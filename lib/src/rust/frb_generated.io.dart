@@ -3,6 +3,7 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
+import 'api/dynamic_ivk.dart';
 import 'api/gift_card_tracking.dart';
 import 'api/keystone.dart';
 import 'api/ledger.dart';
@@ -13,16 +14,12 @@ import 'api/sync.dart';
 import 'api/voting.dart';
 import 'api/voting_session.dart';
 import 'api/wallet.dart';
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi' as ffi;
-
 import 'frb_generated.dart';
 import 'network_privacy.dart';
-
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
-
 import 'third_party/zcash_voting/config.dart';
 import 'third_party/zcash_voting/delegate.dart';
 import 'third_party/zcash_voting/share_policy.dart';
@@ -305,6 +302,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int dco_decode_box_autoadd_i_32(dynamic raw);
 
   @protected
+  PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
+
+  @protected
   ImmediateShareKey dco_decode_box_autoadd_immediate_share_key(dynamic raw);
 
   @protected
@@ -328,6 +328,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PirLayout dco_decode_box_autoadd_pir_layout(dynamic raw);
+
+  @protected
+  ReceiveDeposit dco_decode_box_autoadd_receive_deposit(dynamic raw);
 
   @protected
   ResolvedVotingConfig dco_decode_box_autoadd_resolved_voting_config(
@@ -391,6 +394,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   SubmissionDiagnosticView dco_decode_box_autoadd_submission_diagnostic_view(
     dynamic raw,
   );
+
+  @protected
+  SwapProviderStatus dco_decode_box_autoadd_swap_provider_status(dynamic raw);
 
   @protected
   TransparentDetailsState dco_decode_box_autoadd_transparent_details_state(
@@ -978,6 +984,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int? dco_decode_opt_box_autoadd_i_32(dynamic raw);
 
   @protected
+  PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
+
+  @protected
   ImmediateShareKey? dco_decode_opt_box_autoadd_immediate_share_key(
     dynamic raw,
   );
@@ -1000,6 +1009,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   OrchardMigrationPrivatePlan?
   dco_decode_opt_box_autoadd_orchard_migration_private_plan(dynamic raw);
+
+  @protected
+  ReceiveDeposit? dco_decode_opt_box_autoadd_receive_deposit(dynamic raw);
 
   @protected
   ResolvedVotingConfig? dco_decode_opt_box_autoadd_resolved_voting_config(
@@ -1126,6 +1138,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProposalResult dco_decode_proposal_result(dynamic raw);
+
+  @protected
+  ReceiveDeposit dco_decode_receive_deposit(dynamic raw);
+
+  @protected
+  ReceiveError dco_decode_receive_error(dynamic raw);
 
   @protected
   ResolvedVotingConfig dco_decode_resolved_voting_config(dynamic raw);
@@ -1279,6 +1297,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SupportedVersions dco_decode_supported_versions(dynamic raw);
+
+  @protected
+  SwapAddress dco_decode_swap_address(dynamic raw);
+
+  @protected
+  SwapProviderStatus dco_decode_swap_provider_status(dynamic raw);
 
   @protected
   SyncProgress dco_decode_sync_progress(dynamic raw);
@@ -1726,6 +1750,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int sse_decode_box_autoadd_i_32(SseDeserializer deserializer);
 
   @protected
+  PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
+
+  @protected
   ImmediateShareKey sse_decode_box_autoadd_immediate_share_key(
     SseDeserializer deserializer,
   );
@@ -1759,6 +1786,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PirLayout sse_decode_box_autoadd_pir_layout(SseDeserializer deserializer);
+
+  @protected
+  ReceiveDeposit sse_decode_box_autoadd_receive_deposit(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ResolvedVotingConfig sse_decode_box_autoadd_resolved_voting_config(
@@ -1836,6 +1868,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SubmissionDiagnosticView sse_decode_box_autoadd_submission_diagnostic_view(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SwapProviderStatus sse_decode_box_autoadd_swap_provider_status(
     SseDeserializer deserializer,
   );
 
@@ -2587,6 +2624,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int? sse_decode_opt_box_autoadd_i_32(SseDeserializer deserializer);
 
   @protected
+  PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
+
+  @protected
   ImmediateShareKey? sse_decode_opt_box_autoadd_immediate_share_key(
     SseDeserializer deserializer,
   );
@@ -2615,6 +2655,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   OrchardMigrationPrivatePlan?
   sse_decode_opt_box_autoadd_orchard_migration_private_plan(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ReceiveDeposit? sse_decode_opt_box_autoadd_receive_deposit(
     SseDeserializer deserializer,
   );
 
@@ -2769,6 +2814,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProposalResult sse_decode_proposal_result(SseDeserializer deserializer);
+
+  @protected
+  ReceiveDeposit sse_decode_receive_deposit(SseDeserializer deserializer);
+
+  @protected
+  ReceiveError sse_decode_receive_error(SseDeserializer deserializer);
 
   @protected
   ResolvedVotingConfig sse_decode_resolved_voting_config(
@@ -2970,6 +3021,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SupportedVersions sse_decode_supported_versions(SseDeserializer deserializer);
+
+  @protected
+  SwapAddress sse_decode_swap_address(SseDeserializer deserializer);
+
+  @protected
+  SwapProviderStatus sse_decode_swap_provider_status(
+    SseDeserializer deserializer,
+  );
 
   @protected
   SyncProgress sse_decode_sync_progress(SseDeserializer deserializer);
@@ -3527,6 +3586,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_i_64(
+    PlatformInt64 self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_immediate_share_key(
     ImmediateShareKey self,
     SseSerializer serializer,
@@ -3565,6 +3630,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_pir_layout(
     PirLayout self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_receive_deposit(
+    ReceiveDeposit self,
     SseSerializer serializer,
   );
 
@@ -3655,6 +3726,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_submission_diagnostic_view(
     SubmissionDiagnosticView self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_swap_provider_status(
+    SwapProviderStatus self,
     SseSerializer serializer,
   );
 
@@ -4565,6 +4642,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_box_autoadd_i_32(int? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_i_64(
+    PlatformInt64? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_immediate_share_key(
     ImmediateShareKey? self,
     SseSerializer serializer,
@@ -4597,6 +4680,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_orchard_migration_private_plan(
     OrchardMigrationPrivatePlan? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_receive_deposit(
+    ReceiveDeposit? self,
     SseSerializer serializer,
   );
 
@@ -4773,6 +4862,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     ProposalResult self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_receive_deposit(
+    ReceiveDeposit self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_receive_error(ReceiveError self, SseSerializer serializer);
 
   @protected
   void sse_encode_resolved_voting_config(
@@ -5014,6 +5112,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_supported_versions(
     SupportedVersions self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_swap_address(SwapAddress self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_swap_provider_status(
+    SwapProviderStatus self,
     SseSerializer serializer,
   );
 
