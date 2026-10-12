@@ -5,7 +5,7 @@ import 'package:zcash_wallet/src/features/ledger/services/ledger_operation_lifec
 import 'package:zcash_wallet/src/features/swap/domain/swap_contract.dart';
 import 'package:zcash_wallet/src/features/swap/integrations/near_intents/near_intents_one_click_swap_adapter.dart';
 import 'package:zcash_wallet/src/features/swap/providers/swap_receive_reservation_service.dart';
-import 'package:zcash_wallet/src/rust/api/dynamic_ivk.dart' as api;
+import 'package:zcash_wallet/src/rust/api/one_time_ivk.dart' as api;
 
 void main() {
   late _Store store;

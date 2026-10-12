@@ -10,7 +10,7 @@ import '../core/storage/linux_keyring_coordinator.dart';
 import '../core/storage/wallet_paths.dart';
 import '../core/widgets/app_toast.dart';
 import '../features/migration/services/ironwood_migration_background_credential_store.dart';
-import '../rust/api/dynamic_ivk.dart' as rust_swap;
+import '../rust/api/one_time_ivk.dart' as rust_swap;
 import '../rust/api/sync.dart' as rust_sync;
 import 'account_provider.dart';
 import 'rpc_endpoint_failover_provider.dart';

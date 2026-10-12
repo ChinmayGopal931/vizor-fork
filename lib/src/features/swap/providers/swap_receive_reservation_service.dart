@@ -6,7 +6,7 @@ import '../../../core/storage/wallet_paths.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/rpc_endpoint_failover_provider.dart';
-import '../../../rust/api/dynamic_ivk.dart' as api;
+import '../../../rust/api/one_time_ivk.dart' as api;
 import '../../ledger/services/ledger_operation_lifecycle.dart';
 import '../domain/swap_contract.dart';
 import '../integrations/near_intents/near_intents_one_click_swap_adapter.dart';
@@ -98,10 +98,6 @@ api.SwapProviderStatus _providerStatus(SwapIntentSnapshot snapshot) =>
       swapType: snapshot.providerSwapType,
       refundedAmount: snapshot.refundedAmountBaseUnits,
       amountOut: snapshot.amountOutBaseUnits,
-      deadlineSeconds: switch (snapshot.depositInstruction.deadline) {
-        final deadline? => unixSeconds(deadline),
-        null => null,
-      },
     );
 
 class RustReceiveReservationStore implements ReceiveReservationStore {

@@ -5,7 +5,7 @@ import '../../../providers/receive_address_provider.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/enhance_pir_provider.dart';
 import '../../../providers/rpc_endpoint_failover_provider.dart';
-import '../../../rust/api/dynamic_ivk.dart' show ReceiveError;
+import '../../../rust/api/one_time_ivk.dart' show ReceiveError;
 import '../domain/swap_address_plan.dart';
 import '../domain/swap_contract.dart';
 import 'swap_receive_reservation_service.dart';
