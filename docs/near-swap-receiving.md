@@ -6,9 +6,9 @@ linked through a shared address. Every address is recoverable from the seed. A
 software account is one Vizor derives from a seed, including accounts added from
 another seed; hardware and view-only accounts keep their existing swap addresses.
 
-The addresses come from the wallet library's dynamic IVKs
-(`zcash_client_sqlite::wallet::dynamic_ivk`). Vizor's policy is in
-`rust/src/wallet/dynamic_ivk.rs`, its bridge in `rust/src/api/dynamic_ivk.rs`, and
+The addresses come from the wallet library's one-time IVKs
+(`zcash_client_sqlite::wallet::one_time_ivk`). Vizor's policy is in
+`rust/src/wallet/one_time_ivk.rs`, its bridge in `rust/src/api/one_time_ivk.rs`, and
 the swap flows in `lib/src/features/swap/providers/swap_receive_reservation_service.dart`.
 
 ## Settings
@@ -99,12 +99,13 @@ A seed restore finds swap keys without trial-decrypting history for every index:
 3. Each restored key gets one receiver-directory sweep. The wallet accepts a
    publication at a block it scanned and downloads its filters, which every wallet
    downloads alike, then tests each receiver locally. Only a receiver the paid
-   filter holds is queried over PIR, with the common witness file, and each
-   matching payment's note data comes over Enhance PIR in batches, saved as it
-   arrives. A wallet with nothing to look up makes no PIR query. The wallet
-   authenticates the note and memo with the derived key, checks the inclusion path
-   against its own chain and the spend state against retained history, then stores
-   the note, key, memo, witness and known spend together. Missing evidence leaves
+   filter holds is queried over PIR, with the common witness file. The directory's
+   answer carries each payment's compact note data, and a swap key's notes carry no
+   memo the wallet reads, so no other service is asked. A wallet with nothing to
+   look up makes no PIR query. The wallet authenticates the note with the derived
+   key, checks the inclusion path against its own chain and the spend state against
+   retained history, then stores the note, key, witness and known spend together.
+   Missing evidence leaves
    a candidate pending without crediting balance; an answer that fails a check is
    asked for again.
 4. A key the recent filter holds, because NEAR was given its address in the last
@@ -113,7 +114,7 @@ A seed restore finds swap keys without trial-decrypting history for every index:
    trusts the recent filter only while it is current, NEAR's feed having been read
    within the last fifteen minutes, and covers the whole day; otherwise every
    restored key keeps scanning for 24 hours. Paid incoming indices extend
-   the lookahead, and the new keys are swept too. A key the seen filter holds,
+   the lookahead, and a later run sweeps the new keys. A key the seen filter holds,
    because NEAR was ever given its address, is marked quoted, so this device does not
    hand out the old device's addresses again.
 5. Once memos, lookahead, sweeps and candidates are resolved, old unrelated spend
@@ -126,9 +127,11 @@ tracked, as with any note, but once its inclusion is checked its index is marked
 used and counts toward that window.
 
 Sweeps resume after interruption without repeating finished lookups. Failed
-lookups back off from one minute to twelve hours, as does every due sweep when the
-directory cannot be reached. One recovery run takes at most three minutes and starts
-after sync reports completion, so sends never wait for it; none of these fails
+lookups back off from one minute to twelve hours. A directory that cannot be
+reached or used fails a run before any key is leased, so the next sync tries
+again. One recovery run sweeps at most one batch of due keys per software account,
+within three minutes, as the last follow-up after sync reports completion, so sends
+never wait for it; background preparation syncs skip it. None of these fails
 ordinary sync or makes recovery appear complete. Rewinds below a sweep
 reopen it. If an included candidate needs pruned spend history, the library
 replays the account's public Ironwood recovery interval once.
@@ -169,14 +172,12 @@ Installations of the same seed do not share pending reservations.
 
 ## Services
 
-Swap recovery uses the configured Enhance endpoint
-(`https://enhance-pir.valargroup.dev` unless `VIZOR_ENHANCE_PIR_URL` overrides it)
-and the receiver directory (`https://receiver-pir.valargroup.dev` unless
-`VIZOR_RECEIVER_PIR_URL` overrides it). Both use the
-route-aware HTTPS transport of ordinary Enhance PIR, honoring Tor and cancellation,
+Swap recovery uses the receiver directory (`https://receiver-pir.valargroup.dev`;
+in a debug build, `VIZOR_RECEIVER_PIR_URL` overrides it). It uses the route-aware
+HTTPS transport of Vizor's other private services, honoring Tor and cancellation,
 with bounded requests, no redirects and no direct or public fallback. Receiver
-discovery and its note data always use PIR, whatever the Private queries setting;
-ordinary transaction and memo retrieval follows that setting.
+discovery always uses PIR, whatever the Private queries setting; ordinary
+transaction and memo retrieval follows that setting.
 
 A publication must commit to mainnet's genesis, cover history from Ironwood
 activation, and end within 100 blocks of the wallet's scanned tip. The directory
@@ -203,7 +204,7 @@ The shared library covers derivation, funding records, scanning, closing, restor
 sweeps and reservations. In this repository:
 
 ```sh
-cargo test --manifest-path rust/Cargo.toml --lib -- swap dynamic_ivk
+cargo test --manifest-path rust/Cargo.toml --lib -- swap one_time_ivk
 fvm flutter test test/features/swap
 ```
 
