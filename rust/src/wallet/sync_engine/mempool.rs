@@ -1499,7 +1499,7 @@ mod tests {
              INSERT INTO scan_queue(block_range_start,block_range_end,priority) VALUES(100,111,10);",
         )
         .unwrap();
-        crate::wallet::dynamic_ivk::maintain_recovery(&mut db).unwrap();
+        crate::wallet::one_time_ivk::maintain_recovery(&mut db).unwrap();
         drop(db);
         // The receiver of the incoming key whose big-endian index is `index_hex`.
         let receiver = |index_hex: &str| -> orchard::Address {

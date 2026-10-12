@@ -21,7 +21,7 @@ Future<SwapAddress> reserveSwapAddress({
   required String accountUuid,
   required bool incoming,
   required BigInt liveTip,
-}) => RustLib.instance.api.crateApiDynamicIvkReserveSwapAddress(
+}) => RustLib.instance.api.crateApiOneTimeIvkReserveSwapAddress(
   dbPath: dbPath,
   networkName: networkName,
   accountUuid: accountUuid,
@@ -39,7 +39,7 @@ Future<String> beginReceiveQuote({
   required String accountUuid,
   required BigInt reservationIndex,
   required PlatformInt64 deadlineSeconds,
-}) => RustLib.instance.api.crateApiDynamicIvkBeginReceiveQuote(
+}) => RustLib.instance.api.crateApiOneTimeIvkBeginReceiveQuote(
   dbPath: dbPath,
   networkName: networkName,
   accountUuid: accountUuid,
@@ -57,7 +57,7 @@ Future<void> finishReceiveQuote({
   required String accountUuid,
   required String requestId,
   ReceiveDeposit? accepted,
-}) => RustLib.instance.api.crateApiDynamicIvkFinishReceiveQuote(
+}) => RustLib.instance.api.crateApiOneTimeIvkFinishReceiveQuote(
   dbPath: dbPath,
   networkName: networkName,
   accountUuid: accountUuid,
@@ -72,7 +72,7 @@ Future<ReceiveDeposit> startReceiveQuote({
   required String networkName,
   required String accountUuid,
   required String requestId,
-}) => RustLib.instance.api.crateApiDynamicIvkStartReceiveQuote(
+}) => RustLib.instance.api.crateApiOneTimeIvkStartReceiveQuote(
   dbPath: dbPath,
   networkName: networkName,
   accountUuid: accountUuid,
@@ -88,7 +88,7 @@ Future<void> recordSwapRefundQuote({
   required BigInt refundIndex,
   required String depositAddress,
   required PlatformInt64 deadlineSeconds,
-}) => RustLib.instance.api.crateApiDynamicIvkRecordSwapRefundQuote(
+}) => RustLib.instance.api.crateApiOneTimeIvkRecordSwapRefundQuote(
   dbPath: dbPath,
   networkName: networkName,
   accountUuid: accountUuid,
@@ -114,7 +114,7 @@ Future<void> observeSwapStatus({
   required SwapProviderStatus status,
   required bool funded,
   required PlatformInt64 checkedAtSeconds,
-}) => RustLib.instance.api.crateApiDynamicIvkObserveSwapStatus(
+}) => RustLib.instance.api.crateApiOneTimeIvkObserveSwapStatus(
   dbPath: dbPath,
   networkName: networkName,
   accountUuid: accountUuid,
@@ -132,7 +132,7 @@ Future<void> observeSwapStatus({
 Future<void> recheckSwapHistory({
   required String dbPath,
   required String networkName,
-}) => RustLib.instance.api.crateApiDynamicIvkRecheckSwapHistory(
+}) => RustLib.instance.api.crateApiOneTimeIvkRecheckSwapHistory(
   dbPath: dbPath,
   networkName: networkName,
 );

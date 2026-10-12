@@ -1,9 +1,9 @@
-//! Private NEAR swap addresses over the wallet's dynamic IVKs: reservations, quote
+//! Private NEAR swap addresses over the wallet's one-time IVKs: reservations, quote
 //! records, provider statuses and history rechecks. Provider polling stays in Dart;
 //! allocation is durable in Rust.
 use super::sync::parse_network_and_migrate;
 use crate::wallet::db::{open_wallet_db_with_timeout, with_wallet_db_write_lock};
-use crate::wallet::dynamic_ivk::{self, with_db};
+use crate::wallet::one_time_ivk::{self, with_db};
 use crate::wallet::{db::WALLET_DB_BUSY_TIMEOUT, keys};
 use zakura_near_intents::near_observation;
 use zakura_one_time_ivk::{swap::Observation, Purpose};
@@ -99,8 +99,8 @@ pub fn reserve_swap_address(
     live_tip: u64,
 ) -> Result<SwapAddress, ReceiveError> {
     let network = parse_network_and_migrate(&db_path, &network_name)?;
-    dynamic_ivk::require_new_address(network)?;
-    let tip = dynamic_ivk::network_tip(live_tip)?;
+    one_time_ivk::require_new_address(network)?;
+    let tip = one_time_ivk::network_tip(live_tip)?;
     let key = if incoming {
         // Fetched before taking the wallet lock, so a slow directory never holds it.
         let seen = tokio::runtime::Runtime::new()
@@ -116,24 +116,24 @@ pub fn reserve_swap_address(
             contains: &contains,
         });
         with_db(&db_path, network, &account_uuid, |db, a| {
-            dynamic_ivk::require_software_account(db, a)?;
+            one_time_ivk::require_software_account(db, a)?;
             Ok::<_, ReceiveError>(db.prepare_receive_reservation(
                 a,
-                dynamic_ivk::now()?,
+                one_time_ivk::now()?,
                 tip,
                 view.as_ref(),
             )??)
         })?
     } else {
         with_db(&db_path, network, &account_uuid, |db, a| {
-            dynamic_ivk::require_software_account(db, a)?;
+            one_time_ivk::require_software_account(db, a)?;
             // Refund issuance does not download the seen set, so it skips no index.
             Ok::<_, ReceiveError>(db.reserve_refund_key(a, tip, None)??)
         })?
     };
     let index = key.key_id().index();
     Ok(SwapAddress {
-        address: dynamic_ivk::encode_address(&key, network)?,
+        address: one_time_ivk::encode_address(&key, network)?,
         refund_index: (!incoming).then_some(index),
         reservation_index: incoming.then_some(index),
     })
@@ -152,12 +152,12 @@ pub fn begin_receive_quote(
 ) -> Result<String, ReceiveError> {
     let network = parse_network_and_migrate(&db_path, &network_name)?;
     with_db(&db_path, network, &account_uuid, |db, a| {
-        dynamic_ivk::require_new_address(network)?;
+        one_time_ivk::require_new_address(network)?;
         Ok(db.begin_receive_operation(
             a,
             reservation_index,
             deadline_seconds,
-            dynamic_ivk::now()?,
+            one_time_ivk::now()?,
         )??)
     })
 }
@@ -225,7 +225,7 @@ pub fn record_swap_refund_quote(
             refund_index,
             &deposit_address,
             deadline_seconds,
-            dynamic_ivk::now()?,
+            one_time_ivk::now()?,
         )?)
     })
 }
@@ -249,7 +249,7 @@ pub fn observe_swap_status(
     checked_at_seconds: i64,
 ) -> Result<(), ReceiveError> {
     let network = parse_network_and_migrate(&db_path, &network_name)?;
-    if !dynamic_ivk::supported(network) {
+    if !one_time_ivk::supported(network) {
         return Ok(());
     }
     let purpose = if incoming {
@@ -257,7 +257,7 @@ pub fn observe_swap_status(
     } else {
         Purpose::Refund
     };
-    let observation = near_observation(purpose, &dynamic_ivk::near_status(&status));
+    let observation = near_observation(purpose, &one_time_ivk::near_status(&status));
     let observation = Observation {
         funded: observation.funded || funded,
         ..observation
@@ -284,12 +284,12 @@ pub fn recheck_swap_history(db_path: String, network_name: String) -> Result<(),
     }
     let network = parse_network_and_migrate(&db_path, &network_name)?;
     // Only supported networks run restore sweeps.
-    if !dynamic_ivk::supported(network) {
+    if !one_time_ivk::supported(network) {
         return Ok(());
     }
-    with_wallet_db_write_lock("dynamic_ivk.recheck", || {
+    with_wallet_db_write_lock("one_time_ivk.recheck", || {
         let mut db = open_wallet_db_with_timeout(&db_path, network, WALLET_DB_BUSY_TIMEOUT)?;
-        for account in dynamic_ivk::software_accounts(&db)? {
+        for account in one_time_ivk::software_accounts(&db)? {
             db.recheck_one_time_key_history(account)?;
         }
         Ok(())

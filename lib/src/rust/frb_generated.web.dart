@@ -6,11 +6,11 @@
 // Static analysis wrongly picks the IO variant, thus ignore this
 // ignore_for_file: argument_type_not_assignable
 
-import 'api/dynamic_ivk.dart';
 import 'api/gift_card_tracking.dart';
 import 'api/keystone.dart';
 import 'api/ledger.dart';
 import 'api/network_privacy.dart';
+import 'api/one_time_ivk.dart';
 import 'api/secret.dart';
 import 'api/simple.dart';
 import 'api/sync.dart';

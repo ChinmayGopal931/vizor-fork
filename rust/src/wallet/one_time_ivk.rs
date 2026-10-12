@@ -1,5 +1,5 @@
-//! Thin application policy over the wallet library's dynamic IVKs (see
-//! `zcash_client_sqlite::wallet::dynamic_ivk`), which Vizor uses for private NEAR swap
+//! Thin application policy over the wallet library's one-time IVKs (see
+//! `zcash_client_sqlite::wallet::one_time_ivk`), which Vizor uses for private NEAR swap
 //! addresses.
 
 use zakura_near_intents::NearStatus;
@@ -20,7 +20,7 @@ use super::{
     sync_engine::enhancement::EnhancementPolicy,
 };
 
-/// Whether `network` runs dynamic IVKs at all: wherever Private queries could (see
+/// Whether `network` runs one-time IVKs at all: wherever Private queries could (see
 /// [`EnhancementPolicy`]), whatever the switches say. Restore sweeps, key maintenance
 /// and provider statuses need nothing more; new addresses do (see
 /// [`require_new_address`]).
@@ -50,7 +50,7 @@ pub(crate) fn network_tip(live_tip: u64) -> Result<BlockHeight, String> {
 
 /// Borrows a bridged provider status for the library. Unparseable amounts are
 /// treated as unreported.
-pub(crate) fn near_status(status: &crate::api::dynamic_ivk::SwapProviderStatus) -> NearStatus<'_> {
+pub(crate) fn near_status(status: &crate::api::one_time_ivk::SwapProviderStatus) -> NearStatus<'_> {
     let amount = |value: &Option<String>| {
         value
             .as_deref()
@@ -89,7 +89,7 @@ pub(crate) fn require_software_account(
     Ok(())
 }
 
-/// The software accounts that can spend with dynamic keys.
+/// The software accounts that can spend with one-time keys.
 pub(crate) fn software_accounts(db: &WalletDatabase) -> Result<Vec<AccountUuid>, String> {
     let mut accounts = Vec::new();
     for account in db.get_account_ids().map_err(|e| e.to_string())? {
@@ -126,14 +126,14 @@ pub(crate) fn with_db<T, E: From<String>>(
     uuid: &str,
     action: impl FnOnce(&mut WalletDatabase, AccountUuid) -> Result<T, E>,
 ) -> Result<T, E> {
-    with_wallet_db_write_lock("dynamic_ivk", || {
+    with_wallet_db_write_lock("one_time_ivk", || {
         let mut db = open_wallet_db_with_timeout(path, network, WALLET_DB_BUSY_TIMEOUT)?;
         let account = parse_account_uuid(uuid)?;
         action(&mut db, account)
     })
 }
 
-/// Keeps every software account's dynamic key recovery current, under the wallet write
+/// Keeps every software account's one-time key recovery current, under the wallet write
 /// lock, when sync starts and at the tip. Sync calls it only where [`supported`]; it runs
 /// with both privacy switches off, since only new address issuance is opt-in.
 pub(crate) fn maintain_recovery(db: &mut WalletDatabase) -> Result<(), String> {
@@ -144,7 +144,7 @@ pub(crate) fn maintain_recovery(db: &mut WalletDatabase) -> Result<(), String> {
     Ok(())
 }
 
-/// Stops scanning finished dynamic keys, under the wallet write lock, once sync has
+/// Stops scanning finished one-time keys, under the wallet write lock, once sync has
 /// scanned to `tip`, the chain tip it revalidated this session. Sync calls it only where
 /// [`supported`].
 pub(crate) fn close_finished_keys(db: &mut WalletDatabase, tip: BlockHeight) -> Result<(), String> {
@@ -221,7 +221,7 @@ mod tests {
         assert!(error.contains("Enable Private queries"), "{error}");
     }
 
-    /// Dynamic IVKs cover the first account and accounts added from another seed,
+    /// One-time IVKs cover the first account and accounts added from another seed,
     /// whose swap notes Vizor can spend, but not hardware or view-only accounts.
     #[test]
     fn added_seed_accounts_are_software_but_hardware_and_view_only_accounts_are_not() {

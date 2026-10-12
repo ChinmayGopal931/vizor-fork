@@ -84,10 +84,10 @@ fn error(e: impl std::fmt::Display) -> String {
 
 /// The receiver directory's swap provider seen sets, which issuance checks (see
 /// `prepare_receive_reservation`), over the restore sweep's transport. `None` where
-/// dynamic IVKs are not `supported`, or when the directory does not answer within
+/// one-time IVKs are not `supported`, or when the directory does not answer within
 /// [`SEEN_BUDGET`]; issuance then counts every quote as seen.
 pub(crate) async fn fetch_seen(network: WalletNetwork) -> Option<zakura_pir_receiver::Seen> {
-    if !crate::wallet::dynamic_ivk::supported(network) {
+    if !crate::wallet::one_time_ivk::supported(network) {
         return None;
     }
     let should_exit = || false;
@@ -109,7 +109,7 @@ pub(crate) async fn fetch_seen(network: WalletNetwork) -> Option<zakura_pir_rece
 
 /// Runs pending restore sweeps for at most [`RUN_BUDGET`], returning whether one
 /// finished. Sync calls it after reporting completion, so sends never wait for the
-/// directory, and only where dynamic IVKs are `supported`. Failures are logged and
+/// directory, and only where one-time IVKs are `supported`. Failures are logged and
 /// retried on a later sync.
 pub(super) async fn run(
     db: &mut WalletDatabase,
@@ -161,9 +161,9 @@ async fn run_inner(
     }
     let transport = SwapTransport::new(should_exit);
     let origin = receiver_origin();
-    let now = crate::wallet::dynamic_ivk::now()?;
+    let now = crate::wallet::one_time_ivk::now()?;
     let mut finished = false;
-    for account in crate::wallet::dynamic_ivk::software_accounts(db)? {
+    for account in crate::wallet::one_time_ivk::software_accounts(db)? {
         let swept = zakura_pir_receiver::sweep(
             db,
             &network,

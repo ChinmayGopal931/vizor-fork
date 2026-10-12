@@ -3,11 +3,11 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
-import 'api/dynamic_ivk.dart';
 import 'api/gift_card_tracking.dart';
 import 'api/keystone.dart';
 import 'api/ledger.dart';
 import 'api/network_privacy.dart';
+import 'api/one_time_ivk.dart';
 import 'api/secret.dart';
 import 'api/simple.dart';
 import 'api/sync.dart';
@@ -83,7 +83,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => 159422668;
+  int get rustContentHash => -1367102097;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -180,7 +180,7 @@ abstract class RustLibApi extends BaseApi {
 
   void crateApiNetworkPrivacyBeginNetworkPrivacyEnable();
 
-  Future<String> crateApiDynamicIvkBeginReceiveQuote({
+  Future<String> crateApiOneTimeIvkBeginReceiveQuote({
     required String dbPath,
     required String networkName,
     required String accountUuid,
@@ -574,7 +574,7 @@ abstract class RustLibApi extends BaseApi {
     required int zip32AccountIndex,
   });
 
-  Future<void> crateApiDynamicIvkFinishReceiveQuote({
+  Future<void> crateApiOneTimeIvkFinishReceiveQuote({
     required String dbPath,
     required String networkName,
     required String accountUuid,
@@ -1089,7 +1089,7 @@ abstract class RustLibApi extends BaseApi {
 
   List<String> crateApiWalletMnemonicWordList();
 
-  Future<void> crateApiDynamicIvkObserveSwapStatus({
+  Future<void> crateApiOneTimeIvkObserveSwapStatus({
     required String dbPath,
     required String networkName,
     required String accountUuid,
@@ -1251,7 +1251,7 @@ abstract class RustLibApi extends BaseApi {
     required String network,
   });
 
-  Future<void> crateApiDynamicIvkRecheckSwapHistory({
+  Future<void> crateApiOneTimeIvkRecheckSwapHistory({
     required String dbPath,
     required String networkName,
   });
@@ -1275,7 +1275,7 @@ abstract class RustLibApi extends BaseApi {
     required bool privateQueries,
   });
 
-  Future<void> crateApiDynamicIvkRecordSwapRefundQuote({
+  Future<void> crateApiOneTimeIvkRecordSwapRefundQuote({
     required String dbPath,
     required String networkName,
     required String accountUuid,
@@ -1302,7 +1302,7 @@ abstract class RustLibApi extends BaseApi {
     required String accountUuid,
   });
 
-  Future<SwapAddress> crateApiDynamicIvkReserveSwapAddress({
+  Future<SwapAddress> crateApiOneTimeIvkReserveSwapAddress({
     required String dbPath,
     required String networkName,
     required String accountUuid,
@@ -1467,7 +1467,7 @@ abstract class RustLibApi extends BaseApi {
     required String lightwalletdUrl,
   });
 
-  Future<ReceiveDeposit> crateApiDynamicIvkStartReceiveQuote({
+  Future<ReceiveDeposit> crateApiOneTimeIvkStartReceiveQuote({
     required String dbPath,
     required String networkName,
     required String accountUuid,
@@ -2249,7 +2249,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<String> crateApiDynamicIvkBeginReceiveQuote({
+  Future<String> crateApiOneTimeIvkBeginReceiveQuote({
     required String dbPath,
     required String networkName,
     required String accountUuid,
@@ -2276,7 +2276,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_String,
           decodeErrorData: sse_decode_receive_error,
         ),
-        constMeta: kCrateApiDynamicIvkBeginReceiveQuoteConstMeta,
+        constMeta: kCrateApiOneTimeIvkBeginReceiveQuoteConstMeta,
         argValues: [
           dbPath,
           networkName,
@@ -2289,7 +2289,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiDynamicIvkBeginReceiveQuoteConstMeta =>
+  TaskConstMeta get kCrateApiOneTimeIvkBeginReceiveQuoteConstMeta =>
       const TaskConstMeta(
         debugName: "begin_receive_quote",
         argNames: [
@@ -4884,7 +4884,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<void> crateApiDynamicIvkFinishReceiveQuote({
+  Future<void> crateApiOneTimeIvkFinishReceiveQuote({
     required String dbPath,
     required String networkName,
     required String accountUuid,
@@ -4911,14 +4911,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_receive_error,
         ),
-        constMeta: kCrateApiDynamicIvkFinishReceiveQuoteConstMeta,
+        constMeta: kCrateApiOneTimeIvkFinishReceiveQuoteConstMeta,
         argValues: [dbPath, networkName, accountUuid, requestId, accepted],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiDynamicIvkFinishReceiveQuoteConstMeta =>
+  TaskConstMeta get kCrateApiOneTimeIvkFinishReceiveQuoteConstMeta =>
       const TaskConstMeta(
         debugName: "finish_receive_quote",
         argNames: [
@@ -8356,7 +8356,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "mnemonic_word_list", argNames: []);
 
   @override
-  Future<void> crateApiDynamicIvkObserveSwapStatus({
+  Future<void> crateApiOneTimeIvkObserveSwapStatus({
     required String dbPath,
     required String networkName,
     required String accountUuid,
@@ -8391,7 +8391,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_receive_error,
         ),
-        constMeta: kCrateApiDynamicIvkObserveSwapStatusConstMeta,
+        constMeta: kCrateApiOneTimeIvkObserveSwapStatusConstMeta,
         argValues: [
           dbPath,
           networkName,
@@ -8408,7 +8408,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiDynamicIvkObserveSwapStatusConstMeta =>
+  TaskConstMeta get kCrateApiOneTimeIvkObserveSwapStatusConstMeta =>
       const TaskConstMeta(
         debugName: "observe_swap_status",
         argNames: [
@@ -9406,7 +9406,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<void> crateApiDynamicIvkRecheckSwapHistory({
+  Future<void> crateApiOneTimeIvkRecheckSwapHistory({
     required String dbPath,
     required String networkName,
   }) {
@@ -9427,14 +9427,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_receive_error,
         ),
-        constMeta: kCrateApiDynamicIvkRecheckSwapHistoryConstMeta,
+        constMeta: kCrateApiOneTimeIvkRecheckSwapHistoryConstMeta,
         argValues: [dbPath, networkName],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiDynamicIvkRecheckSwapHistoryConstMeta =>
+  TaskConstMeta get kCrateApiOneTimeIvkRecheckSwapHistoryConstMeta =>
       const TaskConstMeta(
         debugName: "recheck_swap_history",
         argNames: ["dbPath", "networkName"],
@@ -9559,7 +9559,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<void> crateApiDynamicIvkRecordSwapRefundQuote({
+  Future<void> crateApiOneTimeIvkRecordSwapRefundQuote({
     required String dbPath,
     required String networkName,
     required String accountUuid,
@@ -9588,7 +9588,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_receive_error,
         ),
-        constMeta: kCrateApiDynamicIvkRecordSwapRefundQuoteConstMeta,
+        constMeta: kCrateApiOneTimeIvkRecordSwapRefundQuoteConstMeta,
         argValues: [
           dbPath,
           networkName,
@@ -9602,7 +9602,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiDynamicIvkRecordSwapRefundQuoteConstMeta =>
+  TaskConstMeta get kCrateApiOneTimeIvkRecordSwapRefundQuoteConstMeta =>
       const TaskConstMeta(
         debugName: "record_swap_refund_quote",
         argNames: [
@@ -9734,7 +9734,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<SwapAddress> crateApiDynamicIvkReserveSwapAddress({
+  Future<SwapAddress> crateApiOneTimeIvkReserveSwapAddress({
     required String dbPath,
     required String networkName,
     required String accountUuid,
@@ -9761,14 +9761,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_swap_address,
           decodeErrorData: sse_decode_receive_error,
         ),
-        constMeta: kCrateApiDynamicIvkReserveSwapAddressConstMeta,
+        constMeta: kCrateApiOneTimeIvkReserveSwapAddressConstMeta,
         argValues: [dbPath, networkName, accountUuid, incoming, liveTip],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiDynamicIvkReserveSwapAddressConstMeta =>
+  TaskConstMeta get kCrateApiOneTimeIvkReserveSwapAddressConstMeta =>
       const TaskConstMeta(
         debugName: "reserve_swap_address",
         argNames: [
@@ -10953,7 +10953,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<ReceiveDeposit> crateApiDynamicIvkStartReceiveQuote({
+  Future<ReceiveDeposit> crateApiOneTimeIvkStartReceiveQuote({
     required String dbPath,
     required String networkName,
     required String accountUuid,
@@ -10978,14 +10978,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_receive_deposit,
           decodeErrorData: sse_decode_receive_error,
         ),
-        constMeta: kCrateApiDynamicIvkStartReceiveQuoteConstMeta,
+        constMeta: kCrateApiOneTimeIvkStartReceiveQuoteConstMeta,
         argValues: [dbPath, networkName, accountUuid, requestId],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiDynamicIvkStartReceiveQuoteConstMeta =>
+  TaskConstMeta get kCrateApiOneTimeIvkStartReceiveQuoteConstMeta =>
       const TaskConstMeta(
         debugName: "start_receive_quote",
         argNames: ["dbPath", "networkName", "accountUuid", "requestId"],

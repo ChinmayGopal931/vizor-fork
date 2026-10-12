@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 159422668;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1367102097;
 
 // Section: executor
 
@@ -770,7 +770,7 @@ fn wire__crate__api__network_privacy__begin_network_privacy_enable_impl(
         },
     )
 }
-fn wire__crate__api__dynamic_ivk__begin_receive_quote_impl(
+fn wire__crate__api__one_time_ivk__begin_receive_quote_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -799,8 +799,8 @@ fn wire__crate__api__dynamic_ivk__begin_receive_quote_impl(
             let api_deadline_seconds = <i64>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, crate::api::dynamic_ivk::ReceiveError>((move || {
-                    let output_ok = crate::api::dynamic_ivk::begin_receive_quote(
+                transform_result_sse::<_, crate::api::one_time_ivk::ReceiveError>((move || {
+                    let output_ok = crate::api::one_time_ivk::begin_receive_quote(
                         api_db_path,
                         api_network_name,
                         api_account_uuid,
@@ -3290,7 +3290,7 @@ fn wire__crate__api__wallet__find_software_account_for_mnemonic_impl(
         },
     )
 }
-fn wire__crate__api__dynamic_ivk__finish_receive_quote_impl(
+fn wire__crate__api__one_time_ivk__finish_receive_quote_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -3317,11 +3317,11 @@ fn wire__crate__api__dynamic_ivk__finish_receive_quote_impl(
             let api_account_uuid = <String>::sse_decode(&mut deserializer);
             let api_request_id = <String>::sse_decode(&mut deserializer);
             let api_accepted =
-                <Option<crate::api::dynamic_ivk::ReceiveDeposit>>::sse_decode(&mut deserializer);
+                <Option<crate::api::one_time_ivk::ReceiveDeposit>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, crate::api::dynamic_ivk::ReceiveError>((move || {
-                    let output_ok = crate::api::dynamic_ivk::finish_receive_quote(
+                transform_result_sse::<_, crate::api::one_time_ivk::ReceiveError>((move || {
+                    let output_ok = crate::api::one_time_ivk::finish_receive_quote(
                         api_db_path,
                         api_network_name,
                         api_account_uuid,
@@ -6654,7 +6654,7 @@ fn wire__crate__api__wallet__mnemonic_word_list_impl(
         },
     )
 }
-fn wire__crate__api__dynamic_ivk__observe_swap_status_impl(
+fn wire__crate__api__one_time_ivk__observe_swap_status_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -6683,13 +6683,13 @@ fn wire__crate__api__dynamic_ivk__observe_swap_status_impl(
             let api_deposit_address = <String>::sse_decode(&mut deserializer);
             let api_deposit_memo = <Option<String>>::sse_decode(&mut deserializer);
             let api_status =
-                <crate::api::dynamic_ivk::SwapProviderStatus>::sse_decode(&mut deserializer);
+                <crate::api::one_time_ivk::SwapProviderStatus>::sse_decode(&mut deserializer);
             let api_funded = <bool>::sse_decode(&mut deserializer);
             let api_checked_at_seconds = <i64>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, crate::api::dynamic_ivk::ReceiveError>((move || {
-                    let output_ok = crate::api::dynamic_ivk::observe_swap_status(
+                transform_result_sse::<_, crate::api::one_time_ivk::ReceiveError>((move || {
+                    let output_ok = crate::api::one_time_ivk::observe_swap_status(
                         api_db_path,
                         api_network_name,
                         api_account_uuid,
@@ -7573,7 +7573,7 @@ fn wire__crate__api__sync__read_transparent_policy_impl(
         },
     )
 }
-fn wire__crate__api__dynamic_ivk__recheck_swap_history_impl(
+fn wire__crate__api__one_time_ivk__recheck_swap_history_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -7599,8 +7599,8 @@ fn wire__crate__api__dynamic_ivk__recheck_swap_history_impl(
             let api_network_name = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, crate::api::dynamic_ivk::ReceiveError>((move || {
-                    let output_ok = crate::api::dynamic_ivk::recheck_swap_history(
+                transform_result_sse::<_, crate::api::one_time_ivk::ReceiveError>((move || {
+                    let output_ok = crate::api::one_time_ivk::recheck_swap_history(
                         api_db_path,
                         api_network_name,
                     )?;
@@ -7706,7 +7706,7 @@ fn wire__crate__api__sync__reconcile_transparent_policy_impl(
         },
     )
 }
-fn wire__crate__api__dynamic_ivk__record_swap_refund_quote_impl(
+fn wire__crate__api__one_time_ivk__record_swap_refund_quote_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -7736,8 +7736,8 @@ fn wire__crate__api__dynamic_ivk__record_swap_refund_quote_impl(
             let api_deadline_seconds = <i64>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, crate::api::dynamic_ivk::ReceiveError>((move || {
-                    let output_ok = crate::api::dynamic_ivk::record_swap_refund_quote(
+                transform_result_sse::<_, crate::api::one_time_ivk::ReceiveError>((move || {
+                    let output_ok = crate::api::one_time_ivk::record_swap_refund_quote(
                         api_db_path,
                         api_network_name,
                         api_account_uuid,
@@ -7867,7 +7867,7 @@ fn wire__crate__api__gift_card_tracking__remove_gift_card_observer_impl(
         },
     )
 }
-fn wire__crate__api__dynamic_ivk__reserve_swap_address_impl(
+fn wire__crate__api__one_time_ivk__reserve_swap_address_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -7896,8 +7896,8 @@ fn wire__crate__api__dynamic_ivk__reserve_swap_address_impl(
             let api_live_tip = <u64>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, crate::api::dynamic_ivk::ReceiveError>((move || {
-                    let output_ok = crate::api::dynamic_ivk::reserve_swap_address(
+                transform_result_sse::<_, crate::api::one_time_ivk::ReceiveError>((move || {
+                    let output_ok = crate::api::one_time_ivk::reserve_swap_address(
                         api_db_path,
                         api_network_name,
                         api_account_uuid,
@@ -9069,7 +9069,7 @@ fn wire__crate__api__sync__start_mempool_observer_impl(
         },
     )
 }
-fn wire__crate__api__dynamic_ivk__start_receive_quote_impl(
+fn wire__crate__api__one_time_ivk__start_receive_quote_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -9097,8 +9097,8 @@ fn wire__crate__api__dynamic_ivk__start_receive_quote_impl(
             let api_request_id = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, crate::api::dynamic_ivk::ReceiveError>((move || {
-                    let output_ok = crate::api::dynamic_ivk::start_receive_quote(
+                transform_result_sse::<_, crate::api::one_time_ivk::ReceiveError>((move || {
+                    let output_ok = crate::api::one_time_ivk::start_receive_quote(
                         api_db_path,
                         api_network_name,
                         api_account_uuid,
@@ -13677,11 +13677,11 @@ impl SseDecode for Option<crate::api::sync::OrchardMigrationPrivatePlan> {
     }
 }
 
-impl SseDecode for Option<crate::api::dynamic_ivk::ReceiveDeposit> {
+impl SseDecode for Option<crate::api::one_time_ivk::ReceiveDeposit> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
-            return Some(<crate::api::dynamic_ivk::ReceiveDeposit>::sse_decode(
+            return Some(<crate::api::one_time_ivk::ReceiveDeposit>::sse_decode(
                 deserializer,
             ));
         } else {
@@ -14134,13 +14134,13 @@ impl SseDecode for crate::api::sync::ProposalResult {
     }
 }
 
-impl SseDecode for crate::api::dynamic_ivk::ReceiveDeposit {
+impl SseDecode for crate::api::one_time_ivk::ReceiveDeposit {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_address = <String>::sse_decode(deserializer);
         let mut var_memo = <Option<String>>::sse_decode(deserializer);
         let mut var_deadlineSeconds = <i64>::sse_decode(deserializer);
-        return crate::api::dynamic_ivk::ReceiveDeposit {
+        return crate::api::one_time_ivk::ReceiveDeposit {
             address: var_address,
             memo: var_memo,
             deadline_seconds: var_deadlineSeconds,
@@ -14148,11 +14148,11 @@ impl SseDecode for crate::api::dynamic_ivk::ReceiveDeposit {
     }
 }
 
-impl SseDecode for crate::api::dynamic_ivk::ReceiveError {
+impl SseDecode for crate::api::one_time_ivk::ReceiveError {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_message = <String>::sse_decode(deserializer);
-        return crate::api::dynamic_ivk::ReceiveError {
+        return crate::api::one_time_ivk::ReceiveError {
             message: var_message,
         };
     }
@@ -14999,13 +14999,13 @@ impl SseDecode for zcash_voting::config::SupportedVersions {
     }
 }
 
-impl SseDecode for crate::api::dynamic_ivk::SwapAddress {
+impl SseDecode for crate::api::one_time_ivk::SwapAddress {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_address = <String>::sse_decode(deserializer);
         let mut var_refundIndex = <Option<u64>>::sse_decode(deserializer);
         let mut var_reservationIndex = <Option<u64>>::sse_decode(deserializer);
-        return crate::api::dynamic_ivk::SwapAddress {
+        return crate::api::one_time_ivk::SwapAddress {
             address: var_address,
             refund_index: var_refundIndex,
             reservation_index: var_reservationIndex,
@@ -15013,14 +15013,14 @@ impl SseDecode for crate::api::dynamic_ivk::SwapAddress {
     }
 }
 
-impl SseDecode for crate::api::dynamic_ivk::SwapProviderStatus {
+impl SseDecode for crate::api::one_time_ivk::SwapProviderStatus {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_status = <String>::sse_decode(deserializer);
         let mut var_swapType = <Option<String>>::sse_decode(deserializer);
         let mut var_refundedAmount = <Option<String>>::sse_decode(deserializer);
         let mut var_amountOut = <Option<String>>::sse_decode(deserializer);
-        return crate::api::dynamic_ivk::SwapProviderStatus {
+        return crate::api::one_time_ivk::SwapProviderStatus {
             status: var_status,
             swap_type: var_swapType,
             refunded_amount: var_refundedAmount,
@@ -15658,7 +15658,7 @@ fn pde_ffi_dispatcher_primary_impl(
 12 => wire__crate__api__wallet__add_account_impl(port, ptr, rust_vec_len, data_len),
 13 => wire__crate__api__sync__add_proofs_to_pczt_impl(port, ptr, rust_vec_len, data_len),
 14 => wire__crate__api__wallet__backfill_legacy_hardware_accounts_impl(port, ptr, rust_vec_len, data_len),
-16 => wire__crate__api__dynamic_ivk__begin_receive_quote_impl(port, ptr, rust_vec_len, data_len),
+16 => wire__crate__api__one_time_ivk__begin_receive_quote_impl(port, ptr, rust_vec_len, data_len),
 17 => wire__crate__api__sync__broadcast_due_orchard_migration_transactions_impl(port, ptr, rust_vec_len, data_len),
 18 => wire__crate__api__sync__broadcast_one_due_orchard_migration_transaction_impl(port, ptr, rust_vec_len, data_len),
 19 => wire__crate__api__voting__build_keystone_delegation_requests_impl(port, ptr, rust_vec_len, data_len),
@@ -15716,7 +15716,7 @@ fn pde_ffi_dispatcher_primary_impl(
 75 => wire__crate__api__sync__export_orchard_migration_outbox_impl(port, ptr, rust_vec_len, data_len),
 76 => wire__crate__api__sync__extract_and_broadcast_pczt_impl(port, ptr, rust_vec_len, data_len),
 78 => wire__crate__api__wallet__find_software_account_for_mnemonic_impl(port, ptr, rust_vec_len, data_len),
-79 => wire__crate__api__dynamic_ivk__finish_receive_quote_impl(port, ptr, rust_vec_len, data_len),
+79 => wire__crate__api__one_time_ivk__finish_receive_quote_impl(port, ptr, rust_vec_len, data_len),
 81 => wire__crate__api__wallet__generate_software_account_impl(port, ptr, rust_vec_len, data_len),
 82 => wire__crate__api__voting__generate_voting_hotkey_impl(port, ptr, rust_vec_len, data_len),
 83 => wire__crate__api__wallet__get_account_export_metadata_impl(port, ptr, rust_vec_len, data_len),
@@ -15787,7 +15787,7 @@ fn pde_ffi_dispatcher_primary_impl(
 163 => wire__crate__api__sync__migrate_orchard_to_ironwood_impl(port, ptr, rust_vec_len, data_len),
 164 => wire__crate__api__sync__migrate_orchard_to_ironwood_immediately_impl(port, ptr, rust_vec_len, data_len),
 165 => wire__crate__api__sync__migrate_orchard_to_ironwood_with_macos_stored_mnemonic_impl(port, ptr, rust_vec_len, data_len),
-167 => wire__crate__api__dynamic_ivk__observe_swap_status_impl(port, ptr, rust_vec_len, data_len),
+167 => wire__crate__api__one_time_ivk__observe_swap_status_impl(port, ptr, rust_vec_len, data_len),
 169 => wire__crate__api__keystone__pczt_spend_nullifiers_impl(port, ptr, rust_vec_len, data_len),
 170 => wire__crate__api__voting__precompute_delegation_proof_impl(port, ptr, rust_vec_len, data_len),
 171 => wire__crate__api__voting__precompute_snapshot_bundles_impl(port, ptr, rust_vec_len, data_len),
@@ -15806,14 +15806,14 @@ fn pde_ffi_dispatcher_primary_impl(
 186 => wire__crate__api__sync__put_subtree_roots_impl(port, ptr, rust_vec_len, data_len),
 187 => wire__crate__api__network_privacy__quiesce_network_privacy_direct_requests_impl(port, ptr, rust_vec_len, data_len),
 188 => wire__crate__api__sync__read_transparent_policy_impl(port, ptr, rust_vec_len, data_len),
-189 => wire__crate__api__dynamic_ivk__recheck_swap_history_impl(port, ptr, rust_vec_len, data_len),
+189 => wire__crate__api__one_time_ivk__recheck_swap_history_impl(port, ptr, rust_vec_len, data_len),
 190 => wire__crate__api__sync__reconcile_orchard_migration_outbox_receipt_impl(port, ptr, rust_vec_len, data_len),
 191 => wire__crate__api__sync__reconcile_transparent_policy_impl(port, ptr, rust_vec_len, data_len),
-192 => wire__crate__api__dynamic_ivk__record_swap_refund_quote_impl(port, ptr, rust_vec_len, data_len),
+192 => wire__crate__api__one_time_ivk__record_swap_refund_quote_impl(port, ptr, rust_vec_len, data_len),
 193 => wire__crate__api__sync__redact_pczt_for_signer_impl(port, ptr, rust_vec_len, data_len),
 194 => wire__crate__api__gift_card_tracking__register_gift_card_observer_impl(port, ptr, rust_vec_len, data_len),
 195 => wire__crate__api__gift_card_tracking__remove_gift_card_observer_impl(port, ptr, rust_vec_len, data_len),
-196 => wire__crate__api__dynamic_ivk__reserve_swap_address_impl(port, ptr, rust_vec_len, data_len),
+196 => wire__crate__api__one_time_ivk__reserve_swap_address_impl(port, ptr, rust_vec_len, data_len),
 198 => wire__crate__api__voting__reset_vote_tree_impl(port, ptr, rust_vec_len, data_len),
 199 => wire__crate__api__voting__reset_voting_session_state_impl(port, ptr, rust_vec_len, data_len),
 200 => wire__crate__api__voting__resolve_pir_snapshot_endpoint_impl(port, ptr, rust_vec_len, data_len),
@@ -15836,7 +15836,7 @@ fn pde_ffi_dispatcher_primary_impl(
 224 => wire__crate__api__sync__shutdown_signing_reservations_impl(port, ptr, rust_vec_len, data_len),
 225 => wire__crate__api__sync__start_full_sync_impl(port, ptr, rust_vec_len, data_len),
 226 => wire__crate__api__sync__start_mempool_observer_impl(port, ptr, rust_vec_len, data_len),
-227 => wire__crate__api__dynamic_ivk__start_receive_quote_impl(port, ptr, rust_vec_len, data_len),
+227 => wire__crate__api__one_time_ivk__start_receive_quote_impl(port, ptr, rust_vec_len, data_len),
 228 => wire__crate__api__network_privacy__start_tor_update_relay_impl(port, ptr, rust_vec_len, data_len),
 230 => wire__crate__api__network_privacy__stop_tor_update_relay_impl(port, ptr, rust_vec_len, data_len),
 231 => wire__crate__api__sync__store_and_broadcast_pczts_with_keystone_signatures_for_proposal_impl(port, ptr, rust_vec_len, data_len),
@@ -18862,7 +18862,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::sync::ProposalResult>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::dynamic_ivk::ReceiveDeposit {
+impl flutter_rust_bridge::IntoDart for crate::api::one_time_ivk::ReceiveDeposit {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.address.into_into_dart().into_dart(),
@@ -18873,30 +18873,30 @@ impl flutter_rust_bridge::IntoDart for crate::api::dynamic_ivk::ReceiveDeposit {
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::dynamic_ivk::ReceiveDeposit
+    for crate::api::one_time_ivk::ReceiveDeposit
 {
 }
-impl flutter_rust_bridge::IntoIntoDart<crate::api::dynamic_ivk::ReceiveDeposit>
-    for crate::api::dynamic_ivk::ReceiveDeposit
+impl flutter_rust_bridge::IntoIntoDart<crate::api::one_time_ivk::ReceiveDeposit>
+    for crate::api::one_time_ivk::ReceiveDeposit
 {
-    fn into_into_dart(self) -> crate::api::dynamic_ivk::ReceiveDeposit {
+    fn into_into_dart(self) -> crate::api::one_time_ivk::ReceiveDeposit {
         self
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::dynamic_ivk::ReceiveError {
+impl flutter_rust_bridge::IntoDart for crate::api::one_time_ivk::ReceiveError {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [self.message.into_into_dart().into_dart()].into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::dynamic_ivk::ReceiveError
+    for crate::api::one_time_ivk::ReceiveError
 {
 }
-impl flutter_rust_bridge::IntoIntoDart<crate::api::dynamic_ivk::ReceiveError>
-    for crate::api::dynamic_ivk::ReceiveError
+impl flutter_rust_bridge::IntoIntoDart<crate::api::one_time_ivk::ReceiveError>
+    for crate::api::one_time_ivk::ReceiveError
 {
-    fn into_into_dart(self) -> crate::api::dynamic_ivk::ReceiveError {
+    fn into_into_dart(self) -> crate::api::one_time_ivk::ReceiveError {
         self
     }
 }
@@ -19989,7 +19989,7 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<zcash_voting::config::Supporte
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::dynamic_ivk::SwapAddress {
+impl flutter_rust_bridge::IntoDart for crate::api::one_time_ivk::SwapAddress {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.address.into_into_dart().into_dart(),
@@ -20000,18 +20000,18 @@ impl flutter_rust_bridge::IntoDart for crate::api::dynamic_ivk::SwapAddress {
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::dynamic_ivk::SwapAddress
+    for crate::api::one_time_ivk::SwapAddress
 {
 }
-impl flutter_rust_bridge::IntoIntoDart<crate::api::dynamic_ivk::SwapAddress>
-    for crate::api::dynamic_ivk::SwapAddress
+impl flutter_rust_bridge::IntoIntoDart<crate::api::one_time_ivk::SwapAddress>
+    for crate::api::one_time_ivk::SwapAddress
 {
-    fn into_into_dart(self) -> crate::api::dynamic_ivk::SwapAddress {
+    fn into_into_dart(self) -> crate::api::one_time_ivk::SwapAddress {
         self
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::dynamic_ivk::SwapProviderStatus {
+impl flutter_rust_bridge::IntoDart for crate::api::one_time_ivk::SwapProviderStatus {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.status.into_into_dart().into_dart(),
@@ -20023,13 +20023,13 @@ impl flutter_rust_bridge::IntoDart for crate::api::dynamic_ivk::SwapProviderStat
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::dynamic_ivk::SwapProviderStatus
+    for crate::api::one_time_ivk::SwapProviderStatus
 {
 }
-impl flutter_rust_bridge::IntoIntoDart<crate::api::dynamic_ivk::SwapProviderStatus>
-    for crate::api::dynamic_ivk::SwapProviderStatus
+impl flutter_rust_bridge::IntoIntoDart<crate::api::one_time_ivk::SwapProviderStatus>
+    for crate::api::one_time_ivk::SwapProviderStatus
 {
-    fn into_into_dart(self) -> crate::api::dynamic_ivk::SwapProviderStatus {
+    fn into_into_dart(self) -> crate::api::one_time_ivk::SwapProviderStatus {
         self
     }
 }
@@ -23128,12 +23128,12 @@ impl SseEncode for Option<crate::api::sync::OrchardMigrationPrivatePlan> {
     }
 }
 
-impl SseEncode for Option<crate::api::dynamic_ivk::ReceiveDeposit> {
+impl SseEncode for Option<crate::api::one_time_ivk::ReceiveDeposit> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
-            <crate::api::dynamic_ivk::ReceiveDeposit>::sse_encode(value, serializer);
+            <crate::api::one_time_ivk::ReceiveDeposit>::sse_encode(value, serializer);
         }
     }
 }
@@ -23476,7 +23476,7 @@ impl SseEncode for crate::api::sync::ProposalResult {
     }
 }
 
-impl SseEncode for crate::api::dynamic_ivk::ReceiveDeposit {
+impl SseEncode for crate::api::one_time_ivk::ReceiveDeposit {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.address, serializer);
@@ -23485,7 +23485,7 @@ impl SseEncode for crate::api::dynamic_ivk::ReceiveDeposit {
     }
 }
 
-impl SseEncode for crate::api::dynamic_ivk::ReceiveError {
+impl SseEncode for crate::api::one_time_ivk::ReceiveError {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.message, serializer);
@@ -24138,7 +24138,7 @@ impl SseEncode for zcash_voting::config::SupportedVersions {
     }
 }
 
-impl SseEncode for crate::api::dynamic_ivk::SwapAddress {
+impl SseEncode for crate::api::one_time_ivk::SwapAddress {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.address, serializer);
@@ -24147,7 +24147,7 @@ impl SseEncode for crate::api::dynamic_ivk::SwapAddress {
     }
 }
 
-impl SseEncode for crate::api::dynamic_ivk::SwapProviderStatus {
+impl SseEncode for crate::api::one_time_ivk::SwapProviderStatus {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.status, serializer);

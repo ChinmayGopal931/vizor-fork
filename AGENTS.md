@@ -332,7 +332,7 @@ Flutter + Rust FFI via `flutter_rust_bridge` v2. All Zcash cryptography and sync
 
 ### Multi-Account Model
 
-Single DB (`zcash_wallet.db`) holds multiple accounts from different seeds. Single sync loop decrypts notes for all accounts simultaneously via `scan_cached_blocks_with_one_time_ivks` (uses all UFVKs and open dynamic IVKs). UI shows one "active account" at a time.
+Single DB (`zcash_wallet.db`) holds multiple accounts from different seeds. Single sync loop decrypts notes for all accounts simultaneously via `scan_cached_blocks_with_one_time_ivks` (uses all UFVKs and open one-time IVKs). UI shows one "active account" at a time.
 
 **Account creation strategy** (due to `zcash_client_sqlite` constraints):
 - **First account**: `create_account()` → `AccountSource::Derived`. Uses `init_wallet_db(Some(seed))` so the seed fingerprint is pinned to the DB and future seed-requiring migrations can verify relevance.
@@ -500,8 +500,8 @@ The entire sync loop runs in Rust (`rust/src/wallet/sync_engine.rs`). A single c
 2. Download subtree roots (sapling + orchard, incremental with start_index optimization)
 3. Download compact blocks into memory (in-memory `MemoryBlockSource`, no file I/O)
 4. `scan_cached_blocks_with_one_time_ivks` from memory (100 blocks per batch).
-   Every scan and transaction decryption uses the library's dynamic IVK entry
-   points, since the wallet DB refuses results that skipped its open dynamic
+   Every scan and transaction decryption uses the library's one-time IVK entry
+   points, since the wallet DB refuses results that skipped its open one-time
    IVKs; `rust/clippy.toml` disallows the plain `scan_cached_blocks` and
    `decrypt_and_store_transaction`.
 5. Enhancement: process each work queue separately. Status observations come
