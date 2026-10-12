@@ -13,9 +13,7 @@ pub(super) mod public;
 pub(in crate::wallet::sync_engine) mod queue;
 
 pub(in crate::wallet::sync_engine) use diagnostics::{begin_session, phase};
-pub(in crate::wallet::sync_engine) use private::{
-    enhance_endpoint, EnhancePirRunError, RoutedPayloadEnhancement,
-};
+pub(in crate::wallet::sync_engine) use private::{EnhancePirRunError, RoutedPayloadEnhancement};
 pub(in crate::wallet::sync_engine) use queue::queue_stored_transactions;
 
 pub(super) use coordinator::ProductionEnhancementEffects;

@@ -1128,7 +1128,7 @@ fn swap_funding_shortfall_asks_for_ironwood_funds() {
         )
         .unwrap();
     let refund_index = db
-        .reserve_refund_key(account_id, tip)
+        .reserve_refund_key(account_id, tip, None)
         .unwrap()
         .unwrap()
         .key_id()

@@ -7,9 +7,11 @@ edition = "2021"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-# These receiver and dynamic IVK crates are not published yet.
-zakura-pir-receiver = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "699a4910495ab20da2349c86298c8dd788ea4de7", features = ["wallet"] }
-zakura-dynamic-ivk = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "699a4910495ab20da2349c86298c8dd788ea4de7" }
+# These receiver, one-time IVK and NEAR Intents crates are not published yet.
+# Keep their rev equal to the `[patch.crates-io]` pins below.
+zakura-pir-receiver = { git = "https://github.com/zakura-core/wallet-libraries", rev = "f66b74cdbc10228a5f61a41ae164bd2949092136", features = ["wallet"] }
+zakura-one-time-ivk = { git = "https://github.com/zakura-core/wallet-libraries", rev = "f66b74cdbc10228a5f61a41ae164bd2949092136" }
+zakura-near-intents = { git = "https://github.com/zakura-core/wallet-libraries", rev = "f66b74cdbc10228a5f61a41ae164bd2949092136" }
 zakura-pir-status = { version = "=0.0.1-rc1" }
 zakura-transaction-status = { version = "=0.0.1-rc1" }
 zcash_note_encryption = "0.4"
@@ -125,12 +127,15 @@ features = [
     "tor",
     "sync",
     "pczt",
+    "one-time-ivk",
 ]
 
 [dependencies.zcash_client_sqlite]
 package = "zakura-client-sqlite"
 version = "=0.1.0-rc8"
-features = ["orchard", "transparent-inputs", "unstable", "serde"]
+# Without `one-time-ivk` the library refuses a database holding one-time IVK
+# state, so every build that opens a swap wallet needs it.
+features = ["orchard", "transparent-inputs", "unstable", "serde", "one-time-ivk"]
 
 [dependencies.zcash_voting]
 version = "=5.1.1-rc.3"

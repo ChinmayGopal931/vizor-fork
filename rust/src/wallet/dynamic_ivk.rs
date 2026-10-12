@@ -2,9 +2,11 @@
 //! `zcash_client_sqlite::wallet::dynamic_ivk`), which Vizor uses for private NEAR swap
 //! addresses.
 
-use zakura_dynamic_ivk::lifecycle::NearStatus;
-use zcash_client_backend::data_api::{dynamic_ivk::DynamicIvkWrite as _, Account as _, WalletRead};
-use zcash_client_sqlite::{wallet::dynamic_ivk::DynamicKey, AccountUuid};
+use zakura_near_intents::NearStatus;
+use zcash_client_backend::data_api::{
+    one_time_ivk::restore::OneTimeIvkRestoreWrite as _, Account as _, WalletRead,
+};
+use zcash_client_sqlite::{wallet::one_time_ivk::OneTimeKey, AccountUuid};
 use zcash_keys::address::{Address, UnifiedAddress};
 use zcash_protocol::{consensus::BlockHeight, value::Zatoshis};
 
@@ -60,7 +62,6 @@ pub(crate) fn near_status(status: &crate::api::dynamic_ivk::SwapProviderStatus) 
         swap_type: status.swap_type.as_deref(),
         refunded_amount: amount(&status.refunded_amount),
         amount_out: amount(&status.amount_out),
-        deadline: status.deadline_seconds,
     }
 }
 
@@ -100,7 +101,7 @@ pub(crate) fn software_accounts(db: &WalletDatabase) -> Result<Vec<AccountUuid>,
 }
 
 /// Encodes `key`'s receiver as a unified address with no other receiver.
-pub(crate) fn encode_address(key: &DynamicKey, network: WalletNetwork) -> Result<String, String> {
+pub(crate) fn encode_address(key: &OneTimeKey, network: WalletNetwork) -> Result<String, String> {
     let address = UnifiedAddress::from_receivers(Some(key.receiver()), None, None)
         .ok_or("Invalid swap receiver")?;
     Ok(Address::Unified(address)
@@ -137,7 +138,7 @@ pub(crate) fn with_db<T, E: From<String>>(
 /// with both privacy switches off, since only new address issuance is opt-in.
 pub(crate) fn maintain_recovery(db: &mut WalletDatabase) -> Result<(), String> {
     for account in software_accounts(db)? {
-        db.maintain_dynamic_ivks(account)
+        db.maintain_one_time_ivks(account)
             .map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -149,7 +150,7 @@ pub(crate) fn maintain_recovery(db: &mut WalletDatabase) -> Result<(), String> {
 pub(crate) fn close_finished_keys(db: &mut WalletDatabase, tip: BlockHeight) -> Result<(), String> {
     let now = now()?;
     for account in software_accounts(db)? {
-        db.close_finished_dynamic_keys(account, now, tip)
+        db.close_finished_one_time_keys(account, now, tip)
             .map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -159,8 +160,8 @@ pub(crate) fn close_finished_keys(db: &mut WalletDatabase, tip: BlockHeight) -> 
 mod tests {
     use super::*;
     use secrecy::SecretVec;
-    use zcash_client_backend::data_api::{dynamic_ivk::DynamicIvkRead as _, WalletWrite};
-    use zcash_client_sqlite::wallet::dynamic_ivk::RECEIVE_GAP_LIMIT;
+    use zcash_client_backend::data_api::{one_time_ivk::OneTimeIvkRead as _, WalletWrite};
+    use zcash_client_sqlite::wallet::one_time_ivk::swap::RECEIVE_GAP_LIMIT;
 
     #[test]
     fn restore_prepares_pir_discovery_with_both_settings_off() {
@@ -206,7 +207,7 @@ mod tests {
         maintain_recovery(&mut db).unwrap();
         // Restored lookahead keys wait for a directory sweep; they are not scanned.
         assert_eq!(keys(), (RECEIVE_GAP_LIMIT, 0));
-        assert!(db.get_dynamic_scanning_keys().unwrap().is_empty());
+        assert!(db.get_one_time_scanning_keys().unwrap().is_empty());
         assert_eq!(
             db.block_fully_scanned().unwrap().unwrap().block_height(),
             BlockHeight::from_u32(110)
@@ -227,7 +228,7 @@ mod tests {
         use super::super::keys;
         use secrecy::ExposeSecret;
         use std::collections::HashSet;
-        use zakura_dynamic_ivk::{has_same_spending_authority, KeyId, Purpose};
+        use zakura_one_time_ivk::{KeyId, Purpose};
         use zcash_keys::keys::UnifiedSpendingKey;
 
         let dir = tempfile::tempdir().unwrap();
@@ -326,7 +327,7 @@ mod tests {
         for (account, ufvk) in [(hardware, hardware_ufvk), (observer, observer_ufvk)] {
             let receiver = first_receiver(ufvk.orchard().unwrap());
             assert!(db
-                .get_dynamic_key_for_receiver(account, &receiver)
+                .get_one_time_key_for_receiver(account, &receiver)
                 .unwrap()
                 .is_none());
         }
@@ -353,9 +354,10 @@ mod tests {
         );
         let fvk = orchard::keys::FullViewingKey::from(usk.orchard());
         let swap_fvk = KeyId::new(Purpose::Receive, 0).derive(&fvk).unwrap();
-        assert!(has_same_spending_authority(&fvk, &swap_fvk));
+        // A one-time FVK keeps the account's ak and nk, its first 64 bytes.
+        assert_eq!(fvk.to_bytes()[..64], swap_fvk.to_bytes()[..64]);
         let key = db
-            .get_dynamic_key_for_receiver(added, &first_receiver(&fvk))
+            .get_one_time_key_for_receiver(added, &first_receiver(&fvk))
             .unwrap()
             .unwrap();
         assert_eq!(key.key_id(), KeyId::new(Purpose::Receive, 0));

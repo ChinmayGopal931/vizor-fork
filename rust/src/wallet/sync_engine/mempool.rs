@@ -52,7 +52,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use zcash_client_backend::{
-    data_api::{dynamic_ivk::DynamicIvkRead as _, WalletRead},
+    data_api::{one_time_ivk::OneTimeIvkRead as _, WalletRead},
     proto::service::RawTransaction,
 };
 use zcash_primitives::transaction::Transaction;
@@ -935,8 +935,9 @@ fn trial_decrypt_account_uuids(
         tx,
         &ufvks,
     );
-    // Payouts to open swap keys, which have their own incoming viewing keys. These
-    // are the keys `decrypt_and_store_transaction` selects to store the payment.
+    // Payouts to open swap keys, which have their own incoming viewing keys. These are
+    // the keys `decrypt_and_store_transaction_with_one_time_ivks` selects to store the
+    // payment.
     let decrypted = if tx.ironwood_bundle().is_some() {
         let receivers: Vec<_> = decrypted
             .ironwood_outputs()
@@ -944,9 +945,16 @@ fn trial_decrypt_account_uuids(
             .map(|output| output.note().0.recipient())
             .collect();
         let keys = db
-            .get_dynamic_transaction_keys(tx.txid(), None, &receivers)
-            .map_err(|e| format!("get dynamic keys: {e}"))?;
-        decrypted.with_dynamic_ivks(keys)
+            .get_one_time_transaction_keys(tx.txid(), None, &receivers)
+            .map_err(|e| format!("get one-time keys: {e}"))?;
+        zcash_client_backend::decrypt_transaction_with_one_time_ivks(
+            &network,
+            None,
+            Some(chain_tip_height),
+            tx,
+            &ufvks,
+            keys,
+        )
     } else {
         decrypted
     };

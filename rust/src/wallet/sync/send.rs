@@ -77,7 +77,7 @@ use zcash_client_backend::{
 };
 use zcash_client_sqlite::{
     error::SqliteClientError,
-    wallet::{commitment_tree, dynamic_ivk::verify_refund_funding_proposal},
+    wallet::{commitment_tree, one_time_ivk::swap::verify_refund_funding_proposal},
     AccountUuid, ReceivedNoteId,
 };
 use zcash_keys::{address::Address, keys::UnifiedSpendingKey};
@@ -1154,7 +1154,7 @@ fn propose_request(
         SendRequest::SwapFunding {
             refund_index: None, ..
         } => Some(
-            MemoBytes::from_bytes(&zakura_dynamic_ivk::RefundMemo::new(0).encode())
+            MemoBytes::from_bytes(&zakura_one_time_ivk::swap::RefundMemo::new(0).encode())
                 .map_err(|e| e.to_string())?,
         ),
         SendRequest::SwapFunding {

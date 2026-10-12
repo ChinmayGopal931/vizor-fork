@@ -12784,12 +12784,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return dco_decode_i_64(raw);
-  }
-
-  @protected
   ImmediateShareKey dco_decode_box_autoadd_immediate_share_key(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_immediate_share_key(raw);
@@ -14609,12 +14603,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null ? null : dco_decode_box_autoadd_i_64(raw);
-  }
-
-  @protected
   ImmediateShareKey? dco_decode_opt_box_autoadd_immediate_share_key(
     dynamic raw,
   ) {
@@ -15659,14 +15647,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SwapProviderStatus dco_decode_swap_provider_status(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
     return SwapProviderStatus(
       status: dco_decode_String(arr[0]),
       swapType: dco_decode_opt_String(arr[1]),
       refundedAmount: dco_decode_opt_String(arr[2]),
       amountOut: dco_decode_opt_String(arr[3]),
-      deadlineSeconds: dco_decode_opt_box_autoadd_i_64(arr[4]),
     );
   }
 
@@ -17053,12 +17040,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int sse_decode_box_autoadd_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_i_32(deserializer));
-  }
-
-  @protected
-  PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_i_64(deserializer));
   }
 
   @protected
@@ -19560,17 +19541,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    if (sse_decode_bool(deserializer)) {
-      return (sse_decode_box_autoadd_i_64(deserializer));
-    } else {
-      return null;
-    }
-  }
-
-  @protected
   ImmediateShareKey? sse_decode_opt_box_autoadd_immediate_share_key(
     SseDeserializer deserializer,
   ) {
@@ -20965,13 +20935,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_swapType = sse_decode_opt_String(deserializer);
     var var_refundedAmount = sse_decode_opt_String(deserializer);
     var var_amountOut = sse_decode_opt_String(deserializer);
-    var var_deadlineSeconds = sse_decode_opt_box_autoadd_i_64(deserializer);
     return SwapProviderStatus(
       status: var_status,
       swapType: var_swapType,
       refundedAmount: var_refundedAmount,
       amountOut: var_amountOut,
-      deadlineSeconds: var_deadlineSeconds,
     );
   }
 
@@ -22366,15 +22334,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self, serializer);
-  }
-
-  @protected
-  void sse_encode_box_autoadd_i_64(
-    PlatformInt64 self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_i_64(self, serializer);
   }
 
   @protected
@@ -24473,19 +24432,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_opt_box_autoadd_i_64(
-    PlatformInt64? self,
-    SseSerializer serializer,
-  ) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    sse_encode_bool(self != null, serializer);
-    if (self != null) {
-      sse_encode_box_autoadd_i_64(self, serializer);
-    }
-  }
-
-  @protected
   void sse_encode_opt_box_autoadd_immediate_share_key(
     ImmediateShareKey? self,
     SseSerializer serializer,
@@ -25604,7 +25550,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.swapType, serializer);
     sse_encode_opt_String(self.refundedAmount, serializer);
     sse_encode_opt_String(self.amountOut, serializer);
-    sse_encode_opt_box_autoadd_i_64(self.deadlineSeconds, serializer);
   }
 
   @protected

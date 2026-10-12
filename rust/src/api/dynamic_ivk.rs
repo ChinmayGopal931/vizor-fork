@@ -5,10 +5,11 @@ use super::sync::parse_network_and_migrate;
 use crate::wallet::db::{open_wallet_db_with_timeout, with_wallet_db_write_lock};
 use crate::wallet::dynamic_ivk::{self, with_db};
 use crate::wallet::{db::WALLET_DB_BUSY_TIMEOUT, keys};
-use zakura_dynamic_ivk::{lifecycle::near_observation, Purpose};
+use zakura_near_intents::near_observation;
+use zakura_one_time_ivk::{swap::Observation, Purpose};
 use zcash_client_sqlite::{
     error::SqliteClientError,
-    wallet::dynamic_ivk::{OperationOutcome, ProviderSeen, ReservationPolicy},
+    wallet::one_time_ivk::swap::{OperationOutcome, ProviderSeen, ReservationPolicy},
 };
 
 /// A private swap failure. `message` is display text, never a parsing protocol.
@@ -54,10 +55,6 @@ impl From<ReservationPolicy> for ReceiveError {
             ReservationPolicy::Coverage => {
                 "Finish syncing to the chain tip before requesting a quote."
             }
-            ReservationPolicy::Unreadable => {
-                "A swap refund record could not be read. \
-                 Update the app before swapping ZEC again."
-            }
         }
         .into()
     }
@@ -78,7 +75,6 @@ pub struct SwapProviderStatus {
     pub swap_type: Option<String>,
     pub refunded_amount: Option<String>,
     pub amount_out: Option<String>,
-    pub deadline_seconds: Option<i64>,
 }
 
 /// An incoming quote's deposit instructions, as the provider issued them.
@@ -131,7 +127,8 @@ pub fn reserve_swap_address(
     } else {
         with_db(&db_path, network, &account_uuid, |db, a| {
             dynamic_ivk::require_software_account(db, a)?;
-            Ok::<_, ReceiveError>(db.reserve_refund_key(a, tip)??)
+            // Refund issuance does not download the seen set, so it skips no index.
+            Ok::<_, ReceiveError>(db.reserve_refund_key(a, tip, None)??)
         })?
     };
     let index = key.key_id().index();
@@ -178,13 +175,13 @@ pub fn finish_receive_quote(
 ) -> Result<(), ReceiveError> {
     let network = parse_network_and_migrate(&db_path, &network_name)?;
     let outcome = match accepted {
-        Some(deposit) => {
-            OperationOutcome::Accepted(zcash_client_sqlite::wallet::dynamic_ivk::ReceiveDeposit {
+        Some(deposit) => OperationOutcome::Accepted(
+            zcash_client_sqlite::wallet::one_time_ivk::swap::ReceiveDeposit {
                 address: deposit.address,
                 memo: deposit.memo,
                 deadline: deposit.deadline_seconds,
-            })
-        }
+            },
+        ),
         None => OperationOutcome::Rejected,
     };
     with_db(&db_path, network, &account_uuid, |db, a| {
@@ -236,8 +233,10 @@ pub fn record_swap_refund_quote(
 /// Records a provider status, requested at `checked_at_seconds`, on the account's swap
 /// operations with this deposit address and memo, and reclaims what that makes
 /// reclaimable. `incoming` says the swap pays ZEC into the wallet; otherwise it is the
-/// refund side of a ZEC deposit. `funded` says the provider saw a deposit. Swaps
-/// without a private address are ignored. Do not call it for a failed status request.
+/// refund side of a ZEC deposit. `funded` says the app has its own evidence that the
+/// provider saw a deposit, which the status alone implies only from `KNOWN_DEPOSIT_TX`
+/// on (see `near_observation`). Swaps without a private address are ignored. Do not call
+/// it for a failed status request.
 pub fn observe_swap_status(
     db_path: String,
     network_name: String,
@@ -259,13 +258,16 @@ pub fn observe_swap_status(
         Purpose::Refund
     };
     let observation = near_observation(purpose, &dynamic_ivk::near_status(&status));
+    let observation = Observation {
+        funded: observation.funded || funded,
+        ..observation
+    };
     with_db(&db_path, network, &account_uuid, |db, a| {
         db.record_operation_status(
             a,
             &deposit_address,
             deposit_memo.as_deref(),
             observation,
-            funded,
             checked_at_seconds,
         )?;
         Ok(())
@@ -288,7 +290,7 @@ pub fn recheck_swap_history(db_path: String, network_name: String) -> Result<(),
     with_wallet_db_write_lock("dynamic_ivk.recheck", || {
         let mut db = open_wallet_db_with_timeout(&db_path, network, WALLET_DB_BUSY_TIMEOUT)?;
         for account in dynamic_ivk::software_accounts(&db)? {
-            db.recheck_dynamic_key_history(account)?;
+            db.recheck_one_time_key_history(account)?;
         }
         Ok(())
     })

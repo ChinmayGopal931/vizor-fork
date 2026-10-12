@@ -13601,17 +13601,6 @@ impl SseDecode for Option<i32> {
     }
 }
 
-impl SseDecode for Option<i64> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        if (<bool>::sse_decode(deserializer)) {
-            return Some(<i64>::sse_decode(deserializer));
-        } else {
-            return None;
-        }
-    }
-}
-
 impl SseDecode for Option<zcash_voting::share_policy::ImmediateShareKey> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -15031,13 +15020,11 @@ impl SseDecode for crate::api::dynamic_ivk::SwapProviderStatus {
         let mut var_swapType = <Option<String>>::sse_decode(deserializer);
         let mut var_refundedAmount = <Option<String>>::sse_decode(deserializer);
         let mut var_amountOut = <Option<String>>::sse_decode(deserializer);
-        let mut var_deadlineSeconds = <Option<i64>>::sse_decode(deserializer);
         return crate::api::dynamic_ivk::SwapProviderStatus {
             status: var_status,
             swap_type: var_swapType,
             refunded_amount: var_refundedAmount,
             amount_out: var_amountOut,
-            deadline_seconds: var_deadlineSeconds,
         };
     }
 }
@@ -20031,7 +20018,6 @@ impl flutter_rust_bridge::IntoDart for crate::api::dynamic_ivk::SwapProviderStat
             self.swap_type.into_into_dart().into_dart(),
             self.refunded_amount.into_into_dart().into_dart(),
             self.amount_out.into_into_dart().into_dart(),
-            self.deadline_seconds.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -23082,16 +23068,6 @@ impl SseEncode for Option<i32> {
     }
 }
 
-impl SseEncode for Option<i64> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
-            <i64>::sse_encode(value, serializer);
-        }
-    }
-}
-
 impl SseEncode for Option<zcash_voting::share_policy::ImmediateShareKey> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -24178,7 +24154,6 @@ impl SseEncode for crate::api::dynamic_ivk::SwapProviderStatus {
         <Option<String>>::sse_encode(self.swap_type, serializer);
         <Option<String>>::sse_encode(self.refunded_amount, serializer);
         <Option<String>>::sse_encode(self.amount_out, serializer);
-        <Option<i64>>::sse_encode(self.deadline_seconds, serializer);
     }
 }
 

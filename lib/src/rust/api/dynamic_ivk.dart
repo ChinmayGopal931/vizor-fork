@@ -100,8 +100,10 @@ Future<void> recordSwapRefundQuote({
 /// Records a provider status, requested at `checked_at_seconds`, on the account's swap
 /// operations with this deposit address and memo, and reclaims what that makes
 /// reclaimable. `incoming` says the swap pays ZEC into the wallet; otherwise it is the
-/// refund side of a ZEC deposit. `funded` says the provider saw a deposit. Swaps
-/// without a private address are ignored. Do not call it for a failed status request.
+/// refund side of a ZEC deposit. `funded` says the app has its own evidence that the
+/// provider saw a deposit, which the status alone implies only from `KNOWN_DEPOSIT_TX`
+/// on (see `near_observation`). Swaps without a private address are ignored. Do not call
+/// it for a failed status request.
 Future<void> observeSwapStatus({
   required String dbPath,
   required String networkName,
@@ -212,14 +214,12 @@ class SwapProviderStatus {
   final String? swapType;
   final String? refundedAmount;
   final String? amountOut;
-  final PlatformInt64? deadlineSeconds;
 
   const SwapProviderStatus({
     required this.status,
     this.swapType,
     this.refundedAmount,
     this.amountOut,
-    this.deadlineSeconds,
   });
 
   @override
@@ -227,8 +227,7 @@ class SwapProviderStatus {
       status.hashCode ^
       swapType.hashCode ^
       refundedAmount.hashCode ^
-      amountOut.hashCode ^
-      deadlineSeconds.hashCode;
+      amountOut.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -238,6 +237,5 @@ class SwapProviderStatus {
           status == other.status &&
           swapType == other.swapType &&
           refundedAmount == other.refundedAmount &&
-          amountOut == other.amountOut &&
-          deadlineSeconds == other.deadlineSeconds;
+          amountOut == other.amountOut;
 }

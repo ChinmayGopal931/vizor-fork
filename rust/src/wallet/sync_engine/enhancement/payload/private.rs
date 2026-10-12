@@ -29,7 +29,7 @@ const ENDPOINT_ENV: &str = "VIZOR_ENHANCE_PIR_URL";
 
 /// The Enhance PIR endpoint: the production service, or in a debug build a
 /// configured override.
-pub(in crate::wallet::sync_engine) fn enhance_endpoint() -> String {
+fn enhance_endpoint() -> String {
     #[cfg(debug_assertions)]
     if let Ok(endpoint) = std::env::var(ENDPOINT_ENV) {
         return endpoint;
