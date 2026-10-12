@@ -94,9 +94,9 @@ pub enum SyncEventKind {
     /// ephemeral address checks report it again when they change wallet data.
     Completed,
     /// A post-sync follow-up (private transparent recovery, transparent
-    /// details) changed wallet data after completion was reported. The sync
-    /// stays complete; its stream, and the running guard, end only once
-    /// every follow-up has.
+    /// details, one-time key restore sweeps) changed wallet data after
+    /// completion was reported. The sync stays complete; its stream, and the
+    /// running guard, end only once every follow-up has.
     FollowupUpdated,
 }
 
@@ -5024,25 +5024,21 @@ async fn run_sync_impl(
         }
     }
 
-    // Restore sweeps reach the receiver directory, so they run after completion is
-    // reported and sends never wait for them. A finished sweep's rescan runs next sync.
-    if one_time_ivks && !should_exit() && swap_private::run(&mut db, network, &should_exit).await {
-        progress_fn(SyncProgressEvent {
-            scanned_height: final_scanned_height,
-            chain_tip_height: final_tip_height,
-            percentage: 1.0,
-            display_target_percentage: 1.0,
-            display_target_blocks: 0,
-            remaining_scan_blocks: Some(0),
-            pending_scan_start_height: None,
-            is_syncing: false,
-            kind: SyncEventKind::Completed,
-            checking: None,
-            has_new_tx: true,
-            phase_completed_units: 0,
-            phase_total_units: 0,
-            phase: String::new(),
-        });
+    // Restore sweeps of one-time keys are the last follow-up: they reach the receiver
+    // directory under a three-minute budget, so neither completion nor the work above
+    // waits for them. They run under the same cancellation and never fail the sync
+    // (see [`swap_private::run`]). A finished sweep may have stored payments, so it
+    // reports `FollowupUpdated`; its rescan runs next sync. Background preparation
+    // syncs skip the sweeps, as they skip the transparent follow-ups.
+    if one_time_ivks
+        && running_mode != 2
+        && !should_exit()
+        && swap_private::run(&mut db, network, &should_exit).await
+    {
+        progress_fn(followup_updated_event((
+            final_scanned_height,
+            final_tip_height,
+        )));
     }
 
     Ok(())

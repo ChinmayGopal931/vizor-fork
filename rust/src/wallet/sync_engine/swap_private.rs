@@ -108,9 +108,9 @@ pub(crate) async fn fetch_seen(network: WalletNetwork) -> Option<zakura_pir_rece
 }
 
 /// Runs pending restore sweeps for at most [`RUN_BUDGET`], returning whether one
-/// finished. Sync calls it after reporting completion, so sends never wait for the
-/// directory, and only where one-time IVKs are `supported`. Failures are logged and
-/// retried on a later sync.
+/// finished. Sync runs it as its last follow-up after reporting completion, so sends
+/// never wait for the directory, and only where one-time IVKs are `supported`.
+/// Failures are logged and retried on a later sync.
 pub(super) async fn run(
     db: &mut WalletDatabase,
     network: WalletNetwork,
