@@ -186,7 +186,7 @@ mod tests {
                 .unwrap()
                 .query_row(
                     "SELECT COUNT(*), COALESCE(SUM(advances_allocation), 0)
-                     FROM ironwood_receiving_keys",
+                     FROM ironwood_one_time_keys",
                     [],
                     |r| Ok((r.get(0)?, r.get(1)?)),
                 )
@@ -306,7 +306,7 @@ mod tests {
         maintain_recovery(&mut db).unwrap();
         let registered: u64 = rusqlite::Connection::open(path)
             .unwrap()
-            .query_row("SELECT COUNT(*) FROM ironwood_receiving_keys", [], |r| {
+            .query_row("SELECT COUNT(*) FROM ironwood_one_time_keys", [], |r| {
                 r.get(0)
             })
             .unwrap();

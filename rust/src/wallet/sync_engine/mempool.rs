@@ -1506,7 +1506,7 @@ mod tests {
             let bytes: Vec<u8> = conn
                 .query_row(
                     &format!(
-                        "SELECT receiver FROM ironwood_receiving_keys
+                        "SELECT receiver FROM ironwood_one_time_keys
                          WHERE purpose = 1 AND key_index = X'{index_hex}'"
                     ),
                     [],
@@ -1518,7 +1518,7 @@ mod tests {
         // Open the first key, as issuing it on this device does. The others wait for a
         // directory sweep, so, as in block scanning, a payout to one stays unmatched.
         conn.execute(
-            "UPDATE ironwood_receiving_keys SET active_from = 111
+            "UPDATE ironwood_one_time_keys SET active_from = 111
              WHERE purpose = 1 AND key_index = X'0000000000000000'",
             [],
         )
@@ -1553,7 +1553,7 @@ mod tests {
             .txid();
         let (mined_height, value, has_key): (Option<u32>, u64, bool) = conn
             .query_row(
-                "SELECT t.mined_height, n.value, n.receiving_key_id IS NOT NULL
+                "SELECT t.mined_height, n.value, n.one_time_key_id IS NOT NULL
                  FROM ironwood_received_notes n JOIN transactions t ON t.id_tx = n.transaction_id
                  WHERE t.txid = ?1",
                 [txid.as_ref()],
