@@ -28,8 +28,14 @@ and a no-go for `zecswap-tokens` (D-1). M0.2 is a go offline. M0.3 is
 undecided: the Rust side works on a desktop host, and the WebView side needs a
 device. On this branch's M0 commit (the `rust-version` line, the M0.2 test,
 docs), `cd rust && cargo test` passes: lib 1430 passed, 0 failed, 9 ignored;
-integration 6 passed, 21 ignored (regtest). `fvm flutter analyze`,
-`fvm flutter test` and the APK build were not run (B-1).
+integration 6 passed, 21 ignored (regtest). After the toolchain install:
+`fvm flutter analyze` finds no issues, and `fvm flutter test` (desktop lane)
+gives 5896 passed, 158 skipped, 4 failed. The 4 failures are pre-existing on
+`main`; this branch changes no Dart. They are in
+`test/features/settings/settings_seed_phrase_screen_test.dart`, the "incoming
+links cannot interrupt backup completion/deferral success/failure" cases, which
+cannot find the `AppButton` "Enter amount" (test line 159). They fail the same
+way when the file runs alone. The APK build is still pending (NDK and disk).
 
 ## M1. Rust foundations
 
@@ -151,8 +157,12 @@ integration 6 passed, 21 ignored (regtest). `fvm flutter analyze`,
 
 ## Blocked
 
-- **B-1. No Flutter toolchain on this machine.** There is no `fvm`, no Flutter
-  3.47.2 (`.fvmrc`), no `dart` and no `flutter_rust_bridge_codegen`. That blocks
+- **B-1. Resolved 2026-10-13:** installed fvm 4.3.1 (Homebrew), Flutter
+  3.47.2 (Dart 3.13.2), `flutter_rust_bridge_codegen` 2.11.1, `cargo-expand`
+  and Android `cmdline-tools` (in the SDK). NDK 28.2.13676358, which Gradle
+  pins, still needs installing once there is disk space. Before that:
+  there was no `fvm`, no Flutter 3.47.2 (`.fvmrc`), no `dart` and no
+  `flutter_rust_bridge_codegen`. That blocks
   `fvm flutter analyze`, `fvm flutter test`, the mobile lane,
   `scripts/generate-rust-bridge.sh`, every APK build (M0.1.4) and any Kotlin
   compile (the Android build needs the Flutter SDK). Every milestone gate needs
