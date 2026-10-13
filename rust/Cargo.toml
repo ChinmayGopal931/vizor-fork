@@ -271,10 +271,10 @@ assertions_on_constants = "allow"
 # not released on crates.io yet. Keep its rev equal to these so its path
 # dependencies on the backend and SQLite crates resolve to the patched sources.
 #
-# Pinned to 7de0c794, the one-time IVK stack (PRs #160 to #164: keys, backend,
-# SQLite store, note selection and the receiver PIR restore client) and its
-# directory payment sibling fix (PR #178), on wallet-libraries main at PR #177
-# (release packaging checks only),
+# Pinned to 7de0c794, the head of the one-time IVK stack (PRs #160 to #164:
+# keys, backend, SQLite store, note selection and the receiver PIR restore
+# client, whose last commit fixes a directory payment's sibling leaf), on
+# wallet-libraries main at PR #177 (release packaging checks only),
 # after PR #175 (the testing fake txid display publication on txid-4k8),
 # PR #174 (the wallet-pir transparent crates from crates.io at 0.1.0-rc.3,
 # which read the 4,096-row txid display tables),
