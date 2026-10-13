@@ -57,6 +57,7 @@ pub(crate) mod gift_card_claim;
 pub(crate) mod ledger_discovery;
 mod lwd;
 pub(crate) mod mempool;
+mod progress_work;
 mod retry_progress;
 #[cfg(test)]
 pub(crate) mod test_lwd;
@@ -3439,6 +3440,8 @@ async fn run_sync_impl(
         .suggest_scan_ranges()
         .map_err(|e| SyncError::db(format!("suggest_scan_ranges: {e}")))?;
     let mut initial_total = pending_scan_blocks(&initial_ranges);
+    let initial_work = progress_work::WorkModel::load(db_data_path, network, BATCH_SIZE_FOREGROUND)
+        .pending_work(&initial_ranges, current_tip_height);
     progress_fn(scan_queue_progress_event(
         &mut checking_cycle,
         main_scan_complete,
@@ -3452,7 +3455,12 @@ async fn run_sync_impl(
     let mut voting_scan_end = None;
     let mut prev_remaining = initial_total;
     let mut progress_display_mode = ProgressDisplayMode::Work;
-    log::info!("[{}] sync: {} blocks to scan", elapsed(), initial_total);
+    log::info!(
+        "[{}] sync: {} blocks to scan, {:.0} estimated work units",
+        elapsed(),
+        initial_total,
+        initial_work,
+    );
 
     // Reorg-triggered rewinds are split between the verify and main scan
     // phases. The main budget was initialized before tip reconciliation;
