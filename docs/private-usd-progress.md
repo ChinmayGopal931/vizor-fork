@@ -157,8 +157,8 @@ integration 6 passed, 21 ignored (regtest). `fvm flutter analyze`,
   `scripts/generate-rust-bridge.sh`, every APK build (M0.1.4) and any Kotlin
   compile (the Android build needs the Flutter SDK). Every milestone gate needs
   them. Owner: install them, or approve installing them (see B-2).
-- **B-2. Disk.** About 12 GB is free on a 460 GB volume (96% used), with Rust
-  debug info already off. Flutter, Gradle and the Android Rust targets need more.
+- **B-2. Disk.** 7.4 GB is free on a 460 GB volume after M0's builds
+  (`rust/target` is 9.2 GB with Rust debug info off). Flutter, Gradle and the Android Rust targets need more.
   The largest reclaimable directories are `~/dev/zapp/zecSwap/target` (39 GB)
   and `~/dev/zapp/zecSwap-mainnet-beta/target` (18 GB). Clearing them is the
   owner's call.
