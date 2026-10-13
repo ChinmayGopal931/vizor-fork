@@ -33,7 +33,9 @@ sequences.
 
 - **Refund address** (sending ZEC). Reserving first recovers confirmed funding
   records, and waits while one still lacks its memo, so an index the seed already
-  used is never issued again. An accepted quote records its deposit address
+  used is never issued again. It also skips any address NEAR's seen set holds (see
+  [Incoming reservations](#incoming-reservations)), which covers one another device
+  on the seed quoted but never funded. An accepted quote records its deposit address
   against the refund key before it is shown, and funding requires that record. The
   funding transaction carries the refund index in a binary memo on ordinary
   internal Ironwood change and pays only the transparent deposit address; a
