@@ -84,13 +84,14 @@ pub struct ReceiveDeposit {
     pub deadline_seconds: i64,
 }
 
-/// Reserves a swap address on a software account. `incoming` resumes the account's
-/// draft or reserves the lowest eligible incoming index, after checking the swap
-/// provider's seen set from the receiver directory (see `prepare_receive_reservation`);
-/// its key scans from the next unscanned block until it closes. Otherwise it reserves
-/// the next refund index, whose key starts scanning when the wallet stores the swap's
-/// funding transaction. `live_tip` is the chain tip the quote flow fetched. Does not
-/// start or restart ordinary wallet sync.
+/// Reserves a swap address on a software account, skipping any the swap provider's seen
+/// set from the receiver directory holds, so an address another device of the same seed
+/// gave the provider is not issued again. `incoming` resumes the account's draft or
+/// reserves the lowest eligible incoming index (see `prepare_receive_reservation`); its
+/// key scans from the next unscanned block until it closes. Otherwise it reserves the
+/// next refund index (see `reserve_refund_key`), whose key starts scanning when the
+/// wallet stores the swap's funding transaction. `live_tip` is the chain tip the quote
+/// flow fetched. Does not start or restart ordinary wallet sync.
 pub fn reserve_swap_address(
     db_path: String,
     network_name: String,
@@ -101,36 +102,27 @@ pub fn reserve_swap_address(
     let network = parse_network_and_migrate(&db_path, &network_name)?;
     one_time_ivk::require_new_address(network)?;
     let tip = one_time_ivk::network_tip(live_tip)?;
-    let key = if incoming {
-        // Fetched before taking the wallet lock, so a slow directory never holds it.
-        let seen = tokio::runtime::Runtime::new()
-            .map_err(|e| format!("tokio: {e}"))?
-            .block_on(crate::wallet::sync_engine::fetch_seen(network));
-        let contains = |receivers: &[[u8; 43]]| {
-            seen.as_ref()
-                .map_or_else(|| vec![true; receivers.len()], |s| s.contains(receivers))
-        };
-        let view = seen.as_ref().map(|s| ProviderSeen {
-            since: s.since(),
-            until: s.until(),
-            contains: &contains,
-        });
-        with_db(&db_path, network, &account_uuid, |db, a| {
-            one_time_ivk::require_software_account(db, a)?;
-            Ok::<_, ReceiveError>(db.prepare_receive_reservation(
-                a,
-                one_time_ivk::now()?,
-                tip,
-                view.as_ref(),
-            )??)
-        })?
-    } else {
-        with_db(&db_path, network, &account_uuid, |db, a| {
-            one_time_ivk::require_software_account(db, a)?;
-            // Refund issuance does not download the seen set, so it skips no index.
-            Ok::<_, ReceiveError>(db.reserve_refund_key(a, tip, None)??)
-        })?
+    // Fetched before taking the wallet lock, so a slow directory never holds it.
+    let seen = tokio::runtime::Runtime::new()
+        .map_err(|e| format!("tokio: {e}"))?
+        .block_on(crate::wallet::sync_engine::fetch_seen(network));
+    let contains = |receivers: &[[u8; 43]]| {
+        seen.as_ref()
+            .map_or_else(|| vec![true; receivers.len()], |s| s.contains(receivers))
     };
+    let view = seen.as_ref().map(|s| ProviderSeen {
+        since: s.since(),
+        until: s.until(),
+        contains: &contains,
+    });
+    let key = with_db(&db_path, network, &account_uuid, |db, a| {
+        one_time_ivk::require_software_account(db, a)?;
+        Ok::<_, ReceiveError>(if incoming {
+            db.prepare_receive_reservation(a, one_time_ivk::now()?, tip, view.as_ref())??
+        } else {
+            db.reserve_refund_key(a, tip, view.as_ref())??
+        })
+    })?;
     let index = key.key_id().index();
     Ok(SwapAddress {
         address: one_time_ivk::encode_address(&key, network)?,

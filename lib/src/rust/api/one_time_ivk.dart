@@ -8,13 +8,14 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`, `fmt`, `from`, `from`, `from`, `from`
 
-/// Reserves a swap address on a software account. `incoming` resumes the account's
-/// draft or reserves the lowest eligible incoming index, after checking the swap
-/// provider's seen set from the receiver directory (see `prepare_receive_reservation`);
-/// its key scans from the next unscanned block until it closes. Otherwise it reserves
-/// the next refund index, whose key starts scanning when the wallet stores the swap's
-/// funding transaction. `live_tip` is the chain tip the quote flow fetched. Does not
-/// start or restart ordinary wallet sync.
+/// Reserves a swap address on a software account, skipping any the swap provider's seen
+/// set from the receiver directory holds, so an address another device of the same seed
+/// gave the provider is not issued again. `incoming` resumes the account's draft or
+/// reserves the lowest eligible incoming index (see `prepare_receive_reservation`); its
+/// key scans from the next unscanned block until it closes. Otherwise it reserves the
+/// next refund index (see `reserve_refund_key`), whose key starts scanning when the
+/// wallet stores the swap's funding transaction. `live_tip` is the chain tip the quote
+/// flow fetched. Does not start or restart ordinary wallet sync.
 Future<SwapAddress> reserveSwapAddress({
   required String dbPath,
   required String networkName,

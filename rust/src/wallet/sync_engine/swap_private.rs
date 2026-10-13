@@ -82,10 +82,11 @@ fn error(e: impl std::fmt::Display) -> String {
     e.to_string()
 }
 
-/// The receiver directory's swap provider seen sets, which issuance checks (see
-/// `prepare_receive_reservation`), over the restore sweep's transport. `None` where
-/// one-time IVKs are not `supported`, or when the directory does not answer within
-/// [`SEEN_BUDGET`]; issuance then counts every quote as seen.
+/// The receiver directory's swap provider seen sets, which incoming and refund issuance
+/// check (see `prepare_receive_reservation` and `reserve_refund_key`), over the restore
+/// sweep's transport. `None` where one-time IVKs are not `supported`, or when the
+/// directory does not answer within [`SEEN_BUDGET`]. Incoming issuance then counts every
+/// quote as seen, and refund issuance skips only the indexes funding memos recover.
 pub(crate) async fn fetch_seen(network: WalletNetwork) -> Option<zakura_pir_receiver::Seen> {
     if !crate::wallet::one_time_ivk::supported(network) {
         return None;
