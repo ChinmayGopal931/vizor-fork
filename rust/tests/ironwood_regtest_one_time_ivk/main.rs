@@ -378,6 +378,31 @@ fn paid_late(twice: bool, sibling: Sibling) -> (World, Wallet, u64) {
     (world, a, paid + PAYOUT / 5)
 }
 
+/// Two devices on one seed: A gives NEAR a refund address for a swap it never funds, so no
+/// funding memo tells B about it. B reserves a refund address two hours later, and only
+/// NEAR's seen set, which the directory publishes, keeps B from giving NEAR the same one.
+#[test]
+#[ignore = "requires the Dockerized Ironwood zcashd/lightwalletd regtest stack"]
+fn a_second_device_skips_a_refund_address_the_first_gave_near() {
+    let _guard = lock();
+    let mut world = World::start();
+    let a = world.wallet("A");
+    let b = Wallet::import("B", &a.mnemonic, world.stack.tip());
+    world.sync(&b);
+    let first = world.quote_refund(&a, HOUR);
+
+    world.stack.advance(2 * HOUR);
+    world.stack.mine(1);
+    world.sync(&b);
+    let second = world.quote_refund(&b, HOUR);
+    assert_ne!(
+        second.index, first.index,
+        "B skips the refund address A gave NEAR (A reserved {}, B reserved {})",
+        first.index, second.index
+    );
+    assert_ne!(second.address, first.address);
+}
+
 /// A ZEC-to-X swap's refund is found while the refund key scans, and a restore two days
 /// later recovers the key from the funding transaction's memo and finds the refund
 /// through the receiver directory.

@@ -170,7 +170,9 @@ is found only by Check swap history, which applies it with its neighbour in the
 note commitment tree, so three tests place that neighbour differently: the
 payment's own change after it, its own change before it, or an earlier block's
 output before it. Another shows that Check swap history, which runs once, misses
-a payment the directory has not published yet and finds it when run again.
+a payment the directory has not published yet and finds it when run again. In
+the last, a second device on the same seed must skip a refund address the first
+gave NEAR for a swap it never funded, which only NEAR's seen set reveals.
 
 The tests start zcashd with `-mocktime` through `IRONWOOD_ZCASHD_CLOCK_ARG`, so
 `setmocktime` can move block times weeks ahead. Debug builds of Vizor read four

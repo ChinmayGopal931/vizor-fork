@@ -48,8 +48,9 @@ impl Near {
     }
 
     /// The provider sets a publication made at `now` carries: `near-intents/recent`
-    /// (payout and refund addresses given in the day before the last read) and
-    /// `near-intents/seen` (payout addresses since the feed started).
+    /// (addresses given in the day before the last read) and `near-intents/seen`
+    /// (addresses given since the feed started), each holding payout and refund
+    /// addresses.
     pub fn sets(&self, now: i64) -> Vec<ProviderSet> {
         let until = now - self.read_lag;
         let window = RESTORE_WATCH_SECS;
@@ -61,9 +62,7 @@ impl Near {
         let seen = self
             .given
             .iter()
-            .filter(|(_, at, role)| {
-                *role == Role::Payout && *at >= self.feed_started && *at <= until
-            })
+            .filter(|(_, at, _)| *at >= self.feed_started && *at <= until)
             .map(|(r, _, _)| *r);
         vec![
             ProviderSet {
