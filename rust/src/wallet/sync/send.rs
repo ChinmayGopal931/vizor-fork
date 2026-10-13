@@ -7248,3 +7248,6 @@ impl OutputProver for NoOpOutputProver {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod orchard_receiver_tests;
