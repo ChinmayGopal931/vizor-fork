@@ -17,17 +17,21 @@ use crate::wallet::keys;
 use crate::wallet::network::WalletNetwork;
 use crate::wallet::private_usd::{
     deployment::{self, hex_address},
-    engine::{self, Activity, OpHandle},
+    engine::{self, Activity, Clock, OpHandle, SystemClock},
+    evm_rpc::EvmRpc,
     forward::{self, AcceptOutcome, AdvanceReport, ForwardWait, Quoted},
     joint::{self as joint_ops, SwapTxStatus},
     keys::{account_derivation, SwapKeyContext},
     models::{
-        Amount, Direction, ForwardOutcome, ForwardRecord, NothingSentCause, RefundCause,
+        Address, Amount, Direction, ForwardOutcome, ForwardRecord, NothingSentCause, RefundCause,
         ReversePhase, ReverseRecord, ZcashTxId,
     },
     railgun_keys,
+    relayer_client::{RailgunBroadcast, RelayerClient},
     reverse::{self, FundingPrice, FundingRequest, ProvedFunding, ReverseAccept, ReverseReport},
+    sends::{self, ProvedSend, SendRecord, Sends},
     store::SwapStore,
+    transport::RoutedTransport,
     ErrorCode, PrivateUsdError, PrivateUsdNetwork,
 };
 
@@ -1236,6 +1240,284 @@ pub fn private_usd_reverse_records(
             .map(|record| api_reverse_record(&store, &account_uuid, record))
             .collect())
     })
+}
+
+// ---- private sends and withdrawals (M7) ----
+
+/// The relayer's terms for private sends and withdrawals, already held to
+/// the deployment's pins (reference §6.7 steps 1–2). The page's broadcaster
+/// is `{chainId, railgunProxy, railgunAddress, token, minFee: fee_floor,
+/// feePerUnitGas?, maxGasPrice: max_gas_price_wei}`. Amounts are decimal
+/// base units of `token`.
+pub struct ApiRailgunSendsTerms {
+    pub chain_id: i64,
+    /// The relayer's `0zk`, which the fee note pays.
+    pub railgun_address: String,
+    pub railgun_proxy: String,
+    /// The fee token (`0x` lowercase), the deployment's swap token.
+    pub token: String,
+    /// The least fee a send pays; never above `max_relayer_fee`.
+    pub fee_floor: String,
+    /// Fee-token base units per 10^18 wei of gas, where the relayer prices
+    /// gas; then `fee_expires_at` is set too.
+    pub fee_per_unit_gas: Option<String>,
+    /// Unix seconds until which a fee worked out at that rate is held.
+    pub fee_expires_at: Option<i64>,
+    pub max_gas_limit: String,
+    pub max_gas_price_wei: String,
+    pub max_calldata_bytes: u32,
+}
+
+/// A proved send or withdrawal, as Dart hands it to Rust to keep before it is
+/// posted.
+pub struct ApiProvedSend {
+    /// A new UUID per send.
+    pub send_id: String,
+    /// The token sent (`0x`), one of the deployment's `usd_tokens`.
+    pub token: String,
+    /// Base units sent, the relayer's fee aside.
+    pub amount: String,
+    /// The `broadcasterFee` the proof pays the relayer, in base units of the
+    /// deployment's token; at most `max_relayer_fee`.
+    pub fee: String,
+    /// The `0zk` (lowercase) or `0x` destination.
+    pub to: String,
+    /// The page's `transfer` or `unshield` result, unchanged.
+    pub proof_json: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApiSendState {
+    /// Proved and kept; not seen in a block yet. Blocks the account's next
+    /// payment.
+    Unconfirmed,
+    Confirmed,
+}
+
+/// One send or withdrawal of the log.
+pub struct ApiSendRecord {
+    pub send_id: String,
+    pub token: String,
+    pub amount: String,
+    pub fee: String,
+    pub to: String,
+    pub withdraw: bool,
+    /// Unix seconds when it was kept.
+    pub sent_at: i64,
+    pub state: ApiSendState,
+    /// The relayer's transaction, once it named one (`0x`).
+    pub tx_hash: Option<String>,
+    /// While unconfirmed: the last post, the last "already spent" answer,
+    /// and the time the relayer asked to wait for.
+    pub posted_at: Option<i64>,
+    pub spent_at: Option<i64>,
+    pub retry_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApiTransactKind {
+    /// Submitted in `transactions[0]`, not mined yet.
+    Sent,
+    /// Its notes are spent (by `transactions`, where named): the chain
+    /// settles it.
+    Spent,
+    /// Refused: nothing went, and the send is dropped from the log.
+    Refused,
+    /// No answer that settles anything: the same bytes go again, no sooner
+    /// than `retry_after_secs` where set.
+    Retry,
+}
+
+pub struct ApiTransactResult {
+    pub kind: ApiTransactKind,
+    pub transactions: Vec<String>,
+    /// At most an hour.
+    pub retry_after_secs: Option<u32>,
+}
+
+/// `GET /v1/terms`' `railgunSends`, held to the pins. `Unavailable` when the
+/// relayer sends none now, or none the pins allow; `RelayerFee` when its
+/// least fee is above the 2 USDC cap.
+pub fn private_usd_railgun_sends_terms(
+    network: String,
+) -> Result<ApiRailgunSendsTerms, ApiPrivateUsdError> {
+    catch(|| {
+        let network = swap_network(&network)?;
+        let pins = deployment::deployment(network);
+        let transport = RoutedTransport::new();
+        let relayer = RelayerClient::new(&transport, pins.relayer_url);
+        let terms = block_on(relayer.railgun_sends(pins))?.ok_or_else(|| {
+            PrivateUsdError::new(
+                ErrorCode::Unavailable,
+                "the relayer sends no private payments now",
+            )
+        })?;
+        Ok(ApiRailgunSendsTerms {
+            chain_id: terms.chain_id as i64,
+            railgun_address: terms.railgun_address.to_owned(),
+            railgun_proxy: hex_address(&terms.railgun_proxy),
+            token: hex_address(&terms.fee_token),
+            fee_floor: terms.min_fee.0.to_string(),
+            fee_per_unit_gas: terms.fee_per_unit_gas,
+            fee_expires_at: terms.fee_expires_at.map(seconds),
+            max_gas_limit: terms.max_gas_limit.to_string(),
+            max_gas_price_wei: terms.max_gas_price_wei,
+            max_calldata_bytes: terms.max_calldata_bytes,
+        })
+    })
+}
+
+/// Keeps a proved send before it is posted (zapp `PrivateUsdSendLog.prove`).
+/// Call it only while still unlocked and in the foreground, then post it
+/// with `private_usd_relayer_transact`. On any error nothing was kept and
+/// nothing goes out: `Mismatch` (the proof is not this deployment's or not
+/// this send's, or another proof is kept under the id), `RelayerFee` (a fee
+/// above the cap), `Busy` (another payment of the account is unsettled, or
+/// a conversion is under way). Keeping the same send again returns it.
+pub fn private_usd_send_log_put(
+    store_dir: String,
+    network: String,
+    account_uuid: String,
+    send: ApiProvedSend,
+) -> Result<ApiSendRecord, ApiPrivateUsdError> {
+    catch(|| {
+        let network = swap_network(&network)?;
+        let token = Address::parse(&send.token).ok_or_else(|| {
+            PrivateUsdError::new(ErrorCode::Mismatch, "the token is not an address")
+        })?;
+        let proved = ProvedSend {
+            id: &send.send_id,
+            token,
+            amount: parse_amount(&send.amount)?,
+            fee: parse_amount(&send.fee)?,
+            to: &send.to,
+            proof_json: &send.proof_json,
+        };
+        let mut store = SwapStore::open(Path::new(&store_dir))?;
+        let record = sends::keep(
+            &mut store,
+            deployment::deployment(network),
+            &account_uuid,
+            &proved,
+            SystemClock.now(),
+        )?;
+        Ok(api_send_record(&record))
+    })
+}
+
+/// The account's sends and withdrawals, newest first; empty when the wallet
+/// never kept one. `StoreUnreadable` must keep spending blocked.
+pub fn private_usd_send_log_list(
+    store_dir: String,
+    account_uuid: String,
+) -> Result<Vec<ApiSendRecord>, ApiPrivateUsdError> {
+    catch(|| {
+        let Some(store) = SwapStore::open_existing(Path::new(&store_dir))? else {
+            return Ok(Vec::new());
+        };
+        Ok(sends::records(&store, &account_uuid)?
+            .iter()
+            .map(api_send_record)
+            .collect())
+    })
+}
+
+/// Posts the kept request of `send_id` to the relayer (`POST
+/// /v1/railgun/transact`), never bytes from Dart, and notes the answer in
+/// the log. `Other` when no such send is kept: nothing went out.
+pub fn private_usd_relayer_transact(
+    store_dir: String,
+    network: String,
+    account_uuid: String,
+    send_id: String,
+) -> Result<ApiTransactResult, ApiPrivateUsdError> {
+    catch(|| {
+        let network = swap_network(&network)?;
+        let pins = deployment::deployment(network);
+        let Some(mut store) = SwapStore::open_existing(Path::new(&store_dir))? else {
+            return Err(PrivateUsdError::new(ErrorCode::Other, "no such send").into());
+        };
+        let transport = RoutedTransport::new();
+        let clock = SystemClock;
+        let relay = Sends::new(&transport, pins.relayer_url, &clock, &account_uuid);
+        let answer = block_on(relay.transact(&mut store, &send_id))?;
+        Ok(api_transact(&answer))
+    })
+}
+
+/// One settlement pass over the account's unconfirmed sends (zapp
+/// `PrivateUsdSender.settleAll`): each is marked confirmed from its receipt
+/// (1 confirmation) or its nullifiers, dropped once it reverted or another
+/// proof took part of its notes, or posted again as the same bytes. A pass
+/// asked for while one runs returns at once. Returns the sends after it.
+pub fn private_usd_send_settle_all(
+    store_dir: String,
+    network: String,
+    eth_rpc_url: String,
+    account_uuid: String,
+) -> Result<Vec<ApiSendRecord>, ApiPrivateUsdError> {
+    catch(|| {
+        let network = swap_network(&network)?;
+        let Some(mut store) = SwapStore::open_existing(Path::new(&store_dir))? else {
+            return Ok(Vec::new());
+        };
+        let pins = deployment::deployment(network);
+        let transport = RoutedTransport::new();
+        let chain = EvmRpc::new(&transport, pins.rpc_url(&eth_rpc_url), pins);
+        let clock = SystemClock;
+        let relay = Sends::new(&transport, pins.relayer_url, &clock, &account_uuid);
+        Ok(block_on(relay.settle_all(&mut store, &chain))?
+            .iter()
+            .map(api_send_record)
+            .collect())
+    })
+}
+
+fn api_send_record(send: &SendRecord) -> ApiSendRecord {
+    let relay = send.relay.as_ref();
+    ApiSendRecord {
+        send_id: send.id.clone(),
+        token: hex_address(&send.token.0),
+        amount: send.amount.0.to_string(),
+        fee: send.fee.0.to_string(),
+        to: send.to.clone(),
+        withdraw: send.withdraw(),
+        sent_at: seconds(send.sent_at),
+        state: if send.confirmed() {
+            ApiSendState::Confirmed
+        } else {
+            ApiSendState::Unconfirmed
+        },
+        tx_hash: send.tx_hash.map(|transaction| transaction.to_hex()),
+        posted_at: relay.and_then(|relay| relay.posted_at).map(seconds),
+        spent_at: relay.and_then(|relay| relay.spent_at).map(seconds),
+        retry_at: relay.and_then(|relay| relay.retry_at).map(seconds),
+    }
+}
+
+fn api_transact(answer: &RailgunBroadcast) -> ApiTransactResult {
+    let to_hex = |transaction: &[u8; 32]| format!("0x{}", hex::encode(transaction));
+    let (kind, transactions, retry_after_secs) = match answer {
+        RailgunBroadcast::Sent(transaction) => {
+            (ApiTransactKind::Sent, vec![to_hex(transaction)], None)
+        }
+        RailgunBroadcast::Refused { .. } => (ApiTransactKind::Refused, Vec::new(), None),
+        RailgunBroadcast::Spent(transactions) => (
+            ApiTransactKind::Spent,
+            transactions.iter().map(to_hex).collect(),
+            None,
+        ),
+        RailgunBroadcast::Retry { retry_after_secs } => (
+            ApiTransactKind::Retry,
+            Vec::new(),
+            retry_after_secs.map(|seconds| u32::try_from(seconds).unwrap_or(u32::MAX)),
+        ),
+    };
+    ApiTransactResult {
+        kind,
+        transactions,
+        retry_after_secs,
+    }
 }
 
 fn reverse_call<'s>(

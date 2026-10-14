@@ -5,16 +5,66 @@
 //! `ZecSwap-Ticket` header where the record keeps one. Never retried here: a
 //! request that timed out may have sent its transaction. The fee caps (D11,
 //! X6) are the engine's to apply before it signs.
+//!
+//! The relayer also broadcasts the wallet's private Railgun sends and
+//! withdrawals for a fee note (reference §6.7; zapp
+//! `of/RailgunSendsClient.kt`, `up/PrivateUsdRelayer.kt`): its terms for
+//! them are held to the deployment's pins, and each post's answer says
+//! whether the send is dropped or posted again as the same bytes.
 
 use serde::Serialize;
 use zecswap_core::Terms;
 
-use super::deployment::{CLIENT_TIMEOUT, TICKET_HEADER};
+use super::deployment::{Deployment, CLIENT_TIMEOUT, MAX_RELAYER_FEE, TICKET_HEADER};
 use super::models::{
-    Amount, Hex, RelayerTerms, ReverseFundingRequest, Sent, Signature, SwapAuthorization, SwapNote,
-    SwapPayout, SwapRescue, Ticket, WireTerms, Word,
+    Amount, Hex, RailgunSendsTerms, RailgunTransactRequest, RelayerTerms, ReverseFundingRequest,
+    Sent, Signature, SwapAuthorization, SwapNote, SwapPayout, SwapRescue, Ticket, WireTerms, Word,
 };
-use super::transport::{get_json, post_json, HttpTransport, Service, SwapHttpError};
+use super::transport::{get_json, post_json, HttpTransport, Service, SwapErrorCode, SwapHttpError};
+use super::{fail, ErrorCode};
+
+/// The longest wait a relayer's `Retry-After` holds a send for: the hour it
+/// holds the notes of a send that reverted (zapp `MAX_RETRY_AFTER`). A
+/// longer one, which it never asks, would hold a send on a bad answer.
+pub(crate) const MAX_RETRY_AFTER_SECONDS: u64 = 60 * 60;
+
+/// What the relayer did with a Railgun transaction it was asked to send
+/// (zapp `RailgunBroadcast`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum RailgunBroadcast {
+    /// Submitted in this transaction, not mined yet: the same bytes posted
+    /// again name it.
+    Sent([u8; 32]),
+    /// Refused (any 4xx but 409): nothing from this proof went, nor will.
+    Refused { status: u16 },
+    /// `409 alreadySpent`: a note it spends is spent, by these transactions
+    /// of the relayer's where it named any. The chain settles it.
+    Spent(Vec<[u8; 32]>),
+    /// Not known yet, or never answered: the same bytes go again later, no
+    /// sooner than `retry_after_secs` (at most an hour) where it asked.
+    Retry { retry_after_secs: Option<u64> },
+}
+
+/// The relayer as the broadcaster of private sends and withdrawals, held to
+/// the deployment's pins (zapp `RailgunSendsPin`, `RailgunBroadcaster`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SendsBroadcaster {
+    pub chain_id: u64,
+    pub railgun_proxy: [u8; 20],
+    /// The relayer's own `0zk` address, which the fee note pays.
+    pub railgun_address: &'static str,
+    pub fee_token: [u8; 20],
+    /// The least fee a send pays, in the fee token's base units.
+    pub min_fee: Amount,
+    /// Positive decimal: fee-token base units per 10^18 wei of gas.
+    pub fee_per_unit_gas: Option<String>,
+    /// Unix seconds the rate is held until; only with a rate.
+    pub fee_expires_at: Option<u64>,
+    pub max_gas_limit: u64,
+    /// Positive decimal wei.
+    pub max_gas_price_wei: String,
+    pub max_calldata_bytes: u32,
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -86,6 +136,73 @@ impl<'a, T: HttpTransport> RelayerClient<'a, T> {
             },
         )
         .await
+    }
+
+    /// The relayer's terms for private sends, held to `pins` (zapp
+    /// `PrivateUsdRelayer.broadcaster`): `None` when it sends none, or none
+    /// the pins allow (another chain, proxy, `0zk` or fee token, no positive
+    /// gas price, or a rate without its expiry). A least fee above the cap
+    /// (D11) is `RelayerFee`: no send could pay it.
+    pub(crate) async fn railgun_sends(
+        &self,
+        pins: &Deployment,
+    ) -> super::Result<Option<SendsBroadcaster>> {
+        let terms = self.terms().await?;
+        let Some(sends) = terms.railgun_sends.as_ref() else {
+            return Ok(None);
+        };
+        let Some(broadcaster) = pinned_sends(&terms, sends, pins) else {
+            log::warn!("Private USD: the relayer's terms for sends aren't the pinned ones");
+            return Ok(None);
+        };
+        if broadcaster.min_fee.0 > MAX_RELAYER_FEE {
+            return fail(
+                ErrorCode::RelayerFee,
+                "the relayer's least fee for a send is above the cap",
+            );
+        }
+        Ok(Some(broadcaster))
+    }
+
+    /// `POST /v1/railgun/transact`: a proved Railgun transaction, sent as it
+    /// is (zapp `RailgunSendsClient.transact`, zecswap-client's
+    /// `railgun_transact`). A 409 `alreadySpent` is spent, any other 4xx
+    /// refused, and anything else, a lost answer included, unknown.
+    pub(crate) async fn railgun_transact(
+        &self,
+        request: &RailgunTransactRequest,
+    ) -> RailgunBroadcast {
+        const CONFLICT: u16 = 409;
+        match self
+            .send("/v1/railgun/transact", request, None, |_: &Sent| Ok(()))
+            .await
+        {
+            Ok(sent) => match sent.transactions.first() {
+                Some(transaction) => RailgunBroadcast::Sent(transaction.0),
+                // The relayer named no transaction.
+                None => RailgunBroadcast::Retry {
+                    retry_after_secs: None,
+                },
+            },
+            Err(SwapHttpError::Refused(refusal)) => {
+                if refusal.status == CONFLICT && refusal.code == Some(SwapErrorCode::AlreadySpent) {
+                    RailgunBroadcast::Spent(refusal.transactions)
+                } else if (400..500).contains(&refusal.status) && refusal.status != CONFLICT {
+                    RailgunBroadcast::Refused {
+                        status: refusal.status,
+                    }
+                } else {
+                    RailgunBroadcast::Retry {
+                        retry_after_secs: refusal
+                            .retry_after_secs
+                            .map(|seconds| seconds.min(MAX_RETRY_AFTER_SECONDS)),
+                    }
+                }
+            }
+            Err(_) => RailgunBroadcast::Retry {
+                retry_after_secs: None,
+            },
+        }
     }
 
     /// `POST /v1/reverse/fund`: the proved Relay Adapt transaction. An empty
@@ -280,6 +397,53 @@ fn payout_request<'a>(payout: &'a SwapPayout, terms: &'a WireTerms) -> PayoutReq
     }
 }
 
+/// `sends` as the pins allow them (zapp `PrivateUsdRelayer.pinned`). Without
+/// the pin, a gateway that rewrote the terms and kept the post could take
+/// the fee note and send the transaction itself.
+fn pinned_sends(
+    terms: &RelayerTerms,
+    sends: &RailgunSendsTerms,
+    pins: &Deployment,
+) -> Option<SendsBroadcaster> {
+    let address = sends.railgun_address.to_ascii_lowercase();
+    let is_pinned = terms.chain_id == pins.chain_id
+        && sends.railgun_proxy.0 == pins.railgun_proxy
+        && super::railgun_keys::is_valid_railgun_address(&address)
+        && address == pins.relayer_railgun_address
+        && sends.token.0 == pins.token;
+    let max_gas_price_wei = positive_decimal(&sends.max_gas_price_wei)?;
+    let fee_per_unit_gas = match sends.fee_per_unit_gas.as_deref() {
+        // A rate comes with the time it's held until, or it does not read.
+        Some(rate) => Some((positive_decimal(rate)?, sends.fee_expires_at?)),
+        None => None,
+    };
+    if !is_pinned || !sends.fee.is_swap_amount(false) {
+        return None;
+    }
+    Some(SendsBroadcaster {
+        chain_id: pins.chain_id,
+        railgun_proxy: pins.railgun_proxy,
+        railgun_address: pins.relayer_railgun_address,
+        fee_token: pins.token,
+        min_fee: sends.fee,
+        fee_per_unit_gas: fee_per_unit_gas.as_ref().map(|(rate, _)| rate.clone()),
+        fee_expires_at: fee_per_unit_gas.map(|(_, expires_at)| expires_at),
+        max_gas_limit: sends.max_gas_limit,
+        max_gas_price_wei,
+        max_calldata_bytes: sends.max_calldata_bytes,
+    })
+}
+
+/// A positive decimal integer of at most 78 digits (`uint256`), without
+/// leading zeros.
+fn positive_decimal(text: &str) -> Option<String> {
+    if text.is_empty() || text.len() > 78 || !text.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let digits = text.trim_start_matches('0');
+    (!digits.is_empty()).then(|| digits.to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -289,6 +453,11 @@ mod tests {
         test_support::{Reply, TestServer},
         RoutedTransport, SwapErrorCode,
     };
+    use crate::wallet::private_usd::{
+        deployment::{self, hex_address},
+        PrivateUsdNetwork,
+    };
+    use serde_json::{json, Value};
 
     fn terms() -> Terms {
         Terms {
@@ -389,5 +558,188 @@ mod tests {
         assert_eq!(body["terms"]["user"], format!("0x{}", "04".repeat(20)));
         assert_eq!(received[2].path, "/relayer/v1/reverse/ready");
         assert_eq!(received[3].path, "/relayer/v1/reverse/fund");
+    }
+
+    /// zapp `SwapClientsTest` 228 and 355: a Railgun send goes out as proved,
+    /// and each answer says whether to drop it or post the same bytes again,
+    /// honouring `Retry-After` up to an hour.
+    #[tokio::test]
+    async fn railgun_send_answers_say_whether_to_drop_it_or_post_it_again() {
+        let _policy = lock_route_policy();
+        let hash = format!("0x{}", "ab".repeat(32));
+        let held_back = |retry_after: &str| Reply::Http {
+            status: 503,
+            headers: vec![
+                ("content-type", "application/json".into()),
+                ("retry-after", retry_after.into()),
+            ],
+            body: r#"{"code":"unavailable","error":"a send of these notes reverted lately"}"#
+                .into(),
+        };
+        let mut replies = vec![
+            Reply::json(200, &format!(r#"{{"transactions":["{hash}"]}}"#)),
+            Reply::json(200, r#"{"transactions":[]}"#),
+            Reply::json(409, r#"{"code":"alreadySpent","error":"spent"}"#),
+            Reply::json(
+                409,
+                &format!(r#"{{"code":"alreadySpent","error":"spent","transactions":["{hash}"]}}"#),
+            ),
+            Reply::json(409, r#"{"code":"unavailable","error":"busy"}"#),
+        ];
+        let refusals = [400, 404, 413, 415, 422];
+        replies.extend(refusals.map(|status| Reply::json(status, "not json")));
+        replies.extend([500, 503].map(|status| Reply::json(status, "not json")));
+        let waits = [
+            "1800",
+            "86400",
+            "Wed, 21 Oct 2026 07:28:00 GMT",
+            "-1",
+            "1.5",
+            "99999999999999999999",
+        ];
+        replies.extend(waits.map(held_back));
+        replies.push(Reply::Hangup);
+        let count = replies.len();
+        let server = TestServer::start(replies);
+        let transport = RoutedTransport::new();
+        let relayer = RelayerClient::new(&transport, &format!("{}/relayer", server.url));
+        let request = RailgunTransactRequest {
+            chain_id: 11_155_111,
+            to: Hex([7; 20]),
+            data: "0xd8ae136a".into(),
+            value: "0".into(),
+        };
+
+        let mut answers = Vec::new();
+        for _ in 0..count {
+            answers.push(relayer.railgun_transact(&request).await);
+        }
+        let retry = |retry_after_secs| RailgunBroadcast::Retry { retry_after_secs };
+        let mut expected = vec![
+            RailgunBroadcast::Sent([0xab; 32]),
+            retry(None),
+            RailgunBroadcast::Spent(Vec::new()),
+            RailgunBroadcast::Spent(vec![[0xab; 32]]),
+            retry(None),
+        ];
+        expected.extend(refusals.map(|status| RailgunBroadcast::Refused { status }));
+        expected.extend([retry(None), retry(None)]);
+        expected.extend([
+            retry(Some(1800)),
+            retry(Some(MAX_RETRY_AFTER_SECONDS)),
+            retry(None),
+            retry(None),
+            retry(None),
+            retry(None),
+        ]);
+        expected.push(retry(None));
+        assert_eq!(answers, expected);
+
+        let received = server.received();
+        assert_eq!(received.len(), count);
+        let body = format!(
+            r#"{{"chainId":11155111,"to":"0x{}","data":"0xd8ae136a","value":"0"}}"#,
+            "07".repeat(20)
+        );
+        for request in received {
+            assert_eq!(request.path, "/relayer/v1/railgun/transact");
+            assert_eq!(request.header("zecswap-ticket"), None);
+            assert_eq!(String::from_utf8(request.body).unwrap(), body);
+        }
+    }
+
+    /// zapp `PrivateUsdRelayer.pinned` (`RelayedPrivateUsdSenderTest` 247
+    /// and 296): only the pinned relayer's terms send, a rate needs its
+    /// expiry, and the least fee is held to the 2 USDC cap (D11).
+    #[tokio::test]
+    async fn railgun_sends_terms_are_held_to_the_pins_and_the_fee_cap() {
+        let _policy = lock_route_policy();
+        let pins = deployment::deployment(PrivateUsdNetwork::Testnet);
+        let mainnet = deployment::deployment(PrivateUsdNetwork::Mainnet);
+        let sends = json!({
+            "railgunAddress": pins.relayer_railgun_address,
+            "railgunProxy": hex_address(&pins.railgun_proxy),
+            "token": hex_address(&pins.token),
+            "fee": "500000",
+            "feePerUnitGas": "2726271000",
+            "feeExpiresAt": 1_791_504_000u64,
+            "maxGasLimit": 6_000_000u64,
+            "maxGasPriceWei": "0200000000000",
+            "maxCalldataBytes": 131_072u32,
+        });
+        let terms = |chain_id: u64, sends: Option<Value>| {
+            let mut terms = json!({
+                "relayer": hex_address(&pins.relayer),
+                "chainId": chain_id,
+                "contract": hex_address(&pins.contract),
+                "fee": "20000",
+            });
+            if let Some(sends) = sends {
+                terms["railgunSends"] = sends;
+            }
+            Reply::json(200, &terms.to_string())
+        };
+        let edited = |edit: &dyn Fn(&mut Value)| {
+            let mut edited = sends.clone();
+            edit(&mut edited);
+            terms(pins.chain_id, Some(edited))
+        };
+        let replies = vec![
+            terms(pins.chain_id, Some(sends.clone())),
+            terms(pins.chain_id, None),
+            terms(mainnet.chain_id, Some(sends.clone())),
+            edited(&|sends| sends["railgunAddress"] = json!(mainnet.relayer_railgun_address)),
+            edited(&|sends| sends["railgunProxy"] = json!(hex_address(&mainnet.railgun_proxy))),
+            edited(&|sends| sends["token"] = json!(hex_address(&mainnet.token))),
+            edited(&|sends| {
+                sends.as_object_mut().unwrap().remove("feeExpiresAt");
+            }),
+            edited(&|sends| sends["maxGasPriceWei"] = json!("0")),
+            edited(&|sends| sends["fee"] = json!("2000001")),
+            edited(&|sends| {
+                sends["fee"] = json!("2000000");
+                sends.as_object_mut().unwrap().remove("feePerUnitGas");
+            }),
+        ];
+        let server = TestServer::start(replies);
+        let transport = RoutedTransport::new();
+        let relayer = RelayerClient::new(&transport, &format!("{}/relayer", server.url));
+
+        let pinned = relayer.railgun_sends(pins).await.unwrap().unwrap();
+        assert_eq!(
+            pinned,
+            SendsBroadcaster {
+                chain_id: pins.chain_id,
+                railgun_proxy: pins.railgun_proxy,
+                railgun_address: pins.relayer_railgun_address,
+                fee_token: pins.token,
+                min_fee: Amount(500_000),
+                fee_per_unit_gas: Some("2726271000".into()),
+                fee_expires_at: Some(1_791_504_000),
+                max_gas_limit: 6_000_000,
+                max_gas_price_wei: "200000000000".into(),
+                max_calldata_bytes: 131_072,
+            }
+        );
+        for case in [
+            "no sends",
+            "another chain",
+            "another 0zk",
+            "another proxy",
+            "another fee token",
+            "a rate without its expiry",
+            "no gas price",
+        ] {
+            assert_eq!(relayer.railgun_sends(pins).await.unwrap(), None, "{case}");
+        }
+        let error = relayer.railgun_sends(pins).await.unwrap_err();
+        assert_eq!(error.code, ErrorCode::RelayerFee);
+        let at_cap = relayer.railgun_sends(pins).await.unwrap().unwrap();
+        assert_eq!(at_cap.min_fee, Amount(MAX_RELAYER_FEE));
+        assert_eq!(
+            (at_cap.fee_per_unit_gas, at_cap.fee_expires_at),
+            (None, None),
+            "an expiry without a rate holds nothing"
+        );
     }
 }

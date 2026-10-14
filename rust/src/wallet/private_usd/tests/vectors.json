@@ -138,7 +138,8 @@
     "PaidOut(bytes32,address,uint256)": "0xf4292e0ae547c949263a88899ebcdac1a5493bef4f206b7592b5a7de68f4c0de",
     "openReverse((address,address,address,uint128,uint256[2],uint256[2],uint64,uint64,bytes32,uint64),bytes)": "0x4c72b9a0",
     "approve(address,uint256)": "0x095ea7b3",
-    "transfer(address,uint256)": "0xa9059cbb"
+    "transfer(address,uint256)": "0xa9059cbb",
+    "nullifiers(uint256,bytes32)": "0xf19ea903"
   },
   "reverseFunding": {
     "source": "zecSwap d69e3fb crates/zecswap-chain/src/evm/funding/sdk-vector.json, encoded by ethers v6 with the ZecSwap ABI (crates/zecswap-railgun/engine/funding-vector.cjs): the three calls of one reverse funding, cut from its Relay Adapt calldata. The shares are SpendAuthG multiples 1 and 2 (contracts/test/vectors/spend_auth_g.json); the signature is the key 0x07..07's OpenReverse. Pinned, never regenerated.",

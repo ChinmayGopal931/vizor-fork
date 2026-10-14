@@ -9,9 +9,9 @@
 //! Never log the mnemonic, the seed, a secret share, a relayer ticket, token
 //! state or a keyed RPC URL.
 
-// M1 and M2 build blocks the engine drives; the forward (M5) and reverse (M6)
-// halves use their share, and the send blocks wait for M7. Remove this once
-// the engine uses them all.
+// M1 and M2 build blocks the engine drives; the forward (M5), reverse (M6) and
+// send (M7) halves use their share, and a few wait for M4's tokens. Remove
+// this once the engine uses them all.
 #![allow(dead_code)]
 
 use std::fmt;
@@ -34,6 +34,7 @@ pub(crate) mod models;
 pub(crate) mod railgun_keys;
 pub(crate) mod relayer_client;
 pub(crate) mod reverse;
+pub(crate) mod sends;
 pub(crate) mod store;
 pub(crate) mod terms;
 pub(crate) mod transport;
