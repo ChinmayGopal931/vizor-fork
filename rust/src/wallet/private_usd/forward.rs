@@ -771,6 +771,10 @@ where
                             .await?,
                     ),
                 };
+                // Proposing can wait seconds on the wallet write lock; a lock or
+                // background that arrived meanwhile stops here, before any key is
+                // used. The guard releases the proposal.
+                self.check_cancelled()?;
                 self.set_activity(Activity::Depositing);
                 // Started before it exists: an interruption from here on finds
                 // it in the wallet rather than paying again.
@@ -1126,7 +1130,12 @@ where
         swap: &SwapState,
     ) -> Result<()> {
         let now = fresh_head(self.chain.head().await?.timestamp, self.clock.now())?;
-        if swap.claim_lock_until > now && swap.claim_lock_until - now > REVEAL_MARGIN_SECONDS {
+        // The margin counts from the later of the head and this device's clock:
+        // the head can trail real time by up to `MAX_HEAD_LAG_SECONDS`.
+        let margin_from = now.max(self.clock.now());
+        if swap.claim_lock_until > margin_from
+            && swap.claim_lock_until - margin_from > REVEAL_MARGIN_SECONDS
+        {
             return Ok(());
         }
         let lock_duration = self.chain.lock_duration().await?;
@@ -1171,9 +1180,11 @@ where
             return fail(ErrorCode::ChainLagging, "the claim lock isn't confirmed");
         };
         let now = fresh_head(fresh.head.timestamp, self.clock.now())?;
+        // As in `hold_claim_lock`: never count the margin from a trailing head.
+        let margin_from = now.max(self.clock.now());
         let lapsing = !matches!(swap.stage, SwapStage::Open | SwapStage::Ready)
-            || swap.claim_lock_until <= now
-            || swap.claim_lock_until - now <= REVEAL_MARGIN_SECONDS;
+            || swap.claim_lock_until <= margin_from
+            || swap.claim_lock_until - margin_from <= REVEAL_MARGIN_SECONDS;
         if lapsing {
             return fail(ErrorCode::ClaimTurn, "no safe claim lock to reveal under");
         }

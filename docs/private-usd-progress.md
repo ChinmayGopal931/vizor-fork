@@ -633,6 +633,33 @@ opt-in scenario is written (D-57). Part 1 is `0a4cb8182` (M5.1–M5.2); part
   the kill switch turned off mid-swap (D-42: a flag URL the phone can
   reach).
 
+M5 review (2026-10-14): a read-only fund-safety review of M5 found no
+double deposit, no reveal inside the margin, no payout above 2 USDC, no
+reused index and no leaked secret. It found four bugs, fixed here without new
+unit tests (owner: E2E first):
+
+- The convert screen re-quoted every 1 s tick after a failed replacement
+  quote, spending a swap index (and a maker request and a seed read) each
+  time. A failed replacement is now left for the user (editing the amount
+  asks again), and a debounced quote no longer runs once the app is
+  backgrounded or locked.
+- A lock or background that arrived while the deposit was being proposed
+  (the wallet write lock can take seconds) was not checked before `Started`,
+  so the seed signed after the lock. `ensure_paid` checks the cancel flag
+  again before `Started`; the proposal guard releases the proposal.
+- An accept interrupted by background or lock left the review stuck in
+  `confirming`. It now returns to the review and shows a conversion under
+  way instead.
+- After a deletion whose conversion cleanup gave up (a busy driver), the
+  engine retried the deleted account every pass. It now skips accounts the
+  wallet no longer lists; their rows stay, unreadable without the seed.
+
+And one hardening (D-59). Checks after the fixes: `cargo test` lib 1500
+passed, 0 failed; `fvm flutter analyze` clean; desktop lane 5963 passed, 4
+failed (the known `settings_seed_phrase_screen_test.dart` four); mobile lane
+2276 passed, 10 failed (the known `app_review_payment_handoff_test.dart`
+ten).
+
 ## M6. Reverse conversion, reverse refunds, rescue and the Refunds screen
 
 - [ ] M6.1 `reverse.rs` and `funding_calls.rs`
@@ -1431,6 +1458,13 @@ opt-in scenario is written (D-57). Part 1 is `0a4cb8182` (M5.1–M5.2); part
   runs the real quote search and engine over a scripted backend on the
   widget tester's fake clock; time-driven tests pump `Duration.zero` because
   a bare `pump()` fires no timers.
+- **D-59 (M5 review): the reveal margin counts from the later clock.**
+  `hold_claim_lock` and `require_fresh_claim_lock` measure the 300 s margin
+  from `max(head time, device clock)`, not the head time alone (zapp and
+  D-38 use the head). The head may trail real time by up to
+  `MAX_HEAD_LAG_SECONDS` (180 s), which left as little as 120 s of real
+  margin. Lock-taking (`may_take_lock`) still uses the head, as the contract
+  does.
 
 ## Blocked
 

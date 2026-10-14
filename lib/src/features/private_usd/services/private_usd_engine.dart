@@ -133,17 +133,26 @@ class PrivateUsdEngine {
     required PrivateUsdSwapBackend backend,
     required Future<Uint8List?> Function(String accountUuid) readMnemonic,
     required bool Function() allowed,
+    bool Function(String accountUuid)? isKnownAccount,
     DateTime Function()? now,
   }) : _backend = backend,
        _readMnemonic = readMnemonic,
        _allowed = allowed,
+       _isKnownAccount = isKnownAccount ?? _anyAccount,
        _now = now ?? DateTime.now;
+
+  static bool _anyAccount(String _) => true;
 
   final PrivateUsdSwapBackend _backend;
   final Future<Uint8List?> Function(String accountUuid) _readMnemonic;
 
   /// The host's conditions: in the foreground and unlocked.
   final bool Function() _allowed;
+
+  /// False for an account the wallet no longer lists: a deletion whose
+  /// conversion cleanup did not finish leaves its rows, and its seed is gone,
+  /// so advancing it would only fail every pass.
+  final bool Function(String accountUuid) _isKnownAccount;
   final DateTime Function() _now;
 
   /// Every conversion the engine has seen, by key.
@@ -253,6 +262,7 @@ class PrivateUsdEngine {
     if (epoch != _epoch) return null;
     Duration? nap;
     for (final account in accounts) {
+      if (!_isKnownAccount(account)) continue;
       final List<rust.ApiForwardRecord> records;
       try {
         records = await loadRecords(account);

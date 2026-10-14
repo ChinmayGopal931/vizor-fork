@@ -82,6 +82,12 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
         foreground &&
         !ref.read(appSecurityProvider).requiresUnlock &&
         !lifecycle.isQuiesced,
+    // Until the account list loads, every account counts as known.
+    isKnownAccount: (accountUuid) {
+      final accounts = ref.read(accountProvider).value?.accounts;
+      return accounts == null ||
+          accounts.any((account) => account.uuid == accountUuid);
+    },
   );
 
   void publish() {

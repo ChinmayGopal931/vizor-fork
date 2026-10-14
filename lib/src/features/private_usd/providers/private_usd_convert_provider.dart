@@ -436,11 +436,12 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
           break;
       }
     } on PrivateUsdEngineInterruptedException {
-      // Locked mid-accept: Rust finished it; the engine picks the record up
-      // after unlock, and the app is on its unlock screen meanwhile.
-      return null;
+      // Locked or backgrounded mid-accept: Rust may have saved it, and the
+      // engine picks a saved record up. Back to the review, never stuck in
+      // `confirming`; a conversion under way shows instead.
+      return _backToReview();
     } on PrivateUsdKeyLockedException {
-      return null;
+      return _backToReview();
     } catch (error) {
       if (kDebugMode) {
         debugPrint('privateUsd: accept failed (${error.runtimeType})');
@@ -514,6 +515,14 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
     return limit == null || fee > limit;
   }
 
+  PrivateUsdRoutePath? _backToReview() {
+    if (ref.mounted) {
+      state = state.copyWith(step: PrivateUsdConvertStep.review);
+      unawaited(findUnderWay());
+    }
+    return null;
+  }
+
   void _startFailed(String message) {
     state = state.copyWith(
       step: PrivateUsdConvertStep.review,
@@ -533,6 +542,9 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
         quote == null ||
         !state.isExpired ||
         state.quoting ||
+        // A failed replacement is not retried every tick: each try spends a
+        // swap index. Editing the amount asks again.
+        state.quoteError != null ||
         !ref.read(privateUsdEngineProvider).canRun) {
       return;
     }
@@ -559,6 +571,13 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
     final generation = _generation;
     state = state.copyWith(quoting: true, clearQuoteError: true);
     _pending = Timer(debounce, () async {
+      if (!ref.mounted || generation != _generation) return;
+      // Backgrounded or locked during the debounce: no quote, since each one
+      // spends a swap index and reads the seed.
+      if (!ref.read(privateUsdEngineProvider).canRun) {
+        state = state.copyWith(quoting: false);
+        return;
+      }
       PrivateUsdZecQuote? quote;
       Object? failure;
       try {
