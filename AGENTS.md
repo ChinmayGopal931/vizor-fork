@@ -567,11 +567,12 @@ rust/src/
 ├── ffi.rs              # Thin, read-only C adapter for iOS Ironwood migration
 │                        # inspection and observable preparation-txid listing.
 ├── migration_preparation.rs
-│                       # Platform-neutral mobile preparation core. Android JNI
-│                       # uses its operation lifecycle, preparation-only sync,
-│                       # inspect/advance, cancellation, and foreground-sync
-│                       # exclusion. iOS C FFI exposes only read-only inspect,
-│                       # proof-readiness, and observable txid reads.
+│                       # Platform-neutral mobile preparation core. iOS C FFI
+│                       # uses only its read-only inspect, proof-readiness, and
+│                       # observable txid reads. Its operation lifecycle,
+│                       # preparation-only sync, advance, and cancellation have
+│                       # had no native caller since the Android adapter was
+│                       # removed (459a8565b).
 │                       # Located outside api/ to avoid FRB codegen picking it up.
 ├── wallet/
 │   ├── mod.rs          # pub mod keys, sync, sync_engine, keystone
@@ -622,15 +623,14 @@ Normal wallet sync has one path: Dart calls `start_full_sync()` through
 `DESIRED_SYNC_MODE`, `SYNC_CANCEL`, and `SYNC_RUNNING` belong to that foreground
 path.
 
-iOS and Android intentionally have different preparation contracts:
+Only iOS has native background migration work. Android has none: commit
+`459a8565b` removed its preparation and outbox WorkManager workers, their
+Kotlin bridge, and `rust/src/android_jni.rs`. The private (denomination
+preparation) mobile migration is iOS-only, and on Android its routes
+redirect to the fast migration (`supportsPrivateMobileIronwoodMigration`).
+The iOS contract:
 
 ```
-Android IronwoodMigrationPreparationWorker
-    → JNI adapter
-    → begin preparation operation
-    → preparation-only Rust full sync / inspect / advance
-    → end preparation operation
-
 Swift BackgroundMigrationPreparationManager
     → submit user-visible BGContinuedProcessingTask
     → read-only C FFI inspect / observable preparation txids
@@ -660,16 +660,16 @@ Swift BackgroundMigrationPreparationManager
   pass is reported as pause-and-re-arm, never as failure. Foreground reentry
   owns the wallet sync, denomination advance, and submission of a fresh
   read-only task for the next wave.
-- Android keeps its WorkManager foreground worker and native preparation path.
-  The worker may run the existing mode-2 full sync, inspect proof readiness,
-  advance denomination preparation, and enqueue a continuation.
-- `rust/src/migration_preparation.rs` owns the mobile preparation operation's
-  cancel token and desired mode. Foreground `cancelFullSync()` does not cancel
-  that operation; the paths share `SYNC_RUNNING` while the sync engine is active
-  so two wallet scans cannot run concurrently.
-- Already-signed migration outbox transport remains background-capable. It may
-  query the chain tip and broadcast exact signed bytes, but it never scans the
-  wallet.
+- Android has no background worker and no native preparation or outbox path.
+  Its migration runs in the foreground only.
+- `rust/src/migration_preparation.rs` still owns a preparation operation's
+  cancel token and desired mode, which foreground `cancelFullSync()` does not
+  cancel; such an operation would share `SYNC_RUNNING` with the sync engine so
+  two wallet scans cannot run concurrently. Nothing starts one today: the iOS
+  task is read-only.
+- The iOS already-signed migration outbox transport remains background-capable.
+  It may query the chain tip and broadcast exact signed bytes, but it never
+  scans the wallet.
 - Account DB mutations quiesce and drain native migration work before changing
   the wallet DB.
 - The removed general iOS background-sync identifier
@@ -707,7 +707,6 @@ policy-aware openers and fails closed while Tor is starting or broken.
 
 Key files:
 - `rust/src/migration_preparation.rs` — shared mobile preparation core
-- `rust/src/android_jni.rs` — Android preparation execution adapter
 - `rust/src/ffi.rs` — iOS read-only inspection and query adapter
 - `ios/Runner/zcash_sync.h` — matching C header
 - `ios/Runner/BackgroundMigrationPreparationManager.swift` — continued-task
@@ -1122,6 +1121,165 @@ edge in `MobileBottomSafeArea`
 - New sheets follow `MobileBottomSafeArea(bottomPadding: token)` >
   `Padding(...)`; both platform geometries are pinned in
   `test/core/layout/mobile/mobile_bottom_safe_area_test.dart`.
+
+## Private USD
+
+A Railgun USDC ("private USD") balance, conversion both ways with shielded
+ZEC by atomic swap (with refunds and rescue), and private send and withdraw.
+It is Android-only and mobile form factor only for now. Before changing it,
+read `docs/private-usd-android-plan.md`: §3.5 lists the invariants and why
+each one exists. The pinned config and defines are in
+`docs/private-usd-reference.md` §7. Progress and deviations are in
+`docs/private-usd-progress.md`, and the device runs in
+`docs/private-usd-device-checklist.md`.
+
+Code:
+
+- Rust: `rust/src/wallet/private_usd/`, `rust/src/api/private_usd.rs`,
+  `rust/src/wallet/routed_http.rs` and `rust/src/railgun_bridge.rs`.
+- Dart: `lib/src/features/private_usd/`,
+  `lib/src/core/config/private_usd_feature_config.dart` and
+  `lib/src/providers/private_usd_lifecycle_provider.dart`.
+- Kotlin: `android/app/src/main/kotlin/com/keplr/vizor/railgun/`.
+- The Railgun page: `android/app/src/main/assets/railgun/`, built from
+  `android/railgun-web/`.
+
+**Defines (reference §7.3).** Each is a Dart define read once in
+`private_usd_feature_config.dart`. Gradle needs none of them.
+
+- `VIZOR_PRIVATE_USD_ENABLED` (default `false`) turns the feature on.
+  Release builds turn it on only after the owner's sign-off.
+- `VIZOR_ETHEREUM_RPC_URL_{MAINNET,SEPOLIA}` are the keyed RPC URLs. They
+  are the only secrets: pass them only with
+  `--dart-define-from-file=<gitignored json>`. Their host must be
+  `eth-{mainnet,sepolia}.g.alchemy.com` or `{mainnet,sepolia}.infura.io`. Any
+  other host needs a bundle rebuild and changes to the Kotlin and Rust
+  allowlists.
+- `VIZOR_PRIVATE_USD_FLAG_URL` is the kill switch. Only an explicit `false`
+  hides the feature. A missing key or a failed fetch keeps the last value,
+  which defaults to available. Even `false` never stops conversions already
+  under way.
+- `VIZOR_SUPPORT_URL` is optional.
+
+**Foreground and unlocked only (plan D9).**
+
+- Every key-using step runs only while the app is unlocked and in the
+  foreground. That covers the deposit, claim, payout signature, refund,
+  sweep and Railgun proving.
+- There is no worker, alarm or notification, and no per-swap key is stored.
+- Background cancels the Rust step and stops polling, but leaves the
+  Railgun page open.
+- Lock cancels the step, closes the page and drops Dart-held secrets.
+- While unlocked, the engine (`PrivateUsdEngineHost` in `lib/app.dart`)
+  advances the conversions of every software account, not only the active
+  one (D14).
+- Hardware accounts, accounts without ZIP-32 metadata, and regtest hide the
+  feature.
+
+**Separate databases.** Rust owns both, in
+`<support>/private_usd_<walletDbName>_<network>/` (`getPrivateUsdDirPath`):
+
+- `swaps.db` holds the swap index counter, the swap records, the
+  joint-account index and the Railgun send log. Records decode strictly: an
+  unreadable record is an error, never a reset.
+- `joint.db` is a librustzcash DB for the short-lived joint accounts.
+
+Never put joint accounts in `zcash_wallet.db`: hidden accounts would leak
+into account lists, sync, voting, PIR and the migration. Never let losing
+`joint.db` take `swaps.db` with it. Account deletion removes that account's
+rows. A full reset removes the whole directory (`deletePrivateUsdDirectories`)
+and the page's WebView origin.
+
+**Invariants (plan §3.5).** Each one guards funds or privacy. Keep them, and
+keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
+`test/features/private_usd/`.
+
+- Commit `next_index + 1` before any quote leaves the device, and never
+  reuse a swap index (a shared `z` hands that swap to its maker).
+- Save the record before accept, and treat an accept that timed out or
+  failed in transport as maybe opened.
+- Never pay a deposit twice. Save `Started` before building it and the bytes
+  before the first broadcast. Rebuild only once the old one is proven
+  expired.
+- Derive the deposit address from the on-chain shares, never from the API.
+- Reveal `z` only under a fresh, confirmed lock with more than 300 s left.
+  Only confirmed reads authorize anything, and only a fresh head counts.
+- Never prove a second reverse funding because a response was lost. Never
+  re-sign `ready` after a restart; resend it.
+- Keep every signed payout, refund payout, refund lock, `ready` and Railgun
+  send proof before posting it. Cap every relayer fee at 2 USDC.
+- Joint sweeps broadcast before they store. `PROPOSAL_STORE` is
+  consume-on-entry with an idempotent discard, as in the hardware invariants.
+- Joint sweeps use Discard OVK, while the deposit uses the sender's OVK.
+- Import joint accounts at the exact birthday, never the rounded restore
+  birthday.
+- Run one conversion at a time per account, and one outgoing Railgun payment
+  at a time per wallet (the spend guard).
+- The chain is the only evidence; the maker's status API never is.
+- Never quote per keystroke. Every quote spends a swap index.
+- Derive keys only after the seed-fingerprint check, and refuse a Railgun
+  session whose address differs from Rust's.
+- Deleting an account, or resetting, with a conversion under way warns with
+  the count and waits for the user's explicit confirmation. Drain
+  `privateUsdLifecycleProvider` first, and clean up only after the Rust
+  delete succeeds.
+
+**Network: Tor and the Railgun page.**
+
+- All engine HTTP (maker, relayer, Ethereum RPC) goes through `routed_http`.
+  It follows the route policy, fails closed while Tor starts or is broken,
+  and never falls back to the clearnet.
+- The Railgun page runs in a native Kotlin WebView host behind
+  `com.zcash.wallet/railgun` (no Dart WebView plugin and no injected JS
+  bridge). It loads only its own assets through `WebViewAssetLoader` and
+  intercepts every subresource against a fixed host allowlist. The Kotlin
+  allowlist (`RailgunEndpoints`), the Rust bridge's allowlist and the
+  page's CSP must agree.
+- The page's traffic leaves only through the Rust loopback SOCKS5 bridge
+  (`railgun_bridge.rs`), which uses arti when Tor is on.
+- On any route change, close the page and stop the bridge, then reopen on a
+  new bridge: Chromium keeps pooled sockets (plan U19). The page also
+  closes on lock, on an account switch, and after 10 idle minutes.
+- The bundle is GPL-3.0 and ships as a separately licensed asset with its
+  notices. Never read `railgun.js` or the `.wasm` files into context.
+
+**Never log secrets, and keep each one in its own store.**
+
+- The keyed RPC URL is never logged or stored: a swap record pins only the
+  keyless URL.
+- Relayer tickets and token blinding secrets stay in `swaps.db` and the
+  token state, and are never logged.
+- The mnemonic and the Railgun encryption key live only in secure storage.
+
+How the code keeps to this:
+
+- Rust's Private USD logs carry error codes and indices, never URLs,
+  headers or bodies. Dart's debug lines carry runtime types.
+- The page's console lines are never printed. Page error text is redacted
+  (`redactRailgunMessage`) before any debug print.
+- `RailgunStartParams.toString` hides `rpcUrls`.
+- `run_device_round.sh --keyed-rpc` checks the logs and files on the device.
+
+**Device rounds.** Use the Galaxy A35 over USB, never an emulator, and run
+`ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh`:
+
+1. Run it with no flags first: this M3 round creates the testnet wallet.
+2. Fund that wallet with testnet ZEC.
+3. Run it again with
+   `--m5 --m6 --m7 --m7-to 0x… [--m8-route] [--keyed-rpc <json>]`.
+
+The rounds are heavy and need the owner's funds and services, so run them
+only when asked. The checklist maps each flag to what it checks.
+
+**Do not merge or push the local stand-ins.** `rust/Cargo.toml` points at
+two local copies:
+
+- `~/dev/zapp/zecSwap-zakura`, a zecSwap `[patch]` (E1);
+- `~/dev/wallet-libraries-e4`, path entries for wallet-libraries (E4).
+
+Both are marked do-not-merge. With the zapp-ported code and the Railgun
+bundle (E2), they keep `feature/private-usd-android` local until the owner
+delivers E1, E2 and E4 (progress B-6).
 
 ## Testing
 

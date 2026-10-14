@@ -80,7 +80,7 @@ way when the file runs alone.
 - [x] M1.8 `store.rs`: `swaps.db` schema and migrations, `take_index`, `save_record`, queries
 - [x] M1.9 `indices.rs`: index allocation with on-chain skipping
 - [x] M1.10 `rust/src/wallet/routed_http.rs` (§8.5)
-- [ ] M1.10b Separate PR: Enhance PIR transport and voting `VizorRoute` onto `routed_http` (may slip to M8; not started in M1)
+- [ ] M1.10b Separate PR: Enhance PIR transport and voting `VizorRoute` onto `routed_http` (slipped to M8; deferred again in M8: not a safe drop-in, see the M1 status below and D-108)
 - [x] M1.11 `evm_rpc.rs`: every §5.4 read behind `ChainReader`
 - [x] M1.12 `maker_client.rs` and `relayer_client.rs` behind `HttpTransport`
 - [x] M1.13 `rust/src/api/private_usd.rs`: `ApiPrivateUsdError`, `ApiDeployment`, the five M1 calls; bridge regenerated
@@ -1091,14 +1091,75 @@ next; the M7 gate and its device checks wait for it.
 
 ## M8. Hardening and release QA
 
-- [ ] M8.1 Route changes during each phase fail closed and resume
-- [ ] M8.2 Kill switch: live JSON, missing flag, fetch failure
-- [ ] M8.3 Keyed RPC never appears in logs or records
-- [ ] M8.4 Measure APK size, first sync, proof time and memory; update plan §11
-- [ ] M8.5 `docs/private-usd-device-checklist.md`
-- [ ] M8.6 AGENTS.md "Private USD" section; correct the Android worker / `android_jni.rs` description
+- [ ] M8.1 Route changes during each phase fail closed and resume. Written;
+  device check pending: `run_device_round.sh --m8-route` (D-104), not run
+  because the phone was not attached (B-10)
+- [x] M8.2 Kill switch: live JSON, missing flag, fetch failure. The M3 unit
+  tests cover all three, and no new test was needed (D-107). The live
+  check against the owner's URL waits for E7 (checklist run M-13)
+- [ ] M8.3 Keyed RPC never appears in logs or records. Written; device check
+  pending: `run_device_round.sh --keyed-rpc <json>` (D-105), which needs
+  the phone (B-10) and E6's keyed RPC JSON. The static audit found no leak
+  (D-105)
+- [ ] M8.4 Measure APK size, first sync, proof time and memory; update plan
+  §11. Needs the phone (B-10; checklist run M-16)
+- [x] M8.5 `docs/private-usd-device-checklist.md`
+- [x] M8.6 AGENTS.md "Private USD" section; correct the Android worker /
+  `android_jni.rs` description (D-106: they were removed in `459a8565b`)
 - [ ] M8.7 `VIZOR_PRIVATE_USD_ENABLED` on for release builds (owner sign-off only)
-- [ ] M8 gate
+- [ ] M8 gate: done when the checklist passes on mainnet with the beta limits
+  (plan M8 **Done when**); the suites pass (status below)
+
+M8 status (2026-10-14): the non-device parts are done.
+
+- **Still waiting.**
+  - The device runs of M8.1 and M8.3, and M8.4, need the phone (B-10); M8.3
+    also needs E6.
+  - M8.2's live check needs E7.
+  - M8.7 needs the owner's sign-off.
+  - M8's **Done when**, the checklist passing on mainnet with the beta
+    limits, needs all of the above.
+  - M1.10b is deferred again (D-108). M4 still waits for N1.
+- **What landed.**
+  - `integration_test/private_usd_device_test.dart`: the opt-in route round
+    (`_M8RouteRound`, D-104).
+  - `scripts/private-usd/run_device_round.sh`: `--m8-route`,
+    `--m8-route-phases` and `--keyed-rpc` (D-104, D-105).
+  - `scripts/private-usd/device_round.py`: `keyed-rpc-check` and
+    `keyed-rpc-scan`; `summarize` now reports both scans.
+  - `docs/private-usd-device-checklist.md` (M8.5):
+    - what to check before you start;
+    - the round order: M3 first, which creates the testnet wallet; then fund
+      it with testnet ZEC; then `--m5 --m6 --m7 --m7-to 0x…`, then
+      `--m8-route`, with `--keyed-rpc`;
+    - what each flag asserts;
+    - 16 manual runs: both directions, refunds, rescue, send and withdraw,
+      lock, background, kill, account switch, Tor on and off, deletion, the
+      kill switch, hidden cases, the beta limit and the measurements;
+    - the mainnet release QA. The beta limit (`maxSwapUsdc` 50) is the
+      server's: test above it and never hard-code it;
+    - a results table.
+  - AGENTS.md (M8.6): a "Private USD" section, and the corrected description
+    of the Android migration worker (D-106).
+  - Plan: the status line, the Commands row, D9, the M8 tasks, §10 and §11.
+  - The static audit for M8.3 found no leak, so no code changed (D-105).
+- **Tests.**
+  - No new unit test: nothing new guards funds or keys.
+  - The route round compiles and analyzes clean. It has not run.
+  - The keyed RPC scan's host side was exercised with a fake key (D-105).
+  - Rust (`cd rust && CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0 cargo
+    test`): lib `1514 passed; 0 failed; 11 ignored`; integration 6 passed,
+    21 ignored (regtest). The flaky `gift_card_input::tests::recovery::*`
+    family passed this time.
+  - `fvm flutter analyze`: no issues.
+  - Desktop lane (`fvm flutter test`): `+5976 ~163 -4`. The 4 are the
+    pre-existing `settings_seed_phrase_screen_test.dart` failures
+    ("incoming links cannot interrupt backup completion/deferral
+    success/failure").
+  - Mobile lane (`--tags mobile --run-skipped
+    --dart-define=VIZOR_FORM_FACTOR=mobile`): `+2304 -10`. The 10 are the
+    pre-existing `app_review_payment_handoff_test.dart` failures (the "Edit"
+    and "Review" cases, 5 each).
 
 ## Deviations
 
@@ -2326,6 +2387,140 @@ next; the M7 gate and its device checks wait for it.
   posted; after unlock settlement posts the same kept bytes and it lands,
   with no proof made (a counting page override) and no new row. Events
   carry outcomes, buckets and timings only.
+- **D-104 (M8.1): the route round, written and not run.** Plan M8 updated.
+  - **How it runs.** `run_device_round.sh --m8-route [--m8-route-phases
+    forward,reverse,send]` is off by default. It implies no release check
+    and keeps the page storage. Given with `--m5`, `--m6` or `--m7`, it runs
+    after them. It runs `private_usd_device_test.dart` once, with
+    `VIZOR_PUSD_DEVICE_M8_ROUTE=<phases>`.
+  - **What it reuses.** It runs on the wallet earlier rounds funded (never
+    reset), starting with Tor off. `_M8RouteRound` drives the screen steps
+    of `_M5Round`, `_M6Round` and `_M7Round` on its own app, with their
+    amounts (`--m5-zec`, `--m6-usd`, `--m7-usd`).
+  - **Forward.** It converts ZEC, or follows a forward conversion already
+    under way. Once the record shows `CLAIMING` it turns Tor on, then
+    follows the conversion to Paid. It records the step codes seen after
+    the flip. If the conversion ends before its claim is seen, the phase is
+    recorded as skipped.
+  - **Reverse.** It converts private USD back and turns Tor on while the
+    page proves the payment. It records whether the flip cut off the proof
+    (nothing to pay with) or met a submit. Then it taps "Pay" over Tor (up
+    to three tries), authorizes settlement and waits for `COMPLETE`.
+  - **Send.** It sends to a second account's `0zk` and turns Tor on while
+    the page proves the send. A send the flip cut off must be back on its
+    review with nothing kept. The same review then sends it again. Exactly
+    one new proof is kept, and it lands (`confirmed`) over Tor.
+  - **Fail closed.** From the flip on, no host sample may show a direct
+    socket to a Railgun host. The host samples every 15 s while Tor
+    connects, then every 30 to 60 s. Once Tor has connected, no sample may
+    show a socket that is neither loopback nor a Tor relay. The sample
+    taken as Tor connects is the exception, as in M3: sockets the direct
+    route opened may still be closing. Tor turns off after each phase.
+  - **Refusals and events.** The reverse and send phases refuse to start
+    while a conversion is under way. Events carry the swap index, phases,
+    steps, outcomes and timings only.
+  - **Deviation from the plan's "resumes".** The forward claim resumes by
+    itself: the loop retries the failed step over Tor. The reverse funding
+    and the send resume through the user's own retry ("Pay", or the review's
+    send), because the app never proves again by itself (D-81, D-96).
+- **D-105 (M8.3): the keyed RPC check as built, and the static audit.** Plan
+  M8 updated.
+  - **The input file.** `run_device_round.sh --keyed-rpc <json>` takes a
+    `--dart-define-from-file` JSON.
+    - The runner refuses a file that git tracks, or one inside the repo that
+      is not gitignored.
+    - `device_round.py keyed-rpc-check --require sepolia` checks that
+      `VIZOR_ETHEREUM_RPC_URL_SEPOLIA` is https, on a host the app accepts,
+      with a key in its path or query. It prints the hosts only.
+    - Every build in the round takes the file, so the URL never appears on a
+      command line.
+  - **The app's files.** After the test the runner force-stops the app and
+    runs `keyed-rpc-scan --app-files`.
+    - `run-as` lists the `*private_usd*` files and `shared_prefs/`: that is
+      `swaps.db` with its WAL and SHM, `joint.db` and the token state.
+    - It reads each into memory with `exec-out run-as … cat`, and checks the
+      byte count against `stat`.
+  - **The logs.** At the end the runner saves `logcat -d` to
+    `logcat-final.txt` and runs `keyed-rpc-scan --logs` over every file in
+    the evidence directory: the logcat captures, the test and build logs,
+    the driver log, events and checkpoints.
+  - **The patterns.** Each keyed URL's host and path, the same JSON-escaped
+    (org.json writes `\/`), and its key: each path or query part of 12 or
+    more characters.
+  - **The verdict.** Exit 0 means clean, 1 found, 2 could not check; 1 or 2
+    fails the round.
+    - The verdicts go to `keyed-rpc-scan-{app-files,logs}.json` and
+      `summary.json`.
+    - They name patterns only by label ("sepolia key"): neither the URL nor
+      the key is ever printed or written.
+    - Tested on the host with a fake key: a clean directory passes; a
+      JSON-escaped URL in a log is found under both labels; a host outside
+      the allowlist is refused.
+  - **Not scanned.** The page's own storage (`app_webview`), which receives
+    the keyed URL by design.
+  - **The static audit found no leak, so nothing was changed.**
+    - Rust: the keyed URL reaches only `EvmRpc::new`, through
+      `Deployment::rpc_url`, and records pin only `keyless_rpc_url`
+      (`RecordDeployment`). `evm_rpc` errors name the JSON-RPC method only.
+      `routed_http`'s errors quote connector and Tor errors, which name at
+      most the host, never the path. The Private USD log lines carry error
+      codes, swap indices and send ids. `railgun_bridge.rs` logs no target.
+    - Dart: only `private_usd_feature_config.dart` reads the define;
+      `privateUsdKeyedRpcUrl` logs only that a host was refused.
+      `PrivateUsdSwapContext.ethRpcUrl` is a getter, so no `toString` shows
+      it, and `RailgunStartParams.toString` hides `rpcUrls`. Page log
+      events are dropped, and page errors print only through
+      `redactRailgunMessage`. Engine and sender debug lines print runtime
+      types. There is no `ProviderObserver`. No persisted value holds the
+      URL: the balance cache, the engine key store and the kill switch hold
+      none of it.
+    - Kotlin: the Railgun host has no `Log` call. `onConsoleMessage`
+      consumes the page's console, which is forwarded only as debug `log`
+      events, and Dart drops those. Its errors name page asset paths only.
+      Gradle decodes only its own dart-defines and prints none.
+- **D-106 (M8.6): the D9 claim holds; AGENTS.md corrected.** Plan D9 and §11
+  updated.
+  - **What is gone.**
+    - `rust/src/android_jni.rs` does not exist.
+    - `IronwoodMigrationPreparationWorker` appears nowhere in `android/`,
+      `lib/` or `rust/`.
+    - Neither `pubspec.yaml` nor Gradle has WorkManager.
+  - **Why.** Commit `459a8565b` (2026-07-28, "[mobile] Remove Android
+    private migration service") removed the Android preparation and outbox
+    workers, their Kotlin bridge, secure store and tests, and
+    `android_jni.rs`. It also made the private mobile migration iOS-only:
+    Android redirects to the fast migration
+    (`supportsPrivateMobileIronwoodMigration`).
+  - **What AGENTS.md now says.**
+    - The Rust module tree: `migration_preparation.rs`'s operation
+      lifecycle, preparation-only sync and advance have no native caller.
+    - "Foreground Sync and Platform-Specific Migration Preparation": only
+      iOS has native background work.
+    - The key files.
+    - A new "Private USD" section, before Testing.
+  - **The plan was right.** D9 and §11 now put it in the past tense.
+- **D-107 (M8.2): the kill switch's coverage, recorded; no new test.**
+  - `test/core/config/private_usd_feature_config_test.dart` (M3) covers:
+    - only an explicit bool is an answer: not a string, another key, an
+      array or non-JSON;
+    - without an answer the last value stands, else available;
+    - no URL means available, with no fetch;
+    - an explicit `false` hides the feature and is remembered;
+    - a failed fetch, and a document without the flag, both keep the last
+      `false`;
+    - a failed fetch with nothing known stays available;
+    - a later `true` brings it back.
+  - `private_usd_available_provider_test.dart` covers that `false` makes
+    the feature unavailable, and that the engine's build gate never reads
+    the switch, so conversions under way keep going.
+  - The live check (E7) is checklist run M-13. The device test cannot reach
+    a flag URL (D-42).
+- **D-108 (M1.10b): deferred again.** Not done in M8. Moving the Enhance PIR
+  transport and voting's `VizorRoute` onto `routed_http` without a
+  behaviour change needs three things `routed_http` lacks: streaming
+  response bodies, the `on_dispatch` hook and the SDK's observation phases
+  (M1 status). So it is not a safe drop-in. It stays a separate PR, outside
+  this branch.
 
 ## Blocked
 
@@ -2380,3 +2575,8 @@ next; the M7 gate and its device checks wait for it.
   `rust/Cargo.toml` paths (D-18), and carries zapp's Railgun bundle, JS source
   and the ported Kotlin host, so `feature/private-usd-android` stays local
   until E1, E2 and E4 land.
+- **B-10. The M8 device checks need the phone attached (2026-10-14).** M8.1
+  (`--m8-route`) and M8.4 (the measurements) run on the Galaxy A35. So does
+  M8.3 (`--keyed-rpc`), which also needs E6's keyed RPC JSON. They come
+  after the M3, M5, M6 and M7 rounds (B-8, B-9). Owner: the order and the
+  commands are in `docs/private-usd-device-checklist.md`.
