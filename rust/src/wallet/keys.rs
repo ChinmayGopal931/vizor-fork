@@ -294,7 +294,13 @@ fn ensure_db_initialized_with_seed(
     })
 }
 
-fn make_birthday(network: WalletNetwork, birthday_height: Option<u64>) -> AccountBirthday {
+/// An account birthday at exactly `birthday_height`, never rounded (Sapling
+/// activation when `None`). Its first scan reads the tree state below it from
+/// lightwalletd.
+pub(crate) fn make_birthday(
+    network: WalletNetwork,
+    birthday_height: Option<u64>,
+) -> AccountBirthday {
     match birthday_height {
         Some(h) => {
             let height = BlockHeight::from_u32(h as u32);

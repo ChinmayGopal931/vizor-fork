@@ -8,7 +8,7 @@
 
 **Scope.** Android, mobile form factor (`--dart-define=VIZOR_FORM_FACTOR=mobile`). iOS and desktop come later, so keep the Rust engine, the Dart models and the JS bundle platform-neutral. iOS then needs only a Swift `WKWebView` host and an attestation channel.
 
-**Status (2026-10-14).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is next. Progress lives in `docs/private-usd-progress.md`.
+**Status (2026-10-13).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is done except its regtest run (M2.7b), which waits for the batched E2E round and the owner's go-ahead. M3 is next. Progress lives in `docs/private-usd-progress.md`.
 
 **Two files.** This file holds the decisions, the architecture, the work and the test strategy. The reference sections §5–§9 and §12 live in `docs/private-usd-reference.md`, with the same numbers:
 
@@ -583,11 +583,11 @@ Every milestone also follows these rules:
 - **Runtimes.** Wrap every FRB body in `catch` and build its runtime inside it. Never call such a wrapper from async code: a nested runtime panics.
 - **Never log secrets:** the mnemonic, the seed, `z`, the relayer ticket, the token `pending` state or the keyed RPC URL. Give secret-holding structs a redacting `Debug`.
 
-### M2. Zcash joint-account operations
+### M2. Zcash joint-account operations: done (2026-10-13) except the regtest run
 
 **Goal.** Everything the swaps need from librustzcash.
 
-**Needs.** The owner's go-ahead for the Ironwood regtest run, which is the gate.
+**Needs.** The owner's go-ahead for the Ironwood regtest run (M2.7b), deferred to the batched E2E round. The code and its unit tests do not wait on it.
 
 **Inputs.**
 - §3.5 (items 3 and 9–12); §8.1; AGENTS.md "Hardware Wallet (Keystone) Send Flow", invariants 1–4.
@@ -600,26 +600,26 @@ Every milestone also follows these rules:
   - `rust/tests/ironwood_regtest_gift_card_claim.rs`
 - Port from: `ua/JointAccounts.kt`, `ua/SwapZcashTransactions.kt:98-141` and `zs/crates/zecswap-chain/src/zcash/wallet.rs:305-320, 451-470`.
 
-**Tasks** (details in §8.1):
+**Tasks** (details in §8.1; the signatures are as built, deviations D-8 to D-14):
 
-1. `joint.rs`:
-   - `register_joint_account(joint_db, network, ufvk, birthday) -> joint_uuid`. Import it as `AccountPurpose::Spending { derivation: None }`, never `ViewOnly`, which does not track spends. The shape follows `register_gift_card_observer` (`keys.rs:512`). Make `make_birthday` (`keys.rs:297`) `pub(crate)`.
-   - `sync_joint_db`, through the async engine function `sync_engine::run_payment_link_claim_sync` (`sync_engine/mod.rs:2808`), not its FRB wrapper.
-   - `joint_receipts`.
-   - `delete_joint_account`, through `keys::delete_account` (`:1033`).
+1. `rust/src/wallet/private_usd/joint.rs`:
+   - `register_joint_account(joint_db, network, ufvk, birthday: u32) -> joint_uuid`. Import it as `AccountPurpose::Spending { derivation: None }`, never `ViewOnly`, which does not track spends. The shape follows `register_gift_card_observer` (`keys.rs:512`). `make_birthday` (`keys.rs:297`) is now `pub(crate)`.
+   - `async sync_joint_db(joint_db, lwd, network, cancel)`, through the async engine function `sync_engine::run_payment_link_claim_sync` (`sync_engine/mod.rs:2808`), not its FRB wrapper. It returns at once while every joint account is born above the tip (U6), and runs one scan per `joint.db` at a time.
+   - `joint_receipts(joint_db, network, joint_uuid, confirmations) -> JointReceipts`: received and confirmed amounts and notes, spendable and pending under the sweep policy, and the fully scanned height.
+   - `delete_joint_account(joint_db, network, joint_uuid)`, through `keys::delete_account` (`:1033`).
 2. Discard OVK (§8.1.3):
    - `SendPurpose::JointSweep` in `send.rs`
    - `StoredProposal.purpose` in `sync/mod.rs`
-   - a purpose-based refusal in `pczt.rs`, passing the stored OVK policy at `:591`
-3. `propose_joint_sweep(joint_db, network, joint_uuid, flow_id, home_ua, max_fee)` in `send.rs`. Refactor the lock-and-store block of `propose_send_with_request` (`send.rs:853-970`) so it can take a proposal that is already built.
-4. `sweep_joint` in `joint.rs`: create the PCZT, sign with `±(e+z)`, extract the compact signatures, prove, then broadcast and store. Return `{txid, raw, expiry_height}`.
+   - a purpose-based refusal in `pczt.rs`, passing the stored OVK policy to `zcb_create_pczt`
+3. `propose_joint_sweep(joint_db, network, joint_uuid, flow_id, home_ua, max_fee) -> SwapProposal { proposal_id, needs_sapling_params, fee_zatoshi, amount_zatoshi }` in `send.rs`. The lock-and-store block of `propose_send_with_request` is now `lock_and_store_proposal`, which takes a built proposal.
+4. `async sweep_joint(joint_db, lwd, network, joint_uuid, flow_id, home_ua, max_fee, key: &SpendKey) -> JointSweep` in `joint.rs`: propose, create the PCZT, sign with `±(e+z)`, extract the compact signatures, prove, then broadcast and store. It returns `transaction: CreatedTransaction { txid, raw, expiry_height }`, the amount and fee, and how the broadcast ended (`Accepted`, `Unknown`, `StorageFailed`).
 5. Split the deposit in `send.rs`:
-   - `propose_swap_deposit`: one step only, and a total no higher than `max_total_zat`
-   - `create_stored_proposal_transactions`: signs and stores, out of `execute_stored_proposal` (`:1516-1680`)
-   - `broadcast_raw`: exposes `broadcast_raw_transaction_isolated` (`:6762`)
+   - `propose_swap_deposit(main_db, network, account_uuid, flow_id, joint_ua, deposit_zat, max_total_zat) -> SwapProposal`: one step only, and a total no higher than `max_total_zat`
+   - `async create_stored_proposal_transactions(main_db, lwd, proposal_id, flow_id, seed, spend_params?, output_params?) -> Vec<CreatedTransaction>`: signs and stores, the create half of `execute_stored_proposal`
+   - `async broadcast_raw(lwd, raw)`: exposes `broadcast_raw_transaction_isolated`
 
-   `execute_proposal`'s behaviour does not change.
-6. `find_deposit(main_db, account_uuid, joint_ua)` and `swap_tx_status(db, txid, expiry_height)` (§8.1.2).
+   `execute_proposal`'s behaviour does not change: it runs the same create half, then the same broadcast.
+6. `find_deposit(main_db, network, account_uuid, joint_ua) -> Option<CreatedTransaction>` and `swap_tx_status(db, network, txid, expiry_height) -> SwapTxStatus` in `joint.rs` (§8.1.2).
 7. An ignored Ironwood regtest test, in-crate at `rust/src/wallet/private_usd/tests/ironwood_regtest.rs`, because it needs `pub(crate)` functions. Copy about 60 lines of the gift-card test's harness and use the §5.5 seed and maker root with `NetworkType::Regtest`. It does the following:
    1. Derive the joint key.
    2. Deposit through the split, and assert the output is Ironwood.
@@ -638,11 +638,13 @@ Every milestone also follows these rules:
 - `find_deposit` finds a stored but unbroadcast deposit
 - the existing gift-card PCZT tests still pass
 
-Then, with the owner's go-ahead, run the regtest test once: `cd rust && cargo test --lib private_usd::tests::ironwood_regtest -- --ignored --nocapture --test-threads=1`. It resets and starts the Docker stack itself. It also settles U4–U9.
+The unit tests are in `rust/src/wallet/private_usd/tests/joint.rs`; the `PaymentLinkClaim` refusal stays in `pczt.rs`. No joint-account proposal can take two steps (a TEX recipient needs a ZIP 320 ephemeral transparent address, which an Orchard-only joint account cannot derive), so the deposit and the sweep share one one-transaction check, and its test refuses a deposit to a TEX address (D-12).
+
+Then, with the owner's go-ahead, run the regtest test once (M2.7b, deferred to the batched E2E round): `cd rust && cargo test --lib private_usd::tests::ironwood_regtest -- --ignored --nocapture --test-threads=1`. It resets and starts the Docker stack itself. It also settles U4–U9.
 
 **Traps.**
 
-- **`StoredProposal` is built in exactly two places,** `send.rs:950` and the test at `pczt.rs:4137`; adding `purpose` touches both.
+- **`StoredProposal` is built in exactly two places,** `send.rs:950` and the test at `pczt.rs:4137`; adding `purpose` touches both. As built, the first is `lock_and_store_proposal` in `send.rs`.
 - **Signatures you will call** (as of `4a859bee0`):
   - `create_pczt_from_proposal(db_path, lwd_url, network, proposal_id, send_flow_id) -> Result<Vec<u8>, String>` (`pczt.rs:502`)
   - `add_proofs_to_pczt(pczt, spend_params?, output_params?)` (`:895`)
@@ -654,7 +656,7 @@ Then, with the owner's go-ahead, run the regtest test once: `cd rust && cargo te
 - **Sign the unredacted base PCZT, then diff.** `zecswap_core::sign_pczt` needs the full note data to check the `SweepIntent` (`SweepIntent::from_address(home_ua, network, amount, fee)`).
 - **`TxId` bytes are in internal (little-endian) order;** displayed hex and lightwalletd JSON are reversed. Store and compare bytes.
 - **`expiry_height == 0` means no expiry,** so it is never `Expired`.
-- **The regtest test needs `simple_api::configure_regtest_ironwood_activation_height` before any wallet call.**
+- **The regtest test needs `simple_api::configure_regtest_ironwood_activation_height` before any wallet call.** In test builds that height is per thread (`wallet/network.rs`), so the in-crate test keeps every wallet call on its own thread: a current-thread runtime, and no FRB wrapper that builds a runtime of its own around consensus-dependent work.
 
 ### M3. Railgun host, Tor bridge, availability and the read-only balance
 
@@ -1057,12 +1059,12 @@ Skip unit tests for UI glue, provider wiring and copy; the device rounds cover t
 | U1 | The zecSwap crates build inside vizor's own crate graph (the scratch build used the same Zakura versions and patch rev). **M0 (2026-10-13):** `zecswap-core` (Zakura build) and `zecswap-railgun` do; `zecswap-tokens` does not (`digest` conflict, M0.1 result) | M0.1 | Path A vendoring (E1) |
 | U2 | A V6 deposit to an Orchard-only UA lands as an Ironwood output in vizor. **M0 (2026-10-13):** verified offline (M0.2 result); testnet confirmation pending | M0.2 on testnet; asserted in the M2 regtest test | Escalate: the protocol depends on it (§5.1) |
 | U3 | vizor's main DB keeps `to_address` for the deposit's sent output (`findDeposit`). **M0 (2026-10-13):** verified offline (`orchard_receiver_tests.rs`) | M0.2; M2 unit test | Recover sent outputs with the account's OVK (the deposit uses the sender OVK) |
-| U4 | `zecswap_core::sign_pczt` accepts vizor's `bind_pczt` proprietary lock-owner field | M2 regtest | Sign a clone with proprietary fields stripped. They are not covered by the sighash. |
-| U5 | `extract_required_compact_sigs_from_signed_pczt` returns exactly the joint spends | M2 | Extract with `extract_orchard_spend_auth_signatures` (`wl/librustzcash/pczt/src/roles/signer/mod.rs:478-487`) and apply them by index |
-| U6 | A joint-DB scan whose birthday is ≥ the tip (librustzcash#2301 panics on an empty scan range next to a deleted account's ranges; vizor's claim sync normalizes ranges, `rust/src/wallet/sync_engine/mod.rs:2865-2868`) | M2 regtest | Import at tip + 1, as zecSwap does (`zs/…/zcash/wallet.rs:451-470`) |
-| U7 | `payment_link_resubmit_exclusions` is harmless on a joint DB | M2 | Pass no exclusions for joint DBs |
-| U8 | With Discard OVK, the primary store path (`extract_and_store_transaction_from_pczt`) still records the sweep as sent. The fallback `decrypt_and_store_transaction` (`pczt.rs:2056`) cannot recover the outgoing metadata. | M2 | Harmless: the joint DB is deleted after the sweep. Persist the bytes in the record regardless. |
-| U9 | `create_pczt_from_proposal` works for a `Spending { derivation: None }` account (zapp does the equivalent on the upstream SDK) | M2 | Investigate: there is no alternative path |
+| U4 | `zecswap_core::sign_pczt` accepts vizor's `bind_pczt` proprietary lock-owner field | M2.7b (the regtest test signs a bound PCZT) | Sign a clone with proprietary fields stripped. They are not covered by the sighash. |
+| U5 | `extract_required_compact_sigs_from_signed_pczt` returns exactly the joint spends | M2.7b (asserted there; the completion path's preflight also refuses any other set) | Extract with `extract_orchard_spend_auth_signatures` (`wl/librustzcash/pczt/src/roles/signer/mod.rs:478-487`) and apply them by index |
+| U6 | A joint-DB scan whose birthday is ≥ the tip (librustzcash#2301 panics on an empty scan range next to a deleted account's ranges; vizor's claim sync normalizes ranges, `rust/src/wallet/sync_engine/mod.rs:2865-2868`). **M2 (2026-10-13):** by reading the claim scan, a `joint.db` born above the tip fails its completion checks (no block is stored at the tip), so `sync_joint_db` returns at once until the tip reaches the birthday, as zecSwap's `born_above` does (D-10) | M2.7b imports above the tip and syncs | Import at tip + 1, as zecSwap does (`zs/…/zcash/wallet.rs:451-470`) |
+| U7 | ~~`payment_link_resubmit_exclusions` is harmless on a joint DB~~ Answered (M2, code reading): it reads only librustzcash tables, and excludes only an unmined local send whose note another transaction six blocks deep already spent. That is right for a joint DB too. M2.7b runs it | M2 | Pass no exclusions for joint DBs |
+| U8 | With Discard OVK, the primary store path (`extract_and_store_transaction_from_pczt`) still records the sweep as sent. The fallback `decrypt_and_store_transaction` (`pczt.rs:2056`) cannot recover the outgoing metadata. **M2 (code reading):** the primary path rebuilds each sent output from the PCZT's own fields and recipient metadata and never uses an OVK; `sweep_joint` returns the bytes either way | M2.7b asserts the sent row | Harmless: the joint DB is deleted after the sweep. Persist the bytes in the record regardless. |
+| U9 | `create_pczt_from_proposal` works for a `Spending { derivation: None }` account (zapp does the equivalent on the upstream SDK). **M2 (2026-10-13):** PCZT creation verified offline by the M2 unit tests; signing, proving and extraction remain for M2.7b | M2, M2.7b | Investigate: there is no alternative path |
 | U10 | WebView `PROXY_OVERRIDE` support, SOCKS5 behaviour, keep-alive on a route change, IndexedDB and `blob:` workers under the proxy, the cleartext policy for the loopback hop. **M0 (2026-10-13):** the Rust side is verified on a desktop host (SOCKS5 no-auth, allowlist, direct lease aborted by a Tor enable, and a real Tor bootstrap tunnelling to an allowlisted host through the patched `connect_stream`); on a device (Galaxy A35, Android 16, WebView 155): `PROXY_OVERRIDE` works, SOCKS5 through the bridge works, IndexedDB and the engine's workers run under the proxy, and the loopback SOCKS hop needs no `network_security_config` | M0.3 | D4 fallback |
 | U11 | ~~Whether each maker requires tokens today~~ Answered: not today (D20). Re-check before release. | Before release | none needed; M4 is built either way |
 | U12 | The WebView data directory path for the backup exclusion (`app_webview`). **M0 (2026-10-13):** confirmed as `/data/data/com.keplr.vizor/app_webview` (`Default/IndexedDB` holds the Railgun DB) | M3: inspect `/data/data/com.keplr.vizor/` on a device | Exclude the observed path |

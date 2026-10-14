@@ -90,19 +90,41 @@ use crate::wallet::failure::{FailureCode, WalletFailure};
 use crate::wallet::network::WalletNetwork;
 
 use super::hardware_authority::DispatchRefusal;
+use super::send::SendPurpose;
 use super::{
     consume_stored_proposal, discard_stored_proposal, finish_stored_proposal, open_wallet_db,
     retain_stored_proposal_lock_until_expiry, stored_proposal_lock, StoredOvkPolicy,
     StoredProposal,
 };
 
-/// PCZT creation always uses the sender's OVK, so a proposal that requires
-/// `Discard` must not reach it. Releases the consumed proposal's input lock.
-fn reject_discard_ovk_proposal(stored: &StoredProposal) -> Result<(), String> {
+const PAYMENT_LINK_CLAIM_PCZT_REFUSAL: &str =
+    "Gift Card claim proposals cannot be signed as a PCZT";
+
+/// Gift Card claims are signed with the card's software key only, never as a
+/// PCZT. Every other purpose builds its PCZT with its own stored OVK policy.
+/// Releases the consumed proposal's input lock.
+fn reject_payment_link_claim_proposal(stored: &StoredProposal) -> Result<(), String> {
+    if stored.purpose != SendPurpose::PaymentLinkClaim {
+        return Ok(());
+    }
+    release_refused_proposal(stored, PAYMENT_LINK_CLAIM_PCZT_REFUSAL.to_string())
+}
+
+/// The TEX path builds both of its PCZTs with the sender's OVK, so a proposal
+/// that requires `Discard` must not reach it. Releases the consumed
+/// proposal's input lock.
+fn reject_discard_ovk_tex_proposal(stored: &StoredProposal) -> Result<(), String> {
+    reject_payment_link_claim_proposal(stored)?;
     if stored.ovk_policy != StoredOvkPolicy::Discard {
         return Ok(());
     }
-    let error = "Gift Card claim proposals cannot be signed as a PCZT".to_string();
+    release_refused_proposal(
+        stored,
+        "Proposals that discard their OVK cannot be signed as a TEX PCZT".to_string(),
+    )
+}
+
+fn release_refused_proposal(stored: &StoredProposal, error: String) -> Result<(), String> {
     match finish_stored_proposal(stored.proposal_id, &stored.send_flow_id, true) {
         Ok(()) => Err(error),
         Err(cleanup_error) => Err(format!(
@@ -137,11 +159,11 @@ pub struct StoreAndBroadcastPcztsResult {
 }
 
 impl StoreAndBroadcastPcztsResult {
-    const BROADCASTED: &'static str = "broadcasted";
+    pub(crate) const BROADCASTED: &'static str = "broadcasted";
     const BROADCAST_UNKNOWN: &'static str = "broadcast_unknown";
     const PARTIAL_BROADCAST: &'static str = "partial_broadcast";
-    const BROADCASTED_STORAGE_FAILED: &'static str = "broadcasted_storage_failed";
-    const EXPIRED: &'static str = "expired";
+    pub(crate) const BROADCASTED_STORAGE_FAILED: &'static str = "broadcasted_storage_failed";
+    pub(crate) const EXPIRED: &'static str = "expired";
 }
 
 #[derive(Debug)]
@@ -507,7 +529,6 @@ pub async fn create_pczt_from_proposal(
     send_flow_id: &str,
 ) -> Result<Vec<u8>, String> {
     use zcash_client_backend::data_api::wallet::create_pczt_from_proposal as zcb_create_pczt;
-    use zcash_client_backend::wallet::OvkPolicy;
 
     // Consume the proposal up-front (matches execute_proposal), so
     // that any later failure path leaves the PROPOSAL_STORE clean.
@@ -516,7 +537,7 @@ pub async fn create_pczt_from_proposal(
         send_flow_id,
         "Proposal not found (expired or already consumed)",
     )?;
-    reject_discard_ovk_proposal(&stored)?;
+    reject_payment_link_claim_proposal(&stored)?;
 
     let proposal_lock = match stored_proposal_lock(stored.proposal_id, &stored.send_flow_id) {
         Ok(lock) => lock,
@@ -584,11 +605,13 @@ pub async fn create_pczt_from_proposal(
             .proposal
             .clone()
             .with_proposed_version(stored.proposed_tx_version);
+        // A Private USD joint sweep discards its OVK (D12); every other
+        // purpose that reaches here keeps the sender's.
         let pczt = zcb_create_pczt::<_, _, Infallible, _, Infallible, _>(
             &mut db,
             &network,
             stored.account_id,
-            OvkPolicy::Sender,
+            stored.ovk_policy.to_ovk_policy(),
             &proposal_for_pczt,
             Some(live_expiry_height),
             BundlePadding::DEFAULT,
@@ -635,7 +658,7 @@ pub async fn create_tex_pczts_from_proposal(
         send_flow_id,
         "Proposal not found (expired or already consumed)",
     )?;
-    reject_discard_ovk_proposal(&stored)?;
+    reject_discard_ovk_tex_proposal(&stored)?;
     if stored.proposal.steps().len() != 2 {
         let _ = finish_stored_proposal(stored.proposal_id, &stored.send_flow_id, true);
         return Err("Keystone TEX signing requires exactly two proposal steps".to_string());
@@ -4145,6 +4168,7 @@ mod tests {
                     .unwrap(),
                     send_flow_id: flow.to_string(),
                     ovk_policy: StoredOvkPolicy::Discard,
+                    purpose: SendPurpose::PaymentLinkClaim,
                 },
             );
         }
@@ -4154,7 +4178,7 @@ mod tests {
                 .await
                 .unwrap_err();
 
-        assert!(error.contains("cannot be signed as a PCZT"), "{error}");
+        assert!(error.contains(PAYMENT_LINK_CLAIM_PCZT_REFUSAL), "{error}");
         let store = PROPOSAL_STORE.lock().unwrap();
         assert!(!store.proposals.contains_key(&id));
         assert!(!store.locks.contains_key(&id));

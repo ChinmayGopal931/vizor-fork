@@ -86,7 +86,7 @@ way when the file runs alone.
 - [x] M1.13 `rust/src/api/private_usd.rs`: `ApiPrivateUsdError`, `ApiDeployment`, the five M1 calls; bridge regenerated
 - [x] M1 gate
 
-M1 status (2026-10-14): done except the optional M1.10b, which slips to M8.
+M1 status (2026-10-13): done except the optional M1.10b, which slips to M8.
 Moving the PIR transport and voting's `VizorRoute` onto `routed_http` without
 behaviour change needs streaming response bodies, the `on_dispatch` hook and
 the SDK's observation phases in `routed_http`, so it is not a safe drop-in.
@@ -124,14 +124,49 @@ the SDK's observation phases in `routed_http`, so it is not a safe drop-in.
 
 ## M2. Zcash joint-account operations
 
-- [ ] M2.1 `private_usd/joint.rs` (`joint.db` operations)
-- [ ] M2.2 Discard OVK for joint sweeps (`SendPurpose::JointSweep`, `StoredProposal.purpose`)
-- [ ] M2.3 `propose_joint_sweep` in `send.rs`
-- [ ] M2.4 `sweep_joint` in `joint.rs`
-- [ ] M2.5 The deposit split in `send.rs`
-- [ ] M2.6 `find_deposit` and `swap_tx_status`
-- [ ] M2.7 Ignored Ironwood regtest test (run only with the owner's go-ahead)
-- [ ] M2 gate
+- [x] M2.1 `private_usd/joint.rs` (`joint.db` operations)
+- [x] M2.2 Discard OVK for joint sweeps (`SendPurpose::JointSweep`, `StoredProposal.purpose`)
+- [x] M2.3 `propose_joint_sweep` in `send.rs`
+- [x] M2.4 `sweep_joint` in `joint.rs`
+- [x] M2.5 The deposit split in `send.rs`
+- [x] M2.6 `find_deposit` and `swap_tx_status`
+- [x] M2.7 Ignored Ironwood regtest test (written; compiles)
+- [ ] M2.7b Run the Ironwood regtest test once (deferred to the batched E2E round; needs the owner's go-ahead; settles U4–U9)
+- [x] M2 gate (the regtest run is M2.7b, deferred)
+
+M2 status (2026-10-13): done except M2.7b, the regtest run, which waits for
+the batched E2E round and the owner's go-ahead.
+
+- **Rust:** `cd rust && cargo test` passes: lib 1451 passed, 0 failed, 10
+  ignored; integration 6 passed, 21 ignored (regtest). The 4 new tests in
+  `private_usd/tests/joint.rs` cover the M2 **Done when** list on real wallet
+  DBs that scan synthetic compact blocks, with a local fake lightwalletd for
+  the tip:
+  - `a_swap_deposit_is_one_transaction_within_its_approved_total`: a total
+    over the cap and a two-transaction (TEX) deposit are refused before
+    anything is locked.
+  - `a_stored_deposit_is_found_and_followed_until_it_expires`: the create
+    half stores the deposit and sends nothing, and `find_deposit` finds it.
+    `swap_tx_status` gives `Unmined` and `Unknown`, `Expired` only once the
+    block after the expiry is scanned (never for an expiry of 0), then
+    `Mined`.
+  - `a_joint_sweep_pczt_discards_the_joint_ovk`: the sweep's one output does
+    not recover under the joint OVKs, while an ordinary send's payment from
+    the same account does.
+  - `a_joint_sweep_over_its_fee_limit_is_refused_and_locks_nothing`.
+
+  The Gift Card claim refusal test in `pczt.rs` now keys on purpose, and the
+  gift-card PCZT and send tests pass unchanged. The ignored regtest test
+  (`private_usd/tests/ironwood_regtest.rs`) compiles and was not run (M2.7b).
+- **Dart:** `fvm flutter analyze` finds no issues. `fvm flutter test`: 5896
+  passed, 158 skipped, 4 failed, the same 4 pre-existing failures in
+  `settings_seed_phrase_screen_test.dart` (the `AppButton` "Enter amount"
+  finder at test line 159). M2 changes no Dart.
+- **API:** no `rust/src/api/` change, so the bindings were not regenerated.
+- **U-items:** U7 is answered by reading. U6 and U8 are read and handled
+  (D-10; plan §11). The unit tests create a PCZT for a spending account
+  without derivation, the first half of U9. U4, U5 and the rest wait for
+  M2.7b.
 
 ## M3. Railgun host, Tor bridge, availability and the read-only balance
 
@@ -292,6 +327,72 @@ the SDK's observation phases in `routed_http`, so it is not a safe drop-in.
     `243c1266…5c3a`), not wallets 0–3 of one; plan §3.3 corrected.
   - `#![allow(dead_code)]` on `private_usd`: most M1 blocks are reached only
     from tests until the engine (M5–M7) drives them. Remove it then.
+- **D-8 (M2): the signatures as built.** Plan M2 tasks and reference §8.1
+  updated.
+  - `find_deposit` and `swap_tx_status` also take the network: they read the
+    fully scanned height through a librustzcash handle.
+  - `register_joint_account` takes the birthday as `u32`. `sync_joint_db` is
+    async and takes a cancel flag.
+  - `propose_swap_deposit` and `propose_joint_sweep` return `SwapProposal {
+    proposal_id, needs_sapling_params, fee_zatoshi, amount_zatoshi }`. The
+    sweep's `SweepIntent` needs the amount, and the engine needs the fee.
+  - `create_stored_proposal_transactions` keeps `execute_proposal`'s optional
+    Sapling parameters, since a deposit may spend Sapling notes. It returns
+    `Vec<CreatedTransaction { txid, raw, expiry_height }>`.
+  - `sweep_joint` proposes the sweep itself, because the intent needs the
+    proposed amount and the fee limit, and takes the combined `SpendKey`. It
+    returns `JointSweep { transaction, amount_zatoshi, fee_zatoshi, broadcast,
+    message }`, where `broadcast` is `Accepted`, `Unknown` or
+    `StorageFailed`. A PCZT that expires before broadcast is an error.
+  - `JOINT_SWEEP_CONFIRMATIONS = 2` is its own constant in `wallet/mod.rs`:
+    the Gift Card claim depth, but not tied to it.
+  - M2 needed no `rand` 0.10: `zecswap_core::sign_pczt` draws its own
+    randomness.
+- **D-9 (M2): `swap_tx_status` semantics.** Reference §5.6 and §8.1 updated.
+  - `Mined` counts its depth from the fully scanned height, as zecSwap's own
+    wallet does, not from the advertised tip (zapp). A lagging scan only
+    delays completion. `joint_receipts` counts depth the same way.
+  - `Expired` needs the fully scanned height above the expiry height
+    (zecSwap's `is_expired`). zapp's `≥` is one block earlier, but a
+    transaction can still be mined in its expiry block.
+  - An expiry height of 0 never expires, also for a transaction the wallet
+    does not hold (zapp's absent branch would call it expired).
+  - `find_deposit` skips only expired deposits and treats an unknown expiry
+    as none. It fails closed when a matching deposit has no stored bytes.
+- **D-10 (M2, U6): a `joint.db` born above the tip is not scanned.** By
+  reading the claim scan, such a DB fails its completion checks: no block is
+  stored at the tip. `sync_joint_db` returns at once until the tip reaches the
+  wallet birthday (zecSwap's `born_above`). It also runs one scan per
+  `joint.db` at a time; a second gets `Busy`. M2.7b exercises it.
+- **D-11 (M2): the TEX PCZT path keeps an OVK-based refusal.** It builds both
+  PCZTs with the sender's OVK, so it still refuses every `Discard` proposal:
+  claims keep the Gift Card message, others get a generic one. Only
+  `create_pczt_from_proposal` moved to the purpose-based refusal.
+- **D-12 (M2): the multi-step sweep test.** A joint account cannot produce a
+  two-step proposal: a TEX recipient needs a ZIP 320 ephemeral transparent
+  address, which an Orchard-only joint account cannot derive. So the deposit
+  and the sweep share one one-transaction check (`single_swap_transaction`),
+  and the unit test refuses a deposit to a TEX address, the usual
+  two-transaction send. Both checks run before anything is locked; the tests
+  assert that no lock rows remain and the note can still be proposed.
+- **D-13 (M2): the bytes `sweep_joint` returns.** They are the joint DB's
+  stored bytes, or, when storing failed, a re-extraction from the same proofs
+  and signatures: the same txid with another binding signature. The stored
+  bytes are themselves a second extraction
+  (`extract_and_store_transaction_from_pczt`), so no path keeps the exact
+  broadcast encoding. Any encoding with the txid resends safely.
+- **D-14 (M2): the regtest test's shape.**
+  - In test builds the regtest NU6.3 height is per thread
+    (`wallet/network.rs`). The in-crate test therefore runs every wallet call
+    on its own thread, with a current-thread runtime, and scans wallets with
+    the claim scan rather than the main full sync.
+  - It asserts broadcast before store by sending a fully signed sweep through
+    a dead route: nothing is stored, and the note stays spendable. Then it
+    sweeps for real.
+  - It also asserts U2 (the deposit's Ironwood bundle, `sent_notes` pool 4),
+    a sender-OVK control on the deposit, U5 (one compact signature), U8 (the
+    sweep's sent row), U7 (the joint sync resubmits the pending sweep) and the
+    sweep arriving home.
 
 ## Blocked
 

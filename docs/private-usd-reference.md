@@ -305,6 +305,8 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
    | `Unmined` | in history but not mined |
    | `Unknown` | not in history and not provably expired |
 
+   vizor's `swap_tx_status` (M2) counts `Mined` depth from the fully scanned height, and calls a transaction `Expired` only once the fully scanned height is above its expiry height; an expiry of 0 never expires (progress doc D-9).
+
    - Unpayable and no deposit → `NothingSent(cause)`.
    - `chain.now ≥ t0` → claim (the maker went quiet).
    - Otherwise `Waiting(CONFIRMING, t0, t1)`.
@@ -1061,7 +1063,7 @@ Every knob is a Dart define, read once with `String.fromEnvironment`/`bool.fromE
 
 ### 8.1 Joint-account and deposit operations (Rust)
 
-Each row is a step zapp performs, and the vizor seam that performs it. "New" means new code in M2.
+Each row is a step zapp performs, and the vizor seam that performs it. "New" means new code in M2. As built (2026-10-13), the joint operations live in `vr/wallet/private_usd/joint.rs` and the proposal halves in `vr/wallet/sync/send.rs`; the plan's M2 tasks give the final signatures, and the progress doc's D-8 to D-14 how they differ from this map.
 
 #### 8.1.1 Operation map
 
@@ -1069,16 +1071,16 @@ Each row is a step zapp performs, and the vizor seam that performs it. "New" mea
 |---|---|---|---|
 | Joint UFVK and UA | `AtomicSwap.depositAccount(index, makerShare)` → `[UA, UFVK]` (`zs/crates/zecswap-jni/src/ops.rs:190-197`) | `zecswap_core::JointAccount::derive(E, Z, viewing).{unified_address, ufvk}` through path B | new thin wrapper |
 | Import, Spending, no derivation, exact birthday, idempotent by UFVK | `ua/JointAccounts.kt:57-75` | `vr/wallet/keys.rs:512` `register_gift_card_observer` shape (`ensure_db_migrated_once` `keys.rs:254`, `open_wallet_db_for_mutation`, `get_account_for_ufvk`), but the observer imports `ViewOnly` with key source `None`; the joint account uses `import_account_ufvk("Private USD joint", ufvk, make_birthday(network, Some(h)), Spending{derivation: None}, Some("vizor-private-usd-joint"))` and, when `get_account_for_ufvk` finds one, requires it to be `Spending` | **new** `register_joint_account(db, network, ufvk, birthday)`; reuse `make_birthday` (`keys.rs:297`, exact and unrounded) |
-| Scan until the deposit is visible | `SwapZcashTransactions.synced()` (SDK `syncToTip`, 2 min) | `vr/api/sync.rs:403` `run_payment_link_claim_sync(claim_id, joint_db, lwd, network, allow_resubmit=true)` (a sync FRB wrapper that builds its own runtime; from async engine code call `vr/wallet/sync_engine/mod.rs:2808` directly): an isolated compact-block scan with its own cancel, which **also rebroadcasts the joint DB's pending sweep** (`vr/wallet/sync_engine/mod.rs:2808, 2983-2996`) | yes. `payment_link_resubmit_exclusions` (`vr/wallet/sync/payment_link.rs:223`) reads Gift Card inspection state; check it is harmless on a joint DB, or pass none (U7) |
-| Received ≥ N confirmations, and spendable | `JointAccounts.estimate` / `settled` | none | **new** read-only query: received notes and mined heights in the joint DB, plus `get_wallet_summary` spendable versus pending |
-| Propose the whole balance, no change | `proposeSweep` fee loop | `build_send_max_proposal` (`vr/wallet/sync/send.rs:4592`) uses `MaxSpendMode::MaxSpendable` (`:4639`) and does not store the proposal | **new** `propose_joint_sweep(joint_db, network, joint_uuid, flow_id, home_ua, max_fee)`: `propose_send_max_transfer(…, &[Orchard, Ironwood], …, MaxSpendMode::Everything, ConfirmationsPolicy(2,2,false))`, as zecSwap's own wallet does (`zs/crates/zecswap-chain/src/zcash/wallet.rs:305-320`). Require one step and `fee ≤ max_fee`. Then reuse the lock-and-store block of `propose_send_with_request` (`send.rs:853-970`), refactored to take a built proposal. |
+| Scan until the deposit is visible | `SwapZcashTransactions.synced()` (SDK `syncToTip`, 2 min) | `vr/api/sync.rs:403` `run_payment_link_claim_sync(claim_id, joint_db, lwd, network, allow_resubmit=true)` (a sync FRB wrapper that builds its own runtime; from async engine code call `vr/wallet/sync_engine/mod.rs:2808` directly): an isolated compact-block scan with its own cancel, which **also rebroadcasts the joint DB's pending sweep** (`vr/wallet/sync_engine/mod.rs:2808, 2983-2996`) | yes, as `sync_joint_db(joint_db, lwd, network, cancel)`. `payment_link_resubmit_exclusions` (`vr/wallet/sync/payment_link.rs:223`) is harmless on a joint DB: it excludes only a local send that a deeply mined transaction conflicts with (U7). A DB born above the tip is not scanned yet (U6) |
+| Received ≥ N confirmations, and spendable | `JointAccounts.estimate` / `settled` | none | **new** `joint_receipts(joint_db, network, joint_uuid, confirmations)`: received notes and mined heights in the joint DB, with depth counted from the fully scanned height, plus `get_wallet_summary` spendable versus pending under the sweep policy |
+| Propose the whole balance, no change | `proposeSweep` fee loop | `build_send_max_proposal` (`vr/wallet/sync/send.rs:4592`) uses `MaxSpendMode::MaxSpendable` (`:4639`) and does not store the proposal | **new** `propose_joint_sweep(joint_db, network, joint_uuid, flow_id, home_ua, max_fee)`: `propose_send_max_transfer(…, &[Orchard, Ironwood], …, MaxSpendMode::Everything, ConfirmationsPolicy(2,2,false))`, as zecSwap's own wallet does (`zs/crates/zecswap-chain/src/zcash/wallet.rs:305-320`). Require one step and `fee ≤ max_fee`. Then reuse the lock-and-store block of `propose_send_with_request` (`send.rs:853-970`), refactored to take a built proposal (`lock_and_store_proposal`). It returns `SwapProposal { proposal_id, needs_sapling_params, fee_zatoshi, amount_zatoshi }`; the sweep's `SweepIntent` takes the amount. |
 | PCZT | `createPcztFromProposal` | `create_pczt_from_proposal(joint_db, lwd, network, id, flow)` (`pczt.rs:502`), keyed by db path and checked against the proposal's lock (`:532`) | yes, after §8.1.3: the proposal carries `StoredOvkPolicy::Discard` (D12) |
 | Sign with `±(e+z)` | `AtomicSwap.signRefund` / `ReverseAtomicSwap.signReceive`, which run `sign_pczt_bytes(pczt, [key], intent)` | `zecswap_core::sign_pczt` on the **unredacted base** PCZT. It needs the note values and randomness to verify the `SweepIntent` (`zcore/sweep.rs:68-100`), and it ignores proprietary fields such as vizor's lock owner. Then `extract_required_compact_sigs_from_signed_pczt(base, signed)` (`pczt.rs:2367`). | yes, plus glue |
 | Prove | `addProofsToPczt` | `add_proofs_to_pczt(base, None, None)` (`pczt.rs:895`; Ironwood proving key, no Sapling) | yes |
 | Combine, extract, broadcast, store | `createTransactionFromPczt` (**the SDK stores, then the app sends**) | `store_and_broadcast_pczts_with_compact_signatures_for_proposal(joint_db, lwd, network, id, flow, &[proofs], &[sigs], None, None)` (`pczt.rs:1645`): extract → broadcast → store, and it releases or retains the lock | yes. It is bound only to a `PROPOSAL_STORE` id and a send-flow id, which any propose call creates, and `hardware_authority` is a no-op without transparent inputs (`vr/wallet/sync/hardware_authority.rs:139, 193-195`). Its errors and logs say "Keystone"; cosmetic. |
-| Keep the bytes and resend until mined | `keepSending` and the record's `sweep` | after the call, read the raw transaction from the joint DB (or extract before) and persist it. Retries: the claim sync's resubmit, or `broadcast_raw_transaction_isolated` (`send.rs:6762`, private; expose it) | small new API |
-| Status: Mined, Unmined, Expired, Unknown | `ua/SwapZcashTransactions.kt:98-141` | none | **new** `swap_tx_status(db, txid, expiry)`. Use mined height, the tip and the fully scanned height (expired only when fully scanned past expiry). Shared by the main and joint DBs. |
-| Delete when mined | `deleteAccount` | `vr/wallet/keys.rs:1033` `delete_account(joint_db, …)` | yes |
+| Keep the bytes and resend until mined | `keepSending` and the record's `sweep` | `sweep_joint` returns `{txid, raw, expiry_height}`: the bytes the joint DB stored, or, if storing failed, a re-extraction with the same txid. Retries: the claim sync's resubmit, or `broadcast_raw` (`send.rs`, over `broadcast_raw_transaction_isolated`) | small new API |
+| Status: Mined, Unmined, Expired, Unknown | `ua/SwapZcashTransactions.kt:98-141` | none | **new** `swap_tx_status(db, network, txid, expiry)`. `Mined` counts its depth from the fully scanned height; `Expired` needs the fully scanned height above the expiry height (zecSwap's `is_expired`); an expiry of 0 never expires. Shared by the main and joint DBs. |
+| Delete when mined | `deleteAccount` | `vr/wallet/keys.rs:1033` `delete_account(joint_db, …)`, as `delete_joint_account` | yes |
 
 #### 8.1.2 The deposit (forward step 7), main account → joint UA
 
@@ -1088,17 +1090,17 @@ Each row is a step zapp performs, and the vizor seam that performs it. "New" mea
   - An active Ironwood migration restricts inputs to Ironwood (`send.rs:4218-4227`). That is fine.
   - `ProposalResult` does not expose the step count. Add a one-step check, so the deposit is never several transactions.
 - **Recording the txid before broadcast.** `execute_proposal` creates and stores, then broadcasts, in one call (`send.rs:1516-1680`; the broadcast is `broadcast_created_transactions` at `:1677`). The txid is known only after it returns. To match zapp's `prepareDeposit().create()` then `submit`:
-  1. Split `execute_stored_proposal` into a create half that returns `{txid, raw, expiryHeight}` and stores the transaction in the main DB.
+  1. Split `execute_stored_proposal` into a create half that returns `{txid, raw, expiryHeight}` and stores the transaction in the main DB. As built: `propose_swap_deposit` (one step, total ≤ the cap) and `create_stored_proposal_transactions`, which returns `Vec<CreatedTransaction>`. If storing succeeds but reading the bytes back fails, it says so; the engine then finds the deposit with `find_deposit`.
   2. The swap engine persists `Kept(tx)`.
-  3. It then broadcasts the raw bytes itself.
+  3. It then broadcasts the raw bytes itself (`broadcast_raw`).
 
   The main wallet sync's `resubmit_pending_transactions` also rebroadcasts it until it is mined or expires. The record must say `deposit = Started` before the create.
-- **Never paying twice.** That relies on `findDeposit`: on resume with `Started` and no transaction, search the main DB's non-expired sent transactions for an output to the joint UA (`sent_notes.to_address`; **unverified**, U3). It also relies on `keepSending` rebuilding only after a proven expiry.
+- **Never paying twice.** That relies on `findDeposit`: on resume with `Started` and no transaction, search the main DB's non-expired sent transactions for an output to the joint UA (`sent_notes.to_address`; U3, verified offline in M0.2 and by the M2 unit test). As built: `find_deposit(main_db, network, account_uuid, joint_ua)`, which fails closed when a matching deposit has no stored bytes. It also relies on `keepSending` rebuilding only after a proven expiry.
 - **Seed.** The deposit needs the active account's seed, so it runs in the foreground only (D9).
 
 #### 8.1.3 Discard OVK for joint sweeps (D12)
 
-**Today.**
+**Before M2.**
 
 - `SendPurpose::{Ordinary, PaymentLinkClaim}` (`rust/src/wallet/sync/send.rs:125-144`) maps to `StoredOvkPolicy::{Sender, Discard}`. That is stored on `StoredProposal.ovk_policy` (`rust/src/wallet/sync/mod.rs:584-604`) by `propose_send_with_request` (`send.rs:957`).
 - The software execute path honours it (`send.rs:1600`, `stored.ovk_policy.to_ovk_policy()`).
@@ -1115,12 +1117,19 @@ Each row is a step zapp performs, and the vizor seam that performs it. "New" mea
    - Keep the PaymentLinkClaim refusal test, keyed on purpose.
    - Add a unit test that a `JointSweep` proposal's PCZT has outputs whose `out_ciphertext` does not decrypt under the joint FVK's OVK (`try_output_recovery_with_ovk` fails).
    - Extend the Ironwood regtest (§10) to assert the same on chain, as `gift_card_claims_at_two_confirmations_and_discards_the_card_ovk` does (`rust/tests/ironwood_regtest_gift_card_claim.rs:27-40`).
-5. **Unverified (U8).** `store_and_broadcast_pczts_with_compact_signatures_for_proposal` (`pczt.rs:1645`) stores through `extract_and_store_transaction_from_pczt`, falling back to `decrypt_and_store_transaction` (call at `:2056`; `:1741` is only its `use`). `extract_and_broadcast_pczt` (`:2399`) has a second fallback at `:2478`. With `Discard` the fallback cannot recover sent-output metadata. That is harmless for a joint DB that is deleted after the sweep, but check that the primary path still records the sweep as sent.
+5. **Unverified (U8).** `store_and_broadcast_pczts_with_compact_signatures_for_proposal` (`pczt.rs:1645`) stores through `extract_and_store_transaction_from_pczt`, falling back to `decrypt_and_store_transaction` (call at `:2056`; `:1741` is only its `use`). `extract_and_broadcast_pczt` (`:2399`) has a second fallback at `:2478`. With `Discard` the fallback cannot recover sent-output metadata. That is harmless for a joint DB that is deleted after the sweep, but check that the primary path still records the sweep as sent. By reading (M2), it rebuilds sent outputs from the PCZT's own fields and never uses an OVK; M2.7b asserts the sent row.
+
+**As built (M2, 2026-10-13).**
+
+- `SendPurpose::JointSweep` maps to `StoredOvkPolicy::Discard` and `joint_sweep_confirmations_policy()`, `ConfirmationsPolicy(2, 2, false)` (`JOINT_SWEEP_CONFIRMATIONS`, `vr/wallet/mod.rs`). `StoredProposal.purpose` sits next to `ovk_policy`.
+- `create_pczt_from_proposal` refuses only `PaymentLinkClaim` (`reject_payment_link_claim_proposal`, message unchanged) and passes `stored.ovk_policy.to_ovk_policy()`.
+- `create_tex_pczts_from_proposal` still builds both PCZTs with the sender's OVK, so it keeps refusing every `Discard` proposal: the Gift Card message for claims, a generic one otherwise (D-11).
+- Tests: `gift_card_claim_proposal_is_rejected_before_pczt_and_releases_lock` (`pczt.rs`) is keyed on purpose. `a_joint_sweep_pczt_discards_the_joint_ovk` (`vr/wallet/private_usd/tests/joint.rs`) shows a sweep's one output does not recover under the joint OVKs, while an ordinary send's payment from the same account does. librustzcash encrypts change without an OVK even under `Sender`.
 
 #### 8.1.4 Traps
 
 - **Global write lock.** `with_wallet_db_write_lock` is process-global, not per path (`vr/wallet/db.rs:220-245`). Joint-DB scans and writes therefore serialize with main-wallet writes, as Gift Card claims already do.
-- **Birthday at the tip.** zecSwap imports at tip + 1, because librustzcash panics on an empty scan range next to a deleted account's ranges (`zs/…/zcash/wallet.rs:451-470`, librustzcash#2301). vizor's claim-sync normalizes ranges (`sync_engine/mod.rs:2865-2868`). **Unverified** for a joint account whose birthday is ≥ the tip (U6).
+- **Birthday at the tip.** zecSwap imports at tip + 1, because librustzcash panics on an empty scan range next to a deleted account's ranges (`zs/…/zcash/wallet.rs:451-470`, librustzcash#2301). vizor's claim-sync normalizes ranges (`sync_engine/mod.rs:2865-2868`). **Unverified** for a joint account whose birthday is ≥ the tip (U6). As built, `sync_joint_db` does not scan a `joint.db` whose accounts are all born above the tip: the claim scan's completion checks need a stored tip block (D-10).
 
 ### 8.2 FRB API conventions
 

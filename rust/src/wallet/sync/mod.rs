@@ -68,8 +68,9 @@ pub use pczt::{
     KeystoneBatchPczt, StoreAndBroadcastPcztsResult, TexPcztPair,
 };
 pub(crate) use pczt::{
-    expiry_height_from_io_finalized_pczt, extract_compact_sigs_from_pczt,
-    store_and_broadcast_signed_pczts, txid_from_io_finalized_pczt, validate_signed_pczts,
+    apply_sigs_and_extract, expiry_height_from_io_finalized_pczt, extract_compact_sigs_from_pczt,
+    extract_required_compact_sigs_from_signed_pczt, store_and_broadcast_signed_pczts,
+    txid_from_io_finalized_pczt, validate_signed_pczts,
 };
 pub(crate) use proposal_locks::recover_previous_process as recover_orphaned_send_locks;
 pub(crate) use send::estimate_send_max;
@@ -101,6 +102,12 @@ pub(crate) use send::{
 pub(crate) use send::{
     estimate_send_max_for_purpose, propose_payment_link_batch, propose_send_for_purpose,
     SendPurpose,
+};
+// Private USD: the deposit split and the joint sweep proposal.
+#[allow(unused_imports)] // The Private USD engine (M5) calls the deposit half.
+pub(crate) use send::{
+    broadcast_raw, create_stored_proposal_transactions, propose_joint_sweep, propose_swap_deposit,
+    CreatedTransaction, SwapProposal,
 };
 pub(crate) use send::{get_orchard_migration_immediate_plan, get_orchard_migration_private_plan};
 // Internal-only re-export for `sync_engine::run_sync_impl`'s
@@ -582,6 +589,8 @@ pub(super) struct StoredProposal {
     pub account_id: AccountUuid,
     pub send_flow_id: String,
     pub ovk_policy: StoredOvkPolicy,
+    /// What the proposal is for. It decides which signing paths may take it.
+    pub purpose: send::SendPurpose,
 }
 
 /// Outgoing viewing key policy fixed when a proposal is created.
@@ -589,7 +598,8 @@ pub(super) struct StoredProposal {
 pub(super) enum StoredOvkPolicy {
     Sender,
     /// Gift Card claims: the link's seed is a shared bearer secret, so its
-    /// OVK must not be able to recover the recipient address.
+    /// OVK must not be able to recover the recipient address. Private USD
+    /// joint sweeps: the maker holds the joint viewing key.
     Discard,
 }
 

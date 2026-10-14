@@ -1,6 +1,7 @@
 //! Known-answer vectors (plan §3.3, reference §5.4 and §5.5), pinned in
 //! `vectors.json`. Signatures are deterministic (RFC 6979), so they compare
-//! byte for byte.
+//! byte for byte. `joint` holds the joint-account and deposit tests (M2), and
+//! `ironwood_regtest` the ignored test against the regtest stack.
 
 use serde_json::Value;
 use zecswap_core::{
@@ -11,6 +12,9 @@ use zecswap_railgun::Keys;
 use super::{evm_rpc, keys::SwapKeyContext, railgun_keys, terms, ErrorCode, PrivateUsdNetwork};
 use crate::wallet::{keys, network::WalletNetwork};
 use secrecy::ExposeSecret;
+
+mod ironwood_regtest;
+mod joint;
 
 fn vectors() -> Value {
     serde_json::from_str(include_str!("vectors.json")).unwrap()
