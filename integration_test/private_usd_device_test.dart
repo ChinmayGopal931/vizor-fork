@@ -438,6 +438,17 @@ void _requireRoundSetup() {
 /// Private USD use (set once by the round): never the Railgun bridge.
 Set<int> _baselineListenPorts = <int>{};
 
+
+/// Opens `/private-usd` from home. A tap while home is still animating in
+/// does nothing, so tap until the screen shows.
+Future<void> _openPrivateUsdScreen(WidgetTester tester) => tapUntilVisible(
+  tester,
+  trigger: find.byKey(const ValueKey('mobile_home_private_usd_strip')),
+  outcome: find.byKey(const ValueKey('mobile_private_usd_convert')),
+  description: 'the Private USD screen',
+  timeout: const Duration(minutes: 2),
+);
+
 class _Checkpoint {
   _Checkpoint(this.name, this.raw);
 
@@ -1230,8 +1241,21 @@ class _M5Round extends _Round {
       _log('waiting for an earlier conversion to end');
       await _pumpFor(const Duration(seconds: 15));
     }
-    await tapWidget(tester, _stripKey);
-    await tapAppButton(tester, _screenConvertKey);
+    // The Convert button waits for the payment guard's first read of the send
+    // log, which can take a while after the app starts; a strip tap that
+    // lands while home is still animating in does nothing.
+    await tapUntilVisible(
+      tester,
+      trigger: find.byKey(_stripKey),
+      outcome: find.byKey(_screenConvertKey),
+      description: 'the Private USD screen',
+      timeout: const Duration(minutes: 1),
+    );
+    await tapAppButton(
+      tester,
+      _screenConvertKey,
+      timeout: const Duration(minutes: 3),
+    );
     await _waitUntil(
       'the convert screen',
       () => tester.any(find.byKey(_amountKey)),
@@ -1301,9 +1325,11 @@ class _M5Round extends _Round {
       timeout: const Duration(minutes: 3),
     );
     _results['m5_resumed_phase'] = _status?.record.phase.name;
-    await _lockUsesNoKey(engine);
+    // The two short checks first: a swap takes only a few minutes, and the
+    // 90 s lock check would otherwise outlast it.
     await _otherAccountKeepsAdvancing();
     await _deleteWarningShowsTheCount();
+    await _lockUsesNoKey(engine);
     await _reachesPaid();
     _log('results: $_results');
     await _event('m5-resume-end', _results);
@@ -1565,7 +1591,7 @@ class _M6Round extends _Round {
   Future<void> _waitForDollars() async {
     final needed =
         privateUsdDollarUnits(_m6Usd)! + privateUsdDollarUnits(_m6FeeMargin)!;
-    await tapWidget(tester, _stripKey);
+    await _openPrivateUsdScreen(tester);
     await _waitUntil('$_m6Usd private USD and its fees to be available', () {
       final token = _container
           .read(privateUsdCurrentDeploymentProvider)
@@ -1988,6 +2014,12 @@ class _M7Round extends _Round {
   Future<void> _home() async {
     await enterPasscode(tester, mobileE2ePasscode);
     await waitForHome(tester);
+    // The conversion rounds hold their private USD in the second account, and
+    // an earlier round's account-switch check can leave the first one active.
+    final holder = await accountUuidAtOrder(1);
+    if (_activeUuidOf(tester) != holder) {
+      await switchAccountTo(tester, holder);
+    }
     _container = ProviderScope.containerOf(
       tester.element(find.byKey(_homeBalanceKey)),
     );
@@ -1996,13 +2028,26 @@ class _M7Round extends _Round {
     expect(_container.read(privateUsdAvailableProvider), isTrue);
   }
 
+  String? _activeUuidOf(WidgetTester tester) =>
+      ProviderScope.containerOf(
+        tester.element(find.byKey(_homeBalanceKey)),
+      ).read(accountProvider).value?.activeAccountUuid;
+
   PrivateUsdBalances? _balancesOf(String uuid) =>
       _container.read(privateUsdBalanceProvider(uuid)).balances;
 
   /// [uuid]'s private USD, freshly synced from `/private-usd`.
   Future<PrivateUsdBalances> _syncedBalances(String uuid) async {
     final before = _container.read(privateUsdBalanceProvider(uuid)).updatedAt;
-    await tapWidget(tester, _stripKey);
+    // The strip renders a moment after home does, and a tap while home is
+    // still animating in does nothing: tap until the screen opens.
+    await tapUntilVisible(
+      tester,
+      trigger: find.byKey(_stripKey),
+      outcome: find.byKey(const ValueKey('mobile_private_usd_convert')),
+      description: 'the Private USD screen',
+      timeout: const Duration(minutes: 2),
+    );
     _container.read(privateUsdBalanceProvider(uuid).notifier).refresh();
     await _waitUntil('a fresh private balance', () {
       final state = _container.read(privateUsdBalanceProvider(uuid));
@@ -2020,7 +2065,7 @@ class _M7Round extends _Round {
         .read(privateUsdCurrentDeploymentProvider)!
         .token
         .toLowerCase();
-    await tapWidget(tester, _stripKey);
+    await _openPrivateUsdScreen(tester);
     await _waitUntil(
       '${formatPrivateUsdExact(_needed, 6)} to be available',
       () {
@@ -2042,7 +2087,7 @@ class _M7Round extends _Round {
     String to,
     String check,
   ) async {
-    await tapWidget(tester, _stripKey);
+    await _openPrivateUsdScreen(tester);
     await tapAppButton(
       tester,
       mode == PrivateUsdSendMode.private ? _sendKey : _withdrawKey,

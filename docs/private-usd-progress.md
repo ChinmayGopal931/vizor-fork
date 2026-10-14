@@ -36,6 +36,19 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   (D-50); new wallets' ZIP-32 index (D-109); the voting restorer's
   `ref.mounted` (D-111); the balance watch mid-build (D-112); two Private USD
   routes that force-unwrapped `GoRouter.extra` (crashed on review → progress).
+- **Update (2026-10-15):** with the NU7 circuit fix `cargo test` passes
+  (lib 1514 passed, 0 failed). M5 now passes in full on the device: kill
+  mid-confirmation, an advance with another account active, the delete
+  warning ("showed 1, nothing deleted"), the 90 s lock ("no advance while
+  locked; resumed after unlock") and `PAID` (swap index 8; two top-up
+  conversions gave account 2 two more $10.86 notes). M7 first hit an app bug
+  (`privateUsdReceiveAddressProvider` read its ref after an await; fixed) and
+  then harness problems (tapping the Private USD strip once while home was
+  animating in; the M5 account-switch check leaving account 1 active, which
+  holds no dollars; now every strip tap retries and M7 starts on the second
+  account). The M7 round (`--m7 --m7-usd 1 --m7-to 0xabEa…0c13`) was
+  rerunning at commit time; its result is not recorded here. E2
+  (relicensing) is dropped by the owner.
 - **Open findings to fix next:**
   - "Your Zcash wallet isn't ready" is shown for any `ZcashWallet` failure,
     not only syncing (misleading on the sweep failure).

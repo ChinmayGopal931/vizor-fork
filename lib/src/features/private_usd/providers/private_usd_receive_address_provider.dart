@@ -12,11 +12,15 @@ import '../services/railgun_engine_key_store.dart';
 /// sensitive. Only while unlocked.
 final privateUsdReceiveAddressProvider = FutureProvider.autoDispose
     .family<String, String>((ref, accountUuid) async {
+      // Read before the first await: nothing watches this provider while its
+      // caller awaits, so it can be disposed in between and a later `ref.read`
+      // would throw.
       final network = ref.read(appBootstrapProvider).network;
+      final accounts = ref.read(accountProvider.notifier);
       final dbPath = await getWalletDbPath();
-      final mnemonicBytes = await ref
-          .read(accountProvider.notifier)
-          .getMnemonicBytesForAccount(accountUuid);
+      final mnemonicBytes = await accounts.getMnemonicBytesForAccount(
+        accountUuid,
+      );
       if (mnemonicBytes == null || mnemonicBytes.isEmpty) {
         throw const RailgunEngineKeyLockedException();
       }
