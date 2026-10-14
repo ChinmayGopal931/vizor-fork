@@ -40,6 +40,19 @@
 #                        (default 2)
 #   --m6-refund          also: a paid conversion, cancelled, ends REFUNDED (waits
 #                        out the refund deadlines; can take hours)
+#   --m7                 the M7 round (private send and withdraw), off by default.
+#                        Run it after an M5 round left private USD in the same
+#                        wallet (or together with --m5/--m6, after them). It
+#                        never resets the wallet and keeps the page storage. It
+#                        runs the test's start phase (a send through the screens
+#                        arrives at a second account's 0zk address and stays
+#                        Processing on Sepolia; a withdrawal reaches --m7-to; a
+#                        third send is kept and held before its post), force-
+#                        stops the app (killed between proving and the post),
+#                        then runs the resume phase (settlement posts the kept
+#                        bytes; nothing is proved again). Implies --skip-release.
+#   --m7-to ADDRESS      the 0x address the withdrawal pays (required with --m7)
+#   --m7-usd AMOUNT      private USD per send and withdrawal (default 1)
 #
 # Safety: it refuses a phone whose com.keplr.vizor is installed but not
 # debuggable (that may be a real wallet), runs `flutter test --no-uninstall`,
@@ -71,7 +84,7 @@ export CARGOKIT_SKIP_EMULATOR_ABIS=true
 OUT="${TMPDIR:-/tmp}/pusd-device-round-$(date +%Y%m%d-%H%M%S)"
 RELEASE_APK=""
 RUN_TEST=1 RUN_RELEASE=1 RUN_RESTORE=1 KEEP_PAGE=0 TOR_FIRST_SYNC=true
-M5=0 M5_ZEC=0.05 M6=0 M6_USD=2 M6_REFUND=false
+M5=0 M5_ZEC=0.05 M6=0 M6_USD=2 M6_REFUND=false M7=0 M7_USD=1 M7_TO=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --m5) M5=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
@@ -79,6 +92,9 @@ while [[ $# -gt 0 ]]; do
     --m6) M6=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
     --m6-usd) M6_USD=$2; shift 2 ;;
     --m6-refund) M6_REFUND=true; shift ;;
+    --m7) M7=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
+    --m7-to) M7_TO=$2; shift 2 ;;
+    --m7-usd) M7_USD=$2; shift 2 ;;
     --out) OUT=$2; shift 2 ;;
     --release-apk) RELEASE_APK=$2; shift 2 ;;
     --skip-test) RUN_TEST=0; shift ;;
@@ -89,6 +105,10 @@ while [[ $# -gt 0 ]]; do
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
+if [[ $M7 == 1 && ! $M7_TO =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+  echo "--m7 needs --m7-to 0x… (40 hex digits): the withdrawal's address" >&2
+  exit 2
+fi
 mkdir -p "$OUT"
 
 log() { echo "$(date +%H:%M:%S) [round] $*" | tee -a "$OUT/round.log"; }
@@ -254,7 +274,35 @@ if [[ $RUN_TEST == 1 ]]; then
       2>&1 | tee "$OUT/flutter-test-m6.log"
     TEST_STATUS=${PIPESTATUS[0]}
   fi
-  if [[ $M5 == 0 && $M6 == 0 ]]; then
+  if [[ $M7 == 1 && $TEST_STATUS == 0 ]]; then
+    # Never VIZOR_PUSD_DEVICE_RESET: the round sends the private USD an M5
+    # round left in the phone's wallet.
+    m7_test() {
+      fvm flutter test integration_test/private_usd_device_test.dart \
+        -d "$SERIAL" --tags private-usd-device --run-skipped --no-uninstall \
+        "${DEFINES[@]}" \
+        --dart-define=ZCASH_E2E_NETWORK=testnet \
+        --dart-define=VIZOR_PUSD_DEVICE_DRIVER_URL="http://127.0.0.1:$PORT" \
+        --dart-define=VIZOR_PUSD_DEVICE_M7="$1" \
+        --dart-define=VIZOR_PUSD_DEVICE_M7_USD="$M7_USD" \
+        --dart-define=VIZOR_PUSD_DEVICE_M7_TO="$M7_TO" \
+        2>&1 | tee "$OUT/flutter-test-m7-$1.log"
+      return "${PIPESTATUS[0]}"
+    }
+    log "M7 round, start phase: send, withdraw, then a send held before its post"
+    m7_test start
+    TEST_STATUS=$?
+    if [[ $TEST_STATUS == 0 ]]; then
+      adb_ shell am force-stop "$PACKAGE"
+      log "killed the app between proving and the post (am force-stop)"
+      sleep 5
+      ensure_screen_ready
+      log "M7 round, resume phase: settlement posts the kept send, nothing is proved"
+      m7_test resume
+      TEST_STATUS=$?
+    fi
+  fi
+  if [[ $M5 == 0 && $M6 == 0 && $M7 == 0 ]]; then
     log "running the integration test (fresh page storage: $fresh, Tor first sync: $TOR_FIRST_SYNC)"
     fvm flutter test integration_test/private_usd_device_test.dart \
       -d "$SERIAL" --tags private-usd-device --run-skipped --no-uninstall \

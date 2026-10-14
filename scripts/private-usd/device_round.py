@@ -15,10 +15,13 @@ $ANDROID_SERIAL. Run it with `python3 -I`.
   probe [--onionoo]             One sample of what `serve` checks, printed.
   summarize --out DIR           Digest of a round's evidence.
 
-The M5 and M6 rounds (`run_device_round.sh --m5`, `--m6`) use the same
-`serve` endpoints: their events (`m5-*`, `m6-*`: the swap index, phases and
-timings, never txids or secrets) and screenshots land in the same evidence
-directory, and `summarize` lists them with the rest.
+The M5, M6 and M7 rounds (`run_device_round.sh --m5`, `--m6`, `--m7`) use
+the same `serve` endpoints: their events (`m5-*`, `m6-*`, `m7-*`: the swap
+index, phases, outcomes and timings, never txids, addresses or secrets) and
+screenshots land in the same evidence directory, and `summarize` lists them
+with the rest. The M7 round also asks `serve` for a public ERC-20 balance
+(`/erc20-balance`, over the deployment's keyless RPC) to see its withdrawal
+arrive.
 
 A checkpoint reports, for the app UID: whether a WebView renderer runs for
 the app (the isolated `…:sandboxed_process…` process tagged with the app's
@@ -36,6 +39,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
 import xml.etree.ElementTree as ElementTree
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -184,6 +188,22 @@ def probe(checks, vm_service_port=None, onionoo=True):
     return result
 
 
+def erc20_balance(rpc, token, address):
+    """`balanceOf(address)` of the ERC-20 `token`, over JSON-RPC at `rpc`."""
+    if not re.fullmatch(r"0x[0-9a-fA-F]{40}", token) or not re.fullmatch(r"0x[0-9a-fA-F]{40}", address):
+        raise ValueError("token and address must be 0x addresses")
+    if not rpc.startswith("https://"):
+        raise ValueError("the RPC must be https")
+    data = "0x70a08231" + address[2:].lower().rjust(64, "0")
+    body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "eth_call", "params": [{"to": token, "data": data}, "latest"]}).encode()
+    request = urllib.request.Request(rpc, data=body, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        answer = json.loads(response.read())
+    if "result" not in answer:
+        raise RuntimeError(f"eth_call failed: {answer.get('error')}")
+    return int(answer["result"], 16)
+
+
 def append_jsonl(path, record):
     with open(path, "a") as f:
         f.write(json.dumps(record) + "\n")
@@ -237,6 +257,11 @@ def serve(port, out):
                         append_jsonl(os.path.join(out, "events.jsonl"), record)
                     print(f"{now()} event {json.dumps(request)}", flush=True)
                     return self.reply({"ok": True})
+                if self.path == "/erc20-balance":
+                    # The M7 round's withdrawal check: a public balance on
+                    # the deployment's keyless RPC, nothing secret.
+                    balance = erc20_balance(str(request["rpc"]), str(request["token"]), str(request["address"]))
+                    return self.reply({"balance": str(balance)})
                 if self.path == "/screenshot":
                     name = re.sub(r"[^A-Za-z0-9_.-]", "_", str(request.get("name", "shot")))
                     size = screenshot(os.path.join(out, f"{name}.png"))

@@ -909,10 +909,61 @@ Nothing in part 2 touched Rust, the FRB bindings or Kotlin.
 - [x] M7.1 Rust: `relayer_client.rs` (sends terms, transact), `sends.rs`
   (the log, keep-before-post, settlement), `evm_rpc.rs` (`nullifiers`),
   FRB (D-90 to D-95)
-- [ ] M7.2 Dart
-- [ ] M7.3 Copy (Send and withdraw)
-- [ ] M7.4 Widgetbook and capture scenarios (send rows)
-- [ ] M7 gate
+- [x] M7.2 Dart: the sender, the full spend guard, the send and
+  spend-status providers, the send, withdraw, review and status routes, and
+  settlement (D-96 to D-99)
+- [x] M7.3 Copy (Send and withdraw) (D-100)
+- [x] M7.4 Widgetbook and capture scenarios (send rows) (D-101)
+- [ ] M7.5 Device round (after M5's; Sepolia): `run_device_round.sh --m7
+  --m7-to 0x…`, written, not run (D-103)
+- [x] M7 gate: every suite passes (status below); the device checks are
+  M7.5, deferred
+
+M7 status (2026-10-14): done except M7.5, the device round, which needs the
+private USD an M5 round leaves in the phone's testnet wallet (E8, N2), and a
+Sepolia address of the owner's to withdraw to.
+
+- **What landed (part 2).**
+  - `services/private_usd_sender.dart`: `PrivateUsdSender` (zapp
+    `RelayedPrivateUsdSender`): pricing (`cost`, `held`), proving through
+    the page, keeping (`send_log_put`, asked right before the call whether
+    the app is still unlocked, in the foreground and at the tap's engine
+    epoch), the first post (`relayer_transact`), the landing wait and
+    settlement passes (`settle`, `settleIfUnsettled`), over two seams:
+    `PrivateUsdSendPage` (`RailgunSendPage`) and `PrivateUsdSendBackend`
+    (`RustPrivateUsdSendBackend`).
+  - `services/private_usd_spend_guard.dart`: the full guard (zapp
+    `PrivateUsdSpendGuard`): the send log's `unconfirmed` rows across
+    restarts, a send or funding starting now, and conversions under way in
+    both directions; `checking` and `unreadable` included.
+  - `models/private_usd_send.dart`: the mode, request, cost, outcomes,
+    network-fee reserve and the form's rules (zapp `PrivateUsdSendForm`);
+    `isValidEvmAddress` and `isZeroEvmAddress` beside `_isEvmAddress` in
+    `address_format_validator.dart`.
+  - Providers: `privateUsdSenderProvider` (kept alive by
+    `PrivateUsdEngineHost`; settles on every Railgun sync, on unlock and on
+    an account switch), `privateUsdSendProvider(mode)`,
+    `privateUsdSpendStatusProvider(uuid)`, `privateUsdSendRecordsProvider(uuid)`
+    and `privateUsdSendBackendProvider`.
+  - Routes: `/private-usd/send`, `/private-usd/withdraw`, their `/review`,
+    and `/private-usd/send/status` (`extra`: the mode). Send and Withdraw
+    sit under the total on `/private-usd`, with the spending note; send
+    rows join its activity.
+- **Tests.** The 8 new Dart tests are listed in D-102.
+  - `fvm flutter analyze`: no issues.
+  - `fvm flutter test` (desktop lane): `+5976 ~163 -4`; the 4 are the
+    pre-existing `settings_seed_phrase_screen_test.dart` failures ("incoming
+    links cannot interrupt backup completion/deferral success/failure").
+  - Mobile lane (`--tags mobile --run-skipped
+    --dart-define=VIZOR_FORM_FACTOR=mobile`): `+2304 -10`; the 10 are the
+    pre-existing `app_review_payment_handoff_test.dart` failures. The 10
+    new capture scenarios pass the mobile scenario smoke test.
+  - No Rust changed, so `cargo test` was not run again (M7 part 1's run
+    stands).
+- **Device checks (M7.5, deferred).** A send arriving at a second
+  account's `0zk`, a withdrawal reaching a `0x` address, a kill between
+  proving and the post (the same bytes go out, nothing is proved again),
+  and Sepolia outputs staying "Processing": all in the `--m7` round (D-103).
 
 M7 part 1 status (2026-10-14): M7.1, the Rust half, is done. Part 2 (M7.2–M7.4:
 the Dart sender, spend guard, providers, routes, copy and Widgetbook) is
@@ -2148,6 +2199,133 @@ next; the M7 gate and its device checks wait for it.
     first branch.
   Not ported: `RelayedPrivateUsdSenderTest` 274 (a higher fee is never paid
   unconfirmed) is pricing, which is Dart's (M7.2).
+- **D-96 (M7.2): the sender as built.** Reference §6.7 and §9.2 updated.
+  - `PrivateUsdSender.send` runs inside the spend guard: `held` (zapp's: the
+    confirmed fee while the relayer still holds it 2 minutes past now and
+    its floor is not above it, else the page's `broadcasterFee` again),
+    then nothing is proved above the 2 USDC cap (`send_error_fee_cap`) or
+    above the confirmed fee (`Repriced`); `cost` refuses a fee above the cap
+    for review too (`PrivateUsdSendFeeCapException`), before any proof.
+  - The page proves (`transfer` or `unshield`); `RailgunSession.prove` now
+    keeps the page's result text on `RailgunRelayedProof.json`, which goes
+    to `send_log_put` unchanged and is never logged or stored by Dart. The
+    keep is bound to an engine ticket taken at the tap
+    (`PrivateUsdEngine.ticket`, as M6's funding): the backend asks
+    `isCurrent` after its last await, right before the FRB call, so a proof
+    that lands after a lock, in the background or after a drain is dropped
+    and nothing is kept or sent.
+  - After a keep it is never proved again: the first post
+    (`relayer_transact`) runs only while the app may run, else the outcome
+    is `Unconfirmed` and settlement posts the kept bytes later (D9). An
+    error from the post is `Unconfirmed` too, except `other` (nothing was
+    kept: `NotSent`). `sent` waits for a block (a settlement pass every 4 s
+    for up to 2 minutes: `Sent`, the row gone `NotSent`, else
+    `Unconfirmed`); `refused` prices again (`Repriced` when the relayer now
+    asks more than the proved fee, else `NotSent`); `spent` and `retry` are
+    `Unconfirmed`. A page sync follows every proved send.
+  - Busy from Rust's keep reads the log again to say which: a pending send
+    (`sending`) or a conversion (`converting`).
+  - The send id is a random version-4 UUID made in Dart (`Random.secure`);
+    the app has no direct `uuid` dependency.
+- **D-97 (M7.2): the spend guard as built, beyond the minimal one (D-82).**
+  `PrivateUsdSpendGuard` is a `ChangeNotifier` per wallet with zapp's rule
+  order: a payment starting now (`send`, `startConversion`, in memory),
+  then `unreadable` (the log did not read; read again after 30 s), then
+  `checking` (not read yet), then `sending` (an `unconfirmed` row), then
+  `converting` (the engine's snapshot holds a conversion under way), else
+  `available`. `send` reads the log and Rust's `unfinished_count` again
+  just before anything is proved; `startConversion` (the reverse funding)
+  reads the log, since Rust's reverse calls do not, and never counts the
+  conversion it funds. `canStartConversion` is now zapp's (`available` or
+  `converting`), for the Convert button; the reverse funding shows the
+  pending-payment note or the store error when a send blocks it. The guard
+  keeps the rows it last read for the activity, and forgets a deleted
+  account's.
+- **D-98 (M7.2): when settlement runs, as built.** `privateUsdSenderProvider`
+  is kept alive by `PrivateUsdEngineHost` and settles the account of every
+  Railgun sync (`railgunEngineStateProvider.lastSync`: balance refreshes,
+  the sync after each send, conversions'), the active account on unlock,
+  on an account switch and at start when its log holds an `unconfirmed`
+  row, and during a send's landing wait; only in the foreground while
+  unlocked and not drained. Building it at start builds the `RailgunEngine`
+  object (no page and no bridge start; its constructor's cleanup of a page
+  a previous Flutter engine left now runs at start rather than on first
+  use). It registers with `privateUsdLifecycleProvider`: a deletion or
+  reset refuses new sends and passes and waits up to 30 s for running ones.
+- **D-99 (M7.2): routes and UI as built.** Reference §9.2 and §9.4 S8
+  updated.
+  - `/private-usd/send` and `/private-usd/withdraw` (one screen, the mode
+    fixed by the button), `/private-usd/{send,withdraw}/review`, and
+    `/private-usd/send/status` (`extra`: the mode). Each step pushes the
+    next and pops with a result, as the convert review does; "Done" closes
+    the status, the review and the form. Back is blocked while a send runs;
+    back during the price look-up drops it.
+  - The status reuses `MobileTransactionProgressScreen`: "Proving your
+    transaction · n%" with the proving detail, then "Sending" with a new
+    landing line once kept; "Sent" or "Withdrawn", pending while not in a
+    block. It has two action slots, so it offers "Done" and "View on
+    Etherscan"; "View on Railscan" (copy kept) is not shown.
+  - The amount field takes up to 18 typed decimals so "Use at most 6
+    decimal places." can show (zapp flags rather than blocks). "Use it all"
+    is the available amount less the reserve: the last quoted fee, else the
+    relayer's floor (`minNetworkFee`, read from the terms when the form
+    opens). Withdrawals offer the deployment's swap token only.
+  - On `/private-usd`: Send and Withdraw under the total (enabled when the
+    guard is `available` and some dollars are available), the spending
+    note under them, and Convert disabled unless a conversion is under way
+    or the guard allows one. Send rows (sent, withdrew, not in a block yet;
+    the transaction on Etherscan) show on `/private-usd` only; the home and
+    Activity feeds keep conversions only. A send still being proved has no
+    row: it is not in the log, and back is blocked meanwhile.
+  - `isValidEvmAddress` requires a lowercase `0x` prefix, as zapp's
+    `^0x[0-9a-fA-F]{40}$` and Rust's `is_destination` do; the mixed-case
+    EIP-55 rule and the zero-address refusal are `_isEvmAddress`'s and
+    `isZeroEvmAddress`'s. `0zk` recipients go through Rust's synchronous
+    `private_usd_is_valid_railgun_address` and are sent lowercased.
+- **D-100 (M7.3): the copy as built.** The Send and withdraw table is in
+  `PrivateUsdCopy`, with `privateUsdSpendMessage(status)` (the spending
+  note) and `privateUsdSendErrorMessage(code)`. New for vizor: "Paste" (the
+  recipient's paste button), "Vizor can't read its saved payments." with
+  the support sentence (the guard's `unreadable`), "Proving your
+  transaction · n%", and the landing line "The relayer is sending it.
+  Waiting for a block can take a minute. Keep Vizor open."
+- **D-101 (M7.4): Widgetbook and capture scenarios.** The nine send rows of
+  §9.7 and `mobile-private-usd-payment-pending`, in
+  `lib/widgetbook/private_usd_send_use_cases.dart` and
+  `private_usd_use_cases.dart`, registered in Widgetbook and as
+  `FigmaCompareScenario`s; the default screen now has Send, Withdraw and a
+  send row. Previews have no Rust, so they pass their own `0zk` check.
+  Captured with `scripts/figma-compare.sh widget --form-factor mobile`
+  (dark) and reviewed; `mobile-private-usd-send-done` shows Etherscan only
+  (D-99).
+- **D-102 (M7): the Dart tests as built.** Eight, per the owner's scope.
+  Untagged: `private_usd_sender_test.dart` (3: the fee cap before proving,
+  for review and for a confirmed fee priced again, with `Repriced` above the
+  confirmed fee and no proof; a proof that lands after a lock, in the
+  background or after a pause even back in the foreground is never kept,
+  and in the foreground it is kept, then posted from the store, then
+  settled, the page's JSON unchanged; a refusal priced higher is
+  `Repriced`, and a `retry` is `Unconfirmed` and blocks the next send
+  unproved) and `private_usd_send_rules_test.dart` (3: `0zk` through Rust's
+  call; `0x` with EIP-55, the zero address and the amount rules; the guard
+  across restarts). Mobile-tagged: `mobile_private_usd_send_screens_test.dart`
+  (2: the form's states; review, proof, outcome and the payment-pending
+  screen), plus the 10 new scenarios in the mobile scenario smoke test.
+- **D-103 (M7): the device round's M7 scenario, written and not run.**
+  `run_device_round.sh --m7 --m7-to 0x… [--m7-usd 1]` (off by default;
+  implies no release check and keeps the page storage; with `--m5` or
+  `--m6` it runs after them) runs `private_usd_device_test.dart` twice
+  around `am force-stop`, on the wallet an M5 round left (never reset).
+  Start: a send through the screens to a second account's `0zk` arrives
+  there, in Processing (MissingExternalPOI) on Sepolia; a withdrawal
+  reaches `--m7-to` (the host reads its public ERC-20 balance over the
+  deployment's keyless RPC: `device_round.py`'s new `/erc20-balance`); a
+  third send is kept and its first post held (a provider override in the
+  test, no production hook), so the kill lands between proving and the
+  post. Resume: before unlock the log holds that send, kept and never
+  posted; after unlock settlement posts the same kept bytes and it lands,
+  with no proof made (a counting page override) and no new row. Events
+  carry outcomes, buckets and timings only.
 
 ## Blocked
 

@@ -933,7 +933,7 @@ Dollar amounts are `amount / 10^decimals` with decimals 6, taken from the table 
 - **Fees.** Railgun's unshield fee is 25 bps (`RailgunFees`, from the engine; `of/AtomicSwapDriver.kt:297` `RAILGUN_FEE`).
 - **Screening caveat.** On Sepolia, relayed-send outputs stay `MissingExternalPOI` because of an indexer break (`railgun-sends.md` "Screening").
 - **Fee cap (D11).** Refuse a `broadcasterFee` result above 2 USDC (in the fee token's base units) with `send_error_fee_cap`, before proving.
-- **vizor storage.** The send log is the `railgun_sends` table in `swaps.db` (§3.4). Persist the proved bytes before posting. Reconcile them on every balance sync. As built (M7 part 1, progress D-90 to D-94): `rust/src/wallet/private_usd/sends.rs` keeps the page's proof (`keep`), posts only kept bytes (`Sends::transact`) and settles from the chain (`Sends::settle_all`); `relayer_client.rs` maps the answers (a `Retry-After` above an hour waits an hour) and pins the terms; `evm_rpc.rs` reads `nullifiers(uint256,bytes32)` through the `SendChain` seam.
+- **vizor storage.** The send log is the `railgun_sends` table in `swaps.db` (§3.4). Persist the proved bytes before posting. Reconcile them on every balance sync. As built (M7 part 1, progress D-90 to D-94): `rust/src/wallet/private_usd/sends.rs` keeps the page's proof (`keep`), posts only kept bytes (`Sends::transact`) and settles from the chain (`Sends::settle_all`); `relayer_client.rs` maps the answers (a `Retry-After` above an hour waits an hour) and pins the terms; `evm_rpc.rs` reads `nullifiers(uint256,bytes32)` through the `SendChain` seam. The Dart half (M7 part 2, progress D-96 to D-98): `services/private_usd_sender.dart` prices, proves, keeps (only while the tap's engine epoch holds) and posts once; `privateUsdSenderProvider` settles on every Railgun sync, on unlock and on an account switch; `services/private_usd_spend_guard.dart` reads the send log across restarts.
 
 ### 6.8 Tor bridge (D4, D13)
 
@@ -1800,6 +1800,8 @@ Read from zapp at `60bcf0b30` and vizor at `4a859bee0`. **No Figma exists for th
 
 **As built (M5, progress D-54).** The progress route redirects a `reverse` path to `/private-usd` until M6; `/private-usd/convert` ignores `?to=zec` and shows no direction toggle until then. The guard's exception reads `privateUsdUnfinishedProvider` with the active account, and `_routerProvider` refreshes on it.
 
+**As built (M7, progress D-99).** The four send routes are as in the table below, plus `/private-usd/withdraw` beside `/private-usd/send`; each step pushes the next and pops with a result. The status screen is `MobileTransactionProgressScreen` with "Done" and "View on Etherscan". Send and Withdraw sit under the total on `/private-usd` with the spending note, and send rows show in its activity only.
+
 **One conversion at a time and the spend guard.**
 
 - "Convert" opens the in-flight conversion when one exists, from `/private-usd`, from the strip and from `/private-usd/convert` on open. That matches `showConversionUnderWay`, including after a crash between accept and the progress route.
@@ -2559,6 +2561,8 @@ scripts/figma-compare.sh widget --form-factor mobile --scenario <id> --theme dar
 ```
 
 As built in M3 (D-28): the six `mobile-home-private-usd*` strip scenarios without the two banners, and `mobile-private-usd-{default,empty,first-load,refresh-failed,blocked}`. The fixtures live in `lib/widgetbook/private_usd_use_cases.dart`; the home ones pass `privateUsdBalance` (and `privacyModeEnabled`) to `_buildMobileHomeUseCase`. The banners arrive with M5, `payment-pending` with M7, and `tor-unavailable` is moot (D-22). The default screen has no activity rows until M5 and M7.
+
+As built in M7 (D-101): the nine send rows below and `mobile-private-usd-payment-pending`, in `lib/widgetbook/private_usd_send_use_cases.dart` (the payment-pending screen in `private_usd_use_cases.dart`); `mobile-private-usd-send-done` shows Etherscan only. `mobile-private-usd-default` now has Send, Withdraw and a send row.
 
 As built in M6 (D-87): the twelve reverse and refunds rows below plus `mobile-private-usd-reverse-proving` (the payment's proof at 42 %), in `lib/widgetbook/private_usd_reverse_use_cases.dart`; `mobile-home-private-usd-attention` passes `privateUsdReverseConversions` to `_buildMobileHomeUseCase`. The forward convert fixture shows the direction toggle.
 

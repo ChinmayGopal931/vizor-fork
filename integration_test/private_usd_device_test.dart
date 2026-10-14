@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:integration_test/integration_test.dart';
@@ -19,7 +20,13 @@ import 'package:zcash_wallet/src/core/formatting/zec_amount.dart';
 import 'package:zcash_wallet/src/core/layout/app_form_factor.dart';
 import 'package:zcash_wallet/src/core/storage/app_secure_store.dart';
 import 'package:zcash_wallet/src/core/storage/wallet_paths.dart';
+import 'package:zcash_wallet/src/features/address_book/models/address_format_validator.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_balances.dart';
+import 'package:zcash_wallet/src/features/private_usd/models/private_usd_send.dart';
+import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_receive_address_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_send_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/services/private_usd_sender.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_balance_provider.dart';
@@ -38,7 +45,14 @@ import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart' as rust_private_usd;
 import 'package:zcash_wallet/src/rust/api/private_usd.dart'
-    show ApiForwardOutcome, ApiReversePhase;
+    show
+        ApiForwardOutcome,
+        ApiProvedSend,
+        ApiRailgunSendsTerms,
+        ApiReversePhase,
+        ApiSendRecord,
+        ApiSendState,
+        ApiTransactResult;
 
 import 'support/mobile_regtest_flow.dart';
 
@@ -89,6 +103,22 @@ import 'support/mobile_regtest_flow.dart';
 //   3. a new one is paid, settlement is authorized, and it reaches COMPLETE;
 //   4. only with VIZOR_PUSD_DEVICE_M6_REFUND (`--m6-refund`, long refund
 //      deadlines): a paid one, cancelled, ends REFUNDED and shows on Refunds.
+//
+// The M7 round (private send and withdraw) is opt-in as well: the runner's
+// `--m7 --m7-to 0x…` passes VIZOR_PUSD_DEVICE_M7=start, kills the app, then
+// runs it again with VIZOR_PUSD_DEVICE_M7=resume. It runs after an M5 round
+// left private USD in the wallet, never resets it, and moves
+// VIZOR_PUSD_DEVICE_M7_USD dollars each time through the screens:
+//   start:  1. a send to a second account's 0zk address arrives there, and
+//              on Sepolia its output stays Processing (MissingExternalPOI);
+//           2. a withdrawal reaches VIZOR_PUSD_DEVICE_M7_TO (a public ERC-20
+//              balance the host reads);
+//           3. a third send is proved and kept, and its first post is held,
+//              so the runner's force-stop kills it between proving and the
+//              post.
+//   resume: before unlock the log holds that send, kept and never posted;
+//           after unlock settlement posts the same kept bytes and it lands,
+//           while nothing is proved again.
 
 const _driverUrl = String.fromEnvironment('VIZOR_PUSD_DEVICE_DRIVER_URL');
 const _allowReset = bool.fromEnvironment('VIZOR_PUSD_DEVICE_RESET');
@@ -110,6 +140,13 @@ const _m6Usd = String.fromEnvironment(
   defaultValue: '2',
 );
 const _m6Refund = bool.fromEnvironment('VIZOR_PUSD_DEVICE_M6_REFUND');
+// '', 'start' or 'resume': the M7 round (private send and withdraw).
+const _m7Phase = String.fromEnvironment('VIZOR_PUSD_DEVICE_M7');
+const _m7Usd = String.fromEnvironment(
+  'VIZOR_PUSD_DEVICE_M7_USD',
+  defaultValue: '1',
+);
+const _m7To = String.fromEnvironment('VIZOR_PUSD_DEVICE_M7_TO');
 
 const _homeBalanceKey = ValueKey('mobile_home_shielded_balance');
 const _stripKey = ValueKey('mobile_home_private_usd_strip');
@@ -143,8 +180,8 @@ void main() {
   testWidgets('M3: the Private USD balance, Tor and lock on a device', (
     tester,
   ) async {
-    if (_m5Phase.isNotEmpty || _m6Phase.isNotEmpty) {
-      return _log('a conversion round: M3 not run');
+    if (_m5Phase.isNotEmpty || _m6Phase.isNotEmpty || _m7Phase.isNotEmpty) {
+      return _log('a conversion or send round: M3 not run');
     }
     tolerateRenderOverflows();
     _requireRoundSetup();
@@ -177,6 +214,46 @@ void main() {
     _requireM6Setup();
     await _M6Round(tester).convertBack();
   }, timeout: Timeout(Duration(minutes: _m6Refund ? 330 : 150)));
+
+  testWidgets('M7 (start): a send arrives, a withdrawal lands, a kept send '
+      'is held before its post', (tester) async {
+    if (_m7Phase != 'start') return _log('not the M7 start round');
+    tolerateRenderOverflows();
+    _requireM7Setup();
+    await _M7Round(tester).start();
+  }, timeout: const Timeout(Duration(minutes: 120)));
+
+  testWidgets('M7 (resume): the kept send goes out as it was, never proved '
+      'again', (tester) async {
+    if (_m7Phase != 'resume') return _log('not the M7 resume round');
+    tolerateRenderOverflows();
+    _requireM7Setup();
+    await _M7Round(tester).resume();
+  }, timeout: const Timeout(Duration(minutes: 40)));
+}
+
+void _requireM7Setup() {
+  if (!Platform.isAndroid) fail('The Railgun host is Android only.');
+  if (kZcashDefaultNetworkName != ZcashNetwork.testnet.name) {
+    fail('Run on testnet: --dart-define=ZCASH_DEFAULT_NETWORK=test.');
+  }
+  if (!kVizorPrivateUsdEnabled || kAppFormFactor != AppFormFactor.mobile) {
+    fail('Build with VIZOR_PRIVATE_USD_ENABLED and VIZOR_FORM_FACTOR=mobile.');
+  }
+  if (_driverUrl.isEmpty) {
+    fail('Run through scripts/private-usd/run_device_round.sh --m7.');
+  }
+  // It sends the private USD an M5 round left: never the reset round.
+  if (_allowReset) fail('An M7 round never resets the wallet.');
+  if (privateUsdTokenUnits(_m7Usd, 6) case final units?
+      when units > BigInt.zero) {
+    // Fine.
+  } else {
+    fail('Bad VIZOR_PUSD_DEVICE_M7_USD: dollars, more than zero.');
+  }
+  if (_m7Phase == 'start' && !isValidEvmAddress(_m7To)) {
+    fail('Bad VIZOR_PUSD_DEVICE_M7_TO: a 0x address to withdraw to.');
+  }
 }
 
 void _requireM6Setup() {
@@ -1498,5 +1575,453 @@ class _M6Round extends _Round {
         }
       },
     );
+  }
+}
+
+/// The M7 start phase's sends: Rust's, except that once [hold] is set a
+/// send's first post never returns and no settlement pass runs, so the
+/// runner can kill the app between proving and the post.
+class _HoldPostBackend implements PrivateUsdSendBackend {
+  _HoldPostBackend(this._inner);
+
+  final PrivateUsdSendBackend _inner;
+  var hold = false;
+  final held = Completer<String>();
+
+  @override
+  Future<ApiRailgunSendsTerms> terms() => _inner.terms();
+
+  @override
+  Future<ApiSendRecord> put(
+    String accountUuid,
+    ApiProvedSend send, {
+    required bool Function() stillCurrent,
+  }) => _inner.put(accountUuid, send, stillCurrent: stillCurrent);
+
+  @override
+  Future<List<ApiSendRecord>> list(String accountUuid) =>
+      _inner.list(accountUuid);
+
+  @override
+  Future<ApiTransactResult> transact(String accountUuid, String sendId) {
+    if (!hold) return _inner.transact(accountUuid, sendId);
+    if (!held.isCompleted) held.complete(sendId);
+    return Completer<ApiTransactResult>().future;
+  }
+
+  @override
+  Future<List<ApiSendRecord>> settleAll(String accountUuid) =>
+      hold ? _inner.list(accountUuid) : _inner.settleAll(accountUuid);
+}
+
+/// Rust's send calls, once the app's provider has made them.
+class _LateBackend implements PrivateUsdSendBackend {
+  late PrivateUsdSendBackend inner;
+
+  @override
+  Future<ApiRailgunSendsTerms> terms() => inner.terms();
+
+  @override
+  Future<ApiSendRecord> put(
+    String accountUuid,
+    ApiProvedSend send, {
+    required bool Function() stillCurrent,
+  }) => inner.put(accountUuid, send, stillCurrent: stillCurrent);
+
+  @override
+  Future<List<ApiSendRecord>> list(String accountUuid) =>
+      inner.list(accountUuid);
+
+  @override
+  Future<ApiTransactResult> transact(String accountUuid, String sendId) =>
+      inner.transact(accountUuid, sendId);
+
+  @override
+  Future<List<ApiSendRecord>> settleAll(String accountUuid) =>
+      inner.settleAll(accountUuid);
+}
+
+/// The M7 resume phase's page: the app's, counting proofs.
+class _CountingSendPage implements PrivateUsdSendPage {
+  _CountingSendPage(this._inner);
+
+  final PrivateUsdSendPage _inner;
+
+  /// Across rebuilds of the provider.
+  static var proofs = 0;
+
+  @override
+  Future<RailgunFees> fees(String accountUuid) => _inner.fees(accountUuid);
+
+  @override
+  Future<BigInt> broadcasterFee(
+    String accountUuid,
+    RailgunTransfer transfer,
+    RailgunBroadcaster broadcaster,
+  ) => _inner.broadcasterFee(accountUuid, transfer, broadcaster);
+
+  @override
+  Future<RailgunRelayedProof> prove(
+    String accountUuid,
+    RailgunTransfer transfer,
+    RailgunBroadcaster broadcaster,
+    BigInt fee,
+  ) {
+    proofs++;
+    return _inner.prove(accountUuid, transfer, broadcaster, fee);
+  }
+
+  @override
+  Future<void> sync(String accountUuid) => _inner.sync(accountUuid);
+}
+
+/// The M7 device round (private send and withdraw, opt-in), in two runs
+/// around a kill, after an M5 round left private USD in the phone's testnet
+/// wallet. Never prints the mnemonic, an address, a transaction or any
+/// secret: the events carry outcomes, buckets and timings.
+class _M7Round extends _Round {
+  _M7Round(super.tester);
+
+  static const _sendKey = ValueKey('mobile_private_usd_send');
+  static const _withdrawKey = ValueKey('mobile_private_usd_withdraw');
+  static const _amountKey = ValueKey('mobile_private_usd_send_amount');
+  static const _recipientKey = ValueKey('mobile_private_usd_send_recipient');
+  static const _reviewKey = ValueKey('mobile_private_usd_send_review');
+  static const _confirmKey = ValueKey('mobile_private_usd_send_confirm');
+  static const _doneKey = ValueKey('mobile_private_usd_send_status_done');
+  static const _statusKey = ValueKey('mobile_private_usd_send_status_title');
+
+  late final GoRouter _router;
+  late final BigInt _units = privateUsdTokenUnits(_m7Usd, 6)!;
+
+  /// What a send needs: its amount and the relayer's fee, at most 2 USDC.
+  BigInt get _needed => _units + BigInt.from(2000000);
+
+  void _goHome() => _router.go('/home');
+
+  Future<void> _unlockToHome(List<Override> overrides) async {
+    _vmServicePort = (await developer.Service.getInfo()).serverUri?.port;
+    await tester.pumpWidget(
+      await buildBootstrappedZcashWalletApp(overrides: overrides),
+    );
+    await _waitUntil(
+      'the unlock keypad',
+      () => tester.any(find.bySemanticsLabel('Digit 1')),
+      timeout: const Duration(minutes: 2),
+    );
+  }
+
+  Future<void> _home() async {
+    await enterPasscode(tester, mobileE2ePasscode);
+    await waitForHome(tester);
+    _container = ProviderScope.containerOf(
+      tester.element(find.byKey(_homeBalanceKey)),
+    );
+    _uuid = _container.read(accountProvider).value!.activeAccountUuid!;
+    _router = GoRouter.of(tester.element(find.byKey(_homeBalanceKey)));
+    expect(_container.read(privateUsdAvailableProvider), isTrue);
+  }
+
+  PrivateUsdBalances? _balancesOf(String uuid) =>
+      _container.read(privateUsdBalanceProvider(uuid)).balances;
+
+  /// [uuid]'s private USD, freshly synced from `/private-usd`.
+  Future<PrivateUsdBalances> _syncedBalances(String uuid) async {
+    final before = _container.read(privateUsdBalanceProvider(uuid)).updatedAt;
+    await tapWidget(tester, _stripKey);
+    _container.read(privateUsdBalanceProvider(uuid).notifier).refresh();
+    await _waitUntil('a fresh private balance', () {
+      final state = _container.read(privateUsdBalanceProvider(uuid));
+      final at = state.updatedAt;
+      return state.balances != null &&
+          !state.isRefreshing &&
+          at != null &&
+          (before == null || at.isAfter(before));
+    }, timeout: _firstSyncTimeout);
+    return _balancesOf(uuid)!;
+  }
+
+  Future<void> _waitForDollars() async {
+    final token = _container
+        .read(privateUsdCurrentDeploymentProvider)!
+        .token
+        .toLowerCase();
+    await tapWidget(tester, _stripKey);
+    await _waitUntil(
+      '${formatPrivateUsdExact(_needed, 6)} to be available',
+      () {
+        final asset = _balancesOf(
+          _uuid,
+        )?.assets.where((a) => a.token.address == token).firstOrNull;
+        return asset != null && asset.available >= _needed;
+      },
+      timeout: const Duration(minutes: 30),
+    );
+    _goHome();
+    await waitForHome(tester);
+  }
+
+  /// Home → strip → Send or Withdraw → amount → recipient → Review →
+  /// confirm; returns once the status shows.
+  Future<void> _sendThroughTheScreens(
+    PrivateUsdSendMode mode,
+    String to,
+    String check,
+  ) async {
+    await tapWidget(tester, _stripKey);
+    await tapAppButton(
+      tester,
+      mode == PrivateUsdSendMode.private ? _sendKey : _withdrawKey,
+      timeout: const Duration(minutes: 2),
+    );
+    await tester.enterText(find.byKey(_amountKey), _m7Usd);
+    await tester.enterText(find.byKey(_recipientKey), to);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tapAppButton(tester, _reviewKey, timeout: const Duration(minutes: 1));
+    await _waitUntil(
+      'the review',
+      () => tester.any(find.byKey(_confirmKey)),
+      timeout: const Duration(minutes: 3),
+    );
+    await _screenshot('m7-$check-review');
+    await tapAppButton(
+      tester,
+      _confirmKey,
+      timeout: const Duration(minutes: 1),
+    );
+    await _waitUntil(
+      'the send status',
+      () => tester.any(find.byKey(_statusKey)),
+    );
+  }
+
+  /// Waits for the outcome on the status screen, then "Done".
+  Future<PrivateUsdSendOutcome> _outcome(
+    PrivateUsdSendMode mode,
+    String check,
+  ) async {
+    final started = DateTime.now();
+    await _waitUntil(
+      'the $check outcome',
+      () =>
+          _container.read(privateUsdSendProvider(mode)).phase !=
+          PrivateUsdSendPhase.sending,
+      timeout: const Duration(minutes: 15),
+    );
+    final form = _container.read(privateUsdSendProvider(mode));
+    await _screenshot('m7-$check-outcome');
+    final outcome = form.outcome;
+    await _event('m7-$check', {
+      'phase': form.phase.name,
+      'outcome': outcome.runtimeType.toString(),
+      'afterS': DateTime.now().difference(started).inSeconds,
+    });
+    expect(
+      form.phase,
+      PrivateUsdSendPhase.done,
+      reason: '$check: nothing was sent (${form.error})',
+    );
+    await tapAppButton(tester, _doneKey);
+    _goHome();
+    await waitForHome(tester);
+    return outcome!;
+  }
+
+  Future<String> _secondAccount() async {
+    final notifier = _container.read(accountProvider.notifier);
+    final other = _container
+        .read(accountProvider)
+        .value!
+        .accounts
+        .where((a) => a.uuid != _uuid && !a.isHardware)
+        .map((a) => a.uuid)
+        .firstOrNull;
+    if (other != null) return other;
+    _log('adding a second account to send to');
+    return notifier.createAccount(name: 'Round second');
+  }
+
+  Future<void> _switchTo(String uuid) async {
+    await _container.read(accountProvider.notifier).switchAccount(uuid);
+    await waitForHome(tester);
+  }
+
+  Future<void> start() async {
+    // The app's own send calls, with the hold in front of them.
+    final holding = _HoldPostBackend(_LateBackend());
+    await _unlockToHome([
+      privateUsdSendBackendProvider.overrideWith((ref) {
+        (holding._inner as _LateBackend).inner = RustPrivateUsdSendBackend(
+          () => privateUsdSwapContextOf(ref),
+        );
+        return holding;
+      }),
+    ]);
+    await _event('m7-start', {'usd': _m7Usd});
+    await _home();
+    _container.read(privateUsdSendBackendProvider);
+
+    // 1. A private send to a second account arrives there.
+    final other = await _secondAccount();
+    final otherAddress = await _container.read(
+      privateUsdReceiveAddressProvider(other).future,
+    );
+    await _switchTo(other);
+    final otherBefore = await _syncedBalances(other);
+    _goHome();
+    await waitForHome(tester);
+    await _switchTo(_uuid);
+    await _waitForDollars();
+    await _sendThroughTheScreens(
+      PrivateUsdSendMode.private,
+      otherAddress,
+      'send',
+    );
+    final sent = await _outcome(PrivateUsdSendMode.private, 'send');
+    _results['m7_send'] = sent.runtimeType.toString();
+    await _switchTo(other);
+    final arrivedStart = DateTime.now();
+    var otherAfter = otherBefore;
+    await _waitUntil(
+      'the send to arrive at the second account',
+      () => otherAfter.total - otherBefore.total >= _units,
+      timeout: const Duration(minutes: 30),
+      every: const Duration(seconds: 30),
+      onTick: (_) async {
+        otherAfter = await _syncedBalances(other);
+        _goHome();
+        await waitForHome(tester);
+      },
+    );
+    // On Sepolia a relayed send's output stays Processing
+    // (MissingExternalPOI, reference §6.7 "Screening caveat").
+    final processing = otherAfter.processing - otherBefore.processing;
+    await _event('m7-arrived', {
+      'processing': processing >= _units,
+      'afterS': DateTime.now().difference(arrivedStart).inSeconds,
+    });
+    expect(
+      processing >= _units,
+      isTrue,
+      reason: 'on Sepolia the output should stay Processing',
+    );
+    _results['m7_arrived'] = 'processing';
+    await _switchTo(_uuid);
+
+    // 2. A withdrawal reaches the given address.
+    final deployment = _container.read(privateUsdCurrentDeploymentProvider)!;
+    Future<BigInt> publicBalance() async {
+      final answer = await postDriver('/erc20-balance', {
+        'rpc': deployment.keylessRpcUrl,
+        'token': deployment.token,
+        'address': _m7To,
+      }, baseUrl: _driverUrl);
+      final balance = answer['balance'];
+      if (balance is! String) fail('No balance from the host: $answer');
+      return BigInt.parse(balance);
+    }
+
+    final publicBefore = await publicBalance();
+    await _waitForDollars();
+    await _sendThroughTheScreens(
+      PrivateUsdSendMode.withdraw,
+      _m7To,
+      'withdraw',
+    );
+    final withdrawn = await _outcome(PrivateUsdSendMode.withdraw, 'withdraw');
+    _results['m7_withdraw'] = withdrawn.runtimeType.toString();
+    // Railgun keeps 25 bps of what is withdrawn.
+    final expected = _units - _units * BigInt.from(25) ~/ BigInt.from(10000);
+    final landedStart = DateTime.now();
+    var landed = false;
+    await _waitUntil(
+      'the withdrawal to reach the address',
+      () => landed,
+      timeout: const Duration(minutes: 20),
+      every: const Duration(seconds: 20),
+      onTick: (_) async {
+        landed = await publicBalance() - publicBefore >= expected;
+      },
+    );
+    await _event('m7-withdraw-landed', {
+      'afterS': DateTime.now().difference(landedStart).inSeconds,
+    });
+    _results['m7_withdraw_landed'] = true;
+
+    // 3. A send proved and kept, whose first post never returns: the
+    // runner kills the app here.
+    await _waitForDollars();
+    holding.hold = true;
+    final keptBefore = (await holding.list(_uuid)).length;
+    await _sendThroughTheScreens(
+      PrivateUsdSendMode.private,
+      otherAddress,
+      'held',
+    );
+    final heldId = await holding.held.future.timeout(
+      const Duration(minutes: 15),
+    );
+    final rows = await holding.list(_uuid);
+    final kept = rows.where((row) => row.sendId == heldId).single;
+    expect(rows.length, keptBefore + 1);
+    expect(kept.state, ApiSendState.unconfirmed);
+    expect(kept.postedAt, isNull, reason: 'the held send was posted');
+    await _screenshot('m7-held');
+    await _event('m7-held', {'kept': true});
+    _log('results: $_results');
+    await _event('m7-start-end', _results);
+  }
+
+  Future<void> resume() async {
+    await _unlockToHome([
+      privateUsdSendPageProvider.overrideWith(
+        (ref) => _CountingSendPage(
+          RailgunSendPage(ref.watch(railgunEngineProvider)),
+        ),
+      ),
+    ]);
+    await _event('m7-resume', {});
+    // Before unlock: the send the start phase kept and never posted.
+    final container = ProviderScope.containerOf(
+      tester.element(find.bySemanticsLabel('Digit 1').first),
+    );
+    final uuid = container.read(accountProvider).value!.activeAccountUuid!;
+    final backend = container.read(privateUsdSendBackendProvider);
+    final before = await backend.list(uuid);
+    final held = before
+        .where(
+          (row) =>
+              row.state == ApiSendState.unconfirmed && row.postedAt == null,
+        )
+        .toList();
+    expect(held, hasLength(1), reason: 'no kept, unposted send to resume');
+    final heldId = held.single.sendId;
+
+    await _home();
+    final started = DateTime.now();
+    // Unlock settles the log: the kept bytes go out, then land.
+    await _waitUntil(
+      'the kept send to land',
+      () async {
+        final rows = await backend.list(_uuid);
+        final row = rows.where((r) => r.sendId == heldId).firstOrNull;
+        return row?.state == ApiSendState.confirmed;
+      },
+      timeout: const Duration(minutes: 30),
+      every: const Duration(seconds: 30),
+      onTick: (_) async {
+        await _container.read(privateUsdSenderProvider).settle(_uuid);
+      },
+    );
+    final after = await backend.list(_uuid);
+    expect(after.length, before.length, reason: 'another send was kept');
+    expect(_CountingSendPage.proofs, 0, reason: 'a kept send was proved again');
+    await _event('m7-resumed', {
+      'landed': true,
+      'afterS': DateTime.now().difference(started).inSeconds,
+    });
+    _results['m7_kill_resend'] = 'landed from the kept bytes; no new proof';
+    _log('results: $_results');
+    await _event('m7-end', _results);
   }
 }
