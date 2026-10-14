@@ -2621,7 +2621,19 @@ M8 status (2026-10-14): the non-device parts are done.
   Funds are safe: the deposit never left the wallet, its notes return at
   its expiry (4502158), and the swap ends with nothing sent. The M5 to M7
   device rounds need a testnet whose consensus matches the wallet's (an
-  Ironwood testnet lightwalletd), owner to provide. Also learned: the
+  Ironwood testnet lightwalletd), owner to provide.
+  Cause, from zecSwap's `docs/deployment.md` ("October 6 NU7 maker
+  upgrade") and `deployments/retired/sepolia-nu7-maker.json`: **Zcash
+  testnet activated NU7 at block 4,465,026 (2026-10-04, branch
+  `0x77190AD9`).** zecSwap's maker hit the same rejection with
+  `zcash_protocol` 0.10.6 (NU6.3 newest) and was moved to the librustzcash
+  NU7 pre-releases on 2026-10-06; zapp's Android SDK builds are noted as
+  still rejected. Vizor's Zakura libraries have no testnet NU7 (vizor's
+  `network.rs`: NU7 has no activation height on main or test), so the fix
+  is NU7 testnet support in the Zakura wallet libraries (owner: E1/E4 or a
+  wallet-libraries release), not app code. Mainnet has no NU7 and is
+  unaffected. Until then the swap device rounds can run only on mainnet
+  (owner's explicit go-ahead, small amounts under the beta limits), or wait. Also learned: the
   testnet maker caps a swap at 20 USDC, and testnet prices ZEC at about
   1,200 USD, so the rounds use about 0.01 ZEC (the quote for 0.01 was
   $10.86 after fees).
