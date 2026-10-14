@@ -12,22 +12,53 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 - [ ] M0.1.1b `zecswap-tokens` resolves in vizor's graph (no-go today: `digest` conflict, Deviations D-1; needs an owner decision)
 - [x] M0.1.2 `cargo build` and `cargo tree -d`: one `zakura-orchard`, one `zakura-pczt`, no upstream `orchard`/`pczt`/`zcash_protocol` (with `zecswap-core` + `zecswap-railgun`; build 5m20s)
 - [x] M0.1.3 zecSwap's 16 library and 8 `tests/sweep.rs` tests on the Zakura build (24/24 pass; workspace narrowed, D-2)
-- [ ] M0.1.4 Debug APK build (`VIZOR_FORM_FACTOR=mobile`); record the `.so` size delta
+- [x] M0.1.4 Debug APK build (`VIZOR_FORM_FACTOR=mobile`); record the `.so` size delta. Both builds pass on all four ABIs. Rust `.so` delta (spike over baseline): arm64 +0.47 MB (67.77 → 68.24 MB, +0.7%), armeabi-v7a +0.41 MB, x86_64 +0.44 MB. No vizor code calls the zecSwap crates yet, so the linker drops most of them; the real delta shows from M1 (re-measure in M8)
 - [x] M0.2a Offline: a payment to an Orchard-only UA lands in the Ironwood bundle, and `sent_notes` records it (`output_pool` 4, `to_address` = the UA). Go on both checks (D-3)
-- [ ] M0.2b The same on testnet (blocked: B-3, B-4)
+- [ ] M0.2b The same on testnet (blocked: B-4, funded testnet ZEC)
 - [x] M0.3.1 `connect_stream` patch in a local wallet-libraries checkout (`~/dev/wallet-libraries-e4`); all ten wallet-libraries refs repointed (spike branch)
 - [x] M0.3.2 `rust/src/railgun_bridge.rs`, tokio I/O for `DirectRouteIo`, and the Rust FRB `start_railgun_bridge` / `stop_railgun_bridge` (spike branch). 8 tests pass, including an ignored one run once here that bootstraps real Tor and tunnels through the bridge to `ethereum-sepolia-rpc.publicnode.com:443` via the patched `connect_stream`
-- [ ] M0.3.2b Dart bindings for the bridge calls regenerated (blocked: B-1)
-- [ ] M0.3.3 Minimal Kotlin host (org.json port) with the `ProxyController` override: written on the spike branch, not compiled (blocked: B-1)
-- [ ] M0.3.4 Debug-only route on Sepolia: `start`, `openWallet`, `refresh`, one `transfer` proof (not posted)
-- [ ] M0.3.5 Measure first sync, proof time, peak memory and artifact bytes; record in plan §11
+- [x] M0.3.2b Dart bindings for the bridge calls regenerated (spike branch; `startRailgunBridge()` → `Future<int>`)
+- [x] M0.3.3 Minimal Kotlin host (org.json port) with the `ProxyController` override, plus `RailgunHostHandler` (the §6.2 channel contract) registered in `MainActivity`. Compiles and runs on the device (spike branch)
+- [x] M0.3.4 On Sepolia, through the debug entrypoint `lib/railgun_spike_main.dart` (D-4) on the Galaxy A35: `start`, `openWallet` and `refresh`, with Tor on and off, a mid-sync route flip and a Tor failure. All five exit criteria hold except the proof half of criterion 1 (results below)
+- [ ] M0.3.4b One `transfer` proof (not posted) (blocked: B-7, a funded Sepolia Railgun wallet)
+- [x] M0.3.5 Measure first sync, peak memory and bytes; recorded in plan §11 (U10, U14, U19)
+- [ ] M0.3.5b Proof time (`proofMs`) and proving-artifact bytes (blocked with M0.3.4b)
 - [ ] M0 gate: go/no-go recorded for M0.1, M0.2 and M0.3; only the `rust-version` line lands
 
-M0 status (2026-10-13). M0.1 is a go for `zecswap-core` and `zecswap-railgun`
-and a no-go for `zecswap-tokens` (D-1). M0.2 is a go offline. M0.3 is
-undecided: the Rust side works on a desktop host, and the WebView side needs a
-device. On this branch's M0 commit (the `rust-version` line, the M0.2 test,
-docs), `cd rust && cargo test` passes: lib 1430 passed, 0 failed, 9 ignored;
+M0 status (2026-10-13).
+
+- **M0.1:** go for `zecswap-core` and `zecswap-railgun`, no-go for `zecswap-tokens` (D-1).
+- **M0.2:** go, verified offline.
+- **M0.3 (D4, the Tor bridge):** go, pending the transfer proof (M0.3.4b).
+
+M0.3 ran on a Samsung Galaxy A35 (SM-A356E; Android 16; WebView 155; user
+build, bootloader locked) on Sepolia, with a fresh wallet and the page storage
+wiped before each run:
+
+| Exit criterion | Result |
+|---|---|
+| 1. Syncs (and proves) with Tor on | Sync: yes. First sync over Tor took 101 s and 136 s in two runs (direct: 96 s); Tor bootstrap 1–12 s. Proof: blocked (B-7). |
+| 2. No direct socket while Tor is on | Yes. 26 samples across the Tor runs of the app UID's `/proc/net/tcp{,6}` during Tor syncs: zero connections to Railgun hosts; every other remote is a Tor relay (Onionoo). The same checker does see the direct connections in direct mode. |
+| 3. A mid-sync route flip cancels cleanly | Yes. The in-flight `refresh` ended `CLOSED` 0.0 s after the close. A new bridge started on a new port, the same wallet reopened, and the sync resumed and finished direct in 68.5 s. |
+| 4. With Tor failed, the page errors and never goes direct | Yes. After `fail_network_privacy_enable`, the page's open tunnels stayed on Tor. Close and stop ended the `refresh` (`CLOSED`), and a new bridge was refused ("Tor connection failed"). |
+| 5. With Tor off, the page works through the direct path | Yes (96 s first sync). |
+
+Other findings:
+
+- **Screen-off freezes the app.** With the screen off, Android froze the app
+  within about 60 s (`onFreezeStateChanged uid=10601`). The Tor circuits then
+  died and the sync failed `Incomplete` (D-5). Runs with the screen on passed.
+- **U19 answered:** Chromium keeps pooled sockets after the page closes and the
+  proxy override is cleared (2–3 tunnels still open 10 s later). Restarting the
+  bridge on every route change is required.
+- **Wiping works:** `wipe` (WebStorage `deleteOrigin`) clears the page's
+  IndexedDB (U12 path: `/data/data/com.keplr.vizor/app_webview`).
+- **First sync bytes (Sepolia):** about 6.8 MB down, almost all from
+  `rail-squid.squids.live`; RPC about 12 KB, POI about 6 KB.
+- **Peak memory:** app PSS 446 MB (debug build), renderer PSS 382 MB.
+
+On this branch's M0 commit (the `rust-version` line, the M0.2 test, docs),
+`cd rust && cargo test` passes: lib 1430 passed, 0 failed, 9 ignored;
 integration 6 passed, 21 ignored (regtest). After the toolchain install:
 `fvm flutter analyze` finds no issues, and `fvm flutter test` (desktop lane)
 gives 5896 passed, 158 skipped, 4 failed. The 4 failures are pre-existing on
@@ -35,7 +66,7 @@ gives 5896 passed, 158 skipped, 4 failed. The 4 failures are pre-existing on
 `test/features/settings/settings_seed_phrase_screen_test.dart`, the "incoming
 links cannot interrupt backup completion/deferral success/failure" cases, which
 cannot find the `AppButton` "Enter amount" (test line 159). They fail the same
-way when the file runs alone. The APK build is still pending (NDK and disk).
+way when the file runs alone.
 
 ## M1. Rust foundations
 
@@ -151,6 +182,23 @@ way when the file runs alone. The APK build is still pending (NDK and disk).
   `sent_notes.output_pool` 4; `to_address` = the UA). The plan's check "the
   Orchard bundle has no actions" was wrong when the sender spends Orchard
   notes (the spend and change stay in Orchard); plan M0.2 corrected.
+- **D-4 (M0.3 step 4): a separate debug entrypoint instead of a debug-only
+  route.** `lib/railgun_spike_main.dart` (`fvm flutter run -t …
+  --dart-define=SPIKE_MODE=direct|tor|flip|fail`), on the spike branch only. It
+  leaves the app's routing untouched, and the modes run unattended with results
+  in logcat.
+- **D-5 (M0.3): the screen stays on during device runs.** A run whose screen
+  turned off failed. Android froze the app within about 60 s
+  (`onFreezeStateChanged uid=10601`), Tor circuits died, and the sync ended
+  `Incomplete`. That is D9's foreground-only behaviour, so the runs used
+  Developer options "Stay awake" (`svc power stayon usb`), restored afterwards.
+  Consequence for M3: the first sync (about 40 min on mainnet, §6.3) needs the
+  app in the foreground with the screen on. X8 covers conversion progress
+  screens only, so M3 needs the same keep-awake for a first sync (owner to
+  confirm).
+- **Testing emphasis (owner, 2026-10-13):** invest in end-to-end and device
+  tests over unit tests. Keep unit tests to known-answer vectors and
+  correctness or security checks.
 - **Local build setting:** all Rust builds here use
   `CARGO_PROFILE_DEV_DEBUG=0` (no debug info) so the target directory fits the
   free disk. No repo file changes.
@@ -167,19 +215,24 @@ way when the file runs alone. The APK build is still pending (NDK and disk).
   `scripts/generate-rust-bridge.sh`, every APK build (M0.1.4) and any Kotlin
   compile (the Android build needs the Flutter SDK). Every milestone gate needs
   them. Owner: install them, or approve installing them (see B-2).
-- **B-2. Disk.** 7.4 GB is free on a 460 GB volume after M0's builds
-  (`rust/target` is 9.2 GB with Rust debug info off). Flutter, Gradle and the Android Rust targets need more.
+- **B-2. Resolved 2026-10-13.** A cleanup of `~/dev/zapp` build outputs
+  (zecSwap untouched, at the owner's request) freed about 45 GB; about 19 GB
+  is free after the device runs. Before that, 7.4 GB was free on the 460 GB
+  volume. Flutter, Gradle and the Android Rust targets need more.
   The largest reclaimable directories are `~/dev/zapp/zecSwap/target` (39 GB)
   and `~/dev/zapp/zecSwap-mainnet-beta/target` (18 GB). Clearing them is the
   owner's call.
-- **B-3. No Android device or emulator.** `adb devices` is empty, and the SDK
-  has no emulator package, system images or `cmdline-tools`. That blocks
-  M0.3.4–M0.3.5 (and so the D4 go/no-go), the M0.2 testnet run and every device
-  acceptance from M3 on.
+- **B-3. Resolved 2026-10-13:** the owner's Galaxy A35 (SM-A356E) is the
+  device (Android 16, bootloader locked, verified boot green, so it also
+  suits E9). Do not install emulators.
 - **B-4. M0.2 on testnet needs funded testnet ZEC (E8).** The routing was
   verified offline instead (see the M0.2 line).
 - **B-5. `zecswap-tokens` (D-1).** An owner decision is needed before M4:
   options (a)–(c) in plan M0.1 result.
+- **B-7. A funded Sepolia Railgun wallet.** It needs test USDC shielded into a
+  Railgun wallet whose mnemonic can be passed as `SPIKE_MNEMONIC`. It blocks
+  M0.3.4b and M0.3.5b (one transfer proof, `proofMs`, artifact bytes). Part of
+  E8.
 - **B-6. E1, E2 and E4 are not delivered.** Local stand-ins:
   `~/dev/zapp/zecSwap-zakura` (detached worktree at `d69e3fb` with the §12
   diff; zecSwap has no LICENSE yet) and `~/dev/wallet-libraries-e4` (`391d0b0`

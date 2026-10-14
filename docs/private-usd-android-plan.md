@@ -484,6 +484,7 @@ pub(crate) async fn take_index<C: ChainReader>(store: &mut SwapStore, chains: &[
    - `rand 0.10` is not a conflict: zakura-orchard already uses it (`rand 0.10.3` is in `Cargo.lock`), and vizor's direct `rand = "0.8"` is unrelated.
 3. In the zecSwap checkout, run its 16 library tests and 8 `tests/sweep.rs` tests on the Zakura build (`cargo test -p zecswap-core` from the worktree root, with the `[patch]` in the pitfalls below and the worktree's `[workspace] members` narrowed to `["crates/zecswap-core"]`: Cargo resolves every member even for `-p`, and `zakura-primitives`' `crypto-common =0.2.0-rc.1` cannot coexist with `zecswap-tokens`' `crypto-common ^0.2`; the sweep tests prove Halo 2 and need the workspace's `opt-level = 3` test profile, which `zs/Cargo.toml` already sets). All 24 passed in a scratch run, and again in the M0 run (2026-10-13). Upstream has 9 sweep tests; the Zakura diff drops the ZIP 316 revision test.
 4. Build the APK: `fvm flutter build apk --debug --dart-define=VIZOR_FORM_FACTOR=mobile`. Record the `.so` size delta.
+   **M0.1 result:** both builds pass on all four ABIs (Gradle also builds `i686`; NDK 28.2.13676358 is required). The Rust `.so` grows by +0.47 MB on arm64 (67.77 → 68.24 MB, +0.7%), +0.41 MB on armeabi-v7a and +0.44 MB on x86_64 (debug profile at `opt-level = 3`, no debug info). No vizor code calls the zecSwap crates yet, so the linker drops most of them; re-measure in M8.
 
 **M0.1 pitfalls.**
 
@@ -537,6 +538,13 @@ pub(crate) async fn take_index<C: ChainReader>(store: &mut SwapStore, chains: &[
 5. With Tor off, the same page works through the bridge's direct path.
 
 - **No-go:** apply D4's fallback. While Tor is on, the page never starts; `privateUsdTorBlockedProvider` is true, and the UI shows `tor_unavailable` (§9.2 guards). Build M3 with that path instead of the bridge.
+- **M0.3 result (2026-10-13): go, pending one transfer proof.** It ran on a Galaxy A35 (Android 16, WebView 155, user build) on Sepolia, through `lib/railgun_spike_main.dart` on the local spike branch.
+  - Criterion 1: the first sync completed over Tor (101 s and 136 s; 96 s direct). The proof is untested: it needs a funded Sepolia Railgun wallet (E8).
+  - Criterion 2: zero direct sockets. 26 samples of the app UID's `/proc/net/tcp{,6}` during Tor syncs; every remote was a Tor relay per Onionoo. `ss -tnp` needs root, so this was the method.
+  - Criterion 3: a mid-sync flip ended `refresh` with `CLOSED` at once, and the reopened page resumed direct.
+  - Criterion 4: after Tor failed, open tunnels stayed on Tor, and a new bridge was refused.
+  - Criterion 5: passed.
+  - **The screen must stay on.** With the screen off, Android froze the app within about 60 s and the sync failed; see U21.
 - **Merge:** nothing. The real implementation is M3.
 
 ### M1. Rust foundations: deployments, keys, store, HTTP and Ethereum clients
@@ -3577,17 +3585,18 @@ Widget tests for these screens are mobile-tagged (`@Tags(['mobile'])`) and compa
 | U7 | `payment_link_resubmit_exclusions` is harmless on a joint DB | M2 | Pass no exclusions for joint DBs |
 | U8 | With Discard OVK, the primary store path (`extract_and_store_transaction_from_pczt`) still records the sweep as sent. The fallback `decrypt_and_store_transaction` (`pczt.rs:2056`) cannot recover the outgoing metadata. | M2 | Harmless: the joint DB is deleted after the sweep. Persist the bytes in the record regardless. |
 | U9 | `create_pczt_from_proposal` works for a `Spending { derivation: None }` account (zapp does the equivalent on the upstream SDK) | M2 | Investigate: there is no alternative path |
-| U10 | WebView `PROXY_OVERRIDE` support, SOCKS5 behaviour, keep-alive on a route change, IndexedDB and `blob:` workers under the proxy, the cleartext policy for the loopback hop. **M0 (2026-10-13):** the Rust side is verified on a desktop host (SOCKS5 no-auth, allowlist, direct lease aborted by a Tor enable, and a real Tor bootstrap tunnelling to an allowlisted host through the patched `connect_stream`); every WebView item is still unverified (no device) | M0.3 | D4 fallback |
+| U10 | WebView `PROXY_OVERRIDE` support, SOCKS5 behaviour, keep-alive on a route change, IndexedDB and `blob:` workers under the proxy, the cleartext policy for the loopback hop. **M0 (2026-10-13):** the Rust side is verified on a desktop host (SOCKS5 no-auth, allowlist, direct lease aborted by a Tor enable, and a real Tor bootstrap tunnelling to an allowlisted host through the patched `connect_stream`); on a device (Galaxy A35, Android 16, WebView 155): `PROXY_OVERRIDE` works, SOCKS5 through the bridge works, IndexedDB and the engine's workers run under the proxy, and the loopback SOCKS hop needs no `network_security_config` | M0.3 | D4 fallback |
 | U11 | ~~Whether each maker requires tokens today~~ Answered: not today (D20). Re-check before release. | Before release | none needed; M4 is built either way |
-| U12 | The WebView data directory path for the backup exclusion (`app_webview`) | M3: inspect `/data/data/com.keplr.vizor/` on a device | Exclude the observed path |
+| U12 | The WebView data directory path for the backup exclusion (`app_webview`). **M0 (2026-10-13):** confirmed as `/data/data/com.keplr.vizor/app_webview` (`Default/IndexedDB` holds the Railgun DB) | M3: inspect `/data/data/com.keplr.vizor/` on a device | Exclude the observed path |
 | U13 | R8 shrinking on the release build breaks nothing the host needs (no reflection; `org.json` is platform code) | M3 release build | Add keep rules |
-| U14 | Memory, proof time, and total artifact download for a typical send (`01x02/zkey.br` 3.53 MB, `01x02.wasm.br` 0.89 MB, `POI_3x3/zkey.br` 7.78 MB; larger variants are bigger) | M0.3, then M8 | none; record the numbers here |
+| U14 | Memory, proof time, and total artifact download for a typical send (`01x02/zkey.br` 3.53 MB, `01x02.wasm.br` 0.89 MB, `POI_3x3/zkey.br` 7.78 MB; larger variants are bigger). **M0 (2026-10-13, Galaxy A35, Sepolia, debug build):** a first sync downloads about 6.8 MB (almost all from `rail-squid.squids.live`; RPC about 12 KB, POI about 6 KB). Peak PSS is 446 MB for the app and 382 MB for the WebView renderer. Proof time and artifact bytes are pending a funded wallet | M0.3, then M8 | none; record the numbers here |
 | U15 | `deleteWalletByID` exists in `@railgun-community/wallet` 11.1.0 for the D15 page method | E5 | Delete only the engine key; the orphaned blob stays encrypted |
 | U16 | ~~`zcash_voting::RouteRequest` can be built outside its crate~~ Moot: Private USD calls `routed_http` directly, and `VizorRoute` delegates to it (M1 task 10b) | — | — |
 | U17 | Where `WALLET_SOURCE` surfaces on chain (X2) | E5 | Keep `'zapp'` |
 | U18 | Alchemy origin allowlisting reduces key exposure | M8 | Rate-capped dedicated keys |
-| U19 | Whether Chromium tears down pooled sockets on a proxy change by itself | M0.3 | Always close and reopen the page on a route change (the default) |
+| U19 | ~~Whether Chromium tears down pooled sockets on a proxy change by itself~~ Answered (M0): it does not. 2–3 tunnels were still open 10 s after the page closed and the override was cleared | M0.3 | Always close the page, stop the bridge and reopen on a route change (now required, not just the default) |
 | U20 | iOS `WKWebView` runs the chrome100-target bundle (ESM, WASM, IndexedDB, blob workers) unchanged | the iOS port, later | Rebuild with an iOS target |
+| U21 | **New (M0):** the Railgun first sync survives only in the foreground with the screen on. On the A35, Android froze the app about 60 s after screen-off (`onFreezeStateChanged`), Tor circuits died, and `refresh` failed `Incomplete`. A restarted sync resumed faster (68.5 s against about 100 s), so some progress persists. Mainnet first syncs take about 40 min (§6.3) | M3 device run on mainnet | Keep the screen awake during a first sync (extend X8), or accept a resumable sync that continues on the next foreground |
 
 **Accepted risks.**
 
