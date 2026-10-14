@@ -205,6 +205,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiProposalRosterEntry dco_decode_api_proposal_roster_entry(dynamic raw);
 
   @protected
+  ApiProvedSend dco_decode_api_proved_send(dynamic raw);
+
+  @protected
+  ApiRailgunSendsTerms dco_decode_api_railgun_sends_terms(dynamic raw);
+
+  @protected
   ApiRefundCause dco_decode_api_refund_cause(dynamic raw);
 
   @protected
@@ -241,6 +247,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiRoundStepEventKind dco_decode_api_round_step_event_kind(dynamic raw);
 
   @protected
+  ApiSendRecord dco_decode_api_send_record(dynamic raw);
+
+  @protected
+  ApiSendState dco_decode_api_send_state(dynamic raw);
+
+  @protected
   ApiShareTrackingDrivePolicy dco_decode_api_share_tracking_drive_policy(
     dynamic raw,
   );
@@ -265,6 +277,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiSyncProgressEvent dco_decode_api_sync_progress_event(dynamic raw);
+
+  @protected
+  ApiTransactKind dco_decode_api_transact_kind(dynamic raw);
+
+  @protected
+  ApiTransactResult dco_decode_api_transact_result(dynamic raw);
 
   @protected
   ApiTransparentLedgerMode dco_decode_api_transparent_ledger_mode(dynamic raw);
@@ -326,6 +344,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiPrivateUsdErrorCode dco_decode_box_autoadd_api_private_usd_error_code(
     dynamic raw,
   );
+
+  @protected
+  ApiProvedSend dco_decode_box_autoadd_api_proved_send(dynamic raw);
 
   @protected
   ApiRefundCause dco_decode_box_autoadd_api_refund_cause(dynamic raw);
@@ -737,6 +758,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ApiReverseRecord> dco_decode_list_api_reverse_record(dynamic raw);
+
+  @protected
+  List<ApiSendRecord> dco_decode_list_api_send_record(dynamic raw);
 
   @protected
   List<ApiSnapshotBundlePirResult>
@@ -1735,6 +1759,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ApiProvedSend sse_decode_api_proved_send(SseDeserializer deserializer);
+
+  @protected
+  ApiRailgunSendsTerms sse_decode_api_railgun_sends_terms(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ApiRefundCause sse_decode_api_refund_cause(SseDeserializer deserializer);
 
   @protected
@@ -1783,6 +1815,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ApiSendRecord sse_decode_api_send_record(SseDeserializer deserializer);
+
+  @protected
+  ApiSendState sse_decode_api_send_state(SseDeserializer deserializer);
+
+  @protected
   ApiShareTrackingDrivePolicy sse_decode_api_share_tracking_drive_policy(
     SseDeserializer deserializer,
   );
@@ -1813,6 +1851,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiSyncProgressEvent sse_decode_api_sync_progress_event(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiTransactKind sse_decode_api_transact_kind(SseDeserializer deserializer);
+
+  @protected
+  ApiTransactResult sse_decode_api_transact_result(
     SseDeserializer deserializer,
   );
 
@@ -1894,6 +1940,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiPrivateUsdErrorCode sse_decode_box_autoadd_api_private_usd_error_code(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiProvedSend sse_decode_box_autoadd_api_proved_send(
     SseDeserializer deserializer,
   );
 
@@ -2423,6 +2474,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ApiReverseRecord> sse_decode_list_api_reverse_record(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ApiSendRecord> sse_decode_list_api_send_record(
     SseDeserializer deserializer,
   );
 
@@ -3702,6 +3758,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_api_proved_send(ApiProvedSend self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_api_railgun_sends_terms(
+    ApiRailgunSendsTerms self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_api_refund_cause(
     ApiRefundCause self,
     SseSerializer serializer,
@@ -3774,6 +3839,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_api_send_record(ApiSendRecord self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_api_send_state(ApiSendState self, SseSerializer serializer);
+
+  @protected
   void sse_encode_api_share_tracking_drive_policy(
     ApiShareTrackingDrivePolicy self,
     SseSerializer serializer,
@@ -3812,6 +3883,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_api_sync_progress_event(
     ApiSyncProgressEvent self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_transact_kind(
+    ApiTransactKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_transact_result(
+    ApiTransactResult self,
     SseSerializer serializer,
   );
 
@@ -3911,6 +3994,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_api_private_usd_error_code(
     ApiPrivateUsdErrorCode self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_api_proved_send(
+    ApiProvedSend self,
     SseSerializer serializer,
   );
 
@@ -4547,6 +4636,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_api_reverse_record(
     List<ApiReverseRecord> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_api_send_record(
+    List<ApiSendRecord> self,
     SseSerializer serializer,
   );
 

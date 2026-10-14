@@ -933,7 +933,7 @@ Dollar amounts are `amount / 10^decimals` with decimals 6, taken from the table 
 - **Fees.** Railgun's unshield fee is 25 bps (`RailgunFees`, from the engine; `of/AtomicSwapDriver.kt:297` `RAILGUN_FEE`).
 - **Screening caveat.** On Sepolia, relayed-send outputs stay `MissingExternalPOI` because of an indexer break (`railgun-sends.md` "Screening").
 - **Fee cap (D11).** Refuse a `broadcasterFee` result above 2 USDC (in the fee token's base units) with `send_error_fee_cap`, before proving.
-- **vizor storage.** The send log is the `railgun_sends` table in `swaps.db` (§3.4). Persist the proved bytes before posting. Reconcile them on every balance sync.
+- **vizor storage.** The send log is the `railgun_sends` table in `swaps.db` (§3.4). Persist the proved bytes before posting. Reconcile them on every balance sync. As built (M7 part 1, progress D-90 to D-94): `rust/src/wallet/private_usd/sends.rs` keeps the page's proof (`keep`), posts only kept bytes (`Sends::transact`) and settles from the chain (`Sends::settle_all`); `relayer_client.rs` maps the answers (a `Retry-After` above an hour waits an hour) and pins the terms; `evm_rpc.rs` reads `nullifiers(uint256,bytes32)` through the `SendChain` seam.
 
 ### 6.8 Tor bridge (D4, D13)
 
@@ -1200,7 +1200,7 @@ Each row is a step zapp performs, and the vizor seam that performs it. "New" mea
 | `private_usd_forward_records(ctx) -> Vec<ApiForwardRecord>` | async | M5 | history and activity |
 | `private_usd_unfinished_count(store_dir, account_uuid) -> u32`, `…_accounts_with_unfinished(store_dir)`, `…_delete_account(store_dir, network, account_uuid)`, `private_usd_activity(op_id)` (sync) | async | M5 | the deletion and reset warning; the D14 loop; cleanup; the in-flight step label |
 | `private_usd_reverse_quote`, `…_set_cost`, `…_go_ahead`, `…_accept`, `…_funding_request`, `…_submit_funding`, `…_advance`, `…_authorize_ready`, `…_cancel`, `…_can_rescue`, `…_rescue`, `…_records` | async | M6 | §5.7, §5.8 |
-| `private_usd_railgun_sends_terms(network, rpc)`, `private_usd_relayer_transact(...)`, `private_usd_send_log_{put,list,update,remove}`, `private_usd_send_settle_all(...)` | async | M7 | §6.7 |
+| `private_usd_railgun_sends_terms(network)`, `private_usd_relayer_transact(...)`, `private_usd_send_log_{put,list}`, `private_usd_send_settle_all(...)` | async | M7 | §6.7; as built, D-90 |
 
 **Exact M1–M4 signatures.** The M5–M7 block follows below.
 
@@ -1385,28 +1385,33 @@ pub fn private_usd_reverse_rescue(db_path: String, network: String, account_uuid
                                   eth_rpc_url: String, index: u32) -> Result<ApiReverseRecord, ApiPrivateUsdError>;
 pub fn private_usd_reverse_records(account_uuid: String, store_dir: String) -> Result<Vec<ApiReverseRecord>, ApiPrivateUsdError>;  // active (incl. QUOTED) first, then history
 
-// ---- sends (M7) ----
+// ---- sends (M7) ----  As built (progress D-90): no send_log_update or send_log_remove; the proof never returns to Dart.
 pub struct ApiRailgunSendsTerms {       // §6.7 step 1, already checked against the pins
-    pub railgun_address: String, pub railgun_proxy: String, pub token: String, pub fee_floor: String,
-    pub fee_per_unit_gas: Option<String>, pub fee_expires_at: Option<i64>,
-    pub max_gas_limit: String, pub max_gas_price_wei: String, pub max_calldata_bytes: u32, pub chain_id: i64,
+    pub chain_id: i64, pub railgun_address: String, pub railgun_proxy: String, pub token: String,
+    pub fee_floor: String,                                   // never above max_relayer_fee (else RelayerFee)
+    pub fee_per_unit_gas: Option<String>, pub fee_expires_at: Option<i64>,   // both or neither
+    pub max_gas_limit: String, pub max_gas_price_wei: String, pub max_calldata_bytes: u32,
 }
-pub fn private_usd_railgun_sends_terms(network: String, eth_rpc_url: String) -> Result<ApiRailgunSendsTerms, ApiPrivateUsdError>; // `Unavailable` when absent
+pub fn private_usd_railgun_sends_terms(network: String) -> Result<ApiRailgunSendsTerms, ApiPrivateUsdError>; // `Unavailable` when absent or not the pinned terms
+pub struct ApiProvedSend {               // input of the put
+    pub send_id: String, pub token: String, pub amount: String,
+    pub fee: String,                     // the broadcasterFee the proof pays, ≤ max_relayer_fee
+    pub to: String,                      // 0zk (lowercase) or 0x
+    pub proof_json: String,              // the page's transfer/unshield result, unchanged
+}
 pub enum ApiSendState { Unconfirmed, Confirmed }
 pub struct ApiSendRecord {
-    pub send_id: String, pub token: String, pub amount: String, pub to: String, pub withdraw: bool, pub sent_at: i64,
+    pub send_id: String, pub token: String, pub amount: String, pub fee: String, pub to: String, pub withdraw: bool, pub sent_at: i64,
     pub state: ApiSendState, pub tx_hash: Option<String>, pub posted_at: Option<i64>, pub spent_at: Option<i64>, pub retry_at: Option<i64>,
-    pub request_json: Option<String>,   // `{chainId,to,data,value}`; None once confirmed
-    pub nullifiers_json: Option<String>, // `[{tree, nullifiers:[hex]}]` from the proof, for reconciliation
 }
-/// Persists a proved send before it is posted (zapp `PrivateUsdSendLog.prove`).
-pub fn private_usd_send_log_put(store_dir: String, account_uuid: String, record: ApiSendRecord) -> Result<(), ApiPrivateUsdError>;
-pub fn private_usd_send_log_list(store_dir: String, account_uuid: String) -> Result<Vec<ApiSendRecord>, ApiPrivateUsdError>;
-pub fn private_usd_send_log_update(store_dir: String, account_uuid: String, record: ApiSendRecord) -> Result<(), ApiPrivateUsdError>;
-pub fn private_usd_send_log_remove(store_dir: String, account_uuid: String, send_id: String) -> Result<(), ApiPrivateUsdError>;
+/// Keeps a proved send before it is posted (zapp `PrivateUsdSendLog.prove`): checks the proof against the pins
+/// (chain, proxy, value 0, nullifiers), the fee cap, and the guard (Busy while another send of the account is
+/// unconfirmed or a conversion is under way). The same send kept again returns it; another proof under its id is Mismatch.
+pub fn private_usd_send_log_put(store_dir: String, network: String, account_uuid: String, send: ApiProvedSend) -> Result<ApiSendRecord, ApiPrivateUsdError>;
+pub fn private_usd_send_log_list(store_dir: String, account_uuid: String) -> Result<Vec<ApiSendRecord>, ApiPrivateUsdError>; // newest first
 pub enum ApiTransactKind { Sent, Spent, Refused, Retry }
 pub struct ApiTransactResult { pub kind: ApiTransactKind, pub transactions: Vec<String>, pub retry_after_secs: Option<u32> }
-/// Posts the stored request bytes for `send_id` (never bytes from Dart) and updates the log row.
+/// Posts the stored request bytes for `send_id` (never bytes from Dart) and updates the log row. `Other` when none is kept.
 pub fn private_usd_relayer_transact(store_dir: String, network: String, account_uuid: String, send_id: String) -> Result<ApiTransactResult, ApiPrivateUsdError>;
 /// `PrivateUsdSender.settleAll` (`up/PrivateUsdSender.kt:294-421`) in Rust: for each `unconfirmed` row, read the receipt
 /// (1 confirmation) or the nullifiers (`nullifiers(uint256,bytes32)` = `0xf19ea903` on the proxy), mark confirmed,

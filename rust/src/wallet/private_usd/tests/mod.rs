@@ -3,8 +3,9 @@
 //! byte for byte. `joint` holds the joint-account and deposit tests (M2),
 //! `ironwood_regtest` the ignored test against the regtest stack, `forward`
 //! the forward conversion's fund-safety tests on the `fakes` (M5),
-//! `lifecycle` the account deletion and drain guards (M5), and `reverse` the
-//! reverse conversion's fund-safety tests and its funding calldata (M6).
+//! `lifecycle` the account deletion and drain guards (M5), `reverse` the
+//! reverse conversion's fund-safety tests and its funding calldata (M6), and
+//! `sends` the send log's keep-before-post, guard and settlement (M7).
 
 use serde_json::Value;
 use zecswap_core::{
@@ -22,6 +23,7 @@ mod ironwood_regtest;
 mod joint;
 mod lifecycle;
 mod reverse;
+mod sends;
 
 fn vectors() -> Value {
     serde_json::from_str(include_str!("vectors.json")).unwrap()
@@ -372,6 +374,7 @@ fn selectors_match_the_contract() {
         super::funding_calls::OPEN_REVERSE,
         super::funding_calls::APPROVE,
         super::funding_calls::TRANSFER,
+        evm_rpc::NULLIFIERS,
     ] {
         assert!(
             vectors()["selectors"].get(signature).is_some(),

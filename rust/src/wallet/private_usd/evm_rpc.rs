@@ -45,6 +45,10 @@ pub(crate) const RESCUE_NONCES: &str = "rescueNonces(bytes32)";
 pub(crate) const TOKEN_BLOCKLIST: &str = "tokenBlocklist(address)";
 pub(crate) const BALANCE_OF: &str = "balanceOf(address)";
 pub(crate) const PAID_OUT_EVENT: &str = "PaidOut(bytes32,address,uint256)";
+/// Railgun's proxy: whether a note's nullifier in a tree is spent.
+pub(crate) const NULLIFIERS: &str = "nullifiers(uint256,bytes32)";
+/// A relayed send counts as landed once its receipt has this many blocks.
+pub(crate) const SEND_CONFIRMATIONS: u32 = 1;
 
 /// The first four bytes of `keccak256(signature)`.
 pub(crate) fn selector(signature: &str) -> [u8; 4] {
@@ -144,6 +148,16 @@ pub(crate) trait ChainReader {
         transaction: &[u8; 32],
         confirmations: u32,
     ) -> Result<TransactionStatus>;
+}
+
+/// What settles a relayed Railgun send (zapp `up/PrivateUsdSendChain.kt`):
+/// its transaction's receipt, or the nullifiers it spends. Implemented over
+/// JSON-RPC by [`EvmRpc`]; the send tests fake it.
+pub(crate) trait SendChain {
+    /// The transaction's receipt with [`SEND_CONFIRMATIONS`].
+    async fn send_status(&self, transaction: &[u8; 32]) -> Result<TransactionStatus>;
+    /// `nullifiers(tree, nullifier)` on Railgun's proxy at `latest`.
+    async fn nullifier_spent(&self, tree: u32, nullifier: &[u8; 32]) -> Result<bool>;
 }
 
 enum RpcError {
@@ -506,6 +520,26 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
         } else {
             TransactionStatus::Confirmed
         })
+    }
+}
+
+impl<T: HttpTransport> SendChain for EvmRpc<'_, T> {
+    async fn send_status(&self, transaction: &[u8; 32]) -> Result<TransactionStatus> {
+        self.transaction_status(transaction, SEND_CONFIRMATIONS)
+            .await
+    }
+
+    async fn nullifier_spent(&self, tree: u32, nullifier: &[u8; 32]) -> Result<bool> {
+        let mut tree_word = [0u8; WORD];
+        tree_word[WORD - 4..].copy_from_slice(&tree.to_be_bytes());
+        let data = self
+            .eth_call(
+                &self.pins.railgun_proxy,
+                call_data(NULLIFIERS, &[&tree_word, nullifier]),
+                "latest",
+            )
+            .await?;
+        Ok(words(&data, 1)?[0].iter().any(|byte| *byte != 0))
     }
 }
 

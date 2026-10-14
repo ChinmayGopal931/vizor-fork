@@ -6,8 +6,8 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `block_on`, `catch`, `deposit_confirmations`, `forward_call`, `internal_hex`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `reverse_call`, `seconds`, `swap_network`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `forward_call`, `internal_hex`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `reverse_call`, `seconds`, `swap_network`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 /// The deployment for the wallet network `"main"` or `"test"`; `None` on
 /// regtest or an unknown network, where Private USD is hidden.
@@ -516,6 +516,76 @@ Future<List<ApiReverseRecord>> privateUsdReverseRecords({
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseRecords(
   accountUuid: accountUuid,
   storeDir: storeDir,
+);
+
+/// `GET /v1/terms`' `railgunSends`, held to the pins. `Unavailable` when the
+/// relayer sends none now, or none the pins allow; `RelayerFee` when its
+/// least fee is above the 2 USDC cap.
+Future<ApiRailgunSendsTerms> privateUsdRailgunSendsTerms({
+  required String network,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdRailgunSendsTerms(
+  network: network,
+);
+
+/// Keeps a proved send before it is posted (zapp `PrivateUsdSendLog.prove`).
+/// Call it only while still unlocked and in the foreground, then post it
+/// with `private_usd_relayer_transact`. On any error nothing was kept and
+/// nothing goes out: `Mismatch` (the proof is not this deployment's or not
+/// this send's, or another proof is kept under the id), `RelayerFee` (a fee
+/// above the cap), `Busy` (another payment of the account is unsettled, or
+/// a conversion is under way). Keeping the same send again returns it.
+Future<ApiSendRecord> privateUsdSendLogPut({
+  required String storeDir,
+  required String network,
+  required String accountUuid,
+  required ApiProvedSend send,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdSendLogPut(
+  storeDir: storeDir,
+  network: network,
+  accountUuid: accountUuid,
+  send: send,
+);
+
+/// The account's sends and withdrawals, newest first; empty when the wallet
+/// never kept one. `StoreUnreadable` must keep spending blocked.
+Future<List<ApiSendRecord>> privateUsdSendLogList({
+  required String storeDir,
+  required String accountUuid,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdSendLogList(
+  storeDir: storeDir,
+  accountUuid: accountUuid,
+);
+
+/// Posts the kept request of `send_id` to the relayer (`POST
+/// /v1/railgun/transact`), never bytes from Dart, and notes the answer in
+/// the log. `Other` when no such send is kept: nothing went out.
+Future<ApiTransactResult> privateUsdRelayerTransact({
+  required String storeDir,
+  required String network,
+  required String accountUuid,
+  required String sendId,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdRelayerTransact(
+  storeDir: storeDir,
+  network: network,
+  accountUuid: accountUuid,
+  sendId: sendId,
+);
+
+/// One settlement pass over the account's unconfirmed sends (zapp
+/// `PrivateUsdSender.settleAll`): each is marked confirmed from its receipt
+/// (1 confirmation) or its nullifiers, dropped once it reverted or another
+/// proof took part of its notes, or posted again as the same bytes. A pass
+/// asked for while one runs returns at once. Returns the sends after it.
+Future<List<ApiSendRecord>> privateUsdSendSettleAll({
+  required String storeDir,
+  required String network,
+  required String ethRpcUrl,
+  required String accountUuid,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdSendSettleAll(
+  storeDir: storeDir,
+  network: network,
+  ethRpcUrl: ethRpcUrl,
+  accountUuid: accountUuid,
 );
 
 enum ApiAcceptKind {
@@ -1036,6 +1106,130 @@ enum ApiPrivateUsdErrorCode {
   cancelled,
 }
 
+/// A proved send or withdrawal, as Dart hands it to Rust to keep before it is
+/// posted.
+class ApiProvedSend {
+  /// A new UUID per send.
+  final String sendId;
+
+  /// The token sent (`0x`), one of the deployment's `usd_tokens`.
+  final String token;
+
+  /// Base units sent, the relayer's fee aside.
+  final String amount;
+
+  /// The `broadcasterFee` the proof pays the relayer, in base units of the
+  /// deployment's token; at most `max_relayer_fee`.
+  final String fee;
+
+  /// The `0zk` (lowercase) or `0x` destination.
+  final String to;
+
+  /// The page's `transfer` or `unshield` result, unchanged.
+  final String proofJson;
+
+  const ApiProvedSend({
+    required this.sendId,
+    required this.token,
+    required this.amount,
+    required this.fee,
+    required this.to,
+    required this.proofJson,
+  });
+
+  @override
+  int get hashCode =>
+      sendId.hashCode ^
+      token.hashCode ^
+      amount.hashCode ^
+      fee.hashCode ^
+      to.hashCode ^
+      proofJson.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiProvedSend &&
+          runtimeType == other.runtimeType &&
+          sendId == other.sendId &&
+          token == other.token &&
+          amount == other.amount &&
+          fee == other.fee &&
+          to == other.to &&
+          proofJson == other.proofJson;
+}
+
+/// The relayer's terms for private sends and withdrawals, already held to
+/// the deployment's pins (reference §6.7 steps 1–2). The page's broadcaster
+/// is `{chainId, railgunProxy, railgunAddress, token, minFee: fee_floor,
+/// feePerUnitGas?, maxGasPrice: max_gas_price_wei}`. Amounts are decimal
+/// base units of `token`.
+class ApiRailgunSendsTerms {
+  final PlatformInt64 chainId;
+
+  /// The relayer's `0zk`, which the fee note pays.
+  final String railgunAddress;
+  final String railgunProxy;
+
+  /// The fee token (`0x` lowercase), the deployment's swap token.
+  final String token;
+
+  /// The least fee a send pays; never above `max_relayer_fee`.
+  final String feeFloor;
+
+  /// Fee-token base units per 10^18 wei of gas, where the relayer prices
+  /// gas; then `fee_expires_at` is set too.
+  final String? feePerUnitGas;
+
+  /// Unix seconds until which a fee worked out at that rate is held.
+  final PlatformInt64? feeExpiresAt;
+  final String maxGasLimit;
+  final String maxGasPriceWei;
+  final int maxCalldataBytes;
+
+  const ApiRailgunSendsTerms({
+    required this.chainId,
+    required this.railgunAddress,
+    required this.railgunProxy,
+    required this.token,
+    required this.feeFloor,
+    this.feePerUnitGas,
+    this.feeExpiresAt,
+    required this.maxGasLimit,
+    required this.maxGasPriceWei,
+    required this.maxCalldataBytes,
+  });
+
+  @override
+  int get hashCode =>
+      chainId.hashCode ^
+      railgunAddress.hashCode ^
+      railgunProxy.hashCode ^
+      token.hashCode ^
+      feeFloor.hashCode ^
+      feePerUnitGas.hashCode ^
+      feeExpiresAt.hashCode ^
+      maxGasLimit.hashCode ^
+      maxGasPriceWei.hashCode ^
+      maxCalldataBytes.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiRailgunSendsTerms &&
+          runtimeType == other.runtimeType &&
+          chainId == other.chainId &&
+          railgunAddress == other.railgunAddress &&
+          railgunProxy == other.railgunProxy &&
+          token == other.token &&
+          feeFloor == other.feeFloor &&
+          feePerUnitGas == other.feePerUnitGas &&
+          feeExpiresAt == other.feeExpiresAt &&
+          maxGasLimit == other.maxGasLimit &&
+          maxGasPriceWei == other.maxGasPriceWei &&
+          maxCalldataBytes == other.maxCalldataBytes;
+}
+
 enum ApiRefundCause { makerCancelled, notClaimedInTime }
 
 class ApiReverseAdvance {
@@ -1341,6 +1535,127 @@ class ApiReverseRecord {
           receiveConfirmations == other.receiveConfirmations &&
           acceptedAt == other.acceptedAt &&
           updatedAt == other.updatedAt;
+}
+
+/// One send or withdrawal of the log.
+class ApiSendRecord {
+  final String sendId;
+  final String token;
+  final String amount;
+  final String fee;
+  final String to;
+  final bool withdraw;
+
+  /// Unix seconds when it was kept.
+  final PlatformInt64 sentAt;
+  final ApiSendState state;
+
+  /// The relayer's transaction, once it named one (`0x`).
+  final String? txHash;
+
+  /// While unconfirmed: the last post, the last "already spent" answer,
+  /// and the time the relayer asked to wait for.
+  final PlatformInt64? postedAt;
+  final PlatformInt64? spentAt;
+  final PlatformInt64? retryAt;
+
+  const ApiSendRecord({
+    required this.sendId,
+    required this.token,
+    required this.amount,
+    required this.fee,
+    required this.to,
+    required this.withdraw,
+    required this.sentAt,
+    required this.state,
+    this.txHash,
+    this.postedAt,
+    this.spentAt,
+    this.retryAt,
+  });
+
+  @override
+  int get hashCode =>
+      sendId.hashCode ^
+      token.hashCode ^
+      amount.hashCode ^
+      fee.hashCode ^
+      to.hashCode ^
+      withdraw.hashCode ^
+      sentAt.hashCode ^
+      state.hashCode ^
+      txHash.hashCode ^
+      postedAt.hashCode ^
+      spentAt.hashCode ^
+      retryAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiSendRecord &&
+          runtimeType == other.runtimeType &&
+          sendId == other.sendId &&
+          token == other.token &&
+          amount == other.amount &&
+          fee == other.fee &&
+          to == other.to &&
+          withdraw == other.withdraw &&
+          sentAt == other.sentAt &&
+          state == other.state &&
+          txHash == other.txHash &&
+          postedAt == other.postedAt &&
+          spentAt == other.spentAt &&
+          retryAt == other.retryAt;
+}
+
+enum ApiSendState {
+  /// Proved and kept; not seen in a block yet. Blocks the account's next
+  /// payment.
+  unconfirmed,
+  confirmed,
+}
+
+enum ApiTransactKind {
+  /// Submitted in `transactions[0]`, not mined yet.
+  sent,
+
+  /// Its notes are spent (by `transactions`, where named): the chain
+  /// settles it.
+  spent,
+
+  /// Refused: nothing went, and the send is dropped from the log.
+  refused,
+
+  /// No answer that settles anything: the same bytes go again, no sooner
+  /// than `retry_after_secs` where set.
+  retry,
+}
+
+class ApiTransactResult {
+  final ApiTransactKind kind;
+  final List<String> transactions;
+
+  /// At most an hour.
+  final int? retryAfterSecs;
+
+  const ApiTransactResult({
+    required this.kind,
+    required this.transactions,
+    this.retryAfterSecs,
+  });
+
+  @override
+  int get hashCode =>
+      kind.hashCode ^ transactions.hashCode ^ retryAfterSecs.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiTransactResult &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          transactions == other.transactions &&
+          retryAfterSecs == other.retryAfterSecs;
 }
 
 /// A token the private USD balance counts as dollars.

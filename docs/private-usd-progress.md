@@ -906,11 +906,137 @@ Nothing in part 2 touched Rust, the FRB bindings or Kotlin.
 
 ## M7. Private send and withdraw
 
-- [ ] M7.1 Rust
+- [x] M7.1 Rust: `relayer_client.rs` (sends terms, transact), `sends.rs`
+  (the log, keep-before-post, settlement), `evm_rpc.rs` (`nullifiers`),
+  FRB (D-90 to D-95)
 - [ ] M7.2 Dart
 - [ ] M7.3 Copy (Send and withdraw)
 - [ ] M7.4 Widgetbook and capture scenarios (send rows)
 - [ ] M7 gate
+
+M7 part 1 status (2026-10-14): M7.1, the Rust half, is done. Part 2 (M7.2–M7.4:
+the Dart sender, spend guard, providers, routes, copy and Widgetbook) is
+next; the M7 gate and its device checks wait for it.
+
+- **What landed.**
+  - `rust/src/wallet/private_usd/relayer_client.rs`: `railgun_sends(pins)`,
+    the relayer's `railgunSends` terms held to the pins (zapp
+    `PrivateUsdRelayer.pinned`: chain, proxy, `0zk`, fee token, a positive
+    gas price, a rate only with its expiry) and to the 2 USDC cap; and
+    `railgun_transact(request)`, `POST /v1/railgun/transact` with exactly
+    `{chainId, to, data, value}`, mapped to `RailgunBroadcast`: `200` with a
+    transaction `Sent`, `200` naming none `Retry`, `409 alreadySpent`
+    `Spent` (with the transactions it names), any other 4xx `Refused`, and
+    everything else (other 409s, 5xx, transport failures, unreadable
+    answers) `Retry`, with `Retry-After` delay-seconds capped at an hour.
+  - `rust/src/wallet/private_usd/sends.rs`: the send log in `swaps.db`'s
+    `railgun_sends` (`keep`, `records`) and `Sends` (`transact`,
+    `settle_all`), zapp's `PrivateUsdSendLog` and `PrivateUsdSendSettlement`
+    with the `when` of `PrivateUsdSender.kt:323-386` ported exactly.
+  - `rust/src/wallet/private_usd/evm_rpc.rs`: the `SendChain` seam:
+    `send_status` (the receipt, 1 confirmation) and `nullifier_spent`
+    (`nullifiers(uint256,bytes32)`, `0xf19ea903`, on Railgun's proxy at
+    `latest`).
+  - FRB (`rust/src/api/private_usd.rs`): the five calls below. Bindings
+    regenerated; the rustc 1.93 noise was reverted as before.
+- **Tests.** The 7 new tests are listed in D-95.
+  - Rust: `cd rust && cargo test` passes: lib 1514 passed, 0 failed, 11
+    ignored; integration 6 passed, 21 ignored (regtest); doc-tests 0.
+    `private_usd` alone: 75 passed, 1 ignored (the regtest test). The known
+    flaky `gift_card_input::tests::recovery` family passed. rustfmt was
+    applied to the new and changed files before that run.
+  - Dart: `fvm flutter analyze` finds no issues. `fvm flutter test`: +5963
+    ~161 -4, the 4 pre-existing failures in
+    `settings_seed_phrase_screen_test.dart` (the "incoming links cannot
+    interrupt backup completion/deferral success/failure" cases). No Dart
+    besides the bindings changed, so the mobile lane was not run.
+- **For part 2: the FRB calls** (`lib/src/rust/api/private_usd.dart`).
+  `storeDir` is `getPrivateUsdDirPath`, `network` the wallet network
+  (`"main"`/`"test"`), `ethRpcUrl` the keyed URL or `""`.
+  - `Future<ApiRailgunSendsTerms> privateUsdRailgunSendsTerms({required
+    String network})`: `{PlatformInt64 chainId; String railgunAddress,
+    railgunProxy, token, feeFloor; String? feePerUnitGas; PlatformInt64?
+    feeExpiresAt; String maxGasLimit, maxGasPriceWei; int
+    maxCalldataBytes}`, already pinned. The page's broadcaster `B` is
+    `{chainId, railgunProxy, railgunAddress, token, minFee: feeFloor,
+    feePerUnitGas?, maxGasPrice: maxGasPriceWei}`; `feePerUnitGas` and
+    `feeExpiresAt` come together or not at all.
+  - `Future<ApiSendRecord> privateUsdSendLogPut({required String storeDir,
+    required String network, required String accountUuid, required
+    ApiProvedSend send})` with `ApiProvedSend({required String sendId,
+    token, amount, fee, to, proofJson})`: `sendId` a new UUID per send,
+    `token` the token sent, `amount` its base units (the fee aside), `fee`
+    the `broadcasterFee` the proof pays (deployment-token base units), `to`
+    the lowercase `0zk` or the `0x` address, `proofJson` the page's
+    `transfer`/`unshield` result string unchanged. Returns the kept record
+    (`unconfirmed`); keeping the same send again returns it.
+  - `Future<List<ApiSendRecord>> privateUsdSendLogList({required String
+    storeDir, required String accountUuid})`: newest first; empty when the
+    wallet never kept one.
+  - `Future<ApiTransactResult> privateUsdRelayerTransact({required String
+    storeDir, required String network, required String accountUuid,
+    required String sendId})`: `{ApiTransactKind kind; List<String>
+    transactions; int? retryAfterSecs}`. Posts the kept bytes only.
+  - `Future<List<ApiSendRecord>> privateUsdSendSettleAll({required String
+    storeDir, required String network, required String ethRpcUrl, required
+    String accountUuid})`: one pass; the rows after it.
+  - `ApiSendRecord { String sendId, token, amount, fee, to; bool withdraw;
+    PlatformInt64 sentAt; ApiSendState state; String? txHash; PlatformInt64?
+    postedAt, spentAt, retryAt }`; `txHash` is the Ethereum hash (`0x`), for
+    `explorerTxPrefix`.
+- **For part 2: the send log's states.**
+  - `unconfirmed`: kept, maybe posted, not seen in a block. It blocks the
+    account's next payment (Send, Withdraw and conversions: the guard's
+    `SENDING`) across restarts. `txHash` set: the relayer sent it, waiting
+    for a block. `spentAt` set: the relayer says its notes are spent; the
+    chain settles it. `retryAt` set: the relayer asked to wait until then.
+  - `confirmed`: landed (`txHash` when known). History; at most 100 kept.
+  - Gone from the list: the relayer refused it, it reverted, or another
+    proof took part of its notes. Nothing moved: "Not sent".
+- **For part 2: error codes and what the UI says.** Every error leaves
+  nothing new on chain.
+  - Terms: `unavailable` (the relayer sends none now, or not on the pinned
+    terms): Send and Withdraw unavailable; `relayerFee` (its least fee is
+    above 2 USDC): `send_error_fee_cap`; `relayerUnreachable` (no answer,
+    Tor down included) and `relayerRefused` (a non-2xx answer): the relayer
+    cannot be reached; try again.
+  - Put: `relayerFee` (the proved fee is above the cap; Dart checks the
+    `broadcasterFee` against `maxRelayerFee` before proving, and Rust again
+    here): `send_error_fee_cap`; `busy` (another payment of the account is
+    unsettled, or a conversion is under way): the guard's message;
+    `mismatch` (the proof is not this deployment's or this send's): a bug,
+    "Not sent"; `storeUnreadable`: "Not sent", spending stays blocked.
+  - List: `storeUnreadable` makes the guard `UNREADABLE` (Send, Withdraw and
+    conversions disabled).
+  - Transact: `other` (no such send kept): nothing went out. Results:
+    `sent`: wait for the block; `refused`: nothing went, the row is gone:
+    price again, and if the relayer now asks more than the proved fee show
+    `Repriced` (confirm the new fee), else "Not sent"; `spent` and `retry`:
+    "Unconfirmed: it may still land" (never prove again; settlement
+    decides).
+  - Settle: only `storeUnreadable`; a send whose chain read or post fails
+    stays as it was for the next pass.
+- **For part 2: the send flow** (zapp `RelayedPrivateUsdSender`). Spend
+  guard (one payment per account: the log has no `unconfirmed` row, no
+  send is proving, `privateUsdUnfinishedCount` is 0) → terms → page
+  `broadcasterFee` (refuse above `maxRelayerFee` before proving) → review
+  → page `transfer` (to a `0zk`) or `unshield` (to a `0x`), showing `proof`
+  events → only if still unlocked, in the foreground and in the same
+  engine epoch, `privateUsdSendLogPut` (on error, "Not sent") →
+  `privateUsdRelayerTransact`. Never prove again once a put succeeded:
+  after a crash, settlement posts the kept bytes. Before a reverse
+  conversion's funding (`startConversion`), check the log too: Rust's
+  reverse calls do not. Offer withdrawals in the terms' `token` only: the
+  relayer refuses a withdrawal paying out another token (`refused`, zapp
+  `SwapClientsTest` 382).
+- **For part 2: when to call settle.** `privateUsdSendSettleAll` runs one
+  pass: call it after each Private USD balance sync (zapp reconciles on
+  every sync, the syncs that sends and conversions start included), on
+  unlock while the log holds an `unconfirmed` row, and every 4 s for up
+  to 2 min after a `sent` answer (zapp's landing wait). Then the row says
+  what happened: `confirmed` "Sent"; gone "Not sent"; still `unconfirmed`
+  "Unconfirmed". Only in the foreground while unlocked (D9). A pass asked
+  for while one runs returns the rows at once.
 
 ## M8. Hardening and release QA
 
@@ -1947,6 +2073,81 @@ Nothing in part 2 touched Rust, the FRB bindings or Kotlin.
   `COMPLETE`. `--m6-refund` adds a paid conversion cancelled to `REFUNDED`
   (it waits out the refund deadlines, up to 3 h) and its row on Refunds.
   Events carry the swap index, phases and timings only.
+- **D-90 (M7.1): the send FRB surface as built.** Reference §8.2 updated.
+  - `private_usd_railgun_sends_terms(network)` takes no `eth_rpc_url`:
+    nothing in it reads the chain.
+  - `private_usd_send_log_put(store_dir, network, account_uuid, send:
+    ApiProvedSend) -> ApiSendRecord`: Dart hands over the page's
+    `transfer`/`unshield` result unchanged (`proof_json`) with the send id,
+    token, amount, fee and destination; Rust parses the request and the
+    nullifiers itself, sets `sent_at` and the state. It takes `network` to
+    check the proof against the pins.
+  - No `send_log_update` or `send_log_remove`: after the put every change is
+    Rust's (`relayer_transact`, `send_settle_all`), so Dart can never alter
+    or drop a kept proof. Account deletion removes an account's rows as
+    before.
+  - `ApiSendRecord` adds `fee` and drops `request_json` and
+    `nullifiers_json`: the proof never goes back to Dart.
+  - `relayer_transact` on a send that is not kept is `Other`, and nothing is
+    posted; on one a settle pass already found landed it answers `Spent`
+    (with its transaction, if known) without posting.
+- **D-91 (M7.1): Rust guards the keep, beyond zapp.** zapp's log keeps what
+  its sender hands it. `send_log_put` refuses, keeping nothing:
+  - `Busy` while another send of the account is unconfirmed or a conversion
+    is under way (`unfinished_count`): the spend guard's rule, enforced again
+    in Rust and across restarts;
+  - `RelayerFee` for a fee above 2 USDC (D11);
+  - `Mismatch` for a proof not for the pinned chain and Railgun proxy, with a
+    value, without nullifiers in every spend or with calldata shorter than a
+    selector; a token not in the deployment's `usd_tokens`; a destination
+    that is neither a `0zk` nor a non-zero `0x` address; a request over
+    132 KiB; and another proof under a kept send's id (never re-proved). The
+    same send kept again returns the kept one.
+  The terms call refuses a relayer whose least fee is above the cap
+  (`RelayerFee`): no send could pay it.
+- **D-92 (M7.1): "retry for at most 1 h" is zapp's cap on the wait.** A
+  `Retry-After` above an hour waits an hour (`MAX_RETRY_AFTER`); one that
+  does not read as delay-seconds (an HTTP date, negative, fractional,
+  overflowing) is ignored. A send that keeps getting `Retry` is never
+  dropped: it stays `unconfirmed`, blocking spending, until the chain
+  settles it.
+- **D-93 (M7.1): one pass at a time per account.** zapp has one settlement
+  lock per wallet; here a per-account lock in `sends.rs` is shared by
+  `relayer_transact` (which waits for a running pass) and
+  `send_settle_all` (which returns the rows without a pass while one runs).
+  The record body is vizor's own JSON (camelCase, strictly decoded), not
+  zapp's `private_usd_sends_v2` shape, which nothing here reads.
+- **D-94 (M7.1): the chain reads.** The receipt status is D-7's
+  `transaction_status` with 1 confirmation, behind a new `SendChain` seam
+  (`send_status`, `nullifier_spent`) that `EvmRpc` implements; the
+  `nullifiers` selector joined the vector list. The relayer's sends pin is
+  zapp's exactly (chain, proxy, `0zk`, fee token; a positive gas price; a
+  rate only with its expiry): it does not compare the swap contract or the
+  relayer's address.
+- **D-95 (M7.1): the tests as built.** Per the owner's scope (fewer unit
+  tests, E2E first), 7 tests, one per M7 "Done when" Rust item:
+  - `relayer_client::tests::railgun_send_answers_say_whether_to_drop_it_or_post_it_again`
+    (zapp `SwapClientsTest` 228 and 355): `200` with and without a
+    transaction, `409 alreadySpent` with and without, `409` otherwise,
+    `400`/`404`/`413`/`415`/`422`, `500`/`503`, six `Retry-After` values
+    and a dropped connection; every post is the same four fields.
+  - `relayer_client::tests::railgun_sends_terms_are_held_to_the_pins_and_the_fee_cap`
+    (`RelayedPrivateUsdSenderTest` 247 and 296).
+  - `tests::sends::a_send_is_kept_before_it_is_posted_and_posted_from_the_store`
+    (`RelayedPrivateUsdSenderTest` 63, `PrivateUsdSendLogTest` 52).
+  - `tests::sends::an_unsettled_send_blocks_the_next_payment_across_restarts`
+    (the guard's log half; `PrivateUsdSendLogTest` 98's case, a send left
+    proving, cannot arise: one being proved is never written).
+  - `tests::sends::a_kept_send_goes_again_as_the_same_bytes_no_sooner_than_asked`
+    (`RelayedPrivateUsdSenderTest` 92, 104 and 132): settlement's third
+    branch, a crash between keep and post included.
+  - `tests::sends::a_named_transaction_settles_from_its_receipt`
+    (`RelayedPrivateUsdSenderTest` 230's revert): the second branch.
+  - `tests::sends::notes_the_relayer_calls_spent_settle_from_the_chain`
+    (`RelayedPrivateUsdSenderTest` 180, 209 and 230's partial spend): the
+    first branch.
+  Not ported: `RelayedPrivateUsdSenderTest` 274 (a higher fee is never paid
+  unconfirmed) is pricing, which is Dart's (M7.2).
 
 ## Blocked
 

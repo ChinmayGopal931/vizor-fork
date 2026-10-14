@@ -429,6 +429,29 @@ pub(crate) struct RailgunSendsTerms {
     pub max_calldata_bytes: u32,
 }
 
+/// A proved Railgun transaction for the relayer to send as it is
+/// (`POST /v1/railgun/transact`): exactly these four fields, `data` in
+/// lowercase hex.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RailgunTransactRequest {
+    pub chain_id: u64,
+    pub to: Address,
+    pub data: String,
+    pub value: String,
+}
+
+/// Redacted: `data` is the proof.
+impl fmt::Debug for RailgunTransactRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RailgunTransactRequest")
+            .field("chain_id", &self.chain_id)
+            .field("to", &self.to)
+            .field("data_chars", &self.data.len())
+            .finish_non_exhaustive()
+    }
+}
+
 /// The transactions a relayer request sent, in order.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub(crate) struct Sent {
