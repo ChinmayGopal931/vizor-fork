@@ -57,6 +57,11 @@ const _ironwoodMigrationPendingTxSaltKeyPrefix =
 const _accountMnemonicMigrationCompleteKey =
     'zcash_mnemonic_storage_migrated_v1';
 const _votingHotkeyKeyPrefix = 'zcash_account_voting_hotkey_';
+
+/// Private USD: one account's Railgun engine encryption key, an app-managed
+/// secret encrypted under the session password and rotated with it.
+const kRailgunEncryptionKeyStoragePrefix = 'vizor_railgun_encryption_key_';
+
 const _e2eUseFirstUnlockMnemonicKeychain = bool.fromEnvironment(
   'ZCASH_E2E_FIRST_UNLOCK_MNEMONIC_KEYCHAIN',
 );
@@ -466,10 +471,7 @@ class AppSecureStore {
       });
       return;
     }
-    if (key.startsWith(_votingHotkeyKeyPrefix) ||
-        key == kPaymentLinkRecoveryStorageKey ||
-        key == kPaymentLinkReceivedStorageKey ||
-        key == kPendingAccountMnemonicStorageKey) {
+    if (_isAppManagedGeneralSecretKey(key)) {
       await _secretMutationLock.run(() async {
         await _runStorageOperation(
           'delete "$key"',
@@ -1213,6 +1215,7 @@ class AppSecureStore {
 
   bool _isAppManagedGeneralSecretKey(String key) {
     return key.startsWith(_votingHotkeyKeyPrefix) ||
+        key.startsWith(kRailgunEncryptionKeyStoragePrefix) ||
         key == kPaymentLinkRecoveryStorageKey ||
         key == kPaymentLinkReceivedStorageKey ||
         key == kPendingAccountMnemonicStorageKey;

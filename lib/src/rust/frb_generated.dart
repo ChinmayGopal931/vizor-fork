@@ -11911,8 +11911,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiDeployment dco_decode_api_deployment(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 17)
-      throw Exception('unexpected arr length: expect 17 but see ${arr.length}');
+    if (arr.length != 18)
+      throw Exception('unexpected arr length: expect 18 but see ${arr.length}');
     return ApiDeployment(
       network: dco_decode_String(arr[0]),
       railgunNetwork: dco_decode_String(arr[1]),
@@ -11931,6 +11931,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       escrowConfirmations: dco_decode_u_32(arr[14]),
       screeningSeconds: dco_decode_u_32(arr[15]),
       maxRelayerFee: dco_decode_String(arr[16]),
+      usdTokens: dco_decode_list_api_usd_token(arr[17]),
     );
   }
 
@@ -12295,6 +12296,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiTransparentLedgerMode dco_decode_api_transparent_ledger_mode(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return ApiTransparentLedgerMode.values[raw as int];
+  }
+
+  @protected
+  ApiUsdToken dco_decode_api_usd_token(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return ApiUsdToken(
+      address: dco_decode_String(arr[0]),
+      symbol: dco_decode_String(arr[1]),
+    );
   }
 
   @protected
@@ -13491,6 +13504,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return (raw as List<dynamic>)
         .map(dco_decode_api_snapshot_bundle_pir_result)
         .toList();
+  }
+
+  @protected
+  List<ApiUsdToken> dco_decode_list_api_usd_token(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_api_usd_token).toList();
   }
 
   @protected
@@ -16044,6 +16063,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_escrowConfirmations = sse_decode_u_32(deserializer);
     var var_screeningSeconds = sse_decode_u_32(deserializer);
     var var_maxRelayerFee = sse_decode_String(deserializer);
+    var var_usdTokens = sse_decode_list_api_usd_token(deserializer);
     return ApiDeployment(
       network: var_network,
       railgunNetwork: var_railgunNetwork,
@@ -16062,6 +16082,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       escrowConfirmations: var_escrowConfirmations,
       screeningSeconds: var_screeningSeconds,
       maxRelayerFee: var_maxRelayerFee,
+      usdTokens: var_usdTokens,
     );
   }
 
@@ -16528,6 +16549,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return ApiTransparentLedgerMode.values[inner];
+  }
+
+  @protected
+  ApiUsdToken sse_decode_api_usd_token(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_address = sse_decode_String(deserializer);
+    var var_symbol = sse_decode_String(deserializer);
+    return ApiUsdToken(address: var_address, symbol: var_symbol);
   }
 
   @protected
@@ -17952,6 +17981,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <ApiSnapshotBundlePirResult>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_api_snapshot_bundle_pir_result(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ApiUsdToken> sse_decode_list_api_usd_token(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ApiUsdToken>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_api_usd_token(deserializer));
     }
     return ans_;
   }
@@ -21492,6 +21535,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_32(self.escrowConfirmations, serializer);
     sse_encode_u_32(self.screeningSeconds, serializer);
     sse_encode_String(self.maxRelayerFee, serializer);
+    sse_encode_list_api_usd_token(self.usdTokens, serializer);
   }
 
   @protected
@@ -21823,6 +21867,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_usd_token(ApiUsdToken self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.address, serializer);
+    sse_encode_String(self.symbol, serializer);
   }
 
   @protected
@@ -23042,6 +23093,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_api_snapshot_bundle_pir_result(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_api_usd_token(
+    List<ApiUsdToken> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_api_usd_token(item, serializer);
     }
   }
 

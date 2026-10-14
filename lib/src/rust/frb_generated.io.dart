@@ -216,6 +216,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiTransparentLedgerMode dco_decode_api_transparent_ledger_mode(dynamic raw);
 
   @protected
+  ApiUsdToken dco_decode_api_usd_token(dynamic raw);
+
+  @protected
   ApiVotingEligibility dco_decode_api_voting_eligibility(dynamic raw);
 
   @protected
@@ -650,6 +653,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   List<ApiSnapshotBundlePirResult>
   dco_decode_list_api_snapshot_bundle_pir_result(dynamic raw);
+
+  @protected
+  List<ApiUsdToken> dco_decode_list_api_usd_token(dynamic raw);
 
   @protected
   List<AuthenticatedRound> dco_decode_list_authenticated_round(dynamic raw);
@@ -1632,6 +1638,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ApiUsdToken sse_decode_api_usd_token(SseDeserializer deserializer);
+
+  @protected
   ApiVotingEligibility sse_decode_api_voting_eligibility(
     SseDeserializer deserializer,
   );
@@ -2190,6 +2199,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   List<ApiSnapshotBundlePirResult>
   sse_decode_list_api_snapshot_bundle_pir_result(SseDeserializer deserializer);
+
+  @protected
+  List<ApiUsdToken> sse_decode_list_api_usd_token(SseDeserializer deserializer);
 
   @protected
   List<AuthenticatedRound> sse_decode_list_authenticated_round(
@@ -3440,6 +3452,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_api_usd_token(ApiUsdToken self, SseSerializer serializer);
+
+  @protected
   void sse_encode_api_voting_eligibility(
     ApiVotingEligibility self,
     SseSerializer serializer,
@@ -4108,6 +4123,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_api_snapshot_bundle_pir_result(
     List<ApiSnapshotBundlePirResult> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_api_usd_token(
+    List<ApiUsdToken> self,
     SseSerializer serializer,
   );
 

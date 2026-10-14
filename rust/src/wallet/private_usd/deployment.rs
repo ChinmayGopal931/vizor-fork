@@ -78,9 +78,10 @@ pub(crate) struct Deployment {
     /// chain.
     pub lock_duration_seconds: u64,
     pub token: [u8; 20],
-    /// Other tokens that count toward the private USD balance (Sepolia:
-    /// Circle's test USDC, which Railgun accepts).
-    pub extra_usd_tokens: &'static [[u8; 20]],
+    /// The dollar tokens the private USD balance counts, the swap token
+    /// first (Sepolia adds Circle's test USDC, which Railgun accepts). Their
+    /// decimals are [`TOKEN_DECIMALS`].
+    pub usd_tokens: &'static [UsdToken],
     /// The only maker whose quotes are taken.
     pub maker: [u8; 20],
     /// The only relayer payouts are signed for.
@@ -106,6 +107,21 @@ pub(crate) struct Deployment {
     pub poi_node_url: &'static str,
 }
 
+/// A token the private USD balance counts as dollars.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct UsdToken {
+    pub address: [u8; 20],
+    /// `USDC`, or `tUSD` for the testnet maker's token (which has no
+    /// `symbol()` of its own).
+    pub symbol: &'static str,
+}
+
+const MAINNET_USDC: [u8; 20] = address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
+/// The testnet maker's swap token; it stands in for USDC.
+const SEPOLIA_TEST_USD: [u8; 20] = address("0x5764D0044bef5AA839E0dDafE2073421101B9Ed8");
+/// Circle's test USDC, the one Railgun accepts on Sepolia.
+const SEPOLIA_USDC: [u8; 20] = address("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238");
+
 const MAINNET: Deployment = Deployment {
     network: PrivateUsdNetwork::Mainnet,
     maker_url: "https://zecswap-mainnet.pepeman931.workers.dev/maker",
@@ -118,8 +134,11 @@ const MAINNET: Deployment = Deployment {
     contract: address("0x4708D7d36992b7e33Ad97a1ab0A31c3ac6C4fe6D"),
     contract_block: 26_178_667,
     lock_duration_seconds: 1800,
-    token: address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"),
-    extra_usd_tokens: &[],
+    token: MAINNET_USDC,
+    usd_tokens: &[UsdToken {
+        address: MAINNET_USDC,
+        symbol: "USDC",
+    }],
     maker: address("0x4370eEaa6bEcf1dAeF21Deeb0379Eb7f6CaEf7eF"),
     relayer: address("0xcBcb5f57C79C88a0E4BB450289dE2088958A017F"),
     relayer_railgun_address: "0zk1qy860uut20m8gd6fnhzvr0zqeyhs0ya5247x7h2eyedxsazx43w5nrv7j6fe3z53l78hn78kmslky2206lm75mclrv7dawd756m2suy7l4zud2m4yhg6kcsn7ed",
@@ -147,8 +166,17 @@ const TESTNET: Deployment = Deployment {
     contract: address("0xD75Efc6a157CC0A95f66962DA86DDf35d9F2617c"),
     contract_block: 11_860_526,
     lock_duration_seconds: 600,
-    token: address("0x5764D0044bef5AA839E0dDafE2073421101B9Ed8"),
-    extra_usd_tokens: &[address("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238")],
+    token: SEPOLIA_TEST_USD,
+    usd_tokens: &[
+        UsdToken {
+            address: SEPOLIA_TEST_USD,
+            symbol: "tUSD",
+        },
+        UsdToken {
+            address: SEPOLIA_USDC,
+            symbol: "USDC",
+        },
+    ],
     maker: address("0x2bac02b5032e9092493814c705f156b49e288922"),
     relayer: address("0xd9633572041886fa7584a2e12f36c8c7f1126412"),
     relayer_railgun_address: "0zk1qy25r4x4qjhtlfe0k9z22jy9psfm83j4k4fgvqs3pmv4he4ytefm8rv7j6fe3z53lltumh8amd66g2axaej92dmjk6mvnuveqtmmwccdm593pft827p4xpwljug",

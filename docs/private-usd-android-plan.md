@@ -237,7 +237,7 @@ Dart owns UI and orchestration only. Rust owns every key, every swap rule and al
 - **Address check.** Refuse a Railgun session whose engine address differs from the Rust-derived one (`ui/common/repository/RailgunEngine.kt:84-95`).
 - **The mnemonic's path to JS.** Dart bytes go to Rust `private_usd_railgun_mnemonic(...) -> String`, then over the MethodChannel to Kotlin, then over the WebMessagePort. It is briefly a Dart `String`, which cannot be zeroed; zapp has the same exposure. Accept it, and drop references after `openWallet`.
 - **Never stored:** the words, `seed` and `railgunSeed`. Re-derive them per use and drop them.
-- **Stored:** a random 32-byte engine encryption key per account in flutter_secure_storage (`vizor_railgun_encryption_key_{uuid}`). It encrypts the wallet in the WebView's IndexedDB (zapp: `railgun_wallet_encryption_key_v2`, `ui/common/provider/RailgunKeyProvider.kt:25-40`). Losing it costs a rescan, never funds.
+- **Stored:** a random 32-byte engine encryption key per account in flutter_secure_storage (`vizor_railgun_encryption_key_{uuid}`). It encrypts the wallet in the WebView's IndexedDB (zapp: `railgun_wallet_encryption_key_v2`, `ui/common/provider/RailgunKeyProvider.kt:25-40`). Losing it costs a rescan, never funds: the page recreates a wallet whose stored copy no longer opens. As built (M3, D-20): an `AppSecureStore` app-managed secret, encrypted under the session password and rotated with it like the voting hotkeys, so the key and the page's storage together never open the Railgun wallet without the password.
 - **Cached in memory:** derived public swap keys, payout notes and deposit addresses, per account and index (zapp: per seed fingerprint, `ua/AtomicSwapKeysImpl.kt:131-169`). Clear the cache on lock.
 
 **Known-answer vectors.** Test against all of these.
@@ -283,7 +283,7 @@ Dart owns UI and orchestration only. Rust owns every key, every swap rule and al
 | Index counter, swap records, active pointers, joint-account index, Railgun send log | `<support>/private_usd_<walletDbName>_<network>/swaps.db` | Rust | account delete (its rows); full reset (the directory) |
 | Joint accounts (librustzcash DB) | `<support>/private_usd_<walletDbName>_<network>/joint.db` | Rust | each joint account is deleted once its sweep is confirmed; account delete; full reset |
 | Privacy Pass token state (device-wide, per network) | `<support>/private_usd_tokens_<network>.json`, written atomically (temp file + rename) | Rust | full reset (X4) |
-| Railgun engine encryption key | flutter_secure_storage `vizor_railgun_encryption_key_{uuid}` (random 32 B) | Dart | account delete; reset (`deleteAll`) |
+| Railgun engine encryption key | flutter_secure_storage `vizor_railgun_encryption_key_{uuid}` (random 32 B), an app-managed secret under the session password (D-20) | Dart | account delete; reset (`deleteAll`) |
 | Balance cache | `AppSecureStore` `vizor_private_usd_balances_v1:<uuid>`: `{address, updatedAt ms, buckets}` | Dart | account delete; reset |
 | Railgun engine data | WebView IndexedDB `railgun-<network>` and `railgun-artifacts`, origin `https://railgun.appassets.androidplatform.net` | JS | `deleteWallet` (account, E5); `WebStorage.deleteOrigin` (reset) |
 | Kill-switch last value | `SharedPreferences` `vizor_private_usd_available_v1` | Dart | none needed |

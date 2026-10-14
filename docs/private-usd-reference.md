@@ -1214,7 +1214,9 @@ pub struct ApiDeployment {
     pub escrow_confirmations: u32,
     pub screening_seconds: u32,
     pub max_relayer_fee: String,      // "2000000"
+    pub usd_tokens: Vec<ApiUsdToken>, // M3 (D-19): the balance's dollar tokens, swap token first
 }
+pub struct ApiUsdToken { pub address: String /* 0x lowercase */, pub symbol: String /* "USDC" | "tUSD" */ }
 
 #[frb(sync)] pub fn private_usd_deployment(network: String) -> Option<ApiDeployment>;   // "main" | "test"
 #[frb(sync)] pub fn private_usd_is_valid_railgun_address(address: String) -> bool;
@@ -1807,8 +1809,9 @@ services/
   private_usd_spend_guard.dart              [M7] enum PrivateUsdSpendStatus {checking, available, sending, converting, unreadable}; send(); startConversion()
   private_usd_sender.dart                   [M7] Future<PrivateUsdSendOutcome> send(PrivateUsdSendRequest, PrivateUsdSendCost); Future<void> settleAll()
 providers/
-  private_usd_available_provider.dart       [M3] Provider<bool> privateUsdAvailableProvider; privateUsdTorBlockedProvider
-  private_usd_balance_provider.dart         [M3] NotifierProvider.family<…, PrivateUsdBalanceState, String /*uuid*/>
+  private_usd_available_provider.dart       [M3] Provider<bool> privateUsdAvailableProvider (+ privateUsdAvailableFor, the deployment providers); no privateUsdTorBlockedProvider: D4 passed (D-22)
+  private_usd_balance_provider.dart         [M3] NotifierProvider.autoDispose.family<…, PrivateUsdBalanceState, String /*uuid*/>, plus privateUsdBalanceKeepFreshProvider((accountUuid, ifUsed)) that polls while watched (D-21)
+  railgun_engine_provider.dart              [M3] railgunEngineProvider (kept alive; registers with privateUsdLifecycleProvider; closes on lock, account switch, route change), railgunEngineStateProvider, RustRailgunWalletSource
   private_usd_receive_address_provider.dart [M3] FutureProvider.family<String, String>
   private_usd_engine_provider.dart          [M5] Provider<PrivateUsdEngine> (keepAlive; registers with privateUsdLifecycleProvider)
   private_usd_unfinished_provider.dart      [M5] NotifierProvider<…, Set<PrivateUsdRecordKey>> (sync; the router reads it)

@@ -146,6 +146,17 @@ pub struct ApiDeployment {
     pub screening_seconds: u32,
     /// The relayer fee cap in token base units, `"2000000"`.
     pub max_relayer_fee: String,
+    /// The tokens the private USD balance counts as dollars, the swap token
+    /// first. Each has `token_decimals`.
+    pub usd_tokens: Vec<ApiUsdToken>,
+}
+
+/// A token the private USD balance counts as dollars.
+pub struct ApiUsdToken {
+    /// `0x`, lowercase.
+    pub address: String,
+    /// `USDC`, or `tUSD` for the testnet maker's token.
+    pub symbol: String,
 }
 
 /// The deployment for the wallet network `"main"` or `"test"`; `None` on
@@ -175,6 +186,14 @@ pub fn private_usd_deployment(network: String) -> Option<ApiDeployment> {
         escrow_confirmations: pins.escrow_confirmations,
         screening_seconds: pins.screening_seconds,
         max_relayer_fee: deployment::MAX_RELAYER_FEE.to_string(),
+        usd_tokens: pins
+            .usd_tokens
+            .iter()
+            .map(|token| ApiUsdToken {
+                address: hex_address(&token.address),
+                symbol: token.symbol.to_owned(),
+            })
+            .collect(),
     })
 }
 

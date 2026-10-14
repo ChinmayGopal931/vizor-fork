@@ -10633,6 +10633,8 @@ impl SseDecode for crate::api::private_usd::ApiDeployment {
         let mut var_escrowConfirmations = <u32>::sse_decode(deserializer);
         let mut var_screeningSeconds = <u32>::sse_decode(deserializer);
         let mut var_maxRelayerFee = <String>::sse_decode(deserializer);
+        let mut var_usdTokens =
+            <Vec<crate::api::private_usd::ApiUsdToken>>::sse_decode(deserializer);
         return crate::api::private_usd::ApiDeployment {
             network: var_network,
             railgun_network: var_railgunNetwork,
@@ -10651,6 +10653,7 @@ impl SseDecode for crate::api::private_usd::ApiDeployment {
             escrow_confirmations: var_escrowConfirmations,
             screening_seconds: var_screeningSeconds,
             max_relayer_fee: var_maxRelayerFee,
+            usd_tokens: var_usdTokens,
         };
     }
 }
@@ -11119,6 +11122,18 @@ impl SseDecode for crate::api::sync::ApiTransparentLedgerMode {
             0 => crate::api::sync::ApiTransparentLedgerMode::Public,
             1 => crate::api::sync::ApiTransparentLedgerMode::PrivateRequired,
             _ => unreachable!("Invalid variant for ApiTransparentLedgerMode: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::private_usd::ApiUsdToken {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_address = <String>::sse_decode(deserializer);
+        let mut var_symbol = <String>::sse_decode(deserializer);
+        return crate::api::private_usd::ApiUsdToken {
+            address: var_address,
+            symbol: var_symbol,
         };
     }
 }
@@ -12235,6 +12250,20 @@ impl SseDecode for Vec<crate::api::voting::ApiSnapshotBundlePirResult> {
         let mut ans_ = vec![];
         for idx_ in 0..len_ {
             ans_.push(<crate::api::voting::ApiSnapshotBundlePirResult>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::private_usd::ApiUsdToken> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = vec![];
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::private_usd::ApiUsdToken>::sse_decode(
+                deserializer,
+            ));
         }
         return ans_;
     }
@@ -16106,6 +16135,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiDeployment {
             self.escrow_confirmations.into_into_dart().into_dart(),
             self.screening_seconds.into_into_dart().into_dart(),
             self.max_relayer_fee.into_into_dart().into_dart(),
+            self.usd_tokens.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -16755,6 +16785,27 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::sync::ApiTransparentLedgerMod
     for crate::api::sync::ApiTransparentLedgerMode
 {
     fn into_into_dart(self) -> crate::api::sync::ApiTransparentLedgerMode {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiUsdToken {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.address.into_into_dart().into_dart(),
+            self.symbol.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::private_usd::ApiUsdToken
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::private_usd::ApiUsdToken>
+    for crate::api::private_usd::ApiUsdToken
+{
+    fn into_into_dart(self) -> crate::api::private_usd::ApiUsdToken {
         self
     }
 }
@@ -20891,6 +20942,7 @@ impl SseEncode for crate::api::private_usd::ApiDeployment {
         <u32>::sse_encode(self.escrow_confirmations, serializer);
         <u32>::sse_encode(self.screening_seconds, serializer);
         <String>::sse_encode(self.max_relayer_fee, serializer);
+        <Vec<crate::api::private_usd::ApiUsdToken>>::sse_encode(self.usd_tokens, serializer);
     }
 }
 
@@ -21228,6 +21280,14 @@ impl SseEncode for crate::api::sync::ApiTransparentLedgerMode {
             },
             serializer,
         );
+    }
+}
+
+impl SseEncode for crate::api::private_usd::ApiUsdToken {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.address, serializer);
+        <String>::sse_encode(self.symbol, serializer);
     }
 }
 
@@ -22055,6 +22115,16 @@ impl SseEncode for Vec<crate::api::voting::ApiSnapshotBundlePirResult> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::voting::ApiSnapshotBundlePirResult>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::private_usd::ApiUsdToken> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::private_usd::ApiUsdToken>::sse_encode(item, serializer);
         }
     }
 }

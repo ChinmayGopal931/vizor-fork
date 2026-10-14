@@ -174,9 +174,9 @@ the batched E2E round and the owner's go-ahead.
 - [x] M3.2 Kotlin host in `android/app/src/main/kotlin/com/keplr/vizor/railgun/` (D-16)
 - [x] M3.3 Gradle and manifest
 - [x] M3.4 Rust bridge `rust/src/railgun_bridge.rs` for real (D-17; E4 stand-in, D-18)
-- [ ] M3.5 Dart, Railgun side
-- [ ] M3.6 Dart, balance repository, cache and provider
-- [ ] M3.7 Availability
+- [x] M3.5 Dart, Railgun side (channel wrapper, models, engine, engine key store; D-20, D-23)
+- [x] M3.6 Dart, balance repository, cache and provider (D-19, D-21)
+- [x] M3.7 Availability (define, kill switch, `privateUsdAvailableProvider`, the X3 price gate; D-22)
 - [ ] M3.8 Home strip
 - [ ] M3.9 `/private-usd` route, guard and screen
 - [ ] M3.10 Lifecycle (no funds yet)
@@ -547,6 +547,67 @@ and the Kotlin tests) is next; the M3 gate and its device checks wait for it.
   comment. `rust/Cargo.lock` follows: its nine wallet-libraries packages lost
   their git `source` lines. Local only (B-6): before anything is pushed, all
   ten go back to git refs on the owner's fork rev with the patch (E4, D13).
+- **D-19 (M3.6): `ApiDeployment` carries the dollar tokens.** The balance
+  counts only known dollar tokens (reference §6.6), and Dart never duplicates
+  pins, so `ApiDeployment` gains `usd_tokens: Vec<ApiUsdToken { address,
+  symbol }>`, the swap token first (mainnet USDC; Sepolia tUSD, then Circle's
+  test USDC). In Rust, `Deployment::extra_usd_tokens` (unused) became
+  `usd_tokens: &[UsdToken]`, built from the same consts as `token`. Sepolia's
+  WETH is not listed: it is not a dollar. Bindings regenerated; reference
+  §8.2 updated.
+- **D-20 (M3.5): the Railgun engine key is an app-managed secret.** It is
+  stored with `AppSecureStore.writeSecretString` under
+  `vizor_railgun_encryption_key_<uuid>`, encrypted under the session password
+  and re-encrypted by `changePassword` (the prefix joins
+  `_isAppManagedGeneralSecretKey`, as the voting hotkeys are), and read only
+  unlocked. A plain flutter_secure_storage entry would have let the key and
+  the page's IndexedDB open the Railgun wallet without the password, which
+  the Zcash seed never allows. Losing it still costs only a rescan: the page
+  recreates a wallet whose stored copy no longer opens. The rotation test in
+  `app_secure_store_test.dart` covers it. Plan §3.3 and §3.4 updated.
+- **D-21 (M3.6): the balance provider as built.** Riverpod rather than
+  zapp's flows:
+  - `privateUsdBalanceProvider(uuid)` (autoDispose family) holds the state,
+    shows the cache at once, and shows every sync of that account, also
+    syncs another use made (the engine's `lastSync`).
+  - Polling runs while something watches
+    `privateUsdBalanceKeepFreshProvider((accountUuid, ifUsed))`: the home
+    strip with `ifUsed: true`, the Private USD screen with `ifUsed: false`
+    (zapp's `observeIfUsed`/`observe`). Each 30 s tick refreshes what is
+    older than 30 s while funds arrive, else 5 min; only in the foreground,
+    unlocked and outside a drain. Failures back off 30 s × 2^n up to 32×.
+  - "In use" is, in M3, a non-zero balance; swap history (M5) and the send
+    log (M7) join it later.
+  - A refresh that times out (5 min, or 2 h before anything shows) marks the
+    balance failed but lets the page finish: its result still shows, and no
+    second refresh queues behind it (zapp's async-in-scope does the same).
+  - A close the engine made itself (lock, switch, route change, drain) is
+    not a failure and backs nothing off.
+  - The cache is keyed by account, so it is not checked against a
+    Rust-derived address before showing; the next sync replaces it with its
+    own address.
+- **D-22 (M3.7): no `privateUsdTorBlockedProvider`.** It applies only under
+  D4's fallback, and the M0.3 spike passed. `tor_unavailable` stays in the
+  copy, unused.
+- **D-23 (M3.5): the engine wrapper as built.**
+  - It runs one use at a time on a serial lock; `close()` bypasses the lock
+    and bumps an epoch, so a lock, an account switch or a route change
+    interrupts a running use at once (`RailgunEngineInterruptedException`).
+    Every step of an open re-checks the epoch, and an abandoned open closes
+    the page and stops the bridge it started.
+  - A call that fails `CLOSED`, `TIMEOUT` or `UNAVAILABLE` drops the session
+    and stops the bridge. Before reusing a session the engine asks
+    `isOpen`, so a renderer that died between uses is reopened.
+  - The page is loaded with `debug: kDebugMode` (content debugging only);
+    `start.debug` is false. The app never prints page `log` events, and the
+    engine state carries a host error code, never a message.
+    `redactRailgunMessage` strips keyed URLs (and Alchemy/Infura key paths)
+    from anything a debug build prints.
+  - The keyed RPC URL is dropped (publicnode alone) unless it is `https` on
+    the default port and its host is in `ApiDeployment.allowed_hosts`.
+  - The mnemonic is held only until `openWallet` is sent; the mnemonic bytes
+    are zeroed as soon as both Rust derivations have started (they copy them
+    as they start, as `swap_deposit_sender.dart` relies on).
 
 ## Blocked
 

@@ -560,6 +560,8 @@ void main() {
     );
     await store.writeSecretString(_externalEncryptedKey, 'external secret');
     final externalPayload = await store.readPlain(_externalEncryptedKey);
+    const railgunKey = '${kRailgunEncryptionKeyStoragePrefix}account-1';
+    await store.writeSecretString(railgunKey, 'ab' * 32);
 
     final didChange = await store.changePassword(
       currentPassword: _oldPassword,
@@ -569,6 +571,13 @@ void main() {
     expect(didChange, isTrue);
     expect(await store.readPlain(_externalEncryptedKey), externalPayload);
     expect(await store.readAccountMnemonic(_accountUuid), _mnemonic);
+    expect(
+      await store.readSecretStringWithOptions(
+        railgunKey,
+        requireUnlockedSession: true,
+      ),
+      'ab' * 32,
+    );
     expect(
       await store.readVotingHotkey(
         accountUuid: 'account-1',

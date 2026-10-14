@@ -9,6 +9,7 @@ import '../../main.dart' show log;
 import '../core/config/swap_feature_config.dart';
 import '../core/formatting/zec_amount.dart';
 import '../core/network/network_http_client.dart';
+import '../features/private_usd/providers/private_usd_available_provider.dart';
 import '../features/swap/models/swap_fiat_value_formatting.dart';
 
 const kVizorCoinGeckoPriceBaseUrlEnvKey = 'VIZOR_COINGECKO_PRICE_BASE_URL';
@@ -248,7 +249,10 @@ class ZecHomeMarketDataNotifier extends Notifier<ZecHomeMarketDataState> {
     _refreshTimer?.cancel();
     _expiryTimer?.cancel();
     final epoch = ++_epoch;
-    if (!ref.watch(swapFeatureEnabledProvider)) {
+    // Private USD shows an indicative ZEC equivalent (X3), also on testnet
+    // where swap is off.
+    if (!ref.watch(swapFeatureEnabledProvider) &&
+        !ref.watch(privateUsdAvailableProvider)) {
       return const ZecHomeMarketDataState();
     }
     final source = ref.watch(zecMarketDataSourceProvider);

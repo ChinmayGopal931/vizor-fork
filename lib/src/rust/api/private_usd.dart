@@ -96,6 +96,10 @@ class ApiDeployment {
   /// The relayer fee cap in token base units, `"2000000"`.
   final String maxRelayerFee;
 
+  /// The tokens the private USD balance counts as dollars, the swap token
+  /// first. Each has `token_decimals`.
+  final List<ApiUsdToken> usdTokens;
+
   const ApiDeployment({
     required this.network,
     required this.railgunNetwork,
@@ -114,6 +118,7 @@ class ApiDeployment {
     required this.escrowConfirmations,
     required this.screeningSeconds,
     required this.maxRelayerFee,
+    required this.usdTokens,
   });
 
   @override
@@ -134,7 +139,8 @@ class ApiDeployment {
       zcashConfirmations.hashCode ^
       escrowConfirmations.hashCode ^
       screeningSeconds.hashCode ^
-      maxRelayerFee.hashCode;
+      maxRelayerFee.hashCode ^
+      usdTokens.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -157,7 +163,8 @@ class ApiDeployment {
           zcashConfirmations == other.zcashConfirmations &&
           escrowConfirmations == other.escrowConfirmations &&
           screeningSeconds == other.screeningSeconds &&
-          maxRelayerFee == other.maxRelayerFee;
+          maxRelayerFee == other.maxRelayerFee &&
+          usdTokens == other.usdTokens;
 }
 
 /// A Private USD failure. Its Dart `toString()` is the message.
@@ -213,4 +220,26 @@ enum ApiPrivateUsdErrorCode {
   unavailable,
   routeBlocked,
   other,
+}
+
+/// A token the private USD balance counts as dollars.
+class ApiUsdToken {
+  /// `0x`, lowercase.
+  final String address;
+
+  /// `USDC`, or `tUSD` for the testnet maker's token.
+  final String symbol;
+
+  const ApiUsdToken({required this.address, required this.symbol});
+
+  @override
+  int get hashCode => address.hashCode ^ symbol.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiUsdToken &&
+          runtimeType == other.runtimeType &&
+          address == other.address &&
+          symbol == other.symbol;
 }
