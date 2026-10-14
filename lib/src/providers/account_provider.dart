@@ -1595,15 +1595,22 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
   ///
   /// [confirmedUnsharedGiftCardCount] is the unshared Gift Card count the user
   /// was warned about; null skips the post-drain recheck.
+  ///
+  /// [confirmedPrivateUsdUnfinishedCount] is the number of Private USD
+  /// conversions under way the user was warned about; more than that (or any
+  /// when null) refuses with [PrivateUsdUnfinishedConversionsException].
   Future<void> removeAccount(
     String uuid, {
     int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
   }) => ref
       .read(linuxKeyringCoordinatorProvider)
       .runMutation(
         () => _removeAccount(
           uuid,
           confirmedUnsharedGiftCardCount: confirmedUnsharedGiftCardCount,
+          confirmedPrivateUsdUnfinishedCount:
+              confirmedPrivateUsdUnfinishedCount,
         ),
       );
 
@@ -1637,9 +1644,34 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
     }
   }
 
+  /// Refuses (plan §3.5, invariant 15) unless the user confirmed at least
+  /// as many Private USD conversions under way across [accountUuids] as
+  /// there are now: their funds sit in a joint account or escrow that only
+  /// this seed and swap index can recover. Read after the drain, so one that
+  /// started meanwhile is counted. A store that cannot be read never blocks:
+  /// the warning is a warning, and a user who must delete is never trapped.
+  Future<void> _throwIfPrivateUsdConversionsUnconfirmed(
+    Iterable<String> accountUuids,
+    int? confirmedCount,
+  ) async {
+    final int count;
+    try {
+      count = await ref
+          .read(privateUsdLifecycleProvider)
+          .unfinishedCount(accountUuids);
+    } catch (e, st) {
+      log('private USD conversion count failed: $e\n$st');
+      return;
+    }
+    if (count > (confirmedCount ?? 0)) {
+      throw PrivateUsdUnfinishedConversionsException(count: count);
+    }
+  }
+
   Future<void> _removeAccount(
     String uuid, {
     int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
   }) async {
     ref.read(votingSubmissionGuardProvider.notifier).throwIfActive();
     final prev = state.value ?? const AccountState();
@@ -1675,6 +1707,9 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
       await _throwIfUnsharedGiftCardsIncreased([
         uuid,
       ], confirmedUnsharedGiftCardCount);
+      await _throwIfPrivateUsdConversionsUnconfirmed([
+        uuid,
+      ], confirmedPrivateUsdUnfinishedCount);
       await _removeAccountWithShareTrackingStopped(uuid);
     } finally {
       ledgerLifecycle.resume();
@@ -1778,6 +1813,18 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         'removeAccount: failed to delete Private USD data for $uuid: $e\n$st',
       );
     }
+    // Its conversion records and joint accounts, only now that the wallet
+    // account is gone (the user confirmed losing any under way).
+    try {
+      await ref
+          .read(privateUsdLifecycleProvider)
+          .deleteAccountConversions(uuid);
+    } catch (e, st) {
+      log(
+        'removeAccount: failed to delete Private USD conversions for '
+        '$uuid: $e\n$st',
+      );
+    }
     // Only after the Rust delete, which also drops this account's Ledger
     // outbox: a checkpointed draft must never lose its secret while its
     // signed transaction can still be broadcast.
@@ -1879,15 +1926,26 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
   ///
   /// [confirmedUnsharedGiftCardCount] works as in [removeAccount], summed over
   /// every account.
-  Future<void> resetWallet({int? confirmedUnsharedGiftCardCount}) => ref
+  ///
+  /// [confirmedPrivateUsdUnfinishedCount] works as in [removeAccount],
+  /// summed over every account; only an unlocked wallet refuses.
+  Future<void> resetWallet({
+    int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
+  }) => ref
       .read(linuxKeyringCoordinatorProvider)
       .runMutation(
         () => _resetWallet(
           confirmedUnsharedGiftCardCount: confirmedUnsharedGiftCardCount,
+          confirmedPrivateUsdUnfinishedCount:
+              confirmedPrivateUsdUnfinishedCount,
         ),
       );
 
-  Future<void> _resetWallet({int? confirmedUnsharedGiftCardCount}) async {
+  Future<void> _resetWallet({
+    int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
+  }) async {
     ref.read(votingSubmissionGuardProvider.notifier).throwIfActive();
 
     final claimLifecycle = ref.read(paymentLinkClaimLifecycleRegistryProvider);
@@ -1911,6 +1969,15 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         for (final account in state.value?.accounts ?? const <AccountInfo>[])
           account.uuid,
       ], confirmedUnsharedGiftCardCount);
+      // Unlocked only, like the Gift Card refusal: a locked reset is the
+      // way back into a wallet whose passcode is lost, and conversions
+      // cannot finish while it is locked anyway, so it warns instead.
+      if (!ref.read(appSecurityProvider).requiresUnlock) {
+        await _throwIfPrivateUsdConversionsUnconfirmed([
+          for (final account in state.value?.accounts ?? const <AccountInfo>[])
+            account.uuid,
+        ], confirmedPrivateUsdUnfinishedCount);
+      }
       await _resetWalletWithShareTrackingStopped();
       resetCompleted = true;
       resumeClaimLifecycle = true;

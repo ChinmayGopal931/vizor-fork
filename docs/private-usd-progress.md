@@ -407,8 +407,8 @@ Until M4 lands, the engine's token seam holds none (D-33).
 
 - [x] M5.1 `engine.rs` and `forward.rs` (D-31, D-33 to D-38)
 - [x] M5.2 FRB forward calls (D-32)
-- [ ] M5.3 Dart engine and provider
-- [ ] M5.4 Lifecycle provider and account-deletion guards
+- [x] M5.3 Dart engine and provider (D-51, D-52)
+- [x] M5.4 Lifecycle provider and account-deletion guards (D-53)
 - [ ] M5.5 UI
 - [ ] M5.6 Copy (Convert tables, Accounts)
 - [ ] M5.7 Widgetbook and capture scenarios (forward rows)
@@ -1161,6 +1161,83 @@ the forward path runs without tokens (D-33).
   route-checked channel (`open_lwd_channel_with_cancel`, honouring the scan's
   cancel) and reads the tip with `get_latest_block_recorded`. Numbered D-50 so
   as not to collide with the M3 device round's D-40 onward.
+- **D-51 (M5.3): the Dart engine as built.** Reference §5.10 and §9.2
+  updated.
+  - `services/private_usd_engine.dart`: `PrivateUsdEngine` holds one serial
+    queue per account (`runFor`), an epoch every pause, drain and dispose
+    bumps, and the published `conversions` snapshot
+    (`PrivateUsdConversionStatus`: record, wait, activity, problem,
+    `failingSince`, `resuming`, `checkedAt`). The loop idles, with no timer,
+    while nothing is under way; accept, opening a progress screen, unlock
+    and the foreground start it again. It naps the shortest `next_poll_ms`
+    of a pass (at least 1 s), 15 s after a failed step or `busy`, 30 s when
+    the listing itself failed.
+  - Only the loop's advances and accept drop a result that lands after a
+    pause (`PrivateUsdEngineInterruptedException`). A quote or a "Call it
+    off" that finished in Rust is still shown: the index is spent either
+    way, and a lock drops the offer in Rust (`private_usd_clear_sessions`).
+    A step queued before a pause never starts, and a seed read that ends
+    after one is zeroed and never reaches Rust.
+  - Op ids are unique per process (a static counter), so a cancel Rust
+    remembers for an old id can never stop a newer call. The activity label
+    is polled every 500 ms while an advance runs.
+  - A setup error an advance throws counts as a failed step (`mismatch`,
+    `zcashWallet`, `storeUnreadable`, `routeBlocked`, the unreachable codes,
+    else `other`); `cancelled` and `busy` never do.
+  - `services/private_usd_swap_backend.dart` is the FRB seam
+    (`PrivateUsdSwapBackend`, `RustPrivateUsdSwapBackend`). Key-using calls
+    take a `PrivateUsdSecretReader`: the seed is read only once the paths
+    are known, handed to Rust in the same synchronous step, and zeroed in
+    `finally`, as `swap_deposit_sender.dart` does. Reads go through the new
+    `getExistingPrivateUsdDirPath` and never create the store; only a quote
+    or an accept (which may write a first record) creates it.
+    `services/private_usd_paths.dart` wraps both.
+  - `privateUsdEngineProvider` holds the `AppLifecycleListener` (hide and
+    pause → `pause(background)`, resume → `start(resuming: true)`) and the
+    lock listener (`pause(lock)`: cancel, `private_usd_clear_sessions`, clear
+    the problem timers, wait at most 5 s), Gift Card's shape as the M5
+    pitfall says, rather than the host widget §9.2 described. It registers
+    `quiesceAndDrain` / `resumeAfterMutation` with
+    `privateUsdLifecycleProvider`, and forgets a deleted account's
+    conversions (all of them on a reset).
+  - `PrivateUsdEngineHost` (beside `BackgroundAutoLockHost` in `lib/app.dart`)
+    only keeps the engine alive, when `privateUsdEngineEnabledProvider`
+    holds: the define, the mobile form factor, Android and a deployment. It
+    does not follow the kill switch or the active account, so conversions
+    under way keep being driven (D14, D16).
+- **D-52 (M5.3): the Dart ★ cases as built.** In
+  `test/features/private_usd/private_usd_engine_test.dart`, on a scripted
+  `FakePrivateUsdBackend` and the widget tester's fake clock:
+  `SwapLoopTest` 58 (`a failed step is tried again, says why only once…`),
+  155 (`a nudge cuts a nap short`) and 186 (`cancellation is never taken for
+  a failed step`, plus an unexpected error counting as one) as zapp wrote
+  them. 77 (`failing for five minutes asks the user once…`) is adapted: zapp
+  asks through a notification, which vizor does not have (D9), so the ask is
+  the problem on the conversion, which appears once and holds while steps
+  keep failing, and clears on the first that goes through. Four more pin the
+  M5 pitfalls: a lock with a call in flight, a seed read that finishes after
+  a lock, the drain, and D14 (every account under way is advanced).
+- **D-53 (M5.4): the deletion and reset guards as built.** Reference §8.4
+  updated.
+  - `removeAccount` and `resetWallet` take `confirmedPrivateUsdUnfinishedCount`
+    and throw `PrivateUsdUnfinishedConversionsException(count)` when more
+    conversions are under way than the user confirmed. The count is read
+    after the drain (§8.4 said before it), like the Gift Card recheck, so one
+    that started meanwhile is counted; a store that cannot be read never
+    blocks (warn and allow). A reset refuses only while unlocked, summed over
+    every account.
+  - After the Rust account delete, `deleteAccountConversions(uuid)` removes
+    the account's records and joint accounts, asking again (up to three
+    times, 1 s apart) on `busy`. A failed Rust delete leaves them.
+  - The warning is in the mobile removal sheet (title, the count, and "Delete
+    anyway" or "Reset anyway") and the forgot-passcode sheet, not in
+    `accounts_screen.dart` or `settings_uninstall_screen.dart`: those are
+    desktop routes, and Private USD is mobile-only. The mobile account rows
+    show no pending counts, so `accountsPendingConversions` is not shown in
+    v1.
+  - The lifecycle's conversions backend exists only in builds with the
+    define on the mobile form factor (const), so desktop never looks for
+    conversions.
 
 ## Blocked
 

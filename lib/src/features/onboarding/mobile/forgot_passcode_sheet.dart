@@ -13,6 +13,8 @@ import '../../../providers/biometric_unlock_provider.dart';
 import '../../../providers/device_owner_auth_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../../providers/wallet_mutation_guard.dart';
+import '../../private_usd/private_usd_copy.dart';
+import '../../private_usd/providers/private_usd_unfinished_provider.dart';
 
 const kForgotPasscodeLastWarningArmDelay = Duration(seconds: 3);
 const kForgotPasscodeUnbackedAccountWarning =
@@ -38,6 +40,10 @@ class ForgotPasscodeSheet extends ConsumerWidget {
     // the locked path for the same reason.
     final claimsInFlight =
         ref.watch(paymentLinkClaimsInFlightProvider).value ?? 0;
+    // Private USD conversions under way are warned about the same way: only
+    // this wallet could finish or refund them (plan §3.5, invariant 15).
+    final conversionsUnderWay =
+        ref.watch(privateUsdUnfinishedTotalProvider).value ?? 0;
     return MobileModalScaffold(
       title: 'Forgot Passcode?',
       onClose: () => Navigator.of(context).pop(false),
@@ -71,6 +77,16 @@ class ForgotPasscodeSheet extends ConsumerWidget {
               const SizedBox(height: AppSpacing.s),
               Text(
                 kWalletResetInFlightGiftCardWarningMessage,
+                style: AppTypography.bodyMediumStrong.copyWith(
+                  color: colors.text.destructive,
+                ),
+              ),
+            ],
+            if (conversionsUnderWay > 0) ...[
+              const SizedBox(height: AppSpacing.s),
+              Text(
+                PrivateUsdCopy.resetUnfinishedBody(conversionsUnderWay),
+                key: const ValueKey('mobile_forgot_passcode_private_usd'),
                 style: AppTypography.bodyMediumStrong.copyWith(
                   color: colors.text.destructive,
                 ),

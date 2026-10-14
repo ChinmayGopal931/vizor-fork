@@ -6248,6 +6248,7 @@ class _PreviewAccountNotifier extends AccountNotifier {
   Future<void> removeAccount(
     String uuid, {
     int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
   }) async {
     final prev = state.value ?? initialState;
     final updated = [
@@ -6258,7 +6259,10 @@ class _PreviewAccountNotifier extends AccountNotifier {
   }
 
   @override
-  Future<void> resetWallet({int? confirmedUnsharedGiftCardCount}) async {
+  Future<void> resetWallet({
+    int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
+  }) async {
     state = const AsyncData(AccountState());
   }
 }

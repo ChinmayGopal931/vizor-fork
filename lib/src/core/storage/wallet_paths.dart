@@ -199,6 +199,21 @@ Future<String> getPrivateUsdDirPath(String network) async {
   return directory.path;
 }
 
+/// [getPrivateUsdDirPath] when that directory already exists, else null.
+/// Reads that must not create anything use it: a wallet that never
+/// converted has no Private USD directory (and desktop never gets one).
+Future<String?> getExistingPrivateUsdDirPath(String network) async {
+  if (!RegExp(r'^[a-z0-9]+$').hasMatch(network)) {
+    throw ArgumentError.value(network, 'network');
+  }
+  final support = await getWalletSupportDirectory();
+  final walletName = await getWalletDbName();
+  final directory = Directory(
+    '${support.path}${Platform.pathSeparator}$_privateUsdPrefix${walletName}_$network',
+  );
+  return await directory.exists() ? directory.path : null;
+}
+
 /// The device-wide Privacy Pass token store for [network] (M4), written
 /// atomically through a temporary file beside it.
 Future<String> getPrivateUsdTokenStorePath(String network) async {

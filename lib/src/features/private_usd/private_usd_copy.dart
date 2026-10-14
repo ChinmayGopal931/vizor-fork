@@ -6,8 +6,9 @@ import '../../core/config/private_usd_feature_config.dart';
 /// capitalized at the start of a sentence and as a title, "private USD"
 /// mid-sentence.
 ///
-/// M3 holds the Shared, Home, Private USD screen and Activity tables; the
-/// convert, refunds, send and account tables arrive with M5–M7.
+/// M3 holds the Shared, Home, Private USD screen and Activity tables, M5 the
+/// Convert and Accounts tables; the reverse, refunds and send tables arrive
+/// with M6 and M7.
 abstract final class PrivateUsdCopy {
   // ── Shared ─────────────────────────────────────────────────────────────
 
@@ -302,4 +303,35 @@ abstract final class PrivateUsdCopy {
 
   /// `refunds_view`
   static const refundsView = 'View refunds';
+
+  // ── Accounts and reset (new for vizor; §8.4 refusal) ──────────────────
+
+  /// New: `delete_unfinished_title`
+  static const deleteUnfinishedTitle = 'Conversion in progress';
+
+  /// New (F): `delete_unfinished_body`
+  static String deleteUnfinishedBody(int count) =>
+      'This account has $count unfinished private USD '
+      '${_conversions(count)}. Only this account can recover their funds, '
+      'so deleting it now can lose them. Keep Vizor open until they finish '
+      'or are refunded.';
+
+  /// New: `reset_unfinished_body`
+  static String resetUnfinishedBody(int count) =>
+      'Your wallet has $count unfinished private USD ${_conversions(count)}. '
+      'Only this wallet can recover their funds, so resetting now can lose '
+      'them.';
+
+  /// New: `delete_anyway`
+  static const deleteAnyway = 'Delete anyway';
+
+  /// New: `reset_anyway`
+  static const resetAnyway = 'Reset anyway';
+
+  /// New: `accounts_pending_conversions`
+  static String accountsPendingConversions(int count) =>
+      '$count ${_conversions(count)} in progress';
+
+  static String _conversions(int count) =>
+      count == 1 ? 'conversion' : 'conversions';
 }

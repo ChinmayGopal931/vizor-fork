@@ -22,6 +22,7 @@ import '../../../../core/widgets/mobile/mobile_list_row.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/biometric_unlock_provider.dart';
+import '../../../../providers/private_usd_lifecycle_provider.dart';
 import '../../../../providers/receive_address_provider.dart';
 import '../../../../providers/sync_provider.dart';
 import '../../../../providers/wallet_mutation_guard.dart';
@@ -30,6 +31,8 @@ import '../../../migration/providers/ironwood_migration_coordinator_provider.dar
 import '../../../payment_links/services/payment_link_received_store.dart';
 import '../../../payment_links/services/payment_link_recovery_reconciler.dart';
 import '../../../payment_links/services/payment_link_recovery_store.dart';
+import '../../../private_usd/private_usd_copy.dart';
+import '../../../private_usd/providers/private_usd_unfinished_provider.dart';
 import '../../widgets/mobile/account_edit_sheets.dart';
 
 /// Mobile account management — Figma `Accounts` / `Accounts Edits` /
@@ -456,6 +459,18 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
         log('MobileAccounts: unshared gift card count failed: $e\n$st');
       }
     }
+    // Private USD conversions under way: their funds can only be recovered
+    // by this account (or, for the last one, this wallet). Warn, then allow.
+    var privateUsdUnfinishedCount = 0;
+    try {
+      privateUsdUnfinishedCount = await ref.read(
+        isLastAccount
+            ? privateUsdUnfinishedTotalProvider.future
+            : privateUsdUnfinishedCountProvider(account.uuid).future,
+      );
+    } catch (e, st) {
+      log('MobileAccounts: private USD conversion count failed: $e\n$st');
+    }
     if (!mounted) return;
     final confirmed = await showAppMobileSheet<bool>(
       context: context,
@@ -464,6 +479,7 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
         isLastAccount: isLastAccount,
         hasActiveMigration: hasActiveMigration,
         unsharedGiftCardCount: unsharedGiftCardCount,
+        privateUsdUnfinishedCount: privateUsdUnfinishedCount,
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -477,6 +493,7 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
         .value
         ?.activeAccountUuid;
     UnsharedGiftCardsChangedException? reconfirm;
+    var reconfirmPrivateUsd = false;
     try {
       if (isLastAccount) {
         // runWithSyncPausedForWalletReset clears the cached DB path in its
@@ -486,6 +503,7 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
         await runWithSyncPausedForWalletReset(ref, () async {
           await accountNotifier.resetWallet(
             confirmedUnsharedGiftCardCount: unsharedGiftCardCount,
+            confirmedPrivateUsdUnfinishedCount: privateUsdUnfinishedCount,
           );
           try {
             await ref.read(biometricUnlockProvider.notifier).disable();
@@ -503,6 +521,7 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
           () => accountNotifier.removeAccount(
             account.uuid,
             confirmedUnsharedGiftCardCount: unsharedGiftCardCount,
+            confirmedPrivateUsdUnfinishedCount: privateUsdUnfinishedCount,
           ),
           quiesceVotingWork: true,
         );
@@ -519,6 +538,10 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
     } on UnsharedGiftCardsChangedException catch (e) {
       log('MobileAccounts: remove needs reconfirmation: ${e.count}');
       reconfirm = e;
+    } on PrivateUsdUnfinishedConversionsException catch (e) {
+      // More conversions under way than the user confirmed: ask again.
+      log('MobileAccounts: remove needs conversion reconfirmation: ${e.count}');
+      reconfirmPrivateUsd = true;
     } catch (e, st) {
       log('MobileAccounts: remove failed: $e\n$st');
       if (mounted) {
@@ -536,6 +559,10 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
       // Show the confirmation again with the fresh count.
       ref.invalidate(paymentLinkUnsharedFundedCountProvider(account.uuid));
       await _showRemoveSheet(account, recheckFailed: reconfirm.count == null);
+    } else if (reconfirmPrivateUsd && mounted) {
+      ref.invalidate(privateUsdUnfinishedCountProvider(account.uuid));
+      ref.invalidate(privateUsdUnfinishedTotalProvider);
+      await _showRemoveSheet(account);
     }
   }
 
@@ -736,6 +763,7 @@ class MobileAccountRemovalSheet extends StatelessWidget {
     required this.isLastAccount,
     required this.hasActiveMigration,
     required this.unsharedGiftCardCount,
+    this.privateUsdUnfinishedCount = 0,
     super.key,
   });
 
@@ -745,6 +773,10 @@ class MobileAccountRemovalSheet extends StatelessWidget {
 
   /// Null when the unshared gift card check failed.
   final int? unsharedGiftCardCount;
+
+  /// Private USD conversions under way: the account's, or for the last
+  /// account (a reset) the wallet's.
+  final int privateUsdUnfinishedCount;
 
   static const _titleStyle = TextStyle(
     fontFamily: 'Geist',
@@ -835,6 +867,31 @@ class MobileAccountRemovalSheet extends StatelessWidget {
                 style: _bodyStyle.copyWith(color: colors.text.warning),
               ),
             ],
+            if (privateUsdUnfinishedCount > 0) ...[
+              const SizedBox(height: AppSpacing.s),
+              Text(
+                PrivateUsdCopy.deleteUnfinishedTitle,
+                key: const ValueKey(
+                  'mobile_account_remove_private_usd_title',
+                ),
+                style: _bodyStyle.copyWith(
+                  color: colors.text.destructive,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                isLastAccount
+                    ? PrivateUsdCopy.resetUnfinishedBody(
+                        privateUsdUnfinishedCount,
+                      )
+                    : PrivateUsdCopy.deleteUnfinishedBody(
+                        privateUsdUnfinishedCount,
+                      ),
+                key: const ValueKey('mobile_account_remove_private_usd'),
+                style: _bodyStyle.copyWith(color: colors.text.destructive),
+              ),
+            ],
             const SizedBox(height: AppSpacing.md),
             AppButton(
               key: const ValueKey('mobile_account_remove_confirm'),
@@ -843,7 +900,12 @@ class MobileAccountRemovalSheet extends StatelessWidget {
               onPressed: () => Navigator.of(context).pop(true),
               leading: isLastAccount ? null : const AppIcon(AppIcons.trash),
               child: Text(
-                isLastAccount ? 'Reset Vizor' : 'Remove',
+                switch ((isLastAccount, privateUsdUnfinishedCount > 0)) {
+                  (true, true) => PrivateUsdCopy.resetAnyway,
+                  (true, false) => 'Reset Vizor',
+                  (false, true) => PrivateUsdCopy.deleteAnyway,
+                  (false, false) => 'Remove',
+                },
                 style: _buttonLabelStyle.copyWith(
                   color: colors.button.destructive.label,
                 ),

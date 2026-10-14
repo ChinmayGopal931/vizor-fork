@@ -25,6 +25,7 @@ import 'package:zcash_wallet/src/features/accounts/widgets/mobile/account_edit_s
 import 'package:zcash_wallet/src/features/migration/providers/ironwood_migration_coordinator_provider.dart';
 import 'package:zcash_wallet/src/features/payment_links/services/payment_link_received_store.dart';
 import 'package:zcash_wallet/src/features/payment_links/services/payment_link_recovery_reconciler.dart';
+import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/biometric_unlock_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
@@ -178,6 +179,7 @@ class _FakeAccountNotifier extends AccountNotifier {
   Future<void> removeAccount(
     String uuid, {
     int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
   }) async {
     if (removeError case final error?) throw error;
     confirmedUnsharedGiftCardCounts.add(confirmedUnsharedGiftCardCount);
@@ -202,7 +204,10 @@ class _FakeAccountNotifier extends AccountNotifier {
   }
 
   @override
-  Future<void> resetWallet({int? confirmedUnsharedGiftCardCount}) async {
+  Future<void> resetWallet({
+    int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
+  }) async {
     confirmedUnsharedGiftCardCounts.add(confirmedUnsharedGiftCardCount);
     beforeRemove?.call(confirmedUnsharedGiftCardCount);
     resetCount += 1;
@@ -1395,6 +1400,73 @@ void main() {
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(find.byType(MobileAccountRemovalSheet), findsNothing);
+  });
+
+  for (final isLastAccount in [false, true]) {
+    testWidgets('removal warns with the private USD conversions under way '
+        '(lastAccount: $isLastAccount)', (tester) async {
+      tester.view
+        ..physicalSize = const Size(393, 852)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) =>
+              AppTheme(data: AppThemeData.dark, child: child!),
+          home: Scaffold(
+            body: MobileAccountRemovalSheet(
+              account: _account('a', 'Knight'),
+              isLastAccount: isLastAccount,
+              hasActiveMigration: false,
+              unsharedGiftCardCount: 0,
+              privateUsdUnfinishedCount: 2,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text(PrivateUsdCopy.deleteUnfinishedTitle), findsOneWidget);
+      expect(
+        find.text(
+          isLastAccount
+              ? PrivateUsdCopy.resetUnfinishedBody(2)
+              : PrivateUsdCopy.deleteUnfinishedBody(2),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          isLastAccount
+              ? PrivateUsdCopy.resetAnyway
+              : PrivateUsdCopy.deleteAnyway,
+        ),
+        findsOneWidget,
+      );
+    });
+  }
+
+  testWidgets('removal has no conversion warning without one under way', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) =>
+            AppTheme(data: AppThemeData.dark, child: child!),
+        home: Scaffold(
+          body: MobileAccountRemovalSheet(
+            account: _account('a', 'Knight'),
+            isLastAccount: false,
+            hasActiveMigration: false,
+            unsharedGiftCardCount: 0,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text(PrivateUsdCopy.deleteUnfinishedTitle), findsNothing);
+    expect(find.text('Remove'), findsOneWidget);
   });
 
   testWidgets('remove explains what happens to an active migration', (

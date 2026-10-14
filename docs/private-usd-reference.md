@@ -567,6 +567,7 @@ pub(crate) fn delete_account(store_dir, network, account) -> Result<()>;   // dr
 - `pause()` (lock, hide, quiesce): bump the epoch, `private_usd_cancel(currentOpId)`, stop the nap timer. On lock also `private_usd_clear_sessions()`, close the Railgun page (M3) and clear the problem timers.
 - Problem timing (§5.8): track `failingSince` per `(account, direction, index)`; show `problem` only when `now − failingSince ≥ 60 s`; clear on any success. `ZcashSyncing` is a wait, never a problem.
 - After a forward record ends: `private_usd_tokens_issuance_*` prefetch (M4 service).
+- As built (M5, progress D-51): the loop idles with no timer while nothing is under way, and accept, a progress screen opening, unlock and the foreground start it. It naps the shortest `next_poll_ms` of a pass (at least 1 s), 15 s after a failed step or `Busy`, 30 s when listing failed. Only advances and accept drop a result that lands after a pause; a quote or a call-off that finished in Rust is still shown. The lifecycle and lock listeners live in `privateUsdEngineProvider`; `PrivateUsdEngineHost` only keeps it alive.
 
 ### 5.11 End-to-end walk (who does what; crash, kill and lock at each step)
 
@@ -1473,10 +1474,11 @@ pub fn private_usd_send_settle_all(store_dir: String, network: String, eth_rpc_u
 
 - **Where.** `removeAccount` → `_removeAccount` (`account_provider.dart:1638-1681`; public wrapper `:1596`) drains each lifecycle in turn: `ledgerOperationLifecycle`, `publicDetailsLoads`, `giftCardTrackingLifecycle`, `paymentLinkClaimLifecycleRegistry`, `votingShareTrackingRegistry`. It resumes them in `finally`. `_removeAccountWithShareTrackingStopped` (`:1683-1843`) then deletes the Rust account (`rust_wallet.deleteAccount`) and the sidecars: mnemonic, swap activity (`:1758-1763`), Gift Card drafts and voting state.
 - **Add, in this order:**
-  1. **Refuse while unfinished.** Before the drain, refuse with a typed exception, as `PaymentLinkInFlightClaimsException` does (count `:1691-1693`, throw `:1694-1699`), if the account has an unfinished conversion or a held reverse escrow, unless the user confirmed. Funds may sit in a joint account or escrow that only this seed and index can recover (§3.4). Surface the count in `accounts_screen.dart` next to `swapPendingIntentCountProvider` (`:326`).
+  1. **Refuse while unfinished.** Refuse with a typed exception, as `PaymentLinkInFlightClaimsException` does (count `:1691-1693`, throw `:1694-1699`), if the account has an unfinished conversion or a held reverse escrow, unless the user confirmed. Funds may sit in a joint account or escrow that only this seed and index can recover (§3.4). As built (M5, progress D-53): `removeAccount(uuid, confirmedPrivateUsdUnfinishedCount:)` throws `PrivateUsdUnfinishedConversionsException(count)` when more are under way than the user confirmed; it counts **after** the drain, like the Gift Card recheck, so a conversion that started meanwhile is counted, and an unreadable store never blocks. The count shows in the mobile removal sheet (`MobileAccountRemovalSheet` in `mobile_accounts_screen.dart`) and the forgot-passcode sheet; the desktop `accounts_screen.dart` and `settings_uninstall_screen.dart` are desktop-only and Private USD is mobile-only, so they have none.
   2. **Drain.** Add a `privateUsdLifecycleProvider` drained with the others. Model it on `PublicDetailsLoads` (`lib/src/providers/public_details_loads_provider.dart`: `run` / `cancel` / `quiesceAndDrain` / `resume`, register before the first async step) or on `GiftCardTrackingLifecycle` (`features/payment_links/providers/gift_card_tracking_lifecycle_provider.dart`, which fences even before the service is instantiated). Railgun sends hold the same lease until their proved bytes are persisted (§6.7).
      - **Exact place.** `_removeAccount` reads the five lifecycles at `account_provider.dart:1650-1654`, then drains in order `ledgerLifecycle`, `publicLoads`, `_storage.invalidatePendingSecretOperations()`, `giftTracking`, `claimLifecycle`, `shareTracking(accountUuid:)`, and resumes them all in `finally`. Read `privateUsdLifecycleProvider` with the others, `await privateUsd.quiesceAndDrain()` right after `claimLifecycle`, and `privateUsd.resume()` in `finally`. `_resetWallet` has the same order but resumes conditionally (`resetCompleted || restoreAfterFailure`); resume Private USD under the same condition as `claimLifecycle`.
      - `quiesceAndDrain` = stop starting steps, `private_usd_cancel` the in-flight op, await it (bounded, 30 s), close the Railgun page. `resume` = restart the loop if `allowed()`.
+     - As built (M5): `PrivateUsdLifecycle` also answers `unfinishedCount(accountUuids)` and runs `deleteAccountConversions(uuid)` (asking again up to three times on `Busy`), over the `PrivateUsdSwapBackend` it is given; builds without the define give none, so desktop never looks.
   3. **Clean up after the Rust delete succeeds** (best-effort, logged, like the other sidecars):
      - `private_usd_delete_account(store_dir, network, uuid)`: its rows in `swaps.db` (§3.4) and its live joint accounts in `joint.db` (through `rust/src/wallet/keys.rs:1033` `delete_account`)
      - delete its Railgun engine key `vizor_railgun_encryption_key_{uuid}`
@@ -1811,7 +1813,8 @@ services/
   railgun_host_channel.dart, railgun_engine.dart, railgun_engine_key_store.dart       [M3]
   private_usd_balance_repository.dart, private_usd_balance_cache.dart                 [M3]
   private_usd_attestation.dart, private_usd_tokens_service.dart                       [M4]
-  private_usd_paths.dart                    [M4/M5] storeDir(network), tokensPath(network) over wallet_paths.dart; M3 added getPrivateUsdDirPath, getPrivateUsdTokenStorePath, deletePrivateUsdDirectories and deletePrivateUsdTokenStores there (D-26)
+  private_usd_paths.dart                    [M4/M5] storeDir(network), existingStoreDir(network) (never creates; M5 added getExistingPrivateUsdDirPath), tokensPath(network) over wallet_paths.dart; M3 added getPrivateUsdDirPath, getPrivateUsdTokenStorePath, deletePrivateUsdDirectories and deletePrivateUsdTokenStores there (D-26)
+  private_usd_swap_backend.dart             [M5] PrivateUsdSwapBackend: the FRB calls with this wallet's context; key-using calls take a PrivateUsdSecretReader (read the seed last, zero it once Rust copied it) (D-51)
   private_usd_account_data.dart             [M3] deletePrivateUsdAccountData(storage, uuid): the engine key and the balance cache
   private_usd_engine.dart                   [M5] class PrivateUsdEngine {
                                                 start(); pause(PauseReason); resume(); nudge();
@@ -1827,7 +1830,7 @@ providers/
   railgun_engine_provider.dart              [M3] railgunEngineProvider (kept alive; registers with privateUsdLifecycleProvider; closes on lock, account switch, route change), railgunEngineStateProvider, RustRailgunWalletSource
   private_usd_receive_address_provider.dart [M3] FutureProvider.autoDispose.family<String, String> (Rust-derived; unlocked only)
   private_usd_engine_provider.dart          [M5] Provider<PrivateUsdEngine> (keepAlive; registers with privateUsdLifecycleProvider)
-  private_usd_unfinished_provider.dart      [M5] NotifierProvider<…, Set<PrivateUsdRecordKey>> (sync; the router reads it)
+  private_usd_unfinished_provider.dart      [M5] NotifierProvider<…, Set<PrivateUsdRecordKey>> (sync; the router reads it; notifies only when the set changes), plus privateUsdConversionsProvider (the engine's snapshot, Map<PrivateUsdRecordKey, PrivateUsdConversionStatus>) and the deletion/reset counts privateUsdUnfinishedCountProvider(uuid), privateUsdUnfinishedTotalProvider
   private_usd_conversion_provider.dart      [M5] NotifierProvider.family<…, PrivateUsdConversionState, PrivateUsdRecordKey>
                                                  // {record, wait, activity, problem (after 60 s), resuming, busy}; actions: retryNow, callOff, pay, authorizeReady, cancel
   private_usd_conversion_banner_provider.dart [M5] Provider.family<PrivateUsdBannerState?, String>
@@ -1841,7 +1844,7 @@ providers/
 screens/mobile/  mobile_private_usd_{,convert_,convert_review_,conversion_,refunds_,send_,send_review_,send_status_}screen.dart
 widgets/mobile/  private_usd_home_strip.dart, private_usd_banner.dart, private_usd_amount_step.dart, private_usd_info_sheets.dart, private_usd_confirm_sheets.dart
 lib/src/providers/private_usd_lifecycle_provider.dart   [M3] register / quiesceAndDrain / resume (GiftCardTrackingLifecycle shape, several owners) + wipeRailgunPage for a reset; M5 registers the swap engine (run / cancel)
-lib/src/core/widgets/mobile/private_usd_engine_host.dart [M5] ConsumerStatefulWidget; watches privateUsdEngineProvider when available; AppLifecycleListener → engine.pause/resume
+lib/src/core/widgets/mobile/private_usd_engine_host.dart [M5] ConsumerWidget; watches privateUsdEngineProvider when privateUsdEngineEnabledProvider (define, mobile, Android, a deployment; not the kill switch or the active account). As built (D-51) the AppLifecycleListener and the lock listener live in privateUsdEngineProvider (Gift Card's shape)
 ```
 
 The home strip and banner widgets are passed into `_BalanceCard` and the home `ListView` from `mobile_home_screen.dart` (§8.3); they are separate files so `mobile_home_screen.dart` grows only by the wiring.

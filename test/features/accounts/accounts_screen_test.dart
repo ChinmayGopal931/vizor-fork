@@ -1921,6 +1921,7 @@ class _FakeAccountNotifier extends AccountNotifier {
   Future<void> removeAccount(
     String uuid, {
     int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
   }) async {
     events?.add('remove:$uuid');
     confirmedUnsharedGiftCardCounts.add(confirmedUnsharedGiftCardCount);
@@ -1949,7 +1950,10 @@ class _FakeAccountNotifier extends AccountNotifier {
   }
 
   @override
-  Future<void> resetWallet({int? confirmedUnsharedGiftCardCount}) async {
+  Future<void> resetWallet({
+    int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
+  }) async {
     events?.add('resetWallet');
     final error = resetError;
     if (error != null) {
