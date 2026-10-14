@@ -70,7 +70,7 @@ way when the file runs alone.
 
 ## M1. Rust foundations
 
-- [ ] M1.1 `rust/Cargo.toml` dependency lines (zecSwap crates, `hmac`, `sha3`, `bech32`)
+- [ ] M1.1 `rust/Cargo.toml` dependency lines (`zecswap-core`, `zecswap-railgun`, `hmac`, `sha3`, `bech32`; not `zecswap-tokens`, N1)
 - [ ] M1.2 `private_usd/mod.rs`: module tree and `PrivateUsdNetwork`
 - [ ] M1.3 `deployment.rs`: §7.1 pins and §7.2 constants, including the 2,000,000 fee cap
 - [ ] M1.4 `railgun_keys.rs`: BIP-85 and the Railgun key chain (§3.3)
@@ -199,6 +199,13 @@ way when the file runs alone.
 - **Testing emphasis (owner, 2026-10-13):** invest in end-to-end and device
   tests over unit tests. Keep unit tests to known-answer vectors and
   correctness or security checks.
+- **D-6 (owner request, 2026-10-13): the plan was restructured.**
+  `docs/private-usd-android-plan.md` is now the lean plan: decisions,
+  deliverables, architecture, milestones and tests. Each milestone has Goal,
+  Needs, Inputs, Tasks, Done when and Traps; only non-obvious traps are kept.
+  M0 is collapsed to its results, and testing is E2E-first. The reference
+  sections §5–§9 and §12 moved verbatim to `docs/private-usd-reference.md`,
+  with the same numbers. Device E2E helpers are in `scripts/private-usd/`.
 - **Local build setting:** all Rust builds here use
   `CARGO_PROFILE_DEV_DEBUG=0` (no debug info) so the target directory fits the
   free disk. No repo file changes.

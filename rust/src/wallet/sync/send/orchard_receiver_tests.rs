@@ -5,7 +5,7 @@
 //! receiver, the swap's sweep is an Ironwood spend (only Ironwood allows the
 //! cross-address transfer it needs), and the deposit lookup matches
 //! `sent_notes.to_address` against the joint UA
-//! (`docs/private-usd-android-plan.md` §5.1, §8.1.2, spike M0.2).
+//! (`docs/private-usd-reference.md` §5.1, §8.1.2; plan M0).
 
 use std::convert::Infallible;
 
