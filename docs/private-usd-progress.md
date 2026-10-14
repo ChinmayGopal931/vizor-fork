@@ -170,10 +170,10 @@ the batched E2E round and the owner's go-ahead.
 
 ## M3. Railgun host, Tor bridge, availability and the read-only balance
 
-- [ ] M3.1 Bundle (§8.7 commands 1, 2, 5 and the `build.mjs` edit)
-- [ ] M3.2 Kotlin host in `android/app/src/main/kotlin/com/keplr/vizor/railgun/`
-- [ ] M3.3 Gradle and manifest
-- [ ] M3.4 Rust bridge `rust/src/railgun_bridge.rs` for real
+- [x] M3.1 Bundle (§8.7 commands 1, 2, 5 and the `build.mjs` edit; zapp's bundle, no rebuild: E5, D-15)
+- [x] M3.2 Kotlin host in `android/app/src/main/kotlin/com/keplr/vizor/railgun/` (D-16)
+- [x] M3.3 Gradle and manifest
+- [x] M3.4 Rust bridge `rust/src/railgun_bridge.rs` for real (D-17; E4 stand-in, D-18)
 - [ ] M3.5 Dart, Railgun side
 - [ ] M3.6 Dart, balance repository, cache and provider
 - [ ] M3.7 Availability
@@ -184,6 +184,97 @@ the batched E2E round and the owner's go-ahead.
 - [ ] M3.12 Widgetbook and capture scenarios (home, `/private-usd`)
 - [ ] M3.13 Kotlin tests (`RailgunBoundaryTest`, `RailgunChannelTest`, `RailgunProtocolTest`)
 - [ ] M3 gate
+
+M3 part 1 status (2026-10-13): M3.1–M3.4, the native layer, are done. Part 2
+(M3.5–M3.13: the Dart services, balance, availability, UI, copy, Widgetbook
+and the Kotlin tests) is next; the M3 gate and its device checks wait for it.
+
+- **What landed.**
+  - `android/railgun-web/`: zapp's JS source, lockfile, build script, stubs
+    and dev tests, plus `COPYING` (GPL-3.0). `android/app/src/main/assets/railgun/`:
+    zapp's bundle, plus `COPYING`. `.gitignore` keeps
+    `/android/railgun-web/node_modules/` out.
+  - `android/app/src/main/kotlin/com/keplr/vizor/railgun/`:
+    `RailgunWebViewHost`, `RailgunChannel`, `RailgunProtocol`,
+    `RailgunEndpoints`, `RailgunException` and `RailgunHostHandler`,
+    registered in `MainActivity`. `onDestroy` unbinds it and closes the page
+    only when the Activity is finishing.
+  - Gradle: `androidx.webkit:webkit:1.17.1`,
+    `kotlinx-coroutines-android:1.10.2`, and the test dependency
+    `kotlin-test-junit:2.2.20`. `data_extraction_rules.xml` excludes
+    `root/app_webview` from cloud backup and device transfer.
+  - Rust: `rust/src/railgun_bridge.rs`, the tokio `AsyncRead`/`AsyncWrite`
+    for `DirectRouteIo`, and the two FRB calls in
+    `rust/src/api/network_privacy.rs`. The `tokio` line names `net`,
+    `io-util` and `time`.
+- **Tests.**
+  - Rust: `cd rust && cargo test` passes: lib 1459 passed, 0 failed, 11
+    ignored; integration 6 passed, 21 ignored (regtest). The 9 new tests are
+    the bridge's: the spike's 8 (one ignored, the real-Tor tunnel, not run
+    here) and the 9-host pinning test. The tests that flip the route take
+    `lock_route_policy()`.
+  - The full run after the bindings were regenerated hit the known Gift Card
+    isolation gap (M1 status) once:
+    `gift_card_input::tests::recovery::receipt_recovery_preserves_retained_reservations_until_their_expiry`
+    failed with "network privacy blocked lightwalletd: Tor connection
+    failed", a route test's state. Alone it passed, and the next full run
+    passed (the numbers above). It did not recur, so the Gift Card tests
+    still do not take the lock.
+  - Dart: `fvm flutter analyze` finds no issues. `fvm flutter test`: 5896
+    passed, 158 skipped, 4 failed, the 4 pre-existing failures in
+    `settings_seed_phrase_screen_test.dart` (the `AppButton` "Enter amount"
+    finder at test line 159).
+  - Bindings: `lib/src/rust/api/network_privacy.dart` gains the two bridge
+    calls. The codegen's rustc 1.93 noise was reverted as in M1 (the
+    comment-only changes in `network_privacy.dart`, `private_usd.dart`,
+    `sync.dart`, `voting.dart`, `voting_session.dart` and
+    `third_party/zcash_voting/wire.dart`, and the import-group blank lines in
+    `frb_generated{,.io,.web}.dart`).
+  - Kotlin: `cd android && ./gradlew :app:compileDebugKotlin` builds
+    (`BUILD SUCCESSFUL`, no Kotlin warnings in the new files); it runs no
+    cargokit task. The Kotlin unit tests are M3.13.
+  - No device or E2E run in part 1: the M3 device checks are batched for the
+    next device round.
+- **For part 2.**
+  - FRB (`lib/src/rust/api/network_privacy.dart`):
+    `Future<int> startRailgunBridge()` and `Future<void> stopRailgunBridge()`.
+    Start is idempotent (it returns the running bridge's port), can wait up
+    to 3 minutes for a Tor bootstrap, and throws the route's message (a
+    `String`) when Tor failed or is unavailable. Stop is idempotent.
+  - `MethodChannel('com.zcash.wallet/railgun')`: `load({proxyPort: int,
+    debug: bool})` → `null`; `call({method: String, paramsJson: String})` →
+    the result as raw JSON `String`; `close()` and `wipe()` → `null`;
+    `isOpen()` → `bool`. Errors are `PlatformException` with code `CLOSED`,
+    `TIMEOUT`, `UNAVAILABLE`, `PROTOCOL`, `FAILED` or `BAD_ARGS`
+    (reference §6.2).
+  - `EventChannel('com.zcash.wallet/railgun/events')`: each event is the
+    page's raw `{event, data}` JSON as a `String`: `scan` and `proof`, and
+    `log` only from a page loaded with `debug` in a debug build.
+  - Where the engine calls the bridge:
+    - open: `startRailgunBridge()`, then `load` on its port, then `start`,
+      `openWallet` and the address check
+    - every close (lock, the 10-minute idle close, an account switch,
+      `forget`): `close`, then `stopRailgunBridge()`. A running bridge is a
+      no-auth loopback proxy, so it runs only while a page is open.
+    - a route change (`ref.listen(networkPrivacyProvider…)`): `close`, then
+      `stopRailgunBridge()`; the next use reopens, on a new bridge
+    - reset: `wipe`, then `stopRailgunBridge()`
+    - when the engine is first built in a process: `close` and
+      `stopRailgunBridge()` once. The page and the bridge can outlive a
+      Flutter engine whose Activity Android destroyed without finishing.
+  - Never log `paramsJson`, a result or a `FAILED` message: ethers errors can
+    quote the keyed RPC URL. Redact it before showing a message.
+  - The bundle is still zapp's (E5 open): no `deleteWallet`, so an account
+    deletion drops only the engine key and the cache.
+  - For the Kotlin test port (M3.13): `RailgunChannel(post, onEvent)` takes
+    `(RailgunProtocol.Message.Event) -> Unit`; `Message.Event(name, raw)`;
+    `RailgunEndpoints.hosts` and `POI_NODE_URL` are `internal`;
+    `RailgunRequests.route(scheme, host, port)` is unchanged. The page files
+    are at `../railgun-web/src/` and `src/main/assets/railgun/` from
+    `android/app`.
+  - The spike's device harness `lib/railgun_spike_main.dart` is not on this
+    branch. Plan §10 keeps it as a debug entrypoint; it fits once
+    `railgun_host_channel.dart` (M3.5) exists.
 
 ## M4. Privacy Pass tokens and attestation
 
@@ -393,6 +484,69 @@ the batched E2E round and the owner's go-ahead.
     a sender-OVK control on the deposit, U5 (one compact signature), U8 (the
     sweep's sent row), U7 (the joint sync resubmits the pending sweep) and the
     sweep arriving home.
+- **D-15 (M3.1): the bundle copy.** Reference §8.7 updated.
+  - The bundle is zapp's, copied blind with §8.7 command 2; its five files
+    are byte-identical to the spike's. E5 is not delivered, so nothing was
+    rebuilt and `npm` never ran: `INIT` stays `zapp-railgun-init`,
+    `WALLET_SOURCE` stays `'zapp'`, and the page has no `deleteWallet`.
+  - The GPL-3.0 text (the canonical 35,147-byte `COPYING`, md5
+    `d32239bcb673463ab874e80d47fae504`, copied from a local GNU package) is
+    `android/railgun-web/COPYING`. It is also placed by hand as
+    `android/app/src/main/assets/railgun/COPYING`, which is where the edited
+    `build.mjs` copies it on a rebuild.
+  - `dev/check.mjs` (the desktop smoke test) needed the same path move as
+    `build.mjs`: `ASSETS` → `../app/src/main/assets/railgun` and
+    `LOCAL_PROPERTIES` → `../local.properties` (`android/local.properties`,
+    gitignored).
+  - `package.json` keeps `"license": "AGPL-3.0-only"` until E2.
+- **D-16 (M3.2): the Kotlin host as built differs from the spike and from
+  reference §6.2 and §8.7 in these places.** Both sections updated.
+  - `load`'s `debug` argument is honoured; the spike ignored it and used
+    `BuildConfig.DEBUG`. Kotlin ANDs it with `BuildConfig.DEBUG`, so a release
+    build never debugs the page.
+  - The page sends `log` events without `debug` too (`wallet.js:123`, a failed
+    screening refresh), so the host drops page `log` events unless the page
+    was loaded with `debug`. To allow that, `RailgunProtocol.Message.Event`
+    carries the event name, and `RailgunChannel`'s `onEvent` takes the
+    `Message.Event` rather than a `String`.
+  - `close` and `wipe` lift the proxy override even when no page is open. The
+    host records whether it set one, so a close with nothing to lift never
+    loads the WebView package (Dart may close on every lock).
+  - The wait for the proxy override is bounded at 10 s (`TIMEOUT`), and a page
+    closed while its override was pending no longer calls `loadUrl` on a
+    destroyed WebView.
+  - A call whose coroutine is cancelled is answered `CLOSED`; in the spike it
+    was never answered.
+  - `RailgunEndpoints` is `internal` and lists its hosts as literals (the Rust
+    pinning test reads them); the spike's unused `SEPOLIA_RPC_URL` and
+    `MAINNET_RPC_URL` are gone.
+  - The handler exposes `handle(call, result)`, like vizor's other handlers,
+    instead of implementing `MethodCallHandler`.
+  - The debug-only page method `openNewWallet` is not in `RailgunMethod`, so
+    `call` refuses it with `BAD_ARGS`.
+- **D-17 (M3.4): the bridge as built.** Reference §6.8 and §8.2 updated.
+  - The SOCKS5 handshake is the spike's own RFC 1928 parser, not
+    `tor-socksproto`'s `SocksProxyHandshake`. The bridge needs only a no-auth
+    `CONNECT` to a domain name; the parser refuses everything else, and
+    `tor-socksproto` stays transitive. It ran on the device in M0.
+  - The route is resolved once, in `start()`, waiting out a bootstrap (up to
+    3 minutes), not per connection. Each connection only checks that the
+    route still matches the bridge's, and is refused otherwise.
+  - Logging is down to "started", "stopped" and an accept failure. The
+    spike's per-tunnel lines, its byte counters (`Counted`, `TRAFFIC`,
+    `log_traffic`) and its open-tunnel count are gone.
+  - The 9-host pinning test that D-7 moved here is
+    `railgun_bridge::tests::the_page_hosts_match_the_kotlin_filter_and_the_page_csp`.
+    It reads `RailgunEndpoints.kt` and both `index.html` files through
+    `CARGO_MANIFEST_DIR/../android`, so `cargo test` needs the whole
+    repository, as CI has.
+- **D-18 (M3.4): the E4 stand-in is on this branch now, not only on the
+  spike.** All ten wallet-libraries references in `rust/Cargo.toml` (the
+  eight `[patch.crates-io]` entries and both `zakura-pir-transparent`
+  entries) are paths into `~/dev/wallet-libraries-e4`, under a do-not-merge
+  comment. `rust/Cargo.lock` follows: its nine wallet-libraries packages lost
+  their git `source` lines. Local only (B-6): before anything is pushed, all
+  ten go back to git refs on the owner's fork rev with the patch (E4, D13).
 
 ## Blocked
 
@@ -429,4 +583,7 @@ the batched E2E round and the owner's go-ahead.
   diff; zecSwap has no LICENSE yet) and `~/dev/wallet-libraries-e4` (`391d0b0`
   plus the §6.8 `connect_stream` patch). Nothing built on them, and nothing
   ported from zapp, may be pushed or merged; the M0.3 spike lives on the local
-  branch `spike/private-usd-m0`.
+  branch `spike/private-usd-m0`. Since M3 this branch depends on both through
+  `rust/Cargo.toml` paths (D-18), and carries zapp's Railgun bundle, JS source
+  and the ported Kotlin host, so `feature/private-usd-android` stays local
+  until E1, E2 and E4 land.

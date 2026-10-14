@@ -108,6 +108,23 @@ pub async fn stop_tor_update_relay() {
     crate::tor_update_relay::stop().await;
 }
 
+/// Starts the loopback SOCKS5 bridge the Private USD Railgun page is proxied
+/// through, or returns the running bridge's port. It serves only `CONNECT` to
+/// the page's hosts on port 443, over the route it started on. Fails closed
+/// while Tor is on but not usable (after waiting out a bootstrap).
+///
+/// On every route change, close the page, then [`stop_railgun_bridge`], then
+/// start a new bridge and load the page on its port: Chromium keeps pooled
+/// tunnels otherwise, and a bridge whose route changed refuses new ones.
+pub async fn start_railgun_bridge() -> Result<u16, String> {
+    crate::railgun_bridge::start().await
+}
+
+/// Stops the Railgun bridge and closes the page's tunnels. Idempotent.
+pub async fn stop_railgun_bridge() {
+    crate::railgun_bridge::stop().await;
+}
+
 pub struct ImportBirthdayMetadata {
     pub sapling_activation_height: u64,
     pub sapling_activation_time: u32,

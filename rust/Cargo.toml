@@ -50,7 +50,7 @@ sha2 = "0.10"
 rand = "0.8"
 
 # Async runtime & gRPC
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "net", "io-util", "time"] }
 futures = "0.3"
 tonic = { version = "0.14", features = ["channel", "tls-webpki-roots", "tls-ring"] }
 bytes = "1"
@@ -181,8 +181,7 @@ features = ["wallet"]
 # Transparent PIR recovery adapter. A git dependency rather than a patched
 # crates.io package; see the `[patch.crates-io]` comment below.
 [dependencies.zakura-pir-transparent]
-git = "https://github.com/zakura-core/wallet-libraries"
-rev = "391d0b0247f0e07cfdea855ce87fcdf8ba376aae"
+path = "../../wallet-libraries-e4/zakura/pir-transparent"   # local E4 stand-in; see [patch.crates-io]
 default-features = false
 # `sqlite` applies a batch to the wallet and acknowledges it in one call.
 features = ["sqlite"]
@@ -233,8 +232,7 @@ features = ["test-fixtures"]
 # process, with the wallet-pir crates it publishes with. Same rev as the
 # dependency above.
 [dev-dependencies.zakura-pir-transparent]
-git = "https://github.com/zakura-core/wallet-libraries"
-rev = "391d0b0247f0e07cfdea855ce87fcdf8ba376aae"
+path = "../../wallet-libraries-e4/zakura/pir-transparent"   # local E4 stand-in; see [patch.crates-io]
 default-features = false
 features = ["sqlite", "testing"]
 
@@ -301,15 +299,23 @@ assertions_on_constants = "allow"
 # The status response hook also needs its status/native path dependencies here
 # so their public types stay unified. Keep every wallet-libraries dependency at
 # this exact revision.
+#
+# LOCAL E4 STAND-IN, DO NOT MERGE (docs/private-usd-progress.md B-6). Every
+# wallet-libraries reference (these eight and both `zakura-pir-transparent`
+# entries) points at ~/dev/wallet-libraries-e4: wallet-libraries at
+# 391d0b0247f0e07cfdea855ce87fcdf8ba376aae plus the `connect_stream` patch the
+# Railgun bridge needs (docs/private-usd-reference.md §6.8). Before anything
+# here is pushed, point all ten back at `git = "https://github.com/...` refs
+# on the owner's fork rev that carries the patch (E4, D13).
 [patch.crates-io]
-zakura-client-backend = { git = "https://github.com/zakura-core/wallet-libraries", rev = "391d0b0247f0e07cfdea855ce87fcdf8ba376aae" }
-zakura-client-sqlite = { git = "https://github.com/zakura-core/wallet-libraries", rev = "391d0b0247f0e07cfdea855ce87fcdf8ba376aae" }
-zakura-pczt = { git = "https://github.com/zakura-core/wallet-libraries", rev = "391d0b0247f0e07cfdea855ce87fcdf8ba376aae" }
-zakura-pir-enhance-types = { git = "https://github.com/zakura-core/wallet-libraries", rev = "391d0b0247f0e07cfdea855ce87fcdf8ba376aae" }
-zakura-transaction-status = { git = "https://github.com/zakura-core/wallet-libraries", rev = "391d0b0247f0e07cfdea855ce87fcdf8ba376aae" }
-zakura-pir-status = { git = "https://github.com/zakura-core/wallet-libraries", rev = "391d0b0247f0e07cfdea855ce87fcdf8ba376aae" }
-zakura-pir-native = { git = "https://github.com/zakura-core/wallet-libraries", rev = "391d0b0247f0e07cfdea855ce87fcdf8ba376aae" }
-zakura-pir-enhance = { git = "https://github.com/zakura-core/wallet-libraries", rev = "391d0b0247f0e07cfdea855ce87fcdf8ba376aae" }
+zakura-client-backend = { path = "../../wallet-libraries-e4/librustzcash/zcash_client_backend" }
+zakura-client-sqlite = { path = "../../wallet-libraries-e4/librustzcash/zcash_client_sqlite" }
+zakura-pczt = { path = "../../wallet-libraries-e4/librustzcash/pczt" }
+zakura-pir-enhance-types = { path = "../../wallet-libraries-e4/zakura/pir-enhance-types" }
+zakura-transaction-status = { path = "../../wallet-libraries-e4/zakura/transaction-status" }
+zakura-pir-status = { path = "../../wallet-libraries-e4/zakura/pir-status" }
+zakura-pir-native = { path = "../../wallet-libraries-e4/zakura/pir-native" }
+zakura-pir-enhance = { path = "../../wallet-libraries-e4/zakura/pir-enhance" }
 
 # Local Zakura build of zecswap-core until E1 lands. Do not merge: drop this
 # once the zecSwap rev above carries the Zakura manifest.

@@ -12,6 +12,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.security.MessageDigest
 import io.flutter.plugin.common.EventChannel
+import com.keplr.vizor.railgun.RailgunHostHandler
 
 // FlutterFragmentActivity: BiometricPrompt requires a FragmentActivity host.
 class MainActivity : FlutterFragmentActivity() {
@@ -93,6 +94,7 @@ class MainActivity : FlutterFragmentActivity() {
         )
     }
     private lateinit var ledgerMobileHandler: LedgerMobileHandler
+    private lateinit var railgunHostHandler: RailgunHostHandler
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -159,6 +161,18 @@ class MainActivity : FlutterFragmentActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             LedgerMobileHandler.EVENT_CHANNEL
         ).setStreamHandler(ledgerMobileHandler)
+        // Private USD: the Railgun page. The host is process-wide; this only binds the channels.
+        railgunHostHandler = RailgunHostHandler(this, BuildConfig.DEBUG)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            RailgunHostHandler.CHANNEL
+        ).setMethodCallHandler { call, result ->
+            railgunHostHandler.handle(call, result)
+        }
+        EventChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            RailgunHostHandler.EVENT_CHANNEL
+        ).setStreamHandler(railgunHostHandler)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             CAMERA_PERMISSION_CHANNEL
@@ -328,6 +342,8 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun onDestroy() {
         if (::ledgerMobileHandler.isInitialized) ledgerMobileHandler.close()
+        // The page survives recreation; only a finishing Activity closes it.
+        if (::railgunHostHandler.isInitialized) railgunHostHandler.dispose(isFinishing)
         super.onDestroy()
     }
 

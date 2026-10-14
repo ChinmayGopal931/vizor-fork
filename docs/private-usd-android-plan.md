@@ -8,7 +8,7 @@
 
 **Scope.** Android, mobile form factor (`--dart-define=VIZOR_FORM_FACTOR=mobile`). iOS and desktop come later, so keep the Rust engine, the Dart models and the JS bundle platform-neutral. iOS then needs only a Swift `WKWebView` host and an attestation channel.
 
-**Status (2026-10-13).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is done except its regtest run (M2.7b), which waits for the batched E2E round and the owner's go-ahead. M3 is next. Progress lives in `docs/private-usd-progress.md`.
+**Status (2026-10-13).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is done except its regtest run (M2.7b), which waits for the batched E2E round and the owner's go-ahead. M3 part 1 (tasks 1–4, the native layer: bundle, Kotlin host, Gradle and manifest, Rust bridge) is done; part 2 (tasks 5–13) is next. Progress lives in `docs/private-usd-progress.md`.
 
 **Two files.** This file holds the decisions, the architecture, the work and the test strategy. The reference sections §5–§9 and §12 live in `docs/private-usd-reference.md`, with the same numbers:
 
@@ -58,7 +58,7 @@ A pointer such as "§5.5" means that file. Open a reference section only when a 
 **Local stand-ins until the owner delivers.** These must never be pushed:
 
 - E1: `~/dev/zapp/zecSwap-zakura`, a detached worktree at `d69e3fb` with the §12 Zakura diff, referenced through a `[patch]`.
-- E4: `~/dev/wallet-libraries-e4`, rev `391d0b0` plus `connect_stream`, referenced only on the spike branch.
+- E4: `~/dev/wallet-libraries-e4`, rev `391d0b0` plus `connect_stream`. Since M3 every wallet-libraries reference in `rust/Cargo.toml` (the eight `[patch.crates-io]` entries and both `zakura-pir-transparent` entries) is a path into it, marked do-not-merge (B-6).
 - The M0 spike code is on the local branch `spike/private-usd-m0`: the bridge, the Kotlin host, `RailgunHostHandler` and the device harness `lib/railgun_spike_main.dart`. M3 starts from it.
 
 **Path prefixes.** Unprefixed paths are in this repo (`main` at `4a859bee0`).
@@ -725,6 +725,7 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b, deferred to t
 **Traps.**
 
 - **Route change order.** Close the page, `stop_railgun_bridge()`, `start_railgun_bridge()` (a new port and a new isolated Tor client), then `load({proxyPort})`. Chromium keeps pooled sockets otherwise (U19).
+- **Stop the bridge with the page.** A running bridge is a no-auth loopback proxy that any app on the device can use, so stop it whenever the page closes (lock, idle, account switch, reset), not only on a route change. `startRailgunBridge()` can wait up to 3 minutes for a Tor bootstrap, and fails with the route's message when Tor failed.
 - **Return `true` from `onRenderProcessGone`,** or the app process dies with the renderer.
 - **WebView work happens on the main thread; port messages are decoded on the `railgun-page` thread.** A `MethodChannel` result is answered exactly once. EventChannel `success` is called only on the main thread.
 - **The proxy override is process-wide** and outlives a page close until cleared. Clear it in `close` and `wipe`; set it, and wait for it, in every `load`.

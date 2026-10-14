@@ -1,0 +1,36 @@
+{
+  "name": "zapp-railgun-web",
+  "private": true,
+  "description": "Railgun's wallet SDK, bundled for the hidden WebView in railgun-lib",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node dev/check.mjs",
+    "test": "node --test dev/*.test.mjs"
+  },
+  "dependencies": {
+    "@railgun-community/engine": "9.8.0",
+    "@railgun-community/shared-models": "8.2.0",
+    "@railgun-community/wallet": "11.1.0",
+    "buffer": "6.0.3",
+    "crypto-browserify": "3.12.0",
+    "ethers": "6.14.3",
+    "level-js": "6.1.0",
+    "process": "0.11.10",
+    "snarkjs": "0.7.6",
+    "stream-browserify": "3.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "puppeteer-core": "25.12.0",
+    "web3": "file:./stubs/web3"
+  },
+  "overrides": {
+    "axios": "1.20.0",
+    "bn.js@<4.12.3": "4.12.5",
+    "underscore": "1.13.8",
+    "web3": "$web3",
+    "ws@8": "8.21.3"
+  }
+}

@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1874174623;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -867313103;
 
 // Section: executor
 
@@ -8868,6 +8868,41 @@ fn wire__crate__api__sync__start_mempool_observer_impl(
         },
     )
 }
+fn wire__crate__api__network_privacy__start_railgun_bridge_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "start_railgun_bridge",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok = crate::api::network_privacy::start_railgun_bridge().await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__network_privacy__start_tor_update_relay_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -8932,6 +8967,43 @@ fn wire__crate__api__sync__stop_mempool_observer_impl(
                 })?;
                 Ok(output_ok)
             })())
+        },
+    )
+}
+fn wire__crate__api__network_privacy__stop_railgun_bridge_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "stop_railgun_bridge",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok({
+                            crate::api::network_privacy::stop_railgun_bridge().await;
+                        })?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
         },
     )
 }
@@ -15628,25 +15700,27 @@ fn pde_ffi_dispatcher_primary_impl(
 220 => wire__crate__api__sync__shutdown_signing_reservations_impl(port, ptr, rust_vec_len, data_len),
 221 => wire__crate__api__sync__start_full_sync_impl(port, ptr, rust_vec_len, data_len),
 222 => wire__crate__api__sync__start_mempool_observer_impl(port, ptr, rust_vec_len, data_len),
-223 => wire__crate__api__network_privacy__start_tor_update_relay_impl(port, ptr, rust_vec_len, data_len),
-225 => wire__crate__api__network_privacy__stop_tor_update_relay_impl(port, ptr, rust_vec_len, data_len),
-226 => wire__crate__api__sync__store_and_broadcast_pczts_with_keystone_signatures_for_proposal_impl(port, ptr, rust_vec_len, data_len),
-227 => wire__crate__api__sync__store_and_broadcast_signed_pczts_for_proposal_impl(port, ptr, rust_vec_len, data_len),
-228 => wire__crate__api__voting__store_keystone_signatures_batch_impl(port, ptr, rust_vec_len, data_len),
-229 => wire__crate__api__sync__suggest_scan_ranges_impl(port, ptr, rust_vec_len, data_len),
-230 => wire__crate__api__gift_card_tracking__sync_gift_card_observers_impl(port, ptr, rust_vec_len, data_len),
-231 => wire__crate__api__voting__sync_vote_tree_impl(port, ptr, rust_vec_len, data_len),
-234 => wire__crate__api__network_privacy__tor_http_download_impl(port, ptr, rust_vec_len, data_len),
-235 => wire__crate__api__network_privacy__tor_http_get_impl(port, ptr, rust_vec_len, data_len),
-236 => wire__crate__api__network_privacy__tor_http_post_impl(port, ptr, rust_vec_len, data_len),
-237 => wire__crate__api__voting__trusted_voting_round_params_from_config_impl(port, ptr, rust_vec_len, data_len),
-238 => wire__crate__api__sync__update_chain_tip_impl(port, ptr, rust_vec_len, data_len),
-239 => wire__crate__api__sync__validate_address_impl(port, ptr, rust_vec_len, data_len),
-240 => wire__crate__api__wallet__validate_gift_address_impl(port, ptr, rust_vec_len, data_len),
-242 => wire__crate__api__voting__voting_proposal_id_range_impl(port, ptr, rust_vec_len, data_len),
-245 => wire__crate__api__voting__warm_pir_proof_cache_impl(port, ptr, rust_vec_len, data_len),
-247 => wire__crate__api__sync__write_block_metadata_impl(port, ptr, rust_vec_len, data_len),
-248 => wire__crate__api__keystone__zcash_sign_batch_round_message_counts_impl(port, ptr, rust_vec_len, data_len),
+223 => wire__crate__api__network_privacy__start_railgun_bridge_impl(port, ptr, rust_vec_len, data_len),
+224 => wire__crate__api__network_privacy__start_tor_update_relay_impl(port, ptr, rust_vec_len, data_len),
+226 => wire__crate__api__network_privacy__stop_railgun_bridge_impl(port, ptr, rust_vec_len, data_len),
+227 => wire__crate__api__network_privacy__stop_tor_update_relay_impl(port, ptr, rust_vec_len, data_len),
+228 => wire__crate__api__sync__store_and_broadcast_pczts_with_keystone_signatures_for_proposal_impl(port, ptr, rust_vec_len, data_len),
+229 => wire__crate__api__sync__store_and_broadcast_signed_pczts_for_proposal_impl(port, ptr, rust_vec_len, data_len),
+230 => wire__crate__api__voting__store_keystone_signatures_batch_impl(port, ptr, rust_vec_len, data_len),
+231 => wire__crate__api__sync__suggest_scan_ranges_impl(port, ptr, rust_vec_len, data_len),
+232 => wire__crate__api__gift_card_tracking__sync_gift_card_observers_impl(port, ptr, rust_vec_len, data_len),
+233 => wire__crate__api__voting__sync_vote_tree_impl(port, ptr, rust_vec_len, data_len),
+236 => wire__crate__api__network_privacy__tor_http_download_impl(port, ptr, rust_vec_len, data_len),
+237 => wire__crate__api__network_privacy__tor_http_get_impl(port, ptr, rust_vec_len, data_len),
+238 => wire__crate__api__network_privacy__tor_http_post_impl(port, ptr, rust_vec_len, data_len),
+239 => wire__crate__api__voting__trusted_voting_round_params_from_config_impl(port, ptr, rust_vec_len, data_len),
+240 => wire__crate__api__sync__update_chain_tip_impl(port, ptr, rust_vec_len, data_len),
+241 => wire__crate__api__sync__validate_address_impl(port, ptr, rust_vec_len, data_len),
+242 => wire__crate__api__wallet__validate_gift_address_impl(port, ptr, rust_vec_len, data_len),
+244 => wire__crate__api__voting__voting_proposal_id_range_impl(port, ptr, rust_vec_len, data_len),
+247 => wire__crate__api__voting__warm_pir_proof_cache_impl(port, ptr, rust_vec_len, data_len),
+249 => wire__crate__api__sync__write_block_metadata_impl(port, ptr, rust_vec_len, data_len),
+250 => wire__crate__api__keystone__zcash_sign_batch_round_message_counts_impl(port, ptr, rust_vec_len, data_len),
                         _ => unreachable!(),
                     }
 }
@@ -15759,23 +15833,23 @@ fn pde_ffi_dispatcher_sync_impl(
             data_len,
         ),
         213 => wire__crate__api__sync__set_sync_mode_impl(ptr, rust_vec_len, data_len),
-        224 => wire__crate__api__sync__stop_mempool_observer_impl(ptr, rust_vec_len, data_len),
-        232 => wire__crate__api__network_privacy__tor_http_begin_request_impl(
+        225 => wire__crate__api__sync__stop_mempool_observer_impl(ptr, rust_vec_len, data_len),
+        234 => wire__crate__api__network_privacy__tor_http_begin_request_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        233 => wire__crate__api__network_privacy__tor_http_cancel_request_impl(
+        235 => wire__crate__api__network_privacy__tor_http_cancel_request_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        241 => wire__crate__api__wallet__validate_mnemonic_impl(ptr, rust_vec_len, data_len),
-        243 => wire__crate__api__wallet__wallet_exists_impl(ptr, rust_vec_len, data_len),
-        244 => {
+        243 => wire__crate__api__wallet__validate_mnemonic_impl(ptr, rust_vec_len, data_len),
+        245 => wire__crate__api__wallet__wallet_exists_impl(ptr, rust_vec_len, data_len),
+        246 => {
             wire__crate__api__sync__warm_orchard_proving_key_cache_impl(ptr, rust_vec_len, data_len)
         }
-        246 => {
+        248 => {
             wire__crate__api__voting__warm_voting_proving_caches_impl(ptr, rust_vec_len, data_len)
         }
         _ => unreachable!(),

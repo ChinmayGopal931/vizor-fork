@@ -722,9 +722,9 @@ JSON strings go over one `WebMessagePort`. The page side is `rl/web/src/index.js
 
 | Method | Args | Result | Notes |
 |---|---|---|---|
-| `load` | `{proxyPort: int, debug: bool}` | `null` once the page says `ready` | Closes any previous page. Sets the proxy override, waits for its callback, then `loadUrl`. `debug` enables content debugging and `log` events (pass `kDebugMode`). |
-| `call` | `{method: String, paramsJson: String}` | `resultJson: String` | `method` must be one of the §6.2 table names; Kotlin picks the timeout from it. |
-| `close` | — | `null` | Idempotent. Clears the proxy override. |
+| `load` | `{proxyPort: int, debug: bool}` | `null` once the page says `ready` | Closes any previous page. Sets the proxy override, waits for its callback (at most 10 s, else `TIMEOUT`), then `loadUrl`. `debug` enables content debugging and `log` events (pass `kDebugMode`); Kotlin ANDs it with `BuildConfig.DEBUG`, so a release build never debugs the page. |
+| `call` | `{method: String, paramsJson: String}` | `resultJson: String` | `method` must be one of the §6.2 table names except the debug-only `openNewWallet`, which is not exposed (`BAD_ARGS`); Kotlin picks the timeout from it. With no open page: `CLOSED`. |
+| `close` | — | `null` | Idempotent. Clears the proxy override, also when no page is open (as built, only when this host set one, so a close with nothing to clear does not load the WebView package). |
 | `wipe` | — | `null` | `close`, then `WebStorage.getInstance().deleteOrigin(PAGE_ORIGIN)`. |
 | `isOpen` | — | `bool` | |
 
@@ -736,10 +736,12 @@ Errors are `PlatformException(code, message)`, mapped from `RailgunException`:
 | `TIMEOUT` | `Timeout` (the page is closed) | as `CLOSED`; a first-sync `refresh` timeout restarts from zero (§6.3) |
 | `UNAVAILABLE` | `Unavailable` (no WebView package, no `PROXY_OVERRIDE`) | show unavailable; do not retry in a loop |
 | `PROTOCOL` | `Protocol` (`BAD_REQUEST`, unreadable reply) | a bug: log the method only, never params |
-| `FAILED` | `Failed` (engine, chain or POI error) | retry per caller |
+| `FAILED` | `Failed` (engine, chain or POI error) | retry per caller. The message is the engine's own text and can quote a keyed RPC URL (ethers puts request URLs in its errors): never log it, and redact the keyed URL before showing it |
 | `BAD_ARGS` | handler-level argument check | a bug |
 
-`EventChannel com.zcash.wallet/railgun/events`: each event is the page's raw JSON `{event, data}` as a `String`, forwarded unparsed. Dart decodes `scan` and `proof`; `log` is forwarded only when `debug`.
+A call whose coroutine is cancelled is answered `CLOSED`, so every call gets exactly one answer.
+
+`EventChannel com.zcash.wallet/railgun/events`: each event is the page's raw JSON `{event, data}` as a `String`, forwarded unparsed. Dart decodes `scan` and `proof`; `log` is forwarded only when `debug`. The page also emits `log` without `debug` (a failed screening refresh, `wallet.js:123`), so Kotlin drops page `log` events from a page loaded without `debug`.
 
 - **Threading.** MethodChannel handlers run on the main thread. Launch each `call` in a `CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)` owned by the process singleton, and reply with `result.success`/`result.error` exactly once (a second reply crashes). EventChannel `success` must be called on the main thread: collect the host's `SharedFlow` with `Dispatchers.Main`.
 - **Method timeouts are enforced in Kotlin** (the table above). A timeout closes the page.
@@ -755,7 +757,7 @@ Errors are `PlatformException(code, message)`, mapped from `RailgunException`:
 - **Reuse** `rl/web/` (source, lockfile and build) and the bundle, rebuilt per E5 and X2. Keep `rl/web/dev/check.mjs` as the desktop smoke test.
 - **Port to Kotlin** (`android/app/src/main/kotlin/com/keplr/vizor/railgun/`): `RailgunWebViewHost`, `RailgunChannel` and `RailgunException` with the edits in §8.7 (they are **not** verbatim-portable: Host and Channel use `kotlinx.serialization.json.JsonElement`, which vizor does not have). From `RailgunProtocol`, port only `INIT`, the envelope (`request`, `decode`; `:162-282`) with `org.json`, and the method timeouts (`RailgunMethod`, `:30-58`) as a plain enum. Port `RailgunEndpoints.hosts` (`RailgunModels.kt:28-58`) without its `BuildConfig` keyed-URL fields. `Bech32m`, the typed models, `RailgunWallet` and `RailgunReverseFunding` are not ported to Kotlin.
 - **Port to Dart** (`lib/src/features/private_usd/`): the typed models (`RailgunModels`, `RailgunWallet`, `RailgunSession`, `RailgunReverseFunding`); `RailgunEngine` (`ui/common/repository/RailgunEngine.kt`, 127 lines); `RailgunWalletRepository` (196); `PrivateUsdBalanceRepository` (483) and its cache (89).
-- **WebView ownership.** Channel handlers are per Activity, but the host must survive Activity recreation. Hold `RailgunWebViewHost` in a process-level singleton built with `applicationContext`, as zapp does (`rl/.../RailgunWallet.kt:25`, an unattached WebView). The per-Activity handler only binds the channel. Close the page in `onDestroy` only when `isFinishing`.
+- **WebView ownership.** Channel handlers are per Activity, but the host must survive Activity recreation. Hold `RailgunWebViewHost` in a process-level singleton built with `applicationContext`, as zapp does (`rl/.../RailgunWallet.kt:25`, an unattached WebView). The per-Activity handler only binds the channel. Close the page in `onDestroy` only when `isFinishing`. As built (M3): the singleton is `RailgunHostHandler.Pages`, which also holds the coroutine scope and the current page. A page therefore outlives its Flutter engine when Android destroys the Activity without finishing it, so the Dart engine wrapper calls `close` once when it starts.
 
 ### 6.3 Lifecycle and the engine wrapper
 
@@ -938,7 +940,7 @@ Every name used exists at `391d0b0`: `Timeouts.connect` (`tor.rs:28-40`), `ensur
 **What exists to build on.**
 
 - `rust/src/tor_update_relay.rs` is a loopback HTTP relay (`TcpListener::bind(127.0.0.1:0)`, `:43-70`). It serves one random-token path and fetches upstream with `tor.http_get`. It is the precedent for a loopback listener with start, stop and a `JoinSet` of connections. It is **not** a CONNECT or SOCKS tunnel: it terminates HTTP and serves only the desktop updater (`rust/src/api/network_privacy.rs:100-108`).
-- `tor-socksproto 0.35.0` is in `rust/Cargo.lock` (`:7300`) with its default `proxy-handshake` feature, which gives `SocksProxyHandshake`, a server-side SOCKS4/4a/5 state machine. `arti-client 0.35.0` (`DataStream`, with tokio `AsyncRead`/`AsyncWrite` under its `tokio` feature) is in the lock too. Both are transitive. Neither needs to become direct (M3 task 4).
+- `tor-socksproto 0.35.0` is in `rust/Cargo.lock` (`:7300`) with its default `proxy-handshake` feature, which gives `SocksProxyHandshake`, a server-side SOCKS4/4a/5 state machine. `arti-client 0.35.0` (`DataStream`, with tokio `AsyncRead`/`AsyncWrite` under its `tokio` feature) is in the lock too. Both are transitive. Neither needs to become direct (M3 task 4); as built, the bridge does not use `SocksProxyHandshake` at all (D-17).
 
 **WebView behaviour** (from androidx source and Chromium docs; verified on a Galaxy A35 with WebView 155 in M0.3):
 
@@ -950,16 +952,17 @@ Every name used exists at `391d0b0`: `Timeouts.connect` (`tor.rs:28-40`), `ensur
 
 **Design.** The page is **always proxied**, so the route policy lives in one place.
 
-1. **Rust `rust/src/railgun_bridge.rs`:**
-   - Bind `127.0.0.1:0` and speak SOCKS5 with no auth, through `SocksProxyHandshake`.
-   - Accept only `CONNECT host:443`, where `host` is in the allowlist (§6.4). Refuse everything else.
-   - For each connection, call `tor_client_for_route(true, || stopped)`:
-     - `Some(tor)` → `tor.connect_stream(host, 443)`, isolated per page session.
-     - `None` → `tokio::net::TcpStream::connect`, wrapped in a `DirectRouteLease` (add a tokio `AsyncRead`/`AsyncWrite` impl beside the hyper one), so `begin_tor_enable` aborts it.
-     - `Err` → refuse. Fail closed.
-   - Then `copy_bidirectional`.
-   - FRB: `start_railgun_bridge() -> Result<u16, String>` and `stop_railgun_bridge()`.
-2. **Kotlin.** Before loading the page, call `setProxyOverride(ProxyConfig.Builder().addProxyRule("socks://127.0.0.1:$port").build(), …)`, and wait for its listener callback before `loadUrl`. Call `clearProxyOverride` on close. If `!WebViewFeature.isFeatureSupported(PROXY_OVERRIDE)`, refuse to start the page (`RailgunException.Unavailable`).
+1. **Rust `rust/src/railgun_bridge.rs`** (as built in M3, from the M0 spike):
+   - `start()` resolves the route once, with `tor_client_for_route(true, || false)`, waiting out a bootstrap (up to 3 minutes). `Some(tor)` keeps that isolated client for the whole page session, `None` means direct, and `Err` means no bridge at all (fail closed). Only then does it bind `127.0.0.1:0`.
+   - It speaks SOCKS5 with no auth through its own RFC 1928 parser, not `SocksProxyHandshake` (D-17): the bridge needs only a no-auth `CONNECT` to a domain name.
+   - Accept only `CONNECT host:443` with a domain name (ATYP 3), where `host` is in `deployment::RAILGUN_PAGE_HOSTS` (§6.4). Refuse everything else: other commands, IP addresses, other ports, and clients that offer only authentication.
+   - For each connection, `try_tor_client_for_route(false)` must still match the route the bridge started on:
+     - a Tor bridge while Tor is usable → `tor.connect_stream(host, 443)` on the session's isolated client
+     - a direct bridge while the route is direct → `tokio::net::TcpStream::connect` under a `DirectRouteLease` (with a tokio `AsyncRead`/`AsyncWrite` impl beside the hyper one), so `begin_tor_enable` aborts it, mid-connect too
+     - anything else (a route change, Tor failed) → refuse. Fail closed; the caller restarts the bridge.
+   - Then `copy_bidirectional`. Nothing per connection is logged.
+   - FRB, in `rust/src/api/network_privacy.rs`: `start_railgun_bridge() -> Result<u16, String>` (idempotent: it returns the running bridge's port) and `stop_railgun_bridge()` (idempotent). Dart: `startRailgunBridge()` → `Future<int>`, `stopRailgunBridge()` → `Future<void>`.
+2. **Kotlin.** Before loading the page, call `setProxyOverride(ProxyConfig.Builder().addProxyRule("socks://127.0.0.1:$port").build(), …)`, and wait for its listener callback before `loadUrl`. Call `clearProxyOverride` on close and wipe, and whenever the page closes itself (timeout, renderer gone). If `!WebViewFeature.isFeatureSupported(PROXY_OVERRIDE)`, refuse to start the page (`RailgunException.Unavailable`).
 3. **Dart.** On every route change (`ref.listen(networkPrivacyProvider…)`), close and reopen the page, so Chromium drops pooled connections. M0.3 showed that Chromium does **not** tear down pooled sockets by itself (U19), so this close and reopen is required.
 
 **Residual risk.** A no-auth loopback proxy is reachable by other apps on the device while the page is open. The destination allowlist limits that to Railgun hosts on port 443, through vizor's route. Android gives ordinary apps no per-UID loopback filter (`ConnectivityManager.getConnectionOwnerUid` is VPN-only).
@@ -1222,9 +1225,9 @@ pub fn private_usd_account_eligible(db_path: String, network: String, account_uu
 pub fn private_usd_railgun_mnemonic(db_path: String, network: String, account_uuid: String, mnemonic_bytes: Vec<u8>) -> Result<String, ApiPrivateUsdError>;
 pub fn private_usd_railgun_address(db_path: String, network: String, account_uuid: String, mnemonic_bytes: Vec<u8>) -> Result<String, ApiPrivateUsdError>;
 
-// M3, in rust/src/api/network_privacy.rs next to the updater relay (or a new api/railgun_bridge.rs)
+// M3, in rust/src/api/network_privacy.rs next to the updater relay (as built)
 pub async fn start_railgun_bridge() -> Result<u16, String>;  // idempotent: returns the running port; allowlist = deployment::RAILGUN_PAGE_HOSTS
-pub async fn stop_railgun_bridge();
+pub async fn stop_railgun_bridge();                          // idempotent
 
 // M4. `tokens_path` = `<support>/private_usd_tokens_<network>.json`, from Dart `getPrivateUsdTokenStorePath(network)`.
 pub struct ApiIssuanceBegin { pub session_id: u32, pub issuer_name: String, pub message: Vec<u8> }
@@ -1241,7 +1244,7 @@ pub fn private_usd_tokens_status(tokens_path: String, network: String) -> Result
 ```
 
 - Dart reads `db_path` and `network` the way the Gift Card provider does (`ref.read(rpcEndpointFailoverProvider).current.networkName`, `gift_card_tracking_provider.dart:82`; the wallet DB path from `getWalletDbPath()`), and `lightwalletd_url` from `rpcEndpointFailoverProvider.current.normalizedLightwalletdUrl` (the provider is `lib/src/providers/rpc_endpoint_failover_provider.dart:716`; the getter is `lib/src/core/config/rpc_endpoint_config.dart:25`, used at `gift_card_tracking_provider.dart:184`).
-- **Three copies of the host allowlist** (§6.4): Rust `deployment::RAILGUN_PAGE_HOSTS` (the 9 hosts, both networks; the bridge uses it), Kotlin `RailgunEndpoints.hosts`, and the CSP in the bundle's `index.html`. The ported `RailgunBoundaryTest` pins Kotlin against the CSP; add a Rust unit test that pins the same 9 strings. Dart refuses a keyed RPC URL whose host is not in `ApiDeployment.allowed_hosts`.
+- **Three copies of the host allowlist** (§6.4): Rust `deployment::RAILGUN_PAGE_HOSTS` (the 9 hosts, both networks; the bridge uses it), Kotlin `RailgunEndpoints.hosts`, and the CSP in the bundle's `index.html`. The ported `RailgunBoundaryTest` pins Kotlin against the CSP. The Rust unit test `railgun_bridge::tests::the_page_hosts_match_the_kotlin_filter_and_the_page_csp` (M3) pins all three: it reads the string literals of `RailgunEndpoints.kt`'s `setOf(…)` and the `connect-src` of both `android/app/src/main/assets/railgun/index.html` and `android/railgun-web/src/index.html`, so keep the Kotlin hosts literal. Dart refuses a keyed RPC URL whose host is not in `ApiDeployment.allowed_hosts`.
 
 **Exact M5–M7 signatures** (same conventions as M1–M4; every call is `catch` + inner runtime unless marked `sync`). `ctx` expands to `db_path: String, network: String, account_uuid: String, store_dir: String`; `secret` to `mnemonic_bytes: Vec<u8>`; `lwd` to `lightwalletd_url: String`; `rpc` to `eth_rpc_url: String`; `op_id: u32` is allocated by Dart per call (`private_usd_cancel(op_id)` sets its flag). The shorthand is for this doc only; write the parameters out in code. Zatoshi are `u64` (Dart `BigInt`, as `estimate_fee` already is), token amounts decimal `String`, unix seconds `i64` (Dart `int`).
 
@@ -1557,16 +1560,16 @@ pub fn private_usd_send_settle_all(store_dir: String, network: String, eth_rpc_u
 **`AndroidManifest.xml`.**
 
 - **Permissions:** only `INTERNET`, biometric, camera and Bluetooth. Nothing more is needed for v1 (no foreground service, no notifications, no exact alarms, per D9).
-- **Backup.** `allowBackup="false"`. `data_extraction_rules.xml` excludes only `file/tor` from cloud backup and device transfer. **Add** an exclusion for the WebView data directory (`domain="root" path="app_webview"`, **unverified** exact path, U12), so the encrypted Railgun IndexedDB and its scan cache are not carried to a new device. Without the secure-storage key the data is useless anyway.
+- **Backup.** `allowBackup="false"`. `data_extraction_rules.xml` excluded only `file/tor` from cloud backup and device transfer. M3.3 added an exclusion for the WebView data directory (`domain="root" path="app_webview"`; the path was confirmed on the device in M0, U12), so the encrypted Railgun IndexedDB and its scan cache are not carried to a new device. Without the secure-storage key the data is useless anyway.
 
 **Worker and JNI.** Absent (D9). The only native Rust entry is FRB through cargokit (`rust_builder/cargokit`); the crate is built as `cdylib`/`staticlib`/`rlib` (`rust/Cargo.toml:7`).
 
 **More Android facts** (verified at `4a859bee0`):
 
-- `MainActivity.onDestroy` already exists (`:329-332`, closes the Ledger handler). Add the Railgun handler's unbind there, and close the page only `if (isFinishing)`.
-- There is no `android/app/src/main/assets/` directory yet; the bundle copy creates it.
+- `MainActivity.onDestroy` already exists (`:329-332`, closes the Ledger handler). Add the Railgun handler's unbind there, and close the page only `if (isFinishing)`. Done in M3 (`railgunHostHandler.dispose(isFinishing)`).
+- There was no `android/app/src/main/assets/` directory; the M3 bundle copy created it.
 - There is no `network_security_config` and no `usesCleartextTraffic`; leave them unset: M0.3 showed that the loopback SOCKS hop needs none.
-- Kotlin unit tests have JUnit 4, Robolectric 4.16.1, Mockito and `kotlinx-coroutines-test:1.10.2` (`build.gradle.kts:198-201`), but **no `kotlin-test`**, which zapp's Railgun tests import (`kotlin.test.*`). Add `testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")` (the Kotlin plugin version, `android/settings.gradle.kts:23`), or rewrite the asserts to `org.junit.Assert`.
+- Kotlin unit tests have JUnit 4, Robolectric 4.16.1, Mockito and `kotlinx-coroutines-test:1.10.2` (`build.gradle.kts:198-201`), but had **no `kotlin-test`**, which zapp's Railgun tests import (`kotlin.test.*`). M3.3 added `testImplementation("org.jetbrains.kotlin:kotlin-test-junit:2.2.20")` (the Kotlin plugin version, `android/settings.gradle.kts:23`).
 - **`org.json` in local unit tests is a stub** that throws "Method … not mocked" on the plain JVM. Run envelope tests with `@RunWith(RobolectricTestRunner::class)`, or add `testImplementation("org.json:json:20240303")`.
 - Device-to-device transfer copies everything except `files/tor` (`data_extraction_rules.xml`), including `zcash_wallet.db`. The new `private_usd_*` directories hold no keys, so they need no exclusion; the WebView directory does (U12).
 
@@ -1606,13 +1609,13 @@ printf '\n# Railgun bundle build\n/android/railgun-web/node_modules/\n' >> .giti
 
 | Source (`za/`) | Destination | Mode | Edits |
 |---|---|---|---|
-| `railgun-lib/web/**` (≈380 KB without the lockfile) | `android/railgun-web/` | copy | `build.mjs:8`: `path.resolve('../src/main/assets/railgun')` → `path.resolve('../app/src/main/assets/railgun')`. The build `rm -rf`s that directory, so keep the GPL-3.0 text as `android/railgun-web/COPYING` and add a `copyFile('COPYING', path.join(out, 'COPYING'))` beside `:60`. With E5: `src/wallet.js:25` `WALLET_SOURCE`, `src/index.js:7` `INIT`, and the `deleteWallet` handler. `package.json` `license` → per E2. |
-| `railgun-lib/src/main/assets/railgun/*` (11.7 MB) | `android/app/src/main/assets/railgun/` | copy blind | none; it is rebuilt by `npm ci --ignore-scripts && npm run build` in `android/railgun-web` after E5 |
+| `railgun-lib/web/**` (≈380 KB without the lockfile) | `android/railgun-web/` | copy | `build.mjs:8`: `path.resolve('../src/main/assets/railgun')` → `path.resolve('../app/src/main/assets/railgun')`. The build `rm -rf`s that directory, so keep the GPL-3.0 text as `android/railgun-web/COPYING` and add a `copyFile('COPYING', path.join(out, 'COPYING'))` beside `:60`. `dev/check.mjs:16, 18` get the same move: `ASSETS` → `../app/src/main/assets/railgun`, `LOCAL_PROPERTIES` → `../local.properties` (D-15). With E5: `src/wallet.js:25` `WALLET_SOURCE`, `src/index.js:7` `INIT`, and the `deleteWallet` handler. `package.json` `license` → per E2. |
+| `railgun-lib/src/main/assets/railgun/*` (11.7 MB) | `android/app/src/main/assets/railgun/` | copy blind | none, besides the GPL-3.0 text added as `COPYING`, as a rebuild would (D-15); it is rebuilt by `npm ci --ignore-scripts && npm run build` in `android/railgun-web` after E5 |
 | `$RLK/RailgunException.kt` (37 lines) | `$K/` | copy | package, header |
-| `$RLK/RailgunChannel.kt` (67) | `$K/` | copy with edits | `JsonElement` → `String` (raw JSON) for `call` params and result; `onEvent: (RailgunEvent) -> Unit` → `(String) -> Unit`; drop the `kotlinx.serialization` import |
-| `$RLK/RailgunWebViewHost.kt` (305) | `$K/` | copy with edits | `JsonElement` → `String`; `MutableSharedFlow<RailgunEvent>` → `MutableSharedFlow<String>`; the console `RailgunEvent.Log(…)` (`:243`) → a `{"event":"log","data":…}` string built with `JSONObject`, emitted only when `debug`; in `Page.load()` set the proxy override and wait for its callback before `loadUrl`, and clear it in `close` (§6.8). Keep `RailgunRequests` (`:278-305`) as is. |
-| `$RLK/RailgunProtocol.kt` (298) | `$K/` | rewrite down to ~90 lines | keep `INIT` (`:163`; `"zapp-railgun-init"` until the E5 rebuild, it must equal `index.js:7`), `RailgunMethod` as a plain enum of wire name + timeout (`:30-58`), and `request`/`decode` (`:162-282`) over `org.json`: `Message.{Ready, Event(raw: String), Reply(id, resultJson: String), Failure(id, RailgunException)}`. Drop every serializer, `DecimalSerializer` and `Address`. |
-| `$RLK/RailgunModels.kt` (250) | `$K/RailgunEndpoints.kt` | trim | keep only `object RailgunEndpoints` (`:28-58`) minus `SEPOLIA_KEYED_RPC_URL`/`MAINNET_KEYED_RPC_URL` (they read zapp's `BuildConfig`); keep `hosts` and `POI_NODE_URL` |
+| `$RLK/RailgunChannel.kt` (67) | `$K/` | copy with edits | `JsonElement` → `String` (raw JSON) for `call` params and result; `onEvent: (RailgunEvent) -> Unit` → `(RailgunProtocol.Message.Event) -> Unit`, the event's name and raw JSON, so the host can drop `log` events (D-16); drop the `kotlinx.serialization` import |
+| `$RLK/RailgunWebViewHost.kt` (305) | `$K/` | copy with edits | `JsonElement` → `String`; `MutableSharedFlow<RailgunEvent>` → `MutableSharedFlow<String>`; the console `RailgunEvent.Log(…)` (`:243`) → a `{"event":"log","data":…}` string built with `JSONObject`, emitted only when `debug`; in `Page.load()` set the proxy override and wait for its callback before `loadUrl`, and clear it in `close` (§6.8). Keep `RailgunRequests` (`:278-305`) as is. As built (D-16): `debug` is a `load` parameter, not a constructor one, and page `log` events are dropped unless `debug`. |
+| `$RLK/RailgunProtocol.kt` (298) | `$K/` | rewrite down to ~90 lines | keep `INIT` (`:163`; `"zapp-railgun-init"` until the E5 rebuild, it must equal `index.js:7`), `RailgunMethod` as a plain enum of wire name + timeout (`:30-58`), and `request`/`decode` (`:162-282`) over `org.json`: `Message.{Ready, Event(name: String, raw: String), Reply(id, resultJson: String), Failure(id, RailgunException)}`. Drop every serializer, `DecimalSerializer` and `Address`. |
+| `$RLK/RailgunModels.kt` (250) | `$K/RailgunEndpoints.kt` | trim | keep only `object RailgunEndpoints` (`:28-58`) minus `SEPOLIA_KEYED_RPC_URL`/`MAINNET_KEYED_RPC_URL` (they read zapp's `BuildConfig`); keep `hosts` and `POI_NODE_URL`. As built: `internal`, the hosts written as literals inside `setOf(…)` (a Rust test reads them, §8.2), and the unused `SEPOLIA_RPC_URL`/`MAINNET_RPC_URL` dropped |
 | `$RLK/{RailgunWallet,RailgunReverseFunding,Bech32m}.kt` | — | do not copy | their logic moves to Dart (models, session) and Rust (address check) |
 | `$RLT/RailgunChannelTest.kt` (117) | `$KT/` | copy with edits | JSON types → strings; needs `kotlin-test` (§8.6) and `kotlinx-coroutines-test` |
 | `$RLT/RailgunProtocolTest.kt` (144) | `$KT/` | copy with edits | delete the two `RailgunAddress` checksum tests; `File("web/src/index.js")` → `File("../railgun-web/src/index.js")` (unit tests run in `android/app`); Robolectric runner for `org.json` |
