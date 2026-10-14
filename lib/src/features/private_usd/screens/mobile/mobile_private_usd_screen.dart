@@ -11,24 +11,33 @@ import '../../../../core/formatting/date_format.dart';
 import '../../../../core/layout/mobile/mobile_top_nav.dart';
 import '../../../../core/privacy/privacy_mask.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../../../providers/zec_price_change_provider.dart';
+import '../../../activity/models/activity_row_data.dart';
+import '../../../activity/widgets/activity_feed.dart' show ActivityFeedRowGroup;
 import '../../models/private_usd_balances.dart';
+import '../../models/private_usd_record_key.dart';
 import '../../private_usd_copy.dart';
 import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_balance_provider.dart';
+import '../../providers/private_usd_activity_provider.dart';
+import '../../providers/private_usd_conversion_provider.dart';
+import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_receive_address_provider.dart';
 import '../../services/private_usd_balance_repository.dart';
 import '../../widgets/mobile/private_usd_home_strip.dart';
+import '../../widgets/mobile/private_usd_activity_rows.dart';
+import '../../widgets/mobile/private_usd_banner.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
 
 /// `/private-usd` (plan reference §9.4 S2): the balance with its screening
-/// buckets, the receive address and the activity. Convert, Send and
-/// Withdraw arrive with M5 and M7.
+/// buckets, the conversion under way, the receive address, the activity,
+/// and "Convert". Send and Withdraw arrive with M7.
 class MobilePrivateUsdScreen extends ConsumerStatefulWidget {
   const MobilePrivateUsdScreen({super.key});
 
@@ -64,19 +73,40 @@ class _MobilePrivateUsdScreenState
     );
     final deployment = ref.watch(privateUsdCurrentDeploymentProvider);
     final address = ref.watch(privateUsdReceiveAddressProvider(uuid));
+    final privacyModeEnabled = ref.watch(privacyModeProvider);
+    final underWay = ref.watch(privateUsdUnderWayProvider(uuid));
+    void open(PrivateUsdRoutePath path) => context.push(path.location);
+    final activity = [
+      for (final entry in privateUsdActivityEntries(
+        context: context,
+        records: ref.watch(privateUsdActivityRecordsProvider(uuid)),
+        zcashConfirmations: deployment?.zcashConfirmations ?? 2,
+        privacyModeEnabled: privacyModeEnabled,
+        onOpenConversion: open,
+        onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
+      ))
+        entry.row,
+    ];
     return MobilePrivateUsdView(
       state: ref.watch(privateUsdBalanceProvider(uuid)),
       zecUsdPrice: ref.watch(zecHomeUsdUnitPriceProvider),
-      privacyModeEnabled: ref.watch(privacyModeProvider),
+      privacyModeEnabled: privacyModeEnabled,
       receiveAddress: address.value,
       screening: Duration(seconds: deployment?.screeningSeconds ?? 0),
       tokenNames: {
         for (final token in deployment?.usdTokens ?? const [])
           token.address.toLowerCase(): PrivateUsdCopy.tokenName(token.symbol),
       },
+      banner: ref.watch(privateUsdConversionBannerProvider(uuid)),
+      activityRows: activity,
       onBack: () => context.pop(),
       onRefresh: () =>
           ref.read(privateUsdBalanceProvider(uuid).notifier).refresh(),
+      onOpenConversion: open,
+      // The conversion under way opens instead of a new one (one at a time).
+      onConvert: () => underWay == null
+          ? context.push('/private-usd/convert')
+          : open(underWay.path),
     );
   }
 }
@@ -93,6 +123,10 @@ class MobilePrivateUsdView extends StatelessWidget {
     required this.onBack,
     required this.onRefresh,
     this.tokenNames = const {},
+    this.banner,
+    this.activityRows = const [],
+    this.onOpenConversion,
+    this.onConvert,
     super.key,
   });
 
@@ -111,15 +145,26 @@ class MobilePrivateUsdView extends StatelessWidget {
   final VoidCallback onBack;
   final VoidCallback onRefresh;
 
+  /// The conversion under way, if any.
+  final PrivateUsdBannerState? banner;
+  final List<ActivityRowData> activityRows;
+  final ValueChanged<PrivateUsdRoutePath>? onOpenConversion;
+
+  /// "Convert": the conversion under way, else a new one. Hidden when null.
+  final VoidCallback? onConvert;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final balances = state.balances;
+    final banner = this.banner;
+    final onConvert = this.onConvert;
     return Scaffold(
       backgroundColor: colors.background.window,
       body: AppToastHost(
         child: SafeArea(
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               MobileTopNav.back(
                 title: PrivateUsdCopy.title,
@@ -152,7 +197,16 @@ class MobilePrivateUsdView extends StatelessWidget {
                       privacyModeEnabled: privacyModeEnabled,
                       onRefresh: onRefresh,
                     ),
-                    if (balances != null && balances.total == BigInt.zero) ...[
+                    if (banner != null) ...[
+                      const SizedBox(height: AppSpacing.s),
+                      PrivateUsdConversionBannerView(
+                        banner: banner,
+                        onTap: () => onOpenConversion?.call(banner.path),
+                      ),
+                    ],
+                    if (balances != null &&
+                        balances.total == BigInt.zero &&
+                        banner == null) ...[
                       const SizedBox(height: AppSpacing.s),
                       const _EmptyCard(),
                     ] else if (balances != null) ...[
@@ -176,10 +230,25 @@ class MobilePrivateUsdView extends StatelessWidget {
                       _ReceiveAddressCard(address: address),
                     ],
                     const SizedBox(height: AppSpacing.md),
-                    const _ActivitySection(),
+                    _ActivitySection(rows: activityRows),
                   ],
                 ),
               ),
+              if (onConvert != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.sm,
+                    AppSpacing.s,
+                    AppSpacing.sm,
+                    AppSpacing.md,
+                  ),
+                  child: AppButton(
+                    key: const ValueKey('mobile_private_usd_convert'),
+                    expand: true,
+                    onPressed: onConvert,
+                    child: const Text(PrivateUsdCopy.actionConvert),
+                  ),
+                ),
             ],
           ),
         ),
@@ -606,9 +675,11 @@ class _ReceiveAddressCard extends StatelessWidget {
   }
 }
 
-/// Conversions, sends and withdrawals land here with M5–M7.
+/// Conversions (M5), then sends and withdrawals (M7), newest first.
 class _ActivitySection extends StatelessWidget {
-  const _ActivitySection();
+  const _ActivitySection({required this.rows});
+
+  final List<ActivityRowData> rows;
 
   @override
   Widget build(BuildContext context) {
@@ -625,13 +696,22 @@ class _ActivitySection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.s),
-          Text(
-            PrivateUsdCopy.activityEmpty,
-            key: const ValueKey('mobile_private_usd_activity_empty'),
-            style: AppTypography.bodySmall.copyWith(
-              color: colors.text.secondary,
-            ),
-          ),
+          if (rows.isEmpty)
+            Text(
+              PrivateUsdCopy.activityEmpty,
+              key: const ValueKey('mobile_private_usd_activity_empty'),
+              style: AppTypography.bodySmall.copyWith(
+                color: colors.text.secondary,
+              ),
+            )
+          else
+            for (var i = 0; i < rows.length; i++) ...[
+              if (i > 0) const SizedBox(height: AppSpacing.s),
+              KeyedSubtree(
+                key: ValueKey('mobile_private_usd_activity_row_$i'),
+                child: ActivityFeedRowGroup(row: rows[i]),
+              ),
+            ],
         ],
       ),
     );

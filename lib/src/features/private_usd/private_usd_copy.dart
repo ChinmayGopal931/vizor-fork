@@ -1,4 +1,6 @@
 import '../../core/config/private_usd_feature_config.dart';
+import '../../rust/api/private_usd.dart'
+    show ApiNothingSentCause, ApiPrivateUsdErrorCode, ApiRefundCause;
 
 /// Every user-facing Private USD string (plan reference §9.6), sentence case,
 /// in one place so widgets, tests and Widgetbook share it. The comment on
@@ -50,6 +52,9 @@ abstract final class PrivateUsdCopy {
 
   /// `private_usd_use_available` (accessibility label)
   static const useAvailable = 'Use it all';
+
+  /// New: vizor's visible label for using it all (as send has it).
+  static const max = 'Max';
 
   /// New (D17): a link to `VIZOR_SUPPORT_URL` when that define is set.
   static const supportSentence = 'Contact support.';
@@ -304,6 +309,503 @@ abstract final class PrivateUsdCopy {
   /// `refunds_view`
   static const refundsView = 'View refunds';
 
+  // ── Convert (both directions): amount and quote ─────────────────────
+
+  /// `convert_title`
+  static const convertTitle = 'Convert';
+
+  /// `convert_asset_zec`
+  static const convertAssetZec = 'ZEC';
+
+  /// `convert_zec_includes_fee`
+  static const convertZecIncludesFee = 'Includes the Zcash network fee';
+
+  /// `convert_estimated_amount`
+  static const convertEstimatedAmount = 'Estimated amount';
+
+  /// `convert_you_pay`
+  static const convertYouPay = 'You pay';
+
+  /// `convert_network_fee`
+  static const convertNetworkFee = 'Network fee';
+
+  /// `convert_you_receive`
+  static const convertYouReceive = 'You receive about';
+
+  /// `convert_fees`
+  static const convertFees = 'Conversion fees';
+
+  /// `convert_fees_value`
+  static String convertFeesValue(String relayerUsd, String railgunPercent) =>
+      '$relayerUsd relayer · $railgunPercent% Railgun';
+
+  /// `convert_maker_cost`
+  static const convertMakerCost = "Market maker's network cost";
+
+  /// `convert_quote_expires` (S): vizor's wording.
+  static String convertQuoteExpires(String minutesSeconds) =>
+      'Quote expires in $minutesSeconds';
+
+  /// `convert_quote_holds`
+  static String convertQuoteHolds(String minutesSeconds) =>
+      'Quote holds for $minutesSeconds';
+
+  /// New: vizor's expired-quote label.
+  static const quoteExpired = 'Quote expired';
+
+  /// `convert_quote_loading`
+  static const convertQuoteLoading = 'Getting quote…';
+
+  /// `convert_new_quote` (S): vizor's label.
+  static const convertNewQuote = 'Refresh quote';
+
+  /// `convert_quote_ran_out` (S)
+  static const convertQuoteRanOut =
+      'This quote expired. Refresh it to continue.';
+
+  /// `convert_quote_clock_ahead`
+  static const convertQuoteClockAhead =
+      "The quote had expired by the time it arrived. Check that your phone's "
+      'clock is right, then try again.';
+
+  /// `convert_insufficient`
+  static String convertInsufficient(String zec) =>
+      'Not enough ZEC. You have $zec available.';
+
+  /// `convert_zec_syncing`
+  static const convertZecSyncing =
+      'Your wallet is still syncing. The rest of your ZEC is available once '
+      'it catches up.';
+
+  /// `convert_zec_syncing_progress`
+  static String convertZecSyncingProgress(int percent) =>
+      'Your wallet is still syncing ($percent%). The rest of your ZEC is '
+      'available once it catches up.';
+
+  /// `convert_zec_no_quote` (S)
+  static const convertZecNoQuote =
+      'No quote fits this amount. Try a different amount, or use it all for '
+      'the maximum.';
+
+  // ── Convert: errors before anything is sent ───────────────────────────
+
+  /// `convert_error_maker`
+  static const convertErrorMaker =
+      "The market maker can't be reached right now. Try again in a moment.";
+
+  /// `convert_error_maker_cant_fill`
+  static const convertErrorMakerCantFill =
+      "The market maker can't convert this much right now. Try a smaller "
+      'amount, or try again later.';
+
+  /// `convert_error_maker_busy`
+  static const convertErrorMakerBusy =
+      'The market maker is busy with other conversions. Try again in a few '
+      'minutes.';
+
+  /// `convert_error_amount_refused`
+  static const convertErrorAmountRefused =
+      "The market maker won't convert this amount. It may be over the limit "
+      "for one conversion, or too small to cover the swap's network cost.";
+
+  /// `convert_error_below_fee`
+  static const convertErrorBelowFee =
+      "This amount doesn't cover the relayer's fee. Try a larger amount.";
+
+  /// New (D11): `convert_error_fee_cap`
+  static const convertErrorFeeCap =
+      "The relayer's fee is above the 2 USDC limit right now, so nothing was "
+      'sent. Try again later.';
+
+  /// `convert_error_no_tokens_today`
+  static const convertErrorNoTokensToday =
+      "This phone has used today's conversions. More are available after "
+      'midnight UTC.';
+
+  /// `convert_error_tokens_unavailable` (B, T)
+  static const convertErrorTokensUnavailable =
+      "Couldn't get this conversion's token, so nothing was sent. Try again "
+      'in a moment.';
+
+  /// `convert_error_device_refused` (B)
+  static const convertErrorDeviceRefused =
+      "This phone can't get conversion tokens. The token service turns away "
+      'emulators, phones with an unlocked bootloader or a modified system, '
+      "and app builds it doesn't recognize.";
+
+  /// `convert_error_keystore` (B)
+  static const convertErrorKeystore =
+      "Vizor couldn't use this phone's secure key storage to get a conversion "
+      'token, so nothing was sent. Try again in a moment.';
+
+  /// `convert_error_relayer`
+  static const convertErrorRelayer =
+      "The relayer that completes conversions can't be reached right now. "
+      'Try again in a moment.';
+
+  /// `convert_error_relayer_refused`
+  static const convertErrorRelayerRefused =
+      'The relayer that completes conversions turned this down. Try again in '
+      'a moment.';
+
+  /// `convert_error_ethereum` (B)
+  static const convertErrorEthereum =
+      "Vizor can't reach Ethereum right now. Try again in a moment.";
+
+  /// `convert_error_wallet`
+  static const convertErrorWallet =
+      "Your Zcash wallet isn't ready. Try again once it has synced.";
+
+  /// `convert_error_unpayable`
+  static const convertErrorUnpayable =
+      "Your wallet can't pay this in one transaction right now. Try a smaller "
+      'amount.';
+
+  /// `convert_error_store` (B, D17)
+  static const convertErrorStore =
+      "Vizor can't read its saved conversions. $supportSentence";
+
+  /// `convert_error_generic`
+  static const convertErrorGeneric =
+      "Couldn't get a quote. Try again in a moment.";
+
+  /// `convert_start_failed`
+  static const convertStartFailed =
+      "The conversion couldn't start. Nothing was sent. Try again in a "
+      'moment.';
+
+  /// New (T): `route_blocked`
+  static const routeBlocked =
+      "Tor is starting or unavailable, so nothing was sent. Try again once "
+      "it's connected.";
+
+  // ── Convert: review and info ──────────────────────────────────────────
+
+  /// `convert_review_title`
+  static const convertReviewTitle = 'Review conversion';
+
+  /// `convert_review_arrow`
+  static const convertReviewArrow = 'for about';
+
+  /// `convert_info_title`
+  static const convertInfoTitle = 'How converting works';
+
+  /// `convert_info_step_quote`
+  static const convertInfoStepQuote =
+      'Enter the ZEC you want to convert, including the network fee. The '
+      'market maker quotes how much private USD you receive. The quote holds '
+      'for a few minutes.';
+
+  /// `convert_info_step_deposit`
+  static const convertInfoStepDeposit =
+      'Your ZEC goes to a deposit address that you and the market maker '
+      'control together.';
+
+  /// `convert_info_step_claim` (B)
+  static const convertInfoStepClaim =
+      'Once the deposit is confirmed, Vizor claims the dollars into your '
+      'private balance.';
+
+  /// `convert_info_note_either`
+  static const convertInfoNoteEither =
+      'Either the dollars reach your private balance, or your ZEC comes back '
+      'to you.';
+
+  /// `convert_info_note_time` (B, F)
+  static String convertInfoNoteTime(String about) =>
+      'Takes $about. Keep Vizor open and unlocked until it\'s done. If you '
+      "leave, it pauses; if it can't finish in time, it's called off and "
+      'your ZEC comes back, less a network fee.';
+
+  /// `convert_review_info_title`
+  static const convertReviewInfoTitle = 'Before you convert';
+
+  /// `convert_review_info_pay`
+  static const convertReviewInfoPay =
+      "You pay the ZEC deposit, which includes the market maker's network "
+      'cost, plus the Zcash network fee.';
+
+  /// `convert_review_info_receive`
+  static String convertReviewInfoReceive(String railgunPercent) =>
+      "You receive the dollars left after the relayer's fee and Railgun's "
+      '$railgunPercent% fee for shielding them.';
+
+  /// `convert_review_info_quote` (S)
+  static const convertReviewInfoQuote =
+      'The quote holds for a few minutes. If it expires, refresh it: nothing '
+      'is sent until you convert.';
+
+  /// New (T, D10): `tor_off_disclosure`. Shown only once Vizor fetches
+  /// conversion tokens (M4); M5 converts without them.
+  static const torOffDisclosure =
+      "Tor is off, so the token service sees this phone's attestation "
+      'together with your IP address.';
+
+  // ── Convert: progress (forward) ───────────────────────────────────────
+
+  /// `convert_progress_title`
+  static const convertProgressTitle = 'Converting';
+
+  /// `convert_progress_amounts`
+  static String convertProgressAmounts(String zec, String usd) =>
+      '$zec for about $usd';
+
+  /// `convert_step_open`
+  static const convertStepOpen = 'Opening the swap on Ethereum';
+
+  /// `convert_step_deposit`
+  static const convertStepDeposit = 'Sending your ZEC';
+
+  /// `convert_step_confirm`
+  static const convertStepConfirm = 'Waiting for confirmations';
+
+  /// `convert_step_claim`
+  static const convertStepClaim = 'Claiming your dollars';
+
+  /// `convert_step_confirm_count`
+  static String convertStepConfirmCount(int count, int of) => '$count of $of';
+
+  /// `convert_step_arrive`
+  static const convertStepArrive = 'Arriving in your private balance';
+
+  /// `convert_step_screen`
+  static const convertStepScreen = 'Screening';
+
+  /// `convert_step_refund`
+  static const convertStepRefund = 'Bringing your ZEC back';
+
+  /// `convert_eta_seconds`
+  static const convertEtaSeconds = 'A few seconds';
+
+  /// `convert_eta_minute`
+  static const convertEtaMinute = 'About a minute';
+
+  /// `convert_wait_syncing`
+  static const convertWaitSyncing = 'Waiting for your Zcash wallet to sync';
+
+  /// `convert_maker_silent` (B, F)
+  static String convertMakerSilent(String time) =>
+      "The market maker hasn't confirmed your deposit yet. If it still "
+      "hasn't by $time, Vizor claims your dollars itself. Keep Vizor open "
+      'until then.';
+
+  /// `convert_opening_slow`
+  static const convertOpeningSlow =
+      "The market maker hasn't opened the swap yet. Nothing has been sent.";
+
+  /// `convert_call_off`
+  static const convertCallOff = 'Call it off';
+
+  /// `convert_call_off_failed`
+  static const convertCallOffFailed =
+      "Couldn't call it off. Try again in a moment.";
+
+  /// `convert_call_off_too_late`
+  static const convertCallOffTooLate =
+      "The swap opened on Ethereum meanwhile, so it can't be called off. It "
+      'carries on.';
+
+  /// `convert_unsettled` (B)
+  static const convertUnsettled =
+      'The market maker called the swap off while your ZEC payment was still '
+      'unconfirmed. If it goes through, Vizor brings your ZEC back.';
+
+  /// `convert_resuming`
+  static const convertResuming = 'Picking up where it left off.';
+
+  /// `convert_refunding` (B)
+  static const convertRefunding =
+      'The swap was called off. Vizor is bringing your ZEC back to your '
+      'wallet.';
+
+  /// `convert_background_note` (B, F)
+  static const convertBackgroundNote =
+      "Keep Vizor open until this finishes. If you leave, it pauses and picks "
+      "up when you're back.";
+
+  /// `convert_progress_info_title`
+  static const convertProgressInfoTitle = "What's happening";
+
+  /// `convert_progress_info_open`
+  static const convertProgressInfoOpen =
+      'The market maker opens the swap on Ethereum and locks the dollars in '
+      'it.';
+
+  /// `convert_progress_info_deposit` (B)
+  static const convertProgressInfoDeposit =
+      'Vizor sends your ZEC to the deposit address you and the market maker '
+      'share.';
+
+  /// `convert_progress_info_confirm` (plural)
+  static String convertProgressInfoConfirm(int confirmations) =>
+      'The market maker waits for $confirmations Zcash '
+      '${confirmations == 1 ? 'confirmation' : 'confirmations'}.';
+
+  /// `convert_progress_info_claim` (B)
+  static const convertProgressInfoClaim =
+      'Vizor claims the dollars into your private balance. A relayer pays the '
+      'Ethereum fees.';
+
+  /// `convert_progress_info_screen`
+  static String convertProgressInfoScreen(String about) =>
+      'Railgun screens them for $about before they can be spent.';
+
+  /// `convert_progress_info_refund`
+  static const convertProgressInfoRefund =
+      "If the swap can't finish in time, it's called off and your ZEC comes "
+      'back, less a small network fee.';
+
+  /// New: the progress tab of the step list.
+  static const progressTab = 'Conversion progress';
+
+  /// New: the details tab's rows.
+  static const detailSwapId = 'Swap ID';
+  static const detailDeposit = 'ZEC deposit';
+  static const detailPayout = 'Payout';
+  static const detailRefund = 'ZEC refund';
+  static const detailStarted = 'Started';
+
+  // ── Convert: problems (after a minute of failures) ────────────────────
+
+  /// `convert_problem_title`
+  static const convertProblemTitle = 'Taking longer than usual';
+
+  /// `convert_problem_retry`
+  static const convertProblemRetry = 'Try now';
+
+  /// `convert_problem_relayer` (B, F)
+  static const convertProblemRelayer =
+      "Vizor can't reach the relayer that sends your claim. It keeps trying "
+      "while it's open.";
+
+  /// `convert_problem_relayer_refused` (B, F)
+  static const convertProblemRelayerRefused =
+      "The relayer keeps turning down this conversion's transaction. Vizor "
+      "keeps trying while it's open.";
+
+  /// `convert_problem_relayer_fee` (B, N)
+  static const convertProblemRelayerFee =
+      "The relayer's fee is more than this conversion pays out, or above the "
+      '2 USDC limit, so Vizor waits for it to come down.';
+
+  /// `convert_problem_ethereum` (B, F)
+  static const convertProblemEthereum =
+      "Vizor can't reach Ethereum right now. It keeps trying while it's open.";
+
+  /// `convert_problem_railgun` (B)
+  static const convertProblemRailgun =
+      "Railgun isn't accepting deposits right now, so Vizor holds off "
+      "claiming. If it doesn't reopen in time, the swap is called off and "
+      'your ZEC comes back.';
+
+  /// `convert_problem_turn` (B)
+  static const convertProblemTurn =
+      'The market maker holds the claim for a few minutes. Vizor claims as '
+      "soon as it's your turn.";
+
+  /// `convert_problem_wallet` (B)
+  static const convertProblemWallet =
+      "Your Zcash wallet isn't ready. Vizor retries once it has synced.";
+
+  /// `convert_problem_unpayable` (B)
+  static const convertProblemUnpayable =
+      "Your wallet can't pay the deposit right now, for example because the "
+      'network fee went up. Vizor keeps trying. If it still can\'t pay in '
+      'time, the swap ends and nothing is sent.';
+
+  /// `convert_problem_tokens` (B, T, F)
+  static const convertProblemTokens =
+      "Vizor can't get this conversion's token right now. It keeps trying "
+      "while it's open.";
+
+  /// `convert_problem_rejected` (B)
+  static const convertProblemRejected =
+      'The Zcash network turned down a transaction of this conversion. Vizor '
+      'keeps sending it until it goes through or expires.';
+
+  /// `convert_problem_mismatch` (B)
+  static const convertProblemMismatch =
+      "What's on the chain doesn't match this conversion, so Vizor only "
+      'brings your funds back.';
+
+  /// New (T): a step held up by the Tor route (`RouteBlocked`).
+  static const convertProblemRoute =
+      "Tor is starting or unavailable. Vizor keeps trying while it's open.";
+
+  /// `convert_problem_unexpected` (B, F)
+  static const convertProblemUnexpected =
+      "Something went wrong. Vizor keeps trying while it's open.";
+
+  // ── Convert: results (forward) ────────────────────────────────────────
+
+  /// `convert_result_paid_title`
+  static const convertResultPaidTitle = 'Dollars on their way';
+
+  /// `convert_result_paid_body`
+  static String convertResultPaidBody(String usd, String about) =>
+      '$usd is in your private balance. Railgun screens new funds for $about '
+      'before they can be spent.';
+
+  /// `convert_result_screened_body`
+  static String convertResultScreenedBody(String usd) =>
+      '$usd is in your private balance, ready to use.';
+
+  /// `convert_result_refunded_title`
+  static const convertResultRefundedTitle = 'Your ZEC came back';
+
+  /// `convert_result_refunded_maker`
+  static const convertResultRefundedMaker =
+      'The market maker called the swap off, so your ZEC came back to your '
+      'wallet, less a small network fee.';
+
+  /// `convert_result_refunded_late`
+  static const convertResultRefundedLate =
+      "The swap couldn't be completed in time, so it was called off and your "
+      'ZEC came back, less a small network fee.';
+
+  /// `convert_result_nothing_title`
+  static const convertResultNothingTitle = 'Nothing was sent';
+
+  /// `convert_result_quote_expired`
+  static const convertResultQuoteExpired =
+      'The quote expired before the market maker took it. Your ZEC never '
+      'left your wallet.';
+
+  /// `convert_result_maker_refused`
+  static const convertResultMakerRefused =
+      'The market maker turned the conversion down. Your ZEC never left your '
+      'wallet.';
+
+  /// `convert_result_maker_unavailable`
+  static const convertResultMakerUnavailable =
+      "The market maker isn't taking conversions right now. Your ZEC never "
+      'left your wallet.';
+
+  /// `convert_result_never_opened`
+  static const convertResultNeverOpened =
+      'The swap never opened on Ethereum. Your ZEC never left your wallet.';
+
+  /// `convert_result_mismatch` (B)
+  static const convertResultMismatch =
+      "The swap on Ethereum didn't match its quote, so Vizor didn't send your "
+      'ZEC.';
+
+  /// `convert_result_window_missed` (B)
+  static const convertResultWindowMissed =
+      "The swap opened too late to finish safely, so Vizor didn't send your "
+      'ZEC.';
+
+  /// `convert_result_maker_cancelled`
+  static const convertResultMakerCancelled =
+      'The market maker called the swap off before your ZEC was sent. Your '
+      'ZEC never left your wallet.';
+
+  /// `convert_result_view_balance`
+  static const convertResultViewBalance = 'View private USD';
+
+  /// `convert_result_try_again`
+  static const convertResultTryAgain = 'Try again';
+
   // ── Accounts and reset (new for vizor; §8.4 refusal) ──────────────────
 
   /// New: `delete_unfinished_title`
@@ -335,3 +837,96 @@ abstract final class PrivateUsdCopy {
   static String _conversions(int count) =>
       count == 1 ? 'conversion' : 'conversions';
 }
+
+/// What to say when a quote or an accept fails before anything was sent
+/// (mirrors zapp `PrivateUsdFailure`); null for a cancelled call, which is
+/// never a failure. Dart never branches on an error's message text.
+String? privateUsdErrorMessage(ApiPrivateUsdErrorCode code) => switch (code) {
+  ApiPrivateUsdErrorCode.cancelled => null,
+  ApiPrivateUsdErrorCode.relayerUnreachable =>
+    PrivateUsdCopy.convertErrorRelayer,
+  ApiPrivateUsdErrorCode.relayerRefused =>
+    PrivateUsdCopy.convertErrorRelayerRefused,
+  // At quote, Rust refuses a fee above the 2 USDC cap (D11).
+  ApiPrivateUsdErrorCode.relayerFee => PrivateUsdCopy.convertErrorFeeCap,
+  ApiPrivateUsdErrorCode.ethereumUnreachable ||
+  ApiPrivateUsdErrorCode.chainLagging => PrivateUsdCopy.convertErrorEthereum,
+  ApiPrivateUsdErrorCode.zcashWallet => PrivateUsdCopy.convertErrorWallet,
+  ApiPrivateUsdErrorCode.depositUnpayable =>
+    PrivateUsdCopy.convertErrorUnpayable,
+  ApiPrivateUsdErrorCode.tokensUnreachable ||
+  ApiPrivateUsdErrorCode.tokensRefused =>
+    PrivateUsdCopy.convertErrorTokensUnavailable,
+  ApiPrivateUsdErrorCode.tokensDeviceRefused =>
+    PrivateUsdCopy.convertErrorDeviceRefused,
+  ApiPrivateUsdErrorCode.noTokensToday =>
+    PrivateUsdCopy.convertErrorNoTokensToday,
+  ApiPrivateUsdErrorCode.keystore => PrivateUsdCopy.convertErrorKeystore,
+  ApiPrivateUsdErrorCode.tokensNeeded =>
+    PrivateUsdCopy.convertResultMakerUnavailable,
+  ApiPrivateUsdErrorCode.quoteExpired => PrivateUsdCopy.convertQuoteRanOut,
+  ApiPrivateUsdErrorCode.makerUnavailable => PrivateUsdCopy.convertErrorMaker,
+  ApiPrivateUsdErrorCode.makerBusy => PrivateUsdCopy.convertErrorMakerBusy,
+  ApiPrivateUsdErrorCode.amountRefused =>
+    PrivateUsdCopy.convertErrorAmountRefused,
+  ApiPrivateUsdErrorCode.storeUnreadable => PrivateUsdCopy.convertErrorStore,
+  ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.routeBlocked,
+  ApiPrivateUsdErrorCode.railgunClosed ||
+  ApiPrivateUsdErrorCode.claimTurn ||
+  ApiPrivateUsdErrorCode.zcashRejected ||
+  ApiPrivateUsdErrorCode.mismatch ||
+  ApiPrivateUsdErrorCode.fundingCostChanged ||
+  ApiPrivateUsdErrorCode.depositUnconfirmed ||
+  ApiPrivateUsdErrorCode.tooLate ||
+  ApiPrivateUsdErrorCode.busy ||
+  ApiPrivateUsdErrorCode.unavailable ||
+  ApiPrivateUsdErrorCode.other => PrivateUsdCopy.convertErrorGeneric,
+};
+
+/// The problem card's message for a conversion whose steps have failed for
+/// a minute (reference §5.8; the forward rows of §9.6).
+String privateUsdProblemMessage(ApiPrivateUsdErrorCode code) => switch (code) {
+  ApiPrivateUsdErrorCode.relayerUnreachable =>
+    PrivateUsdCopy.convertProblemRelayer,
+  ApiPrivateUsdErrorCode.relayerRefused =>
+    PrivateUsdCopy.convertProblemRelayerRefused,
+  ApiPrivateUsdErrorCode.relayerFee => PrivateUsdCopy.convertProblemRelayerFee,
+  ApiPrivateUsdErrorCode.ethereumUnreachable ||
+  ApiPrivateUsdErrorCode.chainLagging => PrivateUsdCopy.convertProblemEthereum,
+  ApiPrivateUsdErrorCode.railgunClosed => PrivateUsdCopy.convertProblemRailgun,
+  ApiPrivateUsdErrorCode.claimTurn => PrivateUsdCopy.convertProblemTurn,
+  ApiPrivateUsdErrorCode.zcashWallet => PrivateUsdCopy.convertProblemWallet,
+  ApiPrivateUsdErrorCode.depositUnpayable =>
+    PrivateUsdCopy.convertProblemUnpayable,
+  ApiPrivateUsdErrorCode.tokensUnreachable =>
+    PrivateUsdCopy.convertProblemTokens,
+  ApiPrivateUsdErrorCode.zcashRejected => PrivateUsdCopy.convertProblemRejected,
+  ApiPrivateUsdErrorCode.mismatch => PrivateUsdCopy.convertProblemMismatch,
+  ApiPrivateUsdErrorCode.storeUnreadable => PrivateUsdCopy.convertErrorStore,
+  ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.convertProblemRoute,
+  _ => PrivateUsdCopy.convertProblemUnexpected,
+};
+
+/// Why a forward conversion ended with nothing sent.
+String privateUsdNothingSentMessage(
+  ApiNothingSentCause? cause,
+) => switch (cause) {
+  ApiNothingSentCause.quoteExpired => PrivateUsdCopy.convertResultQuoteExpired,
+  ApiNothingSentCause.makerRefused => PrivateUsdCopy.convertResultMakerRefused,
+  ApiNothingSentCause.makerUnavailable =>
+    PrivateUsdCopy.convertResultMakerUnavailable,
+  ApiNothingSentCause.neverOpened ||
+  null => PrivateUsdCopy.convertResultNeverOpened,
+  ApiNothingSentCause.mismatch => PrivateUsdCopy.convertResultMismatch,
+  ApiNothingSentCause.depositWindowMissed =>
+    PrivateUsdCopy.convertResultWindowMissed,
+  ApiNothingSentCause.makerCancelled =>
+    PrivateUsdCopy.convertResultMakerCancelled,
+};
+
+/// Why a forward conversion's ZEC came back.
+String privateUsdRefundedMessage(ApiRefundCause? cause) => switch (cause) {
+  ApiRefundCause.makerCancelled ||
+  null => PrivateUsdCopy.convertResultRefundedMaker,
+  ApiRefundCause.notClaimedInTime => PrivateUsdCopy.convertResultRefundedLate,
+};

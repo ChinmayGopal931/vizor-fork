@@ -23,6 +23,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/widgets/mobile/mobile_home_entry_card.dart';
 import '../../../../core/widgets/app_tooltip.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/enhance_pir_provider.dart';
@@ -55,7 +56,11 @@ import '../../../migration/widgets/mobile/mobile_ironwood_migration_attention.da
 import '../../../migration/providers/ironwood_migration_coordinator_provider.dart';
 import '../../../migration/widgets/mobile/mobile_ironwood_migration_announcement_sheet.dart';
 import '../../../private_usd/providers/private_usd_available_provider.dart';
+import '../../../private_usd/providers/private_usd_activity_provider.dart';
+import '../../../private_usd/widgets/mobile/private_usd_activity_rows.dart';
+import '../../../private_usd/widgets/mobile/private_usd_banner.dart';
 import '../../../private_usd/widgets/mobile/private_usd_home_strip.dart';
+import '../../../../rust/api/private_usd.dart' show ApiForwardRecord;
 import '../../../swap/models/swap_activity_navigation.dart';
 import '../../../swap/providers/swap_state_provider.dart';
 import '../../../swap/widgets/swap_activity_status_auto_refresh.dart';
@@ -1093,11 +1098,18 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             transactions: sync.recentTransactions,
           );
     final swapReceiveTxByIntent = absorption.receiveTxByIntent;
+    // Private USD conversions stand in for the deposits and refund sweeps
+    // they made (plan reference §9.2).
+    final privateUsdRecords = uuid == null
+        ? const <ApiForwardRecord>[]
+        : ref.watch(privateUsdActivityRecordsProvider(uuid));
+    final privateUsdTxids = privateUsdActivityTxids(privateUsdRecords);
     final entries = <ActivityEntry>[
       for (final tx in giftCardActivityIndex.withPendingClaims(
         sync.recentTransactions,
       ))
-        if (!absorption.absorbs(tx))
+        if (!absorption.absorbs(tx) &&
+            !privateUsdTxids.contains(tx.txidHex.toLowerCase()))
           _transactionEntry(
             context,
             ref,
@@ -1130,6 +1142,21 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
               final tx => () => _openLoadedTransactionStatus(tx),
             },
           ),
+        ),
+      // No rows, no deployment read (an FRB call desktop never makes).
+      if (privateUsdRecords.isNotEmpty)
+        ...privateUsdActivityEntries(
+          context: context,
+          records: privateUsdRecords,
+          zcashConfirmations:
+              ref
+                  .watch(privateUsdCurrentDeploymentProvider)
+                  ?.zcashConfirmations ??
+              2,
+          privacyModeEnabled: privacyModeEnabled,
+          dateOnlyTimestamp: true,
+          onOpenConversion: (path) => _pushUsedScreen(path.location),
+          onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
         ),
     ]..sort(compareActivityEntries);
     final recentRows = [
@@ -1276,6 +1303,12 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+              ),
+            if (uuid != null)
+              PrivateUsdConversionBanner(
+                accountUuid: uuid,
+                padding: const EdgeInsets.only(top: AppSpacing.s),
+                onOpen: (path) => _pushUsedScreen(path.location),
               ),
             const _MobileSetupCarousel(),
             const _MobileVotingEntry(),
@@ -1511,7 +1544,7 @@ class _MobileVotingEntryState extends ConsumerState<_MobileVotingEntry> {
     }
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.s),
-      child: _MobileHomeEntryCard(
+      child: MobileHomeEntryCard(
         key: const ValueKey('mobile_home_coinholder_voting'),
         icon: AppIcons.vote,
         title: 'Coinholder voting',
@@ -1536,7 +1569,7 @@ class _MobileSetupCarousel extends ConsumerWidget {
       items.add(
         MobileHomeCarouselItem(
           id: 'wallet-setup',
-          child: _MobileHomeEntryCard(
+          child: MobileHomeEntryCard(
             key: const ValueKey('mobile_home_backup'),
             icon: AppIcons.shieldKeyhole,
             title: 'Secure your wallet',
@@ -1560,7 +1593,7 @@ class _MobileSetupCarousel extends ConsumerWidget {
       items.add(
         MobileHomeCarouselItem(
           id: 'zcash-education',
-          child: _MobileHomeEntryCard(
+          child: MobileHomeEntryCard(
             key: const ValueKey('mobile_home_zcash_education'),
             icon: AppIcons.book,
             title: 'Learn about Zcash',
@@ -1581,134 +1614,6 @@ class _MobileSetupCarousel extends ConsumerWidget {
       child: MobileHomeCarousel(
         key: ValueKey('mobile_home_setup_carousel_$activeAccountUuid'),
         items: items,
-      ),
-    );
-  }
-}
-
-class _MobileHomeEntryCard extends StatelessWidget {
-  const _MobileHomeEntryCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.emphasized = false,
-    this.showChevron = true,
-    this.semanticsLabel,
-    super.key,
-  });
-
-  final String icon;
-  final String title;
-  final String subtitle;
-  final bool emphasized;
-  final bool showChevron;
-
-  /// Replaces [title] as the spoken name; the subtitle is always read after.
-  final String? semanticsLabel;
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Semantics(
-      // One item for screen readers whether or not it is tappable.
-      container: true,
-      button: true,
-      label: '${semanticsLabel ?? title}\n$subtitle',
-      onTap: onTap,
-      excludeSemantics: true,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          constraints: BoxConstraints(minHeight: emphasized ? 88 : 77),
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: emphasized ? AppSpacing.sm : AppSpacing.s,
-          ),
-          decoration: BoxDecoration(
-            color: emphasized ? colors.surface.card : colors.background.ground,
-            borderRadius: BorderRadius.circular(AppRadii.large),
-            boxShadow: emphasized ? appSurfaceShadow(colors) : null,
-          ),
-          foregroundDecoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppRadii.large),
-            border: emphasized
-                ? Border.all(color: colors.border.regular)
-                : Border.all(color: const Color(0x12FFFFFF), width: 1.5),
-          ),
-          child: Padding(
-            padding: emphasized
-                ? EdgeInsets.zero
-                : const EdgeInsets.all(AppSpacing.xxs),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (emphasized)
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: colors.background.brandCrimsonSubtle,
-                      borderRadius: BorderRadius.circular(AppRadii.xSmall),
-                    ),
-                    alignment: Alignment.center,
-                    child: AppIcon(
-                      icon,
-                      size: 20,
-                      color: colors.icon.brandCrimson,
-                    ),
-                  )
-                else
-                  AppIcon(icon, size: 20, color: colors.icon.accent),
-                const SizedBox(width: AppSpacing.s),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              maxLines: emphasized ? null : 1,
-                              overflow: emphasized
-                                  ? null
-                                  : TextOverflow.ellipsis,
-                              style: AppTypography.labelLarge.copyWith(
-                                color: colors.text.accent,
-                              ),
-                            ),
-                          ),
-                          if (showChevron)
-                            AppIcon(
-                              AppIcons.chevronForward,
-                              size: 20,
-                              color: colors.icon.accent,
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        subtitle,
-                        maxLines: emphasized ? null : 1,
-                        overflow: emphasized ? null : TextOverflow.ellipsis,
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: colors.text.secondary,
-                          height: 17 / 16,
-                          letterSpacing: -0.04,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

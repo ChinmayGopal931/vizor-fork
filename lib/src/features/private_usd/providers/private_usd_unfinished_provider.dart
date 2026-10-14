@@ -87,3 +87,14 @@ final privateUsdUnfinishedTotalProvider = FutureProvider.autoDispose<int>((
       .read(privateUsdLifecycleProvider)
       .unfinishedCount(accounts.isEmpty ? const [] : accounts.split(','));
 });
+
+/// Conversions that only show [fixed]: Widgetbook, capture scenarios and
+/// widget tests. No engine runs.
+class FixedPrivateUsdConversionsNotifier extends PrivateUsdConversionsNotifier {
+  FixedPrivateUsdConversionsNotifier(this.fixed);
+
+  final Map<PrivateUsdRecordKey, PrivateUsdConversionStatus> fixed;
+
+  @override
+  Map<PrivateUsdRecordKey, PrivateUsdConversionStatus> build() => fixed;
+}

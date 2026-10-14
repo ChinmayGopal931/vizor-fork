@@ -76,7 +76,8 @@ void main() {
     expect(find.text(previewPrivateUsdAddress), findsOneWidget);
     expect(find.text(PrivateUsdCopy.activityEmpty), findsOneWidget);
     expect(find.text(PrivateUsdCopy.emptyTitle), findsNothing);
-    // Convert, Send and Withdraw arrive with M5 and M7.
+    // Convert shows only with its action (the screen always gives one);
+    // Send and Withdraw arrive with M7.
     expect(find.text(PrivateUsdCopy.actionConvert), findsNothing);
     expect(find.text(PrivateUsdCopy.actionSend), findsNothing);
   });

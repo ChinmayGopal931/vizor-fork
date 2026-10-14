@@ -409,10 +409,11 @@ Until M4 lands, the engine's token seam holds none (D-33).
 - [x] M5.2 FRB forward calls (D-32)
 - [x] M5.3 Dart engine and provider (D-51, D-52)
 - [x] M5.4 Lifecycle provider and account-deletion guards (D-53)
-- [ ] M5.5 UI
-- [ ] M5.6 Copy (Convert tables, Accounts)
-- [ ] M5.7 Widgetbook and capture scenarios (forward rows)
-- [ ] M5 gate
+- [x] M5.5 UI (D-54)
+- [x] M5.6 Copy (Convert tables, Accounts) (D-55)
+- [x] M5.7 Widgetbook and capture scenarios (forward rows) (D-56)
+- [ ] M5.8 Device round (testnet + Sepolia; needs testnet ZEC on the phone's wallet, E8). Scenario written, opt-in (D-57); not run (B-9)
+- [x] M5 gate: every suite passes (status below); the device checks are M5.8, deferred
 
 M5 part 1 status (2026-10-13): M5.1 and M5.2, the Rust half, are done. Part 2
 (M5.3–M5.7: the Dart engine, lifecycle, UI, copy and Widgetbook) is next; the
@@ -565,6 +566,72 @@ the forward path runs without tokens (D-33).
   - Each advance holds the account's driver lock for its whole run (up to a
     minute while the chain catches up after a lock or claim), so keep one
     serial queue per account.
+
+M5 status (2026-10-14): done except M5.8, the device round, which needs
+testnet ZEC on the phone's wallet (E8) and the phone attached (B-9); its
+opt-in scenario is written (D-57). Part 1 is `0a4cb8182` (M5.1–M5.2); part
+2a is `518bda590` (M5.3–M5.4); part 2b is the commit that checks this note
+(M5.5–M5.7). Nothing in part 2 touched Rust, the FRB API or Kotlin.
+
+- **What landed in part 2.**
+  - The engine (D-51): `services/private_usd_engine.dart`,
+    `services/private_usd_swap_backend.dart` (the FRB seam) and
+    `services/private_usd_paths.dart`; `providers/private_usd_engine_provider.dart`
+    (the engine, its backend and its build gate) and
+    `providers/private_usd_unfinished_provider.dart` (the engine's snapshot,
+    the unfinished set the router reads, and the deletion and reset counts);
+    `PrivateUsdEngineHost` beside `BackgroundAutoLockHost` in `lib/app.dart`.
+  - The lifecycle (D-53): `privateUsdLifecycleProvider` counts conversions
+    and removes a deleted account's; `removeAccount` and `resetWallet` refuse
+    more than the user confirmed; the mobile removal sheet and the
+    forgot-passcode sheet warn with the count.
+  - The UI (D-54): `/private-usd/convert`, `/private-usd/convert/review` and
+    `/private-usd/conversion/:direction/:index` with their screens, the guard
+    exception, the convert provider and quote search, the conversion, banner
+    and keep-awake providers, the progress presentation
+    (`models/private_usd_status_presentation.dart`), the banner and activity
+    rows on home, in Activity and on `/private-usd`, and Convert there.
+    `MobileHomeEntryCard` and `MobileWarningNotice` moved to
+    `lib/src/core/widgets/mobile/`.
+  - The copy (D-55), Widgetbook entries and 15 capture scenarios (D-56), and
+    the device round's `--m5` scenario (D-57).
+- **The engine host's behaviour.** Inert unless the build has the define,
+  the mobile form factor, Android and a deployment (desktop builds none). It
+  advances every account's conversions under way (D14), one serial queue
+  per account, only in the foreground, unlocked and outside a drain; it
+  idles with no timer when nothing is under way. A lock cancels the running
+  step, drops the held quotes and problem timers, and waits at most 5 s; the
+  background only cancels; a drain cancels and waits at most 30 s. A step
+  queued before a pause never starts, a result after one is dropped (advances
+  and accept), and a seed read after one is zeroed before Rust sees it.
+  Problems show after a minute of failures; `cancelled` and `busy` are never
+  failures.
+- **Tests.**
+  - Rust, the FRB bindings and Kotlin did not change in part 2, so `cargo
+    test`, the codegen and the Gradle tests were not run (part 1's Rust run
+    stands: lib 1500 passed, 11 ignored; integration 6 passed, 21 ignored).
+  - `fvm flutter analyze`: no issues.
+  - `fvm flutter test` (desktop lane): 5963 passed, 161 skipped, 4 failed,
+    the 4 pre-existing failures in `settings_seed_phrase_screen_test.dart`
+    ("incoming links cannot interrupt backup …").
+  - Mobile lane (`--tags mobile --run-skipped
+    --dart-define=VIZOR_FORM_FACTOR=mobile`): 2276 passed, 10 failed, the 10
+    pre-existing failures in `app_review_payment_handoff_test.dart` ("Edit"
+    and "Review" × 5).
+  - New: 37 untagged tests (part 2a's 15 among them) and 34 mobile-tagged
+    ones (D-58). Both lanes' totals grew by exactly those.
+  - Captures: the new scenarios rendered with `scripts/figma-compare.sh
+    widget --form-factor mobile` and reviewed (D-56).
+- **For M5.8 (the device round).** With testnet ZEC on the phone's testnet
+  wallet (an earlier round's, passcode 111111) and the phone on USB and
+  unlocked: `ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh
+  --m5` (`--m5-zec` sets the amount; 0.05 by default). It checks, in two
+  runs around an `am force-stop`: a small conversion reaches `Paid`; killed
+  mid-confirmation, it resumes; locked mid-swap, no advance (so no key) runs
+  for 90 s and unlock resumes it; with another account active it keeps
+  advancing; the removal sheet shows the count. Not covered by the harness:
+  the kill switch turned off mid-swap (D-42: a flag URL the phone can
+  reach).
 
 ## M6. Reverse conversion, reverse refunds, rescue and the Refunds screen
 
@@ -1238,6 +1305,132 @@ the forward path runs without tokens (D-33).
   - The lifecycle's conversions backend exists only in builds with the
     define on the mobile form factor (const), so desktop never looks for
     conversions.
+- **D-54 (M5.5): the UI as built.** Reference §9.1, §9.2 and §9.7 updated.
+  - Routes: `/private-usd/convert`, `/private-usd/convert/review` (extra
+    `PrivateUsdReviewArgs`, else back to the convert screen) and
+    `/private-usd/conversion/:direction/:index` (a `reverse` path goes to
+    `/private-usd` until M6). While Private USD is unavailable, the guard
+    still lets the active account's conversion under way show its progress
+    (`privateUsdUnfinishedProvider`, which `_routerProvider` now listens to).
+  - Navigation: "Convert" on `/private-usd` opens the conversion under way,
+    else the convert screen, which itself gives way to one found on opening
+    (the engine's set, then the records, as after a crash mid-accept) or
+    after a quote refused as `busy`. Accept pops the review with the
+    conversion's route and the convert screen replaces itself with its
+    progress (§9.1 said the review is replaced), so back from progress lands
+    on `/private-usd`. "View private USD" goes home and pushes `/private-usd`,
+    as send's status does; "Try again" replaces progress with the convert
+    screen.
+  - The convert provider quotes through the engine's per-account queue (a
+    quote takes Rust's driver lock too). "Getting quote…" shows from the
+    first keystroke; the countdown runs to the 20 s cutoff; on the amount
+    step the 1 s tick asks again, at the same size, for a quote past it
+    (only in the foreground and unlocked: each quote spends an index); on
+    the review "Refresh quote" asks there and the review keeps the answer
+    (zapp went back to the amount phase), and says why when it fails; any
+    other quote that lands while the review is up is dropped, and one already
+    past its cutoff on arrival shows the clock message (on the review the
+    expired quote stays, so "Refresh quote" does too). "Max" needs a balance Rust vouches for
+    (`authoritative`) and a wallet not catching up. `units` is clamped to a
+    `u32`, the most a quote can name. No direction toggle, and `?to=zec` is
+    ignored, until M6.
+  - Accept: `quoteExpired`, `relayerFee` and `depositUnpayable` are refusals
+    before anything was saved; the quote then counts as spent and the review
+    offers "Refresh quote". `relayerFee` says the 2 USDC message when the
+    quote's fee is above the deployment's cap, else the "doesn't cover"
+    one. Any other failure reads the records and opens the progress if the
+    index is under way, else says it couldn't start. `tokensNeeded` (no
+    tokens client, D-33) says "The market maker isn't taking conversions
+    right now…" and calls the record off, never asking again.
+  - Progress: the result, problem card, note and "Call it off" sit above
+    the step list, so they show without scrolling. Paid shows "Arriving"
+    until the balance was read 30 s after the payout (the screen asks for
+    that read), "Screening" while some is still arriving, then the completed
+    status card. The details tab has the swap ID, the ZEC deposit and refund
+    (explorer order), the payout (an Etherscan link) and the start time.
+  - The banner reuses home's emphasized entry card, now
+    `MobileHomeEntryCard` in `lib/src/core/widgets/mobile/`: on home after
+    the action row, and on `/private-usd`. Its second line is "Keep Vizor
+    open to finish" whenever a conversion is under way: every forward stage
+    still has a key step to come.
+  - Activity: rows from the engine's snapshot of the account's records,
+    read once per account: "Converting ZEC" (its stage), "Converted ZEC"
+    (the ZEC paid; opens the payout on Etherscan) and "Conversion called
+    off"; nothing sent makes no row. The main-wallet rows of deposits and
+    refund sweeps are dropped. On home, in Activity and on `/private-usd`.
+    Builds without the engine have none, and read no deployment.
+  - Keep-awake: `privateUsdKeepAwakeProvider` is true while a progress
+    screen shows and its conversion is unfinished, OR-ed into
+    `SyncKeepAwakeNativeHost` (both watched, no short-circuit).
+  - The balance counts an account with any conversion record as in use
+    (D-21's M5 step), so the home strip keeps it fresh.
+  - The Tor-off disclosure (D10) is not shown in M5: it is about the token
+    service, and M5 fetches no tokens. The review takes a flag, which the
+    capture scenario sets.
+  - The swap review's warning line is now `MobileWarningNotice` in
+    `lib/src/core/widgets/mobile/` (§9.1), used by both.
+- **D-55 (M5.6): the copy as built.** The Convert tables (amount and quote,
+  errors, review and info, forward progress, problems, forward results) and
+  Accounts are in `PrivateUsdCopy`, with `privateUsdErrorMessage`,
+  `privateUsdProblemMessage`, `privateUsdNothingSentMessage` and
+  `privateUsdRefundedMessage`. New: "Max" (vizor's visible label; "Use it
+  all" stays the semantics label), the details tab and its row labels, and
+  `convertProblemRoute` for a step held up by the Tor route (`route_blocked`
+  says "nothing was sent", which a conversion in progress cannot say).
+  `makerUnavailable` maps to "can't be reached"; `tokensNeeded` to the
+  maker-unavailable result; `mismatch`, `busy`, `unavailable` and `other` to
+  the generic quote error. The reverse, refunds and send tables wait for M6
+  and M7.
+- **D-56 (M5.7): Widgetbook and capture scenarios.** The 15 forward rows of
+  §9.7 except the reverse attention banner (M6), registered in Widgetbook's
+  Home and Private USD folders and as `FigmaCompareScenario`s;
+  `mobile-private-usd-default` gains a converted and a called-off row and the
+  Convert button. All 26 Private USD mobile scenarios render in
+  `figma_compare_mobile_scenarios_test.dart`. Captured with
+  `scripts/figma-compare.sh widget --form-factor mobile`, in dark (every new
+  screen) and light (convert, the review with Tor off, progress, the home
+  banner), and reviewed; that review made the bottom buttons full width,
+  right-aligned the ledger values and moved the problem card above the
+  steps.
+- **D-57 (M5): the device round's M5 scenario, written and not run.**
+  `run_device_round.sh --m5 [--m5-zec 0.05]` (off by default; implies no
+  release check and keeps the page storage) runs
+  `private_usd_device_test.dart` twice: `VIZOR_PUSD_DEVICE_M5=start`
+  unlocks the testnet wallet already on the phone (passcode 111111, an
+  earlier round's), waits for it to sync with the amount spendable, converts
+  through the screens and stops once the deposit is kept; the runner then
+  `am force-stop`s the app (killed mid-confirmation) and runs
+  `VIZOR_PUSD_DEVICE_M5=resume`, which checks that it resumes, that a lock
+  runs no advance for 90 s (each advance reads the seed) and unlock resumes
+  it, that it advances with another account active (adding one if the
+  wallet has none), that removing the account warns with the count and
+  Cancel deletes nothing, and that it reaches Paid. A check the conversion
+  outran is recorded as skipped, not failed. The test refuses to run with
+  `VIZOR_PUSD_DEVICE_RESET`, so it can never reset the funded wallet; each
+  test now returns early unless its round was asked for (`--run-skipped`
+  lifts `skip:`). Events carry the swap index, phases and timings only.
+- **D-58 (M5): the Dart tests as built.** Plan §10 updated. Untagged:
+  `test/features/private_usd/private_usd_engine_test.dart` (8: D-52),
+  `private_usd_zec_quote_search_test.dart` (10: all nine of zapp's
+  `PrivateUsdZecQuotesTest`, plus the `u32` clamp),
+  `private_usd_convert_provider_test.dart` (10: the `PrivateUsdConvertVMTest`
+  button-enable cases at 107, 126, 138, 150, 179, 201 and 216, then vizor's
+  back rule and two expiry rules: the 20 s cutoff with the same-size
+  replacement on the amount step, and "Refresh quote" on the review),
+  `test/providers/private_usd_account_lifecycle_test.dart` (7: the refusal
+  after the drain, a count above the confirmed one, drain before the Rust
+  delete and cleanup after it, no cleanup when the Rust delete fails, no
+  question without conversions, the reset refusal only while unlocked, and
+  an unreadable store never blocking), and two more in
+  `private_usd_available_provider_test.dart` (the engine's build gate, and
+  the host building no engine without the define). Mobile-tagged:
+  `mobile_private_usd_conversion_screens_test.dart` (16: the convert, review
+  and progress states, the banner, and `/private-usd` with a conversion), 3
+  removal-sheet cases in `mobile_accounts_screen_test.dart`, and the 15 new
+  scenarios in `figma_compare_mobile_scenarios_test.dart`. The convert flow
+  runs the real quote search and engine over a scripted backend on the
+  widget tester's fake clock; time-driven tests pump `Duration.zero` because
+  a bare `pump()` fires no timers.
 
 ## Blocked
 
@@ -1277,6 +1470,12 @@ the forward path runs without tokens (D-33).
   unlock it, and run
   `ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh`, or
   ask for the round again.
+- **B-9. The M5 device round (M5.8) needs testnet ZEC on the phone's wallet
+  (E8), and the phone attached (2026-10-14).** The scenario is written and
+  off by default (D-57). Owner: fund the testnet wallet an earlier round left
+  on the phone (or let the M3 round create one, then fund its receive
+  address), attach the phone over USB, unlock it, and run
+  `ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh --m5`.
 - **B-6. E1, E2 and E4 are not delivered.** Local stand-ins:
   `~/dev/zapp/zecSwap-zakura` (detached worktree at `d69e3fb` with the §12
   diff; zecSwap has no LICENSE yet) and `~/dev/wallet-libraries-e4` (`391d0b0`

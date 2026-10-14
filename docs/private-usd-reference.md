@@ -1710,8 +1710,8 @@ Read from zapp at `60bcf0b30` and vizor at `4a859bee0`. **No Figma exists for th
 | Topic | zapp | vizor (follow this) |
 |---|---|---|
 | Steps | one route with in-screen phases (amount ⇄ review; form → review → sending → done) | separate `CupertinoPage` routes per step, with state in a Riverpod notifier, as send (`/send`, `/send/amount`, `/send/review`, `/send/status`, `lib/src/core/navigation/mobile_routes.dart:189-280`) and swap/pay (`/swap/review`, `/pay/review`) do |
-| Back | to the Pay tab | pop the stack. Accept replaces the review with progress (`pushReplacement`), so back from progress lands on `/private-usd`. |
-| Quote expiry | "Quote refreshes in", then "Get a new quote" | "Quote expires in m:ss" divider, "Quote expired", and a "Refresh quote" primary (`features/pay/widgets/mobile/mobile_pay_review_content.dart:155-206` `_QuoteExpiryDivider`, labels in `MobilePayReviewActions` `:229-260`). The divider has no timer: the caller passes `expiresInText` (computed in `features/swap/screens/mobile/mobile_swap_review_screen.dart:124`); the convert provider's 1 s tick supplies it. Stale notice text as in `mobile_swap_review_content.dart:113-117`. |
+| Back | to the Pay tab | pop the stack. As built (M5, progress D-54): accept pops the review with the conversion's route, and the convert screen replaces itself with progress (`pushReplacement`), so back from progress lands on `/private-usd`. |
+| Quote expiry | "Quote refreshes in", then "Get a new quote" | "Quote expires in m:ss" divider, "Quote expired", and a "Refresh quote" primary (`features/pay/widgets/mobile/mobile_pay_review_content.dart:155-206` `_QuoteExpiryDivider`, labels in `MobilePayReviewActions` `:229-260`). The divider has no timer: the caller passes `expiresInText` (computed in `features/swap/screens/mobile/mobile_swap_review_screen.dart:124`); the convert provider's 1 s tick supplies it. Stale notice text as in `mobile_swap_review_content.dart:113-117`. As built (M5): "Refresh quote" asks again on the review itself (same size first) and the review keeps the new quote; the countdown runs to 20 s before expiry, when the quote stops being offered. |
 | Errors | a danger caption in the scaffold | an inline warning notice with icon and destructive text (the private `_MobileReviewNotice`, `mobile_swap_review_content.dart:257-287`; lift it to `core/widgets/mobile/`) |
 | Progress | a `ZappStepList` | `MobileSwapStatusContent` (`features/swap/widgets/mobile/mobile_swap_status_content.dart:35`) with progress and details tabs, fed a `SwapActivityStatusPresentation` whose `steps` use `SwapStatusStepData{title, state, completeTitle, activeTitle, pendingTitle, description}` (`features/swap/models/swap_status_presentation.dart:3-47`) and whose badge is a `SwapStatusBadgeKind` (`liveQuote`, `completed`, `refunded`, `warning`, `failed`). The details tab carries the Etherscan and Railscan links through `SwapStatusDetailRowData.linkUri` (`:49-61`). |
 | Send in flight / done | an in-screen proving bar | `MobileTransactionProgressScreen` (`core/widgets/mobile/mobile_transaction_progress_screen.dart:30`; phases `inProgress`, `pending`, `succeeded`, `failed`, `:12`). Put the proof percentage in `body` ("Proving your transaction · 42%"). `pending` = `Unconfirmed`. |
@@ -1767,6 +1767,8 @@ Read from zapp at `60bcf0b30` and vizor at `4a859bee0`. **No Figma exists for th
   - Send, Withdraw and Convert are disabled.
   - Conversion progress stays reachable. The engine's Rust HTTP follows Tor, so forward steps continue (the forward path never needs the page, §3.3). Steps that need the Railgun page (the reverse funding proof, the balance) wait with that notice.
 
+**As built (M5, progress D-54).** The progress route redirects a `reverse` path to `/private-usd` until M6; `/private-usd/convert` ignores `?to=zec` and shows no direction toggle until then. The guard's exception reads `privateUsdUnfinishedProvider` with the active account, and `_routerProvider` refreshes on it.
+
 **One conversion at a time and the spend guard.**
 
 - "Convert" opens the in-flight conversion when one exists, from `/private-usd`, from the strip and from `/private-usd/convert` on open. That matches `showConversionUnderWay`, including after a crash between accept and the progress route.
@@ -1816,10 +1818,12 @@ services/
   private_usd_paths.dart                    [M4/M5] storeDir(network), existingStoreDir(network) (never creates; M5 added getExistingPrivateUsdDirPath), tokensPath(network) over wallet_paths.dart; M3 added getPrivateUsdDirPath, getPrivateUsdTokenStorePath, deletePrivateUsdDirectories and deletePrivateUsdTokenStores there (D-26)
   private_usd_swap_backend.dart             [M5] PrivateUsdSwapBackend: the FRB calls with this wallet's context; key-using calls take a PrivateUsdSecretReader (read the seed last, zero it once Rust copied it) (D-51)
   private_usd_account_data.dart             [M3] deletePrivateUsdAccountData(storage, uuid): the engine key and the balance cache
-  private_usd_engine.dart                   [M5] class PrivateUsdEngine {
-                                                start(); pause(PauseReason); resume(); nudge();
-                                                Future<T> runFor<T>(String accountUuid, Future<T> Function(int opId, Uint8List mnemonic) step); // serial per account, zeroes bytes, epoch-checked
-                                                Future<void> quiesceAndDrain(); void resumeAfterMutation(); }
+  private_usd_engine.dart                   [M5] class PrivateUsdEngine {   // as built (D-51)
+                                                ValueNotifier<Map<PrivateUsdRecordKey, PrivateUsdConversionStatus>> conversions;
+                                                void start({bool resuming}); void nudge(); Future<void> pause(PrivateUsdPauseReason);   // lock | background
+                                                Future<T> runFor<T>(String accountUuid, Future<T> Function(int opId, PrivateUsdSecretReader secret) step, {bool dropLateResult}); // serial per account, epoch-checked
+                                                quote(account, units:); accept(account, index:, maxTotalZat:); abandon(account, index:); loadRecords(account);
+                                                Future<void> quiesceAndDrain(); void resumeAfterMutation(); forgetAccount(uuid); forgetAll(); dispose(); }
   private_usd_zec_quote_search.dart         [M5] class PrivateUsdZecQuoteSearch { Future<ZecQuote> quote(BigInt totalZat, {BigInt? requestedUnits}); } // PrivateUsdZecQuotes.kt:35-80
   private_usd_reverse_funding.dart          [M6] Future<ApiReverseRecord> fund(PrivateUsdRecordKey key) // R4–R6 in §5.11
   private_usd_spend_guard.dart              [M7] enum PrivateUsdSpendStatus {checking, available, sending, converting, unreadable}; send(); startConversion()
@@ -1833,16 +1837,16 @@ providers/
   private_usd_unfinished_provider.dart      [M5] NotifierProvider<…, Set<PrivateUsdRecordKey>> (sync; the router reads it; notifies only when the set changes), plus privateUsdConversionsProvider (the engine's snapshot, Map<PrivateUsdRecordKey, PrivateUsdConversionStatus>) and the deletion/reset counts privateUsdUnfinishedCountProvider(uuid), privateUsdUnfinishedTotalProvider
   private_usd_conversion_provider.dart      [M5] NotifierProvider.family<…, PrivateUsdConversionState, PrivateUsdRecordKey>
                                                  // {record, wait, activity, problem (after 60 s), resuming, busy}; actions: retryNow, callOff, pay, authorizeReady, cancel
-  private_usd_conversion_banner_provider.dart [M5] Provider.family<PrivateUsdBannerState?, String>
+  private_usd_conversion_banner_provider.dart [M5] Provider.family<PrivateUsdBannerState?, String>; as built it sits in private_usd_conversion_provider.dart, from the engine's snapshot (D-54)
   private_usd_convert_provider.dart         [M5/M6] NotifierProvider.autoDispose<…, PrivateUsdConvertState>
                                                  // {direction, amountText, quote, quoting, error, expiresIn, step: amount|review|confirming}; onAmountChanged (700 ms), onMax, refreshQuote, confirm
   private_usd_keep_awake_provider.dart      [M5] Provider<bool> (OR-ed into SyncKeepAwakeNativeHost)
-  private_usd_activity_provider.dart        [M5] privateUsdActivityRowItemsProvider(uuid)
+  private_usd_activity_provider.dart        [M5] as built: privateUsdActivityRecordsProvider(uuid) (the account's forward records from the engine's snapshot, read once) and privateUsdActivityTxids; the rows come from widgets/mobile/private_usd_activity_rows.dart (D-54)
   private_usd_refunds_provider.dart         [M6] NotifierProvider.autoDispose.family<…, PrivateUsdRefundsState, String> (15 s, ≤ 4 checks, 30 s each)
   private_usd_send_provider.dart            [M7] NotifierProvider.autoDispose.family<…, PrivateUsdSendState, PrivateUsdSendMode>
   private_usd_spend_status_provider.dart    [M7] StreamProvider.family<PrivateUsdSpendStatus, String>
 screens/mobile/  mobile_private_usd_{,convert_,convert_review_,conversion_,refunds_,send_,send_review_,send_status_}screen.dart
-widgets/mobile/  private_usd_home_strip.dart, private_usd_banner.dart, private_usd_amount_step.dart, private_usd_info_sheets.dart, private_usd_confirm_sheets.dart
+widgets/mobile/  private_usd_home_strip.dart, private_usd_banner.dart, private_usd_activity_rows.dart, private_usd_info_sheets.dart, private_usd_confirm_sheets.dart (M6). As built (M5) the amount step is in mobile_private_usd_convert_screen.dart with the quote ledger and expiry divider, and the banner reuses MobileHomeEntryCard (lib/src/core/widgets/mobile/, extracted from home)
 lib/src/providers/private_usd_lifecycle_provider.dart   [M3] register / quiesceAndDrain / resume (GiftCardTrackingLifecycle shape, several owners) + wipeRailgunPage for a reset; M5 registers the swap engine (run / cancel)
 lib/src/core/widgets/mobile/private_usd_engine_host.dart [M5] ConsumerWidget; watches privateUsdEngineProvider when privateUsdEngineEnabledProvider (define, mobile, Android, a deployment; not the kill switch or the active account). As built (D-51) the AppLifecycleListener and the lock listener live in privateUsdEngineProvider (Gift Card's shape)
 ```
@@ -2522,6 +2526,8 @@ scripts/figma-compare.sh widget --form-factor mobile --scenario <id> --theme dar
 ```
 
 As built in M3 (D-28): the six `mobile-home-private-usd*` strip scenarios without the two banners, and `mobile-private-usd-{default,empty,first-load,refresh-failed,blocked}`. The fixtures live in `lib/widgetbook/private_usd_use_cases.dart`; the home ones pass `privateUsdBalance` (and `privacyModeEnabled`) to `_buildMobileHomeUseCase`. The banners arrive with M5, `payment-pending` with M7, and `tor-unavailable` is moot (D-22). The default screen has no activity rows until M5 and M7.
+
+As built in M5 (D-56): the forward rows, `mobile-home-private-usd-converting` (through `_buildMobileHomeUseCase`'s `privateUsdConversions`), `mobile-private-usd-convert{,-quoting,-insufficient,-syncing}`, `mobile-private-usd-review{,-expired,-tor-off}` and `mobile-private-usd-progress{,-opening-slow,-problem,-paid,-refunding,-refunded,-nothing-sent}`; `mobile-private-usd-default` now has a converted and a called-off row and the Convert button. `mobile-home-private-usd-attention` is a reverse banner and arrives with M6.
 
 | Scenario id | State |
 |---|---|

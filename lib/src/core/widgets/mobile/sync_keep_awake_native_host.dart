@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../layout/app_form_factor.dart';
+import '../../../features/private_usd/providers/private_usd_keep_awake_provider.dart';
 import '../../../providers/sync_keep_awake_provider.dart';
 import '../../../services/native_screen_awake.dart';
 
@@ -62,9 +63,11 @@ class _SyncKeepAwakeNativeHostState
   Widget build(BuildContext context) {
     if (kAppFormFactor == AppFormFactor.mobile) {
       // Keep observing while inactive; a short-circuit here drops the provider
-      // subscription, and resume's one-time read cannot restore it.
-      final active = ref.watch(syncKeepAwakeActiveProvider);
-      _requestNativeState(_isInForeground && active);
+      // subscription, and resume's one-time read cannot restore it. Private
+      // USD's progress screens share this one native flag (X8).
+      final syncActive = ref.watch(syncKeepAwakeActiveProvider);
+      final privateUsdActive = ref.watch(privateUsdKeepAwakeProvider);
+      _requestNativeState(_isInForeground && (syncActive || privateUsdActive));
     }
     return widget.child;
   }
@@ -89,7 +92,10 @@ class _SyncKeepAwakeNativeHostState
   void _handleLifecycleResume() {
     if (_isInForeground) return;
     _isInForeground = true;
-    _requestNativeState(ref.read(syncKeepAwakeActiveProvider));
+    _requestNativeState(
+      ref.read(syncKeepAwakeActiveProvider) ||
+          ref.read(privateUsdKeepAwakeProvider),
+    );
   }
 
   void _requestNativeState(

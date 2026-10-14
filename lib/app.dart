@@ -98,7 +98,9 @@ import 'src/features/payment_links/providers/payment_link_intake_provider.dart';
 import 'src/features/payment_links/providers/gift_claim_flow_provider.dart';
 import 'src/features/payment_links/screens/gift_claim_screen.dart';
 import 'src/features/payment_links/screens/desktop_payment_link_scan_screen.dart';
+import 'src/features/private_usd/models/private_usd_record_key.dart';
 import 'src/features/private_usd/providers/private_usd_available_provider.dart';
+import 'src/features/private_usd/providers/private_usd_unfinished_provider.dart';
 import 'src/features/send/screens/payment_request_scan_screen.dart';
 import 'src/features/payment_links/screens/desktop_gift_password_screen.dart';
 import 'src/features/payment_links/screens/desktop_gift_customise_screen.dart';
@@ -556,6 +558,10 @@ final _routerProvider = Provider<_AppRouter>((ref) {
   ref.listen(privateUsdAvailableProvider, (_, _) {
     refresh.requestRefresh();
   });
+  // A conversion under way keeps its progress route reachable (D16).
+  ref.listen(privateUsdUnfinishedProvider, (_, _) {
+    refresh.requestRefresh();
+  });
   log('router: initialized');
 
   final navigatorKey = GlobalKey<NavigatorState>();
@@ -685,8 +691,8 @@ String? appRedirect({
       _isRouteOrChild(state.matchedLocation, '/activity/swap');
   final swapFeatureEnabled = ref.read(swapFeatureEnabledProvider);
   // Hardware accounts, accounts without a ZIP-32 index, networks without a
-  // deployment and the kill switch all leave it unavailable. (M5 exempts a
-  // conversion still under way, whose progress must stay reachable.)
+  // deployment and the kill switch all leave it unavailable, except the
+  // progress of a conversion still under way for the active account (D16).
   final isPrivateUsd = _isRouteOrChild(state.matchedLocation, '/private-usd');
 
   log(
@@ -736,7 +742,19 @@ String? appRedirect({
     return requiresUnlock ? '/unlock' : '/home';
   }
   if (!swapFeatureEnabled && isSwap) return '/home';
-  if (isPrivateUsd && !ref.read(privateUsdAvailableProvider)) return '/home';
+  if (isPrivateUsd && !ref.read(privateUsdAvailableProvider)) {
+    final conversion = PrivateUsdRoutePath.tryParseLocation(
+      state.matchedLocation,
+    );
+    final account = ref.read(accountProvider).value?.activeAccountUuid;
+    final underWay =
+        conversion != null &&
+        account != null &&
+        ref
+            .read(privateUsdUnfinishedProvider)
+            .contains(conversion.keyFor(account));
+    if (!underWay) return '/home';
+  }
   return null;
 }
 

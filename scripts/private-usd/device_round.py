@@ -15,6 +15,11 @@ $ANDROID_SERIAL. Run it with `python3 -I`.
   probe [--onionoo]             One sample of what `serve` checks, printed.
   summarize --out DIR           Digest of a round's evidence.
 
+The M5 round (`run_device_round.sh --m5`) uses the same `serve` endpoints:
+its events (`m5-*`: the swap index, phases and timings, never amounts or
+txids) and screenshots land in the same evidence directory, and `summarize`
+lists them with the rest.
+
 A checkpoint reports, for the app UID: whether a WebView renderer runs for
 the app (the isolated `…:sandboxed_process…` process tagged with the app's
 `u0a…i`), the app UID's LISTEN rows in /proc/net/tcp{,6}, memory (PSS), and

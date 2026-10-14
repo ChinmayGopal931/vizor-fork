@@ -12,7 +12,9 @@ import '../services/private_usd_balance_cache.dart';
 import '../services/private_usd_balance_repository.dart';
 import '../services/railgun_engine.dart';
 import '../services/railgun_engine_key_store.dart';
+import '../models/private_usd_record_key.dart';
 import 'private_usd_available_provider.dart';
+import 'private_usd_unfinished_provider.dart';
 import 'railgun_engine_provider.dart';
 
 final privateUsdBalanceCacheProvider = Provider<PrivateUsdBalanceCache>(
@@ -103,6 +105,15 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
     // Syncs made for sending or converting count too, and the engine's scan
     // reports drive the first-sync percentage.
     ref.listen(railgunEngineStateProvider, (_, next) => _onEngine(next));
+    // An account that converted is in use: its payouts arrive here.
+    bool converted(Map<PrivateUsdRecordKey, Object?> all) =>
+        all.keys.any((key) => key.accountUuid == accountUuid);
+    _inUse = converted(ref.read(privateUsdConversionsProvider));
+    ref.listen(privateUsdConversionsProvider.select(converted), (_, next) {
+      if (!next || _inUse) return;
+      _inUse = true;
+      if (_pollTimer != null) _poll();
+    });
     unawaited(_load());
     return const PrivateUsdBalanceState();
   }

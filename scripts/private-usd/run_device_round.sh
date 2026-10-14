@@ -18,6 +18,15 @@
 #   --skip-test | --skip-release | --skip-restore
 #   --keep-page-data     keep the Railgun page storage (no true first sync)
 #   --no-tor-first-sync  skip the first sync through Tor
+#   --m5                 the M5 round (forward conversion) instead of M3's checks,
+#                        off by default. It never resets the wallet: it converts
+#                        from the testnet wallet on the phone (an earlier round's,
+#                        passcode 111111), which needs testnet ZEC (E8). It runs
+#                        the test's start phase, force-stops the app once the
+#                        deposit is kept (killed mid-confirmation), then runs the
+#                        resume phase (lock, account switch, delete warning, Paid).
+#                        Implies --skip-release and keeps the page storage.
+#   --m5-zec AMOUNT      ZEC to convert in the M5 round (default 0.05)
 #
 # Safety: it refuses a phone whose com.keplr.vizor is installed but not
 # debuggable (that may be a real wallet), runs `flutter test --no-uninstall`,
@@ -49,8 +58,11 @@ export CARGOKIT_SKIP_EMULATOR_ABIS=true
 OUT="${TMPDIR:-/tmp}/pusd-device-round-$(date +%Y%m%d-%H%M%S)"
 RELEASE_APK=""
 RUN_TEST=1 RUN_RELEASE=1 RUN_RESTORE=1 KEEP_PAGE=0 TOR_FIRST_SYNC=true
+M5=0 M5_ZEC=0.05
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --m5) M5=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
+    --m5-zec) M5_ZEC=$2; shift 2 ;;
     --out) OUT=$2; shift 2 ;;
     --release-apk) RELEASE_APK=$2; shift 2 ;;
     --skip-test) RUN_TEST=0; shift ;;
@@ -183,18 +195,46 @@ if [[ $RUN_TEST == 1 ]]; then
   start_logcat logcat-test.txt
   fresh=true
   [[ $KEEP_PAGE == 1 ]] && fresh=false
-  log "running the integration test (fresh page storage: $fresh, Tor first sync: $TOR_FIRST_SYNC)"
   set +e
-  fvm flutter test integration_test/private_usd_device_test.dart \
-    -d "$SERIAL" --tags private-usd-device --run-skipped --no-uninstall \
-    "${DEFINES[@]}" \
-    --dart-define=ZCASH_E2E_NETWORK=testnet \
-    --dart-define=VIZOR_PUSD_DEVICE_DRIVER_URL="http://127.0.0.1:$PORT" \
-    --dart-define=VIZOR_PUSD_DEVICE_RESET=true \
-    --dart-define=VIZOR_PUSD_DEVICE_FRESH_PAGE=$fresh \
-    --dart-define=VIZOR_PUSD_DEVICE_TOR_FIRST_SYNC=$TOR_FIRST_SYNC \
-    2>&1 | tee "$OUT/flutter-test.log"
-  TEST_STATUS=${PIPESTATUS[0]}
+  if [[ $M5 == 1 ]]; then
+    # Never VIZOR_PUSD_DEVICE_RESET: the round converts the phone's funded
+    # wallet, and the test refuses to run with it.
+    m5_test() {
+      fvm flutter test integration_test/private_usd_device_test.dart \
+        -d "$SERIAL" --tags private-usd-device --run-skipped --no-uninstall \
+        "${DEFINES[@]}" \
+        --dart-define=ZCASH_E2E_NETWORK=testnet \
+        --dart-define=VIZOR_PUSD_DEVICE_DRIVER_URL="http://127.0.0.1:$PORT" \
+        --dart-define=VIZOR_PUSD_DEVICE_M5="$1" \
+        --dart-define=VIZOR_PUSD_DEVICE_M5_ZEC="$M5_ZEC" \
+        2>&1 | tee "$OUT/flutter-test-m5-$1.log"
+      return "${PIPESTATUS[0]}"
+    }
+    log "M5 round, start phase: convert $M5_ZEC ZEC until the deposit is kept"
+    m5_test start
+    TEST_STATUS=$?
+    if [[ $TEST_STATUS == 0 ]]; then
+      adb_ shell am force-stop "$PACKAGE"
+      log "killed the app mid-confirmation (am force-stop)"
+      sleep 5
+      ensure_screen_ready
+      log "M5 round, resume phase: kill, lock, account switch, delete warning, Paid"
+      m5_test resume
+      TEST_STATUS=$?
+    fi
+  else
+    log "running the integration test (fresh page storage: $fresh, Tor first sync: $TOR_FIRST_SYNC)"
+    fvm flutter test integration_test/private_usd_device_test.dart \
+      -d "$SERIAL" --tags private-usd-device --run-skipped --no-uninstall \
+      "${DEFINES[@]}" \
+      --dart-define=ZCASH_E2E_NETWORK=testnet \
+      --dart-define=VIZOR_PUSD_DEVICE_DRIVER_URL="http://127.0.0.1:$PORT" \
+      --dart-define=VIZOR_PUSD_DEVICE_RESET=true \
+      --dart-define=VIZOR_PUSD_DEVICE_FRESH_PAGE=$fresh \
+      --dart-define=VIZOR_PUSD_DEVICE_TOR_FIRST_SYNC=$TOR_FIRST_SYNC \
+      2>&1 | tee "$OUT/flutter-test.log"
+    TEST_STATUS=${PIPESTATUS[0]}
+  fi
   set -e
   stop_pid "$SAMPLER_PID"
   stop_pid "$LOGCAT_PID"

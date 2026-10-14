@@ -15,6 +15,7 @@ import 'package:zcash_wallet/app.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/network_config.dart';
 import 'package:zcash_wallet/src/core/config/private_usd_feature_config.dart';
+import 'package:zcash_wallet/src/core/formatting/zec_amount.dart';
 import 'package:zcash_wallet/src/core/layout/app_form_factor.dart';
 import 'package:zcash_wallet/src/core/storage/app_secure_store.dart';
 import 'package:zcash_wallet/src/core/storage/wallet_paths.dart';
@@ -22,7 +23,11 @@ import 'package:zcash_wallet/src/features/private_usd/models/private_usd_balance
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_balance_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/models/private_usd_record_key.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_engine_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_unfinished_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/railgun_engine_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/railgun_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/railgun_host_channel.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
@@ -30,6 +35,8 @@ import 'package:zcash_wallet/src/providers/app_security_provider.dart';
 import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart' as rust_private_usd;
+import 'package:zcash_wallet/src/rust/api/private_usd.dart'
+    show ApiForwardOutcome;
 
 import 'support/mobile_regtest_flow.dart';
 
@@ -56,6 +63,20 @@ import 'support/mobile_regtest_flow.dart';
 //      socket. Tor off: a refresh works direct again.
 //   4. Lock closes the page and leaves no loopback listener.
 //   5. Unlock: the strip shows the known balance and does not reopen the page.
+//
+// The M5 round (forward conversion) is opt-in: the runner's `--m5` passes
+// VIZOR_PUSD_DEVICE_M5=start, kills the app, then runs it again with
+// VIZOR_PUSD_DEVICE_M5=resume. It never resets the wallet: it converts from
+// the testnet wallet already on the phone (an earlier round's, unlocked with
+// that round's passcode), which needs testnet ZEC (E8).
+//   start:  unlock, wait for the wallet to sync, convert
+//           VIZOR_PUSD_DEVICE_M5_ZEC through the screens, and stop once the
+//           deposit is kept (the runner then force-stops the app mid-
+//           confirmation).
+//   resume: unlock; the conversion resumes after the kill; a lock uses no
+//           key until unlock resumes it; with another account active it
+//           keeps advancing; the delete warning shows the count; it reaches
+//           Paid.
 
 const _driverUrl = String.fromEnvironment('VIZOR_PUSD_DEVICE_DRIVER_URL');
 const _allowReset = bool.fromEnvironment('VIZOR_PUSD_DEVICE_RESET');
@@ -63,6 +84,12 @@ const _freshPage = bool.fromEnvironment('VIZOR_PUSD_DEVICE_FRESH_PAGE');
 const _torFirstSync = bool.fromEnvironment(
   'VIZOR_PUSD_DEVICE_TOR_FIRST_SYNC',
   defaultValue: true,
+);
+// '' (the M3 round), 'start' or 'resume'.
+const _m5Phase = String.fromEnvironment('VIZOR_PUSD_DEVICE_M5');
+const _m5Zec = String.fromEnvironment(
+  'VIZOR_PUSD_DEVICE_M5_ZEC',
+  defaultValue: '0.05',
 );
 
 const _homeBalanceKey = ValueKey('mobile_home_shielded_balance');
@@ -92,13 +119,51 @@ void main() {
     await initializeZcashWalletRuntime();
   });
 
+  // `--run-skipped` (which the tag needs) lifts `skip:`, so each test picks
+  // its round itself.
   testWidgets('M3: the Private USD balance, Tor and lock on a device', (
     tester,
   ) async {
+    if (_m5Phase.isNotEmpty) return _log('an M5 round: M3 not run');
     tolerateRenderOverflows();
     _requireRoundSetup();
     await _Round(tester).run();
   }, timeout: const Timeout(Duration(minutes: 50)));
+
+  testWidgets('M5 (start): a conversion until its deposit is kept', (
+    tester,
+  ) async {
+    if (_m5Phase != 'start') return _log('not the M5 start round');
+    tolerateRenderOverflows();
+    _requireM5Setup();
+    await _M5Round(tester).start();
+  }, timeout: const Timeout(Duration(minutes: 40)));
+
+  testWidgets('M5 (resume): kill, lock, account switch, delete warning, Paid', (
+    tester,
+  ) async {
+    if (_m5Phase != 'resume') return _log('not the M5 resume round');
+    tolerateRenderOverflows();
+    _requireM5Setup();
+    await _M5Round(tester).resume();
+  }, timeout: const Timeout(Duration(minutes: 70)));
+}
+
+void _requireM5Setup() {
+  if (!Platform.isAndroid) fail('The swap engine is Android only.');
+  if (kZcashDefaultNetworkName != ZcashNetwork.testnet.name) {
+    fail('Run on testnet: --dart-define=ZCASH_DEFAULT_NETWORK=test.');
+  }
+  if (!kVizorPrivateUsdEnabled || kAppFormFactor != AppFormFactor.mobile) {
+    fail('Build with VIZOR_PRIVATE_USD_ENABLED and VIZOR_FORM_FACTOR=mobile.');
+  }
+  if (_driverUrl.isEmpty) {
+    fail('Run through scripts/private-usd/run_device_round.sh --m5.');
+  }
+  // The M5 round converts real (testnet) funds from the wallet on the phone:
+  // it must never be the round that resets that wallet.
+  if (_allowReset) fail('An M5 round never resets the wallet.');
+  if (parseZecAmount(_m5Zec) == null) fail('Bad VIZOR_PUSD_DEVICE_M5_ZEC.');
 }
 
 void _requireRoundSetup() {
@@ -801,4 +866,279 @@ class _Round {
 
   static String _short(String address) =>
       '${address.substring(0, 8)}…${address.substring(address.length - 6)}';
+}
+
+/// The M5 device round (forward conversion), in two runs around a kill.
+/// Never prints the mnemonic, a txid with an amount, or any secret: the
+/// events carry the swap index, phases and timings.
+class _M5Round extends _Round {
+  _M5Round(super.tester);
+
+  static const _amountKey = ValueKey('mobile_private_usd_convert_amount');
+  static const _reviewKey = ValueKey('mobile_private_usd_convert_review');
+  static const _convertKey = ValueKey('mobile_private_usd_review_convert');
+  static const _screenConvertKey = ValueKey('mobile_private_usd_convert');
+  static const _progressKey = ValueKey('mobile_private_usd_progress_list');
+  static const _bannerKey = ValueKey('private_usd_conversion_banner');
+
+  late PrivateUsdRecordKey _key;
+
+  PrivateUsdConversionStatus? get _status =>
+      _container.read(privateUsdConversionsProvider)[_key];
+
+  /// Unlocks the wallet already on the phone and waits for home.
+  Future<void> _openWallet(String phase) async {
+    _vmServicePort = (await developer.Service.getInfo()).serverUri?.port;
+    await _event('m5-$phase-start', {'zec': _m5Zec});
+    await tester.pumpWidget(await buildBootstrappedZcashWalletApp());
+    await _waitUntil(
+      'the unlock keypad',
+      () => tester.any(find.bySemanticsLabel('Digit 1')),
+      timeout: const Duration(minutes: 2),
+    );
+    await enterPasscode(tester, mobileE2ePasscode);
+    await waitForHome(tester);
+    _container = ProviderScope.containerOf(
+      tester.element(find.byKey(_homeBalanceKey)),
+    );
+    _uuid = _container.read(accountProvider).value!.activeAccountUuid!;
+    expect(_container.read(privateUsdAvailableProvider), isTrue);
+  }
+
+  Future<void> start() async {
+    await _openWallet('start');
+    final spend = parseZecAmount(_m5Zec)!;
+    await _waitUntil('the wallet to sync with $_m5Zec ZEC spendable', () {
+      final sync = _container.read(syncProvider).value;
+      return sync != null &&
+          sync.isSyncComplete &&
+          sync.spendableBalance >= spend;
+    }, timeout: const Duration(minutes: 20));
+    // A conversion a died round left under way is used, not a new one.
+    final underWay = privateUsdUnderWayFor(
+      _container.read(privateUsdUnfinishedProvider),
+      _uuid,
+    );
+    if (underWay != null) {
+      _key = underWay;
+      _log('a conversion is already under way: index ${_key.index}');
+    } else {
+      await _convertThroughTheScreens();
+    }
+    await _event('m5-accepted', {'index': _key.index});
+    final accepted = DateTime.now();
+    await _waitUntil(
+      'the deposit to be kept',
+      () => _status?.record.depositTxid != null || _status?.isUnderWay == false,
+      timeout: const Duration(minutes: 15),
+      every: const Duration(seconds: 30),
+      onTick: (elapsed) async => _log('phase ${_status?.record.phase.name}'),
+    );
+    await _screenshot('m5-01-deposit-kept');
+    await _event('m5-start-end', {
+      'index': _key.index,
+      'phase': _status?.record.phase.name,
+      'depositKeptAfterS': DateTime.now().difference(accepted).inSeconds,
+    });
+    // The runner force-stops the app now: killed mid-confirmation.
+  }
+
+  Future<void> _convertThroughTheScreens() async {
+    await tapWidget(tester, _stripKey);
+    await tapAppButton(tester, _screenConvertKey);
+    await _waitUntil(
+      'the convert screen',
+      () => tester.any(find.byKey(_amountKey)),
+    );
+    await tester.enterText(find.byKey(_amountKey), _m5Zec);
+    await tester.pump(const Duration(milliseconds: 100));
+    // 700 ms after typing stops, then a price probe and a quote.
+    await tapAppButton(tester, _reviewKey, timeout: const Duration(minutes: 2));
+    await _screenshot('m5-00-review');
+    await tapAppButton(
+      tester,
+      _convertKey,
+      timeout: const Duration(minutes: 1),
+    );
+    await _waitUntil(
+      'the progress screen',
+      () => tester.any(find.byKey(_progressKey)),
+      timeout: const Duration(minutes: 3),
+    );
+    final key = privateUsdUnderWayFor(
+      _container.read(privateUsdUnfinishedProvider),
+      _uuid,
+    );
+    expect(key, isNotNull, reason: 'accepted, but nothing is under way');
+    _key = key!;
+  }
+
+  Future<void> resume() async {
+    await _openWallet('resume');
+    final engine = _container.read(privateUsdEngineProvider);
+    await _waitUntil(
+      'the conversion under way to be known',
+      () =>
+          privateUsdUnderWayFor(
+            _container.read(privateUsdUnfinishedProvider),
+            _uuid,
+          ) !=
+          null,
+      timeout: const Duration(minutes: 2),
+    );
+    _key = privateUsdUnderWayFor(
+      _container.read(privateUsdUnfinishedProvider),
+      _uuid,
+    )!;
+    // 1. Killed mid-confirmation, it resumes: an advance after the restart.
+    await _waitUntil(
+      'an advance after the restart',
+      () => _status?.checkedAt != null || _status?.isUnderWay == false,
+      timeout: const Duration(minutes: 3),
+    );
+    _results['m5_resumed_phase'] = _status?.record.phase.name;
+    await _lockUsesNoKey(engine);
+    await _otherAccountKeepsAdvancing();
+    await _deleteWarningShowsTheCount();
+    await _reachesPaid();
+    _log('results: $_results');
+    await _event('m5-resume-end', _results);
+  }
+
+  /// 2. Locked mid-swap, no key is used (no advance runs: each needs the
+  /// seed), and unlock resumes it.
+  Future<void> _lockUsesNoKey(PrivateUsdEngine engine) async {
+    if (_status?.isUnderWay != true) {
+      _results['m5_lock'] = 'skipped: ended before the check';
+      return;
+    }
+    final router = GoRouter.of(tester.element(find.byKey(_homeBalanceKey)));
+    final before = _status?.checkedAt;
+    _container.read(appSecurityProvider.notifier).lock();
+    _container.read(accountProvider.notifier).clearSensitiveStateForLock();
+    router.go('/unlock');
+    unawaited(
+      _container.read(syncProvider.notifier).clearSensitiveStateForLock(),
+    );
+    await _pumpFor(const Duration(seconds: 90));
+    expect(engine.canRun, isFalse);
+    expect(
+      _status?.checkedAt,
+      before,
+      reason: 'an advance (which reads the seed) ran while locked',
+    );
+    await enterPasscode(tester, mobileE2ePasscode);
+    await waitForHome(tester);
+    await _waitUntil(
+      'an advance after unlock',
+      () =>
+          _status?.isUnderWay == false ||
+          (_status?.checkedAt?.isAfter(before ?? DateTime(0)) ?? false),
+      timeout: const Duration(minutes: 3),
+    );
+    _results['m5_lock'] = 'no advance while locked; resumed after unlock';
+  }
+
+  /// 3. With another account active, the conversion keeps advancing (D14).
+  Future<void> _otherAccountKeepsAdvancing() async {
+    if (_status?.isUnderWay != true) {
+      _results['m5_switch'] = 'skipped: ended before the check';
+      return;
+    }
+    final notifier = _container.read(accountProvider.notifier);
+    var other = _container
+        .read(accountProvider)
+        .value!
+        .accounts
+        .where((a) => a.uuid != _uuid && !a.isHardware)
+        .map((a) => a.uuid)
+        .firstOrNull;
+    if (other == null) {
+      _log('adding a second account for the switch check');
+      other = await notifier.createAccount(name: 'Round second');
+    }
+    await notifier.switchAccount(other);
+    await waitForHome(tester);
+    final before = _status?.checkedAt;
+    await _waitUntil(
+      'an advance with the other account active',
+      () =>
+          _status?.isUnderWay == false ||
+          (_status?.checkedAt?.isAfter(before ?? DateTime(0)) ?? false),
+      timeout: const Duration(minutes: 3),
+    );
+    await _screenshot('m5-02-other-account');
+    await notifier.switchAccount(_uuid);
+    await waitForHome(tester);
+    _results['m5_switch'] = 'advanced while another account was active';
+  }
+
+  /// 4. Removing the account warns with the number under way, and Cancel
+  /// deletes nothing.
+  Future<void> _deleteWarningShowsTheCount() async {
+    if (_status?.isUnderWay != true) {
+      _results['m5_delete_warning'] = 'skipped: ended before the check';
+      return;
+    }
+    final router = GoRouter.of(tester.element(find.byKey(_homeBalanceKey)));
+    unawaited(router.push('/accounts'));
+    await tapWidget(tester, ValueKey('mobile_accounts_menu_$_uuid'));
+    await tapWidget(tester, const ValueKey('mobile_account_menu_remove'));
+    await _waitUntil(
+      'the removal warning',
+      () => tester.any(
+        find.byKey(const ValueKey('mobile_account_remove_private_usd')),
+      ),
+    );
+    final count = await _container.read(
+      privateUsdUnfinishedCountProvider(_uuid).future,
+    );
+    expect(count, greaterThanOrEqualTo(1));
+    expect(
+      find.text(PrivateUsdCopy.deleteUnfinishedBody(count)),
+      findsOneWidget,
+    );
+    await _screenshot('m5-03-delete-warning');
+    await tester.tap(find.text('Cancel'));
+    await _pumpFor(const Duration(seconds: 2));
+    expect(
+      _container.read(accountProvider).value!.accounts.map((a) => a.uuid),
+      contains(_uuid),
+    );
+    router.go('/home');
+    await waitForHome(tester);
+    _results['m5_delete_warning'] = 'showed $count, nothing deleted';
+  }
+
+  /// 5. It reaches Paid, watched from its progress screen.
+  Future<void> _reachesPaid() async {
+    if (_status?.isUnderWay == true) {
+      await tapWidget(tester, _bannerKey);
+      await _waitUntil(
+        'the progress screen',
+        () => tester.any(find.byKey(_progressKey)),
+      );
+    }
+    final started = DateTime.now();
+    String? phase;
+    await _waitUntil(
+      'the conversion to end',
+      () => _status?.isUnderWay == false,
+      timeout: const Duration(minutes: 45),
+      every: const Duration(seconds: 30),
+      onTick: (elapsed) async {
+        final now = _status?.record.phase.name;
+        if (now != phase) {
+          phase = now;
+          await _event('m5-phase', {'phase': now, 'afterS': elapsed.inSeconds});
+        }
+      },
+    );
+    await _screenshot('m5-04-ended');
+    expect(_status?.record.outcome, ApiForwardOutcome.paid);
+    _results['m5_outcome'] = _status?.record.outcome?.name;
+    _results['m5_paid_after_resume_s'] = DateTime.now()
+        .difference(started)
+        .inSeconds;
+  }
 }

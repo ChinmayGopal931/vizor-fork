@@ -13,7 +13,10 @@ import 'package:flutter/widgets.dart';
 import '../src/providers/voting/voting_home_entry_provider.dart';
 import '../src/features/payment_links/models/vizor_payment_link.dart';
 import '../src/features/private_usd/providers/private_usd_available_provider.dart';
+import '../src/features/private_usd/models/private_usd_record_key.dart';
 import '../src/features/private_usd/providers/private_usd_balance_provider.dart';
+import '../src/features/private_usd/providers/private_usd_unfinished_provider.dart';
+import '../src/features/private_usd/services/private_usd_engine.dart';
 import '../src/features/private_usd/services/private_usd_balance_repository.dart';
 import 'private_usd_use_cases.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1670,6 +1673,7 @@ Widget buildMobileHomeDefaultUseCase(
 Widget _buildMobileHomePrivateUsdUseCase(
   PrivateUsdBalanceState balance, {
   bool privacyModeEnabled = false,
+  bool converting = false,
 }) {
   return _buildMobileHomeUseCase(
     accountState: _accountsDesignState,
@@ -1678,9 +1682,19 @@ Widget _buildMobileHomePrivateUsdUseCase(
       recentTransactions: [_homeTx(1), _homeTx(2)],
     ),
     privateUsdBalance: balance,
+    privateUsdConversions: converting
+        ? previewPrivateUsdConverting(_accountsDesignState.activeAccountUuid!)
+        : null,
     privacyModeEnabled: privacyModeEnabled,
   );
 }
+
+/// Home with a conversion under way: the forward banner.
+Widget buildMobileHomePrivateUsdConvertingUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(
+      previewPrivateUsdBalance(available: 1250.4),
+      converting: true,
+    );
 
 /// Home with the Private USD strip: the balance and its `≈ ZEC` worth.
 Widget buildMobileHomePrivateUsdUseCase(BuildContext context) =>
@@ -3379,6 +3393,7 @@ Widget _buildMobileHomeUseCase({
   GiftCardActivityIndex giftCardActivityIndex = GiftCardActivityIndex.empty,
   NetworkPrivacyState? networkPrivacyState,
   PrivateUsdBalanceState? privateUsdBalance,
+  Map<PrivateUsdRecordKey, PrivateUsdConversionStatus>? privateUsdConversions,
   bool privacyModeEnabled = false,
 }) {
   final harness = _MobileHomeHarness(
@@ -3407,6 +3422,13 @@ Widget _buildMobileHomeUseCase({
         privateUsdBalanceProvider.overrideWith2(
           (uuid) => FixedPrivateUsdBalanceNotifier(uuid, privateUsdBalance),
         ),
+      ],
+      // A conversion under way, with no engine or deployment behind it.
+      if (privateUsdConversions != null) ...[
+        privateUsdConversionsProvider.overrideWith(
+          () => FixedPrivateUsdConversionsNotifier(privateUsdConversions),
+        ),
+        privateUsdCurrentDeploymentProvider.overrideWithValue(null),
       ],
       if (!inheritWalletState)
         accountProvider.overrideWith(

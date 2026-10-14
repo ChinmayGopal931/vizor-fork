@@ -27,6 +27,10 @@ import '../../swap_activity_row_items_provider.dart';
 import '../../swap_activity_row_mapper.dart';
 import '../../widgets/activity_feed.dart';
 import 'mobile_transaction_status_screen.dart';
+import '../../../private_usd/providers/private_usd_activity_provider.dart';
+import '../../../private_usd/providers/private_usd_available_provider.dart';
+import '../../../private_usd/widgets/mobile/private_usd_activity_rows.dart';
+import '../../../../rust/api/private_usd.dart' show ApiForwardRecord;
 
 /// Loads the full transaction history for one account; injectable so
 /// widget tests can avoid the Rust FFI.
@@ -281,10 +285,17 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen> {
             transactions: transactions,
           );
     final swapReceiveTxByIntent = absorption.receiveTxByIntent;
+    // Private USD conversions stand in for the deposits and refund sweeps
+    // they made (plan reference §9.2).
+    final privateUsdRecords = accountUuid == null
+        ? const <ApiForwardRecord>[]
+        : ref.watch(privateUsdActivityRecordsProvider(accountUuid));
+    final privateUsdTxids = privateUsdActivityTxids(privateUsdRecords);
 
     final entries = <ActivityEntry>[
       for (final tx in giftCardActivityIndex.withPendingClaims(transactions))
-        if (!absorption.absorbs(tx))
+        if (!absorption.absorbs(tx) &&
+            !privateUsdTxids.contains(tx.txidHex.toLowerCase()))
           _transactionEntry(
             context,
             tx,
@@ -314,6 +325,20 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen> {
               final tx => () => _openLoadedTransactionStatus(context, tx),
             },
           ),
+        ),
+      // No rows, no deployment read (an FRB call desktop never makes).
+      if (privateUsdRecords.isNotEmpty)
+        ...privateUsdActivityEntries(
+          context: context,
+          records: privateUsdRecords,
+          zcashConfirmations:
+              ref
+                  .watch(privateUsdCurrentDeploymentProvider)
+                  ?.zcashConfirmations ??
+              2,
+          privacyModeEnabled: privacyModeEnabled,
+          onOpenConversion: (path) => context.push(path.location),
+          onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
         ),
     ];
     final sections = buildActivityFeedSections(entries);

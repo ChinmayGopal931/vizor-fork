@@ -568,6 +568,10 @@ class WidgetbookApp extends StatelessWidget {
                       name: 'Private USD hidden balances',
                       builder: buildMobileHomePrivateUsdHiddenUseCase,
                     ),
+                    WidgetbookUseCase(
+                      name: 'Private USD converting',
+                      builder: buildMobileHomePrivateUsdConvertingUseCase,
+                    ),
                   ],
                 ),
                 WidgetbookComponent(
@@ -610,6 +614,62 @@ class WidgetbookApp extends StatelessWidget {
                     WidgetbookUseCase(
                       name: 'Hidden balances',
                       builder: buildMobilePrivateUsdHiddenUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Convert',
+                      builder: buildMobilePrivateUsdConvertUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Convert getting a quote',
+                      builder: buildMobilePrivateUsdConvertQuotingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Convert not enough ZEC',
+                      builder: buildMobilePrivateUsdConvertInsufficientUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Convert while syncing',
+                      builder: buildMobilePrivateUsdConvertSyncingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Review',
+                      builder: buildMobilePrivateUsdReviewUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Review expired',
+                      builder: buildMobilePrivateUsdReviewExpiredUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Review with Tor off',
+                      builder: buildMobilePrivateUsdReviewTorOffUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Progress',
+                      builder: buildMobilePrivateUsdProgressUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Progress opening slowly',
+                      builder: buildMobilePrivateUsdProgressOpeningSlowUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Progress problem',
+                      builder: buildMobilePrivateUsdProgressProblemUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Progress paid',
+                      builder: buildMobilePrivateUsdProgressPaidUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Progress refunding',
+                      builder: buildMobilePrivateUsdProgressRefundingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Progress refunded',
+                      builder: buildMobilePrivateUsdProgressRefundedUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Progress nothing sent',
+                      builder: buildMobilePrivateUsdProgressNothingSentUseCase,
                     ),
                   ],
                 ),

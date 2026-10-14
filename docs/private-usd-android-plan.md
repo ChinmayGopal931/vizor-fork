@@ -8,7 +8,7 @@
 
 **Scope.** Android, mobile form factor (`--dart-define=VIZOR_FORM_FACTOR=mobile`). iOS and desktop come later, so keep the Rust engine, the Dart models and the JS bundle platform-neutral. iOS then needs only a Swift `WKWebView` host and an attestation channel.
 
-**Status (2026-10-13).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is done, including its Ironwood regtest run (M2.7b, passed 2026-10-13 after the fresh-tip fix D-50). M3 is done (tasks 1–13: the native layer, the Dart Railgun side, balance, availability, the home strip, `/private-usd`, lifecycle, copy, Widgetbook and the Kotlin tests) except its device round, M3.14: the round's harness is ready (progress D-40), but the 2026-10-14 round could not run because the phone was not attached (B-8). M4 is skipped for now: it waits for N1 (B-5), and M5–M7 proceed without tokens (D20; the owner disabled them on testnet for now). M5 part 1 (tasks 1–2, the Rust engine and its FRB calls) is done; part 2 (tasks 3–7, Dart) is next. Progress lives in `docs/private-usd-progress.md`.
+**Status (2026-10-13).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is done, including its Ironwood regtest run (M2.7b, passed 2026-10-13 after the fresh-tip fix D-50). M3 is done (tasks 1–13: the native layer, the Dart Railgun side, balance, availability, the home strip, `/private-usd`, lifecycle, copy, Widgetbook and the Kotlin tests) except its device round, M3.14: the round's harness is ready (progress D-40), but the 2026-10-14 round could not run because the phone was not attached (B-8). M4 is skipped for now: it waits for N1 (B-5), and M5–M7 proceed without tokens (D20; the owner disabled them on testnet for now). M5 is done (tasks 1–7: the Rust engine and its FRB calls, then the Dart engine, lifecycle guards, UI, copy and Widgetbook) except its device round, M5.8, which needs testnet ZEC on the phone's wallet (E8); its opt-in scenario is written (`run_device_round.sh --m5`, progress D-57). Progress lives in `docs/private-usd-progress.md`.
 
 **Two files.** This file holds the decisions, the architecture, the work and the test strategy. The reference sections §5–§9 and §12 live in `docs/private-usd-reference.md`, with the same numbers:
 
@@ -53,7 +53,7 @@ A pointer such as "§5.5" means that file. Open a reference section only when a 
 | Dart | `fvm flutter analyze`; `fvm flutter test`; mobile lane: `fvm flutter test --tags mobile --run-skipped --dart-define=VIZOR_FORM_FACTOR=mobile` |
 | Kotlin | `cd android && ./gradlew :app:testDebugUnitTest --tests 'com.keplr.vizor.railgun.*'` |
 | Device (Galaxy A35, `adb -s RZCX40721QZ`) | `fvm flutter run -d RZCX40721QZ --dart-define=VIZOR_FORM_FACTOR=mobile --dart-define=VIZOR_PRIVATE_USD_ENABLED=true`; keep the screen on during long steps (U21) |
-| Device round (§10) | `ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh` (phone on USB and unlocked; options in the script's header) |
+| Device round (§10) | `ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh` (phone on USB and unlocked; options in the script's header); the M5 round adds `--m5 [--m5-zec 0.05]` and needs the phone's testnet wallet funded (E8) |
 | Stale native-lib merge after switching ABIs | delete `build/app/intermediates/{merged,stripped}_native_libs` and rebuild |
 
 **Local stand-ins until the owner delivers.** These must never be pushed:
@@ -1029,7 +1029,7 @@ The owner's preference (2026-10-13): end-to-end first. Device runs are batched i
   - keep before post
   - the refund branches
 
-  Port only the ★ zapp cases these need (§8.7, "Tests to translate"). As built for the forward machine (M5 part 1): `private_usd/tests/forward.rs` (38 tests) and `private_usd/tests/lifecycle.rs` (3, through the FRB calls) on the fakes in `private_usd/tests/fakes.rs`; the ★ mapping is progress-doc D-39.
+  Port only the ★ zapp cases these need (§8.7, "Tests to translate"). As built for the forward machine (M5 part 1): `private_usd/tests/forward.rs` (38 tests) and `private_usd/tests/lifecycle.rs` (3, through the FRB calls) on the fakes in `private_usd/tests/fakes.rs`; the ★ mapping is progress-doc D-39. The Dart side (M5 part 2): the `SwapLoopTest` ★ cases and the lock and drain rules in `test/features/private_usd/private_usd_engine_test.dart` (D-52), all of `PrivateUsdZecQuotesTest`, the convert flow's button-enable, back and expiry cases, and the deletion and reset guards in `test/providers/private_usd_account_lifecycle_test.dart` (D-58).
 - Routes fail closed under `network_privacy::test_route_policy::lock_route_policy()`.
 
 Skip unit tests for UI glue, provider wiring and copy; the device rounds cover them. The existing suites must keep passing: `cargo test`, `fvm flutter analyze`, `fvm flutter test` and the mobile lane.
