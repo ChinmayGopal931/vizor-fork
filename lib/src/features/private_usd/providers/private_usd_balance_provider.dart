@@ -46,8 +46,18 @@ final privateUsdBalanceKeepFreshProvider = Provider.autoDispose
       final notifier = ref.watch(
         privateUsdBalanceProvider(key.accountUuid).notifier,
       );
-      final watch = notifier.watch(ifUsed: key.ifUsed);
-      ref.onDispose(watch.cancel);
+      // Watching starts polling, which can refresh at once and so change the
+      // balance provider; Riverpod forbids that while this provider builds.
+      // Register right after the build instead.
+      PrivateUsdBalanceWatch? watch;
+      var disposed = false;
+      scheduleMicrotask(() {
+        if (!disposed) watch = notifier.watch(ifUsed: key.ifUsed);
+      });
+      ref.onDispose(() {
+        disposed = true;
+        watch?.cancel();
+      });
     });
 
 /// A watcher's hold on [PrivateUsdBalanceNotifier]'s polling.

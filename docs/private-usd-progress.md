@@ -2548,6 +2548,25 @@ M8 status (2026-10-14): the non-device parts are done.
   pause in flight; when the provider was disposed meanwhile (app exit, a
   test's teardown) it threw `UnmountedRefException`. It now checks
   `ref.mounted` after the wait. Voting's tests pass (`+311`).
+- **D-112 (M5.8): the balance watch is registered after the build.**
+  `privateUsdBalanceKeepFreshProvider` called `notifier.watch(…)` while
+  building; watching starts polling, which can refresh at once and so
+  modify `privateUsdBalanceProvider` during another provider's build
+  (Riverpod: "Providers are not allowed to modify other providers during
+  their initialization"). It surfaced in the M5 device round once the
+  account had a conversion record (in use, D-21). The watch is now
+  registered in a microtask and cancelled with the provider.
+- **D-113 (B-11): `zakura-protocol =2.2.0`.** Vizor's pin moved from
+  `=2.0.0`; the lockfile changes only that crate. `zecswap-core`'s two exact
+  pins in the local E1 stand-in (`~/dev/zapp/zecSwap-zakura`, uncommitted,
+  with the owner's go-ahead) moved with it; E1's Zakura build must carry
+  the same bump. zapp-android is unaffected: it builds from
+  `~/dev/zapp/zecSwap` with upstream crates. The M5 round also gained a wait
+  for earlier conversions before converting, and the device test an opt-in
+  fund phase (`VIZOR_PUSD_DEVICE_FUND=<zec>`): it sends that much from the
+  first account to the second through the Send screens and leaves the
+  second active, so a conversion can start there while the first account's
+  is still closing.
 
 ## Blocked
 
@@ -2633,7 +2652,15 @@ M8 status (2026-10-14): the non-device parts are done.
   is NU7 testnet support in the Zakura wallet libraries (owner: E1/E4 or a
   wallet-libraries release), not app code. Mainnet has no NU7 and is
   unaffected. Until then the swap device rounds can run only on mainnet
-  (owner's explicit go-ahead, small amounts under the beta limits), or wait. Also learned: the
+  (owner's explicit go-ahead, small amounts under the beta limits), or wait.
+  **Fix applied (2026-10-14, owner's go-ahead): `zakura-protocol` 2.0.0 →
+  2.2.0** (D-113). 2.2.0's only behavioural change sets the testnet NU7
+  activation (4,465,026); mainnet is unchanged. The Zakura node crates
+  (`zakura-chain` 9, `zakura-consensus` 10, `zakura-rpc` 12) pin 2.2.0;
+  Zakura's 3.0.0 wallet crates (Rust 1.97) are not needed. The swap that
+  hit the rejection (index 11) stays under way until the maker refunds its
+  lock after t1 (19:33:48 UTC), then ends with nothing sent; the next M5
+  round waits for it. Also learned: the
   testnet maker caps a swap at 20 USDC, and testnet prices ZEC at about
   1,200 USD, so the rounds use about 0.01 ZEC (the quote for 0.01 was
   $10.86 after fees).

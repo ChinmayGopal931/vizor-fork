@@ -149,6 +149,13 @@ const _torFirstSync = bool.fromEnvironment(
 );
 // '' (the M3 round), 'start' or 'resume'.
 const _m5Phase = String.fromEnvironment('VIZOR_PUSD_DEVICE_M5');
+
+/// Opt-in: send this much testnet ZEC from the first account to the second
+/// through the real Send screens, then leave the second account active, so a
+/// conversion can start there while the first account's is still closing
+/// (one conversion per account). It is also a plain testnet send under the
+/// wallet's consensus parameters (B-11).
+const _fundZec = String.fromEnvironment('VIZOR_PUSD_DEVICE_FUND');
 const _m5Zec = String.fromEnvironment(
   'VIZOR_PUSD_DEVICE_M5_ZEC',
   defaultValue: '0.05',
@@ -217,6 +224,46 @@ void main() {
     _requireRoundSetup();
     await _Round(tester).run();
   }, timeout: const Timeout(Duration(minutes: 50)));
+
+  testWidgets('Fund: send testnet ZEC from the first account to the second', (
+    tester,
+  ) async {
+    if (_fundZec.isEmpty) return _log('not the fund round');
+    tolerateRenderOverflows();
+    await tester.pumpWidget(await buildBootstrappedZcashWalletApp());
+    await pumpUntil(
+      tester,
+      () => tester.any(find.bySemanticsLabel('Digit 1')),
+      description: 'the unlock keypad',
+      timeout: const Duration(minutes: 2),
+    );
+    await enterPasscode(tester, mobileE2ePasscode);
+    await waitForHome(tester);
+    final firstUuid = await accountUuidAtOrder(0);
+    final secondUuid = await accountUuidAtOrder(1);
+    await switchAccountTo(tester, secondUuid);
+    final secondAddress = await copyShieldedAddress(tester);
+    await switchAccountTo(tester, firstUuid);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byKey(_homeBalanceKey)),
+    );
+    final spend = parseZecAmount(_fundZec)!;
+    await pumpUntil(
+      tester,
+      () {
+        final sync = container.read(syncProvider).value;
+        return sync != null &&
+            sync.isSyncComplete &&
+            sync.spendableBalance >= spend;
+      },
+      description: 'the first account to sync with $_fundZec ZEC spendable',
+      timeout: const Duration(minutes: 10),
+    );
+    await sendViaWizard(tester, address: secondAddress, amountDigits: _fundZec);
+    _log('sent $_fundZec ZEC from the first account to the second');
+    await switchAccountTo(tester, secondUuid);
+    _log('the second account is active for the next conversion');
+  }, timeout: const Timeout(Duration(minutes: 20)));
 
   testWidgets('M5 (start): a conversion until its deposit is kept', (
     tester,
@@ -1163,6 +1210,18 @@ class _M5Round extends _Round {
   }
 
   Future<void> _convertThroughTheScreens() async {
+    // One conversion per account: an earlier round's conversion may still be
+    // closing (a deposit that never landed ends once its window shuts). The
+    // engine advances it in the foreground; wait for it to end first.
+    final engine = _container.read(privateUsdEngineProvider);
+    final settleBy = DateTime.now().add(const Duration(minutes: 10));
+    while ((await engine.loadRecords(_uuid)).any((r) => r.outcome == null)) {
+      if (DateTime.now().isAfter(settleBy)) {
+        fail('an earlier conversion is still under way after 10 minutes');
+      }
+      _log('waiting for an earlier conversion to end');
+      await _pumpFor(const Duration(seconds: 15));
+    }
     await tapWidget(tester, _stripKey);
     await tapAppButton(tester, _screenConvertKey);
     await _waitUntil(

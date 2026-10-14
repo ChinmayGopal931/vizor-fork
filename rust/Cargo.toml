@@ -119,7 +119,9 @@ features = ["orchard"]
 
 [dependencies.zcash_protocol]
 package = "zakura-protocol"
-version = "=2.0.0"
+# 2.2.0 sets the testnet NU7 activation (4,465,026, branch 0x77190AD9);
+# mainnet is unchanged. Testnet sends are rejected without it (B-11).
+version = "=2.2.0"
 
 [dependencies.transparent]
 package = "zakura-transparent"
