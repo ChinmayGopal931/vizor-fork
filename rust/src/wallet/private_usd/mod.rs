@@ -9,8 +9,9 @@
 //! Never log the mnemonic, the seed, a secret share, a relayer ticket, token
 //! state or a keyed RPC URL.
 
-// M1 and M2 build the blocks the engine (M5 to M7) drives; until then most of
-// them are reached only from tests. Remove this once the engine uses them.
+// M1 and M2 build blocks the engine drives; the forward half (M5) uses its
+// share, and the reverse and send blocks wait for M6 and M7. Remove this once
+// the engine uses them all.
 #![allow(dead_code)]
 
 use std::fmt;
@@ -21,7 +22,9 @@ use zecswap_core::NetworkType;
 use crate::wallet::network::WalletNetwork;
 
 pub(crate) mod deployment;
+pub(crate) mod engine;
 pub(crate) mod evm_rpc;
+pub(crate) mod forward;
 pub(crate) mod indices;
 pub(crate) mod joint;
 pub(crate) mod keys;
@@ -116,6 +119,8 @@ pub(crate) enum ErrorCode {
     Unavailable,
     RouteBlocked,
     Other,
+    /// The call was cancelled (lock, background, drain): never a failure.
+    Cancelled,
     /// A service or node serves another deployment than the pinned one.
     WrongDeployment,
     /// The Ethereum node's answer was too short or malformed to read.

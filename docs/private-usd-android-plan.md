@@ -8,7 +8,7 @@
 
 **Scope.** Android, mobile form factor (`--dart-define=VIZOR_FORM_FACTOR=mobile`). iOS and desktop come later, so keep the Rust engine, the Dart models and the JS bundle platform-neutral. iOS then needs only a Swift `WKWebView` host and an attestation channel.
 
-**Status (2026-10-13).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is done except its regtest run (M2.7b), which waits for the batched E2E round and the owner's go-ahead. M3 is done (tasks 1–13: the native layer, the Dart Railgun side, balance, availability, the home strip, `/private-usd`, lifecycle, copy, Widgetbook and the Kotlin tests) except its device round, M3.14, which is batched with the others; M4 is next. Progress lives in `docs/private-usd-progress.md`.
+**Status (2026-10-13).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is done except its regtest run (M2.7b), which waits for the batched E2E round and the owner's go-ahead. M3 is done (tasks 1–13: the native layer, the Dart Railgun side, balance, availability, the home strip, `/private-usd`, lifecycle, copy, Widgetbook and the Kotlin tests) except its device round, M3.14, which is batched with the others. M4 is skipped for now: it waits for N1 (B-5), and M5–M7 proceed without tokens (D20; the owner disabled them on testnet for now). M5 part 1 (tasks 1–2, the Rust engine and its FRB calls) is done; part 2 (tasks 3–7, Dart) is next. Progress lives in `docs/private-usd-progress.md`.
 
 **Two files.** This file holds the decisions, the architecture, the work and the test strategy. The reference sections §5–§9 and §12 live in `docs/private-usd-reference.md`, with the same numbers:
 
@@ -340,7 +340,7 @@ Each one exists because breaking it loses funds or privacy. Most are enforced in
 5. **Reveal `z` only under a fresh lock.** That means a held, confirmed claim lock (forward) or refund lock (reverse) with **more than 300 s** left, re-read from a fresh confirmed head immediately before sending. Never reveal on a relayer answer or an old observation. *Why:* a reveal that lands after the lock lapses lets the maker take both sides.
 6. **Only a confirmed read authorizes anything.** Only `confirmedSwap` (block `head − confirmations + 1`) authorizes a deposit, a reveal or completion. Refuse lock reasoning when the head's timestamp trails the device clock by more than 180 s (`freshHead`). *Why:* a lagging node can show stale stages.
 7. **Never prove a second reverse funding because a response was lost.** Resend the same bytes only while the node does not know the hash, `now < fundingDeadline`, and the user has not cancelled. `ready` is never re-signed after a restart, only resent. *Why:* a second funding pays twice.
-8. **Save every signed payout, refund payout, lock and ready before sending it.** Re-sign a payout only when the relayer's fee rose. Every relayer fee must be `< amount` and **≤ 2 USDC** (D11, X6).
+8. **Save every signed payout, refund payout, refund lock and ready before sending it.** (A forward claim lock is not saved: losing one reveals nothing, D-36.) A refused payout is re-signed only when the relayer's fee rose; otherwise a payout is re-signed only when the fee to pay changed, the offer's within its window or else the relayer's now (reference §5.6 step 8). Every relayer fee must be `< amount` and **≤ 2 USDC** (D11, X6).
 9. **Broadcast before store** for every externally signed PCZT: the joint sweeps reuse `store_and_broadcast_pczts_with_compact_signatures_for_proposal` (`rust/src/wallet/sync/pczt.rs:1645`). *Why:* AGENTS.md hardware invariant 1. A rejected broadcast must not leave notes marked spent.
 10. **`PROPOSAL_STORE` is consume-on-entry.** Discard on every non-consuming exit, for the deposit and sweep proposals alike (AGENTS.md hardware invariant 4).
 11. **Discard OVK on joint sweeps (D12). Sender OVK on the deposit**, so the user's own OVK still recovers it.
@@ -383,8 +383,9 @@ rust/src/
         ├── relayer_client.rs  §5.3, §6.7
         ├── tokens.rs          [M4] token state, pay/settle, two-phase issuance (§5.9)
         ├── joint.rs           [M2] joint.db ops (§8.1)
-        ├── engine.rs          [M5] per-account driver locks, the forward offer cache, the op_id cancel + activity registry (§5.10)
-        ├── forward.rs         [M5]   reverse.rs, funding_calls.rs [M6]   sends.rs [M7] (send log over swaps.db)
+        ├── engine.rs          [M5] per-account driver locks, the forward offer cache, the op_id cancel + activity registry, the Clock and TokenSource seams, problem mapping, account deletion (§5.10)
+        ├── forward.rs         [M5] the §5.6 driver and §5.8 forward refund over the seams; WalletZcash (the M2 ops); ForwardCall
+        │                      reverse.rs, funding_calls.rs [M6]   sends.rs [M7] (send log over swaps.db)
         └── tests/vectors.json the §3.3 and §5.5 vectors
 ```
 
@@ -422,7 +423,9 @@ impl SwapKeyContext {
     pub fn joint(&self, index: u32, maker: &zecswap_core::PublicShare) -> Result<zecswap_core::JointAccount, PrivateUsdError>;
     pub fn railgun_mnemonic(&self) -> Result<Zeroizing<String>, PrivateUsdError>;
     pub fn railgun_address(&self) -> Result<String, PrivateUsdError>;
-    // M5: acceptance(index, SwapContext, E, makerProof) -> SwapAcceptance (prove_user needs a rand 0.10 CryptoRng)
+    // M5: verifies the maker's proof, proves Z with rand 0.10's UnwrapErr(SysRng) (`rand_0_10`)
+    pub fn acceptance(&self, index: u32, context: SwapContext, maker: &PublicShare, maker_proof: &[u8; 64]) -> Result<SwapAcceptance, PrivateUsdError>;
+    pub fn seed(&self) -> SecretVec<u8>;   // M5: a copy for the deposit's creation; zeroized on drop
 }
 
 // store.rs (rusqlite 0.37 is already a dependency; open with WAL + busy_timeout)
@@ -454,7 +457,7 @@ pub(crate) trait ChainReader {   // errors are PrivateUsdError (D-7)
     async fn confirmed_payout(&self, id: &[u8; 32], since: u64) -> Result<Option<PaidOut>>;
     async fn transaction_status(&self, tx: &[u8; 32], confirmations: u32) -> Result<TransactionStatus>; // Unknown | Pending | Confirmed | Reverted
 }
-pub(crate) async fn take_index<C: ChainReader>(store: &mut SwapStore, chains: &[(C, [u8; 20])], keys: &SwapKeyContext, account: &str) -> Result<u32, PrivateUsdError>;
+pub(crate) async fn take_index<C: ChainReader>(store: &mut SwapStore, chains: &[(&C, [u8; 20])], keys: &SwapKeyContext, account: &str) -> Result<u32, PrivateUsdError>;
 ```
 
 - **Runtime.** vizor's FRB functions are mostly plain `pub fn` that build a runtime and `block_on` (`api/sync.rs:429`). Never call such a wrapper from inside async code: a nested `Runtime::new().block_on` panics. Call the async engine function instead (for example `sync_engine::run_payment_link_claim_sync`, not `api::sync::run_payment_link_claim_sync`).
@@ -861,7 +864,7 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b, deferred to t
   - Rust compares the scanned height with the **live** lightwalletd tip and returns `wait = ZcashSyncing` until it catches up.
 - **A created deposit is always broadcast:** the main sync's `resubmit_pending_transactions` rebroadcasts it. Never replace one; reconcile by txid only. A deposit that lands after a refund lock is swept through `DEPOSIT_UNSETTLED`.
 - **`PROPOSAL_STORE` within one advance.** Hold the deposit proposal in an RAII guard that discards it unless create consumed it. Use `send_flow_id = "private-usd-deposit:{account}:{index}"`. A refusal during app exit is retryable.
-- **The deposit fee preview** builds the `propose_swap_deposit` proposal without storing or locking it, and requires one step. `None` makes the quote unpayable.
+- **The deposit fee preview** builds the `propose_swap_deposit` proposal without storing or locking it, and requires one step and no Sapling parameters (D-35). `None` makes the quote unpayable.
 - **Txid order.** Return internal-order hex for matching history rows; display it with `zcashDisplayTxidHex`. zapp's JSON stores display hex.
 - **Lock with a call in flight.** Run `private_usd_cancel(op_id)` and `private_usd_clear_sessions()`, await at most 5 s, then drop the result: compare an engine epoch before and after each await. Zero the Dart mnemonic in `finally`.
 - **No shared foreground provider exists.** Copy Gift Card's shape: `ref.listen(appSecurityProvider)` and lifecycle `onHide`/`onPause` pause; `onResume` resumes and nudges.
@@ -1025,7 +1028,7 @@ The owner's preference (2026-10-13): end-to-end first. Device runs are batched i
   - keep before post
   - the refund branches
 
-  Port only the ★ zapp cases these need (§8.7, "Tests to translate").
+  Port only the ★ zapp cases these need (§8.7, "Tests to translate"). As built for the forward machine (M5 part 1): `private_usd/tests/forward.rs` (38 tests) and `private_usd/tests/lifecycle.rs` (3, through the FRB calls) on the fakes in `private_usd/tests/fakes.rs`; the ★ mapping is progress-doc D-39.
 - Routes fail closed under `network_privacy::test_route_policy::lock_route_policy()`.
 
 Skip unit tests for UI glue, provider wiring and copy; the device rounds cover them. The existing suites must keep passing: `cargo test`, `fvm flutter analyze`, `fvm flutter test` and the mobile lane.

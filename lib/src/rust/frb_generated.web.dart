@@ -110,6 +110,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AddressValidationResult dco_decode_address_validation_result(dynamic raw);
 
   @protected
+  ApiAcceptKind dco_decode_api_accept_kind(dynamic raw);
+
+  @protected
+  ApiAcceptResult dco_decode_api_accept_result(dynamic raw);
+
+  @protected
+  ApiActivity dco_decode_api_activity(dynamic raw);
+
+  @protected
   ApiAppliedTransparentPolicy dco_decode_api_applied_transparent_policy(
     dynamic raw,
   );
@@ -138,6 +147,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ApiForwardAdvance dco_decode_api_forward_advance(dynamic raw);
+
+  @protected
+  ApiForwardOutcome dco_decode_api_forward_outcome(dynamic raw);
+
+  @protected
+  ApiForwardPhase dco_decode_api_forward_phase(dynamic raw);
+
+  @protected
+  ApiForwardQuote dco_decode_api_forward_quote(dynamic raw);
+
+  @protected
+  ApiForwardRecord dco_decode_api_forward_record(dynamic raw);
+
+  @protected
+  ApiForwardWait dco_decode_api_forward_wait(dynamic raw);
+
+  @protected
   ApiGiftCardCheckProgress dco_decode_api_gift_card_check_progress(dynamic raw);
 
   @protected
@@ -151,6 +178,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiMempoolTxEvent dco_decode_api_mempool_tx_event(dynamic raw);
+
+  @protected
+  ApiNothingSentCause dco_decode_api_nothing_sent_cause(dynamic raw);
 
   @protected
   ApiPendingShareRound dco_decode_api_pending_share_round(dynamic raw);
@@ -172,6 +202,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiProposalRosterEntry dco_decode_api_proposal_roster_entry(dynamic raw);
+
+  @protected
+  ApiRefundCause dco_decode_api_refund_cause(dynamic raw);
 
   @protected
   ApiRoundDrivePolicy dco_decode_api_round_drive_policy(dynamic raw);
@@ -245,6 +278,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  ApiActivity dco_decode_box_autoadd_api_activity(dynamic raw);
+
+  @protected
   ApiAppliedTransparentPolicy
   dco_decode_box_autoadd_api_applied_transparent_policy(dynamic raw);
 
@@ -255,6 +291,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiDeployment dco_decode_box_autoadd_api_deployment(dynamic raw);
+
+  @protected
+  ApiForwardOutcome dco_decode_box_autoadd_api_forward_outcome(dynamic raw);
+
+  @protected
+  ApiForwardWait dco_decode_box_autoadd_api_forward_wait(dynamic raw);
+
+  @protected
+  ApiNothingSentCause dco_decode_box_autoadd_api_nothing_sent_cause(
+    dynamic raw,
+  );
+
+  @protected
+  ApiPrivateUsdErrorCode dco_decode_box_autoadd_api_private_usd_error_code(
+    dynamic raw,
+  );
+
+  @protected
+  ApiRefundCause dco_decode_box_autoadd_api_refund_cause(dynamic raw);
 
   @protected
   ApiRoundDrivePolicy dco_decode_box_autoadd_api_round_drive_policy(
@@ -321,6 +376,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int dco_decode_box_autoadd_i_32(dynamic raw);
+
+  @protected
+  PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
 
   @protected
   ImmediateShareKey dco_decode_box_autoadd_immediate_share_key(dynamic raw);
@@ -638,6 +696,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   dco_decode_list_api_dynamic_config_mirror_failure(dynamic raw);
 
   @protected
+  List<ApiForwardRecord> dco_decode_list_api_forward_record(dynamic raw);
+
+  @protected
   List<ApiKeystoneSignatureInput> dco_decode_list_api_keystone_signature_input(
     dynamic raw,
   );
@@ -934,6 +995,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
+  ApiActivity? dco_decode_opt_box_autoadd_api_activity(dynamic raw);
+
+  @protected
   ApiAppliedTransparentPolicy?
   dco_decode_opt_box_autoadd_api_applied_transparent_policy(dynamic raw);
 
@@ -943,6 +1007,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiDeployment? dco_decode_opt_box_autoadd_api_deployment(dynamic raw);
+
+  @protected
+  ApiForwardOutcome? dco_decode_opt_box_autoadd_api_forward_outcome(
+    dynamic raw,
+  );
+
+  @protected
+  ApiForwardWait? dco_decode_opt_box_autoadd_api_forward_wait(dynamic raw);
+
+  @protected
+  ApiNothingSentCause? dco_decode_opt_box_autoadd_api_nothing_sent_cause(
+    dynamic raw,
+  );
+
+  @protected
+  ApiPrivateUsdErrorCode? dco_decode_opt_box_autoadd_api_private_usd_error_code(
+    dynamic raw,
+  );
+
+  @protected
+  ApiRefundCause? dco_decode_opt_box_autoadd_api_refund_cause(dynamic raw);
 
   @protected
   ApiRoundDrivePolicy? dco_decode_opt_box_autoadd_api_round_drive_policy(
@@ -1000,6 +1085,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int? dco_decode_opt_box_autoadd_i_32(dynamic raw);
+
+  @protected
+  PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
 
   @protected
   ImmediateShareKey? dco_decode_opt_box_autoadd_immediate_share_key(
@@ -1490,6 +1578,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ApiAcceptKind sse_decode_api_accept_kind(SseDeserializer deserializer);
+
+  @protected
+  ApiAcceptResult sse_decode_api_accept_result(SseDeserializer deserializer);
+
+  @protected
+  ApiActivity sse_decode_api_activity(SseDeserializer deserializer);
+
+  @protected
   ApiAppliedTransparentPolicy sse_decode_api_applied_transparent_policy(
     SseDeserializer deserializer,
   );
@@ -1524,6 +1621,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ApiForwardAdvance sse_decode_api_forward_advance(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiForwardOutcome sse_decode_api_forward_outcome(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiForwardPhase sse_decode_api_forward_phase(SseDeserializer deserializer);
+
+  @protected
+  ApiForwardQuote sse_decode_api_forward_quote(SseDeserializer deserializer);
+
+  @protected
+  ApiForwardRecord sse_decode_api_forward_record(SseDeserializer deserializer);
+
+  @protected
+  ApiForwardWait sse_decode_api_forward_wait(SseDeserializer deserializer);
+
+  @protected
   ApiGiftCardCheckProgress sse_decode_api_gift_card_check_progress(
     SseDeserializer deserializer,
   );
@@ -1539,6 +1658,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiMempoolTxEvent sse_decode_api_mempool_tx_event(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiNothingSentCause sse_decode_api_nothing_sent_cause(
     SseDeserializer deserializer,
   );
 
@@ -1576,6 +1700,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiProposalRosterEntry sse_decode_api_proposal_roster_entry(
     SseDeserializer deserializer,
   );
+
+  @protected
+  ApiRefundCause sse_decode_api_refund_cause(SseDeserializer deserializer);
 
   @protected
   ApiRoundDrivePolicy sse_decode_api_round_drive_policy(
@@ -1677,6 +1804,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  ApiActivity sse_decode_box_autoadd_api_activity(SseDeserializer deserializer);
+
+  @protected
   ApiAppliedTransparentPolicy
   sse_decode_box_autoadd_api_applied_transparent_policy(
     SseDeserializer deserializer,
@@ -1689,6 +1819,31 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiDeployment sse_decode_box_autoadd_api_deployment(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiForwardOutcome sse_decode_box_autoadd_api_forward_outcome(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiForwardWait sse_decode_box_autoadd_api_forward_wait(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiNothingSentCause sse_decode_box_autoadd_api_nothing_sent_cause(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiPrivateUsdErrorCode sse_decode_box_autoadd_api_private_usd_error_code(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiRefundCause sse_decode_box_autoadd_api_refund_cause(
     SseDeserializer deserializer,
   );
 
@@ -1769,6 +1924,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int sse_decode_box_autoadd_i_32(SseDeserializer deserializer);
+
+  @protected
+  PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
   ImmediateShareKey sse_decode_box_autoadd_immediate_share_key(
@@ -2184,6 +2342,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<ApiForwardRecord> sse_decode_list_api_forward_record(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<ApiKeystoneSignatureInput> sse_decode_list_api_keystone_signature_input(
     SseDeserializer deserializer,
   );
@@ -2552,6 +2715,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
+  ApiActivity? sse_decode_opt_box_autoadd_api_activity(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ApiAppliedTransparentPolicy?
   sse_decode_opt_box_autoadd_api_applied_transparent_policy(
     SseDeserializer deserializer,
@@ -2565,6 +2733,31 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiDeployment? sse_decode_opt_box_autoadd_api_deployment(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiForwardOutcome? sse_decode_opt_box_autoadd_api_forward_outcome(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiForwardWait? sse_decode_opt_box_autoadd_api_forward_wait(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiNothingSentCause? sse_decode_opt_box_autoadd_api_nothing_sent_cause(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiPrivateUsdErrorCode? sse_decode_opt_box_autoadd_api_private_usd_error_code(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiRefundCause? sse_decode_opt_box_autoadd_api_refund_cause(
     SseDeserializer deserializer,
   );
 
@@ -2638,6 +2831,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int? sse_decode_opt_box_autoadd_i_32(SseDeserializer deserializer);
+
+  @protected
+  PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
   ImmediateShareKey? sse_decode_opt_box_autoadd_immediate_share_key(
@@ -3265,6 +3461,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_api_accept_kind(ApiAcceptKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_api_accept_result(
+    ApiAcceptResult self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_activity(ApiActivity self, SseSerializer serializer);
+
+  @protected
   void sse_encode_api_applied_transparent_policy(
     ApiAppliedTransparentPolicy self,
     SseSerializer serializer,
@@ -3310,6 +3518,42 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_api_forward_advance(
+    ApiForwardAdvance self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_forward_outcome(
+    ApiForwardOutcome self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_forward_phase(
+    ApiForwardPhase self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_forward_quote(
+    ApiForwardQuote self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_forward_record(
+    ApiForwardRecord self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_forward_wait(
+    ApiForwardWait self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_api_gift_card_check_progress(
     ApiGiftCardCheckProgress self,
     SseSerializer serializer,
@@ -3330,6 +3574,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_api_mempool_tx_event(
     ApiMempoolTxEvent self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_nothing_sent_cause(
+    ApiNothingSentCause self,
     SseSerializer serializer,
   );
 
@@ -3372,6 +3622,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_api_proposal_roster_entry(
     ApiProposalRosterEntry self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_refund_cause(
+    ApiRefundCause self,
     SseSerializer serializer,
   );
 
@@ -3499,6 +3755,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_api_activity(
+    ApiActivity self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_api_applied_transparent_policy(
     ApiAppliedTransparentPolicy self,
     SseSerializer serializer,
@@ -3513,6 +3775,36 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_api_deployment(
     ApiDeployment self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_api_forward_outcome(
+    ApiForwardOutcome self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_api_forward_wait(
+    ApiForwardWait self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_api_nothing_sent_cause(
+    ApiNothingSentCause self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_api_private_usd_error_code(
+    ApiPrivateUsdErrorCode self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_api_refund_cause(
+    ApiRefundCause self,
     SseSerializer serializer,
   );
 
@@ -3602,6 +3894,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_i_64(
+    PlatformInt64 self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_box_autoadd_immediate_share_key(
@@ -4105,6 +4403,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_api_forward_record(
+    List<ApiForwardRecord> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_api_keystone_signature_input(
     List<ApiKeystoneSignatureInput> self,
     SseSerializer serializer,
@@ -4561,6 +4865,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_api_activity(
+    ApiActivity? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_api_applied_transparent_policy(
     ApiAppliedTransparentPolicy? self,
     SseSerializer serializer,
@@ -4575,6 +4885,36 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_api_deployment(
     ApiDeployment? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_forward_outcome(
+    ApiForwardOutcome? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_forward_wait(
+    ApiForwardWait? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_nothing_sent_cause(
+    ApiNothingSentCause? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_private_usd_error_code(
+    ApiPrivateUsdErrorCode? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_refund_cause(
+    ApiRefundCause? self,
     SseSerializer serializer,
   );
 
@@ -4652,6 +4992,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_i_32(int? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_i_64(
+    PlatformInt64? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_immediate_share_key(

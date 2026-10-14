@@ -356,6 +356,11 @@ commit that checks this note.
 
 ## M4. Privacy Pass tokens and attestation
 
+Skipped for now: blocked on N1 (B-5); M5–M7 proceed (D20).
+Tokens disabled on testnet by the owner (2026-10-13), temporarily; M5–M7
+testnet E2E are not blocked by tokens; N1 still open for when they return.
+Until M4 lands, the engine's token seam holds none (D-33).
+
 - [ ] M4.1 `private_usd/tokens.rs`
 - [ ] M4.2 FRB issuance begin, finish and status
 - [ ] M4.3 Kotlin `PrivateUsdAttestationHandler.kt`
@@ -365,14 +370,166 @@ commit that checks this note.
 
 ## M5. Forward conversion, engine loop, lifecycle guards and forward refunds
 
-- [ ] M5.1 `engine.rs` and `forward.rs`
-- [ ] M5.2 FRB forward calls
+- [x] M5.1 `engine.rs` and `forward.rs` (D-31, D-33 to D-38)
+- [x] M5.2 FRB forward calls (D-32)
 - [ ] M5.3 Dart engine and provider
 - [ ] M5.4 Lifecycle provider and account-deletion guards
 - [ ] M5.5 UI
 - [ ] M5.6 Copy (Convert tables, Accounts)
 - [ ] M5.7 Widgetbook and capture scenarios (forward rows)
 - [ ] M5 gate
+
+M5 part 1 status (2026-10-13): M5.1 and M5.2, the Rust half, are done. Part 2
+(M5.3–M5.7: the Dart engine, lifecycle, UI, copy and Widgetbook) is next; the
+M5 gate and its device checks wait for it. M4 is skipped for now (N1, B-5), so
+the forward path runs without tokens (D-33).
+
+- **What landed.**
+  - `rust/src/wallet/private_usd/engine.rs`: the per-account driver lock
+    (`lock_account`, a `tokio::sync::Mutex` per account; a second caller gets
+    `Busy`), the forward offer cache (per `(account, index)`, dropped at the
+    quote's expiry and on lock, never persisted), the `op_id` registry
+    (`OpHandle`, `cancel_op`, `op_activity`; a cancel that arrives before its
+    call registers still stops it), the `Clock` and `TokenSource` seams
+    (`SystemClock`, `NoTokens`), the problem mapping and `delete_account`.
+  - `rust/src/wallet/private_usd/forward.rs`: the §5.6 driver (`quote`,
+    `accept`, `advance`, `advance_report`, `abandon`, `records`) and the §5.8
+    forward refund, generic over `ChainReader`, `HttpTransport`,
+    `ForwardZcash`, `Clock` and `TokenSource`; `WalletZcash`, the Zcash seam
+    over the M2 operations; `ForwardCall`, which wires the real seams for one
+    FRB call.
+  - Smaller changes: `keys.rs` (`SwapKeyContext::acceptance`, over
+    `rand_0_10`'s `UnwrapErr(SysRng)`; `seed`), `joint.rs`
+    (`scanned_height`, `find_sent`, `forget_joint_account`), `store.rs`
+    (`open_existing`), `indices.rs` (readers by reference), `send.rs`
+    (`estimate_swap_deposit_fee`, `proposal_needs_sapling`), `Cargo.toml`
+    (`rand_0_10 = { package = "rand", version = "0.10", features =
+    ["sys_rng"] }`, already in the lockfile).
+  - FRB (`rust/src/api/private_usd.rs`): the ten calls below. Bindings
+    regenerated; the rustc 1.93 noise was reverted as before (the
+    comment-only changes in `network_privacy.dart`, `sync.dart`,
+    `voting.dart`, `voting_session.dart` and
+    `third_party/zcash_voting/wire.dart`, the import-group blank lines in
+    `frb_generated{,.io,.web}.dart`, and the new file's ignored-trait wording).
+- **Tests.**
+  - Rust: `cd rust && cargo test` passes: lib 1500 passed, 0 failed, 11
+    ignored; integration 6 passed, 21 ignored (regtest). The 41 new tests are
+    `private_usd/tests/forward.rs` (38: the ★ cases and vizor's own, on the
+    fakes in `private_usd/tests/fakes.rs`) and `private_usd/tests/lifecycle.rs`
+    (3, through the FRB calls). The ★ mapping is in D-39.
+  - Dart: `fvm flutter analyze` finds no issues. `fvm flutter test`: +5926
+    ~160 -4, the 4 pre-existing failures in
+    `settings_seed_phrase_screen_test.dart` (the `AppButton` "Enter amount"
+    finder at test line 159). No Dart besides the bindings changed, so the
+    mobile lane was not run.
+- **For part 2: the FRB calls** (`lib/src/rust/api/private_usd.dart`). Common
+  arguments: `dbPath` (`getWalletDbPath()`), `network` (`"main"` | `"test"`),
+  `accountUuid`, `storeDir` (`getPrivateUsdDirPath(network)`),
+  `mnemonicBytes` (from `getMnemonicBytesForAccount`, zeroed in `finally`),
+  `lightwalletdUrl` (`rpcEndpointFailoverProvider.current
+  .normalizedLightwalletdUrl`) and `ethRpcUrl` (the keyed URL if its host is
+  in `ApiDeployment.allowedHosts`, else `""` for publicnode).
+  - `void privateUsdCancel({required int opId})` (sync).
+  - `ApiActivity? privateUsdActivity({required int opId})` (sync):
+    `depositing`, `claiming`, `payingOut`, `sweeping` while an advance runs
+    (`funding`, `readying`, `refunding` arrive with M6).
+  - `void privateUsdClearSessions()` (sync): call on lock; drops every held
+    quote and maker check (M4 adds its issuance sessions here).
+  - `Future<int> privateUsdUnfinishedCount({storeDir, accountUuid})`: the
+    deletion and reset warning count; 0 when the wallet never converted
+    (nothing is created by asking).
+  - `Future<List<String>> privateUsdAccountsWithUnfinished({storeDir})`: the
+    engine loop's accounts (D14).
+  - `Future<void> privateUsdDeleteAccount({storeDir, network, accountUuid})`:
+    after the user confirmed and the engine drained; `busy` while one of the
+    account's steps runs (drain, then call again). Removes the account's
+    joint accounts from `joint.db`, then its rows from `swaps.db`.
+  - `Future<ApiForwardQuote> privateUsdForwardQuote({dbPath, network,
+    accountUuid, storeDir, mnemonicBytes, lightwalletdUrl, ethRpcUrl,
+    required int units})`: spends an index. `ApiForwardQuote { int index;
+    PlatformInt64 expiresAt; String amount; String? networkCost; String
+    relayerFee; String receives; BigInt depositZat; BigInt? depositFeeZat;
+    BigInt? maxTotalZat; PlatformInt64? feeExpiresAt }`. `maxTotalZat ==
+    null` means unpayable: do not offer it.
+  - `Future<ApiAcceptResult> privateUsdForwardAccept({dbPath, network,
+    accountUuid, storeDir, mnemonicBytes, lightwalletdUrl, ethRpcUrl,
+    required int index, required BigInt maxTotalZat})`: pass the quote's
+    `maxTotalZat`. `ApiAcceptResult { ApiAcceptKind kind;
+    ApiNothingSentCause? cause; int index }`, `kind` ∈ `accepted`,
+    `tokensNeeded`, `nothingSent`. Repeat calls for the same index are safe.
+  - `Future<ApiForwardAdvance> privateUsdForwardAdvance({dbPath, network,
+    accountUuid, storeDir, mnemonicBytes, lightwalletdUrl, ethRpcUrl,
+    required int opId, required int index})`: `ApiForwardAdvance {
+    ApiForwardRecord record; ApiForwardWait? wait; int nextPollMs;
+    ApiPrivateUsdErrorCode? problem }`.
+  - `Future<ApiForwardRecord> privateUsdForwardAbandon({network, accountUuid,
+    storeDir, ethRpcUrl, required int index})` ("Call it off"; no key).
+  - `Future<List<ApiForwardRecord>> privateUsdForwardRecords({dbPath,
+    network, accountUuid, storeDir})`: the active record first, then the
+    rest, newest first.
+  - `ApiForwardRecord { int index; String swapId; ApiForwardPhase phase;
+    PlatformInt64 acceptedAt, quoteExpiresAt; BigInt depositZat; BigInt?
+    maxTotalZat; String amount, receives, relayerFee; PlatformInt64? t0, t1;
+    String? depositTxid; int? depositConfirmations; String? sweepTxid;
+    String? payoutTx; ApiForwardOutcome? outcome; ApiRefundCause?
+    refundCause; ApiNothingSentCause? nothingSentCause; PlatformInt64?
+    endedAt }`. `phase` ∈ `opening`, `depositing`, `confirming`, `claiming`,
+    `refunding`, `paid`, `refunded`, `nothingSent`. `depositTxid` and
+    `sweepTxid` are internal byte order (match history rows; show with
+    `zcashDisplayTxidHex`). `depositConfirmations` is set only while under
+    way with a deposit kept (0 until mined; the maker waits for
+    `ApiDeployment.zcashConfirmations`).
+- **For part 2: error codes** (`ApiPrivateUsdError.code`; copy follows the
+  code).
+  - Quote: `busy` (a conversion is under way, or a step of the account is
+    running: open its progress), `amountRefused` (the maker turned the amount
+    down), `makerBusy`, `makerUnavailable`, `relayerFee` (the relayer's fee is
+    above 2 USDC), `relayerUnreachable` (also a service on another
+    deployment), `ethereumUnreachable`, `tokensRefused`, `zcashWallet`,
+    `mismatch` (wrong seed), `unavailable` (no deployment, hardware account,
+    no derivation), `other` (16 used indices in a row).
+  - Accept: `quoteExpired` (no offer held: expired, too close to expiry, or
+    quoted before a lock; quote again), `relayerFee` (the fee takes the whole
+    amount, or is above the cap), `depositUnpayable` (the deposit does not fit
+    one transaction from this wallet, or `maxTotalZat` is below the deposit),
+    `busy`, `mismatch` (the maker's share proof does not verify). Any other
+    error after the record was saved means "maybe opened": read
+    `privateUsdForwardRecords` and show the progress of `index` if its
+    `outcome` is null.
+  - Advance returns `Err` only for `busy`, `cancelled` (drop it; never a
+    failure), a key or store failure (`mismatch`, `unavailable`,
+    `storeUnreadable`, `zcashWallet` opening the DB) and `other` ("no such
+    conversion"). A failed step returns the reloaded record with `problem`
+    set to one of `relayerUnreachable`, `relayerRefused`, `relayerFee`,
+    `ethereumUnreachable`, `railgunClosed`, `claimTurn`, `zcashWallet`,
+    `depositUnpayable`, `zcashRejected`, `mismatch`, `tokensUnreachable`,
+    `routeBlocked` or `other` (the §5.8 problem set; Rust folds the rest).
+  - Abandon: `tooLate` once a deposit started or the chain shows the swap.
+  - Accept `tokensNeeded`: the maker wants a token and there is no tokens
+    client before M4. Nothing opened. Show that conversions are unavailable
+    right now and call `privateUsdForwardAbandon(index)`; never retry it in a
+    loop. A record left alone ends `nothingSent` within about five minutes of
+    its quote's expiry anyway.
+- **For part 2: the engine loop** (reference §5.10).
+  - For each account of `privateUsdAccountsWithUnfinished`, for each forward
+    record with `outcome == null` (`privateUsdForwardRecords`), call
+    `privateUsdForwardAdvance` with a fresh `opId`, polling
+    `privateUsdActivity(opId)` about every 500 ms for the step label.
+  - Nap the smallest `nextPollMs` of the pass: 5 s `opening`, 20 s
+    `confirming`, 30 s `depositUnsettled` and `refunding`, 15 s
+    `zcashSyncing` and after a failed step (`problem != null`), 0 once the
+    record ended. On `Err(busy)` retry after 15 s or on a nudge; ignore
+    `Err(cancelled)`. Nudge after accept (accept never advances).
+  - Show `problem` only after 60 s of consecutive failures of that `(account,
+    index)`; clear the timer on any result without one. `zcashSyncing` is a
+    wait, never a problem.
+  - Pause (lock, hide, quiesce): `privateUsdCancel(currentOpId)`; on lock also
+    `privateUsdClearSessions()`. A cancelled advance stops at its next safe
+    point (never between saving a deposit as started and keeping its bytes)
+    and returns `cancelled`.
+  - Each advance holds the account's driver lock for its whole run (up to a
+    minute while the chain catches up after a lock or claim), so keep one
+    serial queue per account.
 
 ## M6. Reverse conversion, reverse refunds, rescue and the Refunds screen
 
@@ -762,6 +919,147 @@ commit that checks this note.
   mnemonic. Debug builds only (a release build shows a notice and does
   nothing); it prints the public address, the fee, bucket names and page
   lines with keyed URLs redacted, never params or amounts.
+- **D-31 (M5.1): the engine as built.** Plan §3.6 and reference §5.10
+  updated.
+  - The driver lock is a function, `engine::lock_account(account) ->
+    DriverGuard`, over a `tokio::sync::Mutex` per account; `try_lock_owned`
+    gives `Busy`. The FRB wrappers take it before they build their runtime;
+    `private_usd_delete_account` takes it too, so a step that is still
+    running cannot save a record back after a delete.
+  - Offers are pruned per account, not across accounts, and a quote made
+    before `private_usd_clear_sessions` (a lock) is never held after it: the
+    cache keeps a session number that every clear bumps.
+  - The maker's `/v1/info` check is cached per network until the next clear
+    (zapp checks once per driver; vizor's driver lives for one call).
+  - The op registry remembers up to 64 ids cancelled before their call
+    registered, so a cancel that overtakes its call on the FRB worker queue
+    still stops it.
+  - Two more seams: `Clock` (device time and the 2 s catch-up waits, so the
+    tests run instantly) and `TokenSource` (D-33).
+  - `forward.rs` holds the driver and its Zcash seam, `ForwardZcash`, whose
+    real implementation `WalletZcash` sits over the M2 operations, plus
+    `ForwardCall`, which builds the real seams for one FRB call
+    (`AsyncFnOnce` step).
+- **D-32 (M5.2): the FRB surface as built.** Reference §8.2 updated.
+  - A new error code, `Cancelled` (both enums): a cancelled call is never a
+    failure, so Dart can tell it from one. Part 2 has no Dart switch over
+    the codes yet, so nothing else changes.
+  - `private_usd_clear_sessions` lands now, not in M4: on lock it drops the
+    forward offers and maker checks. M4 adds its issuance sessions to it.
+  - `private_usd_forward_abandon(network, account_uuid, store_dir,
+    eth_rpc_url, index)` takes no `db_path`: it reads no wallet DB.
+  - `ApiForwardRecord` gains `phase: ApiForwardPhase` (the store's phase
+    column), for the activity row and the banner without an advance at hand.
+    `deposit_confirmations` is set only while the record is under way.
+  - `ApiActivity` already lists the reverse activities M6 will report.
+    `ApiDirection` is not added: no call uses it yet.
+  - `private_usd_unfinished_count`, `…_accounts_with_unfinished` and
+    `…_forward_records` never create `swaps.db` (`SwapStore::open_existing`),
+    so asking on a wallet that never converted writes nothing.
+  - A failed advance step is `Ok` with `problem` set, folded into the §5.8
+    problem set by `engine::problem` (`ChainLagging` and `ChainUnreadable`
+    become `EthereumUnreachable`, `WrongDeployment` `RelayerUnreachable`,
+    the rest `Other`; `RouteBlocked` passes through). Only setup failures,
+    `Busy` and `Cancelled` are errors.
+- **D-33 (M5): tokens without M4.** M4 waits for N1 (B-5); makers do not
+  require tokens today (D20), and the owner disabled them on testnet for now.
+  - `engine::TokenSource` is the seam M4 fills: `accept_authorization()`
+    (the `Authorization` of a token already held, sent with the accept) and
+    `token_required(challenge)`. `NoTokens` holds none.
+  - A maker's `tokenRequired` refusal returns `ApiAcceptKind::TokensNeeded`
+    with no retry loop. The refusal sent nothing, so the record stays saved
+    and unanswered; a repeat accept posts the saved quote again for the same
+    index, as the M4 flow will after issuance.
+  - `abandon` ends an unanswered record `MakerUnavailable` (the token
+    turn-away of reference §5.9 and §5.11 F3a) and an answered one
+    `NeverOpened` (zapp's `abandon`, §5.6 step 12). Reference §5.6 updated.
+  - The token return (§5.6 step 11) is not collected: nothing is awaited.
+- **D-34 (M5.1): the forward refund's sweep.** Reference §5.8 updated.
+  - An earlier sweep that may still land is looked for in `joint.db`
+    (`joint::find_sent`, from the joint account to any address) before the
+    balance is checked: an unmined earlier sweep leaves nothing spendable,
+    so the §5.8 order (balance, then the earlier sweep) would wait forever.
+  - The sweep pays the account's current receive address
+    (`keys::get_address_from_db`), as zapp pays its account's UA. The fee
+    limit is `min(320,000, balance − 1)`, refused below 10,000.
+  - Every sweep status read imports the joint account (idempotently) and
+    syncs `joint.db` first, so a lost `joint.db` heals by rescanning from the
+    exact birthday.
+  - Forgetting the joint account after the sweep is final is best effort: a
+    failure is logged and the swap still ends `Refunded`; deleting the
+    account or a reset removes what is left. `joint::forget_joint_account`
+    succeeds when the account is already gone.
+- **D-35 (M5.1): the deposit.** Reference §5.6 updated.
+  - The wait for the main wallet's scan (`ZcashSyncing`) gates only building
+    a new deposit: the fully scanned height must reach the live
+    lightwalletd tip. Status reads and resending a kept deposit do not wait.
+  - A deposit that would spend Sapling notes is refused
+    (`DepositUnpayable`) and its proposal released: Rust cannot fetch the
+    Sapling parameters, and `swap_deposit_sender.dart` refuses them too. The
+    fee preview (`estimate_swap_deposit_fee`) is `None` then, and also for
+    any proposal error (zapp treats an SDK failure as no estimate).
+  - Accept refuses an offer whose fee preview was `None`, and a
+    `max_total_zat` below the deposit (`DepositUnpayable`), before anything
+    is saved.
+  - The send flow ids are `private-usd-deposit:{account}:{index}` and
+    `private-usd-sweep:{account}:{index}`.
+- **D-36 (M5.1): payout fees.** Reference §5.6 step 8 already says this; plan
+  §3.5 item 8 is narrowed to it.
+  - The payout is signed again whenever the fee to pay differs from the saved
+    one: the offer's fee within its window, else the relayer's fee now. After
+    a claim that did not pay out, that can be a lower fee (zapp
+    `aLowerFeeCanFinishASplitClaim…`). On a `400 rejected`, it is signed
+    again only if the relayer's fee rose, and posted once more.
+  - The 2 USDC cap applies at quote and to every payout signature, the
+    refused one's re-signature included. `finishPaid` checks the event's
+    relayer and that its fee leaves something, not the cap: the event can
+    only carry a fee we signed.
+  - The forward claim lock's signature is not saved before it is sent (zapp
+    does not either). Losing it costs only a new lock; it reveals nothing.
+- **D-37 (M5.1): small mappings.** A quote while a conversion is under way
+  is `Busy` (there is no dedicated code); a maker turning a quote down
+  (`rejected`, `invalidRequest`) is `AmountRefused`.
+- **D-38 (M5.1): reads that authorize.** `ConfirmedSwap.head` is the "now"
+  of the fresh check before a reveal (D-7); `hold_claim_lock`, the t0 check
+  and the deposit window read `head()` again, as zapp reads `chain.now()`.
+- **D-39 (M5): the tests as built.** Plan §10 has the list.
+  - `private_usd/tests/fakes.rs`: one shared `World` behind `FakeChain`
+    (terms hashed from the eleven words the contract hashes, checked
+    against `Terms::hash`), `FakeServices` (the maker and relayer routed by
+    path, acting on the chain), `FakeZcash` (with crash points around the
+    deposit's saves, through a test-only `store::crash_before_next_commit`),
+    `FakeClock`, and real keys, a real maker proof and a real `swaps.db`.
+  - The ★ cases, all in `private_usd/tests/forward.rs`:
+    `AtomicSwapDriverTest` 21 (`the_happy_path_claims_into_railgun`), 55
+    (`an_offer_says_what_arrives_…`), 114 (`a_quote_about_to_run_out_…`),
+    214 (`an_accept_that_may_have_opened_…`), 242, 255, 266, 284, 298
+    (`an_interrupted_deposit_that_went_out_…`, `…_never_went_out_…`,
+    `a_deposit_the_wallet_cannot_pay_…`, `a_deposit_is_sent_again_…`,
+    `an_expired_deposit_is_paid_again_only_while_payable`), 398
+    (`nothing_is_deposited_into_a_swap_whose_terms_are_off_by_one_…`), 428
+    (`a_silent_maker_is_claimed_…`); `AtomicSwapClaimTest` 19–131 (the eight
+    `a_refund_…`/`a_sweep_…`/`an_expired_sweep_…` and
+    `a_swap_left_under_the_same_id_…` tests), 161–214 (`the_share_stays_…`),
+    225–271 (`a_claim_signs_the_offers_fee_…`,
+    `a_refused_payout_is_signed_again_only_at_a_higher_fee`), 311
+    (`a_claim_revealed_before_an_interruption_…`), 385 and 397
+    (`an_accept_refusal_ends_only_when_nothing_can_have_opened`);
+    `AtomicSwapSettlementTest` 17–82 (`a_delayed_lock_response_…`,
+    `the_lock_and_terms_are_read_again_immediately_before_the_reveal`,
+    `an_unconfirmed_open_…`, `an_unconfirmed_claim_lock_…`), 124
+    (`an_orphaned_payout_…`).
+  - vizor's own: `swap_indices_are_never_reused`,
+    `a_crash_around_the_deposit_never_pays_it_twice`,
+    `no_deposit_is_built_until_the_wallet_has_scanned_to_the_tip`,
+    `a_payout_is_never_signed_above_the_cap`,
+    `a_maker_asking_for_a_token_turns_the_accept_away_without_a_retry` and
+    `a_concurrent_advance_and_accept_on_one_account_gives_busy_and_leaves_the_record_intact`;
+    the lifecycle file's three through the FRB calls.
+  - Adapted from zapp: a refund ends at the testnet pins' 2 Zcash
+    confirmations, not zapp's default 3; the fees a payout was signed for are
+    read from the posted bodies (the keys are real); zapp's
+    `beforeClaimSecret` cases change the chain on the third confirmed read,
+    the one immediately before the reveal.
 
 ## Blocked
 
@@ -787,7 +1085,9 @@ commit that checks this note.
   suits E9). Do not install emulators.
 - **B-4. M0.2 on testnet needs funded testnet ZEC (E8).** The routing was
   verified offline instead (see the M0.2 line).
-- **B-5. `zecswap-tokens` (D-1).** An owner decision is needed before M4:
+- **B-5. `zecswap-tokens` (D-1).** Tokens disabled on testnet by the owner
+  (2026-10-13), temporarily; M5–M7 testnet E2E are not blocked by tokens; N1
+  still open for when they return. An owner decision is needed before M4:
   options (a)–(c) in plan M0.1 result.
 - **B-7. A funded Sepolia Railgun wallet.** It needs test USDC shielded into a
   Railgun wallet whose mnemonic can be passed as `SPIKE_MNEMONIC`. It blocks

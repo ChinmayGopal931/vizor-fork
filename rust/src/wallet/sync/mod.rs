@@ -103,11 +103,10 @@ pub(crate) use send::{
     estimate_send_max_for_purpose, propose_payment_link_batch, propose_send_for_purpose,
     SendPurpose,
 };
-// Private USD: the deposit split and the joint sweep proposal.
-#[allow(unused_imports)] // The Private USD engine (M5) calls the deposit half.
+// Private USD: the deposit split, its fee preview and the joint sweep proposal.
 pub(crate) use send::{
-    broadcast_raw, create_stored_proposal_transactions, propose_joint_sweep, propose_swap_deposit,
-    CreatedTransaction, SwapProposal,
+    broadcast_raw, create_stored_proposal_transactions, estimate_swap_deposit_fee,
+    propose_joint_sweep, propose_swap_deposit, CreatedTransaction, SwapProposal,
 };
 pub(crate) use send::{get_orchard_migration_immediate_plan, get_orchard_migration_private_plan};
 // Internal-only re-export for `sync_engine::run_sync_impl`'s

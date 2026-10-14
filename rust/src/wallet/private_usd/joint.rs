@@ -114,6 +114,29 @@ pub(crate) fn delete_joint_account(
     keys::delete_account(joint_db, network, joint_uuid).map_err(wallet_error)
 }
 
+/// Forgets a joint account if `joint_db` still holds it: a cleanup that ran
+/// before, or a `joint.db` that is gone, leaves nothing to do.
+pub(crate) fn forget_joint_account(
+    joint_db: &str,
+    network: WalletNetwork,
+    joint_uuid: &str,
+) -> Result<()> {
+    if !std::path::Path::new(joint_db).exists() {
+        return Ok(());
+    }
+    let account = keys::parse_account_uuid(joint_uuid)
+        .map_err(|error| PrivateUsdError::new(ErrorCode::Other, error))?;
+    let held = sync::open_wallet_db_for_read(joint_db, network)
+        .map_err(wallet_error)?
+        .get_account(account)
+        .map_err(|error| wallet_error(error.to_string()))?
+        .is_some();
+    if !held {
+        return Ok(());
+    }
+    delete_joint_account(joint_db, network, joint_uuid)
+}
+
 /// The `joint.db` paths a scan is running on.
 static SCANNING: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
 
@@ -540,6 +563,14 @@ where
         .map(|block| u32::from(block.block_height())))
 }
 
+/// The height through which `db` has scanned every block; `None` before its
+/// first scan.
+pub(crate) fn scanned_height(db: &str, network: WalletNetwork) -> Result<Option<u32>> {
+    let conn =
+        open_readonly_conn_with_timeout(db, Some(READ_DB_BUSY_TIMEOUT)).map_err(wallet_error)?;
+    fully_scanned_height(&wallet_db_on(&conn, db, network))
+}
+
 /// The account's sent transaction to `joint_ua` that may still land, if any:
 /// mined, or unmined and not provably expired. A deposit marked started but
 /// never kept is looked up here before anything new is built, so it is never
@@ -550,12 +581,24 @@ pub(crate) fn find_deposit(
     account_uuid: &str,
     joint_ua: &str,
 ) -> Result<Option<CreatedTransaction>> {
+    find_sent(main_db, network, account_uuid, Some(joint_ua))
+}
+
+/// The account's newest sent transaction that may still land, to `to` or to
+/// anyone: mined, or unmined and not provably expired. A joint account's
+/// earlier sweep is found here whatever home address it paid.
+pub(crate) fn find_sent(
+    db: &str,
+    network: WalletNetwork,
+    account_uuid: &str,
+    to: Option<&str>,
+) -> Result<Option<CreatedTransaction>> {
     let account = keys::parse_account_uuid(account_uuid)
         .map_err(|error| PrivateUsdError::new(ErrorCode::Other, error))?;
-    let conn = open_readonly_conn_with_timeout(main_db, Some(READ_DB_BUSY_TIMEOUT))
-        .map_err(wallet_error)?;
+    let conn =
+        open_readonly_conn_with_timeout(db, Some(READ_DB_BUSY_TIMEOUT)).map_err(wallet_error)?;
     let snapshot = conn.unchecked_transaction().map_err(sql_error)?;
-    let fully_scanned = fully_scanned_height(&wallet_db_on(&snapshot, main_db, network))?;
+    let fully_scanned = fully_scanned_height(&wallet_db_on(&snapshot, db, network))?;
     let mut query = snapshot
         .prepare(
             "SELECT t.txid, t.raw, t.expiry_height, t.mined_height
@@ -564,13 +607,13 @@ pub(crate) fn find_deposit(
                  SELECT sn.transaction_id
                  FROM sent_notes sn
                  JOIN accounts a ON a.id = sn.from_account_id
-                 WHERE a.uuid = ?1 AND sn.to_address = ?2)
+                 WHERE a.uuid = ?1 AND (?2 IS NULL OR sn.to_address = ?2))
              ORDER BY t.id_tx DESC",
         )
         .map_err(sql_error)?;
     let sent = query
         .query_map(
-            rusqlite::params![account.expose_uuid().as_bytes().as_slice(), joint_ua],
+            rusqlite::params![account.expose_uuid().as_bytes().as_slice(), to],
             |row| {
                 Ok((
                     row.get::<_, Vec<u8>>(0)?,

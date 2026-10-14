@@ -123,6 +123,13 @@ thread_local! {
     static CRASH_BEFORE_COMMIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
+/// Fails the next record write on this thread just before it commits, as a
+/// crash there would.
+#[cfg(test)]
+pub(crate) fn crash_before_next_commit() {
+    CRASH_BEFORE_COMMIT.with(|crash| crash.set(true));
+}
+
 impl SwapStore {
     /// Opens `dir/swaps.db`, creating and migrating it. A store written by a
     /// newer version is refused, never reset.
@@ -162,6 +169,15 @@ impl SwapStore {
         }
         tx.commit().map_err(sql)?;
         Ok(Self { conn })
+    }
+
+    /// Opens `dir/swaps.db` only if it exists: a query about conversions on a
+    /// wallet that never made one creates nothing.
+    pub(crate) fn open_existing(dir: &Path) -> Result<Option<Self>> {
+        if !dir.join(FILE_NAME).exists() {
+            return Ok(None);
+        }
+        Self::open(dir).map(Some)
     }
 
     /// The account's next swap index, committed as taken before it is

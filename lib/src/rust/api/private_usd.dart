@@ -6,8 +6,8 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `catch`, `open_context`, `parse_network_and_migrate`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `eq`, `eq`, `fmt`, `fmt`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_quote`, `api_record`, `block_on`, `catch`, `deposit_confirmations`, `forward_call`, `internal_hex`, `open_context`, `parse_network_and_migrate`, `seconds`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 /// The deployment for the wallet network `"main"` or `"test"`; `None` on
 /// regtest or an unknown network, where Private USD is hidden.
@@ -64,6 +64,210 @@ Future<String> privateUsdRailgunAddress({
   accountUuid: accountUuid,
   mnemonicBytes: mnemonicBytes,
 );
+
+/// Cancels the call registered as `op_id` (an advance): it stops at its next
+/// safe point with `Cancelled`, and never between saving a deposit as
+/// started and keeping its transaction. A cancel that reaches Rust before its
+/// call registered still stops it.
+void privateUsdCancel({required int opId}) =>
+    RustLib.instance.api.crateApiPrivateUsdPrivateUsdCancel(opId: opId);
+
+/// What call `op_id` is doing now, while it runs (zapp `onActivity`); poll it
+/// about every 500 ms during an advance.
+ApiActivity? privateUsdActivity({required int opId}) =>
+    RustLib.instance.api.crateApiPrivateUsdPrivateUsdActivity(opId: opId);
+
+/// Forgets every in-memory session: call it on lock. A forward quote made
+/// before the lock is never accepted after it, and each maker's `/v1/info` is
+/// checked again. (M4 adds its token issuance sessions here.)
+void privateUsdClearSessions() =>
+    RustLib.instance.api.crateApiPrivateUsdPrivateUsdClearSessions();
+
+/// The account's conversions under way, in either direction: a forward one
+/// not ended, a reverse one past its quote. The account deletion and reset
+/// warnings show it. 0 when the wallet never made one.
+Future<int> privateUsdUnfinishedCount({
+  required String storeDir,
+  required String accountUuid,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdUnfinishedCount(
+  storeDir: storeDir,
+  accountUuid: accountUuid,
+);
+
+/// Every account with a conversion under way: the engine loop advances each
+/// of them while the app is open and unlocked (D14).
+Future<List<String>> privateUsdAccountsWithUnfinished({
+  required String storeDir,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdAccountsWithUnfinished(
+  storeDir: storeDir,
+);
+
+/// Removes the account's conversions from `swaps.db` and its joint accounts
+/// from `joint.db`, after the user confirmed and the engine drained. `Busy`
+/// while one of its steps runs: drain, then call again.
+Future<void> privateUsdDeleteAccount({
+  required String storeDir,
+  required String network,
+  required String accountUuid,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdDeleteAccount(
+  storeDir: storeDir,
+  network: network,
+  accountUuid: accountUuid,
+);
+
+/// Quotes `units` (token base units) for a fresh swap index, which counts as
+/// spent from here on. The offer stays in Rust until it expires or the
+/// wallet locks. `Busy` while a conversion is under way.
+Future<ApiForwardQuote> privateUsdForwardQuote({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+  required String lightwalletdUrl,
+  required String ethRpcUrl,
+  required int units,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdForwardQuote(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+  lightwalletdUrl: lightwalletdUrl,
+  ethRpcUrl: ethRpcUrl,
+  units: units,
+);
+
+/// Accepts the quote of swap `index`: saves the record, then posts the
+/// accept. A missing offer is `QuoteExpired`. Called again for the same
+/// index, it posts the saved quote once more (never a new index). An error
+/// after the save means "maybe opened": read the records and show the
+/// conversion's progress if it is under way.
+Future<ApiAcceptResult> privateUsdForwardAccept({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+  required String lightwalletdUrl,
+  required String ethRpcUrl,
+  required int index,
+  required BigInt maxTotalZat,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdForwardAccept(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+  lightwalletdUrl: lightwalletdUrl,
+  ethRpcUrl: ethRpcUrl,
+  index: index,
+  maxTotalZat: maxTotalZat,
+);
+
+/// One look at the chain for swap `index`, then at most one key-using step
+/// (deposit, claim, payout or sweep). Reloads the record from `swaps.db`.
+/// Holds the account's driver lock throughout (`Busy` if taken), and stops
+/// with `Cancelled` once `private_usd_cancel(op_id)` is called. A failed step
+/// returns the record with `problem` set; nap `next_poll_ms`, then advance
+/// again.
+Future<ApiForwardAdvance> privateUsdForwardAdvance({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+  required String lightwalletdUrl,
+  required String ethRpcUrl,
+  required int opId,
+  required int index,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdForwardAdvance(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+  lightwalletdUrl: lightwalletdUrl,
+  ethRpcUrl: ethRpcUrl,
+  opId: opId,
+  index: index,
+);
+
+/// Drops swap `index` before it reached the chain (§5.6 step 12): an
+/// unanswered accept ends `MakerUnavailable` (a turn-away at the token gate
+/// included), an answered one `NeverOpened`. `TooLate` once a deposit
+/// started or the chain shows the swap. No key is needed.
+Future<ApiForwardRecord> privateUsdForwardAbandon({
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required String ethRpcUrl,
+  required int index,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdForwardAbandon(
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  ethRpcUrl: ethRpcUrl,
+  index: index,
+);
+
+/// The account's forward conversions: the active one first, then the rest,
+/// newest first.
+Future<List<ApiForwardRecord>> privateUsdForwardRecords({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdForwardRecords(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+);
+
+enum ApiAcceptKind {
+  /// The maker opened the swap, or is opening it: show its progress.
+  accepted,
+
+  /// The maker wants a Privacy Pass token and none is held (no tokens
+  /// client before M4). Nothing opened; abandon the conversion.
+  tokensNeeded,
+
+  /// Over before anything was sent; `cause` says why.
+  nothingSent,
+}
+
+class ApiAcceptResult {
+  final ApiAcceptKind kind;
+  final ApiNothingSentCause? cause;
+  final int index;
+
+  const ApiAcceptResult({required this.kind, this.cause, required this.index});
+
+  @override
+  int get hashCode => kind.hashCode ^ cause.hashCode ^ index.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiAcceptResult &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          cause == other.cause &&
+          index == other.index;
+}
+
+/// What a call is doing now, for the progress screen (zapp
+/// `AtomicSwapActivity`). The reverse steps arrive with M6.
+enum ApiActivity {
+  depositing,
+  claiming,
+  payingOut,
+  sweeping,
+  funding,
+  readying,
+  refunding,
+}
 
 /// A network's pinned deployment: everything Dart and Kotlin need, so they
 /// never duplicate config.
@@ -167,6 +371,259 @@ class ApiDeployment {
           usdTokens == other.usdTokens;
 }
 
+class ApiForwardAdvance {
+  final ApiForwardRecord record;
+  final ApiForwardWait? wait;
+
+  /// How long to nap before the next advance; 0 once the record ended.
+  final int nextPollMs;
+
+  /// The step failed: the problem to show once steps have failed for a
+  /// minute in a row (reference §5.8).
+  final ApiPrivateUsdErrorCode? problem;
+
+  const ApiForwardAdvance({
+    required this.record,
+    this.wait,
+    required this.nextPollMs,
+    this.problem,
+  });
+
+  @override
+  int get hashCode =>
+      record.hashCode ^ wait.hashCode ^ nextPollMs.hashCode ^ problem.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiForwardAdvance &&
+          runtimeType == other.runtimeType &&
+          record == other.record &&
+          wait == other.wait &&
+          nextPollMs == other.nextPollMs &&
+          problem == other.problem;
+}
+
+enum ApiForwardOutcome { paid, refunded, nothingSent }
+
+/// Where a forward record stands by what it keeps (the store's phase).
+enum ApiForwardPhase {
+  opening,
+  depositing,
+  confirming,
+  claiming,
+  refunding,
+  paid,
+  refunded,
+  nothingSent,
+}
+
+/// A forward quote, held in Rust until accepted or expired.
+class ApiForwardQuote {
+  /// The swap index the quote spent.
+  final int index;
+
+  /// Unix seconds. Stop offering the quote 20 s before.
+  final PlatformInt64 expiresAt;
+
+  /// Token base units, decimal.
+  final String amount;
+  final String? networkCost;
+  final String relayerFee;
+
+  /// What reaches the private balance after the relayer's and Railgun's
+  /// fees.
+  final String receives;
+  final BigInt depositZat;
+
+  /// The deposit's network fee from this wallet now; `None`: one
+  /// transaction cannot pay it, so the quote is unpayable.
+  final BigInt? depositFeeZat;
+
+  /// `deposit_zat + deposit_fee_zat`: what the user approves, and what
+  /// accept takes.
+  final BigInt? maxTotalZat;
+  final PlatformInt64? feeExpiresAt;
+
+  const ApiForwardQuote({
+    required this.index,
+    required this.expiresAt,
+    required this.amount,
+    this.networkCost,
+    required this.relayerFee,
+    required this.receives,
+    required this.depositZat,
+    this.depositFeeZat,
+    this.maxTotalZat,
+    this.feeExpiresAt,
+  });
+
+  @override
+  int get hashCode =>
+      index.hashCode ^
+      expiresAt.hashCode ^
+      amount.hashCode ^
+      networkCost.hashCode ^
+      relayerFee.hashCode ^
+      receives.hashCode ^
+      depositZat.hashCode ^
+      depositFeeZat.hashCode ^
+      maxTotalZat.hashCode ^
+      feeExpiresAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiForwardQuote &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          expiresAt == other.expiresAt &&
+          amount == other.amount &&
+          networkCost == other.networkCost &&
+          relayerFee == other.relayerFee &&
+          receives == other.receives &&
+          depositZat == other.depositZat &&
+          depositFeeZat == other.depositFeeZat &&
+          maxTotalZat == other.maxTotalZat &&
+          feeExpiresAt == other.feeExpiresAt;
+}
+
+/// A flat view of a forward record; the record itself stays in Rust.
+class ApiForwardRecord {
+  final int index;
+
+  /// `0x`, 32 bytes.
+  final String swapId;
+  final ApiForwardPhase phase;
+  final PlatformInt64 acceptedAt;
+  final PlatformInt64 quoteExpiresAt;
+  final BigInt depositZat;
+  final BigInt? maxTotalZat;
+  final String amount;
+  final String receives;
+  final String relayerFee;
+  final PlatformInt64? t0;
+  final PlatformInt64? t1;
+
+  /// Internal byte order hex, as wallet history rows carry it; show it with
+  /// `zcashDisplayTxidHex`.
+  final String? depositTxid;
+
+  /// While under way with a deposit kept: its depth in the main wallet
+  /// (0 until mined). `None` otherwise.
+  final int? depositConfirmations;
+
+  /// Internal byte order hex.
+  final String? sweepTxid;
+
+  /// The Ethereum transaction that shielded the payout, `0x` hex.
+  final String? payoutTx;
+  final ApiForwardOutcome? outcome;
+  final ApiRefundCause? refundCause;
+  final ApiNothingSentCause? nothingSentCause;
+  final PlatformInt64? endedAt;
+
+  const ApiForwardRecord({
+    required this.index,
+    required this.swapId,
+    required this.phase,
+    required this.acceptedAt,
+    required this.quoteExpiresAt,
+    required this.depositZat,
+    this.maxTotalZat,
+    required this.amount,
+    required this.receives,
+    required this.relayerFee,
+    this.t0,
+    this.t1,
+    this.depositTxid,
+    this.depositConfirmations,
+    this.sweepTxid,
+    this.payoutTx,
+    this.outcome,
+    this.refundCause,
+    this.nothingSentCause,
+    this.endedAt,
+  });
+
+  @override
+  int get hashCode =>
+      index.hashCode ^
+      swapId.hashCode ^
+      phase.hashCode ^
+      acceptedAt.hashCode ^
+      quoteExpiresAt.hashCode ^
+      depositZat.hashCode ^
+      maxTotalZat.hashCode ^
+      amount.hashCode ^
+      receives.hashCode ^
+      relayerFee.hashCode ^
+      t0.hashCode ^
+      t1.hashCode ^
+      depositTxid.hashCode ^
+      depositConfirmations.hashCode ^
+      sweepTxid.hashCode ^
+      payoutTx.hashCode ^
+      outcome.hashCode ^
+      refundCause.hashCode ^
+      nothingSentCause.hashCode ^
+      endedAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiForwardRecord &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          swapId == other.swapId &&
+          phase == other.phase &&
+          acceptedAt == other.acceptedAt &&
+          quoteExpiresAt == other.quoteExpiresAt &&
+          depositZat == other.depositZat &&
+          maxTotalZat == other.maxTotalZat &&
+          amount == other.amount &&
+          receives == other.receives &&
+          relayerFee == other.relayerFee &&
+          t0 == other.t0 &&
+          t1 == other.t1 &&
+          depositTxid == other.depositTxid &&
+          depositConfirmations == other.depositConfirmations &&
+          sweepTxid == other.sweepTxid &&
+          payoutTx == other.payoutTx &&
+          outcome == other.outcome &&
+          refundCause == other.refundCause &&
+          nothingSentCause == other.nothingSentCause &&
+          endedAt == other.endedAt;
+}
+
+enum ApiForwardWait {
+  /// The maker has not opened the swap on chain yet.
+  opening,
+
+  /// The deposit is out; waiting for the maker to mark the swap ready, or
+  /// for `t0`.
+  confirming,
+
+  /// The maker called the swap off while the deposit was unmined.
+  depositUnsettled,
+
+  /// The refunded deposit is on its way home.
+  refunding,
+
+  /// The Zcash wallet is syncing: never a problem.
+  zcashSyncing,
+}
+
+enum ApiNothingSentCause {
+  quoteExpired,
+  makerRefused,
+  makerUnavailable,
+  neverOpened,
+  mismatch,
+  depositWindowMissed,
+  makerCancelled,
+}
+
 /// A Private USD failure. Its Dart `toString()` is the message.
 class ApiPrivateUsdError implements FrbException {
   final ApiPrivateUsdErrorCode code;
@@ -220,7 +677,12 @@ enum ApiPrivateUsdErrorCode {
   unavailable,
   routeBlocked,
   other,
+
+  /// The call was cancelled (`private_usd_cancel`): never a failure.
+  cancelled,
 }
+
+enum ApiRefundCause { makerCancelled, notClaimedInTime }
 
 /// A token the private USD balance counts as dollars.
 class ApiUsdToken {

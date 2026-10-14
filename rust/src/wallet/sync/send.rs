@@ -908,12 +908,7 @@ fn lock_and_store_proposal(
     proposed_tx_version: Option<TxVersion>,
     purpose: SendPurpose,
 ) -> Result<ProposalResult, String> {
-    use zcash_protocol::{PoolType, ShieldedPool as SP};
-
-    let needs_sapling = proposal
-        .steps()
-        .iter()
-        .any(|step| step.involves(PoolType::Shielded(SP::Sapling)));
+    let needs_sapling = proposal_needs_sapling(&proposal);
 
     let fee: u64 = proposal
         .steps()
@@ -997,6 +992,17 @@ fn lock_and_store_proposal(
     })
 }
 
+/// Whether creating `proposal` needs the Sapling proving parameters: one of
+/// its steps spends or pays Sapling.
+fn proposal_needs_sapling(proposal: &Proposal<WalletFeeRule, ReceivedNoteId>) -> bool {
+    use zcash_protocol::{PoolType, ShieldedPool as SP};
+
+    proposal
+        .steps()
+        .iter()
+        .any(|step| step.involves(PoolType::Shielded(SP::Sapling)))
+}
+
 /// The one transaction a swap proposal may make: a Private USD deposit or a
 /// joint sweep is never split across several (§3.5 item 3).
 fn single_swap_transaction(
@@ -1016,7 +1022,6 @@ pub(crate) struct SwapProposal {
     pub proposal_id: u64,
     /// Whether creating it needs the Sapling proving parameters, as for an
     /// ordinary send that spends Sapling notes.
-    #[allow(dead_code)] // Read by the Private USD engine (M5).
     pub needs_sapling_params: bool,
     pub fee_zatoshi: u64,
     pub amount_zatoshi: u64,
@@ -1027,7 +1032,6 @@ pub(crate) struct SwapProposal {
 /// inputs locked, sender OVK kept so the account still recovers it. The
 /// deposit must be one transaction whose amount plus fee stays within the
 /// approved `max_total_zatoshi`; otherwise nothing is locked or stored.
-#[allow(dead_code)] // Called by the Private USD engine (M5).
 pub(crate) fn propose_swap_deposit(
     db_path: &str,
     network: WalletNetwork,
@@ -1087,6 +1091,42 @@ pub(crate) fn propose_swap_deposit(
             amount_zatoshi: deposit_zatoshi,
         })
     })
+}
+
+/// The network fee of a Private USD deposit of `deposit_zatoshi` from the
+/// account to `joint_ua`, were it proposed now: the quote screen's preview
+/// (`docs/private-usd-reference.md` §5.6 step 1.8). `None` unless one
+/// transaction pays it without the Sapling proving parameters, or when no
+/// proposal can be made (too little funds). Nothing is locked or stored.
+pub(crate) fn estimate_swap_deposit_fee(
+    db_path: &str,
+    network: WalletNetwork,
+    account_uuid: &str,
+    joint_ua: &str,
+    deposit_zatoshi: u64,
+) -> Result<Option<u64>, String> {
+    let db = open_wallet_db_for_read(db_path, network)?;
+    let account_id = parse_account_uuid(account_uuid)?;
+    let Ok((proposal, _)) = propose_request(
+        &db,
+        db_path,
+        network,
+        account_uuid,
+        account_id,
+        SendRequest::Single {
+            to_address: joint_ua,
+            amount_zatoshi: deposit_zatoshi,
+            memo_str: None,
+        },
+        SendPurpose::Ordinary,
+        "estimating a swap deposit fee",
+    ) else {
+        return Ok(None);
+    };
+    if single_swap_transaction(&proposal).is_err() || proposal_needs_sapling(&proposal) {
+        return Ok(None);
+    }
+    Ok(Some(proposal_fee_zatoshi(&proposal)))
 }
 
 /// Proposes sending everything in a Private USD joint account to `home_ua`
@@ -1739,7 +1779,6 @@ pub(crate) struct CreatedTransaction {
     /// In internal byte order, as `transactions.txid` stores it. Display hex
     /// and lightwalletd's JSON reverse it.
     pub txid: TxId,
-    #[allow(dead_code)] // Kept by the Private USD engine (M5).
     pub raw: Vec<u8>,
     pub expiry_height: u32,
 }
@@ -1763,7 +1802,6 @@ impl std::fmt::Debug for CreatedTransaction {
 /// A failure before storage releases the proposal's inputs. If storage
 /// succeeds but the bytes cannot be read back, the error says so and the
 /// transactions stay stored.
-#[allow(dead_code)] // Called by the Private USD engine (M5).
 pub(crate) async fn create_stored_proposal_transactions(
     db_path: &str,
     lightwalletd_url: &str,
@@ -1826,7 +1864,6 @@ fn read_created_transactions(
 /// Sends `raw_tx` once over an isolated route; a transaction the node already
 /// has counts as sent. A Private USD kept transaction is sent again with this
 /// until it is mined.
-#[allow(dead_code)] // Called by the Private USD engine (M5).
 pub(crate) async fn broadcast_raw(lightwalletd_url: &str, raw_tx: &[u8]) -> Result<(), String> {
     broadcast_raw_transaction_isolated(lightwalletd_url, raw_tx).await
 }

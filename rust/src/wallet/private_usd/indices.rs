@@ -20,7 +20,7 @@ pub(crate) const MAX_SKIPPED: u32 = 16;
 /// `contracts` pairs each contract's reader with its forward maker.
 pub(crate) async fn take_index<C: ChainReader>(
     store: &mut SwapStore,
-    contracts: &[(C, [u8; 20])],
+    contracts: &[(&C, [u8; 20])],
     keys: &SwapKeyContext,
     account: &str,
 ) -> Result<u32> {
@@ -42,7 +42,7 @@ pub(crate) async fn take_index<C: ChainReader>(
 /// A forward swap's id binds its maker and our share; a reverse swap spends
 /// our share as its own (`makerKeyUsed`).
 async fn used_on_chain<C: ChainReader>(
-    contracts: &[(C, [u8; 20])],
+    contracts: &[(&C, [u8; 20])],
     keys: &SwapKeyContext,
     index: u32,
 ) -> Result<bool> {
@@ -110,7 +110,7 @@ mod tests {
         // Indices 0 to 2 are in use on chain: 3 is taken, 0 to 2 stay spent.
         let first_three = node((0..3).map(id_of).collect());
         let chain = EvmRpc::new(&first_three, "https://rpc.invalid", pins);
-        let contracts = [(chain, pins.maker)];
+        let contracts = [(&chain, pins.maker)];
         assert_eq!(
             take_index(&mut store, &contracts, &keys, ACCOUNT)
                 .await
@@ -121,7 +121,7 @@ mod tests {
         // Sixteen in a row in use: refused, and all sixteen stay spent.
         let all = node((4..40).map(id_of).collect());
         let chain = EvmRpc::new(&all, "https://rpc.invalid", pins);
-        let contracts = [(chain, pins.maker)];
+        let contracts = [(&chain, pins.maker)];
         let error = take_index(&mut store, &contracts, &keys, ACCOUNT)
             .await
             .unwrap_err();

@@ -270,7 +270,7 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
    | Outcome | Result |
    |---|---|
    | `4xx` | `NothingSent`; the code maps to `MAKER_REFUSED`, `QUOTE_EXPIRED` or `MAKER_UNAVAILABLE` (`:245-270`). `unknownSwap`/`internal` stay open. |
-   | Turned away at the token gate | zapp: `NothingSent(MAKER_UNAVAILABLE)`, then rethrow. vizor: return `TokensNeeded`, issue once, and retry the same acceptance (§5.9); if issuance fails, abandon → `NothingSent(MAKER_UNAVAILABLE)` |
+   | Turned away at the token gate | zapp: `NothingSent(MAKER_UNAVAILABLE)`, then rethrow. vizor: return `TokensNeeded`, issue once, and retry the same acceptance (§5.9); if issuance fails, abandon → `NothingSent(MAKER_UNAVAILABLE)`. Until M4 there is no issuance: Rust returns `TokensNeeded` with no retry, and Dart abandons at once (progress D-33). |
    | Timeout, transport failure or 5xx | throw. The record stays "maybe opened". |
    | 200 | save `t0`, `t1`, `ticket`. If `answer.swapId ≠ record.swapId`: `NothingSent(MISMATCH)`. |
 3. **No `t0`/`t1` yet, or not confirmed on chain** (`notOnChain`, `:157-171`): `Waiting(OPENING)` until `quote.expiresAt + 300 s`. If the deposit is still `NotStarted` at that point:
@@ -296,6 +296,7 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
      2. If there is none and the deposit is payable: `prepareDeposit` proposes `depositZat` to the address and requires exactly 1 transaction and a total ≤ `maxTotalZat` (`DEPOSIT_UNPAYABLE`).
      3. **Save `Started`**, then create (sign and store, no broadcast), then **save `Kept(tx)`**.
      4. If not `Mined`, broadcast the kept bytes. This happens only while `refundLockUntil == 0`.
+   - **vizor (as built, progress D-35).** Building a new deposit first waits for the main wallet's scan to reach the live lightwalletd tip (`wait = ZcashSyncing`); status reads and resends do not. A deposit that would spend Sapling notes is refused (`DEPOSIT_UNPAYABLE`): Rust cannot fetch the Sapling parameters. Send flow `private-usd-deposit:{account}:{index}`.
    - **Status** (`ua/SwapZcashTransactions.kt:98-138`):
 
    | Status | Meaning |
@@ -332,8 +333,8 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
    - **Fee cap (D11).** zapp has none; `zc/user.rs:339-343` takes a caller `max_fee`. vizor refuses a fee above 2 USDC here and at quote time. At claim time that is the `RELAYER_FEE` problem: the swap waits for the fee to come down, and if it never does before `t1`, the maker refunds and the ZEC is swept home.
 9. **`finishPaid`** (`:227-239`): require a confirmed `PaidOut` event (`CHAIN_LAGGING` until one appears). Check the event's relayer and fee against the pin. `end = Paid`, with `payoutTx` and `receives` recomputed from the event's fee.
 10. **`REFUNDED`**: §5.8.
-11. **Token return.** On every advance after the deposit started, `GET /v1/swaps/{id}` collects the token if one is awaited (§5.9).
-12. **Abandon** (user action, `:126-131`): allowed only while the deposit is `NotStarted` and `swap(id)` is empty → `NothingSent(NEVER_OPENED)`.
+11. **Token return.** On every advance after the deposit started, `GET /v1/swaps/{id}` collects the token if one is awaited (§5.9). Until M4, none is awaited and nothing is read (progress D-33).
+12. **Abandon** (user action, `:126-131`): allowed only while the deposit is `NotStarted` and `swap(id)` is empty → `NothingSent(NEVER_OPENED)`. As built, an unanswered record (no `t0`, such as one turned away at the token gate) ends `NothingSent(MAKER_UNAVAILABLE)` instead (progress D-33); otherwise `TooLate`.
 
 The invariants for this machine are §3.5 items 1–8 and 16.
 
@@ -418,7 +419,7 @@ The invariants for this machine are §3.5 items 1–8 and 16.
 2. Sweep:
    1. `prepareSweep`: import the joint UFVK at `zcashHeight` (idempotent, found by UFVK).
    2. Sync. Return null until **every** note is spendable, meaning balance > 0 and pending = 0.
-   3. Reuse an earlier non-expired sent transaction from the joint account, if any.
+   3. Reuse an earlier non-expired sent transaction from the joint account, if any. As built, vizor looks for it **before** step 2's balance check (`joint::find_sent`, to any address), since an unmined earlier sweep leaves nothing spendable (progress D-34). The sweep pays the account's current receive address; send flow `private-usd-sweep:{account}:{index}`.
    4. Else build: `SweepIntent(homeUA, balance − feeLimit, feeLimit)`, with `feeLimit = min(320,000, balance − 1)` and at least 10,000.
    5. Propose the whole balance with no change. The fee starts at 10,000 and grows to the proposal's fee until it is stable at one transaction, up to 64 tries (`ua/JointAccounts.kt:154-208`).
 3. Keep the sweep and send it until it has `zcashConfirmations`.
@@ -517,7 +518,7 @@ The real hazard is a reveal that does not land before the lock lapses. That is w
 2. Kotlin `sign(issuerName, message)` returns `{chain, signature}`.
 3. `private_usd_tokens_issuance_finish(session_id, chain, signature)`. Rust runs steps 4–6. On the first `403 rejected` it fetches a new attestation challenge and returns `SignAgain` with the new message for the same blinded batch; Dart repeats step 2 once (§8.2, M4 pitfalls).
 
-At accept, the engine spends only tokens it already holds. If the maker answers `401` with a pinned challenge and no token for it is held, the engine stores the challenge and returns `TokensNeeded`. Nothing was opened, because a `401` sends nothing. Dart then runs issuance once and calls accept again with the same saved acceptance. If issuance fails, Dart calls abandon, which ends the record as `NothingSent(MAKER_UNAVAILABLE)`, as zapp does for a turn-away at the token gate. Keep zapp's limit of 3 paid tries per accept.
+At accept, the engine spends only tokens it already holds (the M5 seam is `engine::TokenSource`; until M4, `NoTokens` holds none, progress D-33). If the maker answers `401` with a pinned challenge and no token for it is held, the engine stores the challenge and returns `TokensNeeded`. Nothing was opened, because a `401` sends nothing. Dart then runs issuance once and calls accept again with the same saved acceptance. If issuance fails, Dart calls abandon, which ends the record as `NothingSent(MAKER_UNAVAILABLE)`, as zapp does for a turn-away at the token gate. Keep zapp's limit of 3 paid tries per accept.
 
 ### 5.10 The foreground loop (zapp's timing, without the worker)
 
@@ -541,13 +542,21 @@ D9 drops zapp's `AtomicSwapWorker`, its scheduler, its wake alarms and its notif
 **vizor engine (Rust side, `engine.rs`).**
 
 ```rust
-pub(crate) struct DriverLocks;   // per account_uuid: Arc<tokio::sync::Mutex<()>>; try_lock → Busy. Held across I/O; never OPERATIONS.
-impl DriverLocks { pub fn try_acquire(account: &str) -> Result<OwnedMutexGuard<()>, PrivateUsdError>; }
-pub(crate) struct Offers;        // (account, index) → (SwapQuote, relayer fee, fee_expires_at, receives, deposit_fee); TTL = quote.expires_at
-impl Offers { pub fn put(..); pub fn take(account: &str, index: u32) -> Option<Offer>; pub fn clear(); }   // clear() from private_usd_clear_sessions
-pub(crate) struct Ops;           // op_id → (Arc<AtomicBool> cancel, Mutex<Option<Activity>>); registered for one FRB call, removed on return
-impl Ops { pub fn begin(op_id: u32) -> OpHandle; pub fn cancel(op_id: u32); pub fn activity(op_id: u32) -> Option<Activity>; }
-pub(crate) struct OpHandle;      // .cancelled() checked between steps; .set_activity(a) before a slow step (zapp onActivity)
+// As built (M5 part 1, progress D-31).
+pub(crate) fn lock_account(account: &str) -> Result<DriverGuard>;   // a tokio::sync::Mutex per account; try_lock_owned → Busy. Held across I/O; never OPERATIONS.
+pub(crate) struct Offer { network, quote: SwapQuote, relayer_fee, fee_expires_at, receives, deposit_fee_zat: Option<u64> }   // + max_total_zat()
+pub(crate) fn session() -> u64;                                      // a quote takes it first; clear_sessions bumps it
+pub(crate) fn put_offer(account, index, offer, now, session);        // kept until quote.expires_at, pruned per account; dropped if the session moved on
+pub(crate) fn offer(account, index, network, now) -> Option<Offer>;  // None once expired: accept → QuoteExpired
+pub(crate) fn remove_offer(account, index); pub(crate) fn remove_account_offers(account);
+pub(crate) fn clear_sessions();                                      // offers + maker /v1/info checks; from private_usd_clear_sessions (on lock)
+pub(crate) struct OpHandle;      // begin(op_id) registers (Busy if in use); dropped on return. .cancelled() between steps; .cancel_flag() reaches routed HTTP and joint scans; .set_activity(a) before a slow step
+pub(crate) fn cancel_op(op_id: u32);                                 // also remembers up to 64 ids cancelled before their call registered
+pub(crate) fn op_activity(op_id: u32) -> Option<Activity>;          // Depositing | Claiming | PayingOut | Sweeping
+pub(crate) trait Clock { fn now(&self) -> u64; async fn sleep(&self, d: Duration); }   // SystemClock; tests fake it
+pub(crate) trait TokenSource { fn accept_authorization(&self) -> Option<String>; fn token_required(&self, challenge: Option<&str>); }   // NoTokens until M4
+pub(crate) fn problem(code: ErrorCode) -> ErrorCode;                 // folds a failed step's code into the §5.8 problem set
+pub(crate) fn delete_account(store_dir, network, account) -> Result<()>;   // driver lock (Busy), joint accounts, then swaps.db rows
 ```
 
 **vizor engine (Dart side).** `PrivateUsdEngine` in `services/private_usd_engine.dart`, owned by the keepAlive `privateUsdEngineProvider`; skeleton in §9.2.
@@ -1145,7 +1154,7 @@ Each row is a step zapp performs, and the vizor seam that performs it. "New" mea
   - **"async" in the table below means a Dart `Future`**, not necessarily a Rust `async fn`. Follow the file you are next to: most of `api/sync.rs` is plain `pub fn` that FRB runs on a worker thread and that builds its own runtime (`:429`); `api/network_privacy.rs` uses `pub async fn` on FRB's tokio runtime. Use plain `pub fn` + `catch` + an inner runtime for the private USD calls, and `pub async fn` only for the bridge start/stop (it spawns a long-lived tokio task).
   - **No data-carrying enums** (no `freezed` in `pubspec.yaml` dependencies; FRB would emit `@freezed` sealed classes). A result such as `Accepted | TokensNeeded | NothingSent(cause)` is a struct `{ kind: ApiAcceptKind, cause: Option<ApiNothingSentCause>, … }` with fieldless enums.
   - **Integer widths.** `u64` becomes Dart `BigInt` (`lib/src/rust/api/sync.dart:202`); `u32`/`i32` become `int`. Use `u32` for indices, counts and `next_poll_ms`, `i64` for unix seconds, and decimal `String` for token amounts. `Option<T>` → `T?`.
-- **Errors.** Copy `ApiWalletError` (`api/sync.rs:63-122`): `pub struct ApiPrivateUsdError { code: ApiPrivateUsdErrorCode, message: String }`, with `#[frb(dart_code = "@override String toString() => message;")]`. The codes mirror §5.8's problems plus the pre-send errors: `RelayerUnreachable`, `RelayerRefused`, `RelayerFee`, `EthereumUnreachable`, `RailgunClosed`, `ClaimTurn`, `ZcashWallet`, `DepositUnpayable`, `ZcashRejected`, `Mismatch`, `TokensUnreachable`, `TokensRefused`, `TokensDeviceRefused`, `NoTokensToday`, `TokensNeeded`, `Keystore`, `ChainLagging`, `QuoteExpired`, `MakerUnavailable`, `MakerBusy`, `AmountRefused`, `FundingCostChanged`, `DepositUnconfirmed`, `TooLate`, `Busy`, `StoreUnreadable`, `Unavailable`, `RouteBlocked` and `Other`. Dart never branches on message text; `privateUsdErrorMessage(code)` maps them to copy (§9.6). Wrap panics with the `catch` helper (`api/secret.rs:7-21`).
+- **Errors.** Copy `ApiWalletError` (`api/sync.rs:63-122`): `pub struct ApiPrivateUsdError { code: ApiPrivateUsdErrorCode, message: String }`, with `#[frb(dart_code = "@override String toString() => message;")]`. The codes mirror §5.8's problems plus the pre-send errors: `RelayerUnreachable`, `RelayerRefused`, `RelayerFee`, `EthereumUnreachable`, `RailgunClosed`, `ClaimTurn`, `ZcashWallet`, `DepositUnpayable`, `ZcashRejected`, `Mismatch`, `TokensUnreachable`, `TokensRefused`, `TokensDeviceRefused`, `NoTokensToday`, `TokensNeeded`, `Keystore`, `ChainLagging`, `QuoteExpired`, `MakerUnavailable`, `MakerBusy`, `AmountRefused`, `FundingCostChanged`, `DepositUnconfirmed`, `TooLate`, `Busy`, `StoreUnreadable`, `Unavailable`, `RouteBlocked` and `Other`, plus `Cancelled` since M5 (a call stopped by `private_usd_cancel`; never a failure, progress D-32). Dart never branches on message text; `privateUsdErrorMessage(code)` maps them to copy (§9.6). Wrap panics with the `catch` helper (`api/secret.rs:7-21`).
 - **Concurrency.** A module-level `OPERATIONS: Mutex<()>` per DB, like `wallet::gift_card_tracking::OPERATIONS` (defined at `rust/src/wallet/gift_card_tracking.rs:8`, taken at `api/gift_card_tracking.rs:14-16`), plus an id-keyed cancel registry like `cancel_payment_link_claim_sync` (`api/sync.rs:545`; registry shape at `:19-20, 414-449`). From M5 also a per-account async driver lock held across network I/O (§5.10 "vizor engine"); `OPERATIONS` never is.
 - **Streams.** The swap engine needs none: Dart drives `forward_advance(...) -> ApiForwardAdvance { record, wait?, next_poll_ms, problem? }` from a foreground loop, and polls the sync `private_usd_activity(op_id)` for the in-flight step label. Use `StreamSink<T>` (`crate::frb_generated::StreamSink`; examples at `api/sync.rs:305-346` and `api/ledger.rs:512-545`) only if joint-sync progress is shown. Railgun `scan` and `proof` events come from the Kotlin `EventChannel`, not FRB.
 - **Dart conventions.** Riverpod 3 (`flutter_riverpod: ^3.3.1`).
@@ -1174,7 +1183,7 @@ Each row is a step zapp performs, and the vizor seam that performs it. "New" mea
 | `private_usd_forward_quote(ctx, secret, lwd, rpc, units) -> ApiForwardQuote` | async | M5 | takes an index; includes the deposit-fee estimate and `max_total_zat` |
 | `private_usd_forward_accept(ctx, secret, lwd, rpc, index, max_total_zat) -> ApiAcceptResult` | async | M5 | flat struct: `kind` ∈ `Accepted`, `TokensNeeded`, `NothingSent`, plus `cause: Option<…>` |
 | `private_usd_forward_advance(ctx, secret, lwd, rpc, op_id, index) -> ApiForwardAdvance` | async | M5 | `{record, wait?, next_poll_ms, problem?}` |
-| `private_usd_forward_abandon(ctx, rpc, index)` | async | M5 | §5.6 step 12 |
+| `private_usd_forward_abandon(network, account_uuid, store_dir, rpc, index)` | async | M5 | §5.6 step 12; no `db_path` (as built, D-32) |
 | `private_usd_forward_records(ctx) -> Vec<ApiForwardRecord>` | async | M5 | history and activity |
 | `private_usd_unfinished_count(store_dir, account_uuid) -> u32`, `…_accounts_with_unfinished(store_dir)`, `…_delete_account(store_dir, network, account_uuid)`, `private_usd_activity(op_id)` (sync) | async | M5 | the deletion and reset warning; the D14 loop; cleanup; the in-flight step label |
 | `private_usd_reverse_quote`, `…_set_cost`, `…_go_ahead`, `…_accept`, `…_funding_request`, `…_submit_funding`, `…_advance`, `…_authorize_ready`, `…_cancel`, `…_can_rescue`, `…_rescue`, `…_records` | async | M6 | §5.7, §5.8 |
@@ -1242,7 +1251,7 @@ pub enum ApiIssuanceKind { Issued, Exhausted, SignAgain }
 pub struct ApiIssuanceFinish { pub kind: ApiIssuanceKind, pub next: Option<ApiIssuanceBegin>, pub status: ApiTokenStatus }
 pub fn private_usd_tokens_issuance_finish(tokens_path: String, network: String, session_id: u32, chain: Vec<String>, signature: String) -> Result<ApiIssuanceFinish, ApiPrivateUsdError>;
 pub fn private_usd_tokens_status(tokens_path: String, network: String) -> Result<ApiTokenStatus, ApiPrivateUsdError>;
-#[frb(sync)] pub fn private_usd_clear_sessions();   // drops in-memory issuance sessions; called on lock
+#[frb(sync)] pub fn private_usd_clear_sessions();   // called on lock. As built it lands in M5: drops the forward offers and maker checks; M4 adds its issuance sessions
 ```
 
 - Dart reads `db_path` and `network` the way the Gift Card provider does (`ref.read(rpcEndpointFailoverProvider).current.networkName`, `gift_card_tracking_provider.dart:82`; the wallet DB path from `getWalletDbPath()`), and `lightwalletd_url` from `rpcEndpointFailoverProvider.current.normalizedLightwalletdUrl` (the provider is `lib/src/providers/rpc_endpoint_failover_provider.dart:716`; the getter is `lib/src/core/config/rpc_endpoint_config.dart:25`, used at `gift_card_tracking_provider.dart:184`).
@@ -1252,16 +1261,18 @@ pub fn private_usd_tokens_status(tokens_path: String, network: String) -> Result
 
 ```rust
 // ---- shared (M5) ----
-pub enum ApiDirection { Forward, Reverse }
-pub enum ApiActivity { Depositing, Claiming, PayingOut, Sweeping, Funding, Readying, Refunding }   // zapp AtomicSwapActivity + reverse
+// As built (progress D-32): no ApiDirection yet (no call takes one); `Cancelled` joins ApiPrivateUsdErrorCode;
+// private_usd_clear_sessions (above) lands here.
+pub enum ApiActivity { Depositing, Claiming, PayingOut, Sweeping, Funding, Readying, Refunding }   // zapp AtomicSwapActivity + reverse (M6)
 #[frb(sync)] pub fn private_usd_cancel(op_id: u32);
 /// The step `op_id` is in right now (zapp's `onActivity`); Dart polls it every 500 ms while an advance is in flight.
 #[frb(sync)] pub fn private_usd_activity(op_id: u32) -> Option<ApiActivity>;
 /// Unfinished = forward `end == None`, or reverse phase ∉ {QUOTED} ∪ FINISHED. QUOTED drafts do not count.
+/// Neither this nor the next call creates swaps.db (0 / empty for a wallet that never converted).
 pub fn private_usd_unfinished_count(store_dir: String, account_uuid: String) -> Result<u32, ApiPrivateUsdError>;
 /// Every account with an unfinished record (D14 loop input).
 pub fn private_usd_accounts_with_unfinished(store_dir: String) -> Result<Vec<String>, ApiPrivateUsdError>;
-pub fn private_usd_delete_account(store_dir: String, network: String, account_uuid: String) -> Result<(), ApiPrivateUsdError>; // swaps.db rows + its joint accounts in store_dir/joint.db (§8.4)
+pub fn private_usd_delete_account(store_dir: String, network: String, account_uuid: String) -> Result<(), ApiPrivateUsdError>; // its joint accounts in store_dir/joint.db, then its swaps.db rows (§8.4); Busy while one of its steps runs
 
 // ---- forward (M5) ----
 pub struct ApiForwardQuote {
@@ -1287,12 +1298,13 @@ pub fn private_usd_forward_accept(ctx, secret, lwd, rpc, index: u32, max_total_z
 pub enum ApiForwardWait { Opening, Confirming, DepositUnsettled, Refunding, ZcashSyncing }
 pub enum ApiForwardOutcome { Paid, Refunded, NothingSent }
 pub enum ApiRefundCause { MakerCancelled, NotClaimedInTime }
+pub enum ApiForwardPhase { Opening, Depositing, Confirming, Claiming, Refunding, Paid, Refunded, NothingSent }   // as built: the store's phase
 pub struct ApiForwardRecord {          // flat view of zapp's record (§5.6); the JSON stays in Rust
-    pub index: u32, pub swap_id: String, pub accepted_at: i64, pub quote_expires_at: i64,
+    pub index: u32, pub swap_id: String, pub phase: ApiForwardPhase, pub accepted_at: i64, pub quote_expires_at: i64,
     pub deposit_zat: u64, pub max_total_zat: Option<u64>, pub amount: String, pub receives: String, pub relayer_fee: String,
     pub t0: Option<i64>, pub t1: Option<i64>,
     pub deposit_txid: Option<String>,  // internal byte order hex, = TransactionInfo.txidHex (M5 pitfalls); records keep zapp's display hex
-    pub deposit_confirmations: Option<u32>,
+    pub deposit_confirmations: Option<u32>,   // as built: only while under way with a deposit kept (0 until mined)
     pub sweep_txid: Option<String>, pub payout_tx: Option<String>,
     pub outcome: Option<ApiForwardOutcome>, pub refund_cause: Option<ApiRefundCause>, pub nothing_sent_cause: Option<ApiNothingSentCause>,
     pub ended_at: Option<i64>,
@@ -1301,12 +1313,12 @@ pub struct ApiForwardAdvance {
     pub record: ApiForwardRecord,
     pub wait: Option<ApiForwardWait>,
     pub next_poll_ms: u32,                       // §5.10 naps
-    pub problem: Option<ApiPrivateUsdErrorCode>, // the step's failure; Dart shows it only after 1 min (§5.8)
+    pub problem: Option<ApiPrivateUsdErrorCode>, // the step's failure, folded into the §5.8 problem set; Dart shows it only after 1 min
 }
 /// One look at the chain, then at most one key-using step (deposit, claim, payout, sweep). Reloads the record
 /// from swaps.db; never trusts a Dart copy. Holds the per-account driver lock for its whole duration (`Busy` if taken).
 pub fn private_usd_forward_advance(ctx, secret, lwd, rpc, op_id: u32, index: u32) -> Result<ApiForwardAdvance, ApiPrivateUsdError>;
-pub fn private_usd_forward_abandon(ctx, rpc, index: u32) -> Result<ApiForwardRecord, ApiPrivateUsdError>; // §5.6 step 12; `TooLate` if it opened
+pub fn private_usd_forward_abandon(network: String, account_uuid: String, store_dir: String, eth_rpc_url: String, index: u32) -> Result<ApiForwardRecord, ApiPrivateUsdError>; // §5.6 step 12; `TooLate` if it opened
 pub fn private_usd_forward_records(ctx) -> Result<Vec<ApiForwardRecord>, ApiPrivateUsdError>;   // active first, then history newest first
 
 // ---- reverse (M6) ----

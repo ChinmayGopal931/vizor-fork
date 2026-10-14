@@ -5229,6 +5229,7 @@ dependencies = [
  "pbkdf2",
  "prost 0.13.5",
  "prost 0.14.4",
+ "rand 0.10.3",
  "rand 0.8.8",
  "rand_core 0.6.4",
  "redb",

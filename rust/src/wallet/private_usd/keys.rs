@@ -9,12 +9,16 @@
 
 use std::fmt;
 
+use rand_0_10::{rand_core::UnwrapErr, rngs::SysRng};
 use secrecy::{ExposeSecret, SecretVec};
 use zcash_client_backend::data_api::{Account as _, WalletRead};
-use zecswap_core::{derive_user_keys, JointAccount, PublicShare, UserSwapKeys};
+use zecswap_core::{
+    derive_user_keys, JointAccount, Payout, PublicShare, ShareProof, SwapContext, UserSwapKeys,
+};
 use zeroize::Zeroizing;
 use zip32::fingerprint::SeedFingerprint;
 
+use super::models::{Hex, Redacted, SwapAcceptance};
 use super::{fail, railgun_keys, ErrorCode, PrivateUsdError, PrivateUsdNetwork, Result};
 use crate::wallet::{keys, network::WalletNetwork};
 
@@ -155,6 +159,45 @@ impl SwapKeyContext {
             .map_err(|error| {
                 PrivateUsdError::new(ErrorCode::Other, format!("payout note: {error}"))
             })
+    }
+
+    /// Accepts a quote for swap `index` (zecSwap's `ops.rs` `accept`): checks
+    /// the maker's proof of `E` in `context`, then proves our `Z` bound to
+    /// both shares and to the payout into this account's Railgun note.
+    /// `Mismatch` when the maker's proof does not verify.
+    pub(crate) fn acceptance(
+        &self,
+        index: u32,
+        context: SwapContext,
+        maker: &PublicShare,
+        maker_proof: &[u8; 64],
+    ) -> Result<SwapAcceptance> {
+        context
+            .verify_maker(maker, &ShareProof::from_bytes(*maker_proof))
+            .map_err(|_| {
+                PrivateUsdError::new(
+                    ErrorCode::Mismatch,
+                    "the maker's share proof does not verify",
+                )
+            })?;
+        let keys = self.user_keys(index)?;
+        let payout = Payout {
+            user: keys.auth.address(),
+            note: Some(self.note(index)?.commitment()),
+        };
+        let proof = context.prove_user(maker, &keys.share, &payout, UnwrapErr(SysRng));
+        Ok(SwapAcceptance {
+            user_share: Hex(keys.share.public().to_affine_bytes()),
+            user_proof: Hex(proof.to_bytes()),
+            viewing_keys: Redacted(Hex(keys.viewing.to_bytes())),
+            token_request: None,
+        })
+    }
+
+    /// The account's seed, for creating a deposit from the main wallet. It
+    /// zeroizes on drop.
+    pub(crate) fn seed(&self) -> SecretVec<u8> {
+        SecretVec::new(self.seed.expose_secret().clone())
     }
 
     /// The joint account of swap `index` with the maker's share `E`, taken

@@ -97,6 +97,10 @@ zecswap-railgun = { git = "https://github.com/JustZappIt/zecSwap", rev = "d69e3f
 hmac   = "0.12"  # BIP-32/85 (transitive only today)
 sha3   = "0.10"  # Keccak-256 for ids and ABI (transitive only today)
 bech32 = "0.11"  # 0zk address validation (transitive only today)
+# `zecswap_core::SwapContext::prove_user` takes a rand 0.10 `CryptoRng`;
+# vizor's `rand` is 0.8. Renamed, and already in the lockfile through
+# `zecswap-core`, which uses the same `sys_rng` feature.
+rand_0_10 = { package = "rand", version = "0.10", default-features = false, features = ["sys_rng"] }
 
 # Zcash core. Package names are the Zakura forks; lib names stay upstream so
 # `use orchard` / `use zcash_client_backend` keep working.
