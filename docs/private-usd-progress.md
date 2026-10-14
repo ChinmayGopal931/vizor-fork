@@ -16,18 +16,17 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   - M5: passed. 0.01 TAZ → $10.86 private USD, `PAID`; kill and lock checks
     passed; the account-switch and delete-warning checks were skipped (the
     swap finished first).
-  - M6: cancel before funding → `CANCELLED` (reverse index 2) and cancel
-    after funding → `REFUNDED` (index 3) both passed. The full conversion
-    (index 4, account 2, $1.25 paid, maker claimed, ZEC 67,929 zatoshi in
-    the joint account, Ironwood pool) is stuck in `RECEIVING`: every sweep
-    failed `Extract TX from PCZT: Ironwood(InvalidProof)`. Cause:
-    `pczt.rs` `orchard_circuit_version_for_consensus_branch` matched NU6.3
-    alone, so testnet NU7 PCZTs were proved with the post-NU6.2 circuit.
-    Fixed in this commit (it now keys on `orchard_protocol_revision()`;
-    NU7 is V3); not yet confirmed on the device, and `cargo test` was not
-    rerun on it. A round to retry the sweep (`--m6 --m6-usd 1
-    --m6-complete-only --m6-fee-margin 0.5`) was started at 13:05; it
-    follows index 4 to `COMPLETE`. Check the phone, or rerun that command.
+  - M6: passed on the device. Cancel before funding → `CANCELLED`
+    (reverse index 2); cancel after funding → `REFUNDED` (index 3); and the
+    full conversion (index 4, account 2: $1.25 private USD → 0.00057929
+    TAZ) reached `COMPLETE` at 13:11–13:16 after the NU7 PCZT circuit fix
+    (`pczt.rs` keys the circuit on `orchard_protocol_revision()`; before it,
+    every sweep failed `Extract TX from PCZT: Ironwood(InvalidProof)`
+    because NU7 PCZTs were proved with the post-NU6.2 circuit). The last
+    round's exit code was 1 only because the harness expected to see
+    `awaitingReady` on a conversion already authorized by the earlier run;
+    `_reachesComplete` should accept a later phase when it follows a
+    leftover. `cargo test` has not been rerun since the circuit fix.
   - M7 and the M8 route round: not run. Account 2 has $1.89 available and
     $8.69 Processing (a spend's change waits on Railgun's POI on Sepolia);
     top up with a fresh forward conversion (`--m5 --m5-zec 0.01`; the
