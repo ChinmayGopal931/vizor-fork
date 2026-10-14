@@ -300,6 +300,9 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         name: accountName,
         order: accounts.length,
         isSeedAnchor: accounts.isEmpty,
+        // Both Rust paths create ZIP-32 account 0 of this mnemonic, as
+        // `list_accounts` reports after the next launch.
+        zip32AccountIndex: 0,
       );
       final updatedAccounts = [...accounts, newAccount];
       await _saveAccounts(updatedAccounts);
@@ -417,6 +420,9 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         order: accounts.length,
         isSeedAnchor: accounts.isEmpty,
         profilePictureId: normalizedProfilePictureId,
+        // Both Rust paths create ZIP-32 account 0 of this mnemonic, as
+        // `list_accounts` reports after the next launch.
+        zip32AccountIndex: 0,
       );
       final updatedAccounts = [...accounts, newAccount];
       await _saveAccounts(updatedAccounts);

@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -376,6 +377,10 @@ void _requireRoundSetup() {
 }
 
 /// A host checkpoint's result (`scripts/private-usd/device_round.py`).
+/// Loopback listeners present right after the wallet is created, before any
+/// Private USD use (set once by the round): never the Railgun bridge.
+Set<int> _baselineListenPorts = <int>{};
+
 class _Checkpoint {
   _Checkpoint(this.name, this.raw);
 
@@ -392,10 +397,11 @@ class _Checkpoint {
       (pid as num).toInt(),
   ];
 
-  /// Loopback listeners of the app UID other than the Dart VM service.
+  /// Loopback listeners of the app UID other than the Dart VM service and
+  /// the baseline the round took before any Private USD use.
   Set<int> get otherListenPorts => {
     for (final port in (_section('listen')['other_ports'] as List?) ?? const [])
-      (port as num).toInt(),
+      if (!_baselineListenPorts.contains((port as num).toInt())) port.toInt(),
   };
 
   Map<String, int>? get socketCounts {
@@ -444,11 +450,30 @@ class _Round {
       tester.element(find.byKey(_homeBalanceKey)),
     );
     _uuid = _container.read(accountProvider).value!.activeAccountUuid!;
+    final activeAccount = _container.read(accountProvider).value?.activeAccount;
     expect(
       _container.read(privateUsdAvailableProvider),
       isTrue,
-      reason: 'Private USD must be available for a software testnet account.',
+      reason:
+          'Private USD must be available for a software testnet account '
+          '(enabled: $kVizorPrivateUsdEnabled, form factor: $kAppFormFactor, '
+          'platform: $defaultTargetPlatform, bootstrap network: '
+          '${_container.read(appBootstrapProvider).network}, deployment: '
+          '${_container.read(privateUsdCurrentDeploymentProvider) != null}, '
+          'kill switch: ${_container.read(privateUsdKillSwitchProvider)}, '
+          'account: ${activeAccount != null}, hardware: '
+          '${activeAccount?.isHardware}, zip32 index: '
+          '${activeAccount?.zip32AccountIndex}).',
     );
+
+    // A debug build holds loopback listeners of its own (Dart's VM service
+    // and tooling) before any Private USD use; the release round has none.
+    // Every later check counts only listeners that appear after this.
+    _baselineListenPorts = (await _checkpoint(
+      'baseline',
+      checks: const ['listen'],
+    )).otherListenPorts;
+    _results['baseline_listeners'] = _baselineListenPorts.toList();
 
     await _beforeFirstUse();
     await _firstSyncDirect();
@@ -845,7 +870,9 @@ class _Round {
         () =>
             _container.read(privateUsdBalanceProvider(_uuid)).isRefreshing ||
             _container.read(railgunEngineStateProvider).lastSync != before,
-        timeout: const Duration(seconds: 10),
+        // Over Tor a refresh can queue behind the engine's previous use (one
+        // use at a time) for well over 10 s.
+        timeout: const Duration(seconds: 60),
       );
       var failed = false;
       DateTime? finished;

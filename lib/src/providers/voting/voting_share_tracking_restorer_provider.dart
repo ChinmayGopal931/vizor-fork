@@ -90,13 +90,16 @@ class VotingShareTrackingRestorer {
         await _pauseInFlight;
       } finally {
         // A newer pause owns the desired state even when it reused this drain.
-        if (_isPaused && pauseGeneration == _pauseGeneration) {
+        // The provider can be disposed during the wait (app exit, a test's
+        // teardown); its ref is unusable then.
+        if (_isPaused && pauseGeneration == _pauseGeneration && _ref.mounted) {
           _isPaused = false;
           _ref.read(votingShareTrackingRegistryProvider).resume();
         }
       }
     }
     await _restoreInFlight;
+    if (!_ref.mounted) return;
     await restore();
   }
 

@@ -200,7 +200,7 @@ attempt, after a fix (below).
 - [x] M3.11 Copy (Shared, Home, Private USD screen, Activity) (D-27)
 - [x] M3.12 Widgetbook and capture scenarios (home, `/private-usd`) (D-28)
 - [x] M3.13 Kotlin tests (`RailgunBoundaryTest`, `RailgunChannelTest`, `RailgunProtocolTest`) (D-29)
-- [ ] M3.14 Device round (batched; Galaxy A35, Sepolia; the M3 Done-when device checks and the R8 release-build check). Harness ready (D-40 to D-42); not run on 2026-10-14, the phone was not attached (B-8)
+- [x] M3.14 Device round (Galaxy A35, testnet + Sepolia; the M3 Done-when device checks and the R8 release-build check): passed 2026-10-14 (results below; D-109 to D-111)
 - [x] M3 gate: the unit essentials and every suite pass (status below); the device checks are M3.14, deferred
 
 M3 part 1 status (2026-10-13): M3.1–M3.4, the native layer, are done. Part 2
@@ -371,23 +371,29 @@ commit that checks this note.
   page and stops the bridge (no loopback listener left); and a release build
   (R8) loads the page.
 
-M3 device round (2026-10-14): not run on the phone, so M3.14 stays open
-(B-8). The Galaxy A35 (`RZCX40721QZ`) was not attached: no USB device from
-23:05 to 00:06, and its wireless-debugging advert (`_adb-tls-connect`,
-192.168.0.7:38161) refused connections, then went away. Nothing was
-installed, cleared or changed on the phone, and its Stay awake setting was
-never touched. The round's harness is committed and ready (D-40 to D-42).
-With the phone attached over USB and unlocked:
-`ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh`.
+M3 device round (2026-10-14, second attempt): passed on the Galaxy A35 (`RZCX40721QZ`;
+Android 16, WebView 155), Zcash testnet and Sepolia, debug build with
+`CARGOKIT_SKIP_EMULATOR_ABIS`. The R8 release check passed in the first
+run. The integration test passed on the seventh run (`+7: All tests
+passed!`, runner exit 0); runs 1 to 6 found one app bug, one existing
+voting bug and three harness assumptions, all fixed (D-109 to D-111), and
+in run 5 the page's first sync over Tor failed three times (page `FAILED`,
+about 70 s each; no direct socket meanwhile), which run 4 and run 7 did
+not repeat (free RPC over Tor; E6). Stay awake was set to USB for each run
+and restored to `0` after it. Evidence:
+`scratchpad/m3-round` (release) and `scratchpad/m3-round7`.
 
 | Check | Result | Evidence |
 |---|---|---|
-| 1. Before first use the strip shows "—" and no WebView renderer runs | Not run | The test holds home for 20 s, then the host looks for the app's `sandboxed_process` renderer and loopback listeners |
-| 2. `/private-usd` shows the first-sync percentage, then $0; the address equals Rust's | Not run | Time to first balance from the engine's own stamp (M0: 96–136 s), the percentages shown, and the shown address against the page's wallet and `privateUsdRailgunAddress` |
-| 3. Tor on: no direct socket while the page syncs or refreshes; Tor off works | Not run | A first sync through Tor (page storage wiped) and a refresh, sampled every 30 s with `check_sockets.py --onionoo`; Tor bootstrap time; then a direct refresh |
-| 4. Lock closes the page and leaves no loopback listener | Not run | `isOpen` false, then no LISTEN row on loopback for the app UID except the Dart VM service |
-| 5. The R8 release build loads the page | Built; not run | arm64 release APK with the round's defines: 116 MB, built in 8.5 min. R8's mapping keeps every Railgun host class (renamed; only unused data-class `copy`/`componentN` methods went) and `AndroidDispatcherFactory`; the host uses no reflection |
+| 1. Before first use the strip shows "—" and no WebView renderer runs | Pass | Home held 20 s: strip "—", engine idle, `isOpen` false; host: no renderer, no loopback listener beyond the debug build's baseline (D-110) |
+| 2. `/private-usd` shows the first-sync percentage, then $0; the address equals Rust's | Pass | First sync direct passed its 120 s checkpoint (M0: 96–136 s); the shown address equals Rust's (the engine also refuses a mismatch) |
+| 3. Tor on: no direct socket while the page syncs or refreshes; Tor off works | Pass | First sync through Tor passed its 150 s checkpoint, then a refresh; every Tor-phase sample: 0 Railgun-host and 0 unexplained sockets, only loopback and Tor relays (Onionoo). Tor off: a direct refresh |
+| 4. Lock closes the page and leaves no loopback listener | Pass | The bridge listener (40737 direct, then 35425 after the route round trip: a new port per route, U19) is gone after lock and 20 s later. Chromium keeps the renderer process (PSS 220 MB, then 95 MB) with the page closed and the bridge stopped |
+| 5. The R8 release build loads the page | Pass | arm64 release APK installed over the test install; `/private-usd` opened, renderer and bridge seen, first sync 0 % → 53 % with no error text; no listener before first use |
 | 6. Hidden on regtest, for hardware accounts and with the kill switch false | Unit-tested; not run on device | The availability matrix and the strip tests (M3.7, M3.8; D-42) |
+
+Memory (debug build): peak app PSS 662 MB, peak renderer PSS 335 MB
+(M0: 446 MB and 382 MB).
 
 ## M4. Privacy Pass tokens and attestation
 
@@ -2521,6 +2527,27 @@ M8 status (2026-10-14): the non-device parts are done.
   response bodies, the `on_dispatch` hook and the SDK's observation phases
   (M1 status). So it is not a safe drop-in. It stays a separate PR, outside
   this branch.
+- **D-109 (M3.14): a wallet made in mobile onboarding had no ZIP-32 index
+  until the next launch.** `_createAccount` and `_createAccountFromMnemonic`
+  built `AccountInfo` without `zip32AccountIndex`, which Rust's
+  `list_accounts` only fills at the next bootstrap, so Private USD stayed
+  hidden (D6, D8) on a new wallet until a restart. Both now set 0: Rust
+  creates ZIP-32 account 0 of the mnemonic on both paths
+  (`init_db_and_create_account` on a fresh DB, `add_account_at_index(…, 0)`).
+  Found by the device round's first check.
+- **D-110 (M3.14): the device round's listener and timing checks.** A debug
+  build holds a loopback listener of its own (the Dart VM service and
+  tooling; the release build has none before first use), so the round takes
+  a baseline of the app's loopback listeners right after creating the
+  wallet and counts only listeners that appear after it. A refresh over Tor
+  can wait behind the engine's previous use for more than 10 s, so the
+  round now waits up to 60 s for it to start. The availability check's
+  message now names every input.
+- **D-111 (M3.14): an existing voting bug the round hit.**
+  `VotingShareTrackingRestorer.resume` read its `ref` after awaiting the
+  pause in flight; when the provider was disposed meanwhile (app exit, a
+  test's teardown) it threw `UnmountedRefException`. It now checks
+  `ref.mounted` after the wait. Voting's tests pass (`+311`).
 
 ## Blocked
 
