@@ -36,6 +36,10 @@
 #                        cancelled, ends CANCELLED; a new one is paid, settlement
 #                        is authorized and it reaches COMPLETE. Implies
 #                        --skip-release.
+#   --m6-complete-only   in the M6 round, skip the lock and cancel checks and run
+#                        one conversion to COMPLETE (on Sepolia each paid try
+#                        leaves its change Processing for a while)
+#   --m6-fee-margin USDC private USD kept above the amount for fees (default 2.5)
 #   --m6-usd AMOUNT      private USD to convert in the M6 round, whole cents
 #                        (default 2)
 #   --m6-refund          also: a paid conversion, cancelled, ends REFUNDED (waits
@@ -114,7 +118,7 @@ export CARGOKIT_SKIP_EMULATOR_ABIS=true
 OUT="${TMPDIR:-/tmp}/pusd-device-round-$(date +%Y%m%d-%H%M%S)"
 RELEASE_APK=""
 RUN_TEST=1 RUN_RELEASE=1 RUN_RESTORE=1 KEEP_PAGE=0 TOR_FIRST_SYNC=true
-M5=0 M5_ZEC=0.05 M6=0 M6_USD=2 M6_REFUND=false M7=0 M7_USD=1 M7_TO=""
+M5=0 M5_ZEC=0.05 M6=0 M6_USD=2 M6_REFUND=false M6_COMPLETE_ONLY=false M6_FEE_MARGIN=2.5 M7=0 M7_USD=1 M7_TO=""
 M8_ROUTE=0 M8_PHASES=forward,reverse,send KEYED_RPC=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -123,6 +127,8 @@ while [[ $# -gt 0 ]]; do
     --m6) M6=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
     --m6-usd) M6_USD=$2; shift 2 ;;
     --m6-refund) M6_REFUND=true; shift ;;
+    --m6-complete-only) M6_COMPLETE_ONLY=true; shift ;;
+    --m6-fee-margin) M6_FEE_MARGIN=$2; shift 2 ;;
     --m7) M7=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
     --m7-to) M7_TO=$2; shift 2 ;;
     --m7-usd) M7_USD=$2; shift 2 ;;
@@ -328,6 +334,8 @@ if [[ $RUN_TEST == 1 ]]; then
       --dart-define=VIZOR_PUSD_DEVICE_M6=run \
       --dart-define=VIZOR_PUSD_DEVICE_M6_USD="$M6_USD" \
       --dart-define=VIZOR_PUSD_DEVICE_M6_REFUND=$M6_REFUND \
+      --dart-define=VIZOR_PUSD_DEVICE_M6_COMPLETE_ONLY=$M6_COMPLETE_ONLY \
+      --dart-define=VIZOR_PUSD_DEVICE_M6_FEE_MARGIN="$M6_FEE_MARGIN" \
       2>&1 | tee "$OUT/flutter-test-m6.log"
     TEST_STATUS=${PIPESTATUS[0]}
   fi

@@ -37,6 +37,7 @@ import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_reverse_funding.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_engine_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_unfinished_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_spend_status_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/railgun_engine_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/railgun_engine.dart';
@@ -162,6 +163,13 @@ const _m5Zec = String.fromEnvironment(
 );
 // '' or 'run': the M6 round (reverse conversion).
 const _m6Phase = String.fromEnvironment('VIZOR_PUSD_DEVICE_M6');
+const _m6CompleteOnly = bool.fromEnvironment(
+  'VIZOR_PUSD_DEVICE_M6_COMPLETE_ONLY',
+);
+const _m6FeeMargin = String.fromEnvironment(
+  'VIZOR_PUSD_DEVICE_M6_FEE_MARGIN',
+  defaultValue: '2.5',
+);
 const _m6Usd = String.fromEnvironment(
   'VIZOR_PUSD_DEVICE_M6_USD',
   defaultValue: '2',
@@ -1488,9 +1496,59 @@ class _M6Round extends _Round {
     _router = GoRouter.of(tester.element(find.byKey(_homeBalanceKey)));
     expect(_container.read(privateUsdAvailableProvider), isTrue);
 
+    // A paid reverse conversion a died round left under way is followed to
+    // the end; there is nothing to wait for in the balance then.
+    await _container.read(privateUsdEngineProvider).loadReverseRecords(_uuid);
+    await _pumpFor(const Duration(seconds: 2));
+    final earlier = privateUsdUnderWayFor(
+      _container.read(privateUsdUnfinishedProvider),
+      _uuid,
+    );
+    if (earlier != null && earlier.direction == PrivateUsdDirection.reverse) {
+      _key = earlier;
+      await _waitUntil(
+        'the earlier conversion to load',
+        () => _status != null,
+        timeout: const Duration(minutes: 1),
+      );
+      if (_funded || _status?.record.fundingTx != null) {
+        _log('following a paid conversion left under way: ${_key.index}');
+        _results['m6_lock'] = 'skipped: a paid conversion was under way';
+        _results['m6_cancel_before_funding'] =
+            'skipped: a paid conversion was under way';
+        await _reachesComplete();
+        _results['m6_refund'] = 'skipped: a paid conversion was under way';
+        _log('results: $_results');
+        await _event('m6-end', _results);
+        return;
+      }
+    }
     await _waitForDollars();
-    await _lockDuringTheProofPaysNothing();
-    await _cancelBeforeFunding();
+    // A died round can leave an unpaid reverse conversion under way, and an
+    // account has one conversion at a time: cancel it through its sheet first.
+    final leftover = privateUsdUnderWayFor(
+      _container.read(privateUsdUnfinishedProvider),
+      _uuid,
+    );
+    if (leftover != null && leftover.direction == PrivateUsdDirection.reverse) {
+      _key = leftover;
+      await _waitUntil(
+        'the leftover conversion to load',
+        () => _status != null,
+        timeout: const Duration(minutes: 1),
+      );
+      if (!_funded) {
+        _log('cancelling an unpaid conversion left under way: ${_key.index}');
+        await _cancelBeforeFunding();
+      }
+    }
+    if (_m6CompleteOnly) {
+      _results['m6_lock'] = 'skipped: --m6-complete-only';
+      _results['m6_cancel_before_funding'] = 'skipped: --m6-complete-only';
+    } else {
+      await _lockDuringTheProofPaysNothing();
+      await _cancelBeforeFunding();
+    }
     await _reachesComplete();
     if (_m6Refund) {
       await _cancelAfterFundingRefunds();
@@ -1505,7 +1563,8 @@ class _M6Round extends _Round {
   /// fees (the relayer's at most 2 USDC, Railgun's 0.25 %). From
   /// `/private-usd`, which keeps the balance fresh.
   Future<void> _waitForDollars() async {
-    final needed = privateUsdDollarUnits(_m6Usd)! + BigInt.from(2500000);
+    final needed =
+        privateUsdDollarUnits(_m6Usd)! + privateUsdDollarUnits(_m6FeeMargin)!;
     await tapWidget(tester, _stripKey);
     await _waitUntil('$_m6Usd private USD and its fees to be available', () {
       final token = _container
@@ -1533,8 +1592,35 @@ class _M6Round extends _Round {
   /// Home → strip → Convert → the direction toggle → the dollars → Review →
   /// Convert, which accepts and starts paying; its progress shows.
   Future<void> _convertThroughTheScreens(String check) async {
-    await tapWidget(tester, _stripKey);
-    await tapAppButton(tester, _screenConvertKey);
+    // Called from home: a Private USD screen still animating out (after a go
+    // home) would count as shown, so let it close first.
+    await _waitUntil(
+      'the previous Private USD screen to close',
+      () => !tester.any(find.byKey(_screenConvertKey)),
+      timeout: const Duration(seconds: 30),
+    );
+    // Tap until the Private USD screen shows: a tap that lands while home is
+    // still animating in does nothing.
+    await tapUntilVisible(
+      tester,
+      trigger: find.byKey(_stripKey),
+      outcome: find.byKey(_screenConvertKey),
+      description: 'the Private USD screen',
+      timeout: const Duration(minutes: 1),
+    );
+    // Convert waits for the payment guard's first read of the send log (one
+    // payment at a time), which can take a while after the app starts.
+    try {
+      await tapAppButton(
+        tester,
+        _screenConvertKey,
+        timeout: const Duration(minutes: 3),
+      );
+    } on TestFailure {
+      final status = _container.read(privateUsdSpendStatusProvider(_uuid));
+      await _screenshot('m6-$check-guard');
+      fail('Convert never enabled; the payment guard shows ${status.name}');
+    }
     await tapWidget(tester, _directionKey);
     await _waitUntil(
       'the reverse convert screen',
@@ -1576,14 +1662,19 @@ class _M6Round extends _Round {
   /// nothing is paid, then or after unlock.
   Future<void> _lockDuringTheProofPaysNothing() async {
     await _convertThroughTheScreens('lock');
-    await _waitUntil(
-      'the payment proof to start',
-      () => _funding?.stage == PrivateUsdFundingStage.proving || _funded,
-      timeout: const Duration(minutes: 5),
-    );
-    // Let the proof get going, then lock mid-proof.
-    await _pumpFor(const Duration(seconds: 5));
-    if (_funded || _funding?.stage != PrivateUsdFundingStage.proving) {
+    // Lock the moment the proof starts: on a fast phone it takes seconds.
+    final proofBy = DateTime.now().add(const Duration(minutes: 5));
+    while (_funding?.stage != PrivateUsdFundingStage.proving &&
+        !_funded &&
+        _status?.record.fundingTx == null) {
+      if (DateTime.now().isAfter(proofBy)) {
+        fail('Timed out after 5 minutes waiting for the payment proof.');
+      }
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    if (_funded ||
+        _status?.record.fundingTx != null ||
+        _funding?.stage != PrivateUsdFundingStage.proving) {
       _results['m6_lock'] = 'skipped: the proof finished before the lock';
       return;
     }
@@ -1610,11 +1701,18 @@ class _M6Round extends _Round {
 
   /// 2. The unpaid conversion, cancelled behind its sheet: CANCELLED.
   Future<void> _cancelBeforeFunding() async {
-    if (_funded || _status?.isUnderWay != true) {
+    // `funded` follows the chain; a payment already kept and posted shows
+    // first as the record's funding transaction. Cancelling that one asks
+    // for a refund instead (the opt-in refund check covers it).
+    if (_funded ||
+        _status?.record.fundingTx != null ||
+        _status?.isUnderWay != true) {
       _results['m6_cancel_before_funding'] = 'skipped: ${_phase?.name}';
       return;
     }
-    await tapWidget(tester, _bannerKey);
+    // Straight to this conversion's page: home can show more than one
+    // conversion banner (a forward one still arriving, say).
+    _router.go('/private-usd/conversion/reverse/${_key.index}');
     await _waitUntil(
       'the reverse progress screen',
       () => tester.any(find.byKey(_progressKey)),

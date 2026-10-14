@@ -410,12 +410,17 @@ List<RouteBase> buildMobileRoutes({required List<RouteBase> entryRoutes}) {
       path: '/private-usd/send/status',
       redirect: (_, state) =>
           state.extra is PrivateUsdSendMode ? null : '/private-usd',
-      pageBuilder: (context, state) => CupertinoPage(
-        key: state.pageKey,
-        child: MobilePrivateUsdSendStatusScreen(
-          mode: state.extra! as PrivateUsdSendMode,
-        ),
-      ),
+      // `extra` does not survive a lock (the trip to /unlock and back), and
+      // the navigator rebuilds every page in its stack then; never assume it.
+      pageBuilder: (context, state) {
+        final mode = state.extra;
+        return CupertinoPage(
+          key: state.pageKey,
+          child: mode is PrivateUsdSendMode
+              ? MobilePrivateUsdSendStatusScreen(mode: mode)
+              : const MobilePrivateUsdScreen(),
+        );
+      },
     ),
     GoRoute(
       path: '/private-usd/refunds',
@@ -428,12 +433,19 @@ List<RouteBase> buildMobileRoutes({required List<RouteBase> entryRoutes}) {
       path: '/private-usd/convert/review',
       redirect: (_, state) =>
           state.extra is PrivateUsdReviewArgs ? null : '/private-usd/convert',
-      pageBuilder: (context, state) => CupertinoPage(
-        key: state.pageKey,
-        child: MobilePrivateUsdConvertReviewScreen(
-          args: state.extra! as PrivateUsdReviewArgs,
-        ),
-      ),
+      // As for the send status: after a lock the review has lost its quote
+      // (quotes are dropped on lock), so it starts over.
+      pageBuilder: (context, state) {
+        final args = state.extra;
+        return CupertinoPage(
+          key: state.pageKey,
+          child: args is PrivateUsdReviewArgs
+              ? MobilePrivateUsdConvertReviewScreen(args: args)
+              : const MobilePrivateUsdConvertScreen(
+                  initialDirection: PrivateUsdDirection.forward,
+                ),
+        );
+      },
     ),
     GoRoute(
       path: '/private-usd/conversion/:direction/:index',

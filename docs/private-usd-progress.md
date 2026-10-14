@@ -5,6 +5,55 @@ is checked. Each milestone also has a gate line: acceptance met, tests written,
 `cargo test` / `fvm flutter analyze` / `fvm flutter test` (and the mobile lane
 for UI milestones) passing, and its Pitfalls re-read against the diff.
 
+## Where things stand (2026-10-14, end of session; read this first)
+
+- **Branch** `feature/private-usd-android`, pushed to `origin` (the owner's fork)
+  at the owner's request. Not merged anywhere. The local `[patch]`/path
+  stand-ins (`~/dev/zapp/zecSwap-zakura`, `~/dev/wallet-libraries-e4`) still
+  apply (B-6), and `spike/private-usd-m0` stays local.
+- **Device rounds on the Galaxy A35, testnet + Sepolia:**
+  - M3: passed (D-109 to D-111).
+  - M5: passed. 0.01 TAZ → $10.86 private USD, `PAID`; kill and lock checks
+    passed; the account-switch and delete-warning checks were skipped (the
+    swap finished first).
+  - M6: cancel before funding → `CANCELLED` (reverse index 2) and cancel
+    after funding → `REFUNDED` (index 3) both passed. The full conversion
+    (index 4, account 2, $1.25 paid, maker claimed, ZEC 67,929 zatoshi in
+    the joint account, Ironwood pool) is stuck in `RECEIVING`: every sweep
+    failed `Extract TX from PCZT: Ironwood(InvalidProof)`. Cause:
+    `pczt.rs` `orchard_circuit_version_for_consensus_branch` matched NU6.3
+    alone, so testnet NU7 PCZTs were proved with the post-NU6.2 circuit.
+    Fixed in this commit (it now keys on `orchard_protocol_revision()`;
+    NU7 is V3); not yet confirmed on the device, and `cargo test` was not
+    rerun on it. A round to retry the sweep (`--m6 --m6-usd 1
+    --m6-complete-only --m6-fee-margin 0.5`) was started at 13:05; it
+    follows index 4 to `COMPLETE`. Check the phone, or rerun that command.
+  - M7 and the M8 route round: not run. Account 2 has $1.89 available and
+    $8.69 Processing (a spend's change waits on Railgun's POI on Sepolia);
+    top up with a fresh forward conversion (`--m5 --m5-zec 0.01`; the
+    testnet maker caps a swap at 20 USDC and prices ZEC near 1,200 USD).
+- **Fixed today, all committed:** testnet NU7 (`zakura-protocol` 2.2.0,
+  B-11, D-113); the NU7 PCZT circuit (above); the joint DB's fresh tip
+  (D-50); new wallets' ZIP-32 index (D-109); the voting restorer's
+  `ref.mounted` (D-111); the balance watch mid-build (D-112); two Private USD
+  routes that force-unwrapped `GoRouter.extra` (crashed on review → progress).
+- **Open findings to fix next:**
+  - "Your Zcash wallet isn't ready" is shown for any `ZcashWallet` failure,
+    not only syncing (misleading on the sweep failure).
+  - The payment guard's first send-log read after app start is slow, so
+    Convert stays disabled for a while.
+  - The review title "Review conversion" is truncated on the phone.
+  - A quote skipped while the engine cannot run is never retried.
+  - Orchard pool: the code handles pools 3 and 4 (receipts, `find_deposit`,
+    the sweep spends both), but only Ironwood was exercised on device. Add
+    a regtest case: the joint account receives in Orchard before NU6.3 and
+    sweeps after (owner asked for Orchard and Ironwood support).
+- **Owner items:** E1's zecSwap Zakura build must carry the
+  `zakura-protocol =2.2.0` pin (bumped locally, uncommitted, in
+  `~/dev/zapp/zecSwap-zakura/crates/zecswap-core/Cargo.toml` lines 21 and
+  31); upstream vizor has the same testnet NU7 gap; N1 (tokens, M4), E6, E7,
+  E2/E4, and sign-off for M8.7.
+
 ## M0. Prerequisites and spikes (go/no-go)
 
 - [x] M0.1.0 Local patched zecSwap checkout (`~/dev/zapp/zecSwap-zakura`, §12 manifest and diff) and the `[patch]` in vizor

@@ -472,10 +472,14 @@ fn prepare_ironwood_commitments() {
 fn orchard_circuit_version_for_consensus_branch(
     consensus_branch_id: u32,
 ) -> orchard::circuit::OrchardCircuitVersion {
-    if matches!(
-        zcash_protocol::consensus::BranchId::try_from(consensus_branch_id),
-        Ok(zcash_protocol::consensus::BranchId::Nu6_3)
-    ) {
+    // The branch's Orchard protocol revision picks the circuit, so every
+    // upgrade that keeps revision V3 after NU6.3 (testnet NU7) proves as
+    // NU6.3 does. Matching NU6.3 alone proved testnet NU7 PCZTs with the
+    // post-NU6.2 circuit, and extraction rejected them as `InvalidProof`.
+    let revision = zcash_protocol::consensus::BranchId::try_from(consensus_branch_id)
+        .ok()
+        .and_then(|branch| branch.orchard_protocol_revision());
+    if revision == Some(zcash_protocol::consensus::OrchardProtocolRevision::V3) {
         return ironwood_orchard_circuit_version();
     }
     orchard::circuit::OrchardCircuitVersion::FixedPostNu6_2
@@ -3054,6 +3058,11 @@ mod tests {
         // the same keys as a V6 one (both carry `orchard_v3`-format bundles).
         assert_eq!(
             orchard_circuit_version_for_consensus_branch(u32::from(BranchId::Nu6_3)),
+            orchard::bundle::BundleVersion::orchard_v3().circuit_version(),
+        );
+        // Later upgrades that keep revision V3 (testnet NU7) prove the same way.
+        assert_eq!(
+            orchard_circuit_version_for_consensus_branch(u32::from(BranchId::Nu7)),
             orchard::bundle::BundleVersion::orchard_v3().circuit_version(),
         );
     }
