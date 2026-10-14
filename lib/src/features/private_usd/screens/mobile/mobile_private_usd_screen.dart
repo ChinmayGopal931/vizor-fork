@@ -32,6 +32,7 @@ import '../../providers/private_usd_activity_provider.dart';
 import '../../providers/private_usd_conversion_provider.dart';
 import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_receive_address_provider.dart';
+import '../../providers/private_usd_spend_status_provider.dart';
 import '../../services/private_usd_balance_repository.dart';
 import '../../widgets/mobile/private_usd_home_strip.dart';
 import '../../widgets/mobile/private_usd_activity_rows.dart';
@@ -39,8 +40,8 @@ import '../../widgets/mobile/private_usd_banner.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
 
 /// `/private-usd` (plan reference §9.4 S2): the balance with its screening
-/// buckets, the conversion under way, the receive address, the activity,
-/// and "Convert". Send and Withdraw arrive with M7.
+/// buckets, Send and Withdraw with the spending note, the conversion under
+/// way, the receive address, the activity, and "Convert".
 class MobilePrivateUsdScreen extends ConsumerStatefulWidget {
   const MobilePrivateUsdScreen({super.key});
 
@@ -93,14 +94,20 @@ class _MobilePrivateUsdScreenState
         onOpenConversion: open,
         onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
         onOpenRefunds: openRefunds,
+        sendRecords: ref.watch(privateUsdSendRecordsProvider(uuid)),
       )..sort(compareActivityEntries))
         entry.row,
     ];
     final hasRefunds = reverseRecords.any(
       (record) => record.phase == ApiReversePhase.refunded,
     );
+    final balance = ref.watch(privateUsdBalanceProvider(uuid));
+    final sends = ref.watch(privateUsdEngineEnabledProvider);
+    final spending = ref.watch(privateUsdSpendStatusProvider(uuid));
+    final hasDollars =
+        balance.balances?.assets.any((a) => a.available > BigInt.zero) ?? false;
     return MobilePrivateUsdView(
-      state: ref.watch(privateUsdBalanceProvider(uuid)),
+      state: balance,
       zecUsdPrice: ref.watch(zecHomeUsdUnitPriceProvider),
       privacyModeEnabled: privacyModeEnabled,
       receiveAddress: address.value,
@@ -120,6 +127,11 @@ class _MobilePrivateUsdScreenState
       onConvert: () => underWay == null
           ? context.push('/private-usd/convert')
           : open(underWay.path),
+      canConvert: underWay != null || spending.canStartConversion,
+      onSend: sends ? () => context.push('/private-usd/send') : null,
+      onWithdraw: sends ? () => context.push('/private-usd/withdraw') : null,
+      canSend: spending.canSend && hasDollars,
+      spendNote: privateUsdSpendMessage(spending),
     );
   }
 }
@@ -140,6 +152,11 @@ class MobilePrivateUsdView extends StatelessWidget {
     this.activityRows = const [],
     this.onOpenConversion,
     this.onConvert,
+    this.canConvert = true,
+    this.onSend,
+    this.onWithdraw,
+    this.canSend = false,
+    this.spendNote,
     this.onRefunds,
     super.key,
   });
@@ -166,6 +183,20 @@ class MobilePrivateUsdView extends StatelessWidget {
 
   /// "Convert": the conversion under way, else a new one. Hidden when null.
   final VoidCallback? onConvert;
+
+  /// Whether "Convert" is enabled (the spend guard, reference §9.4 S2).
+  final bool canConvert;
+
+  /// "Send" and "Withdraw" (M7); hidden when null.
+  final VoidCallback? onSend;
+  final VoidCallback? onWithdraw;
+
+  /// Whether they are enabled: the spend guard allows it and some dollars
+  /// are available.
+  final bool canSend;
+
+  /// Why sending or converting cannot start now (the spending note).
+  final String? spendNote;
 
   /// "Refunds" beside the Activity heading, once a conversion was refunded.
   final VoidCallback? onRefunds;
@@ -214,6 +245,44 @@ class MobilePrivateUsdView extends StatelessWidget {
                       privacyModeEnabled: privacyModeEnabled,
                       onRefresh: onRefresh,
                     ),
+                    if (onSend != null && onWithdraw != null) ...[
+                      const SizedBox(height: AppSpacing.s),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AppButton(
+                              key: const ValueKey('mobile_private_usd_send'),
+                              variant: AppButtonVariant.secondary,
+                              expand: true,
+                              onPressed: canSend ? onSend : null,
+                              child: const Text(PrivateUsdCopy.actionSend),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.s),
+                          Expanded(
+                            child: AppButton(
+                              key: const ValueKey(
+                                'mobile_private_usd_withdraw',
+                              ),
+                              variant: AppButtonVariant.secondary,
+                              expand: true,
+                              onPressed: canSend ? onWithdraw : null,
+                              child: const Text(PrivateUsdCopy.actionWithdraw),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (spendNote case final note?) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        note,
+                        key: const ValueKey('mobile_private_usd_spend_note'),
+                        style: AppTypography.bodySmall.copyWith(
+                          color: colors.text.secondary,
+                        ),
+                      ),
+                    ],
                     if (banner != null) ...[
                       const SizedBox(height: AppSpacing.s),
                       PrivateUsdConversionBannerView(
@@ -262,7 +331,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                   child: AppButton(
                     key: const ValueKey('mobile_private_usd_convert'),
                     expand: true,
-                    onPressed: onConvert,
+                    onPressed: canConvert ? onConvert : null,
                     child: const Text(PrivateUsdCopy.actionConvert),
                   ),
                 ),

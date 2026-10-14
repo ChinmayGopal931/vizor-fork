@@ -1,6 +1,7 @@
 import '../../core/config/private_usd_feature_config.dart';
 import '../../rust/api/private_usd.dart'
     show ApiNothingSentCause, ApiPrivateUsdErrorCode, ApiRefundCause;
+import 'services/private_usd_spend_guard.dart' show PrivateUsdSpendStatus;
 
 /// Every user-facing Private USD string (plan reference §9.6), sentence case,
 /// in one place so widgets, tests and Widgetbook share it. The comment on
@@ -9,8 +10,8 @@ import '../../rust/api/private_usd.dart'
 /// mid-sentence.
 ///
 /// M3 holds the Shared, Home, Private USD screen and Activity tables, M5 the
-/// Convert and Accounts tables, M6 the Reverse and Refunds tables; the send
-/// table arrives with M7.
+/// Convert and Accounts tables, M6 the Reverse and Refunds tables, M7 the
+/// Send and withdraw table.
 abstract final class PrivateUsdCopy {
   // ── Shared ─────────────────────────────────────────────────────────────
 
@@ -1129,7 +1130,210 @@ abstract final class PrivateUsdCopy {
 
   static String _conversions(int count) =>
       count == 1 ? 'conversion' : 'conversions';
+
+  // ── Send and withdraw (M7) ────────────────────────────────────────────
+
+  /// `private_usd_send_title`
+  static const sendTitle = 'Send privately';
+
+  /// `private_usd_withdraw_title`
+  static const withdrawTitle = 'Withdraw';
+
+  /// `private_usd_send_asset`
+  static const sendAsset = 'Asset';
+
+  /// `private_usd_send_amount`
+  static const sendAmount = 'Amount';
+
+  /// `private_usd_send_to_private`
+  static const sendToPrivate = 'To a Railgun address';
+
+  /// `private_usd_send_to_withdraw`
+  static const sendToWithdraw = 'To an Ethereum address';
+
+  /// `private_usd_send_hint_private`
+  static const sendHintPrivate = '0zk1…';
+
+  /// `private_usd_send_hint_withdraw`
+  static const sendHintWithdraw = '0x…';
+
+  /// New: the paste button's label.
+  static const sendPaste = 'Paste';
+
+  /// `private_usd_send_invalid_0zk`
+  static const sendInvalid0zk = "That isn't a Railgun 0zk address.";
+
+  /// `private_usd_send_invalid_0x`
+  static const sendInvalid0x = "That isn't an Ethereum address.";
+
+  /// `private_usd_send_zero_address`
+  static const sendZeroAddress =
+      "That's the zero address: anything sent there is lost for good.";
+
+  /// `private_usd_send_too_much`
+  static const sendTooMuch = 'More than you have available.';
+
+  /// `private_usd_send_leave_network_fee`
+  static String sendLeaveNetworkFee(String fee) =>
+      'Leave $fee for the network fee.';
+
+  /// `private_usd_send_too_precise` (plural)
+  static String sendTooPrecise(int decimals) =>
+      'Use at most $decimals decimal ${decimals == 1 ? 'place' : 'places'}.';
+
+  /// `private_usd_send_balance_dropped`
+  static const sendBalanceDropped =
+      'Your available balance is now less than this amount.';
+
+  /// `private_usd_send_withdraw_public`
+  static const sendWithdrawPublic =
+      'Anyone on Ethereum can see this amount and address.';
+
+  /// `private_usd_send_review_title_private`
+  static const sendReviewTitlePrivate = 'Review send';
+
+  /// `private_usd_send_review_title_withdraw`
+  static const sendReviewTitleWithdraw = 'Review withdrawal';
+
+  /// `private_usd_send_review_railgun_fee`
+  static String sendReviewRailgunFee(String percent) =>
+      'Railgun fee ($percent%)';
+
+  /// `private_usd_send_review_receives`
+  static const sendReviewReceives = 'They receive';
+
+  /// `private_usd_send_review_to`
+  static const sendReviewTo = 'To';
+
+  /// New (D11): `send_error_fee_cap`
+  static const sendErrorFeeCap =
+      'The network fee is above the 2 USDC limit right now, so nothing was '
+      'sent. Try again later.';
+
+  /// New: the send log does not read, so spending stays blocked.
+  static const sendErrorStore =
+      "Vizor can't read its saved payments. $supportSentence";
+
+  /// `private_usd_send_proving`
+  static const sendProving = 'Proving your transaction';
+
+  /// New: the proof's progress, from the page's `proof` events.
+  static String sendProvingPercent(int percent) =>
+      'Proving your transaction · $percent%';
+
+  /// `private_usd_send_proving_detail` (F)
+  static const sendProvingDetail =
+      'Your phone builds a zero-knowledge proof so nobody can see what you '
+      'send. This takes a few seconds. Keep Vizor open.';
+
+  /// `private_usd_send_sending`
+  static const sendSending = 'Sending';
+
+  /// New (F): once proved, while the relayer sends it and Vizor waits for a
+  /// block.
+  static const sendLanding =
+      'The relayer is sending it. Waiting for a block can take a minute. '
+      'Keep Vizor open.';
+
+  /// `private_usd_send_done_title_private`
+  static const sendDoneTitlePrivate = 'Sent';
+
+  /// `private_usd_send_done_title_withdraw`
+  static const sendDoneTitleWithdraw = 'Withdrawn';
+
+  /// `private_usd_send_done_body`
+  static String sendDoneBody(String amount, String address) =>
+      '$amount went to $address.';
+
+  /// `private_usd_send_view_tx`
+  static const sendViewTx = 'View on Etherscan';
+
+  /// `private_usd_send_view_railscan`
+  static const sendViewRailscan = 'View on Railscan';
+
+  /// `private_usd_send_not_sent`
+  static const sendNotSent = 'Nothing was sent. Try again in a moment.';
+
+  /// `private_usd_send_unavailable`
+  static const sendUnavailable =
+      'Private sends are unavailable right now. Nothing was sent. Try again '
+      'later.';
+
+  /// `private_usd_send_fee_rose`
+  static String sendFeeRose(String fee) =>
+      'The network fee went up to $fee. Nothing was sent.';
+
+  /// `private_usd_send_unconfirmed`
+  static const sendUnconfirmed =
+      "It isn't in a block yet. Check your activity before sending again.";
+
+  /// `private_usd_send_info_title`
+  static const sendInfoTitle = 'Sending privately';
+
+  /// `private_usd_send_info_step_address`
+  static const sendInfoStepAddress =
+      "Enter the amount and the recipient's Railgun address, which starts "
+      'with 0zk.';
+
+  /// `private_usd_send_info_step_proof`
+  static const sendInfoStepProof =
+      'Your phone builds a zero-knowledge proof. This takes a few seconds.';
+
+  /// `private_usd_send_info_step_private`
+  static const sendInfoStepPrivate =
+      'The dollars move inside Railgun: nobody else sees the amount, or who '
+      'sent and received it.';
+
+  /// `private_usd_withdraw_info_title`
+  static const withdrawInfoTitle = 'Withdrawing makes it public';
+
+  /// `private_usd_withdraw_info_step_address`
+  static const withdrawInfoStepAddress =
+      'Enter the amount and an Ethereum address, which starts with 0x.';
+
+  /// `private_usd_withdraw_info_step_proof`
+  static const withdrawInfoStepProof =
+      'Your phone builds a proof, and the dollars leave Railgun for that '
+      'address.';
+
+  /// `private_usd_withdraw_info_note_public`
+  static const withdrawInfoNotePublic =
+      'Once withdrawn, the amount and the address are visible to anyone on '
+      'Ethereum.';
+
+  /// `private_usd_withdraw_info_note_private`
+  static const withdrawInfoNotePrivate =
+      "To stay private, don't withdraw the exact amount you just converted, "
+      'wait a while first, and use a fresh address each time.';
+
+  /// `private_usd_withdraw_info_note_fee`
+  static String withdrawInfoNoteFee(String percent) =>
+      'Railgun keeps $percent% of what you withdraw.';
 }
+
+/// The spending note on `/private-usd` and the send screens (reference §9.4
+/// S2): why Send, Withdraw or a new conversion cannot start now; null when
+/// they can.
+String? privateUsdSpendMessage(PrivateUsdSpendStatus status) =>
+    switch (status) {
+      PrivateUsdSpendStatus.available => null,
+      PrivateUsdSpendStatus.checking => PrivateUsdCopy.checkingPayments,
+      PrivateUsdSpendStatus.sending => PrivateUsdCopy.paymentPending,
+      PrivateUsdSpendStatus.converting => PrivateUsdCopy.conversionPending,
+      PrivateUsdSpendStatus.unreadable => PrivateUsdCopy.sendErrorStore,
+    };
+
+/// What to say when pricing or sending fails before anything was sent
+/// (zapp `PrivateUsdSendVM.onReview`, plus the D11 cap).
+String privateUsdSendErrorMessage(ApiPrivateUsdErrorCode code) =>
+    switch (code) {
+      ApiPrivateUsdErrorCode.unavailable => PrivateUsdCopy.sendUnavailable,
+      ApiPrivateUsdErrorCode.relayerFee => PrivateUsdCopy.sendErrorFeeCap,
+      ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.routeBlocked,
+      ApiPrivateUsdErrorCode.storeUnreadable => PrivateUsdCopy.sendErrorStore,
+      ApiPrivateUsdErrorCode.busy => PrivateUsdCopy.paymentPending,
+      _ => PrivateUsdCopy.sendNotSent,
+    };
 
 /// What to say when a quote or an accept fails before anything was sent
 /// (mirrors zapp `PrivateUsdFailure`); null for a cancelled call, which is

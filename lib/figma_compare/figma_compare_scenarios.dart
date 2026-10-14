@@ -32,6 +32,7 @@ import '../widgetbook/mobile_pay_use_cases.dart';
 import '../widgetbook/mobile_gift_onboarding_use_cases.dart';
 import '../widgetbook/pay_use_cases.dart';
 import '../widgetbook/private_usd_reverse_use_cases.dart';
+import '../widgetbook/private_usd_send_use_cases.dart';
 import '../widgetbook/private_usd_use_cases.dart';
 import '../widgetbook/payment_link_mobile_use_cases.dart';
 import '../widgetbook/payment_link_amount_currency_use_cases.dart';
@@ -2438,6 +2439,77 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     id: 'mobile-private-usd-refunds-empty',
     description: 'Private USD refunds with none yet',
     builder: buildMobilePrivateUsdRefundsEmptyUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-payment-pending',
+    description:
+        'Private USD with a send not in a block yet: spending note, Send and Withdraw disabled',
+    builder: buildMobilePrivateUsdPaymentPendingUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-send',
+    description: 'Private USD send form, valid',
+    builder: buildMobilePrivateUsdSendUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-send-invalid',
+    description: 'Private USD send form with an invalid 0zk address',
+    builder: buildMobilePrivateUsdSendInvalidUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-withdraw-zero',
+    description: 'Private USD withdraw form with the zero address',
+    builder: buildMobilePrivateUsdWithdrawZeroUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-send-leave-fee',
+    description: 'Private USD send form leaving the network fee',
+    builder: buildMobilePrivateUsdSendLeaveFeeUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-send-review',
+    description: 'Private USD private send review',
+    builder: buildMobilePrivateUsdSendReviewUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-withdraw-review',
+    description: 'Private USD withdrawal review with the public notice',
+    builder: buildMobilePrivateUsdWithdrawReviewUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-send-proving',
+    description: 'Private USD send proving at 42%',
+    builder: buildMobilePrivateUsdSendProvingUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-send-done',
+    description: 'Private USD send in a block, with Etherscan',
+    builder: buildMobilePrivateUsdSendDoneUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-send-unconfirmed',
+    description: 'Private USD withdrawal not in a block yet',
+    builder: buildMobilePrivateUsdSendUnconfirmedUseCase,
     desktop: false,
     mobile: true,
   ),

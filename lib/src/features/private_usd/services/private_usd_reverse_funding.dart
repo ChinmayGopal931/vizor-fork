@@ -222,8 +222,13 @@ class PrivateUsdReverseFunding {
         default:
           error = privateUsdReverseStepMessage(failure.code);
       }
-    } on PrivateUsdSpendBusyException {
-      error = PrivateUsdCopy.reverseError;
+    } on PrivateUsdSpendBusyException catch (busy) {
+      // A send not seen in a block yet holds the wallet's notes (M7).
+      error = switch (busy.status) {
+        PrivateUsdSpendStatus.sending ||
+        PrivateUsdSpendStatus.unreadable => privateUsdSpendMessage(busy.status),
+        _ => PrivateUsdCopy.reverseError,
+      };
     } catch (failure) {
       if (_isDrop(failure)) {
         result = PrivateUsdFundingResult.dropped;

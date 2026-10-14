@@ -32,6 +32,7 @@ import 'payment_link_amount_currency_use_cases.dart';
 import 'payment_link_claim_outcome_use_cases.dart';
 import 'payment_link_use_cases.dart';
 import 'private_usd_reverse_use_cases.dart';
+import 'private_usd_send_use_cases.dart';
 import 'private_usd_use_cases.dart';
 import 'receive_use_cases.dart';
 import 'received_receipt_use_cases.dart';
@@ -621,6 +622,10 @@ class WidgetbookApp extends StatelessWidget {
                       builder: buildMobilePrivateUsdHiddenUseCase,
                     ),
                     WidgetbookUseCase(
+                      name: 'Payment pending',
+                      builder: buildMobilePrivateUsdPaymentPendingUseCase,
+                    ),
+                    WidgetbookUseCase(
                       name: 'Convert',
                       builder: buildMobilePrivateUsdConvertUseCase,
                     ),
@@ -723,6 +728,42 @@ class WidgetbookApp extends StatelessWidget {
                     WidgetbookUseCase(
                       name: 'Refunds empty',
                       builder: buildMobilePrivateUsdRefundsEmptyUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Send',
+                      builder: buildMobilePrivateUsdSendUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Send invalid 0zk',
+                      builder: buildMobilePrivateUsdSendInvalidUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Withdraw to the zero address',
+                      builder: buildMobilePrivateUsdWithdrawZeroUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Send leaves the network fee',
+                      builder: buildMobilePrivateUsdSendLeaveFeeUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Send review',
+                      builder: buildMobilePrivateUsdSendReviewUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Withdraw review',
+                      builder: buildMobilePrivateUsdWithdrawReviewUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Send proving',
+                      builder: buildMobilePrivateUsdSendProvingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Send done',
+                      builder: buildMobilePrivateUsdSendDoneUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Send unconfirmed',
+                      builder: buildMobilePrivateUsdSendUnconfirmedUseCase,
                     ),
                   ],
                 ),

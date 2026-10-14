@@ -343,16 +343,27 @@ class RailgunNullifiers {
 /// A proved send for a broadcaster, and what it spends, to settle it by from
 /// the chain.
 class RailgunRelayedProof {
-  const RailgunRelayedProof({required this.request, required this.spends});
+  const RailgunRelayedProof({
+    required this.request,
+    required this.spends,
+    this.json = '',
+  });
 
   final RailgunRelayRequest request;
   final List<RailgunNullifiers> spends;
 
+  /// The page's result as it came, which Rust keeps before anything is
+  /// posted (`private_usd_send_log_put`). Held in memory only: never log it
+  /// or store it from Dart.
+  final String json;
+
   /// `transfer` and `unshield`'s result, checked to be a `transact` call for
   /// [broadcaster] that spends notes; anything else is refused, never posted.
+  /// [raw] is the result's text, kept as [json].
   static RailgunRelayedProof parse(
     Object? json, {
     required RailgunBroadcaster broadcaster,
+    String raw = '',
   }) {
     final result = _object(json, 'proof');
     final chainId = result['chainId'];
@@ -391,8 +402,12 @@ class RailgunRelayedProof {
         value: value,
       ),
       spends: List.unmodifiable(spends),
+      json: raw,
     );
   }
+
+  @override
+  String toString() => 'RailgunRelayedProof($request, ${spends.length} trees)';
 }
 
 class RailgunReverseCostRequest {

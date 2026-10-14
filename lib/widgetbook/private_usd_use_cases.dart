@@ -76,6 +76,39 @@ const previewPrivateUsdUnknown = PrivateUsdBalanceState();
 /// A first sync under way, nothing shown yet.
 const previewPrivateUsdLoading = PrivateUsdBalanceState(isRefreshing: true);
 
+/// Another wallet's real-format `0zk` address, for sends.
+const previewPrivateUsdRecipient =
+    '0zk1qy860uut20m8gd6fnhzvr0zqeyhs0ya5247x7h2eyedxsazx43w5nrv7j6fe3z53l78'
+    'hn78kmslky2206lm75mclrv7dawd756m2suy7l4zud2m4yhg6kcsn7ed';
+
+/// A send of $[dollars] kept [ago] before [previewPrivateUsdNow]:
+/// confirmed with its transaction, or not in a block yet.
+ApiSendRecord previewPrivateUsdSendRecord({
+  String sendId = '6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b',
+  double dollars = 40,
+  bool withdraw = false,
+  bool confirmed = true,
+  Duration ago = const Duration(hours: 5),
+}) {
+  final sentAt = previewPrivateUsdNow.subtract(ago);
+  return ApiSendRecord(
+    sendId: sendId,
+    token: previewPrivateUsdUsdc.address,
+    amount: BigInt.from((dollars * 1e6).round()).toString(),
+    fee: '500000',
+    to: withdraw
+        ? '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
+        : previewPrivateUsdRecipient,
+    withdraw: withdraw,
+    sentAt: sentAt.millisecondsSinceEpoch ~/ 1000,
+    state: confirmed ? ApiSendState.confirmed : ApiSendState.unconfirmed,
+    txHash: confirmed
+        ? '0x4b2e6a8c0d1f3a5c7e9b1d3f5a7c9e0b2d4f6a8c1e3b5d7f9a0c2e4b6d8f1a3c'
+        : null,
+    postedAt: sentAt.millisecondsSinceEpoch ~/ 1000,
+  );
+}
+
 Widget buildMobilePrivateUsdDefaultUseCase(BuildContext context) =>
     _PrivateUsdScreenPreview(
       state: previewPrivateUsdBalance(
@@ -83,6 +116,7 @@ Widget buildMobilePrivateUsdDefaultUseCase(BuildContext context) =>
         arriving: 200,
         processing: 12.5,
       ),
+      sends: [previewPrivateUsdSendRecord()],
       records: [
         previewPrivateUsdRecord(
           index: 4,
@@ -124,16 +158,37 @@ Widget buildMobilePrivateUsdHiddenUseCase(BuildContext context) =>
       privacyModeEnabled: true,
     );
 
+/// A send not in a block yet: the spending note, Send and Withdraw
+/// disabled (M7).
+Widget buildMobilePrivateUsdPaymentPendingUseCase(BuildContext context) =>
+    _PrivateUsdScreenPreview(
+      state: previewPrivateUsdBalance(available: 1210.4, processing: 12.5),
+      sends: [
+        previewPrivateUsdSendRecord(confirmed: false, ago: Duration.zero),
+      ],
+      canSend: false,
+      canConvert: false,
+      spendNote: PrivateUsdCopy.paymentPending,
+    );
+
 class _PrivateUsdScreenPreview extends StatelessWidget {
   const _PrivateUsdScreenPreview({
     required this.state,
     this.privacyModeEnabled = false,
     this.records = const [],
+    this.sends = const [],
+    this.canSend = true,
+    this.canConvert = true,
+    this.spendNote,
   });
 
   final PrivateUsdBalanceState state;
   final bool privacyModeEnabled;
   final List<ApiForwardRecord> records;
+  final List<ApiSendRecord> sends;
+  final bool canSend;
+  final bool canConvert;
+  final String? spendNote;
 
   @override
   Widget build(BuildContext context) {
@@ -151,6 +206,13 @@ class _PrivateUsdScreenPreview extends StatelessWidget {
             ),
           },
           activityRows: [
+            for (final record in sends)
+              buildPrivateUsdSendActivityRow(
+                context: context,
+                record: record,
+                privacyModeEnabled: privacyModeEnabled,
+                onOpenTransaction: () {},
+              ),
             for (final record in records)
               ?buildPrivateUsdActivityRow(
                 context: context,
@@ -163,6 +225,11 @@ class _PrivateUsdScreenPreview extends StatelessWidget {
           onBack: () {},
           onRefresh: () {},
           onConvert: () {},
+          onSend: () {},
+          onWithdraw: () {},
+          canSend: canSend,
+          canConvert: canConvert,
+          spendNote: spendNote,
         ),
       ),
     );

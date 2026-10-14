@@ -27,12 +27,16 @@ import '../../features/pay/models/pay_recent_recipients.dart';
 import '../../features/payment_links/providers/payment_link_cards_provider.dart';
 import '../../features/payment_links/screens/payment_links_screen.dart';
 import '../../features/private_usd/models/private_usd_record_key.dart';
+import '../../features/private_usd/models/private_usd_send.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_conversion_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_convert_review_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_convert_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_refunds_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_reverse_conversion_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_send_review_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_send_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_send_status_screen.dart';
 import '../../features/receive/screens/mobile/mobile_receive_screen.dart';
 import '../../features/address_book/screens/mobile/mobile_address_book_screen.dart';
 import '../../features/activity/screens/mobile/mobile_swap_activity_detail_screen.dart';
@@ -361,6 +365,55 @@ List<RouteBase> buildMobileRoutes({required List<RouteBase> entryRoutes}) {
           initialDirection: state.uri.queryParameters['to'] == 'zec'
               ? PrivateUsdDirection.reverse
               : PrivateUsdDirection.forward,
+        ),
+      ),
+    ),
+    // Send and Withdraw (M7, reference §9.2, §9.4 S8): one screen per mode,
+    // its review, and the status while it proves and posts.
+    GoRoute(
+      path: '/private-usd/send',
+      pageBuilder: (context, state) => CupertinoPage(
+        key: state.pageKey,
+        child: const MobilePrivateUsdSendScreen(
+          mode: PrivateUsdSendMode.private,
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/private-usd/withdraw',
+      pageBuilder: (context, state) => CupertinoPage(
+        key: state.pageKey,
+        child: const MobilePrivateUsdSendScreen(
+          mode: PrivateUsdSendMode.withdraw,
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/private-usd/send/review',
+      pageBuilder: (context, state) => CupertinoPage(
+        key: state.pageKey,
+        child: const MobilePrivateUsdSendReviewScreen(
+          mode: PrivateUsdSendMode.private,
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/private-usd/withdraw/review',
+      pageBuilder: (context, state) => CupertinoPage(
+        key: state.pageKey,
+        child: const MobilePrivateUsdSendReviewScreen(
+          mode: PrivateUsdSendMode.withdraw,
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/private-usd/send/status',
+      redirect: (_, state) =>
+          state.extra is PrivateUsdSendMode ? null : '/private-usd',
+      pageBuilder: (context, state) => CupertinoPage(
+        key: state.pageKey,
+        child: MobilePrivateUsdSendStatusScreen(
+          mode: state.extra! as PrivateUsdSendMode,
         ),
       ),
     ),

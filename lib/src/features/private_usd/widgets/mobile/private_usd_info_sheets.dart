@@ -85,6 +85,37 @@ Future<void> showPrivateUsdReverseInfoSheet(BuildContext context) => _show(
   notes: const [PrivateUsdCopy.reverseRefundNote, PrivateUsdCopy.infoKeepOpen],
 );
 
+/// "Sending privately" (the send screens' info): three steps.
+Future<void> showPrivateUsdSendInfoSheet(BuildContext context) => _show(
+  context,
+  title: PrivateUsdCopy.sendInfoTitle,
+  steps: const [
+    PrivateUsdCopy.sendInfoStepAddress,
+    PrivateUsdCopy.sendInfoStepProof,
+    PrivateUsdCopy.sendInfoStepPrivate,
+  ],
+  notes: const [],
+);
+
+/// "Withdrawing makes it public" (the withdraw screens' info): two steps
+/// and three notes, with Railgun's fee as [railgunPercent].
+Future<void> showPrivateUsdWithdrawInfoSheet(
+  BuildContext context, {
+  required String railgunPercent,
+}) => _show(
+  context,
+  title: PrivateUsdCopy.withdrawInfoTitle,
+  steps: const [
+    PrivateUsdCopy.withdrawInfoStepAddress,
+    PrivateUsdCopy.withdrawInfoStepProof,
+  ],
+  notes: [
+    PrivateUsdCopy.withdrawInfoNotePublic,
+    PrivateUsdCopy.withdrawInfoNotePrivate,
+    PrivateUsdCopy.withdrawInfoNoteFee(railgunPercent),
+  ],
+);
+
 Future<void> _show(
   BuildContext context, {
   required String title,

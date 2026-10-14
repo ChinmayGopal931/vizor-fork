@@ -13,27 +13,37 @@ import '../../../providers/rpc_endpoint_failover_provider.dart';
 import '../models/private_usd_record_key.dart';
 import '../services/private_usd_engine.dart';
 import '../services/private_usd_reverse_funding.dart';
+import '../services/private_usd_sender.dart';
 import '../services/private_usd_spend_guard.dart';
 import '../services/private_usd_swap_backend.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_unfinished_provider.dart';
 import 'railgun_engine_provider.dart';
 
+/// This wallet's swap context now: the network, the lightwalletd endpoint
+/// and the deployment's Railgun network for the keyed Ethereum RPC.
+PrivateUsdSwapContext privateUsdSwapContextOf(Ref ref) {
+  final endpoint = ref.read(rpcEndpointFailoverProvider).current;
+  final deployment = ref.read(
+    privateUsdDeploymentProvider(endpoint.networkName),
+  );
+  return PrivateUsdSwapContext(
+    network: endpoint.networkName,
+    lightwalletdUrl: endpoint.normalizedLightwalletdUrl,
+    railgunNetwork: deployment?.railgunNetwork,
+    allowedHosts: deployment?.allowedHosts ?? const [],
+  );
+}
+
 /// The swap engine's calls for this wallet; replaced by a fake in tests.
-final privateUsdSwapBackendProvider = Provider<PrivateUsdSwapBackend>((ref) {
-  return RustPrivateUsdSwapBackend(() {
-    final endpoint = ref.read(rpcEndpointFailoverProvider).current;
-    final deployment = ref.read(
-      privateUsdDeploymentProvider(endpoint.networkName),
-    );
-    return PrivateUsdSwapContext(
-      network: endpoint.networkName,
-      lightwalletdUrl: endpoint.normalizedLightwalletdUrl,
-      railgunNetwork: deployment?.railgunNetwork,
-      allowedHosts: deployment?.allowedHosts ?? const [],
-    );
-  });
-});
+final privateUsdSwapBackendProvider = Provider<PrivateUsdSwapBackend>(
+  (ref) => RustPrivateUsdSwapBackend(() => privateUsdSwapContextOf(ref)),
+);
+
+/// The Rust send calls for this wallet (M7); replaced by a fake in tests.
+final privateUsdSendBackendProvider = Provider<PrivateUsdSendBackend>(
+  (ref) => RustPrivateUsdSendBackend(() => privateUsdSwapContextOf(ref)),
+);
 
 /// Whether this build runs the swap engine at all: the define, a mobile
 /// Android build, and a deployment for the network. It does not follow the
@@ -174,11 +184,18 @@ final privateUsdUnderWayProvider =
       ),
     );
 
-/// One outgoing Railgun payment at a time per wallet (M6 minimal; M7 adds
-/// sends).
-final privateUsdSpendGuardProvider = Provider<PrivateUsdSpendGuard>(
-  (_) => PrivateUsdSpendGuard(),
-);
+/// One outgoing Railgun payment at a time per account, sends and
+/// conversions alike, across restarts (the send log, M7).
+final privateUsdSpendGuardProvider = Provider<PrivateUsdSpendGuard>((ref) {
+  final guard = PrivateUsdSpendGuard(
+    readLog: (accountUuid) =>
+        ref.read(privateUsdSendBackendProvider).list(accountUuid),
+    unfinishedCount: (accountUuid) =>
+        ref.read(privateUsdSwapBackendProvider).unfinishedCount(accountUuid),
+  );
+  ref.onDispose(guard.dispose);
+  return guard;
+});
 
 /// The Railgun page's reverse calls; replaced by a fake in tests.
 final privateUsdReversePageProvider = Provider<PrivateUsdReversePage>(

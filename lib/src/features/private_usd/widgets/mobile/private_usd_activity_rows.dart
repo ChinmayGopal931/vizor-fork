@@ -13,6 +13,7 @@ import '../../../activity/activity_row_mapper.dart';
 import '../../../activity/models/activity_row_data.dart';
 import '../../models/private_usd_balances.dart';
 import '../../models/private_usd_record_key.dart';
+import '../../models/private_usd_send.dart';
 import '../../models/private_usd_reverse_presentation.dart';
 import '../../models/private_usd_status_presentation.dart';
 import '../../private_usd_copy.dart';
@@ -202,8 +203,59 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
   }
 }
 
-/// [records] (and [reverseRecords]) as activity entries for the home and
-/// Activity feeds.
+/// A send or withdrawal's activity row (M7, reference §9.4 S2): "Sent
+/// privately" or "Withdrew", "to 0zk1qy86…l4zu" once in a block, else "not
+/// in a block yet", and `−$amount`; opens its transaction on Etherscan once
+/// known. A send still being proved is not in the log, so it has no row.
+ActivityRowData buildPrivateUsdSendActivityRow({
+  required BuildContext context,
+  required ApiSendRecord record,
+  bool privacyModeEnabled = false,
+  bool dateOnlyTimestamp = false,
+  VoidCallback? onOpenTransaction,
+}) {
+  final colors = context.colors;
+  final unconfirmed = record.state == ApiSendState.unconfirmed;
+  final usd = hideAmountIfPrivacyMode(
+    formatPrivateUsdExact(
+      BigInt.parse(record.amount),
+      PrivateUsdBalances.decimals,
+    ),
+    privacyModeEnabled: privacyModeEnabled,
+    denomination: '',
+  );
+  return ActivityRowData(
+    stableId: 'private-usd:send:${record.sendId}',
+    title: record.withdraw
+        ? PrivateUsdCopy.activityWithdrew
+        : PrivateUsdCopy.activitySent,
+    leadingIconName: kPrivateUsdIcon,
+    leadingBackgroundColor: colors.background.neutralSubtleOpacity,
+    leadingIconColor: colors.icon.regular,
+    subtitle: unconfirmed
+        ? PrivateUsdCopy.activityUnconfirmed
+        : PrivateUsdCopy.activityTo(privateUsdShortAddress(record.to)),
+    amountText: activityAmountTextForFormFactor(
+      PrivateUsdCopy.activityOut(usd),
+    ),
+    amountColor: outgoingAmountColor(colors),
+    statusText: '',
+    statusIconName: unconfirmed ? AppIcons.loader : null,
+    statusColor: unconfirmed ? colors.text.secondary : null,
+    timestampText: formatActivityTimestamp(
+      privateUsdSendActivityTime(record),
+      dateOnly: dateOnlyTimestamp,
+    ),
+    onTap: onOpenTransaction,
+  );
+}
+
+/// When a send's row sorts: when it was kept.
+DateTime privateUsdSendActivityTime(ApiSendRecord record) =>
+    DateTime.fromMillisecondsSinceEpoch(record.sentAt * 1000);
+
+/// [records] (and [reverseRecords], [sendRecords]) as activity entries for
+/// the home and Activity feeds and `/private-usd`.
 List<ActivityEntry> privateUsdActivityEntries({
   required BuildContext context,
   required List<ApiForwardRecord> records,
@@ -212,9 +264,24 @@ List<ActivityEntry> privateUsdActivityEntries({
   required ValueChanged<PrivateUsdRoutePath> onOpenConversion,
   required ValueChanged<String> onOpenPayout,
   List<ApiReverseRecord> reverseRecords = const [],
+  List<ApiSendRecord> sendRecords = const [],
   VoidCallback? onOpenRefunds,
   bool dateOnlyTimestamp = false,
 }) => [
+  for (final record in sendRecords)
+    ActivityEntry(
+      timestamp: privateUsdSendActivityTime(record),
+      row: buildPrivateUsdSendActivityRow(
+        context: context,
+        record: record,
+        privacyModeEnabled: privacyModeEnabled,
+        dateOnlyTimestamp: dateOnlyTimestamp,
+        onOpenTransaction: switch (record.txHash) {
+          final tx? => () => onOpenPayout(tx),
+          null => null,
+        },
+      ),
+    ),
   for (final record in reverseRecords)
     if (buildPrivateUsdReverseActivityRow(
           context: context,

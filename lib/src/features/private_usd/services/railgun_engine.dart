@@ -578,6 +578,7 @@ class RailgunSession {
     final proof = RailgunRelayedProof.parse(
       _engine._decode(result),
       broadcaster: broadcaster,
+      raw: result,
     );
     _engine._publish(
       _engine.state.value.copyWith(phase: RailgunEnginePhase.ready),
