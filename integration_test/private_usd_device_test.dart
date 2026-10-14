@@ -31,6 +31,7 @@ import 'package:zcash_wallet/src/features/private_usd/services/private_usd_sende
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_balance_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_convert_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_record_key.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_amount.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_reverse_funding.dart';
@@ -42,6 +43,7 @@ import 'package:zcash_wallet/src/features/private_usd/services/railgun_engine.da
 import 'package:zcash_wallet/src/features/private_usd/services/railgun_host_channel.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/app_security_provider.dart';
+import 'package:zcash_wallet/src/providers/private_usd_lifecycle_provider.dart';
 import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart' as rust_private_usd;
@@ -1169,7 +1171,25 @@ class _M5Round extends _Round {
     );
     await tester.enterText(find.byKey(_amountKey), _m5Zec);
     await tester.pump(const Duration(milliseconds: 100));
-    // 700 ms after typing stops, then a price probe and a quote.
+    // 700 ms after typing stops, then a price probe and a quote. Without one
+    // in time, say why: the screen's convert state names it.
+    final quoteDeadline = DateTime.now().add(const Duration(minutes: 2));
+    while (!_container.read(privateUsdConvertProvider).canReview) {
+      if (DateTime.now().isAfter(quoteDeadline)) {
+        final convert = _container.read(privateUsdConvertProvider);
+        await _screenshot('m5-00-no-quote');
+        fail(
+          'no quote to review: quoting=${convert.quoting} '
+          'quote=${convert.quote != null} error=${convert.quoteError} '
+          'short=${convert.isShort} invalid=${convert.isAmountInvalid} '
+          'engineCanRun=${_container.read(privateUsdEngineProvider).canRun} '
+          'lifecycle=${WidgetsBinding.instance.lifecycleState} '
+          'locked=${_container.read(appSecurityProvider).requiresUnlock} '
+          'quiesced=${_container.read(privateUsdLifecycleProvider).isQuiesced}',
+        );
+      }
+      await _pumpFor(const Duration(seconds: 1));
+    }
     await tapAppButton(tester, _reviewKey, timeout: const Duration(minutes: 2));
     await _screenshot('m5-00-review');
     await tapAppButton(

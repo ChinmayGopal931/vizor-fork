@@ -2607,3 +2607,22 @@ M8 status (2026-10-14): the non-device parts are done.
   M8.3 (`--keyed-rpc`), which also needs E6's keyed RPC JSON. They come
   after the M3, M5, M6 and M7 rounds (B-8, B-9). Owner: the order and the
   commands are in `docs/private-usd-device-checklist.md`.
+- **B-11. Testnet sends are rejected: the public testnet is not the Zakura
+  testnet (2026-10-14).** The M5 device round's deposit (txid
+  `e62e4dcd…6cb20c`, built at 4502115) never landed. Its bytes, sent to
+  `testnet.zec.rocks` by hand, came back `errorCode -25: transaction did not
+  pass consensus validation: transaction uses an incorrect consensus branch
+  id`. `zakura-protocol 2.0.0` puts testnet NU6.2 at 4,052,000 (branch
+  `5437f330`) and NU6.3 at 4,134,000 (branch `37a5165b`), so above 4,134,000
+  the wallet signs every testnet transaction for Ironwood (v6, `37a5165b`).
+  `testnet.zec.rocks` (Zebra 7.0.0-rc.0, the app's only testnet endpoint)
+  was at 4,502,135 on branch `77190ad9`. Every testnet send from this build
+  fails there, not only Private USD deposits; receiving still works.
+  Funds are safe: the deposit never left the wallet, its notes return at
+  its expiry (4502158), and the swap ends with nothing sent. The M5 to M7
+  device rounds need a testnet whose consensus matches the wallet's (an
+  Ironwood testnet lightwalletd), owner to provide. Also learned: the
+  testnet maker caps a swap at 20 USDC, and testnet prices ZEC at about
+  1,200 USD, so the rounds use about 0.01 ZEC (the quote for 0.01 was
+  $10.86 after fees).
+
