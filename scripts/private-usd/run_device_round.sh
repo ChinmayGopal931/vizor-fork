@@ -53,6 +53,35 @@
 #                        bytes; nothing is proved again). Implies --skip-release.
 #   --m7-to ADDRESS      the 0x address the withdrawal pays (required with --m7)
 #   --m7-usd AMOUNT      private USD per send and withdrawal (default 1)
+#   --m8-route           the M8 route round, off by default: Tor turns on in the
+#                        middle of a forward claim (converting --m5-zec), a
+#                        reverse funding (--m6-usd, while the page proves the
+#                        payment) and a private send (--m7-usd to a second
+#                        account's 0zk, while the page proves it). From the flip
+#                        on no host sample may show a direct socket to a Railgun
+#                        host, and once Tor has connected none may show a socket
+#                        that is neither loopback nor a Tor relay
+#                        (check_sockets.py --onionoo); each phase must then
+#                        finish over Tor. Run it after an M5 round left private
+#                        USD, with testnet ZEC left for its own forward
+#                        conversion (or together with --m5/--m6/--m7, after
+#                        them). It never resets the wallet, keeps the page
+#                        storage, and implies --skip-release.
+#   --m8-route-phases L  a comma list of forward, reverse and send (default all
+#                        three, in that order)
+#   --keyed-rpc FILE     the keyed RPC check (M8.3). FILE is a JSON file for
+#                        --dart-define-from-file that sets
+#                        VIZOR_ETHEREUM_RPC_URL_SEPOLIA (the round runs on
+#                        Sepolia; _MAINNET may be set too), the keyed RPC (E6).
+#                        Keep it outside the repo or gitignored: the runner
+#                        refuses a file git tracks or would track. Every build
+#                        in the round uses it. After the test the host reads the
+#                        app's Private USD files (swaps.db with its WAL, joint.db,
+#                        the token state) and shared_prefs with run-as from the
+#                        debug build; at the end it dumps logcat and scans every
+#                        log and evidence file of the round. Any match of the
+#                        URL's host and path, or of its key, fails the round.
+#                        Nothing prints the URL or the key.
 #
 # Safety: it refuses a phone whose com.keplr.vizor is installed but not
 # debuggable (that may be a real wallet), runs `flutter test --no-uninstall`,
@@ -60,6 +89,7 @@
 # USB (U21) and restores the original setting on exit, also on failure.
 set -euo pipefail
 
+CALLER_DIR=$PWD
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 SERIAL=${ANDROID_SERIAL:?set ANDROID_SERIAL to the phone adb serial}
 export ANDROID_SERIAL=$SERIAL
@@ -85,6 +115,7 @@ OUT="${TMPDIR:-/tmp}/pusd-device-round-$(date +%Y%m%d-%H%M%S)"
 RELEASE_APK=""
 RUN_TEST=1 RUN_RELEASE=1 RUN_RESTORE=1 KEEP_PAGE=0 TOR_FIRST_SYNC=true
 M5=0 M5_ZEC=0.05 M6=0 M6_USD=2 M6_REFUND=false M7=0 M7_USD=1 M7_TO=""
+M8_ROUTE=0 M8_PHASES=forward,reverse,send KEYED_RPC=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --m5) M5=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
@@ -95,6 +126,9 @@ while [[ $# -gt 0 ]]; do
     --m7) M7=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
     --m7-to) M7_TO=$2; shift 2 ;;
     --m7-usd) M7_USD=$2; shift 2 ;;
+    --m8-route) M8_ROUTE=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
+    --m8-route-phases) M8_PHASES=$2; shift 2 ;;
+    --keyed-rpc) KEYED_RPC=$2; shift 2 ;;
     --out) OUT=$2; shift 2 ;;
     --release-apk) RELEASE_APK=$2; shift 2 ;;
     --skip-test) RUN_TEST=0; shift ;;
@@ -109,6 +143,29 @@ if [[ $M7 == 1 && ! $M7_TO =~ ^0x[0-9a-fA-F]{40}$ ]]; then
   echo "--m7 needs --m7-to 0x… (40 hex digits): the withdrawal's address" >&2
   exit 2
 fi
+if [[ ! $M8_PHASES =~ ^(forward|reverse|send)(,(forward|reverse|send))*$ ]]; then
+  echo "--m8-route-phases takes a comma list of forward, reverse and send" >&2
+  exit 2
+fi
+if [[ -n $KEYED_RPC ]]; then
+  [[ $KEYED_RPC == /* ]] || KEYED_RPC="$CALLER_DIR/$KEYED_RPC"
+  if [[ ! -f $KEYED_RPC || ! -r $KEYED_RPC ]]; then
+    echo "--keyed-rpc: no readable file at $KEYED_RPC" >&2
+    exit 2
+  fi
+  # The key must never reach the repo.
+  if git ls-files --error-unmatch -- "$KEYED_RPC" >/dev/null 2>&1; then
+    echo "--keyed-rpc: git tracks $KEYED_RPC; keep the key out of the repo" >&2
+    exit 2
+  fi
+  if [[ $KEYED_RPC == "$PWD"/* ]] && ! git check-ignore -q -- "$KEYED_RPC"; then
+    echo "--keyed-rpc: $KEYED_RPC is in the repo and not gitignored" >&2
+    exit 2
+  fi
+  # Checks the URL's shape without printing it.
+  python3 -I scripts/private-usd/device_round.py keyed-rpc-check --file "$KEYED_RPC" --require sepolia || exit 2
+  DEFINES+=(--dart-define-from-file="$KEYED_RPC")
+fi
 mkdir -p "$OUT"
 
 log() { echo "$(date +%H:%M:%S) [round] $*" | tee -a "$OUT/round.log"; }
@@ -116,7 +173,7 @@ adb_() { "$ADB" -s "$SERIAL" "$@"; }
 
 PIDS=()
 ORIG_STAY_ON=""
-TEST_STATUS=0 RELEASE_STATUS=0 RESTORE_STATUS=0
+TEST_STATUS=0 RELEASE_STATUS=0 RESTORE_STATUS=0 KEYED_FILES_STATUS=0 KEYED_LOGS_STATUS=0
 
 restore_stay_on() {
   [[ -n "$ORIG_STAY_ON" ]] || return 0
@@ -302,7 +359,23 @@ if [[ $RUN_TEST == 1 ]]; then
       TEST_STATUS=$?
     fi
   fi
-  if [[ $M5 == 0 && $M6 == 0 && $M7 == 0 ]]; then
+  if [[ $M8_ROUTE == 1 && $TEST_STATUS == 0 ]]; then
+    # Never VIZOR_PUSD_DEVICE_RESET: the round converts and sends what the
+    # earlier rounds left in the phone's wallet.
+    log "M8 route round: Tor turns on mid-phase ($M8_PHASES)"
+    fvm flutter test integration_test/private_usd_device_test.dart \
+      -d "$SERIAL" --tags private-usd-device --run-skipped --no-uninstall \
+      "${DEFINES[@]}" \
+      --dart-define=ZCASH_E2E_NETWORK=testnet \
+      --dart-define=VIZOR_PUSD_DEVICE_DRIVER_URL="http://127.0.0.1:$PORT" \
+      --dart-define=VIZOR_PUSD_DEVICE_M8_ROUTE="$M8_PHASES" \
+      --dart-define=VIZOR_PUSD_DEVICE_M5_ZEC="$M5_ZEC" \
+      --dart-define=VIZOR_PUSD_DEVICE_M6_USD="$M6_USD" \
+      --dart-define=VIZOR_PUSD_DEVICE_M7_USD="$M7_USD" \
+      2>&1 | tee "$OUT/flutter-test-m8-route.log"
+    TEST_STATUS=${PIPESTATUS[0]}
+  fi
+  if [[ $M5 == 0 && $M6 == 0 && $M7 == 0 && $M8_ROUTE == 0 ]]; then
     log "running the integration test (fresh page storage: $fresh, Tor first sync: $TOR_FIRST_SYNC)"
     fvm flutter test integration_test/private_usd_device_test.dart \
       -d "$SERIAL" --tags private-usd-device --run-skipped --no-uninstall \
@@ -319,6 +392,19 @@ if [[ $RUN_TEST == 1 ]]; then
   stop_pid "$SAMPLER_PID"
   stop_pid "$LOGCAT_PID"
   log "integration test exit status: $TEST_STATUS"
+fi
+
+# ── The keyed RPC in the app's files (M8.3) ───────────────────────────
+
+if [[ -n $KEYED_RPC ]]; then
+  # run-as needs the debug build the test left; stop the app so its
+  # databases are not mid-write.
+  adb_ shell am force-stop "$PACKAGE" || true
+  set +e
+  python3 -I scripts/private-usd/device_round.py keyed-rpc-scan --file "$KEYED_RPC" --out "$OUT" --app-files
+  KEYED_FILES_STATUS=$?
+  set -e
+  log "keyed RPC check, app files: status $KEYED_FILES_STATUS"
 fi
 
 # ── 2. The R8 release build loads the page ─────────────────────────────
@@ -359,8 +445,20 @@ if [[ $RUN_RESTORE == 1 ]]; then
   log "installed $PACKAGE now: $(package_state) (restore status $RESTORE_STATUS)"
 fi
 
+# ── The keyed RPC in logcat and the round's logs (M8.3) ───────────────
+
+if [[ -n $KEYED_RPC ]]; then
+  adb_ logcat -d -v threadtime >"$OUT/logcat-final.txt" 2>&1 || true
+  set +e
+  python3 -I scripts/private-usd/device_round.py keyed-rpc-scan --file "$KEYED_RPC" --out "$OUT" --logs
+  KEYED_LOGS_STATUS=$?
+  set -e
+  log "keyed RPC check, logs: status $KEYED_LOGS_STATUS"
+fi
+
 python3 -I scripts/private-usd/device_round.py summarize --out "$OUT" >"$OUT/summary.json" 2>&1 || true
 log "evidence: $OUT"
-if [[ $TEST_STATUS != 0 || $RELEASE_STATUS != 0 || $RESTORE_STATUS != 0 ]]; then
+if [[ $TEST_STATUS != 0 || $RELEASE_STATUS != 0 || $RESTORE_STATUS != 0 \
+  || $KEYED_FILES_STATUS != 0 || $KEYED_LOGS_STATUS != 0 ]]; then
   exit 1
 fi

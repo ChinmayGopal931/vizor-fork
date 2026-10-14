@@ -14,9 +14,27 @@ $ANDROID_SERIAL. Run it with `python3 -I`.
                                 release build, which has no test harness.
   probe [--onionoo]             One sample of what `serve` checks, printed.
   summarize --out DIR           Digest of a round's evidence.
+  keyed-rpc-check --file F [--require sepolia|mainnet]
+                                Checks a --dart-define-from-file JSON with the
+                                keyed Ethereum RPC URLs (E6): https, on a host
+                                the app accepts, with a key in its path or
+                                query. Prints the hosts only.
+  keyed-rpc-scan --file F --out DIR (--app-files | --logs)
+                                The M8.3 check: `--app-files` reads the app's
+                                Private USD files (swaps.db with its WAL,
+                                joint.db, the token state) and shared_prefs
+                                with `run-as` (debug builds only) into memory;
+                                `--logs` reads every file in DIR (logcat,
+                                test and build logs, evidence). It looks for
+                                each keyed URL's host and path, and for its
+                                key, and writes keyed-rpc-scan-*.json. Exit 0
+                                clean, 1 found, 2 could not check. It never
+                                prints or writes the URL or the key, only
+                                labels such as "sepolia key".
 
-The M5, M6 and M7 rounds (`run_device_round.sh --m5`, `--m6`, `--m7`) use
-the same `serve` endpoints: their events (`m5-*`, `m6-*`, `m7-*`: the swap
+The M5, M6, M7 and M8 route rounds (`run_device_round.sh --m5`, `--m6`,
+`--m7`, `--m8-route`) use the same `serve` endpoints: their events (`m5-*`,
+`m6-*`, `m7-*`, `m8-*`: the swap
 index, phases, outcomes and timings, never txids, addresses or secrets) and
 screenshots land in the same evidence directory, and `summarize` lists them
 with the rest. The M7 round also asks `serve` for a public ERC-20 balance
@@ -35,10 +53,12 @@ import datetime
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ElementTree
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -492,7 +512,157 @@ def summarize(out):
     verdict_path = os.path.join(out, "release-verdict.json")
     if os.path.exists(verdict_path):
         digest["release"] = json.load(open(verdict_path))
+    for what in ("app-files", "logs"):
+        scan_path = os.path.join(out, f"{KEYED_RPC_SCAN_PREFIX}{what}.json")
+        if os.path.exists(scan_path):
+            scanned = json.load(open(scan_path))
+            digest[f"keyed_rpc_{what}"] = {k: scanned.get(k) for k in ("verdict", "files", "matches", "error")}
     print(json.dumps(digest, indent=2))
+
+
+# ── keyed-rpc-check / keyed-rpc-scan: the keyed RPC never leaks (M8.3) ──
+
+# The defines and the hosts the app accepts for each (reference §7.3;
+# `privateUsdKeyedRpcUrl` drops any other host).
+KEYED_RPC_DEFINES = {
+    "sepolia": ("VIZOR_ETHEREUM_RPC_URL_SEPOLIA", {"eth-sepolia.g.alchemy.com", "sepolia.infura.io"}),
+    "mainnet": ("VIZOR_ETHEREUM_RPC_URL_MAINNET", {"eth-mainnet.g.alchemy.com", "mainnet.infura.io"}),
+}
+KEYED_RPC_SCAN_PREFIX = "keyed-rpc-scan-"
+# What `--app-files` reads: the Private USD directory and token state, and
+# the app's SharedPreferences (relative to the app's data directory).
+APP_FILES_FIND = r"find . -type f \( -path '*private_usd*' -o -path './shared_prefs/*' \)"
+
+
+class KeyedRpcError(Exception):
+    """A check that could not run. Its message never quotes a URL."""
+
+
+def keyed_rpc_needles(path):
+    """[(label, bytes)] to look for, per keyed URL in the define file: its
+    host and path (also JSON-escaped, as org.json writes `/`), and each path or
+    query part long enough to be its key. Only the labels ever leave here."""
+    try:
+        with open(path, "rb") as f:
+            defines = json.loads(f.read())
+    except (OSError, ValueError):
+        raise KeyedRpcError("the define file is not readable JSON") from None
+    if not isinstance(defines, dict):
+        raise KeyedRpcError("the define file is not a JSON object")
+    needles = {}
+    for network, (define, hosts) in KEYED_RPC_DEFINES.items():
+        value = defines.get(define)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            continue
+        if not isinstance(value, str):
+            raise KeyedRpcError(f"{define} is not a string")
+        try:
+            parts = urllib.parse.urlsplit(value.strip())
+            port = parts.port
+        except ValueError:
+            raise KeyedRpcError(f"{define} is not a URL") from None
+        if parts.scheme != "https" or parts.hostname not in hosts or port not in (None, 443):
+            raise KeyedRpcError(f"{define} must be https on {' or '.join(sorted(hosts))}; the app drops any other URL")
+        keys = [part for part in re.split(r"[/?&=;]", f"{parts.path}?{parts.query}") if len(part) >= 12]
+        if not keys:
+            raise KeyedRpcError(f"{define} has no key in its path or query")
+        host_path = f"{parts.netloc}{parts.path}" + (f"?{parts.query}" if parts.query else "")
+        needles[network] = [
+            (f"{network} host+path", host_path.encode()),
+            (f"{network} host+path (JSON-escaped)", host_path.replace("/", "\\/").encode()),
+            *[(f"{network} key" + (f" {i + 1}" if len(keys) > 1 else ""), key.encode()) for i, key in enumerate(keys)],
+        ]
+    if not needles:
+        raise KeyedRpcError("the define file sets no keyed RPC URL")
+    return needles
+
+
+def keyed_rpc_check(path, require):
+    try:
+        needles = keyed_rpc_needles(path)
+    except KeyedRpcError as error:
+        print(f"keyed RPC: {error}", file=sys.stderr)
+        return 2
+    if require and require not in needles:
+        print(f"keyed RPC: the round runs on {require}: set {KEYED_RPC_DEFINES[require][0]}", file=sys.stderr)
+        return 2
+    for network, items in needles.items():
+        host = urllib.parse.urlsplit(json.load(open(path))[KEYED_RPC_DEFINES[network][0]].strip()).hostname
+        print(f"keyed RPC: {network} on {host}; {len(items)} patterns to look for")
+    return 0
+
+
+def scan(data, needles):
+    """{label: count} of the needles found in data."""
+    return {label: data.count(needle) for label, needle in needles if needle in data}
+
+
+def app_files(package=PACKAGE):
+    """(path, bytes) of each file APP_FILES_FIND lists, read with run-as into
+    memory and checked against its size. Raises when anything is unreadable."""
+    listing = shell(f"run-as {package} {APP_FILES_FIND}")
+    paths = sorted(line.strip() for line in listing.splitlines() if line.strip().startswith("./"))
+    if not paths:
+        raise KeyedRpcError(f"run-as found no Private USD file or preference in {package}")
+    sizes = {}
+    stat = shell(f"run-as {package} stat -c '%s %n' " + " ".join(shlex.quote(p) for p in paths))
+    for line in stat.splitlines():
+        size, _, name = line.strip().partition(" ")
+        if size.isdigit():
+            sizes[name] = int(size)
+    for path in paths:
+        for attempt in range(2):
+            data = adb("exec-out", f"run-as {package} cat {shlex.quote(path)}", binary=True, timeout=600)
+            if path not in sizes or len(data) == sizes[path]:
+                break
+            if attempt:
+                raise KeyedRpcError(f"{path}: read {len(data)} bytes of {sizes[path]}")
+        yield path, data
+
+
+def keyed_rpc_scan(path, out, what):
+    """Scans the app's files or the round's logs; writes the verdict."""
+    record = {"what": what, "verdict": "error", "patterns": [], "files": 0, "bytes": 0, "matches": []}
+    try:
+        groups = keyed_rpc_needles(path)
+        needles = [needle for items in groups.values() for needle in items]
+        record["patterns"] = [label for label, _ in needles]
+        if what == "app-files":
+            sources = app_files()
+        else:
+            sources = (
+                (entry.name, open(entry.path, "rb").read())
+                for entry in sorted(os.scandir(out), key=lambda e: e.name)
+                if entry.is_file(follow_symlinks=False) and not entry.name.startswith(KEYED_RPC_SCAN_PREFIX)
+            )
+        for name, data in sources:
+            record["files"] += 1
+            record["bytes"] += len(data)
+            if what == "app-files" and name.endswith("/swaps.db"):
+                record["swaps_db"] = True
+            for label, count in scan(data, needles).items():
+                record["matches"].append({"file": name, "pattern": label, "count": count})
+        if record["files"] == 0:
+            raise KeyedRpcError("nothing to scan")
+        record["verdict"] = "found" if record["matches"] else "clean"
+    except (KeyedRpcError, RuntimeError, OSError, subprocess.SubprocessError) as error:
+        # adb's own messages quote only the command, never file contents.
+        record["error"] = f"{type(error).__name__}: {error}"
+    os.makedirs(out, exist_ok=True)
+    with open(os.path.join(out, f"{KEYED_RPC_SCAN_PREFIX}{what}.json"), "w") as f:
+        json.dump(record, f, indent=2)
+    summary = f"{record['files']} files, {record['bytes'] / 1e6:.1f} MB, {len(record['patterns'])} patterns"
+    if record["verdict"] == "clean":
+        if what == "app-files" and not record.get("swaps_db"):
+            summary += "; no swaps.db yet (no conversion on this wallet)"
+        print(f"keyed RPC scan ({what}): clean; {summary}")
+        return 0
+    if record["verdict"] == "found":
+        for match in record["matches"]:
+            print(f"keyed RPC scan ({what}): FOUND {match['pattern']} in {match['file']} (x{match['count']})")
+        return 1
+    print(f"keyed RPC scan ({what}): could not check: {record['error']}", file=sys.stderr)
+    return 2
 
 
 def main():
@@ -509,8 +679,18 @@ def main():
     probe_parser.add_argument("--onionoo", action="store_true")
     summarize_parser = sub.add_parser("summarize")
     summarize_parser.add_argument("--out", required=True)
+    check_parser = sub.add_parser("keyed-rpc-check")
+    check_parser.add_argument("--file", required=True)
+    check_parser.add_argument("--require", choices=sorted(KEYED_RPC_DEFINES))
+    scan_parser = sub.add_parser("keyed-rpc-scan")
+    scan_parser.add_argument("--file", required=True)
+    scan_parser.add_argument("--out", required=True)
+    scan_what = scan_parser.add_mutually_exclusive_group(required=True)
+    scan_what.add_argument("--app-files", action="store_true")
+    scan_what.add_argument("--logs", action="store_true")
     args = parser.parse_args()
-    if args.command != "summarize" and not os.environ.get("ANDROID_SERIAL"):
+    local = args.command in ("summarize", "keyed-rpc-check") or (args.command == "keyed-rpc-scan" and args.logs)
+    if not local and not os.environ.get("ANDROID_SERIAL"):
         sys.exit("set ANDROID_SERIAL")
     if args.command == "serve":
         serve(args.port, args.out)
@@ -520,6 +700,10 @@ def main():
         print(json.dumps(probe(["renderer", "listen", "mem", "sockets"], onionoo=args.onionoo), indent=2))
     elif args.command == "summarize":
         summarize(args.out)
+    elif args.command == "keyed-rpc-check":
+        sys.exit(keyed_rpc_check(args.file, args.require))
+    elif args.command == "keyed-rpc-scan":
+        sys.exit(keyed_rpc_scan(args.file, args.out, "app-files" if args.app_files else "logs"))
 
 
 if __name__ == "__main__":

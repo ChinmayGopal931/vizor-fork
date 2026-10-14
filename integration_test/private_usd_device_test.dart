@@ -47,6 +47,7 @@ import 'package:zcash_wallet/src/rust/api/private_usd.dart' as rust_private_usd;
 import 'package:zcash_wallet/src/rust/api/private_usd.dart'
     show
         ApiForwardOutcome,
+        ApiForwardPhase,
         ApiProvedSend,
         ApiRailgunSendsTerms,
         ApiReversePhase,
@@ -119,6 +120,22 @@ import 'support/mobile_regtest_flow.dart';
 //   resume: before unlock the log holds that send, kept and never posted;
 //           after unlock settlement posts the same kept bytes and it lands,
 //           while nothing is proved again.
+//
+// The M8 route round (plan M8.1) is opt-in too: the runner's `--m8-route`
+// passes VIZOR_PUSD_DEVICE_M8_ROUTE, a comma list of its phases (default
+// forward,reverse,send). It runs on the wallet earlier rounds funded, never
+// resets it, starts with Tor off, reuses the M5, M6 and M7 rounds' screen
+// steps and their amounts, and turns Tor on in the middle of each phase:
+//   forward: a conversion of VIZOR_PUSD_DEVICE_M5_ZEC, once its claim starts;
+//   reverse: a conversion of VIZOR_PUSD_DEVICE_M6_USD back, while the page
+//            proves the payment;
+//   send:    a send of VIZOR_PUSD_DEVICE_M7_USD to a second account's 0zk
+//            address, while the page proves it.
+// Each must fail closed: from the flip on, no host sample shows a direct
+// socket to a Railgun host, and once Tor has connected none shows a socket
+// that is neither loopback nor a Tor relay; a proof the flip cut off pays
+// and keeps nothing. Each must then resume and finish over Tor (Paid,
+// COMPLETE, the send landed), and Tor goes off again before the next phase.
 
 const _driverUrl = String.fromEnvironment('VIZOR_PUSD_DEVICE_DRIVER_URL');
 const _allowReset = bool.fromEnvironment('VIZOR_PUSD_DEVICE_RESET');
@@ -147,6 +164,13 @@ const _m7Usd = String.fromEnvironment(
   defaultValue: '1',
 );
 const _m7To = String.fromEnvironment('VIZOR_PUSD_DEVICE_M7_TO');
+// '' or a comma list of forward, reverse and send: the M8 route round.
+const _m8Route = String.fromEnvironment('VIZOR_PUSD_DEVICE_M8_ROUTE');
+const _m8AllPhases = ['forward', 'reverse', 'send'];
+final _m8Phases = [
+  for (final phase in _m8Route.split(','))
+    if (phase.trim().isNotEmpty) phase.trim(),
+];
 
 const _homeBalanceKey = ValueKey('mobile_home_shielded_balance');
 const _stripKey = ValueKey('mobile_home_private_usd_strip');
@@ -180,8 +204,11 @@ void main() {
   testWidgets('M3: the Private USD balance, Tor and lock on a device', (
     tester,
   ) async {
-    if (_m5Phase.isNotEmpty || _m6Phase.isNotEmpty || _m7Phase.isNotEmpty) {
-      return _log('a conversion or send round: M3 not run');
+    if (_m5Phase.isNotEmpty ||
+        _m6Phase.isNotEmpty ||
+        _m7Phase.isNotEmpty ||
+        _m8Route.isNotEmpty) {
+      return _log('a conversion, send or route round: M3 not run');
     }
     tolerateRenderOverflows();
     _requireRoundSetup();
@@ -230,6 +257,44 @@ void main() {
     _requireM7Setup();
     await _M7Round(tester).resume();
   }, timeout: const Timeout(Duration(minutes: 40)));
+
+  testWidgets('M8 (route): a Tor flip mid-claim, mid-funding and mid-send '
+      'fails closed and resumes', (tester) async {
+    if (_m8Route.isEmpty) return _log('not the M8 route round');
+    tolerateRenderOverflows();
+    _requireM8Setup();
+    await _M8RouteRound(tester).flip();
+  }, timeout: const Timeout(Duration(minutes: 480)));
+}
+
+void _requireM8Setup() {
+  if (!Platform.isAndroid) fail('The swap engine is Android only.');
+  if (kZcashDefaultNetworkName != ZcashNetwork.testnet.name) {
+    fail('Run on testnet: --dart-define=ZCASH_DEFAULT_NETWORK=test.');
+  }
+  if (!kVizorPrivateUsdEnabled || kAppFormFactor != AppFormFactor.mobile) {
+    fail('Build with VIZOR_PRIVATE_USD_ENABLED and VIZOR_FORM_FACTOR=mobile.');
+  }
+  if (_driverUrl.isEmpty) {
+    fail('Run through scripts/private-usd/run_device_round.sh --m8-route.');
+  }
+  // It converts and sends what earlier rounds left: never the reset round.
+  if (_allowReset) fail('An M8 round never resets the wallet.');
+  if (_m8Phases.isEmpty || _m8Phases.any((p) => !_m8AllPhases.contains(p))) {
+    fail('Bad VIZOR_PUSD_DEVICE_M8_ROUTE: a comma list of $_m8AllPhases.');
+  }
+  if (_m8Phases.contains('forward') && parseZecAmount(_m5Zec) == null) {
+    fail('Bad VIZOR_PUSD_DEVICE_M5_ZEC.');
+  }
+  if (_m8Phases.contains('reverse') && privateUsdDollarUnits(_m6Usd) == null) {
+    fail('Bad VIZOR_PUSD_DEVICE_M6_USD: whole cents, more than zero.');
+  }
+  if (_m8Phases.contains('send')) {
+    final units = privateUsdTokenUnits(_m7Usd, 6);
+    if (units == null || units <= BigInt.zero) {
+      fail('Bad VIZOR_PUSD_DEVICE_M7_USD: dollars, more than zero.');
+    }
+  }
 }
 
 void _requireM7Setup() {
@@ -2023,5 +2088,535 @@ class _M7Round extends _Round {
     _results['m7_kill_resend'] = 'landed from the kept bytes; no new proof';
     _log('results: $_results');
     await _event('m7-end', _results);
+  }
+}
+
+/// The M8 route round (opt-in, plan M8.1): the Tor route flips in the middle
+/// of a forward claim, a reverse funding and a private send, on the wallet
+/// earlier rounds funded (never reset). Each phase must fail closed (the
+/// host's `check_sockets.py --onionoo`: no direct socket to a Railgun host
+/// from the flip on, and nothing but loopback and Tor relays once Tor has
+/// connected) and then resume and finish over Tor. It drives the M5, M6 and
+/// M7 rounds' screen steps on its own app. Events carry the swap index,
+/// phases, steps, outcomes and timings only: never an address, a txid, a URL
+/// or a secret.
+class _M8RouteRound extends _Round {
+  _M8RouteRound(super.tester);
+
+  late final _M5Round _forward = _M5Round(tester);
+  late final _M6Round _reverse = _M6Round(tester);
+  late final _M7Round _send = _M7Round(tester);
+  late final GoRouter _router;
+
+  // Host samples with Tor on; memory is sample_device.sh's.
+  static const _sampleChecks = ['renderer', 'listen', 'sockets'];
+
+  Future<void> flip() async {
+    _vmServicePort = (await developer.Service.getInfo()).serverUri?.port;
+    await _event('m8-route-start', {
+      'phases': _m8Phases,
+      'zec': _m5Zec,
+      'usd': _m6Usd,
+      'sendUsd': _m7Usd,
+    });
+    await tester.pumpWidget(await buildBootstrappedZcashWalletApp());
+    await _waitUntil(
+      'the unlock keypad',
+      () => tester.any(find.bySemanticsLabel('Digit 1')),
+      timeout: const Duration(minutes: 2),
+    );
+    await enterPasscode(tester, mobileE2ePasscode);
+    await waitForHome(tester);
+    _container = ProviderScope.containerOf(
+      tester.element(find.byKey(_homeBalanceKey)),
+    );
+    _uuid = _container.read(accountProvider).value!.activeAccountUuid!;
+    _router = GoRouter.of(tester.element(find.byKey(_homeBalanceKey)));
+    expect(_container.read(privateUsdAvailableProvider), isTrue);
+    expect(
+      _container.read(networkPrivacyProvider).torEnabled,
+      isFalse,
+      reason: 'the round starts direct',
+    );
+    // The M5, M6 and M7 rounds' steps, on this round's app.
+    for (final round in <_Round>[_forward, _reverse, _send]) {
+      round
+        .._container = _container
+        .._uuid = _uuid
+        .._vmServicePort = _vmServicePort;
+    }
+    _reverse._router = _router;
+    _send._router = _router;
+
+    if (_m8Phases.contains('forward')) await _flipDuringTheClaim();
+    if (_m8Phases.contains('reverse')) await _flipDuringTheFunding();
+    if (_m8Phases.contains('send')) await _flipDuringTheSend();
+    _log('results: $_results');
+    await _event('m8-route-end', _results);
+  }
+
+  // ── Forward: Tor turns on as the claim starts ──────────────────────
+
+  Future<void> _flipDuringTheClaim() async {
+    final m5 = _forward;
+    final spend = parseZecAmount(_m5Zec)!;
+    PrivateUsdRecordKey? underWay() => privateUsdUnderWayFor(
+      _container.read(privateUsdUnfinishedProvider),
+      _uuid,
+    );
+    await _waitUntil('the wallet to sync with $_m5Zec ZEC spendable', () {
+      final sync = _container.read(syncProvider).value;
+      return sync != null &&
+          sync.isSyncComplete &&
+          (sync.spendableBalance >= spend || underWay() != null);
+    }, timeout: const Duration(minutes: 20));
+    // A forward conversion a died round left is followed, not a new one.
+    final existing = underWay();
+    if (existing == null) {
+      await m5._convertThroughTheScreens();
+    } else if (existing.direction == PrivateUsdDirection.forward) {
+      m5._key = existing;
+      _log('forward: index ${existing.index} is already under way');
+      await tapWidget(tester, _M5Round._bannerKey);
+    } else {
+      _requireNothingUnderWay('forward');
+    }
+    await _event('m8-forward-accepted', {'index': m5._key.index});
+    await _waitUntil(
+      'the claim to start',
+      () =>
+          m5._status?.record.phase == ApiForwardPhase.claiming ||
+          m5._status?.isUnderWay == false,
+      timeout: const Duration(minutes: 60),
+      every: const Duration(minutes: 1),
+      onTick: (_) async =>
+          _log('forward: phase ${m5._status?.record.phase.name}'),
+    );
+    if (m5._status?.isUnderWay != true) {
+      _results['m8_forward'] =
+          'skipped: it ended ${m5._status?.record.phase.name} before its '
+          'claim was seen';
+      await _event('m8-forward-skipped', {'index': m5._key.index});
+      await _goHomeAndWait();
+      return;
+    }
+    await _screenshot('m8-forward-1-claiming');
+    await _event('m8-forward-flip', {'index': m5._key.index});
+    // The step codes seen after the flip: a request the route change cut
+    // off fails its step, which the loop retries over Tor.
+    final problems = <String>{};
+    void noteProblem() {
+      final problem = m5._status?.problem;
+      if (problem != null) problems.add(problem.name);
+    }
+
+    final connected = await _torOn('forward', observe: noteProblem);
+    final samples = <_Checkpoint>[];
+    await _followOverTor(
+      'forward',
+      'the conversion to end over Tor',
+      () {
+        noteProblem();
+        return m5._status?.isUnderWay == false;
+      },
+      phaseName: () => m5._status?.record.phase.name,
+      samples: samples,
+      timeout: const Duration(minutes: 60),
+    );
+    await _screenshot('m8-forward-2-ended');
+    await _checkTorOnly('forward', connected, samples);
+    expect(
+      m5._status?.record.outcome,
+      ApiForwardOutcome.paid,
+      reason: 'the claim did not finish over Tor',
+    );
+    _results['m8_forward'] = 'paid over Tor after a flip as its claim began';
+    _results['m8_forward_problems_after_flip'] = problems.toList();
+    await _torOff('forward');
+    await _goHomeAndWait();
+  }
+
+  // ── Reverse: Tor turns on while the page proves the payment ────────
+
+  Future<void> _flipDuringTheFunding() async {
+    final m6 = _reverse;
+    await m6._waitForDollars();
+    _requireNothingUnderWay('reverse');
+    await m6._convertThroughTheScreens('m8');
+    // "Convert" goes ahead, accepts and starts paying. The page's proof is
+    // the payment's longest step, so the flip lands in it.
+    await _waitUntil(
+      'the payment proof to start',
+      () =>
+          m6._funded ||
+          m6._funding?.stage == PrivateUsdFundingStage.proving ||
+          m6._funding?.error != null,
+      timeout: const Duration(minutes: 5),
+    );
+    final stage = m6._funded
+        ? 'paid'
+        : (m6._funding?.stage?.name ?? 'not running');
+    await _screenshot('m8-reverse-1-flip');
+    await _event('m8-reverse-flip', {'index': m6._key.index, 'stage': stage});
+    final connected = await _torOn('reverse');
+    await _waitUntil(
+      'the payment the flip met to stop',
+      () => m6._funded || m6._funding?.running != true,
+      timeout: const Duration(minutes: 10),
+    );
+    // A proof the route change cut off is dropped: there is nothing to pay
+    // with. One that finished as the route changed is submitted, and from
+    // the flip on only through Tor (the samples).
+    await _container.read(privateUsdEngineProvider).loadReverseRecords(_uuid);
+    _results['m8_reverse_flip'] = m6._funded
+        ? '$stage: paid as the route changed'
+        : '$stage: cut off, nothing paid';
+    // Resumes: "Pay" proves again, on a page reopened over Tor.
+    final samples = <_Checkpoint>[];
+    var pays = 0;
+    Future<void> payAgain() async {
+      if (m6._funded ||
+          m6._funding?.running == true ||
+          m6._phase != ApiReversePhase.awaitingFunding ||
+          pays >= 3) {
+        return;
+      }
+      pays++;
+      await _event('m8-reverse-pay', {'index': m6._key.index, 'try': pays});
+      await _onReverseProgress();
+      await tapAppButton(
+        tester,
+        _M6Round._actionKey,
+        timeout: const Duration(minutes: 2),
+      );
+    }
+
+    await payAgain();
+    await _waitUntil(
+      'the payment over Tor',
+      () => m6._funded || m6._status?.isUnderWay == false,
+      timeout: const Duration(minutes: 30),
+      every: const Duration(seconds: 30),
+      onTick: (elapsed) async {
+        samples.add(
+          await _checkpoint(
+            'm8-reverse-tor-pay-${elapsed.inSeconds}s',
+            checks: _sampleChecks,
+          ),
+        );
+        await payAgain();
+      },
+    );
+    expect(
+      m6._funded,
+      isTrue,
+      reason: 'nothing was paid over Tor (${m6._phase?.name})',
+    );
+    await _screenshot('m8-reverse-2-paid');
+    await _event('m8-reverse-paid', {'index': m6._key.index, 'pays': pays});
+    await _followOverTor(
+      'reverse',
+      'settlement to be asked for',
+      () =>
+          m6._phase == ApiReversePhase.awaitingReady ||
+          m6._status?.isUnderWay == false,
+      phaseName: () => m6._phase?.name,
+      samples: samples,
+      timeout: const Duration(minutes: 60),
+    );
+    expect(m6._phase, ApiReversePhase.awaitingReady);
+    await _onReverseProgress();
+    await tapAppButton(tester, _M6Round._actionKey);
+    await _followOverTor(
+      'reverse',
+      'the conversion to complete',
+      () => m6._status?.isUnderWay == false,
+      phaseName: () => m6._phase?.name,
+      samples: samples,
+      timeout: const Duration(minutes: 45),
+    );
+    await _screenshot('m8-reverse-3-ended');
+    await _checkTorOnly('reverse', connected, samples);
+    expect(m6._phase, ApiReversePhase.complete);
+    _results['m8_reverse'] = 'complete over Tor after a flip mid-funding';
+    _results['m8_reverse_pays'] = pays;
+    await _torOff('reverse');
+    await _goHomeAndWait();
+  }
+
+  /// The reverse conversion's progress screen, through its banner if needed.
+  Future<void> _onReverseProgress() async {
+    if (tester.any(find.byKey(_M6Round._progressKey))) return;
+    await _goHomeAndWait();
+    await tapWidget(tester, _M6Round._bannerKey);
+    await _waitUntil(
+      'the reverse progress screen',
+      () => tester.any(find.byKey(_M6Round._progressKey)),
+    );
+  }
+
+  // ── Send: Tor turns on while the page proves a send ────────────────
+
+  Future<void> _flipDuringTheSend() async {
+    final m7 = _send;
+    const mode = PrivateUsdSendMode.private;
+    PrivateUsdSendForm form() => _container.read(privateUsdSendProvider(mode));
+    _requireNothingUnderWay('send');
+    final other = await m7._secondAccount();
+    final otherAddress = await _container.read(
+      privateUsdReceiveAddressProvider(other).future,
+    );
+    await m7._switchTo(_uuid);
+    await m7._waitForDollars();
+    final backend = _container.read(privateUsdSendBackendProvider);
+    final before = {for (final row in await backend.list(_uuid)) row.sendId};
+    await m7._sendThroughTheScreens(mode, otherAddress, 'm8');
+    await _waitUntil(
+      'the send to prove',
+      () =>
+          form().step == PrivateUsdSendStep.proving ||
+          form().phase != PrivateUsdSendPhase.sending,
+      timeout: const Duration(minutes: 5),
+    );
+    final step = form().phase == PrivateUsdSendPhase.sending
+        ? (form().step?.name ?? 'sending')
+        : form().phase.name;
+    await _event('m8-send-flip', {'step': step});
+    final connected = await _torOn('send');
+    final samples = <_Checkpoint>[];
+    await _waitUntil(
+      'the send the flip met to end',
+      () => form().phase != PrivateUsdSendPhase.sending,
+      timeout: const Duration(minutes: 15),
+    );
+    await _screenshot('m8-send-1-after-flip');
+    if (form().phase == PrivateUsdSendPhase.done) {
+      // Kept before the flip: its post or settlement goes over Tor.
+      _results['m8_send_flip'] = '$step: kept (${form().outcome.runtimeType})';
+    } else {
+      // Failed closed: cut off before it was kept, nothing was kept.
+      expect(
+        form().phase,
+        PrivateUsdSendPhase.review,
+        reason: 'the cut-off send left its review',
+      );
+      final kept = {for (final row in await backend.list(_uuid)) row.sendId};
+      expect(
+        kept.difference(before),
+        isEmpty,
+        reason: 'a send the route change cut off was kept',
+      );
+      _results['m8_send_flip'] = '$step: cut off, nothing kept';
+      // Resumes: the same review sends it again, over Tor.
+      await tapAppButton(
+        tester,
+        _M7Round._confirmKey,
+        timeout: const Duration(minutes: 2),
+      );
+      await _waitUntil(
+        'the send status',
+        () => tester.any(find.byKey(_M7Round._statusKey)),
+      );
+      await _waitUntil(
+        'the send over Tor',
+        () => form().phase != PrivateUsdSendPhase.sending,
+        timeout: const Duration(minutes: 20),
+        every: const Duration(seconds: 30),
+        onTick: (elapsed) async => samples.add(
+          await _checkpoint(
+            'm8-send-tor-${elapsed.inSeconds}s',
+            checks: _sampleChecks,
+          ),
+        ),
+      );
+    }
+    final outcome = await m7._outcome(mode, 'm8');
+    _results['m8_send_outcome'] = outcome.runtimeType.toString();
+    // One payment, one kept proof, and it lands over Tor.
+    await _waitUntil(
+      'the send to land over Tor',
+      () async {
+        final rows = await backend.list(_uuid);
+        return rows.every((row) => row.state == ApiSendState.confirmed);
+      },
+      timeout: const Duration(minutes: 30),
+      every: const Duration(seconds: 30),
+      onTick: (elapsed) async {
+        samples.add(
+          await _checkpoint(
+            'm8-send-tor-landing-${elapsed.inSeconds}s',
+            checks: _sampleChecks,
+          ),
+        );
+        await _container.read(privateUsdSenderProvider).settle(_uuid);
+      },
+    );
+    final after = {for (final row in await backend.list(_uuid)) row.sendId};
+    expect(
+      after.difference(before),
+      hasLength(1),
+      reason: 'one send must keep exactly one proof',
+    );
+    await _checkTorOnly('send', connected, samples);
+    _results['m8_send'] = 'landed over Tor after a flip mid-proof';
+    await _torOff('send');
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────
+
+  Future<void> _goHomeAndWait() async {
+    _router.go('/home');
+    await waitForHome(tester);
+  }
+
+  /// One conversion at a time per account, and the spend guard holds sends
+  /// while one is under way; these phases start their own.
+  void _requireNothingUnderWay(String phase) {
+    final underWay = privateUsdUnderWayFor(
+      _container.read(privateUsdUnfinishedProvider),
+      _uuid,
+    );
+    if (underWay != null) {
+      fail(
+        '$phase: a ${underWay.direction.name} conversion is under way '
+        '(index ${underWay.index}); let it finish first (its banner, or the '
+        '--m5 or --m6 round).',
+      );
+    }
+  }
+
+  /// Turns Tor on mid-phase. The route change closes the page and stops its
+  /// bridge at once; from then on no sample may show a direct socket to a
+  /// Railgun host, while Tor connects (sampled every 15 s) or after. Returns
+  /// the sample taken as Tor connected.
+  Future<_Checkpoint> _torOn(String phase, {void Function()? observe}) async {
+    _log('$phase: Tor on');
+    final privacy = _container.read(networkPrivacyProvider.notifier);
+    final started = DateTime.now();
+    unawaited(privacy.setTorEnabled(true));
+    await _waitUntil(
+      'the route change to close the page',
+      () async => !(await _host.isOpen()),
+    );
+    final connecting = <_Checkpoint>[];
+    await _waitUntil(
+      'Tor to connect',
+      () {
+        observe?.call();
+        final state = _container.read(networkPrivacyProvider);
+        if (state.status == NetworkPrivacyConnectionStatus.failed) {
+          fail('Tor failed: ${state.error}');
+        }
+        return state.torEnabled &&
+            state.status == NetworkPrivacyConnectionStatus.connected;
+      },
+      timeout: const Duration(minutes: 4),
+      every: const Duration(seconds: 15),
+      onTick: (elapsed) async => connecting.add(
+        await _checkpoint(
+          'm8-$phase-connecting-${elapsed.inSeconds}s',
+          checks: _sampleChecks,
+        ),
+      ),
+    );
+    final seconds = _Round._seconds(DateTime.now().difference(started));
+    _results['m8_${phase}_tor_connect_s'] = seconds;
+    await _event('m8-$phase-tor-connected', {'seconds': seconds});
+    final connected = await _checkpoint(
+      'm8-$phase-tor-connected',
+      checks: _sampleChecks,
+    );
+    _results['m8_${phase}_connecting_samples'] = connecting.length;
+    for (final sample in [...connecting, connected]) {
+      expect(
+        sample.sockets('railgun-host'),
+        0,
+        reason: '$phase: a direct Railgun socket after the flip: $sample',
+      );
+    }
+    return connected;
+  }
+
+  Future<void> _torOff(String phase) async {
+    _log('$phase: Tor off');
+    final privacy = _container.read(networkPrivacyProvider.notifier);
+    unawaited(privacy.setTorEnabled(false));
+    await _waitUntil('Tor to turn off', () {
+      final state = _container.read(networkPrivacyProvider);
+      return !state.torEnabled &&
+          state.status == NetworkPrivacyConnectionStatus.off;
+    }, timeout: const Duration(minutes: 2));
+  }
+
+  /// Waits for [done] with Tor on, sampling the host every minute into
+  /// [samples] and recording each phase change as an event.
+  Future<void> _followOverTor(
+    String phase,
+    String description,
+    bool Function() done, {
+    required String? Function() phaseName,
+    required List<_Checkpoint> samples,
+    required Duration timeout,
+  }) async {
+    String? last;
+    await _waitUntil(
+      description,
+      done,
+      timeout: timeout,
+      every: const Duration(minutes: 1),
+      onTick: (elapsed) async {
+        samples.add(
+          await _checkpoint(
+            'm8-$phase-tor-${elapsed.inSeconds}s',
+            checks: _sampleChecks,
+          ),
+        );
+        final now = phaseName();
+        if (now != last) {
+          last = now;
+          await _event('m8-$phase-phase', {
+            'phase': now,
+            'afterS': elapsed.inSeconds,
+          });
+        }
+      },
+    );
+  }
+
+  /// With Tor on, the app's traffic leaves the phone only through Tor. The
+  /// sample taken as Tor connected counted for Railgun hosts only (sockets
+  /// the direct route opened before the flip may still be closing, as in
+  /// M3); every later one, and a last one now, must show nothing but
+  /// loopback and Tor relays.
+  Future<void> _checkTorOnly(
+    String phase,
+    _Checkpoint connected,
+    List<_Checkpoint> samples,
+  ) async {
+    samples.add(await _checkpoint('m8-$phase-tor-end', checks: _sampleChecks));
+    final railgunHost = samples.fold<int>(
+      0,
+      (n, s) => n + s.sockets('railgun-host'),
+    );
+    final unexplained = [
+      for (final sample in samples)
+        if (sample.sockets('unexplained') > 0) sample,
+    ];
+    _results['m8_${phase}_connected_sample'] = connected.socketCounts;
+    _results['m8_${phase}_tor_samples'] = samples.length;
+    _results['m8_${phase}_railgun_host_total'] = railgunHost;
+    _results['m8_${phase}_unexplained_samples'] = unexplained.length;
+    _results['m8_${phase}_tor_relay_total'] = samples.fold<int>(
+      0,
+      (n, s) => n + s.sockets('tor-relay'),
+    );
+    expect(railgunHost, 0, reason: '$phase: a direct Railgun socket, Tor on');
+    expect(
+      unexplained,
+      isEmpty,
+      reason:
+          '$phase: a socket that is neither loopback nor a Tor relay with '
+          'Tor on: ${[for (final s in unexplained) '${s.name} ${s.socketLines}']}',
+    );
   }
 }
