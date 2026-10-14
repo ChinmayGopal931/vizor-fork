@@ -51,7 +51,8 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   `zakura-protocol =2.2.0` pin (bumped locally, uncommitted, in
   `~/dev/zapp/zecSwap-zakura/crates/zecswap-core/Cargo.toml` lines 21 and
   31); upstream vizor has the same testnet NU7 gap; N1 (tokens, M4), E6, E7,
-  E2/E4, and sign-off for M8.7.
+  E4, and sign-off for M8.7. E2 (relicensing) is dropped: the owner said
+  none is needed (2026-10-14); sign off at the end, then commit and push.
 
 ## M0. Prerequisites and spikes (go/no-go)
 

@@ -1768,9 +1768,14 @@ class _M6Round extends _Round {
           _status?.isUnderWay == false,
       timeout: const Duration(minutes: 60),
     );
-    expect(_phase, ApiReversePhase.awaitingReady);
-    await _screenshot('m6-04-authorize');
-    await tapAppButton(tester, _actionKey);
+    // A conversion an earlier run already authorized (or finished) has gone
+    // past the ask; only a conversion still asking is authorized here.
+    if (_phase == ApiReversePhase.awaitingReady) {
+      await _screenshot('m6-04-authorize');
+      await tapAppButton(tester, _actionKey);
+    } else {
+      _log('settlement was authorized earlier: ${_phase?.name}');
+    }
     await _followUntil(
       'the conversion to complete',
       () => _status?.isUnderWay == false,
