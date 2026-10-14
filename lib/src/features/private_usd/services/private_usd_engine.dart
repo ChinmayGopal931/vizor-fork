@@ -113,6 +113,74 @@ class PrivateUsdConversionStatus {
   );
 }
 
+/// Whether a reverse conversion in [phase] is under way: past its `quoted`
+/// draft and not ended (reference §5.7; drafts are never advanced).
+bool privateUsdReverseUnderWay(rust.ApiReversePhase phase) => switch (phase) {
+  rust.ApiReversePhase.quoted ||
+  rust.ApiReversePhase.complete ||
+  rust.ApiReversePhase.refunded ||
+  rust.ApiReversePhase.cancelled => false,
+  _ => true,
+};
+
+/// What the loop knows about one reverse conversion (M6): the record as
+/// Rust last returned it, the step running now, and the problem to show once
+/// its steps have failed for [PrivateUsdEngineTiming.problemAfter].
+@immutable
+class PrivateUsdReverseStatus {
+  const PrivateUsdReverseStatus({
+    required this.record,
+    this.activity,
+    this.problem,
+    this.failingSince,
+    this.resuming = false,
+    this.checkedAt,
+  });
+
+  final rust.ApiReverseRecord record;
+  final rust.ApiActivity? activity;
+  final rust.ApiPrivateUsdErrorCode? problem;
+  final DateTime? failingSince;
+  final bool resuming;
+  final DateTime? checkedAt;
+
+  bool get isUnderWay => privateUsdReverseUnderWay(record.phase);
+
+  /// Waiting on the user's payment or settlement approval: the banner turns
+  /// to "Conversion needs attention" (an advance's `needs_you`).
+  bool get needsYou => record.awaitingUser;
+
+  PrivateUsdReverseStatus copyWith({
+    rust.ApiReverseRecord? record,
+    rust.ApiActivity? activity,
+    bool clearActivity = false,
+    rust.ApiPrivateUsdErrorCode? problem,
+    bool clearProblem = false,
+    DateTime? failingSince,
+    bool clearFailingSince = false,
+    bool? resuming,
+    DateTime? checkedAt,
+  }) => PrivateUsdReverseStatus(
+    record: record ?? this.record,
+    activity: clearActivity ? null : (activity ?? this.activity),
+    problem: clearProblem ? null : (problem ?? this.problem),
+    failingSince: clearFailingSince
+        ? null
+        : (failingSince ?? this.failingSince),
+    resuming: resuming ?? this.resuming,
+    checkedAt: checkedAt ?? this.checkedAt,
+  );
+}
+
+/// The engine's moment when a long step outside its queue began (the page's
+/// funding proof, up to 10 minutes): a call bound to it never starts once
+/// the engine paused, drained or moved on since.
+class PrivateUsdEngineTicket {
+  const PrivateUsdEngineTicket._(this._epoch);
+
+  final int _epoch;
+}
+
 /// The foreground swap loop (plan reference §5.10, D9, D14): it advances
 /// every account's conversions under way while the app is open, in the
 /// foreground and unlocked, and not while a deletion or reset drains it.
@@ -161,7 +229,14 @@ class PrivateUsdEngine {
         const {},
       );
 
+  /// Every reverse conversion the engine has seen (drafts too), by key.
+  final reverseConversions =
+      ValueNotifier<Map<PrivateUsdRecordKey, PrivateUsdReverseStatus>>(
+        const {},
+      );
+
   final _statuses = <PrivateUsdRecordKey, PrivateUsdConversionStatus>{};
+  final _reverse = <PrivateUsdRecordKey, PrivateUsdReverseStatus>{};
   final _tails = <String, Future<void>>{};
   final _running = <Future<void>>{};
   final _inFlight = <int>{};
@@ -278,9 +353,149 @@ class PrivateUsdEngine {
         if (epoch != _epoch) return null;
         if (next != null) nap = _shorter(nap, next);
       }
+      // Reverse conversions under way (M6). A `quoted` draft is never
+      // advanced, and the loop never sends a rescue.
+      final List<rust.ApiReverseRecord> reverse;
+      try {
+        reverse = await loadReverseRecords(account);
+      } catch (error) {
+        _debugLog('reading conversions failed (${error.runtimeType})');
+        nap = _shorter(nap, PrivateUsdEngineTiming.restart);
+        continue;
+      }
+      if (epoch != _epoch) return null;
+      for (final record in reverse) {
+        if (!privateUsdReverseUnderWay(record.phase)) continue;
+        final next = await _advanceReverse(account, record, epoch);
+        if (epoch != _epoch) return null;
+        if (next != null) nap = _shorter(nap, next);
+      }
     }
     _resumeLoaded = false;
     return nap;
+  }
+
+  /// Advances one reverse conversion; the nap it asks for, or null once it
+  /// ended.
+  Future<Duration?> _advanceReverse(
+    String accountUuid,
+    rust.ApiReverseRecord record,
+    int epoch,
+  ) async {
+    final key = PrivateUsdRecordKey(
+      accountUuid: accountUuid,
+      direction: PrivateUsdDirection.reverse,
+      index: record.index,
+    );
+    Timer? poller;
+    try {
+      final result = await _queue(accountUuid, epoch, (opId, secret) {
+        poller = Timer.periodic(
+          PrivateUsdEngineTiming.activityPoll,
+          (_) => _showReverseActivity(key, opId),
+        );
+        return _backend.reverseAdvance(
+          accountUuid,
+          secret,
+          opId: opId,
+          index: record.index,
+        );
+      });
+      _advancedReverse(key, result);
+      if (!privateUsdReverseUnderWay(result.record.phase)) return null;
+      final asked = Duration(milliseconds: result.nextPollMs);
+      return asked < PrivateUsdEngineTiming.minNap
+          ? PrivateUsdEngineTiming.minNap
+          : asked;
+    } on rust.ApiPrivateUsdError catch (error) {
+      switch (error.code) {
+        case rust.ApiPrivateUsdErrorCode.cancelled:
+        case rust.ApiPrivateUsdErrorCode.busy:
+          break;
+        default:
+          _failedReverse(key, record, _problemOf(error.code));
+      }
+      return PrivateUsdEngineTiming.retry;
+    } on PrivateUsdEngineInterruptedException {
+      return PrivateUsdEngineTiming.retry;
+    } on PrivateUsdEngineUnavailableException {
+      return PrivateUsdEngineTiming.retry;
+    } on PrivateUsdKeyLockedException {
+      return PrivateUsdEngineTiming.retry;
+    } catch (error) {
+      _debugLog('an advance failed (${error.runtimeType})');
+      _failedReverse(key, record, rust.ApiPrivateUsdErrorCode.other);
+      return PrivateUsdEngineTiming.retry;
+    } finally {
+      poller?.cancel();
+      final status = _reverse[key];
+      if (status != null && status.activity != null) {
+        _putReverse(key, status.copyWith(clearActivity: true));
+      }
+    }
+  }
+
+  void _advancedReverse(
+    PrivateUsdRecordKey key,
+    rust.ApiReverseAdvance result,
+  ) {
+    final now = _now();
+    final problem = result.problem;
+    if (problem == null) {
+      _putReverse(
+        key,
+        PrivateUsdReverseStatus(record: result.record, checkedAt: now),
+      );
+      return;
+    }
+    final since = _reverse[key]?.failingSince ?? now;
+    _putReverse(
+      key,
+      PrivateUsdReverseStatus(
+        record: result.record,
+        problem: _shows(since, now) ? problem : null,
+        failingSince: since,
+        checkedAt: now,
+      ),
+    );
+  }
+
+  void _failedReverse(
+    PrivateUsdRecordKey key,
+    rust.ApiReverseRecord record,
+    rust.ApiPrivateUsdErrorCode problem,
+  ) {
+    final now = _now();
+    final previous = _reverse[key] ?? PrivateUsdReverseStatus(record: record);
+    final since = previous.failingSince ?? now;
+    _putReverse(
+      key,
+      previous.copyWith(
+        problem: _shows(since, now) ? problem : null,
+        clearProblem: !_shows(since, now),
+        failingSince: since,
+        resuming: false,
+        checkedAt: now,
+        clearActivity: true,
+      ),
+    );
+  }
+
+  void _showReverseActivity(PrivateUsdRecordKey key, int opId) {
+    final rust.ApiActivity? activity;
+    try {
+      activity = _backend.activity(opId);
+    } catch (_) {
+      return;
+    }
+    final status = _reverse[key];
+    if (status == null || status.activity == activity) return;
+    _putReverse(
+      key,
+      activity == null
+          ? status.copyWith(clearActivity: true)
+          : status.copyWith(activity: activity),
+    );
   }
 
   /// Advances one conversion; the nap it asks for, or null once it ended.
@@ -582,7 +797,7 @@ class PrivateUsdEngine {
     _statuses.removeWhere(
       (key, _) => key.accountUuid == accountUuid && !seen.contains(key),
     );
-    _publish();
+    _publishForward();
     return records;
   }
 
@@ -622,8 +837,261 @@ class PrivateUsdEngine {
       next = previous.copyWith(record: record);
     }
     _statuses[key] = next;
-    if (publish) _publish();
+    if (publish) _publishForward();
     return key;
+  }
+
+  // ── Reverse calls (M6) ─────────────────────────────────────────────
+
+  /// The engine's moment now, for a step that runs outside the queue (the
+  /// page's funding proof) and must be dropped if the engine paused since.
+  PrivateUsdEngineTicket ticket() => PrivateUsdEngineTicket._(_epoch);
+
+  /// Whether [ticket] still holds: no lock, background or drain since it
+  /// was taken, and the app is in the foreground and unlocked now.
+  bool isCurrent(PrivateUsdEngineTicket ticket) =>
+      ticket._epoch == _epoch && canRun;
+
+  /// Quotes [units] for a fresh swap index and keeps the unpriced draft (it
+  /// replaces an earlier one). Like a forward quote, a result that lands
+  /// after a pause still counts: the index is spent either way.
+  Future<rust.ApiReverseQuote> reverseQuote(
+    String accountUuid, {
+    required int units,
+  }) async {
+    final quote = await runFor(
+      accountUuid,
+      (_, secret) => _backend.reverseQuote(accountUuid, secret, units: units),
+      dropLateResult: false,
+    );
+    _mergeReverse(accountUuid, quote.record);
+    return quote;
+  }
+
+  /// The page's `reverseCost` params for [index] now: a read, off the queue.
+  Future<rust.ApiReverseCostRequest> reverseCostRequest(
+    String accountUuid, {
+    required int index,
+  }) {
+    if (_disposed || _quiesceDepth > 0) {
+      return Future.error(const PrivateUsdEngineUnavailableException());
+    }
+    return _backend.reverseCostRequest(accountUuid, index: index);
+  }
+
+  /// Keeps the page's price for [index].
+  Future<rust.ApiReverseRecord> reverseSetCost(
+    String accountUuid, {
+    required int index,
+    required String debit,
+    required String railgunFee,
+  }) => _reverseStep(
+    accountUuid,
+    (_, _) => _backend.reverseSetCost(
+      accountUuid,
+      index: index,
+      debit: debit,
+      railgunFee: railgunFee,
+    ),
+  );
+
+  /// The user's "Convert": goes ahead with [index] (`accepting`).
+  Future<rust.ApiReverseRecord> reverseGoAhead(
+    String accountUuid, {
+    required int index,
+  }) => _reverseStep(
+    accountUuid,
+    (_, _) => _backend.reverseGoAhead(accountUuid, index: index),
+  );
+
+  /// Accepts [index] with the maker and imports its joint account. A result
+  /// after a pause is dropped (the loop picks the record up); afterwards the
+  /// records are read again and the loop starts.
+  Future<rust.ApiAcceptResult> reverseAccept(
+    String accountUuid, {
+    required int index,
+  }) async {
+    try {
+      return await runFor(
+        accountUuid,
+        (_, secret) =>
+            _backend.reverseAccept(accountUuid, secret, index: index),
+      );
+    } finally {
+      unawaited(_refreshReverseThenStart(accountUuid));
+    }
+  }
+
+  /// Signs `OpenReverse` for [index] under [ticket]: never once the engine
+  /// paused since the funding began.
+  Future<rust.ApiFundingRequest> reverseFundingRequest(
+    String accountUuid, {
+    required int index,
+    required String railgunAddress,
+    required PrivateUsdEngineTicket ticket,
+  }) => _queue(
+    accountUuid,
+    ticket._epoch,
+    (_, secret) => _backend.reverseFundingRequest(
+      accountUuid,
+      secret,
+      index: index,
+      railgunAddress: railgunAddress,
+    ),
+  );
+
+  /// Submits the page's funding proof for [index], only while [ticket]
+  /// holds right up to the call (unlocked, in the foreground, same epoch);
+  /// otherwise the proof is dropped and nothing reaches Rust. A result that
+  /// lands later is still shown: Rust kept the funding either way.
+  Future<rust.ApiReverseRecord> reverseSubmitFunding(
+    String accountUuid, {
+    required int index,
+    required PrivateUsdFundingProof proof,
+    required PrivateUsdEngineTicket ticket,
+  }) async {
+    if (!isCurrent(ticket)) throw const PrivateUsdStaleStepException();
+    try {
+      final record = await _queue(
+        accountUuid,
+        ticket._epoch,
+        (_, _) => _backend.reverseSubmitFunding(
+          accountUuid,
+          index: index,
+          proof: proof,
+          stillCurrent: () => isCurrent(ticket),
+        ),
+        dropLateResult: false,
+      );
+      _mergeReverse(accountUuid, record);
+      return record;
+    } on PrivateUsdEngineInterruptedException {
+      throw const PrivateUsdStaleStepException();
+    } finally {
+      nudge();
+    }
+  }
+
+  /// "Authorize settlement": signs and sends `ready` for [index].
+  Future<rust.ApiReverseRecord> reverseAuthorizeReady(
+    String accountUuid, {
+    required int index,
+  }) => _reverseStep(
+    accountUuid,
+    (_, secret) =>
+        _backend.reverseAuthorizeReady(accountUuid, secret, index: index),
+    nudges: true,
+  );
+
+  /// "Cancel conversion" / "Request refund" for [index]. A cancel that
+  /// finished in Rust is shown even after a pause.
+  Future<rust.ApiReverseRecord> reverseCancel(
+    String accountUuid, {
+    required int index,
+  }) => _reverseStep(
+    accountUuid,
+    (_, secret) => _backend.reverseCancel(accountUuid, secret, index: index),
+    nudges: true,
+  );
+
+  /// Whether a refunded [index] can be rescued now: a chain read, off the
+  /// queue (no key, no lock).
+  Future<bool> reverseCanRescue(String accountUuid, {required int index}) {
+    if (_disposed || _quiesceDepth > 0) {
+      return Future.error(const PrivateUsdEngineUnavailableException());
+    }
+    return _backend.reverseCanRescue(accountUuid, index: index);
+  }
+
+  /// "Recover refund" for [index]: a user action only, never the loop's.
+  Future<rust.ApiReverseRecord> reverseRescue(
+    String accountUuid, {
+    required int index,
+  }) => _reverseStep(
+    accountUuid,
+    (_, secret) => _backend.reverseRescue(accountUuid, secret, index: index),
+  );
+
+  Future<rust.ApiReverseRecord> _reverseStep(
+    String accountUuid,
+    Future<rust.ApiReverseRecord> Function(
+      int opId,
+      PrivateUsdSecretReader secret,
+    )
+    step, {
+    bool nudges = false,
+  }) async {
+    try {
+      final record = await runFor(accountUuid, step, dropLateResult: false);
+      _mergeReverse(accountUuid, record);
+      return record;
+    } finally {
+      if (nudges) nudge();
+    }
+  }
+
+  /// Reads [accountUuid]'s reverse records (drafts too) and publishes them.
+  Future<List<rust.ApiReverseRecord>> loadReverseRecords(
+    String accountUuid,
+  ) async {
+    final records = await _backend.reverseRecords(accountUuid);
+    if (_disposed) return records;
+    final seen = <PrivateUsdRecordKey>{};
+    for (final record in records) {
+      seen.add(_mergeReverse(accountUuid, record, publish: false));
+    }
+    _reverse.removeWhere(
+      (key, _) => key.accountUuid == accountUuid && !seen.contains(key),
+    );
+    _publishReverse();
+    return records;
+  }
+
+  Future<void> _refreshReverseThenStart(String accountUuid) async {
+    try {
+      await loadReverseRecords(accountUuid);
+    } catch (error) {
+      _debugLog('reading conversions failed (${error.runtimeType})');
+    }
+    start();
+  }
+
+  PrivateUsdRecordKey _mergeReverse(
+    String accountUuid,
+    rust.ApiReverseRecord record, {
+    bool publish = true,
+  }) {
+    final key = PrivateUsdRecordKey(
+      accountUuid: accountUuid,
+      direction: PrivateUsdDirection.reverse,
+      index: record.index,
+    );
+    final previous = _reverse[key];
+    final underWay = privateUsdReverseUnderWay(record.phase);
+    final PrivateUsdReverseStatus next;
+    if (previous == null) {
+      next = PrivateUsdReverseStatus(
+        record: record,
+        resuming: _resumeLoaded && underWay,
+      );
+    } else if (!underWay) {
+      // A draft or an ended conversion: nothing waits or fails.
+      next = PrivateUsdReverseStatus(
+        record: record,
+        checkedAt: previous.checkedAt,
+      );
+    } else {
+      next = previous.copyWith(record: record);
+    }
+    _reverse[key] = next;
+    if (publish) _publishReverse();
+    return key;
+  }
+
+  void _putReverse(PrivateUsdRecordKey key, PrivateUsdReverseStatus status) {
+    if (_disposed) return;
+    _reverse[key] = status;
+    _publishReverse();
   }
 
   // ── Pausing and draining ───────────────────────────────────────────
@@ -663,12 +1131,14 @@ class PrivateUsdEngine {
   /// Drops what the engine knows about [accountUuid] (deleted).
   void forgetAccount(String accountUuid) {
     _statuses.removeWhere((key, _) => key.accountUuid == accountUuid);
+    _reverse.removeWhere((key, _) => key.accountUuid == accountUuid);
     _publish();
   }
 
   /// Drops everything (the wallet was reset).
   void forgetAll() {
     _statuses.clear();
+    _reverse.clear();
     _publish();
   }
 
@@ -677,6 +1147,7 @@ class PrivateUsdEngine {
     _disposed = true;
     _interrupt();
     conversions.dispose();
+    reverseConversions.dispose();
   }
 
   void _interrupt() {
@@ -715,6 +1186,12 @@ class PrivateUsdEngine {
         changed = true;
       }
     }
+    for (final entry in _reverse.entries.toList()) {
+      if (entry.value.isUnderWay && !entry.value.resuming) {
+        _reverse[entry.key] = entry.value.copyWith(resuming: true);
+        changed = true;
+      }
+    }
     if (changed) _publish();
   }
 
@@ -730,18 +1207,39 @@ class PrivateUsdEngine {
         changed = true;
       }
     }
+    for (final entry in _reverse.entries.toList()) {
+      final status = entry.value;
+      if (status.failingSince != null || status.problem != null) {
+        _reverse[entry.key] = status.copyWith(
+          clearProblem: true,
+          clearFailingSince: true,
+        );
+        changed = true;
+      }
+    }
     if (changed) _publish();
   }
 
   void _put(PrivateUsdRecordKey key, PrivateUsdConversionStatus status) {
     if (_disposed) return;
     _statuses[key] = status;
-    _publish();
+    _publishForward();
   }
 
+  /// Publishes both directions' snapshots.
   void _publish() {
+    _publishForward();
+    _publishReverse();
+  }
+
+  void _publishForward() {
     if (_disposed) return;
     conversions.value = Map.unmodifiable(_statuses);
+  }
+
+  void _publishReverse() {
+    if (_disposed) return;
+    reverseConversions.value = Map.unmodifiable(_reverse);
   }
 
   static void _debugLog(String message) {

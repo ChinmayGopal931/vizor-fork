@@ -579,6 +579,7 @@ pub(crate) fn delete_account(store_dir, network, account) -> Result<()>;   // dr
 - Problem timing (§5.8): track `failingSince` per `(account, direction, index)`; show `problem` only when `now − failingSince ≥ 60 s`; clear on any success. `ZcashSyncing` is a wait, never a problem.
 - After a forward record ends: `private_usd_tokens_issuance_*` prefetch (M4 service).
 - As built (M5, progress D-51): the loop idles with no timer while nothing is under way, and accept, a progress screen opening, unlock and the foreground start it. It naps the shortest `next_poll_ms` of a pass (at least 1 s), 15 s after a failed step or `Busy`, 30 s when listing failed. Only advances and accept drop a result that lands after a pause; a quote or a call-off that finished in Rust is still shown. The lifecycle and lock listeners live in `privateUsdEngineProvider`; `PrivateUsdEngineHost` only keeps it alive.
+- As built (M6, progress D-81): each pass reads both directions per account and advances reverse records under way only (never a `quoted` draft); reverse records live in a second snapshot (`privateUsdReverseConversionsProvider`), and the unfinished set is the union. The funding runs outside the queue, bound to the engine's epoch (`PrivateUsdEngineTicket`), and its submit is asked again right before the FRB call; a cancel `drop`s it. The loop never sends a rescue.
 
 ### 5.11 End-to-end walk (who does what; crash, kill and lock at each step)
 
@@ -1850,8 +1851,8 @@ services/
                                                 quote(account, units:); accept(account, index:, maxTotalZat:); abandon(account, index:); loadRecords(account);
                                                 Future<void> quiesceAndDrain(); void resumeAfterMutation(); forgetAccount(uuid); forgetAll(); dispose(); }
   private_usd_zec_quote_search.dart         [M5] class PrivateUsdZecQuoteSearch { Future<ZecQuote> quote(BigInt totalZat, {BigInt? requestedUnits}); } // PrivateUsdZecQuotes.kt:35-80
-  private_usd_reverse_funding.dart          [M6] Future<ApiReverseRecord> fund(PrivateUsdRecordKey key) // R4–R6 in §5.11
-  private_usd_spend_guard.dart              [M7] enum PrivateUsdSpendStatus {checking, available, sending, converting, unreadable}; send(); startConversion()
+  private_usd_reverse_funding.dart          [M6] as built (D-81): PrivateUsdReverseFunding { price(account, costRequest); Future<PrivateUsdFundingResult> fund(PrivateUsdRecordKey key); drop(key); states } over PrivateUsdReversePage (RailgunReversePage) // R2, R4–R6 in §5.11
+  private_usd_spend_guard.dart              [M6 minimal, M7] enum PrivateUsdSpendStatus {checking, available, sending, converting, unreadable}; startConversion() (M6, in memory per account, D-82); send() and the send log (M7)
   private_usd_sender.dart                   [M7] Future<PrivateUsdSendOutcome> send(PrivateUsdSendRequest, PrivateUsdSendCost); Future<void> settleAll()
 providers/
   private_usd_available_provider.dart       [M3] Provider<bool> privateUsdAvailableProvider (+ privateUsdAvailableFor, the deployment providers); no privateUsdTorBlockedProvider: D4 passed (D-22)
@@ -1868,10 +1869,12 @@ providers/
   private_usd_keep_awake_provider.dart      [M5] Provider<bool> (OR-ed into SyncKeepAwakeNativeHost)
   private_usd_activity_provider.dart        [M5] as built: privateUsdActivityRecordsProvider(uuid) (the account's forward records from the engine's snapshot, read once) and privateUsdActivityTxids; the rows come from widgets/mobile/private_usd_activity_rows.dart (D-54)
   private_usd_refunds_provider.dart         [M6] NotifierProvider.autoDispose.family<…, PrivateUsdRefundsState, String> (15 s, ≤ 4 checks, 30 s each)
+  private_usd_reverse_convert_provider.dart [M6] as built (D-86): the reverse amount, quote (priced by the page) and review; "Convert" = go ahead → accept → fund
+  private_usd_reverse_conversion_provider.dart [M6] as built: one reverse conversion's progress; pay, authorizeReady, cancel (the sheet is the screen's)
   private_usd_send_provider.dart            [M7] NotifierProvider.autoDispose.family<…, PrivateUsdSendState, PrivateUsdSendMode>
   private_usd_spend_status_provider.dart    [M7] StreamProvider.family<PrivateUsdSpendStatus, String>
 screens/mobile/  mobile_private_usd_{,convert_,convert_review_,conversion_,refunds_,send_,send_review_,send_status_}screen.dart
-widgets/mobile/  private_usd_home_strip.dart, private_usd_banner.dart, private_usd_activity_rows.dart, private_usd_info_sheets.dart, private_usd_confirm_sheets.dart (M6). As built (M5) the amount step is in mobile_private_usd_convert_screen.dart with the quote ledger and expiry divider, and the banner reuses MobileHomeEntryCard (lib/src/core/widgets/mobile/, extracted from home)
+widgets/mobile/  private_usd_home_strip.dart, private_usd_banner.dart, private_usd_activity_rows.dart, private_usd_info_sheets.dart, private_usd_confirm_sheets.dart (M6). As built (M6): the reverse amount and review views are mobile_private_usd_reverse_convert_view.dart, the reverse progress mobile_private_usd_reverse_conversion_screen.dart, and models/private_usd_reverse_{amount,presentation}.dart hold the 2-decimal amounts, Max, the "Authorize settlement" window and the progress presentation. As built (M5) the amount step is in mobile_private_usd_convert_screen.dart with the quote ledger and expiry divider, and the banner reuses MobileHomeEntryCard (lib/src/core/widgets/mobile/, extracted from home)
 lib/src/providers/private_usd_lifecycle_provider.dart   [M3] register / quiesceAndDrain / resume (GiftCardTrackingLifecycle shape, several owners) + wipeRailgunPage for a reset; M5 registers the swap engine (run / cancel)
 lib/src/core/widgets/mobile/private_usd_engine_host.dart [M5] ConsumerWidget; watches privateUsdEngineProvider when privateUsdEngineEnabledProvider (define, mobile, Android, a deployment; not the kill switch or the active account). As built (D-51) the AppLifecycleListener and the lock listener live in privateUsdEngineProvider (Gift Card's shape)
 ```
@@ -2066,7 +2069,7 @@ The **review** phase (same screen):
   - amounts: "{$} for about {ZEC} after fees", without "about" once the sweep exists. Hidden for refunded and cancelled.
   - steps and notes (§9.5)
   - a problem card (no retry button)
-  - the call-off button: "Cancel conversion" before any funding in `ACCEPTING`/`AWAITING_FUNDING`, else "Request private refund". It is shown only while the status is `cancellable` (`!cancelRequested && !isSettled && phase ∉ {REFUNDING, REFUND_PAYOUT}`).
+  - the call-off button: "Cancel conversion" before any funding in `ACCEPTING`/`AWAITING_FUNDING`, else "Request private refund" (as built, the copy table's "Request refund", progress D-84). It is shown only while the status is `cancellable` (`!cancelRequested && !isSettled && phase ∉ {REFUNDING, REFUND_PAYOUT}`).
   - while refunded: "View refunds"
 - **Primary button.**
   - `AWAITING_FUNDING` → "Convert"
@@ -2551,6 +2554,8 @@ scripts/figma-compare.sh widget --form-factor mobile --scenario <id> --theme dar
 ```
 
 As built in M3 (D-28): the six `mobile-home-private-usd*` strip scenarios without the two banners, and `mobile-private-usd-{default,empty,first-load,refresh-failed,blocked}`. The fixtures live in `lib/widgetbook/private_usd_use_cases.dart`; the home ones pass `privateUsdBalance` (and `privacyModeEnabled`) to `_buildMobileHomeUseCase`. The banners arrive with M5, `payment-pending` with M7, and `tor-unavailable` is moot (D-22). The default screen has no activity rows until M5 and M7.
+
+As built in M6 (D-87): the twelve reverse and refunds rows below plus `mobile-private-usd-reverse-proving` (the payment's proof at 42 %), in `lib/widgetbook/private_usd_reverse_use_cases.dart`; `mobile-home-private-usd-attention` passes `privateUsdReverseConversions` to `_buildMobileHomeUseCase`. The forward convert fixture shows the direction toggle.
 
 As built in M5 (D-56): the forward rows, `mobile-home-private-usd-converting` (through `_buildMobileHomeUseCase`'s `privateUsdConversions`), `mobile-private-usd-convert{,-quoting,-insufficient,-syncing}`, `mobile-private-usd-review{,-expired,-tor-off}` and `mobile-private-usd-progress{,-opening-slow,-problem,-paid,-refunding,-refunded,-nothing-sent}`; `mobile-private-usd-default` now has a converted and a called-off row and the Convert button. `mobile-home-private-usd-attention` is a reverse banner and arrives with M6.
 

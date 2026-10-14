@@ -31,6 +31,7 @@ import 'payment_link_mobile_use_cases.dart';
 import 'payment_link_amount_currency_use_cases.dart';
 import 'payment_link_claim_outcome_use_cases.dart';
 import 'payment_link_use_cases.dart';
+import 'private_usd_reverse_use_cases.dart';
 import 'private_usd_use_cases.dart';
 import 'receive_use_cases.dart';
 import 'received_receipt_use_cases.dart';
@@ -572,6 +573,10 @@ class WidgetbookApp extends StatelessWidget {
                       name: 'Private USD converting',
                       builder: buildMobileHomePrivateUsdConvertingUseCase,
                     ),
+                    WidgetbookUseCase(
+                      name: 'Private USD needs attention',
+                      builder: buildMobileHomePrivateUsdAttentionUseCase,
+                    ),
                   ],
                 ),
                 WidgetbookComponent(
@@ -670,6 +675,54 @@ class WidgetbookApp extends StatelessWidget {
                     WidgetbookUseCase(
                       name: 'Progress nothing sent',
                       builder: buildMobilePrivateUsdProgressNothingSentUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Convert to ZEC',
+                      builder: buildMobilePrivateUsdConvertReverseUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Review to ZEC',
+                      builder: buildMobilePrivateUsdReviewReverseUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Reverse funding, fees changed',
+                      builder: buildMobilePrivateUsdReverseFundingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Reverse proving the payment',
+                      builder: buildMobilePrivateUsdReverseProvingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Reverse authorize settlement',
+                      builder: buildMobilePrivateUsdReverseReadyUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Reverse settling',
+                      builder: buildMobilePrivateUsdReverseSettlingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Reverse receiving',
+                      builder: buildMobilePrivateUsdReverseReceivingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Reverse complete',
+                      builder: buildMobilePrivateUsdReverseCompleteUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Reverse refund wait',
+                      builder: buildMobilePrivateUsdReverseRefundWaitUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Reverse refunded',
+                      builder: buildMobilePrivateUsdReverseRefundedUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Refunds',
+                      builder: buildMobilePrivateUsdRefundsUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Refunds empty',
+                      builder: buildMobilePrivateUsdRefundsEmptyUseCase,
                     ),
                   ],
                 ),

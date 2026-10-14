@@ -30,6 +30,8 @@ import '../../features/private_usd/models/private_usd_record_key.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_conversion_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_convert_review_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_convert_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_refunds_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_reverse_conversion_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_screen.dart';
 import '../../features/receive/screens/mobile/mobile_receive_screen.dart';
 import '../../features/address_book/screens/mobile/mobile_address_book_screen.dart';
@@ -352,9 +354,21 @@ List<RouteBase> buildMobileRoutes({required List<RouteBase> entryRoutes}) {
     ),
     GoRoute(
       path: '/private-usd/convert',
+      // `?to=zec` opens the reverse direction (private USD → ZEC).
       pageBuilder: (context, state) => CupertinoPage(
         key: state.pageKey,
-        child: const MobilePrivateUsdConvertScreen(),
+        child: MobilePrivateUsdConvertScreen(
+          initialDirection: state.uri.queryParameters['to'] == 'zec'
+              ? PrivateUsdDirection.reverse
+              : PrivateUsdDirection.forward,
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/private-usd/refunds',
+      pageBuilder: (context, state) => CupertinoPage(
+        key: state.pageKey,
+        child: const MobilePrivateUsdRefundsScreen(),
       ),
     ),
     GoRoute(
@@ -371,19 +385,20 @@ List<RouteBase> buildMobileRoutes({required List<RouteBase> entryRoutes}) {
     GoRoute(
       path: '/private-usd/conversion/:direction/:index',
       // The key is in the path, so a cold start, the banner and a deep link
-      // all open it. Reverse conversions arrive with M6.
-      redirect: (_, state) {
-        final path = PrivateUsdRoutePath.tryParse(state.pathParameters);
-        return path == null || path.direction != PrivateUsdDirection.forward
-            ? '/private-usd'
-            : null;
+      // all open it, in either direction.
+      redirect: (_, state) =>
+          PrivateUsdRoutePath.tryParse(state.pathParameters) == null
+          ? '/private-usd'
+          : null,
+      pageBuilder: (context, state) {
+        final path = PrivateUsdRoutePath.tryParse(state.pathParameters)!;
+        return CupertinoPage(
+          key: state.pageKey,
+          child: path.direction == PrivateUsdDirection.reverse
+              ? MobilePrivateUsdReverseConversionScreen(path: path)
+              : MobilePrivateUsdConversionScreen(path: path),
+        );
       },
-      pageBuilder: (context, state) => CupertinoPage(
-        key: state.pageKey,
-        child: MobilePrivateUsdConversionScreen(
-          path: PrivateUsdRoutePath.tryParse(state.pathParameters)!,
-        ),
-      ),
     ),
     GoRoute(
       path: '/pay',

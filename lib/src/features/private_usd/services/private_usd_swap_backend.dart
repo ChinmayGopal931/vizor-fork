@@ -18,6 +18,36 @@ class PrivateUsdKeyLockedException implements Exception {
   String toString() => 'The wallet is locked.';
 }
 
+/// A step bound to an earlier moment found the app locked, in the
+/// background or the engine moved on just before it reached Rust, so it
+/// never started (a funding proof that finished too late, plan M6 traps).
+class PrivateUsdStaleStepException implements Exception {
+  const PrivateUsdStaleStepException();
+
+  @override
+  String toString() => 'The step was dropped.';
+}
+
+/// The page's `prepareReverse` result, as `submit_funding` takes it.
+class PrivateUsdFundingProof {
+  const PrivateUsdFundingProof({
+    required this.to,
+    required this.data,
+    required this.value,
+    required this.debit,
+    required this.railgunFee,
+  });
+
+  final String to;
+  final String data;
+  final String value;
+  final String debit;
+  final String railgunFee;
+
+  @override
+  String toString() => 'PrivateUsdFundingProof(to: $to)';
+}
+
 /// What this wallet needs to reach the swap engine: the network, the store
 /// directory, the lightwalletd endpoint and the Ethereum RPC.
 class PrivateUsdSwapContext {
@@ -96,6 +126,99 @@ abstract interface class PrivateUsdSwapBackend {
   /// "Call it off" before anything reached the chain. No key.
   Future<rust.ApiForwardRecord> forwardAbandon(
     String accountUuid, {
+    required int index,
+  });
+
+  // ── Reverse (M6, reference §5.7) ──────────────────────────────────
+
+  /// The account's reverse conversions: the active one first (a `quoted`
+  /// draft too), then the rest, newest first.
+  Future<List<rust.ApiReverseRecord>> reverseRecords(String accountUuid);
+
+  /// Quotes [units] (token base units, whole cents) for a fresh swap index
+  /// and keeps it as an unpriced `quoted` draft.
+  Future<rust.ApiReverseQuote> reverseQuote(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int units,
+  });
+
+  /// The page's `reverseCost` params for swap [index] now. No key.
+  Future<rust.ApiReverseCostRequest> reverseCostRequest(
+    String accountUuid, {
+    required int index,
+  });
+
+  /// Keeps the page's price for swap [index]. No key.
+  Future<rust.ApiReverseRecord> reverseSetCost(
+    String accountUuid, {
+    required int index,
+    required String debit,
+    required String railgunFee,
+  });
+
+  /// The user's first authorization (`ACCEPTING`). No key.
+  Future<rust.ApiReverseRecord> reverseGoAhead(
+    String accountUuid, {
+    required int index,
+  });
+
+  /// Accepts swap [index] with the maker and imports its joint account;
+  /// re-entrant.
+  Future<rust.ApiAcceptResult> reverseAccept(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+  });
+
+  /// Signs `OpenReverse` and returns the page's `prepareReverse` params;
+  /// [railgunAddress] is the page's open wallet.
+  Future<rust.ApiFundingRequest> reverseFundingRequest(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+    required String railgunAddress,
+  });
+
+  /// Keeps and posts the page's proof. [stillCurrent] is asked right before
+  /// the call reaches Rust: false throws [PrivateUsdStaleStepException].
+  Future<rust.ApiReverseRecord> reverseSubmitFunding(
+    String accountUuid, {
+    required int index,
+    required PrivateUsdFundingProof proof,
+    required bool Function() stillCurrent,
+  });
+
+  /// One look at the chains for swap [index], then at most one key step.
+  Future<rust.ApiReverseAdvance> reverseAdvance(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int opId,
+    required int index,
+  });
+
+  /// The user's settlement approval: signs `ready` (never again after).
+  Future<rust.ApiReverseRecord> reverseAuthorizeReady(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+  });
+
+  /// Calls swap [index] off: "Cancel conversion" or "Request refund".
+  Future<rust.ApiReverseRecord> reverseCancel(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+  });
+
+  /// Whether a refunded swap's vault holds more than the relayer's fee: a
+  /// chain read, no key, no lock.
+  Future<bool> reverseCanRescue(String accountUuid, {required int index});
+
+  /// Recovers a refund that could not enter the private balance.
+  Future<rust.ApiReverseRecord> reverseRescue(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
     required int index,
   });
 
@@ -263,6 +386,276 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
   }
 
   @override
+  Future<List<rust.ApiReverseRecord>> reverseRecords(String accountUuid) async {
+    final storeDir = await PrivateUsdPaths.existingStoreDir(_context().network);
+    if (storeDir == null) return const [];
+    return rust.privateUsdReverseRecords(
+      accountUuid: accountUuid,
+      storeDir: storeDir,
+    );
+  }
+
+  @override
+  Future<rust.ApiReverseQuote> reverseQuote(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int units,
+  }) async {
+    final context = _context();
+    // A quote may write the wallet's first record: the store may not exist.
+    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final dbPath = await getWalletDbPath();
+    return _withSeed(
+      secret,
+      (mnemonic) => rust.privateUsdReverseQuote(
+        dbPath: dbPath,
+        network: context.network,
+        accountUuid: accountUuid,
+        storeDir: storeDir,
+        mnemonicBytes: mnemonic,
+        lightwalletdUrl: context.lightwalletdUrl,
+        ethRpcUrl: context.ethRpcUrl,
+        units: units,
+      ),
+    );
+  }
+
+  @override
+  Future<rust.ApiReverseCostRequest> reverseCostRequest(
+    String accountUuid, {
+    required int index,
+  }) async {
+    final network = _context().network;
+    return rust.privateUsdReverseCostRequest(
+      network: network,
+      accountUuid: accountUuid,
+      storeDir: await PrivateUsdPaths.storeDir(network),
+      index: index,
+    );
+  }
+
+  @override
+  Future<rust.ApiReverseRecord> reverseSetCost(
+    String accountUuid, {
+    required int index,
+    required String debit,
+    required String railgunFee,
+  }) async {
+    final network = _context().network;
+    return rust.privateUsdReverseSetCost(
+      network: network,
+      accountUuid: accountUuid,
+      storeDir: await PrivateUsdPaths.storeDir(network),
+      index: index,
+      debit: debit,
+      railgunFee: railgunFee,
+    );
+  }
+
+  @override
+  Future<rust.ApiReverseRecord> reverseGoAhead(
+    String accountUuid, {
+    required int index,
+  }) async {
+    final context = _context();
+    return rust.privateUsdReverseGoAhead(
+      network: context.network,
+      accountUuid: accountUuid,
+      storeDir: await PrivateUsdPaths.storeDir(context.network),
+      ethRpcUrl: context.ethRpcUrl,
+      index: index,
+    );
+  }
+
+  @override
+  Future<rust.ApiAcceptResult> reverseAccept(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+  }) async {
+    final context = _context();
+    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final dbPath = await getWalletDbPath();
+    return _withSeed(
+      secret,
+      (mnemonic) => rust.privateUsdReverseAccept(
+        dbPath: dbPath,
+        network: context.network,
+        accountUuid: accountUuid,
+        storeDir: storeDir,
+        mnemonicBytes: mnemonic,
+        lightwalletdUrl: context.lightwalletdUrl,
+        ethRpcUrl: context.ethRpcUrl,
+        index: index,
+      ),
+    );
+  }
+
+  @override
+  Future<rust.ApiFundingRequest> reverseFundingRequest(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+    required String railgunAddress,
+  }) async {
+    final context = _context();
+    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final dbPath = await getWalletDbPath();
+    return _withSeed(
+      secret,
+      (mnemonic) => rust.privateUsdReverseFundingRequest(
+        dbPath: dbPath,
+        network: context.network,
+        accountUuid: accountUuid,
+        storeDir: storeDir,
+        mnemonicBytes: mnemonic,
+        ethRpcUrl: context.ethRpcUrl,
+        index: index,
+        railgunAddress: railgunAddress,
+      ),
+    );
+  }
+
+  @override
+  Future<rust.ApiReverseRecord> reverseSubmitFunding(
+    String accountUuid, {
+    required int index,
+    required PrivateUsdFundingProof proof,
+    required bool Function() stillCurrent,
+  }) async {
+    final context = _context();
+    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    // Asked after the last await: nothing can lock between it and the call.
+    if (!stillCurrent()) throw const PrivateUsdStaleStepException();
+    return rust.privateUsdReverseSubmitFunding(
+      network: context.network,
+      accountUuid: accountUuid,
+      storeDir: storeDir,
+      ethRpcUrl: context.ethRpcUrl,
+      index: index,
+      to: proof.to,
+      data: proof.data,
+      value: proof.value,
+      debit: proof.debit,
+      railgunFee: proof.railgunFee,
+    );
+  }
+
+  @override
+  Future<rust.ApiReverseAdvance> reverseAdvance(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int opId,
+    required int index,
+  }) async {
+    final context = _context();
+    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final dbPath = await getWalletDbPath();
+    return _withSeed(
+      secret,
+      (mnemonic) => rust.privateUsdReverseAdvance(
+        dbPath: dbPath,
+        network: context.network,
+        accountUuid: accountUuid,
+        storeDir: storeDir,
+        mnemonicBytes: mnemonic,
+        lightwalletdUrl: context.lightwalletdUrl,
+        ethRpcUrl: context.ethRpcUrl,
+        opId: opId,
+        index: index,
+      ),
+    );
+  }
+
+  @override
+  Future<rust.ApiReverseRecord> reverseAuthorizeReady(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+  }) async {
+    final context = _context();
+    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final dbPath = await getWalletDbPath();
+    return _withSeed(
+      secret,
+      (mnemonic) => rust.privateUsdReverseAuthorizeReady(
+        dbPath: dbPath,
+        network: context.network,
+        accountUuid: accountUuid,
+        storeDir: storeDir,
+        mnemonicBytes: mnemonic,
+        lightwalletdUrl: context.lightwalletdUrl,
+        ethRpcUrl: context.ethRpcUrl,
+        index: index,
+      ),
+    );
+  }
+
+  @override
+  Future<rust.ApiReverseRecord> reverseCancel(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+  }) async {
+    final context = _context();
+    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final dbPath = await getWalletDbPath();
+    return _withSeed(
+      secret,
+      (mnemonic) => rust.privateUsdReverseCancel(
+        dbPath: dbPath,
+        network: context.network,
+        accountUuid: accountUuid,
+        storeDir: storeDir,
+        mnemonicBytes: mnemonic,
+        lightwalletdUrl: context.lightwalletdUrl,
+        ethRpcUrl: context.ethRpcUrl,
+        index: index,
+      ),
+    );
+  }
+
+  @override
+  Future<bool> reverseCanRescue(
+    String accountUuid, {
+    required int index,
+  }) async {
+    final context = _context();
+    final storeDir = await PrivateUsdPaths.existingStoreDir(context.network);
+    if (storeDir == null) return false;
+    return rust.privateUsdReverseCanRescue(
+      network: context.network,
+      accountUuid: accountUuid,
+      storeDir: storeDir,
+      ethRpcUrl: context.ethRpcUrl,
+      index: index,
+    );
+  }
+
+  @override
+  Future<rust.ApiReverseRecord> reverseRescue(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+  }) async {
+    final context = _context();
+    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final dbPath = await getWalletDbPath();
+    return _withSeed(
+      secret,
+      (mnemonic) => rust.privateUsdReverseRescue(
+        dbPath: dbPath,
+        network: context.network,
+        accountUuid: accountUuid,
+        storeDir: storeDir,
+        mnemonicBytes: mnemonic,
+        ethRpcUrl: context.ethRpcUrl,
+        index: index,
+      ),
+    );
+  }
+
+  @override
   void cancel(int opId) => rust.privateUsdCancel(opId: opId);
 
   @override
@@ -270,6 +663,22 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
 
   @override
   void clearSessions() => rust.privateUsdClearSessions();
+
+  /// Reads the seed last, hands it to [call] (which must start the FRB call
+  /// synchronously: FRB copies the bytes as it starts) and zeroes it.
+  static Future<T> _withSeed<T>(
+    PrivateUsdSecretReader secret,
+    Future<T> Function(Uint8List mnemonic) call,
+  ) async {
+    final mnemonic = await _read(secret);
+    late final Future<T> started;
+    try {
+      started = call(mnemonic);
+    } finally {
+      mnemonic.fillRange(0, mnemonic.length, 0);
+    }
+    return started;
+  }
 
   static Future<Uint8List> _read(PrivateUsdSecretReader secret) async {
     final bytes = await secret();

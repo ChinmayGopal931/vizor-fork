@@ -664,10 +664,11 @@ ten).
 
 - [x] M6.1 `reverse.rs` and `funding_calls.rs` (D-70 to D-78)
 - [x] M6.2 FRB reverse calls (D-79)
-- [ ] M6.3 Dart
-- [ ] M6.4 Copy (Reverse, Refunds)
-- [ ] M6.5 Widgetbook and capture scenarios (reverse, refunds rows)
-- [ ] M6 gate
+- [x] M6.3 Dart (D-81 to D-83, D-85, D-86)
+- [x] M6.4 Copy (Reverse, Refunds) (D-84)
+- [x] M6.5 Widgetbook and capture scenarios (reverse, refunds rows) (D-87)
+- [ ] M6.6 Device round (after M5's; Sepolia + testnet). Scenario written, opt-in (D-89); not run (B-9)
+- [x] M6 gate: every suite passes (status below); the device checks are M6.6, deferred
 
 M6 part 1 status (2026-10-14): M6.1 and M6.2, the Rust half, are done. Part 2
 (M6.3–M6.5: the Dart funding orchestration, providers, screens, copy and
@@ -847,6 +848,61 @@ Widgetbook) is next; the M6 gate and its device checks wait for it.
   `privateUsdReverseAuthorizeReady`; a second tap or a restart sends the
   kept one again. Cancel shows while `cancellable`: "Cancel conversion"
   before any funding (`funded` false), else "Request private refund".
+
+M6 status (2026-10-14): done except M6.6, the device round, which needs the
+phone attached and private USD in its testnet wallet from an M5 round
+(B-9); its opt-in scenario is written (D-89). Part 1 is `35cead966` (merged
+in `e269c98bb`); part 2 (M6.3–M6.5) is the commit that checks this note.
+Nothing in part 2 touched Rust, the FRB bindings or Kotlin.
+
+- **What landed in part 2.**
+  - The engine and the funding (D-81, D-82): reverse records in the
+    engine's loop and snapshot, the reverse calls on the per-account queue,
+    `services/private_usd_reverse_funding.dart` (pricing through the page,
+    and the funding: spend guard, `funding_request`, the page's proof with
+    its `proof` events, `submit_funding` only while unlocked, in the
+    foreground and in the same epoch), and the minimal
+    `services/private_usd_spend_guard.dart`.
+  - The providers: `private_usd_reverse_convert_provider.dart` (`?to=zec`,
+    2-decimal amounts, Max, the priced quote, "Convert" = go ahead, accept,
+    pay), `private_usd_reverse_conversion_provider.dart` ("Pay {debit}",
+    "Authorize settlement", the call-off), `private_usd_refunds_provider.dart`,
+    the reverse banner (attention while it needs the user) and the reverse
+    activity rows.
+  - The UI (D-86): the direction toggle, the reverse amount and review
+    views, `/private-usd/conversion/reverse/:index`, `/private-usd/refunds`,
+    the confirmation sheets for cancel, refund and rescue (D18), "Refunds"
+    beside the Activity heading.
+  - The copy (D-84, D-85), the Widgetbook entries and 13 capture scenarios
+    (D-87), and the device round's `--m6` and `--m6-refund` (D-89).
+- **Tests.**
+  - Rust, the FRB bindings and Kotlin did not change in part 2, so `cargo
+    test`, the codegen and the Gradle tests were not run (part 1's Rust run
+    stands: lib 1507 passed, 11 ignored; integration 6 passed, 21 ignored).
+  - `fvm flutter analyze`: no issues.
+  - `fvm flutter test` (desktop lane): 5970 passed, 162 skipped, 4 failed,
+    the 4 pre-existing failures in `settings_seed_phrase_screen_test.dart`
+    ("incoming links cannot interrupt backup …").
+  - Mobile lane (`--tags mobile --run-skipped
+    --dart-define=VIZOR_FORM_FACTOR=mobile`): 2292 passed, 10 failed, the 10
+    pre-existing failures in `app_review_payment_handoff_test.dart` ("Edit"
+    and "Review" × 5).
+  - New (D-88): 7 untagged tests (4 for the funding, 3 for amounts, Max and
+    the settlement window) and 3 mobile-tagged ones, plus the 13 new
+    scenarios rendered in `figma_compare_mobile_scenarios_test.dart`. Against
+    M5's runs, the desktop lane grew by 7 passed (and one skipped file) and
+    the mobile lane by 16.
+  - Captures: the new scenarios rendered with `scripts/figma-compare.sh
+    widget --form-factor mobile` and reviewed (D-87).
+- **For M6.6 (the device round).** After an M5 round has left private USD
+  in the phone's testnet wallet (passcode 111111), with the phone on USB and
+  unlocked: `ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh
+  --m6` (`--m6-usd` sets the amount, 2 by default; `--m5 --m6` runs both
+  rounds in one go). It checks that a lock while the page proves the payment
+  pays nothing, that the unpaid conversion cancelled ends `CANCELLED`, and
+  that a new one reaches `COMPLETE` after "Authorize settlement". Add
+  `--m6-refund` for a paid conversion cancelled to `REFUNDED` (it waits out
+  the refund deadlines, up to 3 h).
 
 ## M7. Private send and withdraw
 
@@ -1768,6 +1824,129 @@ Widgetbook) is next; the M6 gate and its device checks wait for it.
     for its deadline and turn), and `ReverseFundingTest` 64 (a funding that
     landed during a timeout is followed, never sent again); 47 is covered
     only from the receive on. The device rounds cover the rest.
+- **D-81 (M6.3): the Dart reverse engine and funding as built.** Reference
+  §5.10, §5.11 and §9.2 updated.
+  - `PrivateUsdEngine` keeps reverse records in a second snapshot
+    (`reverseConversions`, published as `privateUsdReverseConversionsProvider`,
+    drafts included); `privateUsdUnfinishedProvider` is the union of both
+    directions' records under way. Each pass reads both directions per
+    account and advances a reverse record only when it is under way
+    (never `quoted`, `complete`, `refunded`, `cancelled`), with the forward
+    loop's naps, problem timing and pause rules. The loop never sends a
+    rescue. `needsYou` is `record.awaitingUser` (the attention banner).
+  - The reverse calls go through the per-account queue (`reverseQuote`,
+    `reverseSetCost`, `reverseGoAhead`, `reverseAccept`,
+    `reverseFundingRequest`, `reverseSubmitFunding`,
+    `reverseAuthorizeReady`, `reverseCancel`, `reverseRescue`);
+    `reverseCostRequest` and `reverseCanRescue` are reads off it. A
+    funding is bound to a `PrivateUsdEngineTicket` (the engine's epoch when
+    "Convert" or "Pay" was tapped): its `funding_request` runs at that
+    epoch, and its submit runs only while the ticket holds, asked again in
+    the backend right before the FRB call (`stillCurrent`, after the last
+    await), else `PrivateUsdStaleStepException` and nothing reaches Rust.
+  - `services/private_usd_reverse_funding.dart`: a keep-alive service
+    (`privateUsdReverseFundingProvider`) over a page seam
+    (`PrivateUsdReversePage`, `RailgunReversePage` over `RailgunEngine`). It
+    prices (`reverseCost` → `set_cost`, once more if the relayer's fee moved)
+    and funds (spend guard → page address → `funding_request` → page
+    `prepareReverse` → `submit_funding`), publishing per conversion
+    `preparing`/`proving`/`submitting` and the last error
+    (`privateUsdFundingStatesProvider`). The proof runs outside the queue,
+    so a cancel can run meanwhile; a cancel also `drop`s the running try. A
+    lock, the background, a drain, a closed page or the cancel drops the
+    proof silently ("Pay {debit}" proves again); `fundingCostChanged` from
+    a submit shows the kept new total, and one from `funding_request` prices
+    the cleared cost first. `RailgunSession.prepareReverse` now publishes
+    `proving` and clears the last proof, so the `proof` events show as
+    "Proving your payment · n%".
+  - "Convert" on the review goes ahead, accepts, starts the funding and
+    pops to the progress at once; the payment continues there (zapp shows it
+    on one screen). The page is opened before a quote, so a page that cannot
+    start spends no swap index.
+- **D-82 (M6.3): the spend guard is minimal.**
+  `services/private_usd_spend_guard.dart` keeps the §9.2 status enum and
+  `startConversion`, in memory per account: one funding at a time per
+  Railgun wallet. M7 adds sends and the send log (which carries an
+  unsettled send across restarts); a kept funding needs no such record, as
+  the loop follows it and it is never proved again.
+- **D-83 (M6.3): Max's funding fee.** No FRB call reads the relayer's
+  funding fee without a record (zapp's `fundingFee()` reads `/v1/terms`).
+  Max reads it through the account's `quoted` draft
+  (`private_usd_reverse_cost_request`, no index spent), else uses the 2 USDC
+  cap (X6), so Max is never more than the fees leave; with no draft it can be
+  up to the cap below the true maximum. A Rust call for the fee alone would
+  make it exact (plan M6 traps updated). The unshield fee is the page's
+  `RailgunFees`; the balance is the swap token's `Spendable` bucket only.
+- **D-84 (M6.4): the copy as built.** The Reverse and Refunds tables are in
+  `PrivateUsdCopy`, with `privateUsdReverseQuoteMessage`,
+  `privateUsdReverseStepMessage`, `privateUsdReverseProblemMessage` and
+  `privateUsdReverseNothingSentMessage`. The call-off reads "Request refund"
+  (the copy table's `reverse_request_refund`), not §9.5's "Request private
+  refund". New for vizor: "Pay {debit}", "Proving your payment · n%" and
+  its keep-open note, "Use at most 2 decimal places.", "Converting to ZEC"
+  (activity), the reverse details rows ("Escrow payment", "ZEC received"),
+  "Refresh" (Refunds), "Not now" (the sheets), and an unpaid variant of the
+  cancel sheet ("Nothing has been paid yet, so nothing is lost. This can't
+  be undone."). `refunds_recover_confirm_body` names the fee's cap ("The
+  relayer's fee, at most $2.00, comes out of the refund."): Rust reads the
+  rescue fee only as it signs. `reverse_title` titles the reverse info
+  sheet; `reverse_review` is the banner's detail while a payment waits.
+- **D-85 (M6.3): the cancel-requested note.** `ApiReverseRecord` does not
+  say whether `ready` was sent, so the refund-wait note is always
+  `reverse_refund_requested`; `reverse_refund_requested_after_ready` is in
+  the copy for when the record exposes it (settling already shows the
+  `refundAfter` limit).
+- **D-86 (M6.3): routes and UI as built.** Reference §9.2 and §9.4 updated.
+  - `/private-usd/convert?to=zec` and a direction toggle between the cards
+    (both directions, on the amount step); the review route's args carry the
+    direction; `/private-usd/conversion/reverse/:index` opens
+    `MobilePrivateUsdReverseConversionScreen`; `/private-usd/refunds` opens
+    `MobilePrivateUsdRefundsScreen` over `privateUsdRefundsProvider` (every
+    `refunded` record newest first, checked every 15 s, 4 at a time, 30 s
+    each, only while the engine may run; one recovery at a time, back
+    blocked meanwhile).
+  - Progress: "Pay {debit}" in `awaitingFunding` (disabled while a funding
+    runs, or before the cleared cost is priced again, which the screen does
+    on opening); "Authorize settlement" in `awaitingReady` until
+    `readyDeadline − 120 s` on a 5 s tick; the call-off behind a sheet while
+    `cancellable`; "New conversion" and, once refunded, "View refunds". Back
+    is blocked while settlement or a call-off runs. The problem card keeps
+    vizor's "Try now" (zapp's reverse card has none).
+  - "Refunds" sits beside the Activity heading on `/private-usd` once a
+    conversion was refunded, and on the reverse amount step. Activity rows
+    for reverse records (no row for a draft or a cancelled one); the main
+    wallet's row for the sweep home is dropped, as the forward deposit's is.
+- **D-87 (M6.5): Widgetbook and capture scenarios.** The twelve reverse and
+  refunds rows of §9.7 plus `mobile-private-usd-reverse-proving` (the proof
+  at 42 %), in `lib/widgetbook/private_usd_reverse_use_cases.dart`,
+  registered in Widgetbook and as `FigmaCompareScenario`s; the forward
+  convert fixture now shows the direction toggle, as the app does. Captured
+  with `scripts/figma-compare.sh widget --form-factor mobile` (dark; the
+  ready state also light) and reviewed: the reverse ledger gives labels the
+  free width and values their own.
+- **D-88 (M6): the Dart tests as built.** Untagged:
+  `private_usd_reverse_funding_test.dart` (4: a proof submitted once in the
+  foreground; dropped, never submitted, after a lock, in the background,
+  and after a pause even back in the foreground) and
+  `private_usd_reverse_amount_test.dart` (3: 2-decimal amounts by string
+  arithmetic, Max, the "Authorize settlement" window). Mobile-tagged:
+  `mobile_private_usd_reverse_screens_test.dart` (3: the amount step, the
+  progress actions, Refunds) and the 13 new scenarios in
+  `figma_compare_mobile_scenarios_test.dart`. The reverse screens test runs
+  430 px wide: the test font's square glyphs make "Authorize settlement" a
+  pixel wider than the button at 393 px.
+- **D-89 (M6): the device round's M6 scenario, written and not run.**
+  `run_device_round.sh --m6 [--m6-usd 2] [--m6-refund]` (off by default;
+  implies no release check and keeps the page storage; with `--m5` it runs
+  after M5's round) runs `private_usd_device_test.dart` once with
+  `VIZOR_PUSD_DEVICE_M6=run`, on the wallet an M5 round left (never reset):
+  it waits for the dollars, converts through the screens (strip, Convert,
+  the toggle), locks while the page proves and checks nothing was paid then
+  or after unlock, cancels that unpaid conversion behind its sheet
+  (`CANCELLED`), converts again, authorizes settlement and reaches
+  `COMPLETE`. `--m6-refund` adds a paid conversion cancelled to `REFUNDED`
+  (it waits out the refund deadlines, up to 3 h) and its row on Refunds.
+  Events carry the swap index, phases and timings only.
 
 ## Blocked
 

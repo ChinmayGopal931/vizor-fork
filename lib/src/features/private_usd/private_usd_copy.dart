@@ -9,8 +9,8 @@ import '../../rust/api/private_usd.dart'
 /// mid-sentence.
 ///
 /// M3 holds the Shared, Home, Private USD screen and Activity tables, M5 the
-/// Convert and Accounts tables; the reverse, refunds and send tables arrive
-/// with M6 and M7.
+/// Convert and Accounts tables, M6 the Reverse and Refunds tables; the send
+/// table arrives with M7.
 abstract final class PrivateUsdCopy {
   // ── Shared ─────────────────────────────────────────────────────────────
 
@@ -266,6 +266,9 @@ abstract final class PrivateUsdCopy {
 
   /// `private_usd_activity_converted_zec`
   static const activityConvertedToZec = 'Converted to ZEC';
+
+  /// Reverse under way (reference §9.4 S2).
+  static const activityConvertingToZec = 'Converting to ZEC';
 
   /// `private_usd_activity_refunded`
   static const activityRefunded = 'Conversion called off';
@@ -665,6 +668,10 @@ abstract final class PrivateUsdCopy {
   static const detailRefund = 'ZEC refund';
   static const detailStarted = 'Started';
 
+  /// New (M6): the reverse details tab's rows.
+  static const detailFunding = 'Escrow payment';
+  static const detailZecReceived = 'ZEC received';
+
   // ── Convert: problems (after a minute of failures) ────────────────────
 
   /// `convert_problem_title`
@@ -806,6 +813,292 @@ abstract final class PrivateUsdCopy {
   /// `convert_result_try_again`
   static const convertResultTryAgain = 'Try again';
 
+  // ── Reverse (M6): amount, review and info ───────────────────────────
+
+  /// `convert_swap_direction`: the direction toggle's label.
+  static const convertSwapDirection = 'Swap conversion direction';
+
+  /// `reverse_insufficient` (S)
+  static const reverseInsufficient =
+      'Not enough private USD for this amount and its fees.';
+
+  /// `reverse_error_max`
+  static const reverseErrorMax =
+      "Couldn't work out the most you can convert. Try again in a moment.";
+
+  /// New: a reverse amount takes whole cents (Rust refuses more decimals).
+  static const reverseAmountCents = 'Use at most 2 decimal places.';
+
+  /// `reverse_error_funding_unavailable` (S)
+  static const reverseErrorFundingUnavailable =
+      'Conversion to ZEC is unavailable right now. Try again later.';
+
+  /// `reverse_error_cost_changed`
+  static const reverseErrorCostChanged =
+      'The fees changed, so nothing was paid. Review the new total, then pay '
+      'it or cancel.';
+
+  /// `reverse_title` (S): the reverse info sheet's title.
+  static const reverseTitle = 'Private USD to ZEC';
+
+  /// `reverse_intro` (S)
+  static const reverseIntro =
+      'Approve sending private USD first. After your wallet confirms the full '
+      'ZEC deposit itself, approve settlement to receive shielded ZEC.';
+
+  /// `reverse_refund_note` (B)
+  static const reverseRefundNote =
+      'Before you approve settlement, you can cancel. After that, a refund '
+      "waits for the contract deadline. A refund pays the relayer's fee and "
+      "Railgun's shielding fee. Closing Vizor never approves settlement.";
+
+  /// New (F): `reverse_keep_open`
+  static String reverseKeepOpen(String time) =>
+      'Keep Vizor open after you pay. Once the ZEC is confirmed, you approve '
+      "settlement here by $time. If you don't, your private USD is refunded, "
+      'less fees.';
+
+  /// `reverse_escrow`
+  static const reverseEscrow = 'Escrow value';
+
+  /// `reverse_railgun_fee`
+  static const reverseRailgunFee = 'Railgun unshield fee';
+
+  /// `reverse_broadcaster_fee`
+  static const reverseBroadcasterFee = 'Broadcast fee';
+
+  /// `reverse_total`
+  static const reverseTotal = 'Total paid';
+
+  /// `reverse_receive_estimate`
+  static const reverseReceiveEstimate = 'Estimated ZEC after sweep fee';
+
+  /// `reverse_problem_relayer` (B, F)
+  static const reverseProblemRelayer =
+      "Vizor can't reach the relayer that moves your dollars. It keeps trying "
+      "while it's open.";
+
+  // ── Reverse (M6): progress, results and actions ───────────────────────
+
+  /// `reverse_accepting`
+  static const reverseAccepting = 'Preparing your receiving account';
+
+  /// `reverse_review` (S): the banner's detail while the payment waits.
+  static const reverseReview = 'Review and approve your payment';
+
+  /// `reverse_step_fund`
+  static const reverseStepFund = 'Sending private USD to escrow';
+
+  /// `reverse_sending` (S)
+  static const reverseSending = 'Sending private USD';
+
+  /// `reverse_confirming`
+  static const reverseConfirming = 'Confirming escrow';
+
+  /// `reverse_receiving`
+  static const reverseReceiving = 'Waiting for confirmed ZEC';
+
+  /// `reverse_ready`
+  static const reverseReady = 'Authorize settlement';
+
+  /// `reverse_step_approval_detail`
+  static const reverseStepApprovalDetail =
+      'Your approval is needed to continue.';
+
+  /// `reverse_ready_explanation` (S)
+  static const reverseReadyExplanation =
+      'The full ZEC deposit is confirmed. Authorize settlement to release '
+      'your private USD and move ZEC to your shielded wallet.';
+
+  /// `reverse_step_settle`
+  static const reverseStepSettle = 'Settling your conversion';
+
+  /// `reverse_settling`
+  static const reverseSettling = 'Waiting for settlement';
+
+  /// `reverse_sweeping`
+  static const reverseSweeping = 'Moving ZEC to your shielded wallet';
+
+  /// `reverse_sweep_confirmations`
+  static String reverseSweepConfirmations(int count) =>
+      'Zcash confirmations: $count';
+
+  /// `reverse_refund_wait` (B, F)
+  static const reverseRefundWait =
+      "Waiting until a refund can proceed. Vizor retries while it's open.";
+
+  /// `reverse_refunding`
+  static const reverseRefunding = 'Securing your private refund';
+
+  /// `reverse_payout` (S)
+  static const reversePayout = 'Returning your private USD to Railgun';
+
+  /// `reverse_complete`
+  static const reverseComplete = 'ZEC received in your shielded wallet';
+
+  /// `reverse_refunded`
+  static const reverseRefunded =
+      'Private refund paid. Railgun screening may delay availability.';
+
+  /// `reverse_cancelled` (S)
+  static const reverseCancelled =
+      'Conversion cancelled. No escrow payment remains.';
+
+  /// `reverse_progress_amounts`
+  static String reverseProgressAmounts(String usd, String zec) =>
+      '$usd for $zec after fees';
+
+  /// `reverse_progress_estimate`
+  static String reverseProgressEstimate(String usd, String zec) =>
+      '$usd for about $zec after fees';
+
+  /// `reverse_progress_received`
+  static String reverseProgressReceived(String zec) =>
+      '$zec arrived after fees.';
+
+  /// `reverse_result_received`
+  static const reverseResultReceived = 'ZEC received';
+
+  /// `reverse_result_refunded`
+  static const reverseResultRefunded = 'Refund sent';
+
+  /// `reverse_result_cancelled`
+  static const reverseResultCancelled = 'Conversion cancelled';
+
+  /// `reverse_new`
+  static const reverseNew = 'New conversion';
+
+  /// `reverse_cancel`
+  static const reverseCancel = 'Cancel conversion';
+
+  /// `reverse_request_refund` (S)
+  static const reverseRequestRefund = 'Request refund';
+
+  /// New (D18): `reverse_cancel_confirm_title`
+  static const reverseCancelConfirmTitle = 'Cancel this conversion?';
+
+  /// New (D18): `reverse_cancel_confirm_body`, once private USD was paid.
+  static const reverseCancelConfirmBody =
+      "Your private USD comes back, less the relayer's and Railgun's fees. "
+      "This can't be undone.";
+
+  /// New (D18): the same sheet before anything was paid.
+  static const reverseCancelConfirmUnpaidBody =
+      "Nothing has been paid yet, so nothing is lost. This can't be undone.";
+
+  /// New: the confirmation sheets' way out.
+  static const notNow = 'Not now';
+
+  /// `reverse_refund_requested` (B, F)
+  static const reverseRefundRequested =
+      "Refund requested. Vizor continues when your refund is available, while "
+      "it's open.";
+
+  /// `reverse_refund_requested_after_ready` (B)
+  static String reverseRefundRequestedAfterReady(String time) =>
+      "Refund requested. If settlement doesn't finish, Vizor can start "
+      'returning your funds after $time. Settlement may still finish before '
+      'then.';
+
+  /// `reverse_settlement_refund_limit`
+  static String reverseSettlementRefundLimit(String time) =>
+      'Settlement is authorized. A refund can only proceed after $time if '
+      "settlement hasn't completed.";
+
+  /// `reverse_refund_unavailable` (B)
+  static const reverseRefundUnavailable =
+      'This conversion has already settled and can no longer be refunded. '
+      'Vizor will finish moving your ZEC to your wallet.';
+
+  /// `reverse_error` (B)
+  static const reverseError =
+      'Unable to complete this step. Your saved conversion resumes after '
+      'Vizor checks both chains. A payment is never repeated because a '
+      'request timed out.';
+
+  /// `reverse_error_unconfirmed`
+  static const reverseErrorUnconfirmed =
+      "The market maker's ZEC isn't confirmed yet. Try again in a few minutes.";
+
+  /// `reverse_error_too_late`
+  static const reverseErrorTooLate =
+      "It's too late for this step, so the conversion ends by itself. "
+      'Anything you paid comes back.';
+
+  /// `reverse_error_rescue`
+  static const reverseErrorRescue =
+      "Couldn't recover the refund. Try again in a moment.";
+
+  /// `reverse_rescue`
+  static const reverseRescue = 'Recover refund';
+
+  /// New: "Pay {debit}", the funding payment (`awaitingFunding`).
+  static String reversePay(String debit) => 'Pay $debit';
+
+  /// New (F): the funding proof in the page, with its progress.
+  static String reverseProving(int percent) =>
+      'Proving your payment · $percent%';
+
+  /// New (F): under the proof.
+  static const reverseProvingNote =
+      'Your phone builds a zero-knowledge proof of the payment. This can take '
+      'a few minutes. Keep Vizor open.';
+
+  // ── Refunds (M6) ──────────────────────────────────────────────────────
+
+  /// `refunds_title`
+  static const refundsTitle = 'Refunds';
+
+  /// `refunds_subtitle`
+  static const refundsSubtitle = 'Refunds from earlier conversions';
+
+  /// `refunds_info`
+  static const refundsInfo =
+      "If a refund couldn't enter your private balance, recover it here. "
+      'Railgun screening may delay availability.';
+
+  /// `refunds_original_amount`
+  static const refundsOriginalAmount = 'Original conversion amount';
+
+  /// `refunds_empty`
+  static const refundsEmpty = 'No refunded conversions yet.';
+
+  /// `refunds_checking`
+  static const refundsChecking = 'Checking refunds…';
+
+  /// `refunds_available`
+  static const refundsAvailable = 'This refund can be recovered.';
+
+  /// `refunds_no_recovery`
+  static const refundsNoRecovery =
+      'No recovery available right now. Your refund may still be going '
+      'through Railgun screening.';
+
+  /// `refunds_recover`
+  static const refundsRecover = 'Recover refund';
+
+  /// `refunds_recovering`
+  static const refundsRecovering = 'Recovering your refund…';
+
+  /// `refunds_check_failed`
+  static const refundsCheckFailed =
+      "Couldn't check this refund. Refresh to try again.";
+
+  /// `refunds_recover_failed`
+  static const refundsRecoverFailed =
+      "Couldn't recover this refund. Try again.";
+
+  /// New (D18): `refunds_recover_confirm_title`
+  static const refundsRecoverConfirmTitle = 'Recover this refund?';
+
+  /// New (D18): `refunds_recover_confirm_body`. Rust reads the relayer's fee
+  /// only as it signs, so the sheet names its cap (X6, D-84).
+  static String refundsRecoverConfirmBody(String cap) =>
+      "The relayer's fee, at most $cap, comes out of the refund.";
+
+  /// New: the refresh button's label.
+  static const refundsRefresh = 'Refresh';
+
   // ── Accounts and reset (new for vizor; §8.4 refusal) ──────────────────
 
   /// New: `delete_unfinished_title`
@@ -930,3 +1223,59 @@ String privateUsdRefundedMessage(ApiRefundCause? cause) => switch (cause) {
   null => PrivateUsdCopy.convertResultRefundedMaker,
   ApiRefundCause.notClaimedInTime => PrivateUsdCopy.convertResultRefundedLate,
 };
+
+/// What to say when a reverse quote fails before anything was spent but an
+/// index (reference §9.6; zapp `PrivateUsdFailure`).
+String? privateUsdReverseQuoteMessage(ApiPrivateUsdErrorCode code) =>
+    switch (code) {
+      ApiPrivateUsdErrorCode.unavailable =>
+        PrivateUsdCopy.reverseErrorFundingUnavailable,
+      _ => privateUsdErrorMessage(code),
+    };
+
+/// What to say when a reverse step the user took (pay, authorize settlement,
+/// cancel) did not go through (reference §9.4 S4, S6).
+String privateUsdReverseStepMessage(ApiPrivateUsdErrorCode code) =>
+    switch (code) {
+      ApiPrivateUsdErrorCode.depositUnconfirmed =>
+        PrivateUsdCopy.reverseErrorUnconfirmed,
+      ApiPrivateUsdErrorCode.tooLate ||
+      ApiPrivateUsdErrorCode.quoteExpired => PrivateUsdCopy.reverseErrorTooLate,
+      ApiPrivateUsdErrorCode.fundingCostChanged =>
+        PrivateUsdCopy.reverseErrorCostChanged,
+      ApiPrivateUsdErrorCode.unavailable =>
+        PrivateUsdCopy.reverseErrorFundingUnavailable,
+      ApiPrivateUsdErrorCode.relayerFee => PrivateUsdCopy.convertErrorFeeCap,
+      ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.convertProblemRoute,
+      ApiPrivateUsdErrorCode.storeUnreadable =>
+        PrivateUsdCopy.convertErrorStore,
+      _ => PrivateUsdCopy.reverseError,
+    };
+
+/// The problem card's message for a reverse conversion whose steps have
+/// failed for a minute (reference §5.8; the reverse rows of §9.6).
+String privateUsdReverseProblemMessage(ApiPrivateUsdErrorCode code) =>
+    switch (code) {
+      ApiPrivateUsdErrorCode.relayerUnreachable =>
+        PrivateUsdCopy.reverseProblemRelayer,
+      ApiPrivateUsdErrorCode.relayerRefused ||
+      ApiPrivateUsdErrorCode.relayerFee ||
+      ApiPrivateUsdErrorCode.ethereumUnreachable ||
+      ApiPrivateUsdErrorCode.chainLagging ||
+      ApiPrivateUsdErrorCode.zcashWallet ||
+      ApiPrivateUsdErrorCode.zcashRejected ||
+      ApiPrivateUsdErrorCode.tokensUnreachable ||
+      ApiPrivateUsdErrorCode.mismatch ||
+      ApiPrivateUsdErrorCode.storeUnreadable ||
+      ApiPrivateUsdErrorCode.routeBlocked => privateUsdProblemMessage(code),
+      _ => PrivateUsdCopy.convertProblemUnexpected,
+    };
+
+/// Why "Convert" did not start a reverse conversion: the maker's answer
+/// ended it (`nothingSent`) with nothing paid.
+String privateUsdReverseNothingSentMessage(ApiNothingSentCause? cause) =>
+    switch (cause) {
+      ApiNothingSentCause.makerUnavailable => PrivateUsdCopy.convertErrorMaker,
+      ApiNothingSentCause.quoteExpired => PrivateUsdCopy.convertQuoteRanOut,
+      _ => PrivateUsdCopy.convertStartFailed,
+    };

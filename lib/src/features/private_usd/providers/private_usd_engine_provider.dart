@@ -12,9 +12,12 @@ import '../../../providers/private_usd_lifecycle_provider.dart';
 import '../../../providers/rpc_endpoint_failover_provider.dart';
 import '../models/private_usd_record_key.dart';
 import '../services/private_usd_engine.dart';
+import '../services/private_usd_reverse_funding.dart';
+import '../services/private_usd_spend_guard.dart';
 import '../services/private_usd_swap_backend.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_unfinished_provider.dart';
+import 'railgun_engine_provider.dart';
 
 /// The swap engine's calls for this wallet; replaced by a fake in tests.
 final privateUsdSwapBackendProvider = Provider<PrivateUsdSwapBackend>((ref) {
@@ -92,14 +95,19 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
 
   void publish() {
     final snapshot = engine.conversions.value;
+    final reverse = engine.reverseConversions.value;
     ref.read(privateUsdConversionsProvider.notifier).publish(snapshot);
+    ref.read(privateUsdReverseConversionsProvider.notifier).publish(reverse);
     ref.read(privateUsdUnfinishedProvider.notifier).publish({
       for (final entry in snapshot.entries)
+        if (entry.value.isUnderWay) entry.key,
+      for (final entry in reverse.entries)
         if (entry.value.isUnderWay) entry.key,
     });
   }
 
   engine.conversions.addListener(publish);
+  engine.reverseConversions.addListener(publish);
   lifecycle.register(
     owner: engine,
     quiesceAndDrain: engine.quiesceAndDrain,
@@ -149,6 +157,7 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
     listener.dispose();
     lifecycle.unregister(engine);
     engine.conversions.removeListener(publish);
+    engine.reverseConversions.removeListener(publish);
     unawaited(engine.dispose());
   });
   // After the provider is built: starting may publish.
@@ -164,3 +173,52 @@ final privateUsdUnderWayProvider =
         accountUuid,
       ),
     );
+
+/// One outgoing Railgun payment at a time per wallet (M6 minimal; M7 adds
+/// sends).
+final privateUsdSpendGuardProvider = Provider<PrivateUsdSpendGuard>(
+  (_) => PrivateUsdSpendGuard(),
+);
+
+/// The Railgun page's reverse calls; replaced by a fake in tests.
+final privateUsdReversePageProvider = Provider<PrivateUsdReversePage>(
+  (ref) => RailgunReversePage(ref.watch(railgunEngineProvider)),
+);
+
+/// The reverse funding (§5.11 R4–R6), kept alive with the engine: a proof
+/// outlives the screen that started it.
+final privateUsdReverseFundingProvider = Provider<PrivateUsdReverseFunding>((
+  ref,
+) {
+  final funding = PrivateUsdReverseFunding(
+    engine: ref.watch(privateUsdEngineProvider),
+    page: ref.watch(privateUsdReversePageProvider),
+    guard: ref.watch(privateUsdSpendGuardProvider),
+  );
+  void publish() => ref
+      .read(privateUsdFundingStatesProvider.notifier)
+      .publish(funding.states.value);
+  funding.states.addListener(publish);
+  ref.onDispose(() {
+    funding.states.removeListener(publish);
+    funding.dispose();
+  });
+  return funding;
+});
+
+/// Each reverse conversion's funding as [privateUsdReverseFundingProvider]
+/// last published it.
+final privateUsdFundingStatesProvider =
+    NotifierProvider<
+      PrivateUsdFundingStatesNotifier,
+      Map<PrivateUsdRecordKey, PrivateUsdFundingState>
+    >(PrivateUsdFundingStatesNotifier.new);
+
+class PrivateUsdFundingStatesNotifier
+    extends Notifier<Map<PrivateUsdRecordKey, PrivateUsdFundingState>> {
+  @override
+  Map<PrivateUsdRecordKey, PrivateUsdFundingState> build() => const {};
+
+  void publish(Map<PrivateUsdRecordKey, PrivateUsdFundingState> next) =>
+      state = next;
+}

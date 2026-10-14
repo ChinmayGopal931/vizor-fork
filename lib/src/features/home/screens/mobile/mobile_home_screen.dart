@@ -60,7 +60,8 @@ import '../../../private_usd/providers/private_usd_activity_provider.dart';
 import '../../../private_usd/widgets/mobile/private_usd_activity_rows.dart';
 import '../../../private_usd/widgets/mobile/private_usd_banner.dart';
 import '../../../private_usd/widgets/mobile/private_usd_home_strip.dart';
-import '../../../../rust/api/private_usd.dart' show ApiForwardRecord;
+import '../../../../rust/api/private_usd.dart'
+    show ApiForwardRecord, ApiReverseRecord;
 import '../../../swap/models/swap_activity_navigation.dart';
 import '../../../swap/providers/swap_state_provider.dart';
 import '../../../swap/widgets/swap_activity_status_auto_refresh.dart';
@@ -1103,7 +1104,13 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     final privateUsdRecords = uuid == null
         ? const <ApiForwardRecord>[]
         : ref.watch(privateUsdActivityRecordsProvider(uuid));
-    final privateUsdTxids = privateUsdActivityTxids(privateUsdRecords);
+    final privateUsdReverseRecords = uuid == null
+        ? const <ApiReverseRecord>[]
+        : ref.watch(privateUsdReverseActivityRecordsProvider(uuid));
+    final privateUsdTxids = privateUsdActivityTxids(
+      privateUsdRecords,
+      reverse: privateUsdReverseRecords,
+    );
     final entries = <ActivityEntry>[
       for (final tx in giftCardActivityIndex.withPendingClaims(
         sync.recentTransactions,
@@ -1144,10 +1151,12 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
           ),
         ),
       // No rows, no deployment read (an FRB call desktop never makes).
-      if (privateUsdRecords.isNotEmpty)
+      if (privateUsdRecords.isNotEmpty || privateUsdReverseRecords.isNotEmpty)
         ...privateUsdActivityEntries(
           context: context,
           records: privateUsdRecords,
+          reverseRecords: privateUsdReverseRecords,
+          onOpenRefunds: () => _pushUsedScreen('/private-usd/refunds'),
           zcashConfirmations:
               ref
                   .watch(privateUsdCurrentDeploymentProvider)

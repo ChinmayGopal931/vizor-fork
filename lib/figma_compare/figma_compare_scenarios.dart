@@ -31,6 +31,7 @@ import '../widgetbook/donation_use_cases.dart';
 import '../widgetbook/mobile_pay_use_cases.dart';
 import '../widgetbook/mobile_gift_onboarding_use_cases.dart';
 import '../widgetbook/pay_use_cases.dart';
+import '../widgetbook/private_usd_reverse_use_cases.dart';
 import '../widgetbook/private_usd_use_cases.dart';
 import '../widgetbook/payment_link_mobile_use_cases.dart';
 import '../widgetbook/payment_link_amount_currency_use_cases.dart';
@@ -2340,6 +2341,103 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     id: 'mobile-private-usd-progress-nothing-sent',
     description: 'Private USD progress when nothing was sent',
     builder: buildMobilePrivateUsdProgressNothingSentUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-home-private-usd-attention',
+    description:
+        'Mobile home with a reverse conversion waiting for settlement (attention banner)',
+    builder: buildMobileHomePrivateUsdAttentionUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-convert-reverse',
+    description: 'Private USD convert, USD to ZEC, with a priced quote',
+    builder: buildMobilePrivateUsdConvertReverseUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-review-reverse',
+    description:
+        'Private USD reverse review: ledger, keep-open note and deadline',
+    builder: buildMobilePrivateUsdReviewReverseUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-reverse-funding',
+    description:
+        'Private USD reverse progress awaiting payment after the fees changed',
+    builder: buildMobilePrivateUsdReverseFundingUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-reverse-proving',
+    description:
+        'Private USD reverse progress while the page proves the payment',
+    builder: buildMobilePrivateUsdReverseProvingUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-reverse-ready',
+    description: 'Private USD reverse progress: Authorize settlement',
+    builder: buildMobilePrivateUsdReverseReadyUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-reverse-settling',
+    description:
+        'Private USD reverse progress settling, with the refund limit note',
+    builder: buildMobilePrivateUsdReverseSettlingUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-reverse-receiving',
+    description: 'Private USD reverse progress moving the ZEC home',
+    builder: buildMobilePrivateUsdReverseReceivingUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-reverse-complete',
+    description: 'Private USD reverse progress: ZEC received',
+    builder: buildMobilePrivateUsdReverseCompleteUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-reverse-refund-wait',
+    description: 'Private USD reverse progress after a refund request',
+    builder: buildMobilePrivateUsdReverseRefundWaitUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-reverse-refunded',
+    description: 'Private USD reverse progress refunded, with View refunds',
+    builder: buildMobilePrivateUsdReverseRefundedUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-refunds',
+    description:
+        'Private USD refunds: checking, recoverable, none, check failed',
+    builder: buildMobilePrivateUsdRefundsUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-refunds-empty',
+    description: 'Private USD refunds with none yet',
+    builder: buildMobilePrivateUsdRefundsEmptyUseCase,
     desktop: false,
     mobile: true,
   ),

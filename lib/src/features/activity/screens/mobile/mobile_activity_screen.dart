@@ -30,7 +30,8 @@ import 'mobile_transaction_status_screen.dart';
 import '../../../private_usd/providers/private_usd_activity_provider.dart';
 import '../../../private_usd/providers/private_usd_available_provider.dart';
 import '../../../private_usd/widgets/mobile/private_usd_activity_rows.dart';
-import '../../../../rust/api/private_usd.dart' show ApiForwardRecord;
+import '../../../../rust/api/private_usd.dart'
+    show ApiForwardRecord, ApiReverseRecord;
 
 /// Loads the full transaction history for one account; injectable so
 /// widget tests can avoid the Rust FFI.
@@ -290,7 +291,13 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen> {
     final privateUsdRecords = accountUuid == null
         ? const <ApiForwardRecord>[]
         : ref.watch(privateUsdActivityRecordsProvider(accountUuid));
-    final privateUsdTxids = privateUsdActivityTxids(privateUsdRecords);
+    final privateUsdReverseRecords = accountUuid == null
+        ? const <ApiReverseRecord>[]
+        : ref.watch(privateUsdReverseActivityRecordsProvider(accountUuid));
+    final privateUsdTxids = privateUsdActivityTxids(
+      privateUsdRecords,
+      reverse: privateUsdReverseRecords,
+    );
 
     final entries = <ActivityEntry>[
       for (final tx in giftCardActivityIndex.withPendingClaims(transactions))
@@ -327,10 +334,12 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen> {
           ),
         ),
       // No rows, no deployment read (an FRB call desktop never makes).
-      if (privateUsdRecords.isNotEmpty)
+      if (privateUsdRecords.isNotEmpty || privateUsdReverseRecords.isNotEmpty)
         ...privateUsdActivityEntries(
           context: context,
           records: privateUsdRecords,
+          reverseRecords: privateUsdReverseRecords,
+          onOpenRefunds: () => context.push('/private-usd/refunds'),
           zcashConfirmations:
               ref
                   .watch(privateUsdCurrentDeploymentProvider)

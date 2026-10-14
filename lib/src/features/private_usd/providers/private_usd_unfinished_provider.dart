@@ -25,9 +25,27 @@ class PrivateUsdConversionsNotifier
       state = next;
 }
 
-/// The conversions under way, for every account: the router's synchronous
-/// guard keeps a conversion's progress route reachable while its record is
-/// here, even when Private USD is otherwise unavailable (D16). It changes
+/// Every reverse conversion the swap engine has seen (M6), drafts too, by
+/// key, as it last published them.
+final privateUsdReverseConversionsProvider =
+    NotifierProvider<
+      PrivateUsdReverseConversionsNotifier,
+      Map<PrivateUsdRecordKey, PrivateUsdReverseStatus>
+    >(PrivateUsdReverseConversionsNotifier.new);
+
+class PrivateUsdReverseConversionsNotifier
+    extends Notifier<Map<PrivateUsdRecordKey, PrivateUsdReverseStatus>> {
+  @override
+  Map<PrivateUsdRecordKey, PrivateUsdReverseStatus> build() => const {};
+
+  /// The engine's latest snapshot.
+  void publish(Map<PrivateUsdRecordKey, PrivateUsdReverseStatus> next) =>
+      state = next;
+}
+
+/// The conversions under way in either direction, for every account: the
+/// router's synchronous guard keeps a conversion's progress route reachable
+/// while its record is here, even when Private USD is otherwise unavailable (D16). It changes
 /// only when a conversion starts or ends, so the router refreshes rarely.
 final privateUsdUnfinishedProvider =
     NotifierProvider<PrivateUsdUnfinishedNotifier, Set<PrivateUsdRecordKey>>(
@@ -97,4 +115,16 @@ class FixedPrivateUsdConversionsNotifier extends PrivateUsdConversionsNotifier {
 
   @override
   Map<PrivateUsdRecordKey, PrivateUsdConversionStatus> build() => fixed;
+}
+
+/// Reverse conversions that only show [fixed]: Widgetbook, capture scenarios
+/// and widget tests. No engine runs.
+class FixedPrivateUsdReverseConversionsNotifier
+    extends PrivateUsdReverseConversionsNotifier {
+  FixedPrivateUsdReverseConversionsNotifier(this.fixed);
+
+  final Map<PrivateUsdRecordKey, PrivateUsdReverseStatus> fixed;
+
+  @override
+  Map<PrivateUsdRecordKey, PrivateUsdReverseStatus> build() => fixed;
 }

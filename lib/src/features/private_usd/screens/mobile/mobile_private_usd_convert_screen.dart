@@ -26,8 +26,10 @@ import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_balance_provider.dart';
 import '../../providers/private_usd_convert_provider.dart';
 import '../../providers/private_usd_engine_provider.dart';
+import '../../providers/private_usd_reverse_convert_provider.dart';
 import '../../services/private_usd_zec_quote_search.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
+import 'mobile_private_usd_reverse_convert_view.dart';
 
 /// Railgun's fee for shielding the payout, as the quote ledger says it.
 const kPrivateUsdRailgunFeePercent = '0.25';
@@ -39,16 +41,26 @@ const kPrivateUsdForwardTakes = Duration(minutes: 10);
 /// The review reads the convert flow's state; this only proves the route was
 /// opened from it.
 class PrivateUsdReviewArgs {
-  const PrivateUsdReviewArgs({required this.index});
+  const PrivateUsdReviewArgs({
+    required this.index,
+    this.direction = PrivateUsdDirection.forward,
+  });
 
   final int index;
+  final PrivateUsdDirection direction;
 }
 
-/// `/private-usd/convert` (plan reference §9.4 S3), ZEC → private USD: the
-/// total ZEC to spend, its quote, and "Review". A conversion found under way
+/// `/private-usd/convert` (plan reference §9.4 S3, S4): ZEC → private USD
+/// (the total ZEC to spend, its quote, and "Review"), or private USD → ZEC
+/// with `?to=zec` or the direction toggle. A conversion found under way
 /// shows instead.
 class MobilePrivateUsdConvertScreen extends ConsumerStatefulWidget {
-  const MobilePrivateUsdConvertScreen({super.key});
+  const MobilePrivateUsdConvertScreen({
+    this.initialDirection = PrivateUsdDirection.forward,
+    super.key,
+  });
+
+  final PrivateUsdDirection initialDirection;
 
   @override
   ConsumerState<MobilePrivateUsdConvertScreen> createState() =>
@@ -59,6 +71,9 @@ class _MobilePrivateUsdConvertScreenState
     extends ConsumerState<MobilePrivateUsdConvertScreen> {
   final _amount = TextEditingController();
   final _focus = FocusNode();
+  late var _direction = widget.initialDirection;
+
+  bool get _reverse => _direction == PrivateUsdDirection.reverse;
 
   @override
   void initState() {
@@ -75,8 +90,90 @@ class _MobilePrivateUsdConvertScreenState
         _showProgress(underWay.path);
         return;
       }
-      unawaited(ref.read(privateUsdConvertProvider.notifier).findUnderWay());
+      unawaited(
+        _reverse
+            ? ref.read(privateUsdReverseConvertProvider.notifier).findUnderWay()
+            : ref.read(privateUsdConvertProvider.notifier).findUnderWay(),
+      );
     });
+  }
+
+  /// The direction toggle: the other flow starts empty.
+  void _switchDirection() {
+    setState(() {
+      _direction = _reverse
+          ? PrivateUsdDirection.forward
+          : PrivateUsdDirection.reverse;
+      _amount.clear();
+    });
+  }
+
+  void _syncAmount(String text) {
+    if (_amount.text != text) {
+      _amount.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    }
+  }
+
+  Future<void> _reviewReverse() async {
+    final notifier = ref.read(privateUsdReverseConvertProvider.notifier);
+    if (!notifier.openReview()) return;
+    final draft = ref.read(privateUsdReverseConvertProvider).draft!;
+    final shown = await context.push<PrivateUsdRoutePath>(
+      '/private-usd/convert/review',
+      extra: PrivateUsdReviewArgs(
+        index: draft.index,
+        direction: PrivateUsdDirection.reverse,
+      ),
+    );
+    if (!mounted) return;
+    if (shown != null) {
+      _showProgress(shown);
+      return;
+    }
+    notifier.leaveReview();
+  }
+
+  Widget _buildReverse(BuildContext context) {
+    ref.listen(privateUsdReverseConvertProvider.select((s) => s.underWay), (
+      _,
+      path,
+    ) {
+      if (path != null) _showProgress(path);
+    });
+    // Max rewrites the amount.
+    ref.listen(
+      privateUsdReverseConvertProvider.select((s) => s.amountText),
+      (_, text) => _syncAmount(text),
+    );
+    final state = ref.watch(privateUsdReverseConvertProvider);
+    final uuid = ref.watch(
+      accountProvider.select((s) => s.value?.activeAccountUuid),
+    );
+    // The balance the amount is checked against stays fresh meanwhile.
+    if (uuid != null) {
+      ref.watch(
+        privateUsdBalanceKeepFreshProvider((accountUuid: uuid, ifUsed: false)),
+      );
+    }
+    final notifier = ref.read(privateUsdReverseConvertProvider.notifier);
+    return MobilePrivateUsdReverseConvertView(
+      state: state,
+      controller: _amount,
+      focusNode: _focus,
+      privacyModeEnabled: ref.watch(privacyModeProvider),
+      onAmountChanged: notifier.onAmountChanged,
+      onMax: () => unawaited(notifier.onMax()),
+      onReview: _reviewReverse,
+      onBack: () => context.pop(),
+      onSwitchDirection:
+          state.step == PrivateUsdConvertStep.amount && !state.quoting
+          ? _switchDirection
+          : null,
+      onViewRefunds: () => context.push('/private-usd/refunds'),
+    );
   }
 
   @override
@@ -111,21 +208,15 @@ class _MobilePrivateUsdConvertScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (_reverse) return _buildReverse(context);
     ref.listen(privateUsdConvertProvider.select((s) => s.underWay), (_, path) {
       if (path != null) _showProgress(path);
     });
     // A quote can rewrite the amount ("Use it all", then what it pays for).
-    ref.listen(privateUsdConvertProvider.select((s) => s.amountText), (
-      _,
-      text,
-    ) {
-      if (_amount.text != text) {
-        _amount.value = TextEditingValue(
-          text: text,
-          selection: TextSelection.collapsed(offset: text.length),
-        );
-      }
-    });
+    ref.listen(
+      privateUsdConvertProvider.select((s) => s.amountText),
+      (_, text) => _syncAmount(text),
+    );
     final state = ref.watch(privateUsdConvertProvider);
     final uuid = ref.watch(
       accountProvider.select((s) => s.value?.activeAccountUuid),
@@ -146,6 +237,10 @@ class _MobilePrivateUsdConvertScreenState
       onMax: notifier.onMax,
       onReview: _review,
       onBack: () => context.pop(),
+      onSwitchDirection:
+          state.step == PrivateUsdConvertStep.amount && !state.quoting
+          ? _switchDirection
+          : null,
     );
   }
 }
@@ -165,6 +260,7 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
     this.privateUsdAvailable,
     this.maxRelayerFee,
     this.autofocus = true,
+    this.onSwitchDirection,
     super.key,
   });
 
@@ -181,6 +277,9 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
   final VoidCallback onMax;
   final VoidCallback onReview;
   final VoidCallback onBack;
+
+  /// The direction toggle (private USD → ZEC); null hides it.
+  final VoidCallback? onSwitchDirection;
 
   @override
   Widget build(BuildContext context) {
@@ -223,7 +322,7 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
                       onAmountChanged: onAmountChanged,
                       onMax: onMax,
                     ),
-                    const SizedBox(height: AppSpacing.s),
+                    PrivateUsdDirectionToggle(onTap: onSwitchDirection),
                     _EstimateCard(
                       state: state,
                       privacyModeEnabled: privacyModeEnabled,
@@ -597,6 +696,50 @@ class PrivateUsdQuoteExpiry extends StatelessWidget {
           const SizedBox(width: AppSpacing.s),
           rule(),
         ],
+      ),
+    );
+  }
+}
+
+/// The convert screen's direction toggle between its two cards (zapp
+/// `canSwitchDirection`); with no [onTap] only the gap shows.
+class PrivateUsdDirectionToggle extends StatelessWidget {
+  const PrivateUsdDirectionToggle({this.onTap, super.key});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final onTap = this.onTap;
+    if (onTap == null) return const SizedBox(height: AppSpacing.s);
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: Center(
+        child: Semantics(
+          button: true,
+          label: PrivateUsdCopy.convertSwapDirection,
+          excludeSemantics: true,
+          child: GestureDetector(
+            key: const ValueKey('mobile_private_usd_convert_direction'),
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: colors.background.inverse,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: AppIcon(
+                AppIcons.swapArrows,
+                size: 20,
+                color: colors.icon.inverse,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

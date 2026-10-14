@@ -27,6 +27,19 @@
 #                        resume phase (lock, account switch, delete warning, Paid).
 #                        Implies --skip-release and keeps the page storage.
 #   --m5-zec AMOUNT      ZEC to convert in the M5 round (default 0.05)
+#   --m6                 the M6 round (reverse conversion), off by default. Run it
+#                        after an M5 round left private USD in the same wallet
+#                        (or together with --m5, after it). It never resets the
+#                        wallet and keeps the page storage. It converts --m6-usd
+#                        back to ZEC through the screens: a lock while the page
+#                        proves the payment pays nothing; that unpaid conversion,
+#                        cancelled, ends CANCELLED; a new one is paid, settlement
+#                        is authorized and it reaches COMPLETE. Implies
+#                        --skip-release.
+#   --m6-usd AMOUNT      private USD to convert in the M6 round, whole cents
+#                        (default 2)
+#   --m6-refund          also: a paid conversion, cancelled, ends REFUNDED (waits
+#                        out the refund deadlines; can take hours)
 #
 # Safety: it refuses a phone whose com.keplr.vizor is installed but not
 # debuggable (that may be a real wallet), runs `flutter test --no-uninstall`,
@@ -58,11 +71,14 @@ export CARGOKIT_SKIP_EMULATOR_ABIS=true
 OUT="${TMPDIR:-/tmp}/pusd-device-round-$(date +%Y%m%d-%H%M%S)"
 RELEASE_APK=""
 RUN_TEST=1 RUN_RELEASE=1 RUN_RESTORE=1 KEEP_PAGE=0 TOR_FIRST_SYNC=true
-M5=0 M5_ZEC=0.05
+M5=0 M5_ZEC=0.05 M6=0 M6_USD=2 M6_REFUND=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --m5) M5=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
     --m5-zec) M5_ZEC=$2; shift 2 ;;
+    --m6) M6=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
+    --m6-usd) M6_USD=$2; shift 2 ;;
+    --m6-refund) M6_REFUND=true; shift ;;
     --out) OUT=$2; shift 2 ;;
     --release-apk) RELEASE_APK=$2; shift 2 ;;
     --skip-test) RUN_TEST=0; shift ;;
@@ -222,7 +238,23 @@ if [[ $RUN_TEST == 1 ]]; then
       m5_test resume
       TEST_STATUS=$?
     fi
-  else
+  fi
+  if [[ $M6 == 1 && $TEST_STATUS == 0 ]]; then
+    # Never VIZOR_PUSD_DEVICE_RESET: the round converts the private USD an
+    # M5 round left in the phone's wallet.
+    log "M6 round: convert $M6_USD private USD to ZEC (refund check: $M6_REFUND)"
+    fvm flutter test integration_test/private_usd_device_test.dart \
+      -d "$SERIAL" --tags private-usd-device --run-skipped --no-uninstall \
+      "${DEFINES[@]}" \
+      --dart-define=ZCASH_E2E_NETWORK=testnet \
+      --dart-define=VIZOR_PUSD_DEVICE_DRIVER_URL="http://127.0.0.1:$PORT" \
+      --dart-define=VIZOR_PUSD_DEVICE_M6=run \
+      --dart-define=VIZOR_PUSD_DEVICE_M6_USD="$M6_USD" \
+      --dart-define=VIZOR_PUSD_DEVICE_M6_REFUND=$M6_REFUND \
+      2>&1 | tee "$OUT/flutter-test-m6.log"
+    TEST_STATUS=${PIPESTATUS[0]}
+  fi
+  if [[ $M5 == 0 && $M6 == 0 ]]; then
     log "running the integration test (fresh page storage: $fresh, Tor first sync: $TOR_FIRST_SYNC)"
     fvm flutter test integration_test/private_usd_device_test.dart \
       -d "$SERIAL" --tags private-usd-device --run-skipped --no-uninstall \

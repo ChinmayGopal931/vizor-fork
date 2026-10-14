@@ -76,6 +76,15 @@ Future<void> showPrivateUsdProgressInfoSheet(
   ],
 );
 
+/// "Private USD to ZEC" (the reverse screens' info): the two approvals,
+/// and when a refund can follow.
+Future<void> showPrivateUsdReverseInfoSheet(BuildContext context) => _show(
+  context,
+  title: PrivateUsdCopy.reverseTitle,
+  steps: const [PrivateUsdCopy.reverseIntro],
+  notes: const [PrivateUsdCopy.reverseRefundNote, PrivateUsdCopy.infoKeepOpen],
+);
+
 Future<void> _show(
   BuildContext context, {
   required String title,

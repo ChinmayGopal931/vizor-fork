@@ -460,26 +460,12 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
   Future<void> findUnderWay() async {
     final account = _account;
     if (account == null) return;
-    final engine = ref.read(privateUsdEngineProvider);
-    try {
-      final records = await engine.loadRecords(account);
-      if (!ref.mounted) return;
-      for (final record in records) {
-        if (record.outcome == null) {
-          state = state.copyWith(
-            underWay: PrivateUsdRoutePath(
-              direction: PrivateUsdDirection.forward,
-              index: record.index,
-            ),
-          );
-          return;
-        }
-      }
-    } catch (error) {
-      if (kDebugMode) {
-        debugPrint('privateUsd: reading conversions failed');
-      }
-    }
+    final path = await privateUsdFindUnderWay(
+      ref.read(privateUsdEngineProvider),
+      account,
+    );
+    if (!ref.mounted || path == null) return;
+    state = state.copyWith(underWay: path);
   }
 
   Future<bool> _isUnderWay(
@@ -647,4 +633,37 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
       clearQuoteError: message == null,
     );
   }
+}
+
+/// [accountUuid]'s conversion under way in either direction, read from the
+/// records (opening a convert screen, or after the app died mid-accept):
+/// one at a time per account, so it shows instead of a new one. Reading
+/// them also publishes the account's reverse drafts.
+Future<PrivateUsdRoutePath?> privateUsdFindUnderWay(
+  PrivateUsdEngine engine,
+  String accountUuid,
+) async {
+  try {
+    final forward = await engine.loadRecords(accountUuid);
+    for (final record in forward) {
+      if (record.outcome == null) {
+        return PrivateUsdRoutePath(
+          direction: PrivateUsdDirection.forward,
+          index: record.index,
+        );
+      }
+    }
+    final reverse = await engine.loadReverseRecords(accountUuid);
+    for (final record in reverse) {
+      if (privateUsdReverseUnderWay(record.phase)) {
+        return PrivateUsdRoutePath(
+          direction: PrivateUsdDirection.reverse,
+          index: record.index,
+        );
+      }
+    }
+  } catch (error) {
+    if (kDebugMode) debugPrint('privateUsd: reading conversions failed');
+  }
+  return null;
 }

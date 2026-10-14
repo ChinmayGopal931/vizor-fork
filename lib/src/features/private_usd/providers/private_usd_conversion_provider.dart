@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../rust/api/private_usd.dart' as rust;
 import '../models/private_usd_record_key.dart';
+import '../models/private_usd_reverse_presentation.dart';
 import '../models/private_usd_status_presentation.dart';
 import '../private_usd_copy.dart';
 import '../services/private_usd_engine.dart';
@@ -179,7 +180,7 @@ final privateUsdConversionBannerProvider = Provider.autoDispose
           return null;
         }),
       );
-      if (status == null) return null;
+      if (status == null) return _reverseBanner(ref, accountUuid);
       final confirmations =
           ref.watch(privateUsdCurrentDeploymentProvider)?.zcashConfirmations ??
           2;
@@ -196,3 +197,30 @@ final privateUsdConversionBannerProvider = Provider.autoDispose
         attention: attention,
       );
     });
+
+/// [accountUuid]'s reverse conversion under way as a banner (M6): it asks
+/// for attention while it waits on the user's payment or settlement
+/// approval (`needs_you`), or once its steps keep failing.
+PrivateUsdBannerState? _reverseBanner(Ref ref, String accountUuid) {
+  final entry = ref.watch(
+    privateUsdReverseConversionsProvider.select((all) {
+      for (final entry in all.entries) {
+        if (entry.key.accountUuid == accountUuid && entry.value.isUnderWay) {
+          return entry;
+        }
+      }
+      return null;
+    }),
+  );
+  if (entry == null) return null;
+  final status = entry.value;
+  final attention = status.needsYou || status.problem != null;
+  return PrivateUsdBannerState(
+    path: entry.key.path,
+    title: attention
+        ? PrivateUsdCopy.bannerAttention
+        : PrivateUsdCopy.bannerToZec,
+    detail: privateUsdReverseStageLabel(status.record),
+    attention: attention,
+  );
+}

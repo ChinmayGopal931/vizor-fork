@@ -338,6 +338,10 @@ class _ConvertPreviewState extends State<_ConvertPreview> {
     onMax: () {},
     onReview: () {},
     onBack: () {},
+    // The direction toggle shows on the amount step, as in the app (M6).
+    onSwitchDirection: widget.state.step == PrivateUsdConvertStep.amount
+        ? () {}
+        : null,
   );
 }
 

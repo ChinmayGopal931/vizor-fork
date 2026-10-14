@@ -18,6 +18,9 @@ import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../../../providers/zec_price_change_provider.dart';
+import '../../../../rust/api/private_usd.dart' show ApiReversePhase;
+import '../../../activity/activity_feed_sections.dart'
+    show compareActivityEntries;
 import '../../../activity/models/activity_row_data.dart';
 import '../../../activity/widgets/activity_feed.dart' show ActivityFeedRowGroup;
 import '../../models/private_usd_balances.dart';
@@ -76,17 +79,26 @@ class _MobilePrivateUsdScreenState
     final privacyModeEnabled = ref.watch(privacyModeProvider);
     final underWay = ref.watch(privateUsdUnderWayProvider(uuid));
     void open(PrivateUsdRoutePath path) => context.push(path.location);
+    void openRefunds() => context.push('/private-usd/refunds');
+    final reverseRecords = ref.watch(
+      privateUsdReverseActivityRecordsProvider(uuid),
+    );
     final activity = [
       for (final entry in privateUsdActivityEntries(
         context: context,
         records: ref.watch(privateUsdActivityRecordsProvider(uuid)),
+        reverseRecords: reverseRecords,
         zcashConfirmations: deployment?.zcashConfirmations ?? 2,
         privacyModeEnabled: privacyModeEnabled,
         onOpenConversion: open,
         onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
-      ))
+        onOpenRefunds: openRefunds,
+      )..sort(compareActivityEntries))
         entry.row,
     ];
+    final hasRefunds = reverseRecords.any(
+      (record) => record.phase == ApiReversePhase.refunded,
+    );
     return MobilePrivateUsdView(
       state: ref.watch(privateUsdBalanceProvider(uuid)),
       zecUsdPrice: ref.watch(zecHomeUsdUnitPriceProvider),
@@ -99,6 +111,7 @@ class _MobilePrivateUsdScreenState
       },
       banner: ref.watch(privateUsdConversionBannerProvider(uuid)),
       activityRows: activity,
+      onRefunds: hasRefunds ? openRefunds : null,
       onBack: () => context.pop(),
       onRefresh: () =>
           ref.read(privateUsdBalanceProvider(uuid).notifier).refresh(),
@@ -127,6 +140,7 @@ class MobilePrivateUsdView extends StatelessWidget {
     this.activityRows = const [],
     this.onOpenConversion,
     this.onConvert,
+    this.onRefunds,
     super.key,
   });
 
@@ -152,6 +166,9 @@ class MobilePrivateUsdView extends StatelessWidget {
 
   /// "Convert": the conversion under way, else a new one. Hidden when null.
   final VoidCallback? onConvert;
+
+  /// "Refunds" beside the Activity heading, once a conversion was refunded.
+  final VoidCallback? onRefunds;
 
   @override
   Widget build(BuildContext context) {
@@ -230,7 +247,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                       _ReceiveAddressCard(address: address),
                     ],
                     const SizedBox(height: AppSpacing.md),
-                    _ActivitySection(rows: activityRows),
+                    _ActivitySection(rows: activityRows, onRefunds: onRefunds),
                   ],
                 ),
               ),
@@ -677,9 +694,10 @@ class _ReceiveAddressCard extends StatelessWidget {
 
 /// Conversions (M5), then sends and withdrawals (M7), newest first.
 class _ActivitySection extends StatelessWidget {
-  const _ActivitySection({required this.rows});
+  const _ActivitySection({required this.rows, this.onRefunds});
 
   final List<ActivityRowData> rows;
+  final VoidCallback? onRefunds;
 
   @override
   Widget build(BuildContext context) {
@@ -689,11 +707,25 @@ class _ActivitySection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            PrivateUsdCopy.activityTitle,
-            style: AppTypography.headlineSmall.copyWith(
-              color: colors.text.accent,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  PrivateUsdCopy.activityTitle,
+                  style: AppTypography.headlineSmall.copyWith(
+                    color: colors.text.accent,
+                  ),
+                ),
+              ),
+              if (onRefunds case final onRefunds?)
+                AppButton(
+                  key: const ValueKey('mobile_private_usd_refunds'),
+                  variant: AppButtonVariant.secondary,
+                  size: AppButtonSize.small,
+                  onPressed: onRefunds,
+                  child: const Text(PrivateUsdCopy.refundsTitle),
+                ),
+            ],
           ),
           const SizedBox(height: AppSpacing.s),
           if (rows.isEmpty)

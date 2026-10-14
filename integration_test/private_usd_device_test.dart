@@ -24,6 +24,8 @@ import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_balance_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_record_key.dart';
+import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_amount.dart';
+import 'package:zcash_wallet/src/features/private_usd/services/private_usd_reverse_funding.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_engine_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_unfinished_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/railgun_engine_provider.dart';
@@ -36,7 +38,7 @@ import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart' as rust_private_usd;
 import 'package:zcash_wallet/src/rust/api/private_usd.dart'
-    show ApiForwardOutcome;
+    show ApiForwardOutcome, ApiReversePhase;
 
 import 'support/mobile_regtest_flow.dart';
 
@@ -77,6 +79,16 @@ import 'support/mobile_regtest_flow.dart';
 //           key until unlock resumes it; with another account active it
 //           keeps advancing; the delete warning shows the count; it reaches
 //           Paid.
+//
+// The M6 round (reverse conversion) is opt-in too: the runner's `--m6`
+// passes VIZOR_PUSD_DEVICE_M6=run. It runs after an M5 round left private
+// USD in the same wallet, never resets it, and converts
+// VIZOR_PUSD_DEVICE_M6_USD dollars back to ZEC through the screens:
+//   1. a lock while the page proves the payment pays nothing;
+//   2. that unpaid conversion, cancelled, ends CANCELLED;
+//   3. a new one is paid, settlement is authorized, and it reaches COMPLETE;
+//   4. only with VIZOR_PUSD_DEVICE_M6_REFUND (`--m6-refund`, long refund
+//      deadlines): a paid one, cancelled, ends REFUNDED and shows on Refunds.
 
 const _driverUrl = String.fromEnvironment('VIZOR_PUSD_DEVICE_DRIVER_URL');
 const _allowReset = bool.fromEnvironment('VIZOR_PUSD_DEVICE_RESET');
@@ -91,6 +103,13 @@ const _m5Zec = String.fromEnvironment(
   'VIZOR_PUSD_DEVICE_M5_ZEC',
   defaultValue: '0.05',
 );
+// '' or 'run': the M6 round (reverse conversion).
+const _m6Phase = String.fromEnvironment('VIZOR_PUSD_DEVICE_M6');
+const _m6Usd = String.fromEnvironment(
+  'VIZOR_PUSD_DEVICE_M6_USD',
+  defaultValue: '2',
+);
+const _m6Refund = bool.fromEnvironment('VIZOR_PUSD_DEVICE_M6_REFUND');
 
 const _homeBalanceKey = ValueKey('mobile_home_shielded_balance');
 const _stripKey = ValueKey('mobile_home_private_usd_strip');
@@ -124,7 +143,9 @@ void main() {
   testWidgets('M3: the Private USD balance, Tor and lock on a device', (
     tester,
   ) async {
-    if (_m5Phase.isNotEmpty) return _log('an M5 round: M3 not run');
+    if (_m5Phase.isNotEmpty || _m6Phase.isNotEmpty) {
+      return _log('a conversion round: M3 not run');
+    }
     tolerateRenderOverflows();
     _requireRoundSetup();
     await _Round(tester).run();
@@ -147,6 +168,33 @@ void main() {
     _requireM5Setup();
     await _M5Round(tester).resume();
   }, timeout: const Timeout(Duration(minutes: 70)));
+
+  testWidgets('M6: reverse conversion, lock mid-proof, cancel, complete', (
+    tester,
+  ) async {
+    if (_m6Phase != 'run') return _log('not the M6 round');
+    tolerateRenderOverflows();
+    _requireM6Setup();
+    await _M6Round(tester).convertBack();
+  }, timeout: Timeout(Duration(minutes: _m6Refund ? 330 : 150)));
+}
+
+void _requireM6Setup() {
+  if (!Platform.isAndroid) fail('The swap engine is Android only.');
+  if (kZcashDefaultNetworkName != ZcashNetwork.testnet.name) {
+    fail('Run on testnet: --dart-define=ZCASH_DEFAULT_NETWORK=test.');
+  }
+  if (!kVizorPrivateUsdEnabled || kAppFormFactor != AppFormFactor.mobile) {
+    fail('Build with VIZOR_PRIVATE_USD_ENABLED and VIZOR_FORM_FACTOR=mobile.');
+  }
+  if (_driverUrl.isEmpty) {
+    fail('Run through scripts/private-usd/run_device_round.sh --m6.');
+  }
+  // It converts the private USD an M5 round left: never the reset round.
+  if (_allowReset) fail('An M6 round never resets the wallet.');
+  if (privateUsdDollarUnits(_m6Usd) == null) {
+    fail('Bad VIZOR_PUSD_DEVICE_M6_USD: whole cents, more than zero.');
+  }
 }
 
 void _requireM5Setup() {
@@ -1140,5 +1188,315 @@ class _M5Round extends _Round {
     _results['m5_paid_after_resume_s'] = DateTime.now()
         .difference(started)
         .inSeconds;
+  }
+}
+
+/// The M6 device round (reverse conversion, opt-in), after an M5 round left
+/// private USD in the phone's testnet wallet. Never prints the mnemonic, an
+/// address, a txid or any secret: the events carry the swap index, phases
+/// and timings.
+class _M6Round extends _Round {
+  _M6Round(super.tester);
+
+  static const _screenConvertKey = ValueKey('mobile_private_usd_convert');
+  static const _directionKey = ValueKey('mobile_private_usd_convert_direction');
+  static const _amountKey = ValueKey('mobile_private_usd_convert_amount');
+  static const _reviewKey = ValueKey('mobile_private_usd_convert_review');
+  static const _convertKey = ValueKey('mobile_private_usd_review_convert');
+  static const _progressKey = ValueKey('mobile_private_usd_progress_list');
+  static const _actionKey = ValueKey('mobile_private_usd_progress_action');
+  static const _callOffKey = ValueKey('mobile_private_usd_progress_call_off');
+  static const _confirmKey = ValueKey('private_usd_confirm_sheet_confirm');
+  static const _bannerKey = ValueKey('private_usd_conversion_banner');
+  static const _refundsKey = ValueKey('mobile_private_usd_progress_refunds');
+
+  late PrivateUsdRecordKey _key;
+
+  PrivateUsdReverseStatus? get _status =>
+      _container.read(privateUsdReverseConversionsProvider)[_key];
+
+  PrivateUsdFundingState? get _funding =>
+      _container.read(privateUsdFundingStatesProvider)[_key];
+
+  ApiReversePhase? get _phase => _status?.record.phase;
+
+  bool get _funded => _status?.record.funded ?? false;
+
+  Future<void> convertBack() async {
+    _vmServicePort = (await developer.Service.getInfo()).serverUri?.port;
+    await _event('m6-start', {'usd': _m6Usd, 'refund': _m6Refund});
+    await tester.pumpWidget(await buildBootstrappedZcashWalletApp());
+    await _waitUntil(
+      'the unlock keypad',
+      () => tester.any(find.bySemanticsLabel('Digit 1')),
+      timeout: const Duration(minutes: 2),
+    );
+    await enterPasscode(tester, mobileE2ePasscode);
+    await waitForHome(tester);
+    _container = ProviderScope.containerOf(
+      tester.element(find.byKey(_homeBalanceKey)),
+    );
+    _uuid = _container.read(accountProvider).value!.activeAccountUuid!;
+    _router = GoRouter.of(tester.element(find.byKey(_homeBalanceKey)));
+    expect(_container.read(privateUsdAvailableProvider), isTrue);
+
+    await _waitForDollars();
+    await _lockDuringTheProofPaysNothing();
+    await _cancelBeforeFunding();
+    await _reachesComplete();
+    if (_m6Refund) {
+      await _cancelAfterFundingRefunds();
+    } else {
+      _results['m6_refund'] = 'skipped: not asked for (--m6-refund)';
+    }
+    _log('results: $_results');
+    await _event('m6-end', _results);
+  }
+
+  /// The swap token's spendable private balance covers the amount and its
+  /// fees (the relayer's at most 2 USDC, Railgun's 0.25 %). From
+  /// `/private-usd`, which keeps the balance fresh.
+  Future<void> _waitForDollars() async {
+    final needed = privateUsdDollarUnits(_m6Usd)! + BigInt.from(2500000);
+    await tapWidget(tester, _stripKey);
+    await _waitUntil('$_m6Usd private USD and its fees to be available', () {
+      final token = _container
+          .read(privateUsdCurrentDeploymentProvider)
+          ?.token
+          .toLowerCase();
+      final assets = _container
+          .read(privateUsdBalanceProvider(_uuid))
+          .balances
+          ?.assets;
+      final asset = assets?.where((a) => a.token.address == token);
+      return asset != null &&
+          asset.isNotEmpty &&
+          asset.first.available >= needed;
+    }, timeout: const Duration(minutes: 30));
+    _goHome();
+    await waitForHome(tester);
+  }
+
+  // Taken on home: the app's one router, whichever screen shows later.
+  late final GoRouter _router;
+
+  void _goHome() => _router.go('/home');
+
+  /// Home → strip → Convert → the direction toggle → the dollars → Review →
+  /// Convert, which accepts and starts paying; its progress shows.
+  Future<void> _convertThroughTheScreens(String check) async {
+    await tapWidget(tester, _stripKey);
+    await tapAppButton(tester, _screenConvertKey);
+    await tapWidget(tester, _directionKey);
+    await _waitUntil(
+      'the reverse convert screen',
+      () => tester.any(
+        find.byKey(const ValueKey('mobile_private_usd_convert_usd')),
+      ),
+    );
+    await tester.enterText(find.byKey(_amountKey), _m6Usd);
+    await tester.pump(const Duration(milliseconds: 100));
+    // 700 ms after typing stops: a quote, then the page prices it.
+    await tapAppButton(tester, _reviewKey, timeout: const Duration(minutes: 3));
+    await _screenshot('m6-$check-review');
+    final started = DateTime.now();
+    await tapAppButton(
+      tester,
+      _convertKey,
+      timeout: const Duration(minutes: 1),
+    );
+    await _waitUntil(
+      'the reverse progress screen',
+      () => tester.any(find.byKey(_progressKey)),
+      timeout: const Duration(minutes: 3),
+    );
+    final key = privateUsdUnderWayFor(
+      _container.read(privateUsdUnfinishedProvider),
+      _uuid,
+    );
+    expect(key, isNotNull, reason: 'accepted, but nothing is under way');
+    expect(key!.direction, PrivateUsdDirection.reverse);
+    _key = key;
+    await _event('m6-accepted', {
+      'check': check,
+      'index': _key.index,
+      'afterS': DateTime.now().difference(started).inSeconds,
+    });
+  }
+
+  /// 1. Locked while the page proves the payment: the proof is dropped and
+  /// nothing is paid, then or after unlock.
+  Future<void> _lockDuringTheProofPaysNothing() async {
+    await _convertThroughTheScreens('lock');
+    await _waitUntil(
+      'the payment proof to start',
+      () => _funding?.stage == PrivateUsdFundingStage.proving || _funded,
+      timeout: const Duration(minutes: 5),
+    );
+    // Let the proof get going, then lock mid-proof.
+    await _pumpFor(const Duration(seconds: 5));
+    if (_funded || _funding?.stage != PrivateUsdFundingStage.proving) {
+      _results['m6_lock'] = 'skipped: the proof finished before the lock';
+      return;
+    }
+    await _screenshot('m6-01-proving');
+    _container.read(appSecurityProvider.notifier).lock();
+    _container.read(accountProvider.notifier).clearSensitiveStateForLock();
+    _router.go('/unlock');
+    unawaited(
+      _container.read(syncProvider.notifier).clearSensitiveStateForLock(),
+    );
+    // Longer than a proof takes: one that finished would be submitted now.
+    await _pumpFor(const Duration(minutes: 3));
+    expect(_funded, isFalse, reason: 'a payment was submitted while locked');
+    await enterPasscode(tester, mobileE2ePasscode);
+    await waitForHome(tester);
+    await _pumpFor(const Duration(seconds: 30));
+    await _container.read(privateUsdEngineProvider).loadReverseRecords(_uuid);
+    expect(_funded, isFalse, reason: 'the dropped proof was paid after unlock');
+    expect(_status?.record.fundingTx, isNull);
+    expect(_funding?.running ?? false, isFalse);
+    _results['m6_lock'] =
+        'no payment after a lock mid-proof (phase ${_phase?.name})';
+  }
+
+  /// 2. The unpaid conversion, cancelled behind its sheet: CANCELLED.
+  Future<void> _cancelBeforeFunding() async {
+    if (_funded || _status?.isUnderWay != true) {
+      _results['m6_cancel_before_funding'] = 'skipped: ${_phase?.name}';
+      return;
+    }
+    await tapWidget(tester, _bannerKey);
+    await _waitUntil(
+      'the reverse progress screen',
+      () => tester.any(find.byKey(_progressKey)),
+    );
+    expect(find.text(PrivateUsdCopy.reverseCancel), findsOneWidget);
+    await tapAppButton(tester, _callOffKey);
+    await tapAppButton(tester, _confirmKey);
+    await _waitUntil(
+      'the conversion to be cancelled',
+      () => _phase == ApiReversePhase.cancelled,
+      timeout: const Duration(minutes: 5),
+    );
+    await _screenshot('m6-02-cancelled');
+    expect(_funded, isFalse);
+    _results['m6_cancel_before_funding'] = _phase?.name;
+    _goHome();
+    await waitForHome(tester);
+  }
+
+  /// 3. Paid, settlement authorized, COMPLETE. A conversion the lock check
+  /// left paid is followed instead of a new one.
+  Future<void> _reachesComplete() async {
+    final underWay = privateUsdUnderWayFor(
+      _container.read(privateUsdUnfinishedProvider),
+      _uuid,
+    );
+    if (underWay != null && underWay.direction == PrivateUsdDirection.reverse) {
+      _key = underWay;
+      if (!tester.any(find.byKey(_progressKey))) {
+        _goHome();
+        await waitForHome(tester);
+        await tapWidget(tester, _bannerKey);
+      }
+    } else {
+      await _convertThroughTheScreens('complete');
+    }
+    final started = DateTime.now();
+    await _waitUntil(
+      'the payment to be kept',
+      () => _funded || _status?.isUnderWay == false,
+      timeout: const Duration(minutes: 15),
+    );
+    expect(_funded, isTrue, reason: 'ended ${_phase?.name} before paying');
+    await _screenshot('m6-03-paid');
+    await _event('m6-paid', {
+      'index': _key.index,
+      'afterS': DateTime.now().difference(started).inSeconds,
+    });
+    await _followUntil(
+      'settlement to be asked for',
+      () =>
+          _phase == ApiReversePhase.awaitingReady ||
+          _status?.isUnderWay == false,
+      timeout: const Duration(minutes: 60),
+    );
+    expect(_phase, ApiReversePhase.awaitingReady);
+    await _screenshot('m6-04-authorize');
+    await tapAppButton(tester, _actionKey);
+    await _followUntil(
+      'the conversion to complete',
+      () => _status?.isUnderWay == false,
+      timeout: const Duration(minutes: 45),
+    );
+    await _screenshot('m6-05-complete');
+    expect(_phase, ApiReversePhase.complete);
+    _results['m6_outcome'] = _phase?.name;
+    _results['m6_complete_after_s'] = DateTime.now()
+        .difference(started)
+        .inSeconds;
+    _goHome();
+    await waitForHome(tester);
+  }
+
+  /// 4. Opt-in: a paid conversion, cancelled behind its sheet ("Request
+  /// refund"), ends REFUNDED and shows on Refunds.
+  Future<void> _cancelAfterFundingRefunds() async {
+    await _waitForDollars();
+    await _convertThroughTheScreens('refund');
+    await _waitUntil(
+      'the payment to be kept',
+      () => _funded || _status?.isUnderWay == false,
+      timeout: const Duration(minutes: 15),
+    );
+    expect(_funded, isTrue, reason: 'ended ${_phase?.name} before paying');
+    expect(find.text(PrivateUsdCopy.reverseRequestRefund), findsOneWidget);
+    await tapAppButton(tester, _callOffKey);
+    await tapAppButton(tester, _confirmKey);
+    final started = DateTime.now();
+    await _followUntil(
+      'the refund',
+      () => _status?.isUnderWay == false,
+      timeout: const Duration(hours: 3),
+    );
+    await _screenshot('m6-06-refunded');
+    expect(_phase, ApiReversePhase.refunded);
+    _results['m6_refund'] = _phase?.name;
+    _results['m6_refunded_after_s'] = DateTime.now()
+        .difference(started)
+        .inSeconds;
+    await tapAppButton(tester, _refundsKey);
+    await _waitUntil(
+      'the refund on Refunds',
+      () => tester.any(find.text(PrivateUsdCopy.refundsOriginalAmount)),
+    );
+    await _screenshot('m6-07-refunds');
+  }
+
+  /// Waits for [done], recording each phase change as an event.
+  Future<void> _followUntil(
+    String description,
+    bool Function() done, {
+    required Duration timeout,
+  }) async {
+    String? phase;
+    await _waitUntil(
+      description,
+      done,
+      timeout: timeout,
+      every: const Duration(seconds: 30),
+      onTick: (elapsed) async {
+        final now = _phase?.name;
+        if (now != phase) {
+          phase = now;
+          await _event('m6-phase', {
+            'index': _key.index,
+            'phase': now,
+            'afterS': elapsed.inSeconds,
+          });
+        }
+      },
+    );
   }
 }

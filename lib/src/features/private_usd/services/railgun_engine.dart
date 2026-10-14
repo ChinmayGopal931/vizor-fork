@@ -591,14 +591,28 @@ class RailgunSession {
     _engine._decode(await _engine._call(this, 'reverseCost', request.toJson())),
   );
 
+  /// Proves a reverse conversion's funding (up to 10 minutes); its `proof`
+  /// events show meanwhile. Nothing is sent.
   Future<RailgunReverseTransaction> prepareReverse(
     RailgunReverseRequest request,
-  ) async => RailgunReverseTransaction.parse(
-    _engine._decode(
-      await _engine._call(this, 'prepareReverse', request.toJson()),
-    ),
-    relayAdapt: request.relayAdapt,
-  );
+  ) async {
+    _engine._publish(
+      _engine.state.value.copyWith(
+        phase: RailgunEnginePhase.proving,
+        clearProof: true,
+      ),
+    );
+    final transaction = RailgunReverseTransaction.parse(
+      _engine._decode(
+        await _engine._call(this, 'prepareReverse', request.toJson()),
+      ),
+      relayAdapt: request.relayAdapt,
+    );
+    _engine._publish(
+      _engine.state.value.copyWith(phase: RailgunEnginePhase.ready),
+    );
+    return transaction;
+  }
 }
 
 class _SerialLock {

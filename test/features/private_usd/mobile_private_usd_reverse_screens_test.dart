@@ -1,0 +1,236 @@
+@Tags(['mobile'])
+library;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/theme/app_theme.dart';
+import 'package:zcash_wallet/src/core/widgets/app_button.dart';
+import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_presentation.dart';
+import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_refunds_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_reverse_convert_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_refunds_screen.dart';
+import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_reverse_conversion_screen.dart';
+import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_reverse_convert_view.dart';
+import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
+import 'package:zcash_wallet/src/rust/api/private_usd.dart';
+import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
+import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+
+// The reverse conversion's screens (plan reference §9.4 S4, S6, S7; §9.5),
+// built from the Widgetbook fixtures.
+void main() {
+  setUp(() {
+    final view = TestWidgetsFlutterBinding.ensureInitialized()
+        .platformDispatcher
+        .views
+        .first;
+    // Wider than a phone: the test font's square glyphs make "Authorize
+    // settlement" a pixel wider than the button at 393 (real fonts fit).
+    view.physicalSize = const Size(430, 1800);
+    view.devicePixelRatio = 1;
+  });
+  tearDown(() {
+    final view = TestWidgetsFlutterBinding.ensureInitialized()
+        .platformDispatcher
+        .views
+        .first;
+    view.resetPhysicalSize();
+    view.resetDevicePixelRatio();
+  });
+
+  Future<void> pump(WidgetTester tester, Widget child) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppTheme(data: AppThemeData.dark, child: child),
+      ),
+    );
+    await tester.pump();
+  }
+
+  AppButton button(WidgetTester tester, String key) =>
+      tester.widget<AppButton>(find.byKey(ValueKey(key)));
+
+  testWidgets('the amount step: a priced quote can be reviewed; '
+      'more than 2 decimals cannot', (tester) async {
+    Future<void> amount(PrivateUsdReverseConvertState state) async {
+      final controller = TextEditingController(text: state.amountText);
+      addTearDown(controller.dispose);
+      await pump(
+        tester,
+        MobilePrivateUsdReverseConvertView(
+          state: state,
+          controller: controller,
+          autofocus: false,
+          onAmountChanged: (_) {},
+          onMax: () {},
+          onReview: () {},
+          onBack: () {},
+          onSwitchDirection: () {},
+        ),
+      );
+    }
+
+    final priced = previewPrivateUsdReverseConvertState();
+    await amount(priced);
+    for (final label in [
+      PrivateUsdCopy.reverseEscrow,
+      PrivateUsdCopy.reverseRailgunFee,
+      PrivateUsdCopy.reverseBroadcasterFee,
+      PrivateUsdCopy.reverseTotal,
+      PrivateUsdCopy.reverseReceiveEstimate,
+    ]) {
+      expect(find.text(label), findsOneWidget, reason: label);
+    }
+    expect(find.text(r'$25.31'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(PrivateUsdCopy.convertSwapDirection),
+      findsOneWidget,
+    );
+    expect(
+      button(tester, 'mobile_private_usd_convert_review').onPressed,
+      isNotNull,
+    );
+
+    await amount(
+      PrivateUsdReverseConvertState(
+        now: previewPrivateUsdNow,
+        amountText: '2.501',
+        available: BigInt.from(1250400000),
+      ),
+    );
+    expect(find.text(PrivateUsdCopy.reverseAmountCents), findsOneWidget);
+    expect(
+      button(tester, 'mobile_private_usd_convert_review').onPressed,
+      isNull,
+    );
+  });
+
+  testWidgets('progress offers "Pay" and "Authorize settlement" only in '
+      'their window, and the call-off as fits', (tester) async {
+    Future<PrivateUsdReverseProgressPresentation> progress(
+      ApiReverseRecord record, {
+      DateTime? now,
+    }) async {
+      final presentation = privateUsdReverseProgressPresentation(
+        status: PrivateUsdReverseStatus(record: record),
+        now: now ?? previewPrivateUsdNow,
+      );
+      await pump(
+        tester,
+        MobilePrivateUsdReverseConversionView(
+          presentation: presentation,
+          onBack: () {},
+          onInfo: () {},
+          onRetry: () {},
+          onAction: () {},
+          onCallOff: () {},
+        ),
+      );
+      return presentation;
+    }
+
+    // Unpaid: "Pay {debit}" and "Cancel conversion".
+    await progress(
+      previewPrivateUsdReverseRecord(phase: ApiReversePhase.awaitingFunding),
+    );
+    expect(find.text(PrivateUsdCopy.reversePay(r'$25.31')), findsOneWidget);
+    expect(
+      button(tester, 'mobile_private_usd_progress_action').onPressed,
+      isNotNull,
+    );
+    expect(find.text(PrivateUsdCopy.reverseCancel), findsOneWidget);
+
+    // Paid and confirmed: "Authorize settlement", "Request refund".
+    final ready = previewPrivateUsdReverseRecord(
+      phase: ApiReversePhase.awaitingReady,
+    );
+    await progress(ready);
+    expect(find.text(PrivateUsdCopy.reverseReadyExplanation), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.reverseRequestRefund), findsOneWidget);
+    expect(
+      button(tester, 'mobile_private_usd_progress_action').onPressed,
+      isNotNull,
+    );
+
+    // Within 120 s of the ready deadline it can no longer be authorized.
+    await progress(
+      ready,
+      now: DateTime.fromMillisecondsSinceEpoch(
+        ready.readyDeadline * 1000,
+      ).subtract(const Duration(seconds: 100)),
+    );
+    expect(find.text(PrivateUsdCopy.reverseReady), findsWidgets);
+    expect(
+      button(tester, 'mobile_private_usd_progress_action').onPressed,
+      isNull,
+    );
+
+    // Settled: no call-off; ended: "New conversion".
+    await progress(
+      previewPrivateUsdReverseRecord(phase: ApiReversePhase.receiving),
+    );
+    expect(
+      find.byKey(const ValueKey('mobile_private_usd_progress_call_off')),
+      findsNothing,
+    );
+    await progress(
+      previewPrivateUsdReverseRecord(phase: ApiReversePhase.refunded),
+    );
+    expect(find.text(PrivateUsdCopy.reverseResultRefunded), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.reverseNew), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.refundsView), findsOneWidget);
+  });
+
+  testWidgets('refunds: each row says where its recovery stands, and only a '
+      'recoverable one offers it', (tester) async {
+    PrivateUsdRefundRow row(
+      int index, {
+      bool? recoverable,
+      bool failed = false,
+    }) => PrivateUsdRefundRow(
+      record: previewPrivateUsdReverseRecord(
+        index: index,
+        phase: ApiReversePhase.refunded,
+      ),
+      recoverable: recoverable,
+      checkFailed: failed,
+    );
+    await pump(
+      tester,
+      MobilePrivateUsdRefundsView(
+        state: PrivateUsdRefundsState(
+          loaded: true,
+          rows: [
+            row(1),
+            row(2, recoverable: true),
+            row(3, recoverable: false),
+            row(4, failed: true),
+          ],
+        ),
+        onBack: () {},
+        onRefresh: () {},
+        onRecover: (_) {},
+      ),
+    );
+    expect(find.text(PrivateUsdCopy.refundsChecking), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.refundsAvailable), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.refundsNoRecovery), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.refundsCheckFailed), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('mobile_private_usd_refund_recover')),
+      findsOneWidget,
+    );
+
+    await pump(
+      tester,
+      MobilePrivateUsdRefundsView(
+        state: const PrivateUsdRefundsState(loaded: true),
+        onBack: () {},
+        onRefresh: () {},
+        onRecover: (_) {},
+      ),
+    );
+    expect(find.text(PrivateUsdCopy.refundsEmpty), findsOneWidget);
+  });
+}

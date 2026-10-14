@@ -204,6 +204,114 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
     if (at >= 0) list[at] = record;
   }
 
+  // ── Reverse (M6) ───────────────────────────────────────────────────
+
+  /// Reverse records per account.
+  final reverse = <String, List<ApiReverseRecord>>{};
+
+  /// What each reverse call answers; unset ones fail the test.
+  ApiFundingRequest Function(int index)? onFundingRequest;
+  ApiReverseRecord Function(int index, PrivateUsdFundingProof proof)?
+  onSubmitFunding;
+  int fundingRequests = 0;
+  final submitted = <PrivateUsdFundingProof>[];
+
+  @override
+  Future<List<ApiReverseRecord>> reverseRecords(String accountUuid) async =>
+      List.of(reverse[accountUuid] ?? const []);
+
+  @override
+  Future<ApiReverseQuote> reverseQuote(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int units,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ApiReverseCostRequest> reverseCostRequest(
+    String accountUuid, {
+    required int index,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ApiReverseRecord> reverseSetCost(
+    String accountUuid, {
+    required int index,
+    required String debit,
+    required String railgunFee,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ApiReverseRecord> reverseGoAhead(
+    String accountUuid, {
+    required int index,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ApiAcceptResult> reverseAccept(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ApiFundingRequest> reverseFundingRequest(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+    required String railgunAddress,
+  }) async {
+    final bytes = await _secret(secret);
+    bytes.fillRange(0, bytes.length, 0);
+    fundingRequests++;
+    return onFundingRequest!(index);
+  }
+
+  @override
+  Future<ApiReverseRecord> reverseSubmitFunding(
+    String accountUuid, {
+    required int index,
+    required PrivateUsdFundingProof proof,
+    required bool Function() stillCurrent,
+  }) async {
+    if (!stillCurrent()) throw const PrivateUsdStaleStepException();
+    submitted.add(proof);
+    return onSubmitFunding!(index, proof);
+  }
+
+  @override
+  Future<ApiReverseAdvance> reverseAdvance(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int opId,
+    required int index,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ApiReverseRecord> reverseAuthorizeReady(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ApiReverseRecord> reverseCancel(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<bool> reverseCanRescue(String accountUuid, {required int index}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<ApiReverseRecord> reverseRescue(
+    String accountUuid,
+    PrivateUsdSecretReader secret, {
+    required int index,
+  }) => throw UnimplementedError();
+
   @override
   void cancel(int opId) => cancelled.add(opId);
 

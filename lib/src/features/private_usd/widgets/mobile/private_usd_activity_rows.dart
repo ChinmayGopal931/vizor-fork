@@ -13,6 +13,7 @@ import '../../../activity/activity_row_mapper.dart';
 import '../../../activity/models/activity_row_data.dart';
 import '../../models/private_usd_balances.dart';
 import '../../models/private_usd_record_key.dart';
+import '../../models/private_usd_reverse_presentation.dart';
 import '../../models/private_usd_status_presentation.dart';
 import '../../private_usd_copy.dart';
 import '../../providers/private_usd_activity_provider.dart';
@@ -112,7 +113,97 @@ ActivityRowData? buildPrivateUsdActivityRow({
   }
 }
 
-/// [records] as activity entries for the home and Activity feeds.
+/// A reverse conversion's activity row (M6, reference §9.4 S2), or null
+/// when it moved no money (a draft, or cancelled).
+///
+/// - Under way: "Converting to ZEC", its step, `−$debit` (neutral); opens
+///   its progress.
+/// - Complete: "Converted to ZEC", the ZEC received, `−$debit`; opens the
+///   funding on Etherscan.
+/// - Refunded: "Conversion called off", "your dollars came back", no
+///   amount; opens Refunds.
+ActivityRowData? buildPrivateUsdReverseActivityRow({
+  required BuildContext context,
+  required ApiReverseRecord record,
+  bool privacyModeEnabled = false,
+  bool dateOnlyTimestamp = false,
+  VoidCallback? onOpenConversion,
+  VoidCallback? onOpenFunding,
+  VoidCallback? onOpenRefunds,
+}) {
+  final colors = context.colors;
+  final usd = hideAmountIfPrivacyMode(
+    formatPrivateUsd(privateUsdReverseDebit(record)),
+    privacyModeEnabled: privacyModeEnabled,
+    denomination: '',
+  );
+  final timestamp = formatActivityTimestamp(
+    privateUsdReverseActivityTime(record),
+    dateOnly: dateOnlyTimestamp,
+  );
+  final stableId = 'private-usd:reverse:${record.index}';
+  final background = colors.background.neutralSubtleOpacity;
+  final icon = colors.icon.regular;
+  switch (record.phase) {
+    case ApiReversePhase.quoted || ApiReversePhase.cancelled:
+      return null;
+    case ApiReversePhase.complete:
+      final zec = privacyModeEnabled
+          ? fixedPrivacyMask()
+          : ZecAmount.fromZatoshi(
+              privateUsdReverseReceivedZat(record),
+            ).activity.toString();
+      return ActivityRowData(
+        stableId: stableId,
+        title: PrivateUsdCopy.activityConvertedToZec,
+        leadingIconName: kPrivateUsdIcon,
+        leadingBackgroundColor: background,
+        leadingIconColor: icon,
+        subtitle: zec,
+        amountText: activityAmountTextForFormFactor(
+          PrivateUsdCopy.activityOut(usd),
+        ),
+        amountColor: outgoingAmountColor(colors),
+        statusText: '',
+        timestampText: timestamp,
+        onTap: onOpenFunding,
+      );
+    case ApiReversePhase.refunded:
+      return ActivityRowData(
+        stableId: stableId,
+        title: PrivateUsdCopy.activityRefunded,
+        leadingIconName: AppIcons.uturnUp,
+        leadingBackgroundColor: background,
+        leadingIconColor: icon,
+        subtitle: PrivateUsdCopy.activityRefundedZecDetail,
+        amountText: '',
+        statusText: '',
+        timestampText: timestamp,
+        onTap: onOpenRefunds,
+      );
+    default:
+      return ActivityRowData(
+        stableId: stableId,
+        title: PrivateUsdCopy.activityConvertingToZec,
+        leadingIconName: kPrivateUsdIcon,
+        leadingBackgroundColor: background,
+        leadingIconColor: icon,
+        subtitle: privateUsdReverseStageLabel(record),
+        amountText: activityAmountTextForFormFactor(
+          PrivateUsdCopy.activityOut(usd),
+        ),
+        amountColor: outgoingAmountColor(colors),
+        statusText: '',
+        statusIconName: AppIcons.loader,
+        statusColor: colors.text.secondary,
+        timestampText: timestamp,
+        onTap: onOpenConversion,
+      );
+  }
+}
+
+/// [records] (and [reverseRecords]) as activity entries for the home and
+/// Activity feeds.
 List<ActivityEntry> privateUsdActivityEntries({
   required BuildContext context,
   required List<ApiForwardRecord> records,
@@ -120,8 +211,30 @@ List<ActivityEntry> privateUsdActivityEntries({
   required bool privacyModeEnabled,
   required ValueChanged<PrivateUsdRoutePath> onOpenConversion,
   required ValueChanged<String> onOpenPayout,
+  List<ApiReverseRecord> reverseRecords = const [],
+  VoidCallback? onOpenRefunds,
   bool dateOnlyTimestamp = false,
 }) => [
+  for (final record in reverseRecords)
+    if (buildPrivateUsdReverseActivityRow(
+          context: context,
+          record: record,
+          privacyModeEnabled: privacyModeEnabled,
+          dateOnlyTimestamp: dateOnlyTimestamp,
+          onOpenConversion: () => onOpenConversion(
+            PrivateUsdRoutePath(
+              direction: PrivateUsdDirection.reverse,
+              index: record.index,
+            ),
+          ),
+          onOpenFunding: switch (record.fundingTx) {
+            final funding? => () => onOpenPayout(funding),
+            null => null,
+          },
+          onOpenRefunds: onOpenRefunds,
+        )
+        case final row?)
+      ActivityEntry(timestamp: privateUsdReverseActivityTime(record), row: row),
   for (final record in records)
     if (buildPrivateUsdActivityRow(
           context: context,
@@ -144,7 +257,8 @@ List<ActivityEntry> privateUsdActivityEntries({
       ActivityEntry(timestamp: privateUsdActivityTime(record), row: row),
 ];
 
-/// Opens a payout on Etherscan (the deployment's explorer), outside Vizor.
+/// Opens a payout or a funding on Etherscan (the deployment's explorer),
+/// outside Vizor.
 Future<void> openPrivateUsdPayout(WidgetRef ref, String payoutTx) async {
   final prefix = ref
       .read(privateUsdCurrentDeploymentProvider)

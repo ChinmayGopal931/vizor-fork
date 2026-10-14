@@ -334,7 +334,7 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
       ],
       if (problem != null) ...[
         const SizedBox(height: AppSpacing.s),
-        _ProblemCard(message: problem, onRetry: onRetry),
+        PrivateUsdProblemCard(message: problem, onRetry: onRetry),
       ],
       if (presentation.showsCallOff) ...[
         const SizedBox(height: AppSpacing.s),
@@ -386,9 +386,13 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
   }
 }
 
-/// "Taking longer than usual", why, and "Try now".
-class _ProblemCard extends StatelessWidget {
-  const _ProblemCard({required this.message, required this.onRetry});
+/// "Taking longer than usual", why, and "Try now" (both directions).
+class PrivateUsdProblemCard extends StatelessWidget {
+  const PrivateUsdProblemCard({
+    required this.message,
+    required this.onRetry,
+    super.key,
+  });
 
   final String message;
   final VoidCallback onRetry;

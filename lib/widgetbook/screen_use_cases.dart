@@ -18,6 +18,7 @@ import '../src/features/private_usd/providers/private_usd_balance_provider.dart'
 import '../src/features/private_usd/providers/private_usd_unfinished_provider.dart';
 import '../src/features/private_usd/services/private_usd_engine.dart';
 import '../src/features/private_usd/services/private_usd_balance_repository.dart';
+import 'private_usd_reverse_use_cases.dart';
 import 'private_usd_use_cases.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
@@ -1674,6 +1675,7 @@ Widget _buildMobileHomePrivateUsdUseCase(
   PrivateUsdBalanceState balance, {
   bool privacyModeEnabled = false,
   bool converting = false,
+  bool attention = false,
 }) {
   return _buildMobileHomeUseCase(
     accountState: _accountsDesignState,
@@ -1685,9 +1687,22 @@ Widget _buildMobileHomePrivateUsdUseCase(
     privateUsdConversions: converting
         ? previewPrivateUsdConverting(_accountsDesignState.activeAccountUuid!)
         : null,
+    privateUsdReverseConversions: attention
+        ? previewPrivateUsdReverseAttention(
+            _accountsDesignState.activeAccountUuid!,
+          )
+        : null,
     privacyModeEnabled: privacyModeEnabled,
   );
 }
+
+/// Home with a reverse conversion waiting for "Authorize settlement": the
+/// banner asks for attention.
+Widget buildMobileHomePrivateUsdAttentionUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(
+      previewPrivateUsdBalance(available: 1250.4),
+      attention: true,
+    );
 
 /// Home with a conversion under way: the forward banner.
 Widget buildMobileHomePrivateUsdConvertingUseCase(BuildContext context) =>
@@ -3394,6 +3409,8 @@ Widget _buildMobileHomeUseCase({
   NetworkPrivacyState? networkPrivacyState,
   PrivateUsdBalanceState? privateUsdBalance,
   Map<PrivateUsdRecordKey, PrivateUsdConversionStatus>? privateUsdConversions,
+  Map<PrivateUsdRecordKey, PrivateUsdReverseStatus>?
+  privateUsdReverseConversions,
   bool privacyModeEnabled = false,
 }) {
   final harness = _MobileHomeHarness(
@@ -3429,6 +3446,15 @@ Widget _buildMobileHomeUseCase({
           () => FixedPrivateUsdConversionsNotifier(privateUsdConversions),
         ),
         privateUsdCurrentDeploymentProvider.overrideWithValue(null),
+      ],
+      if (privateUsdReverseConversions != null) ...[
+        privateUsdReverseConversionsProvider.overrideWith(
+          () => FixedPrivateUsdReverseConversionsNotifier(
+            privateUsdReverseConversions,
+          ),
+        ),
+        if (privateUsdConversions == null)
+          privateUsdCurrentDeploymentProvider.overrideWithValue(null),
       ],
       if (!inheritWalletState)
         accountProvider.overrideWith(

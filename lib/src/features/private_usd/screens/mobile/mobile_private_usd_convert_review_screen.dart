@@ -18,8 +18,10 @@ import '../../models/private_usd_balances.dart';
 import '../../models/private_usd_record_key.dart';
 import '../../private_usd_copy.dart';
 import '../../providers/private_usd_convert_provider.dart';
+import '../../providers/private_usd_reverse_convert_provider.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
 import 'mobile_private_usd_convert_screen.dart';
+import 'mobile_private_usd_reverse_convert_view.dart';
 
 /// `/private-usd/convert/review` (plan reference §9.4 S3): the reviewed
 /// quote and "Convert". It pops with the conversion's route once accepted
@@ -32,6 +34,9 @@ class MobilePrivateUsdConvertReviewScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (args.direction == PrivateUsdDirection.reverse) {
+      return _buildReverse(context, ref);
+    }
     final state = ref.watch(privateUsdConvertProvider);
     final notifier = ref.read(privateUsdConvertProvider.notifier);
     if (state.quote == null) {
@@ -54,6 +59,44 @@ class MobilePrivateUsdConvertReviewScreen extends ConsumerWidget {
         if (didPop) notifier.leaveReview();
       },
       child: MobilePrivateUsdConvertReviewView(
+        state: state,
+        privacyModeEnabled: ref.watch(privacyModeProvider),
+        onBack: back,
+        onConfirm: () async {
+          final path = await notifier.confirm();
+          if (path != null && context.mounted) {
+            context.pop<PrivateUsdRoutePath>(path);
+          }
+        },
+        onRefreshQuote: notifier.refreshQuote,
+      ),
+    );
+  }
+
+  /// The reverse review (§9.4 S4): "Convert" goes ahead, accepts and pays,
+  /// then pops with the conversion's route.
+  Widget _buildReverse(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(privateUsdReverseConvertProvider);
+    final notifier = ref.read(privateUsdReverseConvertProvider.notifier);
+    if (state.draft == null) {
+      return MobilePrivateUsdReverseReviewView(
+        state: state,
+        privacyModeEnabled: false,
+        onBack: () => context.pop(),
+        onConfirm: () {},
+        onRefreshQuote: () {},
+      );
+    }
+    void back() {
+      if (notifier.leaveReview()) context.pop();
+    }
+
+    return PopScope(
+      canPop: !state.isConfirming,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) notifier.leaveReview();
+      },
+      child: MobilePrivateUsdReverseReviewView(
         state: state,
         privacyModeEnabled: ref.watch(privacyModeProvider),
         onBack: back,
