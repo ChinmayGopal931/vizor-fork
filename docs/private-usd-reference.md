@@ -408,6 +408,15 @@ The invariants for this machine are §3.5 items 1–8 and 16.
 8. **Sweep home** (`receive`, `:534-558`): `keepSending` with `prepareReceive`. The sweep is signed with `e + z` and capped at the reviewed `receiveEstimate.feeZat`. It is kept before it is first sent. `confirmations ≥ zcashConfirmations` → `COMPLETE`, then forget the joint account.
 9. **Cancel** (user, `:159-182`): allowed until the escrow is claimed or a receive is built (`isSettled`). It saves `cancelRequested`. The phase becomes `REFUND_WAIT` unless a refund is already under way, and an advance follows at once. With no escrow it ends `CANCELLED`. With an escrow it starts a refund.
 
+**vizor as built (M6 part 1, progress D-70 to D-78).** `rust/src/wallet/private_usd/reverse.rs`; the calldata is `funding_calls.rs`.
+
+- **Pricing is split around the page.** Step 1.8's cost is set by `set_cost` after the page's `reverseCost`: the quote returns the request (amount, Railgun proxy, the relayer's funding fee), and `set_cost` re-reads the fee and requires `debit = amount + fee + railgun_fee`. Going ahead and the funding request need a priced record.
+- **Step 4 runs in two calls around the page.** `funding_request` (steps 4.1–4.5; the page's open address must be the account's) holds the request in memory for its lock session; `submit_funding` (4.7–4.11) takes it once and refuses after a cancel, a lock or a restart (`Cancelled`) or a changed record (`TooLate`). The proof must go to the pinned Relay Adapt with no value and cost exactly what the calls pay. After a `400 rejected` at a higher fee, the dropped funding's cost is cleared for the page to price again.
+- **Posts follow their save** under the per-account driver lock, which spans the post: a cancel waits for a funding's post rather than interleaving with it. The funding's answer is merged into the record as it is then.
+- **The token gate** (step 3): the user's accept returns `TokensNeeded` and leaves the record unanswered; the loop resuming an interrupted accept ends it `CANCELLED` (no tokens client before M4).
+- **The sweep home** pays at most the reviewed `receiveEstimate.feeZat`; `estimate` is the joint account's confirmed receipts and `5000 × max(2, notes + 1)`.
+- **A record's deployment** must match the pins in chain, contract, token, Railgun proxy, maker, relayer and Zcash network.
+
 ### 5.8 Refunds, offline behaviour and user-visible states
 
 **Forward refund** (`of/AtomicSwapDeposits.kt:47-93`). It runs when `getSwap.stage == Refunded`; the maker revealed `e` in `secret`.
@@ -549,10 +558,12 @@ pub(crate) fn session() -> u64;                                      // a quote 
 pub(crate) fn put_offer(account, index, offer, now, session);        // kept until quote.expires_at, pruned per account; dropped if the session moved on
 pub(crate) fn offer(account, index, network, now) -> Option<Offer>;  // None once expired: accept → QuoteExpired
 pub(crate) fn remove_offer(account, index); pub(crate) fn remove_account_offers(account);
-pub(crate) fn clear_sessions();                                      // offers + maker /v1/info checks; from private_usd_clear_sessions (on lock)
+pub(crate) fn clear_sessions();                                      // offers, reverse fundings, maker /v1/info checks; from private_usd_clear_sessions (on lock)
+pub(crate) struct FundingSession { network, record, fee, fee_expires_at, relay_adapt, max_calldata_bytes }   // M6: a reverse funding handed to the page
+pub(crate) fn put_funding(account, index, funding, session); pub(crate) fn take_funding(account, index, network) -> Option<FundingSession>;
 pub(crate) struct OpHandle;      // begin(op_id) registers (Busy if in use); dropped on return. .cancelled() between steps; .cancel_flag() reaches routed HTTP and joint scans; .set_activity(a) before a slow step
 pub(crate) fn cancel_op(op_id: u32);                                 // also remembers up to 64 ids cancelled before their call registered
-pub(crate) fn op_activity(op_id: u32) -> Option<Activity>;          // Depositing | Claiming | PayingOut | Sweeping
+pub(crate) fn op_activity(op_id: u32) -> Option<Activity>;          // Depositing | Claiming | PayingOut | Sweeping | Funding | Readying | Refunding
 pub(crate) trait Clock { fn now(&self) -> u64; async fn sleep(&self, d: Duration); }   // SystemClock; tests fake it
 pub(crate) trait TokenSource { fn accept_authorization(&self) -> Option<String>; fn token_required(&self, challenge: Option<&str>); }   // NoTokens until M4
 pub(crate) fn problem(code: ErrorCode) -> ErrorCode;                 // folds a failed step's code into the §5.8 problem set
@@ -1323,23 +1334,32 @@ pub fn private_usd_forward_abandon(network: String, account_uuid: String, store_
 pub fn private_usd_forward_records(ctx) -> Result<Vec<ApiForwardRecord>, ApiPrivateUsdError>;   // active first, then history newest first
 
 // ---- reverse (M6) ----
+// As built (M6 part 1, progress D-79): the calls that need no key take no db_path; `reverse_quote`
+// returns the page's `reverseCost` params; `private_usd_reverse_cost_request` is new.
 pub enum ApiReversePhase { Quoted, Accepting, AwaitingFunding, SendingUsdc, ConfirmingEscrow, ReceivingZec, AwaitingReady,
                            Settling, Receiving, Complete, RefundWait, Refunding, RefundPayout, Refunded, Cancelled }
 pub struct ApiReverseCost { pub debit: String, pub railgun_fee: String, pub broadcaster_fee: String, pub fee_expires_at: Option<i64> }
 pub struct ApiReverseRecord {
-    pub index: u32, pub swap_id: String, pub phase: ApiReversePhase, pub amount: String, pub deposit_zat: u64,
-    pub quote_expires_at: i64, pub funding_deadline: i64, pub ready_deadline: i64, pub refund_after: i64,
-    pub cost: Option<ApiReverseCost>, pub funding_tx: Option<String>, pub cancel_requested: bool, pub settled: bool, pub cancellable: bool,
-    pub receive_estimate_zat: Option<u64>, pub receive_fee_zat: Option<u64>,
-    pub receive_txid: Option<String>, pub received_zat: Option<u64>, pub receive_confirmations: u32,
+    pub index: u32, pub swap_id: String, pub phase: ApiReversePhase, pub amount: String, pub network_cost: Option<String>,
+    pub deposit_zat: u64, pub quote_expires_at: i64, pub funding_deadline: i64, pub ready_deadline: i64, pub refund_after: i64,
+    pub cost: Option<ApiReverseCost>, pub funded: bool, pub funding_tx: Option<String>,
+    pub cancel_requested: bool, pub settled: bool, pub cancellable: bool, pub awaiting_user: bool,
+    pub receive_estimate_zat: Option<u64>, pub receive_fee_zat: Option<u64>,   // the reviewed sweep: after its fee, and the fee (its cap)
+    pub receive_txid: Option<String>, pub received_zat: Option<u64>, pub receive_confirmations: u32,   // receive_txid: internal byte order
     pub accepted_at: Option<i64>, pub updated_at: i64,
 }
 pub struct ApiReverseAdvance { pub record: ApiReverseRecord, pub next_poll_ms: u32, pub problem: Option<ApiPrivateUsdErrorCode>, pub needs_you: bool }
-/// §5.7 step 1. Saves QUOTED with `cost = None` (replacing any earlier QUOTED draft). `TooLate` if readyDeadline is too near.
-pub fn private_usd_reverse_quote(ctx, secret, lwd, rpc, units: u32) -> Result<ApiReverseRecord, ApiPrivateUsdError>;
-/// After the page's `reverseCost`. Refuses unless phase == QUOTED or AWAITING_FUNDING.
-pub fn private_usd_reverse_set_cost(ctx, index: u32, debit: String, railgun_fee: String) -> Result<ApiReverseRecord, ApiPrivateUsdError>;
-pub fn private_usd_reverse_go_ahead(ctx, rpc, index: u32) -> Result<ApiReverseRecord, ApiPrivateUsdError>;
+pub struct ApiReverseCostRequest { pub index: u32, pub amount: String, pub railgun_proxy: String, pub fee: String, pub fee_expires_at: Option<i64> }
+pub struct ApiReverseQuote { pub record: ApiReverseRecord, pub cost_request: ApiReverseCostRequest }
+/// §5.7 step 1. Saves QUOTED with `cost = None` (replacing any earlier QUOTED draft); `units` whole cents (else `AmountRefused`).
+/// `TooLate` if readyDeadline is too near.
+pub fn private_usd_reverse_quote(ctx, secret, lwd, rpc, units: u32) -> Result<ApiReverseQuote, ApiPrivateUsdError>;
+/// The page's `reverseCost` params now (no key).
+pub fn private_usd_reverse_cost_request(network: String, account_uuid: String, store_dir: String, index: u32) -> Result<ApiReverseCostRequest, ApiPrivateUsdError>;
+/// After the page's `reverseCost`. Refuses unless QUOTED, or AWAITING_FUNDING with no funding; re-reads the relayer's fee and
+/// requires `debit = amount + fee + railgun_fee` (`FundingCostChanged` when the fee moved).
+pub fn private_usd_reverse_set_cost(network: String, account_uuid: String, store_dir: String, index: u32, debit: String, railgun_fee: String) -> Result<ApiReverseRecord, ApiPrivateUsdError>;
+pub fn private_usd_reverse_go_ahead(network: String, account_uuid: String, store_dir: String, eth_rpc_url: String, index: u32) -> Result<ApiReverseRecord, ApiPrivateUsdError>;
 /// Idempotent (zapp `accepted`): POST accept if `!makerAccepted`, then import the joint account. May return `TokensNeeded`.
 pub fn private_usd_reverse_accept(ctx, secret, lwd, rpc, index: u32) -> Result<ApiAcceptResult, ApiPrivateUsdError>;
 pub struct ApiFundingRequest {          // the page's `prepareReverse` params, ready to JSON-encode
@@ -1348,16 +1368,21 @@ pub struct ApiFundingRequest {          // the page's `prepareReverse` params, r
     pub relay_adapt: String, pub fee: String,
     pub already_funded: bool,           // record.funding != None: skip the page, call advance
 }
-/// §5.7 step 4.1–4.5: checks, picks the fee (≤ 2 USDC, X6), signs OpenReverse, encodes the calls.
-pub fn private_usd_reverse_funding_request(ctx, secret, rpc, index: u32) -> Result<ApiFundingRequest, ApiPrivateUsdError>;
+/// §5.7 step 4.1–4.5: checks (the page's open wallet must be the account's: `railgun_address`), picks the fee (≤ 2 USDC, X6),
+/// signs OpenReverse, encodes the calls; holds the request in memory for `submit_funding`.
+pub fn private_usd_reverse_funding_request(db_path: String, network: String, account_uuid: String, store_dir: String, mnemonic_bytes: Vec<u8>,
+                                           eth_rpc_url: String, index: u32, railgun_address: String) -> Result<ApiFundingRequest, ApiPrivateUsdError>;
 /// §5.7 step 4.7–4.11: checks the page result, `FundingCostChanged` (saves the new cost) or saves `funding` + SENDING_USDC, then POSTs.
-pub fn private_usd_reverse_submit_funding(ctx, rpc, index: u32, to: String, data: String, value: String, debit: String, railgun_fee: String) -> Result<ApiReverseRecord, ApiPrivateUsdError>;
+/// `Cancelled` after a cancel or a lock (the request is gone), `TooLate` when the record changed.
+pub fn private_usd_reverse_submit_funding(network: String, account_uuid: String, store_dir: String, eth_rpc_url: String, index: u32,
+                                          to: String, data: String, value: String, debit: String, railgun_fee: String) -> Result<ApiReverseRecord, ApiPrivateUsdError>;
 pub fn private_usd_reverse_advance(ctx, secret, lwd, rpc, op_id: u32, index: u32) -> Result<ApiReverseAdvance, ApiPrivateUsdError>;
 pub fn private_usd_reverse_authorize_ready(ctx, secret, lwd, rpc, index: u32) -> Result<ApiReverseRecord, ApiPrivateUsdError>; // `DepositUnconfirmed`, `TooLate`
 pub fn private_usd_reverse_cancel(ctx, secret, lwd, rpc, index: u32) -> Result<ApiReverseRecord, ApiPrivateUsdError>;
-pub fn private_usd_reverse_can_rescue(ctx, rpc, index: u32) -> Result<bool, ApiPrivateUsdError>;
-pub fn private_usd_reverse_rescue(ctx, secret, rpc, index: u32) -> Result<ApiReverseRecord, ApiPrivateUsdError>;
-pub fn private_usd_reverse_records(ctx) -> Result<Vec<ApiReverseRecord>, ApiPrivateUsdError>;  // active (incl. QUOTED) first, then history
+pub fn private_usd_reverse_can_rescue(network: String, account_uuid: String, store_dir: String, eth_rpc_url: String, index: u32) -> Result<bool, ApiPrivateUsdError>;
+pub fn private_usd_reverse_rescue(db_path: String, network: String, account_uuid: String, store_dir: String, mnemonic_bytes: Vec<u8>,
+                                  eth_rpc_url: String, index: u32) -> Result<ApiReverseRecord, ApiPrivateUsdError>;
+pub fn private_usd_reverse_records(account_uuid: String, store_dir: String) -> Result<Vec<ApiReverseRecord>, ApiPrivateUsdError>;  // active (incl. QUOTED) first, then history
 
 // ---- sends (M7) ----
 pub struct ApiRailgunSendsTerms {       // §6.7 step 1, already checked against the pins

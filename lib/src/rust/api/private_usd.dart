@@ -6,8 +6,8 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_quote`, `api_record`, `block_on`, `catch`, `deposit_confirmations`, `forward_call`, `internal_hex`, `open_context`, `parse_network_and_migrate`, `seconds`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `block_on`, `catch`, `deposit_confirmations`, `forward_call`, `internal_hex`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `reverse_call`, `seconds`, `swap_network`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 /// The deployment for the wallet network `"main"` or `"test"`; `None` on
 /// regtest or an unknown network, where Private USD is hidden.
@@ -78,7 +78,8 @@ ApiActivity? privateUsdActivity({required int opId}) =>
     RustLib.instance.api.crateApiPrivateUsdPrivateUsdActivity(opId: opId);
 
 /// Forgets every in-memory session: call it on lock. A forward quote made
-/// before the lock is never accepted after it, and each maker's `/v1/info` is
+/// before the lock is never accepted after it, a reverse funding proved
+/// across the lock is never submitted, and each maker's `/v1/info` is
 /// checked again. (M4 adds its token issuance sessions here.)
 void privateUsdClearSessions() =>
     RustLib.instance.api.crateApiPrivateUsdPrivateUsdClearSessions();
@@ -225,6 +226,298 @@ Future<List<ApiForwardRecord>> privateUsdForwardRecords({
   storeDir: storeDir,
 );
 
+/// Quotes `units` of private dollars (token base units, whole cents) for a
+/// fresh swap index, which counts as spent from here on, and keeps the
+/// verified quote as a `QUOTED` draft, replacing any earlier draft. Price it
+/// next: the page's `reverseCost` with `cost_request`, then
+/// `private_usd_reverse_set_cost`. `Busy` while a conversion is under way.
+Future<ApiReverseQuote> privateUsdReverseQuote({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+  required String lightwalletdUrl,
+  required String ethRpcUrl,
+  required int units,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseQuote(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+  lightwalletdUrl: lightwalletdUrl,
+  ethRpcUrl: ethRpcUrl,
+  units: units,
+);
+
+/// What to price swap `index`'s funding at now (for a draft whose pricing
+/// was cut short, or after `FundingCostChanged`). No key is needed.
+Future<ApiReverseCostRequest> privateUsdReverseCostRequest({
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required int index,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseCostRequest(
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  index: index,
+);
+
+/// Keeps the page's `reverseCost` answer as the reviewed cost (`debit =
+/// amount + fee + railgun_fee`, strings of base units). Only a draft, or a
+/// conversion waiting to be paid, is priced; `FundingCostChanged` when the
+/// relayer's fee moved meanwhile: ask for a cost request again.
+Future<ApiReverseRecord> privateUsdReverseSetCost({
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required int index,
+  required String debit,
+  required String railgunFee,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseSetCost(
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  index: index,
+  debit: debit,
+  railgunFee: railgunFee,
+);
+
+/// The user went ahead with the reviewed draft (the first tap of "Convert"):
+/// `Accepting` with `accepted_at`, nothing paid yet. Needs a priced draft
+/// (`FundingCostChanged` otherwise); `QuoteExpired` once the quote ran out;
+/// `Busy` while another conversion is under way. No key is needed.
+Future<ApiReverseRecord> privateUsdReverseGoAhead({
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required String ethRpcUrl,
+  required int index,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseGoAhead(
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  ethRpcUrl: ethRpcUrl,
+  index: index,
+);
+
+/// The maker's acceptance of swap `index`, posted once, and its joint account
+/// imported (idempotent: call it again after an error). `TokensNeeded`: the
+/// maker wants a token and no tokens client exists before M4; nothing
+/// opened, so cancel the conversion. `NothingSent`: the maker's last word
+/// ended it (`CANCELLED`), with the cause when known.
+Future<ApiAcceptResult> privateUsdReverseAccept({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+  required String lightwalletdUrl,
+  required String ethRpcUrl,
+  required int index,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseAccept(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+  lightwalletdUrl: lightwalletdUrl,
+  ethRpcUrl: ethRpcUrl,
+  index: index,
+);
+
+/// The calls the Railgun page proves for swap `index`'s funding, with the
+/// user's `OpenReverse` signed. `railgun_address` is the page's open wallet
+/// (`openWallet`'s address): another than this account's is `Mismatch`.
+/// Needs the conversion accepted and priced. Nothing is kept: after the
+/// page's `prepareReverse`, pass its result to
+/// `private_usd_reverse_submit_funding` while still unlocked, in the
+/// foreground and in the same session; a lock drops it. `already_funded`:
+/// skip the page and advance.
+Future<ApiFundingRequest> privateUsdReverseFundingRequest({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+  required String ethRpcUrl,
+  required int index,
+  required String railgunAddress,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseFundingRequest(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+  ethRpcUrl: ethRpcUrl,
+  index: index,
+  railgunAddress: railgunAddress,
+);
+
+/// Checks the page's `prepareReverse` result (`{to, data, value, cost:
+/// {debit, railgunFee}}`), keeps it (`SendingUsdc`) and posts it. Nothing is
+/// kept or sent when the conversion was called off or the wallet locked
+/// since the request (`Cancelled`: drop the proof), when the record changed
+/// (`TooLate`), or when the proved cost differs from the reviewed one
+/// (`FundingCostChanged`: the new cost is kept for review, pay again). An
+/// error after the keep means the funding is kept and the engine loop sends
+/// the same bytes again: read the record. No key is needed.
+Future<ApiReverseRecord> privateUsdReverseSubmitFunding({
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required String ethRpcUrl,
+  required int index,
+  required String to,
+  required String data,
+  required String value,
+  required String debit,
+  required String railgunFee,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseSubmitFunding(
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  ethRpcUrl: ethRpcUrl,
+  index: index,
+  to: to,
+  data: data,
+  value: value,
+  debit: debit,
+  railgunFee: railgunFee,
+);
+
+/// One look at the chain for swap `index`, then what is due: the funding
+/// followed to its escrow (sent again only while the node does not know
+/// it), the maker's deposit, a kept `ready` sent again, the sweep home, or
+/// the refund. Never signs `ready`. Holds the account's driver lock
+/// throughout (`Busy` if taken) and stops with `Cancelled` once
+/// `private_usd_cancel(op_id)` is called. A failed step returns the record
+/// with `problem` set; nap `next_poll_ms`, then advance again.
+Future<ApiReverseAdvance> privateUsdReverseAdvance({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+  required String lightwalletdUrl,
+  required String ethRpcUrl,
+  required int opId,
+  required int index,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseAdvance(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+  lightwalletdUrl: lightwalletdUrl,
+  ethRpcUrl: ethRpcUrl,
+  opId: opId,
+  index: index,
+);
+
+/// "Authorize settlement": once the maker's whole deposit has its
+/// confirmations, signs `ready`, keeps it with the sweep's reviewed fee and
+/// posts it. Offer it in `AwaitingReady` until `ready_deadline − 120`.
+/// `DepositUnconfirmed` before the deposit or the escrow is confirmed,
+/// `TooLate` past the deadline. A kept `ready` is only sent again; an error
+/// after the keep leaves it kept, and the loop sends it until its deadline.
+Future<ApiReverseRecord> privateUsdReverseAuthorizeReady({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+  required String lightwalletdUrl,
+  required String ethRpcUrl,
+  required int index,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseAuthorizeReady(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+  lightwalletdUrl: lightwalletdUrl,
+  ethRpcUrl: ethRpcUrl,
+  index: index,
+);
+
+/// Calls swap `index` off: the request is kept first, then an advance runs
+/// at once. With no escrow and no funding kept it ends `Cancelled`; with an
+/// escrow, its refund starts (`RefundWait`, then `Refunding`). `TooLate`
+/// once settled ("already settled, can no longer be refunded"), also when it
+/// settled during this call. An error after the keep leaves the request
+/// kept: read the record.
+Future<ApiReverseRecord> privateUsdReverseCancel({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+  required String lightwalletdUrl,
+  required String ethRpcUrl,
+  required int index,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseCancel(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+  lightwalletdUrl: lightwalletdUrl,
+  ethRpcUrl: ethRpcUrl,
+  index: index,
+);
+
+/// Whether swap `index`'s refund (a `Refunded` record) can be rescued now:
+/// Railgun sent it back to its vault, which holds more than the relayer's
+/// fee. A chain read only; no key and no lock.
+Future<bool> privateUsdReverseCanRescue({
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required String ethRpcUrl,
+  required int index,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseCanRescue(
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  ethRpcUrl: ethRpcUrl,
+  index: index,
+);
+
+/// "Recover refund": signs a rescue with a fresh nonce and deadline, keeps
+/// it, and asks the relayer to shield the refund again into this account's
+/// note. The record stays `Refunded`. Nothing happens when nothing is
+/// rescuable now (check `private_usd_reverse_can_rescue` again).
+Future<ApiReverseRecord> privateUsdReverseRescue({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+  required String ethRpcUrl,
+  required int index,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseRescue(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+  ethRpcUrl: ethRpcUrl,
+  index: index,
+);
+
+/// The account's reverse conversions: the active one first (a draft too),
+/// then the rest, newest first. Empty when the wallet never converted.
+Future<List<ApiReverseRecord>> privateUsdReverseRecords({
+  required String accountUuid,
+  required String storeDir,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseRecords(
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+);
+
 enum ApiAcceptKind {
   /// The maker opened the swap, or is opening it: show its progress.
   accepted,
@@ -258,14 +551,22 @@ class ApiAcceptResult {
 }
 
 /// What a call is doing now, for the progress screen (zapp
-/// `AtomicSwapActivity`). The reverse steps arrive with M6.
+/// `AtomicSwapActivity`, and the reverse steps).
 enum ApiActivity {
   depositing,
   claiming,
   payingOut,
+
+  /// A sweep home: a forward refund's, or a reverse conversion's ZEC.
   sweeping,
+
+  /// Sending a kept reverse funding again.
   funding,
+
+  /// Sending the kept `ready` again.
   readying,
+
+  /// Locking, revealing or paying out a reverse refund.
   refunding,
 }
 
@@ -614,6 +915,59 @@ enum ApiForwardWait {
   zcashSyncing,
 }
 
+/// The page's `prepareReverse` params, ready to JSON-encode: `{amount,
+/// railgun: railgun_proxy, token, calls: [{to, data}] × 3, relayAdapt, fee}`.
+class ApiFundingRequest {
+  final String amount;
+  final String railgunProxy;
+  final String token;
+
+  /// The three calls, in order: approve, openReverse, transfer.
+  final List<String> callsTo;
+  final List<String> callsData;
+  final String relayAdapt;
+  final String fee;
+
+  /// A funding is kept already: skip the page and advance instead.
+  final bool alreadyFunded;
+
+  const ApiFundingRequest({
+    required this.amount,
+    required this.railgunProxy,
+    required this.token,
+    required this.callsTo,
+    required this.callsData,
+    required this.relayAdapt,
+    required this.fee,
+    required this.alreadyFunded,
+  });
+
+  @override
+  int get hashCode =>
+      amount.hashCode ^
+      railgunProxy.hashCode ^
+      token.hashCode ^
+      callsTo.hashCode ^
+      callsData.hashCode ^
+      relayAdapt.hashCode ^
+      fee.hashCode ^
+      alreadyFunded.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiFundingRequest &&
+          runtimeType == other.runtimeType &&
+          amount == other.amount &&
+          railgunProxy == other.railgunProxy &&
+          token == other.token &&
+          callsTo == other.callsTo &&
+          callsData == other.callsData &&
+          relayAdapt == other.relayAdapt &&
+          fee == other.fee &&
+          alreadyFunded == other.alreadyFunded;
+}
+
 enum ApiNothingSentCause {
   quoteExpired,
   makerRefused,
@@ -683,6 +1037,311 @@ enum ApiPrivateUsdErrorCode {
 }
 
 enum ApiRefundCause { makerCancelled, notClaimedInTime }
+
+class ApiReverseAdvance {
+  final ApiReverseRecord record;
+
+  /// How long to nap before the next advance; 0 once it ended.
+  final int nextPollMs;
+
+  /// The step failed: the problem to show once steps have failed for a
+  /// minute in a row (reference §5.8).
+  final ApiPrivateUsdErrorCode? problem;
+
+  /// The user's approval is needed: "Pay {debit}" in `AwaitingFunding`,
+  /// "Authorize settlement" in `AwaitingReady`.
+  final bool needsYou;
+
+  const ApiReverseAdvance({
+    required this.record,
+    required this.nextPollMs,
+    this.problem,
+    required this.needsYou,
+  });
+
+  @override
+  int get hashCode =>
+      record.hashCode ^
+      nextPollMs.hashCode ^
+      problem.hashCode ^
+      needsYou.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiReverseAdvance &&
+          runtimeType == other.runtimeType &&
+          record == other.record &&
+          nextPollMs == other.nextPollMs &&
+          problem == other.problem &&
+          needsYou == other.needsYou;
+}
+
+/// What funding takes from the private balance, in token base units: the
+/// escrow, Railgun's unshield fee and the relayer's fee for the gas.
+class ApiReverseCost {
+  final String debit;
+  final String railgunFee;
+  final String broadcasterFee;
+
+  /// Unix seconds until which the relayer takes `broadcaster_fee`.
+  final PlatformInt64? feeExpiresAt;
+
+  const ApiReverseCost({
+    required this.debit,
+    required this.railgunFee,
+    required this.broadcasterFee,
+    this.feeExpiresAt,
+  });
+
+  @override
+  int get hashCode =>
+      debit.hashCode ^
+      railgunFee.hashCode ^
+      broadcasterFee.hashCode ^
+      feeExpiresAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiReverseCost &&
+          runtimeType == other.runtimeType &&
+          debit == other.debit &&
+          railgunFee == other.railgunFee &&
+          broadcasterFee == other.broadcasterFee &&
+          feeExpiresAt == other.feeExpiresAt;
+}
+
+/// What the Railgun page's `reverseCost` takes: `{amount, railgun:
+/// railgun_proxy, fee}`. Its `{debit, railgunFee}` answer goes to
+/// `private_usd_reverse_set_cost`.
+class ApiReverseCostRequest {
+  final int index;
+  final String amount;
+  final String railgunProxy;
+
+  /// The relayer's funding fee now (at most 2 USDC).
+  final String fee;
+  final PlatformInt64? feeExpiresAt;
+
+  const ApiReverseCostRequest({
+    required this.index,
+    required this.amount,
+    required this.railgunProxy,
+    required this.fee,
+    this.feeExpiresAt,
+  });
+
+  @override
+  int get hashCode =>
+      index.hashCode ^
+      amount.hashCode ^
+      railgunProxy.hashCode ^
+      fee.hashCode ^
+      feeExpiresAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiReverseCostRequest &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          amount == other.amount &&
+          railgunProxy == other.railgunProxy &&
+          fee == other.fee &&
+          feeExpiresAt == other.feeExpiresAt;
+}
+
+/// Where a reverse conversion stands (zapp `ReversePhase`).
+enum ApiReversePhase {
+  /// A reviewed draft: nothing accepted or paid, not under way.
+  quoted,
+  accepting,
+
+  /// The user's first approval: "Pay {debit}".
+  awaitingFunding,
+  sendingUsdc,
+  confirmingEscrow,
+  receivingZec,
+
+  /// The user's second approval: "Authorize settlement".
+  awaitingReady,
+  settling,
+  receiving,
+  complete,
+  refundWait,
+  refunding,
+  refundPayout,
+  refunded,
+  cancelled,
+}
+
+/// A reverse quote kept as a `QUOTED` draft, and what to price it at.
+class ApiReverseQuote {
+  final ApiReverseRecord record;
+  final ApiReverseCostRequest costRequest;
+
+  const ApiReverseQuote({required this.record, required this.costRequest});
+
+  @override
+  int get hashCode => record.hashCode ^ costRequest.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiReverseQuote &&
+          runtimeType == other.runtimeType &&
+          record == other.record &&
+          costRequest == other.costRequest;
+}
+
+/// A flat view of a reverse record; the record itself stays in Rust.
+class ApiReverseRecord {
+  final int index;
+
+  /// `0x`, 32 bytes: the escrow's id.
+  final String swapId;
+  final ApiReversePhase phase;
+
+  /// The escrow amount, token base units.
+  final String amount;
+
+  /// The maker's own network cost the quote charges, if it names one.
+  final String? networkCost;
+
+  /// What the maker deposits into the joint account.
+  final BigInt depositZat;
+  final PlatformInt64 quoteExpiresAt;
+  final PlatformInt64 fundingDeadline;
+
+  /// "Authorize settlement" is offered until `ready_deadline − 120`.
+  final PlatformInt64 readyDeadline;
+
+  /// A refund after `ready` can only proceed from here.
+  final PlatformInt64 refundAfter;
+
+  /// The reviewed cost; `None` until priced (or after the relayer's fee
+  /// rose): price it before "Pay".
+  final ApiReverseCost? cost;
+
+  /// A funding is kept (posted, or to be posted again).
+  final bool funded;
+
+  /// The funding's Ethereum transaction, `0x` hex, once the relayer named
+  /// one.
+  final String? fundingTx;
+  final bool cancelRequested;
+
+  /// The maker claimed: the ZEC is on its way home; no refund follows.
+  final bool settled;
+
+  /// Whether "Cancel conversion" / "Request private refund" shows.
+  final bool cancellable;
+
+  /// Waiting on the user's funding payment or settlement approval.
+  final bool awaitingUser;
+
+  /// The sweep home's estimate the user reviewed with `ready`: what
+  /// arrives after its fee, and the fee, the most the sweep pays.
+  final BigInt? receiveEstimateZat;
+  final BigInt? receiveFeeZat;
+
+  /// The sweep home, internal byte order hex, as wallet history rows carry
+  /// it; show it with `zcashDisplayTxidHex`.
+  final String? receiveTxid;
+  final BigInt? receivedZat;
+  final int receiveConfirmations;
+
+  /// When the user went ahead; `None` for a draft.
+  final PlatformInt64? acceptedAt;
+
+  /// When the record last changed (device clock).
+  final PlatformInt64 updatedAt;
+
+  const ApiReverseRecord({
+    required this.index,
+    required this.swapId,
+    required this.phase,
+    required this.amount,
+    this.networkCost,
+    required this.depositZat,
+    required this.quoteExpiresAt,
+    required this.fundingDeadline,
+    required this.readyDeadline,
+    required this.refundAfter,
+    this.cost,
+    required this.funded,
+    this.fundingTx,
+    required this.cancelRequested,
+    required this.settled,
+    required this.cancellable,
+    required this.awaitingUser,
+    this.receiveEstimateZat,
+    this.receiveFeeZat,
+    this.receiveTxid,
+    this.receivedZat,
+    required this.receiveConfirmations,
+    this.acceptedAt,
+    required this.updatedAt,
+  });
+
+  @override
+  int get hashCode =>
+      index.hashCode ^
+      swapId.hashCode ^
+      phase.hashCode ^
+      amount.hashCode ^
+      networkCost.hashCode ^
+      depositZat.hashCode ^
+      quoteExpiresAt.hashCode ^
+      fundingDeadline.hashCode ^
+      readyDeadline.hashCode ^
+      refundAfter.hashCode ^
+      cost.hashCode ^
+      funded.hashCode ^
+      fundingTx.hashCode ^
+      cancelRequested.hashCode ^
+      settled.hashCode ^
+      cancellable.hashCode ^
+      awaitingUser.hashCode ^
+      receiveEstimateZat.hashCode ^
+      receiveFeeZat.hashCode ^
+      receiveTxid.hashCode ^
+      receivedZat.hashCode ^
+      receiveConfirmations.hashCode ^
+      acceptedAt.hashCode ^
+      updatedAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiReverseRecord &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          swapId == other.swapId &&
+          phase == other.phase &&
+          amount == other.amount &&
+          networkCost == other.networkCost &&
+          depositZat == other.depositZat &&
+          quoteExpiresAt == other.quoteExpiresAt &&
+          fundingDeadline == other.fundingDeadline &&
+          readyDeadline == other.readyDeadline &&
+          refundAfter == other.refundAfter &&
+          cost == other.cost &&
+          funded == other.funded &&
+          fundingTx == other.fundingTx &&
+          cancelRequested == other.cancelRequested &&
+          settled == other.settled &&
+          cancellable == other.cancellable &&
+          awaitingUser == other.awaitingUser &&
+          receiveEstimateZat == other.receiveEstimateZat &&
+          receiveFeeZat == other.receiveFeeZat &&
+          receiveTxid == other.receiveTxid &&
+          receivedZat == other.receivedZat &&
+          receiveConfirmations == other.receiveConfirmations &&
+          acceptedAt == other.acceptedAt &&
+          updatedAt == other.updatedAt;
+}
 
 /// A token the private USD balance counts as dollars.
 class ApiUsdToken {

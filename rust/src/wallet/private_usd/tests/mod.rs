@@ -2,8 +2,9 @@
 //! `vectors.json`. Signatures are deterministic (RFC 6979), so they compare
 //! byte for byte. `joint` holds the joint-account and deposit tests (M2),
 //! `ironwood_regtest` the ignored test against the regtest stack, `forward`
-//! the forward conversion's fund-safety tests on the `fakes` (M5), and
-//! `lifecycle` the account deletion and drain guards (M5).
+//! the forward conversion's fund-safety tests on the `fakes` (M5),
+//! `lifecycle` the account deletion and drain guards (M5), and `reverse` the
+//! reverse conversion's fund-safety tests and its funding calldata (M6).
 
 use serde_json::Value;
 use zecswap_core::{
@@ -20,6 +21,7 @@ mod forward;
 mod ironwood_regtest;
 mod joint;
 mod lifecycle;
+mod reverse;
 
 fn vectors() -> Value {
     serde_json::from_str(include_str!("vectors.json")).unwrap()
@@ -367,6 +369,9 @@ fn selectors_match_the_contract() {
         evm_rpc::TOKEN_BLOCKLIST,
         evm_rpc::BALANCE_OF,
         evm_rpc::PAID_OUT_EVENT,
+        super::funding_calls::OPEN_REVERSE,
+        super::funding_calls::APPROVE,
+        super::funding_calls::TRANSFER,
     ] {
         assert!(
             vectors()["selectors"].get(signature).is_some(),

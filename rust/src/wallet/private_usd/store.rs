@@ -398,6 +398,27 @@ impl SwapStore {
             .transpose()
     }
 
+    /// When swap `index`'s record last changed, in unix seconds on this
+    /// device's clock.
+    pub(crate) fn updated_at(
+        &self,
+        account: &str,
+        direction: Direction,
+        index: u32,
+    ) -> Result<Option<u64>> {
+        let updated: Option<i64> = self
+            .conn
+            .query_row(
+                "SELECT updated_at FROM swaps
+                 WHERE account_uuid = ?1 AND direction = ?2 AND swap_index = ?3",
+                params![account, direction.as_str(), index],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(sql)?;
+        Ok(updated.map(|seconds| u64::try_from(seconds).unwrap_or_default()))
+    }
+
     /// Conversions under way: forward unfinished, reverse unfinished and past
     /// its quote (a draft is not under way).
     pub(crate) fn unfinished_count(&self, account: &str) -> Result<u32> {

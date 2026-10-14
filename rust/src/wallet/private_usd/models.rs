@@ -806,6 +806,18 @@ pub(crate) struct ReverseReceiveEstimate {
     pub fee_zat: u64,
 }
 
+impl ReverseReceiveEstimate {
+    /// What the sweep home brings after its fee.
+    pub(crate) fn received_zat(&self) -> u64 {
+        self.available_zat.saturating_sub(self.fee_zat)
+    }
+
+    /// A sweep that pays a fee and still brings something home.
+    pub(crate) fn is_usable(&self) -> bool {
+        self.fee_zat > 0 && self.available_zat > self.fee_zat
+    }
+}
+
 /// The joint account's sweep home, kept before it is first sent.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -820,6 +832,17 @@ pub(crate) struct ReverseReceiveTransaction {
 impl fmt::Debug for ReverseReceiveTransaction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ReverseReceiveTransaction({:?})", self.tx_id)
+    }
+}
+
+impl ReverseReceiveTransaction {
+    /// The transaction alone, as it is sent again and followed.
+    pub(crate) fn transaction(&self) -> ZcashTransaction {
+        ZcashTransaction {
+            tx_id: self.tx_id.clone(),
+            raw: self.raw.clone(),
+            expiry_height: self.expiry_height,
+        }
     }
 }
 
@@ -881,6 +904,45 @@ impl ReverseRecord {
 
     pub(crate) fn under_way(&self) -> bool {
         !self.is_draft() && !self.finished()
+    }
+
+    /// Settlement was seen on Ethereum, even if the sweep home is not built
+    /// yet: no refund can follow.
+    pub(crate) fn is_settled(&self) -> bool {
+        matches!(self.phase, ReversePhase::Receiving | ReversePhase::Complete)
+            || self.receive.is_some()
+    }
+
+    /// Whether the user may still call it off (zapp `ReverseSwapStatus`
+    /// `cancellable`): under way, not called off already, not settled, and
+    /// no refund being paid.
+    pub(crate) fn cancellable(&self) -> bool {
+        self.under_way()
+            && !self.cancel_requested
+            && !self.is_settled()
+            && !matches!(
+                self.phase,
+                ReversePhase::Refunding | ReversePhase::RefundPayout
+            )
+    }
+
+    /// Gone ahead with, and neither accepted nor funded nor called off yet.
+    pub(crate) fn is_accepting(&self) -> bool {
+        self.under_way()
+            && self.account.is_none()
+            && self.funding.is_none()
+            && !self.cancel_requested
+    }
+
+    /// Waiting on one of the user's two approvals: the funding payment or
+    /// the settlement (zapp `ReverseApproval`).
+    pub(crate) fn awaiting_user(&self) -> bool {
+        self.under_way()
+            && !self.cancel_requested
+            && matches!(
+                self.phase,
+                ReversePhase::AwaitingFunding | ReversePhase::AwaitingReady
+            )
     }
 }
 

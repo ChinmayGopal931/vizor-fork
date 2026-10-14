@@ -1,7 +1,8 @@
 //! The swap engine's process-wide state (plan §5.10, reference §5.10 "vizor
 //! engine"): one driver step per account at a time, the forward offers quoted
-//! but not accepted yet, and the FRB calls in flight with their cancel flags
-//! and current activity. None of it is persisted.
+//! but not accepted yet, the reverse fundings handed to the Railgun page to
+//! prove, and the FRB calls in flight with their cancel flags and current
+//! activity. None of it is persisted.
 //!
 //! - A driver step holds its account's [`DriverGuard`] for its whole run,
 //!   network I/O included; a second caller gets `Busy`. `OPERATIONS` is never
@@ -9,6 +10,9 @@
 //! - An offer lives until its quote expires or the wallet locks
 //!   ([`clear_sessions`]). The forward quote is never persisted and never
 //!   crosses to Dart: a missing offer at accept is `QuoteExpired`.
+//! - A reverse funding lives from its request until its proof is submitted,
+//!   the wallet locks or the account is deleted: a proof that finishes after
+//!   a lock is never submitted.
 //! - A call registered with [`OpHandle::begin`] can be cancelled by its id and
 //!   reports what it is doing (zapp `onActivity`) until it returns.
 
@@ -22,7 +26,7 @@ use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
 use super::forward::joint_db_path;
 use super::joint;
-use super::models::{Amount, SwapQuote};
+use super::models::{Amount, ReverseRecord, SwapQuote};
 use super::store::SwapStore;
 use super::{ErrorCode, PrivateUsdError, PrivateUsdNetwork, Result, OPERATIONS};
 use crate::wallet::network::WalletNetwork;
@@ -71,6 +75,7 @@ pub(crate) fn delete_account(
 ) -> Result<()> {
     let _driver = lock_account(account)?;
     remove_account_offers(account);
+    remove_account_fundings(account);
     let Some(mut store) = SwapStore::open_existing(store_dir)? else {
         return Ok(());
     };
@@ -166,18 +171,19 @@ pub(crate) fn remove_account_offers(account: &str) {
     lock(&OFFERS).retain(|(held, _), _| held != account);
 }
 
-/// Which makers' `/v1/info` already matched the pins this session (zapp
-/// checks once per driver). Cleared with the offers.
+/// Which makers' `/v1/info` already matched the pins this session, for which
+/// direction (zapp checks once per driver; reverse also needs
+/// `reverseEnabled`). Cleared with the offers.
 #[derive(Default)]
-pub(crate) struct MakerChecks(Mutex<HashSet<PrivateUsdNetwork>>);
+pub(crate) struct MakerChecks(Mutex<HashSet<(PrivateUsdNetwork, bool)>>);
 
 impl MakerChecks {
-    pub(crate) fn checked(&self, network: PrivateUsdNetwork) -> bool {
-        lock(&self.0).contains(&network)
+    pub(crate) fn checked(&self, network: PrivateUsdNetwork, reverse: bool) -> bool {
+        lock(&self.0).contains(&(network, reverse))
     }
 
-    pub(crate) fn mark(&self, network: PrivateUsdNetwork) {
-        lock(&self.0).insert(network);
+    pub(crate) fn mark(&self, network: PrivateUsdNetwork, reverse: bool) {
+        lock(&self.0).insert((network, reverse));
     }
 
     fn clear(&self) {
@@ -187,26 +193,83 @@ impl MakerChecks {
 
 pub(crate) static MAKER_CHECKS: LazyLock<MakerChecks> = LazyLock::new(Default::default);
 
-/// Forgets every offer and maker check: the wallet locked (D9). A quote made
-/// before the lock is never accepted after it.
+/// Forgets every offer, reverse funding and maker check: the wallet locked
+/// (D9). A quote made before the lock is never accepted after it, and a
+/// funding proved across it is never submitted.
 pub(crate) fn clear_sessions() {
     let mut offers = lock(&OFFERS);
     SESSION.fetch_add(1, Ordering::AcqRel);
     offers.clear();
     drop(offers);
+    lock(&FUNDINGS).clear();
     MAKER_CHECKS.clear();
+}
+
+// ---- reverse fundings ----
+
+/// A reverse swap's funding as Rust handed it to the Railgun page to prove
+/// (reference §5.7 step 4): kept in memory only, until the proof comes back.
+#[derive(Clone, Debug)]
+pub(crate) struct FundingSession {
+    pub network: PrivateUsdNetwork,
+    /// The record when its `OpenReverse` was signed: a proof is submitted
+    /// only while the record is unchanged (zapp `fund`'s check).
+    pub record: ReverseRecord,
+    /// The relayer fee the calls pay, and until when the relayer takes it.
+    pub fee: Amount,
+    pub fee_expires_at: Option<u64>,
+    /// The relayer's pinned Relay Adapt and calldata limit when signed.
+    pub relay_adapt: [u8; 20],
+    pub max_calldata_bytes: u32,
+}
+
+static FUNDINGS: LazyLock<Mutex<HashMap<(String, u32), FundingSession>>> =
+    LazyLock::new(Default::default);
+
+/// Holds `funding` for `account`'s swap `index` until its proof comes back;
+/// one made in an earlier `session` (the wallet locked meanwhile) is never
+/// held.
+pub(crate) fn put_funding(account: &str, index: u32, funding: FundingSession, session: u64) {
+    let mut fundings = lock(&FUNDINGS);
+    if SESSION.load(Ordering::Acquire) != session {
+        return;
+    }
+    fundings.insert((account.to_owned(), index), funding);
+}
+
+/// Takes the funding held for `account`'s swap `index` on `network`: one
+/// proof is submitted once.
+pub(crate) fn take_funding(
+    account: &str,
+    index: u32,
+    network: PrivateUsdNetwork,
+) -> Option<FundingSession> {
+    lock(&FUNDINGS)
+        .remove(&(account.to_owned(), index))
+        .filter(|held| held.network == network)
+}
+
+/// Drops every funding of `account`, as its deletion does.
+pub(crate) fn remove_account_fundings(account: &str) {
+    lock(&FUNDINGS).retain(|(held, _), _| held != account);
 }
 
 // ---- calls in flight ----
 
 /// What a call is doing now, for the progress screen (zapp
-/// `AtomicSwapActivity`).
+/// `AtomicSwapActivity`, plus the reverse steps).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Activity {
     Depositing,
     Claiming,
     PayingOut,
     Sweeping,
+    /// Sending a kept reverse funding (again).
+    Funding,
+    /// Sending the saved `ready` again.
+    Readying,
+    /// Locking, revealing or paying out a reverse refund.
+    Refunding,
 }
 
 struct OpState {

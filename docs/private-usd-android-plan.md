@@ -8,7 +8,7 @@
 
 **Scope.** Android, mobile form factor (`--dart-define=VIZOR_FORM_FACTOR=mobile`). iOS and desktop come later, so keep the Rust engine, the Dart models and the JS bundle platform-neutral. iOS then needs only a Swift `WKWebView` host and an attestation channel.
 
-**Status (2026-10-13).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is done, including its Ironwood regtest run (M2.7b, passed 2026-10-13 after the fresh-tip fix D-50). M3 is done (tasks 1–13: the native layer, the Dart Railgun side, balance, availability, the home strip, `/private-usd`, lifecycle, copy, Widgetbook and the Kotlin tests) except its device round, M3.14: the round's harness is ready (progress D-40), but the 2026-10-14 round could not run because the phone was not attached (B-8). M4 is skipped for now: it waits for N1 (B-5), and M5–M7 proceed without tokens (D20; the owner disabled them on testnet for now). M5 is done (tasks 1–7: the Rust engine and its FRB calls, then the Dart engine, lifecycle guards, UI, copy and Widgetbook) except its device round, M5.8, which needs testnet ZEC on the phone's wallet (E8); its opt-in scenario is written (`run_device_round.sh --m5`, progress D-57). Progress lives in `docs/private-usd-progress.md`.
+**Status (2026-10-14).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is done, including its Ironwood regtest run (M2.7b, passed 2026-10-13 after the fresh-tip fix D-50). M3 is done (tasks 1–13: the native layer, the Dart Railgun side, balance, availability, the home strip, `/private-usd`, lifecycle, copy, Widgetbook and the Kotlin tests) except its device round, M3.14: the round's harness is ready (progress D-40), but the 2026-10-14 round could not run because the phone was not attached (B-8). M4 is skipped for now: it waits for N1 (B-5), and M5–M7 proceed without tokens (D20; the owner disabled them on testnet for now). M5 is done (tasks 1–7: the Rust engine and its FRB calls, then the Dart engine, lifecycle guards, UI, copy and Widgetbook) except its device round, M5.8, which needs testnet ZEC on the phone's wallet (E8); its opt-in scenario is written (`run_device_round.sh --m5`, progress D-57). A fund-safety review of M5 led to four fixes and one hardening (D-59). M6 part 1 (tasks 1–2: the Rust reverse engine, refunds, rescue, funding calls and FRB calls) is done; part 2 (tasks 3–5, Dart) is next. Progress lives in `docs/private-usd-progress.md`.
 
 **Two files.** This file holds the decisions, the architecture, the work and the test strategy. The reference sections §5–§9 and §12 live in `docs/private-usd-reference.md`, with the same numbers:
 
@@ -386,7 +386,9 @@ rust/src/
         ├── joint.rs           [M2] joint.db ops (§8.1)
         ├── engine.rs          [M5] per-account driver locks, the forward offer cache, the op_id cancel + activity registry, the Clock and TokenSource seams, problem mapping, account deletion (§5.10)
         ├── forward.rs         [M5] the §5.6 driver and §5.8 forward refund over the seams; WalletZcash (the M2 ops); ForwardCall
-        │                      reverse.rs, funding_calls.rs [M6]   sends.rs [M7] (send log over swaps.db)
+        ├── reverse.rs         [M6] the §5.7 driver, reverse refund and rescue: ReverseView (no key) and Reverse; the ReverseZcash seam (WalletZcash); ReverseCall
+        ├── funding_calls.rs   [M6] the funding's approve, openReverse and transfer calldata
+        │                      sends.rs [M7] (send log over swaps.db)
         └── tests/vectors.json the §3.3 and §5.5 vectors
 ```
 
@@ -925,14 +927,14 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
 
 **Traps.**
 
-- **The reverse quote needs the page.** `cost` comes from the page's `reverseCost`, so the direction works only once the page is `READY`. For each amount: `reverse_quote`, then `reverseCost`, then `set_cost`.
-- **The Railgun seed signs `OpenReverse`,** so `funding_request` takes `mnemonic_bytes`. Refuse a page whose address differs (invariant 19).
-- **A funding proof can finish after lock or background** (it takes up to 10 min in the page). Before `submit_funding`, re-check unlocked, foreground and the epoch; otherwise drop the proof.
-- **Cancel can race the proof.** `submit_funding` refuses when `cancelRequested` is set.
+- **The reverse quote needs the page.** `cost` comes from the page's `reverseCost`, so the direction works only once the page is `READY`. For each amount: `reverse_quote` (it returns the page's `reverseCost` params as `cost_request`), then `reverseCost`, then `set_cost`, which re-reads the relayer's fee and requires `debit = amount + fee + railgun_fee` (progress D-71). Going ahead and paying need a priced record.
+- **The Railgun seed signs `OpenReverse`,** so `funding_request` takes `mnemonic_bytes`. Refuse a page whose address differs (invariant 19): as built, `funding_request` takes the page's open address as `railgun_address` (D-73).
+- **A funding proof can finish after lock or background** (it takes up to 10 min in the page). Before `submit_funding`, re-check unlocked, foreground and the epoch; otherwise drop the proof. As built, Rust also holds the request only in memory for its session, so a proof that crosses a lock or a restart is refused `Cancelled` (D-72).
+- **Cancel can race the proof.** `submit_funding` refuses when `cancelRequested` is set. A cancel during the funding's post waits for it: the driver lock spans the post (D-76).
 - **Outbox order:** save in one SQLite transaction, then post. The driver lock may span the post; `OPERATIONS` must not.
 - **`ready` is a user action only.** The loop only resends a saved `ready` before its deadline. The button is enabled in `AWAITING_READY` until `readyDeadline − 120 s`.
-- **The joint import and claim scan take the global write lock** and contend with the main sync. A docstring at `sync_engine/mod.rs:2805-2807` wrongly says otherwise.
-- **Reverse amounts have at most 2 decimals.** Convert with string arithmetic. Max = `available − unshieldFee − fundingFee`, rounded down.
+- **The joint import and claim scan take the global write lock** and contend with the main sync. A docstring at `sync_engine/mod.rs:2805-2807` wrongly said otherwise (corrected in M6 part 1: the scan's send-lock recovery and subtree-root writes take it).
+- **Reverse amounts have at most 2 decimals.** Convert with string arithmetic. Max = `available − unshieldFee − fundingFee`, rounded down. Rust refuses `units` that are not whole cents (D-74).
 - **`can_rescue` is a chain read only;** `rescue` needs the secret and the lock.
 
 ### M7. Private send and withdraw
@@ -1029,7 +1031,7 @@ The owner's preference (2026-10-13): end-to-end first. Device runs are batched i
   - keep before post
   - the refund branches
 
-  Port only the ★ zapp cases these need (§8.7, "Tests to translate"). As built for the forward machine (M5 part 1): `private_usd/tests/forward.rs` (38 tests) and `private_usd/tests/lifecycle.rs` (3, through the FRB calls) on the fakes in `private_usd/tests/fakes.rs`; the ★ mapping is progress-doc D-39. The Dart side (M5 part 2): the `SwapLoopTest` ★ cases and the lock and drain rules in `test/features/private_usd/private_usd_engine_test.dart` (D-52), all of `PrivateUsdZecQuotesTest`, the convert flow's button-enable, back and expiry cases, and the deletion and reset guards in `test/providers/private_usd_account_lifecycle_test.dart` (D-58).
+  Port only the ★ zapp cases these need (§8.7, "Tests to translate"). As built for the forward machine (M5 part 1): `private_usd/tests/forward.rs` (38 tests) and `private_usd/tests/lifecycle.rs` (3, through the FRB calls) on the fakes in `private_usd/tests/fakes.rs`; the ★ mapping is progress-doc D-39. For the reverse machine (M6 part 1, after the owner's 2026-10-14 call for fewer unit tests): `private_usd/tests/reverse.rs`, 7 tests, one per M6 "Done when" rule, on the same fakes; the mapping is D-80. The Dart side (M5 part 2): the `SwapLoopTest` ★ cases and the lock and drain rules in `test/features/private_usd/private_usd_engine_test.dart` (D-52), all of `PrivateUsdZecQuotesTest`, the convert flow's button-enable, back and expiry cases, and the deletion and reset guards in `test/providers/private_usd_account_lifecycle_test.dart` (D-58).
 - Routes fail closed under `network_privacy::test_route_policy::lock_route_policy()`.
 
 Skip unit tests for UI glue, provider wiring and copy; the device rounds cover them. The existing suites must keep passing: `cargo test`, `fvm flutter analyze`, `fvm flutter test` and the mobile lane.
