@@ -17,7 +17,7 @@
 //! wallet write lock. One scan of a `joint.db` runs at a time.
 
 use std::collections::HashSet;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 
 use rusqlite::OptionalExtension;
@@ -184,9 +184,17 @@ pub(crate) async fn sync_joint_db(
     let Some(birthday) = birthday else {
         return Ok(());
     };
-    let tip = sync_engine::latest_block_for_transaction(lightwalletd_url, network)
+    // A fresh tip, never the transaction tip cache: a tip cached up to 15 s
+    // earlier would skip the scan of the very block that reaches the birthday.
+    let mut client = sync_engine::open_lwd_channel_with_cancel(lightwalletd_url, || {
+        cancel.load(Ordering::Relaxed)
+    })
+    .await
+    .map_err(|error| wallet_error(format!("read the chain tip: {error}")))?;
+    let tip = sync_engine::get_latest_block_recorded(&mut client, lightwalletd_url, network)
         .await
         .map_err(|error| wallet_error(format!("read the chain tip: {error}")))?;
+    drop(client);
     if u64::from(u32::from(birthday)) > tip.height {
         return Ok(());
     }

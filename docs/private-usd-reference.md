@@ -1141,7 +1141,7 @@ Each row is a step zapp performs, and the vizor seam that performs it. "New" mea
 #### 8.1.4 Traps
 
 - **Global write lock.** `with_wallet_db_write_lock` is process-global, not per path (`vr/wallet/db.rs:220-245`). Joint-DB scans and writes therefore serialize with main-wallet writes, as Gift Card claims already do.
-- **Birthday at the tip.** zecSwap imports at tip + 1, because librustzcash panics on an empty scan range next to a deleted account's ranges (`zs/…/zcash/wallet.rs:451-470`, librustzcash#2301). vizor's claim-sync normalizes ranges (`sync_engine/mod.rs:2865-2868`). **Unverified** for a joint account whose birthday is ≥ the tip (U6). As built, `sync_joint_db` does not scan a `joint.db` whose accounts are all born above the tip: the claim scan's completion checks need a stored tip block (D-10).
+- **Birthday at the tip.** zecSwap imports at tip + 1, because librustzcash panics on an empty scan range next to a deleted account's ranges (`zs/…/zcash/wallet.rs:451-470`, librustzcash#2301). vizor's claim-sync normalizes ranges (`sync_engine/mod.rs:2865-2868`). Verified for a joint account born above the tip by the M2.7b regtest run, 2026-10-13 (U6). As built, `sync_joint_db` does not scan a `joint.db` whose accounts are all born above the tip: the claim scan's completion checks need a stored tip block (D-10). The tip it compares must be fresh, not the 15 s transaction tip cache, or the block that reaches the birthday is skipped (D-50).
 
 ### 8.2 FRB API conventions
 

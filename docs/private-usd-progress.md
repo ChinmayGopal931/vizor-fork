@@ -131,11 +131,28 @@ the SDK's observation phases in `routed_http`, so it is not a safe drop-in.
 - [x] M2.5 The deposit split in `send.rs`
 - [x] M2.6 `find_deposit` and `swap_tx_status`
 - [x] M2.7 Ignored Ironwood regtest test (written; compiles)
-- [ ] M2.7b Run the Ironwood regtest test once (deferred to the batched E2E round; needs the owner's go-ahead; settles U4–U9)
-- [x] M2 gate (the regtest run is M2.7b, deferred)
+- [x] M2.7b Run the Ironwood regtest test once (2026-10-13, with the owner's go-ahead: passed after the fresh-tip fix, D-50; settles U4–U9)
+- [x] M2 gate (including the M2.7b regtest run)
 
-M2 status (2026-10-13): done except M2.7b, the regtest run, which waits for
-the batched E2E round and the owner's go-ahead.
+M2 status (2026-10-13): done. The regtest run (M2.7b) passed on the second
+attempt, after a fix (below).
+
+- **M2.7b, the Ironwood regtest run** (Dockerized Zero zcashd and the
+  Ironwood lightwalletd, NU6.3 at 500):
+  `cargo test --lib private_usd::tests::ironwood_regtest -- --ignored --nocapture --test-threads=1`.
+  - First run: failed at the first receipt check (`received_zatoshi` 0, not
+    50,000,000). The deposit was mined at height 507, the joint birthday, but
+    the joint DB had scanned nothing: no `blocks` rows, and `scan_queue` held
+    only `[1, 507)` Ignored. `sync_joint_db` had judged the DB born above the
+    tip using `latest_block_for_transaction`, a tip cache up to 15 s old,
+    which still said 506.
+  - Fix (D-50): `sync_joint_db` reads a fresh tip.
+  - Second run: `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured;
+    1510 filtered out; finished in 73.17s`. Every assertion held: deposit
+    into the Ironwood bundle and recorded for `find_deposit`, import above
+    the tip, two-confirmation receipts, broadcast before store, and a sweep
+    home whose output does not recover under the joint OVKs. That answers
+    U4–U9 (plan §11).
 
 - **Rust:** `cd rust && cargo test` passes: lib 1451 passed, 0 failed, 10
   ignored; integration 6 passed, 21 ignored (regtest). The 4 new tests in
@@ -689,7 +706,8 @@ the forward path runs without tokens (D-33).
   reading the claim scan, such a DB fails its completion checks: no block is
   stored at the tip. `sync_joint_db` returns at once until the tip reaches the
   wallet birthday (zecSwap's `born_above`). It also runs one scan per
-  `joint.db` at a time; a second gets `Busy`. M2.7b exercises it.
+  `joint.db` at a time; a second gets `Busy`. M2.7b exercises it; the tip it
+  compares against must be fresh (D-50).
 - **D-11 (M2): the TEX PCZT path keeps an OVK-based refusal.** It builds both
   PCZTs with the sender's OVK, so it still refuses every `Discard` proposal:
   claims keep the Gift Card message, others get a generic one. Only
@@ -1060,6 +1078,15 @@ the forward path runs without tokens (D-33).
     read from the posted bodies (the keys are real); zapp's
     `beforeClaimSecret` cases change the chain on the third confirmed read,
     the one immediately before the reveal.
+- **D-50 (M2.7b): `sync_joint_db` reads a fresh tip.** It compared the
+  joint birthday with `latest_block_for_transaction`, which returns a tip
+  observed up to 15 s earlier (a cache meant for building transactions). A
+  deposit mined into the birthday block within those 15 s was therefore
+  skipped by that sync: the regtest run's first attempt failed this way. In
+  the app it would only have delayed the deposit by a poll. It now opens a
+  route-checked channel (`open_lwd_channel_with_cancel`, honouring the scan's
+  cancel) and reads the tip with `get_latest_block_recorded`. Numbered D-50 so
+  as not to collide with the M3 device round's D-40 onward.
 
 ## Blocked
 
