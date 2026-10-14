@@ -1,10 +1,10 @@
 //! Fakes for the swap engine's seams (plan §10), after zapp's
-//! `AtomicSwapDriverFixtures` (`FakeChain`, `FakeKeys`, `FakeZcash`,
-//! `FakeStore`): one shared [`World`] behind a [`ChainReader`], the maker and
-//! relayer as an [`HttpTransport`] routed by path, the wallet's Zcash side and
-//! the clocks. The keys are real (the §5.5 vector seed), the maker's share
-//! and proof are real, and the store is a real `swaps.db` in a temp dir.
-//! Nothing here reaches a network.
+//! `AtomicSwapDriverFixtures` and `ReverseSwapDriverFixtures` (`FakeChain`,
+//! `FakeKeys`, `FakeZcash`, `FakeStore`): one shared [`World`] behind a
+//! [`ChainReader`], the maker and relayer as an [`HttpTransport`] routed by
+//! path, the wallet's Zcash side and the clocks. The keys are real (the §5.5
+//! vector seed), the maker's share and proof are real, and the store is a
+//! real `swaps.db` in a temp dir. Nothing here reaches a network.
 
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
@@ -29,9 +29,13 @@ use super::super::evm_rpc::{
 use super::super::forward::{Forward, ForwardStep, ForwardWait, ForwardZcash, Quoted};
 use super::super::joint::SwapTxStatus;
 use super::super::keys::SwapKeyContext;
-use super::super::models::{Direction, ForwardRecord, StoredRecord, ZcashTransaction, ZcashTxId};
+use super::super::models::{
+    Direction, ForwardRecord, JointAccountId, ReverseReceiveEstimate, ReverseReceiveTransaction,
+    ReverseRecord, StoredRecord, ZcashTransaction, ZcashTxId,
+};
+use super::super::reverse::{self, ProvedFunding, Reverse, ReverseQuoted, ReverseZcash};
 use super::super::store::{self, SwapStore};
-use super::super::terms::{keccak, swap_id};
+use super::super::terms::{keccak, reverse_swap_id, swap_id};
 use super::super::transport::HttpTransport;
 use super::super::{fail, ErrorCode, PrivateUsdNetwork, Result};
 use crate::wallet::routed_http::{RoutedError, RoutedPhase, RoutedRequest, RoutedResponse};
@@ -45,6 +49,16 @@ pub(super) const DEPOSIT_FEE_ZAT: u64 = 10_000;
 pub(super) const ZCASH_HEIGHT: u64 = 4_200_000;
 pub(super) const NETWORK: PrivateUsdNetwork = PrivateUsdNetwork::Testnet;
 pub(super) const QUOTE_ID: [u8; 32] = [0x22; 32];
+// A reverse quote's deadlines (zapp's fixture spacing: funding, ready and
+// refund 1000, 3000 and 5000 s out), and the relayer's funding fee.
+pub(super) const FUNDING: u64 = NOW + 1_000;
+pub(super) const READY: u64 = NOW + 3_000;
+pub(super) const REFUND: u64 = NOW + 5_000;
+pub(super) const FUNDING_FEE: u128 = 250_000;
+/// The maker's ZEC deposit into a reverse conversion's joint account.
+pub(super) const REVERSE_DEPOSIT_ZAT: u64 = 100_000;
+/// Railgun's unshield fee, as the Railgun page loads it.
+const UNSHIELD_BPS: u128 = 25;
 
 pub(super) fn pins() -> &'static Deployment {
     deployment::deployment(NETWORK)
@@ -140,6 +154,20 @@ pub(super) struct State {
     /// Swap ids an earlier use of their index left on chain.
     pub used_ids: Vec<[u8; 32]>,
 
+    // A reverse escrow, open once funded, with the stage, locks, payout and
+    // secret above.
+    pub escrow_terms: Option<Terms>,
+    pub escrow_id: Option<[u8; 32]>,
+    pub escrow_note: [u8; 32],
+    pub funding_block: u64,
+    /// The funding transaction as the node sees it.
+    pub funding_status: TransactionStatus,
+    pub vault: u128,
+    pub rescue_nonce: u64,
+    /// Runs before each reverse escrow read, with its number (1, 2, …).
+    pub on_reverse_read: Option<Box<dyn FnMut(&mut State, u32)>>,
+    pub reverse_reads: u32,
+
     // The maker.
     /// The amount every quote names, in token base units.
     pub amount: u128,
@@ -149,6 +177,9 @@ pub(super) struct State {
     pub accept_code: Option<&'static str>,
     /// Holds the accept's answer until notified.
     pub hold_accept: Option<Arc<Notify>>,
+    /// A reverse quote's funding, ready and refund deadlines.
+    pub reverse_deadlines: (u64, u64, u64),
+    pub reverse_accepts: u32,
 
     // The relayer.
     pub relayer: [u8; 20],
@@ -163,6 +194,17 @@ pub(super) struct State {
     pub hold_lock: Option<Arc<Notify>>,
     /// A relayer path that never answers.
     pub unreachable: Option<&'static str>,
+    /// The fee the relayer funds reverse escrows for; `None`: no sponsorship.
+    pub funding_fee: Option<u128>,
+    /// The transaction `/v1/reverse/fund` names; `None` names none (a
+    /// matching escrow exists already).
+    pub fund_hash: Option<[u8; 32]>,
+    /// Holds the funding's answer until notified.
+    pub hold_fund: Option<Arc<Notify>>,
+    /// Every funding posted, answered or not, in order.
+    pub fundings: Vec<Value>,
+    /// Runs once at the next `/v1/terms` read.
+    pub on_terms: Option<Hook>,
 
     // What was asked.
     pub paths: Vec<String>,
@@ -185,6 +227,17 @@ pub(super) struct State {
     pub spendable: bool,
     pub sweeps: Vec<(u32, u64)>,
     pub forgotten: u32,
+    /// The maker's ZEC in a reverse joint account, and its depth.
+    pub paid_in: u64,
+    pub deposit_confirmations: u32,
+    /// The fee a reverse sweep's estimate names, and what a sweep pays.
+    pub sweep_fee: u64,
+    pub sweep_pays: u64,
+    /// The fee cap each reverse sweep home was asked under.
+    pub receive_caps: Vec<Option<u64>>,
+    pub imports: u32,
+    /// Proofs the Railgun page made.
+    pub proofs: u32,
 }
 
 /// Where a crash cuts a deposit short: right after it is proposed, so the
@@ -221,12 +274,23 @@ impl State {
             payout_hash: word(0),
             payout_fee: RELAYER_FEE,
             used_ids: Vec::new(),
+            escrow_terms: None,
+            escrow_id: None,
+            escrow_note: [0; 32],
+            funding_block: 0,
+            funding_status: TransactionStatus::Unknown,
+            vault: 0,
+            rescue_nonce: 0,
+            on_reverse_read: None,
+            reverse_reads: 0,
             amount: AMOUNT,
             quote_expires_at: NOW + 300,
             quote_requests: Vec::new(),
             accept_status: 200,
             accept_code: None,
             hold_accept: None,
+            reverse_deadlines: (FUNDING, READY, REFUND),
+            reverse_accepts: 0,
             relayer: pins.relayer,
             relayer_fee: RELAYER_FEE,
             fee_expires_at: None,
@@ -236,6 +300,11 @@ impl State {
             after_lock: None,
             hold_lock: None,
             unreachable: None,
+            funding_fee: Some(FUNDING_FEE),
+            fund_hash: Some(word(8)),
+            hold_fund: None,
+            fundings: Vec::new(),
+            on_terms: None,
             paths: Vec::new(),
             bodies: HashMap::new(),
             headers: HashMap::new(),
@@ -252,11 +321,41 @@ impl State {
             spendable: true,
             sweeps: Vec::new(),
             forgotten: 0,
+            paid_in: 0,
+            deposit_confirmations: 10,
+            sweep_fee: 10_000,
+            sweep_pays: 10_000,
+            receive_caps: Vec::new(),
+            imports: 0,
+            proofs: 0,
         }
     }
 
     pub(super) fn t1(&self) -> u64 {
         self.t0 + 300
+    }
+
+    /// Time passes, on the device and on the chain alike.
+    pub(super) fn pass(&mut self, seconds: u64) {
+        self.clock += seconds;
+        self.chain_now += seconds;
+    }
+
+    /// A reverse escrow as the contract keeps it: its terms only as the hash
+    /// of what `openReverse` stored.
+    pub(super) fn escrow_at(&self, id: &[u8; 32]) -> Option<SwapState> {
+        if self.escrow_id.as_ref() != Some(id) {
+            return None;
+        }
+        let terms = self.escrow_terms.as_ref()?;
+        Some(SwapState {
+            terms_hash: words_hash(&terms_words(terms)),
+            stage: self.stage,
+            paid_out: self.paid_out,
+            claim_lock_until: self.claim_lock_until,
+            refund_lock_until: self.refund_lock_until,
+            secret: self.secret,
+        })
     }
 
     /// What the contract keeps of the swap at the tip: its terms only as the
@@ -378,16 +477,47 @@ impl ChainReader for FakeChain {
         Ok(false)
     }
 
-    async fn reverse_state(&self, _id: &[u8; 32], _terms: &Terms) -> Result<ReverseChainState> {
-        fail(ErrorCode::Other, "not a forward read")
+    async fn reverse_state(&self, id: &[u8; 32], terms: &Terms) -> Result<ReverseChainState> {
+        let read = {
+            let mut state = self.0.set();
+            state.reverse_reads += 1;
+            state.reverse_reads
+        };
+        let hook = self.0.set().on_reverse_read.take();
+        if let Some(mut hook) = hook {
+            hook(&mut self.0.set(), read);
+            self.0.set().on_reverse_read = Some(hook);
+        }
+        let state = self.0.get();
+        let swap = state.escrow_at(id);
+        if swap
+            .as_ref()
+            .is_some_and(|swap| swap.terms_hash != terms.hash())
+        {
+            return fail(
+                ErrorCode::Mismatch,
+                "the escrow on chain opened with other terms",
+            );
+        }
+        let open = swap.is_some();
+        Ok(ReverseChainState {
+            head: Head {
+                number: state.head_number,
+                timestamp: state.chain_now,
+            },
+            swap,
+            refund_note: if open { state.escrow_note } else { [0; 32] },
+            funding_block: if open { state.funding_block } else { 0 },
+            lock_duration: LOCK_SECONDS,
+        })
     }
 
     async fn vault_balance(&self, _id: &[u8; 32]) -> Result<u128> {
-        fail(ErrorCode::Other, "not a forward read")
+        Ok(self.0.get().vault)
     }
 
     async fn rescue_nonce(&self, _id: &[u8; 32]) -> Result<u64> {
-        fail(ErrorCode::Other, "not a forward read")
+        Ok(self.0.get().rescue_nonce)
     }
 
     async fn railgun_accepts(&self) -> Result<bool> {
@@ -409,7 +539,7 @@ impl ChainReader for FakeChain {
         _transaction: &[u8; 32],
         _confirmations: u32,
     ) -> Result<TransactionStatus> {
-        fail(ErrorCode::Other, "not a forward read")
+        Ok(self.0.get().funding_status)
     }
 }
 
@@ -466,11 +596,16 @@ impl HttpTransport for FakeServices {
             state.paths.push(path.clone());
             state.bodies.insert(path.clone(), body.clone());
             state.headers.insert(path.clone(), request.headers.clone());
+            if path == "/v1/reverse/fund" {
+                state.fundings.push(body.clone());
+            }
         }
         let hold = if path.ends_with("/accept") {
             self.0.get().hold_accept.clone()
         } else if path == "/v1/lock-claim" {
             self.0.get().hold_lock.clone()
+        } else if path == "/v1/reverse/fund" {
+            self.0.get().hold_fund.clone()
         } else {
             None
         };
@@ -534,6 +669,56 @@ impl FakeServices {
                         "amount": state.amount.to_string(),
                         "depositZat": DEPOSIT_ZAT,
                         "expiresAt": state.quote_expires_at,
+                    }),
+                )
+            }
+            (&Method::POST, "/v1/reverse/quote") => {
+                let context = SwapContext {
+                    chain_id: pins.chain_id,
+                    contract: pins.contract,
+                    quote_id: QUOTE_ID,
+                };
+                let proof = context.prove_maker(&maker_secret(), UnwrapErr(SysRng));
+                let mut state = self.0.set();
+                state.quote_requests.push(body.clone());
+                let (funding, ready, refund) = state.reverse_deadlines;
+                answer(
+                    200,
+                    json!({
+                        "terms": {
+                            "quoteId": hex0x(&QUOTE_ID),
+                            "maker": hex0x(&pins.maker),
+                            "makerShare": hex0x(&maker_share().to_affine_bytes()),
+                            "makerProof": hex0x(&proof.to_bytes()),
+                            "chainId": pins.chain_id,
+                            "contract": hex0x(&pins.contract),
+                            "token": hex0x(&pins.token),
+                            "amount": body["units"].as_u64().unwrap().to_string(),
+                            "depositZat": REVERSE_DEPOSIT_ZAT,
+                            "expiresAt": funding,
+                        },
+                        "user": body["user"],
+                        "refundNote": body["refundNote"],
+                        "fundingDeadline": funding,
+                        "readyDeadline": ready,
+                        "refundAfter": refund,
+                    }),
+                )
+            }
+            (&Method::POST, path) if path.starts_with("/v1/reverse/quote/") => {
+                // The maker opens nothing yet: the user funds the escrow.
+                let mut state = self.0.set();
+                state.reverse_accepts += 1;
+                let request = state.quote_requests.last().unwrap().clone();
+                let id = reverse_swap_id(&bytes(&request["user"]), &maker_share());
+                let (_, ready, refund) = state.reverse_deadlines;
+                answer(
+                    200,
+                    json!({
+                        "swapId": hex0x(&id),
+                        "t0": ready,
+                        "t1": refund,
+                        "ticket": format!("{}.{}", hex0x(&id), "3f".repeat(32)),
                     }),
                 )
             }
@@ -614,6 +799,10 @@ impl FakeServices {
         };
         match (method, path) {
             (&Method::GET, "/v1/terms") => {
+                let hook = self.0.set().on_terms.take();
+                if let Some(mut hook) = hook {
+                    hook(&mut self.0.set());
+                }
                 let state = self.0.get();
                 let mut terms = json!({
                     "relayer": hex0x(&state.relayer),
@@ -624,8 +813,32 @@ impl FakeServices {
                 if let Some(expires_at) = state.fee_expires_at {
                     terms["feeExpiresAt"] = json!(expires_at);
                 }
+                if let Some(fee) = state.funding_fee {
+                    terms["reverseFunding"] = json!({
+                        "relayAdapt": hex0x(&pins.relay_adapt),
+                        "token": hex0x(&pins.token),
+                        "maker": hex0x(&pins.maker),
+                        "maxGasLimit": 4_000_000,
+                        "maxGasPriceWei": "20000000000",
+                        "maxCalldataBytes": 65_536,
+                        "fee": fee.to_string(),
+                    });
+                }
                 answer(200, terms)
             }
+            (&Method::POST, "/v1/reverse/fund") => {
+                let state = self.0.get();
+                let sent: Vec<String> = state.fund_hash.iter().map(|hash| hex0x(hash)).collect();
+                answer(200, json!({ "transactions": sent }))
+            }
+            (
+                &Method::POST,
+                "/v1/reverse/ready"
+                | "/v1/reverse/lock-refund"
+                | "/v1/reverse/refund"
+                | "/v1/reverse/refund-payout"
+                | "/v1/reverse/rescue",
+            ) => answer(200, json!({ "transactions": [] })),
             (&Method::POST, "/v1/lock-claim") => {
                 {
                     let mut state = self.0.set();
@@ -772,6 +985,86 @@ impl ForwardZcash for FakeZcash {
     }
 
     async fn forget_joint_account(&self, _index: u32) -> Result<()> {
+        self.0.set().forgotten += 1;
+        Ok(())
+    }
+}
+
+impl ReverseZcash for FakeZcash {
+    async fn chain_height(&self) -> Result<u64> {
+        Ok(ZCASH_HEIGHT)
+    }
+
+    async fn import_account(
+        &self,
+        _index: u32,
+        _joint: &JointAccount,
+        _birthday: u64,
+    ) -> Result<JointAccountId> {
+        self.0.set().imports += 1;
+        Ok(JointAccountId([0x0a; 16]))
+    }
+
+    async fn estimate_receive(
+        &self,
+        _index: u32,
+        _joint: &JointAccount,
+        _birthday: u64,
+        confirmations: u32,
+    ) -> Result<ReverseReceiveEstimate> {
+        let state = self.0.get();
+        let deep_enough = state.deposit_confirmations >= confirmations;
+        Ok(ReverseReceiveEstimate {
+            available_zat: if deep_enough { state.paid_in } else { 0 },
+            fee_zat: state.sweep_fee,
+        })
+    }
+
+    /// Refuses, as the wallet's proposal does, a sweep whose fee is above
+    /// its cap.
+    async fn prepare_receive(
+        &self,
+        _index: u32,
+        _joint: &JointAccount,
+        _key: &SpendKey,
+        _birthday: u64,
+        max_fee_zat: Option<u64>,
+    ) -> Result<Option<ReverseReceiveTransaction>> {
+        let mut state = self.0.set();
+        state.receive_caps.push(max_fee_zat);
+        if !state.spendable {
+            return Ok(None);
+        }
+        let fee = state.sweep_pays;
+        if max_fee_zat.is_some_and(|cap| fee > cap) {
+            return fail(ErrorCode::ZcashWallet, "the sweep's fee is over its limit");
+        }
+        let built = transaction(&format!("receive{}", state.receive_caps.len()));
+        Ok(Some(ReverseReceiveTransaction {
+            tx_id: built.tx_id,
+            raw: built.raw,
+            expiry_height: built.expiry_height,
+            received_zat: state.paid_in - fee,
+            fee_zat: fee,
+        }))
+    }
+
+    async fn receive_status(
+        &self,
+        _index: u32,
+        _joint: &JointAccount,
+        _birthday: u64,
+        receive: &ZcashTransaction,
+    ) -> Result<SwapTxStatus> {
+        Ok(self.status(receive))
+    }
+
+    async fn broadcast(&self, transaction: &ZcashTransaction) -> Result<()> {
+        self.0.set().submitted.push(transaction.tx_id.clone());
+        Ok(())
+    }
+
+    async fn forget(&self, _index: u32) -> Result<()> {
         self.0.set().forgotten += 1;
         Ok(())
     }
@@ -958,5 +1251,143 @@ impl Harness {
             t0: Some(state.t0),
             t1: Some(state.t1()),
         }
+    }
+}
+
+// ---- the reverse harness ----
+
+pub(super) type FakeReverse<'a> =
+    Reverse<'a, FakeChain, FakeServices, FakeZcash, FakeClock, NoTokens>;
+
+impl Harness {
+    pub(super) fn reverse(&self) -> FakeReverse<'_> {
+        Reverse::new(
+            &self.account,
+            &self.keys,
+            &self.chain,
+            &self.services,
+            &self.zcash,
+            &self.clock,
+            &self.tokens,
+            &self.makers,
+            None,
+        )
+    }
+
+    /// A reverse quote of `AMOUNT` for a fresh index, kept as a draft.
+    pub(super) async fn reverse_quote(&self) -> Result<ReverseQuoted> {
+        self.reverse().quote(&mut self.store(), AMOUNT as u32).await
+    }
+
+    /// The Railgun page's `reverseCost` for the escrow and the relayer's
+    /// `fee`: Railgun's unshield fee on top (`fundingAmounts`).
+    pub(super) fn page_cost(
+        &self,
+        fee: u128,
+    ) -> (super::super::models::Amount, super::super::models::Amount) {
+        let escrow = AMOUNT + fee;
+        let debit = (escrow - 1) * 10_000 / (10_000 - UNSHIELD_BPS) + 1;
+        (
+            super::super::models::Amount(debit),
+            super::super::models::Amount(debit - escrow),
+        )
+    }
+
+    /// Quoted, priced, gone ahead with, accepted and its joint account
+    /// imported: waiting for the user's payment (zapp `prepared`).
+    pub(super) async fn prepared(&self) -> ReverseRecord {
+        let quoted = self.reverse_quote().await.unwrap();
+        let (debit, railgun_fee) = self.page_cost(quoted.price.fee.0);
+        let reverse = self.reverse();
+        let index = quoted.record.index;
+        reverse
+            .view()
+            .set_cost(&mut self.store(), index, debit, railgun_fee)
+            .await
+            .unwrap();
+        reverse
+            .view()
+            .go_ahead(&mut self.store(), index)
+            .await
+            .unwrap();
+        reverse.advance(&mut self.store(), index).await.unwrap()
+    }
+
+    /// The user pays: Rust's funding request, the page's proof of its
+    /// calls, and the proof's submission. Once a funding is kept, the
+    /// request says so and an advance follows instead.
+    pub(super) async fn fund(&self) -> Result<ReverseRecord> {
+        let reverse = self.reverse();
+        let request = reverse
+            .funding_request(&mut self.store(), 0, &self.keys.railgun_address().unwrap())
+            .await?;
+        if request.already_funded {
+            return reverse.advance(&mut self.store(), 0).await;
+        }
+        let proved = self.prove(&request);
+        reverse
+            .view()
+            .submit_funding(&mut self.store(), 0, proved)
+            .await
+    }
+
+    /// The Railgun page's `prepareReverse`: a proof of the calls through the
+    /// Relay Adapt, costed as `reverseCost` costs them.
+    pub(super) fn prove(&self, request: &reverse::FundingRequest) -> ProvedFunding {
+        self.world.set().proofs += 1;
+        let (debit, railgun_fee) = self.page_cost(request.fee.0);
+        let calls: Vec<u8> = request
+            .calls
+            .iter()
+            .flat_map(|call| call.data.iter().copied())
+            .collect();
+        ProvedFunding {
+            to: hex0x(&request.relay_adapt),
+            data: hex0x(&calls),
+            value: "0".into(),
+            debit,
+            railgun_fee,
+        }
+    }
+
+    /// The funding landed: the escrow of swap 0 opens on chain as
+    /// `openReverse` stores it, some blocks deep.
+    pub(super) fn funded(&self) {
+        let record = self.reverse_record(0);
+        let terms = reverse::reverse_terms(&record).unwrap();
+        let mut state = self.world.set();
+        state.escrow_terms = Some(terms);
+        state.escrow_id = Some(record.swap_id.0);
+        state.escrow_note = record.quote.refund_note.0;
+        state.funding_block = state.head_number - 5;
+        state.stage = SwapStage::Open;
+    }
+
+    /// The maker claims the escrow, revealing `e`.
+    pub(super) fn claimed(&self) {
+        let mut state = self.world.set();
+        state.stage = SwapStage::Claimed;
+        state.secret = maker_secret().to_be_bytes();
+    }
+
+    pub(super) async fn advance_reverse(&self) -> Result<ReverseRecord> {
+        self.reverse().advance(&mut self.store(), 0).await
+    }
+
+    /// The reverse record of swap `index`, as `swaps.db` keeps it.
+    pub(super) fn reverse_record(&self, index: u32) -> ReverseRecord {
+        match self
+            .store()
+            .find(&self.account, Direction::Reverse, index)
+            .unwrap()
+        {
+            Some(StoredRecord::Reverse(record)) => record,
+            other => panic!("no reverse record {index}: {other:?}"),
+        }
+    }
+
+    /// How many requests went to `path`.
+    pub(super) fn posts(&self, path: &str) -> usize {
+        self.paths().iter().filter(|posted| *posted == path).count()
     }
 }

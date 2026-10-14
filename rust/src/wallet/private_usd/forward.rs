@@ -38,8 +38,8 @@ use super::keys::SwapKeyContext;
 use super::maker_client::MakerClient;
 use super::models::{
     Amount, DepositState, Direction, ForwardOutcome, ForwardRecord, Hex, NothingSentCause,
-    RefundCause, StoredRecord, SwapAcceptance, SwapAuthorization, SwapNote, SwapPayout, SwapQuote,
-    SwapZcashNetwork, ZcashTransaction, ZcashTxId,
+    RefundCause, RelayerTerms, StoredRecord, SwapAcceptance, SwapAuthorization, SwapNote,
+    SwapPayout, SwapQuote, SwapZcashNetwork, ZcashTransaction, ZcashTxId,
 };
 use super::relayer_client::RelayerClient;
 use super::store::{JointAccountRow, SwapStore};
@@ -519,17 +519,7 @@ where
     }
 
     fn acceptance(&self, index: u32, quote: &SwapQuote) -> Result<SwapAcceptance> {
-        let (Some(quote_id), Some(proof)) = (quote.quote_id_bytes(), quote.maker_proof_bytes())
-        else {
-            return fail(ErrorCode::Mismatch, "the quote's id or proof is malformed");
-        };
-        let context = SwapContext {
-            chain_id: quote.chain_id,
-            contract: self.pins.contract,
-            quote_id,
-        };
-        self.keys
-            .acceptance(index, context, &terms::quote_maker_share(quote)?, &proof)
+        acceptance(self.keys, self.pins, index, quote)
     }
 
     // ---- advance ----
@@ -1282,14 +1272,7 @@ where
     /// The pinned relayer's fee now: refused when another deployment's
     /// relayer, or the maker, answers.
     async fn relayer_fee(&self) -> Result<RelayerFee> {
-        let terms = self.relayer.terms().await?;
-        let serves = terms.chain_id == self.pins.chain_id
-            && terms.contract.0 == self.pins.contract
-            && terms.relayer.0 == self.pins.relayer
-            && terms.relayer.0 != self.pins.maker;
-        if !serves {
-            return fail(ErrorCode::WrongDeployment, "another deployment's relayer");
-        }
+        let terms = pinned_relayer_terms(&self.relayer, self.pins).await?;
         Ok(RelayerFee {
             fee: terms.fee,
             expires_at: terms.fee_expires_at,
@@ -1298,37 +1281,7 @@ where
 
     /// The maker's `/v1/info` against the pins, once per session.
     async fn check_maker(&self) -> Result<()> {
-        let network = self.keys.network();
-        if self.makers.checked(network) {
-            return Ok(());
-        }
-        let info = self.maker.info().await?;
-        let serves = info.api_version == MAKER_API_VERSION
-            && info.maker.0 == self.pins.maker
-            && info.chain_id == self.pins.chain_id
-            && info.contract.0 == self.pins.contract
-            && info.token.0 == self.pins.token
-            && info.zcash_network == SwapZcashNetwork::from(network);
-        if !serves {
-            return fail(
-                ErrorCode::WrongDeployment,
-                "the maker serves another deployment",
-            );
-        }
-        // A return key shown to only some devices would mark the tokens they
-        // get back.
-        if info
-            .token_return_key
-            .as_deref()
-            .is_some_and(|key| key != self.pins.maker_token_return_key)
-        {
-            return fail(
-                ErrorCode::TokensRefused,
-                "the maker returns tokens under another key",
-            );
-        }
-        self.makers.mark(network);
-        Ok(())
+        check_maker(&self.maker, self.pins, self.makers, false).await
     }
 
     /// One conversion at a time per account, in either direction (§3.5 item
@@ -1439,7 +1392,7 @@ pub(crate) fn payout_after_fees(amount: Amount, relayer_fee: Amount) -> Amount {
 
 /// The relayer refuses a payout `fee` would take all of, so nothing that
 /// needs one starts.
-fn require_pays_out(amount: Amount, fee: Amount) -> Result<()> {
+pub(crate) fn require_pays_out(amount: Amount, fee: Amount) -> Result<()> {
     if fee >= amount {
         return fail(
             ErrorCode::RelayerFee,
@@ -1451,7 +1404,7 @@ fn require_pays_out(amount: Amount, fee: Amount) -> Result<()> {
 
 /// A fee a payout may be signed for: it leaves something of `amount`, and it
 /// is within the 2 USDC cap (D11).
-fn require_payout_fee(amount: Amount, fee: Amount) -> Result<()> {
+pub(crate) fn require_payout_fee(amount: Amount, fee: Amount) -> Result<()> {
     require_pays_out(amount, fee)?;
     if fee.0 > MAX_RELAYER_FEE {
         return fail(
@@ -1541,7 +1494,7 @@ fn accept_refusal(refusal: &Refusal) -> Option<NothingSentCause> {
 }
 
 /// A quote's error: the maker turning the amount down is `AmountRefused`.
-fn quote_error(error: SwapHttpError) -> PrivateUsdError {
+pub(crate) fn quote_error(error: SwapHttpError) -> PrivateUsdError {
     match error.code() {
         Some(SwapErrorCode::Rejected | SwapErrorCode::InvalidRequest) => {
             PrivateUsdError::new(ErrorCode::AmountRefused, error.to_string())
@@ -1550,11 +1503,97 @@ fn quote_error(error: SwapHttpError) -> PrivateUsdError {
     }
 }
 
-fn serves(pins: &Deployment, quote: &SwapQuote) -> bool {
+/// The quote names the pinned chain, contract, token and maker.
+pub(crate) fn serves(pins: &Deployment, quote: &SwapQuote) -> bool {
     quote.chain_id == pins.chain_id
         && quote.contract.0 == pins.contract
         && quote.token.0 == pins.token
         && quote.maker.0 == pins.maker
+}
+
+/// The maker's `/v1/info` against the pins, once per session and direction
+/// (zapp `requireServing`). A reverse conversion also needs the maker to take
+/// them (`reverseEnabled`), else `Unavailable`.
+pub(crate) async fn check_maker<T: HttpTransport>(
+    maker: &MakerClient<'_, T>,
+    pins: &Deployment,
+    makers: &MakerChecks,
+    reverse: bool,
+) -> Result<()> {
+    let network = pins.network;
+    if makers.checked(network, reverse) {
+        return Ok(());
+    }
+    let info = maker.info().await?;
+    let serves = info.api_version == MAKER_API_VERSION
+        && info.maker.0 == pins.maker
+        && info.chain_id == pins.chain_id
+        && info.contract.0 == pins.contract
+        && info.token.0 == pins.token
+        && info.zcash_network == SwapZcashNetwork::from(network);
+    if !serves {
+        return fail(
+            ErrorCode::WrongDeployment,
+            "the maker serves another deployment",
+        );
+    }
+    if reverse && !info.reverse_enabled {
+        return fail(
+            ErrorCode::Unavailable,
+            "the maker takes no conversions to ZEC now",
+        );
+    }
+    // A return key shown to only some devices would mark the tokens they
+    // get back.
+    if info
+        .token_return_key
+        .as_deref()
+        .is_some_and(|key| key != pins.maker_token_return_key)
+    {
+        return fail(
+            ErrorCode::TokensRefused,
+            "the maker returns tokens under another key",
+        );
+    }
+    makers.mark(network, reverse);
+    Ok(())
+}
+
+/// `GET /v1/terms`, once they are the pinned relayer's on the pinned chain
+/// and contract, and not the maker's (zapp `checkedFee`).
+pub(crate) async fn pinned_relayer_terms<T: HttpTransport>(
+    relayer: &RelayerClient<'_, T>,
+    pins: &Deployment,
+) -> Result<RelayerTerms> {
+    let terms = relayer.terms().await?;
+    let serves = terms.chain_id == pins.chain_id
+        && terms.contract.0 == pins.contract
+        && terms.relayer.0 == pins.relayer
+        && terms.relayer.0 != pins.maker;
+    if !serves {
+        return fail(ErrorCode::WrongDeployment, "another deployment's relayer");
+    }
+    Ok(terms)
+}
+
+/// Accepts `quote` for swap `index` (zecSwap's `ops.rs` `accept`): the
+/// maker's proof of its share checked, our share proved. `Mismatch` when the
+/// maker's proof does not verify.
+pub(crate) fn acceptance(
+    keys: &SwapKeyContext,
+    pins: &Deployment,
+    index: u32,
+    quote: &SwapQuote,
+) -> Result<SwapAcceptance> {
+    let (Some(quote_id), Some(proof)) = (quote.quote_id_bytes(), quote.maker_proof_bytes()) else {
+        return fail(ErrorCode::Mismatch, "the quote's id or proof is malformed");
+    };
+    let context = SwapContext {
+        chain_id: quote.chain_id,
+        contract: pins.contract,
+        quote_id,
+    };
+    keys.acceptance(index, context, &terms::quote_maker_share(quote)?, &proof)
 }
 
 // ---- the store ----
@@ -1635,12 +1674,21 @@ pub(crate) struct DepositProposal {
     send_flow_id: String,
 }
 
+/// A joint account's balance swept home.
+pub(crate) struct SweptHome {
+    pub transaction: CreatedTransaction,
+    /// What reached the home address, and the fee, as far as the wallet
+    /// knows them (an earlier sweep found again may not record its fee).
+    pub amount_zatoshi: u64,
+    pub fee_zatoshi: Option<u64>,
+}
+
 impl WalletZcash<'_> {
     pub(crate) fn joint_db(&self) -> String {
         joint_db_path(self.store_dir)
     }
 
-    async fn tip(&self) -> Result<u64> {
+    pub(crate) async fn tip(&self) -> Result<u64> {
         sync_engine::latest_block_for_transaction(self.lightwalletd_url, self.network)
             .await
             .map(|tip| tip.height)
@@ -1652,9 +1700,17 @@ impl WalletZcash<'_> {
             })
     }
 
-    /// Imports swap `index`'s joint account at its exact birthday (§3.5 item
-    /// 12), idempotently, and indexes it in `swaps.db`.
-    fn import_joint(&self, index: u32, joint: &JointAccount, birthday: u64) -> Result<String> {
+    /// Imports `direction`'s swap `index`'s joint account at its exact
+    /// birthday (§3.5 item 12), idempotently, and indexes it in `swaps.db`.
+    /// It takes the process-wide wallet write lock, so it may wait on a batch
+    /// of the main sync.
+    pub(crate) fn import_joint(
+        &self,
+        direction: Direction,
+        index: u32,
+        joint: &JointAccount,
+        birthday: u64,
+    ) -> Result<String> {
         let ufvk = joint.ufvk(self.network.network_type());
         let birthday = u32::try_from(birthday).map_err(|_| {
             PrivateUsdError::new(ErrorCode::Other, "the joint account's birthday is too high")
@@ -1665,7 +1721,7 @@ impl WalletZcash<'_> {
         let _guard = OPERATIONS.lock().unwrap_or_else(|error| error.into_inner());
         store.put_joint_account(&JointAccountRow {
             account_uuid: self.account_uuid.to_owned(),
-            direction: Direction::Forward,
+            direction,
             swap_index: index,
             joint_uuid: joint_uuid.clone(),
             ufvk,
@@ -1674,13 +1730,17 @@ impl WalletZcash<'_> {
         Ok(joint_uuid)
     }
 
-    async fn synced_joint(
+    /// The joint account imported (idempotently, so a lost `joint.db` heals
+    /// by rescanning from the exact birthday) and `joint.db` scanned to the
+    /// tip. The scan's writes take the process-wide wallet write lock.
+    pub(crate) async fn synced_joint(
         &self,
+        direction: Direction,
         index: u32,
         joint: &JointAccount,
         birthday: u64,
     ) -> Result<String> {
-        let joint_uuid = self.import_joint(index, joint, birthday)?;
+        let joint_uuid = self.import_joint(direction, index, joint, birthday)?;
         joint::sync_joint_db(
             &self.joint_db(),
             self.lightwalletd_url,
@@ -1689,6 +1749,129 @@ impl WalletZcash<'_> {
         )
         .await?;
         Ok(joint_uuid)
+    }
+
+    /// Where `transaction`, sent from the joint account, stands in
+    /// `joint.db`, once synced.
+    pub(crate) async fn joint_tx_status(
+        &self,
+        direction: Direction,
+        index: u32,
+        joint: &JointAccount,
+        birthday: u64,
+        transaction: &ZcashTransaction,
+    ) -> Result<SwapTxStatus> {
+        self.synced_joint(direction, index, joint, birthday).await?;
+        joint::swap_tx_status(
+            &self.joint_db(),
+            self.network,
+            &internal_txid(&transaction.tx_id)?,
+            expiry(transaction),
+        )
+    }
+
+    /// The joint account's whole balance swept home with the combined `key`
+    /// and Discard OVK: an earlier sweep that may still land is returned
+    /// again, never built twice; `None` until every note is spendable. The
+    /// sweep pays at most `fee_cap` (the forward refund's default when
+    /// `None`), and at least ZIP 317's least fee.
+    pub(crate) async fn sweep_home(
+        &self,
+        direction: Direction,
+        index: u32,
+        joint: &JointAccount,
+        key: &SpendKey,
+        birthday: u64,
+        fee_cap: Option<u64>,
+        send_flow_id: &str,
+    ) -> Result<Option<SweptHome>> {
+        let joint_uuid = self.synced_joint(direction, index, joint, birthday).await?;
+        let joint_db = self.joint_db();
+        // An earlier sweep that may still land is kept, never built again.
+        if let Some(earlier) = joint::find_sent(&joint_db, self.network, &joint_uuid, None)? {
+            let (amount_zatoshi, fee_zatoshi) =
+                joint::sent_value_and_fee(&joint_db, &earlier.txid)?;
+            return Ok(Some(SweptHome {
+                transaction: earlier,
+                amount_zatoshi,
+                fee_zatoshi,
+            }));
+        }
+        let receipts = joint::joint_receipts(
+            &joint_db,
+            self.network,
+            &joint_uuid,
+            crate::wallet::JOINT_SWEEP_CONFIRMATIONS,
+        )?;
+        // The whole balance at once, so no note is left behind.
+        if receipts.spendable_zatoshi == 0 || receipts.pending_zatoshi > 0 {
+            return Ok(None);
+        }
+        let fee_limit = fee_cap
+            .unwrap_or(MAX_SWEEP_FEE_ZAT)
+            .min(receipts.spendable_zatoshi - 1);
+        if fee_limit < MIN_SWEEP_FEE_ZAT {
+            return fail(
+                ErrorCode::ZcashWallet,
+                "the joint account does not cover a sweep's fee",
+            );
+        }
+        let home = keys::get_address_from_db(self.main_db, self.network, Some(self.account_uuid))
+            .map_err(|message| PrivateUsdError::new(ErrorCode::ZcashWallet, message))?;
+        let swept = joint::sweep_joint(
+            &joint_db,
+            self.lightwalletd_url,
+            self.network,
+            &joint_uuid,
+            send_flow_id,
+            &home,
+            fee_limit,
+            key,
+        )
+        .await?;
+        Ok(Some(SweptHome {
+            transaction: swept.transaction,
+            amount_zatoshi: swept.amount_zatoshi,
+            fee_zatoshi: Some(swept.fee_zatoshi),
+        }))
+    }
+
+    /// Sends a kept transaction once more.
+    pub(crate) async fn broadcast_kept(&self, transaction: &ZcashTransaction) -> Result<()> {
+        let raw = hex::decode(&transaction.raw).map_err(|_| {
+            PrivateUsdError::new(ErrorCode::StoreUnreadable, "a kept transaction is not hex")
+        })?;
+        sync::broadcast_raw(self.lightwalletd_url, &raw)
+            .await
+            .map_err(|message| {
+                let code = if message.starts_with("Broadcast rejected:") {
+                    ErrorCode::ZcashRejected
+                } else {
+                    ErrorCode::ZcashWallet
+                };
+                PrivateUsdError::new(code, message)
+            })
+    }
+
+    /// Forgets `direction`'s swap `index`'s joint account once nothing more
+    /// can come from it.
+    pub(crate) fn forget_joint(&self, direction: Direction, index: u32) -> Result<()> {
+        let rows: Vec<JointAccountRow> = SwapStore::open(self.store_dir)?
+            .joint_accounts()?
+            .into_iter()
+            .filter(|row| {
+                row.account_uuid == self.account_uuid
+                    && row.direction == direction
+                    && row.swap_index == index
+            })
+            .collect();
+        for row in rows {
+            joint::forget_joint_account(&self.joint_db(), self.network, &row.joint_uuid)?;
+            let mut store = SwapStore::open(self.store_dir)?;
+            let _guard = OPERATIONS.lock().unwrap_or_else(|error| error.into_inner());
+            store.remove_joint_account(self.account_uuid, direction, index)?;
+        }
+        Ok(())
     }
 }
 
@@ -1801,19 +1984,7 @@ impl ForwardZcash for WalletZcash<'_> {
     }
 
     async fn broadcast(&self, transaction: &ZcashTransaction) -> Result<()> {
-        let raw = hex::decode(&transaction.raw).map_err(|_| {
-            PrivateUsdError::new(ErrorCode::StoreUnreadable, "a kept transaction is not hex")
-        })?;
-        sync::broadcast_raw(self.lightwalletd_url, &raw)
-            .await
-            .map_err(|message| {
-                let code = if message.starts_with("Broadcast rejected:") {
-                    ErrorCode::ZcashRejected
-                } else {
-                    ErrorCode::ZcashWallet
-                };
-                PrivateUsdError::new(code, message)
-            })
+        self.broadcast_kept(transaction).await
     }
 
     async fn prepare_sweep(
@@ -1823,44 +1994,19 @@ impl ForwardZcash for WalletZcash<'_> {
         key: &SpendKey,
         birthday: u64,
     ) -> Result<Option<ZcashTransaction>> {
-        let joint_uuid = self.synced_joint(index, joint, birthday).await?;
-        let joint_db = self.joint_db();
-        // An earlier sweep that may still land is kept, never built again.
-        if let Some(earlier) = joint::find_sent(&joint_db, self.network, &joint_uuid, None)? {
-            return kept_transaction(&earlier).map(Some);
-        }
-        let receipts = joint::joint_receipts(
-            &joint_db,
-            self.network,
-            &joint_uuid,
-            crate::wallet::JOINT_SWEEP_CONFIRMATIONS,
-        )?;
-        // The whole balance at once, so no note is left behind.
-        if receipts.spendable_zatoshi == 0 || receipts.pending_zatoshi > 0 {
-            return Ok(None);
-        }
-        let fee_limit = MAX_SWEEP_FEE_ZAT.min(receipts.spendable_zatoshi - 1);
-        if fee_limit < MIN_SWEEP_FEE_ZAT {
-            return fail(
-                ErrorCode::ZcashWallet,
-                "the refunded deposit does not cover a sweep's fee",
-            );
-        }
-        let home = keys::get_address_from_db(self.main_db, self.network, Some(self.account_uuid))
-            .map_err(|message| PrivateUsdError::new(ErrorCode::ZcashWallet, message))?;
         let send_flow_id = format!("private-usd-sweep:{}:{index}", self.account_uuid);
-        let swept = joint::sweep_joint(
-            &joint_db,
-            self.lightwalletd_url,
-            self.network,
-            &joint_uuid,
-            &send_flow_id,
-            &home,
-            fee_limit,
+        self.sweep_home(
+            Direction::Forward,
+            index,
+            joint,
             key,
+            birthday,
+            None,
+            &send_flow_id,
         )
-        .await?;
-        kept_transaction(&swept.transaction).map(Some)
+        .await?
+        .map(|swept| kept_transaction(&swept.transaction))
+        .transpose()
     }
 
     async fn sweep_status(
@@ -1870,32 +2016,12 @@ impl ForwardZcash for WalletZcash<'_> {
         birthday: u64,
         sweep: &ZcashTransaction,
     ) -> Result<SwapTxStatus> {
-        self.synced_joint(index, joint, birthday).await?;
-        joint::swap_tx_status(
-            &self.joint_db(),
-            self.network,
-            &internal_txid(&sweep.tx_id)?,
-            expiry(sweep),
-        )
+        self.joint_tx_status(Direction::Forward, index, joint, birthday, sweep)
+            .await
     }
 
     async fn forget_joint_account(&self, index: u32) -> Result<()> {
-        let rows: Vec<JointAccountRow> = SwapStore::open(self.store_dir)?
-            .joint_accounts()?
-            .into_iter()
-            .filter(|row| {
-                row.account_uuid == self.account_uuid
-                    && row.direction == Direction::Forward
-                    && row.swap_index == index
-            })
-            .collect();
-        for row in rows {
-            joint::forget_joint_account(&self.joint_db(), self.network, &row.joint_uuid)?;
-            let mut store = SwapStore::open(self.store_dir)?;
-            let _guard = OPERATIONS.lock().unwrap_or_else(|error| error.into_inner());
-            store.remove_joint_account(self.account_uuid, Direction::Forward, index)?;
-        }
-        Ok(())
+        self.forget_joint(Direction::Forward, index)
     }
 }
 
@@ -1999,7 +2125,7 @@ fn deposit_error(message: String) -> PrivateUsdError {
 
 /// A created transaction as a record keeps it: its id in display order (as
 /// zapp's records do), its bytes in hex.
-fn kept_transaction(created: &CreatedTransaction) -> Result<ZcashTransaction> {
+pub(crate) fn kept_transaction(created: &CreatedTransaction) -> Result<ZcashTransaction> {
     let tx_id = ZcashTxId::parse(&created.txid.to_string()).ok_or_else(|| {
         PrivateUsdError::new(ErrorCode::ZcashWallet, "a created transaction has no id")
     })?;

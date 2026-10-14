@@ -163,6 +163,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiForwardWait dco_decode_api_forward_wait(dynamic raw);
 
   @protected
+  ApiFundingRequest dco_decode_api_funding_request(dynamic raw);
+
+  @protected
   ApiGiftCardCheckProgress dco_decode_api_gift_card_check_progress(dynamic raw);
 
   @protected
@@ -203,6 +206,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiRefundCause dco_decode_api_refund_cause(dynamic raw);
+
+  @protected
+  ApiReverseAdvance dco_decode_api_reverse_advance(dynamic raw);
+
+  @protected
+  ApiReverseCost dco_decode_api_reverse_cost(dynamic raw);
+
+  @protected
+  ApiReverseCostRequest dco_decode_api_reverse_cost_request(dynamic raw);
+
+  @protected
+  ApiReversePhase dco_decode_api_reverse_phase(dynamic raw);
+
+  @protected
+  ApiReverseQuote dco_decode_api_reverse_quote(dynamic raw);
+
+  @protected
+  ApiReverseRecord dco_decode_api_reverse_record(dynamic raw);
 
   @protected
   ApiRoundDrivePolicy dco_decode_api_round_drive_policy(dynamic raw);
@@ -308,6 +329,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiRefundCause dco_decode_box_autoadd_api_refund_cause(dynamic raw);
+
+  @protected
+  ApiReverseCost dco_decode_box_autoadd_api_reverse_cost(dynamic raw);
 
   @protected
   ApiRoundDrivePolicy dco_decode_box_autoadd_api_round_drive_policy(
@@ -712,6 +736,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<ApiReverseRecord> dco_decode_list_api_reverse_record(dynamic raw);
+
+  @protected
   List<ApiSnapshotBundlePirResult>
   dco_decode_list_api_snapshot_bundle_pir_result(dynamic raw);
 
@@ -1026,6 +1053,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiRefundCause? dco_decode_opt_box_autoadd_api_refund_cause(dynamic raw);
+
+  @protected
+  ApiReverseCost? dco_decode_opt_box_autoadd_api_reverse_cost(dynamic raw);
 
   @protected
   ApiRoundDrivePolicy? dco_decode_opt_box_autoadd_api_round_drive_policy(
@@ -1641,6 +1671,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiForwardWait sse_decode_api_forward_wait(SseDeserializer deserializer);
 
   @protected
+  ApiFundingRequest sse_decode_api_funding_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ApiGiftCardCheckProgress sse_decode_api_gift_card_check_progress(
     SseDeserializer deserializer,
   );
@@ -1701,6 +1736,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiRefundCause sse_decode_api_refund_cause(SseDeserializer deserializer);
+
+  @protected
+  ApiReverseAdvance sse_decode_api_reverse_advance(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiReverseCost sse_decode_api_reverse_cost(SseDeserializer deserializer);
+
+  @protected
+  ApiReverseCostRequest sse_decode_api_reverse_cost_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiReversePhase sse_decode_api_reverse_phase(SseDeserializer deserializer);
+
+  @protected
+  ApiReverseQuote sse_decode_api_reverse_quote(SseDeserializer deserializer);
+
+  @protected
+  ApiReverseRecord sse_decode_api_reverse_record(SseDeserializer deserializer);
 
   @protected
   ApiRoundDrivePolicy sse_decode_api_round_drive_policy(
@@ -1842,6 +1899,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiRefundCause sse_decode_box_autoadd_api_refund_cause(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiReverseCost sse_decode_box_autoadd_api_reverse_cost(
     SseDeserializer deserializer,
   );
 
@@ -2360,6 +2422,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<ApiReverseRecord> sse_decode_list_api_reverse_record(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<ApiSnapshotBundlePirResult>
   sse_decode_list_api_snapshot_bundle_pir_result(SseDeserializer deserializer);
 
@@ -2756,6 +2823,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiRefundCause? sse_decode_opt_box_autoadd_api_refund_cause(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiReverseCost? sse_decode_opt_box_autoadd_api_reverse_cost(
     SseDeserializer deserializer,
   );
 
@@ -3552,6 +3624,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_api_funding_request(
+    ApiFundingRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_api_gift_card_check_progress(
     ApiGiftCardCheckProgress self,
     SseSerializer serializer,
@@ -3626,6 +3704,42 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_api_refund_cause(
     ApiRefundCause self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_reverse_advance(
+    ApiReverseAdvance self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_reverse_cost(
+    ApiReverseCost self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_reverse_cost_request(
+    ApiReverseCostRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_reverse_phase(
+    ApiReversePhase self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_reverse_quote(
+    ApiReverseQuote self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_reverse_record(
+    ApiReverseRecord self,
     SseSerializer serializer,
   );
 
@@ -3803,6 +3917,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_api_refund_cause(
     ApiRefundCause self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_api_reverse_cost(
+    ApiReverseCost self,
     SseSerializer serializer,
   );
 
@@ -4425,6 +4545,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_api_reverse_record(
+    List<ApiReverseRecord> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_api_snapshot_bundle_pir_result(
     List<ApiSnapshotBundlePirResult> self,
     SseSerializer serializer,
@@ -4913,6 +5039,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_api_refund_cause(
     ApiRefundCause? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_reverse_cost(
+    ApiReverseCost? self,
     SseSerializer serializer,
   );
 

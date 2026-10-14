@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -336454915;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1219857326;
 
 // Section: executor
 
@@ -7659,6 +7659,640 @@ fn wire__crate__api__private_usd__private_usd_railgun_mnemonic_impl(
         },
     )
 }
+fn wire__crate__api__private_usd__private_usd_reverse_accept_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "private_usd_reverse_accept",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_db_path = <String>::sse_decode(&mut deserializer);
+            let api_network = <String>::sse_decode(&mut deserializer);
+            let api_account_uuid = <String>::sse_decode(&mut deserializer);
+            let api_store_dir = <String>::sse_decode(&mut deserializer);
+            let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_lightwalletd_url = <String>::sse_decode(&mut deserializer);
+            let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_index = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
+                    (move || {
+                        let output_ok = crate::api::private_usd::private_usd_reverse_accept(
+                            api_db_path,
+                            api_network,
+                            api_account_uuid,
+                            api_store_dir,
+                            api_mnemonic_bytes,
+                            api_lightwalletd_url,
+                            api_eth_rpc_url,
+                            api_index,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__private_usd__private_usd_reverse_advance_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "private_usd_reverse_advance",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_db_path = <String>::sse_decode(&mut deserializer);
+            let api_network = <String>::sse_decode(&mut deserializer);
+            let api_account_uuid = <String>::sse_decode(&mut deserializer);
+            let api_store_dir = <String>::sse_decode(&mut deserializer);
+            let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_lightwalletd_url = <String>::sse_decode(&mut deserializer);
+            let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_op_id = <u32>::sse_decode(&mut deserializer);
+            let api_index = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
+                    (move || {
+                        let output_ok = crate::api::private_usd::private_usd_reverse_advance(
+                            api_db_path,
+                            api_network,
+                            api_account_uuid,
+                            api_store_dir,
+                            api_mnemonic_bytes,
+                            api_lightwalletd_url,
+                            api_eth_rpc_url,
+                            api_op_id,
+                            api_index,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__private_usd__private_usd_reverse_authorize_ready_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "private_usd_reverse_authorize_ready",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_db_path = <String>::sse_decode(&mut deserializer);
+            let api_network = <String>::sse_decode(&mut deserializer);
+            let api_account_uuid = <String>::sse_decode(&mut deserializer);
+            let api_store_dir = <String>::sse_decode(&mut deserializer);
+            let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_lightwalletd_url = <String>::sse_decode(&mut deserializer);
+            let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_index = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
+                    (move || {
+                        let output_ok =
+                            crate::api::private_usd::private_usd_reverse_authorize_ready(
+                                api_db_path,
+                                api_network,
+                                api_account_uuid,
+                                api_store_dir,
+                                api_mnemonic_bytes,
+                                api_lightwalletd_url,
+                                api_eth_rpc_url,
+                                api_index,
+                            )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__private_usd__private_usd_reverse_can_rescue_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "private_usd_reverse_can_rescue",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_network = <String>::sse_decode(&mut deserializer);
+            let api_account_uuid = <String>::sse_decode(&mut deserializer);
+            let api_store_dir = <String>::sse_decode(&mut deserializer);
+            let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_index = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
+                    (move || {
+                        let output_ok = crate::api::private_usd::private_usd_reverse_can_rescue(
+                            api_network,
+                            api_account_uuid,
+                            api_store_dir,
+                            api_eth_rpc_url,
+                            api_index,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__private_usd__private_usd_reverse_cancel_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "private_usd_reverse_cancel",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_db_path = <String>::sse_decode(&mut deserializer);
+            let api_network = <String>::sse_decode(&mut deserializer);
+            let api_account_uuid = <String>::sse_decode(&mut deserializer);
+            let api_store_dir = <String>::sse_decode(&mut deserializer);
+            let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_lightwalletd_url = <String>::sse_decode(&mut deserializer);
+            let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_index = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
+                    (move || {
+                        let output_ok = crate::api::private_usd::private_usd_reverse_cancel(
+                            api_db_path,
+                            api_network,
+                            api_account_uuid,
+                            api_store_dir,
+                            api_mnemonic_bytes,
+                            api_lightwalletd_url,
+                            api_eth_rpc_url,
+                            api_index,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__private_usd__private_usd_reverse_cost_request_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "private_usd_reverse_cost_request",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_network = <String>::sse_decode(&mut deserializer);
+            let api_account_uuid = <String>::sse_decode(&mut deserializer);
+            let api_store_dir = <String>::sse_decode(&mut deserializer);
+            let api_index = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
+                    (move || {
+                        let output_ok = crate::api::private_usd::private_usd_reverse_cost_request(
+                            api_network,
+                            api_account_uuid,
+                            api_store_dir,
+                            api_index,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__private_usd__private_usd_reverse_funding_request_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "private_usd_reverse_funding_request",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_db_path = <String>::sse_decode(&mut deserializer);
+            let api_network = <String>::sse_decode(&mut deserializer);
+            let api_account_uuid = <String>::sse_decode(&mut deserializer);
+            let api_store_dir = <String>::sse_decode(&mut deserializer);
+            let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_index = <u32>::sse_decode(&mut deserializer);
+            let api_railgun_address = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
+                    (move || {
+                        let output_ok =
+                            crate::api::private_usd::private_usd_reverse_funding_request(
+                                api_db_path,
+                                api_network,
+                                api_account_uuid,
+                                api_store_dir,
+                                api_mnemonic_bytes,
+                                api_eth_rpc_url,
+                                api_index,
+                                api_railgun_address,
+                            )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__private_usd__private_usd_reverse_go_ahead_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "private_usd_reverse_go_ahead",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_network = <String>::sse_decode(&mut deserializer);
+            let api_account_uuid = <String>::sse_decode(&mut deserializer);
+            let api_store_dir = <String>::sse_decode(&mut deserializer);
+            let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_index = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
+                    (move || {
+                        let output_ok = crate::api::private_usd::private_usd_reverse_go_ahead(
+                            api_network,
+                            api_account_uuid,
+                            api_store_dir,
+                            api_eth_rpc_url,
+                            api_index,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__private_usd__private_usd_reverse_quote_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "private_usd_reverse_quote",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_db_path = <String>::sse_decode(&mut deserializer);
+            let api_network = <String>::sse_decode(&mut deserializer);
+            let api_account_uuid = <String>::sse_decode(&mut deserializer);
+            let api_store_dir = <String>::sse_decode(&mut deserializer);
+            let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_lightwalletd_url = <String>::sse_decode(&mut deserializer);
+            let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_units = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
+                    (move || {
+                        let output_ok = crate::api::private_usd::private_usd_reverse_quote(
+                            api_db_path,
+                            api_network,
+                            api_account_uuid,
+                            api_store_dir,
+                            api_mnemonic_bytes,
+                            api_lightwalletd_url,
+                            api_eth_rpc_url,
+                            api_units,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__private_usd__private_usd_reverse_records_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "private_usd_reverse_records",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_account_uuid = <String>::sse_decode(&mut deserializer);
+            let api_store_dir = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
+                    (move || {
+                        let output_ok = crate::api::private_usd::private_usd_reverse_records(
+                            api_account_uuid,
+                            api_store_dir,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__private_usd__private_usd_reverse_rescue_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "private_usd_reverse_rescue",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_db_path = <String>::sse_decode(&mut deserializer);
+            let api_network = <String>::sse_decode(&mut deserializer);
+            let api_account_uuid = <String>::sse_decode(&mut deserializer);
+            let api_store_dir = <String>::sse_decode(&mut deserializer);
+            let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
+            let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_index = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
+                    (move || {
+                        let output_ok = crate::api::private_usd::private_usd_reverse_rescue(
+                            api_db_path,
+                            api_network,
+                            api_account_uuid,
+                            api_store_dir,
+                            api_mnemonic_bytes,
+                            api_eth_rpc_url,
+                            api_index,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__private_usd__private_usd_reverse_set_cost_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "private_usd_reverse_set_cost",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_network = <String>::sse_decode(&mut deserializer);
+            let api_account_uuid = <String>::sse_decode(&mut deserializer);
+            let api_store_dir = <String>::sse_decode(&mut deserializer);
+            let api_index = <u32>::sse_decode(&mut deserializer);
+            let api_debit = <String>::sse_decode(&mut deserializer);
+            let api_railgun_fee = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
+                    (move || {
+                        let output_ok = crate::api::private_usd::private_usd_reverse_set_cost(
+                            api_network,
+                            api_account_uuid,
+                            api_store_dir,
+                            api_index,
+                            api_debit,
+                            api_railgun_fee,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__private_usd__private_usd_reverse_submit_funding_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "private_usd_reverse_submit_funding",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_network = <String>::sse_decode(&mut deserializer);
+            let api_account_uuid = <String>::sse_decode(&mut deserializer);
+            let api_store_dir = <String>::sse_decode(&mut deserializer);
+            let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
+            let api_index = <u32>::sse_decode(&mut deserializer);
+            let api_to = <String>::sse_decode(&mut deserializer);
+            let api_data = <String>::sse_decode(&mut deserializer);
+            let api_value = <String>::sse_decode(&mut deserializer);
+            let api_debit = <String>::sse_decode(&mut deserializer);
+            let api_railgun_fee = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
+                    (move || {
+                        let output_ok =
+                            crate::api::private_usd::private_usd_reverse_submit_funding(
+                                api_network,
+                                api_account_uuid,
+                                api_store_dir,
+                                api_eth_rpc_url,
+                                api_index,
+                                api_to,
+                                api_data,
+                                api_value,
+                                api_debit,
+                                api_railgun_fee,
+                            )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__private_usd__private_usd_unfinished_count_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -11329,6 +11963,30 @@ impl SseDecode for crate::api::private_usd::ApiForwardWait {
     }
 }
 
+impl SseDecode for crate::api::private_usd::ApiFundingRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_amount = <String>::sse_decode(deserializer);
+        let mut var_railgunProxy = <String>::sse_decode(deserializer);
+        let mut var_token = <String>::sse_decode(deserializer);
+        let mut var_callsTo = <Vec<String>>::sse_decode(deserializer);
+        let mut var_callsData = <Vec<String>>::sse_decode(deserializer);
+        let mut var_relayAdapt = <String>::sse_decode(deserializer);
+        let mut var_fee = <String>::sse_decode(deserializer);
+        let mut var_alreadyFunded = <bool>::sse_decode(deserializer);
+        return crate::api::private_usd::ApiFundingRequest {
+            amount: var_amount,
+            railgun_proxy: var_railgunProxy,
+            token: var_token,
+            calls_to: var_callsTo,
+            calls_data: var_callsData,
+            relay_adapt: var_relayAdapt,
+            fee: var_fee,
+            already_funded: var_alreadyFunded,
+        };
+    }
+}
+
 impl SseDecode for crate::api::sync::ApiGiftCardCheckProgress {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -11542,6 +12200,152 @@ impl SseDecode for crate::api::private_usd::ApiRefundCause {
             0 => crate::api::private_usd::ApiRefundCause::MakerCancelled,
             1 => crate::api::private_usd::ApiRefundCause::NotClaimedInTime,
             _ => unreachable!("Invalid variant for ApiRefundCause: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::private_usd::ApiReverseAdvance {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_record = <crate::api::private_usd::ApiReverseRecord>::sse_decode(deserializer);
+        let mut var_nextPollMs = <u32>::sse_decode(deserializer);
+        let mut var_problem =
+            <Option<crate::api::private_usd::ApiPrivateUsdErrorCode>>::sse_decode(deserializer);
+        let mut var_needsYou = <bool>::sse_decode(deserializer);
+        return crate::api::private_usd::ApiReverseAdvance {
+            record: var_record,
+            next_poll_ms: var_nextPollMs,
+            problem: var_problem,
+            needs_you: var_needsYou,
+        };
+    }
+}
+
+impl SseDecode for crate::api::private_usd::ApiReverseCost {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_debit = <String>::sse_decode(deserializer);
+        let mut var_railgunFee = <String>::sse_decode(deserializer);
+        let mut var_broadcasterFee = <String>::sse_decode(deserializer);
+        let mut var_feeExpiresAt = <Option<i64>>::sse_decode(deserializer);
+        return crate::api::private_usd::ApiReverseCost {
+            debit: var_debit,
+            railgun_fee: var_railgunFee,
+            broadcaster_fee: var_broadcasterFee,
+            fee_expires_at: var_feeExpiresAt,
+        };
+    }
+}
+
+impl SseDecode for crate::api::private_usd::ApiReverseCostRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_index = <u32>::sse_decode(deserializer);
+        let mut var_amount = <String>::sse_decode(deserializer);
+        let mut var_railgunProxy = <String>::sse_decode(deserializer);
+        let mut var_fee = <String>::sse_decode(deserializer);
+        let mut var_feeExpiresAt = <Option<i64>>::sse_decode(deserializer);
+        return crate::api::private_usd::ApiReverseCostRequest {
+            index: var_index,
+            amount: var_amount,
+            railgun_proxy: var_railgunProxy,
+            fee: var_fee,
+            fee_expires_at: var_feeExpiresAt,
+        };
+    }
+}
+
+impl SseDecode for crate::api::private_usd::ApiReversePhase {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::private_usd::ApiReversePhase::Quoted,
+            1 => crate::api::private_usd::ApiReversePhase::Accepting,
+            2 => crate::api::private_usd::ApiReversePhase::AwaitingFunding,
+            3 => crate::api::private_usd::ApiReversePhase::SendingUsdc,
+            4 => crate::api::private_usd::ApiReversePhase::ConfirmingEscrow,
+            5 => crate::api::private_usd::ApiReversePhase::ReceivingZec,
+            6 => crate::api::private_usd::ApiReversePhase::AwaitingReady,
+            7 => crate::api::private_usd::ApiReversePhase::Settling,
+            8 => crate::api::private_usd::ApiReversePhase::Receiving,
+            9 => crate::api::private_usd::ApiReversePhase::Complete,
+            10 => crate::api::private_usd::ApiReversePhase::RefundWait,
+            11 => crate::api::private_usd::ApiReversePhase::Refunding,
+            12 => crate::api::private_usd::ApiReversePhase::RefundPayout,
+            13 => crate::api::private_usd::ApiReversePhase::Refunded,
+            14 => crate::api::private_usd::ApiReversePhase::Cancelled,
+            _ => unreachable!("Invalid variant for ApiReversePhase: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::private_usd::ApiReverseQuote {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_record = <crate::api::private_usd::ApiReverseRecord>::sse_decode(deserializer);
+        let mut var_costRequest =
+            <crate::api::private_usd::ApiReverseCostRequest>::sse_decode(deserializer);
+        return crate::api::private_usd::ApiReverseQuote {
+            record: var_record,
+            cost_request: var_costRequest,
+        };
+    }
+}
+
+impl SseDecode for crate::api::private_usd::ApiReverseRecord {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_index = <u32>::sse_decode(deserializer);
+        let mut var_swapId = <String>::sse_decode(deserializer);
+        let mut var_phase = <crate::api::private_usd::ApiReversePhase>::sse_decode(deserializer);
+        let mut var_amount = <String>::sse_decode(deserializer);
+        let mut var_networkCost = <Option<String>>::sse_decode(deserializer);
+        let mut var_depositZat = <u64>::sse_decode(deserializer);
+        let mut var_quoteExpiresAt = <i64>::sse_decode(deserializer);
+        let mut var_fundingDeadline = <i64>::sse_decode(deserializer);
+        let mut var_readyDeadline = <i64>::sse_decode(deserializer);
+        let mut var_refundAfter = <i64>::sse_decode(deserializer);
+        let mut var_cost =
+            <Option<crate::api::private_usd::ApiReverseCost>>::sse_decode(deserializer);
+        let mut var_funded = <bool>::sse_decode(deserializer);
+        let mut var_fundingTx = <Option<String>>::sse_decode(deserializer);
+        let mut var_cancelRequested = <bool>::sse_decode(deserializer);
+        let mut var_settled = <bool>::sse_decode(deserializer);
+        let mut var_cancellable = <bool>::sse_decode(deserializer);
+        let mut var_awaitingUser = <bool>::sse_decode(deserializer);
+        let mut var_receiveEstimateZat = <Option<u64>>::sse_decode(deserializer);
+        let mut var_receiveFeeZat = <Option<u64>>::sse_decode(deserializer);
+        let mut var_receiveTxid = <Option<String>>::sse_decode(deserializer);
+        let mut var_receivedZat = <Option<u64>>::sse_decode(deserializer);
+        let mut var_receiveConfirmations = <u32>::sse_decode(deserializer);
+        let mut var_acceptedAt = <Option<i64>>::sse_decode(deserializer);
+        let mut var_updatedAt = <i64>::sse_decode(deserializer);
+        return crate::api::private_usd::ApiReverseRecord {
+            index: var_index,
+            swap_id: var_swapId,
+            phase: var_phase,
+            amount: var_amount,
+            network_cost: var_networkCost,
+            deposit_zat: var_depositZat,
+            quote_expires_at: var_quoteExpiresAt,
+            funding_deadline: var_fundingDeadline,
+            ready_deadline: var_readyDeadline,
+            refund_after: var_refundAfter,
+            cost: var_cost,
+            funded: var_funded,
+            funding_tx: var_fundingTx,
+            cancel_requested: var_cancelRequested,
+            settled: var_settled,
+            cancellable: var_cancellable,
+            awaiting_user: var_awaitingUser,
+            receive_estimate_zat: var_receiveEstimateZat,
+            receive_fee_zat: var_receiveFeeZat,
+            receive_txid: var_receiveTxid,
+            received_zat: var_receivedZat,
+            receive_confirmations: var_receiveConfirmations,
+            accepted_at: var_acceptedAt,
+            updated_at: var_updatedAt,
         };
     }
 }
@@ -12932,6 +13736,20 @@ impl SseDecode for Vec<crate::api::voting_session::ApiProposalRosterEntry> {
     }
 }
 
+impl SseDecode for Vec<crate::api::private_usd::ApiReverseRecord> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = vec![];
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::private_usd::ApiReverseRecord>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::voting::ApiSnapshotBundlePirResult> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -14149,6 +14967,19 @@ impl SseDecode for Option<crate::api::private_usd::ApiRefundCause> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<crate::api::private_usd::ApiRefundCause>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::private_usd::ApiReverseCost> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::private_usd::ApiReverseCost>::sse_decode(
                 deserializer,
             ));
         } else {
@@ -16481,61 +17312,74 @@ fn pde_ffi_dispatcher_primary_impl(
 188 => wire__crate__api__private_usd__private_usd_forward_records_impl(port, ptr, rust_vec_len, data_len),
 190 => wire__crate__api__private_usd__private_usd_railgun_address_impl(port, ptr, rust_vec_len, data_len),
 191 => wire__crate__api__private_usd__private_usd_railgun_mnemonic_impl(port, ptr, rust_vec_len, data_len),
-192 => wire__crate__api__private_usd__private_usd_unfinished_count_impl(port, ptr, rust_vec_len, data_len),
-193 => wire__crate__api__sync__propose_payment_link_batch_impl(port, ptr, rust_vec_len, data_len),
-194 => wire__crate__api__sync__propose_payment_link_claim_impl(port, ptr, rust_vec_len, data_len),
-195 => wire__crate__api__sync__propose_send_impl(port, ptr, rust_vec_len, data_len),
-197 => wire__crate__api__sync__put_subtree_roots_impl(port, ptr, rust_vec_len, data_len),
-198 => wire__crate__api__network_privacy__quiesce_network_privacy_direct_requests_impl(port, ptr, rust_vec_len, data_len),
-199 => wire__crate__api__sync__read_transparent_policy_impl(port, ptr, rust_vec_len, data_len),
-200 => wire__crate__api__sync__reconcile_orchard_migration_outbox_receipt_impl(port, ptr, rust_vec_len, data_len),
-201 => wire__crate__api__sync__reconcile_transparent_policy_impl(port, ptr, rust_vec_len, data_len),
-202 => wire__crate__api__sync__redact_pczt_for_signer_impl(port, ptr, rust_vec_len, data_len),
-203 => wire__crate__api__gift_card_tracking__register_gift_card_observer_impl(port, ptr, rust_vec_len, data_len),
-204 => wire__crate__api__gift_card_tracking__remove_gift_card_observer_impl(port, ptr, rust_vec_len, data_len),
-206 => wire__crate__api__voting__reset_vote_tree_impl(port, ptr, rust_vec_len, data_len),
-207 => wire__crate__api__voting__reset_voting_session_state_impl(port, ptr, rust_vec_len, data_len),
-208 => wire__crate__api__voting__resolve_pir_snapshot_endpoint_impl(port, ptr, rust_vec_len, data_len),
-209 => wire__crate__api__voting__resolve_static_voting_config_impl(port, ptr, rust_vec_len, data_len),
-210 => wire__crate__api__voting__resolve_voting_config_from_attempts_impl(port, ptr, rust_vec_len, data_len),
-211 => wire__crate__api__sync__retain_proposal_lock_until_expiry_impl(port, ptr, rust_vec_len, data_len),
-212 => wire__crate__api__sync__retire_unbroadcast_orchard_migration_impl(port, ptr, rust_vec_len, data_len),
-213 => wire__crate__api__sync__rewind_to_height_impl(port, ptr, rust_vec_len, data_len),
-214 => wire__zcash_voting__wire__round_work_tally_view_default_impl(port, ptr, rust_vec_len, data_len),
-215 => wire__crate__api__sync__run_full_sync_blocking_impl(port, ptr, rust_vec_len, data_len),
-216 => wire__crate__api__sync__run_payment_link_claim_check_impl(port, ptr, rust_vec_len, data_len),
-217 => wire__crate__api__sync__run_payment_link_claim_sync_impl(port, ptr, rust_vec_len, data_len),
-219 => wire__crate__api__sync__scan_blocks_impl(port, ptr, rust_vec_len, data_len),
-225 => wire__crate__api__sync__set_transaction_status_impl(port, ptr, rust_vec_len, data_len),
-226 => wire__crate__api__voting__set_voting_observability_sink_impl(port, ptr, rust_vec_len, data_len),
-227 => wire__crate__api__voting__setup_delegation_bundles_impl(port, ptr, rust_vec_len, data_len),
-228 => wire__zcash_voting__wire__share_tracking_pass_report_view_default_impl(port, ptr, rust_vec_len, data_len),
-229 => wire__crate__api__sync__shield_transparent_balance_impl(port, ptr, rust_vec_len, data_len),
-230 => wire__crate__api__sync__shield_transparent_balance_with_macos_stored_mnemonic_impl(port, ptr, rust_vec_len, data_len),
-231 => wire__crate__api__sync__shutdown_signing_reservations_impl(port, ptr, rust_vec_len, data_len),
-232 => wire__crate__api__sync__start_full_sync_impl(port, ptr, rust_vec_len, data_len),
-233 => wire__crate__api__sync__start_mempool_observer_impl(port, ptr, rust_vec_len, data_len),
-234 => wire__crate__api__network_privacy__start_railgun_bridge_impl(port, ptr, rust_vec_len, data_len),
-235 => wire__crate__api__network_privacy__start_tor_update_relay_impl(port, ptr, rust_vec_len, data_len),
-237 => wire__crate__api__network_privacy__stop_railgun_bridge_impl(port, ptr, rust_vec_len, data_len),
-238 => wire__crate__api__network_privacy__stop_tor_update_relay_impl(port, ptr, rust_vec_len, data_len),
-239 => wire__crate__api__sync__store_and_broadcast_pczts_with_keystone_signatures_for_proposal_impl(port, ptr, rust_vec_len, data_len),
-240 => wire__crate__api__sync__store_and_broadcast_signed_pczts_for_proposal_impl(port, ptr, rust_vec_len, data_len),
-241 => wire__crate__api__voting__store_keystone_signatures_batch_impl(port, ptr, rust_vec_len, data_len),
-242 => wire__crate__api__sync__suggest_scan_ranges_impl(port, ptr, rust_vec_len, data_len),
-243 => wire__crate__api__gift_card_tracking__sync_gift_card_observers_impl(port, ptr, rust_vec_len, data_len),
-244 => wire__crate__api__voting__sync_vote_tree_impl(port, ptr, rust_vec_len, data_len),
-247 => wire__crate__api__network_privacy__tor_http_download_impl(port, ptr, rust_vec_len, data_len),
-248 => wire__crate__api__network_privacy__tor_http_get_impl(port, ptr, rust_vec_len, data_len),
-249 => wire__crate__api__network_privacy__tor_http_post_impl(port, ptr, rust_vec_len, data_len),
-250 => wire__crate__api__voting__trusted_voting_round_params_from_config_impl(port, ptr, rust_vec_len, data_len),
-251 => wire__crate__api__sync__update_chain_tip_impl(port, ptr, rust_vec_len, data_len),
-252 => wire__crate__api__sync__validate_address_impl(port, ptr, rust_vec_len, data_len),
-253 => wire__crate__api__wallet__validate_gift_address_impl(port, ptr, rust_vec_len, data_len),
-255 => wire__crate__api__voting__voting_proposal_id_range_impl(port, ptr, rust_vec_len, data_len),
-258 => wire__crate__api__voting__warm_pir_proof_cache_impl(port, ptr, rust_vec_len, data_len),
-260 => wire__crate__api__sync__write_block_metadata_impl(port, ptr, rust_vec_len, data_len),
-261 => wire__crate__api__keystone__zcash_sign_batch_round_message_counts_impl(port, ptr, rust_vec_len, data_len),
+192 => wire__crate__api__private_usd__private_usd_reverse_accept_impl(port, ptr, rust_vec_len, data_len),
+193 => wire__crate__api__private_usd__private_usd_reverse_advance_impl(port, ptr, rust_vec_len, data_len),
+194 => wire__crate__api__private_usd__private_usd_reverse_authorize_ready_impl(port, ptr, rust_vec_len, data_len),
+195 => wire__crate__api__private_usd__private_usd_reverse_can_rescue_impl(port, ptr, rust_vec_len, data_len),
+196 => wire__crate__api__private_usd__private_usd_reverse_cancel_impl(port, ptr, rust_vec_len, data_len),
+197 => wire__crate__api__private_usd__private_usd_reverse_cost_request_impl(port, ptr, rust_vec_len, data_len),
+198 => wire__crate__api__private_usd__private_usd_reverse_funding_request_impl(port, ptr, rust_vec_len, data_len),
+199 => wire__crate__api__private_usd__private_usd_reverse_go_ahead_impl(port, ptr, rust_vec_len, data_len),
+200 => wire__crate__api__private_usd__private_usd_reverse_quote_impl(port, ptr, rust_vec_len, data_len),
+201 => wire__crate__api__private_usd__private_usd_reverse_records_impl(port, ptr, rust_vec_len, data_len),
+202 => wire__crate__api__private_usd__private_usd_reverse_rescue_impl(port, ptr, rust_vec_len, data_len),
+203 => wire__crate__api__private_usd__private_usd_reverse_set_cost_impl(port, ptr, rust_vec_len, data_len),
+204 => wire__crate__api__private_usd__private_usd_reverse_submit_funding_impl(port, ptr, rust_vec_len, data_len),
+205 => wire__crate__api__private_usd__private_usd_unfinished_count_impl(port, ptr, rust_vec_len, data_len),
+206 => wire__crate__api__sync__propose_payment_link_batch_impl(port, ptr, rust_vec_len, data_len),
+207 => wire__crate__api__sync__propose_payment_link_claim_impl(port, ptr, rust_vec_len, data_len),
+208 => wire__crate__api__sync__propose_send_impl(port, ptr, rust_vec_len, data_len),
+210 => wire__crate__api__sync__put_subtree_roots_impl(port, ptr, rust_vec_len, data_len),
+211 => wire__crate__api__network_privacy__quiesce_network_privacy_direct_requests_impl(port, ptr, rust_vec_len, data_len),
+212 => wire__crate__api__sync__read_transparent_policy_impl(port, ptr, rust_vec_len, data_len),
+213 => wire__crate__api__sync__reconcile_orchard_migration_outbox_receipt_impl(port, ptr, rust_vec_len, data_len),
+214 => wire__crate__api__sync__reconcile_transparent_policy_impl(port, ptr, rust_vec_len, data_len),
+215 => wire__crate__api__sync__redact_pczt_for_signer_impl(port, ptr, rust_vec_len, data_len),
+216 => wire__crate__api__gift_card_tracking__register_gift_card_observer_impl(port, ptr, rust_vec_len, data_len),
+217 => wire__crate__api__gift_card_tracking__remove_gift_card_observer_impl(port, ptr, rust_vec_len, data_len),
+219 => wire__crate__api__voting__reset_vote_tree_impl(port, ptr, rust_vec_len, data_len),
+220 => wire__crate__api__voting__reset_voting_session_state_impl(port, ptr, rust_vec_len, data_len),
+221 => wire__crate__api__voting__resolve_pir_snapshot_endpoint_impl(port, ptr, rust_vec_len, data_len),
+222 => wire__crate__api__voting__resolve_static_voting_config_impl(port, ptr, rust_vec_len, data_len),
+223 => wire__crate__api__voting__resolve_voting_config_from_attempts_impl(port, ptr, rust_vec_len, data_len),
+224 => wire__crate__api__sync__retain_proposal_lock_until_expiry_impl(port, ptr, rust_vec_len, data_len),
+225 => wire__crate__api__sync__retire_unbroadcast_orchard_migration_impl(port, ptr, rust_vec_len, data_len),
+226 => wire__crate__api__sync__rewind_to_height_impl(port, ptr, rust_vec_len, data_len),
+227 => wire__zcash_voting__wire__round_work_tally_view_default_impl(port, ptr, rust_vec_len, data_len),
+228 => wire__crate__api__sync__run_full_sync_blocking_impl(port, ptr, rust_vec_len, data_len),
+229 => wire__crate__api__sync__run_payment_link_claim_check_impl(port, ptr, rust_vec_len, data_len),
+230 => wire__crate__api__sync__run_payment_link_claim_sync_impl(port, ptr, rust_vec_len, data_len),
+232 => wire__crate__api__sync__scan_blocks_impl(port, ptr, rust_vec_len, data_len),
+238 => wire__crate__api__sync__set_transaction_status_impl(port, ptr, rust_vec_len, data_len),
+239 => wire__crate__api__voting__set_voting_observability_sink_impl(port, ptr, rust_vec_len, data_len),
+240 => wire__crate__api__voting__setup_delegation_bundles_impl(port, ptr, rust_vec_len, data_len),
+241 => wire__zcash_voting__wire__share_tracking_pass_report_view_default_impl(port, ptr, rust_vec_len, data_len),
+242 => wire__crate__api__sync__shield_transparent_balance_impl(port, ptr, rust_vec_len, data_len),
+243 => wire__crate__api__sync__shield_transparent_balance_with_macos_stored_mnemonic_impl(port, ptr, rust_vec_len, data_len),
+244 => wire__crate__api__sync__shutdown_signing_reservations_impl(port, ptr, rust_vec_len, data_len),
+245 => wire__crate__api__sync__start_full_sync_impl(port, ptr, rust_vec_len, data_len),
+246 => wire__crate__api__sync__start_mempool_observer_impl(port, ptr, rust_vec_len, data_len),
+247 => wire__crate__api__network_privacy__start_railgun_bridge_impl(port, ptr, rust_vec_len, data_len),
+248 => wire__crate__api__network_privacy__start_tor_update_relay_impl(port, ptr, rust_vec_len, data_len),
+250 => wire__crate__api__network_privacy__stop_railgun_bridge_impl(port, ptr, rust_vec_len, data_len),
+251 => wire__crate__api__network_privacy__stop_tor_update_relay_impl(port, ptr, rust_vec_len, data_len),
+252 => wire__crate__api__sync__store_and_broadcast_pczts_with_keystone_signatures_for_proposal_impl(port, ptr, rust_vec_len, data_len),
+253 => wire__crate__api__sync__store_and_broadcast_signed_pczts_for_proposal_impl(port, ptr, rust_vec_len, data_len),
+254 => wire__crate__api__voting__store_keystone_signatures_batch_impl(port, ptr, rust_vec_len, data_len),
+255 => wire__crate__api__sync__suggest_scan_ranges_impl(port, ptr, rust_vec_len, data_len),
+256 => wire__crate__api__gift_card_tracking__sync_gift_card_observers_impl(port, ptr, rust_vec_len, data_len),
+257 => wire__crate__api__voting__sync_vote_tree_impl(port, ptr, rust_vec_len, data_len),
+260 => wire__crate__api__network_privacy__tor_http_download_impl(port, ptr, rust_vec_len, data_len),
+261 => wire__crate__api__network_privacy__tor_http_get_impl(port, ptr, rust_vec_len, data_len),
+262 => wire__crate__api__network_privacy__tor_http_post_impl(port, ptr, rust_vec_len, data_len),
+263 => wire__crate__api__voting__trusted_voting_round_params_from_config_impl(port, ptr, rust_vec_len, data_len),
+264 => wire__crate__api__sync__update_chain_tip_impl(port, ptr, rust_vec_len, data_len),
+265 => wire__crate__api__sync__validate_address_impl(port, ptr, rust_vec_len, data_len),
+266 => wire__crate__api__wallet__validate_gift_address_impl(port, ptr, rust_vec_len, data_len),
+268 => wire__crate__api__voting__voting_proposal_id_range_impl(port, ptr, rust_vec_len, data_len),
+271 => wire__crate__api__voting__warm_pir_proof_cache_impl(port, ptr, rust_vec_len, data_len),
+273 => wire__crate__api__sync__write_block_metadata_impl(port, ptr, rust_vec_len, data_len),
+274 => wire__crate__api__keystone__zcash_sign_batch_round_message_counts_impl(port, ptr, rust_vec_len, data_len),
                         _ => unreachable!(),
                     }
 }
@@ -16639,41 +17483,41 @@ fn pde_ffi_dispatcher_sync_impl(
             rust_vec_len,
             data_len,
         ),
-        196 => {
+        209 => {
             wire__crate__api__sync__public_transaction_load_epoch_impl(ptr, rust_vec_len, data_len)
         }
-        205 => wire__crate__api__keystone__reset_ur_session_impl(ptr, rust_vec_len, data_len),
-        218 => wire__crate__api__wallet__same_orchard_receiver_impl(ptr, rust_vec_len, data_len),
-        220 => wire__crate__api__sync__set_active_sync_account_impl(ptr, rust_vec_len, data_len),
-        221 => wire__crate__api__sync__set_enhance_pir_enabled_impl(ptr, rust_vec_len, data_len),
-        222 => wire__crate__api__sync__set_enhance_pir_preference_confirmed_impl(
+        218 => wire__crate__api__keystone__reset_ur_session_impl(ptr, rust_vec_len, data_len),
+        231 => wire__crate__api__wallet__same_orchard_receiver_impl(ptr, rust_vec_len, data_len),
+        233 => wire__crate__api__sync__set_active_sync_account_impl(ptr, rust_vec_len, data_len),
+        234 => wire__crate__api__sync__set_enhance_pir_enabled_impl(ptr, rust_vec_len, data_len),
+        235 => wire__crate__api__sync__set_enhance_pir_preference_confirmed_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        223 => wire__crate__api__network_privacy__set_network_privacy_dormant_impl(
+        236 => wire__crate__api__network_privacy__set_network_privacy_dormant_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        224 => wire__crate__api__sync__set_sync_mode_impl(ptr, rust_vec_len, data_len),
-        236 => wire__crate__api__sync__stop_mempool_observer_impl(ptr, rust_vec_len, data_len),
-        245 => wire__crate__api__network_privacy__tor_http_begin_request_impl(
+        237 => wire__crate__api__sync__set_sync_mode_impl(ptr, rust_vec_len, data_len),
+        249 => wire__crate__api__sync__stop_mempool_observer_impl(ptr, rust_vec_len, data_len),
+        258 => wire__crate__api__network_privacy__tor_http_begin_request_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        246 => wire__crate__api__network_privacy__tor_http_cancel_request_impl(
+        259 => wire__crate__api__network_privacy__tor_http_cancel_request_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        254 => wire__crate__api__wallet__validate_mnemonic_impl(ptr, rust_vec_len, data_len),
-        256 => wire__crate__api__wallet__wallet_exists_impl(ptr, rust_vec_len, data_len),
-        257 => {
+        267 => wire__crate__api__wallet__validate_mnemonic_impl(ptr, rust_vec_len, data_len),
+        269 => wire__crate__api__wallet__wallet_exists_impl(ptr, rust_vec_len, data_len),
+        270 => {
             wire__crate__api__sync__warm_orchard_proving_key_cache_impl(ptr, rust_vec_len, data_len)
         }
-        259 => {
+        272 => {
             wire__crate__api__voting__warm_voting_proving_caches_impl(ptr, rust_vec_len, data_len)
         }
         _ => unreachable!(),
@@ -17224,6 +18068,33 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::private_usd::ApiForwardWait>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiFundingRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.amount.into_into_dart().into_dart(),
+            self.railgun_proxy.into_into_dart().into_dart(),
+            self.token.into_into_dart().into_dart(),
+            self.calls_to.into_into_dart().into_dart(),
+            self.calls_data.into_into_dart().into_dart(),
+            self.relay_adapt.into_into_dart().into_dart(),
+            self.fee.into_into_dart().into_dart(),
+            self.already_funded.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::private_usd::ApiFundingRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::private_usd::ApiFundingRequest>
+    for crate::api::private_usd::ApiFundingRequest
+{
+    fn into_into_dart(self) -> crate::api::private_usd::ApiFundingRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::sync::ApiGiftCardCheckProgress {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -17539,6 +18410,174 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::private_usd::ApiRefundCause>
     for crate::api::private_usd::ApiRefundCause
 {
     fn into_into_dart(self) -> crate::api::private_usd::ApiRefundCause {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiReverseAdvance {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.record.into_into_dart().into_dart(),
+            self.next_poll_ms.into_into_dart().into_dart(),
+            self.problem.into_into_dart().into_dart(),
+            self.needs_you.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::private_usd::ApiReverseAdvance
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::private_usd::ApiReverseAdvance>
+    for crate::api::private_usd::ApiReverseAdvance
+{
+    fn into_into_dart(self) -> crate::api::private_usd::ApiReverseAdvance {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiReverseCost {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.debit.into_into_dart().into_dart(),
+            self.railgun_fee.into_into_dart().into_dart(),
+            self.broadcaster_fee.into_into_dart().into_dart(),
+            self.fee_expires_at.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::private_usd::ApiReverseCost
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::private_usd::ApiReverseCost>
+    for crate::api::private_usd::ApiReverseCost
+{
+    fn into_into_dart(self) -> crate::api::private_usd::ApiReverseCost {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiReverseCostRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.index.into_into_dart().into_dart(),
+            self.amount.into_into_dart().into_dart(),
+            self.railgun_proxy.into_into_dart().into_dart(),
+            self.fee.into_into_dart().into_dart(),
+            self.fee_expires_at.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::private_usd::ApiReverseCostRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::private_usd::ApiReverseCostRequest>
+    for crate::api::private_usd::ApiReverseCostRequest
+{
+    fn into_into_dart(self) -> crate::api::private_usd::ApiReverseCostRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiReversePhase {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Quoted => 0.into_dart(),
+            Self::Accepting => 1.into_dart(),
+            Self::AwaitingFunding => 2.into_dart(),
+            Self::SendingUsdc => 3.into_dart(),
+            Self::ConfirmingEscrow => 4.into_dart(),
+            Self::ReceivingZec => 5.into_dart(),
+            Self::AwaitingReady => 6.into_dart(),
+            Self::Settling => 7.into_dart(),
+            Self::Receiving => 8.into_dart(),
+            Self::Complete => 9.into_dart(),
+            Self::RefundWait => 10.into_dart(),
+            Self::Refunding => 11.into_dart(),
+            Self::RefundPayout => 12.into_dart(),
+            Self::Refunded => 13.into_dart(),
+            Self::Cancelled => 14.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::private_usd::ApiReversePhase
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::private_usd::ApiReversePhase>
+    for crate::api::private_usd::ApiReversePhase
+{
+    fn into_into_dart(self) -> crate::api::private_usd::ApiReversePhase {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiReverseQuote {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.record.into_into_dart().into_dart(),
+            self.cost_request.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::private_usd::ApiReverseQuote
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::private_usd::ApiReverseQuote>
+    for crate::api::private_usd::ApiReverseQuote
+{
+    fn into_into_dart(self) -> crate::api::private_usd::ApiReverseQuote {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiReverseRecord {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.index.into_into_dart().into_dart(),
+            self.swap_id.into_into_dart().into_dart(),
+            self.phase.into_into_dart().into_dart(),
+            self.amount.into_into_dart().into_dart(),
+            self.network_cost.into_into_dart().into_dart(),
+            self.deposit_zat.into_into_dart().into_dart(),
+            self.quote_expires_at.into_into_dart().into_dart(),
+            self.funding_deadline.into_into_dart().into_dart(),
+            self.ready_deadline.into_into_dart().into_dart(),
+            self.refund_after.into_into_dart().into_dart(),
+            self.cost.into_into_dart().into_dart(),
+            self.funded.into_into_dart().into_dart(),
+            self.funding_tx.into_into_dart().into_dart(),
+            self.cancel_requested.into_into_dart().into_dart(),
+            self.settled.into_into_dart().into_dart(),
+            self.cancellable.into_into_dart().into_dart(),
+            self.awaiting_user.into_into_dart().into_dart(),
+            self.receive_estimate_zat.into_into_dart().into_dart(),
+            self.receive_fee_zat.into_into_dart().into_dart(),
+            self.receive_txid.into_into_dart().into_dart(),
+            self.received_zat.into_into_dart().into_dart(),
+            self.receive_confirmations.into_into_dart().into_dart(),
+            self.accepted_at.into_into_dart().into_dart(),
+            self.updated_at.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::private_usd::ApiReverseRecord
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::private_usd::ApiReverseRecord>
+    for crate::api::private_usd::ApiReverseRecord
+{
+    fn into_into_dart(self) -> crate::api::private_usd::ApiReverseRecord {
         self
     }
 }
@@ -22206,6 +23245,20 @@ impl SseEncode for crate::api::private_usd::ApiForwardWait {
     }
 }
 
+impl SseEncode for crate::api::private_usd::ApiFundingRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.amount, serializer);
+        <String>::sse_encode(self.railgun_proxy, serializer);
+        <String>::sse_encode(self.token, serializer);
+        <Vec<String>>::sse_encode(self.calls_to, serializer);
+        <Vec<String>>::sse_encode(self.calls_data, serializer);
+        <String>::sse_encode(self.relay_adapt, serializer);
+        <String>::sse_encode(self.fee, serializer);
+        <bool>::sse_encode(self.already_funded, serializer);
+    }
+}
+
 impl SseEncode for crate::api::sync::ApiGiftCardCheckProgress {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -22380,6 +23433,107 @@ impl SseEncode for crate::api::private_usd::ApiRefundCause {
             },
             serializer,
         );
+    }
+}
+
+impl SseEncode for crate::api::private_usd::ApiReverseAdvance {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::private_usd::ApiReverseRecord>::sse_encode(self.record, serializer);
+        <u32>::sse_encode(self.next_poll_ms, serializer);
+        <Option<crate::api::private_usd::ApiPrivateUsdErrorCode>>::sse_encode(
+            self.problem,
+            serializer,
+        );
+        <bool>::sse_encode(self.needs_you, serializer);
+    }
+}
+
+impl SseEncode for crate::api::private_usd::ApiReverseCost {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.debit, serializer);
+        <String>::sse_encode(self.railgun_fee, serializer);
+        <String>::sse_encode(self.broadcaster_fee, serializer);
+        <Option<i64>>::sse_encode(self.fee_expires_at, serializer);
+    }
+}
+
+impl SseEncode for crate::api::private_usd::ApiReverseCostRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u32>::sse_encode(self.index, serializer);
+        <String>::sse_encode(self.amount, serializer);
+        <String>::sse_encode(self.railgun_proxy, serializer);
+        <String>::sse_encode(self.fee, serializer);
+        <Option<i64>>::sse_encode(self.fee_expires_at, serializer);
+    }
+}
+
+impl SseEncode for crate::api::private_usd::ApiReversePhase {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::private_usd::ApiReversePhase::Quoted => 0,
+                crate::api::private_usd::ApiReversePhase::Accepting => 1,
+                crate::api::private_usd::ApiReversePhase::AwaitingFunding => 2,
+                crate::api::private_usd::ApiReversePhase::SendingUsdc => 3,
+                crate::api::private_usd::ApiReversePhase::ConfirmingEscrow => 4,
+                crate::api::private_usd::ApiReversePhase::ReceivingZec => 5,
+                crate::api::private_usd::ApiReversePhase::AwaitingReady => 6,
+                crate::api::private_usd::ApiReversePhase::Settling => 7,
+                crate::api::private_usd::ApiReversePhase::Receiving => 8,
+                crate::api::private_usd::ApiReversePhase::Complete => 9,
+                crate::api::private_usd::ApiReversePhase::RefundWait => 10,
+                crate::api::private_usd::ApiReversePhase::Refunding => 11,
+                crate::api::private_usd::ApiReversePhase::RefundPayout => 12,
+                crate::api::private_usd::ApiReversePhase::Refunded => 13,
+                crate::api::private_usd::ApiReversePhase::Cancelled => 14,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::private_usd::ApiReverseQuote {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::private_usd::ApiReverseRecord>::sse_encode(self.record, serializer);
+        <crate::api::private_usd::ApiReverseCostRequest>::sse_encode(self.cost_request, serializer);
+    }
+}
+
+impl SseEncode for crate::api::private_usd::ApiReverseRecord {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u32>::sse_encode(self.index, serializer);
+        <String>::sse_encode(self.swap_id, serializer);
+        <crate::api::private_usd::ApiReversePhase>::sse_encode(self.phase, serializer);
+        <String>::sse_encode(self.amount, serializer);
+        <Option<String>>::sse_encode(self.network_cost, serializer);
+        <u64>::sse_encode(self.deposit_zat, serializer);
+        <i64>::sse_encode(self.quote_expires_at, serializer);
+        <i64>::sse_encode(self.funding_deadline, serializer);
+        <i64>::sse_encode(self.ready_deadline, serializer);
+        <i64>::sse_encode(self.refund_after, serializer);
+        <Option<crate::api::private_usd::ApiReverseCost>>::sse_encode(self.cost, serializer);
+        <bool>::sse_encode(self.funded, serializer);
+        <Option<String>>::sse_encode(self.funding_tx, serializer);
+        <bool>::sse_encode(self.cancel_requested, serializer);
+        <bool>::sse_encode(self.settled, serializer);
+        <bool>::sse_encode(self.cancellable, serializer);
+        <bool>::sse_encode(self.awaiting_user, serializer);
+        <Option<u64>>::sse_encode(self.receive_estimate_zat, serializer);
+        <Option<u64>>::sse_encode(self.receive_fee_zat, serializer);
+        <Option<String>>::sse_encode(self.receive_txid, serializer);
+        <Option<u64>>::sse_encode(self.received_zat, serializer);
+        <u32>::sse_encode(self.receive_confirmations, serializer);
+        <Option<i64>>::sse_encode(self.accepted_at, serializer);
+        <i64>::sse_encode(self.updated_at, serializer);
     }
 }
 
@@ -23400,6 +24554,16 @@ impl SseEncode for Vec<crate::api::voting_session::ApiProposalRosterEntry> {
     }
 }
 
+impl SseEncode for Vec<crate::api::private_usd::ApiReverseRecord> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::private_usd::ApiReverseRecord>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::voting::ApiSnapshotBundlePirResult> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -24318,6 +25482,16 @@ impl SseEncode for Option<crate::api::private_usd::ApiRefundCause> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::api::private_usd::ApiRefundCause>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::private_usd::ApiReverseCost> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::private_usd::ApiReverseCost>::sse_encode(value, serializer);
         }
     }
 }

@@ -658,3 +658,37 @@ pub(crate) fn find_sent(
     }
     Ok(None)
 }
+
+/// What `txid` (internal byte order) sent, as `db` recorded it: the value of
+/// its sent outputs, and its fee when the wallet knows it. A sweep found
+/// again after an interruption reports its amounts from here.
+pub(crate) fn sent_value_and_fee(db: &str, txid: &TxId) -> Result<(u64, Option<u64>)> {
+    let conn =
+        open_readonly_conn_with_timeout(db, Some(READ_DB_BUSY_TIMEOUT)).map_err(wallet_error)?;
+    let snapshot = conn.unchecked_transaction().map_err(sql_error)?;
+    let value: Option<i64> = snapshot
+        .query_row(
+            "SELECT SUM(sn.value) FROM sent_notes sn
+             JOIN transactions t ON t.id_tx = sn.transaction_id
+             WHERE t.txid = ?1",
+            [txid.as_ref()],
+            |row| row.get(0),
+        )
+        .map_err(sql_error)?;
+    let fee: Option<Option<i64>> = snapshot
+        .query_row(
+            "SELECT fee FROM transactions WHERE txid = ?1",
+            [txid.as_ref()],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(sql_error)?;
+    let value = u64::try_from(value.unwrap_or_default())
+        .map_err(|_| wallet_error("a sent value is negative"))?;
+    let fee = fee
+        .flatten()
+        .map(u64::try_from)
+        .transpose()
+        .map_err(|_| wallet_error("a stored fee is negative"))?;
+    Ok((value, fee))
+}

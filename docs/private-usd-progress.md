@@ -568,12 +568,191 @@ the forward path runs without tokens (D-33).
 
 ## M6. Reverse conversion, reverse refunds, rescue and the Refunds screen
 
-- [ ] M6.1 `reverse.rs` and `funding_calls.rs`
-- [ ] M6.2 FRB reverse calls
+- [x] M6.1 `reverse.rs` and `funding_calls.rs` (D-70 to D-78)
+- [x] M6.2 FRB reverse calls (D-79)
 - [ ] M6.3 Dart
 - [ ] M6.4 Copy (Reverse, Refunds)
 - [ ] M6.5 Widgetbook and capture scenarios (reverse, refunds rows)
 - [ ] M6 gate
+
+M6 part 1 status (2026-10-14): M6.1 and M6.2, the Rust half, are done. Part 2
+(M6.3–M6.5: the Dart funding orchestration, providers, screens, copy and
+Widgetbook) is next; the M6 gate and its device checks wait for it.
+
+- **What landed.**
+  - `rust/src/wallet/private_usd/reverse.rs`: the §5.7 driver and the §5.8
+    reverse refund and rescue. `ReverseView` holds the steps that need no
+    key (`price`, `set_cost`, `go_ahead`, `submit_funding`, `can_rescue`);
+    `Reverse` the keyed ones (`quote`, `accept`, `funding_request`,
+    `advance`/`advance_report`, `authorize_ready`, `cancel`, `rescue`), over
+    `ChainReader`, `HttpTransport`, the new `ReverseZcash` seam (implemented
+    by `WalletZcash`), `Clock` and `TokenSource`. `ReverseCall` and
+    `run_view` wire the real seams for one FRB call.
+  - `rust/src/wallet/private_usd/funding_calls.rs`: the funding's three
+    calls (`approve`, `openReverse`, `transfer`), 68 + 548 + 68 bytes.
+  - Smaller changes: `engine.rs` (the reverse funding sessions, maker checks
+    per direction, the `Funding`, `Readying` and `Refunding` activities),
+    `forward.rs` (the joint-account helpers of `WalletZcash` take a
+    direction, the sweep builder is shared, and the maker, relayer and
+    acceptance checks are free functions), `models.rs` (record helpers),
+    `store.rs` (`updated_at`), `joint.rs` (`sent_value_and_fee`), and the
+    claim scan's docstring (`sync_engine/mod.rs`), which wrongly said it takes
+    no global write lock.
+  - FRB (`rust/src/api/private_usd.rs`): the thirteen calls below. Bindings
+    regenerated; the rustc 1.93 noise was reverted as before.
+- **The reverse state machine as built** (reference §5.7). Phases: `Quoted`
+  (a priced draft, not under way) → `Accepting` (gone ahead) →
+  `AwaitingFunding` (accepted, joint account imported; the user's first
+  approval) → `SendingUsdc` (funding kept, posted) → `ConfirmingEscrow` (the
+  relayer or node knows it) → `ReceivingZec` (escrow confirmed; waiting for
+  the maker's ZEC) → `AwaitingReady` (the whole deposit has 2 confirmations;
+  the user's second approval) → `Settling` (`ready` kept and sent) →
+  `Receiving` (the maker claimed, revealing `e`; the sweep home) →
+  `Complete`. Refund branch: `RefundWait` → `Refunding` (refund lock taken,
+  `z` revealed under it) → `RefundPayout` → `Refunded`; `Cancelled` ends a
+  conversion with nothing paid. Waits, all re-read from the chain each
+  advance: the funding until the node knows it (sent again only while it
+  does not, before the funding deadline and without a cancel; called off
+  10 min after the deadline), the escrow's confirmations, the deposit's 2
+  confirmations, the maker's claim or the refund deadlines, the refund lock's
+  turn, and the sweep's 2 confirmations.
+- **Tests.** The 7 new tests are `private_usd/tests/reverse.rs`, one per M6
+  "Done when" rule (D-80).
+  - Rust: `cd rust && cargo test` passes: lib 1507 passed, 0 failed, 11
+    ignored; integration 6 passed, 21 ignored (regtest). `private_usd`
+    alone: 68 passed, 1 ignored (the regtest test). The known flaky
+    `gift_card_input::tests::recovery` family passed. rustfmt was applied to
+    the changed files after that run (formatting only); `cargo check --lib
+    --tests` is clean after it.
+  - Dart: `fvm flutter analyze` finds no issues. `fvm flutter test`: +5941
+    ~160 -4, the 4 pre-existing failures in
+    `settings_seed_phrase_screen_test.dart` (the `AppButton` "Enter amount"
+    finder at test line 159). No Dart besides the bindings changed, so the
+    mobile lane was not run.
+- **For part 2: the FRB calls** (`lib/src/rust/api/private_usd.dart`).
+  Arguments as for forward (part 1 of M5): `dbPath`, `network`,
+  `accountUuid`, `storeDir` (`getPrivateUsdDirPath` for calls that write a
+  first record; the reverse quote is one), `mnemonicBytes` (zeroed in
+  `finally`), `lightwalletdUrl`, `ethRpcUrl` (the keyed URL or `""`).
+  - `Future<ApiReverseQuote> privateUsdReverseQuote({dbPath, network,
+    accountUuid, storeDir, mnemonicBytes, lightwalletdUrl, ethRpcUrl,
+    required int units})`: spends an index and keeps a `QUOTED` draft
+    (replacing an earlier draft). `units` = token base units, whole cents
+    (a multiple of 10,000), else `amountRefused`. Returns `{ApiReverseRecord
+    record; ApiReverseCostRequest costRequest}`.
+  - `Future<ApiReverseCostRequest> privateUsdReverseCostRequest({network,
+    accountUuid, storeDir, required int index})`: `{int index; String amount,
+    railgunProxy, fee; PlatformInt64? feeExpiresAt}`, the page's
+    `reverseCost` params now (after a lock cut pricing short, or after
+    `fundingCostChanged`).
+  - `Future<ApiReverseRecord> privateUsdReverseSetCost({network,
+    accountUuid, storeDir, required int index, required String debit,
+    required String railgunFee})`: the page's `{debit, railgunFee}`; only for
+    `quoted`, or `awaitingFunding` with no funding kept.
+  - `Future<ApiReverseRecord> privateUsdReverseGoAhead({network,
+    accountUuid, storeDir, ethRpcUrl, required int index})`.
+  - `Future<ApiAcceptResult> privateUsdReverseAccept({dbPath, network,
+    accountUuid, storeDir, mnemonicBytes, lightwalletdUrl, ethRpcUrl,
+    required int index})`: idempotent; `kind` `accepted`, `tokensNeeded`
+    (cancel the conversion: no tokens client before M4) or `nothingSent`
+    (ended `cancelled`; `cause` when known).
+  - `Future<ApiFundingRequest> privateUsdReverseFundingRequest({dbPath,
+    network, accountUuid, storeDir, mnemonicBytes, ethRpcUrl, required int
+    index, required String railgunAddress})`: `{String amount, railgunProxy,
+    token; List<String> callsTo, callsData; String relayAdapt, fee; bool
+    alreadyFunded}`. `railgunAddress` is the page's open wallet.
+  - `Future<ApiReverseRecord> privateUsdReverseSubmitFunding({network,
+    accountUuid, storeDir, ethRpcUrl, required int index, required String
+    to, required String data, required String value, required String debit,
+    required String railgunFee})`: the page's `prepareReverse` result.
+  - `Future<ApiReverseAdvance> privateUsdReverseAdvance({dbPath, network,
+    accountUuid, storeDir, mnemonicBytes, lightwalletdUrl, ethRpcUrl,
+    required int opId, required int index})`: `{ApiReverseRecord record; int
+    nextPollMs; ApiPrivateUsdErrorCode? problem; bool needsYou}`.
+  - `Future<ApiReverseRecord> privateUsdReverseAuthorizeReady({dbPath,
+    network, accountUuid, storeDir, mnemonicBytes, lightwalletdUrl,
+    ethRpcUrl, required int index})`.
+  - `Future<ApiReverseRecord> privateUsdReverseCancel({dbPath, network,
+    accountUuid, storeDir, mnemonicBytes, lightwalletdUrl, ethRpcUrl,
+    required int index})`.
+  - `Future<bool> privateUsdReverseCanRescue({network, accountUuid,
+    storeDir, ethRpcUrl, required int index})`: a chain read; no key, no
+    lock.
+  - `Future<ApiReverseRecord> privateUsdReverseRescue({dbPath, network,
+    accountUuid, storeDir, mnemonicBytes, ethRpcUrl, required int index})`.
+  - `Future<List<ApiReverseRecord>> privateUsdReverseRecords({required
+    String accountUuid, required String storeDir})`: the active record first
+    (a draft too), then the rest, newest first.
+  - `ApiReverseRecord { int index; String swapId; ApiReversePhase phase;
+    String amount; String? networkCost; BigInt depositZat; PlatformInt64
+    quoteExpiresAt, fundingDeadline, readyDeadline, refundAfter;
+    ApiReverseCost? cost; bool funded; String? fundingTx; bool
+    cancelRequested, settled, cancellable, awaitingUser; BigInt?
+    receiveEstimateZat, receiveFeeZat; String? receiveTxid; BigInt?
+    receivedZat; int receiveConfirmations; PlatformInt64? acceptedAt;
+    PlatformInt64 updatedAt }`. `ApiReverseCost { String debit, railgunFee,
+    broadcasterFee; PlatformInt64? feeExpiresAt }`. `receiveTxid` is internal
+    byte order (match history rows; show with `zcashDisplayTxidHex`);
+    `fundingTx` is the Ethereum hash. The "ZEC" figure is `receivedZat`, else
+    `receiveEstimateZat`, else `depositZat − 10,000` (reference §9.4 S4).
+  - `ApiActivity` now also reports `funding`, `readying`, `refunding`, and
+    `sweeping` for the reverse sweep home.
+- **For part 2: error codes and what the UI says.**
+  - `busy`: another step of the account runs (the per-account queue makes it
+    rare), or a conversion is under way (quote, go ahead).
+  - `quoteExpired`: the quote ran out (go ahead), or it is too late to fund
+    (funding request): quote again.
+  - `tooLate`: the maker's deadlines leave too little time (quote); the
+    conversion changed while the page proved (submit); too late to
+    authorize settlement; the escrow is open already; already settled, so no
+    refund (cancel: "This conversion has already settled…").
+  - `fundingCostChanged`: price it (cost request → page `reverseCost` → set
+    cost) before going ahead or paying; the proof's cost differs from the
+    reviewed one (the new cost is kept: show "The fees changed, so nothing
+    was paid…", the button "Pay {debit}"); the relayer's fee moved while
+    pricing, or after a refused funding (the cost is cleared: price again).
+  - `cancelled` (submit): the user called it off or the wallet locked while
+    the page proved: drop the proof silently. From an advance: a pause.
+  - `depositUnconfirmed`: "The market maker's ZEC isn't confirmed yet."
+  - `mismatch`: the page holds another Railgun wallet (funding request), the
+    proof does not match the request, or the maker's quote or proof does not
+    verify. `unavailable`: no maker or relayer sponsorship for conversions to
+    ZEC now. `relayerFee`: a fee above 2 USDC, or one leaving nothing.
+  - Advance returns `Err` only for `busy`, `cancelled`, a key or store
+    failure and "no such conversion" (`other`); a failed step is `Ok` with
+    `problem` (the §5.8 set, shown after a minute).
+- **For part 2: the engine loop.** For each account of
+  `privateUsdAccountsWithUnfinished` (reverse records past `quoted` count),
+  advance each reverse record that is under way (`phase` not `quoted`,
+  `complete`, `refunded` or `cancelled`) with a fresh `opId`; nap
+  `nextPollMs` (15 s under way, 0 once ended, 15 s after a failure). Never
+  advance a `quoted` draft. `needsYou` (= `awaitingUser`) drives the
+  "Conversion needs attention" banner. Nudge after accept, submit, ready,
+  cancel and rescue. Rescues are never sent by the loop.
+- **For part 2: the page calls and the funding orchestration** (§5.11
+  R2–R6). Pricing: `privateUsdReverseQuote` → page `reverseCost({amount,
+  railgun: railgunProxy, fee})` with its `costRequest` →
+  `privateUsdReverseSetCost(debit, railgunFee)`; review shows the record's
+  `cost`. "Convert": `privateUsdReverseGoAhead` → `privateUsdReverseAccept`
+  (stop on `tokensNeeded` or `nothingSent`) → spend guard `startConversion`
+  → `privateUsdReverseFundingRequest(railgunAddress: the page's address)`
+  (on `alreadyFunded` skip to an advance) → page `prepareReverse({amount,
+  railgun: railgunProxy, token, calls: [{to: callsTo[i], data: callsData[i]}]
+  × 3, relayAdapt, fee})`, showing its `proof` events (up to 10 min,
+  keep-awake) → only if still unlocked, in the foreground and in the same
+  engine epoch, `privateUsdReverseSubmitFunding(to, data, value, debit:
+  cost.debit, railgunFee: cost.railgunFee)`. Do not hold the account's
+  queue across the page proof: a cancel must be able to run meanwhile (the
+  submit then refuses). Rust holds the request in memory only: a lock
+  (`privateUsdClearSessions`) or a restart drops it, and "Pay {debit}"
+  proves again. An error after the submit kept the funding means the loop
+  resends the same bytes; never prove again while `funded`.
+- **For part 2: "Authorize settlement".** Enable it only in
+  `awaitingReady`, with `cancelRequested` false, until `readyDeadline −
+  120 s` (device clock; Rust checks the chain's). Rust signs `ready` only in
+  `privateUsdReverseAuthorizeReady`; a second tap or a restart sends the
+  kept one again. Cancel shows while `cancellable`: "Cancel conversion"
+  before any funding (`funded` false), else "Request private refund".
 
 ## M7. Private send and withdraw
 
@@ -1238,6 +1417,130 @@ the forward path runs without tokens (D-33).
   - The lifecycle's conversions backend exists only in builds with the
     define on the mobile form factor (const), so desktop never looks for
     conversions.
+- **D-70 (M6.1): the reverse engine as built.** Plan §3.6 and reference §5.7
+  and §5.10 updated.
+  - `reverse.rs` splits zapp's driver into `ReverseView` (no key: pricing,
+    going ahead, submitting a proof, the rescue check) and `Reverse` (keyed:
+    quote, accept, the funding request, advance, ready, cancel, rescue).
+    `ReverseZcash` is the Zcash seam; `WalletZcash` implements it beside
+    `ForwardZcash`, and its joint-account helpers (`import_joint`,
+    `synced_joint`, `joint_tx_status`, `sweep_home`, `broadcast_kept`,
+    `forget_joint`) now take the direction.
+  - The maker's `/v1/info` check, the pinned relayer check and the
+    acceptance are shared free functions in `forward.rs`; `MakerChecks` is
+    kept per network and direction, as reverse also needs `reverseEnabled`.
+  - zapp's `ReverseOutbox` defers posts until its record lock is released.
+    Here the per-account driver lock spans the post and `OPERATIONS` does
+    not: each step saves in one SQLite transaction, then posts. The
+    funding's answer is merged into the record as it is then
+    (`ReverseFundingSubmission`).
+  - `engine.rs` gains `Activity::{Funding, Readying, Refunding}` and the
+    funding sessions (D-72).
+- **D-71 (M6.1, M6.2): pricing is split around the page.** zapp's quote calls
+  the page's `reverseCost` itself; Rust cannot. `reverse_quote` keeps the
+  draft with no cost and returns the cost request (amount, Railgun proxy, and
+  the relayer's funding fee and expiry, within the 2 USDC cap); the new
+  `private_usd_reverse_cost_request` asks again. `set_cost` reads the
+  relayer's fee again and keeps the cost only if `debit = amount + fee +
+  railgun_fee` (the page's `fundingAmounts`): another fee is
+  `FundingCostChanged`, a cost that does not cover the escrow `Mismatch`.
+  Going ahead and the funding request need a priced record
+  (`FundingCostChanged`). After a relayer refused a funding and now asks a
+  higher fee, the dropped funding's cost is cleared for the page to price
+  (zapp prices it itself).
+- **D-72 (M6.1): the funding proof's round trip.** `funding_request` keeps a
+  `FundingSession` in memory (the record as signed, the fee and its expiry,
+  the relayer's Relay Adapt and calldata limit) under the lock session;
+  `submit_funding` takes it once. It refuses (`Cancelled`) when none is held,
+  as after a lock or a restart, or when the user called the conversion off;
+  `TooLate` when the record changed. The proof must go to that Relay Adapt
+  with no value, be well-formed calldata within the limit, and cost exactly
+  what the calls pay (`Mismatch`). A cost other than the reviewed one is kept
+  for review and `FundingCostChanged` (zapp).
+- **D-73 (M6.1): the page's wallet is checked at funding.** `funding_request`
+  takes the page's open address and refuses one other than the account's
+  (`Mismatch`, §3.5 item 19): the funding's refund note is the account's.
+- **D-74 (M6.1): reverse error mappings.** A quote whose ready deadline is too
+  near is `TooLate` (zapp `MISMATCH`); one whose refund is more than a day
+  out stays `Mismatch`. A maker without `reverseEnabled` and a relayer
+  without paid sponsorship are `Unavailable` (zapp `WRONG_DEPLOYMENT`,
+  `FUNDING_UNAVAILABLE`). zapp's `DEADLINE_PASSED`, `UNDER_WAY_ON_CHAIN` and
+  "already settled" are `TooLate`; a conversion not waiting on the user is
+  `Other` while a draft, else `TooLate`. A reverse amount must be whole cents
+  (a multiple of 10,000 base units, plan M6 trap), else `AmountUnquotable`
+  (`AmountRefused` over FRB).
+- **D-75 (M6.1): the maker's acceptance.** A refusal no other try would change
+  ends the conversion `CANCELLED` and is reported as `NothingSent`:
+  `unavailable` and `watchtowerUnavailable` as `MakerUnavailable`,
+  `unknownQuote` as `QuoteExpired`, `rejected`, `invalidRequest`,
+  `unknownSwap`, `notFound` and `methodNotAllowed` as `MakerRefused` (zapp
+  `MISMATCH`), another swap or other deadlines as `Mismatch`; `internal`,
+  `alreadySpent` and unknown codes are errors, posted again. A token-gate
+  refusal on the user's accept is `TokensNeeded` and leaves the record
+  unanswered (D-33); found by the loop resuming an interrupted accept, it
+  ends `CANCELLED`, as zapp's turned-down token does, since no client can
+  pay one before M4.
+- **D-76 (M6.1): a cancel waits for a funding post.** The driver lock spans
+  the post (up to the client's 180 s), so a cancel then gets `Busy` and
+  runs after it; zapp lets it interleave. A cancel while the page proves is
+  not held up (the proof is outside Rust), and the submit then refuses.
+- **D-77 (M6.1): the record's deployment.** A step refuses a record whose
+  chain, contract, token, Railgun proxy, maker, relayer or Zcash network is
+  not the build's pins (`WrongDeployment`). zapp compares the whole pinned
+  deployment; URLs, confirmations and the issuer may change between
+  versions, so they do not strand a conversion, and the current pins' URLs
+  are used.
+- **D-78 (M6.1): the sweep home.** It pays at most the reviewed
+  `receiveEstimate.feeZat` (without one, the forward refund's limit); the
+  estimate is `joint_receipts`' confirmed amount and `5000 × max(2, notes +
+  1)`. Send flow `private-usd-receive:{account}:{index}`. An earlier sweep
+  found again reports its amount and fee from `joint.db`
+  (`joint::sent_value_and_fee`; fee 0 when the wallet did not record it).
+- **D-79 (M6.2): the FRB surface as built.** Reference §8.2 updated.
+  - New: `private_usd_reverse_cost_request`. `private_usd_reverse_quote`
+    returns `ApiReverseQuote { record, cost_request }`.
+  - The calls that need no key take no `db_path` (D-32's rule): `set_cost`,
+    `go_ahead`, `submit_funding`, `can_rescue` and `cost_request` take
+    `network, account_uuid, store_dir` (and `eth_rpc_url` where the plan had
+    it); `reverse_records` takes `account_uuid, store_dir`.
+    `funding_request` takes no `lightwalletd_url` and adds
+    `railgun_address`; `rescue` takes no `lightwalletd_url`.
+  - `ApiReverseRecord` adds `network_cost`, `funded` and `awaiting_user`.
+  - Only the calls that write take the driver lock; `cost_request`,
+    `can_rescue` and `records` read.
+- **D-80 (M6): the tests as built.** Per the owner's scope change
+  (2026-10-14: fewer unit tests, more E2E), one test per M6 "Done when" rule
+  in `private_usd/tests/reverse.rs`, on the shared fakes (reverse escrow,
+  funding, maker and relayer paths, and `ReverseZcash` added to
+  `tests/fakes.rs`):
+  - `a_lost_funding_answer_is_sent_again_only_while_the_node_does_not_know_it`
+    (`ReverseFundingTest` 43 and 95, `ReverseSwapDriverTest` 183,
+    `ReverseSwapRefundTest` 171)
+  - `a_late_funding_answer_keeps_the_users_cancel` (`ReverseFundingTest` 24,
+    with `Busy` for a cancel during the post and a store-level cancel during
+    it for the merge; `ReverseSwapRefundTest` 370, the cancel during the
+    proof)
+  - `ready_is_signed_only_by_the_user_and_never_again_after_a_restart`
+    (`ReverseSwapDriverTest` 200, 215 and 382)
+  - `the_sweep_home_pays_no_more_than_the_reviewed_fee`
+    (`ReverseSwapRefundTest` 220, `ReverseSwapDriverTest` 47's receive)
+  - `the_refund_secret_is_revealed_only_under_a_fresh_lock_with_time_to_spare`
+    (`ReverseSwapDriverTest` 338, `ReverseSwapRevealTest` 13 and 33,
+    `ReverseSwapRefundTest` 202)
+  - `a_refund_is_rescued_only_from_a_vault_holding_more_than_the_fee`
+    (`ReverseSwapRevealTest` 46, `ReverseSwapRefundTest` 99 and 305)
+  - `open_reverse_calldata_matches_the_independent_encoding_and_zapps_roles`:
+    zapp has no hex fixture for `openReverse`, so the calls are compared byte
+    for byte with zecSwap's funding vector (`sdk-vector.json` at `d69e3fb`,
+    encoded by ethers with the contract's ABI; its signature also recovers
+    under zecswap-core's `OpenReverse` digest), now in `vectors.json` as
+    `reverseFunding`, plus zapp's `ReverseSwapRefundTest` 283 roles on a real
+    funding request. The three selectors joined the vector list.
+  - Not ported, per the scope change: `ReverseSwapDriverTest` 145 (partial
+    deposits never enable `ready`) and 359 (the refund after `ready` waits
+    for its deadline and turn), and `ReverseFundingTest` 64 (a funding that
+    landed during a timeout is followed, never sent again); 47 is covered
+    only from the receive on. The device rounds cover the rest.
 
 ## Blocked
 
