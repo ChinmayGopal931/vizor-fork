@@ -31,6 +31,7 @@ import '../widgetbook/donation_use_cases.dart';
 import '../widgetbook/mobile_pay_use_cases.dart';
 import '../widgetbook/mobile_gift_onboarding_use_cases.dart';
 import '../widgetbook/pay_use_cases.dart';
+import '../widgetbook/private_usd_use_cases.dart';
 import '../widgetbook/payment_link_mobile_use_cases.dart';
 import '../widgetbook/payment_link_amount_currency_use_cases.dart';
 import '../widgetbook/payment_link_use_cases.dart';
@@ -2155,6 +2156,83 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     id: 'mobile-home-default',
     description: 'Mobile home with deterministic balance and activity',
     builder: buildMobileHomeDefaultUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-home-private-usd',
+    description: 'Mobile home Private USD strip with a balance and its ZEC',
+    builder: buildMobileHomePrivateUsdUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-home-private-usd-unknown',
+    description: 'Mobile home Private USD strip before first use',
+    builder: buildMobileHomePrivateUsdUnknownUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-home-private-usd-loading',
+    description: 'Mobile home Private USD strip while loading',
+    builder: buildMobileHomePrivateUsdLoadingUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-home-private-usd-arriving',
+    description: 'Mobile home Private USD strip with dollars arriving',
+    builder: buildMobileHomePrivateUsdArrivingUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-home-private-usd-blocked',
+    description: 'Mobile home Private USD strip with refused funds',
+    builder: buildMobileHomePrivateUsdBlockedUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-home-private-usd-hidden',
+    description: 'Mobile home Private USD strip with balances hidden',
+    builder: buildMobileHomePrivateUsdHiddenUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-default',
+    description: 'Private USD screen with buckets and the receive address',
+    builder: buildMobilePrivateUsdDefaultUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-empty',
+    description: 'Private USD screen with no private dollars yet',
+    builder: buildMobilePrivateUsdEmptyUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-first-load',
+    description: 'Private USD screen during a first sync at 42%',
+    builder: buildMobilePrivateUsdFirstLoadUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-refresh-failed',
+    description: 'Private USD screen with the last known balance and an error',
+    builder: buildMobilePrivateUsdRefreshFailedUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-blocked',
+    description: 'Private USD screen with a screening refused row',
+    builder: buildMobilePrivateUsdBlockedUseCase,
     desktop: false,
     mobile: true,
   ),

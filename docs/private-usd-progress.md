@@ -177,13 +177,14 @@ the batched E2E round and the owner's go-ahead.
 - [x] M3.5 Dart, Railgun side (channel wrapper, models, engine, engine key store; D-20, D-23)
 - [x] M3.6 Dart, balance repository, cache and provider (D-19, D-21)
 - [x] M3.7 Availability (define, kill switch, `privateUsdAvailableProvider`, the X3 price gate; D-22)
-- [ ] M3.8 Home strip
-- [ ] M3.9 `/private-usd` route, guard and screen
-- [ ] M3.10 Lifecycle (no funds yet)
-- [ ] M3.11 Copy (Shared, Home, Private USD screen, Activity)
-- [ ] M3.12 Widgetbook and capture scenarios (home, `/private-usd`)
-- [ ] M3.13 Kotlin tests (`RailgunBoundaryTest`, `RailgunChannelTest`, `RailgunProtocolTest`)
-- [ ] M3 gate
+- [x] M3.8 Home strip (D-24)
+- [x] M3.9 `/private-usd` route, guard and screen (D-25)
+- [x] M3.10 Lifecycle (no funds yet) (D-26)
+- [x] M3.11 Copy (Shared, Home, Private USD screen, Activity) (D-27)
+- [x] M3.12 Widgetbook and capture scenarios (home, `/private-usd`) (D-28)
+- [x] M3.13 Kotlin tests (`RailgunBoundaryTest`, `RailgunChannelTest`, `RailgunProtocolTest`) (D-29)
+- [ ] M3.14 Device round (batched; Galaxy A35, Sepolia; the M3 Done-when device checks and the R8 release-build check)
+- [x] M3 gate: the unit essentials and every suite pass (status below); the device checks are M3.14, deferred
 
 M3 part 1 status (2026-10-13): M3.1–M3.4, the native layer, are done. Part 2
 (M3.5–M3.13: the Dart services, balance, availability, UI, copy, Widgetbook
@@ -275,6 +276,83 @@ and the Kotlin tests) is next; the M3 gate and its device checks wait for it.
   - The spike's device harness `lib/railgun_spike_main.dart` is not on this
     branch. Plan §10 keeps it as a debug entrypoint; it fits once
     `railgun_host_channel.dart` (M3.5) exists.
+
+M3 status (2026-10-13): done except M3.14, the device round, which is
+batched with the others (the M3 **Done when** device checks and the R8
+release-build check). Part 2a is `405bf700d` (M3.5–M3.7); part 2b is the
+commit that checks this note.
+
+- **What landed in part 2.**
+  - `lib/src/features/private_usd/`: the channel wrapper
+    (`services/railgun_host_channel.dart`), the page models
+    (`models/railgun_models.dart`), the engine wrapper
+    (`services/railgun_engine.dart`) and its key store, the balance model,
+    cache and repository helpers, `private_usd_copy.dart`, the home strip
+    (`widgets/mobile/private_usd_home_strip.dart`), the info sheet, and
+    `screens/mobile/mobile_private_usd_screen.dart`.
+  - Providers: `privateUsdAvailableProvider` (with the deployment
+    providers), `railgunEngineProvider` and `railgunEngineStateProvider`,
+    `privateUsdBalanceProvider(uuid)` and
+    `privateUsdBalanceKeepFreshProvider((uuid, ifUsed))`,
+    `privateUsdReceiveAddressProvider(uuid)`, and the kill switch
+    `privateUsdKillSwitchProvider` in
+    `lib/src/core/config/private_usd_feature_config.dart`;
+    `lib/src/providers/private_usd_lifecycle_provider.dart` is the fence.
+  - Wiring: the `/private-usd` route and its redirect, the strip in the home
+    balance card, the X3 price gate, the account-deletion and reset drains
+    and cleanups, the Railgun key's rotation with the password.
+  - `ApiDeployment.usd_tokens` (bindings regenerated; the rustc 1.93 noise
+    reverted as in M1).
+  - Widgetbook entries (Home and a new Private USD folder), 11 capture
+    scenarios, the three Kotlin tests, and the debug harness
+    `lib/railgun_spike_main.dart`.
+- **Tests.**
+  - Rust: the first gate run of `cd rust && cargo test` hit the known Gift
+    Card isolation gap once:
+    `gift_card_input::tests::recovery::observed_mining_and_conflicting_spends_never_relay_or_unlock_funding`
+    failed with "network: network privacy blocked lightwalletd: Tor
+    connection failed" (lib 1458 passed, 1 failed, 11 ignored). Alone it
+    passed (1 passed), and the next full run passed: lib 1459 passed, 0
+    failed, 11 ignored; integration 6 passed, 21 ignored (regtest). An
+    earlier run in this part failed its neighbour
+    `observer_and_configured_endpoint_disagreement_does_not_recover_receipts`
+    the same way ("tip changed" assertion); alone it passed too. M3 part 2
+    adds no Rust tests (one pin moved).
+  - Dart: `fvm flutter analyze` finds no issues. `fvm flutter test`
+    (desktop lane): 5926 passed, 160 skipped, 4 failed, the 4 pre-existing
+    failures in `settings_seed_phrase_screen_test.dart` (the `AppButton`
+    "Enter amount" finder at test line 159). The 30 new tests: page-model
+    parsing (9, zapp's `RailgunSessionTest` cases and the events), bucket
+    mapping, formatting and the cache (6), the availability matrix (2), the
+    engine's open order, address refusal, interruption and drain (4), and
+    the kill switch, its last-known fallback and the keyed RPC host check
+    (9); the password-rotation test also covers the Railgun key.
+  - Mobile lane (`--tags mobile --run-skipped
+    --dart-define=VIZOR_FORM_FACTOR=mobile`): 2242 passed, 10 failed. All 10
+    are pre-existing, in `test/core/feedback/app_review_payment_handoff_test.dart`
+    ("Edit"/"Review" × 5: the finder for that button finds nothing); the same
+    file fails the same 10 at `fcca09a9c`, before any part-2 change. New: 7
+    strip and 7 screen tests, and the 11 scenarios in
+    `figma_compare_mobile_scenarios_test.dart`.
+  - After the gate, a zero balance stopped showing "≈ 0 ZEC"; analyze, the
+    Private USD tests in both lanes and the mobile scenario test were run
+    again and pass (desktop 21 passed, 2 skipped; mobile 274 passed).
+  - Kotlin: `cd android && ./gradlew :app:testDebugUnitTest --tests
+    'com.keplr.vizor.railgun.*'`: BUILD SUCCESSFUL; `RailgunBoundaryTest` 4,
+    `RailgunChannelTest` 7, `RailgunProtocolTest` 10, no failures. A dry run
+    first showed no cargokit or native-lib task. No main Kotlin changed, so
+    `compileDebugKotlin` was not re-run beyond what the test task compiles.
+  - Captures: all 11 scenarios rendered with `scripts/figma-compare.sh
+    widget --form-factor mobile` in both themes and were reviewed.
+- **For M3.14 (the device round).** Build with
+  `--dart-define=VIZOR_PRIVATE_USD_ENABLED=true` on testnet. Check that the
+  strip shows "—" and no WebView process starts before first use; that
+  `/private-usd` shows the first-sync percentage and then the balance, with
+  the address equal to Rust's; that the strip is hidden on regtest, for
+  Keystone and Ledger accounts, and with the kill switch false; Tor on means
+  no direct sockets (`scripts/private-usd/check_sockets.py`); lock closes the
+  page and stops the bridge (no loopback listener left); and a release build
+  (R8) loads the page.
 
 ## M4. Privacy Pass tokens and attestation
 
@@ -608,6 +686,82 @@ and the Kotlin tests) is next; the M3 gate and its device checks wait for it.
   - The mnemonic is held only until `openWallet` is sent; the mnemonic bytes
     are zeroed as soon as both Rust derivations have started (they copy them
     as they start, as `swap_deposit_sender.dart` relies on).
+- **D-24 (M3.8): the home strip as built.** `PrivateUsdHomeStrip` in
+  `widgets/mobile/private_usd_home_strip.dart`, passed to `_BalanceCard`
+  through its new optional `privateUsdStrip`, under the transparent row:
+  - Two columns: "Private USD" and the `≈ Y ZEC` worth on the left; the
+    headline amount and the one detail that needs saying on the right
+    (refused funds first, as "$Z needs attention" in the danger colour,
+    else "+$Y arriving" in the positive colour), then a chevron. One line
+    each did not fit 393 px with both the worth and an arriving amount.
+  - It uses `AppTypography.labelMedium` and `bodyExtraSmall`: the home's
+    label style is private to `mobile_home_screen.dart`. `AppIcons.moneyBag`
+    stands in for the E10 artwork.
+  - Hidden balances mask the amounts and drop the worth. Its semantics are
+    one button, "Open private USD", whose value reads the amounts ("Needs
+    attention: $X" while refused).
+- **D-25 (M3.9): the Private USD screen as built.** `MobilePrivateUsdScreen`
+  wraps `MobilePrivateUsdView`, which Widgetbook and tests build directly.
+  It has the total card (headline, `≈ ZEC`, the status line, a refresh
+  button, the error line), the buckets card, Assets only when more than one
+  dollar token is held, the empty state when the total is 0, the receive
+  address card (the plain clipboard: the address is not sensitive; new copy
+  "Address copied"), the Activity heading with its empty state, and the info
+  sheet. Not in M3: Convert, Send and Withdraw (M5, M7), the banner and the
+  guard's conversion exception (M5), the Refunds button (M6), the spending
+  note (M7). The empty state does not yet check for a conversion under way
+  (M5).
+- **D-26 (M3.10): the lifecycle as built.**
+  - Lock, account switch and route change are listeners in
+    `railgunEngineProvider`; they close the page and stop the bridge. Hiding
+    the app stops balance polling and leaves the page to its idle close.
+  - The engine registers its drain, resume and page wipe with
+    `privateUsdLifecycleProvider`, which `removeAccount` and `resetWallet`
+    drain after the Gift Card claims and resume with them.
+  - After the Rust delete, `removeAccount` calls
+    `deletePrivateUsdAccountData` (the engine key and the balance cache);
+    without `deleteWallet` (E5) the page's stored wallet stays, unreadable
+    without its key.
+  - Once the wallet DB is gone, `resetWallet` calls `wipeRailgunPage()` (the
+    engine's wipe, or the channel's when this run built no engine; a
+    platform without the host has nothing to wipe), then
+    `deletePrivateUsdDirectories()` and `deletePrivateUsdTokenStores()`.
+    Either failure is a reset error, like the claim-DB cleanup, so a retry
+    finishes it. `deleteAll()` takes the engine keys and balance caches.
+  - `private_usd_paths.dart` is not built yet: `wallet_paths.dart` gained
+    `getPrivateUsdDirPath`, `getPrivateUsdTokenStorePath`,
+    `deletePrivateUsdDirectories` and `deletePrivateUsdTokenStores`, and the
+    wrapper waits for its first caller (M4, M5).
+- **D-27 (M3.11): the copy file.** `PrivateUsdCopy`, an
+  `abstract final class` of consts and builders, with zapp's key on each.
+  Two strings are new: the "Address copied" toast and the info sheet's
+  "Close". `privateUsdErrorMessage` comes with the M5 error tables.
+- **D-28 (M3.12): Widgetbook and capture scenarios cover what M3 shows.**
+  Home: the strip with a balance, not used yet, loading, arriving, refused
+  and hidden. Screen: default, empty, first load at 42 %, refresh failed and
+  refused (plus hidden in Widgetbook). The converting and attention banners
+  wait for M5, payment-pending for M7, and tor-unavailable is moot (D-22).
+  Checked with `scripts/figma-compare.sh widget --form-factor mobile` in
+  both themes. Reference §9.7 updated.
+- **D-29 (M3.13): the Kotlin tests as built.** `RailgunBoundaryTest` runs on
+  the plain JVM; `RailgunChannelTest` and `RailgunProtocolTest` run on
+  Robolectric SDK 34, the only android-all jar cached here (no new test
+  dependencies were needed). The cases are zapp's over raw JSON strings,
+  with `Message.Event(name, raw)` and the timeout message naming the wire
+  method. Added: params must be one JSON object and are spliced unparsed (a
+  large number keeps every digit), the page's `INIT` equals
+  `RailgunProtocol.INIT`, and `openNewWallet` is not exposed. Moved out:
+  scan-data decoding (Dart's `RailgunEvent.decode`) and the `RailgunAddress`
+  checksum tests (Rust's `is_valid_railgun_address`). The
+  `RailgunSessionTest` parsing cases are in Dart
+  (`test/features/private_usd/railgun_models_test.dart`).
+- **D-30: the device harness.** `lib/railgun_spike_main.dart` keeps its spike
+  name and modes and now drives `RailgunHostChannel` and the page models.
+  It does not use `RailgunEngine`, whose address check needs an
+  account-derived address; the harness opens a throwaway or given Railgun
+  mnemonic. Debug builds only (a release build shows a notice and does
+  nothing); it prints the public address, the fee, bucket names and page
+  lines with keyed URLs redacted, never params or amounts.
 
 ## Blocked
 

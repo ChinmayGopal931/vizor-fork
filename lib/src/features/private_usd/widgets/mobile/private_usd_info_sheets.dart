@@ -1,0 +1,87 @@
+import 'package:flutter/widgets.dart';
+
+import '../../../../core/layout/mobile/app_mobile_sheet.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_button.dart';
+import '../../private_usd_copy.dart';
+
+/// "About private USD" (zapp's info sheet on the Private USD screen): what
+/// each action does, then the notes on screening, privacy and keeping Vizor
+/// open. [screening] is the deployment's screening time.
+Future<void> showPrivateUsdInfoSheet(
+  BuildContext context, {
+  required Duration screening,
+}) {
+  return showAppMobileSheet<void>(
+    context: context,
+    builder: (sheetContext) => PrivateUsdInfoSheetBody(
+      screening: screening,
+      onClose: () => Navigator.of(sheetContext).pop(),
+    ),
+  );
+}
+
+class PrivateUsdInfoSheetBody extends StatelessWidget {
+  const PrivateUsdInfoSheetBody({
+    required this.screening,
+    required this.onClose,
+    super.key,
+  });
+
+  final Duration screening;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final body = AppTypography.bodyMedium.copyWith(color: colors.text.primary);
+    final note = AppTypography.bodySmall.copyWith(color: colors.text.secondary);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.sm,
+        AppSpacing.base,
+        AppSpacing.sm,
+        AppSpacing.base,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            PrivateUsdCopy.infoTitle,
+            style: AppTypography.headlineSmall.copyWith(
+              color: colors.text.accent,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s),
+          for (final step in const [
+            PrivateUsdCopy.infoConvert,
+            PrivateUsdCopy.infoReceive,
+            PrivateUsdCopy.infoSend,
+            PrivateUsdCopy.infoWithdraw,
+            PrivateUsdCopy.infoRefunds,
+          ]) ...[
+            Text(step, style: body),
+            const SizedBox(height: AppSpacing.xs),
+          ],
+          const SizedBox(height: AppSpacing.xs),
+          for (final line in [
+            PrivateUsdCopy.infoScreening(PrivateUsdCopy.about(screening)),
+            PrivateUsdCopy.infoPrivate,
+            PrivateUsdCopy.infoKeepOpen,
+          ]) ...[
+            Text(line, style: note),
+            const SizedBox(height: AppSpacing.xxs),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          AppButton(
+            variant: AppButtonVariant.secondary,
+            expand: true,
+            onPressed: onClose,
+            child: const Text(PrivateUsdCopy.close),
+          ),
+        ],
+      ),
+    );
+  }
+}

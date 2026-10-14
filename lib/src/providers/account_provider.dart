@@ -24,6 +24,7 @@ import '../core/storage/app_secure_store.dart';
 import '../core/storage/linux_keyring_coordinator.dart';
 import '../core/storage/wallet_paths.dart';
 import '../features/payment_links/providers/gift_card_tracking_lifecycle_provider.dart';
+import '../features/private_usd/services/private_usd_account_data.dart';
 import '../features/swap/providers/swap_activity_store.dart';
 import '../features/migration/services/ironwood_migration_background_credential_store.dart';
 import '../features/migration/services/ironwood_migration_operation_registry.dart';
@@ -38,6 +39,7 @@ import '../rust/api/wallet.dart' as rust_wallet;
 import 'account_models.dart';
 import 'app_security_provider.dart';
 import 'enhance_pir_provider.dart';
+import 'private_usd_lifecycle_provider.dart';
 import 'public_details_loads_provider.dart';
 import 'network_privacy_provider.dart';
 import 'rpc_endpoint_failover_provider.dart';
@@ -1651,6 +1653,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
     final shareTracking = ref.read(votingShareTrackingRegistryProvider);
     final ledgerLifecycle = ref.read(ledgerOperationLifecycleProvider);
     final publicLoads = ref.read(publicDetailsLoadsProvider);
+    final privateUsd = ref.read(privateUsdLifecycleProvider);
     try {
       await ledgerLifecycle.quiesceAndDrain();
       await publicLoads.quiesceAndDrain();
@@ -1665,6 +1668,9 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
       // deletion. The pause holds until the wallet rows are gone.
       await giftTracking.quiesceAndDrain();
       await claimLifecycle.quiesceAndDrain();
+      // The Railgun page holds an account's wallet: it closes before any
+      // account data goes.
+      await privateUsd.quiesceAndDrain();
       await shareTracking.quiesceAndDrain(accountUuid: uuid);
       await _throwIfUnsharedGiftCardsIncreased([
         uuid,
@@ -1674,6 +1680,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
       ledgerLifecycle.resume();
       publicLoads.resume();
       claimLifecycle.resume();
+      privateUsd.resume();
       giftTracking.resume();
       shareTracking.resume(accountUuid: uuid);
       shareTracking.requestRestore();
@@ -1761,6 +1768,16 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
           .read(swapActivityStoreProvider)
           .deleteForAccount(accountUuid: uuid);
     } catch (_) {}
+    // Its Railgun engine key and balance cache; the page's stored wallet
+    // stays encrypted under the deleted key until a reset (no `deleteWallet`
+    // in the bundle yet, E5).
+    try {
+      await deletePrivateUsdAccountData(_storage, uuid);
+    } catch (e, st) {
+      log(
+        'removeAccount: failed to delete Private USD data for $uuid: $e\n$st',
+      );
+    }
     // Only after the Rust delete, which also drops this account's Ledger
     // outbox: a checkpointed draft must never lose its secret while its
     // signed transaction can still be broadcast.
@@ -1878,6 +1895,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
     final shareTracking = ref.read(votingShareTrackingRegistryProvider);
     final ledgerLifecycle = ref.read(ledgerOperationLifecycleProvider);
     final publicLoads = ref.read(publicDetailsLoadsProvider);
+    final privateUsd = ref.read(privateUsdLifecycleProvider);
     var restoreAfterFailure = false;
     var resumeClaimLifecycle = false;
     var resetCompleted = false;
@@ -1887,6 +1905,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
       _storage.invalidatePendingSecretOperations();
       await giftTracking.quiesceAndDrain();
       await claimLifecycle.quiesceAndDrain();
+      await privateUsd.quiesceAndDrain();
       await shareTracking.quiesceAndDrain();
       await _throwIfUnsharedGiftCardsIncreased([
         for (final account in state.value?.accounts ?? const <AccountInfo>[])
@@ -1902,7 +1921,10 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
     } finally {
       ledgerLifecycle.resume();
       publicLoads.resume();
-      if (resumeClaimLifecycle) claimLifecycle.resume();
+      if (resumeClaimLifecycle) {
+        claimLifecycle.resume();
+        privateUsd.resume();
+      }
       // Release only after all destructive work has finished. New onboarding
       // reuses this registry; stale registrations re-read the now-empty store.
       if (resetCompleted || restoreAfterFailure) giftTracking.resume();
@@ -2053,6 +2075,21 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         await deleteGiftCardTrackingDirectories();
       } catch (e, st) {
         recordError('gift-card observer db cleanup', e, st);
+      }
+      // Every account's Railgun wallet and scan cache in the page's storage,
+      // the swap records and joint accounts, and the device-wide token
+      // stores (X4). The secure-storage wipe below takes the engine keys and
+      // balance caches.
+      try {
+        await ref.read(privateUsdLifecycleProvider).wipeRailgunPage();
+      } catch (e, st) {
+        recordError('private USD page wipe', e, st);
+      }
+      try {
+        await deletePrivateUsdDirectories();
+        await deletePrivateUsdTokenStores();
+      } catch (e, st) {
+        recordError('private USD storage cleanup', e, st);
       }
       try {
         // The wallet's own companions went with it. No wallet is current

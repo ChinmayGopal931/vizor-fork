@@ -206,12 +206,17 @@ String formatPrivateUsd(BigInt microDollars) {
 }
 
 /// The indicative zatoshi worth of [microDollars] at [zecUsdPrice], or null
-/// without a usable price. Display only: never an amount to spend.
+/// without a usable price or with nothing to price (callers then hide the
+/// line, as `fiatTextForZatoshi` does). Display only: never an amount to
+/// spend.
 BigInt? privateUsdZecEquivalentZatoshi(
   BigInt microDollars, {
   required double? zecUsdPrice,
 }) {
-  if (zecUsdPrice == null || !zecUsdPrice.isFinite || zecUsdPrice <= 0) {
+  if (microDollars <= BigInt.zero ||
+      zecUsdPrice == null ||
+      !zecUsdPrice.isFinite ||
+      zecUsdPrice <= 0) {
     return null;
   }
   final zec = microDollars.toDouble() / 1e6 / zecUsdPrice;

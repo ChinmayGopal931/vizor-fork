@@ -84,6 +84,10 @@ void main() {
       privateUsdZecEquivalentZatoshi(BigInt.from(50000000), zecUsdPrice: 0),
       isNull,
     );
+    expect(
+      privateUsdZecEquivalentZatoshi(BigInt.zero, zecUsdPrice: 50),
+      isNull,
+    );
   });
 
   test('the cache keeps positive amounts and drops what it cannot read', () {

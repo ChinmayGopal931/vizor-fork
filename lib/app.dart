@@ -97,6 +97,7 @@ import 'src/features/payment_links/providers/payment_link_intake_provider.dart';
 import 'src/features/payment_links/providers/gift_claim_flow_provider.dart';
 import 'src/features/payment_links/screens/gift_claim_screen.dart';
 import 'src/features/payment_links/screens/desktop_payment_link_scan_screen.dart';
+import 'src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'src/features/send/screens/payment_request_scan_screen.dart';
 import 'src/features/payment_links/screens/desktop_gift_password_screen.dart';
 import 'src/features/payment_links/screens/desktop_gift_customise_screen.dart';
@@ -551,6 +552,9 @@ final _routerProvider = Provider<_AppRouter>((ref) {
   ref.listen(swapFeatureEnabledProvider, (_, _) {
     refresh.requestRefresh();
   });
+  ref.listen(privateUsdAvailableProvider, (_, _) {
+    refresh.requestRefresh();
+  });
   log('router: initialized');
 
   final navigatorKey = GlobalKey<NavigatorState>();
@@ -679,6 +683,10 @@ String? appRedirect({
       _isRouteOrChild(state.matchedLocation, '/pay') ||
       _isRouteOrChild(state.matchedLocation, '/activity/swap');
   final swapFeatureEnabled = ref.read(swapFeatureEnabledProvider);
+  // Hardware accounts, accounts without a ZIP-32 index, networks without a
+  // deployment and the kill switch all leave it unavailable. (M5 exempts a
+  // conversion still under way, whose progress must stay reachable.)
+  final isPrivateUsd = _isRouteOrChild(state.matchedLocation, '/private-usd');
 
   log(
     'router redirect: location=${state.matchedLocation}, hasWallet=$hasWallet, '
@@ -727,6 +735,7 @@ String? appRedirect({
     return requiresUnlock ? '/unlock' : '/home';
   }
   if (!swapFeatureEnabled && isSwap) return '/home';
+  if (isPrivateUsd && !ref.read(privateUsdAvailableProvider)) return '/home';
   return null;
 }
 

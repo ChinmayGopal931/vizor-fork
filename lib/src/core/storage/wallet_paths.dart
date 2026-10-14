@@ -180,3 +180,62 @@ Future<void> deleteGiftCardTrackingDirectories() async {
     }
   }
 }
+
+const _privateUsdPrefix = 'private_usd_';
+const _privateUsdTokenStorePrefix = 'private_usd_tokens_';
+
+/// Private USD's `swaps.db` and `joint.db` directory for one wallet and
+/// network (plan §3.4): `<support>/private_usd_<walletDbName>_<network>`.
+Future<String> getPrivateUsdDirPath(String network) async {
+  if (!RegExp(r'^[a-z0-9]+$').hasMatch(network)) {
+    throw ArgumentError.value(network, 'network');
+  }
+  final support = await getWalletSupportDirectory();
+  final walletName = await getWalletDbName();
+  final directory = Directory(
+    '${support.path}${Platform.pathSeparator}$_privateUsdPrefix${walletName}_$network',
+  );
+  await directory.create(recursive: true);
+  return directory.path;
+}
+
+/// The device-wide Privacy Pass token store for [network] (M4), written
+/// atomically through a temporary file beside it.
+Future<String> getPrivateUsdTokenStorePath(String network) async {
+  if (!RegExp(r'^[a-z0-9]+$').hasMatch(network)) {
+    throw ArgumentError.value(network, 'network');
+  }
+  final support = await getWalletSupportDirectory();
+  return '${support.path}${Platform.pathSeparator}'
+      '$_privateUsdTokenStorePrefix$network.json';
+}
+
+/// Removes every wallet's Private USD directory (swap records and joint
+/// accounts), for a full reset.
+Future<void> deletePrivateUsdDirectories() async {
+  final support = await getWalletSupportDirectory();
+  await for (final entity in support.list(followLinks: false)) {
+    if (entity is Directory &&
+        entity.path
+            .split(Platform.pathSeparator)
+            .last
+            .startsWith(_privateUsdPrefix)) {
+      await entity.delete(recursive: true);
+    }
+  }
+}
+
+/// Removes the device-wide token stores and their temporary files, for a
+/// full reset (X4). The Keystore attestation key stays.
+Future<void> deletePrivateUsdTokenStores() async {
+  final support = await getWalletSupportDirectory();
+  await for (final entity in support.list(followLinks: false)) {
+    if (entity is File &&
+        entity.path
+            .split(Platform.pathSeparator)
+            .last
+            .startsWith(_privateUsdTokenStorePrefix)) {
+      await entity.delete();
+    }
+  }
+}

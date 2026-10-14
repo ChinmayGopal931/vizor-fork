@@ -1790,7 +1790,7 @@ The progress route carries its key in the path (not `extra`), so a cold start, t
 **Dart feature tree** (`lib/src/features/private_usd/`; signature level, milestone in brackets):
 
 ```text
-private_usd_copy.dart                       [M3+] const strings + privateUsdErrorMessage(ApiPrivateUsdErrorCode) (§9.6)
+private_usd_copy.dart                       [M3+] abstract final class PrivateUsdCopy: const strings and builders (§9.6); privateUsdErrorMessage(ApiPrivateUsdErrorCode) with the M5 error tables
 models/
   railgun_models.dart                       [M3] typed page requests/results (§6.2)
   private_usd_record_key.dart               [M5] class PrivateUsdRecordKey {String accountUuid; PrivateUsdDirection direction; int index} (==, hashCode); class PrivateUsdRoutePath {direction; index; static tryParse(Map<String,String>)}
@@ -1799,7 +1799,8 @@ services/
   railgun_host_channel.dart, railgun_engine.dart, railgun_engine_key_store.dart       [M3]
   private_usd_balance_repository.dart, private_usd_balance_cache.dart                 [M3]
   private_usd_attestation.dart, private_usd_tokens_service.dart                       [M4]
-  private_usd_paths.dart                    [M3] storeDir(network), tokensPath(network) over wallet_paths.dart
+  private_usd_paths.dart                    [M4/M5] storeDir(network), tokensPath(network) over wallet_paths.dart; M3 added getPrivateUsdDirPath, getPrivateUsdTokenStorePath, deletePrivateUsdDirectories and deletePrivateUsdTokenStores there (D-26)
+  private_usd_account_data.dart             [M3] deletePrivateUsdAccountData(storage, uuid): the engine key and the balance cache
   private_usd_engine.dart                   [M5] class PrivateUsdEngine {
                                                 start(); pause(PauseReason); resume(); nudge();
                                                 Future<T> runFor<T>(String accountUuid, Future<T> Function(int opId, Uint8List mnemonic) step); // serial per account, zeroes bytes, epoch-checked
@@ -1812,7 +1813,7 @@ providers/
   private_usd_available_provider.dart       [M3] Provider<bool> privateUsdAvailableProvider (+ privateUsdAvailableFor, the deployment providers); no privateUsdTorBlockedProvider: D4 passed (D-22)
   private_usd_balance_provider.dart         [M3] NotifierProvider.autoDispose.family<…, PrivateUsdBalanceState, String /*uuid*/>, plus privateUsdBalanceKeepFreshProvider((accountUuid, ifUsed)) that polls while watched (D-21)
   railgun_engine_provider.dart              [M3] railgunEngineProvider (kept alive; registers with privateUsdLifecycleProvider; closes on lock, account switch, route change), railgunEngineStateProvider, RustRailgunWalletSource
-  private_usd_receive_address_provider.dart [M3] FutureProvider.family<String, String>
+  private_usd_receive_address_provider.dart [M3] FutureProvider.autoDispose.family<String, String> (Rust-derived; unlocked only)
   private_usd_engine_provider.dart          [M5] Provider<PrivateUsdEngine> (keepAlive; registers with privateUsdLifecycleProvider)
   private_usd_unfinished_provider.dart      [M5] NotifierProvider<…, Set<PrivateUsdRecordKey>> (sync; the router reads it)
   private_usd_conversion_provider.dart      [M5] NotifierProvider.family<…, PrivateUsdConversionState, PrivateUsdRecordKey>
@@ -1827,7 +1828,7 @@ providers/
   private_usd_spend_status_provider.dart    [M7] StreamProvider.family<PrivateUsdSpendStatus, String>
 screens/mobile/  mobile_private_usd_{,convert_,convert_review_,conversion_,refunds_,send_,send_review_,send_status_}screen.dart
 widgets/mobile/  private_usd_home_strip.dart, private_usd_banner.dart, private_usd_amount_step.dart, private_usd_info_sheets.dart, private_usd_confirm_sheets.dart
-lib/src/providers/private_usd_lifecycle_provider.dart   [M5] run / cancel / quiesceAndDrain / resume (PublicDetailsLoads shape)
+lib/src/providers/private_usd_lifecycle_provider.dart   [M3] register / quiesceAndDrain / resume (GiftCardTrackingLifecycle shape, several owners) + wipeRailgunPage for a reset; M5 registers the swap engine (run / cancel)
 lib/src/core/widgets/mobile/private_usd_engine_host.dart [M5] ConsumerStatefulWidget; watches privateUsdEngineProvider when available; AppLifecycleListener → engine.pause/resume
 ```
 
@@ -2504,6 +2505,8 @@ All of them use deterministic fakes: provider overrides with fixed balances, rec
 ```bash
 scripts/figma-compare.sh widget --form-factor mobile --scenario <id> --theme dark
 ```
+
+As built in M3 (D-28): the six `mobile-home-private-usd*` strip scenarios without the two banners, and `mobile-private-usd-{default,empty,first-load,refresh-failed,blocked}`. The fixtures live in `lib/widgetbook/private_usd_use_cases.dart`; the home ones pass `privateUsdBalance` (and `privacyModeEnabled`) to `_buildMobileHomeUseCase`. The banners arrive with M5, `payment-pending` with M7, and `tor-unavailable` is moot (D-22). The default screen has no activity rows until M5 and M7.
 
 | Scenario id | State |
 |---|---|

@@ -12,6 +12,10 @@ import 'package:flutter/material.dart' show ThemeMode, MaterialApp, Material;
 import 'package:flutter/widgets.dart';
 import '../src/providers/voting/voting_home_entry_provider.dart';
 import '../src/features/payment_links/models/vizor_payment_link.dart';
+import '../src/features/private_usd/providers/private_usd_available_provider.dart';
+import '../src/features/private_usd/providers/private_usd_balance_provider.dart';
+import '../src/features/private_usd/services/private_usd_balance_repository.dart';
+import 'private_usd_use_cases.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
     as frb;
@@ -1662,6 +1666,50 @@ Widget buildMobileHomeDefaultUseCase(
     ),
   );
 }
+
+Widget _buildMobileHomePrivateUsdUseCase(
+  PrivateUsdBalanceState balance, {
+  bool privacyModeEnabled = false,
+}) {
+  return _buildMobileHomeUseCase(
+    accountState: _accountsDesignState,
+    syncState: _homeSyncedState(
+      orchardBalance: BigInt.from(14312000000),
+      recentTransactions: [_homeTx(1), _homeTx(2)],
+    ),
+    privateUsdBalance: balance,
+    privacyModeEnabled: privacyModeEnabled,
+  );
+}
+
+/// Home with the Private USD strip: the balance and its `≈ ZEC` worth.
+Widget buildMobileHomePrivateUsdUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(
+      previewPrivateUsdBalance(available: 1250.4),
+    );
+
+/// Not used yet: "—", and no page starts.
+Widget buildMobileHomePrivateUsdUnknownUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(previewPrivateUsdUnknown);
+
+Widget buildMobileHomePrivateUsdLoadingUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(previewPrivateUsdLoading);
+
+Widget buildMobileHomePrivateUsdArrivingUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(
+      previewPrivateUsdBalance(available: 1250.4, arriving: 200),
+    );
+
+Widget buildMobileHomePrivateUsdBlockedUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(
+      previewPrivateUsdBalance(available: 80, blocked: 25),
+    );
+
+Widget buildMobileHomePrivateUsdHiddenUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(
+      previewPrivateUsdBalance(available: 1250.4, arriving: 200),
+      privacyModeEnabled: true,
+    );
 
 Widget buildMobileHomeGiftCardsUseCase(BuildContext context) {
   final transactions = _previewGiftCardActivityTransactions();
@@ -3330,6 +3378,8 @@ Widget _buildMobileHomeUseCase({
   bool constrainToPreviewFrame = true,
   GiftCardActivityIndex giftCardActivityIndex = GiftCardActivityIndex.empty,
   NetworkPrivacyState? networkPrivacyState,
+  PrivateUsdBalanceState? privateUsdBalance,
+  bool privacyModeEnabled = false,
 }) {
   final harness = _MobileHomeHarness(
     initialLocation: initialLocation,
@@ -3348,7 +3398,16 @@ Widget _buildMobileHomeUseCase({
         networkPrivacyProvider.overrideWith(
           () => _PreviewNetworkPrivacyNotifier(networkPrivacyState),
         ),
-      appBootstrapProvider.overrideWithValue(_homeBootstrap(accountState)),
+      appBootstrapProvider.overrideWithValue(
+        _homeBootstrap(accountState, privacyModeEnabled: privacyModeEnabled),
+      ),
+      // Private USD with a fixed balance: no page, Rust or network.
+      if (privateUsdBalance != null) ...[
+        privateUsdAvailableProvider.overrideWithValue(true),
+        privateUsdBalanceProvider.overrideWith2(
+          (uuid) => FixedPrivateUsdBalanceNotifier(uuid, privateUsdBalance),
+        ),
+      ],
       if (!inheritWalletState)
         accountProvider.overrideWith(
           () => setupPreview
@@ -4168,6 +4227,11 @@ class _MobileHomeHarnessState extends State<_MobileHomeHarness> {
           path: '/add-account',
           builder: (_, _) =>
               const _PreviewRoutePlaceholder(label: '/add-account'),
+        ),
+        GoRoute(
+          path: '/private-usd',
+          builder: (_, _) =>
+              const _PreviewRoutePlaceholder(label: '/private-usd'),
         ),
       ],
     );
@@ -5215,7 +5279,10 @@ AppBootstrapState _utilityBootstrap(
   );
 }
 
-AppBootstrapState _homeBootstrap(AccountState accountState) {
+AppBootstrapState _homeBootstrap(
+  AccountState accountState, {
+  bool privacyModeEnabled = false,
+}) {
   return AppBootstrapState(
     initialLocation: '/home',
     initialAccountState: accountState,
@@ -5223,7 +5290,7 @@ AppBootstrapState _homeBootstrap(AccountState accountState) {
     network: 'main',
     rpcEndpointConfig: defaultRpcEndpointConfig('main'),
     themeMode: ThemeMode.system,
-    privacyModeEnabled: false,
+    privacyModeEnabled: privacyModeEnabled,
     isPasswordConfigured: true,
     isUnlocked: true,
     passwordRotationRecoveryFailed: false,

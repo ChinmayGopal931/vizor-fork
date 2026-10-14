@@ -31,6 +31,7 @@ import 'payment_link_mobile_use_cases.dart';
 import 'payment_link_amount_currency_use_cases.dart';
 import 'payment_link_claim_outcome_use_cases.dart';
 import 'payment_link_use_cases.dart';
+import 'private_usd_use_cases.dart';
 import 'receive_use_cases.dart';
 import 'received_receipt_use_cases.dart';
 import 'review_components_use_cases.dart';
@@ -543,6 +544,30 @@ class WidgetbookApp extends StatelessWidget {
                       name: 'Accounts modal',
                       builder: buildMobileHomeAccountsModalUseCase,
                     ),
+                    WidgetbookUseCase(
+                      name: 'Private USD',
+                      builder: buildMobileHomePrivateUsdUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Private USD not used yet',
+                      builder: buildMobileHomePrivateUsdUnknownUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Private USD loading',
+                      builder: buildMobileHomePrivateUsdLoadingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Private USD arriving',
+                      builder: buildMobileHomePrivateUsdArrivingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Private USD screening refused',
+                      builder: buildMobileHomePrivateUsdBlockedUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Private USD hidden balances',
+                      builder: buildMobileHomePrivateUsdHiddenUseCase,
+                    ),
                   ],
                 ),
                 WidgetbookComponent(
@@ -551,6 +576,40 @@ class WidgetbookApp extends StatelessWidget {
                     WidgetbookUseCase(
                       name: 'Gift Cards',
                       builder: buildDesktopHomeGiftCardsUseCase,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            WidgetbookFolder(
+              name: 'Private USD',
+              children: [
+                WidgetbookComponent(
+                  name: 'Mobile',
+                  useCases: [
+                    WidgetbookUseCase(
+                      name: 'Default',
+                      builder: buildMobilePrivateUsdDefaultUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Empty',
+                      builder: buildMobilePrivateUsdEmptyUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'First load',
+                      builder: buildMobilePrivateUsdFirstLoadUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Refresh failed',
+                      builder: buildMobilePrivateUsdRefreshFailedUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Screening refused',
+                      builder: buildMobilePrivateUsdBlockedUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Hidden balances',
+                      builder: buildMobilePrivateUsdHiddenUseCase,
                     ),
                   ],
                 ),

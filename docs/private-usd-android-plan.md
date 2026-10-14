@@ -8,7 +8,7 @@
 
 **Scope.** Android, mobile form factor (`--dart-define=VIZOR_FORM_FACTOR=mobile`). iOS and desktop come later, so keep the Rust engine, the Dart models and the JS bundle platform-neutral. iOS then needs only a Swift `WKWebView` host and an attestation channel.
 
-**Status (2026-10-13).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is done except its regtest run (M2.7b), which waits for the batched E2E round and the owner's go-ahead. M3 part 1 (tasks 1–4, the native layer: bundle, Kotlin host, Gradle and manifest, Rust bridge) is done; part 2 (tasks 5–13) is next. Progress lives in `docs/private-usd-progress.md`.
+**Status (2026-10-13).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is done except its regtest run (M2.7b), which waits for the batched E2E round and the owner's go-ahead. M3 is done (tasks 1–13: the native layer, the Dart Railgun side, balance, availability, the home strip, `/private-usd`, lifecycle, copy, Widgetbook and the Kotlin tests) except its device round, M3.14, which is batched with the others; M4 is next. Progress lives in `docs/private-usd-progress.md`.
 
 **Two files.** This file holds the decisions, the architecture, the work and the test strategy. The reference sections §5–§9 and §12 live in `docs/private-usd-reference.md`, with the same numbers:
 
@@ -698,7 +698,7 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b, deferred to t
    - `providers/private_usd_available_provider.dart` (§8.3)
    - the X3 gate in `zec_price_change_provider.dart:251`
 8. **Home:** `_MobilePrivateUsdStrip` (§8.3, §9.4 S1), passed to `_BalanceCard` through new optional fields.
-9. **Screen:** the `/private-usd` route and its guard (§9.2), and `mobile_private_usd_screen.dart`. Convert, Send and Withdraw stay hidden until M5 and M7.
+9. **Screen:** the `/private-usd` route and its guard (§9.2), and `mobile_private_usd_screen.dart`. Convert, Send and Withdraw stay hidden until M5 and M7. The guard's exception for an unfinished conversion's progress route comes with that route in M5.
 10. **Lifecycle (no funds yet):**
     - lock closes the page
     - hide stops polling
@@ -1036,7 +1036,7 @@ Skip unit tests for UI glue, provider wiring and copy; the device rounds cover t
 |---|---|---|
 | Device rounds (Galaxy A35, testnet + Sepolia) | Each milestone's device checks under **Done when** | One round each after M3, M5, M6 and M7; mainnet in M8 |
 | Ironwood regtest | The M2 joint-account test (deposit, import, scan, sweep, Discard OVK) | The M2 gate, with the owner's go-ahead |
-| Railgun host harness | `lib/railgun_spike_main.dart`: `SPIKE_MODE=direct\|tor\|flip\|fail` (spike branch; M3 keeps it as a debug entrypoint) | Host or bridge changes |
+| Railgun host harness | `lib/railgun_spike_main.dart`: `SPIKE_MODE=direct\|tor\|flip\|fail`, a debug-only entrypoint over the app's channel wrapper and page models since M3 (D-30) | Host or bridge changes |
 
 **In every device round:**
 

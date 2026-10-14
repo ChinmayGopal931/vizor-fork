@@ -54,6 +54,8 @@ import '../../../migration/providers/ironwood_migration_announcement_provider.da
 import '../../../migration/widgets/mobile/mobile_ironwood_migration_attention.dart';
 import '../../../migration/providers/ironwood_migration_coordinator_provider.dart';
 import '../../../migration/widgets/mobile/mobile_ironwood_migration_announcement_sheet.dart';
+import '../../../private_usd/providers/private_usd_available_provider.dart';
+import '../../../private_usd/widgets/mobile/private_usd_home_strip.dart';
 import '../../../swap/models/swap_activity_navigation.dart';
 import '../../../swap/providers/swap_state_provider.dart';
 import '../../../swap/widgets/swap_activity_status_auto_refresh.dart';
@@ -1074,6 +1076,8 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     );
 
     final uuid = activeAccountUuid;
+    final showPrivateUsd =
+        uuid != null && ref.watch(privateUsdAvailableProvider);
     final giftCardActivityIndex = uuid == null
         ? GiftCardActivityIndex.empty
         : ref.watch(giftCardActivityIndexProvider(uuid)).value ??
@@ -1185,6 +1189,13 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
               onShieldBalancePressed: () => unawaited(
                 duringAppReviewBusy(ref, _shieldTransparentBalance),
               ),
+              privateUsdStrip: showPrivateUsd
+                  ? PrivateUsdHomeStrip(
+                      accountUuid: uuid,
+                      privacyModeEnabled: privacyModeEnabled,
+                      onTap: () => _pushUsedScreen('/private-usd'),
+                    )
+                  : null,
             ),
             const SizedBox(height: AppSpacing.s),
             if (hasBalance)
@@ -1746,6 +1757,7 @@ class _BalanceCard extends StatelessWidget {
     required this.onTogglePrivacyMode,
     required this.onIronwoodMigrationTap,
     required this.onShieldBalancePressed,
+    this.privateUsdStrip,
   });
 
   final String balanceText;
@@ -1764,6 +1776,10 @@ class _BalanceCard extends StatelessWidget {
   final VoidCallback onTogglePrivacyMode;
   final VoidCallback onIronwoodMigrationTap;
   final VoidCallback onShieldBalancePressed;
+
+  /// The Private USD row under the transparent one; absent while Private
+  /// USD is unavailable, so the card is unchanged then.
+  final Widget? privateUsdStrip;
 
   @override
   Widget build(BuildContext context) {
@@ -1917,6 +1933,7 @@ class _BalanceCard extends StatelessWidget {
               privacyModeEnabled: privacyModeEnabled,
               onShieldBalancePressed: onShieldBalancePressed,
             ),
+            ?privateUsdStrip,
           ],
         ),
       ),
