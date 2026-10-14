@@ -314,13 +314,15 @@ async fn open_lwd_transport_for_route(
         .map_err(|e| SyncError::net(format!("gRPC connect failed: {e}")))
 }
 
+/// TCP connector whose connections hold a direct-route lease, so a switch to
+/// Tor aborts them. Also the direct route of `crate::wallet::routed_http`.
 #[derive(Clone)]
-pub(super) struct DirectRouteConnector {
+pub(crate) struct DirectRouteConnector {
     inner: HttpConnector,
 }
 
 impl DirectRouteConnector {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let mut inner = HttpConnector::new();
         inner.enforce_http(false);
         // Tonic applies the endpoint's `tcp_nodelay` (enabled by default) only

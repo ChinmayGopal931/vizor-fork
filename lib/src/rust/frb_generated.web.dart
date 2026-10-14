@@ -10,6 +10,7 @@ import 'api/gift_card_tracking.dart';
 import 'api/keystone.dart';
 import 'api/ledger.dart';
 import 'api/network_privacy.dart';
+import 'api/private_usd.dart';
 import 'api/secret.dart';
 import 'api/simple.dart';
 import 'api/sync.dart';
@@ -126,6 +127,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiDelegationSignerKind dco_decode_api_delegation_signer_kind(dynamic raw);
 
   @protected
+  ApiDeployment dco_decode_api_deployment(dynamic raw);
+
+  @protected
   ApiDynamicConfigAttempt dco_decode_api_dynamic_config_attempt(dynamic raw);
 
   @protected
@@ -156,6 +160,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiPirSnapshotResolution dco_decode_api_pir_snapshot_resolution(dynamic raw);
+
+  @protected
+  ApiPrivateUsdError dco_decode_api_private_usd_error(dynamic raw);
+
+  @protected
+  ApiPrivateUsdErrorCode dco_decode_api_private_usd_error_code(dynamic raw);
 
   @protected
   ApiProposalIdRange dco_decode_api_proposal_id_range(dynamic raw);
@@ -239,6 +249,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiDelegationSignerInput dco_decode_box_autoadd_api_delegation_signer_input(
     dynamic raw,
   );
+
+  @protected
+  ApiDeployment dco_decode_box_autoadd_api_deployment(dynamic raw);
 
   @protected
   ApiRoundDrivePolicy dco_decode_box_autoadd_api_round_drive_policy(
@@ -923,6 +936,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   dco_decode_opt_box_autoadd_api_delegation_signer_input(dynamic raw);
 
   @protected
+  ApiDeployment? dco_decode_opt_box_autoadd_api_deployment(dynamic raw);
+
+  @protected
   ApiRoundDrivePolicy? dco_decode_opt_box_autoadd_api_round_drive_policy(
     dynamic raw,
   );
@@ -1489,6 +1505,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ApiDeployment sse_decode_api_deployment(SseDeserializer deserializer);
+
+  @protected
   ApiDynamicConfigAttempt sse_decode_api_dynamic_config_attempt(
     SseDeserializer deserializer,
   );
@@ -1529,6 +1548,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiPirSnapshotResolution sse_decode_api_pir_snapshot_resolution(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiPrivateUsdError sse_decode_api_private_usd_error(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiPrivateUsdErrorCode sse_decode_api_private_usd_error_code(
     SseDeserializer deserializer,
   );
 
@@ -1646,6 +1675,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiDelegationSignerInput sse_decode_box_autoadd_api_delegation_signer_input(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiDeployment sse_decode_box_autoadd_api_deployment(
     SseDeserializer deserializer,
   );
 
@@ -2518,6 +2552,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ApiDeployment? sse_decode_opt_box_autoadd_api_deployment(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ApiRoundDrivePolicy? sse_decode_opt_box_autoadd_api_round_drive_policy(
     SseDeserializer deserializer,
   );
@@ -3244,6 +3283,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_api_deployment(ApiDeployment self, SseSerializer serializer);
+
+  @protected
   void sse_encode_api_dynamic_config_attempt(
     ApiDynamicConfigAttempt self,
     SseSerializer serializer,
@@ -3294,6 +3336,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_api_pir_snapshot_resolution(
     ApiPirSnapshotResolution self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_private_usd_error(
+    ApiPrivateUsdError self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_private_usd_error_code(
+    ApiPrivateUsdErrorCode self,
     SseSerializer serializer,
   );
 
@@ -3438,6 +3492,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_api_delegation_signer_input(
     ApiDelegationSignerInput self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_api_deployment(
+    ApiDeployment self,
     SseSerializer serializer,
   );
 
@@ -4488,6 +4548,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_api_delegation_signer_input(
     ApiDelegationSignerInput? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_deployment(
+    ApiDeployment? self,
     SseSerializer serializer,
   );
 

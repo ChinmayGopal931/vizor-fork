@@ -89,6 +89,15 @@ prost13 = { package = "prost", version = "0.13" }
 tendermint = "0.40.4"
 tendermint-light-client-verifier = "0.40.4"
 
+# Private USD (D3). One zecSwap rev for both crates; E1 replaces it with the
+# Zakura build's rev. `zecswap-tokens` cannot resolve beside this graph yet
+# (docs/private-usd-android-plan.md §2 N1).
+zecswap-core    = { git = "https://github.com/JustZappIt/zecSwap", rev = "d69e3fb2d5c3bfc99fd20844dfdcd0d9d2509a11" }
+zecswap-railgun = { git = "https://github.com/JustZappIt/zecSwap", rev = "d69e3fb2d5c3bfc99fd20844dfdcd0d9d2509a11" }
+hmac   = "0.12"  # BIP-32/85 (transitive only today)
+sha3   = "0.10"  # Keccak-256 for ids and ABI (transitive only today)
+bech32 = "0.11"  # 0zk address validation (transitive only today)
+
 # Zcash core. Package names are the Zakura forks; lib names stay upstream so
 # `use orchard` / `use zcash_client_backend` keep working.
 [dependencies.zcash_primitives]
@@ -301,6 +310,11 @@ zakura-transaction-status = { git = "https://github.com/zakura-core/wallet-libra
 zakura-pir-status = { git = "https://github.com/zakura-core/wallet-libraries", rev = "391d0b0247f0e07cfdea855ce87fcdf8ba376aae" }
 zakura-pir-native = { git = "https://github.com/zakura-core/wallet-libraries", rev = "391d0b0247f0e07cfdea855ce87fcdf8ba376aae" }
 zakura-pir-enhance = { git = "https://github.com/zakura-core/wallet-libraries", rev = "391d0b0247f0e07cfdea855ce87fcdf8ba376aae" }
+
+# Local Zakura build of zecswap-core until E1 lands. Do not merge: drop this
+# once the zecSwap rev above carries the Zakura manifest.
+[patch."https://github.com/JustZappIt/zecSwap"]
+zecswap-core = { path = "../../zapp/zecSwap-zakura/crates/zecswap-core" }   # relative to rust/
 
 # Flutter debug builds use Cargokit + Cargo's dev profile (`cargo build`
 # without `--release`). Rust crypto and voting flows are slow under the default

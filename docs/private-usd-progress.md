@@ -70,21 +70,57 @@ way when the file runs alone.
 
 ## M1. Rust foundations
 
-- [ ] M1.1 `rust/Cargo.toml` dependency lines (`zecswap-core`, `zecswap-railgun`, `hmac`, `sha3`, `bech32`; not `zecswap-tokens`, N1)
-- [ ] M1.2 `private_usd/mod.rs`: module tree and `PrivateUsdNetwork`
-- [ ] M1.3 `deployment.rs`: §7.1 pins and §7.2 constants, including the 2,000,000 fee cap
-- [ ] M1.4 `railgun_keys.rs`: BIP-85 and the Railgun key chain (§3.3)
-- [ ] M1.5 `keys.rs`: `SwapKeyContext::open` (seed, ZIP-32 index, fingerprint check)
-- [ ] M1.6 `models.rs`: forward and reverse records in zapp's JSON shape
-- [ ] M1.7 `terms.rs`: forward and reverse terms, `terms_hash`, EIP-712
-- [ ] M1.8 `store.rs`: `swaps.db` schema and migrations, `take_index`, `save_record`, queries
-- [ ] M1.9 `indices.rs`: index allocation with on-chain skipping
-- [ ] M1.10 `rust/src/wallet/routed_http.rs` (§8.5)
-- [ ] M1.10b Separate PR: Enhance PIR transport and voting `VizorRoute` onto `routed_http` (may slip to M8)
-- [ ] M1.11 `evm_rpc.rs`: every §5.4 read behind `ChainReader`
-- [ ] M1.12 `maker_client.rs` and `relayer_client.rs` behind `HttpTransport`
-- [ ] M1.13 `rust/src/api/private_usd.rs`: `ApiPrivateUsdError`, `ApiDeployment`, the five M1 calls; bridge regenerated
-- [ ] M1 gate
+- [x] M1.1 `rust/Cargo.toml` dependency lines (`zecswap-core`, `zecswap-railgun`, `hmac`, `sha3`, `bech32`; not `zecswap-tokens`, N1). Builds with the local `[patch]` (E1 pending; do not merge)
+- [x] M1.2 `private_usd/mod.rs`: module tree and `PrivateUsdNetwork`
+- [x] M1.3 `deployment.rs`: §7.1 pins and §7.2 constants, including the 2,000,000 fee cap. Token keys are string constants; their `TokenKey::from_base64` parse test waits for N1
+- [x] M1.4 `railgun_keys.rs`: BIP-85 and the Railgun key chain (§3.3)
+- [x] M1.5 `keys.rs`: `SwapKeyContext::open` (seed, ZIP-32 index, fingerprint check)
+- [x] M1.6 `models.rs`: forward and reverse records in zapp's JSON shape
+- [x] M1.7 `terms.rs`: forward and reverse terms, `terms_hash`, EIP-712
+- [x] M1.8 `store.rs`: `swaps.db` schema and migrations, `take_index`, `save_record`, queries
+- [x] M1.9 `indices.rs`: index allocation with on-chain skipping
+- [x] M1.10 `rust/src/wallet/routed_http.rs` (§8.5)
+- [ ] M1.10b Separate PR: Enhance PIR transport and voting `VizorRoute` onto `routed_http` (may slip to M8; not started in M1)
+- [x] M1.11 `evm_rpc.rs`: every §5.4 read behind `ChainReader`
+- [x] M1.12 `maker_client.rs` and `relayer_client.rs` behind `HttpTransport`
+- [x] M1.13 `rust/src/api/private_usd.rs`: `ApiPrivateUsdError`, `ApiDeployment`, the five M1 calls; bridge regenerated
+- [x] M1 gate
+
+M1 status (2026-10-14): done except the optional M1.10b, which slips to M8.
+Moving the PIR transport and voting's `VizorRoute` onto `routed_http` without
+behaviour change needs streaming response bodies, the `on_dispatch` hook and
+the SDK's observation phases in `routed_http`, so it is not a safe drop-in.
+
+- **Rust:** `cd rust && cargo test` passes: lib 1447 passed, 0 failed, 9
+  ignored; integration 6 passed, 21 ignored (regtest). The 17 new tests
+  (`private_usd`, `routed_http`) cover the M1 **Done when** list: every §3.3
+  and §5.5 vector (pinned in `private_usd/tests/vectors.json`, plus the §5.4
+  selectors), address validation, `getSwap` decoding, a revert as closed, a
+  wrong chain, store crash safety, strict decoding of every zapp
+  `SwapRecordStorageTest` fixture, the counter across reopen, the 16-index
+  cap, routed HTTP failing closed, and maker and relayer error classification
+  against a local server.
+- **Pre-existing test-isolation gap, not M1's:** the Gift Card test
+  `settlement_requires_an_uncancelled_contiguous_agreed_observation` (and its
+  `gift_card_input` neighbours) open direct lightwalletd connections without
+  `lock_route_policy()`. When a route test flips Tor at the same moment, the
+  test fails. It reproduces with the pre-existing voting route tests (6 of 8
+  paired runs), and it failed once in a full run that overlapped
+  `flutter test`. Alone it passes 5 of 5, and the clean full runs pass. The
+  fix is for those tests to take the lock, as `network_privacy`'s
+  `test_route_policy` asks.
+- **Dart:** `fvm flutter analyze` finds no issues. `fvm flutter test`: 5896
+  passed, 158 skipped, 4 failed, the 4 pre-existing failures in
+  `settings_seed_phrase_screen_test.dart` ("incoming links cannot interrupt
+  backup completion/deferral success/failure": the `AppButton` "Enter amount"
+  finder at test line 159).
+- **Bindings:** `lib/src/rust/api/private_usd.dart` is new. The codegen's
+  rustc 1.93 noise was reverted: the comment-only changes in
+  `network_privacy.dart`, `sync.dart`, `voting.dart`, `voting_session.dart`
+  and `third_party/zcash_voting/wire.dart`, and the import-group blank lines
+  it dropped in `frb_generated{,.io,.web}.dart`. The new file's
+  ignored-trait comment uses the committed files' `assert_fields_are_eq`
+  wording.
 
 ## M2. Zcash joint-account operations
 
@@ -209,6 +245,53 @@ way when the file runs alone.
 - **Local build setting:** all Rust builds here use
   `CARGO_PROFILE_DEV_DEBUG=0` (no debug info) so the target directory fits the
   free disk. No repo file changes.
+- **D-7 (M1): the Rust skeleton as built differs from plan §3.6 in these
+  places.** Plan §3.6, §3.3, §3.4, task 10 and reference §8.5 updated to
+  match.
+  - `ChainReader` returns `PrivateUsdError` (internal codes
+    `WrongDeployment`, `ChainUnreadable`, `Mismatch`, `EthereumUnreachable`);
+    there is no separate `EvmError`.
+  - `reverse_funding(id)` is `reverse_state(id, terms)`: the refund note, the
+    funding block, `getSwap` and `LOCK_DURATION` read at one confirmed block,
+    as zapp's `AtomicSwapChain.read` does. Two reads at different blocks could
+    disagree.
+  - `receipt_succeeded(tx)` is `transaction_status(tx, confirmations)`
+    (`Unknown`/`Pending`/`Confirmed`/`Reverted`, zapp `transactionStatus`). M6
+    needs to know whether the node knows a funding hash at all (§3.5 item 7).
+  - `confirmed_swap` returns `ConfirmedSwap { head, swap }`, so lock reasoning
+    uses the head the read was taken against.
+  - Internal error codes add `WrongDeployment`, `ChainUnreadable`,
+    `IndicesInUse` and `AmountUnquotable`; the FRB enum keeps the §8.2 list
+    and folds them in (`WrongDeployment` → `RelayerUnreachable`, as zapp's
+    hold mapping does; `ChainUnreadable` → `EthereumUnreachable`;
+    `IndicesInUse` → `Other`; `AmountUnquotable` → `AmountRefused`).
+  - Strict decoding is a round trip: a stored record must re-encode to exactly
+    the JSON it was read from. An unknown field, a written-out default, a
+    mixed-case id or a malformed value is `StoreUnreadable`. Wire answers stay
+    lenient (unknown fields ignored).
+  - Forward rows' `phase` column: zapp's stage names while under way
+    (`OPENING`, `DEPOSITING`, `CONFIRMING`, `CLAIMING`, `REFUNDING`, derived
+    from the record), the outcome once ended (`PAID`, `REFUNDED`,
+    `NOTHING_SENT`).
+  - `take_index` also never returns an index below one a kept record already
+    has. `swaps.db` runs with `synchronous = FULL`, so a taken index survives
+    power loss.
+  - `RoutedHttp` pools direct connections per instance (make one per
+    operation) rather than taking a pooling flag. Test builds alone admit
+    plaintext `http://127.0.0.1` URLs, for the client tests' local server.
+  - `getSwap`: any length other than 192 bytes is `WrongDeployment`, as the
+    plan says. zapp reads a shorter answer as `CHAIN_UNREADABLE`.
+  - Deferred: the op-id cancel registry moves to `engine.rs` (M5), where
+    `private_usd_cancel` lands. `SwapKeyContext::acceptance` (the user's share
+    proof, `ops.rs:164-188`) moves to M5: `zecswap-core`'s `prove_user` needs a
+    `rand 0.10` `CryptoRng`, and vizor's `rand` is 0.8 (M5 adds `rand` 0.10
+    under a renamed dependency; it is already in the lockfile). The Rust test
+    pinning the 9 page hosts against Kotlin and the CSP (reference §8.2)
+    moves to M3, where those copies land.
+  - The engine vectors are wallets 0 and 1 of two seeds (`5eb00bbd…e38e4` and
+    `243c1266…5c3a`), not wallets 0–3 of one; plan §3.3 corrected.
+  - `#![allow(dead_code)]` on `private_usd`: most M1 blocks are reached only
+    from tests until the engine (M5–M7) drives them. Remove it then.
 
 ## Blocked
 

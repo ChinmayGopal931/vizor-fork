@@ -8,7 +8,7 @@
 
 **Scope.** Android, mobile form factor (`--dart-define=VIZOR_FORM_FACTOR=mobile`). iOS and desktop come later, so keep the Rust engine, the Dart models and the JS bundle platform-neutral. iOS then needs only a Swift `WKWebView` host and an attestation channel.
 
-**Status (2026-10-13).** M0 is done (results in §4). M1 is next. Progress lives in `docs/private-usd-progress.md`.
+**Status (2026-10-14).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is next. Progress lives in `docs/private-usd-progress.md`.
 
 **Two files.** This file holds the decisions, the architecture, the work and the test strategy. The reference sections §5–§9 and §12 live in `docs/private-usd-reference.md`, with the same numbers:
 
@@ -253,7 +253,7 @@ Dart owns UI and orchestration only. Rust owns every key, every swap rule and al
   - Source: `RailgunMnemonicTest.kt:26-40`.
 - **The `0zk` address for that seed**, computed with `zecswap_railgun::Keys::from_seed(railgunSeed, 0).address()`:
   `0zk1qy4jkxxr9zsw46luz7hvp2j6rtqmjws6ttnrrr6uf485mg9xwpwu0rv7j6fe3z53llrc73lffkv84nudklsglyryy0703mu97e8sgn6sk8anxxypf8jjz382jz9`
-- **Engine-checked key steps:** `zs/crates/zecswap-railgun/tests/engine-vectors.json` (engine 9.8.0, wallets 0–3 of seed `5eb00bbd…e38e4`).
+- **Engine-checked key steps:** `zs/crates/zecswap-railgun/tests/engine-vectors.json` (engine 9.8.0, wallets 0 and 1 of seeds `5eb00bbd…e38e4` and `243c1266…5c3a`).
 - **The vizor vector** (pins D7 and D8). Mnemonic `abandon`×23 + `art`, BIP-39 passphrase `vizor`, ZIP-32 index 1. Computed 2026-10-13 with an independent Python reference that reproduces both vectors above; the address is from `zecswap_railgun::Keys::from_seed(railgunSeed, 0).address()`.
   - entropy: `723d0672c95ccdd3d85c10388379d7e46ff863d2be0143db88e52c4db9ffcf0e`
   - Railgun mnemonic: `impulse trial original naive smoke try gesture link decade bridge invest silver zebra cradle enough scan duck sword deer flat swear zoo destroy space`
@@ -321,12 +321,12 @@ CREATE TABLE railgun_sends(       -- zapp PrivateUsdSendLog (`private_usd_sends_
 
 - **Record bodies.** `record_json` uses zapp's serialized shapes (`AtomicSwapRecordSerializer.Stored`, `of/AtomicSwapModels.kt:209-292`; `ReverseSwapRecord`, `of/ReverseSwapModels.kt:120-147`), so the fixtures from zapp's `SwapRecordStorageTest` port directly.
 - **Writes.** Each driver save is one SQLite transaction. A crash cannot tear a record. `keep` skips writes that change nothing.
-- **Strict decoding.** An unknown or garbled record is an error, never a reset (zapp: an unreadable `atomicswap_state_v3` throws, `ua/AtomicSwapStoreImpl.kt:52-58, 91-103`).
+- **Strict decoding.** An unknown or garbled record is an error, never a reset (zapp: an unreadable `atomicswap_state_v3` throws, `ua/AtomicSwapStoreImpl.kt:52-58, 91-103`). A stored record must re-encode to exactly the JSON it was read from (`models::decode_strict`).
 - **History.** Keep at most 100 finished records per direction. Reverse `REFUNDED` records are kept forever (rescue may still be possible, `ua/ReverseSwapStoreImpl.kt:61-69`). A `QUOTED` reverse draft is never written to history.
 - **Scoping.** Every row is keyed by `account_uuid`. The ZIP-32 index is not part of any key.
 - **The deployment is pinned in each record** (zapp pins the whole deployment in a reverse record). The keyed RPC URL is never in a record.
 - **Token state.** It is the zapp shape `SwapTokenState` (§5.9), with lenient decoding: an unreadable file starts empty. It holds blinding secrets (`pending`), so never log it.
-- **`swaps.state` and "unfinished".** Forward: `phase` = the zapp stage name, `finished = end != null`. Reverse: `phase` = the `ReversePhase` name, `finished = phase ∈ {COMPLETE, REFUNDED, CANCELLED}`. `unfinished_count` counts forward `finished = 0` plus reverse `finished = 0 AND phase <> 'QUOTED'` (a QUOTED draft is not under way, `of/ReverseSwapModels.kt:151`). A new reverse quote replaces the account's QUOTED draft in `active`.
+- **`swaps.state` and "unfinished".** Forward: `phase` = zapp's stage name derived from the record while under way (`OPENING`, `DEPOSITING`, `CONFIRMING`, `CLAIMING`, `REFUNDING`), the outcome once ended (`PAID`, `REFUNDED`, `NOTHING_SENT`); `finished = end != null`. Reverse: `phase` = the `ReversePhase` name, `finished = phase ∈ {COMPLETE, REFUNDED, CANCELLED}`. `unfinished_count` counts forward `finished = 0` plus reverse `finished = 0 AND phase <> 'QUOTED'` (a QUOTED draft is not under way, `of/ReverseSwapModels.kt:151`). A new reverse quote replaces the account's QUOTED draft in `active`.
 - **`railgun_sends.state`** is `unconfirmed` (proved and kept, `record_json` holds the relay request bytes and nullifiers) or `confirmed`. A send still being proved is **not** written (zapp keeps it in an in-memory `live` set and drops it on restart, `PrivateUsdSendLog.kt:146-149, 181-189`): nothing left the wallet. Trim to 100 `confirmed` rows per account; never trim `unconfirmed`.
 
 ### 3.5 Invariants
@@ -369,7 +369,7 @@ rust/src/
     ├── keys.rs                make `make_birthday` (:297) `pub(crate)` [M2]
     ├── sync/{send,pczt,mod}.rs  SendPurpose::JointSweep, StoredProposal.purpose, deposit split [M2] (§8.1)
     └── private_usd/
-        ├── mod.rs             PrivateUsdNetwork, PrivateUsdError{code,message}, OPERATIONS mutex, cancel registry
+        ├── mod.rs             PrivateUsdNetwork, PrivateUsdError{code,message}, OPERATIONS mutex
         ├── deployment.rs      Deployment consts per network (§7.1) + driver consts (§7.2)
         ├── railgun_keys.rs    BIP-85 → Railgun mnemonic → railgunSeed → zecswap_railgun::Keys (§3.3)
         ├── keys.rs            SwapKeyContext (seed, ZIP-32 index, fingerprint check)
@@ -377,7 +377,7 @@ rust/src/
         ├── models.rs          ForwardRecord, ReverseRecord, SwapQuote… (serde, zapp's JSON shape)
         ├── store.rs           SwapStore over swaps.db (§3.4)
         ├── indices.rs         take_index with on-chain skipping
-        ├── transport.rs       HttpTransport trait + RoutedTransport (over routed_http)
+        ├── transport.rs       HttpTransport trait + RoutedTransport (over routed_http); swap-service JSON exchange, SwapHttpError
         ├── evm_rpc.rs         ChainReader trait + EvmRpc (§5.4, §8.5)
         ├── maker_client.rs    §5.2
         ├── relayer_client.rs  §5.3, §6.7
@@ -398,6 +398,7 @@ impl PrivateUsdNetwork {
     pub fn railgun_name(self) -> &'static str;              // "mainnet" | "sepolia" (page `start.network`)
 }
 pub(crate) struct PrivateUsdError { pub code: ErrorCode, pub message: String } // → ApiPrivateUsdError
+// ErrorCode = the §8.2 codes + internal WrongDeployment, ChainUnreadable, IndicesInUse, AmountUnquotable
 pub(crate) static OPERATIONS: std::sync::Mutex<()>;        // one store/joint.db writer at a time
 
 // deployment.rs
@@ -420,6 +421,8 @@ impl SwapKeyContext {
     pub fn note(&self, index: u32) -> Result<zecswap_railgun::ShieldNote, PrivateUsdError>;
     pub fn joint(&self, index: u32, maker: &zecswap_core::PublicShare) -> Result<zecswap_core::JointAccount, PrivateUsdError>;
     pub fn railgun_mnemonic(&self) -> Result<Zeroizing<String>, PrivateUsdError>;
+    pub fn railgun_address(&self) -> Result<String, PrivateUsdError>;
+    // M5: acceptance(index, SwapContext, E, makerProof) -> SwapAcceptance (prove_user needs a rand 0.10 CryptoRng)
 }
 
 // store.rs (rusqlite 0.37 is already a dependency; open with WAL + busy_timeout)
@@ -432,24 +435,24 @@ impl SwapStore {
     pub fn history(&self, account: &str, dir: Direction) -> Result<Vec<StoredRecord>, PrivateUsdError>;
     pub fn unfinished_count(&self, account: &str) -> Result<u32, PrivateUsdError>;
     pub fn delete_account(&mut self, account: &str) -> Result<(), PrivateUsdError>;
-    // + joint_accounts and railgun_sends accessors
+    // + update (in place), find, accounts_with_unfinished, joint_accounts and railgun_sends accessors
 }
 
 // transport.rs / evm_rpc.rs: native `async fn` in traits (Rust ≥ 1.75), used through generics, never `dyn`
-pub(crate) trait HttpTransport { async fn send(&self, req: HttpRequest) -> Result<HttpResponse, RoutedError>; }
-pub(crate) trait ChainReader {
-    async fn chain_id(&self) -> Result<u64, EvmError>;
-    async fn head(&self) -> Result<Head /*{number, timestamp}*/, EvmError>;
-    async fn swap(&self, id: [u8; 32]) -> Result<Option<SwapState>, EvmError>;                  // latest
-    async fn confirmed_swap(&self, id: [u8; 32], terms: &Terms) -> Result<ConfirmedSwap, EvmError>;
-    async fn lock_duration(&self) -> Result<u64, EvmError>;
-    async fn maker_key_used(&self, key: [u8; 32]) -> Result<bool, EvmError>;
-    async fn reverse_funding(&self, id: [u8; 32]) -> Result<Option<([u8; 32], u64)>, EvmError>;
-    async fn vault_balance(&self, id: [u8; 32]) -> Result<u128, EvmError>;
-    async fn rescue_nonce(&self, id: [u8; 32]) -> Result<u64, EvmError>;
-    async fn railgun_accepts(&self) -> Result<bool, EvmError>;                                  // tokenBlocklist; revert → false
-    async fn confirmed_payout(&self, id: [u8; 32], since: u64) -> Result<Option<PaidOut>, EvmError>;
-    async fn receipt_succeeded(&self, tx: [u8; 32]) -> Result<Option<bool>, EvmError>;
+pub(crate) trait HttpTransport { async fn send(&self, req: RoutedRequest) -> Result<RoutedResponse, RoutedError>; }
+pub(crate) trait ChainReader {   // errors are PrivateUsdError (D-7)
+    async fn chain_id(&self) -> Result<u64>;
+    async fn head(&self) -> Result<Head /*{number, timestamp}*/>;
+    async fn swap(&self, id: &[u8; 32]) -> Result<Option<SwapState>>;                           // latest
+    async fn confirmed_swap(&self, id: &[u8; 32], terms: &Terms) -> Result<ConfirmedSwap /*{head, swap}*/>;
+    async fn lock_duration(&self) -> Result<u64>;
+    async fn maker_key_used(&self, key: &[u8; 32]) -> Result<bool>;
+    async fn reverse_state(&self, id: &[u8; 32], terms: &Terms) -> Result<ReverseChainState>;   // refund note, funding block, getSwap at one confirmed block
+    async fn vault_balance(&self, id: &[u8; 32]) -> Result<u128>;
+    async fn rescue_nonce(&self, id: &[u8; 32]) -> Result<u64>;
+    async fn railgun_accepts(&self) -> Result<bool>;                                            // tokenBlocklist; revert → false
+    async fn confirmed_payout(&self, id: &[u8; 32], since: u64) -> Result<Option<PaidOut>>;
+    async fn transaction_status(&self, tx: &[u8; 32], confirmations: u32) -> Result<TransactionStatus>; // Unknown | Pending | Confirmed | Reverted
 }
 pub(crate) async fn take_index<C: ChainReader>(store: &mut SwapStore, chains: &[(C, [u8; 20])], keys: &SwapKeyContext, account: &str) -> Result<u32, PrivateUsdError>;
 ```
@@ -537,7 +540,7 @@ Every milestone also follows these rules:
     - returned response headers (`WWW-Authenticate`, `Retry-After`)
     - non-2xx bodies (the maker's `{code, error}`)
     - a `phase` on errors, classified like `classify_tor_error`
-    - an optional pooled direct client (PIR needs pooling)
+    - a pooled direct client per `RoutedHttp` instance (make one per operation; PIR needs pooling)
     - a per-request route re-check, fail closed, never retry
 
     Reuse `DirectRouteConnector` (`rust/src/wallet/sync_engine/lwd.rs:318-360`, made `pub(crate)`).
@@ -845,6 +848,7 @@ Then, with the owner's go-ahead, run the regtest test once: `cd rust && cargo te
 **Traps.**
 
 - **The forward quote is not persisted.** Keep the offer in Rust (the `engine.rs` cache keyed `(account, index)`, dropped at `expires_at` and on lock). A missing offer at accept is `QuoteExpired`. Never pass quote JSON through Dart.
+- **The share proof needs `rand` 0.10.** `zecswap_core::SwapContext::prove_user` takes a `rand` 0.10 `CryptoRng`; vizor's `rand` is 0.8, whose `OsRng` does not satisfy it. Add `rand` 0.10 (already in the lockfile through `zecswap-core`) under a renamed dependency with `sys_rng`, and use `UnwrapErr(SysRng)` as zecSwap's tests do. `SwapKeyContext::acceptance` (mirroring `ops.rs:164-188`) lands with it (D-7).
 - **Accept must be re-entrant.** A repeat accept for a saved, unfinished, unanswered index (`t0 == None`) re-POSTs `record.quote`. After any accept error, Dart reads `forward_records` and switches to progress if the index is under way.
 - **Two Rust locks.**
   - `OPERATIONS` guards SQLite writes and is never held across I/O.
