@@ -8,7 +8,7 @@
 
 **Scope.** Android, mobile form factor (`--dart-define=VIZOR_FORM_FACTOR=mobile`). iOS and desktop come later, so keep the Rust engine, the Dart models and the JS bundle platform-neutral. iOS then needs only a Swift `WKWebView` host and an attestation channel.
 
-**Status (2026-10-13).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is done, including its Ironwood regtest run (M2.7b, passed 2026-10-13 after the fresh-tip fix D-50). M3 is done (tasks 1–13: the native layer, the Dart Railgun side, balance, availability, the home strip, `/private-usd`, lifecycle, copy, Widgetbook and the Kotlin tests) except its device round, M3.14, which is batched with the others. M4 is skipped for now: it waits for N1 (B-5), and M5–M7 proceed without tokens (D20; the owner disabled them on testnet for now). M5 part 1 (tasks 1–2, the Rust engine and its FRB calls) is done; part 2 (tasks 3–7, Dart) is next. Progress lives in `docs/private-usd-progress.md`.
+**Status (2026-10-13).** M0 is done (results in §4). M1 is done except its optional task 10b, which slips to M8. M2 is done, including its Ironwood regtest run (M2.7b, passed 2026-10-13 after the fresh-tip fix D-50). M3 is done (tasks 1–13: the native layer, the Dart Railgun side, balance, availability, the home strip, `/private-usd`, lifecycle, copy, Widgetbook and the Kotlin tests) except its device round, M3.14: the round's harness is ready (progress D-40), but the 2026-10-14 round could not run because the phone was not attached (B-8). M4 is skipped for now: it waits for N1 (B-5), and M5–M7 proceed without tokens (D20; the owner disabled them on testnet for now). M5 part 1 (tasks 1–2, the Rust engine and its FRB calls) is done; part 2 (tasks 3–7, Dart) is next. Progress lives in `docs/private-usd-progress.md`.
 
 **Two files.** This file holds the decisions, the architecture, the work and the test strategy. The reference sections §5–§9 and §12 live in `docs/private-usd-reference.md`, with the same numbers:
 
@@ -53,6 +53,7 @@ A pointer such as "§5.5" means that file. Open a reference section only when a 
 | Dart | `fvm flutter analyze`; `fvm flutter test`; mobile lane: `fvm flutter test --tags mobile --run-skipped --dart-define=VIZOR_FORM_FACTOR=mobile` |
 | Kotlin | `cd android && ./gradlew :app:testDebugUnitTest --tests 'com.keplr.vizor.railgun.*'` |
 | Device (Galaxy A35, `adb -s RZCX40721QZ`) | `fvm flutter run -d RZCX40721QZ --dart-define=VIZOR_FORM_FACTOR=mobile --dart-define=VIZOR_PRIVATE_USD_ENABLED=true`; keep the screen on during long steps (U21) |
+| Device round (§10) | `ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh` (phone on USB and unlocked; options in the script's header) |
 | Stale native-lib merge after switching ABIs | delete `build/app/intermediates/{merged,stripped}_native_libs` and rebuild |
 
 **Local stand-ins until the owner delivers.** These must never be pushed:
@@ -1037,7 +1038,7 @@ Skip unit tests for UI glue, provider wiring and copy; the device rounds cover t
 
 | Lane | What | When |
 |---|---|---|
-| Device rounds (Galaxy A35, testnet + Sepolia) | Each milestone's device checks under **Done when** | One round each after M3, M5, M6 and M7; mainnet in M8 |
+| Device rounds (Galaxy A35, testnet + Sepolia) | Each milestone's device checks under **Done when**: `scripts/private-usd/run_device_round.sh` runs `integration_test/private_usd_device_test.dart` (each round extends it) and then the R8 release build (progress D-40) | One round each after M3, M5, M6 and M7; mainnet in M8 |
 | Ironwood regtest | The M2 joint-account test (deposit, import, scan, sweep, Discard OVK) | The M2 gate, with the owner's go-ahead |
 | Railgun host harness | `lib/railgun_spike_main.dart`: `SPIKE_MODE=direct\|tor\|flip\|fail`, a debug-only entrypoint over the app's channel wrapper and page models since M3 (D-30) | Host or bridge changes |
 
@@ -1046,7 +1047,8 @@ Skip unit tests for UI glue, provider wiring and copy; the device rounds cover t
 - Tor on: no direct sockets. `scripts/private-usd/check_sockets.py` classifies the app UID's `/proc/net/tcp{,6}`; `--onionoo` checks every remote against the Tor relay list.
 - Lock, background, kill and account switch mid-flow.
 - Memory and timing: `scripts/private-usd/sample_device.sh`.
-- Keep the screen on (U21) with Developer options "Stay awake", and restore the setting afterwards.
+- Keep the screen on (U21) with "Stay awake" (`svc power stayon usb`), and restore the setting afterwards; the runner does both.
+- Build Rust for arm64 only: `flutter test` always builds debug, which cargokit otherwise builds for the emulator ABIs too, with full debuginfo. The runner sets `CARGO_PROFILE_DEV_DEBUG=0` and `CARGOKIT_SKIP_EMULATOR_ABIS=true` (progress D-41).
 - Never install an emulator.
 
 **Notes.**

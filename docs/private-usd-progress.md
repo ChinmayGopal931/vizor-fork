@@ -200,7 +200,7 @@ attempt, after a fix (below).
 - [x] M3.11 Copy (Shared, Home, Private USD screen, Activity) (D-27)
 - [x] M3.12 Widgetbook and capture scenarios (home, `/private-usd`) (D-28)
 - [x] M3.13 Kotlin tests (`RailgunBoundaryTest`, `RailgunChannelTest`, `RailgunProtocolTest`) (D-29)
-- [ ] M3.14 Device round (batched; Galaxy A35, Sepolia; the M3 Done-when device checks and the R8 release-build check)
+- [ ] M3.14 Device round (batched; Galaxy A35, Sepolia; the M3 Done-when device checks and the R8 release-build check). Harness ready (D-40 to D-42); not run on 2026-10-14, the phone was not attached (B-8)
 - [x] M3 gate: the unit essentials and every suite pass (status below); the device checks are M3.14, deferred
 
 M3 part 1 status (2026-10-13): M3.1–M3.4, the native layer, are done. Part 2
@@ -370,6 +370,24 @@ commit that checks this note.
   no direct sockets (`scripts/private-usd/check_sockets.py`); lock closes the
   page and stops the bridge (no loopback listener left); and a release build
   (R8) loads the page.
+
+M3 device round (2026-10-14): not run on the phone, so M3.14 stays open
+(B-8). The Galaxy A35 (`RZCX40721QZ`) was not attached: no USB device from
+23:05 to 00:06, and its wireless-debugging advert (`_adb-tls-connect`,
+192.168.0.7:38161) refused connections, then went away. Nothing was
+installed, cleared or changed on the phone, and its Stay awake setting was
+never touched. The round's harness is committed and ready (D-40 to D-42).
+With the phone attached over USB and unlocked:
+`ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh`.
+
+| Check | Result | Evidence |
+|---|---|---|
+| 1. Before first use the strip shows "—" and no WebView renderer runs | Not run | The test holds home for 20 s, then the host looks for the app's `sandboxed_process` renderer and loopback listeners |
+| 2. `/private-usd` shows the first-sync percentage, then $0; the address equals Rust's | Not run | Time to first balance from the engine's own stamp (M0: 96–136 s), the percentages shown, and the shown address against the page's wallet and `privateUsdRailgunAddress` |
+| 3. Tor on: no direct socket while the page syncs or refreshes; Tor off works | Not run | A first sync through Tor (page storage wiped) and a refresh, sampled every 30 s with `check_sockets.py --onionoo`; Tor bootstrap time; then a direct refresh |
+| 4. Lock closes the page and leaves no loopback listener | Not run | `isOpen` false, then no LISTEN row on loopback for the app UID except the Dart VM service |
+| 5. The R8 release build loads the page | Built; not run | arm64 release APK with the round's defines: 116 MB, built in 8.5 min. R8's mapping keeps every Railgun host class (renamed; only unused data-class `copy`/`componentN` methods went) and `AndroidDispatcherFactory`; the host uses no reflection |
+| 6. Hidden on regtest, for hardware accounts and with the kill switch false | Unit-tested; not run on device | The availability matrix and the strip tests (M3.7, M3.8; D-42) |
 
 ## M4. Privacy Pass tokens and attestation
 
@@ -1078,6 +1096,62 @@ the forward path runs without tokens (D-33).
     read from the posted bodies (the keys are real); zapp's
     `beforeClaimSecret` cases change the chain on the third confirmed read,
     the one immediately before the reveal.
+- **D-40 (M3.14): the device round's harness.** Plan §10 updated.
+  - `integration_test/private_usd_device_test.dart`, tagged `mobile` and
+    `private-usd-device`; `dart_test.yaml` skips the new tag, so only the
+    runner starts it. It resets the build's testnet wallet (the
+    testnet-scoped secure storage, the wallet DB and the files beside it),
+    creates one through the UI (the mnemonic screens are never captured),
+    runs checks 1–4 of the round and an unlock in one test, and posts its
+    timings to the host. Later rounds extend it.
+  - `scripts/private-usd/run_device_round.sh` refuses a phone whose
+    `com.keplr.vizor` is installed but not debuggable. It records
+    `stay_on_while_plugged_in`, sets `svc power stayon usb` and restores the
+    original on exit; wipes `app_webview` with `run-as` for a true first
+    sync; serves the host checkpoints; samples with `sample_device.sh`;
+    keeps logcat; runs the test; installs the release APK with
+    `adb install -r` and drives it; and reinstalls a debug build of
+    `lib/main.dart`, so the next round's debuggable check passes.
+  - `scripts/private-usd/device_round.py`: `serve` (over `adb reverse`: the
+    app's renderer process, the app UID's LISTEN rows, PSS,
+    `check_sockets.py --onionoo`, screenshots and timings),
+    `release-check` (`adb shell input` and `uiautomator dump`: unlock, the
+    strip, `/private-usd`, until a refresh stamped after the launch shows;
+    logcat scanned for crashes and missing-class errors), `probe` and
+    `summarize`. A failed adb call fails a probe rather than reporting
+    nothing, and `check_sockets.py` now refuses an unreadable
+    `/proc/net/tcp{,6}` the same way.
+  - `flutter test` uninstalls an integration test's app when it ends, and
+    uninstalls the installed app first when `adb install -r` fails. The
+    runner passes `--no-uninstall` and checks debuggability before anything
+    installs.
+  - Mobile has no manual lock, only `BackgroundAutoLockHost` after 15
+    minutes in the background, so the test runs that host's sequence:
+    `lock()`, `clearSensitiveStateForLock()`, `go('/unlock')`, then the sync
+    provider's.
+  - A debug build's Dart VM service listens on loopback. The test reports
+    its port (`Service.getInfo()`), and "no loopback listener" means none
+    but that one; the release check expects none at all before first use.
+  - Tor goes on and off through `networkPrivacyProvider.setTorEnabled`,
+    which the settings row calls. The first sync through Tor follows
+    `RailgunEngine.wipe()` and a 10 s pause for WebStorage's asynchronous
+    delete.
+- **D-41 (M3.14): debug builds on a full disk.** `flutter test` always
+  builds debug, and cargokit adds the x86 and x86_64 emulator ABIs to every
+  debug variant, so `--target-platform android-arm64` still compiled three
+  Rust targets. With the dev profile's full debuginfo, the arm64 debug
+  target alone grew to about 6 GB, and a first attempt filled the disk
+  (ENOSPC). The runner now builds with `CARGO_PROFILE_DEV_DEBUG=0`, as
+  `cargo test` does locally, and sets `CARGOKIT_SKIP_EMULATOR_ABIS=true`, a
+  new opt-in switch in `rust_builder/cargokit/gradle/plugin.gradle`; unset,
+  debug builds are unchanged. An arm64-only debug APK then built in 30 s on
+  a warm cache. To recover the disk, the superseded Rust targets under
+  `build/rust_lib_zcash_wallet/build/` (aarch64 debug and release, and the
+  partial i686 and x86_64 ones) were deleted; they are caches.
+- **D-42 (M3.14): the hidden cases are not run on the device.** Regtest needs
+  another build and has no Sepolia, a hardware account needs a Keystone or
+  a Ledger, and a false kill switch needs a flag URL the phone can reach.
+  The availability matrix and the strip tests cover all three.
 - **D-50 (M2.7b): `sync_joint_db` reads a fresh tip.** It compared the
   joint birthday with `latest_block_for_transaction`, which returns a tip
   observed up to 15 s earlier (a cache meant for building transactions). A
@@ -1120,6 +1194,12 @@ the forward path runs without tokens (D-33).
   Railgun wallet whose mnemonic can be passed as `SPIKE_MNEMONIC`. It blocks
   M0.3.4b and M0.3.5b (one transfer proof, `proofMs`, artifact bytes). Part of
   E8.
+- **B-8. The M3 device round needs the phone attached (2026-10-14).** The
+  Galaxy A35 was not connected over USB when the round was due, and its
+  wireless-debugging advert refused connections. Owner: attach it over USB,
+  unlock it, and run
+  `ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh`, or
+  ask for the round again.
 - **B-6. E1, E2 and E4 are not delivered.** Local stand-ins:
   `~/dev/zapp/zecSwap-zakura` (detached worktree at `d69e3fb` with the §12
   diff; zecSwap has no LICENSE yet) and `~/dev/wallet-libraries-e4` (`391d0b0`

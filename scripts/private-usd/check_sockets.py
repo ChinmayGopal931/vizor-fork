@@ -97,7 +97,10 @@ def main():
     railgun = railgun_ips()
     counts = {"loopback": 0, "railgun-host": 0, "tor-relay": 0, "unexplained": 0}
     for table in ("/proc/net/tcp", "/proc/net/tcp6"):
-        for line in adb_shell(f"cat {table}").splitlines()[1:]:
+        rows = adb_shell(f"cat {table}").splitlines()
+        if not rows or "local_address" not in rows[0]:
+            sys.exit(f"could not read {table}")
+        for line in rows[1:]:
             cols = line.split()
             if len(cols) < 8 or cols[7] != uid or cols[3] not in STATES:
                 continue

@@ -134,8 +134,10 @@ class CargoKitPlugin implements Plugin<Project> {
 
             def platforms = com.flutter.gradle.FlutterPluginUtils.getTargetPlatforms(project).collect()
 
-            // Same thing addFlutterDependencies does in flutter.gradle
-            if (buildType == "debug") {
+            // Same thing addFlutterDependencies does in flutter.gradle.
+            // CARGOKIT_SKIP_EMULATOR_ABIS=true builds a debug variant for the
+            // requested platforms only (vizor: device rounds on a full disk).
+            if (buildType == "debug" && System.getenv("CARGOKIT_SKIP_EMULATOR_ABIS") != "true") {
                 platforms.add("android-x86")
                 platforms.add("android-x64")
             }
