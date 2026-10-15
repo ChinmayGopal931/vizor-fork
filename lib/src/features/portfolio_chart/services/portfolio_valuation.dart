@@ -4,6 +4,9 @@ import 'portfolio_price_history.dart';
 
 const _zatoshiPerZec = 100000000.0;
 
+/// Earlier than any wallet history, for a span with no start of its own.
+final _beforeAnyBalance = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+
 /// More points than a phone can show add nothing.
 const kPortfolioChartMaxPoints = 240;
 
@@ -15,9 +18,10 @@ const _clockSlack = Duration(minutes: 10);
 /// With [prices] the line is the balance valued at each daily price (USD),
 /// from the first of them: the price series is already the range, as whole UTC
 /// days, so it is not cut again at the device's clock. Without, it is the ZEC
-/// balance over the last [PortfolioChartRange.window] as a step function.
-/// Either way the line starts at the first moment the balance was above zero,
-/// so a young wallet is not drawn from a long flat zero.
+/// balance over the last [PortfolioChartRange.window] (all of it, for
+/// [PortfolioChartRange.all]) as a step function. Either way the line starts at
+/// the first moment the balance was above zero, so a young wallet is not drawn
+/// from a long flat zero.
 ///
 /// Returns `null` when fewer than two points remain, or the line would start
 /// at nothing.
@@ -29,8 +33,13 @@ PortfolioChartData? buildPortfolioChart({
   PortfolioChartNotice notice = PortfolioChartNotice.none,
 }) {
   final end = now.toUtc();
+  final window = range.window;
   final points = prices == null
-      ? _balancePoints(balance, end.subtract(range.window), end)
+      ? _balancePoints(
+          balance,
+          window == null ? _beforeAnyBalance : end.subtract(window),
+          end,
+        )
       : _downsample(
           _valuedPoints(balance, prices, end),
           kPortfolioChartMaxPoints,

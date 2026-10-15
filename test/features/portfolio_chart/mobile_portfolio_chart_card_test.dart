@@ -93,6 +93,32 @@ void main() {
     expect(_sourceLine(tester), 'Older prices');
   });
 
+  testWidgets('offers every range, All included, and says which was '
+      'picked', (tester) async {
+    final picked = <PortfolioChartRange>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) =>
+            AppTheme(data: AppThemeData.dark, child: child!),
+        home: Scaffold(
+          body: MobilePortfolioChartCard(
+            state: PortfolioChartReady(_data()),
+            onRangeSelected: picked.add,
+          ),
+        ),
+      ),
+    );
+
+    for (final label in ['1w', '1m', '3m', '1y', 'All']) {
+      expect(find.text(label), findsOneWidget);
+    }
+    await tester.tap(
+      find.byKey(const ValueKey('mobile_home_portfolio_chart_range_All')),
+    );
+    expect(picked, [PortfolioChartRange.all]);
+    expect(PortfolioChartRange.all.description, 'All time');
+  });
+
   testWidgets('Home takes the server name from the build configuration', (
     tester,
   ) async {

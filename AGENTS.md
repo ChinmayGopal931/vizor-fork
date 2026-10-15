@@ -740,11 +740,13 @@ the chart no longer reads that define.
   in that order (the order is part of the server's cache key), and nothing
   else. The dates are whole UTC days ending at the last completed UTC day
   (yesterday, or the day before in the first ten minutes of a UTC day) over a
-  fixed window per chip: 7, 30, 90 or 365 days, so every device sends the same
-  request on a given day. Never put an address, key, seed, balance, account,
-  wallet identifier, wallet-derived date or wallet-derived timing in it;
-  balances and prices are joined on the device. `pricingEnginePricesUri` is the
-  only place the request is built, and
+  fixed window per chip: 7, 30, 90 or 365 days, or for All from the server's own
+  first day (`availableFrom`, learned from the 1w answer, as zapp does, so All
+  costs one more fixed request; at most the newest 4,000 days), so every device
+  sends the same request on a given day. Never put an address, key, seed,
+  balance, account, wallet identifier, wallet-derived date or wallet-derived
+  timing in it; balances and prices are joined on the device.
+  `pricingEnginePricesUri` is the only place the request is built, and
   `test/features/portfolio_chart/portfolio_chart_history_test.dart` pins its
   keys and values.
 - **When it may leave the device.** `portfolioPriceRequestsAllowedProvider` is

@@ -32,18 +32,20 @@ final _previewBalance = buildBalanceHistory([
   ),
 ])!;
 
-/// A repeatable price walk ending near $70, hourly up to a quarter and daily
-/// beyond, like the real series. [falling] makes it end lower than it began.
+/// How far back the preview server's history reaches, for the All range.
+const _previewHistoryDays = 420;
+
+/// A repeatable price walk ending near $70, one price per UTC day up to the
+/// last completed one, like the pricing engine's. [falling] makes it end lower
+/// than it began.
 List<PricePoint> _previewPrices(PortfolioChartRange range, bool falling) {
-  final step = range.days > 90
-      ? const Duration(days: 1)
-      : const Duration(hours: 1);
-  final count = range.window.inMinutes ~/ step.inMinutes;
+  final days = range.days ?? _previewHistoryDays;
+  final last = lastCompletedUtcDay(previewPortfolioChartNow);
   return [
-    for (var i = 0; i <= count; i++)
+    for (var i = 0; i < days; i++)
       PricePoint(
-        previewPortfolioChartNow.subtract(step * (count - i)),
-        _previewPrice(i / count, falling, i),
+        last.subtract(Duration(days: days - 1 - i)),
+        _previewPrice(i / (days - 1), falling, i),
       ),
   ];
 }

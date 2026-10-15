@@ -46,12 +46,23 @@ List<PricePoint> _daily(
   return points;
 }
 
-PriceSeries _series(PriceWindow window, {DateTime? availableTo}) {
+final _serverStart = DateTime.utc(2025, 1, 1);
+
+PriceSeries _series(
+  PriceWindow window, {
+  DateTime? availableFrom,
+  DateTime? availableTo,
+}) {
+  final first = availableFrom ?? _serverStart;
   final end = availableTo ?? window.to;
   return PriceSeries(
     window: window,
-    points: _daily(window.from, end, usd: 50),
-    availableFrom: DateTime.utc(2025, 1, 1),
+    points: _daily(
+      window.from.isAfter(first) ? window.from : first,
+      end,
+      usd: 50,
+    ),
+    availableFrom: first,
     availableTo: end,
   );
 }
@@ -94,10 +105,12 @@ void main() {
     expect(uri.userInfo, isEmpty);
 
     expect(PortfolioChartRange.tryParse('3m'), PortfolioChartRange.quarter);
+    expect(PortfolioChartRange.tryParse('All'), PortfolioChartRange.all);
     expect(PortfolioChartRange.tryParse('all'), isNull);
+    // All has no number of days: it starts where the server's history does.
     expect(
       [for (final range in PortfolioChartRange.values) range.days],
-      [7, 30, 90, 365],
+      [7, 30, 90, 365, null],
     );
   });
 
@@ -125,7 +138,8 @@ void main() {
     final to = DateTime.utc(2026, 10, 14);
     final windows = {
       for (final range in PortfolioChartRange.values)
-        range: PriceWindow.endingOn(to, days: range.days),
+        if (range.days case final days?)
+          range: PriceWindow.endingOn(to, days: days),
     };
     expect(
       {
@@ -293,6 +307,36 @@ void main() {
       );
     });
 
+    test('draws all of the history there is for All, from the first '
+        'balance', () {
+      final balance = buildBalanceHistory([
+        _delta(100, const Duration(days: 40), 40 * _zec),
+        _delta(300, const Duration(days: 3), 20 * _zec),
+      ])!;
+
+      final zec = buildPortfolioChart(
+        balance: balance,
+        range: PortfolioChartRange.all,
+        now: _now,
+      )!;
+      expect(zec.range, PortfolioChartRange.all);
+      expect(zec.points.first.time, _now.subtract(const Duration(days: 40)));
+      expect(zec.points.first.value, 40);
+      expect(zec.endValue, 60);
+
+      // The prices are the server's, back to its first day; the line begins
+      // where the wallet's balance does.
+      final usd = buildPortfolioChart(
+        balance: balance,
+        range: PortfolioChartRange.all,
+        now: _now,
+        prices: _daily(DateTime.utc(2025, 1, 1), DateTime.utc(2026, 10, 14)),
+      )!;
+      expect(usd.points.first.time, _now.subtract(const Duration(days: 40)));
+      expect(usd.startValue, 4000);
+      expect(usd.endValue, 6000);
+    });
+
     test('draws the ZEC balance as steps over the range', () {
       final balance = buildBalanceHistory([
         _delta(100, const Duration(days: 40), 40 * _zec),
@@ -355,7 +399,7 @@ void main() {
 
     test('asks for each range as whole UTC days ending yesterday', () async {
       for (final range in PortfolioChartRange.values) {
-        await repository.load(range);
+        if (range != PortfolioChartRange.all) await repository.load(range);
       }
 
       expect(
@@ -457,6 +501,60 @@ void main() {
       expect(repository.cached(PortfolioChartRange.week), same(loaded));
       expect(repository.cached(PortfolioChartRange.month), isNull);
       expect(source.windows.length, 2);
+    });
+
+    test('asks for the shortest range first, then for all the server '
+        'has', () async {
+      final all = (await repository.load(PortfolioChartRange.all))!;
+
+      expect(
+        [
+          for (final window in source.windows)
+            '${utcDateText(window.from)}..${utcDateText(window.to)}',
+        ],
+        ['2026-10-08..2026-10-14', '2025-01-01..2026-10-14'],
+      );
+      expect(all.series.points.length, 652);
+      expect(all.series.points.first.time, DateTime.utc(2025, 1, 1));
+
+      // It moves with the UTC day like any other, and now needs only itself.
+      expect(await repository.load(PortfolioChartRange.all), same(all));
+      expect(source.windows.length, 2);
+      clock = DateTime.utc(2026, 10, 16, 1);
+      await repository.load(PortfolioChartRange.all);
+      expect(source.windows.length, 3);
+      expect(utcDateText(source.windows.last.from), '2025-01-01');
+      expect(utcDateText(source.windows.last.to), '2026-10-15');
+    });
+
+    test('needs no extra request once a shorter range has been seen', () async {
+      await repository.load(PortfolioChartRange.month);
+      await repository.load(PortfolioChartRange.all);
+
+      expect(source.windows.map((window) => window.days), [30, 652]);
+    });
+
+    test('is nothing for All when not even the shortest range comes '
+        'back', () async {
+      source.fail = true;
+
+      expect(await repository.load(PortfolioChartRange.all), isNull);
+      expect(source.windows.map((window) => window.days), [7]);
+
+      // And it is left alone for a while, not asked for again at once.
+      expect(await repository.load(PortfolioChartRange.all), isNull);
+      expect(source.windows.length, 1);
+    });
+
+    test('never asks for more days than four pages can carry', () async {
+      source.availableFrom = DateTime.utc(2000, 1, 1);
+
+      await repository.load(PortfolioChartRange.all);
+
+      final window = source.windows.last;
+      expect(window.days, kPricingEngineMaxDays);
+      expect(window.to, DateTime.utc(2026, 10, 14));
+      expect(window.from.isAfter(DateTime.utc(2000, 1, 1)), isTrue);
     });
 
     test('calls a series old only when it is over a day behind', () async {
@@ -737,13 +835,20 @@ rust_sync.TransactionInfo _transaction(int height, Duration ago, int delta) {
 /// nothing.
 class _FakePriceSource implements PortfolioPriceHistorySource {
   bool fail = false;
+  DateTime? availableFrom;
   DateTime? availableTo;
   final windows = <PriceWindow>[];
 
   @override
   Future<PriceSeries?> fetch(PriceWindow window) async {
     windows.add(window);
-    return fail ? null : _series(window, availableTo: availableTo);
+    return fail
+        ? null
+        : _series(
+            window,
+            availableFrom: availableFrom,
+            availableTo: availableTo,
+          );
   }
 }
 

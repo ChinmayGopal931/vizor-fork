@@ -94,6 +94,15 @@ class PriceWindow {
     return PriceWindow(last.subtract(_oneDay * (days - 1)), last);
   }
 
+  /// From [first] to [to], cut to its newest [kPricingEngineMaxDays] days when
+  /// that is more than the pages can carry.
+  factory PriceWindow.since(DateTime first, {required DateTime to}) {
+    final last = utcDay(to);
+    final earliest = last.subtract(_oneDay * (kPricingEngineMaxDays - 1));
+    final start = utcDay(first);
+    return PriceWindow(start.isBefore(earliest) ? earliest : start, last);
+  }
+
   final DateTime from;
   final DateTime to;
 

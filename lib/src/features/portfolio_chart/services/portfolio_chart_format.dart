@@ -67,7 +67,7 @@ PortfolioChartChange describePortfolioChange(PortfolioChartData data) {
 /// A daily price (a USD point at a UTC midnight) is that UTC day's, so it is
 /// dated by its UTC day: shifted into local time it would read a day early west
 /// of Greenwich. Any other point is an instant (a block time, or now): to the
-/// minute for the shorter spans, the day for a year.
+/// minute for the shorter spans, the day for a year or all of it.
 String formatPortfolioPointTime(
   DateTime time,
   PortfolioChartRange range,
@@ -84,7 +84,7 @@ String formatPortfolioPointTime(
   if (isDailyPrice) {
     return '${monthAbbreviation(utc.month)} ${utc.day}, ${utc.year}';
   }
-  return range == PortfolioChartRange.year
+  return range == PortfolioChartRange.year || range == PortfolioChartRange.all
       ? formatMonthDayYear(time)
       : formatDayMonthTime(time);
 }

@@ -166,6 +166,13 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(notifier.changes.last, 'range=1y');
+
+    // All is a chip like the rest, and is stored as its label.
+    await tester.tap(
+      find.byKey(const ValueKey('mobile_settings_portfolio_chart_range_All')),
+    );
+    await tester.pumpAndSettle();
+    expect(notifier.changes.last, 'range=All');
   });
 
   testWidgets('names the host the build is configured with, port included', (

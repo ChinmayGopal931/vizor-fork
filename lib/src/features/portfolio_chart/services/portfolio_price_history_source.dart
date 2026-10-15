@@ -144,6 +144,11 @@ class PortfolioPriceHistory {
 /// served, and the range is left alone for [failureCooldown] so a flaky route
 /// is not hammered. The cache lives in memory only: nothing about the wallet is
 /// in it, and a restart costs one request per range viewed.
+///
+/// [PortfolioChartRange.all] begins where the server's own history does, which
+/// only an answer can say. Until one has, the shortest range is asked for
+/// first: the request every device sends anyway, so nothing extra leaves the
+/// device but the second, equally fixed, request.
 class PortfolioPriceHistoryRepository {
   PortfolioPriceHistoryRepository({
     required PortfolioPriceHistorySource source,
@@ -162,6 +167,9 @@ class PortfolioPriceHistoryRepository {
   final _inFlight = <PortfolioChartRange, Future<PortfolioPriceHistory?>>{};
   final _failedAt = <PortfolioChartRange, DateTime>{};
 
+  /// The first day the server has prices for, as its latest answer said.
+  DateTime? _availableFrom;
+
   /// What is cached for [range], however old. Asks nobody.
   PortfolioPriceHistory? cached(PortfolioChartRange range) => _cache[range];
 
@@ -169,7 +177,8 @@ class PortfolioPriceHistoryRepository {
   Future<PortfolioPriceHistory?> load(PortfolioChartRange range) {
     final now = _now().toUtc();
     final cached = _cache[range];
-    if (cached != null && _isCurrent(cached, _windowFor(range, now), now)) {
+    final window = _windowFor(range, now);
+    if (cached != null && window != null && _isCurrent(cached, window, now)) {
       return Future.value(cached);
     }
     final failedAt = _failedAt[range];
@@ -193,25 +202,40 @@ class PortfolioPriceHistoryRepository {
             now.difference(history.fetchedAt) < recheckAfter);
   }
 
-  PriceWindow _windowFor(PortfolioChartRange range, DateTime now) {
-    return PriceWindow.endingOn(lastCompletedUtcDay(now), days: range.days);
+  /// The window of [range] at [now], or `null` for [PortfolioChartRange.all]
+  /// before the server has said where its history begins.
+  PriceWindow? _windowFor(PortfolioChartRange range, DateTime now) {
+    final to = lastCompletedUtcDay(now);
+    final days = range.days;
+    if (days != null) return PriceWindow.endingOn(to, days: days);
+    final first = _availableFrom;
+    if (first == null || first.isAfter(to)) return null;
+    return PriceWindow.since(first, to: to);
   }
 
   Future<PortfolioPriceHistory?> _fetch(
     PortfolioChartRange range,
     DateTime now,
   ) async {
+    var window = _windowFor(range, now);
+    if (window == null) {
+      await load(PortfolioChartRange.week);
+      window = _windowFor(range, _now().toUtc());
+    }
     PriceSeries? series;
-    try {
-      series = await _source.fetch(_windowFor(range, now));
-    } catch (_) {
-      series = null;
+    if (window != null) {
+      try {
+        series = await _source.fetch(window);
+      } catch (_) {
+        series = null;
+      }
     }
     final finished = _now().toUtc();
     if (series == null) {
       _failedAt[range] = finished;
       return _cache[range];
     }
+    _availableFrom = series.availableFrom;
     _failedAt.remove(range);
     return _cache[range] = PortfolioPriceHistory(
       series: series,

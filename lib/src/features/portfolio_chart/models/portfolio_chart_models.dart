@@ -2,14 +2,17 @@ import 'package:flutter/foundation.dart';
 
 /// The spans the Home portfolio chart offers.
 ///
-/// Each is a fixed run of whole UTC days of daily prices, counted back from the
-/// last completed UTC day, so the request for one is the same for everybody on
-/// a given day.
+/// Each but [all] is a fixed run of whole UTC days of daily prices, counted back
+/// from the last completed UTC day, so the request for one is the same for
+/// everybody on a given day. [all] starts where the pricing server's own
+/// history does (its `availableFrom`), which is the server's to say, not the
+/// wallet's.
 enum PortfolioChartRange {
   week('1w', 'Past week', Duration(days: 7)),
   month('1m', 'Past month', Duration(days: 30)),
   quarter('3m', 'Past 3 months', Duration(days: 90)),
-  year('1y', 'Past year', Duration(days: 365));
+  year('1y', 'Past year', Duration(days: 365)),
+  all('All', 'All time', null);
 
   const PortfolioChartRange(this.label, this.description, this.window);
 
@@ -18,9 +21,12 @@ enum PortfolioChartRange {
 
   /// Screen-reader wording for the span.
   final String description;
-  final Duration window;
 
-  int get days => window.inDays;
+  /// How far back the span reaches, or `null` for all of the history there is.
+  final Duration? window;
+
+  /// The whole days of [window], or `null` for [all].
+  int? get days => window?.inDays;
 
   static const defaultRange = PortfolioChartRange.week;
 

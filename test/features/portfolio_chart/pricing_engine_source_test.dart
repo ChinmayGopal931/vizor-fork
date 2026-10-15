@@ -480,6 +480,23 @@ void main() {
       ]);
     });
 
+    test('pages all of the history the same way, from the server\'s first '
+        'day', () async {
+      final history = PriceWindow(DateTime.utc(2025, 1, 1), _to);
+      final server = _FakePricingServer(pageSize: 300);
+
+      final series = await sourceFor(server).fetch(history);
+
+      expect(history.days, 652);
+      expect(series!.points.length, 652);
+      expect(series.points.first.time, DateTime.utc(2025, 1, 1));
+      expect(series.points.last.time, _to);
+      expect(
+        [for (final uri in server.requests) uri.queryParameters['from']],
+        ['2025-01-01', '2025-10-28', '2026-08-24'],
+      );
+    });
+
     test('refuses a series that needs more than four pages', () async {
       final year = PriceWindow.endingOn(_to, days: 365);
       final server = _FakePricingServer(pageSize: 90);
