@@ -1979,7 +1979,8 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
   ),
   FigmaCompareScenario(
     id: 'mobile-settings-portfolio-chart',
-    description: 'Mobile settings card for the Home portfolio chart',
+    description:
+        'Mobile settings card for the Home portfolio chart, market prices on',
     builder: buildMobileSettingsPortfolioChartUseCase,
     desktop: false,
     mobile: true,
@@ -2171,7 +2172,8 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
   FigmaCompareScenario(
     id: 'mobile-home-portfolio-chart',
     description:
-        'Mobile home portfolio chart: balance valued at public prices, 1w',
+        'Mobile home portfolio chart: balance valued at daily prices from the '
+        'pricing server, 1w',
     builder: buildMobileHomePortfolioChartUseCase,
     desktop: false,
     mobile: true,

@@ -796,18 +796,19 @@ Widget buildSettingsSupportVizorUseCase(BuildContext context) {
   );
 }
 
-/// Real mobile settings and tab bar, pinned to the app footer for visual review.
-/// The version still comes from VIZOR_RELEASE_VERSION, just as in a release.
-/// The Settings card for the Home portfolio chart: on, with market prices, so
-/// it names CoinGecko and what a request carries.
+/// The Settings card for the Home portfolio chart with market prices turned on:
+/// it names the pricing server, what a request carries, and who sees the IP
+/// address.
 Widget buildMobileSettingsPortfolioChartUseCase(BuildContext context) =>
-    _buildMobileSettingsPortfolioChartUseCase(PortfolioChartSettings.defaults);
+    _buildMobileSettingsPortfolioChartUseCase(
+      PortfolioChartSettings.defaults.copyWith(marketPrices: true),
+    );
 
-/// Market prices off: the ZEC balance chart, which asks no server for anything.
+/// Market prices off, as a fresh install has them: the ZEC balance chart, which
+/// asks no server for anything, and what turning prices on would do.
 Widget buildMobileSettingsPortfolioChartLocalUseCase(BuildContext context) =>
     _buildMobileSettingsPortfolioChartUseCase(
       PortfolioChartSettings.defaults.copyWith(
-        marketPrices: false,
         defaultRange: PortfolioChartRange.month,
       ),
     );
@@ -1824,6 +1825,14 @@ Widget buildMobileHomePortfolioChartFallingUseCase(BuildContext context) =>
           range: PortfolioChartRange.month,
           falling: true,
         ),
+      ),
+    );
+
+/// All the history there is, from the pricing server's first day.
+Widget buildMobileHomePortfolioChartAllUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      PortfolioChartReady(
+        previewPortfolioChartData(range: PortfolioChartRange.all),
       ),
     );
 

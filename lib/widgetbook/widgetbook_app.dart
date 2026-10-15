@@ -535,6 +535,10 @@ class WidgetbookApp extends StatelessWidget {
                       builder: buildMobileHomePortfolioChartFallingUseCase,
                     ),
                     WidgetbookUseCase(
+                      name: 'Portfolio chart all time',
+                      builder: buildMobileHomePortfolioChartAllUseCase,
+                    ),
+                    WidgetbookUseCase(
                       name: 'Portfolio chart ZEC balance',
                       builder: buildMobileHomePortfolioChartZecUseCase,
                     ),
@@ -1144,7 +1148,7 @@ class WidgetbookApp extends StatelessWidget {
                       builder: buildMobileSettingsPortfolioChartUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Mobile portfolio chart settings without prices',
+                      name: 'Mobile portfolio chart settings prices off',
                       builder: buildMobileSettingsPortfolioChartLocalUseCase,
                     ),
                     WidgetbookUseCase(
