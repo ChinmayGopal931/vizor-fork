@@ -28,8 +28,8 @@ const kPrivacyModeEnabledKey = 'zcash_privacy_mode_enabled';
 const kSyncKeepAwakeEnabledKey = 'zcash_sync_keep_awake_enabled';
 const kSyncKeepAwakePromptSeenKey = 'zcash_sync_keep_awake_prompt_seen';
 
-/// Home portfolio chart preferences. Absent means the default: shown, valued
-/// with market prices, starting at one week.
+/// Home portfolio chart preferences. Absent means the default: shown, the ZEC
+/// balance only (market prices are opt-in), starting at one week.
 const kPortfolioChartEnabledKey = 'zcash_portfolio_chart_enabled';
 const kPortfolioChartMarketPricesKey = 'zcash_portfolio_chart_market_prices';
 const kPortfolioChartRangeKey = 'zcash_portfolio_chart_range';

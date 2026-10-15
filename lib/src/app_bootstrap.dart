@@ -64,7 +64,7 @@ class AppBootstrapState {
     this.syncKeepAwakeEnabled = false,
     this.syncKeepAwakePromptSeen = false,
     this.portfolioChartEnabled = true,
-    this.portfolioChartMarketPrices = true,
+    this.portfolioChartMarketPrices = false,
     this.portfolioChartRange,
     this.enhancePirEnabled = false,
     this.failureKind,
@@ -83,8 +83,9 @@ class AppBootstrapState {
   final bool syncKeepAwakeEnabled;
   final bool syncKeepAwakePromptSeen;
 
-  /// Home portfolio chart preferences. Both switches default to on, like the
-  /// Home price they sit next to; [portfolioChartRange] is the stored range
+  /// Home portfolio chart preferences. The chart is shown by default, but
+  /// market prices are off until the user turns them on: they are the only
+  /// part that contacts a server. [portfolioChartRange] is the stored range
   /// label, or `null` for the default.
   final bool portfolioChartEnabled;
   final bool portfolioChartMarketPrices;
@@ -296,23 +297,7 @@ Future<AppBootstrapState> loadAppBootstrap({
       key: kSyncKeepAwakePromptSeenKey,
       label: 'sync keep-awake prompt seen flag',
     );
-    final portfolioChartEnabled = await _readPlainBoolOr(
-      storage,
-      key: kPortfolioChartEnabledKey,
-      defaultValue: true,
-      label: 'portfolio chart visibility',
-    );
-    final portfolioChartMarketPrices = await _readPlainBoolOr(
-      storage,
-      key: kPortfolioChartMarketPricesKey,
-      defaultValue: true,
-      label: 'portfolio chart market prices flag',
-    );
-    final portfolioChartRange = await _readPlainString(
-      storage,
-      key: kPortfolioChartRangeKey,
-      label: 'portfolio chart range',
-    );
+    final portfolioChart = await readPortfolioChartPreferences(storage);
     final enhancePirEnabled = await readEnhancePirEnabledPreference(storage);
     var isPasswordConfigured = await storage.isPasswordConfigured();
     var isUnlocked = storage.hasSessionPassword;
@@ -506,9 +491,9 @@ Future<AppBootstrapState> loadAppBootstrap({
       biometricUnlockEnabled: biometricUnlockEnabled,
       syncKeepAwakeEnabled: syncKeepAwakeEnabled,
       syncKeepAwakePromptSeen: syncKeepAwakePromptSeen,
-      portfolioChartEnabled: portfolioChartEnabled,
-      portfolioChartMarketPrices: portfolioChartMarketPrices,
-      portfolioChartRange: portfolioChartRange,
+      portfolioChartEnabled: portfolioChart.enabled,
+      portfolioChartMarketPrices: portfolioChart.marketPrices,
+      portfolioChartRange: portfolioChart.range,
       enhancePirEnabled: enhancePirEnabled,
       isPasswordConfigured: isPasswordConfigured,
       isUnlocked: isUnlocked,
@@ -709,8 +694,36 @@ Future<bool> _readPlainBool(
   }
 }
 
-/// Like [_readPlainBool], for a switch that is on until the user turns it off:
-/// an absent or unreadable value keeps the default rather than reading as off.
+/// The Home portfolio chart's saved preferences. A saved choice is kept as it
+/// was written. An absent or unreadable value keeps the default: the chart is
+/// shown, market prices are off (so an unreadable keychain never turns a server
+/// on), and the range is unset.
+@visibleForTesting
+Future<({bool enabled, bool marketPrices, String? range})>
+readPortfolioChartPreferences(AppSecureStore storage) async {
+  return (
+    enabled: await _readPlainBoolOr(
+      storage,
+      key: kPortfolioChartEnabledKey,
+      defaultValue: true,
+      label: 'portfolio chart visibility',
+    ),
+    marketPrices: await _readPlainBoolOr(
+      storage,
+      key: kPortfolioChartMarketPricesKey,
+      defaultValue: false,
+      label: 'portfolio chart market prices flag',
+    ),
+    range: await _readPlainString(
+      storage,
+      key: kPortfolioChartRangeKey,
+      label: 'portfolio chart range',
+    ),
+  );
+}
+
+/// Like [_readPlainBool], for a switch with its own default: an absent or
+/// unreadable value keeps [defaultValue] rather than reading as off.
 Future<bool> _readPlainBoolOr(
   AppSecureStore storage, {
   required String key,

@@ -2,8 +2,9 @@ import 'package:flutter/foundation.dart';
 
 /// The spans the Home portfolio chart offers.
 ///
-/// The longest is one year: the public CoinGecko API serves no older history
-/// than that, so a longer span would be a promise the price source cannot keep.
+/// Each is a fixed run of whole UTC days of daily prices, counted back from the
+/// last completed UTC day, so the request for one is the same for everybody on
+/// a given day.
 enum PortfolioChartRange {
   week('1w', 'Past week', Duration(days: 7)),
   month('1m', 'Past month', Duration(days: 30)),
@@ -34,8 +35,8 @@ enum PortfolioChartRange {
 
 /// What the chart plots.
 enum PortfolioChartMode {
-  /// The balance valued at public ZEC/USD prices. Asks a price service for
-  /// prices over the range; nothing about the wallet is sent.
+  /// The balance valued at public ZEC/USD prices. Asks the pricing server for
+  /// daily prices over the range; nothing about the wallet is sent.
   usd,
 
   /// The ZEC balance alone, built from the wallet database. No network.

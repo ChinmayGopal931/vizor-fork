@@ -52,11 +52,19 @@ fvm flutter build macos --release \
 ```
 
 `VIZOR_COINGECKO_PRICE_BASE_URL` controls the home screen ZEC price and 24h
-change source, and the price history behind the mobile Home portfolio chart
-(`/coins/zcash/market_chart`, asked for by number of days only). Open-source
-builds should use the public CoinGecko base URL above; production builds can
-point this define at a Veylor-operated proxy, which then has to serve both
-`/simple/price` and `/coins/zcash/market_chart`.
+change source. Open-source builds should use the public CoinGecko base URL
+above; production builds can point this define at a Veylor-operated proxy,
+which then has to serve `/simple/price`.
+
+`VIZOR_PRICING_ENGINE_BASE_URL` controls the price history behind the mobile
+Home portfolio chart: the origin of a pricing engine that serves
+`GET /v1/prices` (daily ZEC prices in USD for a range of UTC dates). It
+defaults to `https://zapp-pricing-engine.majorworker.workers.dev`. The app asks
+it for nothing unless the user turns on "Use market prices" in Settings, and
+then a request names only the coin, the currency, the resolution and the dates
+(never anything from the wallet); the server sees the device's IP address
+unless Tor is on. An empty, non-https or invalid value turns the chart's market
+prices off.
 
 The built app is at:
 

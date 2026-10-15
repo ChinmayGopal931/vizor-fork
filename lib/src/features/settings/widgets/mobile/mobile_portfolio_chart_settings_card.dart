@@ -7,22 +7,30 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
-import '../../../../providers/zec_price_change_provider.dart';
 import '../../../portfolio_chart/providers/portfolio_chart_settings_provider.dart';
+import '../../../portfolio_chart/services/portfolio_chart_format.dart';
 import '../../../portfolio_chart/widgets/portfolio_chart_range_selector.dart';
 import 'mobile_tor_control.dart' show MobilePrivacyToggle;
 
 const _rowHeight = 44.0;
 
-/// Where the chart's prices come from, and the one thing a price request says.
-/// Named in full so what the chart contacts is never a surprise.
-const kPortfolioChartMarketPricesCopy =
+/// With market prices on: which server the chart asks, what a request carries,
+/// and who sees the IP address. The host is named in full so what the chart
+/// contacts is never a surprise.
+String portfolioChartMarketPricesCopy(String host) =>
     'Charts your balance in USD over time. Your balance history is built on '
-    'this device. Prices come from CoinGecko (api.coingecko.com), the same '
-    'source as the price on the home screen; the request names only ZEC, USD '
-    'and the range, never an address, key or balance. CoinGecko sees your IP '
-    'address unless Tor is on.';
+    'this device. Daily prices are requested from $host. A request names only '
+    'ZEC, USD, daily prices and a date range, and nothing from your wallet. '
+    'That server sees your IP address unless Tor is on. Prices are USD only.';
 
+/// With market prices off (the default) on a build that offers them: nothing is
+/// requested, and what turning them on would do is said before it is done.
+String portfolioChartPricesOffCopy(String host) =>
+    'Charts your ZEC balance over time, built on this device. Nothing is '
+    'requested from any server. Turning on market prices would request daily '
+    'USD prices from $host, which then sees your IP address unless Tor is on.';
+
+/// On a build with no market prices to offer.
 const kPortfolioChartLocalCopy =
     'Charts your ZEC balance over time, built on this device. Nothing is '
     'requested from any server.';
@@ -40,13 +48,17 @@ class MobilePortfolioChartSettingsCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
     final settings = ref.watch(portfolioChartSettingsProvider);
-    final pricesAvailable = ref.watch(zecMarketDataAvailableProvider);
-    final usesPrices = pricesAvailable && settings.marketPrices;
+    final pricesAvailable = ref.watch(portfolioChartPricesAvailableProvider);
+    final host = portfolioPricingServerHost(
+      ref.watch(portfolioPricingEngineBaseUriProvider),
+    );
     final description = !settings.enabled
         ? kPortfolioChartHiddenCopy
-        : usesPrices
-        ? kPortfolioChartMarketPricesCopy
-        : kPortfolioChartLocalCopy;
+        : !pricesAvailable
+        ? kPortfolioChartLocalCopy
+        : settings.marketPrices
+        ? portfolioChartMarketPricesCopy(host)
+        : portfolioChartPricesOffCopy(host);
 
     return MobileSurfaceCard(
       cornerRadius: AppRadii.large,
@@ -88,8 +100,9 @@ class MobilePortfolioChartSettingsCard extends ConsumerWidget {
               ),
             ),
           ),
-          // Only builds that show a market price at all offer one here; on the
-          // rest the chart is the ZEC balance and nothing could be requested.
+          // Only builds that can value the chart at market prices (a Home price
+          // and a usable pricing server) offer the switch; on the rest the
+          // chart is the ZEC balance and nothing could be requested.
           if (pricesAvailable) ...[
             const SizedBox(height: AppSpacing.xxs),
             _ToggleRow(

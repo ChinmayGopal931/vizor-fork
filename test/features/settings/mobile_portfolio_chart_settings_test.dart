@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/config/pricing_engine_config.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/models/portfolio_chart_models.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/providers/portfolio_chart_settings_provider.dart';
@@ -37,11 +38,24 @@ class _FakeSettingsNotifier extends PortfolioChartSettingsNotifier {
   }
 }
 
-Widget _app(_FakeSettingsNotifier notifier, {bool pricesAvailable = true}) {
+const _host = 'zapp-pricing-engine.majorworker.workers.dev';
+
+Widget _app(
+  _FakeSettingsNotifier notifier, {
+  bool pricesAvailable = true,
+  Uri? pricingServer,
+  bool hasPricingServer = true,
+}) {
   return ProviderScope(
     overrides: [
       portfolioChartSettingsProvider.overrideWith(() => notifier),
       zecMarketDataAvailableProvider.overrideWithValue(pricesAvailable),
+      portfolioPricingEngineBaseUriProvider.overrideWithValue(
+        hasPricingServer
+            ? pricingServer ??
+                  parsePricingEngineBaseUri(kVizorPricingEngineBaseUrl)
+            : null,
+      ),
     ],
     child: MaterialApp(
       builder: (context, child) =>
@@ -74,10 +88,10 @@ void main() {
     final notifier = _FakeSettingsNotifier();
     await tester.pumpWidget(_app(notifier));
 
-    // On by default, with prices: the card names the server and the request.
+    // Shown by default, and nothing is requested: the card says so, and what
+    // turning prices on would do.
     expect(_isOn(tester, 'toggle'), isTrue);
-    expect(_description(tester), kPortfolioChartMarketPricesCopy);
-    expect(_description(tester), contains('CoinGecko (api.coingecko.com)'));
+    expect(_description(tester), portfolioChartPricesOffCopy(_host));
     expect(find.text('Default range'), findsOneWidget);
 
     await tester.tap(
@@ -106,28 +120,71 @@ void main() {
     expect(_isOn(tester, 'toggle'), isTrue);
   });
 
-  testWidgets('market prices off charts the ZEC balance with no request', (
-    tester,
-  ) async {
+  testWidgets('market prices are off until turned on, and the card then '
+      'says exactly what is contacted', (tester) async {
     final notifier = _FakeSettingsNotifier();
     await tester.pumpWidget(_app(notifier));
 
-    expect(_isOn(tester, 'prices_toggle'), isTrue);
+    // Opt-in: off by default, with the offer and its cost stated up front.
+    expect(_isOn(tester, 'prices_toggle'), isFalse);
+    expect(_description(tester), contains(_host));
+    expect(_description(tester), contains('Nothing is requested'));
+    expect(_description(tester), contains('IP address unless Tor is on'));
+    expect(_description(tester), isNot(contains('CoinGecko')));
+
     await tester.tap(
       find.byKey(const ValueKey('mobile_settings_portfolio_chart_prices_row')),
     );
     await tester.pumpAndSettle();
 
-    expect(notifier.changes, ['marketPrices=false']);
+    expect(notifier.changes, ['marketPrices=true']);
+    expect(_isOn(tester, 'prices_toggle'), isTrue);
+    final copy = _description(tester);
+    expect(copy, portfolioChartMarketPricesCopy(_host));
+    // The host in full, what a request carries, who sees the address, and the
+    // currency.
+    expect(copy, contains('requested from $_host'));
+    expect(
+      copy,
+      contains('names only ZEC, USD, daily prices and a date range'),
+    );
+    expect(copy, contains('nothing from your wallet'));
+    expect(copy, contains('sees your IP address unless Tor is on'));
+    expect(copy, contains('USD only'));
+    expect(copy, isNot(contains('CoinGecko')));
+
+    await tester.tap(
+      find.byKey(const ValueKey('mobile_settings_portfolio_chart_prices_row')),
+    );
+    await tester.pumpAndSettle();
+    expect(notifier.changes, ['marketPrices=true', 'marketPrices=false']);
     expect(_isOn(tester, 'prices_toggle'), isFalse);
-    expect(_description(tester), kPortfolioChartLocalCopy);
-    expect(_description(tester), isNot(contains('CoinGecko')));
+    expect(_description(tester), portfolioChartPricesOffCopy(_host));
 
     await tester.tap(
       find.byKey(const ValueKey('mobile_settings_portfolio_chart_range_1y')),
     );
     await tester.pumpAndSettle();
     expect(notifier.changes.last, 'range=1y');
+  });
+
+  testWidgets('names the host the build is configured with, port included', (
+    tester,
+  ) async {
+    final notifier = _FakeSettingsNotifier();
+    await tester.pumpWidget(
+      _app(notifier, pricingServer: Uri.parse('https://prices.example:8443')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('mobile_settings_portfolio_chart_prices_row')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      _description(tester),
+      portfolioChartMarketPricesCopy('prices.example:8443'),
+    );
+    expect(_description(tester), isNot(contains(_host)));
   });
 
   testWidgets('a build without market prices offers no price switch', (
@@ -140,5 +197,18 @@ void main() {
     expect(find.text('Use market prices'), findsNothing);
     expect(_description(tester), kPortfolioChartLocalCopy);
     expect(find.text('Show on home'), findsOneWidget);
+  });
+
+  testWidgets('a build with no usable pricing server offers no price switch', (
+    tester,
+  ) async {
+    // An empty, non-https or invalid VIZOR_PRICING_ENGINE_BASE_URL.
+    await tester.pumpWidget(
+      _app(_FakeSettingsNotifier(), hasPricingServer: false),
+    );
+
+    expect(find.text('Use market prices'), findsNothing);
+    expect(_description(tester), kPortfolioChartLocalCopy);
+    expect(_description(tester), isNot(contains('IP address')));
   });
 }

@@ -722,24 +722,61 @@ Mobile Home shows a chart under the balance card
 wallet DB alone: `getTransactionHistory`, `account_balance_delta` per mined
 block, folded into a balance step function once a sync has completed (nothing
 while locked, and a mask in privacy mode). Its market side is public ZEC/USD
-history, CoinGecko `/coins/zcash/market_chart` on
-`VIZOR_COINGECKO_PRICE_BASE_URL` (the Home price's own base), through
-`NetworkHttpClient`, so it follows the Tor route and fails closed.
+daily price history from the zapp pricing engine, `GET /v1/prices` on
+`VIZOR_PRICING_ENGINE_BASE_URL` (default
+`https://zapp-pricing-engine.majorworker.workers.dev`), through
+`NetworkHttpClient`, so it follows the Tor route and fails closed. The Home
+price is separate and stays on CoinGecko (`VIZOR_COINGECKO_PRICE_BASE_URL`);
+the chart no longer reads that define.
 
-- A price request names the coin, the currency and a number of days, nothing
-  else. Never put an address, key, seed, balance, account, wallet identifier or
-  wallet-derived date in it; balances and prices are joined on the device.
-  `coinGeckoMarketChartUri` is the only place the request is built, and
+- **Opt-in.** "Show on home" is on by default; "Use market prices" is off, so a
+  fresh install makes no chart request and the chart is the ZEC balance. A
+  saved choice is kept as written, and an unreadable "Use market prices" reads
+  as off. Settings, Portfolio chart names the host, what a request carries,
+  that the server sees the IP address unless Tor is on, and that prices are
+  USD only.
+- **What a request carries.** The coin (`asset=ZEC`), the currency
+  (`fiat=USD`), `resolution=1d`, two UTC dates (`from`, `to`) and `limit=1000`,
+  in that order (the order is part of the server's cache key), and nothing
+  else. The dates are whole UTC days ending at the last completed UTC day
+  (yesterday, or the day before in the first ten minutes of a UTC day) over a
+  fixed window per chip: 7, 30, 90 or 365 days, so every device sends the same
+  request on a given day. Never put an address, key, seed, balance, account,
+  wallet identifier, wallet-derived date or wallet-derived timing in it;
+  balances and prices are joined on the device. `pricingEnginePricesUri` is the
+  only place the request is built, and
   `test/features/portfolio_chart/portfolio_chart_history_test.dart` pins its
-  parameters.
-- It shares the Home price's gate (`zecMarketDataAvailableProvider`) and its
-  default: prices are on wherever Home fetches one. Settings, Portfolio chart
-  can hide the chart or turn market prices off, and the chart is then the ZEC
-  balance with no request at all. Both settings and the default range persist in
-  the secure-store plain lane and are read in bootstrap.
-- Prices are cached in memory only (30 minutes per range, a 5 minute cool-down
-  after a failure). When none can be had the chart falls back to the ZEC
-  balance and says so on the card.
+  keys and values.
+- **When it may leave the device.** `portfolioPriceRequestsAllowedProvider` is
+  the one gate in front of the price source: "Use market prices" is on, the
+  chart is shown on Home, this build shows market prices at all
+  (`zecMarketDataAvailableProvider`, the Home price's own gate) and has a
+  usable server, the wallet is unlocked, privacy mode is off, and the app is
+  in the foreground (`appInForegroundProvider`). While any of these does not
+  hold nothing is requested; only an already cached series is drawn. An empty,
+  non-https or invalid `VIZOR_PRICING_ENGINE_BASE_URL` has the same effect for
+  good: no price switch in Settings and no request.
+- **The answer is untrusted data.** `parsePricingEnginePage` and
+  `assemblePriceSeries` accept a series only when it is the documented
+  document for the same asset, currency, resolution and dates; its
+  availability is whole UTC days; every price is finite, positive and
+  consistent; and its timestamps are UTC midnights, ascending, one day apart,
+  inside the window and the availability. A page that is not `complete`
+  follows its `nextCursor` (its UTC date becomes the next `from`, as in zapp)
+  for at most four pages, and a series that would need more, or whose cursor
+  repeats or goes back, is refused rather than drawn short. https only, 30 s
+  per request and 90 s in all, 512 KiB per page.
+- **Fallback and cache.** Any failure falls back to the ZEC balance with
+  "Prices unavailable" on the card and a five minute cool-down. Prices are
+  cached in memory only, per range and window (a window moves at UTC
+  midnight); a window the server had not finished is asked again after 30
+  minutes; a series more than a day behind is marked "Older prices".
+- **Valuation.** The balance side is exact (block times) and the prices are
+  daily, so `buildPortfolioChart` draws every price of the window and places a
+  balance change between two prices at its own time, valued on the straight
+  line between them. Do not sample the balance at the price timestamps alone:
+  that draws a receipt as a day-long slope and gives a wallet funded since the
+  last price no chart. A daily price is dated by its UTC day when scrubbed.
 
 ### iOS Preparation Confirmation Tracking
 

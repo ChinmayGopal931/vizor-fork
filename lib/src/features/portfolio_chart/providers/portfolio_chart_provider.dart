@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../main.dart' show log;
 import '../../../core/storage/wallet_paths.dart';
 import '../../../providers/account_provider.dart';
+import '../../../providers/app_foreground_provider.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/privacy_mode_provider.dart';
 import '../../../providers/rpc_endpoint_provider.dart';
 import '../../../providers/sync_provider.dart';
-import '../../../providers/zec_price_change_provider.dart';
 import '../../../rust/api/sync.dart' as rust_sync;
 import '../models/portfolio_chart_models.dart';
 import '../services/portfolio_balance_history.dart';
@@ -38,7 +38,11 @@ final portfolioChartNowProvider = Provider<DateTime Function()>(
 
 final portfolioPriceHistorySourceProvider =
     Provider<PortfolioPriceHistorySource>((ref) {
-      final source = CoinGeckoPortfolioPriceHistorySource();
+      final baseUri = ref.watch(portfolioPricingEngineBaseUriProvider);
+      if (baseUri == null) {
+        return const UnavailablePortfolioPriceHistorySource();
+      }
+      final source = PricingEnginePortfolioPriceHistorySource(baseUri: baseUri);
       ref.onDispose(source.close);
       return source;
     });
@@ -181,23 +185,56 @@ final portfolioBalanceHistoryProvider =
       }
     });
 
+/// Whether a price request may leave the device right now. Every condition has
+/// to hold, and the chart makes no request while any does not:
+///
+/// - the user turned "Use market prices" on (it is off by default) and the
+///   chart is shown on Home;
+/// - this build can show market prices at all;
+/// - the wallet is unlocked;
+/// - privacy mode is off, so there is a chart to draw;
+/// - the app is in the foreground.
+///
+/// This is the single gate in front of the price source. The chart is also not
+/// asked for while Home has no balance history to draw it from, which the view
+/// provider decides before it reads prices.
+final portfolioPriceRequestsAllowedProvider = Provider<bool>((ref) {
+  final wantsPrices = ref.watch(
+    portfolioChartSettingsProvider.select(
+      (settings) => settings.enabled && settings.marketPrices,
+    ),
+  );
+  if (!wantsPrices) return false;
+  if (!ref.watch(portfolioChartPricesAvailableProvider)) return false;
+  final locked = ref.watch(
+    appSecurityProvider.select((state) => state.requiresUnlock),
+  );
+  if (locked) return false;
+  if (ref.watch(privacyModeProvider)) return false;
+  return ref.watch(appInForegroundProvider);
+});
+
 /// Prices for one range, from the shared cache. Asked again after each sync, so
-/// a series past its time to live is refreshed without a timer.
+/// a window that has moved on or a series the server had not finished is
+/// refreshed without a timer. While [portfolioPriceRequestsAllowedProvider] is
+/// false only what is already cached is served, and nothing is requested.
 final portfolioPriceHistoryProvider = FutureProvider.autoDispose
     .family<PortfolioPriceHistory?, PortfolioChartRange>((ref, range) {
+      final repository = ref.watch(portfolioPriceHistoryRepositoryProvider);
+      if (!ref.watch(portfolioPriceRequestsAllowedProvider)) {
+        return repository.cached(range);
+      }
       ref.watch(_walletKeyProvider.select((key) => key.completedAt));
-      return ref
-          .watch(portfolioPriceHistoryRepositoryProvider)
-          .load(range.days);
+      return repository.load(range);
     });
 
-/// USD only where this build shows market prices at all (the Home price's own
-/// gate) and the user has not turned them off.
+/// USD only where this build can show market prices and the user turned them
+/// on; otherwise the ZEC balance.
 final portfolioChartModeProvider = Provider<PortfolioChartMode>((ref) {
   final wantsPrices = ref.watch(
     portfolioChartSettingsProvider.select((settings) => settings.marketPrices),
   );
-  final available = ref.watch(zecMarketDataAvailableProvider);
+  final available = ref.watch(portfolioChartPricesAvailableProvider);
   return wantsPrices && available
       ? PortfolioChartMode.usd
       : PortfolioChartMode.zec;
@@ -249,15 +286,12 @@ final portfolioChartViewProvider =
         final prices = ref.watch(portfolioPriceHistoryProvider(range));
         final series = prices.value;
         if (series != null) {
-          final stale =
-              now.toUtc().difference(series.fetchedAt) >
-              const Duration(hours: 1);
           data = buildPortfolioChart(
             balance: balance,
             range: range,
             now: now,
             prices: series.points,
-            notice: stale
+            notice: series.isStaleAt(now)
                 ? PortfolioChartNotice.pricesStale
                 : PortfolioChartNotice.none,
           );

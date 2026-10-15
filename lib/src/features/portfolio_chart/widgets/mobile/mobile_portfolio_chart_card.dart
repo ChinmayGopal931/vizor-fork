@@ -27,6 +27,9 @@ class MobilePortfolioChartSlot extends ConsumerWidget {
       child: MobilePortfolioChartCard(
         key: const ValueKey('mobile_home_portfolio_chart'),
         state: state,
+        priceSourceName: portfolioPriceSourceName(
+          ref.watch(portfolioPricingEngineBaseUriProvider),
+        ),
         onRangeSelected: ref.read(portfolioChartRangeProvider.notifier).select,
       ),
     );
@@ -50,11 +53,15 @@ class MobilePortfolioChartCard extends StatefulWidget {
   const MobilePortfolioChartCard({
     required this.state,
     required this.onRangeSelected,
+    this.priceSourceName = 'the pricing server',
     super.key,
   });
 
   final PortfolioChartViewState state;
   final ValueChanged<PortfolioChartRange> onRangeSelected;
+
+  /// Who the prices come from, as the source line names it.
+  final String priceSourceName;
 
   @override
   State<MobilePortfolioChartCard> createState() =>
@@ -140,9 +147,11 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
     }
 
     // Top right: where the numbers come from, or the time under the finger.
+    // The server's name is part of what the card discloses, so on a narrow
+    // phone it shrinks to fit rather than being cut short.
     final Widget source = Text(
       data != null && selected != null
-          ? formatPortfolioPointTime(selected.time, data.range)
+          ? formatPortfolioPointTime(selected.time, data.range, data.mode)
           : _sourceLabel(state),
       key: const ValueKey('mobile_home_portfolio_chart_source'),
       maxLines: 1,
@@ -192,7 +201,13 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),
-              Expanded(child: source),
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: source,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: AppSpacing.xxs),
@@ -296,19 +311,16 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
   /// Names what the chart contacts, or that it contacts nothing. Always on the
   /// card, so the source is never something to look up in Settings.
   String _sourceLabel(PortfolioChartViewState state) {
+    final fromServer = 'Prices from ${widget.priceSourceName}';
     final data = _dataOf(state);
     if (data == null) {
-      return _mode == PortfolioChartMode.usd
-          ? 'Prices from CoinGecko'
-          : 'On this device';
+      return _mode == PortfolioChartMode.usd ? fromServer : 'On this device';
     }
     return switch (data.notice) {
       PortfolioChartNotice.pricesUnavailable => 'Prices unavailable',
       PortfolioChartNotice.pricesStale => 'Older prices',
       PortfolioChartNotice.none =>
-        data.mode == PortfolioChartMode.usd
-            ? 'Prices from CoinGecko'
-            : 'On this device',
+        data.mode == PortfolioChartMode.usd ? fromServer : 'On this device',
     };
   }
 }

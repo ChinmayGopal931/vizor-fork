@@ -62,9 +62,50 @@ PortfolioChartChange describePortfolioChange(PortfolioChartData data) {
   );
 }
 
-/// When a point was: to the hour for the hourly spans, the day for a year.
-String formatPortfolioPointTime(DateTime time, PortfolioChartRange range) {
+/// When a point was.
+///
+/// A daily price (a USD point at a UTC midnight) is that UTC day's, so it is
+/// dated by its UTC day: shifted into local time it would read a day early west
+/// of Greenwich. Any other point is an instant (a block time, or now): to the
+/// minute for the shorter spans, the day for a year.
+String formatPortfolioPointTime(
+  DateTime time,
+  PortfolioChartRange range,
+  PortfolioChartMode mode,
+) {
+  final utc = time.toUtc();
+  final isDailyPrice =
+      mode == PortfolioChartMode.usd &&
+      utc.hour == 0 &&
+      utc.minute == 0 &&
+      utc.second == 0 &&
+      utc.millisecond == 0 &&
+      utc.microsecond == 0;
+  if (isDailyPrice) {
+    return '${monthAbbreviation(utc.month)} ${utc.day}, ${utc.year}';
+  }
   return range == PortfolioChartRange.year
       ? formatMonthDayYear(time)
       : formatDayMonthTime(time);
+}
+
+/// The pricing server's host as Settings names it, in full: `host`, or
+/// `host:port` when the origin has a port of its own. Empty without a server.
+String portfolioPricingServerHost(Uri? baseUri) {
+  if (baseUri == null || baseUri.host.isEmpty) return '';
+  return baseUri.hasPort ? '${baseUri.host}:${baseUri.port}' : baseUri.host;
+}
+
+/// The longest host the Home card names in full; a longer one is shortened to
+/// its first label, which for `zapp-pricing-engine.majorworker.workers.dev` is
+/// the service's own name. Settings always names the host in full.
+const _fullHostLimit = 24;
+
+/// What the Home card calls the pricing server in "Prices from ...": the host
+/// when it is short enough to fit beside the card's title, otherwise its first
+/// label.
+String portfolioPriceSourceName(Uri? baseUri) {
+  final host = baseUri?.host ?? '';
+  if (host.isEmpty) return 'the pricing server';
+  return host.length <= _fullHostLimit ? host : host.split('.').first;
 }

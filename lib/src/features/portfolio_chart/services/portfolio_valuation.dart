@@ -4,8 +4,7 @@ import 'portfolio_price_history.dart';
 
 const _zatoshiPerZec = 100000000.0;
 
-/// More points than a phone can show add nothing, and the hourly series for a
-/// quarter has over two thousand.
+/// More points than a phone can show add nothing.
 const kPortfolioChartMaxPoints = 240;
 
 /// A price sample may be stamped a little ahead of this device's clock.
@@ -13,10 +12,12 @@ const _clockSlack = Duration(minutes: 10);
 
 /// Builds the chart for [range] counted back from [now].
 ///
-/// With [prices] the line is the balance valued at each price sample (USD);
-/// without, it is the ZEC balance as a step function. Either way the line
-/// starts at the first moment the balance was above zero, so a young wallet is
-/// not drawn from a long flat zero.
+/// With [prices] the line is the balance valued at each daily price (USD),
+/// from the first of them: the price series is already the range, as whole UTC
+/// days, so it is not cut again at the device's clock. Without, it is the ZEC
+/// balance over the last [PortfolioChartRange.window] as a step function.
+/// Either way the line starts at the first moment the balance was above zero,
+/// so a young wallet is not drawn from a long flat zero.
 ///
 /// Returns `null` when fewer than two points remain, or the line would start
 /// at nothing.
@@ -28,11 +29,10 @@ PortfolioChartData? buildPortfolioChart({
   PortfolioChartNotice notice = PortfolioChartNotice.none,
 }) {
   final end = now.toUtc();
-  final start = end.subtract(range.window);
   final points = prices == null
-      ? _balancePoints(balance, start, end)
+      ? _balancePoints(balance, end.subtract(range.window), end)
       : _downsample(
-          _valuedPoints(balance, prices, start, end),
+          _valuedPoints(balance, prices, end),
           kPortfolioChartMaxPoints,
         );
   if (points.length < 2 || points.first.value <= 0) return null;
@@ -67,33 +67,72 @@ List<PortfolioChartPoint> _balancePoints(
   return points;
 }
 
+/// The balance valued at each daily price.
+///
+/// A daily price is one sample a day, but the balance changes at block times,
+/// so a change between two samples is placed at its own time, valued on the
+/// straight line between the two prices around it. Without that, a receipt
+/// would be drawn as a slope across the whole day, and a wallet funded since
+/// the last sample would have no chart until the next one.
 List<PortfolioChartPoint> _valuedPoints(
   BalanceHistory balance,
   List<PricePoint> prices,
-  DateTime start,
   DateTime end,
 ) {
   final limit = end.add(_clockSlack);
+  final steps = balance.steps;
   final points = <PortfolioChartPoint>[];
-  PricePoint? latest;
-  for (final price in prices) {
-    if (price.time.isBefore(start)) continue;
-    if (price.time.isAfter(limit)) break;
-    latest = price;
-    final value = _zec(balance.balanceAt(price.time)) * price.usd;
+
+  void add(DateTime time, int zatoshi, double usd) {
+    final value = _zec(zatoshi) * usd;
     // Leading zero balance is not part of the story.
-    if (value <= 0 && points.isEmpty) continue;
-    points.add(PortfolioChartPoint(price.time, value));
+    if (value <= 0 && points.isEmpty) return;
+    points.add(PortfolioChartPoint(time, value));
   }
-  // A balance change after the last price sample would otherwise wait for the
-  // next sample to show.
-  if (latest != null && points.isNotEmpty && latest.time.isBefore(end)) {
-    final settled = balance.balanceAt(end);
-    if (settled != balance.balanceAt(latest.time)) {
-      points.add(PortfolioChartPoint(end, _zec(settled) * latest.usd));
+
+  // The first step not placed yet, and the balance after the last point placed.
+  var next = 0;
+  var held = 0;
+  PricePoint? previous;
+  for (final price in prices) {
+    if (price.time.isAfter(limit)) break;
+    while (next < steps.length && steps[next].time.isBefore(price.time)) {
+      final step = steps[next++];
+      // Before the first sample, or at the previous one: already in the balance.
+      if (previous == null || !step.time.isAfter(previous.time)) continue;
+      final usd = _priceBetween(previous, price, step.time);
+      add(step.time, held, usd);
+      add(step.time, step.zatoshi, usd);
+      held = step.zatoshi;
     }
+    held = balance.balanceAt(price.time);
+    add(price.time, held, price.usd);
+    previous = price;
+  }
+
+  // A balance change after the last price sample would otherwise wait for the
+  // next sample to show. It keeps that price, up to now.
+  final latest = previous;
+  if (latest != null && latest.time.isBefore(end)) {
+    final sampled = held;
+    while (next < steps.length && !steps[next].time.isAfter(end)) {
+      final step = steps[next++];
+      if (!step.time.isAfter(latest.time)) continue;
+      add(step.time, held, latest.usd);
+      add(step.time, step.zatoshi, latest.usd);
+      held = step.zatoshi;
+    }
+    if (held != sampled) add(end, held, latest.usd);
   }
   return points;
+}
+
+/// The price at [time], between [before] and [after], on the line through them.
+double _priceBetween(PricePoint before, PricePoint after, DateTime time) {
+  final span = after.time.difference(before.time).inMicroseconds;
+  if (span <= 0) return after.usd;
+  final elapsed = time.difference(before.time).inMicroseconds;
+  return before.usd + (after.usd - before.usd) * (elapsed / span);
 }
 
 List<PortfolioChartPoint> _downsample(
