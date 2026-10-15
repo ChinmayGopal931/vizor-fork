@@ -7,6 +7,75 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-15; read this first)
 
+- **Gotham, Veylor and the portfolio chart (2026-10-15; local, nothing of it
+  pushed yet; `origin` is still at `b52cfcc6b`):**
+  - **Gotham.** The app uses Gotham: the nine uploaded cuts (Thin, Thin
+    Italic, Extra Light Italic, Light, Book, Medium, Bold, Black, Ultra).
+    `Gotham Regular.otf` is a cut-down copy, so Book serves 400. The files
+    declare non-standard OS/2 weights (Book 325 up to Ultra 450) and Flutter
+    takes a face's weight from the file, so in a `flutter_test` measurement
+    `w400` rendered Bold. `loadGothamFonts()`
+    (`lib/src/core/theme/gotham_fonts.dart`) loads the files as plain assets
+    and rewrites each face's weight in memory, so Gotham is not a pubspec
+    `fonts:` family and the files on disk are untouched. **Not yet confirmed on
+    the phone.** Gotham is 6 to 9 percent wider than Geist and 21 percent
+    wider than Young Serif, so mobile Headline L and M went from 32 and 28 to
+    28 and 24. There is no SemiBold (`w600` renders Bold), no monospace face,
+    and `→ ≈ ↳` come from the fallback font.
+  - **The two Gotham commits are the last two on the branch and must not be
+    pushed without the owner's OK.** Gotham is a commercial typeface and the
+    fork is public; the owner has to confirm the licence covers this,
+    including the in-memory weight rewrite. The code commit cannot build
+    without the binaries, so push everything below them, or all of it.
+  - **Veylor (branding only).** Visible text, the Android and iOS app label,
+    permission texts, the Rust error strings that reach the UI, docs, README
+    and release notes now say Veylor. Application IDs, `vizor_*` keys,
+    `VIZOR_*` flags, identifiers and domains are unchanged, so the installed
+    test wallet keeps working. `scripts/brand/rename_veylor.py` is
+    idempotent; `--include-desktop` is the later desktop pass (desktop-only
+    files skipped: 77 occurrences in 23 Dart files, 65 in 21 test files, 17 in
+    6 native files; packaging names such as `PRODUCT_NAME` and `Vizor.app`
+    are never touched). **Artwork still says Vizor** and needs the owner:
+    `assets/icons/vizor_logo.svg` (welcome wordmark), `assets/icons/vizor.svg`,
+    the Android and iOS launcher icons, `.github/assets/gh-vizor-banner.png`
+    and some welcome art. "Veylor" is longer than "Vizor": "Veylor is
+    synced" at 1.45x text scale overflowed the mobile top bar by 18 px, so
+    the sync status is now capped at 65% of the bar.
+  - **Portfolio chart (mobile Home, settings card).** Under the balance card:
+    ZEC balance over time from local history (no network), 1w, 1m, 3m, 1y and
+    All, hidden when the history does not reconcile and masked in privacy
+    mode. **Use market prices** (off by default) values it in USD from the zapp
+    pricing engine (`zapp-pricing-engine.majorworker.workers.dev`, USD only,
+    verified live: HTTP 200, no key). A request carries only `asset=ZEC`,
+    `fiat=USD`, `resolution=1d`, whole UTC `from` and `to` dates and
+    `limit=1000`, identical for every user, and goes through
+    `NetworkHttpClient` (Tor policy, fail closed). It is made only when
+    "Show on home" and "Use market prices" are on, the wallet is unlocked,
+    privacy mode is off and the app is in the foreground
+    (`portfolioPriceRequestsAllowedProvider`). The server sees the IP address
+    unless Tor is on; the settings card says so. `VIZOR_PRICING_ENGINE_BASE_URL`
+    overrides the host (https only); the Home price still uses CoinGecko.
+    Desktop is not done.
+  - **Checks on the integrated tree.** `fvm flutter analyze`: clean. Rust
+    `cargo test`: 1,515 library tests and the integration suites pass, none
+    fail (12 ignored). Mobile lane on the final tree: 2,319 passed, 10 failed
+    (the known ones below); its first run also caught the top-bar overflow,
+    now fixed. Default lane (run just before that fix, which only touches a
+    mobile-only widget): 6,029 passed, 13 failed. Failures that already exist at `b52cfcc6b` (checked
+    there): `settings_seed_phrase_screen_test` (4, default lane) and
+    `app_review_payment_handoff_test` (10, mobile lane); both are finder
+    misses ("Enter amount", "Edit"). Desktop-lane failures from the font
+    swap, deferred while the focus is iOS and Android:
+    `widgetbook/settings_use_cases_test` (hangs on an uncaught exception in
+    the endpoint use case), `payment_link_ledger_ui_test` (2),
+    `ironwood_migration_flow_screen_test` (2) and `figma_compare_test` (1)
+    (a 21 px overflow in `transfer_status.dart:184`),
+    `lost_password_screen_test` (1) and `app_main_sidebar_test` (1).
+  - **Owner decisions pending:** the Gotham licence question above; the
+    Veylor artwork; whether to keep the Figma deviations (mobile Headline
+    28 and 24, activity rows 15 px) or redo the mobile designs in Gotham; two
+    near-miss mobile strings (the Ledger address pill, "Preparing your
+    receiving account"); and whether market prices should be on by default.
 - **Follow-up, local changes after `acdd2db45` (2026-10-15):**
   - M8 now selects the funded second account before sharing its context
     with the forward, reverse and send scenarios, matching M5/M7. The
