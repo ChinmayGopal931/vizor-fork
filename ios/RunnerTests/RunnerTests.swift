@@ -1022,7 +1022,7 @@ class RunnerTests: XCTestCase {
       migrationPreparationTrackingCompletionPresentation(batch),
       MigrationPreparationTrackingCompletionPresentation(
         title: "2 of 4 preparation transactions confirmed",
-        subtitle: "Open Vizor to start the next step"
+        subtitle: "Open Veylor to start the next step"
       )
     )
     // The task owns one wave. It reports that wave successfully instead of
@@ -1036,7 +1036,7 @@ class RunnerTests: XCTestCase {
       .finishConfirmed(
         MigrationPreparationTrackingCompletionPresentation(
           title: "2 of 4 preparation transactions confirmed",
-          subtitle: "Open Vizor to start the next step"
+          subtitle: "Open Veylor to start the next step"
         )
       )
     )
@@ -1134,7 +1134,7 @@ class RunnerTests: XCTestCase {
       migrationPreparationTrackingCompletionPresentation(batch),
       MigrationPreparationTrackingCompletionPresentation(
         title: "Preparation transactions confirmed",
-        subtitle: "Open Vizor to start the next step"
+        subtitle: "Open Veylor to start the next step"
       )
     )
   }
@@ -1865,7 +1865,7 @@ class RunnerTests: XCTestCase {
       migrationPreparationTrackingCompletionPresentation(batch),
       MigrationPreparationTrackingCompletionPresentation(
         title: "Migration preparation complete",
-        subtitle: "Open Vizor to continue your migration"
+        subtitle: "Open Veylor to continue your migration"
       )
     )
   }
@@ -1907,7 +1907,7 @@ class RunnerTests: XCTestCase {
     XCTAssertEqual(summary?.title, "Migration updates")
     XCTAssertEqual(
       summary?.body,
-      "2 accounts need attention. Open Vizor to continue."
+      "2 accounts need attention. Open Veylor to continue."
     )
   }
 
@@ -1925,7 +1925,7 @@ class RunnerTests: XCTestCase {
     XCTAssertEqual(summary?.accountCount, 1)
     XCTAssertEqual(summary?.highestPriority, .confirmedWaveReady)
     XCTAssertEqual(summary?.title, "Preparation transactions confirmed")
-    XCTAssertEqual(summary?.body, "Open Vizor to start the next step.")
+    XCTAssertEqual(summary?.body, "Open Veylor to start the next step.")
   }
 
   func testSingleAccountFailureKeepsTheAttentionCopy() {
@@ -1939,7 +1939,7 @@ class RunnerTests: XCTestCase {
     XCTAssertTrue(state.enqueue(failure))
 
     XCTAssertEqual(state.summary?.title, "Migration needs attention")
-    XCTAssertEqual(state.summary?.body, "Open Vizor to continue.")
+    XCTAssertEqual(state.summary?.body, "Open Veylor to continue.")
   }
 
   func testFailureOutranksAConfirmedWaveInTheSameBatch() {
@@ -1964,7 +1964,7 @@ class RunnerTests: XCTestCase {
     XCTAssertEqual(state.summary?.title, "Migration updates")
     XCTAssertEqual(
       state.summary?.body,
-      "2 accounts need attention. Open Vizor to continue."
+      "2 accounts need attention. Open Veylor to continue."
     )
   }
 
@@ -1993,7 +1993,7 @@ class RunnerTests: XCTestCase {
     XCTAssertEqual(state.summary?.title, "Migration preparation updates")
     XCTAssertEqual(
       state.summary?.body,
-      "2 accounts are ready for the next step. Open Vizor to continue."
+      "2 accounts are ready for the next step. Open Veylor to continue."
     )
   }
 
@@ -2208,7 +2208,7 @@ class RunnerTests: XCTestCase {
     wait(for: [refreshedRequestAdded], timeout: 1)
     XCTAssertEqual(
       center.addedRequests.last?.content.body,
-      "Open Vizor to continue."
+      "Open Veylor to continue."
     )
     center.completeAdd(error: nil)
   }
@@ -2264,7 +2264,7 @@ class RunnerTests: XCTestCase {
     wait(for: [refreshedRequestAdded], timeout: 1)
     XCTAssertEqual(
       center.addedRequests.last?.content.body,
-      "Open Vizor to continue."
+      "Open Veylor to continue."
     )
     center.completeAdd(error: nil)
   }

@@ -1096,7 +1096,7 @@ final class BackgroundMigrationManager {
     guard !isNotificationWorkDisabled else { return }
     let content = UNMutableNotificationContent()
     content.title = "Ironwood migration needs attention"
-    content.body = "Open Vizor to review and continue your migration."
+    content.body = "Open Veylor to review and continue your migration."
     content.sound = .default
     addNotificationIfEnabled(
       UNNotificationRequest(
@@ -1211,7 +1211,7 @@ final class BackgroundMigrationManager {
     let content = UNMutableNotificationContent()
     content.title = "Migration transfers sent"
     content.body =
-      "All scheduled transfers were submitted. Open Vizor to check the status."
+      "All scheduled transfers were submitted. Open Veylor to check the status."
     content.sound = .default
     addNotificationIfEnabled(
       UNNotificationRequest(
@@ -1231,7 +1231,7 @@ final class BackgroundMigrationManager {
   ) {
     let content = UNMutableNotificationContent()
     content.title = "Continue your Ironwood migration"
-    content.body = "Open Vizor to prepare the next migration transfer."
+    content.body = "Open Veylor to prepare the next migration transfer."
     content.sound = .default
     addNotificationIfEnabled(
       UNNotificationRequest(
