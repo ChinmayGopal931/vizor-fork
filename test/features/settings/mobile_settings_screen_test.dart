@@ -314,6 +314,14 @@ class _FakeNetworkPrivacyNotifier extends NetworkPrivacyNotifier {
   }
 }
 
+/// The Portfolio chart card made the settings list taller than the default
+/// test viewport, so the rows below it are not built until scrolled to. A tall
+/// surface keeps every row on screen for the tests that look for them.
+Future<void> _useTallSurface(WidgetTester tester) async {
+  await tester.binding.setSurfaceSize(const Size(800, 2400));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+}
+
 void main() {
   testWidgets('mobile private recovery is labelled experimental', (
     tester,
@@ -644,6 +652,7 @@ void main() {
 
   testWidgets('off mainnet a durably private wallet can still be returned to '
       'public lookups', (tester) async {
+    await _useTallSurface(tester);
     final enhancePir = _RecordingToggle(false);
     await tester.pumpWidget(
       _app(
@@ -1063,6 +1072,7 @@ void main() {
   });
 
   testWidgets('renders the grouped settings with live values', (tester) async {
+    await _useTallSurface(tester);
     await tester.pumpWidget(_app());
     await tester.pump();
 
@@ -1198,6 +1208,7 @@ void main() {
   testWidgets('Gift Cards drops a slow open once a sheet takes over', (
     tester,
   ) async {
+    await _useTallSurface(tester);
     final cards = Completer<PaymentLinkCardsSnapshot>();
     await tester.pumpWidget(_routedApp(cardsLoader: () => cards.future));
     await tester.pump();
@@ -1227,6 +1238,7 @@ void main() {
   testWidgets('theme row opens the sheet and applies the selection', (
     tester,
   ) async {
+    await _useTallSurface(tester);
     await tester.pumpWidget(_app());
     await tester.pump();
 
@@ -1456,6 +1468,7 @@ void main() {
   });
 
   testWidgets('labels Face ID hardware by brand', (tester) async {
+    await _useTallSurface(tester);
     await tester.pumpWidget(
       _app(
         biometric: const BiometricUnlockState(
@@ -1484,6 +1497,7 @@ void main() {
   });
 
   testWidgets('asks before turning off Face ID unlock', (tester) async {
+    await _useTallSurface(tester);
     final biometricNotifier = _FakeBiometricNotifier(
       const BiometricUnlockState(
         availability: BiometricAvailability(
@@ -1528,6 +1542,7 @@ void main() {
   });
 
   testWidgets('cancel keeps biometric unlock enabled', (tester) async {
+    await _useTallSurface(tester);
     final biometricNotifier = _FakeBiometricNotifier(
       const BiometricUnlockState(
         availability: BiometricAvailability(
@@ -1570,6 +1585,7 @@ void main() {
   testWidgets('Touch ID settings and disable sheet use Apple naming', (
     tester,
   ) async {
+    await _useTallSurface(tester);
     final biometricNotifier = _FakeBiometricNotifier(
       const BiometricUnlockState(
         availability: BiometricAvailability(
@@ -1610,6 +1626,7 @@ void main() {
   });
 
   testWidgets('close keeps biometric unlock enabled', (tester) async {
+    await _useTallSurface(tester);
     final biometricNotifier = _FakeBiometricNotifier(
       const BiometricUnlockState(
         availability: BiometricAvailability(
@@ -1650,6 +1667,7 @@ void main() {
   });
 
   testWidgets('labels fingerprint hardware by modality', (tester) async {
+    await _useTallSurface(tester);
     await tester.pumpWidget(
       _app(
         biometric: const BiometricUnlockState(
