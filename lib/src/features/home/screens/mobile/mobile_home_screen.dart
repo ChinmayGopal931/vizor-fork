@@ -49,6 +49,7 @@ import '../../../activity/screens/mobile/mobile_transaction_status_screen.dart';
 import '../../../activity/swap_activity_row_items_provider.dart';
 import '../../../activity/swap_activity_row_mapper.dart';
 import '../../../activity/widgets/activity_feed.dart';
+import '../../../portfolio_chart/widgets/mobile/mobile_portfolio_chart_card.dart';
 import '../../../migration/models/mobile_ironwood_migration_status_entry.dart';
 import '../../../migration/models/mobile_ironwood_migration_attention_state.dart';
 import '../../../migration/providers/ironwood_migration_announcement_provider.dart';
@@ -1233,6 +1234,9 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                     )
                   : null,
             ),
+            // History chart: the wallet's own balance over time, valued at
+            // public prices when that is on. Absent when off or without history.
+            const MobilePortfolioChartSlot(),
             const SizedBox(height: AppSpacing.s),
             if (hasBalance)
               Row(

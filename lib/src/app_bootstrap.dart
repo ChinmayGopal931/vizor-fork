@@ -63,6 +63,9 @@ class AppBootstrapState {
     this.biometricUnlockEnabled = false,
     this.syncKeepAwakeEnabled = false,
     this.syncKeepAwakePromptSeen = false,
+    this.portfolioChartEnabled = true,
+    this.portfolioChartMarketPrices = true,
+    this.portfolioChartRange,
     this.enhancePirEnabled = false,
     this.failureKind,
     this.failureMessage,
@@ -79,6 +82,13 @@ class AppBootstrapState {
   final bool swapEnabledOverrideCachedForRelease;
   final bool syncKeepAwakeEnabled;
   final bool syncKeepAwakePromptSeen;
+
+  /// Home portfolio chart preferences. Both switches default to on, like the
+  /// Home price they sit next to; [portfolioChartRange] is the stored range
+  /// label, or `null` for the default.
+  final bool portfolioChartEnabled;
+  final bool portfolioChartMarketPrices;
+  final String? portfolioChartRange;
 
   /// The saved private queries setting, or `null` when it could not be read.
   /// An unreadable setting is private for this launch, but unconfirmed: see
@@ -286,6 +296,23 @@ Future<AppBootstrapState> loadAppBootstrap({
       key: kSyncKeepAwakePromptSeenKey,
       label: 'sync keep-awake prompt seen flag',
     );
+    final portfolioChartEnabled = await _readPlainBoolOr(
+      storage,
+      key: kPortfolioChartEnabledKey,
+      defaultValue: true,
+      label: 'portfolio chart visibility',
+    );
+    final portfolioChartMarketPrices = await _readPlainBoolOr(
+      storage,
+      key: kPortfolioChartMarketPricesKey,
+      defaultValue: true,
+      label: 'portfolio chart market prices flag',
+    );
+    final portfolioChartRange = await _readPlainString(
+      storage,
+      key: kPortfolioChartRangeKey,
+      label: 'portfolio chart range',
+    );
     final enhancePirEnabled = await readEnhancePirEnabledPreference(storage);
     var isPasswordConfigured = await storage.isPasswordConfigured();
     var isUnlocked = storage.hasSessionPassword;
@@ -479,6 +506,9 @@ Future<AppBootstrapState> loadAppBootstrap({
       biometricUnlockEnabled: biometricUnlockEnabled,
       syncKeepAwakeEnabled: syncKeepAwakeEnabled,
       syncKeepAwakePromptSeen: syncKeepAwakePromptSeen,
+      portfolioChartEnabled: portfolioChartEnabled,
+      portfolioChartMarketPrices: portfolioChartMarketPrices,
+      portfolioChartRange: portfolioChartRange,
       enhancePirEnabled: enhancePirEnabled,
       isPasswordConfigured: isPasswordConfigured,
       isUnlocked: isUnlocked,
@@ -676,6 +706,43 @@ Future<bool> _readPlainBool(
   } catch (e) {
     log('bootstrap: failed to read $label: $e');
     return false;
+  }
+}
+
+/// Like [_readPlainBool], for a switch that is on until the user turns it off:
+/// an absent or unreadable value keeps the default rather than reading as off.
+Future<bool> _readPlainBoolOr(
+  AppSecureStore storage, {
+  required String key,
+  required bool defaultValue,
+  required String label,
+}) async {
+  try {
+    return switch (await storage.readPlain(key)) {
+      'true' => true,
+      'false' => false,
+      _ => defaultValue,
+    };
+  } on SecureStorageUnavailableException {
+    rethrow;
+  } catch (e) {
+    log('bootstrap: failed to read $label: $e');
+    return defaultValue;
+  }
+}
+
+Future<String?> _readPlainString(
+  AppSecureStore storage, {
+  required String key,
+  required String label,
+}) async {
+  try {
+    return await storage.readPlain(key);
+  } on SecureStorageUnavailableException {
+    rethrow;
+  } catch (e) {
+    log('bootstrap: failed to read $label: $e');
+    return null;
   }
 }
 

@@ -27,6 +27,12 @@ const kThemeModeKey = 'zcash_theme_mode';
 const kPrivacyModeEnabledKey = 'zcash_privacy_mode_enabled';
 const kSyncKeepAwakeEnabledKey = 'zcash_sync_keep_awake_enabled';
 const kSyncKeepAwakePromptSeenKey = 'zcash_sync_keep_awake_prompt_seen';
+
+/// Home portfolio chart preferences. Absent means the default: shown, valued
+/// with market prices, starting at one week.
+const kPortfolioChartEnabledKey = 'zcash_portfolio_chart_enabled';
+const kPortfolioChartMarketPricesKey = 'zcash_portfolio_chart_market_prices';
+const kPortfolioChartRangeKey = 'zcash_portfolio_chart_range';
 const kRpcEndpointUrlKey = 'zcash_rpc_endpoint_url';
 const kRpcEndpointPresetKey = 'zcash_rpc_endpoint_preset';
 const kPaymentLinkRecoveryStorageKey = 'zcash_gift_card_recovery_v1';
