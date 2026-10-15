@@ -2587,7 +2587,7 @@ fn pczt_broadcast_expiry_error(
         Some(format!(
             "Hardware signing request expired before broadcast: txid={txid}, \
              expiry height {expiry_height}, current chain height {current_height}. \
-             Start the signing flow again so Vizor can build a fresh transaction."
+             Start the signing flow again so Veylor can build a fresh transaction."
         ))
     }
 }

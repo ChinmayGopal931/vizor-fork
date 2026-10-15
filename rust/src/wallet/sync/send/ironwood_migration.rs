@@ -215,12 +215,12 @@ pub(crate) async fn complete_orchard_migration_denominations_pczt(
         match stored.state {
             KeystoneMigrationRequestState::Proofing => {
                 return Err(
-                    "Vizor is still finishing migration proofs. Try again shortly.".to_string(),
+                    "Veylor is still finishing migration proofs. Try again shortly.".to_string(),
                 );
             }
             KeystoneMigrationRequestState::ProofFailed => {
                 return Err(stored.proof_error.clone().unwrap_or_else(|| {
-                    "Vizor proof generation failed. Reject and prepare a new request.".to_string()
+                    "Veylor proof generation failed. Reject and prepare a new request.".to_string()
                 }));
             }
             KeystoneMigrationRequestState::Completing => {
@@ -523,12 +523,12 @@ pub(crate) async fn complete_orchard_migration_single_qr_pczt(
         match stored.state {
             KeystoneMigrationRequestState::Proofing => {
                 return Err(
-                    "Vizor is still finishing migration proofs. Try again shortly.".to_string(),
+                    "Veylor is still finishing migration proofs. Try again shortly.".to_string(),
                 );
             }
             KeystoneMigrationRequestState::ProofFailed => {
                 return Err(stored.proof_error.clone().unwrap_or_else(|| {
-                    "Vizor proof generation failed. Reject and prepare a new request.".to_string()
+                    "Veylor proof generation failed. Reject and prepare a new request.".to_string()
                 }));
             }
             KeystoneMigrationRequestState::Completing => {
@@ -779,12 +779,12 @@ pub(crate) async fn complete_orchard_migration_immediate_pczt(
         match stored.state {
             KeystoneMigrationRequestState::Proofing => {
                 return Err(
-                    "Vizor is still finishing migration proofs. Try again shortly.".to_string(),
+                    "Veylor is still finishing migration proofs. Try again shortly.".to_string(),
                 );
             }
             KeystoneMigrationRequestState::ProofFailed => {
                 return Err(stored.proof_error.clone().unwrap_or_else(|| {
-                    "Vizor proof generation failed. Reject and prepare a new request.".to_string()
+                    "Veylor proof generation failed. Reject and prepare a new request.".to_string()
                 }));
             }
             KeystoneMigrationRequestState::Completing => {
@@ -1182,12 +1182,12 @@ pub(crate) fn complete_orchard_migration_batch_pczt(
         match stored.state {
             KeystoneMigrationRequestState::Proofing => {
                 return Err(
-                    "Vizor is still finishing migration proofs. Try again shortly.".to_string(),
+                    "Veylor is still finishing migration proofs. Try again shortly.".to_string(),
                 );
             }
             KeystoneMigrationRequestState::ProofFailed => {
                 return Err(stored.proof_error.clone().unwrap_or_else(|| {
-                    "Vizor proof generation failed. Reject and prepare a new request.".to_string()
+                    "Veylor proof generation failed. Reject and prepare a new request.".to_string()
                 }));
             }
             KeystoneMigrationRequestState::Completing => {

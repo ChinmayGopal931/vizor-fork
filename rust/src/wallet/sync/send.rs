@@ -433,7 +433,7 @@ fn accepted_migration_processing_failure_result(
 ) -> MigrationBroadcastAdvance {
     let accepted_txid_list = accepted_txids.join(",");
     let message = format!(
-        "Migration transaction {accepted_txid_list} was accepted by lightwalletd, but local migration bookkeeping failed: {error}. Vizor will reconcile it on the next advance."
+        "Migration transaction {accepted_txid_list} was accepted by lightwalletd, but local migration bookkeeping failed: {error}. Veylor will reconcile it on the next advance."
     );
     log::warn!("migration: {message}");
     MigrationBroadcastAdvance {
@@ -787,7 +787,7 @@ fn retry_store_then_pending_migration_policy_rebuild_message(
     .len();
     if still_missing > 0 {
         return Err(format!(
-            "{still_missing} accepted migration transaction(s) are still missing from local wallet storage. Vizor will retry until local state is recorded."
+            "{still_missing} accepted migration transaction(s) are still missing from local wallet storage. Veylor will retry until local state is recorded."
         ));
     }
     pending_migration_policy_rebuild_message(db_path, network, run_id, chain_tip_height)
@@ -2868,7 +2868,7 @@ async fn reconcile_migration_stop_candidates(
             MigrationStopDisposition::Block => {
                 return Err(format!(
                     "Migration cannot stop until transaction {} is recorded locally or expires at block {}. \
-                     Vizor records a submitted transaction after the wallet syncs.",
+                     Veylor records a submitted transaction after the wallet syncs.",
                     candidate.txid_hex, candidate.expiry_height
                 ));
             }
@@ -6816,7 +6816,7 @@ fn reconcile_orchard_migration_outbox_receipt(
 
 fn migration_storage_retry_message(tx_label: &str, txid_hex: &str, error: &str) -> String {
     format!(
-        "{tx_label} {txid_hex} was accepted by lightwalletd, but local wallet storage failed: {error}. Vizor will retry until local state is recorded."
+        "{tx_label} {txid_hex} was accepted by lightwalletd, but local wallet storage failed: {error}. Veylor will retry until local state is recorded."
     )
 }
 
