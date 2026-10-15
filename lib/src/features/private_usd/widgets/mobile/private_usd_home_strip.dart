@@ -141,85 +141,103 @@ class PrivateUsdHomeStripView extends StatelessWidget {
               horizontal: AppSpacing.sm,
               vertical: AppSpacing.xs,
             ),
-            child: Row(
-              children: [
-                AppIcon(kPrivateUsdIcon, size: 20, color: colors.text.primary),
-                const SizedBox(width: AppSpacing.xs),
-                // The name and the ZEC worth on the left, the amount and what
-                // needs saying about it on the right, which gets more room.
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        PrivateUsdCopy.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.labelMedium.copyWith(
-                          color: colors.text.primary,
-                        ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // What is left once the icon, chevron and gaps are placed.
+                final room =
+                    constraints.maxWidth -
+                    (20 + AppSpacing.xs + AppSpacing.s + AppSpacing.xxs + 20);
+                return Row(
+                  children: [
+                    AppIcon(
+                      kPrivateUsdIcon,
+                      size: 20,
+                      color: colors.text.primary,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    // The name and the ZEC worth on the left keep whatever the
+                    // right side does not need, so "≈ 0.03613 ZEC" is not cut
+                    // short in a wide font.
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            PrivateUsdCopy.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.labelMedium.copyWith(
+                              color: colors.text.primary,
+                            ),
+                          ),
+                          if (zec != null) ...[
+                            const SizedBox(height: AppSpacing.xxs),
+                            Text(
+                              zec,
+                              key: const ValueKey(
+                                'mobile_home_private_usd_zec_equivalent',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.bodyExtraSmall.copyWith(
+                                color: colors.text.secondary,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                      if (zec != null) ...[
-                        const SizedBox(height: AppSpacing.xxs),
-                        Text(
-                          zec,
-                          key: const ValueKey(
-                            'mobile_home_private_usd_zec_equivalent',
+                    ),
+                    const SizedBox(width: AppSpacing.s),
+                    // The amount and what needs saying about it take their own
+                    // width, up to three fifths of the room.
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: room * 0.6),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            amount,
+                            key: const ValueKey(
+                              'mobile_home_private_usd_amount',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.labelMedium.copyWith(
+                              color: blocked
+                                  ? colors.text.destructive
+                                  : colors.text.primary,
+                            ),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.bodyExtraSmall.copyWith(
-                            color: colors.text.secondary,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.s),
-                Expanded(
-                  flex: 3,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        amount,
-                        key: const ValueKey('mobile_home_private_usd_amount'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.labelMedium.copyWith(
-                          color: blocked
-                              ? colors.text.destructive
-                              : colors.text.primary,
-                        ),
+                          if (detail != null) ...[
+                            const SizedBox(height: AppSpacing.xxs),
+                            Text(
+                              detail,
+                              key: const ValueKey(
+                                'mobile_home_private_usd_detail',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.bodyExtraSmall.copyWith(
+                                color: blocked
+                                    ? colors.text.destructive
+                                    : colors.text.positiveStrong,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                      if (detail != null) ...[
-                        const SizedBox(height: AppSpacing.xxs),
-                        Text(
-                          detail,
-                          key: const ValueKey('mobile_home_private_usd_detail'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.bodyExtraSmall.copyWith(
-                            color: blocked
-                                ? colors.text.destructive
-                                : colors.text.positiveStrong,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.xxs),
-                AppIcon(
-                  AppIcons.chevronForward,
-                  size: 20,
-                  color: colors.icon.accent,
-                ),
-              ],
+                    ),
+                    const SizedBox(width: AppSpacing.xxs),
+                    AppIcon(
+                      AppIcons.chevronForward,
+                      size: 20,
+                      color: colors.icon.accent,
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),

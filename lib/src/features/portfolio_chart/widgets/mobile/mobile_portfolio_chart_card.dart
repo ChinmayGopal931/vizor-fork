@@ -211,21 +211,25 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
             ],
           ),
           const SizedBox(height: AppSpacing.xxs),
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: Align(alignment: Alignment.centerLeft, child: value),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                flex: 3,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: changeText,
+          // The balance and its change share a line. When both do not fit (a
+          // long ZEC amount in a wide font, large text) the line shrinks as
+          // one rather than cutting either short.
+          LayoutBuilder(
+            builder: (context, constraints) => FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    value,
+                    const SizedBox(width: AppSpacing.xs),
+                    changeText,
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
           const SizedBox(height: AppSpacing.s),
           SizedBox(
