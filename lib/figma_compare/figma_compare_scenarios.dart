@@ -1978,6 +1978,13 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     mobile: true,
   ),
   FigmaCompareScenario(
+    id: 'mobile-settings-portfolio-chart',
+    description: 'Mobile settings card for the Home portfolio chart',
+    builder: buildMobileSettingsPortfolioChartUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
     id: 'settings-support-vizor',
     description: 'Desktop settings scrolled to Support Vizor',
     builder: buildSettingsSupportVizorUseCase,
@@ -2158,6 +2165,29 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     id: 'mobile-home-default',
     description: 'Mobile home with deterministic balance and activity',
     builder: buildMobileHomeDefaultUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-home-portfolio-chart',
+    description:
+        'Mobile home portfolio chart: balance valued at public prices, 1w',
+    builder: buildMobileHomePortfolioChartUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-home-portfolio-chart-falling',
+    description: 'Mobile home portfolio chart: a falling month',
+    builder: buildMobileHomePortfolioChartFallingUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-home-portfolio-chart-zec',
+    description:
+        'Mobile home portfolio chart: ZEC balance over a year, no prices',
+    builder: buildMobileHomePortfolioChartZecUseCase,
     desktop: false,
     mobile: true,
   ),

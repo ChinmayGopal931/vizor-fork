@@ -715,6 +715,32 @@ Key files:
 - `lib/src/features/migration/services/ironwood_migration_service.dart` —
   foreground preparation recovery
 
+### Home portfolio chart
+
+Mobile Home shows a chart under the balance card
+(`lib/src/features/portfolio_chart/`). Its wallet side is read from the local
+wallet DB alone: `getTransactionHistory`, `account_balance_delta` per mined
+block, folded into a balance step function once a sync has completed (nothing
+while locked, and a mask in privacy mode). Its market side is public ZEC/USD
+history, CoinGecko `/coins/zcash/market_chart` on
+`VIZOR_COINGECKO_PRICE_BASE_URL` (the Home price's own base), through
+`NetworkHttpClient`, so it follows the Tor route and fails closed.
+
+- A price request names the coin, the currency and a number of days, nothing
+  else. Never put an address, key, seed, balance, account, wallet identifier or
+  wallet-derived date in it; balances and prices are joined on the device.
+  `coinGeckoMarketChartUri` is the only place the request is built, and
+  `test/features/portfolio_chart/portfolio_chart_history_test.dart` pins its
+  parameters.
+- It shares the Home price's gate (`zecMarketDataAvailableProvider`) and its
+  default: prices are on wherever Home fetches one. Settings, Portfolio chart
+  can hide the chart or turn market prices off, and the chart is then the ZEC
+  balance with no request at all. Both settings and the default range persist in
+  the secure-store plain lane and are read in bootstrap.
+- Prices are cached in memory only (30 minutes per range, a 5 minute cool-down
+  after a failure). When none can be had the chart falls back to the ZEC
+  balance and says so on the card.
+
 ### iOS Preparation Confirmation Tracking
 
 `BGContinuedProcessingTask`

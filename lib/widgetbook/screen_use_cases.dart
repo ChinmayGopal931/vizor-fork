@@ -106,6 +106,11 @@ import '../src/providers/receive_address_provider.dart';
 import '../src/providers/sync_failure.dart';
 import '../src/providers/sync_provider.dart';
 import '../src/providers/zec_price_change_provider.dart';
+import '../src/features/portfolio_chart/models/portfolio_chart_models.dart';
+import '../src/features/portfolio_chart/providers/portfolio_chart_provider.dart';
+import '../src/features/portfolio_chart/providers/portfolio_chart_settings_provider.dart';
+import '../src/features/settings/widgets/mobile/mobile_portfolio_chart_settings_card.dart';
+import 'portfolio_chart_fixtures.dart';
 import '../src/rust/api/sync.dart' as rust_sync;
 import '../src/services/biometric_unlock.dart';
 
@@ -793,6 +798,56 @@ Widget buildSettingsSupportVizorUseCase(BuildContext context) {
 
 /// Real mobile settings and tab bar, pinned to the app footer for visual review.
 /// The version still comes from VIZOR_RELEASE_VERSION, just as in a release.
+/// The Settings card for the Home portfolio chart: on, with market prices, so
+/// it names CoinGecko and what a request carries.
+Widget buildMobileSettingsPortfolioChartUseCase(BuildContext context) =>
+    _buildMobileSettingsPortfolioChartUseCase(PortfolioChartSettings.defaults);
+
+/// Market prices off: the ZEC balance chart, which asks no server for anything.
+Widget buildMobileSettingsPortfolioChartLocalUseCase(BuildContext context) =>
+    _buildMobileSettingsPortfolioChartUseCase(
+      PortfolioChartSettings.defaults.copyWith(
+        marketPrices: false,
+        defaultRange: PortfolioChartRange.month,
+      ),
+    );
+
+/// The chart switched off.
+Widget buildMobileSettingsPortfolioChartHiddenUseCase(BuildContext context) =>
+    _buildMobileSettingsPortfolioChartUseCase(
+      PortfolioChartSettings.defaults.copyWith(enabled: false),
+    );
+
+Widget _buildMobileSettingsPortfolioChartUseCase(
+  PortfolioChartSettings settings,
+) {
+  return ProviderScope(
+    overrides: [
+      zecMarketDataAvailableProvider.overrideWithValue(true),
+      portfolioChartSettingsProvider.overrideWith(
+        () => PreviewPortfolioChartSettingsNotifier(settings),
+      ),
+    ],
+    child: _MobilePreviewFrame(
+      constrainToDesignSize: false,
+      child: Builder(
+        builder: (context) => ColoredBox(
+          color: context.colors.background.window,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: const Align(
+                alignment: Alignment.topCenter,
+                child: MobilePortfolioChartSettingsCard(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 Widget buildMobileSettingsFooterUseCase(BuildContext context) =>
     _buildMobileSettingsFooterUseCase();
 Widget _buildMobileSettingsFooterUseCase({bool recoveryChanging = false}) {
@@ -1737,6 +1792,86 @@ Widget buildMobileHomePrivateUsdBlockedUseCase(BuildContext context) =>
 Widget buildMobileHomePrivateUsdHiddenUseCase(BuildContext context) =>
     _buildMobileHomePrivateUsdUseCase(
       previewPrivateUsdBalance(available: 1250.4, arriving: 200),
+      privacyModeEnabled: true,
+    );
+
+Widget _buildMobileHomePortfolioChartUseCase(
+  PortfolioChartViewState chart, {
+  bool privacyModeEnabled = false,
+}) {
+  return _buildMobileHomeUseCase(
+    accountState: _accountsDesignState,
+    syncState: _homeSyncedState(
+      orchardBalance: BigInt.from(14312000000),
+      recentTransactions: [_homeTx(1), _homeTx(2)],
+    ),
+    portfolioChart: chart,
+    privacyModeEnabled: privacyModeEnabled,
+  );
+}
+
+/// Home with the portfolio chart: the balance valued at public prices.
+Widget buildMobileHomePortfolioChartUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      PortfolioChartReady(previewPortfolioChartData()),
+    );
+
+/// A falling month, so the change reads in the destructive colour.
+Widget buildMobileHomePortfolioChartFallingUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      PortfolioChartReady(
+        previewPortfolioChartData(
+          range: PortfolioChartRange.month,
+          falling: true,
+        ),
+      ),
+    );
+
+/// Market prices off: the ZEC balance over a year, with no request made.
+Widget buildMobileHomePortfolioChartZecUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      PortfolioChartReady(
+        previewPortfolioChartData(
+          mode: PortfolioChartMode.zec,
+          range: PortfolioChartRange.year,
+        ),
+      ),
+    );
+
+/// Prices asked for but not to be had: the ZEC balance, and a line saying so.
+Widget buildMobileHomePortfolioChartUnavailableUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      PortfolioChartReady(
+        previewPortfolioChartData(
+          mode: PortfolioChartMode.zec,
+          notice: PortfolioChartNotice.pricesUnavailable,
+        ),
+      ),
+    );
+
+Widget buildMobileHomePortfolioChartLoadingUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      const PortfolioChartLoading(
+        PortfolioChartRange.week,
+        PortfolioChartMode.usd,
+      ),
+    );
+
+Widget buildMobileHomePortfolioChartEmptyUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      const PortfolioChartEmpty(
+        PortfolioChartRange.quarter,
+        PortfolioChartMode.usd,
+      ),
+    );
+
+/// Privacy mode on: neither the values nor the shape of the history show.
+Widget buildMobileHomePortfolioChartPrivateUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      const PortfolioChartPrivate(
+        PortfolioChartRange.week,
+        PortfolioChartMode.usd,
+      ),
       privacyModeEnabled: true,
     );
 
@@ -3412,6 +3547,7 @@ Widget _buildMobileHomeUseCase({
   Map<PrivateUsdRecordKey, PrivateUsdReverseStatus>?
   privateUsdReverseConversions,
   bool privacyModeEnabled = false,
+  PortfolioChartViewState portfolioChart = const PortfolioChartHidden(),
 }) {
   final harness = _MobileHomeHarness(
     initialLocation: initialLocation,
@@ -3489,6 +3625,9 @@ Widget _buildMobileHomeUseCase({
       ),
       zecHomeUsdUnitPriceProvider.overrideWithValue(marketData.usdPrice),
       zecPriceChange24hPctProvider.overrideWithValue(marketData.change24hPct),
+      // No wallet database or price service behind the Home chart: it draws
+      // the state it is given, and nothing by default.
+      portfolioChartViewProvider.overrideWithValue(portfolioChart),
       swapFeatureEnabledProvider.overrideWithValue(swapEnabled),
       swapActivityRowItemsProvider.overrideWith((ref, accountUuid) async {
         return const [];

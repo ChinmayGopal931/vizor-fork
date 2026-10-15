@@ -52,8 +52,11 @@ fvm flutter build macos --release \
 ```
 
 `VIZOR_COINGECKO_PRICE_BASE_URL` controls the home screen ZEC price and 24h
-change source. Open-source builds should use the public CoinGecko base URL
-above; production builds can point this define at a Vizor-operated proxy.
+change source, and the price history behind the mobile Home portfolio chart
+(`/coins/zcash/market_chart`, asked for by number of days only). Open-source
+builds should use the public CoinGecko base URL above; production builds can
+point this define at a Vizor-operated proxy, which then has to serve both
+`/simple/price` and `/coins/zcash/market_chart`.
 
 The built app is at:
 

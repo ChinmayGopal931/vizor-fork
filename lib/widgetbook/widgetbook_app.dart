@@ -527,6 +527,34 @@ class WidgetbookApp extends StatelessWidget {
                       builder: buildMobileHomeGiftCardsUseCase,
                     ),
                     WidgetbookUseCase(
+                      name: 'Portfolio chart',
+                      builder: buildMobileHomePortfolioChartUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Portfolio chart falling',
+                      builder: buildMobileHomePortfolioChartFallingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Portfolio chart ZEC balance',
+                      builder: buildMobileHomePortfolioChartZecUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Portfolio chart prices unavailable',
+                      builder: buildMobileHomePortfolioChartUnavailableUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Portfolio chart loading',
+                      builder: buildMobileHomePortfolioChartLoadingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Portfolio chart not enough history',
+                      builder: buildMobileHomePortfolioChartEmptyUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Portfolio chart hidden balances',
+                      builder: buildMobileHomePortfolioChartPrivateUseCase,
+                    ),
+                    WidgetbookUseCase(
                       name: 'No activity',
                       builder: buildMobileHomeNoActivityUseCase,
                     ),
@@ -1110,6 +1138,18 @@ class WidgetbookApp extends StatelessWidget {
                     WidgetbookUseCase(
                       name: 'Mobile settings explorer row',
                       builder: buildMobileSettingsExplorerUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Mobile portfolio chart settings',
+                      builder: buildMobileSettingsPortfolioChartUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Mobile portfolio chart settings without prices',
+                      builder: buildMobileSettingsPortfolioChartLocalUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Mobile portfolio chart settings hidden',
+                      builder: buildMobileSettingsPortfolioChartHiddenUseCase,
                     ),
                     WidgetbookUseCase(
                       name: 'Secret passphrase gate',
