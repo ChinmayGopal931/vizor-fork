@@ -159,6 +159,7 @@ class MobileTopNav extends StatelessWidget {
   static const _progressTrackWidth = 196.0;
   static const _progressTrackHeight = 6.0;
   static const _syncIndicatorSize = Size(6, 50);
+  static const _syncStatusMaxShare = 0.65;
 
   @override
   Widget build(BuildContext context) {
@@ -216,25 +217,35 @@ class MobileTopNav extends StatelessWidget {
       ),
     );
 
-    return Row(
-      children: [
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: Align(alignment: Alignment.centerLeft, child: account),
-        ),
-        if (syncLabel != null)
-          _SyncStatus(
-            label: syncLabel!,
-            baseColor: syncLabelColor ?? colors.sync.text,
-            highlightColor:
-                syncHighlightColor ?? syncLabelColor ?? colors.sync.text,
-            indicatorColor: syncIndicatorColor ?? colors.sync.glow,
-            indicatorSize: _syncIndicatorSize,
-            animated: syncAnimated,
-          )
-        else
+    return LayoutBuilder(
+      builder: (context, constraints) => Row(
+        children: [
           const SizedBox(width: AppSpacing.sm),
-      ],
+          Expanded(
+            child: Align(alignment: Alignment.centerLeft, child: account),
+          ),
+          if (syncLabel != null)
+            // The status never takes more than this share of the bar, so the
+            // account avatar keeps its room at large text sizes and with a
+            // long label; past it the label ends in an ellipsis.
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: constraints.maxWidth * _syncStatusMaxShare,
+              ),
+              child: _SyncStatus(
+                label: syncLabel!,
+                baseColor: syncLabelColor ?? colors.sync.text,
+                highlightColor:
+                    syncHighlightColor ?? syncLabelColor ?? colors.sync.text,
+                indicatorColor: syncIndicatorColor ?? colors.sync.glow,
+                indicatorSize: _syncIndicatorSize,
+                animated: syncAnimated,
+              ),
+            )
+          else
+            const SizedBox(width: AppSpacing.sm),
+        ],
+      ),
     );
   }
 
@@ -495,9 +506,16 @@ class _SyncStatusState extends State<_SyncStatus>
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            widget.label,
-            style: AppTypography.labelMedium.copyWith(color: widget.baseColor),
+          Flexible(
+            child: Text(
+              widget.label,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.labelMedium.copyWith(
+                color: widget.baseColor,
+              ),
+            ),
           ),
           const SizedBox(width: AppSpacing.s),
           _SyncEdgeIndicator(
@@ -516,11 +534,13 @@ class _SyncStatusState extends State<_SyncStatus>
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _ShimmerLabel(
-              label: widget.label,
-              baseColor: widget.baseColor,
-              highlightColor: widget.highlightColor,
-              progress: t,
+            Flexible(
+              child: _ShimmerLabel(
+                label: widget.label,
+                baseColor: widget.baseColor,
+                highlightColor: widget.highlightColor,
+                progress: t,
+              ),
             ),
             const SizedBox(width: AppSpacing.s),
             _SyncEdgeIndicator(
@@ -582,6 +602,9 @@ class _ShimmerLabel extends StatelessWidget {
       // Solid color so `srcIn` keeps the gradient over the full glyph.
       child: Text(
         label,
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.ellipsis,
         style: AppTypography.labelMedium.copyWith(
           color: const Color(0xFFFFFFFF),
         ),
