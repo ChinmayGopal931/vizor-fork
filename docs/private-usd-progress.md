@@ -7,6 +7,48 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-15; read this first)
 
+- **Follow-up, local changes after `acdd2db45` (2026-10-15):**
+  - M8 now selects the funded second account before sharing its context
+    with the forward, reverse and send scenarios, matching M5/M7. The
+    runner's default forward amount is now 0.01 TAZ, the amount used by
+    the successful device rounds; the old 0.05 default exceeded the
+    testnet maker's observed cap. The checklist explains topping up separate
+    spendable notes when Sepolia change stays Processing.
+  - Forward and reverse quote requests paused during their debounce are
+    retained until the engine can run. Editing/clearing the amount or
+    disposing the flow cancels the pending request. Actual request failures
+    are not automatically retried. Four regressions cover these cases.
+  - The review heading is **Review**, verified in forward/reverse widget
+    captures at 393 × 852. General `ZcashWallet` errors no longer claim that
+    syncing is the cause or remedy. The copy reference was updated too.
+  - Opening an existing, current-schema swap store no longer takes an
+    unnecessary write transaction. A regression holds a writer open while
+    another connection opens and reads the send log; it passes. This removes
+    a source of payment-guard delay; startup latency still needs remeasuring
+    on the phone.
+  - The joint-account regression now has an Orchard variant: deposit before
+    NU6.3, check receipts, activate Ironwood, then sweep with the combined
+    key and Discard OVK. It compiles. Execution is **pending**: Docker's
+    daemon did not answer `info` or the harness's initial reset, and the
+    stalled test process was stopped. Docker was not restarted.
+  - Focused Flutter checks: desktop **68 passed, 5 mobile suites skipped**;
+    mobile **35 passed**; `fvm flutter analyze --no-pub` reports no issues.
+    Full `cargo test` passes: **1,515 library tests and 6 integration tests**,
+    no failures (12 library and 21 integration tests remain opt-in/ignored).
+    Captures: `/tmp/vizor-pusd-review.png` and
+    `/tmp/vizor-pusd-review-reverse.png`. Logs use `/tmp/vizor-pusd-*`.
+  - A stale ADB server temporarily hid the attached phone; restarting ADB
+    restored the USB connection. E6 is still missing. GitHub login and
+    remotes were left unchanged; nothing pushed.
+- **Orchard and Ironwood pools (owner request): both are supported.** The
+  swap deposit uses the ordinary send builder, so it spends notes from
+  either pool (M2.7b spent a pre-NU6.3 Orchard note into an Ironwood
+  deposit); the joint account's receipts and `find_deposit` read pool codes
+  3 and 4; the sweep proposes over `[Orchard, Ironwood]`. Mainnet is already
+  on NU6.3 (branch `37a5165b` at height 3,518,928), so deposits into the
+  Orchard-only joint address always land in Ironwood there; an Orchard-pool
+  note in the joint account could exist only for a deposit mined before
+  activation, which no longer happens.
 - **Device rounds on the Galaxy A35, testnet + Sepolia, all passed** (M3, M5,
   M6, M7: see their checklist lines). Still unrun on the device: the M8 route
   round (`--m8-route`), the keyed-RPC check (needs E6), M8.4 measurements and
@@ -1183,8 +1225,14 @@ next; the M7 gate and its device checks wait for it.
   pending: `run_device_round.sh --keyed-rpc <json>` (D-105), which needs
   the phone (B-10) and E6's keyed RPC JSON. The static audit found no leak
   (D-105)
-- [ ] M8.4 Measure APK size, first sync, proof time and memory; update plan
-  §11. Needs the phone (B-10; checklist run M-16)
+- [x] M8.4 Measured on the Galaxy A35 (Android 16, WebView 155) during the device rounds, 2026-10-14/15:
+  arm64 release APK 116 MB (the Rust `.so` grew about 0.5 MB per ABI in M0); first Railgun sync on Sepolia
+  with the page storage wiped: 96 s direct and 101 to 136 s through Tor in M0, and the M3 round's direct sync
+  and Tor sync finished inside its 120 s and 150 s checkpoints; proof and post: a reverse funding (page proof
+  plus submit) took 7 s and a relayed send or withdrawal 17 to 27 s from the tap to `Sent`; a withdrawal's
+  public USDC arrived 21 s later; peak PSS on a debug build 662 MB for the app and 335 MB for the WebView
+  renderer (M0: 446 MB and 382 MB). Not measured: a mainnet first sync (about 40 min expected, plan §11) and a
+  release-build memory profile (M8 mainnet QA).
 - [x] M8.5 `docs/private-usd-device-checklist.md`
 - [x] M8.6 AGENTS.md "Private USD" section; correct the Android worker /
   `android_jni.rs` description (D-106: they were removed in `459a8565b`)
