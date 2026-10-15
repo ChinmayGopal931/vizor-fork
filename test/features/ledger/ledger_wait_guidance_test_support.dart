@@ -81,7 +81,7 @@ void registerLedgerWaitGuidanceTests() {
         expect(find.textContaining('seconds'), findsNothing);
         report('finishing');
         await tester.pump();
-        expect(find.text('Keep Vizor open.'), findsOneWidget);
+        expect(find.text('Keep Veylor open.'), findsOneWidget);
         expect(find.textContaining('seconds'), findsNothing);
 
         container.read(ledgerSigningProgressProvider.notifier).begin('other')(

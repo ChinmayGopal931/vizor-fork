@@ -409,7 +409,7 @@ class _MobileUnlockScreenState extends ConsumerState<MobileUnlockScreen> {
                             Text(
                               _submitting
                                   ? 'Opening your wallet...'
-                                  : 'Enter your passcode to open Vizor',
+                                  : 'Enter your passcode to open Veylor',
                               textAlign: TextAlign.center,
                               style: AppTypography.bodyMediumStrong.copyWith(
                                 color: colors.text.primary,

@@ -320,13 +320,13 @@ class _IronwoodMigrationHowItWorksContentState
     (
       title: 'Pre-migration preparations',
       body:
-          'Vizor splits your total balance into many smaller notes '
+          'Veylor splits your total balance into many smaller notes '
           '(e.g. 0.1 ZEC / 1 ZEC / 5 ZEC) before migrating.',
     ),
     (
       title: 'Delayed and randomized migrations',
       body:
-          'Vizor slowly sends parts at staggered intervals across multiple '
+          'Veylor slowly sends parts at staggered intervals across multiple '
           'batches to reduce traceability.',
     ),
   ];
@@ -855,9 +855,9 @@ class _IronwoodMigrationWhatToExpectContent extends StatelessWidget {
           'VPN/network privacy layer',
     ),
     (
-      title: 'Keep Vizor running',
+      title: 'Keep Veylor running',
       body:
-          'Your computer needs to be unlocked with Vizor running so we can '
+          'Your computer needs to be unlocked with Veylor running so we can '
           'send the next migration transaction',
     ),
   ];

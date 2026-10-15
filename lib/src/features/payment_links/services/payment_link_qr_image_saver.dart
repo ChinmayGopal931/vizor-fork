@@ -21,7 +21,7 @@ abstract interface class PaymentLinkQrImageSaver {
 class FileSelectorPaymentLinkQrImageSaver implements PaymentLinkQrImageSaver {
   const FileSelectorPaymentLinkQrImageSaver();
 
-  static const _suggestedName = 'vizor-gift-card.png';
+  static const _suggestedName = 'veylor-gift-card.png';
 
   @override
   Future<bool> savePng(Uint8List pngBytes) async {

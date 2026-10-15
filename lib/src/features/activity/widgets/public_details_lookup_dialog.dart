@@ -41,7 +41,7 @@ class PublicDetailsLookupDialog extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Vizor will ask the server for this one transaction to show '
+                'Veylor will ask the server for this one transaction to show '
                 'what private lookups leave out.',
                 style: AppTypography.bodyMedium.copyWith(
                   color: colors.text.secondary,

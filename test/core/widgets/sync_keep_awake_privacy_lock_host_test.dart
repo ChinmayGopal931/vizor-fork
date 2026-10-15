@@ -109,7 +109,7 @@ void main() {
       await _settleInitialSync(tester);
       await tester.pump(const Duration(milliseconds: 60));
       await tester.pump();
-      expect(find.text('Vizor is syncing'), findsOneWidget);
+      expect(find.text('Veylor is syncing'), findsOneWidget);
 
       final mainDrained = initial.copyWith(
         percentage: 1,
@@ -120,7 +120,7 @@ void main() {
       notifier.emit(mainDrained);
       await tester.pump();
       expect(find.text('Sync Complete'), findsOneWidget);
-      expect(find.text('Vizor is syncing'), findsNothing);
+      expect(find.text('Veylor is syncing'), findsNothing);
       final container = ProviderScope.containerOf(
         tester.element(find.byType(SyncKeepAwakePrivacyLockHost)),
       );
@@ -138,9 +138,9 @@ void main() {
       notifier.emit(checking);
       await tester.pump();
       expect(find.text('Sync Complete'), findsOneWidget);
-      expect(find.text('Vizor is checking'), findsNothing);
+      expect(find.text('Veylor is checking'), findsNothing);
       expect(find.textContaining('%'), findsNothing);
-      await tester.tap(find.text('Unlock Vizor'));
+      await tester.tap(find.text('Unlock Veylor'));
       await tester.pumpAndSettle();
       expect(find.text('Synced'), findsOneWidget);
       expect(tester.takeException(), isNull);
@@ -232,7 +232,7 @@ void main() {
       expect(calls.last.arguments['visible'], true);
       await tester.pump(const Duration(seconds: 61));
       await tester.pump();
-      expect(find.text('Unlock Vizor'), findsOneWidget);
+      expect(find.text('Unlock Veylor'), findsOneWidget);
       expect(tester.testTextInput.isVisible, false);
       expect(calls.last.arguments['visible'], false);
       expect(
@@ -269,9 +269,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 60));
     await tester.pump();
 
-    expect(find.text('Vizor is syncing'), findsOneWidget);
+    expect(find.text('Veylor is syncing'), findsOneWidget);
     expect(find.text('25%'), findsOneWidget);
-    expect(find.text('Unlock Vizor'), findsOneWidget);
+    expect(find.text('Unlock Veylor'), findsOneWidget);
   });
 
   testWidgets('does not show the privacy screen for near-tip catch-up', (
@@ -296,7 +296,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 80));
     await tester.pump();
 
-    expect(find.text('Vizor is syncing'), findsNothing);
+    expect(find.text('Veylor is syncing'), findsNothing);
   });
 
   testWidgets('recent interaction delays the privacy screen', (tester) async {
@@ -317,12 +317,12 @@ void main() {
     await tester.pump(const Duration(seconds: 30));
     await tester.pump();
 
-    expect(find.text('Vizor is syncing'), findsNothing);
+    expect(find.text('Veylor is syncing'), findsNothing);
 
     await tester.pump(const Duration(seconds: 31));
     await tester.pump();
 
-    expect(find.text('Vizor is syncing'), findsOneWidget);
+    expect(find.text('Veylor is syncing'), findsOneWidget);
   });
 
   testWidgets(
@@ -344,17 +344,17 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(minutes: 5));
 
-      expect(find.text('Vizor is syncing'), findsNothing);
+      expect(find.text('Veylor is syncing'), findsNothing);
 
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pump();
 
-      expect(find.text('Vizor is syncing'), findsNothing);
+      expect(find.text('Veylor is syncing'), findsNothing);
 
       await tester.pump(const Duration(milliseconds: 60));
       await tester.pump();
 
-      expect(find.text('Vizor is syncing'), findsOneWidget);
+      expect(find.text('Veylor is syncing'), findsOneWidget);
     },
   );
 
@@ -373,14 +373,14 @@ void main() {
     await tester.pump(const Duration(milliseconds: 60));
     await tester.pump();
 
-    expect(find.text('Vizor is syncing'), findsOneWidget);
+    expect(find.text('Veylor is syncing'), findsOneWidget);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pump(const Duration(minutes: 5));
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
 
-    expect(find.text('Vizor is syncing'), findsOneWidget);
+    expect(find.text('Veylor is syncing'), findsOneWidget);
   });
 
   testWidgets('passcode confirmation clears the virtual privacy lock', (
@@ -413,7 +413,7 @@ void main() {
 
     expect(container.read(syncKeepAwakePrivacyLockProvider).isLocked, isTrue);
 
-    await tester.tap(find.text('Unlock Vizor'));
+    await tester.tap(find.text('Unlock Veylor'));
     await tester.pump();
 
     expect(find.text('Welcome Back'), findsOneWidget);
@@ -463,7 +463,7 @@ void main() {
       expect(container.read(syncKeepAwakePrivacyLockProvider).isLocked, isTrue);
       expect(_findAppIcon(AppIcons.faceId), findsOneWidget);
 
-      await tester.tap(find.text('Unlock Vizor'));
+      await tester.tap(find.text('Unlock Veylor'));
       await tester.pump();
       await tester.pump();
 
@@ -510,8 +510,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 60));
       await tester.pump();
 
-      await tester.tap(find.text('Unlock Vizor'));
-      await tester.tap(find.text('Unlock Vizor'));
+      await tester.tap(find.text('Unlock Veylor'));
+      await tester.tap(find.text('Unlock Veylor'));
 
       buildCompleter.complete(_faceBiometricState);
       await tester.pump();
@@ -553,7 +553,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 60));
     await tester.pump();
 
-    await tester.tap(find.text('Unlock Vizor'));
+    await tester.tap(find.text('Unlock Veylor'));
     await tester.pump();
     await tester.pump();
 
@@ -598,7 +598,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 60));
     await tester.pump();
 
-    await tester.tap(find.text('Unlock Vizor'));
+    await tester.tap(find.text('Unlock Veylor'));
     await tester.pump();
     await tester.pump();
 
@@ -636,7 +636,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 60));
     await tester.pump();
 
-    await tester.tap(find.text('Unlock Vizor'));
+    await tester.tap(find.text('Unlock Veylor'));
     await tester.pump();
     await _enterPasscode(tester, '999999');
 
@@ -671,7 +671,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 60));
     await tester.pump();
 
-    expect(find.text('Vizor is syncing'), findsOneWidget);
+    expect(find.text('Veylor is syncing'), findsOneWidget);
 
     syncNotifier.emit(
       _sync(
@@ -689,10 +689,10 @@ void main() {
       container.read(syncKeepAwakePrivacyLockModeProvider),
       SyncKeepAwakePrivacyLockMode.done,
     );
-    expect(find.text('Vizor is syncing'), findsNothing);
+    expect(find.text('Veylor is syncing'), findsNothing);
     expect(find.text('Sync Complete'), findsOneWidget);
-    expect(find.text('Unlock Vizor to continue'), findsOneWidget);
-    expect(find.text('Unlock Vizor'), findsOneWidget);
+    expect(find.text('Unlock Veylor to continue'), findsOneWidget);
+    expect(find.text('Unlock Veylor'), findsOneWidget);
   });
 
   testWidgets('keeps the privacy screen across near-tip follow-up syncs', (
@@ -751,7 +751,7 @@ void main() {
     );
     expect(find.text('Sync Complete'), findsNothing);
     expect(find.text('0%'), findsOneWidget);
-    expect(find.text('Vizor is syncing'), findsOneWidget);
+    expect(find.text('Veylor is syncing'), findsOneWidget);
 
     syncNotifier.emit(
       _sync(
@@ -769,7 +769,7 @@ void main() {
       SyncKeepAwakePrivacyLockMode.done,
     );
     expect(find.text('Sync Complete'), findsOneWidget);
-    expect(find.text('Unlock Vizor'), findsOneWidget);
+    expect(find.text('Unlock Veylor'), findsOneWidget);
   });
 
   testWidgets(
@@ -814,10 +814,10 @@ void main() {
         SyncKeepAwakePrivacyLockMode.interrupted,
       );
       expect(find.text('Sync Complete'), findsNothing);
-      expect(find.text('Unlock Vizor to continue'), findsNothing);
+      expect(find.text('Unlock Veylor to continue'), findsNothing);
       expect(find.text('Sync paused'), findsOneWidget);
-      expect(find.text('Unlock Vizor to continue.'), findsOneWidget);
-      expect(find.text('Unlock Vizor'), findsOneWidget);
+      expect(find.text('Unlock Veylor to continue.'), findsOneWidget);
+      expect(find.text('Unlock Veylor'), findsOneWidget);
     },
   );
 

@@ -96,7 +96,7 @@ abstract final class PrivateUsdCopy {
   static String homeZecEquivalent(String zec) => '≈ $zec ZEC';
 
   /// New (F): the banner detail's suffix while a key step is pending.
-  static const bannerKeepOpen = 'Keep Vizor open to finish';
+  static const bannerKeepOpen = 'Keep Veylor open to finish';
 
   // ── Private USD screen ─────────────────────────────────────────────────
 
@@ -159,12 +159,12 @@ abstract final class PrivateUsdCopy {
   /// `private_usd_first_load` (F)
   static const firstLoad =
       "Loading your private balance. The first time reads Railgun's history "
-      'and can take a while. Keep Vizor open.';
+      'and can take a while. Keep Veylor open.';
 
   /// `private_usd_first_load_progress` (F)
   static String firstLoadProgress(int percent) =>
       'Loading your private balance: $percent%. The first time reads '
-      "Railgun's history and can take a while. Keep Vizor open.";
+      "Railgun's history and can take a while. Keep Veylor open.";
 
   /// `private_usd_refresh_failed`
   static const refreshFailed =
@@ -238,7 +238,7 @@ abstract final class PrivateUsdCopy {
 
   /// New (F)
   static const infoKeepOpen =
-      'Conversions, sends and refunds run only while Vizor is open and '
+      'Conversions, sends and refunds run only while Veylor is open and '
       'unlocked.';
 
   /// New (T): only if the D4 bridge had failed. It did not (M0.3), so
@@ -439,7 +439,7 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_error_keystore` (B)
   static const convertErrorKeystore =
-      "Vizor couldn't use this phone's secure key storage to get a conversion "
+      "Veylor couldn't use this phone's secure key storage to get a conversion "
       'token, so nothing was sent. Try again in a moment.';
 
   /// `convert_error_relayer`
@@ -454,7 +454,7 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_error_ethereum` (B)
   static const convertErrorEthereum =
-      "Vizor can't reach Ethereum right now. Try again in a moment.";
+      "Veylor can't reach Ethereum right now. Try again in a moment.";
 
   /// `convert_error_wallet`
   static const convertErrorWallet =
@@ -467,7 +467,7 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_error_store` (B, D17)
   static const convertErrorStore =
-      "Vizor can't read its saved conversions. $supportSentence";
+      "Veylor can't read its saved conversions. $supportSentence";
 
   /// `convert_error_generic`
   static const convertErrorGeneric =
@@ -507,7 +507,7 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_info_step_claim` (B)
   static const convertInfoStepClaim =
-      'Once the deposit is confirmed, Vizor claims the dollars into your '
+      'Once the deposit is confirmed, Veylor claims the dollars into your '
       'private balance.';
 
   /// `convert_info_note_either`
@@ -517,7 +517,7 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_info_note_time` (B, F)
   static String convertInfoNoteTime(String about) =>
-      'Takes $about. Keep Vizor open and unlocked until it\'s done. If you '
+      'Takes $about. Keep Veylor open and unlocked until it\'s done. If you '
       "leave, it pauses; if it can't finish in time, it's called off and "
       'your ZEC comes back, less a network fee.';
 
@@ -590,7 +590,7 @@ abstract final class PrivateUsdCopy {
   /// `convert_maker_silent` (B, F)
   static String convertMakerSilent(String time) =>
       "The market maker hasn't confirmed your deposit yet. If it still "
-      "hasn't by $time, Vizor claims your dollars itself. Keep Vizor open "
+      "hasn't by $time, Veylor claims your dollars itself. Keep Veylor open "
       'until then.';
 
   /// `convert_opening_slow`
@@ -612,19 +612,19 @@ abstract final class PrivateUsdCopy {
   /// `convert_unsettled` (B)
   static const convertUnsettled =
       'The market maker called the swap off while your ZEC payment was still '
-      'unconfirmed. If it goes through, Vizor brings your ZEC back.';
+      'unconfirmed. If it goes through, Veylor brings your ZEC back.';
 
   /// `convert_resuming`
   static const convertResuming = 'Picking up where it left off.';
 
   /// `convert_refunding` (B)
   static const convertRefunding =
-      'The swap was called off. Vizor is bringing your ZEC back to your '
+      'The swap was called off. Veylor is bringing your ZEC back to your '
       'wallet.';
 
   /// `convert_background_note` (B, F)
   static const convertBackgroundNote =
-      "Keep Vizor open until this finishes. If you leave, it pauses and picks "
+      "Keep Veylor open until this finishes. If you leave, it pauses and picks "
       "up when you're back.";
 
   /// `convert_progress_info_title`
@@ -637,7 +637,7 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_progress_info_deposit` (B)
   static const convertProgressInfoDeposit =
-      'Vizor sends your ZEC to the deposit address you and the market maker '
+      'Veylor sends your ZEC to the deposit address you and the market maker '
       'share.';
 
   /// `convert_progress_info_confirm` (plural)
@@ -647,7 +647,7 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_progress_info_claim` (B)
   static const convertProgressInfoClaim =
-      'Vizor claims the dollars into your private balance. A relayer pays the '
+      'Veylor claims the dollars into your private balance. A relayer pays the '
       'Ethereum fees.';
 
   /// `convert_progress_info_screen`
@@ -683,66 +683,66 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_problem_relayer` (B, F)
   static const convertProblemRelayer =
-      "Vizor can't reach the relayer that sends your claim. It keeps trying "
+      "Veylor can't reach the relayer that sends your claim. It keeps trying "
       "while it's open.";
 
   /// `convert_problem_relayer_refused` (B, F)
   static const convertProblemRelayerRefused =
-      "The relayer keeps turning down this conversion's transaction. Vizor "
+      "The relayer keeps turning down this conversion's transaction. Veylor "
       "keeps trying while it's open.";
 
   /// `convert_problem_relayer_fee` (B, N)
   static const convertProblemRelayerFee =
       "The relayer's fee is more than this conversion pays out, or above the "
-      '2 USDC limit, so Vizor waits for it to come down.';
+      '2 USDC limit, so Veylor waits for it to come down.';
 
   /// `convert_problem_ethereum` (B, F)
   static const convertProblemEthereum =
-      "Vizor can't reach Ethereum right now. It keeps trying while it's open.";
+      "Veylor can't reach Ethereum right now. It keeps trying while it's open.";
 
   /// `convert_problem_railgun` (B)
   static const convertProblemRailgun =
-      "Railgun isn't accepting deposits right now, so Vizor holds off "
+      "Railgun isn't accepting deposits right now, so Veylor holds off "
       "claiming. If it doesn't reopen in time, the swap is called off and "
       'your ZEC comes back.';
 
   /// `convert_problem_turn` (B)
   static const convertProblemTurn =
-      'The market maker holds the claim for a few minutes. Vizor claims as '
+      'The market maker holds the claim for a few minutes. Veylor claims as '
       "soon as it's your turn.";
 
   /// `convert_problem_wallet` (B)
   static const convertProblemWallet =
-      "Your Zcash wallet isn't ready. Vizor retries once it has synced.";
+      "Your Zcash wallet isn't ready. Veylor retries once it has synced.";
 
   /// `convert_problem_unpayable` (B)
   static const convertProblemUnpayable =
       "Your wallet can't pay the deposit right now, for example because the "
-      'network fee went up. Vizor keeps trying. If it still can\'t pay in '
+      'network fee went up. Veylor keeps trying. If it still can\'t pay in '
       'time, the swap ends and nothing is sent.';
 
   /// `convert_problem_tokens` (B, T, F)
   static const convertProblemTokens =
-      "Vizor can't get this conversion's token right now. It keeps trying "
+      "Veylor can't get this conversion's token right now. It keeps trying "
       "while it's open.";
 
   /// `convert_problem_rejected` (B)
   static const convertProblemRejected =
-      'The Zcash network turned down a transaction of this conversion. Vizor '
+      'The Zcash network turned down a transaction of this conversion. Veylor '
       'keeps sending it until it goes through or expires.';
 
   /// `convert_problem_mismatch` (B)
   static const convertProblemMismatch =
-      "What's on the chain doesn't match this conversion, so Vizor only "
+      "What's on the chain doesn't match this conversion, so Veylor only "
       'brings your funds back.';
 
   /// New (T): a step held up by the Tor route (`RouteBlocked`).
   static const convertProblemRoute =
-      "Tor is starting or unavailable. Vizor keeps trying while it's open.";
+      "Tor is starting or unavailable. Veylor keeps trying while it's open.";
 
   /// `convert_problem_unexpected` (B, F)
   static const convertProblemUnexpected =
-      "Something went wrong. Vizor keeps trying while it's open.";
+      "Something went wrong. Veylor keeps trying while it's open.";
 
   // ── Convert: results (forward) ────────────────────────────────────────
 
@@ -795,12 +795,12 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_result_mismatch` (B)
   static const convertResultMismatch =
-      "The swap on Ethereum didn't match its quote, so Vizor didn't send your "
+      "The swap on Ethereum didn't match its quote, so Veylor didn't send your "
       'ZEC.';
 
   /// `convert_result_window_missed` (B)
   static const convertResultWindowMissed =
-      "The swap opened too late to finish safely, so Vizor didn't send your "
+      "The swap opened too late to finish safely, so Veylor didn't send your "
       'ZEC.';
 
   /// `convert_result_maker_cancelled`
@@ -851,11 +851,11 @@ abstract final class PrivateUsdCopy {
   static const reverseRefundNote =
       'Before you approve settlement, you can cancel. After that, a refund '
       "waits for the contract deadline. A refund pays the relayer's fee and "
-      "Railgun's shielding fee. Closing Vizor never approves settlement.";
+      "Railgun's shielding fee. Closing Veylor never approves settlement.";
 
   /// New (F): `reverse_keep_open`
   static String reverseKeepOpen(String time) =>
-      'Keep Vizor open after you pay. Once the ZEC is confirmed, you approve '
+      'Keep Veylor open after you pay. Once the ZEC is confirmed, you approve '
       "settlement here by $time. If you don't, your private USD is refunded, "
       'less fees.';
 
@@ -876,7 +876,7 @@ abstract final class PrivateUsdCopy {
 
   /// `reverse_problem_relayer` (B, F)
   static const reverseProblemRelayer =
-      "Vizor can't reach the relayer that moves your dollars. It keeps trying "
+      "Veylor can't reach the relayer that moves your dollars. It keeps trying "
       "while it's open.";
 
   // ── Reverse (M6): progress, results and actions ───────────────────────
@@ -926,7 +926,7 @@ abstract final class PrivateUsdCopy {
 
   /// `reverse_refund_wait` (B, F)
   static const reverseRefundWait =
-      "Waiting until a refund can proceed. Vizor retries while it's open.";
+      "Waiting until a refund can proceed. Veylor retries while it's open.";
 
   /// `reverse_refunding`
   static const reverseRefunding = 'Securing your private refund';
@@ -992,12 +992,12 @@ abstract final class PrivateUsdCopy {
 
   /// `reverse_refund_requested` (B, F)
   static const reverseRefundRequested =
-      "Refund requested. Vizor continues when your refund is available, while "
+      "Refund requested. Veylor continues when your refund is available, while "
       "it's open.";
 
   /// `reverse_refund_requested_after_ready` (B)
   static String reverseRefundRequestedAfterReady(String time) =>
-      "Refund requested. If settlement doesn't finish, Vizor can start "
+      "Refund requested. If settlement doesn't finish, Veylor can start "
       'returning your funds after $time. Settlement may still finish before '
       'then.';
 
@@ -1009,12 +1009,12 @@ abstract final class PrivateUsdCopy {
   /// `reverse_refund_unavailable` (B)
   static const reverseRefundUnavailable =
       'This conversion has already settled and can no longer be refunded. '
-      'Vizor will finish moving your ZEC to your wallet.';
+      'Veylor will finish moving your ZEC to your wallet.';
 
   /// `reverse_error` (B)
   static const reverseError =
       'Unable to complete this step. Your saved conversion resumes after '
-      'Vizor checks both chains. A payment is never repeated because a '
+      'Veylor checks both chains. A payment is never repeated because a '
       'request timed out.';
 
   /// `reverse_error_unconfirmed`
@@ -1043,7 +1043,7 @@ abstract final class PrivateUsdCopy {
   /// New (F): under the proof.
   static const reverseProvingNote =
       'Your phone builds a zero-knowledge proof of the payment. This can take '
-      'a few minutes. Keep Vizor open.';
+      'a few minutes. Keep Veylor open.';
 
   // ── Refunds (M6) ──────────────────────────────────────────────────────
 
@@ -1109,7 +1109,7 @@ abstract final class PrivateUsdCopy {
   static String deleteUnfinishedBody(int count) =>
       'This account has $count unfinished private USD '
       '${_conversions(count)}. Only this account can recover their funds, '
-      'so deleting it now can lose them. Keep Vizor open until they finish '
+      'so deleting it now can lose them. Keep Veylor open until they finish '
       'or are refunded.';
 
   /// New: `reset_unfinished_body`
@@ -1212,7 +1212,7 @@ abstract final class PrivateUsdCopy {
 
   /// New: the send log does not read, so spending stays blocked.
   static const sendErrorStore =
-      "Vizor can't read its saved payments. $supportSentence";
+      "Veylor can't read its saved payments. $supportSentence";
 
   /// `private_usd_send_proving`
   static const sendProving = 'Proving your transaction';
@@ -1224,7 +1224,7 @@ abstract final class PrivateUsdCopy {
   /// `private_usd_send_proving_detail` (F)
   static const sendProvingDetail =
       'Your phone builds a zero-knowledge proof so nobody can see what you '
-      'send. This takes a few seconds. Keep Vizor open.';
+      'send. This takes a few seconds. Keep Veylor open.';
 
   /// `private_usd_send_sending`
   static const sendSending = 'Sending';
@@ -1233,7 +1233,7 @@ abstract final class PrivateUsdCopy {
   /// block.
   static const sendLanding =
       'The relayer is sending it. Waiting for a block can take a minute. '
-      'Keep Vizor open.';
+      'Keep Veylor open.';
 
   /// `private_usd_send_done_title_private`
   static const sendDoneTitlePrivate = 'Sent';

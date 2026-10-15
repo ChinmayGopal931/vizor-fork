@@ -43,7 +43,7 @@ class MobileTorControl extends ConsumerWidget {
             state.status != NetworkPrivacyConnectionStatus.failed
         ? 'Use Tor to hide your IP address from servers. Other apps use their '
               'own network settings.'
-              '${defaultTargetPlatform == TargetPlatform.iOS ? ' Ironwood private migration connects directly while Vizor is closed.' : ''}'
+              '${defaultTargetPlatform == TargetPlatform.iOS ? ' Ironwood private migration connects directly while Veylor is closed.' : ''}'
         : presentation.description;
     final toggleAction = networkPrivacyToggleAction(state);
     final interactive = enabled && toggleAction.isInteractive;
@@ -204,7 +204,7 @@ _MobileTorPresentation _presentationFor(
       _MobileTorPresentation(
         statusLabel: 'Switching…',
         description:
-            'Vizor is switching network requests to a direct '
+            'Veylor is switching network requests to a direct '
             'connection.',
         statusColor: (colors) => colors.text.secondary,
         iconColor: (colors) => colors.icon.muted,
@@ -216,10 +216,10 @@ _MobileTorPresentation _presentationFor(
       // name the exception instead of weakening the foreground guarantee with
       // "most". Android has no corresponding background migration lane.
       description: platform == TargetPlatform.iOS
-          ? 'Vizor’s network requests go through Tor. Ironwood private '
-                'migration uses a direct connection while Vizor is closed. '
+          ? 'Veylor’s network requests go through Tor. Ironwood private '
+                'migration uses a direct connection while Veylor is closed. '
                 'Links opened in other apps use those apps’ network settings.'
-          : 'Vizor’s network requests go through Tor. Links opened in other '
+          : 'Veylor’s network requests go through Tor. Links opened in other '
                 'apps use those apps’ network settings.',
       statusColor: (colors) => colors.text.brandCrimson,
       iconColor: (colors) => colors.icon.brandCrimson,
@@ -232,7 +232,7 @@ _MobileTorPresentation _presentationFor(
           ? _MobileTorPresentation(
               statusLabel: 'Failed',
               description:
-                  'Vizor could not connect to Tor. Requests stay blocked '
+                  'Veylor could not connect to Tor. Requests stay blocked '
                   'until it connects or you turn Tor off.',
               statusColor: (colors) => colors.text.brandCrimson,
               iconColor: (colors) => colors.icon.brandCrimson,
@@ -243,7 +243,7 @@ _MobileTorPresentation _presentationFor(
           : _MobileTorPresentation(
               statusLabel: 'Setting not saved',
               description:
-                  'Vizor could not save the change, so Tor was not turned '
+                  'Veylor could not save the change, so Tor was not turned '
                   'on. Requests keep using a direct connection.',
               statusColor: (colors) => colors.text.brandCrimson,
               iconColor: (colors) => colors.icon.brandCrimson,
@@ -258,7 +258,7 @@ _MobileTorPresentation _presentationFor(
           ? _MobileTorPresentation(
               statusLabel: 'Switch failed',
               description:
-                  'Vizor could not switch to a direct connection. Tor is '
+                  'Veylor could not switch to a direct connection. Tor is '
                   'still on and requests keep going through it.',
               statusColor: (colors) => colors.text.brandCrimson,
               iconColor: (colors) => colors.icon.brandCrimson,
@@ -272,7 +272,7 @@ _MobileTorPresentation _presentationFor(
           : _MobileTorPresentation(
               statusLabel: 'Setting not saved',
               description:
-                  'Requests now use a direct connection, but Vizor could not '
+                  'Requests now use a direct connection, but Veylor could not '
                   'save the change. Tor turns back on the next time you open '
                   'the app.',
               statusColor: (colors) => colors.text.brandCrimson,
@@ -282,7 +282,7 @@ _MobileTorPresentation _presentationFor(
       statusLabel: 'Off',
       description:
           'Wallet sync and in-app requests connect directly. Turn Tor '
-          'on to hide your IP address from the servers Vizor talks to.',
+          'on to hide your IP address from the servers Veylor talks to.',
       statusColor: (colors) => colors.text.secondary,
       iconColor: (colors) => colors.icon.muted,
     ),

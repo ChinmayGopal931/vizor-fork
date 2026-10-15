@@ -947,13 +947,13 @@ List<ReceiveAddressInfoItem> receiveAddressInfoItems(
     const ReceiveAddressInfoItem(
       iconName: AppIcons.renew,
       text:
-          'After this address receives ZEC and Vizor syncs, your next transparent address will automatically change. Previous addresses still belong to this wallet.',
+          'After this address receives ZEC and Veylor syncs, your next transparent address will automatically change. Previous addresses still belong to this wallet.',
     ),
     ReceiveAddressInfoItem(
       iconName: touchUi ? AppIcons.shieldKeyholeOutline : AppIcons.shieldAsset,
       text:
           'After receiving $kZcashDefaultCurrencyTicker to your transparent '
-          "address, Vizor will guide you to shield the balance. Otherwise, "
+          "address, Veylor will guide you to shield the balance. Otherwise, "
           "you won't be able to send it.",
     ),
   ];

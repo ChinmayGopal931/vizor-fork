@@ -249,7 +249,7 @@ void main() {
     expect(find.text('2. Prepare to connect'), findsOneWidget);
     expect(find.text('On your Keystone'), findsOneWidget);
     expect(find.text('Unlock it.'), findsNothing);
-    expect(find.text('On Vizor'), findsOneWidget);
+    expect(find.text('On Veylor'), findsOneWidget);
     expect(find.text('Continue'), findsOneWidget);
   });
 

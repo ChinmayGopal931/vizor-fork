@@ -186,8 +186,8 @@ void main() {
 
     expect(find.byType(MobileMethodSelectionScreen), findsOneWidget);
     expect(find.text('Import secret passphrase'), findsOneWidget);
-    expect(find.text('Import Account\nto Vizor'), findsOneWidget);
-    expect(find.text('Link Vizor Desktop'), findsOneWidget);
+    expect(find.text('Import Account\nto Veylor'), findsOneWidget);
+    expect(find.text('Link Veylor Desktop'), findsOneWidget);
     expect(find.text('Connect hardware wallet'), findsOneWidget);
     expect(_stepsProgress(tester), closeTo(60 / 196, 0.0001));
     expect(find.textContaining('you agree to our'), findsNothing);
@@ -291,7 +291,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Go to Settings → Link Vizor Mobile'), findsOneWidget);
+    expect(find.text('Go to Settings → Link Veylor Mobile'), findsOneWidget);
     expect(
       find.text('Scan the QR code on your desktop from the next screen.'),
       findsOneWidget,
@@ -354,7 +354,7 @@ void main() {
     await tester.tap(button);
     await tester.pumpAndSettle();
     expect(
-      find.text('Create wallet by redeeming Vizor Gift Card'),
+      find.text('Create wallet by redeeming Veylor Gift Card'),
       findsOneWidget,
     );
     semantics.dispose();

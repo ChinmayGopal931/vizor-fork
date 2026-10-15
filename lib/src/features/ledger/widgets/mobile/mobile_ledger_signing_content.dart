@@ -61,7 +61,7 @@ class MobileLedgerSigningContent extends StatelessWidget {
         MobileLedgerAction(actionLabel!, onPressed: onAction),
       if (failed && actionLabel == null && onClose == null) ...[
         const SizedBox(height: AppSpacing.sm),
-        const MobileLedgerMessage('Keep Vizor open.'),
+        const MobileLedgerMessage('Keep Veylor open.'),
       ],
     ],
   );

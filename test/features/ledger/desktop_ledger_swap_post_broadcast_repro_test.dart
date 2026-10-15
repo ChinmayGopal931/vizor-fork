@@ -142,7 +142,7 @@ void main() {
         expect(find.text('Transaction sent'), findsOneWidget);
         expect(
           find.text(
-            'The transaction was sent, but Vizor could not finish saving it.',
+            'The transaction was sent, but Veylor could not finish saving it.',
           ),
           findsOneWidget,
         );
@@ -360,7 +360,7 @@ void main() {
       expect(find.text('Transaction status pending'), findsOneWidget);
       expect(
         find.text(
-          'Vizor could not confirm whether the transaction was sent, and still needs to save its status.',
+          'Veylor could not confirm whether the transaction was sent, and still needs to save its status.',
         ),
         findsOneWidget,
       );

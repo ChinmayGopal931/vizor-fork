@@ -1861,7 +1861,7 @@ class ZcashWalletApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
-      title: 'Vizor',
+      title: 'Veylor',
       debugShowCheckedModeBanner: false,
       theme: buildLegacyLightTheme(),
       darkTheme: buildLegacyDarkTheme(),
@@ -2888,7 +2888,7 @@ class _WindowsUpdatePrompt extends StatelessWidget {
         'Update ${state.availableVersion} available',
       WindowsUpdateStatus.downloading => 'Downloading update',
       WindowsUpdateStatus.ready => 'Update ready',
-      WindowsUpdateStatus.applying => 'Restarting Vizor',
+      WindowsUpdateStatus.applying => 'Restarting Veylor',
       WindowsUpdateStatus.failed => 'Update failed',
       _ => 'Update available',
     };
@@ -2900,7 +2900,7 @@ class _WindowsUpdatePrompt extends StatelessWidget {
       WindowsUpdateStatus.downloading =>
         '${state.downloadProgress}% downloaded.',
       WindowsUpdateStatus.ready => 'Restart when you are ready.',
-      WindowsUpdateStatus.applying => 'Applying after Vizor closes.',
+      WindowsUpdateStatus.applying => 'Applying after Veylor closes.',
       WindowsUpdateStatus.failed =>
         state.message.trim().isEmpty
             ? "Couldn't complete the update. Try again."
@@ -3033,10 +3033,10 @@ class _LinuxUpdateNoticeListener extends ConsumerWidget {
           SnackBar(
             content: Text(
               torEnabled
-                  ? 'Vizor ${update.assetVersion} is available. The release '
-                        'page opens in your browser, outside Vizor’s Tor '
+                  ? 'Veylor ${update.assetVersion} is available. The release '
+                        'page opens in your browser, outside Veylor’s Tor '
                         'connection.'
-                  : 'Vizor ${update.assetVersion} is available.',
+                  : 'Veylor ${update.assetVersion} is available.',
             ),
             duration: const Duration(seconds: 8),
             action: SnackBarAction(

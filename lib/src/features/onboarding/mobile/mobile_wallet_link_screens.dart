@@ -105,8 +105,8 @@ class _DesktopLinkSteps extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     const steps = [
-      'Open & unlock your Vizor desktop app',
-      'Go to Settings → Link Vizor Mobile',
+      'Open & unlock your Veylor desktop app',
+      'Go to Settings → Link Veylor Mobile',
       'Scan the QR code on your desktop from the next screen.',
     ];
     return Column(
@@ -281,7 +281,7 @@ class _WalletLinkScanCardState extends State<_WalletLinkScanCard> {
       return MobileAddressScanCardContent(
         status: forced,
         cameraHeight: widget.cameraHeight,
-        caption: 'Scan the Vizor desktop QR',
+        caption: 'Scan the Veylor desktop QR',
         permissionBuilder:
             (context, status, unavailableDescription, onRetry, onClose) =>
                 MobileKeystoneScanPermissionCard(
@@ -302,8 +302,8 @@ class _WalletLinkScanCardState extends State<_WalletLinkScanCard> {
           : null,
       forceActiveForTesting: forced == AddressQrCameraStatus.active,
       cameraHeight: widget.cameraHeight,
-      caption: widget.loading ? 'Reading link...' : 'Scan the Vizor desktop QR',
-      permissionTitle: 'Scan the Vizor desktop QR',
+      caption: widget.loading ? 'Reading link...' : 'Scan the Veylor desktop QR',
+      permissionTitle: 'Scan the Veylor desktop QR',
       unavailableDescription:
           'Desktop link scanning needs a camera on this device.',
       closeEnabled: !widget.loading,
@@ -345,7 +345,7 @@ class _WalletLinkScanErrorCard extends StatelessWidget {
 
   String get _body => switch (error) {
     MobileWalletLinkScanError.invalid =>
-      "The code you scanned isn't a Vizor desktop link. On your computer, open Settings → Link Vizor Mobile.",
+      "The code you scanned isn't a Veylor desktop link. On your computer, open Settings → Link Veylor Mobile.",
     MobileWalletLinkScanError.expired =>
       'The code on your computer timed out. On desktop, choose Generate new code and scan it again.',
     MobileWalletLinkScanError.failed =>

@@ -32,7 +32,7 @@ const _migrationPreparationCarouselItems = [
 final _migrationInProgressCarouselItems = [
   const AppCarouselItem.icon(
     message:
-        'You can close Vizor anytime. Migration will pause, and you can '
+        'You can close Veylor anytime. Migration will pause, and you can '
         'restart it when you return.',
     tileColor: _migrationCarouselPurple,
     icon: AppIcons.pause,
@@ -47,7 +47,7 @@ final _migrationInProgressCarouselItems = [
   ),
   const AppCarouselItem.image(
     message:
-        'Keep Vizor running and the migration will automatically run in the '
+        'Keep Veylor running and the migration will automatically run in the '
         'background.',
     tileColor: _migrationCarouselCrimson,
     imageAsset: _ironwoodMigrationExpectationRunningAsset,
@@ -2070,7 +2070,7 @@ String _privateMigrationStartErrorMessage(Object error) {
     return "Secret Passphrase isn't available for this account.";
   }
   if (lower.contains('secret storage') || lower.contains('unlocked session')) {
-    return 'Unlock Vizor before starting migration.';
+    return 'Unlock Veylor before starting migration.';
   }
   if (lower.contains('ledger')) {
     return 'Ledger private migration is excluded because the current flow requires batched signing.';
@@ -2088,7 +2088,7 @@ String _privateMigrationContinueErrorMessage(Object error) {
   final message = error.toString();
   final lower = message.toLowerCase();
   if (lower.contains('secret storage') || lower.contains('unlocked session')) {
-    return 'Unlock Vizor before continuing migration.';
+    return 'Unlock Veylor before continuing migration.';
   }
   if (lower.contains('sync')) {
     return 'Wait for sync to finish, then try again.';

@@ -283,7 +283,7 @@ Future<void> _removeAccountThroughMobileUi(
   await pumpUntil(
     tester,
     () => tester.any(
-      find.textContaining('migration will no longer continue in Vizor'),
+      find.textContaining('migration will no longer continue in Veylor'),
     ),
     description: 'active migration account removal warning',
   );

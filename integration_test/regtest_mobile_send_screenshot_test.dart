@@ -58,7 +58,7 @@ void main() {
     await waitForShieldedBalance(tester, '1.25 $mobileE2eTicker');
     await pumpUntil(
       tester,
-      () => tester.any(find.text('Vizor is synced')),
+      () => tester.any(find.text('Veylor is synced')),
       description: 'sync to complete',
       timeout: const Duration(minutes: 2),
     );

@@ -1708,7 +1708,7 @@ class _PaymentLinksScreenState extends ConsumerState<PaymentLinksScreen>
         });
         _showError(
           'Funding was sent, but the gift card could not be saved. '
-          'Try again before closing Vizor.',
+          'Try again before closing Veylor.',
         );
         return;
       }
@@ -1778,7 +1778,7 @@ class _PaymentLinksScreenState extends ConsumerState<PaymentLinksScreen>
     } catch (_) {
       if (mounted) {
         _showError(
-          'The gift card still could not be saved. Try again before closing Vizor.',
+          'The gift card still could not be saved. Try again before closing Veylor.',
         );
       }
     } finally {
@@ -1888,7 +1888,7 @@ class _PaymentLinksScreenState extends ConsumerState<PaymentLinksScreen>
       });
       _showError(
         'Funding was sent, but the gift card could not be saved. '
-        'Try again before closing Vizor.',
+        'Try again before closing Veylor.',
       );
       return;
     }
@@ -1927,7 +1927,7 @@ class _PaymentLinksScreenState extends ConsumerState<PaymentLinksScreen>
       context,
       result.message ??
           (result.status == 'broadcast_unknown'
-              ? 'Funding is still being verified. Vizor will keep checking it.'
+              ? 'Funding is still being verified. Veylor will keep checking it.'
               : 'Funding was sent, but local transaction storage needs to sync.'),
       iconName: AppIcons.warning,
     );

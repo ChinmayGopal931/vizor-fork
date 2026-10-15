@@ -348,7 +348,7 @@ void main() {
     expect(find.text('Forgot Passcode?'), findsOneWidget);
     expect(find.text(kForgotPasscodeUnbackedAccountWarning), findsOneWidget);
     expect(tester.takeException(), isNull);
-    expect(find.text('Continue to reset Vizor'), findsOneWidget);
+    expect(find.text('Continue to reset Veylor'), findsOneWidget);
 
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -376,7 +376,7 @@ void main() {
       find.text(kWalletResetInFlightGiftCardWarningMessage),
       findsOneWidget,
     );
-    expect(find.text('Continue to reset Vizor'), findsOneWidget);
+    expect(find.text('Continue to reset Veylor'), findsOneWidget);
   });
 
   testWidgets('a refused reset reads as a Gift Card wait, not a failure', (
@@ -432,13 +432,13 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel('Passcode help'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Continue to reset Vizor'));
+    await tester.tap(find.text('Continue to reset Veylor'));
     await tester.pumpAndSettle();
 
     // The second sheet arms after a deliberate countdown.
     await tester.pump(kForgotPasscodeLastWarningArmDelay);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Reset Vizor'));
+    await tester.tap(find.text('Reset Veylor'));
     await tester.pumpAndSettle();
 
     expect(accountNotifier.resets, 1);

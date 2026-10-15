@@ -283,7 +283,7 @@ class _SyncKeepAwakePrivacyLockScreenState
     final wasEnabled = biometric.enabled;
     final passcode = await ref
         .read(biometricUnlockProvider.notifier)
-        .readPasscode(reason: 'Unlock Vizor');
+        .readPasscode(reason: 'Unlock Veylor');
     if (!mounted) return;
 
     if (passcode == null) {
@@ -372,7 +372,7 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
         iconName: AppIcons.checkCircle,
         iconKey: ValueKey('sync_keep_awake_privacy_done_check'),
         title: 'Sync Complete',
-        body: 'Unlock Vizor to continue',
+        body: 'Unlock Veylor to continue',
         success: true,
       ),
       SyncKeepAwakePrivacyLockMode.interrupted =>
@@ -380,7 +380,7 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
           iconName: AppIcons.warning,
           iconKey: ValueKey('sync_keep_awake_privacy_interrupted_warning'),
           title: 'Sync paused',
-          body: 'Unlock Vizor to continue.',
+          body: 'Unlock Veylor to continue.',
           success: false,
         ),
       SyncKeepAwakePrivacyLockMode.hidden ||
@@ -388,10 +388,10 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
         const _SyncKeepAwakeDisplayProgressLockup(),
     };
     final semanticsLabel = switch (mode) {
-      SyncKeepAwakePrivacyLockMode.done => 'Vizor is synced',
-      SyncKeepAwakePrivacyLockMode.interrupted => 'Vizor sync is paused',
+      SyncKeepAwakePrivacyLockMode.done => 'Veylor is synced',
+      SyncKeepAwakePrivacyLockMode.interrupted => 'Veylor sync is paused',
       SyncKeepAwakePrivacyLockMode.hidden ||
-      SyncKeepAwakePrivacyLockMode.syncing => 'Vizor is syncing',
+      SyncKeepAwakePrivacyLockMode.syncing => 'Veylor is syncing',
     };
 
     return Material(
@@ -428,7 +428,7 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
                     onPressed: onUnlockPressed,
                     leading: _SyncKeepAwakeUnlockIcon(biometric: biometric),
                     minWidth: 165,
-                    child: const Text('Unlock Vizor'),
+                    child: const Text('Unlock Veylor'),
                   ),
                 ],
               );
@@ -611,7 +611,7 @@ class _SyncKeepAwakePasscodeConfirmScreen extends StatelessWidget {
         scopesRoute: true,
         namesRoute: true,
         explicitChildNodes: true,
-        label: 'Confirm passcode to unlock Vizor',
+        label: 'Confirm passcode to unlock Veylor',
         child: SafeArea(
           child: Column(
             children: [
@@ -708,9 +708,9 @@ class _SyncKeepAwakePasscodeConfirmScreen extends StatelessWidget {
     if (submitting) return 'Checking passcode...';
     return switch (mode) {
       SyncKeepAwakePrivacyLockMode.done =>
-        'Synced successfully. Unlock Vizor to continue.',
+        'Synced successfully. Unlock Veylor to continue.',
       SyncKeepAwakePrivacyLockMode.interrupted =>
-        'Sync paused. Unlock Vizor to continue.',
+        'Sync paused. Unlock Veylor to continue.',
       SyncKeepAwakePrivacyLockMode.hidden ||
       SyncKeepAwakePrivacyLockMode.syncing => 'Unlock to continue',
     };
@@ -837,7 +837,7 @@ class _SyncKeepAwakeProgressLockup extends StatelessWidget {
                   child: SizedBox(
                     width: SyncKeepAwakePrivacyLockScreen._bodyWidth,
                     child: Text(
-                      'Vizor is syncing',
+                      'Veylor is syncing',
                       textAlign: TextAlign.center,
                       style: AppTypography.bodyMediumStrong.copyWith(
                         color: colors.text.primary,

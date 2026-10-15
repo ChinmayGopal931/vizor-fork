@@ -49,7 +49,7 @@ void main() {
             await sharePaymentLinkQr(png: png, sharePositionOrigin: origin),
             isTrue,
           );
-          expectedName = 'vizor-gift-card.png';
+          expectedName = 'veylor-gift-card.png';
         } else {
           await defaultRequestShare(
             png: png,

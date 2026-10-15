@@ -479,7 +479,7 @@ void main() {
 
     expect(auth.calls, 1);
     expect(auth.lastReason, kWalletResetDeviceAuthReason);
-    expect(find.text('Confirm reset Vizor'), findsNothing);
+    expect(find.text('Confirm reset Veylor'), findsNothing);
     expect(resetCalls, 1);
   });
 }

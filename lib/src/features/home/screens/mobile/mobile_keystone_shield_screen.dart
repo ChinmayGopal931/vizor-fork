@@ -517,7 +517,7 @@ class _MobileKeystoneShieldScreenState
             const SizedBox(height: AppSpacing.s),
             Text(
               _stage == _ShieldSignStage.broadcasting
-                  ? 'Keep Vizor open while the transaction is sent.'
+                  ? 'Keep Veylor open while the transaction is sent.'
                   : 'Use your Keystone wallet to scan this shielding QR code. Follow the steps on your device.',
               textAlign: TextAlign.center,
               style: AppTypography.bodyMedium.copyWith(

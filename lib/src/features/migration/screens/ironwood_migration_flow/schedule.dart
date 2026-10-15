@@ -1243,7 +1243,7 @@ class _MigrationScheduleErrorContent extends StatelessWidget {
           SizedBox(
             width: 318,
             child: Text(
-              "Vizor couldn't load the latest migration schedule. "
+              "Veylor couldn't load the latest migration schedule. "
               'Your saved migration state is unchanged.',
               textAlign: TextAlign.center,
               style: AppTypography.bodyMedium.copyWith(

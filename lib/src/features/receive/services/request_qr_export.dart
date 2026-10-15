@@ -15,7 +15,7 @@ import '../../../core/sharing/share_png.dart';
 import '../../../core/storage/png_save_location.dart';
 
 /// Base name of an exported request QR, before the amount and the extension.
-const _requestQrFileStem = 'vizor-request';
+const _requestQrFileStem = 'veylor-request';
 
 /// File name the mobile share attaches. Mobile shares one request at a time
 /// into another app's inbox, so it does not carry the amount the desktop

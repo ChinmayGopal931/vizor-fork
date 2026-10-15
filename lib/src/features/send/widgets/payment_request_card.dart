@@ -1287,7 +1287,7 @@ class _ExternalRequestIntroduction extends StatelessWidget {
                             ),
                             const SizedBox(height: AppSpacing.sm),
                             Text(
-                              'Scan the original QR code directly in Vizor.',
+                              'Scan the original QR code directly in Veylor.',
                               style: AppTypography.bodyMedium.copyWith(
                                 color: colors.text.secondary,
                               ),

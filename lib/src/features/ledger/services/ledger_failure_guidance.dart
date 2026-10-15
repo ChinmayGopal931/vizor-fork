@@ -276,7 +276,7 @@ String _rebuildMessage(Object error, LedgerRequestKind kind) {
       // The planner does not size steps by Ledger limits, and retrying sends
       // the same step.
       LedgerRequestKind.migration =>
-        'This migration step is too large for your Ledger to sign. Vizor can’t split it yet.',
+        'This migration step is too large for your Ledger to sign. Veylor can’t split it yet.',
       // The round's bundle policy fixes the vote's size.
       LedgerRequestKind.voting =>
         'This vote is too large for your Ledger to sign.',
@@ -308,8 +308,8 @@ String _unexpectedStatusMessage(Object error) {
 String ledgerUsbPermissionMessage(TargetPlatform platform) {
   // Linux hidraw nodes stay root-only until a udev rule grants access.
   return platform == TargetPlatform.linux
-      ? "Vizor cannot access your Ledger over USB. Install Ledger's udev rules for Linux (github.com/LedgerHQ/udev-rules), then reconnect your Ledger and try again."
-      : 'Vizor cannot access your Ledger over USB. Check USB device permissions, then reconnect and try again.';
+      ? "Veylor cannot access your Ledger over USB. Install Ledger's udev rules for Linux (github.com/LedgerHQ/udev-rules), then reconnect your Ledger and try again."
+      : 'Veylor cannot access your Ledger over USB. Check USB device permissions, then reconnect and try again.';
 }
 
 /// Tells the Rust USB transport's failures apart, so "no Ledger plugged in"
@@ -330,10 +330,10 @@ String? ledgerUsbErrorMessage(
         text.contains('access denied')) {
       return ledgerUsbPermissionMessage(platform ?? defaultTargetPlatform);
     }
-    return 'Vizor found your Ledger but could not open it. Close other wallet apps that use the Ledger, reconnect it, then try again.';
+    return 'Veylor found your Ledger but could not open it. Close other wallet apps that use the Ledger, reconnect it, then try again.';
   }
   if (text.contains('initialize ledger hid')) {
-    return 'Vizor could not start USB access for your Ledger. Reconnect the device, then try again.';
+    return 'Veylor could not start USB access for your Ledger. Reconnect the device, then try again.';
   }
   return 'The USB connection to your Ledger was interrupted. Reconnect and unlock your Ledger, then try again.';
 }

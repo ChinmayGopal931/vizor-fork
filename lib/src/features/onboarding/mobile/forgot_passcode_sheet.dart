@@ -19,7 +19,7 @@ import '../../private_usd/providers/private_usd_unfinished_provider.dart';
 const kForgotPasscodeLastWarningArmDelay = Duration(seconds: 3);
 const kForgotPasscodeUnbackedAccountWarning =
     'If you haven’t backed up an account’s secret passphrase, '
-    'you can’t recover its funds after resetting Vizor.';
+    'you can’t recover its funds after resetting Veylor.';
 const _kForgotPasscodeCountdownTick = Duration(seconds: 1);
 const double _kForgotPasscodeButtonMinWidth = 196;
 
@@ -57,7 +57,7 @@ class ForgotPasscodeSheet extends ConsumerWidget {
           children: [
             Text(
               "If you can't remember your passcode, the only way to "
-              'recover your account is to completely reset the Vizor app, '
+              'recover your account is to completely reset the Veylor app, '
               'which means deleting all accounts and requiring you to '
               'import accounts again. Unshared gift card links will be '
               'permanently lost.',
@@ -99,7 +99,7 @@ class ForgotPasscodeSheet extends ConsumerWidget {
               constrainContent: true,
               minWidth: _kForgotPasscodeButtonMinWidth,
               onPressed: () => Navigator.of(context).pop(true),
-              child: const _ModalButtonLabel('Continue to reset Vizor'),
+              child: const _ModalButtonLabel('Continue to reset Veylor'),
             ),
             const SizedBox(height: AppSpacing.s),
             AppButton(
@@ -171,7 +171,7 @@ class _ForgotPasscodeLastWarningContentState
   Widget build(BuildContext context) {
     final colors = context.colors;
     final resetLabel = _armed
-        ? 'Reset Vizor'
+        ? 'Reset Veylor'
         : 'Reset after ${_remainingSeconds}s...';
     return MobileModalScaffold(
       title: 'Are you sure?',

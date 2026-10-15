@@ -122,7 +122,7 @@ class _MobileLedgerConnectScreenState
       requestKind: LedgerRequestKind.viewingKey,
     );
     if (guidance != null) return guidance.message;
-    return 'Vizor could not read this Ledger account. Check the connection and try again.';
+    return 'Veylor could not read this Ledger account. Check the connection and try again.';
   }
 
   String _buttonLabel(LedgerAppReadinessState readiness) {

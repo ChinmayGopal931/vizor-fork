@@ -1794,7 +1794,7 @@ class _IronwoodMigrationKeystonePrivateSignScreenState
                   : completing
                   ? 'Applying the Keystone signature to your migration plan.'
                   : waitingForProofs
-                  ? 'Signature captured. Vizor will continue when local proofs are ready.'
+                  ? 'Signature captured. Veylor will continue when local proofs are ready.'
                   : 'Scan the new signed QR shown on Keystone.',
               textAlign: TextAlign.center,
               style:
@@ -2106,10 +2106,10 @@ String ironwoodMigrationKeystoneProofWaitingMessage(
   rust_sync.KeystoneMigrationProofStatus? status,
 ) {
   if (status != null && status.totalCount > 0) {
-    return 'Signature captured. Vizor is still preparing local proofs '
+    return 'Signature captured. Veylor is still preparing local proofs '
         '(${status.readyCount}/${status.totalCount}). Keep this screen open.';
   }
-  return 'Signature captured. Vizor is still preparing local proofs. '
+  return 'Signature captured. Veylor is still preparing local proofs. '
       'Keep this screen open.';
 }
 
@@ -2119,7 +2119,7 @@ String ironwoodMigrationKeystoneProofFailureMessage(
 ) {
   final message = status?.message?.trim();
   if (message != null && message.isNotEmpty) return message;
-  return 'Vizor could not prepare local proofs. Go back and prepare this request again.';
+  return 'Veylor could not prepare local proofs. Go back and prepare this request again.';
 }
 
 @visibleForTesting
@@ -2167,7 +2167,7 @@ String ironwoodMigrationKeystoneSigningErrorMessage(Object error) {
   if (lower.contains('password') ||
       lower.contains('secret storage') ||
       lower.contains('unlocked session')) {
-    return 'Unlock Vizor before signing migration.';
+    return 'Unlock Veylor before signing migration.';
   }
   if (lower.contains('request') && lower.contains('not found')) {
     return 'This Keystone signing request expired. Prepare it again.';

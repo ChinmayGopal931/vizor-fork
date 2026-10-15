@@ -331,7 +331,7 @@ void main() {
     await _pumpMobileLockUseCase(tester, buildMobileForgotPasscodeSheetUseCase);
     expect(tester.takeException(), isNull);
     expect(find.text('Forgot Passcode?'), findsOneWidget);
-    expect(find.text('Continue to reset Vizor'), findsOneWidget);
+    expect(find.text('Continue to reset Veylor'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
     final forgotBody = tester.widget<Text>(
       find.textContaining("If you can't remember your passcode"),
@@ -467,7 +467,7 @@ void main() {
     expect(resetButton().onPressed, isNull);
 
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('Reset Vizor'), findsOneWidget);
+    expect(find.text('Reset Veylor'), findsOneWidget);
     expect(resetButton().onPressed, isNotNull);
   });
 }

@@ -2694,7 +2694,7 @@ void main() {
     expect(find.text('This gift card may take a while'), findsOneWidget);
     expect(
       find.text(
-        'Vizor needs to scan more history than usual before it can verify the '
+        'Veylor needs to scan more history than usual before it can verify the '
         'balance. This is safe, but it may take a long time.',
       ),
       findsOneWidget,

@@ -40,13 +40,13 @@ Widget buildMobileTopNavVariantsUseCase(BuildContext context) {
       children: [
         MobileTopNav.account(
           accountName: 'Account1',
-          syncLabel: 'Vizor is synced',
+          syncLabel: 'Veylor is synced',
           onAccountTap: () {},
         ),
         MobileTopNav.account(
           accountName: 'Account1',
           balanceLabel: '140.12 ZEC',
-          syncLabel: 'Vizor is synced',
+          syncLabel: 'Veylor is synced',
           onAccountTap: () {},
         ),
         MobileTopNav.account(
@@ -116,7 +116,7 @@ class _ShellPreviewState extends State<_ShellPreview> {
         children: [
           MobileTopNav.account(
             accountName: 'Account1',
-            syncLabel: 'Vizor is synced',
+            syncLabel: 'Veylor is synced',
           ),
           Expanded(
             child: Center(

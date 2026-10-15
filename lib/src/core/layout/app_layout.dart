@@ -81,12 +81,12 @@ Future<void> initializeDesktopWindow({
   await windowManager.ensureInitialized();
 
   final options = Platform.isWindows
-      ? WindowOptions(title: 'Vizor')
+      ? WindowOptions(title: 'Veylor')
       : WindowOptions(
           size: initialMode.defaultSize,
           minimumSize: initialMode.minimumSize,
           center: true,
-          title: 'Vizor',
+          title: 'Veylor',
         );
 
   await windowManager.waitUntilReadyToShow(options);

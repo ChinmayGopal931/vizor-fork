@@ -57,7 +57,7 @@ class MobileImportBirthdayUnknownHeightSheet extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'If you continue without a wallet birthday, Vizor will scan from '
+            'If you continue without a wallet birthday, Veylor will scan from '
             'the earliest supported shielded height. This is safe, but the '
             'first sync can take a very long time.',
             style: AppTypography.bodyMedium.copyWith(color: colors.text.accent),

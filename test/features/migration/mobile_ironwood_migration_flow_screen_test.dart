@@ -249,7 +249,7 @@ class _RecoveryScreenTestMigrationCoordinator
       errors: {
         'account-1':
             'Bad state: Ironwood migration credential is missing for the '
-            'active run. Vizor will only continue transactions preserved in '
+            'active run. Veylor will only continue transactions preserved in '
             'the verified iOS outbox.',
       },
     );
@@ -3667,11 +3667,11 @@ void main() {
     );
     expect(find.text('4.12 ZEC'), findsWidgets);
     expect(
-      find.text('Keep Vizor open & unlocked.').hitTestable(),
+      find.text('Keep Veylor open & unlocked.').hitTestable(),
       findsOneWidget,
     );
     expect(
-      find.text('Vizor will retry automatically.').hitTestable(),
+      find.text('Veylor will retry automatically.').hitTestable(),
       findsOneWidget,
     );
     await tester.ensureVisible(find.text('Go home'));
@@ -5940,7 +5940,7 @@ void main() {
     expect(
       find.text(
         'Allow notifications to continue in the background, or keep '
-        'Vizor open.',
+        'Veylor open.',
       ),
       findsOneWidget,
     );
@@ -6043,7 +6043,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
       expect(find.text('Syncing your wallet…'), findsNothing);
       expect(
-        find.text('Confirming in the background. You can close Vizor.'),
+        find.text('Confirming in the background. You can close Veylor.'),
         findsOneWidget,
       );
     },
@@ -6364,7 +6364,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Confirming in the background. You can close Vizor.'),
+        find.text('Confirming in the background. You can close Veylor.'),
         findsOneWidget,
       );
       expect(find.text('Continue preparation'), findsNothing);
@@ -6397,7 +6397,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Confirming in the background. You can close Vizor.'),
+        find.text('Confirming in the background. You can close Veylor.'),
         findsOneWidget,
       );
     },
@@ -6436,11 +6436,11 @@ void main() {
       // until the next reentry. That must outrank the "safe to leave" copy
       // even though background tracking is also armed.
       expect(
-        find.text('Preparing the next transactions. Keep Vizor open.'),
+        find.text('Preparing the next transactions. Keep Veylor open.'),
         findsOneWidget,
       );
       expect(
-        find.text('Confirming in the background. You can close Vizor.'),
+        find.text('Confirming in the background. You can close Veylor.'),
         findsNothing,
       );
     },
@@ -6474,7 +6474,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Confirming in the background. You can close Vizor.'),
+      find.text('Confirming in the background. You can close Veylor.'),
       findsOneWidget,
     );
 
@@ -6485,11 +6485,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(
-      find.text('Preparing the next transactions. Keep Vizor open.'),
+      find.text('Preparing the next transactions. Keep Veylor open.'),
       findsNothing,
     );
     expect(
-      find.text('Confirming in the background. You can close Vizor.'),
+      find.text('Confirming in the background. You can close Veylor.'),
       findsOneWidget,
     );
 
@@ -6498,11 +6498,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
 
     expect(
-      find.text('Preparing the next transactions. Keep Vizor open.'),
+      find.text('Preparing the next transactions. Keep Veylor open.'),
       findsNothing,
     );
     expect(
-      find.text('Confirming in the background. You can close Vizor.'),
+      find.text('Confirming in the background. You can close Veylor.'),
       findsOneWidget,
     );
   });
@@ -6537,18 +6537,18 @@ void main() {
     await tester.pump(const Duration(milliseconds: 700));
 
     expect(
-      find.text('Preparing the next transactions. Keep Vizor open.'),
+      find.text('Preparing the next transactions. Keep Veylor open.'),
       findsNothing,
     );
 
     await tester.pump(const Duration(milliseconds: 150));
 
     expect(
-      find.text('Preparing the next transactions. Keep Vizor open.'),
+      find.text('Preparing the next transactions. Keep Veylor open.'),
       findsOneWidget,
     );
     expect(
-      find.text('Confirming in the background. You can close Vizor.'),
+      find.text('Confirming in the background. You can close Veylor.'),
       findsNothing,
     );
   });
@@ -6585,7 +6585,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 850));
 
     expect(
-      find.text('Preparing the next transactions. Keep Vizor open.'),
+      find.text('Preparing the next transactions. Keep Veylor open.'),
       findsOneWidget,
     );
 
@@ -6595,18 +6595,18 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(
-      find.text('Preparing the next transactions. Keep Vizor open.'),
+      find.text('Preparing the next transactions. Keep Veylor open.'),
       findsOneWidget,
     );
 
     await tester.pump(const Duration(milliseconds: 1600));
 
     expect(
-      find.text('Preparing the next transactions. Keep Vizor open.'),
+      find.text('Preparing the next transactions. Keep Veylor open.'),
       findsNothing,
     );
     expect(
-      find.text('Confirming in the background. You can close Vizor.'),
+      find.text('Confirming in the background. You can close Veylor.'),
       findsOneWidget,
     );
   });
@@ -6644,7 +6644,7 @@ void main() {
       expect(
         find.text(
           'Allow notifications to continue in the background, or keep '
-          'Vizor open.',
+          'Veylor open.',
         ),
         findsOneWidget,
       );
@@ -6680,7 +6680,7 @@ void main() {
 
     expect(
       find.text(
-        'This device can\u2019t confirm in the background. Keep Vizor open.',
+        'This device can\u2019t confirm in the background. Keep Veylor open.',
       ),
       findsOneWidget,
     );
@@ -6689,12 +6689,12 @@ void main() {
     expect(
       find.text(
         'Allow notifications to continue in the background, or keep '
-        'Vizor open.',
+        'Veylor open.',
       ),
       findsNothing,
     );
     expect(
-      find.text('Confirming in the background. You can close Vizor.'),
+      find.text('Confirming in the background. You can close Veylor.'),
       findsNothing,
     );
   });
@@ -6731,7 +6731,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Confirming in the background. You can close Vizor.'),
+        find.text('Confirming in the background. You can close Veylor.'),
         findsOneWidget,
       );
       expect(find.text('Continue preparation'), findsNothing);
@@ -6957,7 +6957,7 @@ void main() {
     expect(find.text('Est. completion'), findsOneWidget);
     expect(
       find.text(
-        'Confirmations are still arriving.\nYou can leave Vizor and check '
+        'Confirmations are still arriving.\nYou can leave Veylor and check '
         'again later.',
       ),
       findsOneWidget,
@@ -7804,7 +7804,7 @@ void main() {
       find.text(
         'Next migration step expected in\n'
         '~25 minutes.\n'
-        'Notifications are on. You can leave Vizor and check back later.',
+        'Notifications are on. You can leave Veylor and check back later.',
       ),
       findsOneWidget,
     );
@@ -7865,8 +7865,8 @@ void main() {
         find.text(
           'Next migration step expected in\n'
           '~25 minutes.\n'
-          'Notifications are on. You can leave Vizor and check back later.\n'
-          'While Vizor is closed, migration continues over a direct '
+          'Notifications are on. You can leave Veylor and check back later.\n'
+          'While Veylor is closed, migration continues over a direct '
           'connection.',
         ),
         findsOneWidget,
@@ -7949,7 +7949,7 @@ void main() {
       find.text(
         'Next migration step expected in\n'
         '~25 minutes.\n'
-        'Notifications are disabled. Open Vizor again to continue.',
+        'Notifications are disabled. Open Veylor again to continue.',
       ),
       findsOneWidget,
     );
@@ -8305,7 +8305,7 @@ void main() {
 
     expect(
       find.textContaining(
-        'Notifications are disabled. Open Vizor after block 3000020',
+        'Notifications are disabled. Open Veylor after block 3000020',
       ),
       findsOneWidget,
     );

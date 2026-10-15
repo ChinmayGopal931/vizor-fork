@@ -90,7 +90,7 @@ class WalletAccountSetupInterruptedException implements Exception {
 
   @override
   String toString() =>
-      'Couldn’t finish saving your wallet. Close and reopen Vizor to finish setup.';
+      'Couldn’t finish saving your wallet. Close and reopen Veylor to finish setup.';
 }
 
 class GiftClaimAccountCreatedException
@@ -102,7 +102,7 @@ class GiftClaimAccountCreatedException
 }
 
 const kWalletAccountStateUncertainMessage =
-    "Vizor couldn't verify the existing wallet. Close and reopen Vizor before trying again.";
+    "Veylor couldn't verify the existing wallet. Close and reopen Veylor before trying again.";
 
 /// A first-account operation was refused because the wallet DB may already
 /// contain an account that is not represented in Dart state.

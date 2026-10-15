@@ -961,7 +961,7 @@ class _MobileMigrationScheduleError extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.s),
             Text(
-              "Vizor couldn't load the latest schedule. "
+              "Veylor couldn't load the latest schedule. "
               'Your saved migration state is unchanged.',
               textAlign: TextAlign.center,
               style: AppTypography.bodyMedium.copyWith(

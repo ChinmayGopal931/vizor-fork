@@ -628,7 +628,7 @@ void main() {
     expect(find.text('Connected'), findsOneWidget);
     expect(
       find.text(
-        'Vizor’s network requests go through Tor. Links opened in other apps '
+        'Veylor’s network requests go through Tor. Links opened in other apps '
         'use those apps’ network settings.',
       ),
       findsOneWidget,
@@ -695,7 +695,7 @@ void main() {
 
       expect(
         find.text(
-          'Vizor’s network requests go through Tor. Links opened in other apps '
+          'Veylor’s network requests go through Tor. Links opened in other apps '
           'use those apps’ network settings.',
         ),
         findsOneWidget,
@@ -900,7 +900,7 @@ void main() {
       );
       expect(
         kPrivateQueriesTurnOffBody,
-        'Vizor will rebuild your transparent history publicly, allowing the '
+        'Veylor will rebuild your transparent history publicly, allowing the '
         'server to learn all your addresses.',
       );
 
@@ -967,7 +967,7 @@ void main() {
     expect(find.text('Switching to direct…'), findsOneWidget);
     expect(
       find.text(
-        'Vizor is switching network requests and software updates to a direct connection.',
+        'Veylor is switching network requests and software updates to a direct connection.',
       ),
       findsOneWidget,
     );
@@ -995,7 +995,7 @@ void main() {
 
     expect(
       find.text(
-        'Vizor’s network requests go through Tor, but software updates are '
+        'Veylor’s network requests go through Tor, but software updates are '
         'unavailable.',
       ),
       findsOneWidget,

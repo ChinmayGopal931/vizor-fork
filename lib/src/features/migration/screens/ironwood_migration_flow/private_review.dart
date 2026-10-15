@@ -400,7 +400,7 @@ class _MigrationAnalyzingContentState extends State<_MigrationAnalyzingContent>
             top: 424,
             width: 300,
             child: Text(
-              'Vizor is working hard to find a perfect balance\n'
+              'Veylor is working hard to find a perfect balance\n'
               'of safety, privacy, and speed for your migration',
               textAlign: TextAlign.center,
               style: AppTypography.bodyMedium.copyWith(
@@ -719,7 +719,7 @@ class _MigrationReviewContent extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Keep Vizor running',
+                        'Keep Veylor running',
                         style: AppTypography.bodyMedium.copyWith(
                           color: colors.text.accent,
                           fontWeight: FontWeight.w500,

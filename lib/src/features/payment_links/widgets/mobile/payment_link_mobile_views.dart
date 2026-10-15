@@ -112,7 +112,7 @@ class PaymentLinkHowItWorksMobileSheet extends StatelessWidget {
           const _MobileHelpStep(
             icon: AppIcons.arrowDownCircle,
             text:
-                'The recipient opens the link in Vizor and claims the full '
+                'The recipient opens the link in Veylor and claims the full '
                 'card amount. The sender covers both fees.',
           ),
           const SizedBox(height: AppSpacing.md),
@@ -1366,7 +1366,7 @@ class PaymentLinkReadyMobileView extends StatelessWidget {
                       Text(
                         ready
                             ? 'Share this link with the intended recipient so '
-                                  'they can claim the Card using their Vizor app.'
+                                  'they can claim the Card using their Veylor app.'
                             : waitingDescription,
                         textAlign: TextAlign.center,
                         style: AppTypography.bodyMedium.copyWith(

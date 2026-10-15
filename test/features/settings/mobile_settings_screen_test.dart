@@ -340,7 +340,7 @@ void main() {
     (
       TargetPlatform.iOS,
       '$kPrivateQueriesSettingsCopy While on, migration confirmations are '
-          'checked only when Vizor is open.',
+          'checked only when Veylor is open.',
     ),
     (TargetPlatform.android, kPrivateQueriesSettingsCopy),
   ]) {
@@ -486,12 +486,12 @@ void main() {
               ),
               findsNothing,
             );
-            expect(find.text('About Vizor'), findsNothing);
+            expect(find.text('About Veylor'), findsNothing);
             final semantics = tester.ensureSemantics();
             try {
               await tester.pump();
               expect(
-                find.bySemanticsLabel('Vizor, version $kVizorReleaseVersion'),
+                find.bySemanticsLabel('Veylor, version $kVizorReleaseVersion'),
                 findsOneWidget,
               );
             } finally {
@@ -630,8 +630,8 @@ void main() {
           .data;
       expect(
         description,
-        'Vizor’s network requests go through Tor. Ironwood private migration '
-        'uses a direct connection while Vizor is closed. Links opened in other '
+        'Veylor’s network requests go through Tor. Ironwood private migration '
+        'uses a direct connection while Veylor is closed. Links opened in other '
         'apps use those apps’ network settings.',
       );
     } finally {
@@ -806,7 +806,7 @@ void main() {
           .data;
       expect(
         description,
-        'Vizor’s network requests go through Tor. Links opened in other apps '
+        'Veylor’s network requests go through Tor. Links opened in other apps '
         'use those apps’ network settings.',
       );
       expect(description, isNot(contains('migration')));
@@ -1126,7 +1126,7 @@ void main() {
       findsOneWidget,
     );
     // The About entry stays hidden until the legal documents are ready.
-    expect(find.text('About Vizor'), findsNothing);
+    expect(find.text('About Veylor'), findsNothing);
     // Endpoint shows the live RPC host:port.
     expect(
       find.text(defaultRpcEndpointConfig('main').hostPort),
@@ -1164,7 +1164,7 @@ void main() {
 
     // Mobile keeps its own pieces and never offers to link to itself.
     expect(find.text('Syncing'), findsOneWidget);
-    expect(find.textContaining('Link Vizor'), findsNothing);
+    expect(find.textContaining('Link Veylor'), findsNothing);
   });
 
   testWidgets('Gift Cards settings row opens the feature', (tester) async {

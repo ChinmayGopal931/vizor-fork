@@ -36,12 +36,12 @@ String? unsharedGiftCardRemovalWarning(
   required bool walletReset,
 }) {
   if (count == null) {
-    final action = walletReset ? 'resetting Vizor' : 'removing this account';
+    final action = walletReset ? 'resetting Veylor' : 'removing this account';
     return "Couldn't check for unshared gift card links. "
         'Copy any links you still need before $action.';
   }
   if (count <= 0) return null;
-  final subject = walletReset ? 'Resetting Vizor' : 'Removing this account';
+  final subject = walletReset ? 'Resetting Veylor' : 'Removing this account';
   if (count == 1) {
     return '1 funded gift card link has not been shared. '
         '$subject loses it. Copy the link first.';

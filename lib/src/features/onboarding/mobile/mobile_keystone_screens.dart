@@ -85,7 +85,7 @@ class MobileKeystoneIntroScreen extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xxs),
                 for (final (i, step) in const [
                   'Tap ••• (top right), then Connect software wallet.',
-                  'Select Vizor (or ZODL)',
+                  'Select Veylor (or ZODL)',
                 ].indexed)
                   _NumberedStep(
                     index: i + 1,
@@ -93,7 +93,7 @@ class MobileKeystoneIntroScreen extends StatelessWidget {
                     isFirstInGroup: i == 0,
                   ),
                 const SizedBox(height: AppSpacing.sm),
-                const _StepGroupHeading('On Vizor'),
+                const _StepGroupHeading('On Veylor'),
                 const SizedBox(height: AppSpacing.xxs),
                 const _NumberedStep(
                   index: 3,

@@ -13,7 +13,7 @@ String _mobilePrivateMigrationStartErrorMessage(Object error) {
   }
   if (message.contains('secret storage') ||
       message.contains('unlocked session')) {
-    return 'Unlock Vizor before starting migration.';
+    return 'Unlock Veylor before starting migration.';
   }
   if (message.contains('sync')) {
     return 'Wait for sync to finish, then try again.';

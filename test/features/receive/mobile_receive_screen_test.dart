@@ -545,7 +545,7 @@ void main() {
     );
     expect(
       find.textContaining(
-        'Vizor will guide you to shield the balance',
+        'Veylor will guide you to shield the balance',
         findRichText: true,
       ),
       findsOneWidget,

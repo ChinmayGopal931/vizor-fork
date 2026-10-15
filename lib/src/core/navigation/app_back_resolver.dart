@@ -56,7 +56,7 @@ abstract final class AppBackResolver {
     '/settings/change-password': 'Change password',
     '/settings/endpoint': 'Endpoint',
     '/settings/explorer': 'Explorer',
-    '/settings/uninstall': 'Uninstall Vizor',
+    '/settings/uninstall': 'Uninstall Veylor',
     '/onboarding/keystone': 'Connect Keystone',
     '/voting': 'Vote',
     '/voting/poll/:roundId': 'Voting round',

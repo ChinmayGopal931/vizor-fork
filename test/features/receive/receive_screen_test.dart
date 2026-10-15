@@ -602,7 +602,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.textContaining('Vizor will guide you to shield the balance'),
+      find.textContaining('Veylor will guide you to shield the balance'),
       findsOneWidget,
     );
     expect(_findAppIcon(AppIcons.renew), findsOneWidget);
@@ -1154,7 +1154,7 @@ void main() {
       },
     );
 
-    expect(suggested, ['vizor-request-0.5.png']);
+    expect(suggested, ['veylor-request-0.5.png']);
     final saved = File(target);
     expect(saved.existsSync(), isTrue);
     expect(saved.readAsBytesSync().take(4), [

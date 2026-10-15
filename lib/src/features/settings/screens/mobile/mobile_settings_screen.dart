@@ -495,7 +495,7 @@ class _DisableBiometricSheet extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'You will use your passcode to unlock Vizor. You can turn '
+            'You will use your passcode to unlock Veylor. You can turn '
             '${kind.inlineUnlockFeatureLabel} back on in settings anytime.',
             style: _bodyStyle.copyWith(color: colors.text.accent),
           ),
@@ -533,7 +533,7 @@ class _SettingsVersionFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Vizor, version $kVizorReleaseVersion',
+      label: 'Veylor, version $kVizorReleaseVersion',
       excludeSemantics: true,
       child: Center(
         child: Row(

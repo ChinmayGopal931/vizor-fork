@@ -444,7 +444,7 @@ class _MobileLedgerSendSignScreenState
               : 'Could not save signed transaction',
           statusLabel: terminal ? 'Recovery required' : 'Signature preserved',
           message: terminal
-              ? 'Vizor could not verify the saved transaction. Do not sign or send it again.'
+              ? 'Veylor could not verify the saved transaction. Do not sign or send it again.'
               : 'Your Ledger signature is preserved. Retry saving without approving another transaction.',
           showDeviceAppPrompt: false,
           actionLabel: terminal ? null : 'Retry saving',

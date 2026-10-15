@@ -569,7 +569,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('deletes every account'), findsOneWidget);
-      expect(find.text('Reset Vizor'), findsOneWidget);
+      expect(find.text('Reset Veylor'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('mobile_account_remove_backup_warning')),
         setupPending ? findsOneWidget : findsNothing,
@@ -646,7 +646,7 @@ void main() {
       accounts: const ['a'],
       count: 2,
       message:
-          '2 funded gift card links have not been shared. Resetting Vizor '
+          '2 funded gift card links have not been shared. Resetting Veylor '
           'loses them. Copy the links first.',
     ),
     (
@@ -663,7 +663,7 @@ void main() {
       count: null,
       message:
           "Couldn't check for unshared gift card links. Copy any links you "
-          'still need before resetting Vizor.',
+          'still need before resetting Veylor.',
     ),
   ]) {
     testWidgets('removal sheet warns about ${testCase.name}', (tester) async {
@@ -759,10 +759,10 @@ void main() {
       await tester.pumpAndSettle();
 
       final subject = isLastAccount
-          ? 'Resetting Vizor'
+          ? 'Resetting Veylor'
           : 'Removing this account';
       final action = isLastAccount
-          ? 'resetting Vizor'
+          ? 'resetting Veylor'
           : 'removing this account';
       expect(
         find.byKey(const ValueKey('mobile_account_remove_backup_warning')),
@@ -1496,7 +1496,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.textContaining('will no longer continue in Vizor'),
+      find.textContaining('will no longer continue in Veylor'),
       findsOneWidget,
     );
     expect(
@@ -1534,6 +1534,6 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('fully sync'), findsOneWidget);
-    expect(find.text('Reset Vizor'), findsOneWidget);
+    expect(find.text('Reset Veylor'), findsOneWidget);
   });
 }

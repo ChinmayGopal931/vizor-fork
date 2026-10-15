@@ -362,7 +362,7 @@ class _SwapKeystoneSigningOverlayState
                 ? 'Submitting transaction'
                 : 'Scan to sign',
             instruction: isBroadcasting
-                ? 'Keep Vizor open while the transaction is sent.'
+                ? 'Keep Veylor open while the transaction is sent.'
                 : _phase == _SwapKeystonePhase.failed
                 ? null
                 : _error ?? 'After you scanned, click Get signature.',

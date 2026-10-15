@@ -1547,7 +1547,7 @@ void main() {
 
     expect(
       find.text(
-        '2 funded gift card links have not been shared. Resetting Vizor '
+        '2 funded gift card links have not been shared. Resetting Veylor '
         'loses them. Copy the links first.',
       ),
       findsOneWidget,

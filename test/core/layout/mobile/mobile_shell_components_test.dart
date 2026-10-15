@@ -50,18 +50,18 @@ void main() {
         MobileTopNav.account(
           accountName: 'Account1',
           balanceLabel: '140.12 ZEC',
-          syncLabel: 'Vizor is synced',
+          syncLabel: 'Veylor is synced',
         ),
       ),
     );
 
     expect(find.text('Account1'), findsOneWidget);
     expect(find.text('140.12 ZEC'), findsOneWidget);
-    expect(find.text('Vizor is synced'), findsOneWidget);
+    expect(find.text('Veylor is synced'), findsOneWidget);
 
     final name = tester.widget<Text>(find.text('Account1'));
     expect(name.style?.color, AppThemeData.dark.colors.text.accent);
-    final sync = tester.widget<Text>(find.text('Vizor is synced'));
+    final sync = tester.widget<Text>(find.text('Veylor is synced'));
     expect(sync.style?.color, AppThemeData.dark.colors.sync.text);
   });
 

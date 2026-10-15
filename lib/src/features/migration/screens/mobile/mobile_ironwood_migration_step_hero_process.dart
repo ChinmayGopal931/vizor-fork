@@ -231,7 +231,7 @@ class _MobileMigrationProcessCard extends StatelessWidget {
                 number: 2,
                 title: 'Prepare your balance',
                 body:
-                    'Vizor reorganizes your balance into common-sized parts '
+                    'Veylor reorganizes your balance into common-sized parts '
                     'before migration begins.',
               ),
               SizedBox(height: AppSpacing.sm),

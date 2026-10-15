@@ -382,7 +382,7 @@ void main() {
     test('the unavailable notice states the recovery, not the cause', () {
       expect(
         kPaymentUriUnavailableMessage,
-        "Vizor couldn't open this payment link. "
+        "Veylor couldn't open this payment link. "
         'Open it again once your wallet has loaded.',
       );
     });

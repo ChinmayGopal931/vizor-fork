@@ -192,7 +192,7 @@ class _MobileVotingConfigSettingsSheetState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Choose where Vizor gets authenticated voting rounds.',
+                  'Choose where Veylor gets authenticated voting rounds.',
                   style: AppTypography.bodyMedium.copyWith(
                     color: context.colors.text.secondary,
                   ),

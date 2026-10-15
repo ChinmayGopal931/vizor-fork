@@ -47,7 +47,7 @@ Future<bool> sharePaymentLinkQr({
 }) async {
   final result = await sharePng(
     png: png,
-    fileName: 'vizor-gift-card.png',
+    fileName: 'veylor-gift-card.png',
     sharePositionOrigin: sharePositionOrigin,
   );
   return result.status == ShareResultStatus.success;

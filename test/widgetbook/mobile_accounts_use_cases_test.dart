@@ -17,7 +17,7 @@ void main() {
     ),
     (
       buildMobileAccountsUnbackedUpResetUseCase,
-      'Reset Vizor',
+      'Reset Veylor',
       'mobile_accounts_menu_preview-account-1',
     ),
   ]) {
@@ -48,7 +48,7 @@ void main() {
       await tester.tap(confirm);
       await tester.pumpAndSettle();
       expect(find.byKey(ValueKey(removedMenu)), findsNothing);
-      if (action == 'Reset Vizor') {
+      if (action == 'Reset Veylor') {
         expect(find.text('Navigated to /welcome'), findsOneWidget);
       }
       expect(tester.takeException(), isNull);

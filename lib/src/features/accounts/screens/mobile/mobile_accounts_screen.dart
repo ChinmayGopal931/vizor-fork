@@ -548,7 +548,7 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
         showAppToast(context, switch (e) {
           PaymentLinkInFlightClaimsException() => e.toString(),
           WalletResetInFlightGiftCardClaimsException() => e.toString(),
-          _ when isLastAccount => "Couldn't reset Vizor",
+          _ when isLastAccount => "Couldn't reset Veylor",
           _ => "Couldn't remove the account",
         }, iconName: AppIcons.cross);
       }
@@ -803,22 +803,22 @@ class MobileAccountRemovalSheet extends StatelessWidget {
   String get _description {
     if (hasActiveMigration) {
       if (isLastAccount) {
-        return 'Resetting Vizor stops migrations on this device and deletes '
+        return 'Resetting Veylor stops migrations on this device and deletes '
             'every account and all local wallet data. Transactions already '
             'submitted to the Zcash network may still complete. After '
             're-importing, let each account fully sync before starting '
             'migration again.';
       }
-      return "This account's migration will no longer continue in Vizor. "
+      return "This account's migration will no longer continue in Veylor. "
           'Transactions already submitted to the Zcash network may still '
           'complete. After re-importing, let the account fully sync before '
           'starting migration again.';
     }
     if (isLastAccount) {
-      return 'Resetting Vizor deletes every account and all local wallet data. '
+      return 'Resetting Veylor deletes every account and all local wallet data. '
           'Make sure you can re-import your accounts before continuing.';
     }
-    return 'Removing this account deletes its local data from Vizor. Make '
+    return 'Removing this account deletes its local data from Veylor. Make '
         'sure you can re-import it before continuing.';
   }
 
@@ -902,7 +902,7 @@ class MobileAccountRemovalSheet extends StatelessWidget {
               child: Text(
                 switch ((isLastAccount, privateUsdUnfinishedCount > 0)) {
                   (true, true) => PrivateUsdCopy.resetAnyway,
-                  (true, false) => 'Reset Vizor',
+                  (true, false) => 'Reset Veylor',
                   (false, true) => PrivateUsdCopy.deleteAnyway,
                   (false, false) => 'Remove',
                 },

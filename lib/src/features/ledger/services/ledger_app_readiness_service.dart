@@ -209,7 +209,7 @@ class LedgerAppReadinessService {
         if (version == null) {
           throw const LedgerAppReadinessException(
             LedgerAppReadinessFailure.unavailable,
-            'Vizor could not verify the Ledger Zcash app. Try again.',
+            'Veylor could not verify the Ledger Zcash app. Try again.',
           );
         }
         try {
@@ -281,7 +281,7 @@ class LedgerAppReadinessService {
         'Reconnect and unlock your Ledger, then try again.',
       _ =>
         ledgerFailureGuidance(error)?.message ??
-            'Vizor could not prepare the Ledger Zcash app. Try again.',
+            'Veylor could not prepare the Ledger Zcash app. Try again.',
     };
     return LedgerAppReadinessException(
       ledgerReadinessFailureFor(kind),

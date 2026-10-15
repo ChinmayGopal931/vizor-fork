@@ -209,7 +209,7 @@ void main() {
     expect(find.text('Opening Zcash'), findsOneWidget);
     expect(
       find.text(
-        'Confirm the request on your Ledger. Vizor will reconnect automatically.',
+        'Confirm the request on your Ledger. Veylor will reconnect automatically.',
       ),
       findsOneWidget,
     );

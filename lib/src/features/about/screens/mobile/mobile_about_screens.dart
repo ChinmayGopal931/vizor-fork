@@ -28,7 +28,7 @@ class MobileAboutScreen extends StatelessWidget {
         child: Column(
           children: [
             MobileTopNav.back(
-              title: 'About Vizor Wallet',
+              title: 'About Veylor Wallet',
               onBack: () => context.pop(),
             ),
             Expanded(

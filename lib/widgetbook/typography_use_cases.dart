@@ -29,7 +29,7 @@ const _displayRows = <_TypographyRow>[
   _TypographyRow(
     name: 'displayMedium',
     style: AppTypography.displayMedium,
-    sample: 'Welcome to Vizor',
+    sample: 'Welcome to Veylor',
   ),
   _TypographyRow(
     name: 'displaySmall',

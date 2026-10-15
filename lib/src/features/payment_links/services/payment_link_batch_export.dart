@@ -16,7 +16,7 @@ Future<bool> exportPaymentLinkBatchCsv(
   final csv = await preparePaymentLinkBatchCsv(members);
   final date = DateTime.now().toLocal().toIso8601String().substring(0, 10);
   final path = await pickSaveLocation(
-    suggestedName: 'vizor-gift-cards-$date.csv',
+    suggestedName: 'veylor-gift-cards-$date.csv',
     type: const XTypeGroup(
       label: 'CSV file',
       extensions: ['csv'],

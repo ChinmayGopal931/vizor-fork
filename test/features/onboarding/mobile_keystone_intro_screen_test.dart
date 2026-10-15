@@ -92,8 +92,8 @@ void main() {
       find.text('Tap ••• (top right), then Connect software wallet.'),
       findsOneWidget,
     );
-    expect(find.text('Select Vizor (or ZODL)'), findsOneWidget);
-    expect(find.text('On Vizor'), findsOneWidget);
+    expect(find.text('Select Veylor (or ZODL)'), findsOneWidget);
+    expect(find.text('On Veylor'), findsOneWidget);
     expect(
       find.text('Scan the dynamic QR code on your Keystone.'),
       findsOneWidget,

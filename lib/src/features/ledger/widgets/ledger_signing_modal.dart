@@ -185,12 +185,12 @@ class LedgerSigningModal extends ConsumerWidget {
         case LedgerAppReadinessPhase.checkingDevice:
           title = 'Checking your Ledger';
           statusLabel = 'Checking device';
-          message = 'Vizor is checking whether the Zcash app is ready.';
+          message = 'Veylor is checking whether the Zcash app is ready.';
         case LedgerAppReadinessPhase.confirmOpening:
           title = 'Confirm opening Zcash';
           statusLabel = 'Opening Zcash';
           message =
-              'Confirm the request on your Ledger. Vizor will reconnect automatically.';
+              'Confirm the request on your Ledger. Veylor will reconnect automatically.';
         case LedgerAppReadinessPhase.idle ||
             LedgerAppReadinessPhase.ready ||
             LedgerAppReadinessPhase.failed:

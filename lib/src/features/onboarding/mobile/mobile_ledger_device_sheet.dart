@@ -179,7 +179,7 @@ class _MobileLedgerDeviceSheetState extends State<MobileLedgerDeviceSheet> {
     if (!_isCurrent(generation)) return;
     final message =
         ledgerFailureGuidance(error)?.message ??
-        'Vizor could not find Ledger devices. Try again.';
+        'Veylor could not find Ledger devices. Try again.';
     setState(() {
       _state = _DiscoveryState.failed;
       _error = message;

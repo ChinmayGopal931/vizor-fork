@@ -8,7 +8,7 @@ import 'payment_link_confirm_modal.dart';
 
 const _title = 'This gift card may take a while';
 const _body =
-    'Vizor needs to scan more history than usual before it can verify the '
+    'Veylor needs to scan more history than usual before it can verify the '
     'balance. This is safe, but it may take a long time.';
 const _supporting = 'You can go back without starting the scan.';
 

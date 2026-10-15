@@ -543,7 +543,7 @@ class _MigrationNotificationConfirmationContent extends StatelessWidget {
           child: SizedBox(
             width: 280,
             child: Text(
-              'Without notifications, you’ll need to remember to open Vizor '
+              'Without notifications, you’ll need to remember to open Veylor '
               'regularly and approve the next migration step when it’s ready.',
               style: AppTypography.bodyMedium.copyWith(
                 color: context.colors.text.primary,
@@ -618,18 +618,18 @@ enum _MigrationPreparationState {
 }
 
 const _migrationPreparationAdvancingMessage =
-    'Preparing the next transactions. Keep Vizor open.';
+    'Preparing the next transactions. Keep Veylor open.';
 // Rendered inside the 200px-wide preparation ring — keep it two short
 // sentences or it fills the dial.
 const _migrationPreparationBackgroundTrackingMessage =
-    'Confirming in the background. You can close Vizor.';
+    'Confirming in the background. You can close Veylor.';
 const _migrationPreparationNotificationsDisabledMessage =
-    'Allow notifications to continue in the background, or keep Vizor open.';
+    'Allow notifications to continue in the background, or keep Veylor open.';
 // Deliberately distinct from the message above: this device has no background
 // preparation lane at all, so telling the user to allow notifications would
 // promise something granting them cannot deliver.
 const _migrationPreparationBackgroundUnsupportedMessage =
-    'This device can\u2019t confirm in the background. Keep Vizor open.';
+    'This device can\u2019t confirm in the background. Keep Veylor open.';
 
 class _MigrationPreparationPreview extends StatelessWidget {
   const _MigrationPreparationPreview({
@@ -1890,14 +1890,14 @@ class _MigrationProgressStatus extends StatelessWidget {
       _MigrationProgressState.waitingNotificationsOff => (
         AppIcons.warningCircle,
         'Waiting for next migration step',
-        'Notifications are disabled. Open Vizor after block 123456 '
+        'Notifications are disabled. Open Veylor after block 123456 '
             '(~1 hr 30 mins) and approve the next migration batch.',
       ),
       _MigrationProgressState.readyToSubmit => (
         AppIcons.migrationTimer,
         'Ready now',
         'The scheduled transaction is ready for automatic submission. '
-            'Keep Vizor open.',
+            'Keep Veylor open.',
       ),
       _MigrationProgressState.broadcasting => (
         AppIcons.notificationBell,
@@ -1906,12 +1906,12 @@ class _MigrationProgressStatus extends StatelessWidget {
             : 'All clear. Migration is in progress',
         'Next migration step expected in\n'
             '~2 hrs 15 mins.\n'
-            'Notifications are on. You can leave Vizor and check back later.',
+            'Notifications are on. You can leave Veylor and check back later.',
       ),
       _MigrationProgressState.confirming => (
         AppIcons.migrationTimer,
         'Waiting for confirmations',
-        'Confirmations are still arriving.\nYou can leave Vizor and check '
+        'Confirmations are still arriving.\nYou can leave Veylor and check '
             'again later.',
       ),
       _MigrationProgressState.needsInput => (

@@ -714,7 +714,7 @@ String _ledgerBroadcastStatusMessage({
   }
   if (status == 'broadcasted_storage_failed') {
     return message ??
-        'The transaction reached the network, but Vizor could not store it locally. Do not send again until sync or an explorer confirms the latest status.';
+        'The transaction reached the network, but Veylor could not store it locally. Do not send again until sync or an explorer confirms the latest status.';
   }
   final rawMessage = message?.toLowerCase() ?? '';
   if (rawMessage.contains('broadcast rejected')) {

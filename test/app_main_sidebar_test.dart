@@ -94,7 +94,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(kSyncStatusConnectingToTorLabel), findsOneWidget);
-    expect(find.text('Vizor is synced'), findsNothing);
+    expect(find.text('Veylor is synced'), findsNothing);
   });
 
   testWidgets('sidebar shows primary navigation', (tester) async {

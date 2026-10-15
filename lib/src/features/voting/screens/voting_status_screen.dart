@@ -792,7 +792,7 @@ class _SkipSignedBundlesDialog extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Vizor can submit now using only signatures already scanned from Keystone.',
+                'Veylor can submit now using only signatures already scanned from Keystone.',
                 style: AppTypography.bodyMedium.copyWith(
                   color: colors.text.secondary,
                 ),
@@ -963,7 +963,7 @@ class VotingStatusContent extends StatelessWidget {
               const SizedBox(height: AppSpacing.sm),
               Text(
                 awaitingLedgerApproval
-                    ? 'Keep Vizor open. Follow the instructions below for each voting bundle.'
+                    ? 'Keep Veylor open. Follow the instructions below for each voting bundle.'
                     : "Don't close the window. Generating zero-knowledge proofs can take a while; closing now may lose in-flight proof work.",
                 textAlign: TextAlign.center,
                 style: AppTypography.bodyMedium.copyWith(
@@ -1245,7 +1245,7 @@ class LedgerVotingSigningPanel extends ConsumerWidget {
           when stage == LedgerSigningStage.preparing =>
         (
           'Checking your Ledger',
-          'Vizor is checking whether the Zcash app is ready.',
+          'Veylor is checking whether the Zcash app is ready.',
         ),
       LedgerAppReadinessPhase.confirmOpening
           when stage == LedgerSigningStage.preparing =>
@@ -1264,7 +1264,7 @@ class LedgerVotingSigningPanel extends ConsumerWidget {
           _ => stage.title,
         },
         stage == LedgerSigningStage.preparing
-            ? 'Please wait while Vizor prepares your request.'
+            ? 'Please wait while Veylor prepares your request.'
             : stage.messageForDevice(
                 progress?.accountUuid == accountUuid
                     ? progress?.deviceModel
@@ -1286,7 +1286,7 @@ class LedgerVotingSigningPanel extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           const MobileLedgerMessage(
-            'Approving on Ledger authorizes this voting delegation. Review the memo below in Vizor before continuing; the device may not display this memo verbatim.',
+            'Approving on Ledger authorizes this voting delegation. Review the memo below in Veylor before continuing; the device may not display this memo verbatim.',
           ),
           if (displayMemo.trim().isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
@@ -1342,7 +1342,7 @@ class LedgerVotingSigningPanel extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Approving on Ledger authorizes this voting delegation. Review the memo below in Vizor before continuing; the device may not display this memo verbatim.',
+              'Approving on Ledger authorizes this voting delegation. Review the memo below in Veylor before continuing; the device may not display this memo verbatim.',
               textAlign: TextAlign.center,
               style: AppTypography.bodySmall.copyWith(
                 color: colors.text.secondary,

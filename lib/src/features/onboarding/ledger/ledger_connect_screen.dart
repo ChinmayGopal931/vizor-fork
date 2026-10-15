@@ -216,9 +216,9 @@ class _LedgerConnectScreenState extends ConsumerState<LedgerConnectScreen> {
       return 'Connect and unlock your Ledger. $appInstruction';
     }
     if (lower.contains('already') || lower.contains('duplicate')) {
-      return 'This Ledger account is already in Vizor.';
+      return 'This Ledger account is already in Veylor.';
     }
-    return 'Vizor could not read this Ledger account. $appInstruction Then try again.';
+    return 'Veylor could not read this Ledger account. $appInstruction Then try again.';
   }
 
   String _connectButtonLabel(LedgerAppReadinessState readiness) {
@@ -264,7 +264,7 @@ class _LedgerConnectScreenState extends ConsumerState<LedgerConnectScreen> {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Vizor imports a watch-only account after you approve sharing its viewing key.',
+                  'Veylor imports a watch-only account after you approve sharing its viewing key.',
                   style: AppTypography.bodyMedium.copyWith(
                     color: context.colors.text.primary,
                   ),

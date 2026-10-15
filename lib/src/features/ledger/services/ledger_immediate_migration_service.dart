@@ -167,7 +167,7 @@ class LedgerImmediateMigrationService {
       final status = await loadProofStatus(requestId: requestId);
       if (status.isFailed) {
         throw StateError(
-          status.message ?? 'Vizor could not prepare migration proofs.',
+          status.message ?? 'Veylor could not prepare migration proofs.',
         );
       }
       if (status.isReady) return;

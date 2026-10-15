@@ -2402,7 +2402,7 @@ class IronwoodMigrationService {
         }
         throw StateError(
           '$_credentialRecoveryRequiredError '
-          'Vizor will only continue transactions preserved in the verified '
+          'Veylor will only continue transactions preserved in the verified '
           'native migration outbox.',
         );
       }

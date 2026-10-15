@@ -198,7 +198,7 @@ void main() {
       // still refresh SyncState so home no longer shows pre-store Orchard funds.
       const storageRetryMessage =
           'Migration transaction aa was accepted by lightwalletd, but local '
-          'wallet storage failed: boom. Vizor will retry until local state is '
+          'wallet storage failed: boom. Veylor will retry until local state is '
           'recorded.';
       final statuses = {
         _softwareUuid: _status(
