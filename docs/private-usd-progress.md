@@ -71,6 +71,19 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     `ironwood_migration_flow_screen_test` (2) and `figma_compare_test` (1)
     (a 21 px overflow in `transfer_status.dart:184`),
     `lost_password_screen_test` (1) and `app_main_sidebar_test` (1).
+  - **Phone check (Galaxy A35, debug build installed over the existing app;
+    the wallet was kept).** The unlock screen, Home, Settings and the Private
+    USD screen render in Gotham; body text looks like Book weight by eye (no
+    Bold substitution); "Veylor" shows in the passcode prompt, the top bar
+    ("Veylor is synced") and the Settings text. The chart shows the ZEC
+    balance by default ("On this device"); with **Use market prices** on it
+    showed "Portfolio value" in USD from the pricing engine (a live request
+    from the phone), and the switch was turned off again afterwards. The
+    phone showed two clipped labels the tests had not: the chart's ZEC header
+    ("0.00257 T...") and the Private USD strip's ZEC worth ("≈ 0.03613 Z...").
+    Both rows now size to their content and were re-checked on the phone. Not
+    checked on the phone: iOS, the Review screens, pricing requests with Tor
+    on.
   - **Owner decisions pending:** the Gotham licence question above; the
     Veylor artwork; whether to keep the Figma deviations (mobile Headline
     28 and 24, activity rows 15 px) or redo the mobile designs in Gotham; two
