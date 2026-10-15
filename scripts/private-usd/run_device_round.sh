@@ -118,7 +118,7 @@ export CARGOKIT_SKIP_EMULATOR_ABIS=true
 OUT="${TMPDIR:-/tmp}/pusd-device-round-$(date +%Y%m%d-%H%M%S)"
 RELEASE_APK=""
 RUN_TEST=1 RUN_RELEASE=1 RUN_RESTORE=1 KEEP_PAGE=0 TOR_FIRST_SYNC=true
-M5=0 M5_ZEC=0.05 M6=0 M6_USD=2 M6_REFUND=false M6_COMPLETE_ONLY=false M6_FEE_MARGIN=2.5 M7=0 M7_USD=1 M7_TO=""
+M5=0 M5_ZEC=0.05 M6=0 M6_USD=2 M6_REFUND=false M6_COMPLETE_ONLY=false M6_FEE_MARGIN=2.5 M7=0 M7_USD=1 M7_TO="" M7_SKIP_SEND=false M7_SKIP_WITHDRAW=false
 M8_ROUTE=0 M8_PHASES=forward,reverse,send KEYED_RPC=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -131,6 +131,8 @@ while [[ $# -gt 0 ]]; do
     --m6-fee-margin) M6_FEE_MARGIN=$2; shift 2 ;;
     --m7) M7=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
     --m7-to) M7_TO=$2; shift 2 ;;
+    --m7-skip-send) M7_SKIP_SEND=true; shift ;;
+    --m7-skip-withdraw) M7_SKIP_WITHDRAW=true; shift ;;
     --m7-usd) M7_USD=$2; shift 2 ;;
     --m8-route) M8_ROUTE=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
     --m8-route-phases) M8_PHASES=$2; shift 2 ;;
@@ -351,6 +353,8 @@ if [[ $RUN_TEST == 1 ]]; then
         --dart-define=VIZOR_PUSD_DEVICE_M7="$1" \
         --dart-define=VIZOR_PUSD_DEVICE_M7_USD="$M7_USD" \
         --dart-define=VIZOR_PUSD_DEVICE_M7_TO="$M7_TO" \
+        --dart-define=VIZOR_PUSD_DEVICE_M7_SKIP_SEND=$M7_SKIP_SEND \
+        --dart-define=VIZOR_PUSD_DEVICE_M7_SKIP_WITHDRAW=$M7_SKIP_WITHDRAW \
         2>&1 | tee "$OUT/flutter-test-m7-$1.log"
       return "${PIPESTATUS[0]}"
     }

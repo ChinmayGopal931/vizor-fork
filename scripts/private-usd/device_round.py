@@ -216,7 +216,7 @@ def erc20_balance(rpc, token, address):
         raise ValueError("the RPC must be https")
     data = "0x70a08231" + address[2:].lower().rjust(64, "0")
     body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "eth_call", "params": [{"to": token, "data": data}, "latest"]}).encode()
-    request = urllib.request.Request(rpc, data=body, headers={"Content-Type": "application/json"})
+    request = urllib.request.Request(rpc, data=body, headers={"Content-Type": "application/json", "User-Agent": "vizor-device-round/1"})
     with urllib.request.urlopen(request, timeout=30) as response:
         answer = json.loads(response.read())
     if "result" not in answer:

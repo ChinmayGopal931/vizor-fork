@@ -5,7 +5,22 @@ is checked. Each milestone also has a gate line: acceptance met, tests written,
 `cargo test` / `fvm flutter analyze` / `fvm flutter test` (and the mobile lane
 for UI milestones) passing, and its Pitfalls re-read against the diff.
 
-## Where things stand (2026-10-14, end of session; read this first)
+## Where things stand (2026-10-15; read this first)
+
+- **Device rounds on the Galaxy A35, testnet + Sepolia, all passed** (M3, M5,
+  M6, M7: see their checklist lines). Still unrun on the device: the M8 route
+  round (`--m8-route`), the keyed-RPC check (needs E6), M8.4 measurements and
+  the release QA on mainnet.
+- Harness lessons (not app bugs): the phone must be unlocked when a round
+  starts (the runner keeps the screen on during a round, but a phone that
+  locked between rounds hides the app: run chained rounds in one invocation,
+  e.g. `--m5 --m7`); each Railgun spend leaves its change Processing on
+  Sepolia, so every spend needs its own spendable note (top up with a
+  conversion; the M7 rounds have `--m7-skip-send` and `--m7-skip-withdraw`
+  for reruns); the round's account-switch check leaves account 1 active, so
+  the later rounds select the second account.
+
+## Where things stood on 2026-10-14 (kept for history)
 
 - **Branch** `feature/private-usd-android`, pushed to `origin` (the owner's fork)
   at the owner's request. Not merged anywhere. The local `[patch]`/path
@@ -480,7 +495,7 @@ Until M4 lands, the engine's token seam holds none (D-33).
 - [x] M5.5 UI (D-54)
 - [x] M5.6 Copy (Convert tables, Accounts) (D-55)
 - [x] M5.7 Widgetbook and capture scenarios (forward rows) (D-56)
-- [ ] M5.8 Device round (testnet + Sepolia; needs testnet ZEC on the phone's wallet, E8). Scenario written, opt-in (D-57); not run (B-9)
+- [x] M5.8 Device round: passed on the Galaxy A35 (2026-10-14/15, testnet + Sepolia): 0.01 TAZ → $10.86 private USD, `PAID`; kill mid-confirmation, an advance with another account active, the delete warning ("showed 1, nothing deleted"), the 90 s lock ("no advance while locked") all held, in three runs. Kill-switch-off-mid-swap is not in the harness (D-42).
 - [x] M5 gate: every suite passes (status below); the device checks are M5.8, deferred
 
 M5 part 1 status (2026-10-13): M5.1 and M5.2, the Rust half, are done. Part 2
@@ -735,7 +750,7 @@ ten).
 - [x] M6.3 Dart (D-81 to D-83, D-85, D-86)
 - [x] M6.4 Copy (Reverse, Refunds) (D-84)
 - [x] M6.5 Widgetbook and capture scenarios (reverse, refunds rows) (D-87)
-- [ ] M6.6 Device round (after M5's; Sepolia + testnet). Scenario written, opt-in (D-89); not run (B-9)
+- [x] M6.6 Device round: passed on the Galaxy A35 (2026-10-14, testnet + Sepolia): cancel before funding → `CANCELLED`; cancel after funding → `REFUNDED`; a $1.25 conversion → 0.00057929 TAZ `COMPLETE` (after the NU7 circuit fix). The lock-during-the-proof check was skipped: the proof finished before the lock (a fast phone); the earlier cancel runs show nothing is paid without the user.
 - [x] M6 gate: every suite passes (status below); the device checks are M6.6, deferred
 
 M6 part 1 status (2026-10-14): M6.1 and M6.2, the Rust half, are done. Part 2
@@ -982,8 +997,7 @@ Nothing in part 2 touched Rust, the FRB bindings or Kotlin.
   settlement (D-96 to D-99)
 - [x] M7.3 Copy (Send and withdraw) (D-100)
 - [x] M7.4 Widgetbook and capture scenarios (send rows) (D-101)
-- [ ] M7.5 Device round (after M5's; Sepolia): `run_device_round.sh --m7
-  --m7-to 0x…`, written, not run (D-103)
+- [x] M7.5 Device round: passed on the Galaxy A35 (2026-10-15, Sepolia): two private sends of $1 relayed (`Sent`, 18 and 27 s) and arrived at the second account as Processing (the expected Sepolia `MissingExternalPOI`); a $1 withdrawal relayed (`Sent`, 17 s) and the public USDC landed at the given `0x` address 21 s later; a send kept but never posted, the app killed, and after the restart it landed from the kept bytes with no new proof (30 s).
 - [x] M7 gate: every suite passes (status below); the device checks are
   M7.5, deferred
 

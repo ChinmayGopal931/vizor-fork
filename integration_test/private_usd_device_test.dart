@@ -182,6 +182,15 @@ const _m7Usd = String.fromEnvironment(
   defaultValue: '1',
 );
 const _m7To = String.fromEnvironment('VIZOR_PUSD_DEVICE_M7_TO');
+
+/// Skip the first send and its arrival check (a rerun after it passed spends
+/// no further private note on it).
+const _m7SkipSend = bool.fromEnvironment('VIZOR_PUSD_DEVICE_M7_SKIP_SEND');
+
+/// Skip the withdrawal and its landing check (a rerun after it passed).
+const _m7SkipWithdraw = bool.fromEnvironment(
+  'VIZOR_PUSD_DEVICE_M7_SKIP_WITHDRAW',
+);
 // '' or a comma list of forward, reverse and send: the M8 route round.
 const _m8Route = String.fromEnvironment('VIZOR_PUSD_DEVICE_M8_ROUTE');
 const _m8AllPhases = ['forward', 'reverse', 'send'];
@@ -438,16 +447,22 @@ void _requireRoundSetup() {
 /// Private USD use (set once by the round): never the Railgun bridge.
 Set<int> _baselineListenPorts = <int>{};
 
-
 /// Opens `/private-usd` from home. A tap while home is still animating in
 /// does nothing, so tap until the screen shows.
-Future<void> _openPrivateUsdScreen(WidgetTester tester) => tapUntilVisible(
-  tester,
-  trigger: find.byKey(const ValueKey('mobile_home_private_usd_strip')),
-  outcome: find.byKey(const ValueKey('mobile_private_usd_convert')),
-  description: 'the Private USD screen',
-  timeout: const Duration(minutes: 2),
-);
+Future<void> _openPrivateUsdScreen(WidgetTester tester) async {
+  // A screen still animating out (after a go-home) would count as shown and
+  // then vanish; let any transition finish before looking.
+  for (var i = 0; i < 12; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  await tapUntilVisible(
+    tester,
+    trigger: find.byKey(const ValueKey('mobile_home_private_usd_strip')),
+    outcome: find.byKey(const ValueKey('mobile_private_usd_convert')),
+    description: 'the Private USD screen',
+    timeout: const Duration(minutes: 2),
+  );
+}
 
 class _Checkpoint {
   _Checkpoint(this.name, this.raw);
@@ -1183,6 +1198,13 @@ class _M5Round extends _Round {
     );
     await enterPasscode(tester, mobileE2ePasscode);
     await waitForHome(tester);
+    // The conversion rounds use the second account; an earlier round's
+    // account-switch check can leave the first one active.
+    final holder = await accountUuidAtOrder(1);
+    final active = ProviderScope.containerOf(
+      tester.element(find.byKey(_homeBalanceKey)),
+    ).read(accountProvider).value?.activeAccountUuid;
+    if (active != holder) await switchAccountTo(tester, holder);
     _container = ProviderScope.containerOf(
       tester.element(find.byKey(_homeBalanceKey)),
     );
@@ -1995,7 +2017,10 @@ class _M7Round extends _Round {
   late final BigInt _units = privateUsdTokenUnits(_m7Usd, 6)!;
 
   /// What a send needs: its amount and the relayer's fee, at most 2 USDC.
-  BigInt get _needed => _units + BigInt.from(2000000);
+  // The amount plus a fee allowance: real relayer fees are cents, so this is
+  // generous without needing the 2 USDC cap (spends leave their change
+  // Processing on Sepolia, so spendable dollars run short quickly).
+  BigInt get _needed => _units + BigInt.from(750000);
 
   void _goHome() => _router.go('/home');
 
@@ -2028,10 +2053,9 @@ class _M7Round extends _Round {
     expect(_container.read(privateUsdAvailableProvider), isTrue);
   }
 
-  String? _activeUuidOf(WidgetTester tester) =>
-      ProviderScope.containerOf(
-        tester.element(find.byKey(_homeBalanceKey)),
-      ).read(accountProvider).value?.activeAccountUuid;
+  String? _activeUuidOf(WidgetTester tester) => ProviderScope.containerOf(
+    tester.element(find.byKey(_homeBalanceKey)),
+  ).read(accountProvider).value?.activeAccountUuid;
 
   PrivateUsdBalances? _balancesOf(String uuid) =>
       _container.read(privateUsdBalanceProvider(uuid)).balances;
@@ -2074,7 +2098,9 @@ class _M7Round extends _Round {
         )?.assets.where((a) => a.token.address == token).firstOrNull;
         return asset != null && asset.available >= _needed;
       },
-      timeout: const Duration(minutes: 30),
+      // Spends leave their change Processing on Sepolia; dollars that are not
+      // available soon will not be (top up with a conversion).
+      timeout: const Duration(minutes: 8),
     );
     _goHome();
     await waitForHome(tester);
@@ -2088,20 +2114,38 @@ class _M7Round extends _Round {
     String check,
   ) async {
     await _openPrivateUsdScreen(tester);
-    await tapAppButton(
-      tester,
-      mode == PrivateUsdSendMode.private ? _sendKey : _withdrawKey,
-      timeout: const Duration(minutes: 2),
-    );
+    try {
+      await tapAppButton(
+        tester,
+        mode == PrivateUsdSendMode.private ? _sendKey : _withdrawKey,
+        timeout: const Duration(minutes: 2),
+      );
+    } on TestFailure {
+      final balance = _container.read(privateUsdBalanceProvider(_uuid));
+      final guard = _container.read(privateUsdSpendStatusProvider(_uuid));
+      await _screenshot('m7-$check-no-button');
+      fail(
+        'the ${mode.name} button never enabled: guard=${guard.name} '
+        'balances=${balance.balances != null} '
+        'total=${balance.balances?.total} refreshing=${balance.isRefreshing} '
+        'active=${_activeUuidOf(tester) == _uuid}',
+      );
+    }
     await tester.enterText(find.byKey(_amountKey), _m7Usd);
     await tester.enterText(find.byKey(_recipientKey), to);
     await tester.pump(const Duration(milliseconds: 300));
     await tapAppButton(tester, _reviewKey, timeout: const Duration(minutes: 1));
-    await _waitUntil(
-      'the review',
-      () => tester.any(find.byKey(_confirmKey)),
-      timeout: const Duration(minutes: 3),
-    );
+    try {
+      await _waitUntil(
+        'the review',
+        () => tester.any(find.byKey(_confirmKey)),
+        timeout: const Duration(minutes: 3),
+      );
+    } on TestFailure {
+      final form = _container.read(privateUsdSendProvider(mode));
+      await _screenshot('m7-$check-no-review');
+      fail('no $check review: phase=${form.phase.name} error=${form.error}');
+    }
     await _screenshot('m7-$check-review');
     await tapAppButton(
       tester,
@@ -2185,47 +2229,52 @@ class _M7Round extends _Round {
     final otherAddress = await _container.read(
       privateUsdReceiveAddressProvider(other).future,
     );
-    await _switchTo(other);
-    final otherBefore = await _syncedBalances(other);
-    _goHome();
-    await waitForHome(tester);
-    await _switchTo(_uuid);
-    await _waitForDollars();
-    await _sendThroughTheScreens(
-      PrivateUsdSendMode.private,
-      otherAddress,
-      'send',
-    );
-    final sent = await _outcome(PrivateUsdSendMode.private, 'send');
-    _results['m7_send'] = sent.runtimeType.toString();
-    await _switchTo(other);
-    final arrivedStart = DateTime.now();
-    var otherAfter = otherBefore;
-    await _waitUntil(
-      'the send to arrive at the second account',
-      () => otherAfter.total - otherBefore.total >= _units,
-      timeout: const Duration(minutes: 30),
-      every: const Duration(seconds: 30),
-      onTick: (_) async {
-        otherAfter = await _syncedBalances(other);
-        _goHome();
-        await waitForHome(tester);
-      },
-    );
-    // On Sepolia a relayed send's output stays Processing
-    // (MissingExternalPOI, reference §6.7 "Screening caveat").
-    final processing = otherAfter.processing - otherBefore.processing;
-    await _event('m7-arrived', {
-      'processing': processing >= _units,
-      'afterS': DateTime.now().difference(arrivedStart).inSeconds,
-    });
-    expect(
-      processing >= _units,
-      isTrue,
-      reason: 'on Sepolia the output should stay Processing',
-    );
-    _results['m7_arrived'] = 'processing';
-    await _switchTo(_uuid);
+    if (_m7SkipSend) {
+      _results['m7_send'] = 'skipped: --m7-skip-send';
+      _results['m7_arrived'] = 'skipped: --m7-skip-send';
+    } else {
+      await _switchTo(other);
+      final otherBefore = await _syncedBalances(other);
+      _goHome();
+      await waitForHome(tester);
+      await _switchTo(_uuid);
+      await _waitForDollars();
+      await _sendThroughTheScreens(
+        PrivateUsdSendMode.private,
+        otherAddress,
+        'send',
+      );
+      final sent = await _outcome(PrivateUsdSendMode.private, 'send');
+      _results['m7_send'] = sent.runtimeType.toString();
+      await _switchTo(other);
+      final arrivedStart = DateTime.now();
+      var otherAfter = otherBefore;
+      await _waitUntil(
+        'the send to arrive at the second account',
+        () => otherAfter.total - otherBefore.total >= _units,
+        timeout: const Duration(minutes: 30),
+        every: const Duration(seconds: 30),
+        onTick: (_) async {
+          otherAfter = await _syncedBalances(other);
+          _goHome();
+          await waitForHome(tester);
+        },
+      );
+      // On Sepolia a relayed send's output stays Processing
+      // (MissingExternalPOI, reference §6.7 "Screening caveat").
+      final processing = otherAfter.processing - otherBefore.processing;
+      await _event('m7-arrived', {
+        'processing': processing >= _units,
+        'afterS': DateTime.now().difference(arrivedStart).inSeconds,
+      });
+      expect(
+        processing >= _units,
+        isTrue,
+        reason: 'on Sepolia the output should stay Processing',
+      );
+      _results['m7_arrived'] = 'processing';
+      await _switchTo(_uuid);
+    }
 
     // 2. A withdrawal reaches the given address.
     final deployment = _container.read(privateUsdCurrentDeploymentProvider)!;
@@ -2240,32 +2289,37 @@ class _M7Round extends _Round {
       return BigInt.parse(balance);
     }
 
-    final publicBefore = await publicBalance();
-    await _waitForDollars();
-    await _sendThroughTheScreens(
-      PrivateUsdSendMode.withdraw,
-      _m7To,
-      'withdraw',
-    );
-    final withdrawn = await _outcome(PrivateUsdSendMode.withdraw, 'withdraw');
-    _results['m7_withdraw'] = withdrawn.runtimeType.toString();
-    // Railgun keeps 25 bps of what is withdrawn.
-    final expected = _units - _units * BigInt.from(25) ~/ BigInt.from(10000);
-    final landedStart = DateTime.now();
-    var landed = false;
-    await _waitUntil(
-      'the withdrawal to reach the address',
-      () => landed,
-      timeout: const Duration(minutes: 20),
-      every: const Duration(seconds: 20),
-      onTick: (_) async {
-        landed = await publicBalance() - publicBefore >= expected;
-      },
-    );
-    await _event('m7-withdraw-landed', {
-      'afterS': DateTime.now().difference(landedStart).inSeconds,
-    });
-    _results['m7_withdraw_landed'] = true;
+    if (_m7SkipWithdraw) {
+      _results['m7_withdraw'] = 'skipped: --m7-skip-withdraw';
+      _results['m7_withdraw_landed'] = 'skipped: --m7-skip-withdraw';
+    } else {
+      final publicBefore = await publicBalance();
+      await _waitForDollars();
+      await _sendThroughTheScreens(
+        PrivateUsdSendMode.withdraw,
+        _m7To,
+        'withdraw',
+      );
+      final withdrawn = await _outcome(PrivateUsdSendMode.withdraw, 'withdraw');
+      _results['m7_withdraw'] = withdrawn.runtimeType.toString();
+      // Railgun keeps 25 bps of what is withdrawn.
+      final expected = _units - _units * BigInt.from(25) ~/ BigInt.from(10000);
+      final landedStart = DateTime.now();
+      var landed = false;
+      await _waitUntil(
+        'the withdrawal to reach the address',
+        () => landed,
+        timeout: const Duration(minutes: 20),
+        every: const Duration(seconds: 20),
+        onTick: (_) async {
+          landed = await publicBalance() - publicBefore >= expected;
+        },
+      );
+      await _event('m7-withdraw-landed', {
+        'afterS': DateTime.now().difference(landedStart).inSeconds,
+      });
+      _results['m7_withdraw_landed'] = true;
+    }
 
     // 3. A send proved and kept, whose first post never returns: the
     // runner kills the app here.
