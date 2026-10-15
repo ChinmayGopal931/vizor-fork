@@ -148,6 +148,17 @@ impl SwapStore {
         // never handed out again.
         conn.pragma_update(None, "synchronous", "FULL")
             .map_err(sql)?;
+        // Reading the send log must not wait for an unrelated writer just
+        // to check a schema that is already current. WAL readers can proceed
+        // while a swap record is being committed. A new store still takes
+        // the write lock and rechecks below, so concurrent first opens cannot
+        // both create the schema.
+        let version: i32 = conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .map_err(sql)?;
+        if version == SCHEMA_VERSION {
+            return Ok(Self { conn });
+        }
         let tx = conn
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sql)?;
@@ -763,6 +774,21 @@ mod tests {
             StoredRecord::Forward(record) => record,
             other => panic!("{other:?}"),
         }
+    }
+
+    #[test]
+    fn reading_an_existing_send_log_does_not_wait_for_a_writer() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut writer = SwapStore::open(dir.path()).unwrap();
+        let transaction = writer
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .unwrap();
+        // This lock stays held throughout the read. An unnecessary write
+        // transaction on open would time out instead of reading the log.
+        let reader = SwapStore::open_existing(dir.path()).unwrap().unwrap();
+        assert!(reader.sends(ACCOUNT).unwrap().is_empty());
+        transaction.rollback().unwrap();
     }
 
     #[test]

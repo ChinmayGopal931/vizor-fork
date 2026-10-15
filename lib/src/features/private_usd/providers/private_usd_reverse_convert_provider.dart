@@ -596,10 +596,14 @@ class PrivateUsdReverseConvertNotifier
     _pending = Timer(debounce, () async {
       if (!ref.mounted || generation != _generation) return;
       final engine = ref.read(privateUsdEngineProvider);
-      // Backgrounded or locked during the debounce: no quote (each spends a
-      // swap index and reads the seed).
+      // Preserve a request paused during the debounce. No page or quote is
+      // opened until the engine can run; editing or disposal cancels it.
       if (!engine.canRun) {
-        state = state.copyWith(quoting: false);
+        _requestQuote(
+          units,
+          debounce: PrivateUsdConvertTiming.tick,
+          forReview: forReview,
+        );
         return;
       }
       rust.ApiReverseRecord? record;

@@ -159,7 +159,7 @@ const _m5Phase = String.fromEnvironment('VIZOR_PUSD_DEVICE_M5');
 const _fundZec = String.fromEnvironment('VIZOR_PUSD_DEVICE_FUND');
 const _m5Zec = String.fromEnvironment(
   'VIZOR_PUSD_DEVICE_M5_ZEC',
-  defaultValue: '0.05',
+  defaultValue: '0.01',
 );
 // '' or 'run': the M6 round (reverse conversion).
 const _m6Phase = String.fromEnvironment('VIZOR_PUSD_DEVICE_M6');
@@ -2435,6 +2435,13 @@ class _M8RouteRound extends _Round {
     );
     await enterPasscode(tester, mobileE2ePasscode);
     await waitForHome(tester);
+    // M5 funds the second account; its switch check can leave the first
+    // active. Use the same funded account as M7 before sharing the context.
+    final holder = await accountUuidAtOrder(1);
+    final active = ProviderScope.containerOf(
+      tester.element(find.byKey(_homeBalanceKey)),
+    ).read(accountProvider).value?.activeAccountUuid;
+    if (active != holder) await switchAccountTo(tester, holder);
     _container = ProviderScope.containerOf(
       tester.element(find.byKey(_homeBalanceKey)),
     );

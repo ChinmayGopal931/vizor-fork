@@ -558,10 +558,16 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
     state = state.copyWith(quoting: true, clearQuoteError: true);
     _pending = Timer(debounce, () async {
       if (!ref.mounted || generation != _generation) return;
-      // Backgrounded or locked during the debounce: no quote, since each one
-      // spends a swap index and reads the seed.
+      // Backgrounded or locked during the debounce: keep the request pending
+      // until the engine can run. Editing or disposal cancels this timer; no
+      // swap index or seed is touched while paused.
       if (!ref.read(privateUsdEngineProvider).canRun) {
-        state = state.copyWith(quoting: false);
+        _requestQuote(
+          run,
+          debounce: PrivateUsdConvertTiming.tick,
+          fillsAmount: fillsAmount,
+          forReview: forReview,
+        );
         return;
       }
       PrivateUsdZecQuote? quote;

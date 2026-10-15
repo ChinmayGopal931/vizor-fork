@@ -54,7 +54,8 @@ Run them in this order. Each command starts with
    2. Copy the receive address.
    3. Send it testnet ZEC (E8): enough for several forward conversions and
       their fees. For example, use 0.5 TAZ with the default
-      `--m5-zec 0.05`.
+      `--m5-zec 0.01`. This default passed the earlier testnet rounds;
+      the maker's live quote still determines whether an amount is accepted.
    4. Wait for the funds to confirm.
 3. **M5, M6 and M7 together:**
    `--m5 --m6 --m7 --m7-to 0x… --keyed-rpc <json>`. They run in that order
@@ -64,14 +65,22 @@ Run them in this order. Each command starts with
    - M7 sends three times, each needing `--m7-usd` (default 1) plus up to
      2 USDC.
 
-   If M5 bought less than that, run `--m5` again, or raise `--m5-zec`.
-   Check the home strip for the private USD balance.
+   On Sepolia a spend's change can remain Processing, so each payment may
+   need a separate spendable note even when the total balance is sufficient.
+   Run `--m5` again to top up before the next spend; a larger single
+   conversion does not create independent notes for every later payment.
+   M7's `--m7-skip-send` and `--m7-skip-withdraw` let reruns continue after
+   topping up. Check **Available**, not just the total private USD balance.
 4. **The route round:** `--m8-route --keyed-rpc <json>`. It needs testnet ZEC
    for its own forward conversion, and private USD for its reverse funding
    and its send. `--m8-route-phases forward,send` (any subset) re-runs only
    the phases you name.
 5. **Optional, long: `--m6 --m6-refund`.** It waits out the refund deadlines,
    which can take up to 3 hours.
+
+For the M8 round, if the reverse phase leaves no spendable note for the send,
+run `--m5 --m8-route --m8-route-phases send` to top up and resume just that
+phase. Do not repeat already completed payments only to reach the next phase.
 
 To run steps 3 and 4 as one command:
 `--m5 --m6 --m7 --m7-to 0x… --m8-route --keyed-rpc <json>`.

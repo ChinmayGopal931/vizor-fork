@@ -2031,7 +2031,7 @@ The **amount** phase (`pu/convert/PrivateUsdConvertVM.kt`, `PrivateUsdConvertTer
 
 The **review** phase (same screen):
 
-- **Header** (`pu/PrivateUsdReviewHeader.kt`): "Review conversion", then `{ZEC}`, "for about", `{$}`. The ledger repeats the fees, with "Quote holds for m:ss".
+- **Header** (`pu/PrivateUsdReviewHeader.kt`): the source says "Review conversion"; Veylor uses "Review" so the mobile navigation title fits. Then `{ZEC}`, "for about", `{$}`. The ledger repeats the fees, with "Quote holds for m:ss".
 - **"Convert":** authenticate, then `accept`, then replace with progress. The failure message defaults to "The conversion couldn't start. Nothing was sent…". If the swap was recorded anyway, the progress screen shows instead (`:286-297`).
 - **Expiry:** once the quote expires, the button becomes "Get a new quote" and the message reads "This quote ran out. Get a new one to continue." A new quote that lands while the review is up is dropped (`withQuote`).
 - **Info sheet** "Before you convert", with five notes (`PrivateUsdConvertTerms.kt:203-215`).
@@ -2341,7 +2341,7 @@ Flags:
 | `convert_error_relayer` | The relayer that completes conversions can't be reached right now. Try again in a moment. | |
 | `convert_error_relayer_refused` | The relayer that completes conversions turned this down. Try again in a moment. | |
 | `convert_error_ethereum` | Veylor can't reach Ethereum right now. Try again in a moment. | B |
-| `convert_error_wallet` | Your Zcash wallet isn't ready. Try again once it has synced. | |
+| `convert_error_wallet` | Veylor couldn't complete this step with your Zcash wallet. Try again in a moment. | |
 | `convert_error_unpayable` | Your wallet can't pay this in one transaction right now. Try a smaller amount. | |
 | `convert_error_store` | Veylor can't read its saved conversions. {support sentence} | B (D17) |
 | `convert_error_generic` | Couldn't get a quote. Try again in a moment. | |
@@ -2354,7 +2354,7 @@ Flags:
 
 | Key | Text | Flag |
 |---|---|---|
-| `convert_review_title` | Review conversion | |
+| `convert_review_title` | Review | |
 | `convert_review_arrow` | for about | |
 | `convert_info_title` | How converting works | |
 | `convert_info_step_quote` | Enter the ZEC you want to convert, including the network fee. The market maker quotes how much private USD you receive. The quote holds for a few minutes. | |
@@ -2413,7 +2413,7 @@ Flags:
 | `convert_problem_ethereum` | Veylor can't reach Ethereum right now. It keeps trying while it's open. | B, F |
 | `convert_problem_railgun` | Railgun isn't accepting deposits right now, so Veylor holds off claiming. If it doesn't reopen in time, the swap is called off and your ZEC comes back. | B |
 | `convert_problem_turn` | The market maker holds the claim for a few minutes. Veylor claims as soon as it's your turn. | B |
-| `convert_problem_wallet` | Your Zcash wallet isn't ready. Veylor retries once it has synced. | B |
+| `convert_problem_wallet` | Veylor couldn't complete this step with your Zcash wallet. It will keep trying while open and unlocked. | B |
 | `convert_problem_unpayable` | Your wallet can't pay the deposit right now, for example because the network fee went up. Veylor keeps trying. If it still can't pay in time, the swap ends and nothing is sent. | B |
 | `convert_problem_tokens` | Veylor can't get this conversion's token right now. It keeps trying while it's open. | B, T, F |
 | `convert_problem_rejected` | The Zcash network turned down a transaction of this conversion. Veylor keeps sending it until it goes through or expires. | B |

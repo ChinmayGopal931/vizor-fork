@@ -26,7 +26,7 @@
 #                        deposit is kept (killed mid-confirmation), then runs the
 #                        resume phase (lock, account switch, delete warning, Paid).
 #                        Implies --skip-release and keeps the page storage.
-#   --m5-zec AMOUNT      ZEC to convert in the M5 round (default 0.05)
+#   --m5-zec AMOUNT      ZEC to convert in the M5 round (default 0.01)
 #   --m6                 the M6 round (reverse conversion), off by default. Run it
 #                        after an M5 round left private USD in the same wallet
 #                        (or together with --m5, after it). It never resets the
@@ -118,7 +118,7 @@ export CARGOKIT_SKIP_EMULATOR_ABIS=true
 OUT="${TMPDIR:-/tmp}/pusd-device-round-$(date +%Y%m%d-%H%M%S)"
 RELEASE_APK=""
 RUN_TEST=1 RUN_RELEASE=1 RUN_RESTORE=1 KEEP_PAGE=0 TOR_FIRST_SYNC=true
-M5=0 M5_ZEC=0.05 M6=0 M6_USD=2 M6_REFUND=false M6_COMPLETE_ONLY=false M6_FEE_MARGIN=2.5 M7=0 M7_USD=1 M7_TO="" M7_SKIP_SEND=false M7_SKIP_WITHDRAW=false
+M5=0 M5_ZEC=0.01 M6=0 M6_USD=2 M6_REFUND=false M6_COMPLETE_ONLY=false M6_FEE_MARGIN=2.5 M7=0 M7_USD=1 M7_TO="" M7_SKIP_SEND=false M7_SKIP_WITHDRAW=false
 M8_ROUTE=0 M8_PHASES=forward,reverse,send KEYED_RPC=""
 while [[ $# -gt 0 ]]; do
   case "$1" in

@@ -60,6 +60,18 @@ struct Wallet {
 #[test]
 #[ignore = "requires the Dockerized Ironwood zcashd/lightwalletd regtest stack"]
 fn a_joint_account_takes_an_ironwood_deposit_and_sweeps_it_home_without_its_ovk() {
+    joint_account_round_trip(false);
+}
+
+/// An Orchard deposit made before NU6.3 remains discoverable and spendable
+/// after activation, including the joint-key signature and Discard OVK path.
+#[test]
+#[ignore = "requires the Dockerized Ironwood zcashd/lightwalletd regtest stack"]
+fn a_joint_account_takes_an_orchard_deposit_and_sweeps_it_after_ironwood_activation() {
+    joint_account_round_trip(true);
+}
+
+fn joint_account_round_trip(deposit_before_activation: bool) {
     start_post_activation_chain();
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -83,7 +95,9 @@ fn a_joint_account_takes_an_ironwood_deposit_and_sweeps_it_home_without_its_ovk(
     // where the sweep goes home.
     let funder = import("Funder", FUNDER_MNEMONIC, 1);
     run_harness("fund-orchard.sh", &[&funder.address, "2.0", "10", "1", "1"]);
-    run_harness("activate-ironwood.sh", &[]);
+    if !deposit_before_activation {
+        run_harness("activate-ironwood.sh", &[]);
+    }
     mine(ORDINARY_UNTRUSTED_CONFIRMATIONS);
     runtime.block_on(scan(&funder.db));
 
@@ -141,14 +155,19 @@ fn a_joint_account_takes_an_ironwood_deposit_and_sweeps_it_home_without_its_ovk(
     runtime
         .block_on(sync::broadcast_raw(&lwd, &deposit_tx.raw))
         .expect("sending it again is harmless");
-    // An Orchard-only joint UA receives in the Ironwood bundle (U2), and the
-    // funder's DB records the recipient for `find_deposit` (U3).
+    // The same joint UA receives in Orchard before NU6.3, Ironwood after it.
+    // Both pools must record the recipient for `find_deposit` (U3).
     let deposit_raw = Transaction::read(&deposit_tx.raw[..], BranchId::Nu6_3).expect("parse");
-    assert!(
-        deposit_raw.ironwood_bundle().is_some(),
-        "the deposit carries an Ironwood bundle"
+    if deposit_before_activation {
+        assert!(deposit_raw.orchard_bundle().is_some());
+        assert!(deposit_raw.ironwood_bundle().is_none());
+    } else {
+        assert!(deposit_raw.ironwood_bundle().is_some());
+    }
+    assert_eq!(
+        sent_output_pool(&funder.db, &deposit_tx.txid, &joint_ua),
+        if deposit_before_activation { 3 } else { 4 }
     );
-    assert_eq!(sent_output_pool(&funder.db, &deposit_tx.txid, &joint_ua), 4);
     let funder_ovk = funder_ovk();
     assert!(
         recovered_outputs(&deposit_tx.raw, &[funder_ovk]) >= 1,
@@ -185,6 +204,21 @@ fn a_joint_account_takes_an_ironwood_deposit_and_sweeps_it_home_without_its_ovk(
         .expect("deposit status"),
         SwapTxStatus::Mined { .. }
     ));
+
+    if deposit_before_activation {
+        run_harness("activate-ironwood.sh", &[]);
+        mine(ORDINARY_UNTRUSTED_CONFIRMATIONS);
+        runtime
+            .block_on(sync_joint(&joint_db))
+            .expect("joint sync after activation");
+        assert_eq!(
+            joint::joint_receipts(&joint_db, NETWORK, &joint_uuid, SWEEP_CONFIRMATIONS)
+                .expect("Orchard receipt after activation")
+                .spendable_zatoshi,
+            DEPOSIT_ZATOSHI,
+            "activation must not strand the joint account's Orchard deposit"
+        );
+    }
 
     // 6a. Broadcast before store: a sweep that cannot be sent stores nothing,
     // and its note stays spendable. Its PCZT carries the lock-owner field the

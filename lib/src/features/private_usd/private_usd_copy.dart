@@ -458,7 +458,8 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_error_wallet`
   static const convertErrorWallet =
-      "Your Zcash wallet isn't ready. Try again once it has synced.";
+      "Veylor couldn't complete this step with your Zcash wallet. Try again "
+      'in a moment.';
 
   /// `convert_error_unpayable`
   static const convertErrorUnpayable =
@@ -486,7 +487,7 @@ abstract final class PrivateUsdCopy {
   // ── Convert: review and info ──────────────────────────────────────────
 
   /// `convert_review_title`
-  static const convertReviewTitle = 'Review conversion';
+  static const convertReviewTitle = 'Review';
 
   /// `convert_review_arrow`
   static const convertReviewArrow = 'for about';
@@ -713,7 +714,8 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_problem_wallet` (B)
   static const convertProblemWallet =
-      "Your Zcash wallet isn't ready. Veylor retries once it has synced.";
+      "Veylor couldn't complete this step with your Zcash wallet. It will "
+      'keep trying while open and unlocked.';
 
   /// `convert_problem_unpayable` (B)
   static const convertProblemUnpayable =
