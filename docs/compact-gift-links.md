@@ -87,13 +87,13 @@ equality continues comparing normalized logical payloads rather than the wire
 version. Different amounts, birthdays, labels, or presentation remain distinct.
 
 Desktop and mobile share v3 without an older-version copy
-option. Recipients must upgrade to a v3-capable Vizor to claim compact links.
+option. Recipients must upgrade to a v3-capable Veylor to claim compact links.
 Existing v1 and v2 links remain readable.
 
 | Reader | v1 | v2 | v3 |
 | --- | --- | --- | --- |
-| V1-only Vizor | Yes | No | No |
-| V2-capable Vizor | Yes | Yes | No |
+| V1-only Veylor | Yes | No | No |
+| V2-capable Veylor | Yes | Yes | No |
 | This implementation | Yes | Yes | Yes |
 
 An older installed app may intercept a new link before a browser fallback can

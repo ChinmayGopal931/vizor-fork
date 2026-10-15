@@ -1,8 +1,8 @@
-![Vizor banner](.github/assets/gh-vizor-banner.png)
+![Veylor banner](.github/assets/gh-vizor-banner.png)
 
-# Vizor
+# Veylor
 
-Vizor is a self-custody Zcash wallet for shielded ZEC, with a polished desktop
+Veylor is a self-custody Zcash wallet for shielded ZEC, with a polished desktop
 experience built around clarity, privacy, and ease of use. It is for users who
 want to create, receive, shield, and send ZEC without giving a hosted wallet
 service control over their funds.
@@ -55,7 +55,7 @@ fvm flutter build macos --release \
 change source, and the price history behind the mobile Home portfolio chart
 (`/coins/zcash/market_chart`, asked for by number of days only). Open-source
 builds should use the public CoinGecko base URL above; production builds can
-point this define at a Vizor-operated proxy, which then has to serve both
+point this define at a Veylor-operated proxy, which then has to serve both
 `/simple/price` and `/coins/zcash/market_chart`.
 
 The built app is at:
@@ -125,7 +125,7 @@ TeamIdentifier=SZTB68DXM4
 
 ## Notes
 
-- Back up your mnemonic. Vizor cannot recover funds if you lose it.
+- Back up your mnemonic. Veylor cannot recover funds if you lose it.
 - The local password protects this device only. It does not replace the
   mnemonic backup.
 - Shielded transactions are scanned locally, but your lightwalletd endpoint can
@@ -159,9 +159,9 @@ repo root:
 flutter_rust_bridge_codegen generate
 ```
 
-## Support Vizor
+## Support Veylor
 
-If Vizor is useful to you, consider supporting its continued development with
+If Veylor is useful to you, consider supporting its continued development with
 a ZEC donation.
 
 <p align="center">

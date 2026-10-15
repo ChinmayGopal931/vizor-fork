@@ -163,7 +163,7 @@ classified as a new user; retry recovery supplies the successful snapshot.
 
 ## Deep-link Host (VIZOR_DEEPLINK_BASE_URL)
 
-The HTTPS origin Vizor claims for incoming links has **one** knob on
+The HTTPS origin Veylor claims for incoming links has **one** knob on
 Android and Dart: `--dart-define=VIZOR_DEEPLINK_BASE_URL` (default
 `https://link.vizor.cash`).
 
@@ -298,7 +298,7 @@ Ledger accounts keep the decorative dot style.
   tooltips, error messages, status labels, form labels, picker headers, empty
   states, page titles. Only capitalize the first word and proper nouns. Keep
   proper-noun acronyms in their canonical form (`ZEC`, `USDC`, `USDT`, `NEAR`,
-  `Vizor`, `Keystone`, `Zcash`, `Ethereum`).
+  `Veylor`, `Keystone`, `Zcash`, `Ethereum`).
 - Figma-authored display headings may keep title case.
 - This applies to interpolated labels too: `'$symbol deposit tx'`, not
   `'$symbol Deposit tx'`. The asset symbol carries its own casing; the rest of
@@ -506,7 +506,7 @@ The entire sync loop runs in Rust (`rust/src/wallet/sync_engine.rs`). A single c
    `transaction_enhancement_work()`. `transaction_data_requests()` feeds only
    transparent-address history (`TransactionsInvolvingAddress`). librustzcash
    persistently requests `GetStatus` only when compact-block scanning cannot
-   observe the transaction's mined state. During recovery, Vizor separately
+   observe the transaction's mined state. During recovery, Veylor separately
    excludes previously mined transactions from resubmission while a pending
    scan range can still restore their mined heights.
 6. Progress streamed to Dart via FRB `StreamSink` per batch. Each event has a
@@ -756,7 +756,7 @@ while an executed denomination preparation waits for confirmations.
   confirmations. A normal mined height contributes
   `tip - minedHeight + 1`, capped at 3.
 - Reaching 3 confirmations finishes only the current observation wave. The
-  manager stores a foreground-continuation token, posts an “Open Vizor”
+  manager stores a foreground-continuation token, posts an “Open Veylor”
   notification under its own `confirmedWaveReady` kind so healthy copy never
   reuses failure copy, and immediately completes that system task successfully
   without opening the wallet DB for sync or advance. It does not wait for the
@@ -857,7 +857,7 @@ apply this cancellable device policy to already-submitted durable broadcasts.
 Normal hardware sends use Keystone's signatures-only batch protocol, even for
 one transaction. The device cannot generate ZK proofs (proving keys are too
 big for the device), and the phone cannot sign (the spending key lives on the
-device), so Vizor retains the proof PCZT and applies only the compact
+device), so Veylor retains the proof PCZT and applies only the compact
 Orchard/Ironwood signatures returned by Keystone.
 
 ```

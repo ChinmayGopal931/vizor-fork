@@ -106,7 +106,7 @@ disposable checkout. `VIZOR_LEDGER_SPECULOS_TESTNET_ELF` can reuse that build;
 the mainnet `VIZOR_LEDGER_SPECULOS_ELF` is not used by this lane.
 
 The distributed Zcash app uses coin type 133. Its source has a testnet feature
-for coin type 1, but the install paths do not change automatically. Vizor's
+for coin type 1, but the install paths do not change automatically. Veylor's
 production mainnet restriction remains in place. This test variant is not an
 officially distributed testnet app.
 
@@ -114,7 +114,7 @@ The lane runs software and Ledger accounts against separate fresh local chains
 using the same public disposable mnemonic, funded notes, four proposals and
 decision 0. The helper exports the real device UFVK at coin type 1 and re-encodes
 it from testnet to regtest without changing its keys. The Ledger case imports it
-as a hardware account with no mnemonic stored in Vizor. Funding and migration
+as a hardware account with no mnemonic stored in Veylor. Funding and migration
 are prepared with the software fixture before this import; this lane does not
 test Ledger shielding.
 

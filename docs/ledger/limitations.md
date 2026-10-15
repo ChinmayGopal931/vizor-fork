@@ -75,5 +75,5 @@ Returned signatures are still cryptographically verified.
    Orchard-to-Ironwood canary before removing the release gate. Speculos proves
    firmware/APDU behavior, not physical USB/Bluetooth or production broadcast.
 
-`pczt-ledger` is a comparison/reference implementation; Vizor does not add it as
+`pczt-ledger` is a comparison/reference implementation; Veylor does not add it as
 a dependency. Its open PR #4 concerns emulator tests, not larger device limits.

@@ -7,7 +7,7 @@ Implemented on top of `9bddb8e65` for existing Ledger accounts. This changes the
 1. Typed BLE pairing-invalid, pairing-rejected and disconnected failures offer **Find my Ledger**. An unknown connection failure is not diagnosed as a pairing reset.
 2. **Did you reset pairing?** expands in place: remove the old OS pairing if listed, then return and find the Ledger. The main action remains below the disclosure. Device selection uses quiet list rows rather than stacked secondary buttons.
 3. Starting discovery stops the previous scan and disconnects the old session. Selecting a discovered device requests a viewing-key export at the existing account's derivation index.
-4. Vizor compares the complete exported UFVK and account index with the existing account. Device name, Bluetooth ID and model are not identity proofs. Only a matching result reaches the metadata commit.
+4. Veylor compares the complete exported UFVK and account index with the existing account. Device name, Bluetooth ID and model are not identity proofs. Only a matching result reaches the metadata commit.
 5. On success, **Continue signing** is a separate explicit action. Settings return, discovery, selection and account verification never request transaction signatures themselves.
 
 macOS retains the equal-width Bluetooth/USB selector for dual-transport devices. Mobile has no transport selector. Permission denial, Bluetooth off, and location restrictions reached during rediscovery use the existing single-action access recovery.

@@ -54,7 +54,7 @@ A rejected proposal says what to try instead, fewer cards or a smaller amount pe
 ### Export contract
 
 - Prepare every share URI through the existing validation path first; if any fails, write nothing.
-- Save through the native panel as `vizor-gift-cards-YYYY-MM-DD.csv`: UTF-8, header `card_number,amount_zec,link`, one quoted row per card in card order.
+- Save through the native panel as `veylor-gift-cards-YYYY-MM-DD.csv`: UTF-8, header `card_number,amount_zec,link`, one quoted row per card in card order.
 - The confirmation before choosing a location says **Anyone with this file can claim these cards. Save it somewhere private.** Cancelling is silent and leaves re-export available.
 - Never log links, mnemonics or CSV contents. Export is not proof of delivery, so it does not mark cards shared.
 

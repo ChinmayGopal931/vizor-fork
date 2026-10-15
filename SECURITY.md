@@ -1,6 +1,6 @@
 # Security Policy
 
-Vizor is a self-custody wallet. We take reports about vulnerabilities that
+Veylor is a self-custody wallet. We take reports about vulnerabilities that
 could affect wallet funds, keys, privacy, availability, or software integrity
 seriously.
 
@@ -24,7 +24,7 @@ that private reporting channel instead.
 Include as much of the following as is safely available:
 
 - A concise description of the vulnerability and its potential impact.
-- The affected Vizor version or commit.
+- The affected Veylor version or commit.
 - The operating system, architecture, device, and relevant OS version.
 - Whether the issue affects mainnet, testnet, regtest, or all networks.
 - Reproduction steps or a minimal proof of concept.
@@ -82,5 +82,5 @@ GitHub issues when issue creation is available.
 - Give us a reasonable opportunity to investigate and address the report before
   public disclosure.
 
-Vizor does not currently operate a public bug-bounty program. Submission of a
+Veylor does not currently operate a public bug-bounty program. Submission of a
 report does not create an entitlement to payment or other compensation.

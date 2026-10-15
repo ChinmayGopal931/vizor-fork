@@ -9,14 +9,14 @@ Do not treat the signing-phase UI improvement as a fix for this device failure.
 - Nano X buttons become sluggish, then the screen turns off and on in a reboot
   (user explicitly distinguished this from returning to the Zcash dashboard or PIN lock).
 - The original conversation also reported battery trouble, automatic locking,
-  and failed Try again recovery until restarting Vizor. Desktop was reported working,
+  and failed Try again recovery until restarting Veylor. Desktop was reported working,
   but identical transaction/device/version conditions have not been established.
 - Phone OS, Ledger OS, installed Zcash app version, transaction shape, and failing
   command are still unknown. No physical-device reproduction has been performed.
 
 ## Findings and limits
 
-- Vizor's iOS/Android handlers await each APDU response before sending the next;
+- Veylor's iOS/Android handlers await each APDU response before sending the next;
   there is no observed unbounded pipeline of transaction APDUs into the device.
 - BLE fragments inside one APDU are distinct from APDU-level backpressure.
   The pinned iOS SDK uses write-without-response where available; its flow control
@@ -27,7 +27,7 @@ Do not treat the signing-phase UI improvement as a fix for this device failure.
   APDU round-trip time. It cannot be labeled purely radio transfer time.
 - Upstream has concrete Nano X stack/SE-resource/heap fixes, but these are already
   present in source commit `22dc38537f9a84b31b938e3ca95434595ef378d3`, also referenced
-  by tag `nanox_2.7.1_3.9.3_sdk_v26.6.1`. Current Vizor requires Zcash >= 3.9.3.
+  by tag `nanox_2.7.1_3.9.3_sdk_v26.6.1`. Current Veylor requires Zcash >= 3.9.3.
   Historical app exits do not prove the cause of the reported full-device reboot.
 - The current device implementation caches the spending key but rebuilds FVK /
   decipher keys per action. Reuse is a device-app optimization candidate, subject
@@ -35,7 +35,7 @@ Do not treat the signing-phase UI improvement as a fix for this device failure.
 
 ## Resume plan
 
-1. Record phone OS, Vizor build, Ledger OS/Zcash versions, power source and lock settings.
+1. Record phone OS, Veylor build, Ledger OS/Zcash versions, power source and lock settings.
 2. Record host preparation duration, command index/type/length, action/input/output
    counts, APDU start/response timestamps, last successful response and disconnect.
    Do not log raw transaction payloads, viewing keys or note secrets.
@@ -80,7 +80,7 @@ Physical-device verification still required:
 
 1. With Zcash open, repeat the Android flow.
    A stalled app query should leave preparation after about 10 seconds.
-2. After disconnect cleanup, retry without restarting Vizor. A fresh connection
+2. After disconnect cleanup, retry without restarting Veylor. A fresh connection
    should proceed to signing preparation, or return a concrete
    connection error. Signing commands are never automatically replayed.
 3. Repeat on iOS, including turning the Ledger off during the query, cancelling,

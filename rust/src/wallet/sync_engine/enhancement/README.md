@@ -247,7 +247,7 @@ positive records; a missing record is then `CoverageIncomplete`. `Mempool` and
 not-in-main-chain state.
 
 `CoverageIncomplete` is an explicit, retryable feedback gate. `GetStatus` work
-is expected to be highly unlikely in private mode, so Vizor surfaces a clear
+is expected to be highly unlikely in private mode, so Veylor surfaces a clear
 Settings action and pauses automatic sync after bounded retry instead of
 silently weakening privacy. If production users encounter the gate, its
 complete negative-coverage recovery needs a dedicated design; there is no
@@ -584,11 +584,11 @@ without granting funds. Tests use the trusted fixture, not the library's
   expiry checks and retry their exact bytes. Wallet storage and Ledger outbox
   outcomes remain separate commits: recovery can retry between them, and an
   outcome committed before acknowledgement remains available for metadata repair.
-- **Account deletion.** Vizor borrows its existing SQLite transaction through
+- **Account deletion.** Veylor borrows its existing SQLite transaction through
   `SqlTransaction::new` and delegates wallet rows to library `WalletWrite::delete_account`.
   Newer reader requirements or missing recorded policy metadata refuse deletion.
   Retrieval detachment, enhancement retirement and ledger/provenance cleanup share
-  the transaction with Vizor receive addresses, Ledger discovery, migration runs,
+  the transaction with Veylor receive addresses, Ledger discovery, migration runs,
   signed operations and orphaned scan-range cleanup. Every transactional failure
   rolls back all of these; cache and process-local cleanup run after commit.
   Per-account deletion includes the initial Derived account while another remains;
@@ -1122,11 +1122,11 @@ well as the 49-bit and 44-bit full queries; Status needs `06a972db` or later.
 The production fleets run `9d2cbda0`.
 It retains the parent's private-recovery and compact txid-display changes and
 adds durable privacy-policy resolution at each sensitive read plus optional
-SQLite settlement (`settle_latest`). Vizor supplies explicit trust, then the library
+SQLite settlement (`settle_latest`). Veylor supplies explicit trust, then the library
 commits wallet facts and quarantine before acknowledging the opaque batch.
 A failed or interrupted batch remains replayable; trusted qualification
 reconciles provisional revision replacement. Scheduling, network routing,
-promotion and spending authorization remain in Vizor. Every manifest reference
+promotion and spending authorization remain in Veylor. Every manifest reference
 and lockfile source uses that same revision; Cargo resolution is checked
 without local sibling overrides.
 
@@ -1136,7 +1136,7 @@ parent's repin, whether or not private queries is enabled:
 `ironwood_transparent_output_shape` (`8f4c3210-04e1-49eb-9de2-d713ee0a8426`),
 and `transparent_txid_enhancement` (`73d751a3-dbdc-461a-9154-e061903aae4f`).
 They persist memo, metadata and detail obligations without sending network
-requests; Vizor still authorizes dispatch. Upgrade probes check the migration
+requests; Veylor still authorizes dispatch. Upgrade probes check the migration
 IDs, new storage, repeated initialization, retained data and zero private-work
 backfills for never-private wallets. App probes cover the released mobile
 v0.0.50 baseline and the fork immediately preceding these migrations across
@@ -1154,7 +1154,7 @@ The adapter is a direct git dependency rather than a patched crates.io
 package: it depends on wallet-pir's transparent crates, which exist only in git
 (`pir-native` has `publish = false`). #783 requires a published release
 before merge, which the adapter cannot meet while those crates are git-only;
-that is recorded as a release gate, not worked around. Vizor repins after any
+that is recorded as a release gate, not worked around. Veylor repins after any
 restack of the library stacks, and to `main` once they merge.
 
 - **#77** adds source-bound transparent transaction metadata and the
@@ -1168,7 +1168,7 @@ restack of the library stacks, and to `main` once they merge.
   raises the reader version, and neither changes policy, balances, or
   authority.
 - **#86** retains `transactions.zip318_kind` and its view field throughout upgrades
-  from published schemas. The explicit rollback preparation API is removed; Vizor
+  from published schemas. The explicit rollback preparation API is removed; Veylor
   removes its unused wrapper. Development databases that already dropped the column
   and writable downgrades after a private-ledger upgrade are outside this change's
   supported upgrade path. Unknown migration IDs still cause initialization to refuse.
@@ -1199,4 +1199,4 @@ zero to the card amount and redemption reserves to manufacture an exact total.
 Known fees, including zero, retain exact totals. Public-mode presentation is
 unchanged.
 
-Public status observations pass their authorized, signalled RPC response through the library's `lightwalletd::observe_response`, retaining its cancellation, timeout, payload/txid validation and classification. This keeps the wallet dispatch lease through submission rather than a slow response, without duplicating protocol rules in Vizor.
+Public status observations pass their authorized, signalled RPC response through the library's `lightwalletd::observe_response`, retaining its cancellation, timeout, payload/txid validation and classification. This keeps the wallet dispatch lease through submission rather than a slow response, without duplicating protocol rules in Veylor.

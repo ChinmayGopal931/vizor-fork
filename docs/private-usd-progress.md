@@ -120,18 +120,18 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 - **Owner items:** E1's zecSwap Zakura build must carry the
   `zakura-protocol =2.2.0` pin (bumped locally, uncommitted, in
   `~/dev/zapp/zecSwap-zakura/crates/zecswap-core/Cargo.toml` lines 21 and
-  31); upstream vizor has the same testnet NU7 gap; N1 (tokens, M4), E6, E7,
+  31); upstream veylor has the same testnet NU7 gap; N1 (tokens, M4), E6, E7,
   E4, and sign-off for M8.7. E2 (relicensing) is dropped: the owner said
   none is needed (2026-10-14); sign off at the end, then commit and push.
 
 ## M0. Prerequisites and spikes (go/no-go)
 
-- [x] M0.1.0 Local patched zecSwap checkout (`~/dev/zapp/zecSwap-zakura`, §12 manifest and diff) and the `[patch]` in vizor
+- [x] M0.1.0 Local patched zecSwap checkout (`~/dev/zapp/zecSwap-zakura`, §12 manifest and diff) and the `[patch]` in veylor
 - [x] M0.1.1 `rust/Cargo.toml`: `zecswap-core`, `zecswap-railgun`, `hmac`, `sha3`, `bech32`; `rust-version = "1.92"`
-- [ ] M0.1.1b `zecswap-tokens` resolves in vizor's graph (no-go today: `digest` conflict, Deviations D-1; needs an owner decision)
+- [ ] M0.1.1b `zecswap-tokens` resolves in veylor's graph (no-go today: `digest` conflict, Deviations D-1; needs an owner decision)
 - [x] M0.1.2 `cargo build` and `cargo tree -d`: one `zakura-orchard`, one `zakura-pczt`, no upstream `orchard`/`pczt`/`zcash_protocol` (with `zecswap-core` + `zecswap-railgun`; build 5m20s)
 - [x] M0.1.3 zecSwap's 16 library and 8 `tests/sweep.rs` tests on the Zakura build (24/24 pass; workspace narrowed, D-2)
-- [x] M0.1.4 Debug APK build (`VIZOR_FORM_FACTOR=mobile`); record the `.so` size delta. Both builds pass on all four ABIs. Rust `.so` delta (spike over baseline): arm64 +0.47 MB (67.77 → 68.24 MB, +0.7%), armeabi-v7a +0.41 MB, x86_64 +0.44 MB. No vizor code calls the zecSwap crates yet, so the linker drops most of them; the real delta shows from M1 (re-measure in M8)
+- [x] M0.1.4 Debug APK build (`VIZOR_FORM_FACTOR=mobile`); record the `.so` size delta. Both builds pass on all four ABIs. Rust `.so` delta (spike over baseline): arm64 +0.47 MB (67.77 → 68.24 MB, +0.7%), armeabi-v7a +0.41 MB, x86_64 +0.44 MB. No veylor code calls the zecSwap crates yet, so the linker drops most of them; the real delta shows from M1 (re-measure in M8)
 - [x] M0.2a Offline: a payment to an Orchard-only UA lands in the Ironwood bundle, and `sent_notes` records it (`output_pool` 4, `to_address` = the UA). Go on both checks (D-3)
 - [ ] M0.2b The same on testnet (blocked: B-4, funded testnet ZEC)
 - [x] M0.3.1 `connect_stream` patch in a local wallet-libraries checkout (`~/dev/wallet-libraries-e4`); all ten wallet-libraries refs repointed (spike branch)
@@ -575,7 +575,7 @@ the forward path runs without tokens (D-33).
 - **Tests.**
   - Rust: `cd rust && cargo test` passes: lib 1500 passed, 0 failed, 11
     ignored; integration 6 passed, 21 ignored (regtest). The 41 new tests are
-    `private_usd/tests/forward.rs` (38: the ★ cases and vizor's own, on the
+    `private_usd/tests/forward.rs` (38: the ★ cases and veylor's own, on the
     fakes in `private_usd/tests/fakes.rs`) and `private_usd/tests/lifecycle.rs`
     (3, through the FRB calls). The ★ mapping is in D-39.
   - Dart: `fvm flutter analyze` finds no issues. `fvm flutter test`: +5926
@@ -1293,8 +1293,8 @@ M8 status (2026-10-14): the non-device parts are done.
 
 ## Deviations
 
-- **D-1 (M0.1 step 1): `zecswap-tokens` is not in vizor's graph.** It does not
-  resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and vizor's
+- **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
+  resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
   `zakura-client-backend` pins `digest =0.11.0-pre.9` (through
   `bip32 =0.6.0-pre.1` and `hmac =0.13.0-pre.4`). No `blind-rsa-signatures`
   0.16+ accepts that pre-release. `zecswap-core` and `zecswap-railgun` resolve and
@@ -1306,7 +1306,7 @@ M8 status (2026-10-14): the non-device parts are done.
   `zecswap-tokens`. Plan updated (M0.1 step 3, §2 E1).
 - **D-3 (M0.2): verified offline, not on testnet.** No funded testnet wallet or
   device exists here (B-3, B-4). Evidence: wallet-libraries' own
-  `orchard_payment_routes_to_ironwood_and_builds`, and the new vizor test
+  `orchard_payment_routes_to_ironwood_and_builds`, and the new veylor test
   `rust/src/wallet/sync/send/orchard_receiver_tests.rs` (Ironwood bundle;
   `sent_notes.output_pool` 4; `to_address` = the UA). The plan's check "the
   Orchard bundle has no actions" was wrong when the sender spends Orchard
@@ -1377,7 +1377,7 @@ M8 status (2026-10-14): the non-device parts are done.
   - Deferred: the op-id cancel registry moves to `engine.rs` (M5), where
     `private_usd_cancel` lands. `SwapKeyContext::acceptance` (the user's share
     proof, `ops.rs:164-188`) moves to M5: `zecswap-core`'s `prove_user` needs a
-    `rand 0.10` `CryptoRng`, and vizor's `rand` is 0.8 (M5 adds `rand` 0.10
+    `rand 0.10` `CryptoRng`, and veylor's `rand` is 0.8 (M5 adds `rand` 0.10
     under a renamed dependency; it is already in the lockfile). The Rust test
     pinning the 9 page hosts against Kotlin and the CSP (reference §8.2)
     moves to M3, where those copies land.
@@ -1488,7 +1488,7 @@ M8 status (2026-10-14): the non-device parts are done.
   - `RailgunEndpoints` is `internal` and lists its hosts as literals (the Rust
     pinning test reads them); the spike's unused `SEPOLIA_RPC_URL` and
     `MAINNET_RPC_URL` are gone.
-  - The handler exposes `handle(call, result)`, like vizor's other handlers,
+  - The handler exposes `handle(call, result)`, like veylor's other handlers,
     instead of implementing `MethodCallHandler`.
   - The debug-only page method `openNewWallet` is not in `RailgunMethod`, so
     `call` refuses it with `BAD_ARGS`.
@@ -1663,7 +1663,7 @@ M8 status (2026-10-14): the non-device parts are done.
     before `private_usd_clear_sessions` (a lock) is never held after it: the
     cache keeps a session number that every clear bumps.
   - The maker's `/v1/info` check is cached per network until the next clear
-    (zapp checks once per driver; vizor's driver lives for one call).
+    (zapp checks once per driver; veylor's driver lives for one call).
   - The op registry remembers up to 64 ids cancelled before their call
     registered, so a cancel that overtakes its call on the FRB worker queue
     still stops it.
@@ -1781,7 +1781,7 @@ M8 status (2026-10-14): the non-device parts are done.
     `the_lock_and_terms_are_read_again_immediately_before_the_reveal`,
     `an_unconfirmed_open_…`, `an_unconfirmed_claim_lock_…`), 124
     (`an_orphaned_payout_…`).
-  - vizor's own: `swap_indices_are_never_reused`,
+  - veylor's own: `swap_indices_are_never_reused`,
     `a_crash_around_the_deposit_never_pays_it_twice`,
     `no_deposit_is_built_until_the_wallet_has_scanned_to_the_tip`,
     `a_payout_is_never_signed_above_the_cap`,
@@ -1909,7 +1909,7 @@ M8 status (2026-10-14): the non-device parts are done.
   155 (`a nudge cuts a nap short`) and 186 (`cancellation is never taken for
   a failed step`, plus an unexpected error counting as one) as zapp wrote
   them. 77 (`failing for five minutes asks the user once…`) is adapted: zapp
-  asks through a notification, which vizor does not have (D9), so the ask is
+  asks through a notification, which veylor does not have (D9), so the ask is
   the problem on the conversion, which appears once and holds while steps
   keep failing, and clears on the first that goes through. Four more pin the
   M5 pitfalls: a lock with a call in flight, a seed read that finishes after
@@ -1980,7 +1980,7 @@ M8 status (2026-10-14): the non-device parts are done.
     (explorer order), the payout (an Etherscan link) and the start time.
   - The banner reuses home's emphasized entry card, now
     `MobileHomeEntryCard` in `lib/src/core/widgets/mobile/`: on home after
-    the action row, and on `/private-usd`. Its second line is "Keep Vizor
+    the action row, and on `/private-usd`. Its second line is "Keep Veylor
     open to finish" whenever a conversion is under way: every forward stage
     still has a key step to come.
   - Activity: rows from the engine's snapshot of the account's records,
@@ -2003,7 +2003,7 @@ M8 status (2026-10-14): the non-device parts are done.
   errors, review and info, forward progress, problems, forward results) and
   Accounts are in `PrivateUsdCopy`, with `privateUsdErrorMessage`,
   `privateUsdProblemMessage`, `privateUsdNothingSentMessage` and
-  `privateUsdRefundedMessage`. New: "Max" (vizor's visible label; "Use it
+  `privateUsdRefundedMessage`. New: "Max" (veylor's visible label; "Use it
   all" stays the semantics label), the details tab and its row labels, and
   `convertProblemRoute` for a step held up by the Tor route (`route_blocked`
   says "nothing was sent", which a conversion in progress cannot say).
@@ -2044,7 +2044,7 @@ M8 status (2026-10-14): the non-device parts are done.
   `private_usd_zec_quote_search_test.dart` (10: all nine of zapp's
   `PrivateUsdZecQuotesTest`, plus the `u32` clamp),
   `private_usd_convert_provider_test.dart` (10: the `PrivateUsdConvertVMTest`
-  button-enable cases at 107, 126, 138, 150, 179, 201 and 216, then vizor's
+  button-enable cases at 107, 126, 138, 150, 179, 201 and 216, then veylor's
   back rule and two expiry rules: the 20 s cutoff with the same-size
   replacement on the amount step, and "Refresh quote" on the review),
   `test/providers/private_usd_account_lifecycle_test.dart` (7: the refusal
@@ -2250,7 +2250,7 @@ M8 status (2026-10-14): the non-device parts are done.
   `privateUsdReverseStepMessage`, `privateUsdReverseProblemMessage` and
   `privateUsdReverseNothingSentMessage`. The call-off reads "Request refund"
   (the copy table's `reverse_request_refund`), not §9.5's "Request private
-  refund". New for vizor: "Pay {debit}", "Proving your payment · n%" and
+  refund". New for veylor: "Pay {debit}", "Proving your payment · n%" and
   its keep-open note, "Use at most 2 decimal places.", "Converting to ZEC"
   (activity), the reverse details rows ("Escrow payment", "ZEC received"),
   "Refresh" (Refunds), "Not now" (the sheets), and an unpaid variant of the
@@ -2279,7 +2279,7 @@ M8 status (2026-10-14): the non-device parts are done.
     `readyDeadline − 120 s` on a 5 s tick; the call-off behind a sheet while
     `cancellable`; "New conversion" and, once refunded, "View refunds". Back
     is blocked while settlement or a call-off runs. The problem card keeps
-    vizor's "Try now" (zapp's reverse card has none).
+    veylor's "Try now" (zapp's reverse card has none).
   - "Refunds" sits beside the Activity heading on `/private-usd` once a
     conversion was refunded, and on the reverse amount step. Activity rows
     for reverse records (no row for a draft or a cancelled one); the main
@@ -2357,7 +2357,7 @@ M8 status (2026-10-14): the non-device parts are done.
   lock per wallet; here a per-account lock in `sends.rs` is shared by
   `relayer_transact` (which waits for a running pass) and
   `send_settle_all` (which returns the rows without a pass while one runs).
-  The record body is vizor's own JSON (camelCase, strictly decoded), not
+  The record body is veylor's own JSON (camelCase, strictly decoded), not
   zapp's `private_usd_sends_v2` shape, which nothing here reads.
 - **D-94 (M7.1): the chain reads.** The receipt status is D-7's
   `transaction_status` with 1 confirmation, behind a new `SendChain` seam
@@ -2475,11 +2475,11 @@ M8 status (2026-10-14): the non-device parts are done.
     `private_usd_is_valid_railgun_address` and are sent lowercased.
 - **D-100 (M7.3): the copy as built.** The Send and withdraw table is in
   `PrivateUsdCopy`, with `privateUsdSpendMessage(status)` (the spending
-  note) and `privateUsdSendErrorMessage(code)`. New for vizor: "Paste" (the
-  recipient's paste button), "Vizor can't read its saved payments." with
+  note) and `privateUsdSendErrorMessage(code)`. New for veylor: "Paste" (the
+  recipient's paste button), "Veylor can't read its saved payments." with
   the support sentence (the guard's `unreadable`), "Proving your
   transaction · n%", and the landing line "The relayer is sending it.
-  Waiting for a block can take a minute. Keep Vizor open."
+  Waiting for a block can take a minute. Keep Veylor open."
 - **D-101 (M7.4): Widgetbook and capture scenarios.** The nine send rows of
   §9.7 and `mobile-private-usd-payment-pending`, in
   `lib/widgetbook/private_usd_send_use_cases.dart` and
@@ -2680,7 +2680,7 @@ M8 status (2026-10-14): the non-device parts are done.
   their initialization"). It surfaced in the M5 device round once the
   account had a conversion record (in use, D-21). The watch is now
   registered in a microtask and cancelled with the provider.
-- **D-113 (B-11): `zakura-protocol =2.2.0`.** Vizor's pin moved from
+- **D-113 (B-11): `zakura-protocol =2.2.0`.** Veylor's pin moved from
   `=2.0.0`; the lockfile changes only that crate. `zecswap-core`'s two exact
   pins in the local E1 stand-in (`~/dev/zapp/zecSwap-zakura`, uncommitted,
   with the owner's go-ahead) moved with it; E1's Zakura build must carry
@@ -2771,7 +2771,7 @@ M8 status (2026-10-14): the non-device parts are done.
   `0x77190AD9`).** zecSwap's maker hit the same rejection with
   `zcash_protocol` 0.10.6 (NU6.3 newest) and was moved to the librustzcash
   NU7 pre-releases on 2026-10-06; zapp's Android SDK builds are noted as
-  still rejected. Vizor's Zakura libraries have no testnet NU7 (vizor's
+  still rejected. Veylor's Zakura libraries have no testnet NU7 (veylor's
   `network.rs`: NU7 has no activation height on main or test), so the fix
   is NU7 testnet support in the Zakura wallet libraries (owner: E1/E4 or a
   wallet-libraries release), not app code. Mainnet has no NU7 and is

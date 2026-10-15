@@ -50,7 +50,7 @@ Run them in this order. Each command starts with
    mnemonic is never printed). It then runs the M3 checks and the R8
    release-build check, and leaves a debug build installed.
 2. **Fund the wallet.**
-   1. Open Vizor on the phone and unlock it with `111111`.
+   1. Open Veylor on the phone and unlock it with `111111`.
    2. Copy the receive address.
    3. Send it testnet ZEC (E8): enough for several forward conversions and
       their fees. For example, use 0.5 TAZ with the default
@@ -112,7 +112,7 @@ the end.
 |---|---|---|
 | M-1 | **mainnet** Convert ZEC → private USD from the home strip | The progress screen walks through its steps and ends Paid. The strip and the activity row update. |
 | M-2 | **mainnet** Convert private USD → ZEC: Pay, then Authorize settlement | `COMPLETE`, and the ZEC arrives in the shielded balance. |
-| M-3 | Forward refund: once the deposit is kept, leave Vizor closed past the claim deadline (hours) | On return the deposit sweeps home, less fees, and the conversion ends `REFUNDED`. It ends Nothing sent if the deposit never left. Nothing is lost while away (plan D9). |
+| M-3 | Forward refund: once the deposit is kept, leave Veylor closed past the claim deadline (hours) | On return the deposit sweeps home, less fees, and the conversion ends `REFUNDED`. It ends Nothing sent if the deposit never left. Nothing is lost while away (plan D9). |
 | M-4 | **mainnet** Reverse refund: request the refund of a paid conversion, behind its confirmation sheet | `REFUNDED`, and its row shows on Refunds. |
 | M-5 | Rescue: on Refunds, a `REFUNDED` row that offers "Recover refund", behind its sheet | The refund is recovered and the row stays `REFUNDED`. A row is eligible only while its vault holds more than the relayer fee. If none offers it, record "not eligible" and do not force it. |
 | M-6 | **mainnet** Send to a `0zk`, then withdraw to a `0x` address | Sent and Withdrawn. The fees match the review. A relayer fee above 2 USDC is refused before any proof. |

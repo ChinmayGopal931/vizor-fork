@@ -1,6 +1,6 @@
 # User-Facing Release Notes
 
-This directory stores the canonical user-facing changelog for each Vizor
+This directory stores the canonical user-facing changelog for each Veylor
 release. These notes are used by the desktop release flow across Windows,
 Linux, and macOS, with Sparkle consuming them on macOS. They may also be reused
 by GitHub Releases or future platform release flows.
@@ -37,7 +37,7 @@ directly affect the desktop user experience.
 Use this structure:
 
 ```markdown
-# Vizor Wallet vX.Y.Z
+# Veylor Wallet vX.Y.Z
 
 One short paragraph summarizing the release in user-facing terms.
 
@@ -98,7 +98,7 @@ Review the generated file manually before tagging the release.
 ## Example
 
 ```markdown
-# Vizor Wallet v0.0.14
+# Veylor Wallet v0.0.14
 
 This release improves wallet reliability, network recovery, account
 personalization, and several setup and sending edge cases.
@@ -112,7 +112,7 @@ personalization, and several setup and sending edge cases.
 ## Improvements
 
 - Added automatic fallback for built-in network endpoints. If a preset endpoint
-  becomes slow or unavailable, Vizor can switch to another preset and notify
+  becomes slow or unavailable, Veylor can switch to another preset and notify
   you.
 - Custom endpoints remain private and are never silently replaced by another
   server.

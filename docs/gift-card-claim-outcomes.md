@@ -2,7 +2,7 @@
 
 A claim's transaction lifecycle and a card's availability are separate. Opening
 or checking a link does not reserve its funds. Competition is settled by the
-chain, not by the order of taps in Vizor.
+chain, not by the order of taps in Veylor.
 
 - Empty history or balance is not proof of a failed broadcast or an external
   claim. Saved bearer links remain in secure storage until the user removes a

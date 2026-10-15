@@ -14,7 +14,7 @@ validated in the desktop test lane. Mobile builds, tests, and captures use
 | Create a wallet | Introduction, address types, things to know, secret passphrase, account customisation, passcode | Optional Face ID, then Home |
 | Import a secret passphrase | Phrase entry and review, wallet birthday, account customisation, passcode when needed | Optional Face ID for initial setup, then Home |
 | Import a hardware wallet | Existing Keystone or Ledger connection, account/birthday steps, account customisation, passcode when needed | Existing capability and device gates apply |
-| Link Vizor Desktop | Introduction, scan, account selection, contacts, passcode when needed | Optional Face ID for initial setup, then Home |
+| Link Veylor Desktop | Introduction, scan, account selection, contacts, passcode when needed | Optional Face ID for initial setup, then Home |
 | Redeem a gift card into a new wallet | Card inspection, account customisation, passcode | Claim handoff, optional Face ID, then Home |
 | Redeem a gift card into an imported wallet | Card inspection, existing import flow, receiving-account selection when needed | Claim handoff, optional Face ID, then Home |
 
@@ -129,7 +129,7 @@ browser history. Locking routes to unlock; the durable journal supports recovery
 
 Choosing an existing wallet saves the card and the pre-import account UUIDs in
 OS secure storage before leaving the card screen. All existing import methods
-remain available: secret passphrase, Link Vizor Desktop, and the hardware wallet
+remain available: secret passphrase, Link Veylor Desktop, and the hardware wallet
 options under their existing capability gates.
 
 At startup, this import handoff also identifies unfinished first-wallet setup.
@@ -186,7 +186,7 @@ its matching handoff before deletion so restart recovery cannot recreate it.
   to that recipient and deletes their temporary claim wallets. It preserves cards
   bound to other accounts and unbound cards. Cleanup failure retains the record
   for retry; it never chooses a replacement recipient. Removing the final account
-  resets Vizor and clears the entire Received store. Successful claims clean up
+  resets Veylor and clears the entire Received store. Successful claims clean up
   their temporary claim wallet and recovery secrets after the existing
   six-scanned-confirmation condition.
 
@@ -236,7 +236,7 @@ screen's phrase/Continue step.
 
 Zcash introduction, address types, and things-to-know screens complete education
 independently of backup. Removing an unbacked account shows its backup warning;
-removing the last account becomes **Reset Vizor**. Combined removal warnings
+removing the last account becomes **Reset Veylor**. Combined removal warnings
 remain scrollable at enlarged text sizes and use button confirmation without
 requiring typed `remove`.
 
@@ -291,7 +291,7 @@ completion, birthday, education, Received, six scanned confirmations, and
 ordinary creation/additional import. The walkthrough masked all 24 mnemonic
 words before rendering; capture-only source changes and harnesses were removed.
 
-A subsequent native run exercised **Accounts > Reset Vizor → create a wallet →
+A subsequent native run exercised **Accounts > Reset Veylor → create a wallet →
 import an additional account**, without replacing the app root or directly
 clearing storage after entry. It verified account/passcode reset, two accounts
 after recreation/import, and no widget exceptions. This exposed and fixed an
@@ -385,7 +385,7 @@ the recovery slice connects and verifies desktop retry and navigation behavior.
 
 Complete recovery and backup before integrating Gift onboarding. Desktop keeps
 its existing password flow rather than adopting the mobile passcode/Face ID
-screens. Link Vizor Desktop is excluded from the desktop import selector because
+screens. Link Veylor Desktop is excluded from the desktop import selector because
 it is a phone-to-desktop QR flow. Ledger choices and summary copy follow the
 existing capability gates; this work does not expand Ledger network support.
 

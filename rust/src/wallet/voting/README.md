@@ -1,12 +1,12 @@
-# Vizor Voting Integration (Rust)
+# Veylor Voting Integration (Rust)
 
 This module integrates the [`zcash_voting`](https://github.com/valargroup/zcash_voting)
-crate into Vizor. It owns the wallet-side concerns the crate intentionally leaves
+crate into Veylor. It owns the wallet-side concerns the crate intentionally leaves
 to the host app: wallet seed handling, voting hotkey storage, the voting sidecar
 database, delegation signing, and the Flutter Rust Bridge (FRB) surface that
 exposes the crate lifecycle to Dart.
 
-`zcash_voting` owns the protocol and the durable recovery state machine. Vizor
+`zcash_voting` owns the protocol and the durable recovery state machine. Veylor
 adds no parallel workflow tables. All phases and recovery are derived from the
 crate's own `bundles`, `votes`, and `share_delegations` rows. For the canonical
 setup -> precompute -> delegate -> vote -> share lifecycle, the per-bundle phase
@@ -16,7 +16,7 @@ definitions, and the restart planner, see the crate docs:
 - Reference usage: [`wallet-example/src`](https://github.com/valargroup/zcash_voting/tree/main/wallet-example/src)
   (`example_delegation.rs`, `example_vote.rs`, `example_recovery.rs`)
 
-This document focuses on what Vizor's integration is responsible for.
+This document focuses on what Veylor's integration is responsible for.
 
 ## Module Map
 
@@ -104,7 +104,7 @@ fields for abandoned round work. Do not use it for best-effort vote-tree warmup
 failover while the user may still be signing or submitting.
 
 Vote-tree sync and reset are owned by the crate
-(`zcash_voting::precompute::{sync_vote_tree_with, reset_vote_tree}`); Vizor does not
+(`zcash_voting::precompute::{sync_vote_tree_with, reset_vote_tree}`); Veylor does not
 maintain its own tree-sync registry.
 
 Account-wide reset runs when switching away from the active account, removing an
@@ -195,7 +195,7 @@ Keystone accounts. The SDK stores the exact signing transaction alongside the
 proof setup, so QR preparation and app restart reuse those bytes and the same
 stored voting hotkey. Signing can proceed while the proof runs.
 
-Vizor briefly retries the SDK's `Busy` error when initial setup overlaps QR
+Veylor briefly retries the SDK's `Busy` error when initial setup overlaps QR
 preparation. Signing errors preserve warmed setup instead of resetting it. This
 path assumes the new voting package is installed before preparing the next
 round; it does not repair older setups that lack the original transaction.
@@ -204,7 +204,7 @@ round; it does not repair older setups that lack the original transaction.
 
 Helper-share `submit_at` (the Unix-second reveal time sent to the helper server)
 is planned and durably persisted by `zcash_voting`'s complete-batch delivery
-API. Vizor supplies authenticated round timing, the configured fleet, and the
+API. Veylor supplies authenticated round timing, the configured fleet, and the
 round's immediate-share key; the SDK owns entropy, readiness-derived targets,
 placement, generation binding, and restart reuse:
 
@@ -214,7 +214,7 @@ placement, generation binding, and restart reuse:
   `[now, vote_end_time - buffer)`.
 - Inside the buffer, the vote commitment uses single-share mode and shares use
   `submit_at = 0` (immediate submission).
-- If round timing is missing or invalid, Vizor uses `submit_at = 0`.
+- If round timing is missing or invalid, Veylor uses `submit_at = 0`.
 
 Overdue recovery submits immediately (`submit_at = 0`), while early
 under-placement replenishment preserves the original schedule in both the
@@ -235,7 +235,7 @@ that pass.
 Configured helpers are trusted global chain-status oracles, but one helper
 cannot finalize a share by itself. The crate requires matching `confirmed`
 responses from two distinct helpers in the current configuration and binds the
-confirmation write to the exact stored nullifier generation. Vizor uses the
+confirmation write to the exact stored nullifier generation. Veylor uses the
 crate's focused `confirm_pending_share` API for the designated immediate share
 and `ShareTrackingDriver` for background recovery. It does not expose helper
 observations, schedule passes, or implement a second polling path.
@@ -249,7 +249,7 @@ persistence, so the host cannot conflate those lifecycle steps. Normal vote
 confirmation advances a matching plan from the exact pre-confirmation recovery
 snapshot to the exact confirmed snapshot; replacement, clearing, and unrelated
 recovery-material changes invalidate it. `LegacyBestEffort` is metadata only
-for old durable state that predates complete-plan persistence. Vizor surfaces
+for old durable state that predates complete-plan persistence. Veylor surfaces
 that state but does not implement a second replanning policy.
 
 Initial submission and recovery share one account/round/database-bound Rust
@@ -263,7 +263,7 @@ Tor connection, TLS, connect-timeout, URL, and request-construction failures
 are definite and remain retryable; request/response-phase failures are
 ambiguous.
 
-On launch, unlock, and resume, Vizor asks
+On launch, unlock, and resume, Veylor asks
 `zcash_voting::share::pending_rounds` for durable
 unconfirmed rounds and rejects malformed or unauthenticated entries before
 restoring a session. The persisted session deadline is only a discovery hint:
@@ -280,7 +280,7 @@ share delivery and additional helper metadata exposure for liveness when a
 share might otherwise never reach the chain. Lock, account
 deletion, and wallet reset stop and drain discovery plus active checks before
 protected state changes. If a mutation aborts while wallet state remains,
-Vizor requests fresh discovery after leaving the mutation boundary.
+Veylor requests fresh discovery after leaving the mutation boundary.
 
 ## Wire Types And FRB Scanning
 
@@ -290,7 +290,7 @@ bounds), for example `DelegationSubmissionWire`, `VoteCommitmentWire`,
 `VanWitness`, `RoundPlanView`, `RoundStepOutcomeView`, and `VotingErrorView`. See
 `zcash_voting::wire` for the full set.
 
-Vizor keeps no FRB-local `Api*Wire` mirrors for these types. FRB codegen scans
+Veylor keeps no FRB-local `Api*Wire` mirrors for these types. FRB codegen scans
 the shared crate module directly via `flutter_rust_bridge.yaml`:
 
 ```yaml
@@ -299,7 +299,7 @@ rust_input: crate::api,zcash_voting::wire
 
 That scan emits Dart value classes under
 `lib/src/rust/third_party/zcash_voting/wire.dart` and generates the
-`SseEncode` / `SseDecode` glue in Vizor's bridge code. The `zcash_voting` crate
+`SseEncode` / `SseDecode` glue in Veylor's bridge code. The `zcash_voting` crate
 stays framework-agnostic and does not depend on FRB.
 
 FRB third-party scanning expects a struct-only module surface, so the DTO structs

@@ -5,11 +5,11 @@ Reference material for `docs/private-usd-android-plan.md`, numbered as the plan 
 - §5 protocol and state machines
 - §6 the Railgun host
 - §7 pinned config
-- §8 vizor integration
+- §8 veylor integration
 - §9 UI and copy
 - §12 the source map
 
-Open a section only when a milestone's **Inputs** names it. Line numbers into vizor are at `main` `4a859bee0`, and into zapp at `release/4.7.0`; confirm one before relying on it. The plan's §1 decisions win over anything here.
+Open a section only when a milestone's **Inputs** names it. Line numbers into veylor are at `main` `4a859bee0`, and into zapp at `release/4.7.0`; confirm one before relying on it. The plan's §1 decisions win over anything here.
 
 ## 5. Protocol reference
 
@@ -25,7 +25,7 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
 - `spend_key` computes `±(e+z)` and checks `[ask]·G == ak` (`joint.rs:113-121`). The signer randomizes the key by each spend's `alpha`, matches it to `rk`, signs the PCZT's shielded sighash with raw RedPallas, and applies the signature with `Signer::apply_orchard_spend_auth_signature(SpendAuthSignature::from_parts(pool, index, sig))`, which checks it against `rk` (`zcore/signer.rs:3-5, 38-52, 57-93`).
 - **It is an Ironwood spend.** Under NU6.3, Orchard-pool bundles must set `enableCrossAddress = 0`; only Ironwood allows cross-address transfers (`zo/src/lib.rs:205-211`). So the deposit into the joint address and the sweep or refund out of it both happen in the Ironwood bundle. Ironwood has no receiver or FVK of its own: the Orchard receiver and FVK serve both pools. NU6.3 activates at 3,428,143 on mainnet and 4,134,000 on testnet (branch id `0x37a5_165b`).
 - The circuit does not care where `ak` comes from. It witnesses `ak_P` and constrains `rk = ak_P + [alpha]·SpendAuthG` and `ivk = CommitIvk(ak, nk)` (`zo/src/circuit.rs:671-676, 795-807, 813-820`). The extractor verifies the proof and every signature (`wl/.../pczt/src/roles/tx_extractor/mod.rs:125-137`).
-- **This was proven on vizor's stack.** `zecswap-core` (d69e3fb) was built against `zakura-orchard =2.0.0`, `zakura-pczt =0.1.0-rc5` (patched to `wl@391d0b02`), `zakura-address`, `zakura-protocol`, `zakura-pasta-curves =2.0.0` and `zcash_note_encryption 0.4.2`. All 16 library tests and all 8 `tests/sweep.rs` tests pass. That covers a real Ironwood note to the joint address, a Builder PCZT, a Halo 2 `PostNu6_3` proof, a combined-key signature, full extractor verification, and the full and compact signer views.
+- **This was proven on veylor's stack.** `zecswap-core` (d69e3fb) was built against `zakura-orchard =2.0.0`, `zakura-pczt =0.1.0-rc5` (patched to `wl@391d0b02`), `zakura-address`, `zakura-protocol`, `zakura-pasta-curves =2.0.0` and `zcash_note_encryption 0.4.2`. All 16 library tests and all 8 `tests/sweep.rs` tests pass. That covers a real Ironwood note to the joint address, a Builder PCZT, a Halo 2 `PostNu6_3` proof, a combined-key signature, full extractor verification, and the full and compact signer views.
 
 **The Ethereum side.** An Ethereum contract (`ZecSwap.sol`) pays out USDC against whichever half is revealed.
 
@@ -69,7 +69,7 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
   - Reads (`GET /v1/info`, `GET /v1/terms`, `GET /v1/swaps/{id}`) and the quote POSTs use 20 s (`of/SwapClients.kt:304-308, 370-374, 438`).
   - Accept and relayer POSTs get the client's 180 s.
   - The client never retries at the HTTP level: a quote is single-use, and an accept or relayer request that timed out may have landed (`ProviderModule.kt:557-558`).
-  - `zc/api.rs:374-394` resends while the answer is `503` with `Retry-After ≤ 30 s`, up to 90 s in total. That is safe because the gateway answers before the service sees the request. vizor may add it.
+  - `zc/api.rs:374-394` resends while the answer is `503` with `Retry-After ≤ 30 s`, up to 90 s in total. That is safe because the gateway answers before the service sees the request. veylor may add it.
 - **Refused versus unknown.** A 4xx (`AtomicSwapHttpException.Refused`) sent nothing. A transport failure (`Unreachable`) or a 5xx may have sent something (`zc/api.rs:35-37`).
 
 **Maker endpoints** (`of/SwapClients.kt:135-210`):
@@ -173,7 +173,7 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
 | `Rescue(bytes32 id,bytes32 note,address relayer,uint128 fee,uint64 nonce,uint64 deadline)` | `/v1/reverse/rescue` |
 
 - **Deadline.** Every lock or ready deadline is `chainHead.timestamp + 120` (`SIGNATURE_TTL_SECONDS`), which must stay below `LOCK_DURATION`.
-- **Ids are not in `zecswap-core`.** `swap_id` and `reverse_swap_id` live in `zecswap-chain` (`zs/crates/zecswap-chain/src/evm.rs:293-308`), which vizor does not depend on (D3). Write them in `terms.rs` with `sha3::Keccak256`:
+- **Ids are not in `zecswap-core`.** `swap_id` and `reverse_swap_id` live in `zecswap-chain` (`zs/crates/zecswap-chain/src/evm.rs:293-308`), which veylor does not depend on (D3). Write them in `terms.rs` with `sha3::Keccak256`:
   - `swap_id(maker, Z) = keccak(pad32(maker) ‖ Z.to_affine_bytes())` (96 bytes)
   - `reverse_swap_id(user, E) = keccak(pad32(user) ‖ E.to_affine_bytes() ‖ word(1))` (128 bytes)
   - the `makerKeyUsed` key = `swap_id(authAddress, Z)`, the same 96-byte preimage with the auth address as owner (`of/AtomicSwapChain.kt:59-63`, `SwapId.of(owner, share)`)
@@ -270,7 +270,7 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
    | Outcome | Result |
    |---|---|
    | `4xx` | `NothingSent`; the code maps to `MAKER_REFUSED`, `QUOTE_EXPIRED` or `MAKER_UNAVAILABLE` (`:245-270`). `unknownSwap`/`internal` stay open. |
-   | Turned away at the token gate | zapp: `NothingSent(MAKER_UNAVAILABLE)`, then rethrow. vizor: return `TokensNeeded`, issue once, and retry the same acceptance (§5.9); if issuance fails, abandon → `NothingSent(MAKER_UNAVAILABLE)`. Until M4 there is no issuance: Rust returns `TokensNeeded` with no retry, and Dart abandons at once (progress D-33). |
+   | Turned away at the token gate | zapp: `NothingSent(MAKER_UNAVAILABLE)`, then rethrow. veylor: return `TokensNeeded`, issue once, and retry the same acceptance (§5.9); if issuance fails, abandon → `NothingSent(MAKER_UNAVAILABLE)`. Until M4 there is no issuance: Rust returns `TokensNeeded` with no retry, and Dart abandons at once (progress D-33). |
    | Timeout, transport failure or 5xx | throw. The record stays "maybe opened". |
    | 200 | save `t0`, `t1`, `ticket`. If `answer.swapId ≠ record.swapId`: `NothingSent(MISMATCH)`. |
 3. **No `t0`/`t1` yet, or not confirmed on chain** (`notOnChain`, `:157-171`): `Waiting(OPENING)` until `quote.expiresAt + 300 s`. If the deposit is still `NotStarted` at that point:
@@ -296,7 +296,7 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
      2. If there is none and the deposit is payable: `prepareDeposit` proposes `depositZat` to the address and requires exactly 1 transaction and a total ≤ `maxTotalZat` (`DEPOSIT_UNPAYABLE`).
      3. **Save `Started`**, then create (sign and store, no broadcast), then **save `Kept(tx)`**.
      4. If not `Mined`, broadcast the kept bytes. This happens only while `refundLockUntil == 0`.
-   - **vizor (as built, progress D-35).** Building a new deposit first waits for the main wallet's scan to reach the live lightwalletd tip (`wait = ZcashSyncing`); status reads and resends do not. A deposit that would spend Sapling notes is refused (`DEPOSIT_UNPAYABLE`): Rust cannot fetch the Sapling parameters. Send flow `private-usd-deposit:{account}:{index}`.
+   - **veylor (as built, progress D-35).** Building a new deposit first waits for the main wallet's scan to reach the live lightwalletd tip (`wait = ZcashSyncing`); status reads and resends do not. A deposit that would spend Sapling notes is refused (`DEPOSIT_UNPAYABLE`): Rust cannot fetch the Sapling parameters. Send flow `private-usd-deposit:{account}:{index}`.
    - **Status** (`ua/SwapZcashTransactions.kt:98-138`):
 
    | Status | Meaning |
@@ -306,7 +306,7 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
    | `Unmined` | in history but not mined |
    | `Unknown` | not in history and not provably expired |
 
-   vizor's `swap_tx_status` (M2) counts `Mined` depth from the fully scanned height, and calls a transaction `Expired` only once the fully scanned height is above its expiry height; an expiry of 0 never expires (progress doc D-9).
+   veylor's `swap_tx_status` (M2) counts `Mined` depth from the fully scanned height, and calls a transaction `Expired` only once the fully scanned height is above its expiry height; an expiry of 0 never expires (progress doc D-9).
 
    - Unpayable and no deposit → `NothingSent(cause)`.
    - `chain.now ≥ t0` → claim (the maker went quiet).
@@ -330,7 +330,7 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
    - Require `fee < amount`.
    - Reuse the saved `payout` if its fee matches. Otherwise sign `Payout(id, pinnedRelayer, fee)` and **save it before sending**.
    - On `400 rejected`: re-read the terms. If the fee went up, sign again at the new fee and send once more. Otherwise rethrow.
-   - **Fee cap (D11).** zapp has none; `zc/user.rs:339-343` takes a caller `max_fee`. vizor refuses a fee above 2 USDC here and at quote time. At claim time that is the `RELAYER_FEE` problem: the swap waits for the fee to come down, and if it never does before `t1`, the maker refunds and the ZEC is swept home.
+   - **Fee cap (D11).** zapp has none; `zc/user.rs:339-343` takes a caller `max_fee`. veylor refuses a fee above 2 USDC here and at quote time. At claim time that is the `RELAYER_FEE` problem: the swap waits for the fee to come down, and if it never does before `t1`, the maker refunds and the ZEC is swept home.
 9. **`finishPaid`** (`:227-239`): require a confirmed `PaidOut` event (`CHAIN_LAGGING` until one appears). Check the event's relayer and fee against the pin. `end = Paid`, with `payoutTx` and `receives` recomputed from the event's fee.
 10. **`REFUNDED`**: §5.8.
 11. **Token return.** On every advance after the deposit started, `GET /v1/swaps/{id}` collects the token if one is awaited (§5.9). Until M4, none is awaited and nothing is read (progress D-33).
@@ -408,7 +408,7 @@ The invariants for this machine are §3.5 items 1–8 and 16.
 8. **Sweep home** (`receive`, `:534-558`): `keepSending` with `prepareReceive`. The sweep is signed with `e + z` and capped at the reviewed `receiveEstimate.feeZat`. It is kept before it is first sent. `confirmations ≥ zcashConfirmations` → `COMPLETE`, then forget the joint account.
 9. **Cancel** (user, `:159-182`): allowed until the escrow is claimed or a receive is built (`isSettled`). It saves `cancelRequested`. The phase becomes `REFUND_WAIT` unless a refund is already under way, and an advance follows at once. With no escrow it ends `CANCELLED`. With an escrow it starts a refund.
 
-**vizor as built (M6 part 1, progress D-70 to D-78).** `rust/src/wallet/private_usd/reverse.rs`; the calldata is `funding_calls.rs`.
+**veylor as built (M6 part 1, progress D-70 to D-78).** `rust/src/wallet/private_usd/reverse.rs`; the calldata is `funding_calls.rs`.
 
 - **Pricing is split around the page.** Step 1.8's cost is set by `set_cost` after the page's `reverseCost`: the quote returns the request (amount, Railgun proxy, the relayer's funding fee), and `set_cost` re-reads the fee and requires `debit = amount + fee + railgun_fee`. Going ahead and the funding request need a priced record.
 - **Step 4 runs in two calls around the page.** `funding_request` (steps 4.1–4.5; the page's open address must be the account's) holds the request in memory for its lock session; `submit_funding` (4.7–4.11) takes it once and refuses after a cancel, a lock or a restart (`Cancelled`) or a changed record (`TooLate`). The proof must go to the pinned Relay Adapt with no value and cost exactly what the calls pay. After a `400 rejected` at a higher fee, the dropped funding's cost is cleared for the page to price again.
@@ -428,7 +428,7 @@ The invariants for this machine are §3.5 items 1–8 and 16.
 2. Sweep:
    1. `prepareSweep`: import the joint UFVK at `zcashHeight` (idempotent, found by UFVK).
    2. Sync. Return null until **every** note is spendable, meaning balance > 0 and pending = 0.
-   3. Reuse an earlier non-expired sent transaction from the joint account, if any. As built, vizor looks for it **before** step 2's balance check (`joint::find_sent`, to any address), since an unmined earlier sweep leaves nothing spendable (progress D-34). The sweep pays the account's current receive address; send flow `private-usd-sweep:{account}:{index}`.
+   3. Reuse an earlier non-expired sent transaction from the joint account, if any. As built, veylor looks for it **before** step 2's balance check (`joint::find_sent`, to any address), since an unmined earlier sweep leaves nothing spendable (progress D-34). The sweep pays the account's current receive address; send flow `private-usd-sweep:{account}:{index}`.
    4. Else build: `SweepIntent(homeUA, balance − feeLimit, feeLimit)`, with `feeLimit = min(320,000, balance − 1)` and at least 10,000.
    5. Propose the whole balance with no change. The fee starts at 10,000 and grows to the proposal's fee until it is stable at one transaction, up to 64 tries (`ua/JointAccounts.kt:154-208`).
 3. Keep the sweep and send it until it has `zcashConfirmations`.
@@ -448,7 +448,7 @@ The invariants for this machine are §3.5 items 1–8 and 16.
 | Direction and state | Outcome |
 |---|---|
 | Forward, before the deposit | Past `t0 − minSecondsToT0` the deposit is never paid: `NothingSent(DEPOSIT_WINDOW_MISSED)`. |
-| Forward, deposit paid, swap `Ready`, user absent past `t1` | The maker may lock a refund and reveal `e`. The user sweeps the ZEC home whenever they next open and unlock Vizor (`Refunded(NOT_CLAIMED_IN_TIME)`, less Zcash fees). The USDC is lost only as an opportunity. |
+| Forward, deposit paid, swap `Ready`, user absent past `t1` | The maker may lock a refund and reveal `e`. The user sweeps the ZEC home whenever they next open and unlock Veylor (`Refunded(NOT_CLAIMED_IN_TIME)`, less Zcash fees). The USDC is lost only as an opportunity. |
 | Forward, `Open` after `t0` | Both sides may take locks. The first lock wins. |
 | Reverse, unready escrow | Never claimable by time (`ZecSwap.sol:552`). The USDC stays locked until the phone returns and refunds. |
 | Reverse, `Ready` | The maker claims. A user who returns late still sweeps with the revealed `e`. |
@@ -467,7 +467,7 @@ The real hazard is a reveal that does not land before the lock lapses. That is w
 
 ### 5.9 Privacy Pass tokens and attestation
 
-**Spec:** `zs/docs/tokens.md`. **Client:** `of/SwapTokens.kt`. **Crypto:** `zs/crates/zecswap-tokens` (RFC 9578 type `0x0002`, `blind-rsa-signatures 0.18`, no Zcash dependencies, but it does not resolve beside vizor's Zakura stack: M0.1 result). The JNI wrapper `zs/crates/zecswap-jni/src/tokens.rs` shows the four calls: `read_www_authenticate`, `Pending::new` → `(pending, blinded 256 B)`, `Pending::finalize(key, blind_sig)` → a 354-byte token, and `Token::authorization()`.
+**Spec:** `zs/docs/tokens.md`. **Client:** `of/SwapTokens.kt`. **Crypto:** `zs/crates/zecswap-tokens` (RFC 9578 type `0x0002`, `blind-rsa-signatures 0.18`, no Zcash dependencies, but it does not resolve beside veylor's Zakura stack: M0.1 result). The JNI wrapper `zs/crates/zecswap-jni/src/tokens.rs` shows the four calls: `read_www_authenticate`, `Pending::new` → `(pending, blinded 256 B)`, `Pending::finalize(key, blind_sig)` → a 354-byte token, and `Token::authorization()`.
 
 **Spending a token at accept** (`of/SwapClients.kt:325-349`):
 
@@ -513,15 +513,15 @@ The real hazard is a reveal that does not land before the lock lapses. That is w
 
 **Attestation** (`ua/AtomicSwapAttestation.kt`, `tokens.md` §Attestation):
 
-- **The key.** EC P-256 (`secp256r1`), `PURPOSE_SIGN`, `DIGEST_SHA256`, with the attestation challenge `SHA-256("zecswap-issuer-v1" ‖ issuerName)`. It uses StrongBox where `generate` succeeds, else the TEE (vizor's minSdk 30 always tries StrongBox). It needs no user authentication (zapp fetches in the background; keep the same key spec in vizor).
+- **The key.** EC P-256 (`secp256r1`), `PURPOSE_SIGN`, `DIGEST_SHA256`, with the attestation challenge `SHA-256("zecswap-issuer-v1" ‖ issuerName)`. It uses StrongBox where `generate` succeeds, else the TEE (veylor's minSdk 30 always tries StrongBox). It needs no user authentication (zapp fetches in the background; keep the same key spec in veylor).
 - **Alias and lifetime.** One alias (zapp: `atomicswap_issuer_attestation`). The key is regenerated **only** when a certificate in its chain has expired. Making a new key after a refusal would hand out a fresh allowance.
 - **The request.** `chain` is the `KeyStore.getCertificateChain` list, leaf first, each DER, base64url without padding. `signature` is `SHA256withECDSA` over `"zecswap-issuer-v1" ‖ challenge(32 B) ‖ SHA-256(blinded₁‖…‖blindedₙ)`.
 - **What the issuer checks:** the chain up to Google's root, each certificate's validity, Google's status list, at least TEE level, a locked bootloader with verified boot, and the configured package and signing digest (`tokens.md` "What the issuer checks"). An emulator or a debug build signed with another key gets `403`.
-- **vizor needs one alias per issuer**, for example `vizor_privateusd_attest_<issuerName>`. vizor runs mainnet and testnet in one app (D2), while zapp ships one network per build. A key attested for the testnet issuer counts for nothing at the mainnet issuer. Never delete it (X4).
+- **veylor needs one alias per issuer**, for example `vizor_privateusd_attest_<issuerName>`. veylor runs mainnet and testnet in one app (D2), while zapp ships one network per build. A key attested for the testnet issuer counts for nothing at the mainnet issuer. Never delete it (X4).
 
-**Route (D10).** Issuer requests go through `routed_http`, like every other engine request: over Tor when Tor is on, direct otherwise. zapp requires Tor here (`TOKENS_NEED_TOR`, `ua/AtomicSwapTokens.kt:40-50`). Its reason is unlinkability: the issuer sees the install's attestation key on every fetch, the maker sees the spend, and a fetch and a spend from the same address can be matched (`tokens.md`: "Fetch ahead, spend later … Send both over Tor or Oblivious HTTP"). vizor accepts that link when Tor is off, and discloses it on the review screens (`tor_off_disclosure`).
+**Route (D10).** Issuer requests go through `routed_http`, like every other engine request: over Tor when Tor is on, direct otherwise. zapp requires Tor here (`TOKENS_NEED_TOR`, `ua/AtomicSwapTokens.kt:40-50`). Its reason is unlinkability: the issuer sees the install's attestation key on every fetch, the maker sees the spend, and a fetch and a spend from the same address can be matched (`tokens.md`: "Fetch ahead, spend later … Send both over Tor or Oblivious HTTP"). veylor accepts that link when Tor is off, and discloses it on the review screens (`tor_off_disclosure`).
 
-**vizor issuance (X11).** Rust cannot reach the Keystore, so issuance takes two FRB phases around a Kotlin call:
+**veylor issuance (X11).** Rust cannot reach the Keystore, so issuance takes two FRB phases around a Kotlin call:
 
 1. `private_usd_tokens_issuance_begin`. Rust runs issuance steps 1–3 (token key, blinded requests, challenge). It keeps the pending blinding secrets in memory under a `session_id`, and returns `message = "zecswap-issuer-v1" ‖ challenge ‖ SHA-256(blinded₁‖…‖blindedₙ)` and the issuer name. It returns `None` when nothing is needed: a token is already held for the current challenge, or today is marked exhausted.
 2. Kotlin `sign(issuerName, message)` returns `{chain, signature}`.
@@ -531,7 +531,7 @@ At accept, the engine spends only tokens it already holds (the M5 seam is `engin
 
 ### 5.10 The foreground loop (zapp's timing, without the worker)
 
-D9 drops zapp's `AtomicSwapWorker`, its scheduler, its wake alarms and its notifier. These are zapp's loop rules that vizor keeps, in `PrivateUsdEngineLoop` (`ua/SwapLoop.kt:160-345`):
+D9 drops zapp's `AtomicSwapWorker`, its scheduler, its wake alarms and its notifier. These are zapp's loop rules that veylor keeps, in `PrivateUsdEngineLoop` (`ua/SwapLoop.kt:160-345`):
 
 - The loop runs while any software account has a record under way, and only while unlocked and in the foreground (D9, D14). It calls `forward_advance`/`reverse_advance`, then naps. A `nudge` (`retryNow`: "Try now", accept, fund, ready, cancel or rescue) cuts the nap short.
 - A failed step is retried every 15 s. A crashed loop restarts after 30 s.
@@ -539,7 +539,7 @@ D9 drops zapp's `AtomicSwapWorker`, its scheduler, its wake alarms and its notif
 - A problem (§5.8) shows only after 1 minute of consecutive failures. `ZcashWait.{SYNCING, CONFIRMATIONS}` is never a problem. The mapping from a failed step to a held problem is at `ua/SwapLoop.kt:424-486`.
 - **Starts:** app foreground and unlock; the progress screen opening; and in a `finally` after accept, fund, ready, cancel and rescue (`ua/AtomicSwapRepository.kt:137-144`, `ua/ReverseSwapRepository.kt:122-129`).
 - **On a finished forward swap:** prefetch tokens.
-- **Zcash status reads:** zapp runs `syncToTip` for up to 1 minute per read, because nothing else syncs in its background (`ua/SwapZcashTransactions.kt:103-104`). In vizor, the main DB is kept current by `syncProvider`. Before a deposit decision, check that the main wallet's scan has reached the tip, else return `ZcashWait.SYNCING`. Sync `joint.db` with `sync_joint_db` on each advance that needs it.
+- **Zcash status reads:** zapp runs `syncToTip` for up to 1 minute per read, because nothing else syncs in its background (`ua/SwapZcashTransactions.kt:103-104`). In veylor, the main DB is kept current by `syncProvider`. Before a deposit decision, check that the main wallet's scan has reached the tip, else return `ZcashWait.SYNCING`. Sync `joint.db` with `sync_joint_db` on each advance that needs it.
 - **What must happen while the app is open**, for a conversion to *succeed* rather than only stay safe:
   - the forward deposit, before `t0 − minSecondsToT0`
   - the forward claim, before the maker refunds a `Ready` swap at `t1`
@@ -548,7 +548,7 @@ D9 drops zapp's `AtomicSwapWorker`, its scheduler, its wake alarms and its notif
 
   The progress copy says so (§9.6, `F` rows).
 
-**vizor engine (Rust side, `engine.rs`).**
+**veylor engine (Rust side, `engine.rs`).**
 
 ```rust
 // As built (M5 part 1, progress D-31).
@@ -570,7 +570,7 @@ pub(crate) fn problem(code: ErrorCode) -> ErrorCode;                 // folds a 
 pub(crate) fn delete_account(store_dir, network, account) -> Result<()>;   // driver lock (Busy), joint accounts, then swaps.db rows
 ```
 
-**vizor engine (Dart side).** `PrivateUsdEngine` in `services/private_usd_engine.dart`, owned by the keepAlive `privateUsdEngineProvider`; skeleton in §9.2.
+**veylor engine (Dart side).** `PrivateUsdEngine` in `services/private_usd_engine.dart`, owned by the keepAlive `privateUsdEngineProvider`; skeleton in §9.2.
 
 - One serial queue per account. Every FRB call that touches a record (accept, advance, fund, ready, cancel, rescue, abandon) goes through it, so Rust's `Busy` is a rare race, not a normal path.
 - `run()` loop: while `allowed()`, for each account from `private_usd_accounts_with_unfinished`, for each unfinished index: read the mnemonic (`getMnemonicBytesForAccount(uuid)`), call `…_advance(op_id)`, zero the bytes in `finally`, publish the result to `privateUsdConversionProvider` and `privateUsdUnfinishedProvider`, then nap the minimum `next_poll_ms` (or 15 s after a failure). `nudge()` cuts the nap.
@@ -738,7 +738,7 @@ JSON strings go over one `WebMessagePort`. The page side is `rl/web/src/index.js
 
   The host emits them on a `SharedFlow` (buffer 256, drop oldest) (`RailgunWebViewHost.kt:51-56`).
 
-**The vizor channel contract** (X7). The typed models stay in Dart, so a Swift host can reuse them. Arguments are a `Map`; JSON travels as `String`, never as nested maps, so Kotlin never parses params or results.
+**The veylor channel contract** (X7). The typed models stay in Dart, so a Swift host can reuse them. Arguments are a `Map`; JSON travels as `String`, never as nested maps, so Kotlin never parses params or results.
 
 `MethodChannel com.zcash.wallet/railgun` (handler `RailgunHostHandler`):
 
@@ -777,7 +777,7 @@ A call whose coroutine is cancelled is answered `CLOSED`, so every call gets exa
 **What to port and what to reuse.**
 
 - **Reuse** `rl/web/` (source, lockfile and build) and the bundle, rebuilt per E5 and X2. Keep `rl/web/dev/check.mjs` as the desktop smoke test.
-- **Port to Kotlin** (`android/app/src/main/kotlin/com/keplr/vizor/railgun/`): `RailgunWebViewHost`, `RailgunChannel` and `RailgunException` with the edits in §8.7 (they are **not** verbatim-portable: Host and Channel use `kotlinx.serialization.json.JsonElement`, which vizor does not have). From `RailgunProtocol`, port only `INIT`, the envelope (`request`, `decode`; `:162-282`) with `org.json`, and the method timeouts (`RailgunMethod`, `:30-58`) as a plain enum. Port `RailgunEndpoints.hosts` (`RailgunModels.kt:28-58`) without its `BuildConfig` keyed-URL fields. `Bech32m`, the typed models, `RailgunWallet` and `RailgunReverseFunding` are not ported to Kotlin.
+- **Port to Kotlin** (`android/app/src/main/kotlin/com/keplr/vizor/railgun/`): `RailgunWebViewHost`, `RailgunChannel` and `RailgunException` with the edits in §8.7 (they are **not** verbatim-portable: Host and Channel use `kotlinx.serialization.json.JsonElement`, which veylor does not have). From `RailgunProtocol`, port only `INIT`, the envelope (`request`, `decode`; `:162-282`) with `org.json`, and the method timeouts (`RailgunMethod`, `:30-58`) as a plain enum. Port `RailgunEndpoints.hosts` (`RailgunModels.kt:28-58`) without its `BuildConfig` keyed-URL fields. `Bech32m`, the typed models, `RailgunWallet` and `RailgunReverseFunding` are not ported to Kotlin.
 - **Port to Dart** (`lib/src/features/private_usd/`): the typed models (`RailgunModels`, `RailgunWallet`, `RailgunSession`, `RailgunReverseFunding`); `RailgunEngine` (`ui/common/repository/RailgunEngine.kt`, 127 lines); `RailgunWalletRepository` (196); `PrivateUsdBalanceRepository` (483) and its cache (89).
 - **WebView ownership.** Channel handlers are per Activity, but the host must survive Activity recreation. Hold `RailgunWebViewHost` in a process-level singleton built with `applicationContext`, as zapp does (`rl/.../RailgunWallet.kt:25`, an unattached WebView). The per-Activity handler only binds the channel. Close the page in `onDestroy` only when `isFinishing`. As built (M3): the singleton is `RailgunHostHandler.Pages`, which also holds the coroutine scope and the current page. A page therefore outlives its Flutter engine when Android destroys the Activity without finishing it, so the Dart engine wrapper calls `close` once when it starts.
 
@@ -805,7 +805,7 @@ A call whose coroutine is cancelled is answered `CLOSED`, so every call gets exa
   - `forget()` runs on a wallet change (`ui/common/repository/RailgunWalletRepository.kt:119-120`).
   - Phases: `UNAVAILABLE, IDLE, STARTING, SYNCING, PROVING, READY, FAILED` (`:86`).
 
-**vizor rules for the engine wrapper** (details in §8.4):
+**veylor rules for the engine wrapper** (details in §8.4):
 
 - **Lock:** close the page. It holds the wallet's keys in memory.
 - **Background:** stop polling. The idle close takes the page down after 10 minutes. A key-using step never runs in the background (D9).
@@ -905,13 +905,13 @@ Dollar amounts are `amount / 10^decimals` with decimals 6, taken from the table 
 - **When it is absent.** The whole widget is null when there is no deployment, no Railgun network, or `is_private_usd_available` is false (`ObservePrivateUsdAvailableUseCase.kt:17-30`).
 - **What it does not show.** zapp shows **no ZEC equivalent** of the Private USD balance. Its currency is the user's fiat: local per-ZEC price (Zcash SDK exchange rate) ÷ ZEC USD price (NEAR 1-Click asset list), falling back to USD (`ObserveLocalCurrencyUseCase.kt:24-44`).
 
-**Data sources for vizor's home.** Show both USD and ZEC amounts.
+**Data sources for veylor's home.** Show both USD and ZEC amounts.
 
 | Number | Source | Notes |
 |---|---|---|
 | Shielded ZEC balance | the existing `syncProvider` balances (Rust `get_balance`) | unchanged |
 | ZEC → USD price | `zecHomeUsdUnitPriceProvider` (`lib/src/providers/zec_price_change_provider.dart:359-361`) | CoinGecko `/simple/price?ids=zcash&vs_currencies=usd` (`:113-160`) through `NetworkHttpClient`, which is Tor-aware. It refreshes every 3 min, with a 1 h cached display value (`:14-22`). It is gated by `swapFeatureEnabledProvider` (`:251`), which is mainnet-only; the gate becomes `swapFeatureEnabled || privateUsdAvailable` (X3). Use `zecLiveUsdUnitPriceProvider` (`:366-368`) for anything that computes an amount to spend. |
-| Private USD (USD) | the Railgun `refresh` buckets → `spendable` | Show `arriving` and `blocked` as zapp does. vizor shows USD only and has no local-fiat selector, so `LocalCurrency` is not needed. |
+| Private USD (USD) | the Railgun `refresh` buckets → `spendable` | Show `arriving` and `blocked` as zapp does. veylor shows USD only and has no local-fiat selector, so `LocalCurrency` is not needed. |
 | Private USD in ZEC | `spendable / zecUsdPrice` | **Indicative only.** zapp has none, and it is not a conversion quote. Never use a maker quote for display: each `/v1/quote` takes a swap index (`ui/screen/privateusd/convert/PrivateUsdZecQuotes.kt` header). |
 | Total in USD (optional) | `shieldedZec × zecUsdPrice + spendable` | Label it as an estimate. Hide it when the price is null (`fiatTextForZatoshi`, `:378-388`). |
 
@@ -928,16 +928,16 @@ Dollar amounts are `amount / 10^decimals` with decimals 6, taken from the table 
   - `409 alreadySpent`: Spent; settle from the chain
   - any other 4xx: Refused; free the notes
   - `503` with `Retry-After`, `500` or a transport failure: Retry with the **same bytes**, waiting no more than 1 h
-- **Persistence.** zapp persists the proved bytes before posting, in `PrivateUsdSendLog` (`private_usd_sends_v2`, max 100). It reconciles them on every balance sync (`PrivateUsdSender.kt:269-437`; vizor runs this in Rust, `private_usd_send_settle_all`, §8.2).
+- **Persistence.** zapp persists the proved bytes before posting, in `PrivateUsdSendLog` (`private_usd_sends_v2`, max 100). It reconciles them on every balance sync (`PrivateUsdSender.kt:269-437`; veylor runs this in Rust, `private_usd_send_settle_all`, §8.2).
 - **One outgoing payment at a time.** `PrivateUsdSpendGuard` allows one outgoing payment per wallet, conversions included, across restarts (`PrivateUsdSpendGuard.kt:32-96`).
 - **Fees.** Railgun's unshield fee is 25 bps (`RailgunFees`, from the engine; `of/AtomicSwapDriver.kt:297` `RAILGUN_FEE`).
 - **Screening caveat.** On Sepolia, relayed-send outputs stay `MissingExternalPOI` because of an indexer break (`railgun-sends.md` "Screening").
 - **Fee cap (D11).** Refuse a `broadcasterFee` result above 2 USDC (in the fee token's base units) with `send_error_fee_cap`, before proving.
-- **vizor storage.** The send log is the `railgun_sends` table in `swaps.db` (§3.4). Persist the proved bytes before posting. Reconcile them on every balance sync. As built (M7 part 1, progress D-90 to D-94): `rust/src/wallet/private_usd/sends.rs` keeps the page's proof (`keep`), posts only kept bytes (`Sends::transact`) and settles from the chain (`Sends::settle_all`); `relayer_client.rs` maps the answers (a `Retry-After` above an hour waits an hour) and pins the terms; `evm_rpc.rs` reads `nullifiers(uint256,bytes32)` through the `SendChain` seam. The Dart half (M7 part 2, progress D-96 to D-98): `services/private_usd_sender.dart` prices, proves, keeps (only while the tap's engine epoch holds) and posts once; `privateUsdSenderProvider` settles on every Railgun sync, on unlock and on an account switch; `services/private_usd_spend_guard.dart` reads the send log across restarts.
+- **veylor storage.** The send log is the `railgun_sends` table in `swaps.db` (§3.4). Persist the proved bytes before posting. Reconcile them on every balance sync. As built (M7 part 1, progress D-90 to D-94): `rust/src/wallet/private_usd/sends.rs` keeps the page's proof (`keep`), posts only kept bytes (`Sends::transact`) and settles from the chain (`Sends::settle_all`); `relayer_client.rs` maps the answers (a `Retry-After` above an hour waits an hour) and pins the terms; `evm_rpc.rs` reads `nullifiers(uint256,bytes32)` through the `SendChain` seam. The Dart half (M7 part 2, progress D-96 to D-98): `services/private_usd_sender.dart` prices, proves, keeps (only while the tap's engine epoch holds) and posts once; `privateUsdSenderProvider` settles on every Railgun sync, on unlock and on an account switch; `services/private_usd_spend_guard.dart` reads the send log across restarts.
 
 ### 6.8 Tor bridge (D4, D13)
 
-**Why a bridge.** The WebView cannot use vizor's Tor. vizor's Tor is arti, in process, through `zcash_client_backend`'s `tor` feature, and there is no SOCKS listener in `rust/src/`. The zakura `tor::Client` keeps its `arti_client::TorClient` private (`wl/librustzcash/zcash_client_backend/src/tor.rs:104-106`). Its only stream-opening code is the private `HttpTcpConnector` (`tor/grpc.rs:90-145`) and `one_http_request` (`tor/http.rs:317-338`). Hence the patch.
+**Why a bridge.** The WebView cannot use veylor's Tor. veylor's Tor is arti, in process, through `zcash_client_backend`'s `tor` feature, and there is no SOCKS listener in `rust/src/`. The zakura `tor::Client` keeps its `arti_client::TorClient` private (`wl/librustzcash/zcash_client_backend/src/tor.rs:104-106`). Its only stream-opening code is the private `HttpTcpConnector` (`tor/grpc.rs:90-145`) and `one_http_request` (`tor/http.rs:317-338`). Hence the patch.
 
 **The patch (E4, owner's fork, D13).** Add this to `wl/.../zcash_client_backend/src/tor.rs` (~15 lines):
 
@@ -957,7 +957,7 @@ pub async fn connect_stream(&self, host: &str, port: u16) -> Result<DataStream, 
 }
 ```
 
-Every name used exists at `391d0b0`: `Timeouts.connect` (`tor.rs:28-40`), `ensure_bootstrapped` (private, same impl), `Error::Http`/`From<arti_client::Error>` (`tor.rs:282`), `HttpError::Timeout(TimeoutPhase::Connect)` (`tor/http.rs:39-46, 442`), and `tokio` is already a dependency under the `tor` feature. `DataStream` implements tokio `AsyncRead`/`AsyncWrite` because the backend enables arti-client's `tokio` feature (`wl/Cargo.toml:184`), so vizor needs no direct `arti-client` dependency for it, only for naming the type (`zcash_client_backend::tor::DataStream` after the patch).
+Every name used exists at `391d0b0`: `Timeouts.connect` (`tor.rs:28-40`), `ensure_bootstrapped` (private, same impl), `Error::Http`/`From<arti_client::Error>` (`tor.rs:282`), `HttpError::Timeout(TimeoutPhase::Connect)` (`tor/http.rs:39-46, 442`), and `tokio` is already a dependency under the `tor` feature. `DataStream` implements tokio `AsyncRead`/`AsyncWrite` because the backend enables arti-client's `tokio` feature (`wl/Cargo.toml:184`), so veylor needs no direct `arti-client` dependency for it, only for naming the type (`zcash_client_backend::tor::DataStream` after the patch).
 
 **What exists to build on.**
 
@@ -969,7 +969,7 @@ Every name used exists at `391d0b0`: `Timeouts.connect` (`tor.rs:28-40`), `ensur
 - `ProxyController.getInstance().setProxyOverride(ProxyConfig, executor, listener)` is gated by `WebViewFeature.PROXY_OVERRIDE`.
 - `ProxyConfig.Builder.addProxyRule("[scheme://]host[:port]")` accepts `HTTP`, `HTTPS` or `SOCKS` (default port 1080). Loopback bypasses the proxy implicitly unless `removeImplicitRules()` is called. That does not matter here, because the page fetches only public hosts.
 - Chromium maps `socks://` to SOCKS5 and resolves names on the proxy side, so there is no DNS leak. It supports **no SOCKS5 authentication** (Chromium `net/docs/proxy.md`). Use a destination allowlist instead.
-- The override is process-wide, for all WebViews. vizor has no other WebView: `url_launcher` is only used with `LaunchMode.externalApplication`.
+- The override is process-wide, for all WebViews. veylor has no other WebView: `url_launcher` is only used with `LaunchMode.externalApplication`.
 - zapp pins `ANDROIDX_WEBKIT_VERSION=1.17.1` (`za/gradle.properties:297`).
 
 **Design.** The page is **always proxied**, so the route policy lives in one place.
@@ -987,7 +987,7 @@ Every name used exists at `391d0b0`: `Timeouts.connect` (`tor.rs:28-40`), `ensur
 2. **Kotlin.** Before loading the page, call `setProxyOverride(ProxyConfig.Builder().addProxyRule("socks://127.0.0.1:$port").build(), …)`, and wait for its listener callback before `loadUrl`. Call `clearProxyOverride` on close and wipe, and whenever the page closes itself (timeout, renderer gone). If `!WebViewFeature.isFeatureSupported(PROXY_OVERRIDE)`, refuse to start the page (`RailgunException.Unavailable`).
 3. **Dart.** On every route change (`ref.listen(networkPrivacyProvider…)`), close and reopen the page, so Chromium drops pooled connections. M0.3 showed that Chromium does **not** tear down pooled sockets by itself (U19), so this close and reopen is required.
 
-**Residual risk.** A no-auth loopback proxy is reachable by other apps on the device while the page is open. The destination allowlist limits that to Railgun hosts on port 443, through vizor's route. Android gives ordinary apps no per-UID loopback filter (`ConnectivityManager.getConnectionOwnerUid` is VPN-only).
+**Residual risk.** A no-auth loopback proxy is reachable by other apps on the device while the page is open. The destination allowlist limits that to Railgun hosts on port 443, through veylor's route. Android gives ordinary apps no per-UID loopback filter (`ConnectivityManager.getConnectionOwnerUid` is VPN-only).
 
 **Risk rating:** MEDIUM overall. Rust tunnelling is LOW once `connect_stream` exists. The WebView side is MEDIUM until it runs on a device: `PROXY_OVERRIDE` support, SOCKS5 behaviour, keep-alive on a route change, and IndexedDB and `blob:` workers under a proxy. **Unverified:** whether targetSdk 36's cleartext policy affects the WebView's SOCKS hop to `127.0.0.1`. The tunnelled bytes are TLS, so it probably does not. There is no `network_security_config` today.
 
@@ -1084,15 +1084,15 @@ Every knob is a Dart define, read once with `String.fromEnvironment`/`bool.fromE
 - Only an explicit `false` disables the feature. A missing key, a parse error or a fetch failure keeps the last known value, defaulting to `true`.
 - `false` hides the strip and the entry points. It does **not** stop the engine: the banner and `/private-usd/conversion/...` stay reachable for an unfinished swap, and the loop keeps driving it to completion or refund.
 
-## 8. vizor integration reference
+## 8. veylor integration reference
 
 ### 8.1 Joint-account and deposit operations (Rust)
 
-Each row is a step zapp performs, and the vizor seam that performs it. "New" means new code in M2. As built (2026-10-13), the joint operations live in `vr/wallet/private_usd/joint.rs` and the proposal halves in `vr/wallet/sync/send.rs`; the plan's M2 tasks give the final signatures, and the progress doc's D-8 to D-14 how they differ from this map.
+Each row is a step zapp performs, and the veylor seam that performs it. "New" means new code in M2. As built (2026-10-13), the joint operations live in `vr/wallet/private_usd/joint.rs` and the proposal halves in `vr/wallet/sync/send.rs`; the plan's M2 tasks give the final signatures, and the progress doc's D-8 to D-14 how they differ from this map.
 
 #### 8.1.1 Operation map
 
-| zapp step | zapp code | vizor seam | Reuse as is? |
+| zapp step | zapp code | veylor seam | Reuse as is? |
 |---|---|---|---|
 | Joint UFVK and UA | `AtomicSwap.depositAccount(index, makerShare)` → `[UA, UFVK]` (`zs/crates/zecswap-jni/src/ops.rs:190-197`) | `zecswap_core::JointAccount::derive(E, Z, viewing).{unified_address, ufvk}` through path B | new thin wrapper |
 | Import, Spending, no derivation, exact birthday, idempotent by UFVK | `ua/JointAccounts.kt:57-75` | `vr/wallet/keys.rs:512` `register_gift_card_observer` shape (`ensure_db_migrated_once` `keys.rs:254`, `open_wallet_db_for_mutation`, `get_account_for_ufvk`), but the observer imports `ViewOnly` with key source `None`; the joint account uses `import_account_ufvk("Private USD joint", ufvk, make_birthday(network, Some(h)), Spending{derivation: None}, Some("vizor-private-usd-joint"))` and, when `get_account_for_ufvk` finds one, requires it to be `Spending` | **new** `register_joint_account(db, network, ufvk, birthday)`; reuse `make_birthday` (`keys.rs:297`, exact and unrounded) |
@@ -1100,7 +1100,7 @@ Each row is a step zapp performs, and the vizor seam that performs it. "New" mea
 | Received ≥ N confirmations, and spendable | `JointAccounts.estimate` / `settled` | none | **new** `joint_receipts(joint_db, network, joint_uuid, confirmations)`: received notes and mined heights in the joint DB, with depth counted from the fully scanned height, plus `get_wallet_summary` spendable versus pending under the sweep policy |
 | Propose the whole balance, no change | `proposeSweep` fee loop | `build_send_max_proposal` (`vr/wallet/sync/send.rs:4592`) uses `MaxSpendMode::MaxSpendable` (`:4639`) and does not store the proposal | **new** `propose_joint_sweep(joint_db, network, joint_uuid, flow_id, home_ua, max_fee)`: `propose_send_max_transfer(…, &[Orchard, Ironwood], …, MaxSpendMode::Everything, ConfirmationsPolicy(2,2,false))`, as zecSwap's own wallet does (`zs/crates/zecswap-chain/src/zcash/wallet.rs:305-320`). Require one step and `fee ≤ max_fee`. Then reuse the lock-and-store block of `propose_send_with_request` (`send.rs:853-970`), refactored to take a built proposal (`lock_and_store_proposal`). It returns `SwapProposal { proposal_id, needs_sapling_params, fee_zatoshi, amount_zatoshi }`; the sweep's `SweepIntent` takes the amount. |
 | PCZT | `createPcztFromProposal` | `create_pczt_from_proposal(joint_db, lwd, network, id, flow)` (`pczt.rs:502`), keyed by db path and checked against the proposal's lock (`:532`) | yes, after §8.1.3: the proposal carries `StoredOvkPolicy::Discard` (D12) |
-| Sign with `±(e+z)` | `AtomicSwap.signRefund` / `ReverseAtomicSwap.signReceive`, which run `sign_pczt_bytes(pczt, [key], intent)` | `zecswap_core::sign_pczt` on the **unredacted base** PCZT. It needs the note values and randomness to verify the `SweepIntent` (`zcore/sweep.rs:68-100`), and it ignores proprietary fields such as vizor's lock owner. Then `extract_required_compact_sigs_from_signed_pczt(base, signed)` (`pczt.rs:2367`). | yes, plus glue |
+| Sign with `±(e+z)` | `AtomicSwap.signRefund` / `ReverseAtomicSwap.signReceive`, which run `sign_pczt_bytes(pczt, [key], intent)` | `zecswap_core::sign_pczt` on the **unredacted base** PCZT. It needs the note values and randomness to verify the `SweepIntent` (`zcore/sweep.rs:68-100`), and it ignores proprietary fields such as veylor's lock owner. Then `extract_required_compact_sigs_from_signed_pczt(base, signed)` (`pczt.rs:2367`). | yes, plus glue |
 | Prove | `addProofsToPczt` | `add_proofs_to_pczt(base, None, None)` (`pczt.rs:895`; Ironwood proving key, no Sapling) | yes |
 | Combine, extract, broadcast, store | `createTransactionFromPczt` (**the SDK stores, then the app sends**) | `store_and_broadcast_pczts_with_compact_signatures_for_proposal(joint_db, lwd, network, id, flow, &[proofs], &[sigs], None, None)` (`pczt.rs:1645`): extract → broadcast → store, and it releases or retains the lock | yes. It is bound only to a `PROPOSAL_STORE` id and a send-flow id, which any propose call creates, and `hardware_authority` is a no-op without transparent inputs (`vr/wallet/sync/hardware_authority.rs:139, 193-195`). Its errors and logs say "Keystone"; cosmetic. |
 | Keep the bytes and resend until mined | `keepSending` and the record's `sweep` | `sweep_joint` returns `{txid, raw, expiry_height}`: the bytes the joint DB stored, or, if storing failed, a re-extraction with the same txid. Retries: the claim sync's resubmit, or `broadcast_raw` (`send.rs`, over `broadcast_raw_transaction_isolated`) | small new API |
@@ -1111,7 +1111,7 @@ Each row is a step zapp performs, and the vizor seam that performs it. "New" mea
 
 - **Proposal.** `propose_send(main_db, network, account, flow, jointUA, depositZat, None)` (`send.rs:790`) proposes one payment.
   - After NU6.3 the first pass is V6. A payment to an Orchard receiver is never downgraded to V5 (`send.rs:4321-4330`).
-  - The Orchard-only joint UA should therefore produce an Ironwood output, as on zapp's SDK. Verified offline in vizor in M0.2 (U2); M2's regtest test confirms it end to end.
+  - The Orchard-only joint UA should therefore produce an Ironwood output, as on zapp's SDK. Verified offline in veylor in M0.2 (U2); M2's regtest test confirms it end to end.
   - An active Ironwood migration restricts inputs to Ironwood (`send.rs:4218-4227`). That is fine.
   - `ProposalResult` does not expose the step count. Add a one-step check, so the deposit is never several transactions.
 - **Recording the txid before broadcast.** `execute_proposal` creates and stores, then broadcasts, in one call (`send.rs:1516-1680`; the broadcast is `broadcast_created_transactions` at `:1677`). The txid is known only after it returns. To match zapp's `prepareDeposit().create()` then `submit`:
@@ -1154,7 +1154,7 @@ Each row is a step zapp performs, and the vizor seam that performs it. "New" mea
 #### 8.1.4 Traps
 
 - **Global write lock.** `with_wallet_db_write_lock` is process-global, not per path (`vr/wallet/db.rs:220-245`). Joint-DB scans and writes therefore serialize with main-wallet writes, as Gift Card claims already do.
-- **Birthday at the tip.** zecSwap imports at tip + 1, because librustzcash panics on an empty scan range next to a deleted account's ranges (`zs/…/zcash/wallet.rs:451-470`, librustzcash#2301). vizor's claim-sync normalizes ranges (`sync_engine/mod.rs:2865-2868`). Verified for a joint account born above the tip by the M2.7b regtest run, 2026-10-13 (U6). As built, `sync_joint_db` does not scan a `joint.db` whose accounts are all born above the tip: the claim scan's completion checks need a stored tip block (D-10). The tip it compares must be fresh, not the 15 s transaction tip cache, or the block that reaches the birthday is skipped (D-50).
+- **Birthday at the tip.** zecSwap imports at tip + 1, because librustzcash panics on an empty scan range next to a deleted account's ranges (`zs/…/zcash/wallet.rs:451-470`, librustzcash#2301). veylor's claim-sync normalizes ranges (`sync_engine/mod.rs:2865-2868`). Verified for a joint account born above the tip by the M2.7b regtest run, 2026-10-13 (U6). As built, `sync_joint_db` does not scan a `joint.db` whose accounts are all born above the tip: the claim scan's completion checks need a stored tip block (D-10). The tip it compares must be fresh, not the 15 s transaction tip cache, or the block that reaches the birthday is skipped (D-50).
 
 ### 8.2 FRB API conventions
 
@@ -1168,7 +1168,7 @@ Each row is a step zapp performs, and the vizor seam that performs it. "New" mea
   - **No data-carrying enums** (no `freezed` in `pubspec.yaml` dependencies; FRB would emit `@freezed` sealed classes). A result such as `Accepted | TokensNeeded | NothingSent(cause)` is a struct `{ kind: ApiAcceptKind, cause: Option<ApiNothingSentCause>, … }` with fieldless enums.
   - **Integer widths.** `u64` becomes Dart `BigInt` (`lib/src/rust/api/sync.dart:202`); `u32`/`i32` become `int`. Use `u32` for indices, counts and `next_poll_ms`, `i64` for unix seconds, and decimal `String` for token amounts. `Option<T>` → `T?`.
 - **Errors.** Copy `ApiWalletError` (`api/sync.rs:63-122`): `pub struct ApiPrivateUsdError { code: ApiPrivateUsdErrorCode, message: String }`, with `#[frb(dart_code = "@override String toString() => message;")]`. The codes mirror §5.8's problems plus the pre-send errors: `RelayerUnreachable`, `RelayerRefused`, `RelayerFee`, `EthereumUnreachable`, `RailgunClosed`, `ClaimTurn`, `ZcashWallet`, `DepositUnpayable`, `ZcashRejected`, `Mismatch`, `TokensUnreachable`, `TokensRefused`, `TokensDeviceRefused`, `NoTokensToday`, `TokensNeeded`, `Keystore`, `ChainLagging`, `QuoteExpired`, `MakerUnavailable`, `MakerBusy`, `AmountRefused`, `FundingCostChanged`, `DepositUnconfirmed`, `TooLate`, `Busy`, `StoreUnreadable`, `Unavailable`, `RouteBlocked` and `Other`, plus `Cancelled` since M5 (a call stopped by `private_usd_cancel`; never a failure, progress D-32). Dart never branches on message text; `privateUsdErrorMessage(code)` maps them to copy (§9.6). Wrap panics with the `catch` helper (`api/secret.rs:7-21`).
-- **Concurrency.** A module-level `OPERATIONS: Mutex<()>` per DB, like `wallet::gift_card_tracking::OPERATIONS` (defined at `rust/src/wallet/gift_card_tracking.rs:8`, taken at `api/gift_card_tracking.rs:14-16`), plus an id-keyed cancel registry like `cancel_payment_link_claim_sync` (`api/sync.rs:545`; registry shape at `:19-20, 414-449`). From M5 also a per-account async driver lock held across network I/O (§5.10 "vizor engine"); `OPERATIONS` never is.
+- **Concurrency.** A module-level `OPERATIONS: Mutex<()>` per DB, like `wallet::gift_card_tracking::OPERATIONS` (defined at `rust/src/wallet/gift_card_tracking.rs:8`, taken at `api/gift_card_tracking.rs:14-16`), plus an id-keyed cancel registry like `cancel_payment_link_claim_sync` (`api/sync.rs:545`; registry shape at `:19-20, 414-449`). From M5 also a per-account async driver lock held across network I/O (§5.10 "veylor engine"); `OPERATIONS` never is.
 - **Streams.** The swap engine needs none: Dart drives `forward_advance(...) -> ApiForwardAdvance { record, wait?, next_poll_ms, problem? }` from a foreground loop, and polls the sync `private_usd_activity(op_id)` for the in-flight step label. Use `StreamSink<T>` (`crate::frb_generated::StreamSink`; examples at `api/sync.rs:305-346` and `api/ledger.rs:512-545`) only if joint-sync progress is shown. Railgun `scan` and `proof` events come from the Kotlin `EventChannel`, not FRB.
 - **Dart conventions.** Riverpod 3 (`flutter_riverpod: ^3.3.1`).
   - Feature providers go in `lib/src/features/private_usd/providers/`. Global lifecycle fences go in `lib/src/providers/` only if `account_provider.dart` imports them (as `public_details_loads_provider.dart` does).
@@ -1439,7 +1439,7 @@ pub fn private_usd_send_settle_all(store_dir: String, network: String, eth_rpc_u
 - **The entry-card pattern.** `_MobileHomeEntryCard` (`:1578-1704`) takes `icon`, `title`, `subtitle`, an `emphasized` style, `semanticsLabel` and `onTap`. `_MobileVotingEntry` (`:1383-1513`) shows how such a card refreshes on route return and foreground, using `AppLifecycleListener`, the router listener and `ref.listen(appSecurityProvider…requiresUnlock)`.
 - **Hide balances.** `privacyModeProvider` (`lib/src/providers/privacy_mode_provider.dart`) is a plain `bool` notifier seeded from bootstrap. Use `fixedPrivacyMask()` for whole amounts and `hideAmountIfPrivacyMode(text, privacyModeEnabled:)` for labelled amounts.
 
-**The Private USD surface.** It follows zapp's placement and vizor's existing strip.
+**The Private USD surface.** It follows zapp's placement and veylor's existing strip.
 
 - **A second strip under the card.** Add a `_MobilePrivateUsdStrip` in `_BalanceCard`'s `Column`, after the transparent strip. It is a single tappable row:
   - `Private USD $X` and `≈ Y ZEC`, plus `+$Z arriving` in the accent colour
@@ -1558,7 +1558,7 @@ pub fn private_usd_send_settle_all(store_dir: String, network: String, eth_rpc_u
   - Tor via `tor_client_for_route(true, cancelled)`. **No retries** (§5.2: quotes are single-use, and accepts and relayer posts may have landed).
   - As built: a Tor failure before librustzcash's header callback runs is `BeforeDispatch`; a direct failure is `BeforeDispatch` only for a connect error (the pooled hyper client fuses connecting with sending, so a direct timeout counts as `AfterDispatch`).
 
-  `RoutedError::phase` is exactly the "refused versus unknown" split the driver needs (§5.2). Build it from the Enhance PIR transport (M1 task 10). Then move the PIR transport and voting's `VizorRoute` onto it (M1 task 10b), so vizor keeps one routed executor. For reference, `VizorRoute` implements `zcash_voting`'s `RouteHttp` (`fn execute<'a>(&'a self, request: RouteRequest<'a>, on_dispatch: &'a (dyn Fn() + Send + Sync)) -> RouteFuture<'a>`); its body shows the request fields to mirror: `url`, `method`, `headers`, `body`, `timeout`, `max_response_bytes`.
+  `RoutedError::phase` is exactly the "refused versus unknown" split the driver needs (§5.2). Build it from the Enhance PIR transport (M1 task 10). Then move the PIR transport and voting's `VizorRoute` onto it (M1 task 10b), so veylor keeps one routed executor. For reference, `VizorRoute` implements `zcash_voting`'s `RouteHttp` (`fn execute<'a>(&'a self, request: RouteRequest<'a>, on_dispatch: &'a (dyn Fn() + Send + Sync)) -> RouteFuture<'a>`); its body shows the request fields to mirror: `url`, `method`, `headers`, `body`, `timeout`, `max_response_bytes`.
 - **Direct TLS.** As the PIR transport does (`enhancement/transport/mod.rs:107-130`): `HttpsConnectorBuilder::new().with_webpki_roots().https_only().enable_http1().wrap_connector(DirectRouteConnector::new())`, and install the ring `CryptoProvider` once with a `std::sync::Once` (a routed request can be the process's first TLS use, and unit tests never run `init_app`).
 - **Body limits.** Enforce `max_body` while reading (`http_body_util::Limited`); relayer and maker answers are small (cap 1 MiB), `eth_getLogs` pages larger (cap 8 MiB).
 - **JSON.** `serde_json` is already a dependency (`Cargo.toml:84`). POST bodies use `Content-Type: application/json`, and relayer POSTs add `ZecSwap-Ticket`.
@@ -1566,7 +1566,7 @@ pub fn private_usd_send_settle_all(store_dir: String, network: String, eth_rpc_u
 
 **Ethereum JSON-RPC.**
 
-- **Nothing exists.** vizor has no EVM RPC client: no `eth_*`, alloy or ethers in `rust/src` or `lib/src`. The only EVM code is Dart EIP-55 checksumming (`lib/src/core/crypto/keccak256.dart`).
+- **Nothing exists.** veylor has no EVM RPC client: no `eth_*`, alloy or ethers in `rust/src` or `lib/src`. The only EVM code is Dart EIP-55 checksumming (`lib/src/core/crypto/keccak256.dart`).
 - **Write `rust/src/wallet/private_usd/evm_rpc.rs`** (about 250 lines) over `routed_request`, with JSON-RPC 2.0 `{jsonrpc, id, method, params}` and one request per call (no batching, since publicnode limits it):
   - `eth_chainId` → must equal the pin (§5.4)
   - `eth_getBlockByNumber("latest", false)` → `{number, timestamp}`
@@ -1622,7 +1622,7 @@ pub fn private_usd_send_settle_all(store_dir: String, network: String, eth_rpc_u
 
 ### 8.7 Copy manifest
 
-Run from the vizor repo root. **Never open** `railgun.js` (9.8 MB, minified), the `.wasm` files or `package-lock.json` (329 KB); copy them blind. Every zapp file starts with two SPDX lines (`AGPL-3.0-only`, "The Zapp Contributors"); vizor source files carry no header, so delete them once E2 relicenses the code (until then, nothing here merges).
+Run from the veylor repo root. **Never open** `railgun.js` (9.8 MB, minified), the `.wasm` files or `package-lock.json` (329 KB); copy them blind. Every zapp file starts with two SPDX lines (`AGPL-3.0-only`, "The Zapp Contributors"); veylor source files carry no header, so delete them once E2 relicenses the code (until then, nothing here merges).
 
 ```sh
 ZA=~/dev/zapp/zapp-android; REV=release/4.7.0
@@ -1725,20 +1725,20 @@ printf '\n# Railgun bundle build\n/android/railgun-web/node_modules/\n' >> .giti
 
 ## 9. UI reference
 
-Read from zapp at `60bcf0b30` and vizor at `4a859bee0`. **No Figma exists for this feature in vizor.** Nothing in `lib/`, `test/`, `lib/figma_compare/`, `lib/widgetbook/` or `FIGMA-AI-FIX.md` mentions Private USD or Railgun. Build it from vizor's existing tokens and widgets. The Widgetbook fixtures and capture scenarios (§9.7) are for self-review and regression.
+Read from zapp at `60bcf0b30` and veylor at `4a859bee0`. **No Figma exists for this feature in veylor.** Nothing in `lib/`, `test/`, `lib/figma_compare/`, `lib/widgetbook/` or `FIGMA-AI-FIX.md` mentions Private USD or Railgun. Build it from veylor's existing tokens and widgets. The Widgetbook fixtures and capture scenarios (§9.7) are for self-review and regression.
 
 ### 9.1 Rules that differ from zapp
 
 1. **Send and Withdraw are two buttons, two routes, one screen.** `60bcf0b30` deleted zapp's send/withdraw toggle. The mode is fixed by the button that opened the screen (`pu/send/PrivateUsdSendState.kt:48`; `pu/PrivateUsdView.kt:307-323`).
 2. **Every quote spends a swap index, in both directions.** The forward amount step may make up to 4 maker quotes per typed amount: one $1 price probe, plus up to 3 refinements (`pu/convert/PrivateUsdZecQuotes.kt:35-47, 75-80`). The reverse step makes one per amount. The 700 ms typing debounce (`pu/PrivateUsdConversions.kt:27`) is therefore load-bearing (X10).
 3. **The forward amount is total ZEC, network fee included** (`pu/convert/PrivateUsdConvertState.kt:17`; `str:305`). The quote search finds the largest quote whose `depositZat + feeZat` fits. The reverse amount is in dollars, with 2 decimals (`common/privateusd/PrivateUsdAmounts.kt:36, 49`).
-4. **No app-lock prompt before spends (D18).** zapp prompts before convert, fund, ready, cancel, rescue and send (`pu/PrivateUsdAuthentication.kt:11-20`). vizor adds confirmation sheets for cancel, request refund and rescue instead.
-5. **The banner survives the kill switch (D16).** zapp hides it when unavailable (`ObservePrivateUsdSummaryUseCase` returns `null`). vizor keeps the banner and the progress route for an unfinished swap.
-6. **No notifications, no notification-permission prompt (D9).** zapp prompts before review (`pu/convert/PrivateUsdConvertView.kt:31-35`, `pu/reverse/PrivateUsdReverseView.kt:39-43`). Every "Zapp keeps going in the background" line becomes "keep Vizor open" copy (`F` rows in §9.6).
+4. **No app-lock prompt before spends (D18).** zapp prompts before convert, fund, ready, cancel, rescue and send (`pu/PrivateUsdAuthentication.kt:11-20`). veylor adds confirmation sheets for cancel, request refund and rescue instead.
+5. **The banner survives the kill switch (D16).** zapp hides it when unavailable (`ObservePrivateUsdSummaryUseCase` returns `null`). veylor keeps the banner and the progress route for an unfinished swap.
+6. **No notifications, no notification-permission prompt (D9).** zapp prompts before review (`pu/convert/PrivateUsdConvertView.kt:31-35`, `pu/reverse/PrivateUsdReverseView.kt:39-43`). Every "Zapp keeps going in the background" line becomes "keep Veylor open" copy (`F` rows in §9.6).
 7. **USD only.** Drop the local-currency toggle, the `≈ local` lines and their strings. Show `≈ Y ZEC` where zapp shows the local amount (X3).
-8. **Follow vizor's patterns in these places:**
+8. **Follow veylor's patterns in these places:**
 
-| Topic | zapp | vizor (follow this) |
+| Topic | zapp | veylor (follow this) |
 |---|---|---|
 | Steps | one route with in-screen phases (amount ⇄ review; form → review → sending → done) | separate `CupertinoPage` routes per step, with state in a Riverpod notifier, as send (`/send`, `/send/amount`, `/send/review`, `/send/status`, `lib/src/core/navigation/mobile_routes.dart:189-280`) and swap/pay (`/swap/review`, `/pay/review`) do |
 | Back | to the Pay tab | pop the stack. As built (M5, progress D-54): accept pops the review with the conversion's route, and the convert screen replaces itself with progress (`pushReplacement`), so back from progress lands on `/private-usd`. |
@@ -1753,7 +1753,7 @@ Read from zapp at `60bcf0b30` and vizor at `4a859bee0`. **No Figma exists for th
 
 ### 9.2 Routes, screens, providers and reuse
 
-**Module.** Build a new feature, `lib/src/features/private_usd/`, with `models/`, `providers/`, `services/`, `screens/mobile/` and `widgets/mobile/`. Do not extend `SwapNotifier`: vizor's swap UI is tied to NEAR models. `MobileSwapComposerTicket` and `MobilePayAmountStep` take a `SwapState`, and `MobileSwapReviewContent` takes a `SwapQuote`. Reuse only the presentational pieces. Keep Private USD out of the Swap tab, which disappears whenever NEAR is disabled.
+**Module.** Build a new feature, `lib/src/features/private_usd/`, with `models/`, `providers/`, `services/`, `screens/mobile/` and `widgets/mobile/`. Do not extend `SwapNotifier`: veylor's swap UI is tied to NEAR models. `MobileSwapComposerTicket` and `MobilePayAmountStep` take a `SwapState`, and `MobileSwapReviewContent` takes a `SwapQuote`. Reuse only the presentational pieces. Keep Private USD out of the Swap tab, which disappears whenever NEAR is disabled.
 
 **Routes.** All routes are mobile-tree `CupertinoPage`s over the shell, next to `/pay` in `lib/src/core/navigation/mobile_routes.dart` (`/pay` at `:339`). Route arguments go through `state.extra`, with a `redirect` back when the extra has the wrong type (`:289-297`). Titles are sentence case.
 
@@ -1904,7 +1904,7 @@ The home strip and banner widgets are passed into `_BalanceCard` and the home `L
 | 8 | Refunds (reverse `REFUNDED` records, rescue) | `pu/refunds/PrivateUsdRefunds{Screen,View,State,VM}.kt` | full screen |
 | 9 | Send privately / Withdraw: form, review, proving, done | `pu/send/PrivateUsdSend{Screen,View,Form,State,VM}.kt` | full screen, 4 phases |
 | 10 | "How this works" info sheet on every screen | `pu/PrivateUsdScaffold.kt:129-170` (`ZappInfoSheet`), content `pu/PrivateUsdInfo.kt` | bottom sheet |
-| 11 | App-lock prompt | `PinVerifyOverlay` on 4, 5, 8, 9 | overlay; **drop in vizor** |
+| 11 | App-lock prompt | `PinVerifyOverlay` on 4, 5, 8, 9 | overlay; **drop in veylor** |
 | 12 | Notifications | `common/atomicswap/AtomicSwapNotifier.kt` | **not v1** |
 
 There is **no separate onboarding**. First use is the first balance load, shown inline as "Loading your private balance…" with a percentage (`str:42-43`, `pu/PrivateUsdText.kt:98-102`) on 3, 4 and 5. Railgun screening (POI) is shown as the "Arriving" bucket and the "Screening" progress step, not as its own screen. **Unavailable** means the surfaces are absent: the widget is `null` (no deployment, no Railgun network, or the kill switch is off).
@@ -1932,11 +1932,11 @@ Any screen opened while a conversion is under way, or after a crash mid-accept, 
 (`pu/PrivateUsdConversions.kt:37-51`, `PrivateUsdConvertVM.kt:117-120`, `PrivateUsdProgressVM.kt:138-145`).
 ```
 
-Back from 3, 4, 5, 6 and 7 returns to the tab shell on the Pay tab (`ui/common/usecase/NavigateBackToPayUseCase.kt:9-16`). In vizor, back pops the stack instead (§9.1).
+Back from 3, 4, 5, 6 and 7 returns to the tab shell on the Pay tab (`ui/common/usecase/NavigateBackToPayUseCase.kt:9-16`). In veylor, back pops the stack instead (§9.1).
 
 ### 9.4 Per-screen spec
 
-Rules are zapp's unless marked **vizor**. Data references point to §6.6 (balance), §5.6–§5.8 (swap state) and §6.7 (sends).
+Rules are zapp's unless marked **veylor**. Data references point to §6.6 (balance), §5.6–§5.8 (swap state) and §6.7 (sends).
 
 #### S1. Home strip, banner and entry (zapp 1, 2, 2b)
 
@@ -1945,18 +1945,18 @@ Rules are zapp's unless marked **vizor**. Data references point to §6.6 (balanc
   - `+$Y` in the accent colour while `arriving > 0`; its read-aloud text is "$Y arriving".
   - The amount turns the danger colour while `blocked > 0`; read aloud as "Needs attention: $X".
   - Masked with the rest of the balances when hidden.
-  - **vizor:** add `≈ Y ZEC` (indicative, §6.6), hidden when the price is null or balances are hidden.
+  - **veylor:** add `≈ Y ZEC` (indicative, §6.6), hidden when the price is null or balances are hidden.
 - **Banner** (`pu/PrivateUsdConversionBanner.kt:44-67`): only one conversion runs at a time, either way.
   - Title: "Conversion needs attention" when there is a problem (§5.8), or when the reverse phase is `AWAITING_READY`. Otherwise "Converting to private USD" (forward) or "Converting to ZEC" (reverse).
   - Detail: the forward stage label with the confirmation count (`pu/PrivateUsdText.kt:65-76`, for example "Waiting for confirmations · 1 of 2"), or the reverse step label (`pu/reverse/PrivateUsdReverseProgress.kt:158-160`).
-  - **vizor:** also flag `AWAITING_FUNDING` as attention. In foreground-only v1 it means the fees changed or a funding post was refused, and only the user can continue.
-- **When present:** zapp shows the strip whenever the feature is available, even before first use (it shows "—" and starts no WebView until opened; §6.6 `observeIfUsed`). **vizor:** keep that: the strip is the only entry point. Hide it for hardware accounts, accounts without a ZIP-32 index, networks without a deployment, and when the kill switch is off. Keep the banner while an unfinished swap exists (§9.1).
-- **Tap:** strip → Private USD screen. Banner → that conversion's progress. **vizor:** no speed dial; the action row stays Send / Receive / Pay (§8.3).
+  - **veylor:** also flag `AWAITING_FUNDING` as attention. In foreground-only v1 it means the fees changed or a funding post was refused, and only the user can continue.
+- **When present:** zapp shows the strip whenever the feature is available, even before first use (it shows "—" and starts no WebView until opened; §6.6 `observeIfUsed`). **veylor:** keep that: the strip is the only entry point. Hide it for hardware accounts, accounts without a ZIP-32 index, networks without a deployment, and when the kill switch is off. Keep the banner while an unfinished swap exists (§9.1).
+- **Tap:** strip → Private USD screen. Banner → that conversion's progress. **veylor:** no speed dial; the action row stays Send / Receive / Pay (§8.3).
 
 #### S2. Private USD screen (zapp 3)
 
 - **Header:** title "Private USD", subtitle "Dollars held privately on Ethereum, in Railgun" (`str:25`), and an info button.
-- **Total** (`pu/PrivateUsdView.kt:89-156`): headline `spendable`, greyed while unknown. The status line says "Updated {time}", or "Updating…", or the first-load line with its percentage. A refresh button; an explicit refresh ignores back-off (§6.6). A refresh error shows below in the danger colour: "Couldn't update the balance. Showing the last known amounts." with a balance, or "Couldn't load the balance. Try again in a moment." without one (`pu/PrivateUsdVM.kt:164-169`). **vizor:** add the `≈ ZEC` line here; drop the currency toggle.
+- **Total** (`pu/PrivateUsdView.kt:89-156`): headline `spendable`, greyed while unknown. The status line says "Updated {time}", or "Updating…", or the first-load line with its percentage. A refresh button; an explicit refresh ignores back-off (§6.6). A refresh error shows below in the danger colour: "Couldn't update the balance. Showing the last known amounts." with a balance, or "Couldn't load the balance. Try again in a moment." without one (`pu/PrivateUsdVM.kt:164-169`). **veylor:** add the `≈ ZEC` line here; drop the currency toggle.
 - **Banner:** the in-flight conversion, as on home.
 - **Buckets** (`pu/PrivateUsdVM.kt:171-203`): "Available" always; "Processing", "Arriving" and "Screening refused" only when non-zero, each with an explanation. "Screening refused" is in the danger colour.
 - **Empty state:** shown when the total is 0 and nothing is converting: "No private dollars yet" with a short body (`:114`).
@@ -2009,7 +2009,7 @@ The **amount** phase (`pu/convert/PrivateUsdConvertVM.kt`, `PrivateUsdConvertTer
   - A quote that does not pay out (`fee ≥ amount`) → "This amount doesn't cover the relayer's fee. Try a larger amount."
   - No quote fits → "No quote fits this amount. Try a different amount or tap Available for the maximum."
   - Maker refusals map through `pu/PrivateUsdFailure.kt:26-163` (the error table in §9.6).
-  - **vizor:** a relayer fee above the 2 USDC cap (D11) → its own message (§9.6, `N` rows).
+  - **veylor:** a relayer fee above the 2 USDC cap (D11) → its own message (§9.6, `N` rows).
 - **Quoting.** It starts 700 ms after typing stops, and only when the amount is valid and not more than spendable.
   - While a quote loads, the button reads "Getting quote…", disabled and loading.
   - A quote that arrives already expired → "The quote had run out by the time it arrived. Check that your phone's clock is right…" (`PrivateUsdConvertTerms.kt:86-90`).
@@ -2051,9 +2051,9 @@ The **review** phase (same screen):
 - **Review** (`PrivateUsdReverseMapper.kt:74-88`):
   - Header: `{$debit}` for about `{ZEC}`.
   - Rows: "Escrow value", "Railgun unshield fee", "Broadcast fee", "Total paid", "Market maker's network cost" (optional), and "Estimated ZEC after sweep fee".
-  - **vizor:** add a "Keep Vizor open" note, the settlement deadline (`readyDeadline`) and the Tor-off disclosure (§9.6).
+  - **veylor:** add a "Keep Veylor open" note, the settlement deadline (`readyDeadline`) and the Tor-off disclosure (§9.6).
 - **"Convert"** is one authorized step: accept, import the joint account, then fund (`:353-357`). Its default failure is "The conversion couldn't start…". After it, the screen renders progress (S6).
-- **Cost changed.** `FUNDING_COST_CHANGED` → "The fees changed, so nothing was paid. The new total shows above: convert again to pay it, or cancel." The record stays in `AWAITING_FUNDING`, whose primary button is "Convert" again (`PrivateUsdReverseMapper.kt:149-153`). **vizor:** show the new cost rows on the progress screen in `AWAITING_FUNDING`, and label the button "Pay {debit}".
+- **Cost changed.** `FUNDING_COST_CHANGED` → "The fees changed, so nothing was paid. The new total shows above: convert again to pay it, or cancel." The record stays in `AWAITING_FUNDING`, whose primary button is "Convert" again (`PrivateUsdReverseMapper.kt:149-153`). **veylor:** show the new cost rows on the progress screen in `AWAITING_FUNDING`, and label the button "Pay {debit}".
 - **Back** (`:296-317`): from review of a preview → back to the amount. During a look-up (the max calculation) → cancels it. During an authorized step → blocked. Otherwise → leave.
 
 #### S5. Forward progress (zapp 6)
@@ -2065,7 +2065,7 @@ The **review** phase (same screen):
   - a problem card, "Taking longer than usual", with "Try now" (`retryNow`)
   - the result header
   - "Call it off": only while opening has taken more than 90 s and there is no problem (`:89-109`). `abandon` succeeds only before any deposit and with no escrow (§5.6 step 12); otherwise → "The swap opened on Ethereum meanwhile, so it can't be called off. It carries on."
-  - the background note (**vizor:** keep-open note)
+  - the background note (**veylor:** keep-open note)
   - the primary button: none while under way; "View private USD" after `Paid` (replaceAll → S2); "Try again" after `Refunded` or `NothingSent` (replace → S3)
 - **Ticks** every 15 s. On open it resumes the loop. If there is no forward record at all, it moves to the reverse conversion or to Convert (`:137-145`).
 - **Back** goes home (blocked while call-off is busy).
@@ -2083,7 +2083,7 @@ The **review** phase (same screen):
   - `AWAITING_READY` → "Authorize settlement"
   - over → "New conversion"
   - otherwise none
-- **Cancel** (`PrivateUsdReverseRefundRequest.kt`): it runs independently of an authorized funding proof, and cancels that job afterwards. A settled record → "This conversion has already settled and can no longer be refunded…". A failure → "Couldn't call it off. Try again in a moment.". **vizor:** put a confirmation sheet before cancel, because there is no app-lock prompt (D18).
+- **Cancel** (`PrivateUsdReverseRefundRequest.kt`): it runs independently of an authorized funding proof, and cancels that job afterwards. A settled record → "This conversion has already settled and can no longer be refunded…". A failure → "Couldn't call it off. Try again in a moment.". **veylor:** put a confirmation sheet before cancel, because there is no app-lock prompt (D18).
 - **Ready.** Its failure → "The market maker's ZEC isn't confirmed yet. Try again in a few minutes." (`DEPOSIT_UNCONFIRMED`) or the generic `reverse_error`. Too late → "It's too late for this step, so the conversion ends by itself. Anything you paid comes back."
 
 #### S7. Refunds (zapp 8)
@@ -2119,7 +2119,7 @@ The **review** phase (same screen):
   - The withdraw notice reads "Anyone on Ethereum can see this amount and address."
   - If the balance drops below the amount → "Your available balance is now less than this amount."
   - The primary button is "Send" or "Withdraw", enabled when `canSend`, the cost is known and the guard is `AVAILABLE`.
-  - **vizor:** refuse a network fee above 2 USDC (D11) with its own message.
+  - **veylor:** refuse a network fee above 2 USDC (D11) with its own message.
 - **Sending:** "Proving your transaction" with a body and the proof progress (0–1), from the page's `proof` events. The button reads "Sending" (disabled, loading). Back is blocked.
 - **Outcomes** (`:276-302`):
 
@@ -2142,15 +2142,15 @@ The **review** phase (same screen):
 | Engine state (§5.6/§5.8) | Active step (label · detail) | Note | User action |
 |---|---|---|---|
 | Record saved, accept outstanding, or `Waiting(OPENING)` | "Opening the swap on Ethereum" · "About a minute" | after 90 s: "The market maker hasn't opened the swap yet. Nothing has been sent." | "Call it off" (only then) |
-| Deposit `Started`/`Kept`, being built or sent (activity `DEPOSITING`) | "Sending your ZEC" · "A few seconds" | none | none (**vizor: keep the app open**; the deposit needs the seed) |
-| `Waiting(CONFIRMING)` | "Waiting for confirmations" · "n of 2 · about x min" (75 s per block) | `confirmations ≥ 2`, no payout yet, `t0 > now`: "The market maker hasn't confirmed your deposit yet. If it still hasn't by {t0}, Vizor claims your dollars itself." | none (**vizor: stay open past `t0`**) |
+| Deposit `Started`/`Kept`, being built or sent (activity `DEPOSITING`) | "Sending your ZEC" · "A few seconds" | none | none (**veylor: keep the app open**; the deposit needs the seed) |
+| `Waiting(CONFIRMING)` | "Waiting for confirmations" · "n of 2 · about x min" (75 s per block) | `confirmations ≥ 2`, no payout yet, `t0 > now`: "The market maker hasn't confirmed your deposit yet. If it still hasn't by {t0}, Veylor claims your dollars itself." | none (**veylor: stay open past `t0`**) |
 | `ZcashWait.SYNCING` (any step) | detail "Waiting for your Zcash wallet to sync" | none | none |
 | Claim, lock or payout under way (any other activity) | "Claiming your dollars" · "About a minute" | none | none |
 | `end = Paid`, balance not yet synced 30 s after it | all four complete; "Arriving in your private balance" · "About a minute" | none | "View private USD" |
 | `Paid`, arrived but still `arriving` | "Screening" · "about 1 h" (mainnet; 1 min testnet) | none | "View private USD" |
 | `Paid`, screened | all complete | none | "View private USD" |
-| `Refunded`, waiting (`Waiting(REFUNDING)`) or activity `SWEEPING` | single step "Bringing your ZEC back" | "The swap was called off. Vizor is bringing your ZEC back to your wallet." | none (**vizor: keep open**; the sweep needs the seed) |
-| `Waiting(DEPOSIT_UNSETTLED)` | the confirmations step | "The market maker called the swap off while your ZEC payment was still unconfirmed. If it goes through, Vizor brings your ZEC back." | none |
+| `Refunded`, waiting (`Waiting(REFUNDING)`) or activity `SWEEPING` | single step "Bringing your ZEC back" | "The swap was called off. Veylor is bringing your ZEC back to your wallet." | none (**veylor: keep open**; the sweep needs the seed) |
+| `Waiting(DEPOSIT_UNSETTLED)` | the confirmations step | "The market maker called the swap off while your ZEC payment was still unconfirmed. If it goes through, Veylor brings your ZEC back." | none |
 | Resuming after a restart | the current step | "Picking up where it left off." | none |
 | Any problem after 1 min of failures (§5.8) | the current step | problem card "Taking longer than usual" + message | "Try now" |
 | `end = Refunded(cause)` | no steps | result "Your ZEC came back" + body by cause | "Try again" |
@@ -2162,15 +2162,15 @@ The **review** phase (same screen):
 |---|---|---|---|---|---|
 | `QUOTED` | none (review) | no row | none | "Convert" | none |
 | `ACCEPTING` | "Preparing your receiving account" | same | none | none | "Cancel conversion" |
-| `AWAITING_FUNDING` | "Sending private USD to escrow" | same | the cost-changed error when relevant | **"Convert"** (pay; **vizor: "Pay {debit}"**, attention) | "Cancel conversion" (no funding) / "Request private refund" |
+| `AWAITING_FUNDING` | "Sending private USD to escrow" | same | the cost-changed error when relevant | **"Convert"** (pay; **veylor: "Pay {debit}"**, attention) | "Cancel conversion" (no funding) / "Request private refund" |
 | `SENDING_USDC` | same | same | none | none | "Request private refund" |
 | `CONFIRMING_ESCROW` | same | same | none | none | same |
 | `RECEIVING_ZEC` | "Waiting for confirmed ZEC" | same | none | none | same |
 | `AWAITING_READY` | "Authorize settlement" · "Your approval is needed to continue." | banner turns "Conversion needs attention" | "The full ZEC deposit is confirmed. Authorize settlement…" | **"Authorize settlement"** (before `readyDeadline − 120 s`) | same |
 | `SETTLING` | "Settling your conversion" | same | "Settlement is authorized. A refund can only proceed after {refundAfter} if settlement has not completed." | none | same (until claimed) |
-| `RECEIVING` | "Moving ZEC to your shielded wallet" · "Zcash confirmations: n" | same | none | none (**vizor: keep open**) | none (settled) |
+| `RECEIVING` | "Moving ZEC to your shielded wallet" · "Zcash confirmations: n" | same | none | none (**veylor: keep open**) | none (settled) |
 | `COMPLETE` | all complete | "Converted to ZEC" | result "ZEC received" / "{ZEC} arrived after fees." | "New conversion" | none |
-| `REFUND_WAIT` | one step: "Waiting until a refund can proceed. Vizor retries while it's open." | same | the cancel-requested note, if any | none | none (`cancelRequested`) |
+| `REFUND_WAIT` | one step: "Waiting until a refund can proceed. Veylor retries while it's open." | same | the cancel-requested note, if any | none | none (`cancelRequested`) |
 | `REFUNDING` | "Securing your private refund" | same | same | none | none |
 | `REFUND_PAYOUT` | "Returning your private USD to Railgun" | same | none | none | none |
 | `REFUNDED` | none | "Conversion called off" · "your dollars came back" | result "Refund sent" / "Private refund paid. Railgun screening may delay availability." | "New conversion"; "View refunds" → rescue if eligible | none |
@@ -2178,21 +2178,21 @@ The **review** phase (same screen):
 
 The cancel-requested note: "Refund requested…" before `ready`, or "…after {refundAfter}…" after it.
 
-**What needs the user.** In zapp, only the funding payment (`AWAITING_FUNDING`), the settlement approval (`AWAITING_READY`), cancel and rescue. In vizor, **every key-using step also needs the app open and unlocked** (D9): the forward deposit, claim and sweep, and the reverse fund, ready, refund and sweep. So the progress screens and the banner must say so (§9.6 `F` rows). Keep the screen awake while a progress screen is visible and a key step is pending (X8), by OR-ing `privateUsdKeepAwakeProvider` into the watch in `SyncKeepAwakeNativeHost.build` (`lib/src/core/widgets/mobile/sync_keep_awake_native_host.dart:62-70`), never by calling `NativeScreenAwakeBridge` directly (M5 pitfalls; the opt-in sync keep-awake is `syncKeepAwakeActiveProvider`, `lib/src/providers/sync_keep_awake_provider.dart:168`).
+**What needs the user.** In zapp, only the funding payment (`AWAITING_FUNDING`), the settlement approval (`AWAITING_READY`), cancel and rescue. In veylor, **every key-using step also needs the app open and unlocked** (D9): the forward deposit, claim and sweep, and the reverse fund, ready, refund and sweep. So the progress screens and the banner must say so (§9.6 `F` rows). Keep the screen awake while a progress screen is visible and a key step is pending (X8), by OR-ing `privateUsdKeepAwakeProvider` into the watch in `SyncKeepAwakeNativeHost.build` (`lib/src/core/widgets/mobile/sync_keep_awake_native_host.dart:62-70`), never by calling `NativeScreenAwakeBridge` directly (M5 pitfalls; the opt-in sync keep-awake is `syncKeepAwakeActiveProvider`, `lib/src/providers/sync_keep_awake_provider.dart:168`).
 
 **Home for in-flight swaps:** the banner (S1), the activity row with the stage detail (S2), and nothing else. There are no notifications in v1.
 
 ### 9.6 Copy
 
-The tables give every user-facing string the vizor screens need, rewritten in sentence case with zapp's branding removed. The key is zapp's, to keep provenance. `{x}` is a placeholder.
+The tables give every user-facing string the veylor screens need, rewritten in sentence case with zapp's branding removed. The key is zapp's, to keep provenance. `{x}` is a placeholder.
 
 Flags:
 
-- **B**: branding changed ("Zapp" becomes "Vizor", or the sentence is rephrased)
+- **B**: branding changed ("Zapp" becomes "Veylor", or the sentence is rephrased)
 - **F**: foreground-only change
 - **T**: Tor or token-route change (D10, D4)
 - **C**: local-currency text removed
-- **N**: new for vizor
+- **N**: new for veylor
 - **S**: sentence case fixed
 - unflagged: verbatim
 
@@ -2200,10 +2200,10 @@ Flags:
 
 - the notifications block (`str:204-217`) and `convert_notifications_off` (`:113`)
 - `private_usd_info_note_currency` (`:53`), `private_usd_info_switch_currency` (`:56`) and `private_usd_switch_currency` (`:317`), all C
-- `convert_error_tor_off` (`:105`): vizor issues tokens directly when Tor is off (D10)
+- `convert_error_tor_off` (`:105`): veylor issues tokens directly when Tor is off (D10)
 - `private_usd_token_weth` (`:36`): not a dollar
-- `private_usd_home_separator` (`:17`): vizor lays out its own strip
-- `convert_quote_countdown` (`:90`): use vizor's `m:ss` formatter
+- `private_usd_home_separator` (`:17`): veylor lays out its own strip
+- `convert_quote_countdown` (`:90`): use veylor's `m:ss` formatter
 
 **Naming rule.** "Private USD" is the feature's name: capitalize it at the start of a sentence and as a screen title, and write "private USD" mid-sentence (zapp mixes both). "Railgun", "Ethereum", "Etherscan", "Railscan", "ZEC", "USDC" and "Zcash" keep their canonical case (AGENTS.md "UI Copy Conventions").
 
@@ -2239,7 +2239,7 @@ Flags:
 | `private_usd_banner_attention_title` | Conversion needs attention | |
 | `private_usd_banner_view` | View | |
 | N `home_zec_equivalent` | ≈ {zec} ZEC | N |
-| N `banner_keep_open` | Keep Vizor open to finish | N, F (banner detail suffix while a key step is pending) |
+| N `banner_keep_open` | Keep Veylor open to finish | N, F (banner detail suffix while a key step is pending) |
 
 **Private USD screen**
 
@@ -2257,8 +2257,8 @@ Flags:
 | `private_usd_assets_title` | Assets | |
 | `private_usd_token_usdc` / `_test_usd` | USD Coin / Test dollar | |
 | `private_usd_action_convert` / `_send` / `_withdraw` | Convert / Send / Withdraw | |
-| `private_usd_first_load` | Loading your private balance. The first time reads Railgun's history and can take a while. Keep Vizor open. | F |
-| `private_usd_first_load_progress` | Loading your private balance: {n}%. The first time reads Railgun's history and can take a while. Keep Vizor open. | F |
+| `private_usd_first_load` | Loading your private balance. The first time reads Railgun's history and can take a while. Keep Veylor open. | F |
+| `private_usd_first_load_progress` | Loading your private balance: {n}%. The first time reads Railgun's history and can take a while. Keep Veylor open. | F |
 | `private_usd_refresh_failed` | Couldn't update the balance. Showing the last known amounts. | |
 | `private_usd_load_failed` | Couldn't load the balance. Try again in a moment. | |
 | `private_usd_empty_title` | No private dollars yet | |
@@ -2276,7 +2276,7 @@ Flags:
 | `private_usd_info_refunds` | Refunds: recover a refund that couldn't enter your private balance. | |
 | `private_usd_info_step_screen` | Railgun screens new funds for {about} before they can be spent. | |
 | `private_usd_info_note_private` | Nobody else can see your balance, or who you pay. | |
-| N `info_note_keep_open` | Conversions, sends and refunds run only while Vizor is open and unlocked. | N, F |
+| N `info_note_keep_open` | Conversions, sends and refunds run only while Veylor is open and unlocked. | N, F |
 | N `tor_unavailable` | Private USD is unavailable while Tor is on. Turn off Tor in Settings to use it. Conversions already under way continue. | N, T (only if the D4 spike fails) |
 
 **Activity**
@@ -2310,11 +2310,11 @@ Flags:
 | `convert_fees` | Conversion fees | |
 | `convert_fees_value` | {$} relayer · {bps}% Railgun | |
 | `convert_maker_cost` | Market maker's network cost | |
-| `convert_quote_expires` | Quote expires in {m:ss} | S (vizor wording, `features/pay/widgets/mobile/mobile_pay_review_content.dart:186`) |
+| `convert_quote_expires` | Quote expires in {m:ss} | S (veylor wording, `features/pay/widgets/mobile/mobile_pay_review_content.dart:186`) |
 | `convert_quote_holds` | Quote holds for {m:ss} | |
-| N `quote_expired` | Quote expired | N (vizor's, `mobile_pay_review_content.dart:176`) |
+| N `quote_expired` | Quote expired | N (veylor's, `mobile_pay_review_content.dart:176`) |
 | `convert_quote_loading` | Getting quote… | |
-| `convert_new_quote` | Refresh quote | S (vizor's label, `mobile_pay_review_content.dart:255`) |
+| `convert_new_quote` | Refresh quote | S (veylor's label, `mobile_pay_review_content.dart:255`) |
 | `convert_quote_ran_out` | This quote expired. Refresh it to continue. | S |
 | `convert_quote_clock_ahead` | The quote had expired by the time it arrived. Check that your phone's clock is right, then try again. | |
 | `convert_insufficient` | Not enough ZEC. You have {zec} available. | |
@@ -2337,13 +2337,13 @@ Flags:
 | `convert_error_no_tokens_today` | This phone has used today's conversions. More are available after midnight UTC. | |
 | `convert_error_tokens_unavailable` | Couldn't get this conversion's token, so nothing was sent. Try again in a moment. | B, T |
 | `convert_error_device_refused` | This phone can't get conversion tokens. The token service turns away emulators, phones with an unlocked bootloader or a modified system, and app builds it doesn't recognize. | B |
-| `convert_error_keystore` | Vizor couldn't use this phone's secure key storage to get a conversion token, so nothing was sent. Try again in a moment. | B |
+| `convert_error_keystore` | Veylor couldn't use this phone's secure key storage to get a conversion token, so nothing was sent. Try again in a moment. | B |
 | `convert_error_relayer` | The relayer that completes conversions can't be reached right now. Try again in a moment. | |
 | `convert_error_relayer_refused` | The relayer that completes conversions turned this down. Try again in a moment. | |
-| `convert_error_ethereum` | Vizor can't reach Ethereum right now. Try again in a moment. | B |
+| `convert_error_ethereum` | Veylor can't reach Ethereum right now. Try again in a moment. | B |
 | `convert_error_wallet` | Your Zcash wallet isn't ready. Try again once it has synced. | |
 | `convert_error_unpayable` | Your wallet can't pay this in one transaction right now. Try a smaller amount. | |
-| `convert_error_store` | Vizor can't read its saved conversions. {support sentence} | B (D17) |
+| `convert_error_store` | Veylor can't read its saved conversions. {support sentence} | B (D17) |
 | `convert_error_generic` | Couldn't get a quote. Try again in a moment. | |
 | `convert_start_failed` | The conversion couldn't start. Nothing was sent. Try again in a moment. | |
 | `reverse_error_funding_unavailable` | Conversion to ZEC is unavailable right now. Try again later. | S |
@@ -2359,9 +2359,9 @@ Flags:
 | `convert_info_title` | How converting works | |
 | `convert_info_step_quote` | Enter the ZEC you want to convert, including the network fee. The market maker quotes how much private USD you receive. The quote holds for a few minutes. | |
 | `convert_info_step_deposit` | Your ZEC goes to a deposit address that you and the market maker control together. | |
-| `convert_info_step_claim` | Once the deposit is confirmed, Vizor claims the dollars into your private balance. | B |
+| `convert_info_step_claim` | Once the deposit is confirmed, Veylor claims the dollars into your private balance. | B |
 | `convert_info_note_either` | Either the dollars reach your private balance, or your ZEC comes back to you. | |
-| `convert_info_note_time` | Takes {about}. Keep Vizor open and unlocked until it's done. If you leave, it pauses; if it can't finish in time, it's called off and your ZEC comes back, less a network fee. | B, F |
+| `convert_info_note_time` | Takes {about}. Keep Veylor open and unlocked until it's done. If you leave, it pauses; if it can't finish in time, it's called off and your ZEC comes back, less a network fee. | B, F |
 | `convert_review_info_title` | Before you convert | |
 | `convert_review_info_pay` | You pay the ZEC deposit, which includes the market maker's network cost, plus the Zcash network fee. | |
 | `convert_review_info_receive` | You receive the dollars left after the relayer's fee and Railgun's {bps}% fee for shielding them. | |
@@ -2369,8 +2369,8 @@ Flags:
 | N `tor_off_disclosure` | Tor is off, so the token service sees this phone's attestation together with your IP address. | N, T (D10; show on both reviews only when Tor is off; add "Turn on Tor in Settings to hide it." only if the D4 bridge ships) |
 | `reverse_title` | Private USD to ZEC | S (was "→") |
 | `reverse_intro` | Approve sending private USD first. After your wallet confirms the full ZEC deposit itself, approve settlement to receive shielded ZEC. | S |
-| `reverse_refund_note` | Before you approve settlement, you can cancel. After that, a refund waits for the contract deadline. A refund pays the relayer's fee and Railgun's shielding fee. Closing Vizor never approves settlement. | B |
-| N `reverse_keep_open` | Keep Vizor open after you pay. Once the ZEC is confirmed, you approve settlement here by {time}. If you don't, your private USD is refunded, less fees. | N, F |
+| `reverse_refund_note` | Before you approve settlement, you can cancel. After that, a refund waits for the contract deadline. A refund pays the relayer's fee and Railgun's shielding fee. Closing Veylor never approves settlement. | B |
+| N `reverse_keep_open` | Keep Veylor open after you pay. Once the ZEC is confirmed, you approve settlement here by {time}. If you don't, your private USD is refunded, less fees. | N, F |
 | `reverse_escrow` / `reverse_railgun_fee` / `reverse_broadcaster_fee` / `reverse_total` | Escrow value / Railgun unshield fee / Broadcast fee / Total paid | |
 | `reverse_receive_estimate` | Estimated ZEC after sweep fee | |
 
@@ -2385,20 +2385,20 @@ Flags:
 | `convert_step_arrive` / `_screen` / `_refund` | Arriving in your private balance / Screening / Bringing your ZEC back | |
 | `convert_eta_seconds` / `_minute` | A few seconds / About a minute | |
 | `convert_wait_syncing` | Waiting for your Zcash wallet to sync | |
-| `convert_maker_silent` | The market maker hasn't confirmed your deposit yet. If it still hasn't by {time}, Vizor claims your dollars itself. Keep Vizor open until then. | B, F |
+| `convert_maker_silent` | The market maker hasn't confirmed your deposit yet. If it still hasn't by {time}, Veylor claims your dollars itself. Keep Veylor open until then. | B, F |
 | `convert_opening_slow` | The market maker hasn't opened the swap yet. Nothing has been sent. | |
 | `convert_call_off` | Call it off | |
 | `convert_call_off_failed` | Couldn't call it off. Try again in a moment. | |
 | `convert_call_off_too_late` | The swap opened on Ethereum meanwhile, so it can't be called off. It carries on. | |
-| `convert_unsettled` | The market maker called the swap off while your ZEC payment was still unconfirmed. If it goes through, Vizor brings your ZEC back. | B |
+| `convert_unsettled` | The market maker called the swap off while your ZEC payment was still unconfirmed. If it goes through, Veylor brings your ZEC back. | B |
 | `convert_resuming` | Picking up where it left off. | |
-| `convert_refunding` | The swap was called off. Vizor is bringing your ZEC back to your wallet. | B |
-| `convert_background_note` | Keep Vizor open until this finishes. If you leave, it pauses and picks up when you're back. | B, F |
+| `convert_refunding` | The swap was called off. Veylor is bringing your ZEC back to your wallet. | B |
+| `convert_background_note` | Keep Veylor open until this finishes. If you leave, it pauses and picks up when you're back. | B, F |
 | `convert_progress_info_title` | What's happening | |
 | `convert_progress_info_open` | The market maker opens the swap on Ethereum and locks the dollars in it. | |
-| `convert_progress_info_deposit` | Vizor sends your ZEC to the deposit address you and the market maker share. | B |
+| `convert_progress_info_deposit` | Veylor sends your ZEC to the deposit address you and the market maker share. | B |
 | `convert_progress_info_confirm` | The market maker waits for {n} Zcash confirmation(s). (plural) | |
-| `convert_progress_info_claim` | Vizor claims the dollars into your private balance. A relayer pays the Ethereum fees. | B |
+| `convert_progress_info_claim` | Veylor claims the dollars into your private balance. A relayer pays the Ethereum fees. | B |
 | `convert_progress_info_screen` | Railgun screens them for {about} before they can be spent. | |
 | `convert_progress_info_refund` | If the swap can't finish in time, it's called off and your ZEC comes back, less a small network fee. | |
 
@@ -2406,19 +2406,19 @@ Flags:
 
 | Key | Text | Flag |
 |---|---|---|
-| `convert_problem_relayer` | Vizor can't reach the relayer that sends your claim. It keeps trying while it's open. | B, F |
-| `reverse_problem_relayer` | Vizor can't reach the relayer that moves your dollars. It keeps trying while it's open. | B, F |
-| `convert_problem_relayer_refused` | The relayer keeps turning down this conversion's transaction. Vizor keeps trying while it's open. | B, F |
-| `convert_problem_relayer_fee` | The relayer's fee is more than this conversion pays out, or above the 2 USDC limit, so Vizor waits for it to come down. | B, N |
-| `convert_problem_ethereum` | Vizor can't reach Ethereum right now. It keeps trying while it's open. | B, F |
-| `convert_problem_railgun` | Railgun isn't accepting deposits right now, so Vizor holds off claiming. If it doesn't reopen in time, the swap is called off and your ZEC comes back. | B |
-| `convert_problem_turn` | The market maker holds the claim for a few minutes. Vizor claims as soon as it's your turn. | B |
-| `convert_problem_wallet` | Your Zcash wallet isn't ready. Vizor retries once it has synced. | B |
-| `convert_problem_unpayable` | Your wallet can't pay the deposit right now, for example because the network fee went up. Vizor keeps trying. If it still can't pay in time, the swap ends and nothing is sent. | B |
-| `convert_problem_tokens` | Vizor can't get this conversion's token right now. It keeps trying while it's open. | B, T, F |
-| `convert_problem_rejected` | The Zcash network turned down a transaction of this conversion. Vizor keeps sending it until it goes through or expires. | B |
-| `convert_problem_mismatch` | What's on the chain doesn't match this conversion, so Vizor only brings your funds back. | B |
-| `convert_problem_unexpected` | Something went wrong. Vizor keeps trying while it's open. | B, F |
+| `convert_problem_relayer` | Veylor can't reach the relayer that sends your claim. It keeps trying while it's open. | B, F |
+| `reverse_problem_relayer` | Veylor can't reach the relayer that moves your dollars. It keeps trying while it's open. | B, F |
+| `convert_problem_relayer_refused` | The relayer keeps turning down this conversion's transaction. Veylor keeps trying while it's open. | B, F |
+| `convert_problem_relayer_fee` | The relayer's fee is more than this conversion pays out, or above the 2 USDC limit, so Veylor waits for it to come down. | B, N |
+| `convert_problem_ethereum` | Veylor can't reach Ethereum right now. It keeps trying while it's open. | B, F |
+| `convert_problem_railgun` | Railgun isn't accepting deposits right now, so Veylor holds off claiming. If it doesn't reopen in time, the swap is called off and your ZEC comes back. | B |
+| `convert_problem_turn` | The market maker holds the claim for a few minutes. Veylor claims as soon as it's your turn. | B |
+| `convert_problem_wallet` | Your Zcash wallet isn't ready. Veylor retries once it has synced. | B |
+| `convert_problem_unpayable` | Your wallet can't pay the deposit right now, for example because the network fee went up. Veylor keeps trying. If it still can't pay in time, the swap ends and nothing is sent. | B |
+| `convert_problem_tokens` | Veylor can't get this conversion's token right now. It keeps trying while it's open. | B, T, F |
+| `convert_problem_rejected` | The Zcash network turned down a transaction of this conversion. Veylor keeps sending it until it goes through or expires. | B |
+| `convert_problem_mismatch` | What's on the chain doesn't match this conversion, so Veylor only brings your funds back. | B |
+| `convert_problem_unexpected` | Something went wrong. Veylor keeps trying while it's open. | B, F |
 
 **Convert: results (forward)**
 
@@ -2435,8 +2435,8 @@ Flags:
 | `convert_result_maker_refused` | The market maker turned the conversion down. Your ZEC never left your wallet. | |
 | `convert_result_maker_unavailable` | The market maker isn't taking conversions right now. Your ZEC never left your wallet. | |
 | `convert_result_never_opened` | The swap never opened on Ethereum. Your ZEC never left your wallet. | |
-| `convert_result_mismatch` | The swap on Ethereum didn't match its quote, so Vizor didn't send your ZEC. | B |
-| `convert_result_window_missed` | The swap opened too late to finish safely, so Vizor didn't send your ZEC. | B |
+| `convert_result_mismatch` | The swap on Ethereum didn't match its quote, so Veylor didn't send your ZEC. | B |
+| `convert_result_window_missed` | The swap opened too late to finish safely, so Veylor didn't send your ZEC. | B |
 | `convert_result_maker_cancelled` | The market maker called the swap off before your ZEC was sent. Your ZEC never left your wallet. | |
 | `convert_result_view_balance` | View private USD | |
 | `convert_result_try_again` | Try again | |
@@ -2457,7 +2457,7 @@ Flags:
 | `reverse_step_settle` / `reverse_settling` | Settling your conversion / Waiting for settlement | |
 | `reverse_sweeping` | Moving ZEC to your shielded wallet | |
 | `reverse_sweep_confirmations` | Zcash confirmations: {n} | |
-| `reverse_refund_wait` | Waiting until a refund can proceed. Vizor retries while it's open. | B, F |
+| `reverse_refund_wait` | Waiting until a refund can proceed. Veylor retries while it's open. | B, F |
 | `reverse_refunding` | Securing your private refund | |
 | `reverse_payout` | Returning your private USD to Railgun | S |
 | `reverse_complete` | ZEC received in your shielded wallet | |
@@ -2470,11 +2470,11 @@ Flags:
 | `reverse_cancel` | Cancel conversion | |
 | `reverse_request_refund` | Request refund | S |
 | N `reverse_cancel_confirm_title` / `_body` | Cancel this conversion? / Your private USD comes back, less the relayer's and Railgun's fees. This can't be undone. | N (confirm sheet, D18) |
-| `reverse_refund_requested` | Refund requested. Vizor continues when your refund is available, while it's open. | B, F |
-| `reverse_refund_requested_after_ready` | Refund requested. If settlement doesn't finish, Vizor can start returning your funds after {time}. Settlement may still finish before then. | B |
+| `reverse_refund_requested` | Refund requested. Veylor continues when your refund is available, while it's open. | B, F |
+| `reverse_refund_requested_after_ready` | Refund requested. If settlement doesn't finish, Veylor can start returning your funds after {time}. Settlement may still finish before then. | B |
 | `reverse_settlement_refund_limit` | Settlement is authorized. A refund can only proceed after {time} if settlement hasn't completed. | |
-| `reverse_refund_unavailable` | This conversion has already settled and can no longer be refunded. Vizor will finish moving your ZEC to your wallet. | B |
-| `reverse_error` | Unable to complete this step. Your saved conversion resumes after Vizor checks both chains. A payment is never repeated because a request timed out. | B |
+| `reverse_refund_unavailable` | This conversion has already settled and can no longer be refunded. Veylor will finish moving your ZEC to your wallet. | B |
+| `reverse_error` | Unable to complete this step. Your saved conversion resumes after Veylor checks both chains. A payment is never repeated because a request timed out. | B |
 | `reverse_error_unconfirmed` | The market maker's ZEC isn't confirmed yet. Try again in a few minutes. | |
 | `reverse_error_too_late` | It's too late for this step, so the conversion ends by itself. Anything you paid comes back. | |
 | `reverse_error_rescue` | Couldn't recover the refund. Try again in a moment. | |
@@ -2519,7 +2519,7 @@ Flags:
 | `private_usd_send_review_receives` / `_to` | They receive / To | |
 | N `send_error_fee_cap` | The network fee is above the 2 USDC limit right now, so nothing was sent. Try again later. | N (D11) |
 | `private_usd_send_proving` | Proving your transaction | |
-| `private_usd_send_proving_detail` | Your phone builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Vizor open. | F |
+| `private_usd_send_proving_detail` | Your phone builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open. | F |
 | `private_usd_send_sending` | Sending | |
 | `private_usd_send_done_title_private` / `_withdraw` | Sent / Withdrawn | |
 | `private_usd_send_done_body` | {amount} went to {address}. | |
@@ -2539,18 +2539,18 @@ Flags:
 | `private_usd_withdraw_info_note_private` | To stay private, don't withdraw the exact amount you just converted, wait a while first, and use a fresh address each time. | |
 | `private_usd_withdraw_info_note_fee` | Railgun keeps {bps}% of what you withdraw. | |
 
-**Accounts and reset** (new for vizor; §8.4 refusal)
+**Accounts and reset** (new for veylor; §8.4 refusal)
 
 | Key | Text | Flag |
 |---|---|---|
 | N `delete_unfinished_title` | Conversion in progress | N |
-| N `delete_unfinished_body` | This account has {n} unfinished private USD conversion(s). Only this account can recover their funds, so deleting it now can lose them. Keep Vizor open until they finish or are refunded. | N, F (plural) |
+| N `delete_unfinished_body` | This account has {n} unfinished private USD conversion(s). Only this account can recover their funds, so deleting it now can lose them. Keep Veylor open until they finish or are refunded. | N, F (plural) |
 | N `reset_unfinished_body` | Your wallet has {n} unfinished private USD conversion(s). Only this wallet can recover their funds, so resetting now can lose them. | N (plural) |
 | N `delete_anyway` | Delete anyway | N |
 | N `reset_anyway` | Reset anyway | N |
 | N `accounts_pending_conversions` | {n} conversion(s) in progress | N (plural; beside the swap pending count) |
 
-**Where the copy lives.** vizor keeps UI strings inline in widgets (for example `mobile_swap_review_content.dart:116`); there is no ARB. Put them in `lib/src/features/private_usd/private_usd_copy.dart` as `const` strings and builder functions, so tests and Widgetbook assert on one source (AGENTS.md: "When editing existing copy, also update widgetbook fixtures and tests"). Map `ApiPrivateUsdErrorCode` (§8.2) to these strings in one `privateUsdErrorMessage(code)` function, mirroring `pu/PrivateUsdFailure.kt`.
+**Where the copy lives.** veylor keeps UI strings inline in widgets (for example `mobile_swap_review_content.dart:116`); there is no ARB. Put them in `lib/src/features/private_usd/private_usd_copy.dart` as `const` strings and builder functions, so tests and Widgetbook assert on one source (AGENTS.md: "When editing existing copy, also update widgetbook fixtures and tests"). Map `ApiPrivateUsdErrorCode` (§8.2) to these strings in one `privateUsdErrorMessage(code)` function, mirroring `pu/PrivateUsdFailure.kt`.
 
 ### 9.7 Widgetbook fixtures and capture scenarios
 
@@ -2634,7 +2634,7 @@ Widget tests for these screens are mobile-tagged (`@Tags(['mobile'])`) and compa
 
 **Per component.**
 
-| Component | zapp-android / zecSwap source | vizor target |
+| Component | zapp-android / zecSwap source | veylor target |
 |---|---|---|
 | Swap driver, forward | `of/AtomicSwapDriver.kt`, `AtomicSwapDeposits.kt`, `AtomicSwapClaim` (in the driver), `AtomicSwapModels.kt`, `SwapChecks.kt`, `SwapTerms.kt`, `SwapWire.kt`, `SwapTypes.kt`, `ZcashTransactions.kt`; Rust reference `zc/user.rs` | `rust/src/wallet/private_usd/forward.rs`, `models.rs`, `terms.rs` |
 | Swap driver, reverse | `of/ReverseSwapDriver.kt`, `ReverseSwapModels.kt`, `ReverseSwapVerifier.kt`, `ReverseSwapRefunds.kt`, `ReverseFundingTerms.kt`, `ReverseFundingCalls.kt`, `ReverseFundingSubmission.kt`; `ua/ReverseSwapFundingImpl.kt`; Rust reference `zc/reverse.rs` | `reverse.rs` |
@@ -2720,8 +2720,8 @@ The joint UA and UFVK this build produces equal upstream's (§5.5).
 - **`zakura-address` has no `Revision`/`Uitem`.** `try_from_items(items)` takes one argument, and `decode` returns `(net, addr)`. That changes 2 sites in `joint.rs` and 1 in `sweep.rs`, and drops the ZIP 316 r1 metadata check (there is no r1 to check).
 - **`zcash_note_encryption 0.4`'s `ShieldedOutput<D, ENC_CIPHERTEXT_SIZE>`** needs a const-generic bound (`sweep.rs:207`).
 - **The test API diffs are trivial:** `finalize_io()`, `create_ironwood_proof(&pk)` and `extract()` take no RNG.
-- **vizor's matching seams:**
+- **veylor's matching seams:**
   - `FullViewingKey::from_bytes(&[u8;96])` is public (`zo/src/keys.rs:440`). It checks only that `ak` is a non-identity point with even `y`, that `nk` and `rivk` are canonical, and that `ivk ≠ 0` (`keys.rs:206-220, 440-455`).
   - `redpallas::SigningKey: TryFrom<[u8;32]>` and `randomize` are public (`zo/src/primitives/redpallas.rs:41, 53`).
-  - zakura-pczt has `SpendAuthSignature::from_parts`, `apply_orchard_spend_auth_signature` (routing to Orchard or Ironwood), `apply_ironwood_signature` and `extract_orchard_spend_auth_signatures` (`wl/librustzcash/pczt/src/roles/signer/mod.rs:48-67, 91, 405-422, 478-487`). vizor's Keystone and Ledger paths already use them (`rust/src/wallet/sync/pczt.rs:2158`; `rust/src/wallet/ledger/mod.rs:1109`; Ironwood external signatures in tests at `pczt.rs:3651`).
+  - zakura-pczt has `SpendAuthSignature::from_parts`, `apply_orchard_spend_auth_signature` (routing to Orchard or Ironwood), `apply_ironwood_signature` and `extract_orchard_spend_auth_signatures` (`wl/librustzcash/pczt/src/roles/signer/mod.rs:48-67, 91, 405-422, 478-487`). veylor's Keystone and Ledger paths already use them (`rust/src/wallet/sync/pczt.rs:2158`; `rust/src/wallet/ledger/mod.rs:1109`; Ironwood external signatures in tests at `pczt.rs:3651`).
   - Import as `AccountPurpose::Spending { derivation: None }`, never `ViewOnly`: a view-only account "will not track spend information" (`wl/librustzcash/zcash_client_backend/src/data_api.rs:618-624`). The Orchard viewing key trial-decrypts Ironwood outputs (`wl/.../zcash_client_backend/src/scanning.rs:220-262`).

@@ -134,7 +134,7 @@ that account's notes. Real voting/recovery records are not disposed with caches.
 Verified used notes are excluded from new eligibility, precomputation and all
 software/Keystone delegation preparation paths. The adapter retains the SDK's
 selection layout, witness, proof and signing algorithms. The sidecar's
-`vizor_voting_participation` table belongs to Vizor and is cleared on account
+`vizor_voting_participation` table belongs to Veylor and is cleared on account
 deletion. Existing bundle plans are never rewritten: local recovery takes
 precedence, including when a bundle was concurrently prepared.
 
