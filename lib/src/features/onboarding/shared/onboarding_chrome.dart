@@ -212,7 +212,7 @@ class OnboardingSidebarItem extends StatelessWidget {
   final OnboardingSidebarStepData step;
 
   static const _labelStyle = TextStyle(
-    fontFamily: 'Geist',
+    fontFamily: 'Gotham',
     fontWeight: FontWeight.w500,
     fontSize: 14,
     height: 16 / 14,

@@ -346,7 +346,7 @@ class _StepperButton extends StatelessWidget {
               // drops the glyph low. `even` splits the line leading equally so
               // the glyph sits dead-center in the 44px pill.
               style: TextStyle(
-                fontFamily: 'Geist',
+                fontFamily: 'Gotham',
                 fontWeight: FontWeight.w500,
                 fontSize: 24,
                 height: 1,

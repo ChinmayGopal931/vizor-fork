@@ -5,7 +5,6 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/widgetbook/screen_use_cases.dart';
@@ -13,17 +12,11 @@ import 'package:zcash_wallet/src/features/activity/widgets/activity_feed.dart';
 import 'package:zcash_wallet/src/features/payment_links/widgets/payment_link_gift_card.dart';
 import 'package:zcash_wallet/src/features/activity/activity_row_mapper.dart';
 import 'package:zcash_wallet/src/features/activity/screens/mobile/mobile_transaction_status_screen.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   setUpAll(() async {
-    final fonts = FontLoader('Geist')
-      ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-SemiBold.ttf'));
-    await fonts.load();
-    await (FontLoader(
-      'Young Serif',
-    )..addFont(rootBundle.load('assets/fonts/YoungSerif-Regular.ttf'))).load();
+    await loadGothamFonts();
   });
   testWidgets(
     'claim stages preserve identity and restore the pool after confirmation',

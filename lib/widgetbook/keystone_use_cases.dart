@@ -546,7 +546,7 @@ class _FakeKeystoneAppTile extends StatelessWidget {
           label,
           style: const TextStyle(
             color: Color(0xFFFFFFFF),
-            fontFamily: 'Geist',
+            fontFamily: 'Gotham',
             fontWeight: FontWeight.w700,
             fontSize: 13,
             height: 1,

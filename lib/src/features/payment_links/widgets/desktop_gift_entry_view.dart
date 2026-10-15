@@ -78,8 +78,11 @@ class DesktopGiftEntryView extends StatelessWidget {
                               ),
                               const SizedBox(height: AppSpacing.s),
                             ],
+                            // Figma sets both buttons 156 px wide. Gotham's
+                            // "Scan QR code" label needs 157 px, so both are
+                            // 160 px to stay equal and keep the label intact.
                             SizedBox(
-                              width: 156,
+                              width: 160,
                               child: AppButton(
                                 key: const ValueKey(
                                   'gift_desktop_paste_button',
@@ -93,7 +96,7 @@ class DesktopGiftEntryView extends StatelessWidget {
                             ),
                             const SizedBox(height: AppSpacing.s),
                             SizedBox(
-                              width: 156,
+                              width: 160,
                               child: AppButton(
                                 key: const ValueKey('gift_desktop_scan_button'),
                                 onPressed: onScan,

@@ -228,7 +228,9 @@ class _LostPasswordContent extends StatelessWidget {
   final VoidCallback onReset;
 
   static const double cardWidth = 396;
-  static const double cardHeight = 520;
+  // Figma: 520. Gotham's wider copy needs 41 px more content height, so the
+  // card is 568 px (still well inside the 720 px minimum window).
+  static const double cardHeight = 568;
   static const double _buttonGroupWidth = 348;
   static const double _destructiveButtonWidth = 232;
 

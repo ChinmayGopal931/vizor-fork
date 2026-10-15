@@ -3,8 +3,7 @@ import 'dart:async';
 import 'dart:ui' show Size, Offset, SemanticsAction, Tristate;
 
 import 'package:flutter/material.dart' show MaterialApp, TextButton;
-import 'package:flutter/services.dart'
-    show FontLoader, rootBundle, LogicalKeyboardKey;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter/widgets.dart'
     show
         BorderRadius,
@@ -27,6 +26,7 @@ import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/features/onboarding/welcome.dart';
 import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   final api = _PrivacyApi();
@@ -356,13 +356,7 @@ void main() {
 }
 
 Future<void> _loadAppFonts() async {
-  final youngSerif = FontLoader('Young Serif')
-    ..addFont(rootBundle.load('assets/fonts/YoungSerif-Regular.ttf'));
-  final geist = FontLoader('Geist')
-    ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-    ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'));
-
-  await Future.wait([youngSerif.load(), geist.load()]);
+  await loadGothamFonts();
 }
 
 Future<void> _setDesktopViewport(WidgetTester tester) async {

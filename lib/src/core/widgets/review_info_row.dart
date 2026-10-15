@@ -56,7 +56,9 @@ class ReviewInfoIconCircle extends StatelessWidget {
 /// (only the Regular weight ships, hence the explicit w400). The Figma
 /// `"case" 1` font feature is applied so digits render as lining figures —
 /// without it Young Serif falls back to oldstyle figures whose descenders
-/// visually crowd the badge row below the headline.
+/// visually crowd the badge row below the headline. The app now renders the
+/// token in Gotham (lining figures, no `case` feature), so the feature is
+/// inert and kept only to match the Figma token.
 class ReviewInfoRow extends StatelessWidget {
   const ReviewInfoRow({
     required this.label,

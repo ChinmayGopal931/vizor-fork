@@ -1,42 +1,17 @@
 import 'package:flutter/material.dart' show MaterialApp;
-import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/settings/viewing_key_copy.dart';
 import 'package:zcash_wallet/widgetbook/screen_use_cases.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   // Render with the real app fonts instead of the square-glyph test font.
-  // The test font is much wider than Geist/Young Serif, which produces
+  // The test font is much wider than Gotham, which produces
   // RenderFlex overflows that do not exist in the running app.
   setUpAll(() async {
-    final fonts = <String, List<String>>{
-      'Geist': [
-        'assets/fonts/Geist-Regular.ttf',
-        'assets/fonts/Geist-Medium.ttf',
-        'assets/fonts/Geist-SemiBold.ttf',
-        'assets/fonts/Geist-Bold.ttf',
-      ],
-      'Geist Mono': [
-        'assets/fonts/GeistMono-Regular.ttf',
-        'assets/fonts/GeistMono-Medium.ttf',
-      ],
-      'Young Serif': ['assets/fonts/YoungSerif-Regular.ttf'],
-      'Inter': [
-        'assets/fonts/Inter-Regular.ttf',
-        'assets/fonts/Inter-Medium.ttf',
-        'assets/fonts/Inter-SemiBold.ttf',
-        'assets/fonts/Inter-Bold.ttf',
-      ],
-    };
-    for (final entry in fonts.entries) {
-      final loader = FontLoader(entry.key);
-      for (final asset in entry.value) {
-        loader.addFont(rootBundle.load(asset));
-      }
-      await loader.load();
-    }
+    await loadGothamFonts();
   });
 
   testWidgets('settings main use case renders the settings header', (

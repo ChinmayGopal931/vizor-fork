@@ -256,7 +256,7 @@ class _LedgerConnectScreenState extends ConsumerState<LedgerConnectScreen> {
                 Text(
                   'Connect Ledger',
                   style: AppTypography.displayLarge.copyWith(
-                    fontFamily: 'Young Serif',
+                    fontFamily: 'Gotham',
                     fontWeight: FontWeight.w400,
                     color: context.colors.text.accent,
                   ),

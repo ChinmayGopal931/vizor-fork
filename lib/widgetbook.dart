@@ -6,6 +6,7 @@ import 'package:desktop_window_bootstrap/desktop_window_bootstrap.dart';
 import 'package:flutter/widgets.dart';
 
 import 'src/core/layout/app_layout.dart';
+import 'src/core/theme/gotham_fonts.dart';
 import 'widgetbook/widgetbook_app.dart';
 
 /// Widgetbook entry point.
@@ -23,6 +24,7 @@ import 'widgetbook/widgetbook_app.dart';
 /// opaque chrome is better for inspecting flat component previews.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await loadGothamFonts();
   await initializeDesktopWindow();
   if (isDesktopLayoutPlatform) {
     await showDesktopWindow();

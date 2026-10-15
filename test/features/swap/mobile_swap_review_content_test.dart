@@ -262,7 +262,7 @@ void main() {
       find.byKey(const ValueKey('full_address_text')),
     );
     expect(addressText.softWrap, isTrue);
-    expect(addressText.style?.fontFamily, 'Geist Mono');
+    expect(addressText.style?.fontFamily, 'Gotham');
     expect(find.text('Copy address'), findsOneWidget);
     expect(find.text('Cancel'), findsNothing);
     expect(find.bySemanticsLabel('Close'), findsOneWidget);

@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/layout/app_form_factor.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/keystone/widgets/keystone_scan_help_overlay.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 Widget _app({required bool visible}) {
   return MaterialApp(
@@ -19,11 +20,7 @@ Widget _app({required bool visible}) {
 
 void main() {
   setUpAll(() async {
-    final regular = FontLoader('Geist')
-      ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'));
-    final medium = FontLoader('Geist')
-      ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'));
-    await Future.wait([regular.load(), medium.load()]);
+    await loadGothamFonts();
   });
 
   testWidgets('anchors the Figma scan-help tooltip beside the QR', (
@@ -43,7 +40,8 @@ void main() {
     expect(tooltipRect.width, 224);
     if (kAppFormFactor == AppFormFactor.desktop) {
       // The referenced Figma tooltip uses desktop typography and is 98px tall.
-      expect(tooltipRect.height, 98);
+      // Gotham wraps its body onto one more 24px line, so it measures 122px.
+      expect(tooltipRect.height, 122);
     } else {
       expect(tooltipRect.height, greaterThanOrEqualTo(72));
     }

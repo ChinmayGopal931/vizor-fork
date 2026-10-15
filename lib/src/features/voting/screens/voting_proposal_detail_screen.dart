@@ -861,7 +861,7 @@ class _DesktopVotedPollHeader extends StatelessWidget {
     final colors = context.colors;
     final titleStyle = AppTypography.headlineMedium.copyWith(
       color: colors.text.accent,
-      fontFamily: 'Geist',
+      fontFamily: 'Gotham',
       fontWeight: FontWeight.w600,
       fontSize: 20,
       height: 30 / 20,
@@ -1397,7 +1397,7 @@ class _PollSummary extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.headlineMedium.copyWith(
                       color: colors.text.accent,
-                      fontFamily: 'Geist',
+                      fontFamily: 'Gotham',
                       fontWeight: FontWeight.w600,
                       fontSize: 20,
                       height: 30 / 20,
@@ -1414,7 +1414,7 @@ class _PollSummary extends StatelessWidget {
                     '#${formatGroupedInteger(snapshotHeight)}',
                     style: AppTypography.headlineMedium.copyWith(
                       color: colors.text.accent,
-                      fontFamily: 'Geist',
+                      fontFamily: 'Gotham',
                       fontWeight: FontWeight.w500,
                       fontSize: 20,
                       height: 30 / 20,

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/accounts/widgets/account_edit_modal.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   setUpAll(_loadAppFonts);
@@ -239,11 +239,7 @@ void main() {
 }
 
 Future<void> _loadAppFonts() async {
-  final geist = FontLoader('Geist')
-    ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-    ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'));
-
-  await geist.load();
+  await loadGothamFonts();
 }
 
 class _AccountEditModalHarness extends StatelessWidget {

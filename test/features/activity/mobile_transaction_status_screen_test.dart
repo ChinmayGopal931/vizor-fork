@@ -2,8 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'
-    show FontLoader, rootBundle, MethodChannel, SystemChannels;
+import 'package:flutter/services.dart' show MethodChannel, SystemChannels;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
@@ -29,6 +28,7 @@ import 'package:zcash_wallet/src/providers/enhance_pir_provider.dart';
 import 'package:zcash_wallet/src/providers/privacy_mode_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/rust/api/sync.dart' as rust_sync;
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 import '../../fakes/fake_enhance_pir_notifier.dart';
@@ -1563,13 +1563,7 @@ class _FakeAddressBookRepository implements AddressBookRepository {
 }
 
 Future<void> _loadAppFonts() async {
-  final youngSerif = FontLoader('Young Serif')
-    ..addFont(rootBundle.load('assets/fonts/YoungSerif-Regular.ttf'));
-  final geist = FontLoader('Geist')
-    ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-    ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'));
-
-  await Future.wait([youngSerif.load(), geist.load()]);
+  await loadGothamFonts();
 }
 
 class _FixedPrivacy extends PrivacyModeNotifier {

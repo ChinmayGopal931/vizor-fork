@@ -18,6 +18,7 @@ import 'package:zcash_wallet/src/features/payment_links/widgets/payment_link_cop
 import 'package:zcash_wallet/src/features/payment_links/widgets/payment_link_qr_share_card.dart';
 import 'package:zcash_wallet/src/features/payment_links/widgets/payment_link_gift_card.dart';
 import 'package:zcash_wallet/widgetbook/payment_link_use_cases.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   setUpAll(_loadAppFonts);
@@ -584,7 +585,9 @@ void main() {
     );
 
     final modal = find.byType(AppModalCard);
-    expect(tester.getSize(modal), const Size(312, 420));
+    // Figma: 312 x 420. Gotham wraps the help copy onto one more 21px line,
+    // which moves the Close button and its label down by the same amount.
+    expect(tester.getSize(modal), const Size(312, 441));
     final innerHighlight = find.byKey(
       const ValueKey('app_modal_inner_highlight'),
     );
@@ -603,7 +606,7 @@ void main() {
     final modalTopLeft = tester.getTopLeft(modal);
     expect(
       tester.getTopLeft(closeButtonFinder) - modalTopLeft,
-      const Offset(16, 360),
+      const Offset(16, 381),
     );
 
     final closeTextFinder = find.text('Close');
@@ -613,9 +616,9 @@ void main() {
     ).style.merge(closeText.style);
     expect(
       tester.getCenter(closeTextFinder) - modalTopLeft,
-      const Offset(156, 378),
+      const Offset(156, 399),
     );
-    expect(closeTextStyle.fontFamily, 'Geist');
+    expect(closeTextStyle.fontFamily, 'Gotham');
     expect(closeTextStyle.fontWeight, FontWeight.w500);
     expect(closeTextStyle.fontSize, 14);
     expect(closeTextStyle.height, 16 / 14);
@@ -1828,20 +1831,5 @@ Future<void> _pump(
 }
 
 Future<void> _loadAppFonts() async {
-  const fonts = <String, List<String>>{
-    'Geist': [
-      'assets/fonts/Geist-Regular.ttf',
-      'assets/fonts/Geist-Medium.ttf',
-      'assets/fonts/Geist-SemiBold.ttf',
-    ],
-    'Young Serif': ['assets/fonts/YoungSerif-Regular.ttf'],
-  };
-
-  for (final entry in fonts.entries) {
-    final loader = FontLoader(entry.key);
-    for (final asset in entry.value) {
-      loader.addFont(rootBundle.load(asset));
-    }
-    await loader.load();
-  }
+  await loadGothamFonts();
 }

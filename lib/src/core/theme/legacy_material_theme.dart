@@ -110,7 +110,7 @@ const _darkColorScheme = ColorScheme(
 // Text themes
 // ---------------------------------------------------------------------------
 
-const _bodyFamily = 'Inter';
+const _bodyFamily = 'Gotham';
 
 TextTheme _buildTextTheme(Color textColor) {
   return TextTheme(

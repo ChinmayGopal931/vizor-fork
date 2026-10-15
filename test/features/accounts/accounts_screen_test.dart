@@ -29,6 +29,7 @@ import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/app_security_provider.dart';
 import 'package:zcash_wallet/src/providers/receive_address_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 const _validDeletePassword = 'Correct123!';
 const _invalidDeletePassword = 'Wrong123!';
@@ -43,9 +44,7 @@ void main() {
       _bootstrap.initialAccountState,
       switchError: const WalletMutationBusyException(),
     );
-    await tester.pumpWidget(
-      _accountsHarness(accountNotifier: () => notifier),
-    );
+    await tester.pumpWidget(_accountsHarness(accountNotifier: () => notifier));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Shielded Savings'));
     await tester.pumpAndSettle();
@@ -61,10 +60,7 @@ void main() {
   });
 
   setUpAll(() async {
-    final geist = FontLoader('Geist')
-      ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'));
-    await geist.load();
+    await loadGothamFonts();
   });
 
   testWidgets('accounts screen renders active account and other accounts', (

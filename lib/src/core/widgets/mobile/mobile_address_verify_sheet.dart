@@ -6,7 +6,7 @@ import '../app_button.dart';
 import '../full_address_viewer.dart';
 
 /// Full-address verification sheet — identity title on top, a continuous
-/// wrapping Geist Mono address, a primary Copy address action, and header close.
+/// wrapping address, a primary Copy address action, and header close.
 Future<void> showMobileAddressVerifySheet(
   BuildContext context, {
   required String title,

@@ -21,7 +21,7 @@ void main() {
     tester,
   ) async {
     var loaded = false;
-    rootBundle.load('assets/fonts/Geist-Regular.ttf').then((bytes) {
+    rootBundle.load('assets/fonts/Gotham-Book.otf').then((bytes) {
       expect(bytes.lengthInBytes, greaterThan(0));
       loaded = true;
     });

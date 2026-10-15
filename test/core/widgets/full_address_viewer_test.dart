@@ -15,7 +15,7 @@ void main() {
     expect(fullAddressCopyText(_address).contains('\n'), isFalse);
   });
 
-  testWidgets('address text wraps the exact string in Geist Mono', (
+  testWidgets('address text wraps the exact string in the code style', (
     tester,
   ) async {
     await _pump(tester, const FullAddressText(address: _address));
@@ -25,7 +25,7 @@ void main() {
     );
     expect(text.data, _address);
     expect(text.softWrap, isTrue);
-    expect(text.style?.fontFamily, 'Geist Mono');
+    expect(text.style?.fontFamily, 'Gotham');
   });
 
   testWidgets('copy button writes the exact address without spaces', (

@@ -2595,11 +2595,11 @@ void main() {
         .dx;
     expect(headerSnapshotRight, lessThanOrEqualTo(cardRight));
     final completedTitle = tester.widget<Text>(find.text('Poll'));
-    expect(completedTitle.style?.fontFamily, 'Geist');
+    expect(completedTitle.style?.fontFamily, 'Gotham');
     expect(completedTitle.style?.fontSize, 20);
     expect(completedTitle.style?.fontWeight, FontWeight.w600);
     final completedSnapshot = tester.widget<Text>(find.text('#123'));
-    expect(completedSnapshot.style?.fontFamily, 'Geist');
+    expect(completedSnapshot.style?.fontFamily, 'Gotham');
     expect(completedSnapshot.style?.fontSize, 20);
     await tester.tap(find.text('View more'));
     await tester.pumpAndSettle();
@@ -3595,7 +3595,7 @@ void main() {
     expect(find.text('Review your answers'), findsOneWidget);
     final reviewTitle = tester.widget<Text>(find.text('Review your answers'));
     expect(reviewTitle.textAlign, TextAlign.center);
-    expect(reviewTitle.style?.fontFamily, 'Young Serif');
+    expect(reviewTitle.style?.fontFamily, 'Gotham');
     expect(reviewTitle.style?.fontSize, 32);
     expect(reviewTitle.style?.letterSpacing, 0);
     expect(find.text(longRoundDescription), findsNothing);

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
@@ -41,6 +40,7 @@ import 'package:zcash_wallet/src/providers/sync_failure.dart';
 import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/features/activity/activity_eta_provider.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 import '../../support/wallet_path_read_blocker.dart';
@@ -48,25 +48,10 @@ import '../../fakes/fake_zec_market_data_cache.dart';
 
 void main() {
   // Render with the real app fonts instead of the square-glyph test font.
-  // The test font is much wider than Geist/Young Serif, which overflows the
+  // The test font is much wider than Gotham, which overflows the
   // balance row in ways the running app does not.
   setUpAll(() async {
-    final fonts = <String, List<String>>{
-      'Geist': [
-        'assets/fonts/Geist-Regular.ttf',
-        'assets/fonts/Geist-Medium.ttf',
-        'assets/fonts/Geist-SemiBold.ttf',
-        'assets/fonts/Geist-Bold.ttf',
-      ],
-      'Young Serif': ['assets/fonts/YoungSerif-Regular.ttf'],
-    };
-    for (final entry in fonts.entries) {
-      final loader = FontLoader(entry.key);
-      for (final asset in entry.value) {
-        loader.addFont(rootBundle.load(asset));
-      }
-      await loader.load();
-    }
+    await loadGothamFonts();
   });
   testWidgets(
     'home privacy mode masks desktop balance without duplicate ticker',

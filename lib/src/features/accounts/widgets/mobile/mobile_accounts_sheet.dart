@@ -38,7 +38,7 @@ class MobileAccountsSheet extends ConsumerStatefulWidget {
 }
 
 const _accountsSheetLabelMStyle = TextStyle(
-  fontFamily: 'Geist',
+  fontFamily: 'Gotham',
   fontWeight: FontWeight.w500,
   fontSize: 14,
   height: 16 / 14,
@@ -46,7 +46,7 @@ const _accountsSheetLabelMStyle = TextStyle(
 );
 
 const _accountsSheetCurrentNameStyle = TextStyle(
-  fontFamily: 'Geist',
+  fontFamily: 'Gotham',
   fontWeight: FontWeight.w500,
   fontSize: 16,
   height: 20 / 16,

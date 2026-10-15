@@ -534,7 +534,7 @@ class _IronwoodMigrationAnnouncementHostState
 }
 
 const _mobileHomeLabelMStyle = TextStyle(
-  fontFamily: 'Geist',
+  fontFamily: 'Gotham',
   fontWeight: FontWeight.w400,
   fontSize: 14,
   height: 16 / 14,
@@ -542,7 +542,7 @@ const _mobileHomeLabelMStyle = TextStyle(
 );
 
 const _mobileHomeBalanceAmountStyle = TextStyle(
-  fontFamily: 'Young Serif',
+  fontFamily: 'Gotham',
   fontWeight: FontWeight.w400,
   fontSize: 45,
   height: 48 / 45,
@@ -551,7 +551,7 @@ const _mobileHomeBalanceAmountStyle = TextStyle(
 );
 
 const _mobileHomeBalanceTickerStyle = TextStyle(
-  fontFamily: 'Young Serif',
+  fontFamily: 'Gotham',
   fontWeight: FontWeight.w400,
   fontSize: 32,
   height: 33 / 32,
@@ -2413,7 +2413,7 @@ class _ImportingView extends StatelessWidget {
       kMobileTabBarHeight + AppSpacing.sm + AppSpacing.sm + AppSpacing.s;
 
   static const _titleStyle = TextStyle(
-    fontFamily: 'Young Serif',
+    fontFamily: 'Gotham',
     fontWeight: FontWeight.w400,
     fontSize: 24,
     height: 28 / 24,

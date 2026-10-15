@@ -162,7 +162,11 @@ void _expectFloatingInfoSheet(WidgetTester tester) {
   // and the actual app font must fit every explainer without truncation.
   final text = find.descendant(of: sheet, matching: find.byType(Text));
   for (final paragraph in tester.renderObjectList<RenderParagraph>(text)) {
-    expect(paragraph.didExceedMaxLines, isFalse);
+    expect(
+      paragraph.didExceedMaxLines,
+      isFalse,
+      reason: 'truncated: ${paragraph.text.toPlainText()}',
+    );
   }
 }
 

@@ -414,7 +414,7 @@ class _ResultsHeader extends StatelessWidget {
     );
     final titleStyle = AppTypography.headlineMedium.copyWith(
       color: colors.text.accent,
-      fontFamily: 'Geist',
+      fontFamily: 'Gotham',
       fontWeight: FontWeight.w600,
       fontSize: 20,
       height: 30 / 20,

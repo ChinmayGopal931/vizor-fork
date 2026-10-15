@@ -117,20 +117,20 @@ void main() {
   test('desktop font tokens preserve redesign serif typography', () {
     const caseFigures = [FontFeature.enable('case')];
 
-    expect(AppTypographyDesktop.displayMedium.fontFamily, 'Young Serif');
+    expect(AppTypographyDesktop.displayMedium.fontFamily, 'Gotham');
     expect(AppTypographyDesktop.displayMedium.fontWeight, FontWeight.w400);
     expect(AppTypographyDesktop.displayMedium.fontFeatures, caseFigures);
     expect(AppTypographyDesktop.displayMedium.fontSize, 45);
     expect(AppTypographyDesktop.displayMedium.height, 48 / 45);
     expect(AppTypographyDesktop.displayMedium.letterSpacing, -1.35);
 
-    expect(AppTypographyDesktop.headlineLarge.fontFamily, 'Young Serif');
+    expect(AppTypographyDesktop.headlineLarge.fontFamily, 'Gotham');
     expect(AppTypographyDesktop.headlineLarge.fontWeight, FontWeight.w400);
     expect(AppTypographyDesktop.headlineLarge.fontFeatures, caseFigures);
     expect(AppTypographyDesktop.headlineLarge.fontSize, 32);
     expect(AppTypographyDesktop.headlineLarge.height, 33 / 32);
 
-    expect(AppTypographyDesktop.headlineMedium.fontFamily, 'Young Serif');
+    expect(AppTypographyDesktop.headlineMedium.fontFamily, 'Gotham');
     expect(AppTypographyDesktop.headlineMedium.fontWeight, FontWeight.w400);
     expect(AppTypographyDesktop.headlineMedium.fontFeatures, caseFigures);
     expect(AppTypographyDesktop.headlineMedium.fontSize, 28);
@@ -154,18 +154,18 @@ void main() {
     expect(AppTypographyDesktop.labelLarge.fontSize, 14);
     expect(AppTypographyDesktop.labelLarge.height, 16 / 14);
 
-    expect(AppTypographyDesktop.labelMedium.fontFamily, 'Geist');
+    expect(AppTypographyDesktop.labelMedium.fontFamily, 'Gotham');
     expect(AppTypographyDesktop.labelMedium.fontWeight, FontWeight.w500);
     expect(AppTypographyDesktop.labelMedium.fontSize, 13);
     expect(AppTypographyDesktop.labelMedium.height, 14 / 13);
     expect(AppTypographyDesktop.labelMedium.letterSpacing, 0);
 
-    expect(AppTypographyDesktop.labelSmall.fontFamily, 'Geist');
+    expect(AppTypographyDesktop.labelSmall.fontFamily, 'Gotham');
     expect(AppTypographyDesktop.labelSmall.fontWeight, FontWeight.w500);
     expect(AppTypographyDesktop.labelSmall.fontSize, 13);
     expect(AppTypographyDesktop.labelSmall.height, 14 / 13);
 
-    expect(AppTypographyDesktop.codeSmall.fontFamily, 'Geist Mono');
+    expect(AppTypographyDesktop.codeSmall.fontFamily, 'Gotham');
     expect(AppTypographyDesktop.codeSmall.fontWeight, FontWeight.w500);
     expect(AppTypographyDesktop.codeSmall.fontSize, 13);
     expect(AppTypographyDesktop.codeSmall.height, 17 / 13);
@@ -175,7 +175,7 @@ void main() {
     // The current variable export updates mobile body/label/code metrics,
     // but actual mobile app frames still render display headlines with
     // Young Serif. Keep that intentional app-level screen behavior pinned.
-    expect(AppTypographyMobile.displayLarge.fontFamily, 'Young Serif');
+    expect(AppTypographyMobile.displayLarge.fontFamily, 'Gotham');
     expect(AppTypographyMobile.displayLarge.fontWeight, FontWeight.w400);
     expect(AppTypographyMobile.displayLarge.fontSize, 40);
     expect(AppTypographyMobile.displayLarge.height, 40 / 40);
@@ -185,25 +185,16 @@ void main() {
     expect(AppTypographyMobile.headlineLarge.fontFeatures, lining);
     expect(AppTypographyMobile.headlineMedium.fontFeatures, lining);
 
-    expect(AppTypographyMobile.headlineLarge.fontFamily, 'Young Serif');
-    expect(
-      AppTypographyMobile.headlineLarge.fontSize,
-      AppTypographyDesktop.headlineLarge.fontSize,
-    );
-    expect(
-      AppTypographyMobile.headlineLarge.height,
-      AppTypographyDesktop.headlineLarge.height,
-    );
-    expect(AppTypographyMobile.headlineMedium.fontFamily, 'Young Serif');
-    expect(
-      AppTypographyMobile.headlineMedium.fontSize,
-      AppTypographyDesktop.headlineMedium.fontSize,
-    );
-    expect(
-      AppTypographyMobile.headlineMedium.height,
-      AppTypographyDesktop.headlineMedium.height,
-    );
-    expect(AppTypographyMobile.headlineMedium.letterSpacing, -0.28);
+    // Gotham is 21% wider than Young Serif, so the mobile serif headlines are
+    // set 4 px below Figma (32 / 28 px) with the Figma line boxes (33 / 30 px).
+    // Desktop keeps the Figma sizes. See `_headlineLMobile`.
+    expect(AppTypographyMobile.headlineLarge.fontFamily, 'Gotham');
+    expect(AppTypographyMobile.headlineLarge.fontSize, 28);
+    expect(AppTypographyMobile.headlineLarge.height, 33 / 28);
+    expect(AppTypographyMobile.headlineMedium.fontFamily, 'Gotham');
+    expect(AppTypographyMobile.headlineMedium.fontSize, 24);
+    expect(AppTypographyMobile.headlineMedium.height, 30 / 24);
+    expect(AppTypographyMobile.headlineMedium.letterSpacing, -0.24);
 
     // Code S is mode-invariant; Code M scales up on mobile.
     expect(AppTypographyMobile.codeMedium.fontSize, 16);

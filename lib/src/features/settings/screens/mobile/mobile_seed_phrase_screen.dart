@@ -1184,7 +1184,7 @@ class _MobileSeedScreenshotWarningSheetState
   );
 
   static const _titleStyle = TextStyle(
-    fontFamily: 'Young Serif',
+    fontFamily: 'Gotham',
     fontWeight: FontWeight.w500,
     fontSize: 24,
     height: 28 / 24,

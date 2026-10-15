@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart' show MaterialApp;
-import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/layout/app_desktop_shell.dart';
@@ -14,6 +13,7 @@ import 'package:zcash_wallet/src/features/swap/models/swap_activity_status_mappe
 import 'package:zcash_wallet/src/features/swap/widgets/pay_activity_status_content.dart';
 import 'package:zcash_wallet/src/features/swap/widgets/swap_asset_selector_modal.dart';
 import 'package:zcash_wallet/widgetbook/pay_use_cases.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   setUpAll(_loadAppFonts);
@@ -189,25 +189,7 @@ void _expectPayStatusDetails() {
 }
 
 Future<void> _loadAppFonts() async {
-  final fonts = <String, List<String>>{
-    'Geist': [
-      'assets/fonts/Geist-Regular.ttf',
-      'assets/fonts/Geist-Medium.ttf',
-      'assets/fonts/Geist-SemiBold.ttf',
-    ],
-    'Geist Mono': [
-      'assets/fonts/GeistMono-Regular.ttf',
-      'assets/fonts/GeistMono-Medium.ttf',
-    ],
-    'Young Serif': ['assets/fonts/YoungSerif-Regular.ttf'],
-  };
-  for (final entry in fonts.entries) {
-    final loader = FontLoader(entry.key);
-    for (final asset in entry.value) {
-      loader.addFont(rootBundle.load(asset));
-    }
-    await loader.load();
-  }
+  await loadGothamFonts();
 }
 
 Future<void> _pumpPayUseCase(WidgetTester tester, WidgetBuilder builder) async {

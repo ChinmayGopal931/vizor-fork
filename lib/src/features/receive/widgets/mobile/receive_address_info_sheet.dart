@@ -31,7 +31,10 @@ class ReceiveAddressInfoSheet extends StatelessWidget {
     final colors = context.colors;
     final items = receiveAddressInfoItems(type, touchUi: true);
     final isShielded = type == ReceiveAddressType.shielded;
-    final itemMaxLines = isShielded ? const [3, 3, 3] : const [2, 4, 5, 4];
+    // Figma sizes these for Geist (3/3/3 and 2/4/5/4 lines). Gotham is 9%
+    // wider, so each explainer may need one more line; the sheet grows to
+    // fit instead of ellipsizing the copy.
+    final itemMaxLines = isShielded ? const [4, 4, 4] : const [3, 5, 6, 5];
 
     return Stack(
       children: [
@@ -48,8 +51,11 @@ class ReceiveAddressInfoSheet extends StatelessWidget {
             children: [
               Align(
                 alignment: Alignment.centerLeft,
+                // Figma: 184 px. Gotham's "Strong privacy by default." needs 202
+                // px and "Transparent address" 183 px, so the slot is 216 px;
+                // the close button still sits well clear of it.
                 child: SizedBox(
-                  width: 184,
+                  width: 216,
                   height: 51,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

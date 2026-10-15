@@ -21,7 +21,7 @@ class MobileSwapTimeoutContent extends StatelessWidget {
   static const _buttonMinWidth = 96.0;
 
   static const _headlineStyle = TextStyle(
-    fontFamily: 'Young Serif',
+    fontFamily: 'Gotham',
     fontWeight: FontWeight.w400,
     fontSize: 24,
     height: 28 / 24,

@@ -17,14 +17,23 @@ const _activityFeedActivationShortcuts = <ShortcutActivator, Intent>{
 /// amount/timestamp).
 const _activityRowInnerLineGap = AppSpacing.xxs;
 
+/// Label of a row's title, subtitle, amount and timestamp. Desktop uses the
+/// 14px label. Mobile bumps to the 16px label less one point: Gotham is 8%
+/// wider than Geist, and at 16px a title such as "Redeemed a gift card" was
+/// ellipsized in the 159 px slot beside the timestamp column. The 17px line
+/// box is unchanged.
+final _activityRowLabelStyle = kAppFormFactor == AppFormFactor.mobile
+    ? AppTypography.labelLarge.copyWith(fontSize: 15, height: 17 / 15)
+    : AppTypography.labelLarge;
+
 /// Subtitle line (Shielded / Transparent). Desktop keeps main's 14px
-/// label; mobile bumps to the 16px label.
-const _activityRowSubtitleStyle = AppTypography.labelLarge;
+/// label; mobile bumps to the 15px row label.
+final _activityRowSubtitleStyle = _activityRowLabelStyle;
 
 /// Supporting amount line (timestamp / status). Desktop keeps main's 13px
-/// label; mobile bumps to the 16px label.
-const _activitySupportingStyle = kAppFormFactor == AppFormFactor.mobile
-    ? AppTypography.labelLarge
+/// label; mobile bumps to the 15px row label.
+final _activitySupportingStyle = kAppFormFactor == AppFormFactor.mobile
+    ? _activityRowLabelStyle
     : AppTypography.labelSmall;
 
 /// Sub-line leading icon (the shielded / transparent badge).
@@ -909,7 +918,7 @@ class _ActivityRowTitle extends StatelessWidget {
           row.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
+          style: _activityRowLabelStyle.copyWith(color: colors.text.accent),
         ),
         if (row.subtitle != null) ...[
           // Mobile-only extra gap; desktop keeps subtitle flush as on main.
@@ -1030,7 +1039,7 @@ class _ActivityAmountValue extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.end,
-      style: AppTypography.labelLarge.copyWith(
+      style: _activityRowLabelStyle.copyWith(
         color: color,
         fontWeight: FontWeight.w600,
       ),

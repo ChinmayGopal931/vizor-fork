@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -207,9 +206,6 @@ void main() {
     final accountNotifier = _OnboardingAccountNotifier();
     final operations = _WalletlessGiftOperations();
     await loadPaymentLinksTestFonts();
-    await (FontLoader(
-      'YoungSerif',
-    )..addFont(rootBundle.load('assets/fonts/YoungSerif-Regular.ttf'))).load();
     await tester.binding.setSurfaceSize(const Size(1280, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 

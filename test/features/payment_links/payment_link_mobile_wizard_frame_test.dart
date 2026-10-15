@@ -8,6 +8,7 @@ import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/payment_links/widgets/payment_link_card_selector_rail.dart';
 import 'package:zcash_wallet/src/features/payment_links/widgets/payment_link_gift_card.dart';
 import 'package:zcash_wallet/src/features/payment_links/widgets/mobile/payment_link_mobile_views.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 // An iPhone SE class viewport: the shortest phone the wizard has to stay
 // usable on once the software keyboard takes its share of the body.
@@ -276,20 +277,5 @@ Future<void> _pumpAmountStep(
 }
 
 Future<void> _loadAppFonts() async {
-  const fonts = <String, List<String>>{
-    'Geist': [
-      'assets/fonts/Geist-Regular.ttf',
-      'assets/fonts/Geist-Medium.ttf',
-      'assets/fonts/Geist-SemiBold.ttf',
-    ],
-    'Young Serif': ['assets/fonts/YoungSerif-Regular.ttf'],
-  };
-
-  for (final entry in fonts.entries) {
-    final loader = FontLoader(entry.key);
-    for (final asset in entry.value) {
-      loader.addFont(rootBundle.load(asset));
-    }
-    await loader.load();
-  }
+  await loadGothamFonts();
 }

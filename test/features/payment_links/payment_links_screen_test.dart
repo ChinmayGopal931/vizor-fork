@@ -1056,7 +1056,8 @@ void main() {
     );
 
     final modalRect = tester.getRect(find.byType(AppModalCard));
-    expect(modalRect.size, const Size(312, 420));
+    // Figma: 312 x 420. Gotham wraps the help copy onto one more 21px line.
+    expect(modalRect.size, const Size(312, 441));
     final closeRect = tester.getRect(
       find.byKey(const ValueKey('payment_link_help_close_button')),
     );

@@ -4,8 +4,10 @@ import 'app_typography.dart';
 
 /// Figma serif display style: YoungSerif-Regular 32/33 with the OpenType
 /// 'case' feature, which swaps Young Serif's default old-style figures for
-/// uniform lining digits. Shared by the review-info amounts, the swap
-/// composer amounts, and serif page titles.
+/// uniform lining digits. The app renders it in Gotham, whose figures are
+/// lining already and which has no 'case' feature, so the feature is inert.
+/// Shared by the review-info amounts, the swap composer amounts, and serif
+/// page titles.
 ///
 /// [AppTypography.displaySmall] carries the full serif spec since the
 /// Young Serif token migration; this helper remains as the colored

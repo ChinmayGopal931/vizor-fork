@@ -61,7 +61,7 @@ const _kImportManualCardColumns = 3;
 const _kImportManualWordLineHeight = 24.0;
 const _kImportManualWordIndexWidth = 24.0;
 const _kImportManualWordIndexStyle = TextStyle(
-  fontFamily: 'Geist Mono',
+  fontFamily: 'Gotham',
   fontWeight: FontWeight.w500,
   fontSize: 15,
   height: 21 / 15,

@@ -11,6 +11,7 @@ import 'figma_compare/figma_compare_app.dart';
 import 'figma_compare/figma_compare_capture.dart';
 import 'figma_compare/figma_compare_configuration.dart';
 import 'src/core/layout/app_layout.dart';
+import 'src/core/theme/gotham_fonts.dart';
 
 const _settleDelayMs = int.fromEnvironment(
   'FIGMA_COMPARE_SETTLE_MS',
@@ -24,6 +25,7 @@ const _startMinimized = bool.fromEnvironment('FIGMA_COMPARE_START_MINIMIZED');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await loadGothamFonts();
 
   final configuration = FigmaCompareConfiguration.fromEnvironment();
   final scenario = configuration.resolveScenario(kAppFormFactor);

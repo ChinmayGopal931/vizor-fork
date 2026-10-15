@@ -32,6 +32,7 @@ import 'src/core/motion/onboarding_motion.dart';
 import 'src/core/security/background_auto_lock_host.dart';
 import 'src/core/theme/app_theme.dart';
 import 'src/core/theme/app_theme_host.dart';
+import 'src/core/theme/gotham_fonts.dart';
 import 'src/core/theme/legacy_material_theme.dart';
 import 'src/core/widgets/mobile/mobile_numeric_keyboard_toolbar.dart';
 import 'src/core/widgets/mobile/private_usd_engine_host.dart';
@@ -206,8 +207,19 @@ void _startVotingObservabilityLogging() {
       );
 }
 
+/// Registers Gotham before the first frame. A missing or unreadable font
+/// falls back to the platform face instead of keeping a wallet from opening.
+Future<void> _registerAppFonts() async {
+  try {
+    await loadGothamFonts();
+  } catch (error) {
+    log('runtime: Gotham unavailable, using the platform font: $error');
+  }
+}
+
 Future<void> initializeZcashWalletRuntime() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await _registerAppFonts();
   await SecureStorageDiagnostics.instance.initialize();
   log('runtime: initializing RustLib');
   await RustLib.init();

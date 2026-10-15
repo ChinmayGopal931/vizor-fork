@@ -1356,6 +1356,17 @@ delivers E1, E2 and E4 (progress B-6).
   Mobile-UI tests:
   `fvm flutter test --tags mobile --run-skipped --dart-define=VIZOR_FORM_FACTOR=mobile`.
   Lane rules in "Design Token Form Factor" above.
+- Fonts: Gotham is the app's only family. It is a plain asset (`assets/fonts/`),
+  not a pubspec `fonts:` family: Flutter takes a face's weight from the font
+  file, and these files' OS/2 weight classes are off the CSS scale, so
+  `FontWeight.w400` would resolve to the Bold file. `loadGothamFonts()`
+  (`lib/src/core/theme/gotham_fonts.dart`) rewrites the weights in memory and
+  registers the family; `initializeZcashWalletRuntime`, Widgetbook and the
+  Figma-compare entry points call it. A widget test that needs real glyphs
+  instead of the square test font calls `loadGothamFonts()` too, never a
+  hand-rolled `FontLoader` over the `Gotham-*.otf` files. Gotham has no
+  SemiBold (`w600` resolves to Bold) and no monospace face. The mobile serif
+  headline tokens are set below the Figma sizes for it (see `_headlineLMobile`).
 - Integration tests: `fvm flutter test integration_test/` (requires device/simulator)
 - Flutter regtest E2E notes:
   - Run app tests with `--dart-define=ZCASH_DEFAULT_NETWORK=regtest`; do not use the old `ZCASH_USE_E2E_STORAGE` path. Secure storage and wallet DB names are network-scoped.

@@ -21,6 +21,7 @@ import 'package:zcash_wallet/src/providers/biometric_unlock_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_keep_awake_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/services/biometric_unlock.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 
@@ -89,11 +90,7 @@ const _fingerprintBiometricState = BiometricUnlockState(
 
 void main() {
   setUpAll(() async {
-    final loader = FontLoader('Geist')
-      ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-SemiBold.ttf'));
-    await loader.load();
+    await loadGothamFonts();
   });
 
   testWidgets(

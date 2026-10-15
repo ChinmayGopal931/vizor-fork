@@ -36,6 +36,7 @@ import 'package:zcash_wallet/src/providers/privacy_mode_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
 import 'package:zcash_wallet/src/rust/frb_generated.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 import '../fakes/fake_gift_link_rust_api.dart';
 import '../fakes/fake_sync_notifier.dart';
@@ -44,14 +45,7 @@ import '../fakes/fake_zec_market_data_cache.dart';
 /// Harness shared by the desktop and mobile Gift Card screen suites, which are
 /// separate files because only the mobile one runs in the mobile token lane.
 Future<void> loadPaymentLinksTestFonts() async {
-  final loader = FontLoader('Geist')
-    ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-    ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'))
-    ..addFont(rootBundle.load('assets/fonts/Geist-SemiBold.ttf'));
-  await loader.load();
-  final displayLoader = FontLoader('Young Serif')
-    ..addFont(rootBundle.load('assets/fonts/YoungSerif-Regular.ttf'));
-  await displayLoader.load();
+  await loadGothamFonts();
 }
 
 Future<void> pumpPaymentLinksScreen(

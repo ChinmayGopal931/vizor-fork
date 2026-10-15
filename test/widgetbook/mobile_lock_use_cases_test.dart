@@ -5,7 +5,7 @@ import 'dart:ui' as ui;
 import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_sheet.dart';
 
 import 'package:flutter/material.dart' show Icons, MaterialApp;
-import 'package:flutter/services.dart' show FontLoader, rootBundle;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +20,7 @@ import 'package:zcash_wallet/src/features/onboarding/shared/onboarding_auth_shel
 import 'package:zcash_wallet/src/features/payment_links/services/payment_link_received_store.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/widgetbook/screen_use_cases.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   setUpAll(_loadAppFonts);
@@ -522,11 +523,5 @@ Future<void> _pumpMobileLockUseCase(
 }
 
 Future<void> _loadAppFonts() async {
-  final geist = FontLoader('Geist')
-    ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-    ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'));
-  final youngSerif = FontLoader('Young Serif')
-    ..addFont(rootBundle.load('assets/fonts/YoungSerif-Regular.ttf'));
-
-  await Future.wait([geist.load(), youngSerif.load()]);
+  await loadGothamFonts();
 }

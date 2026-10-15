@@ -779,21 +779,21 @@ class MobileAccountRemovalSheet extends StatelessWidget {
   final int privateUsdUnfinishedCount;
 
   static const _titleStyle = TextStyle(
-    fontFamily: 'Geist',
+    fontFamily: 'Gotham',
     fontWeight: FontWeight.w600,
     fontSize: 16,
     height: 24 / 16,
     letterSpacing: -0.24,
   );
   static const _bodyStyle = TextStyle(
-    fontFamily: 'Geist',
+    fontFamily: 'Gotham',
     fontWeight: FontWeight.w400,
     fontSize: 14,
     height: 21 / 14,
     letterSpacing: -0.21,
   );
   static const _buttonLabelStyle = TextStyle(
-    fontFamily: 'Geist',
+    fontFamily: 'Gotham',
     fontWeight: FontWeight.w500,
     fontSize: 14,
     height: 16 / 14,
@@ -871,9 +871,7 @@ class MobileAccountRemovalSheet extends StatelessWidget {
               const SizedBox(height: AppSpacing.s),
               Text(
                 PrivateUsdCopy.deleteUnfinishedTitle,
-                key: const ValueKey(
-                  'mobile_account_remove_private_usd_title',
-                ),
+                key: const ValueKey('mobile_account_remove_private_usd_title'),
                 style: _bodyStyle.copyWith(
                   color: colors.text.destructive,
                   fontWeight: FontWeight.w600,

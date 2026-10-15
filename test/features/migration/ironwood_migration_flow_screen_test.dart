@@ -28,25 +28,11 @@ import 'package:zcash_wallet/src/features/ledger/services/ledger_signing_service
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/rust/api/sync.dart' as rust_sync;
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   setUpAll(() async {
-    const fonts = <String, List<String>>{
-      'Geist': [
-        'assets/fonts/Geist-Regular.ttf',
-        'assets/fonts/Geist-Medium.ttf',
-        'assets/fonts/Geist-SemiBold.ttf',
-        'assets/fonts/Geist-Bold.ttf',
-      ],
-      'Young Serif': ['assets/fonts/YoungSerif-Regular.ttf'],
-    };
-    for (final entry in fonts.entries) {
-      final loader = FontLoader(entry.key);
-      for (final asset in entry.value) {
-        loader.addFont(rootBundle.load(asset));
-      }
-      await loader.load();
-    }
+    await loadGothamFonts();
   });
 
   setUp(() {

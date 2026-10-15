@@ -2,7 +2,6 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_shell.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_sheet.dart';
@@ -10,14 +9,11 @@ import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_tab_bar.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_top_nav.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   setUpAll(() async {
-    final loader = FontLoader('Geist')
-      ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-SemiBold.ttf'));
-    await loader.load();
+    await loadGothamFonts();
   });
 
   testWidgets('Checking label fits the mobile top nav at 320 pixels', (

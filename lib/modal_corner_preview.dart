@@ -8,12 +8,14 @@ import 'package:flutter/material.dart';
 import 'src/core/layout/app_form_factor.dart';
 import 'src/core/layout/mobile/app_mobile_sheet.dart';
 import 'src/core/theme/app_theme.dart';
+import 'src/core/theme/gotham_fonts.dart';
 import 'src/core/theme/legacy_material_theme.dart';
 import 'src/core/widgets/app_button.dart';
 import 'src/services/native_modal_corners.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await loadGothamFonts();
   assert(kAppFormFactor == AppFormFactor.mobile);
   runApp(const _Preview());
 }

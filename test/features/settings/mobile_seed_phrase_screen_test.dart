@@ -829,7 +829,7 @@ void main() {
     expect(title.data, 'Don’t take screenshots of your Secret Passphrase');
     expect(title.maxLines, isNull);
     expect(title.overflow, isNull);
-    expect(title.style?.fontFamily, 'Young Serif');
+    expect(title.style?.fontFamily, 'Gotham');
     expect(title.style?.fontSize, 24);
     expect(title.style?.height, 28 / 24);
     expect(title.style?.fontWeight, FontWeight.w500);
