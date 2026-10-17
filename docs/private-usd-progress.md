@@ -16,6 +16,12 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     new offline bridge (it refuses every connection, so no Tor wait) and
     calls `deleteWallet`. Best effort: a failure leaves the wallet until a
     reset, as before. Not yet run on the A35.
+  - **A first sync keeps the screen on (iOS VI-14 resolved as (a), on both
+    platforms; VI-18).** While a Railgun wallet's first sync runs (a wallet
+    that never completed one), the app is in the foreground and unlocked,
+    the screen stays on through the same native flag as a conversion's
+    progress (X8). It lets go when the sync completes or fails, in the
+    background, and on lock. Not yet run on the A35.
 - **Handoff (2026-10-16): start here.**
   - **State.** `feature/private-usd-android` is pushed to `origin` (the
     owner's fork) with everything below, the Gotham files included: the owner

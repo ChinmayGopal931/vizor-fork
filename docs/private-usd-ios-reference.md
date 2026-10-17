@@ -327,7 +327,7 @@ Unchanged from A-ref §8.4: the lock, the background, an account switch, a delet
 
 ### 8.5 Keep-awake
 
-`NativeScreenAwakeBridge` (`lib/src/services/native_screen_awake.dart`; channel `com.zcash.wallet/screen_awake`, method `setEnabled`) already sets `UIApplication.shared.isIdleTimerDisabled` on iOS (`AppDelegate.swift:560-584`). Private USD's keep-awake (A-plan X8) works unchanged through `SyncKeepAwakeNativeHost`, combined with sync keep-awake (`sync_keep_awake_native_host.dart:69-70`).
+`NativeScreenAwakeBridge` (`lib/src/services/native_screen_awake.dart`; channel `com.zcash.wallet/screen_awake`, method `setEnabled`) already sets `UIApplication.shared.isIdleTimerDisabled` on iOS (`AppDelegate.swift:560-584`). Private USD's keep-awake (A-plan X8) works unchanged through `SyncKeepAwakeNativeHost`, combined with sync keep-awake (`sync_keep_awake_native_host.dart:69-70`). Since progress VI-18 it also holds through a Railgun first sync while the wallet is unlocked (`privateUsdFirstSyncKeepAwakeProvider`), on both platforms.
 
 ### 8.6 App Attest (MI7)
 

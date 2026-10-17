@@ -1341,6 +1341,10 @@ Code:
 - Background cancels the Rust step and stops polling, but leaves the
   Railgun page open.
 - Lock cancels the step, closes the page and drops Dart-held secrets.
+- Screen-off means background, so the screen stays on while a
+  conversion's progress shows with a key step to come, and through a
+  Railgun first sync while unlocked (`privateUsdKeepAwakeProvider`, through
+  `SyncKeepAwakeNativeHost`'s one native flag, foreground only).
 - While unlocked, the engine (`PrivateUsdEngineHost` in `lib/app.dart`)
   advances the conversions of every software account, not only the active
   one (D14).

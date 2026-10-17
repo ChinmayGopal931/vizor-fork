@@ -463,7 +463,7 @@ Every milestone also follows these rules:
 
 **Traps.**
 
-- **A first mainnet sync takes about 40 minutes** (A-ref §6.3), with the app in front and the screen on. The existing keep-awake (`com.zcash.wallet/screen_awake`, `AppDelegate.swift:560-584`) covers the key-using steps; extend it to a first sync, as on Android (A-plan U21). **Not done (VI-14):** Android has no first-sync keep-awake (`privateUsdKeepAwakeProvider` covers conversion progress only), and the shared Dart would change Android too; it is the owner's call.
+- **A first mainnet sync takes about 40 minutes** (A-ref §6.3), with the app in front and the screen on. The existing keep-awake (`com.zcash.wallet/screen_awake`, `AppDelegate.swift:560-584`) covers the key-using steps; extend it to a first sync, as on Android (A-plan U21). **Not done (VI-14):** Android has no first-sync keep-awake (`privateUsdKeepAwakeProvider` covers conversion progress only), and the shared Dart would change Android too; it is the owner's call. **Done (progress VI-18, owner 2026-10-17):** `privateUsdKeepAwakeProvider` also holds through a first sync while the app is unlocked and in the foreground, on both platforms.
 - **`inactive` is not the background** (XI8). Trigger Face ID and pull down the notification shade in the middle of a sync.
 - **The simulator shares the Mac's network.** Its socket checks say nothing about the iPhone's radios; the device round is the evidence.
 

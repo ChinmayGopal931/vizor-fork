@@ -14,6 +14,7 @@ import '../services/railgun_engine.dart';
 import '../services/railgun_engine_key_store.dart';
 import '../models/private_usd_record_key.dart';
 import 'private_usd_available_provider.dart';
+import 'private_usd_keep_awake_provider.dart';
 import 'private_usd_unfinished_provider.dart';
 import 'railgun_engine_provider.dart';
 
@@ -92,6 +93,9 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
   Future<void>? _refreshing;
   RailgunSync? _shown;
 
+  // The first sync this notifier started, while it runs (VI-18).
+  PrivateUsdFirstSync? _runningFirstSync;
+
   @override
   PrivateUsdBalanceState build() {
     _now = ref.watch(privateUsdBalanceClockProvider);
@@ -158,15 +162,22 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       !ref.read(privateUsdLifecycleProvider).isQuiesced;
 
   Future<void> _refreshNow() async {
+    // With nothing shown yet, this may be the wallet's first sync, which
+    // keeps the screen on until it completes or fails (VI-18), even past
+    // this notifier: the page goes on syncing.
+    final firstSync = state.balances == null
+        ? ref.read(privateUsdFirstSyncsProvider.notifier).begin(accountUuid)
+        : null;
+    _runningFirstSync = firstSync;
     state = state.copyWith(isRefreshing: true, refreshFailed: false);
-    // With nothing shown yet, this may be the wallet's first sync.
-    final timeout = state.balances == null
+    final timeout = firstSync != null
         ? PrivateUsdBalanceTiming.firstSyncTimeout
         : PrivateUsdBalanceTiming.refreshTimeout;
     final sync = ref.read(railgunEngineProvider).sync(accountUuid);
     try {
       _shownIfMounted(await sync.timeout(timeout));
     } on TimeoutException {
+      firstSync?.end();
       _failed();
       // The page keeps at it; a late result still shows, and no other
       // refresh starts meanwhile.
@@ -185,6 +196,8 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
         debugPrint('privateUsd: refresh failed (${error.runtimeType})');
       }
       _failed();
+    } finally {
+      firstSync?.end();
     }
   }
 
@@ -227,6 +240,9 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       address: cached.address,
       clearFirstSyncPercent: true,
     );
+    // The wallet synced before: a refresh that started first is no first
+    // sync after all.
+    _runningFirstSync?.end();
     // A cached balance in use: the home strip may now refresh it.
     if (_inUse && _pollTimer != null) _poll();
   }
@@ -244,6 +260,7 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       refreshFailed: false,
       clearFirstSyncPercent: true,
     );
+    _runningFirstSync?.end();
     unawaited(
       ref
           .read(privateUsdBalanceCacheProvider)

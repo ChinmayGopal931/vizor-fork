@@ -19,7 +19,7 @@ Plan: `docs/private-usd-ios-plan.md` (§3.5 invariants, §10 test strategy, MI8)
   - If the iPhone has an App Store Vizor, build with the side-by-side bundle ID (iOS reference §8.7).
   - The runner refuses an iPhone whose installed Vizor is not a development build.
 - **Signing** (EI2): the owner's team, with profiles for Runner and SyncWidget.
-- **The screen.** iOS has no `svc power stayon`. For the round, set Settings, Display & Brightness, Auto-Lock to Never, and restore it afterwards. During key-using steps the app also keeps the screen on itself (A-plan X8).
+- **The screen.** iOS has no `svc power stayon`. For the round, set Settings, Display & Brightness, Auto-Lock to Never, and restore it afterwards. During key-using steps and a first sync the app also keeps the screen on itself (A-plan X8, progress VI-18).
 - **Disk.** Keep 5–6 GB free beyond Xcode's cache, and build with `CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0`.
 - **Capturing traffic** (the Tor checks):
   1. `rvictl -s <udid>`
