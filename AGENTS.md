@@ -1290,14 +1290,17 @@ edge in `MobileBottomSafeArea`
 
 A Railgun USDC ("private USD") balance, conversion both ways with shielded
 ZEC by atomic swap (with refunds and rescue), and private send and withdraw.
-It is Android-only and mobile form factor only for now. Before changing it,
+It runs on Android, mobile form factor only. The iOS port (iOS 17 and later,
+behind the same define) has its code in but has not yet run on a simulator
+or an iPhone. Before changing it,
 read `docs/private-usd-android-plan.md`: §3.5 lists the invariants and why
 each one exists. The pinned config and defines are in
 `docs/private-usd-reference.md` §7. Progress and deviations are in
 `docs/private-usd-progress.md`, and the device runs in
-`docs/private-usd-device-checklist.md`. The iOS port is planned, not built:
+`docs/private-usd-device-checklist.md`. The iOS port follows
 `docs/private-usd-ios-plan.md`, with its reference, progress and device
-checklist beside it (`docs/private-usd-ios-*.md`).
+checklist beside it (`docs/private-usd-ios-*.md`); its progress doc says what
+has run.
 
 Code:
 
@@ -1307,8 +1310,10 @@ Code:
   `lib/src/core/config/private_usd_feature_config.dart` and
   `lib/src/providers/private_usd_lifecycle_provider.dart`.
 - Kotlin: `android/app/src/main/kotlin/com/keplr/vizor/railgun/`.
+- Swift: `ios/Runner/Railgun/`.
 - The Railgun page: `android/app/src/main/assets/railgun/`, built from
-  `android/railgun-web/`.
+  `android/railgun-web/`; the same build copies it as is to
+  `ios/Runner/Railgun/railgun/`.
 
 **Defines (reference §7.3).** Each is a Dart define read once in
 `private_usd_feature_config.dart`. Gradle needs none of them.
@@ -1319,8 +1324,8 @@ Code:
   are the only secrets: pass them only with
   `--dart-define-from-file=<gitignored json>`. Their host must be
   `eth-{mainnet,sepolia}.g.alchemy.com` or `{mainnet,sepolia}.infura.io`. Any
-  other host needs a bundle rebuild and changes to the Kotlin and Rust
-  allowlists.
+  other host needs a bundle rebuild and changes to the Kotlin, Swift and
+  Rust allowlists.
 - `VIZOR_PRIVATE_USD_FLAG_URL` is the kill switch. Only an explicit `false`
   hides the feature. A missing key or a failed fetch keeps the last value,
   which defaults to available. Even `false` never stops conversions already
@@ -1399,8 +1404,12 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   `com.zcash.wallet/railgun` (no Dart WebView plugin and no injected JS
   bridge). It loads only its own assets through `WebViewAssetLoader` and
   intercepts every subresource against a fixed host allowlist. The Kotlin
-  allowlist (`RailgunEndpoints`), the Rust bridge's allowlist and the
-  page's CSP must agree.
+  and Swift allowlists (`RailgunEndpoints`), the Rust bridge's allowlist and
+  the page's CSP must agree; a Rust test in `railgun_bridge.rs` pins them.
+- On iOS a Swift `WKWebView` host behind the same channel serves the page
+  from `veylor-railgun://app/`, in a data store of its own whose SOCKS5
+  proxy is the bridge (no failover), with a `WKContentRuleList` allowlist
+  (iOS reference §6).
 - The page's traffic leaves only through the Rust loopback SOCKS5 bridge
   (`railgun_bridge.rs`), which uses arti when Tor is on.
 - On any route change, close the page and stop the bridge, then reopen on a
@@ -1435,7 +1444,9 @@ How the code keeps to this:
    `--m5 --m6 --m7 --m7-to 0x… [--m8-route] [--keyed-rpc <json>]`.
 
 The rounds are heavy and need the owner's funds and services, so run them
-only when asked. The checklist maps each flag to what it checks.
+only when asked. The checklist maps each flag to what it checks. The iOS
+rounds use `scripts/private-usd/ios/run_device_round.sh` (the M3 round so
+far), per `docs/private-usd-ios-device-checklist.md`.
 
 **Do not merge or push the local stand-ins.** `rust/Cargo.toml` points at
 two local copies:
