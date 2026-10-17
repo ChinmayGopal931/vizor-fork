@@ -59,7 +59,7 @@ class NeonSyncLine {
   final bool climbing;
   final bool failed;
 
-  /// Something scans: the floor flows faster. A synced line's refresh scans
+  /// Something scans: the floor flows. A synced line's refresh scans
   /// without climbing.
   final bool scanning;
 }
@@ -84,7 +84,7 @@ class NeonSyncLineLayer extends StatelessWidget {
       progress: line.progress,
       readout: line.readout,
       active: line.climbing,
-      fastFloor: line.scanning,
+      floorFlows: line.scanning,
       failed: line.failed,
       drawFloor: !front,
       drawLine: front == line.climbing,
@@ -118,7 +118,7 @@ class NeonSyncOcclude extends StatelessWidget {
 /// Home's backdrop in the neon redesign, in two layers around the content.
 ///
 /// A Tron floor recedes to a red horizon low on the screen and flows toward
-/// the viewer while Veylor scans. The sync line, a lit tube in the right part
+/// the viewer while Veylor scans; otherwise it stands still. The sync line, a lit tube in the right part
 /// of the screen, rises from the bottom with the scan's progress and reads
 /// the percentage at its head. While it climbs it is drawn over the content;
 /// once synced it runs the full height behind the content, out of the way,
@@ -187,13 +187,13 @@ class NeonSyncBackdropView extends StatefulWidget {
     required this.progress,
     required this.readout,
     required this.active,
-    bool? fastFloor,
+    bool? floorFlows,
     this.failed = false,
     this.drawFloor = true,
     this.drawLine = true,
     this.drawReadout = true,
     super.key,
-  }) : fastFloor = fastFloor ?? active;
+  }) : floorFlows = floorFlows ?? active;
 
   /// Which parts this layer draws.
   final bool drawFloor;
@@ -206,12 +206,12 @@ class NeonSyncBackdropView extends StatefulWidget {
   /// The text at the line's head, drawn uppercase.
   final String readout;
 
-  /// Scanning: the floor flows faster and a pulse runs up the line.
+  /// Scanning: the floor flows and a pulse runs up the line.
   final bool active;
 
-  /// Whether the floor flows faster; [active] unless set. A synced line's
-  /// refresh scans without the line's pulse.
-  final bool fastFloor;
+  /// Whether the floor flows; [active] unless set. A synced line's refresh
+  /// scans without the line's pulse.
+  final bool floorFlows;
   final bool failed;
 
   @override
@@ -220,12 +220,13 @@ class NeonSyncBackdropView extends StatefulWidget {
 
 class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
     with SingleTickerProviderStateMixin {
-  /// One floor cycle; a scanning wallet runs it four times as fast.
-  static const _idlePeriod = Duration(seconds: 9);
+  /// One floor cycle while something scans; the line's pulse climbs four
+  /// times a cycle.
+  static const _period = Duration(milliseconds: 2250);
 
   late final AnimationController _flow = AnimationController(
     vsync: this,
-    duration: _idlePeriod,
+    duration: _period,
   );
 
   bool get _motion => !(MediaQuery.maybeDisableAnimationsOf(context) ?? false);
@@ -239,23 +240,24 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
   @override
   void didUpdateWidget(NeonSyncBackdropView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.fastFloor != widget.fastFloor) _syncFlow();
+    _syncFlow();
   }
 
+  // Something moves only while something scans: the floor, and the climbing
+  // line's pulse. Idle, nothing does, so no frame is drawn (the owner's
+  // choice on 2026-10-17, iOS progress VI-19): a constant flow would repaint
+  // a full-screen layer every frame while Home shows.
+  bool get _moves =>
+      _motion &&
+      ((widget.drawFloor && widget.floorFlows) ||
+          (widget.drawLine && widget.active));
+
   void _syncFlow() {
-    if (!_motion) {
+    if (!_moves) {
       _flow.stop();
-      return;
-    }
-    final period = widget.fastFloor
-        ? Duration(milliseconds: _idlePeriod.inMilliseconds ~/ 4)
-        : _idlePeriod;
-    if (_flow.duration != period || !_flow.isAnimating) {
-      final at = _flow.value;
-      _flow
-        ..duration = period
-        ..repeat()
-        ..value = at;
+    } else if (!_flow.isAnimating) {
+      // From where it stopped. Setting `value` would stop it again.
+      _flow.repeat();
     }
   }
 

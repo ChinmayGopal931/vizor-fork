@@ -27,8 +27,9 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     rising with a first sync's percentage, over the content while it climbs
     and behind the blocks once synced; a refresh of a wallet that synced
     before stays `SYNCED`. The card keeps the first-load explanation, the
-    balance's time and the errors. Not yet seen on the A35. Open: the floor
-    never moves, on Home either (VI-19).
+    balance's time and the errors. The floor, which never moved (on Home
+    either), now flows only while something scans: the owner's choice on
+    2026-10-17 (VI-19). Not yet seen on the A35.
 - **Handoff (2026-10-16): start here.**
   - **State.** `feature/private-usd-android` is pushed to `origin` (the
     owner's fork) with everything below, the Gotham files included: the owner

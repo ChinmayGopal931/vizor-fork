@@ -439,7 +439,7 @@ class _TotalCard extends StatelessWidget {
           );
     final updatedAt = state.updatedAt;
     // The sync's progress is the sync line's (VI-19): its percentage, and a
-    // refresh as a faster floor. What stays here is what to expect of a
+    // refresh as the floor flowing. What stays here is what to expect of a
     // first sync, and how old the balance is.
     final status = balances == null
         ? (state.isLoading ? PrivateUsdCopy.firstLoad : null)

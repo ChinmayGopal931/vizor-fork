@@ -103,7 +103,7 @@ void main() {
     expect(front.active, isTrue);
     expect(back.drawLine, isFalse);
     expect(back.drawFloor, isTrue);
-    expect(back.fastFloor, isTrue);
+    expect(back.floorFlows, isTrue);
     expect(
       find.ancestor(
         of: find.byWidget(front),
@@ -154,7 +154,7 @@ void main() {
     expect(back.progress, 1);
     expect(back.drawLine, isTrue, reason: 'behind the content');
     expect(back.active, isFalse);
-    expect(back.fastFloor, isFalse);
+    expect(back.floorFlows, isFalse);
     expect(front.drawLine, isFalse);
     for (final block in const [
       'mobile_private_usd_total',
@@ -192,7 +192,7 @@ void main() {
     expect(back.progress, 1, reason: 'no drop to 0 and climb again');
     expect(back.drawLine, isTrue);
     expect(back.active, isFalse);
-    expect(back.fastFloor, isTrue);
+    expect(back.floorFlows, isTrue);
     expect(layer(tester, NeonSyncLayer.front).drawLine, isFalse);
     expect(find.text(PrivateUsdCopy.updating), findsNothing);
     expect(find.bySemanticsLabel(PrivateUsdCopy.updating), findsOneWidget);

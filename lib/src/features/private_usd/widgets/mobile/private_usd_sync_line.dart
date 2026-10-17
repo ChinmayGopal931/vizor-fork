@@ -12,8 +12,8 @@ import '../../services/private_usd_balance_repository.dart';
 /// - A first sync (nothing shown yet) climbs over the content with its
 ///   percentage, or reads "Tor …" while the page waits for Tor to come up.
 /// - A wallet that synced before stays synced through a refresh, behind the
-///   content, with a faster floor: like Home's catch-up, the line never drops
-///   to 0 and climbs again.
+///   content, with the floor flowing: like Home's catch-up, the line never
+///   drops to 0 and climbs again.
 /// - A failure reads "Sync failed", or "Tor offline" when Tor failed.
 ///
 /// Screen readers hear what the card used to show: the first-load progress,

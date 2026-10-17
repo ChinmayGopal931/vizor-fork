@@ -195,8 +195,9 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   seconds, a second tap (or a long press) opens the account switcher, and
   screen readers get the name and the switcher directly.
 - **Sync line.** `NeonSyncBackdrop` replaces the top bar's sync label on
-  Home. A Tron floor flows behind the content (faster while scanning), and
-  a red line at 85% of the width rises from the bottom with the progress,
+  Home. A Tron floor lies behind the content and flows only while
+  something scans (idle, nothing moves and no frame is drawn), and a red
+  line at 85% of the width rises from the bottom with the progress,
   its head reading `SYNC n%`, `SYNCED`, `SYNC FAILED` or `TOR …`
   (`NeonSyncReadout`). It has two layers (`NeonSyncLineLayer`): while
   syncing the line is drawn over the content (`NeonSyncLayer.front`,
@@ -205,10 +206,8 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   A scan that starts at most 20 blocks behind the tip counts as synced, so
   the line does not drop and re-climb every block. The Private USD screen
   draws Railgun's sync the same way (`privateUsdSyncLine`): a first sync
-  climbs, and a refresh of a wallet that synced before stays `SYNCED` with
-  a faster floor. As built the floor stands still: `_syncFlow` sets the
-  controller's `value` after `repeat()`, which stops it (an open question
-  in `docs/private-usd-ios-progress.md` VI-19).
+  climbs, and a refresh of a wallet that synced before stays `SYNCED` while
+  the floor flows.
 - **Tab bar.** Glyphs only: no slab, border or caption. `TronGlyph` draws
   the tab icons (and, on mobile, `AppIcon` draws its round icons —
   check, arrow-down, plus, warning, cancel, help — as angular glyphs). The active
