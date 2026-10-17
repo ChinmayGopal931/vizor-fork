@@ -22,6 +22,13 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     the screen stays on through the same native flag as a conversion's
     progress (X8). It lets go when the sync completes or fails, in the
     background, and on lock. Not yet run on the A35.
+  - **The Private USD screen draws Railgun's sync as Home's sync line (a new
+    request; VI-19).** The Tron floor, and a red line at 85% of the width
+    rising with a first sync's percentage, over the content while it climbs
+    and behind the blocks once synced; a refresh of a wallet that synced
+    before stays `SYNCED`. The card keeps the first-load explanation, the
+    balance's time and the errors. Not yet seen on the A35. Open: the floor
+    never moves, on Home either (VI-19).
 - **Handoff (2026-10-16): start here.**
   - **State.** `feature/private-usd-android` is pushed to `origin` (the
     owner's fork) with everything below, the Gotham files included: the owner

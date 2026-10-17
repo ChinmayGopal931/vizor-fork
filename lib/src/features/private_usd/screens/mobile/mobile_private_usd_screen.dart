@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/feedback/app_haptics.dart';
 import '../../../../core/formatting/date_format.dart';
 import '../../../../core/layout/mobile/mobile_top_nav.dart';
+import '../../../../core/layout/mobile/neon_sync_backdrop.dart';
 import '../../../../core/privacy/privacy_mask.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
@@ -16,6 +17,7 @@ import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../../providers/account_provider.dart';
+import '../../../../providers/network_privacy_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../../../providers/zec_price_change_provider.dart';
 import '../../../../rust/api/private_usd.dart' show ApiReversePhase;
@@ -38,10 +40,12 @@ import '../../widgets/mobile/private_usd_home_strip.dart';
 import '../../widgets/mobile/private_usd_activity_rows.dart';
 import '../../widgets/mobile/private_usd_banner.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
+import '../../widgets/mobile/private_usd_sync_line.dart';
 
 /// `/private-usd` (plan reference §9.4 S2): the balance with its screening
 /// buckets, Send and Withdraw with the spending note, the conversion under
-/// way, the receive address, the activity, and "Convert".
+/// way, the receive address, the activity, and "Convert". Railgun's sync is
+/// Home's sync line (iOS progress VI-19).
 class MobilePrivateUsdScreen extends ConsumerStatefulWidget {
   const MobilePrivateUsdScreen({super.key});
 
@@ -108,6 +112,7 @@ class _MobilePrivateUsdScreenState
         balance.balances?.assets.any((a) => a.available > BigInt.zero) ?? false;
     return MobilePrivateUsdView(
       state: balance,
+      networkPrivacy: ref.watch(networkPrivacyProvider),
       zecUsdPrice: ref.watch(zecHomeUsdUnitPriceProvider),
       privacyModeEnabled: privacyModeEnabled,
       receiveAddress: address.value,
@@ -147,6 +152,7 @@ class MobilePrivateUsdView extends StatelessWidget {
     required this.screening,
     required this.onBack,
     required this.onRefresh,
+    this.networkPrivacy,
     this.tokenNames = const {},
     this.banner,
     this.activityRows = const [],
@@ -162,6 +168,9 @@ class MobilePrivateUsdView extends StatelessWidget {
   });
 
   final PrivateUsdBalanceState state;
+
+  /// Whether the page waits for Tor or Tor failed, for the sync line.
+  final NetworkPrivacyState? networkPrivacy;
   final double? zecUsdPrice;
   final bool privacyModeEnabled;
 
@@ -207,136 +216,189 @@ class MobilePrivateUsdView extends StatelessWidget {
     final balances = state.balances;
     final banner = this.banner;
     final onConvert = this.onConvert;
+    final syncLine = privateUsdSyncLine(state, networkPrivacy: networkPrivacy);
     return Scaffold(
       backgroundColor: colors.background.window,
       body: AppToastHost(
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              MobileTopNav.back(
-                title: PrivateUsdCopy.title,
-                onBack: onBack,
-                trailing: _InfoButton(
-                  onTap: () =>
-                      showPrivateUsdInfoSheet(context, screening: screening),
-                ),
+        // Laid out as Home: the floor (and the line once synced) behind, the
+        // blocks backed solid so that line shows only in the gaps, and the
+        // climbing line with its readout in front, ignoring touches.
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: NeonSyncLineLayer(
+                key: const ValueKey('mobile_private_usd_sync_back'),
+                line: syncLine,
               ),
-              Expanded(
-                child: ListView(
-                  key: const ValueKey('mobile_private_usd_list'),
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.sm,
-                    AppSpacing.xs,
-                    AppSpacing.sm,
-                    AppSpacing.lg,
-                  ),
-                  children: [
-                    Text(
-                      PrivateUsdCopy.subtitle,
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: colors.text.secondary,
+            ),
+            SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  MobileTopNav.back(
+                    title: PrivateUsdCopy.title,
+                    onBack: onBack,
+                    trailing: _InfoButton(
+                      onTap: () => showPrivateUsdInfoSheet(
+                        context,
+                        screening: screening,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.sm),
-                    _TotalCard(
-                      state: state,
-                      zecUsdPrice: zecUsdPrice,
-                      privacyModeEnabled: privacyModeEnabled,
-                      onRefresh: onRefresh,
-                    ),
-                    if (onSend != null && onWithdraw != null) ...[
-                      const SizedBox(height: AppSpacing.s),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: AppButton(
-                              key: const ValueKey('mobile_private_usd_send'),
-                              variant: AppButtonVariant.secondary,
-                              expand: true,
-                              onPressed: canSend ? onSend : null,
-                              child: const Text(PrivateUsdCopy.actionSend),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      key: const ValueKey('mobile_private_usd_list'),
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.sm,
+                        AppSpacing.xs,
+                        AppSpacing.sm,
+                        AppSpacing.lg,
+                      ),
+                      children: [
+                        NeonSyncOcclude(
+                          child: Text(
+                            PrivateUsdCopy.subtitle,
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: colors.text.secondary,
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.s),
-                          Expanded(
-                            child: AppButton(
-                              key: const ValueKey(
-                                'mobile_private_usd_withdraw',
-                              ),
-                              variant: AppButtonVariant.secondary,
-                              expand: true,
-                              onPressed: canSend ? onWithdraw : null,
-                              child: const Text(PrivateUsdCopy.actionWithdraw),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        NeonSyncOcclude(
+                          child: _TotalCard(
+                            state: state,
+                            zecUsdPrice: zecUsdPrice,
+                            privacyModeEnabled: privacyModeEnabled,
+                            onRefresh: onRefresh,
+                          ),
+                        ),
+                        if (onSend != null && onWithdraw != null) ...[
+                          const SizedBox(height: AppSpacing.s),
+                          NeonSyncOcclude(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: AppButton(
+                                    key: const ValueKey(
+                                      'mobile_private_usd_send',
+                                    ),
+                                    variant: AppButtonVariant.secondary,
+                                    expand: true,
+                                    onPressed: canSend ? onSend : null,
+                                    child: const Text(
+                                      PrivateUsdCopy.actionSend,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.s),
+                                Expanded(
+                                  child: AppButton(
+                                    key: const ValueKey(
+                                      'mobile_private_usd_withdraw',
+                                    ),
+                                    variant: AppButtonVariant.secondary,
+                                    expand: true,
+                                    onPressed: canSend ? onWithdraw : null,
+                                    child: const Text(
+                                      PrivateUsdCopy.actionWithdraw,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
-                      ),
-                    ],
-                    if (spendNote case final note?) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        note,
-                        key: const ValueKey('mobile_private_usd_spend_note'),
-                        style: AppTypography.bodySmall.copyWith(
-                          color: colors.text.secondary,
-                        ),
-                      ),
-                    ],
-                    if (banner != null) ...[
-                      const SizedBox(height: AppSpacing.s),
-                      PrivateUsdConversionBannerView(
-                        banner: banner,
-                        onTap: () => onOpenConversion?.call(banner.path),
-                      ),
-                    ],
-                    if (balances != null &&
-                        balances.total == BigInt.zero &&
-                        banner == null) ...[
-                      const SizedBox(height: AppSpacing.s),
-                      const _EmptyCard(),
-                    ] else if (balances != null) ...[
-                      const SizedBox(height: AppSpacing.s),
-                      _BucketsCard(
-                        balances: balances,
-                        privacyModeEnabled: privacyModeEnabled,
-                        screening: screening,
-                      ),
-                      if (balances.held.length > 1) ...[
-                        const SizedBox(height: AppSpacing.s),
-                        _AssetsCard(
-                          balances: balances,
-                          tokenNames: tokenNames,
-                          privacyModeEnabled: privacyModeEnabled,
+                        if (spendNote case final note?) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          NeonSyncOcclude(
+                            child: Text(
+                              note,
+                              key: const ValueKey(
+                                'mobile_private_usd_spend_note',
+                              ),
+                              style: AppTypography.bodySmall.copyWith(
+                                color: colors.text.secondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (banner != null) ...[
+                          const SizedBox(height: AppSpacing.s),
+                          NeonSyncOcclude(
+                            child: PrivateUsdConversionBannerView(
+                              banner: banner,
+                              onTap: () => onOpenConversion?.call(banner.path),
+                            ),
+                          ),
+                        ],
+                        if (balances != null &&
+                            balances.total == BigInt.zero &&
+                            banner == null) ...[
+                          const SizedBox(height: AppSpacing.s),
+                          const NeonSyncOcclude(child: _EmptyCard()),
+                        ] else if (balances != null) ...[
+                          const SizedBox(height: AppSpacing.s),
+                          NeonSyncOcclude(
+                            child: _BucketsCard(
+                              balances: balances,
+                              privacyModeEnabled: privacyModeEnabled,
+                              screening: screening,
+                            ),
+                          ),
+                          if (balances.held.length > 1) ...[
+                            const SizedBox(height: AppSpacing.s),
+                            NeonSyncOcclude(
+                              child: _AssetsCard(
+                                balances: balances,
+                                tokenNames: tokenNames,
+                                privacyModeEnabled: privacyModeEnabled,
+                              ),
+                            ),
+                          ],
+                        ],
+                        if (receiveAddress case final address?) ...[
+                          const SizedBox(height: AppSpacing.s),
+                          NeonSyncOcclude(
+                            child: _ReceiveAddressCard(address: address),
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.md),
+                        _ActivitySection(
+                          rows: activityRows,
+                          onRefunds: onRefunds,
                         ),
                       ],
-                    ],
-                    if (receiveAddress case final address?) ...[
-                      const SizedBox(height: AppSpacing.s),
-                      _ReceiveAddressCard(address: address),
-                    ],
-                    const SizedBox(height: AppSpacing.md),
-                    _ActivitySection(rows: activityRows, onRefunds: onRefunds),
-                  ],
-                ),
+                    ),
+                  ),
+                  if (onConvert != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.sm,
+                        AppSpacing.s,
+                        AppSpacing.sm,
+                        AppSpacing.md,
+                      ),
+                      child: NeonSyncOcclude(
+                        child: AppButton(
+                          key: const ValueKey('mobile_private_usd_convert'),
+                          expand: true,
+                          onPressed: canConvert ? onConvert : null,
+                          child: const Text(PrivateUsdCopy.actionConvert),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              if (onConvert != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.sm,
-                    AppSpacing.s,
-                    AppSpacing.sm,
-                    AppSpacing.md,
-                  ),
-                  child: AppButton(
-                    key: const ValueKey('mobile_private_usd_convert'),
-                    expand: true,
-                    onPressed: canConvert ? onConvert : null,
-                    child: const Text(PrivateUsdCopy.actionConvert),
-                  ),
-                ),
-            ],
-          ),
+            ),
+            Positioned.fill(
+              child: NeonSyncLineLayer(
+                key: const ValueKey('mobile_private_usd_sync_front'),
+                line: syncLine,
+                layer: NeonSyncLayer.front,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -376,13 +438,11 @@ class _TotalCard extends StatelessWidget {
             zecUsdPrice: zecUsdPrice,
           );
     final updatedAt = state.updatedAt;
-    final firstSyncPercent = state.firstSyncPercent;
-    final status = balances == null && state.isLoading
-        ? (firstSyncPercent == null
-              ? PrivateUsdCopy.firstLoad
-              : PrivateUsdCopy.firstLoadProgress(firstSyncPercent))
-        : state.isRefreshing
-        ? PrivateUsdCopy.updating
+    // The sync's progress is the sync line's (VI-19): its percentage, and a
+    // refresh as a faster floor. What stays here is what to expect of a
+    // first sync, and how old the balance is.
+    final status = balances == null
+        ? (state.isLoading ? PrivateUsdCopy.firstLoad : null)
         : updatedAt == null
         ? null
         : PrivateUsdCopy.updated(formatDayMonthTime(updatedAt));
@@ -428,23 +488,28 @@ class _TotalCard extends StatelessWidget {
               ),
             ),
           ],
+          // Screen readers hear both from the sync line, with the progress.
           if (status != null) ...[
             const SizedBox(height: AppSpacing.s),
-            Text(
-              status,
-              key: const ValueKey('mobile_private_usd_status'),
-              style: AppTypography.bodySmall.copyWith(
-                color: colors.text.secondary,
+            ExcludeSemantics(
+              child: Text(
+                status,
+                key: const ValueKey('mobile_private_usd_status'),
+                style: AppTypography.bodySmall.copyWith(
+                  color: colors.text.secondary,
+                ),
               ),
             ),
           ],
           if (error != null) ...[
             const SizedBox(height: AppSpacing.xs),
-            Text(
-              error,
-              key: const ValueKey('mobile_private_usd_error'),
-              style: AppTypography.bodySmall.copyWith(
-                color: colors.text.destructive,
+            ExcludeSemantics(
+              child: Text(
+                error,
+                key: const ValueKey('mobile_private_usd_error'),
+                style: AppTypography.bodySmall.copyWith(
+                  color: colors.text.destructive,
+                ),
               ),
             ),
           ],
@@ -776,33 +841,37 @@ class _ActivitySection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  PrivateUsdCopy.activityTitle,
-                  style: AppTypography.headlineSmall.copyWith(
-                    color: colors.text.accent,
+          NeonSyncOcclude(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    PrivateUsdCopy.activityTitle,
+                    style: AppTypography.headlineSmall.copyWith(
+                      color: colors.text.accent,
+                    ),
                   ),
                 ),
-              ),
-              if (onRefunds case final onRefunds?)
-                AppButton(
-                  key: const ValueKey('mobile_private_usd_refunds'),
-                  variant: AppButtonVariant.secondary,
-                  size: AppButtonSize.small,
-                  onPressed: onRefunds,
-                  child: const Text(PrivateUsdCopy.refundsTitle),
-                ),
-            ],
+                if (onRefunds case final onRefunds?)
+                  AppButton(
+                    key: const ValueKey('mobile_private_usd_refunds'),
+                    variant: AppButtonVariant.secondary,
+                    size: AppButtonSize.small,
+                    onPressed: onRefunds,
+                    child: const Text(PrivateUsdCopy.refundsTitle),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(height: AppSpacing.s),
           if (rows.isEmpty)
-            Text(
-              PrivateUsdCopy.activityEmpty,
-              key: const ValueKey('mobile_private_usd_activity_empty'),
-              style: AppTypography.bodySmall.copyWith(
-                color: colors.text.secondary,
+            NeonSyncOcclude(
+              child: Text(
+                PrivateUsdCopy.activityEmpty,
+                key: const ValueKey('mobile_private_usd_activity_empty'),
+                style: AppTypography.bodySmall.copyWith(
+                  color: colors.text.secondary,
+                ),
               ),
             )
           else
@@ -810,7 +879,9 @@ class _ActivitySection extends StatelessWidget {
               if (i > 0) const SizedBox(height: AppSpacing.s),
               KeyedSubtree(
                 key: ValueKey('mobile_private_usd_activity_row_$i'),
-                child: ActivityFeedRowGroup(row: rows[i]),
+                child: NeonSyncOcclude(
+                  child: ActivityFeedRowGroup(row: rows[i]),
+                ),
               ),
             ],
         ],

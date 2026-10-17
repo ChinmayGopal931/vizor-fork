@@ -19,6 +19,102 @@ enum NeonSyncLayer {
   front,
 }
 
+/// The readouts at the sync line's head, sentence case here and drawn
+/// uppercase (a HUD caption), for every screen that draws a sync line.
+abstract final class NeonSyncReadout {
+  static const synced = 'Synced';
+  static const failed = 'Sync failed';
+  static const torOffline = 'Tor offline';
+  static const torWaiting = 'Tor …';
+
+  /// A scan [percent] of the way, or a check's.
+  static String progress(int percent, {bool checking = false}) =>
+      '${checking ? 'Check' : 'Sync'} $percent%';
+}
+
+/// What a sync line shows, whatever is syncing: Home's wallet, or the
+/// Railgun wallet on the Private USD screen.
+@immutable
+class NeonSyncLine {
+  const NeonSyncLine({
+    required this.progress,
+    required this.readout,
+    required this.semanticsLabel,
+    this.climbing = false,
+    this.failed = false,
+    bool? scanning,
+  }) : scanning = scanning ?? climbing;
+
+  /// How far the line has climbed, 0..1.
+  final double progress;
+
+  /// A [NeonSyncReadout].
+  final String readout;
+
+  /// What a screen reader hears, in a live region.
+  final String semanticsLabel;
+
+  /// Climbing: the line is drawn over the content, lit, with a pulse. Once
+  /// synced it runs behind the content instead.
+  final bool climbing;
+  final bool failed;
+
+  /// Something scans: the floor flows faster. A synced line's refresh scans
+  /// without climbing.
+  final bool scanning;
+}
+
+/// One layer of [line], below or above the content as Home layers it: the
+/// floor (and the line once synced) behind, the climbing line and the
+/// readout in front, where it ignores touches and carries the semantics.
+class NeonSyncLineLayer extends StatelessWidget {
+  const NeonSyncLineLayer({
+    required this.line,
+    this.layer = NeonSyncLayer.back,
+    super.key,
+  });
+
+  final NeonSyncLine line;
+  final NeonSyncLayer layer;
+
+  @override
+  Widget build(BuildContext context) {
+    final front = layer == NeonSyncLayer.front;
+    final view = NeonSyncBackdropView(
+      progress: line.progress,
+      readout: line.readout,
+      active: line.climbing,
+      fastFloor: line.scanning,
+      failed: line.failed,
+      drawFloor: !front,
+      drawLine: front == line.climbing,
+      drawReadout: front,
+    );
+    if (!front) return ExcludeSemantics(child: view);
+    return IgnorePointer(
+      child: Semantics(
+        container: true,
+        liveRegion: true,
+        label: line.semanticsLabel,
+        child: ExcludeSemantics(child: view),
+      ),
+    );
+  }
+}
+
+/// A solid backing for a block over a sync line: the synced line, drawn
+/// behind the content, shows only in the gaps between blocks, never across
+/// one. While it climbs the line is drawn above everything instead.
+class NeonSyncOcclude extends StatelessWidget {
+  const NeonSyncOcclude({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      ColoredBox(color: context.colors.background.window, child: child);
+}
+
 /// Home's backdrop in the neon redesign, in two layers around the content.
 ///
 /// A Tron floor recedes to a red horizon low on the screen and flows toward
@@ -61,35 +157,25 @@ class NeonSyncBackdrop extends ConsumerWidget {
       SyncStatusKind.failed => sync.percentage.clamp(0.03, 0.99),
     };
     final readout = switch (status.kind) {
-      _ when catchingUp => 'SYNCED',
-      SyncStatusKind.synced => 'SYNCED',
+      _ when catchingUp => NeonSyncReadout.synced,
+      SyncStatusKind.synced => NeonSyncReadout.synced,
       SyncStatusKind.failed =>
         status.label == kSyncStatusTorFailedLabel
-            ? 'TOR OFFLINE'
-            : 'SYNC FAILED',
+            ? NeonSyncReadout.torOffline
+            : NeonSyncReadout.failed,
       SyncStatusKind.syncing =>
         status.label == kSyncStatusConnectingToTorLabel
-            ? 'TOR …'
-            : '${sync.isChecking ? 'CHECK' : 'SYNC'} $whole%',
+            ? NeonSyncReadout.torWaiting
+            : NeonSyncReadout.progress(whole, checking: sync.isChecking),
     };
-
-    final front = layer == NeonSyncLayer.front;
-    final view = NeonSyncBackdropView(
-      progress: progress.toDouble(),
-      readout: readout,
-      active: syncing,
-      failed: status.kind == SyncStatusKind.failed,
-      drawFloor: !front,
-      drawLine: front == syncing,
-      drawReadout: front,
-    );
-    if (!front) return ExcludeSemantics(child: view);
-    return IgnorePointer(
-      child: Semantics(
-        container: true,
-        liveRegion: true,
-        label: status.semanticsLabel,
-        child: ExcludeSemantics(child: view),
+    return NeonSyncLineLayer(
+      layer: layer,
+      line: NeonSyncLine(
+        progress: progress.toDouble(),
+        readout: readout,
+        semanticsLabel: status.semanticsLabel,
+        climbing: syncing,
+        failed: status.kind == SyncStatusKind.failed,
       ),
     );
   }
@@ -101,12 +187,13 @@ class NeonSyncBackdropView extends StatefulWidget {
     required this.progress,
     required this.readout,
     required this.active,
+    bool? fastFloor,
     this.failed = false,
     this.drawFloor = true,
     this.drawLine = true,
     this.drawReadout = true,
     super.key,
-  });
+  }) : fastFloor = fastFloor ?? active;
 
   /// Which parts this layer draws.
   final bool drawFloor;
@@ -116,11 +203,15 @@ class NeonSyncBackdropView extends StatefulWidget {
   /// How far the sync line has climbed, 0..1.
   final double progress;
 
-  /// The text at the line's head.
+  /// The text at the line's head, drawn uppercase.
   final String readout;
 
   /// Scanning: the floor flows faster and a pulse runs up the line.
   final bool active;
+
+  /// Whether the floor flows faster; [active] unless set. A synced line's
+  /// refresh scans without the line's pulse.
+  final bool fastFloor;
   final bool failed;
 
   @override
@@ -148,7 +239,7 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
   @override
   void didUpdateWidget(NeonSyncBackdropView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.active != widget.active) _syncFlow();
+    if (oldWidget.fastFloor != widget.fastFloor) _syncFlow();
   }
 
   void _syncFlow() {
@@ -156,7 +247,7 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
       _flow.stop();
       return;
     }
-    final period = widget.active
+    final period = widget.fastFloor
         ? Duration(milliseconds: _idlePeriod.inMilliseconds ~/ 4)
         : _idlePeriod;
     if (_flow.duration != period || !_flow.isAnimating) {
@@ -245,7 +336,7 @@ class _Readout extends StatelessWidget {
               child: RotatedBox(
                 quarterTurns: 3,
                 child: Text(
-                  text,
+                  text.toUpperCase(),
                   maxLines: 1,
                   style: TextStyle(
                     fontFamily: 'Gotham',

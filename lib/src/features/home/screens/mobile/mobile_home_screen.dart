@@ -1173,7 +1173,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
         ],
         Column(
           children: [
-            _Occlude(
+            NeonSyncOcclude(
               child: _BalanceCard(
                 balanceText: privacyModeEnabled
                     ? fixedPrivacyMask()
@@ -1223,7 +1223,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             ),
             const SizedBox(height: AppSpacing.sm),
             if (hasBalance)
-              _Occlude(
+              NeonSyncOcclude(
                 child: Row(
                   children: [
                     Expanded(
@@ -1288,7 +1288,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                 ),
               )
             else
-              _Occlude(
+              NeonSyncOcclude(
                 child: AppButton(
                   // Same key as the funded-state Receive button — only one
                   // of the two renders at a time.
@@ -1350,7 +1350,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _Occlude(
+                NeonSyncOcclude(
                   child: _RecentActivityHeader(
                     onSeeAll: () {
                       _expectReviewVisit('/activity');
@@ -1363,7 +1363,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                   if (i > 0) const SizedBox(height: AppSpacing.s),
                   KeyedSubtree(
                     key: ValueKey('mobile_home_activity_row_$i'),
-                    child: _Occlude(
+                    child: NeonSyncOcclude(
                       child: ActivityFeedRowGroup(row: recentRows[i]),
                     ),
                   ),
@@ -1374,19 +1374,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
       ],
     );
   }
-}
-
-/// A solid backing for a Home block: the synced line, drawn behind the
-/// content, shows only in the gaps between blocks, never across one. While
-/// the wallet syncs the line is drawn above everything instead.
-class _Occlude extends StatelessWidget {
-  const _Occlude({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) =>
-      ColoredBox(color: context.colors.background.window, child: child);
 }
 
 class _PrivateStatusCoverageNotice extends StatelessWidget {

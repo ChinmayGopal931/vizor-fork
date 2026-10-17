@@ -216,10 +216,23 @@ const _errorKey = ValueKey('mobile_private_usd_error');
 const _emptyKey = ValueKey('mobile_private_usd_empty');
 const _addressKey = ValueKey('mobile_private_usd_address');
 const _refreshKey = ValueKey('mobile_private_usd_refresh');
+// The sync line's front layer, whose readout carries a first sync's
+// percentage (iOS progress VI-19).
+const _syncLineKey = ValueKey('mobile_private_usd_sync_front');
 
 const _firstSyncTimeout = Duration(minutes: 10);
 const _refreshTimeout = Duration(minutes: 5);
-final _percent = RegExp(r'Loading your private balance: (\d+)%');
+final _percent = RegExp(r'^SYNC (\d+)%$');
+
+/// The text at the sync line's head, as drawn.
+String? _syncReadout(WidgetTester tester) {
+  final texts = find.descendant(
+    of: find.byKey(_syncLineKey),
+    matching: find.byType(Text),
+  );
+  if (!tester.any(texts)) return null;
+  return tester.widget<Text>(texts.first).data;
+}
 
 void _log(String message) => debugPrint('[pusd-device] $message');
 
@@ -745,8 +758,16 @@ class _Round {
           status = next;
           _log('status: $next');
         }
-        if (next == PrivateUsdCopy.firstLoad) sawFirstLoad = true;
-        final percent = _percent.firstMatch(next ?? '');
+        // Before the engine's first report the line reads 0% on a stub.
+        final reported =
+            _container
+                .read(privateUsdBalanceProvider(_uuid))
+                .firstSyncPercent !=
+            null;
+        if (next == PrivateUsdCopy.firstLoad && !reported) sawFirstLoad = true;
+        final percent = reported
+            ? _percent.firstMatch(_syncReadout(tester) ?? '')
+            : null;
         if (percent != null) {
           final value = int.parse(percent.group(1)!);
           if (percents.isEmpty || percents.last != value) percents.add(value);

@@ -91,14 +91,20 @@ void main() {
     expect(find.text(PrivateUsdCopy.rowAvailable), findsNothing);
   });
 
-  testWidgets('a first load shows its percentage', (tester) async {
+  // The percentage is on the sync line (iOS progress VI-19, its own test);
+  // the card says what a first load takes.
+  testWidgets('a first load says what it takes, its percentage on the line', (
+    tester,
+  ) async {
     await pumpScreen(
       tester,
       const PrivateUsdBalanceState(isRefreshing: true, firstSyncPercent: 42),
       address: null,
     );
 
-    expect(find.text(PrivateUsdCopy.firstLoadProgress(42)), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.firstLoad), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.firstLoadProgress(42)), findsNothing);
+    expect(find.text('SYNC 42%'), findsOneWidget);
     expect(find.text(PrivateUsdCopy.unknown), findsOneWidget);
     expect(find.text(PrivateUsdCopy.receiveAddress), findsNothing);
   });

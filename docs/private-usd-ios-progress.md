@@ -10,9 +10,12 @@ Tracks `docs/private-usd-ios-plan.md` §4. A task is done only when its line is 
 ## Where things stand (2026-10-17; read this first)
 
 - **MI1 to MI3's code is done** (2026-10-17, VI-1: no simulator or device ran): one bundle for both platforms (MI1), the Swift host (MI2), and the iOS gates, backups, device test and runner (MI3). With `VIZOR_PRIVATE_USD_ENABLED`, an iOS 17 build now shows Private USD to a software account. Android's state is in `docs/private-usd-progress.md`.
-- **Owner decisions, 2026-10-17.** Both are shared Dart, so Android gets them too.
+- **Owner decisions, 2026-10-17.** All three are shared Dart, so Android gets them too, and none has run on a phone yet.
   - BI-3 resolved as (a): deleting an account deletes its Railgun wallet through a page of its own, best effort, behind a bridge that needs no Tor (VI-17).
   - VI-14 resolved as (a), on both platforms: a Railgun first sync keeps the screen on while the app is in the foreground and unlocked (VI-18).
+  - A new request: the Private USD screen draws Railgun's sync as Home's sync line, with the same timing (VI-19).
+  - Checks after all three: `fvm flutter analyze` clean; the mobile lane 2,337 passed; the desktop lane 6,061 passed, 166 skipped and 13 failed, the same 13 as before (MI3 evidence); Rust `railgun_bridge` 11 passed, 1 ignored. Kotlin and Swift did not change.
+- **Open for the owner:** the neon floor never moves, on Home either (VI-19). Make it flow (a one-line fix, plus at least 25 widget tests that wait for its frames to settle), or keep it still?
 - **The first device session** owes: MI0's checks, MI1.7 (the A35 round with the new bundle), the Swift tests and the simulator drive of MI2, MI3.3 and MI3.6, then MI4 to MI6.
 - **Decisions.** The owner confirmed DI2 (hide below iOS 17), DI6 (exclude from backups) and DI7 (the full rebuild) on 2026-10-17. DI1, DI3–DI5 and DI8 are still proposals; their defaults hold. DI3, the licensing review, blocks only external distribution.
 - **Order (owner, 2026-10-17; VI-1).** Code first: MI1–MI3 without any simulator or device run. The MI0 checks, the device parts of MI1–MI3 and the Swift test runs wait for the first session with a phone connected. If space runs short, the Android Rust cache (`build/rust_lib_zcash_wallet/build/aarch64-linux-android`, about 3.5 GB) may be deleted; nothing else.
@@ -21,8 +24,8 @@ Tracks `docs/private-usd-ios-plan.md` §4. A task is done only when its line is 
   - The iPhone 17 Pro simulator (iOS 26.5), UDID `2F355481-7C3B-47C9-ACBD-A9E08938C039`, already runs the app with the neon redesign: testnet, with a wallet created on 2026-10-17.
   - Private USD was hidden there, as the platform gate was Android-only. Since MI3 a build with the define shows it on iOS 17 and later; nothing has run on it yet (VI-1).
 - **No iPhone yet.**
-- **Disk.** About 10 GB was free after `rust/target` was deleted on 2026-10-17, and an iOS simulator build needs 5–6 GB of it. Check before each build. After MI1–MI3's builds (the bundle's `node_modules`, `rust/target` for the bridge tests, the simulator build in DerivedData) about 20 GB was free.
-- **Next.** The first device session (above). The owner rules on DI8 before the first device build.
+- **Disk.** About 10 GB was free after `rust/target` was deleted on 2026-10-17, and an iOS simulator build needs 5–6 GB of it. Check before each build. After MI1–MI3's builds (the bundle's `node_modules`, `rust/target` for the bridge tests, the simulator build in DerivedData) about 20 GB was free; after VI-17's bridge tests grew `rust/target`, about 11 GB.
+- **Next.** The first device session (above), where VI-17 to VI-19 are checked too (on the A35 as well). The owner rules on DI8 before the first device build.
 
 ## MI0. Spikes (go/no-go)
 
@@ -170,6 +173,15 @@ Number them VI-1, VI-2, and so on. Each entry says what the plan said, what real
   - **Tests.** The provider: on through a first sync until it completes; a failure and a lock let go; a refresh of a wallet that synced before keeps nothing on; conversion progress as before. The host: on in the foreground, off in the background and when the sync ends.
 
   Plan MI3 Traps, iOS reference §8.5, the iOS device checklist's screen note, the A-plan's X8 and U21 rows and the Android reference's §9.5 updated.
+- **VI-19 (owner request, 2026-10-17): Railgun's sync on the Private USD screen, drawn like Home's.** New: the plans had the screen show the sync as text (the first-load percentage, "Updating…", the errors) beside its refresh button. As built, with Home's look and the same timing (no auto-sync; Railgun still syncs on open and on refresh), shared Dart, so on both platforms:
+  - **One line, two sources.** `neon_sync_backdrop.dart` now splits what a line shows (`NeonSyncLine`) from how it is layered (`NeonSyncLineLayer`, Home's two layers), keeps Home's readouts in one place (`NeonSyncReadout`, sentence case and drawn uppercase), and makes Home's block backing public as `NeonSyncOcclude`. Home's `NeonSyncBackdrop` builds its line from the Zcash sync exactly as before. `privateUsdSyncLine` builds one from the balance state, and the screen layers it as Home does: the Tron floor and the synced line behind, the blocks backed solid so that line shows only in the gaps, and the climbing line with its readout in front, ignoring touches. The painter is shared, not copied.
+  - **The states.** A first sync (no balance yet) climbs with its percentage (`SYNC n%`, on a stub at 0% before the engine's first report), or reads `TOR …` while Tor is the route and still connecting: the page waits for its bridge, which waits for Tor. A wallet that synced before stays `SYNCED` through a refresh, full height and behind the content, and only its floor would speed up (the view gained `fastFloor`). This is Home's 20-block rule; Railgun has no block gap to read, so any wallet that synced before counts. A failure reads `SYNC FAILED`, or `TOR OFFLINE` when Tor failed, as on Home.
+  - **The card.** The percentage and "Updating…" left it. It keeps what a first load takes (the first-load line without its percentage), the balance's time and the errors. Screen readers hear the card's old text from the line's live region (the first-load progress, "Updating…", the time or the failure), and the card's own lines are excluded, so nothing is read twice. Reduced motion holds the floor still, as on Home.
+  - **The device test** reads a first sync's percentages from the line's readout. The Android round's release check (`scripts/private-usd/device_round.py`) still finds the status and the errors, now through the line's label.
+  - **Tests.** Mobile-lane widget tests for each state: the layers, the occluded blocks, the semantics, and a tap through the climbing line. The screen test that asserted the percentage text now asserts the readout. A widget-test capture of the first-load and default scenarios looked right.
+  - **Found on the way, not changed: the floor never moves, on Home either.** `_syncFlow` calls `repeat()` and then sets `value`, and setting `value` stops an `AnimationController`, so no frame is ever scheduled: the floor and the line's pulse stand still, and a refresh's faster floor can't show. Removing `..value = at` (`repeat()` already starts from the current value) makes both screens flow, but then at least 25 widget tests, in the Home and Private USD screen files alone, hang in `pumpAndSettle` on the endless animation and need reduced motion or explicit pumps. It also repaints a full-screen layer every frame while Home or this screen shows. Left for the owner.
+
+  Android reference §9.4 S2 and AGENTS.md's "Sync line" updated.
 
 ## Blocked
 
