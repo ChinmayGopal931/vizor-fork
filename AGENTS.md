@@ -1343,8 +1343,10 @@ two local copies:
 - `~/dev/wallet-libraries-e4`, path entries for wallet-libraries (E4).
 
 Both are marked do-not-merge. With the zapp-ported code and the Railgun
-bundle (E2), they keep `feature/private-usd-android` local until the owner
-delivers E1, E2 and E4 (progress B-6).
+bundle (E2), they keep `feature/private-usd-android` out of `main` until the
+owner delivers E1, E2 and E4 (progress B-6). Push the branch to the owner's
+fork (`origin`) only when the owner asks (they did on 2026-10-14 and
+2026-10-16); never merge it or open a PR unprompted.
 
 ## Testing
 

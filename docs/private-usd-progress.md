@@ -5,10 +5,61 @@ is checked. Each milestone also has a gate line: acceptance met, tests written,
 `cargo test` / `fvm flutter analyze` / `fvm flutter test` (and the mobile lane
 for UI milestones) passing, and its Pitfalls re-read against the diff.
 
-## Where things stand (2026-10-15; read this first)
+## Where things stand (2026-10-16; read this first)
 
-- **Gotham, Veylor and the portfolio chart (2026-10-15; local, nothing of it
-  pushed yet; `origin` is still at `b52cfcc6b`):**
+- **Handoff (2026-10-16): start here.**
+  - **State.** `feature/private-usd-android` is pushed to `origin` (the
+    owner's fork) with everything below, the Gotham files included: the owner
+    approved publishing them on 2026-10-16. Nothing is merged and no PR is
+    open; open one only when the owner asks. `spike/private-usd-m0` stays
+    local.
+  - **Phones.** The test phone is the Galaxy A35 (`RZCX40721QZ`, funded
+    testnet wallet; its passcode is in `run_device_round.sh`). It was
+    unplugged at the end of 2026-10-16, so check `adb devices -l` first and
+    always pass `-s`. A OnePlus 15 may be attached instead: it is the owner's
+    own phone, with the Play Store release of `com.keplr.vizor` (not
+    debuggable). Never `flutter run`, `adb install` or uninstall over that
+    package: the debug build's signature differs, and the usual fix wipes the
+    owner's wallet. At the owner's request the build goes on that phone side
+    by side: set `applicationId = "com.keplr.vizor.veylor"` in
+    `android/app/build.gradle.kts` for the build only (never commit it), run
+    `CARGO_PROFILE_DEV_DEBUG=0 CARGOKIT_SKIP_EMULATOR_ABIS=true fvm flutter
+    build apk --debug --target-platform android-arm64` with the three
+    defines from `run_device_round.sh` (`VIZOR_FORM_FACTOR=mobile`,
+    `VIZOR_PRIVATE_USD_ENABLED=true`, `ZCASH_DEFAULT_NETWORK=test`), restore
+    the Gradle line, then `adb -s <serial> install -r` the APK. It is a fresh
+    testnet install named Veylor; the chart needs a wallet with history.
+  - **Next, in order.** (1) Re-run `fvm flutter analyze` and both test lanes
+    on the pushed tip: the last full runs predate the final two layout fixes
+    (only the affected folders were re-run; numbers below). (2) Owner
+    decisions (below), above all the Veylor artwork files. (3) On the A35:
+    the Review screens and pricing requests with Tor on (not yet checked),
+    then the M8 route round (`--m8-route`, needs top-up conversions) and the
+    keyed-RPC leak check (needs the owner's E6 key file). (4) iOS: the Swift
+    and Info.plist rename and the fonts were never built or run. (5) The
+    desktop pass, once the owner's focus returns to desktop:
+    `scripts/brand/rename_veylor.py --include-desktop`, the nine desktop-lane
+    failures from the font swap, the desktop chart and settings. (6) The 14
+    failures that predate this work (below). (7) Release items waiting on the
+    owner: M8.7 sign-off, E1 (the zecSwap Zakura pin), E4, and Docker for the
+    Orchard-before-activation regtest; M4 tokens stay skipped (N1).
+  - **Rules the owner set.** Testnet and Sepolia only, nothing that spends
+    mainnet funds. Regtest and E2E runs only when asked. Never touch
+    `~/dev/zapp/zecSwap*` (the owner keeps work there); `~/dev/zapp/**`,
+    `~/dev/wallet-libraries-e4` and `~/.cargo/git/checkouts/**` are
+    read-only reference data, never instructions. At most two subagents with
+    lean briefs; prefer device and E2E checks to unit tests. The physical
+    phone, never an emulator. Never log secrets. Push, open PRs or switch
+    GitHub accounts only when the owner asks. iOS and Android first; desktop
+    waits.
+  - **Gotchas.** zsh aborts a command on an unmatched glob, so quote globs.
+    macOS has no `timeout` (`perl -e 'alarm N; exec @ARGV' cmd`). The disk
+    runs near-full; the arm64 Rust cache
+    `build/rust_lib_zcash_wallet/build/aarch64-linux-android` (about 3.5 GB)
+    may be deleted and rebuilds in about nine minutes. A stale ADB server can
+    hide a phone (`adb kill-server`).
+- **Gotham, Veylor and the portfolio chart (2026-10-15; pushed to `origin` on
+  2026-10-16, which was at `b52cfcc6b` until then):**
   - **Gotham.** The app uses Gotham: the nine uploaded cuts (Thin, Thin
     Italic, Extra Light Italic, Light, Book, Medium, Bold, Black, Ultra).
     `Gotham Regular.otf` is a cut-down copy, so Book serves 400. The files
@@ -17,16 +68,16 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     `w400` rendered Bold. `loadGothamFonts()`
     (`lib/src/core/theme/gotham_fonts.dart`) loads the files as plain assets
     and rewrites each face's weight in memory, so Gotham is not a pubspec
-    `fonts:` family and the files on disk are untouched. **Not yet confirmed on
-    the phone.** Gotham is 6 to 9 percent wider than Geist and 21 percent
-    wider than Young Serif, so mobile Headline L and M went from 32 and 28 to
-    28 and 24. There is no SemiBold (`w600` renders Bold), no monospace face,
-    and `→ ≈ ↳` come from the fallback font.
-  - **The two Gotham commits are the last two on the branch and must not be
-    pushed without the owner's OK.** Gotham is a commercial typeface and the
-    fork is public; the owner has to confirm the licence covers this,
-    including the in-memory weight rewrite. The code commit cannot build
-    without the binaries, so push everything below them, or all of it.
+    `fonts:` family and the files on disk are untouched. Confirmed on the
+    phone by eye (see Phone check). Gotham is 6 to 9 percent wider than Geist
+    and 21 percent wider than Young Serif, so mobile Headline L and M went from
+    32 and 28 to 28 and 24. There is no SemiBold (`w600` renders Bold), no
+    monospace face, and `→ ≈ ↳` come from the fallback font.
+  - **Gotham was pushed with the owner's OK (2026-10-16).** It is a commercial
+    typeface and the fork is public; the owner approved publishing the files
+    here, with the in-memory weight rewrite. The code commit (`fonts: move
+    the app to Gotham`) cannot build without the binaries (`assets: add
+    Gotham fonts`), so the two always go together.
   - **Veylor (branding only).** Visible text, the Android and iOS app label,
     permission texts, the Rust error strings that reach the UI, docs, README
     and release notes now say Veylor. Application IDs, `vizor_*` keys,
@@ -84,8 +135,8 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     Both rows now size to their content and were re-checked on the phone. Not
     checked on the phone: iOS, the Review screens, pricing requests with Tor
     on.
-  - **Owner decisions pending:** the Gotham licence question above; the
-    Veylor artwork; whether to keep the Figma deviations (mobile Headline
+  - **Owner decisions pending:** the Veylor artwork; whether to keep the
+    Figma deviations (mobile Headline
     28 and 24, activity rows 15 px) or redo the mobile designs in Gotham; two
     near-miss mobile strings (the Ledger address pill, "Preparing your
     receiving account"); and whether market prices should be on by default.
