@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' show ClipOp;
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,23 @@ import '../../../providers/sync_display_progress_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../formatting/sync_status_label.dart';
 import '../../theme/app_theme.dart';
+
+/// Which part of the sync line a layer draws.
+enum NeonSyncLinePart {
+  none,
+
+  /// All of it: the climbing line, over the content.
+  whole,
+
+  /// All but its head: a line running behind the content, whose head the
+  /// front layer draws.
+  belowHead,
+
+  /// Only its head, from just above it down past the readout: a line
+  /// running behind keeps this part in front, so nothing that lies between
+  /// the two layers (the top bar, a scroll fade) cuts it beside the readout.
+  head,
+}
 
 /// Which of the two sync layers a [NeonSyncBackdrop] draws.
 enum NeonSyncLayer {
@@ -65,8 +83,9 @@ class NeonSyncLine {
 }
 
 /// One layer of [line], below or above the content as Home layers it: the
-/// floor (and the line once synced) behind, the climbing line and the
-/// readout in front, where it ignores touches and carries the semantics.
+/// floor (and the line once synced, all but its head) behind, the climbing
+/// line (or the head of the one behind) and the readout in front, where it
+/// ignores touches and carries the semantics.
 class NeonSyncLineLayer extends StatelessWidget {
   const NeonSyncLineLayer({
     required this.line,
@@ -87,7 +106,12 @@ class NeonSyncLineLayer extends StatelessWidget {
       floorFlows: line.scanning,
       failed: line.failed,
       drawFloor: !front,
-      drawLine: front == line.climbing,
+      linePart: switch ((line.climbing, front)) {
+        (true, true) => NeonSyncLinePart.whole,
+        (true, false) => NeonSyncLinePart.none,
+        (false, true) => NeonSyncLinePart.head,
+        (false, false) => NeonSyncLinePart.belowHead,
+      },
       drawReadout: front,
     );
     if (!front) return ExcludeSemantics(child: view);
@@ -190,14 +214,14 @@ class NeonSyncBackdropView extends StatefulWidget {
     bool? floorFlows,
     this.failed = false,
     this.drawFloor = true,
-    this.drawLine = true,
+    this.linePart = NeonSyncLinePart.whole,
     this.drawReadout = true,
     super.key,
   }) : floorFlows = floorFlows ?? active;
 
   /// Which parts this layer draws.
   final bool drawFloor;
-  final bool drawLine;
+  final NeonSyncLinePart linePart;
   final bool drawReadout;
 
   /// How far the sync line has climbed, 0..1.
@@ -250,7 +274,7 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
   bool get _moves =>
       _motion &&
       ((widget.drawFloor && widget.floorFlows) ||
-          (widget.drawLine && widget.active));
+          (widget.linePart != NeonSyncLinePart.none && widget.active));
 
   void _syncFlow() {
     if (!_moves) {
@@ -272,6 +296,9 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
     final neon = context.colors.neon;
     final dark = context.colors.background.window.computeLuminance() < 0.2;
     final padding = MediaQuery.paddingOf(context);
+    final split =
+        widget.linePart == NeonSyncLinePart.head ||
+        widget.linePart == NeonSyncLinePart.belowHead;
     return RepaintBoundary(
       child: CustomPaint(
         painter: _BackdropPainter(
@@ -280,7 +307,12 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
           active: widget.active,
           failed: widget.failed,
           drawFloor: widget.drawFloor,
-          drawLine: widget.drawLine,
+          linePart: widget.linePart,
+          // Both layers measure the same readout, so they split the line in
+          // the same place.
+          readoutLength: split
+              ? neonSyncReadoutLength(context, widget.readout)
+              : 0,
           glow: neon.glow,
           core: neon.core,
           floorStrength: dark ? 0.6 : 0.35,
@@ -308,6 +340,65 @@ const _catchUpBlocks = 20;
 const _lineXFactor = 0.85;
 double _lineX(double width) => (width * _lineXFactor).roundToDouble() + 0.5;
 
+/// How far below the head the readout starts.
+const _readoutDrop = 10.0;
+
+/// How far past the readout, and above the head (its glow), a head drawn
+/// apart from the rest of its line reaches.
+const _headMargin = 12.0;
+const _headAbove = 32.0;
+
+/// The readout's style; its colours aside, what lays it out.
+TextStyle _readoutStyle({Color? color, Color? core}) => TextStyle(
+  fontFamily: 'Gotham',
+  fontSize: 9,
+  height: 1,
+  fontWeight: FontWeight.w300,
+  letterSpacing: 2.2,
+  color: core,
+  shadows: color == null ? null : Neon.textGlow(color, intensity: 0.5),
+);
+
+/// How far down from its top the drawn [readout] reaches: its text's width,
+/// as it reads bottom to top.
+@visibleForTesting
+double neonSyncReadoutLength(BuildContext context, String readout) {
+  final painter = TextPainter(
+    text: TextSpan(
+      text: readout.toUpperCase(),
+      style: DefaultTextStyle.of(context).style.merge(_readoutStyle()),
+    ),
+    textDirection: TextDirection.ltr,
+    textScaler: MediaQuery.textScalerOf(context),
+    maxLines: 1,
+  )..layout();
+  final length = painter.width;
+  painter.dispose();
+  return length;
+}
+
+/// The band of a line whose head is drawn apart from the rest (its front
+/// layer's part): from above the head, its glow included, down past a
+/// readout [readoutLength] long, on whole pixels so the seam never shows.
+@visibleForTesting
+Rect neonSyncHeadBand(
+  Size size, {
+  required double progress,
+  required double topLimit,
+  required double readoutLength,
+}) {
+  final headY = _headY(size.height, progress, topLimit);
+  return Rect.fromLTRB(
+    0,
+    (headY - _headAbove).floorToDouble(),
+    size.width,
+    math.min(
+      size.height,
+      (headY + _readoutDrop + readoutLength + _headMargin).ceilToDouble(),
+    ),
+  );
+}
+
 class _Readout extends StatelessWidget {
   const _Readout({
     required this.progress,
@@ -334,21 +425,13 @@ class _Readout extends StatelessWidget {
           children: [
             Positioned(
               right: constraints.maxWidth - _lineX(constraints.maxWidth) + 7,
-              top: headY + 10,
+              top: headY + _readoutDrop,
               child: RotatedBox(
                 quarterTurns: 3,
                 child: Text(
                   text.toUpperCase(),
                   maxLines: 1,
-                  style: TextStyle(
-                    fontFamily: 'Gotham',
-                    fontSize: 9,
-                    height: 1,
-                    fontWeight: FontWeight.w300,
-                    letterSpacing: 2.2,
-                    color: core,
-                    shadows: Neon.textGlow(color, intensity: 0.5),
-                  ),
+                  style: _readoutStyle(color: color, core: core),
                 ),
               ),
             ),
@@ -371,7 +454,8 @@ class _BackdropPainter extends CustomPainter {
     required this.active,
     required this.failed,
     required this.drawFloor,
-    required this.drawLine,
+    required this.linePart,
+    required this.readoutLength,
     required this.glow,
     required this.core,
     required this.floorStrength,
@@ -383,7 +467,10 @@ class _BackdropPainter extends CustomPainter {
   final bool active;
   final bool failed;
   final bool drawFloor;
-  final bool drawLine;
+  final NeonSyncLinePart linePart;
+
+  /// The readout's length, for where a head drawn apart ends.
+  final double readoutLength;
   final Color glow;
   final Color core;
   final double floorStrength;
@@ -392,7 +479,30 @@ class _BackdropPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (drawFloor) _paintFloor(canvas, size);
-    if (drawLine) _paintSyncLine(canvas, size);
+    switch (linePart) {
+      case NeonSyncLinePart.none:
+        break;
+      case NeonSyncLinePart.whole:
+        _paintSyncLine(canvas, size);
+      case NeonSyncLinePart.head || NeonSyncLinePart.belowHead:
+        // The same line in both layers, each clipped to its share.
+        final band = neonSyncHeadBand(
+          size,
+          progress: progress,
+          topLimit: topLimit,
+          readoutLength: readoutLength,
+        );
+        canvas
+          ..save()
+          ..clipRect(
+            band,
+            clipOp: linePart == NeonSyncLinePart.head
+                ? ClipOp.intersect
+                : ClipOp.difference,
+          );
+        _paintSyncLine(canvas, size);
+        canvas.restore();
+    }
   }
 
   /// A grid floor in perspective below a red horizon, flowing toward the
@@ -542,7 +652,8 @@ class _BackdropPainter extends CustomPainter {
     return oldDelegate.progress != progress ||
         oldDelegate.active != active ||
         oldDelegate.drawFloor != drawFloor ||
-        oldDelegate.drawLine != drawLine ||
+        oldDelegate.linePart != linePart ||
+        oldDelegate.readoutLength != readoutLength ||
         oldDelegate.failed != failed ||
         oldDelegate.glow != glow ||
         oldDelegate.core != core ||

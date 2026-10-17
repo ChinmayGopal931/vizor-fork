@@ -56,6 +56,10 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   - The Private USD screen's sync line reads "Railgun sync n%", "Railgun
     synced" and "Railgun sync failed" (drawn uppercase); the Tor readouts
     and Home are unchanged, and the device test's readout match follows.
+  - The sync line, once behind the content (synced, or failed), keeps its
+    head in the front layer, from just above it down past the readout, so
+    the top bar or a scroll fade no longer cuts it there (Home and Private
+    USD, `NeonSyncLinePart`). The two layers split it on whole pixels.
 - **Handoff (2026-10-16): start here.**
   - **State.** `feature/private-usd-android` is pushed to `origin` (the
     owner's fork) with everything below, the Gotham files included: the owner

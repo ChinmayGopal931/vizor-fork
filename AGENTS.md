@@ -213,6 +213,9 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   syncing the line is drawn over the content (`NeonSyncLayer.front`,
   ignoring touches); once synced it runs behind, and Home backs its blocks
   with solid black (`NeonSyncOcclude`) so the line shows only in the gaps.
+  Its head, from just above it down past the readout, stays in the front
+  layer (`NeonSyncLinePart.head`), so nothing between the layers (the top
+  bar, a scroll fade) cuts the line beside its readout.
   A scan that starts at most 20 blocks behind the tip counts as synced, so
   the line does not drop and re-climb every block. The Private USD screen
   draws Railgun's sync the same way (`privateUsdSyncLine`), with readouts

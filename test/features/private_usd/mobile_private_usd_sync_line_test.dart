@@ -100,9 +100,13 @@ void main() {
     final back = layer(tester, NeonSyncLayer.back);
     expect(readout(tester), 'RAILGUN SYNC 42%');
     expect(front.progress, 0.42);
-    expect(front.drawLine, isTrue, reason: 'climbing, over the content');
+    expect(
+      front.linePart,
+      NeonSyncLinePart.whole,
+      reason: 'climbing, over the content',
+    );
     expect(front.active, isTrue);
-    expect(back.drawLine, isFalse);
+    expect(back.linePart, NeonSyncLinePart.none);
     expect(back.drawFloor, isTrue);
     expect(back.floorFlows, isTrue);
     expect(
@@ -140,7 +144,7 @@ void main() {
     );
 
     expect(readout(tester), 'TOR …');
-    expect(layer(tester, NeonSyncLayer.front).drawLine, isTrue);
+    expect(layer(tester, NeonSyncLayer.front).linePart, NeonSyncLinePart.whole);
   });
 
   testWidgets('a synced balance runs the line behind blocks backed solid', (
@@ -153,10 +157,18 @@ void main() {
     final back = layer(tester, NeonSyncLayer.back);
     expect(readout(tester), 'RAILGUN SYNCED');
     expect(back.progress, 1);
-    expect(back.drawLine, isTrue, reason: 'behind the content');
+    expect(
+      back.linePart,
+      NeonSyncLinePart.belowHead,
+      reason: 'behind the content',
+    );
     expect(back.active, isFalse);
     expect(back.floorFlows, isFalse);
-    expect(front.drawLine, isFalse);
+    expect(
+      front.linePart,
+      NeonSyncLinePart.head,
+      reason: 'its head beside the readout stays in front',
+    );
     for (final block in const [
       'mobile_private_usd_total',
       'mobile_private_usd_buckets',
@@ -191,10 +203,10 @@ void main() {
     final back = layer(tester, NeonSyncLayer.back);
     expect(readout(tester), 'RAILGUN SYNCED');
     expect(back.progress, 1, reason: 'no drop to 0 and climb again');
-    expect(back.drawLine, isTrue);
+    expect(back.linePart, NeonSyncLinePart.belowHead);
     expect(back.active, isFalse);
     expect(back.floorFlows, isTrue);
-    expect(layer(tester, NeonSyncLayer.front).drawLine, isFalse);
+    expect(layer(tester, NeonSyncLayer.front).linePart, NeonSyncLinePart.head);
     expect(find.text(PrivateUsdCopy.updating), findsNothing);
     expect(find.bySemanticsLabel(PrivateUsdCopy.updating), findsOneWidget);
     semantics.dispose();
@@ -238,7 +250,7 @@ void main() {
   ) async {
     // No balance yet and no refresh running: the line climbs over the card.
     await pumpView(tester, const PrivateUsdBalanceState(firstSyncPercent: 30));
-    expect(layer(tester, NeonSyncLayer.front).drawLine, isTrue);
+    expect(layer(tester, NeonSyncLayer.front).linePart, NeonSyncLinePart.whole);
 
     await tester.tap(find.byKey(const ValueKey('mobile_private_usd_refresh')));
     expect(refreshes, 1);
