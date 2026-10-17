@@ -1,0 +1,12 @@
+{
+  "name": "railgun-artifacts",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "assets": {
+    "directory": "../files",
+    "binding": "ASSETS",
+    "not_found_handling": "none",
+    "run_worker_first": true
+  }
+}
