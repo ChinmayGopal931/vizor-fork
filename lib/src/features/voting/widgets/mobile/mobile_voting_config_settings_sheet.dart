@@ -378,7 +378,6 @@ class _MobileSourceRow extends StatelessWidget {
                       title,
                       style: AppTypography.labelLarge.copyWith(
                         color: colors.text.accent,
-                        fontWeight: FontWeight.w600,
                         letterSpacing: -0.04,
                       ),
                     ),
@@ -389,7 +388,6 @@ class _MobileSourceRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.labelLarge.copyWith(
                         color: colors.text.secondary,
-                        fontWeight: FontWeight.w400,
                         letterSpacing: -0.04,
                       ),
                     ),

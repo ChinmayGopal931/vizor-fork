@@ -344,7 +344,7 @@ class _Readout extends StatelessWidget {
                     fontFamily: 'Gotham',
                     fontSize: 9,
                     height: 1,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w300,
                     letterSpacing: 2.2,
                     color: core,
                     shadows: Neon.textGlow(color, intensity: 0.5),

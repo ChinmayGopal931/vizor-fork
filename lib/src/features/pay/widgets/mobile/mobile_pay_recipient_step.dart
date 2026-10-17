@@ -326,11 +326,9 @@ class _MobilePayRecipientStepState extends State<MobilePayRecipientStep> {
             keyboardType: TextInputType.text,
             textInputAction: TextInputAction.next,
             textStyle: AppTypography.labelLarge.copyWith(
-              fontWeight: FontWeight.w400,
               color: colors.text.accent,
             ),
             hintStyle: AppTypography.labelLarge.copyWith(
-              fontWeight: FontWeight.w400,
               color: colors.text.muted,
             ),
             restingBorderColor: hasError
@@ -432,7 +430,6 @@ class _MobilePayRecipientStepState extends State<MobilePayRecipientStep> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.labelLarge.copyWith(
-                        fontWeight: FontWeight.w400,
                         color: colors.text.secondary,
                       ),
                     ),
@@ -603,7 +600,6 @@ class _RecipientRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.labelLarge.copyWith(
-                    fontWeight: FontWeight.w400,
                     color: contact == null
                         ? colors.text.accent
                         : colors.text.secondary,

@@ -1211,10 +1211,7 @@ class _KeystoneSigningTitle extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: AppTypography.bodyLarge.copyWith(
-              color: subtitleColor,
-              fontWeight: FontWeight.w600,
-            ),
+            style: AppTypography.bodyLarge.copyWith(color: subtitleColor),
           ),
         ],
       ),
@@ -1249,10 +1246,7 @@ class _KeystoneSigningContextBadge extends StatelessWidget {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: AppTypography.bodySmall.copyWith(
-            color: foreground,
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppTypography.bodySmall.copyWith(color: foreground),
         ),
       ),
     );

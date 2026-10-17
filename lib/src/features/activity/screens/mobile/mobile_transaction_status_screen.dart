@@ -1355,10 +1355,7 @@ class _StatusChip extends StatelessWidget {
               maxLines: 1,
               softWrap: false,
               overflow: TextOverflow.ellipsis,
-              style: AppTypography.labelLarge.copyWith(
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
+              style: AppTypography.labelLarge.copyWith(color: color),
             ),
           ),
         ],

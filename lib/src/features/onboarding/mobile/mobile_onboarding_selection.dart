@@ -53,7 +53,6 @@ class MobileOnboardingSelectionPage extends StatelessWidget {
                       title,
                       textAlign: TextAlign.center,
                       style: AppTypography.displayLarge.copyWith(
-                        fontWeight: FontWeight.w500,
                         color: colors.text.accent,
                       ),
                     ),

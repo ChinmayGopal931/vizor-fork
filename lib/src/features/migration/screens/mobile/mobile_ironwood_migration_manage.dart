@@ -102,7 +102,6 @@ class _MobileMigrationManageDialogState
                         : 'Stop migration?',
                     style: AppTypography.bodyLarge.copyWith(
                       color: colors.text.accent,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),

@@ -64,9 +64,10 @@ class ReceiveAddressInfoSheet extends StatelessWidget {
                         receiveAddressInfoTitle(type),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        // The sheet's title: Thin, as sheet titles are.
                         style: AppTypography.bodyLarge.copyWith(
                           color: colors.text.accent,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w100,
                         ),
                       ),
                       Text(

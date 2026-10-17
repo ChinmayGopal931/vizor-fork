@@ -192,7 +192,6 @@ class _MobileSwapSlippageStepperModalState
                                     ),
                                     textAlign: TextAlign.center,
                                     style: AppTypography.labelMedium.copyWith(
-                                      fontWeight: FontWeight.w500,
                                       color: colors.text.destructive,
                                     ),
                                   )
@@ -229,7 +228,6 @@ class _MobileSwapSlippageStepperModalState
 
   Widget _buildValueInput(BuildContext context, Color valueColor) {
     final valueStyle = AppTypography.displayLarge.copyWith(
-      fontWeight: FontWeight.w500,
       fontSize: 60,
       height: 1,
       color: valueColor,
@@ -347,7 +345,7 @@ class _StepperButton extends StatelessWidget {
               // the glyph sits dead-center in the 44px pill.
               style: TextStyle(
                 fontFamily: 'Gotham',
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w300,
                 fontSize: 24,
                 height: 1,
                 leadingDistribution: TextLeadingDistribution.even,

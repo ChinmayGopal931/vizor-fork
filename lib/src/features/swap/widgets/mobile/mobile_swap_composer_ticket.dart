@@ -511,7 +511,6 @@ class _CurrencyPicker extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppTypography.labelLarge.copyWith(
-                  fontWeight: FontWeight.w600,
                   color: colors.text.accent,
                 ),
               ),
@@ -521,7 +520,6 @@ class _CurrencyPicker extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: AppTypography.labelLarge.copyWith(
-                  fontWeight: FontWeight.w400,
                   color: colors.text.secondary,
                 ),
               ),
@@ -554,8 +552,9 @@ class _FiatModeToggle extends StatelessWidget {
   /// Fiat input mode engaged (crimson mode icon).
   final bool active;
 
-  /// The side currently driving the quote renders its value semibold —
-  /// Figma pay "$0" Label M Semibold vs receive Label M Regular.
+  /// The side currently driving the quote renders its value brighter. Figma
+  /// sets it semibold (pay "$0" Label M Semibold vs receive Label M
+  /// Regular); Veylor's mobile type has no weight above Light.
   final bool strong;
   final VoidCallback onTap;
 
@@ -582,8 +581,7 @@ class _FiatModeToggle extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: AppTypography.labelLarge.copyWith(
-                fontWeight: strong ? FontWeight.w600 : FontWeight.w400,
-                color: colors.text.secondary,
+                color: strong ? colors.text.primary : colors.text.secondary,
               ),
             ),
           ),

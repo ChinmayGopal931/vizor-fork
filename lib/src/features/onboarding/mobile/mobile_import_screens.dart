@@ -62,7 +62,7 @@ const _kImportManualWordLineHeight = 24.0;
 const _kImportManualWordIndexWidth = 24.0;
 const _kImportManualWordIndexStyle = TextStyle(
   fontFamily: 'Gotham',
-  fontWeight: FontWeight.w500,
+  fontWeight: FontWeight.w300,
   fontSize: 15,
   height: 21 / 15,
 );

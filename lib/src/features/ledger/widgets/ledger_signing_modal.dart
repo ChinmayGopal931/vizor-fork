@@ -276,7 +276,7 @@ class LedgerSigningModal extends ConsumerWidget {
                       title,
                       style: AppTypography.bodyLarge.copyWith(
                         color: colors.text.accent,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: AppFontWeight.semiBold,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xxs),
@@ -335,7 +335,7 @@ class LedgerSigningModal extends ConsumerWidget {
                           color: error
                               ? colors.text.destructive
                               : colors.text.accent,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeight.semiBold,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xxs),

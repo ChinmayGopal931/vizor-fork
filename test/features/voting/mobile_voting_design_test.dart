@@ -374,17 +374,16 @@ void main() {
     await _pumpMobileFixture(tester, buildMobileVotingIneligibleModalUseCase);
     expect(
       tester.getRect(find.byType(MobileModalCard)),
-      // Re-measured for Gotham, which wraps the body onto more lines than the
-      // Figma frame (16, 238.5, 361, 375).
-      const Rect.fromLTWH(16, 225.5, 361, 401),
+      // Gotham Light sets the copy on the Figma frame's line count again.
+      const Rect.fromLTWH(16, 238.5, 361, 375),
     );
     final switchButton = find.byKey(
       const ValueKey('voting_ineligible_switch_account'),
     );
     final closeButton = find.byKey(const ValueKey('voting_ineligible_close'));
     expect(tester.getSize(switchButton), const Size(329, 50));
-    // Figma: 469.5. The taller Gotham modal body moves the button down 13 px.
-    expect(tester.getTopLeft(switchButton).dy, 482.5);
+    // Figma: 469.5.
+    expect(tester.getTopLeft(switchButton).dy, 469.5);
     expect(
       tester.getTopLeft(closeButton).dy - tester.getBottomLeft(switchButton).dy,
       12,
@@ -710,7 +709,7 @@ void main() {
         );
         final title = tester.widget<Text>(find.text('Vote config'));
         expect(title.style?.fontSize, 18);
-        expect(title.style?.fontWeight, FontWeight.w600);
+        expect(title.style?.fontWeight, FontWeight.w100);
         expect(tester.widget<Text>(find.text('Default')).style?.fontSize, 16);
         expect(find.text('Sources'), findsOneWidget);
         expect(

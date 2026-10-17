@@ -564,25 +564,22 @@ class _AccountCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Label M; SemiBold when selected, Medium otherwise.
+                    // Label M. The selected card is marked by its check and
+                    // the detail's colour, not by weight.
                     Text(
                       name,
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.labelLarge.copyWith(
-                        fontWeight: selected
-                            ? FontWeight.w600
-                            : FontWeight.w500,
                         color: colors.text.accent,
                       ),
                     ),
                     const SizedBox(height: 2),
-                    // Label M Regular; accent on the selected card, secondary
+                    // Label M; accent on the selected card, secondary
                     // otherwise.
                     Text(
                       detail,
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.labelLarge.copyWith(
-                        fontWeight: FontWeight.w400,
                         color: selected
                             ? colors.text.accent
                             : colors.text.secondary,

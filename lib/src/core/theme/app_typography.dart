@@ -132,10 +132,11 @@ const _codeMDesktop = TextStyle(
   letterSpacing: 0,
 );
 
-/// Figma `Code M`, Mobile mode — Geist Mono Medium, 16 / 21 px.
+/// Figma `Code M`, Mobile mode — Geist Mono Medium, 16 / 21 px. Light on
+/// mobile, with the rest of Veylor's type.
 const _codeMMobile = TextStyle(
   fontFamily: 'Gotham',
-  fontWeight: FontWeight.w400,
+  fontWeight: FontWeight.w300,
   fontSize: 16,
   height: 21 / 16,
   letterSpacing: 0,
@@ -145,6 +146,15 @@ const _codeMMobile = TextStyle(
 const _codeS = TextStyle(
   fontFamily: 'Gotham',
   fontWeight: FontWeight.w500,
+  fontSize: 13,
+  height: 17 / 13,
+  letterSpacing: 0,
+);
+
+/// Figma `Code S`, Mobile mode — the [_codeS] metrics in Light.
+const _codeSMobile = TextStyle(
+  fontFamily: 'Gotham',
+  fontWeight: FontWeight.w300,
   fontSize: 13,
   height: 17 / 13,
   letterSpacing: 0,
@@ -252,7 +262,8 @@ abstract final class AppTypographyDesktop {
 abstract final class AppTypographyMobile {
   // Veylor's neon redesign sets the mobile weights lighter than Figma, to
   // read thin and futuristic: Thin (100) for headlines and display numerals,
-  // Light (300) for body and labels, Book (400) where a label must stand out.
+  // Light (300) for everything else. No mobile style is Book (400) or
+  // heavier; emphasis comes from colour and size, not weight.
 
   /// Figma mobile app `Headline XL` — Young Serif, 40 / 40 px, −1.35.
   static const displayLarge = TextStyle(
@@ -296,10 +307,11 @@ abstract final class AppTypographyMobile {
     letterSpacing: -0.21,
   );
 
-  /// Figma `Body M Medium` — Geist Medium, 16 / 25 px, −0.21.
+  /// Figma `Body M Medium` — Geist Medium, 16 / 25 px, −0.21. Light like
+  /// [bodyMedium]: the mobile type has no heavier weight to emphasise with.
   static const bodyMediumStrong = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w300,
     fontSize: 16,
     height: 25 / 16,
     letterSpacing: -0.21,
@@ -343,7 +355,7 @@ abstract final class AppTypographyMobile {
 
   static const labelSmall = labelMedium;
   static const codeMedium = _codeMMobile;
-  static const codeSmall = _codeS;
+  static const codeSmall = _codeSMobile;
 }
 
 const _mobile = kAppFormFactor == AppFormFactor.mobile;
@@ -444,5 +456,32 @@ abstract final class AppTypography {
 
   /// Secondary monospace copy: mnemonic word indices, compact numeric
   /// metadata (Figma `Code S`).
-  static const codeSmall = _codeS;
+  static const codeSmall = _mobile
+      ? AppTypographyMobile.codeSmall
+      : AppTypographyDesktop.codeSmall;
+}
+
+/// Weights for the one-off emphasis overrides in widgets both form factors
+/// draw, as in `AppTypography.bodyMedium.copyWith(fontWeight:
+/// AppFontWeight.medium)`.
+///
+/// Desktop gets the Figma weight each one names. Veylor's mobile type has
+/// nothing heavier than Light, so on mobile every one of them is Light
+/// (`w300`). Mobile-only code needs none of these: it leaves the token's
+/// weight alone.
+abstract final class AppFontWeight {
+  /// Regular (`w400`) on desktop.
+  static const regular = _mobile ? FontWeight.w300 : FontWeight.w400;
+
+  /// Medium (`w500`) on desktop.
+  static const medium = _mobile ? FontWeight.w300 : FontWeight.w500;
+
+  /// SemiBold (`w600`, drawn as Gotham Bold) on desktop.
+  static const semiBold = _mobile ? FontWeight.w300 : FontWeight.w600;
+
+  /// Bold (`w700`) on desktop.
+  static const bold = _mobile ? FontWeight.w300 : FontWeight.w700;
+
+  /// ExtraBold (`w800`, drawn as Gotham Black) on desktop.
+  static const extraBold = _mobile ? FontWeight.w300 : FontWeight.w800;
 }

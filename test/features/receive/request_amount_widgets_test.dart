@@ -888,74 +888,70 @@ void main() {
   });
 
   group('RequestQrExportButton', () {
-    testWidgets(
-      'the button stays busy until the hand-off completes',
-      (tester) async {
-        // The desktop save dialog and the mobile share sheet both outlive the
-        // PNG render; a second press while one is open would start a second
-        // export.
-        final handoff = Completer<void>();
-        var delivered = 0;
-        await _pump(
-          tester,
-          RequestQrExportButton(
-            key: const ValueKey('export_button'),
-            uri: 'zcash:u1exportbusy',
-            label: 'Save QR image',
-            onBytes: (_) {
-              delivered++;
-              return handoff.future;
-            },
-          ),
-        );
+    testWidgets('the button stays busy until the hand-off completes', (
+      tester,
+    ) async {
+      // The desktop save dialog and the mobile share sheet both outlive the
+      // PNG render; a second press while one is open would start a second
+      // export.
+      final handoff = Completer<void>();
+      var delivered = 0;
+      await _pump(
+        tester,
+        RequestQrExportButton(
+          key: const ValueKey('export_button'),
+          uri: 'zcash:u1exportbusy',
+          label: 'Save QR image',
+          onBytes: (_) {
+            delivered++;
+            return handoff.future;
+          },
+        ),
+      );
 
-        await tester.tap(find.byKey(const ValueKey('export_button')));
-        await tester.pump();
-        await _settleEncode(tester);
+      await tester.tap(find.byKey(const ValueKey('export_button')));
+      await tester.pump();
+      await _settleEncode(tester);
 
-        expect(delivered, 1);
-        expect(_exportButton(tester, 'export_button').onPressed, isNull);
+      expect(delivered, 1);
+      expect(_exportButton(tester, 'export_button').onPressed, isNull);
 
-        handoff.complete();
-        await tester.pump();
+      handoff.complete();
+      await tester.pump();
 
-        expect(_exportButton(tester, 'export_button').onPressed, isNotNull);
-      },
-      timeout: _encodeTimeout,
-    );
+      expect(_exportButton(tester, 'export_button').onPressed, isNotNull);
+    }, timeout: _encodeTimeout);
 
-    testWidgets(
-      'an encode that fails calls onError and frees the button',
-      (tester) async {
-        final delivered = <Uint8List>[];
-        var errors = 0;
-        await _pump(
-          tester,
-          RequestQrExportButton(
-            key: const ValueKey('export_button'),
-            // Past the byte capacity of every symbol version, so the encoder
-            // refuses it. Before this the press was a silent no-op: the future
-            // is unawaited, so the throw escaped as a zone error and the user
-            // saw the spinner blink and nothing else.
-            uri: 'zcash:${'u' * 4000}',
-            label: 'Save QR image',
-            onBytes: delivered.add,
-            onError: () => errors++,
-          ),
-        );
+    testWidgets('an encode that fails calls onError and frees the button', (
+      tester,
+    ) async {
+      final delivered = <Uint8List>[];
+      var errors = 0;
+      await _pump(
+        tester,
+        RequestQrExportButton(
+          key: const ValueKey('export_button'),
+          // Past the byte capacity of every symbol version, so the encoder
+          // refuses it. Before this the press was a silent no-op: the future
+          // is unawaited, so the throw escaped as a zone error and the user
+          // saw the spinner blink and nothing else.
+          uri: 'zcash:${'u' * 4000}',
+          label: 'Save QR image',
+          onBytes: delivered.add,
+          onError: () => errors++,
+        ),
+      );
 
-        await tester.tap(find.byKey(const ValueKey('export_button')));
-        await tester.pump();
-        await _settleEncode(tester);
+      await tester.tap(find.byKey(const ValueKey('export_button')));
+      await tester.pump();
+      await _settleEncode(tester);
 
-        expect(delivered, isEmpty);
-        expect(errors, 1);
-        expect(tester.takeException(), isNull);
-        // Still pressable: the failure is reported, not terminal.
-        expect(_exportButton(tester, 'export_button').onPressed, isNotNull);
-      },
-      timeout: _encodeTimeout,
-    );
+      expect(delivered, isEmpty);
+      expect(errors, 1);
+      expect(tester.takeException(), isNull);
+      // Still pressable: the failure is reported, not terminal.
+      expect(_exportButton(tester, 'export_button').onPressed, isNotNull);
+    }, timeout: _encodeTimeout);
   });
 }
 

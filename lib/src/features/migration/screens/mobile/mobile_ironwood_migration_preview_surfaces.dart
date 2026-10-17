@@ -524,7 +524,6 @@ class _MigrationNotificationConfirmationContent extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppTypography.bodyLarge.copyWith(
                 color: context.colors.text.accent,
-                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -1645,7 +1644,6 @@ class _MigrationSkeletonValueRow extends StatelessWidget {
       color: accented
           ? context.colors.text.accent
           : context.colors.text.primary,
-      fontWeight: FontWeight.w400,
     );
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1932,7 +1930,6 @@ class _MigrationProgressStatus extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppTypography.bodyLarge.copyWith(
                 color: context.colors.text.accent,
-                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -2176,9 +2173,7 @@ class _AnimatedMigrationWaitLoopState extends State<_AnimatedMigrationWaitLoop>
               painter: _MigrationWaitLoopPainter(
                 lineColor: context.colors.text.accent,
                 successColor: context.colors.icon.success,
-                labelStyle: AppTypography.bodyLarge.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                labelStyle: AppTypography.bodyLarge,
               ),
             ),
           ),
@@ -2424,7 +2419,6 @@ class _MigrationHomeAttentionPreview extends StatelessWidget {
               'Recent activity',
               style: AppTypography.bodyLarge.copyWith(
                 color: context.colors.text.accent,
-                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -2628,17 +2622,11 @@ class _MigrationValueRow extends StatelessWidget {
       height: 20,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final style =
-              (emphasized
-                      ? AppTypography.labelLarge
-                      : AppTypography.labelLarge.copyWith(
-                          fontWeight: FontWeight.w400,
-                        ))
-                  .copyWith(
-                    color: emphasized || accented
-                        ? context.colors.text.accent
-                        : context.colors.text.primary,
-                  );
+          final style = AppTypography.labelLarge.copyWith(
+            color: emphasized || accented
+                ? context.colors.text.accent
+                : context.colors.text.primary,
+          );
           final labelPainter = TextPainter(
             text: TextSpan(text: label, style: style),
             maxLines: 1,

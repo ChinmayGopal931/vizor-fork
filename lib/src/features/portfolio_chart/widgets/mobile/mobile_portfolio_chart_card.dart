@@ -197,7 +197,7 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
                 maxLines: 1,
                 style: TextStyle(
                   fontFamily: 'Gotham',
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w300,
                   fontSize: 11,
                   height: 1.2,
                   letterSpacing: 2.2,

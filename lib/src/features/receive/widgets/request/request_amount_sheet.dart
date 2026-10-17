@@ -260,7 +260,6 @@ class _SerifAmountDisplay extends StatelessWidget {
           : colors.text.accent,
       fontSize: _kRequestAmountFontSize,
       height: _kRequestAmountLineHeightPx / _kRequestAmountFontSize,
-      fontWeight: FontWeight.w500,
     );
     final unitStyle = amountStyle.copyWith(
       color: amountStyle.color?.withValues(alpha: 0.5),

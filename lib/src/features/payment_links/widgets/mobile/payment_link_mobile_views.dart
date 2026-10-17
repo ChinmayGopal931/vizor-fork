@@ -83,9 +83,10 @@ class PaymentLinkHowItWorksMobileSheet extends StatelessWidget {
         children: [
           Text(
             title,
+            // The sheet's title: Thin, as sheet titles are.
             style: AppTypography.bodyLarge.copyWith(
               color: context.colors.text.accent,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w100,
             ),
           ),
           const SizedBox(height: AppSpacing.xxs),
@@ -1668,7 +1669,6 @@ class PaymentLinkReceivedMobileView extends StatelessWidget {
                     messageTitle,
                     style: AppTypography.labelLarge.copyWith(
                       color: context.colors.text.brandCrimson,
-                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],

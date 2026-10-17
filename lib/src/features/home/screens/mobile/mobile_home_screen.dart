@@ -547,7 +547,7 @@ class _IronwoodMigrationAnnouncementHostState
 
 const _mobileHomeLabelMStyle = TextStyle(
   fontFamily: 'Gotham',
-  fontWeight: FontWeight.w400,
+  fontWeight: FontWeight.w300,
   fontSize: 14,
   height: 16 / 14,
   letterSpacing: -0.06,
@@ -702,7 +702,7 @@ class _SyncKeepAwakePromptSheet extends StatelessWidget {
               _SyncKeepAwakePromptBullet(
                 iconName: AppIcons.cog,
                 text: 'You can change this anytime in the Settings.',
-                textStyle: bodyStyle.copyWith(fontWeight: FontWeight.w500),
+                textStyle: bodyStyle,
               ),
             ],
           ),
@@ -1859,7 +1859,7 @@ class _BalanceCard extends StatelessWidget {
 
 const _neonSignCaptionStyle = TextStyle(
   fontFamily: 'Gotham',
-  fontWeight: FontWeight.w400,
+  fontWeight: FontWeight.w300,
   fontSize: 13,
   height: 16 / 13,
   letterSpacing: 0.4,
@@ -2227,10 +2227,7 @@ class _MobileTransparentBalanceStrip extends StatelessWidget {
       key: const ValueKey('mobile_home_transparent_balance_text'),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: _mobileHomeLabelMStyle.copyWith(
-        color: colors.text.primary,
-        fontWeight: FontWeight.w500,
-      ),
+      style: _mobileHomeLabelMStyle.copyWith(color: colors.text.primary),
     );
 
     return SizedBox(
@@ -2517,9 +2514,10 @@ class _ImportingView extends StatelessWidget {
   static const _bottomClearance =
       kMobileTabBarHeight + AppSpacing.sm + AppSpacing.sm + AppSpacing.s;
 
+  // The state's statement, Thin like the screen titles.
   static const _titleStyle = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w100,
     fontSize: 24,
     height: 28 / 24,
     letterSpacing: -0.4,

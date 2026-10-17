@@ -186,7 +186,6 @@ class _EditAccountSheetState extends State<_EditAccountSheet> {
               Text(
                 'Account name',
                 style: AppTypography.labelLarge.copyWith(
-                  fontWeight: FontWeight.w400,
                   color: colors.text.secondary,
                 ),
               ),
@@ -302,9 +301,10 @@ class _ProfilePictureSheetState extends State<_ProfilePictureSheet> {
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     'Select profile picture',
+                    // The sheet's title: Thin, as sheet titles are.
                     style: AppTypography.bodyLarge.copyWith(
-                      fontWeight: FontWeight.w600,
                       color: colors.text.accent,
+                      fontWeight: FontWeight.w100,
                     ),
                   ),
                 ],

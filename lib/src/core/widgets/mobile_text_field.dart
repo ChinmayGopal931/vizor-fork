@@ -162,10 +162,7 @@ class _MobileTextFieldState extends State<MobileTextField> {
     final focused = widget.focusNode.hasFocus;
     final textStyle =
         widget.textStyle ??
-        AppTypography.labelMedium.copyWith(
-          fontWeight: FontWeight.w500,
-          color: colors.text.accent,
-        );
+        AppTypography.labelMedium.copyWith(color: colors.text.accent);
     final hintStyle =
         widget.hintStyle ??
         AppTypography.labelMedium.copyWith(color: colors.text.muted);

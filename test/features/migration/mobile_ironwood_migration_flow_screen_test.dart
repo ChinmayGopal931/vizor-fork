@@ -1900,7 +1900,7 @@ void main() {
     expect(tester.widget<Text>(find.text('1')).style?.fontSize, 16);
     expect(
       tester.widget<Text>(find.text('1')).style?.fontWeight,
-      FontWeight.w400,
+      AppTypography.labelLarge.fontWeight,
     );
   });
 
@@ -2000,7 +2000,7 @@ void main() {
     expect(subtitle.textAlign, TextAlign.center);
     expect(
       tester.widget<Text>(find.text('Immediate')).style?.fontWeight,
-      FontWeight.w600,
+      AppTypography.bodyLarge.fontWeight,
     );
     expect(
       tester

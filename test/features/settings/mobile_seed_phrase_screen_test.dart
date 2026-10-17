@@ -832,7 +832,7 @@ void main() {
     expect(title.style?.fontFamily, 'Gotham');
     expect(title.style?.fontSize, 24);
     expect(title.style?.height, 28 / 24);
-    expect(title.style?.fontWeight, FontWeight.w500);
+    expect(title.style?.fontWeight, FontWeight.w100);
     expect(title.style?.letterSpacing, -0.4);
     expect(titleSize.width, 253);
     expect(body.textAlign, TextAlign.center);

@@ -509,7 +509,6 @@ class _MobilePollCardContent extends ConsumerWidget {
             key: ValueKey('voting_poll_ineligible_${round.roundId}'),
             style: AppTypography.labelLarge.copyWith(
               color: colors.text.destructive,
-              fontWeight: FontWeight.w400,
               letterSpacing: -0.04,
             ),
           ),
@@ -517,10 +516,7 @@ class _MobilePollCardContent extends ConsumerWidget {
         ],
         Text(
           title,
-          style: AppTypography.bodyLarge.copyWith(
-            color: colors.text.accent,
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppTypography.bodyLarge.copyWith(color: colors.text.accent),
         ),
         const SizedBox(height: AppSpacing.s),
         Text(
@@ -620,7 +616,6 @@ class _MobilePollStatus extends StatelessWidget {
             displayedDate,
             style: AppTypography.labelLarge.copyWith(
               color: context.colors.text.primary,
-              fontWeight: FontWeight.w400,
               letterSpacing: -0.04,
             ),
           ),

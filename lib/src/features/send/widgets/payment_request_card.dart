@@ -923,7 +923,7 @@ class _RequesterDetails extends StatelessWidget {
                       Text(
                         'Note from requester',
                         style: AppTypography.bodySmall.copyWith(
-                          fontWeight: FontWeight.w500,
+                          fontWeight: AppFontWeight.medium,
                           color: c.text.secondary,
                         ),
                       ),
@@ -1228,7 +1228,7 @@ class _ExternalRequestIntroduction extends StatelessWidget {
                         'Payment request',
                         key: const ValueKey('payment_request_title'),
                         style: AppTypography.bodySmall.copyWith(
-                          fontWeight: FontWeight.w500,
+                          fontWeight: AppFontWeight.medium,
                           color: colors.text.secondary,
                         ),
                       ),

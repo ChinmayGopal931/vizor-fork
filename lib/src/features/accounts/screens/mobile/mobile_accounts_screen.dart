@@ -226,7 +226,6 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.labelLarge.copyWith(
                       color: itemTextColor,
-                      fontWeight: FontWeight.w400,
                     ),
                   ),
                 ),
@@ -780,21 +779,21 @@ class MobileAccountRemovalSheet extends StatelessWidget {
 
   static const _titleStyle = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w100,
     fontSize: 16,
     height: 24 / 16,
     letterSpacing: -0.24,
   );
   static const _bodyStyle = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w300,
     fontSize: 14,
     height: 21 / 14,
     letterSpacing: -0.21,
   );
   static const _buttonLabelStyle = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w300,
     fontSize: 14,
     height: 16 / 14,
     letterSpacing: -0.06,
@@ -872,10 +871,7 @@ class MobileAccountRemovalSheet extends StatelessWidget {
               Text(
                 PrivateUsdCopy.deleteUnfinishedTitle,
                 key: const ValueKey('mobile_account_remove_private_usd_title'),
-                style: _bodyStyle.copyWith(
-                  color: colors.text.destructive,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: _bodyStyle.copyWith(color: colors.text.destructive),
               ),
               const SizedBox(height: AppSpacing.xxs),
               Text(

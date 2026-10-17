@@ -2341,7 +2341,6 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
                                 _RecipientLineText(
                                   'Scan an address using camera',
                                   color: colors.text.secondary,
-                                  fontWeight: FontWeight.w400,
                                 ),
                               ],
                             ),
@@ -2420,7 +2419,6 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
                                         _RecipientLineText(
                                           _truncateAddress(contacts[i].address),
                                           color: colors.text.secondary,
-                                          fontWeight: FontWeight.w400,
                                         ),
                                       ],
                                     ),
@@ -2632,7 +2630,6 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
       color: showError ? colors.text.destructive : colors.text.accent,
       fontSize: _kMobileSendAmountFontSize,
       height: _kMobileSendAmountLineHeightPx / _kMobileSendAmountFontSize,
-      fontWeight: FontWeight.w500,
     );
     final amountUnitStyle = amountStyle.copyWith(
       color: amountStyle.color?.withValues(alpha: 0.5),
@@ -2831,10 +2828,7 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
               spendableText,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: AppTypography.labelLarge.copyWith(
-                color: textColor,
-                fontWeight: FontWeight.w600,
-              ),
+              style: AppTypography.labelLarge.copyWith(color: textColor),
             ),
           ),
           const SizedBox(width: AppSpacing.xs),
@@ -4071,7 +4065,6 @@ class _MemoSheetState extends State<_MemoSheet> {
     final error = overLimit ? 'Message is too long' : null;
     final labelStyle = AppTypography.labelLarge.copyWith(
       color: colors.text.secondary,
-      fontWeight: FontWeight.w400,
     );
     final primaryIsClear = _showClearMemo;
     final primaryDisabled = error != null && !primaryIsClear;
@@ -4593,15 +4586,10 @@ class MobileSaplingParamsSheet extends StatelessWidget {
 }
 
 class _RecipientLineText extends StatelessWidget {
-  const _RecipientLineText(
-    this.text, {
-    required this.color,
-    this.fontWeight = FontWeight.w500,
-  });
+  const _RecipientLineText(this.text, {required this.color});
 
   final String text;
   final Color color;
-  final FontWeight fontWeight;
 
   @override
   Widget build(BuildContext context) {
@@ -4617,10 +4605,7 @@ class _RecipientLineText extends StatelessWidget {
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTypography.labelLarge.copyWith(
-              color: color,
-              fontWeight: fontWeight,
-            ),
+            style: AppTypography.labelLarge.copyWith(color: color),
           ),
         ),
       ),

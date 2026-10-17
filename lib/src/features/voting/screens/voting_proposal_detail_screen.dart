@@ -968,7 +968,7 @@ class _SkippedQuestionsDialog extends StatelessWidget {
                         'Skip unanswered questions?',
                         style: AppTypography.bodyLarge.copyWith(
                           color: colors.text.accent,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: AppFontWeight.semiBold,
                         ),
                       ),
                     ),
@@ -1248,7 +1248,6 @@ class _MobilePollSummary extends StatelessWidget {
                     key: const ValueKey('voting_detail_ineligible_badge'),
                     style: AppTypography.labelLarge.copyWith(
                       color: colors.text.destructive,
-                      fontWeight: FontWeight.w400,
                       letterSpacing: -0.04,
                     ),
                   ),
@@ -1328,7 +1327,6 @@ class _MobilePollSummary extends StatelessWidget {
                                   : 'Show description',
                               style: AppTypography.labelLarge.copyWith(
                                 color: colors.text.accent,
-                                fontWeight: FontWeight.w400,
                                 letterSpacing: -0.04,
                               ),
                             ),
@@ -1815,7 +1813,6 @@ class _VotedPollHeader extends StatelessWidget {
               '#${formatGroupedInteger(snapshotHeight)}',
               style: AppTypography.labelLarge.copyWith(
                 color: colors.text.accent,
-                fontWeight: FontWeight.w600,
               ),
             ),
             const Spacer(),

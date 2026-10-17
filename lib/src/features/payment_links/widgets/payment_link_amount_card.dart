@@ -230,7 +230,7 @@ class _PaymentLinkAmountCardState extends State<PaymentLinkAmountCard>
       currency.label,
       style: AppTypography.labelMedium.copyWith(
         color: labelColor,
-        fontWeight: FontWeight.w600,
+        fontWeight: AppFontWeight.semiBold,
       ),
     );
     final action = PaymentLinkAction(

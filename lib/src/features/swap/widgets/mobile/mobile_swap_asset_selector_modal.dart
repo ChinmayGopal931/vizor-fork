@@ -276,7 +276,6 @@ class _AssetMenuRow extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.labelMedium.copyWith(
-                        fontWeight: FontWeight.w500,
                         color: colors.text.accent,
                       ),
                     ),

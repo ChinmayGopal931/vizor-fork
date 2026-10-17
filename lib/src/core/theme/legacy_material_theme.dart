@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
 import 'app_radii.dart';
+import 'app_typography.dart';
 
 /// LEGACY Zcash Wallet Material theme — Stitch-based tokens.
 ///
@@ -108,6 +109,10 @@ const _darkColorScheme = ColorScheme(
 
 // ---------------------------------------------------------------------------
 // Text themes
+//
+// Weights go through [AppFontWeight]: desktop keeps the weights named below,
+// and the mobile form factor, whose type is never heavier than Light, draws
+// every one of them in Light. Unstyled text inherits `bodyMedium` here.
 // ---------------------------------------------------------------------------
 
 const _bodyFamily = 'Gotham';
@@ -116,7 +121,7 @@ TextTheme _buildTextTheme(Color textColor) {
   return TextTheme(
     // Hero balance (56px, w800)
     displayLarge: TextStyle(
-      fontWeight: FontWeight.w800,
+      fontWeight: AppFontWeight.extraBold,
       fontSize: 56,
       height: 1.0,
       letterSpacing: -2,
@@ -124,7 +129,7 @@ TextTheme _buildTextTheme(Color textColor) {
     ),
     // Large heading (28px, w600) — e.g. "ZEC" unit
     displayMedium: TextStyle(
-      fontWeight: FontWeight.w600,
+      fontWeight: AppFontWeight.semiBold,
       fontSize: 28,
       height: 1.2,
       letterSpacing: -0.5,
@@ -132,7 +137,7 @@ TextTheme _buildTextTheme(Color textColor) {
     ),
     // Section heading (20px, w700)
     titleLarge: TextStyle(
-      fontWeight: FontWeight.w700,
+      fontWeight: AppFontWeight.bold,
       fontSize: 20,
       height: 1.2,
       letterSpacing: -0.3,
@@ -140,7 +145,7 @@ TextTheme _buildTextTheme(Color textColor) {
     ),
     // List item title (15px, w700)
     titleMedium: TextStyle(
-      fontWeight: FontWeight.w700,
+      fontWeight: AppFontWeight.bold,
       fontSize: 15,
       height: 1.4,
       color: textColor,
@@ -148,7 +153,7 @@ TextTheme _buildTextTheme(Color textColor) {
     // Body (14px Inter 400)
     bodyLarge: TextStyle(
       fontFamily: _bodyFamily,
-      fontWeight: FontWeight.w400,
+      fontWeight: AppFontWeight.regular,
       fontSize: 14,
       height: 1.5,
       color: textColor,
@@ -156,7 +161,7 @@ TextTheme _buildTextTheme(Color textColor) {
     // Body secondary (14px Inter 500)
     bodyMedium: TextStyle(
       fontFamily: _bodyFamily,
-      fontWeight: FontWeight.w500,
+      fontWeight: AppFontWeight.medium,
       fontSize: 14,
       height: 1.5,
       color: textColor,
@@ -164,7 +169,7 @@ TextTheme _buildTextTheme(Color textColor) {
     // Small body (12px Inter 500)
     bodySmall: TextStyle(
       fontFamily: _bodyFamily,
-      fontWeight: FontWeight.w500,
+      fontWeight: AppFontWeight.medium,
       fontSize: 12,
       height: 1.5,
       color: textColor,
@@ -172,14 +177,14 @@ TextTheme _buildTextTheme(Color textColor) {
     // Uppercase label (11px Inter 600)
     labelLarge: TextStyle(
       fontFamily: _bodyFamily,
-      fontWeight: FontWeight.w600,
+      fontWeight: AppFontWeight.semiBold,
       fontSize: 11,
       letterSpacing: 1.5,
       color: textColor,
     ),
     // Button label (11px, w700)
     labelMedium: TextStyle(
-      fontWeight: FontWeight.w700,
+      fontWeight: AppFontWeight.bold,
       fontSize: 11,
       letterSpacing: 2,
       color: textColor,
@@ -187,7 +192,7 @@ TextTheme _buildTextTheme(Color textColor) {
     // Caption (10px Inter 700)
     labelSmall: TextStyle(
       fontFamily: _bodyFamily,
-      fontWeight: FontWeight.w700,
+      fontWeight: AppFontWeight.bold,
       fontSize: 10,
       letterSpacing: 1.5,
       color: textColor,
@@ -253,7 +258,7 @@ ThemeData _buildTheme(ColorScheme colorScheme) {
       elevation: 0,
       scrolledUnderElevation: 0,
       titleTextStyle: TextStyle(
-        fontWeight: FontWeight.w700,
+        fontWeight: AppFontWeight.bold,
         fontSize: 20,
         letterSpacing: -0.3,
         color: colorScheme.onSurface,
@@ -264,7 +269,10 @@ ThemeData _buildTheme(ColorScheme colorScheme) {
         backgroundColor: colorScheme.primary,
         foregroundColor: colorScheme.onPrimary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        textStyle: const TextStyle(
+          fontWeight: AppFontWeight.bold,
+          fontSize: 14,
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -272,7 +280,10 @@ ThemeData _buildTheme(ColorScheme colorScheme) {
         foregroundColor: colorScheme.onSurface,
         side: BorderSide(color: colorScheme.outline),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        textStyle: const TextStyle(
+          fontWeight: AppFontWeight.bold,
+          fontSize: 14,
+        ),
       ),
     ),
   );

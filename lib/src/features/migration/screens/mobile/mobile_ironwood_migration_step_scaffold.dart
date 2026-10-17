@@ -137,7 +137,6 @@ class _MobileMigrationReviewScaffold extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: AppTypography.headlineLarge.copyWith(
                         color: colors.text.accent,
-                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 24),

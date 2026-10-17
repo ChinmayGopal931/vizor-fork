@@ -289,7 +289,7 @@ class MobileIronwoodKeystoneScanHelpBody extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppTypography.bodyLarge.copyWith(
                 color: colors.text.accent,
-                fontWeight: FontWeight.w600,
+                fontWeight: AppFontWeight.semiBold,
               ),
             ),
           ),

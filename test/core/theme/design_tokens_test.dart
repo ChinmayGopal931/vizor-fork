@@ -189,8 +189,41 @@ void main() {
     // but actual mobile app frames still render display headlines with
     // Young Serif. Keep that intentional app-level screen behavior pinned.
     // The neon redesign sets mobile lighter than Figma: Thin (100) for
-    // headlines and display, Light (300) for body and labels, Book (400)
-    // where a label must stand out.
+    // headlines and display, Light (300) for everything else. No mobile
+    // token is Book (400) or heavier.
+    const mobileStyles = <String, TextStyle>{
+      'displayLarge': AppTypographyMobile.displayLarge,
+      'displayMedium': AppTypographyMobile.displayMedium,
+      'displaySmall': AppTypographyMobile.displaySmall,
+      'headlineLarge': AppTypographyMobile.headlineLarge,
+      'headlineMedium': AppTypographyMobile.headlineMedium,
+      'headlineSmall': AppTypographyMobile.headlineSmall,
+      'bodyLarge': AppTypographyMobile.bodyLarge,
+      'bodyMedium': AppTypographyMobile.bodyMedium,
+      'bodyMediumStrong': AppTypographyMobile.bodyMediumStrong,
+      'bodySmall': AppTypographyMobile.bodySmall,
+      'bodyExtraSmall': AppTypographyMobile.bodyExtraSmall,
+      'labelLarge': AppTypographyMobile.labelLarge,
+      'labelMedium': AppTypographyMobile.labelMedium,
+      'labelSmall': AppTypographyMobile.labelSmall,
+      'codeMedium': AppTypographyMobile.codeMedium,
+      'codeSmall': AppTypographyMobile.codeSmall,
+    };
+    for (final MapEntry(key: name, value: style) in mobileStyles.entries) {
+      expect(
+        style.fontWeight,
+        anyOf(FontWeight.w100, FontWeight.w300),
+        reason: 'AppTypographyMobile.$name must be Thin or Light',
+      );
+    }
+    for (final name in [
+      'displayLarge',
+      'displaySmall',
+      'headlineLarge',
+      'headlineMedium',
+    ]) {
+      expect(mobileStyles[name]!.fontWeight, FontWeight.w100, reason: name);
+    }
     expect(AppTypographyMobile.displayLarge.fontFamily, 'Gotham');
     expect(AppTypographyMobile.displayLarge.fontWeight, FontWeight.w100);
     expect(AppTypographyMobile.displayLarge.fontSize, 40);
@@ -212,10 +245,13 @@ void main() {
     expect(AppTypographyMobile.headlineMedium.height, 30 / 24);
     expect(AppTypographyMobile.headlineMedium.letterSpacing, -0.24);
 
-    // Code S is mode-invariant; Code M scales up on mobile.
+    // Code S keeps the desktop metrics in Light; Code M scales up on mobile.
     expect(AppTypographyMobile.codeMedium.fontSize, 16);
     expect(AppTypographyMobile.codeMedium.height, 21 / 16);
-    expect(AppTypographyMobile.codeSmall, AppTypographyDesktop.codeSmall);
+    expect(
+      AppTypographyMobile.codeSmall,
+      AppTypographyDesktop.codeSmall.copyWith(fontWeight: FontWeight.w300),
+    );
 
     expect(AppTypographyMobile.headlineSmall.fontSize, 18);
     expect(AppTypographyMobile.headlineSmall.height, 22 / 18);
@@ -228,7 +264,7 @@ void main() {
     expect(AppTypographyMobile.bodyMedium.letterSpacing, -0.21);
     expect(AppTypographyMobile.bodyMediumStrong.fontSize, 16);
     expect(AppTypographyMobile.bodyMediumStrong.height, 25 / 16);
-    expect(AppTypographyMobile.bodyMediumStrong.fontWeight, FontWeight.w400);
+    expect(AppTypographyMobile.bodyMediumStrong.fontWeight, FontWeight.w300);
     expect(AppTypographyMobile.bodySmall.fontSize, 14);
     expect(AppTypographyMobile.bodySmall.height, 20 / 14);
     expect(AppTypographyMobile.bodyExtraSmall.fontSize, 13);
@@ -240,6 +276,15 @@ void main() {
     expect(AppTypographyMobile.labelMedium.fontSize, 14);
     expect(AppTypographyMobile.labelMedium.height, 15 / 14);
     expect(AppTypographyMobile.labelSmall, AppTypographyMobile.labelMedium);
+  });
+
+  test('AppFontWeight keeps the desktop weight and is Light on mobile', () {
+    const mobile = kAppFormFactor == AppFormFactor.mobile;
+    expect(AppFontWeight.regular, mobile ? FontWeight.w300 : FontWeight.w400);
+    expect(AppFontWeight.medium, mobile ? FontWeight.w300 : FontWeight.w500);
+    expect(AppFontWeight.semiBold, mobile ? FontWeight.w300 : FontWeight.w600);
+    expect(AppFontWeight.bold, mobile ? FontWeight.w300 : FontWeight.w700);
+    expect(AppFontWeight.extraBold, mobile ? FontWeight.w300 : FontWeight.w800);
   });
 
   test('semantic color tokens match 2 Color Theme-3.zip', () {

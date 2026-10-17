@@ -454,21 +454,21 @@ class _DisableBiometricSheet extends StatelessWidget {
 
   static const _titleStyle = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w100,
     fontSize: 16,
     height: 24 / 16,
     letterSpacing: -0.24,
   );
   static const _bodyStyle = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w300,
     fontSize: 14,
     height: 21 / 14,
     letterSpacing: -0.21,
   );
   static const _buttonLabelStyle = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w300,
     fontSize: 14,
     height: 16 / 14,
     letterSpacing: -0.06,

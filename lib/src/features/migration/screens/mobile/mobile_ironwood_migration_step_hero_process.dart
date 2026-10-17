@@ -146,7 +146,6 @@ class _MobilePoolMigrationHero extends StatelessWidget {
                           amount,
                           style: AppTypography.labelLarge.copyWith(
                             color: colors.text.accent,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -166,7 +165,6 @@ class _MobilePoolMigrationHero extends StatelessWidget {
                           amount,
                           style: AppTypography.labelLarge.copyWith(
                             color: colors.text.accent,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -326,7 +324,6 @@ class _ProcessRow extends StatelessWidget {
                 '$number',
                 style: AppTypography.labelLarge.copyWith(
                   color: colors.text.secondary,
-                  fontWeight: FontWeight.w400,
                 ),
               ),
             ),

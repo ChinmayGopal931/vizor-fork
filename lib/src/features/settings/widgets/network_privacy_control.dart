@@ -146,7 +146,7 @@ class NetworkPrivacyControl extends ConsumerWidget {
                               overflow: TextOverflow.ellipsis,
                               style: AppTypography.labelLarge.copyWith(
                                 color: presentation.statusColor(colors),
-                                fontWeight: FontWeight.w400,
+                                fontWeight: AppFontWeight.regular,
                               ),
                             ),
                           ),
@@ -256,7 +256,7 @@ class NetworkPrivacyControl extends ConsumerWidget {
                 key: const ValueKey('network_privacy_surface_title'),
                 style: AppTypography.labelLarge.copyWith(
                   color: colors.text.secondary,
-                  fontWeight: FontWeight.w400,
+                  fontWeight: AppFontWeight.regular,
                 ),
               ),
             ),

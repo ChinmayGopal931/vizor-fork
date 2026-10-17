@@ -69,7 +69,6 @@ class MobileVotingSubmissionProgressScreen extends StatelessWidget {
     final noticeStyle = AppTypography.bodyLarge.copyWith(
       // Same metrics either way, so the measured layout below is unaffected.
       color: warning == null ? colors.text.accent : colors.text.destructive,
-      fontWeight: FontWeight.w600,
     );
     final titleStyle = AppTypography.displayLarge.copyWith(
       color: colors.text.accent,
@@ -565,7 +564,6 @@ class _VotingSubmissionStepRow extends StatelessWidget {
                 color: activeOrComplete
                     ? colors.text.accent
                     : colors.text.muted,
-                fontWeight: FontWeight.w400,
                 letterSpacing: -0.04,
               ),
             ),

@@ -4,11 +4,11 @@ import 'package:flutter/widgets.dart';
 
 import 'app_radii.dart';
 
-/// The neon redesign's HUD caption: Gotham Book, uppercase (the caller
+/// The neon redesign's HUD caption: Gotham Light, uppercase (the caller
 /// upper-cases the text), wide-tracked. Section heads and small labels.
 const kNeonHudCaptionStyle = TextStyle(
   fontFamily: 'Gotham',
-  fontWeight: FontWeight.w400,
+  fontWeight: FontWeight.w300,
   fontSize: 11,
   height: 1.3,
   letterSpacing: 2.4,

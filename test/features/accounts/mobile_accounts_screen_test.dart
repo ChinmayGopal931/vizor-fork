@@ -980,7 +980,7 @@ void main() {
       findsOneWidget,
     );
     final accountLabel = tester.widget<Text>(find.text('Account name'));
-    expect(accountLabel.style?.fontWeight, FontWeight.w400);
+    expect(accountLabel.style?.fontWeight, AppTypography.labelLarge.fontWeight);
     expect(accountLabel.style?.fontSize, AppTypography.labelLarge.fontSize);
     expect(accountLabel.style?.height, AppTypography.labelLarge.height);
     expect(
@@ -1062,7 +1062,7 @@ void main() {
     final profilePictureTitle = tester.widget<Text>(
       find.text('Select profile picture'),
     );
-    expect(profilePictureTitle.style?.fontWeight, FontWeight.w600);
+    expect(profilePictureTitle.style?.fontWeight, FontWeight.w100);
     expect(
       profilePictureTitle.style?.fontSize,
       AppTypography.bodyLarge.fontSize,
@@ -1253,21 +1253,21 @@ void main() {
     final title = tester.widget<Text>(find.text('Remove account'));
     expect(title.style?.fontSize, 16);
     expect(title.style?.height, 24 / 16);
-    expect(title.style?.fontWeight, FontWeight.w600);
+    expect(title.style?.fontWeight, FontWeight.w100);
     final body = tester.widget<Text>(
       find.textContaining('deletes its local data'),
     );
     expect(body.style?.fontSize, 14);
     expect(body.style?.height, 21 / 14);
-    expect(body.style?.fontWeight, FontWeight.w400);
+    expect(body.style?.fontWeight, FontWeight.w300);
     final remove = tester.widget<Text>(find.text('Remove'));
     expect(remove.style?.fontSize, 14);
     expect(remove.style?.height, 16 / 14);
-    expect(remove.style?.fontWeight, FontWeight.w500);
+    expect(remove.style?.fontWeight, FontWeight.w300);
     final cancel = tester.widget<Text>(find.text('Cancel'));
     expect(cancel.style?.fontSize, 14);
     expect(cancel.style?.height, 16 / 14);
-    expect(cancel.style?.fontWeight, FontWeight.w500);
+    expect(cancel.style?.fontWeight, FontWeight.w300);
 
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();

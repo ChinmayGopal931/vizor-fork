@@ -177,9 +177,7 @@ class _PaymentLinkClaimAccountSheetState
                             ),
                             label: account.name,
                             minRowHeight: _rowHeight,
-                            textStyle: AppTypography.labelMedium.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
+                            textStyle: AppTypography.labelMedium,
                             leading: MobileAccountAvatar(
                               profilePictureId: account.profilePictureId,
                               size: AppProfilePictureSize.navLarge,

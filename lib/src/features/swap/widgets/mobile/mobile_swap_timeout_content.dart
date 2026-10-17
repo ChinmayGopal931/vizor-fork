@@ -22,7 +22,7 @@ class MobileSwapTimeoutContent extends StatelessWidget {
 
   static const _headlineStyle = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w100,
     fontSize: 24,
     height: 28 / 24,
     letterSpacing: 0,

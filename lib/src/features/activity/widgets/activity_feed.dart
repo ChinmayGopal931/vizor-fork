@@ -969,7 +969,7 @@ class _ActivityRowSubtitle extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: _activityRowSubtitleStyle.copyWith(
               color: colors.text.secondary,
-              fontWeight: FontWeight.w400,
+              fontWeight: AppFontWeight.regular,
             ),
           ),
         ),

@@ -302,7 +302,9 @@ class _WalletLinkScanCardState extends State<_WalletLinkScanCard> {
           : null,
       forceActiveForTesting: forced == AddressQrCameraStatus.active,
       cameraHeight: widget.cameraHeight,
-      caption: widget.loading ? 'Reading link...' : 'Scan the Veylor desktop QR',
+      caption: widget.loading
+          ? 'Reading link...'
+          : 'Scan the Veylor desktop QR',
       permissionTitle: 'Scan the Veylor desktop QR',
       unavailableDescription:
           'Desktop link scanning needs a camera on this device.',
@@ -389,7 +391,6 @@ class _WalletLinkScanErrorCard extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: AppTypography.bodyLarge.copyWith(
                     color: colors.text.accent,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xxs),
@@ -972,7 +973,6 @@ class _WalletLinkListSection extends StatelessWidget {
                         color: onAction == null
                             ? colors.text.disabled
                             : colors.text.secondary,
-                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
@@ -1022,10 +1022,7 @@ class _WalletLinkNothingToImportCard extends StatelessWidget {
           Text(
             'Nothing to import',
             textAlign: TextAlign.center,
-            style: AppTypography.bodyLarge.copyWith(
-              color: colors.text.accent,
-              fontWeight: FontWeight.w600,
-            ),
+            style: AppTypography.bodyLarge.copyWith(color: colors.text.accent),
           ),
           const SizedBox(height: AppSpacing.xxs),
           Text(
@@ -1151,7 +1148,6 @@ class _WalletLinkAccountRow extends StatelessWidget {
                       color: account.isImportable
                           ? colors.text.accent
                           : colors.text.secondary,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
                 ],
@@ -1213,7 +1209,6 @@ class _WalletLinkContactRow extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.labelLarge.copyWith(
                       color: colors.text.accent,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -1225,7 +1220,6 @@ class _WalletLinkContactRow extends StatelessWidget {
                       color: enabled && selected
                           ? colors.text.accent
                           : colors.text.secondary,
-                      fontWeight: FontWeight.w400,
                     ),
                   ),
                 ],
@@ -1260,7 +1254,6 @@ class _ContactGroupHeader extends StatelessWidget {
             network.label,
             style: AppTypography.labelLarge.copyWith(
               color: colors.text.secondary,
-              fontWeight: FontWeight.w500,
             ),
           ),
         ],

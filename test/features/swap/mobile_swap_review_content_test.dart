@@ -248,7 +248,7 @@ void main() {
     expect(find.text('Solana address'), findsOneWidget);
     final title = tester.widget<Text>(find.text('Solana address'));
     expect(title.style?.fontSize, AppTypography.bodyLarge.fontSize);
-    expect(title.style?.fontWeight, FontWeight.w600);
+    expect(title.style?.fontWeight, FontWeight.w100);
 
     final addressScope = find.byKey(
       const ValueKey('mobile_address_verify_chunks'),

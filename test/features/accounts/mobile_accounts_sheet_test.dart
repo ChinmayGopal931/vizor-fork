@@ -292,7 +292,7 @@ void main() {
     expect((gutter.padding as EdgeInsets).right, 18);
     expect(rowLabel.style?.fontSize, 14);
     expect(rowLabel.style?.height, 16 / 14);
-    expect(rowLabel.style?.fontWeight, FontWeight.w500);
+    expect(rowLabel.style?.fontWeight, FontWeight.w300);
 
     await tester.dragFrom(
       Offset(scrollbarRect.right - 9, scrollbarRect.top + 24),

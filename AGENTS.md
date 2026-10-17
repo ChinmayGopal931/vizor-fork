@@ -174,13 +174,23 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   `Neon.boxGlow`, `Neon.strokeTube` (halo, glow and core: every lit line
   uses it), `NeonIgnition` (a sign's switch-on flicker, off under reduced
   motion) and `kNeonHudCaptionStyle`.
-- **Type.** Gotham everywhere, lighter on mobile: `AppTypographyMobile`
-  uses Thin (100) for headlines and display numerals and Light (300) for
-  body and labels. Page titles (`MobileTopNav.back`) are spaced uppercase
-  Thin; section heads (Settings groups, Activity dates, Home's recent
-  activity) are uppercase red HUD captions. These uppercase captions are a
-  deliberate exception to the sentence-case rule; the strings themselves
-  stay sentence case and are upper-cased where drawn.
+- **Type.** Gotham everywhere, lighter on mobile, and nothing on mobile is
+  Book (400) or heavier. Headings are Thin (100): screen, step, page and
+  sheet titles, a state's statement (Home's "We're importing your
+  wallet..."), and display numerals. Everything else is Light (300):
+  subtitles, body, labels, field and helper text, buttons, chips, rows,
+  card titles and the HUD captions. Emphasis comes from colour and size,
+  not weight. Every `AppTypographyMobile` token is Thin or Light
+  (`bodyMediumStrong` and the code styles included), so mobile code leaves
+  the token's weight alone. Widgets both form factors draw use
+  `AppFontWeight` for a one-off emphasis weight (desktop keeps the Figma
+  weight, mobile resolves it to Light); the legacy Material theme goes
+  through it too, so unstyled mobile text is Light. There are no exceptions.
+  Page titles (`MobileTopNav.back`) are spaced uppercase Thin; section heads
+  (Settings groups, Activity dates, Home's recent activity) are uppercase
+  red HUD captions. These uppercase captions are a deliberate exception to
+  the sentence-case rule; the strings themselves stay sentence case and are
+  upper-cased where drawn.
 - **Home.** The balance is a frameless neon sign: Thin red digits with a
   glow, the privacy eye (a bare glyph) to their right, the fiat line
   above, and the portfolio chart's line as a light trail below

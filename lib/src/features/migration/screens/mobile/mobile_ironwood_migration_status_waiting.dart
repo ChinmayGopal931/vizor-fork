@@ -136,10 +136,7 @@ class _MobileMigrationWaitingDetailRow extends StatelessWidget {
         if (value.isNotEmpty)
           Text(
             value,
-            style: AppTypography.labelLarge.copyWith(
-              color: colors.text.accent,
-              fontWeight: FontWeight.w600,
-            ),
+            style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
           ),
       ],
     );

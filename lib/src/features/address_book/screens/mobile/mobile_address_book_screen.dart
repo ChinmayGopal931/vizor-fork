@@ -521,7 +521,6 @@ class _ContactRow extends StatelessWidget {
                   // Figma `Asset Sub Text`: Label M Regular (16) — mobile
                   // `labelLarge` weighted down to regular.
                   style: AppTypography.labelLarge.copyWith(
-                    fontWeight: FontWeight.w400,
                     color: colors.text.secondary,
                   ),
                 ),
@@ -666,7 +665,6 @@ class _ContactRowMenuButtonState extends State<_ContactRowMenuButton> {
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.labelLarge.copyWith(
                       color: itemTextColor,
-                      fontWeight: FontWeight.w400,
                     ),
                   ),
                 ),

@@ -58,7 +58,6 @@ class _MobileMigrationPreparing extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: AppTypography.headlineLarge.copyWith(
                       color: colors.text.accent,
-                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -81,7 +80,6 @@ class _MobileMigrationPreparing extends StatelessWidget {
                           TextSpan(
                             style: AppTypography.bodyLarge.copyWith(
                               color: colors.text.accent,
-                              fontWeight: FontWeight.w600,
                             ),
                             children: [
                               const TextSpan(text: 'Migration '),
@@ -230,7 +228,6 @@ class _MobileMigrationMigratingState
           textAlign: TextAlign.center,
           style: AppTypography.headlineLarge.copyWith(
             color: colors.text.accent,
-            fontWeight: FontWeight.w500,
           ),
         ),
         SizedBox(height: compact ? AppSpacing.md : 44),
@@ -241,7 +238,6 @@ class _MobileMigrationMigratingState
                 TextSpan(
                   style: AppTypography.bodyLarge.copyWith(
                     color: colors.text.accent,
-                    fontWeight: FontWeight.w600,
                   ),
                   children: [
                     const TextSpan(text: 'Migration '),
@@ -400,7 +396,6 @@ class _MobileMigrationRecoveryDialog extends StatelessWidget {
                   'Rebuild migration?',
                   style: AppTypography.bodyLarge.copyWith(
                     color: colors.text.accent,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),

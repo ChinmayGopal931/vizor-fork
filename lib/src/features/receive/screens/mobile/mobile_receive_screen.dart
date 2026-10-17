@@ -256,7 +256,8 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                         iconSize: _MobileReceiveMetrics.tabsIconSize,
                         iconGap: AppSpacing.xs,
                         labelStyle: AppTypography.labelLarge,
-                        labelFontWeight: FontWeight.w500,
+                        // Null keeps the label style's Light weight.
+                        labelFontWeight: null,
                         alwaysDarkSelected: true,
                         selectedType: _selectedType,
                         onChanged: _selectType,
@@ -327,9 +328,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                                     ),
                                     child: Text(
                                       'Share $poolLabel address',
-                                      style: AppTypography.labelMedium.copyWith(
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                      style: AppTypography.labelMedium,
                                     ),
                                   ),
                                 ),
@@ -504,7 +503,6 @@ class _ReceiveAddressSummary extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppTypography.bodyLarge.copyWith(
                 color: colors.text.accent,
-                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -575,10 +573,7 @@ class _CopyAddressTextButton extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTypography.labelMedium.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: AppTypography.labelMedium.copyWith(color: color),
                 ),
               ),
             ],
