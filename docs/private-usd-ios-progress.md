@@ -10,14 +10,15 @@ Tracks `docs/private-usd-ios-plan.md` §4. A task is done only when its line is 
 ## Where things stand (2026-10-17; read this first)
 
 - **Planned, nothing built.** The owner deferred the iOS host on 2026-10-17 and asked for this plan the same day. Android's state is in `docs/private-usd-progress.md`.
-- **Decisions waiting for the owner:** DI1–DI8 (plan §1.1). Until the owner rules, the defaults stated there hold. DI3, the licensing review, blocks only external distribution.
+- **Decisions.** The owner confirmed DI2 (hide below iOS 17), DI6 (exclude from backups) and DI7 (the full rebuild) on 2026-10-17. DI1, DI3–DI5 and DI8 are still proposals; their defaults hold. DI3, the licensing review, blocks only external distribution.
+- **Order (owner, 2026-10-17; VI-1).** Code first: MI1–MI3 without any simulator or device run. The MI0 checks, the device parts of MI1–MI3 and the Swift test runs wait for the first session with a phone connected. If space runs short, the Android Rust cache (`build/rust_lib_zcash_wallet/build/aarch64-linux-android`, about 3.5 GB) may be deleted; nothing else.
 - **Deliverables.** EI1 (a test iPhone) and EI2 (signing for device builds) gate every device step. The simulator covers MI0's function checks.
 - **Simulator.**
   - The iPhone 17 Pro simulator (iOS 26.5), UDID `2F355481-7C3B-47C9-ACBD-A9E08938C039`, already runs the app with the neon redesign: testnet, with a wallet created on 2026-10-17.
   - Private USD is hidden there, as it should be: the platform gate is Android-only (`private_usd_available_provider.dart:59`).
 - **No iPhone yet.**
 - **Disk.** About 10 GB was free after `rust/target` was deleted on 2026-10-17, and an iOS simulator build needs 5–6 GB of it. Check before each build.
-- **Next.** The owner rules on DI2, DI6 and DI8, then MI0.
+- **Next.** MI1, MI2 and MI3's code (VI-1). The owner rules on DI8 before the first device build.
 
 ## MI0. Spikes (go/no-go)
 
@@ -101,7 +102,9 @@ Tracks `docs/private-usd-ios-plan.md` §4. A task is done only when its line is 
 
 ## Deviations
 
-None yet. Number them VI-1, VI-2, and so on. Each entry says what the plan said, what reality required, and which section of the plan was updated in the same commit.
+Number them VI-1, VI-2, and so on. Each entry says what the plan said, what reality required, and which section of the plan was updated in the same commit.
+
+- **VI-1 (owner, 2026-10-17): code before the spike.** The plan put MI0, a go/no-go spike on the simulator and an iPhone, before MI1. Because Android already works, the owner moved the code first: MI1–MI3 are implemented without simulator or device runs, and the MI0 checks, the device parts of MI1–MI3 and the Swift test runs happen together in the first session with a phone connected. Their fallbacks (plan §11) still apply if a check fails then. Plan "How to work" updated.
 
 ## Blocked
 

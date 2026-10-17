@@ -40,7 +40,7 @@
 ## How to work
 
 - **Checklist.** `docs/private-usd-ios-progress.md` has one line per task. Check a line only when the task is done, and commit the checklist with the work. Log deviations (VI-n) and blockers (BI-n) there.
-- **Order.** MI0 is a go/no-go spike. Do not start MI1 until MI0's **Done when** holds, or its fallback is recorded as a deviation. Then work the milestones in order, and the tasks within one in order.
+- **Order.** MI0 is a go/no-go spike. Do not start MI1 until MI0's **Done when** holds, or its fallback is recorded as a deviation. Then work the milestones in order, and the tasks within one in order. **Changed by the owner on 2026-10-17 (VI-1):** Android already works, so MI1–MI3's code goes first, with no simulator or device runs. MI0's checks, the device parts of MI1–MI3 and the Swift test runs are done together in the first session with a phone connected.
 - **Milestone done.** A milestone is done when its **Done when** list holds, and all of these pass:
   - `cd rust && cargo test`
   - `fvm flutter analyze`
@@ -84,7 +84,7 @@
 
 ### 1.1 Decisions for the owner (proposed 2026-10-17)
 
-None of these is final. Each row is a proposal with its reasoning; the owner confirms or overrides it before the milestone that needs it.
+Each row is a proposal with its reasoning; the owner confirms or overrides it before the milestone that needs it. **Confirmed by the owner on 2026-10-17:** DI2 (hide below iOS 17), DI6 (exclude from backups) and DI7 (the full rebuild, E5's changes included, accepting that the A35's test wallet may rescan once). The others are still proposals.
 
 | # | Proposal | Why, and what follows | Needed by |
 |---|---|---|---|
