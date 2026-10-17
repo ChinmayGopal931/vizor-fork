@@ -10,9 +10,7 @@ import '../../models/private_usd_balances.dart';
 import '../../private_usd_copy.dart';
 import '../../providers/private_usd_balance_provider.dart';
 import '../../services/private_usd_balance_repository.dart';
-
-/// The Private USD icon until the E10 artwork exists.
-const kPrivateUsdIcon = AppIcons.moneyBag;
+import 'private_usd_logo.dart';
 
 /// Height of the home strip: the transparent-balance strip's.
 const kPrivateUsdHomeStripHeight = 57.0;
@@ -143,17 +141,13 @@ class PrivateUsdHomeStripView extends StatelessWidget {
             ),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                // What is left once the icon, chevron and gaps are placed.
+                // What is left once the logo, chevron and gaps are placed.
                 final room =
                     constraints.maxWidth -
                     (20 + AppSpacing.xs + AppSpacing.s + AppSpacing.xxs + 20);
                 return Row(
                   children: [
-                    AppIcon(
-                      kPrivateUsdIcon,
-                      size: 20,
-                      color: colors.text.primary,
-                    ),
+                    const PrivateUsdLogo(size: 20),
                     const SizedBox(width: AppSpacing.xs),
                     // The name and the ZEC worth on the left keep whatever the
                     // right side does not need, so "≈ 0.03613 ZEC" is not cut

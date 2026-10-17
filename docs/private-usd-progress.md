@@ -38,6 +38,15 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   for 10 s (30 s at first; the owner shortened it the same day, as the SDK
   gives a circuit's three files 45 s in all; the rebuilt bundle's Node tests
   17 passed and `check.mjs` passed). Not yet run on a phone.
+- **Owner feedback from the iPhone (2026-10-17).** Shared Dart, so Android
+  changes too; none of it has run on a phone yet.
+  - The logo: zapp's USDC token with its Railgun badge (`PrivateUsdLogo`,
+    `assets/private_usd/railgun_badge.webp`; the token is the swap screens'
+    `usdc.webp`, pixel for pixel zapp's) replaces the money bag on the home
+    strip, the holdings panel, the banner and the activity rows.
+  - The convert panels show each asset's logo beside their caption, both
+    ways, and the review and progress headers show Private USD's logo in
+    place of USDC on Ethereum (ZEC keeps the app's `zec.webp`, zapp's art).
 - **Handoff (2026-10-16): start here.**
   - **State.** `feature/private-usd-android` is pushed to `origin` (the
     owner's fork) with everything below, the Gotham files included: the owner

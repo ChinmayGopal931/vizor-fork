@@ -1115,6 +1115,12 @@ class _ActivityRowIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (row.leading case final leading?) {
+      return SizedBox.square(
+        dimension: _avatarSize,
+        child: Center(child: leading),
+      );
+    }
     final progress = row.leadingProgressValue;
     if (progress != null) {
       return SizedBox.square(

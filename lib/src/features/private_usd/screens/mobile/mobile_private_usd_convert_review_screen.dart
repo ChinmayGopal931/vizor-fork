@@ -20,6 +20,7 @@ import '../../private_usd_copy.dart';
 import '../../providers/private_usd_convert_provider.dart';
 import '../../providers/private_usd_reverse_convert_provider.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
+import '../../widgets/mobile/private_usd_logo.dart';
 import 'mobile_private_usd_convert_screen.dart';
 import 'mobile_private_usd_reverse_convert_view.dart';
 
@@ -191,6 +192,7 @@ class MobilePrivateUsdConvertReviewView extends StatelessWidget {
                           label: PrivateUsdCopy.convertYouReceive,
                           amountText: masked(formatPrivateUsd(quote.receives)),
                           asset: SwapAsset.usdc,
+                          icon: const PrivateUsdLogo(),
                           bottomText: PrivateUsdCopy.title,
                         ),
                       ),

@@ -24,6 +24,7 @@ import '../../private_usd_copy.dart';
 import '../../providers/private_usd_convert_provider.dart';
 import '../../providers/private_usd_reverse_convert_provider.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
+import '../../widgets/mobile/private_usd_logo.dart';
 import 'mobile_private_usd_convert_screen.dart';
 
 /// The reverse amount step (plan reference §9.4 S4), private USD → ZEC: the
@@ -215,7 +216,7 @@ class _UsdCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const PrivateUsdPanelCaption(PrivateUsdCopy.title),
+          const PrivateUsdPanelCaption.privateUsd(),
           const SizedBox(height: AppSpacing.xs),
           TextField(
             key: const ValueKey('mobile_private_usd_convert_amount'),
@@ -300,7 +301,7 @@ class _ZecCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const PrivateUsdPanelCaption(PrivateUsdCopy.convertAssetZec),
+          const PrivateUsdPanelCaption.zec(),
           const SizedBox(height: AppSpacing.xs),
           // While the quote is on its way the amount churns as cipher; the
           // quote then decrypts in.
@@ -469,6 +470,7 @@ class MobilePrivateUsdReverseReviewView extends StatelessWidget {
                             formatPrivateUsd(privateUsdReverseDebit(draft)),
                           ),
                           asset: SwapAsset.usdc,
+                          icon: const PrivateUsdLogo(),
                           bottomText: PrivateUsdCopy.title,
                         ),
                         receive: MobileSwapReviewHeaderRow(

@@ -30,7 +30,10 @@ import '../../providers/private_usd_convert_provider.dart';
 import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_reverse_convert_provider.dart';
 import '../../services/private_usd_zec_quote_search.dart';
+import '../../../swap/domain/swap_asset.dart';
+import '../../../swap/widgets/swap_asset_icon.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
+import '../../widgets/mobile/private_usd_logo.dart';
 import 'mobile_private_usd_reverse_convert_view.dart';
 
 /// Railgun's fee for shielding the payout, as the quote ledger says it.
@@ -430,7 +433,7 @@ class _ZecCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const PrivateUsdPanelCaption(PrivateUsdCopy.convertAssetZec),
+          const PrivateUsdPanelCaption.zec(),
           const SizedBox(height: AppSpacing.xs),
           TextField(
             key: const ValueKey('mobile_private_usd_convert_amount'),
@@ -534,7 +537,7 @@ class _EstimateCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const PrivateUsdPanelCaption(PrivateUsdCopy.title),
+          const PrivateUsdPanelCaption.privateUsd(),
           const SizedBox(height: AppSpacing.xs),
           // While the quote is on its way the amount churns as cipher; the
           // quote then decrypts in.
@@ -735,21 +738,51 @@ class PrivateUsdLedgerRow extends StatelessWidget {
   }
 }
 
-/// A Private USD panel's caption (the asset it holds), as a red HUD caption.
+/// The side of an asset's logo beside a convert panel's caption.
+const kPrivateUsdCaptionLogoSize = 20.0;
+
+/// A Private USD panel's caption (the asset it holds), as a red HUD caption,
+/// with the asset's logo before it as in zapp's convert screen.
 class PrivateUsdPanelCaption extends StatelessWidget {
-  const PrivateUsdPanelCaption(this.text, {super.key});
+  const PrivateUsdPanelCaption(this.text, {this.logo, super.key});
+
+  /// The ZEC panel's: ZEC's logo and "ZEC".
+  const PrivateUsdPanelCaption.zec({super.key})
+    : text = PrivateUsdCopy.convertAssetZec,
+      logo = const SwapAssetIcon(
+        asset: SwapAsset.zec,
+        size: kPrivateUsdCaptionLogoSize,
+        showChainBadge: false,
+      );
+
+  /// The Private USD panel's: its logo and "Private USD".
+  const PrivateUsdPanelCaption.privateUsd({super.key})
+    : text = PrivateUsdCopy.title,
+      logo = const PrivateUsdLogo(size: kPrivateUsdCaptionLogoSize);
 
   final String text;
+
+  /// The asset's logo, before the caption.
+  final Widget? logo;
 
   @override
   Widget build(BuildContext context) {
     final glow = context.colors.neon.glow;
-    return Text(
+    final caption = Text(
       text.toUpperCase(),
       style: kNeonHudCaptionStyle.copyWith(
         color: glow,
         shadows: Neon.textGlow(glow, intensity: 0.3),
       ),
+    );
+    final logo = this.logo;
+    if (logo == null) return caption;
+    return Row(
+      children: [
+        logo,
+        const SizedBox(width: AppSpacing.xs),
+        Flexible(child: caption),
+      ],
     );
   }
 }

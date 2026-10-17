@@ -17,10 +17,15 @@ class MobileHomeEntryCard extends StatelessWidget {
     this.emphasized = false,
     this.showChevron = true,
     this.semanticsLabel,
+    this.leading,
     super.key,
   });
 
   final String icon;
+
+  /// Drawn in place of [icon], and of its plate on an [emphasized] card: an
+  /// asset's logo (Private USD's).
+  final Widget? leading;
   final String title;
   final String subtitle;
   final bool emphasized;
@@ -68,7 +73,12 @@ class MobileHomeEntryCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (emphasized)
+                if (leading case final leading?)
+                  SizedBox.square(
+                    dimension: emphasized ? 36 : 20,
+                    child: Center(child: leading),
+                  )
+                else if (emphasized)
                   Container(
                     width: 36,
                     height: 36,

@@ -7,6 +7,7 @@ class ActivityRowData {
     required this.leadingIconName,
     required this.leadingBackgroundColor,
     required this.leadingIconColor,
+    this.leading,
     this.leadingProgressValue,
     this.subtitle,
     this.subtitleIconName,
@@ -32,6 +33,10 @@ class ActivityRowData {
   final String leadingIconName;
   final Color leadingBackgroundColor;
   final Color leadingIconColor;
+
+  /// An image drawn in place of the leading icon and its plate, at the
+  /// avatar's size: an asset's logo (Private USD's).
+  final Widget? leading;
   final double? leadingProgressValue;
   final String? subtitle;
   final String? subtitleIconName;

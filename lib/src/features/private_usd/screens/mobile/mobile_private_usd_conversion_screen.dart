@@ -28,6 +28,7 @@ import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_keep_awake_provider.dart';
 import '../../services/private_usd_balance_repository.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
+import '../../widgets/mobile/private_usd_logo.dart';
 import 'mobile_private_usd_convert_screen.dart';
 
 /// `/private-usd/conversion/:direction/:index` (plan reference §9.4 S5,
@@ -362,11 +363,13 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
           label: status.payLabel,
           amountText: presentation.payAmountText,
           asset: status.payAsset,
+          icon: privateUsdHeaderIcon(status.payAsset),
         ),
         receiveHeaderRow: MobileSwapReviewHeaderRow(
           label: status.receiveLabel,
           amountText: presentation.receiveAmountText,
           asset: status.receiveAsset,
+          icon: privateUsdHeaderIcon(status.receiveAsset),
           bottomText: PrivateUsdCopy.title,
         ),
         activeTab: activeTab,

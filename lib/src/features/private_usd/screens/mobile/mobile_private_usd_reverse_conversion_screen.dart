@@ -25,6 +25,7 @@ import '../../providers/private_usd_keep_awake_provider.dart';
 import '../../providers/private_usd_reverse_conversion_provider.dart';
 import '../../widgets/mobile/private_usd_confirm_sheets.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
+import '../../widgets/mobile/private_usd_logo.dart';
 import 'mobile_private_usd_conversion_screen.dart' show PrivateUsdProblemCard;
 import 'mobile_private_usd_convert_screen.dart' show PrivateUsdInfoButton;
 
@@ -359,12 +360,14 @@ class MobilePrivateUsdReverseConversionView extends StatelessWidget {
           label: status.payLabel,
           amountText: presentation.payAmountText,
           asset: status.payAsset,
+          icon: privateUsdHeaderIcon(status.payAsset),
           bottomText: PrivateUsdCopy.title,
         ),
         receiveHeaderRow: MobileSwapReviewHeaderRow(
           label: status.receiveLabel,
           amountText: presentation.receiveAmountText,
           asset: status.receiveAsset,
+          icon: privateUsdHeaderIcon(status.receiveAsset),
         ),
         activeTab: activeTab,
         detailsExpanded: detailsExpanded,

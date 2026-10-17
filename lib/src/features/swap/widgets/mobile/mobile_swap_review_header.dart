@@ -12,6 +12,7 @@ class MobileSwapReviewHeaderRow {
     required this.label,
     required this.amountText,
     required this.asset,
+    this.icon,
     this.bottomText,
     this.fullAddress,
     this.addressNetworkLabel,
@@ -24,6 +25,10 @@ class MobileSwapReviewHeaderRow {
   final String amountText;
 
   final SwapAsset asset;
+
+  /// Drawn in place of [asset]'s coin: Private USD's logo for the private
+  /// dollars, which are USDC but not USDC on Ethereum.
+  final Widget? icon;
 
   /// Small grey line under the amount — the fiat value or
   /// "To: 0x1125 ... 17512".
@@ -142,11 +147,13 @@ class _HeaderRow extends StatelessWidget {
           SizedBox(
             width: 40,
             child: Center(
-              child: SwapAssetIcon(
-                asset: row.asset,
-                size: 32,
-                showChainBadge: !row.asset.isNativeZec,
-              ),
+              child:
+                  row.icon ??
+                  SwapAssetIcon(
+                    asset: row.asset,
+                    size: 32,
+                    showChainBadge: !row.asset.isNativeZec,
+                  ),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -203,11 +210,13 @@ class _HeaderRow extends StatelessWidget {
                                     ? 'Zcash address'
                                     : '${row.asset.chainLabel} address'),
                             address: fullAddress,
-                            leading: SwapAssetIcon(
-                              asset: row.asset,
-                              size: 32,
-                              showChainBadge: false,
-                            ),
+                            leading:
+                                row.icon ??
+                                SwapAssetIcon(
+                                  asset: row.asset,
+                                  size: 32,
+                                  showChainBadge: false,
+                                ),
                           ),
                         ),
                     ],

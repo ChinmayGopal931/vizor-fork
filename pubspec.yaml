@@ -143,6 +143,7 @@ flutter:
         - windows
     - assets/swap/tokens/
     - assets/swap/chains/
+    - assets/private_usd/
     # Gotham, the app's only typeface. These are plain assets, not a
     # `fonts:` family: loadGothamFonts() registers them at startup because
     # Flutter takes a face's weight from the font file, and these files'

@@ -20,7 +20,12 @@ import '../../private_usd_copy.dart';
 import '../../providers/private_usd_activity_provider.dart';
 import '../../providers/private_usd_available_provider.dart';
 import '../../services/private_usd_engine.dart';
-import 'private_usd_home_strip.dart';
+import 'private_usd_logo.dart';
+
+// Private USD's rows lead with its logo; the glyph stands in only where a
+// row cannot draw an image.
+const _glyph = AppIcons.moneyBag;
+const _logo = PrivateUsdLogo(size: AppAssetSize.size);
 
 /// A forward conversion's activity row (plan reference §9.4 S2), or null
 /// when it moved no money (nothing sent).
@@ -59,7 +64,8 @@ ActivityRowData? buildPrivateUsdActivityRow({
       return ActivityRowData(
         stableId: base.stableId,
         title: PrivateUsdCopy.activityConverting,
-        leadingIconName: kPrivateUsdIcon,
+        leadingIconName: _glyph,
+        leading: _logo,
         leadingBackgroundColor: base.leadingBackgroundColor,
         leadingIconColor: base.leadingIconColor,
         subtitle: privateUsdForwardStageLabel(
@@ -85,7 +91,8 @@ ActivityRowData? buildPrivateUsdActivityRow({
       return ActivityRowData(
         stableId: base.stableId,
         title: PrivateUsdCopy.activityConverted,
-        leadingIconName: kPrivateUsdIcon,
+        leadingIconName: _glyph,
+        leading: _logo,
         leadingBackgroundColor: base.leadingBackgroundColor,
         leadingIconColor: base.leadingIconColor,
         subtitle: zec,
@@ -157,7 +164,8 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
       return ActivityRowData(
         stableId: stableId,
         title: PrivateUsdCopy.activityConvertedToZec,
-        leadingIconName: kPrivateUsdIcon,
+        leadingIconName: _glyph,
+        leading: _logo,
         leadingBackgroundColor: background,
         leadingIconColor: icon,
         subtitle: zec,
@@ -186,7 +194,8 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
       return ActivityRowData(
         stableId: stableId,
         title: PrivateUsdCopy.activityConvertingToZec,
-        leadingIconName: kPrivateUsdIcon,
+        leadingIconName: _glyph,
+        leading: _logo,
         leadingBackgroundColor: background,
         leadingIconColor: icon,
         subtitle: privateUsdReverseStageLabel(record),
@@ -229,7 +238,8 @@ ActivityRowData buildPrivateUsdSendActivityRow({
     title: record.withdraw
         ? PrivateUsdCopy.activityWithdrew
         : PrivateUsdCopy.activitySent,
-    leadingIconName: kPrivateUsdIcon,
+    leadingIconName: _glyph,
+    leading: _logo,
     leadingBackgroundColor: colors.background.neutralSubtleOpacity,
     leadingIconColor: colors.icon.regular,
     subtitle: unconfirmed
