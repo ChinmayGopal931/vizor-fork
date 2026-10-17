@@ -89,7 +89,8 @@ test('when the gateway fails, the mirror is asked for the same path, the same wa
   }
 });
 
-test('the mirror is asked once nothing has come from the gateway for 30 s', async (t) => {
+test('the mirror is asked once nothing has come from the gateway for 10 s', async (t) => {
+  assert.equal(GATEWAY_STALL_MS, 10_000);
   t.mock.timers.enable({ apis: ['setTimeout'] });
   let progress;
   const axios = axiosReplying((url, config) => {

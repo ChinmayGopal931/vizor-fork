@@ -7,8 +7,11 @@
 export const IPFS_GATEWAY = 'https://ipfs-lb.com';
 /** Serves the gateway's `/ipfs/<cid>/…` artifact paths, byte for byte (scripts/private-usd/artifacts-mirror/). */
 export const ARTIFACT_MIRROR = 'https://railgun-artifacts.pepeman931.workers.dev';
-/** How long the gateway may send nothing, before its answer starts or during it, until the mirror is asked instead. */
-export const GATEWAY_STALL_MS = 30_000;
+/**
+ * How long the gateway may send nothing, before its answer starts or during it, until the mirror is asked instead. The
+ * SDK gives a circuit's three files 45 s in all, so the mirror needs most of that time.
+ */
+export const GATEWAY_STALL_MS = 10_000;
 
 /**
  * `axios.get(url, config)` for an artifact `url` on the gateway. When the gateway's request fails (an HTTP error, a

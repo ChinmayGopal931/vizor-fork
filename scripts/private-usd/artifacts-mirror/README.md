@@ -3,7 +3,7 @@
 A read-only copy of the RAILGUN circuit artifacts (zkey, wasm, vkey) that the wallet SDK downloads before a
 proof, served at `https://railgun-artifacts.pepeman931.workers.dev` from the owner's Cloudflare account (Worker
 `railgun-artifacts`, static assets). The Private USD page downloads from `https://ipfs-lb.com`, the SDK's own
-gateway, and falls back to this mirror when that fails (an HTTP or network error, or no answer within about 30 s).
+gateway, and falls back to this mirror when that fails (an HTTP or network error, or nothing from it for 10 s).
 
 **Why.** The SDK hard-codes `ipfs-lb.com` as its only gateway, with no setting and no fallback. On 2026-10-17 it
 went down (Cloudflare 502 for everything), and a fresh install could not make its first proof. Railway and zapp

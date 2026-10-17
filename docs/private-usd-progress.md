@@ -35,7 +35,9 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   circuit artifacts from, went down, so a fresh install could make no proof.
   The page still asks it first, and turns to
   `railgun-artifacts.pepeman931.workers.dev` when it fails or sends nothing
-  for 30 s. The bundle is rebuilt; not yet run on a phone.
+  for 10 s (30 s at first; the owner shortened it the same day, as the SDK
+  gives a circuit's three files 45 s in all; the rebuilt bundle's Node tests
+  17 passed and `check.mjs` passed). Not yet run on a phone.
 - **Handoff (2026-10-16): start here.**
   - **State.** `feature/private-usd-android` is pushed to `origin` (the
     owner's fork) with everything below, the Gotham files included: the owner
@@ -2908,7 +2910,7 @@ M8 status (2026-10-14): the non-device parts are done.
     with the same arguments. The build fails if the downloader no longer
     uses axios once, for that request, or if the plugin never sees it.
   - **When the mirror is asked.** When the gateway's request fails: an HTTP
-    error, a network error, or nothing from the gateway for 30 s, before its
+    error, a network error, or nothing from the gateway for 10 s, before its
     answer starts or during it (the request is then aborted). A gateway that
     keeps sending, however slowly, is left to finish. If both fail, the
     mirror's error is the one reported. While the gateway answers 502 at
@@ -2921,9 +2923,11 @@ M8 status (2026-10-14): the non-device parts are done.
     optional, and it is not simple, since the check runs inside the SDK
     after the request returns.
   - **The SDK's time limit.** The SDK gives a circuit's three files 45 s in
-    all, so after a gateway that sent nothing for 30 s the mirror may not
-    finish in time. The step then fails, but the downloads go on while the
-    page stays open and are kept, so the next try finds them.
+    all. The wait was 30 s at first, which could leave the mirror too little
+    of that; the owner had it cut to 10 s the same day
+    (`GATEWAY_STALL_MS`), so the mirror gets most of the 45 s. If it still
+    runs out the step fails, but the downloads go on while the page stays
+    open and are kept, so the next try finds them.
   - **The hosts.** `railgun-artifacts.pepeman931.workers.dev` joined the
     page's hosts, after `ipfs-lb.com`, which stays: Rust
     `RAILGUN_PAGE_HOSTS` (now 10), Kotlin's and Swift's `RailgunEndpoints`
@@ -2936,7 +2940,7 @@ M8 status (2026-10-14): the non-device parts are done.
   - **Tests.** `dev/artifact-mirror.test.mjs` (Node, 9 tests): the SDK asks
     the gateway for exactly the 279 files the mirror holds; the mirror is
     asked only when the gateway fails, for the same path and the same way,
-    including after 30 s with nothing from the gateway (mocked timers); and
+    including after 10 s with nothing from the gateway (mocked timers); and
     the SDK's own downloader, rewritten as the build rewrites it, keeps what
     the mirror sends after the gateway fails and refuses a file with the
     wrong hash from either source. `check.mjs`'s boundary check fetches a
