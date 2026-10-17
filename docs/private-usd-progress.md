@@ -12,7 +12,10 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     owner's fork) with everything below, the Gotham files included: the owner
     approved publishing them on 2026-10-16. Nothing is merged and no PR is
     open; open one only when the owner asks. `spike/private-usd-m0` stays
-    local.
+    local. The mobile neon redesign (AGENTS.md, "Mobile neon redesign
+    (Veylor)") went in on 2026-10-16, directed by the owner on the phones:
+    no behaviour changes except Settings' chart default range, which is
+    gone.
   - **Phones.** The test phone is the Galaxy A35 (`RZCX40721QZ`, funded
     testnet wallet; its passcode is in `run_device_round.sh`). It was
     unplugged at the end of 2026-10-16, so check `adb devices -l` first and
@@ -29,9 +32,27 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     `VIZOR_PRIVATE_USD_ENABLED=true`, `ZCASH_DEFAULT_NETWORK=test`), restore
     the Gradle line, then `adb -s <serial> install -r` the APK. It is a fresh
     testnet install named Veylor; the chart needs a wallet with history.
-  - **Next, in order.** (1) Re-run `fvm flutter analyze` and both test lanes
-    on the pushed tip: the last full runs predate the final two layout fixes
-    (only the affected folders were re-run; numbers below). (2) Owner
+    `flutter run` works the same way for hot reload (switch the line, run,
+    restore it once the app is up); hot-reloaded code is gone when the app
+    restarts, so rebuild before relying on a phone. The OnePlus 15's DNS
+    proxy timed out lookups for the side-by-side app (`result_code:408` for
+    the Sepolia RPC host), which showed as API errors: check that phone's
+    per-app network permission. A OnePlus 8T (`914652c5`, Android 14, no
+    Play Store wallet) also has the side-by-side app.
+  - **Next, in order.** (0) The redesign on iOS: the Live Activities, launch
+    screen and keyboard check are restyled and compile. The first simulator
+    run stopped because the disk ran out mid-build (it needs about 5 to 6 GB
+    free; the cached build is in Xcode's DerivedData, and `rust/target` was
+    deleted to make room). The app now runs on the iPhone simulator
+    (2026-10-17) and the owner reviews it there: the top-left account under
+    the Dynamic Island, the tab bar's 16 px gap, sheets, and Gotham's thin
+    weights. Private USD stays Android-only: on iOS it would need a native
+    host for the Railgun page (a WKWebView with the same allowlist and
+    routing), which the owner deferred on 2026-10-17.
+    (1) Both test lanes ran on the redesign's tree (2026-10-17): mobile
+    2,328 passed and none failed; default 6,030 passed and 13 failed, the
+    same 13 that fail at `25af59f48`, before it (listed under "Checks on the
+    integrated tree"). (2) Owner
     decisions (below), above all the Veylor artwork files. (3) On the A35:
     the Review screens and pricing requests with Tor on (not yet checked),
     then the M8 route round (`--m8-route`, needs top-up conversions) and the
@@ -107,6 +128,14 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     unless Tor is on; the settings card says so. `VIZOR_PRICING_ENGINE_BASE_URL`
     overrides the host (https only); the Home price still uses CoinGecko.
     Desktop is not done.
+  - **Checks after the neon redesign (2026-10-17).** `fvm flutter analyze`:
+    clean. Mobile lane: 2,328 passed, none failed; the redesign's finder,
+    weight and shape changes were carried into 46 test files, and the stale
+    `app_review_payment_handoff_test` was brought up to date with the link
+    caution screen. Default lane: 6,030 passed, 165 skipped, 13 failed, all of
+    them failing at `25af59f48` too: the deferred desktop ones below plus
+    `settings_seed_phrase_screen_test` (4). Rust was not rebuilt
+    (`rust/target` was deleted for disk; nothing under `rust/` changed).
   - **Checks on the integrated tree.** `fvm flutter analyze`: clean. Rust
     `cargo test`: 1,515 library tests and the integration suites pass, none
     fail (12 ignored). Mobile lane on the final tree: 2,319 passed, 10 failed
