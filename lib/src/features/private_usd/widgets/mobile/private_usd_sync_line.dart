@@ -10,11 +10,12 @@ import '../../services/private_usd_balance_repository.dart';
 /// refresh; nothing here starts one.
 ///
 /// - A first sync (nothing shown yet) climbs over the content with its
-///   percentage, or reads "Tor …" while the page waits for Tor to come up.
-/// - A wallet that synced before stays synced through a refresh, behind the
-///   content, with the floor flowing: like Home's catch-up, the line never
-///   drops to 0 and climbs again.
-/// - A failure reads "Sync failed", or "Tor offline" when Tor failed.
+///   percentage ("Railgun sync n%"), or reads "Tor …" while the page waits
+///   for Tor to come up.
+/// - A wallet that synced before stays synced ("Railgun synced") through a
+///   refresh, behind the content, with the floor flowing: like Home's
+///   catch-up, the line never drops to 0 and climbs again.
+/// - A failure reads "Railgun sync failed", or "Tor offline" when Tor failed.
 ///
 /// Screen readers hear what the card used to show: the first-load progress,
 /// "Updating…", the last update's time, or the failure.
@@ -30,7 +31,9 @@ NeonSyncLine privateUsdSyncLine(
         networkPrivacy.status == NetworkPrivacyConnectionStatus.failed;
     return NeonSyncLine(
       progress: balances != null ? 0.99 : _climbed(state.firstSyncPercent ?? 0),
-      readout: torFailed ? NeonSyncReadout.torOffline : NeonSyncReadout.failed,
+      readout: torFailed
+          ? NeonSyncReadout.torOffline
+          : PrivateUsdCopy.syncReadoutFailed,
       semanticsLabel: balances == null
           ? PrivateUsdCopy.loadFailed
           : PrivateUsdCopy.refreshFailed,
@@ -41,7 +44,7 @@ NeonSyncLine privateUsdSyncLine(
     final updatedAt = state.updatedAt;
     return NeonSyncLine(
       progress: 1,
-      readout: NeonSyncReadout.synced,
+      readout: PrivateUsdCopy.syncReadoutSynced,
       semanticsLabel: state.isRefreshing
           ? PrivateUsdCopy.updating
           : updatedAt == null
@@ -66,7 +69,7 @@ NeonSyncLine privateUsdSyncLine(
   final whole = (percent ?? 0).clamp(0, 99);
   return NeonSyncLine(
     progress: _climbed(whole),
-    readout: NeonSyncReadout.progress(whole),
+    readout: PrivateUsdCopy.syncReadoutProgress(whole),
     semanticsLabel: percent == null
         ? PrivateUsdCopy.firstLoad
         : PrivateUsdCopy.firstLoadProgress(whole),

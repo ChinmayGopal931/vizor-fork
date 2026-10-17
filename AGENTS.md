@@ -215,9 +215,10 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   with solid black (`NeonSyncOcclude`) so the line shows only in the gaps.
   A scan that starts at most 20 blocks behind the tip counts as synced, so
   the line does not drop and re-climb every block. The Private USD screen
-  draws Railgun's sync the same way (`privateUsdSyncLine`): a first sync
-  climbs, and a refresh of a wallet that synced before stays `SYNCED` while
-  the floor flows.
+  draws Railgun's sync the same way (`privateUsdSyncLine`), with readouts
+  that name Railgun (`RAILGUN SYNC n%`, `RAILGUN SYNCED`, `RAILGUN SYNC
+  FAILED`; the Tor ones are Home's): a first sync climbs, and a refresh of
+  a wallet that synced before stays `RAILGUN SYNCED` while the floor flows.
 - **Tab bar.** Glyphs only: no slab, border or caption. `TronGlyph` draws
   the tab icons (and, on mobile, `AppIcon` draws its round icons —
   check, arrow-down, plus, warning, cancel, help — as angular glyphs). The active

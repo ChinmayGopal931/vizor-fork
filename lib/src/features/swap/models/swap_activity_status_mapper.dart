@@ -88,6 +88,7 @@ class SwapActivityStatusPresentation {
     this.paymentMode = false,
     this.payStatus,
     required this.showTabs,
+    this.allDetailsInProgress = false,
   });
 
   final String title;
@@ -126,6 +127,12 @@ class SwapActivityStatusPresentation {
   final bool paymentMode;
   final PayActivityStatusPresentation? payStatus;
   final bool showTabs;
+
+  /// Whether the mobile progress screen's "Transaction details" tab lists
+  /// every row of [details] while under way. A swap keeps only its compact
+  /// transaction rows there; a Private USD conversion's rows are all its
+  /// own transactions, so it shows them all.
+  final bool allDetailsInProgress;
 }
 
 SwapActivityStatusPresentation swapActivityStatusPresentationForIntent(

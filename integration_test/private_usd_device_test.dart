@@ -222,7 +222,7 @@ const _syncLineKey = ValueKey('mobile_private_usd_sync_front');
 
 const _firstSyncTimeout = Duration(minutes: 10);
 const _refreshTimeout = Duration(minutes: 5);
-final _percent = RegExp(r'^SYNC (\d+)%$');
+final _percent = RegExp(r'^RAILGUN SYNC (\d+)%$');
 
 /// The text at the sync line's head, as drawn.
 String? _syncReadout(WidgetTester tester) {

@@ -19,6 +19,9 @@ Tracks `docs/private-usd-ios-plan.md` §4. A task is done only when its line is 
 - **Owner feedback from the iPhone (2026-10-17).** Shared Dart, so Android changes too; none of it has run on a phone yet.
   - The logo: zapp's USDC token with its Railgun badge (`PrivateUsdLogo`, `assets/private_usd/railgun_badge.webp`; the token is the swap screens' `usdc.webp`, pixel for pixel zapp's) replaces the money bag on the home strip, the holdings panel, the banner and the activity rows.
   - The convert panels show each asset's logo beside their caption, both ways, and the review and progress headers show Private USD's logo in place of USDC on Ethereum (ZEC keeps the app's `zec.webp`, zapp's art).
+  - USD to ZEC: until "Pay" is tapped, the funding step reads "Pay private USD to escrow", "Tap Pay to send $X of private USD to escrow."; once tapped it is "Sending private USD to escrow" with the proof's percentage.
+  - A conversion's "Transaction details" tab lists all its rows (swap ID, its transactions, when it started) while it runs, both ways (`allDetailsInProgress`); swaps and pay keep their compact rows.
+  - The Private USD screen's sync line reads "Railgun sync n%", "Railgun synced" and "Railgun sync failed" (drawn uppercase); the Tor readouts and Home are unchanged, and the device test's readout match follows.
 - **The neon floor** never moved, on Home either. The owner chose on 2026-10-17 that it flows only while something scans, and it now does (VI-19).
 - **The first device session** owes: MI0's checks, MI1.7 (the A35 round with the new bundle), the Swift tests and the simulator drive of MI2, MI3.3 and MI3.6, then MI4 to MI6.
 - **Decisions.** The owner confirmed DI2 (hide below iOS 17), DI6 (exclude from backups) and DI7 (the full rebuild) on 2026-10-17. DI1, DI3–DI5 and DI8 are still proposals; their defaults hold. DI3, the licensing review, blocks only external distribution.

@@ -13,6 +13,7 @@ import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_priv
 import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_reverse_conversion_screen.dart';
 import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_reverse_convert_view.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
+import 'package:zcash_wallet/src/features/private_usd/services/private_usd_reverse_funding.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
@@ -180,6 +181,65 @@ void main() {
     expect(find.text(PrivateUsdCopy.reverseResultRefunded), findsOneWidget);
     expect(find.text(PrivateUsdCopy.reverseNew), findsOneWidget);
     expect(find.text(PrivateUsdCopy.refundsView), findsOneWidget);
+  });
+
+  testWidgets('the Pay step reads as the user\'s to take until Pay is tapped, '
+      'then as the payment going, with the proof\'s percentage', (
+    tester,
+  ) async {
+    final unpaid = previewPrivateUsdReverseRecord(
+      phase: ApiReversePhase.awaitingFunding,
+    );
+    Future<void> show({
+      PrivateUsdFundingState? funding,
+      double? proofProgress,
+    }) => pump(
+      tester,
+      MobilePrivateUsdReverseConversionView(
+        presentation: privateUsdReverseProgressPresentation(
+          status: PrivateUsdReverseStatus(record: unpaid),
+          now: previewPrivateUsdNow,
+          funding: funding,
+          proofProgress: proofProgress,
+        ),
+        onBack: () {},
+        onInfo: () {},
+        onRetry: () {},
+        onAction: () {},
+        onCallOff: () {},
+      ),
+    );
+
+    // Waiting for the tap (owner, 2026-10-17): nothing is being sent yet.
+    await show();
+    expect(find.text(PrivateUsdCopy.reverseStepPay), findsOneWidget);
+    expect(
+      find.text(PrivateUsdCopy.reverseStepPayDetail(r'$25.31')),
+      findsOneWidget,
+    );
+    expect(find.text(PrivateUsdCopy.reverseStepFund), findsNothing);
+
+    // Tapped: the payment is proved, then sent.
+    await show(
+      funding: const PrivateUsdFundingState(
+        stage: PrivateUsdFundingStage.proving,
+      ),
+      proofProgress: 0.42,
+    );
+    expect(find.text(PrivateUsdCopy.reverseStepFund), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.reverseProving(42)), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.reverseStepPay), findsNothing);
+
+    await show(
+      funding: const PrivateUsdFundingState(
+        stage: PrivateUsdFundingStage.submitting,
+      ),
+    );
+    expect(find.text(PrivateUsdCopy.reverseStepFund), findsOneWidget);
+    expect(
+      find.text(PrivateUsdCopy.reverseStepPayDetail(r'$25.31')),
+      findsNothing,
+    );
   });
 
   testWidgets('refunds: each row says where its recovery stands, and only a '

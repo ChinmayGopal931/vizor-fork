@@ -183,6 +183,9 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     steps: steps,
     details: details,
     progressTabLabel: PrivateUsdCopy.progressTab,
+    // Every row is one of the conversion's own (swap ID, its transactions,
+    // when it started): all of them show while it runs.
+    allDetailsInProgress: true,
     showTabs: steps.isNotEmpty,
   );
 
@@ -240,6 +243,14 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
 
   final problem = status.problem;
   final proving = funding?.stage == PrivateUsdFundingStage.proving;
+  final running = funding?.running ?? false;
+  // "Pay" is offered and not yet tapped: the step is the user's to take
+  // (owner, 2026-10-17), not a payment already going.
+  final awaitingPay =
+      record.phase == ApiReversePhase.awaitingFunding &&
+      !record.cancelRequested &&
+      !record.funded &&
+      !running;
   final refundStep = switch (record.phase) {
     ApiReversePhase.refundWait => PrivateUsdCopy.reverseRefundWait,
     ApiReversePhase.refunding => PrivateUsdCopy.reverseRefunding,
@@ -258,11 +269,16 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     active = privateUsdReverseStepIndex(record);
     steps = _reverseSteps(
       active: active,
+      fundTitle: awaitingPay
+          ? PrivateUsdCopy.reverseStepPay
+          : PrivateUsdCopy.reverseStepFund,
       description: switch (record.phase) {
         ApiReversePhase.awaitingFunding when proving =>
           PrivateUsdCopy.reverseProving(
             ((proofProgress ?? 0) * 100).floor().clamp(0, 100),
           ),
+        ApiReversePhase.awaitingFunding when awaitingPay =>
+          PrivateUsdCopy.reverseStepPayDetail(usdText),
         ApiReversePhase.sendingUsdc => PrivateUsdCopy.reverseSending,
         ApiReversePhase.confirmingEscrow => PrivateUsdCopy.reverseConfirming,
         ApiReversePhase.awaitingReady =>
@@ -291,7 +307,6 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     note = null;
   }
 
-  final running = funding?.running ?? false;
   final PrivateUsdReverseAction? action;
   final String? actionLabel;
   final bool actionEnabled;
@@ -350,10 +365,11 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
 List<SwapStatusStepData> _reverseSteps({
   required int active,
   String? description,
+  String fundTitle = PrivateUsdCopy.reverseStepFund,
 }) => [
-  for (final (index, title) in const [
+  for (final (index, title) in [
     PrivateUsdCopy.reverseAccepting,
-    PrivateUsdCopy.reverseStepFund,
+    fundTitle,
     PrivateUsdCopy.reverseReceiving,
     PrivateUsdCopy.reverseReady,
     PrivateUsdCopy.reverseStepSettle,

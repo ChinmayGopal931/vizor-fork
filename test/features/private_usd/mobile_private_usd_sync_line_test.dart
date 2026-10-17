@@ -13,7 +13,8 @@ import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
 // iOS progress VI-19: Railgun's sync on the Private USD screen is Home's sync
-// line, with Home's readouts, layers and catch-up rule.
+// line, with Home's layers and catch-up rule. Its readouts name Railgun
+// (owner, 2026-10-17); the Tor ones are Home's.
 void main() {
   setUp(() {
     final view = TestWidgetsFlutterBinding.ensureInitialized()
@@ -97,7 +98,7 @@ void main() {
 
     final front = layer(tester, NeonSyncLayer.front);
     final back = layer(tester, NeonSyncLayer.back);
-    expect(readout(tester), 'SYNC 42%');
+    expect(readout(tester), 'RAILGUN SYNC 42%');
     expect(front.progress, 0.42);
     expect(front.drawLine, isTrue, reason: 'climbing, over the content');
     expect(front.active, isTrue);
@@ -124,7 +125,7 @@ void main() {
   testWidgets('before the first report it reads 0% on a stub', (tester) async {
     await pumpView(tester, previewPrivateUsdLoading);
 
-    expect(readout(tester), 'SYNC 0%');
+    expect(readout(tester), 'RAILGUN SYNC 0%');
     expect(layer(tester, NeonSyncLayer.front).progress, 0.03);
   });
 
@@ -150,7 +151,7 @@ void main() {
 
     final front = layer(tester, NeonSyncLayer.front);
     final back = layer(tester, NeonSyncLayer.back);
-    expect(readout(tester), 'SYNCED');
+    expect(readout(tester), 'RAILGUN SYNCED');
     expect(back.progress, 1);
     expect(back.drawLine, isTrue, reason: 'behind the content');
     expect(back.active, isFalse);
@@ -188,7 +189,7 @@ void main() {
     );
 
     final back = layer(tester, NeonSyncLayer.back);
-    expect(readout(tester), 'SYNCED');
+    expect(readout(tester), 'RAILGUN SYNCED');
     expect(back.progress, 1, reason: 'no drop to 0 and climb again');
     expect(back.drawLine, isTrue);
     expect(back.active, isFalse);
@@ -199,8 +200,8 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('a failed refresh reads SYNC FAILED, or TOR OFFLINE when Tor '
-      'failed', (tester) async {
+  testWidgets('a failed refresh reads RAILGUN SYNC FAILED, or TOR OFFLINE '
+      'when Tor failed', (tester) async {
     final semantics = tester.ensureSemantics();
     final failed = previewPrivateUsdBalance(
       available: 100,
@@ -208,7 +209,7 @@ void main() {
     );
     await pumpView(tester, failed);
 
-    expect(readout(tester), 'SYNC FAILED');
+    expect(readout(tester), 'RAILGUN SYNC FAILED');
     expect(layer(tester, NeonSyncLayer.back).failed, isTrue);
     expect(find.text(PrivateUsdCopy.refreshFailed), findsOneWidget);
     expect(find.bySemanticsLabel(PrivateUsdCopy.refreshFailed), findsOneWidget);
@@ -225,10 +226,10 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('a failed first load reads SYNC FAILED', (tester) async {
+  testWidgets('a failed first load reads RAILGUN SYNC FAILED', (tester) async {
     await pumpView(tester, const PrivateUsdBalanceState(refreshFailed: true));
 
-    expect(readout(tester), 'SYNC FAILED');
+    expect(readout(tester), 'RAILGUN SYNC FAILED');
     expect(find.text(PrivateUsdCopy.loadFailed), findsOneWidget);
   });
 

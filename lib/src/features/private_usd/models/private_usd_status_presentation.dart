@@ -112,6 +112,9 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
     steps: steps,
     details: details,
     progressTabLabel: PrivateUsdCopy.progressTab,
+    // Every row is one of the conversion's own (swap ID, its transactions,
+    // when it started): all of them show while it runs.
+    allDetailsInProgress: true,
     showTabs: showTabs,
   );
 

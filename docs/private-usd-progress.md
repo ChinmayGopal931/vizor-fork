@@ -47,6 +47,15 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   - The convert panels show each asset's logo beside their caption, both
     ways, and the review and progress headers show Private USD's logo in
     place of USDC on Ethereum (ZEC keeps the app's `zec.webp`, zapp's art).
+  - USD to ZEC: until "Pay" is tapped, the funding step reads "Pay private
+    USD to escrow", "Tap Pay to send $X of private USD to escrow."; once
+    tapped it is "Sending private USD to escrow" with the proof's percentage.
+  - A conversion's "Transaction details" tab lists all its rows (swap ID,
+    its transactions, when it started) while it runs, both ways
+    (`allDetailsInProgress`); swaps and pay keep their compact rows.
+  - The Private USD screen's sync line reads "Railgun sync n%", "Railgun
+    synced" and "Railgun sync failed" (drawn uppercase); the Tor readouts
+    and Home are unchanged, and the device test's readout match follows.
 - **Handoff (2026-10-16): start here.**
   - **State.** `feature/private-usd-android` is pushed to `origin` (the
     owner's fork) with everything below, the Gotham files included: the owner

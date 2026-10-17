@@ -104,7 +104,7 @@ void main() {
 
     expect(find.text(PrivateUsdCopy.firstLoad), findsOneWidget);
     expect(find.text(PrivateUsdCopy.firstLoadProgress(42)), findsNothing);
-    expect(find.text('SYNC 42%'), findsOneWidget);
+    expect(find.text('RAILGUN SYNC 42%'), findsOneWidget);
     expect(find.text(PrivateUsdCopy.unknown), findsOneWidget);
     expect(find.text(PrivateUsdCopy.receiveAddress), findsNothing);
   });

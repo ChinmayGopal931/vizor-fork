@@ -173,6 +173,14 @@ abstract final class PrivateUsdCopy {
   /// `private_usd_load_failed`
   static const loadFailed = "Couldn't load the balance. Try again in a moment.";
 
+  /// New (owner, 2026-10-17): the sync line's readouts on this screen, drawn
+  /// uppercase. The line is Railgun's, so it says so; Home's and the Tor
+  /// readouts are unchanged.
+  static String syncReadoutProgress(int percent) => 'Railgun sync $percent%';
+
+  static const syncReadoutSynced = 'Railgun synced';
+  static const syncReadoutFailed = 'Railgun sync failed';
+
   /// `private_usd_empty_title`
   static const emptyTitle = 'No private dollars yet';
 
@@ -889,8 +897,16 @@ abstract final class PrivateUsdCopy {
   /// `reverse_review` (S): the banner's detail while the payment waits.
   static const reverseReview = 'Review and approve your payment';
 
-  /// `reverse_step_fund`
+  /// `reverse_step_fund`: once "Pay" was tapped.
   static const reverseStepFund = 'Sending private USD to escrow';
+
+  /// New (owner, 2026-10-17): the same step while it waits for "Pay", so it
+  /// reads as the user's to take rather than a payment already going.
+  static const reverseStepPay = 'Pay private USD to escrow';
+
+  /// New (owner, 2026-10-17): under [reverseStepPay].
+  static String reverseStepPayDetail(String debit) =>
+      'Tap Pay to send $debit of private USD to escrow.';
 
   /// `reverse_sending` (S)
   static const reverseSending = 'Sending private USD';

@@ -89,7 +89,10 @@ class MobileSwapStatusContent extends StatelessWidget {
                   )
                 : presentation.paymentMode && presentation.payStatus != null
                 ? _MobilePaymentDetails(presentation: presentation)
-                : _MobileTransactionDetails(rows: presentation.details),
+                : _MobileTransactionDetails(
+                    rows: presentation.details,
+                    compact: !presentation.allDetailsInProgress,
+                  ),
           ),
         ] else ...[
           if (presentation.paymentMode) const SizedBox(height: 48),
@@ -1456,16 +1459,19 @@ SwapStatusDetailRowData? _paymentDetailRow(
 /// Terminal-state rows in the transaction-status card style: small
 /// grey label left, value right, a divider before the fee section.
 class _MobileTransactionDetails extends StatelessWidget {
-  const _MobileTransactionDetails({required this.rows});
+  const _MobileTransactionDetails({required this.rows, this.compact = true});
 
   final List<SwapStatusDetailRowData> rows;
+
+  /// Only a swap's compact transaction rows; otherwise every row.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return _MobileDetailRows(
       key: const ValueKey('mobile_swap_transaction_details'),
       rows: rows,
-      compactTransactionDetails: true,
+      compactTransactionDetails: compact,
     );
   }
 }
