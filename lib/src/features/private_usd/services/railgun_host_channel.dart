@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// Why a Railgun page call failed (plan reference §6.2). Copy and retries
@@ -9,10 +10,11 @@ enum RailgunHostErrorCode {
   /// the next use.
   closed,
 
-  /// No reply in time, so Kotlin closed the page. As [closed].
+  /// No reply in time, so the host closed the page. As [closed].
   timeout,
 
-  /// No WebView package, or no proxy override. Do not retry in a loop.
+  /// No WebView package or no proxy override (Android), or below iOS 17.
+  /// Do not retry in a loop.
   unavailable,
 
   /// A request or reply one side could not read: a bug.
@@ -85,8 +87,31 @@ String redactRailgunMessage(
       .replaceAll(_infuraKey, '/v3/<key>');
 }
 
-/// The Kotlin Railgun host (`RailgunHostHandler`): one hidden page at a time,
-/// process-wide, proxied through the Rust bridge's loopback port.
+/// Asks the platform's Railgun host whether the page can run here (iOS plan
+/// XI9): Android always can, iOS from iOS 17. No handler means no host
+/// (desktop), except on iOS, where it can only mean the handler was not
+/// registered yet: the answer is then unknown (`null`), and the caller asks
+/// again after the first frame. Any other failure means no.
+Future<bool?> queryRailgunHostSupported({
+  MethodChannel channel = const MethodChannel(
+    RailgunHostChannel.methodChannelName,
+  ),
+  TargetPlatform? platform,
+}) async {
+  try {
+    return await channel.invokeMethod<bool>('supported') ?? false;
+  } on MissingPluginException {
+    return (platform ?? defaultTargetPlatform) == TargetPlatform.iOS
+        ? null
+        : false;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// The platform's Railgun host (Kotlin's or Swift's `RailgunHostHandler`):
+/// one hidden page at a time, process-wide, proxied through the Rust bridge's
+/// loopback port.
 abstract interface class RailgunHost {
   /// Loads a fresh page (closing any previous one) whose traffic goes through
   /// the bridge at [proxyPort]; returns once the page says it is ready.
@@ -140,7 +165,7 @@ class RailgunHostChannel implements RailgunHost {
     return result;
   }
 
-  // No Kotlin host on this platform: the page cannot run here.
+  // No host on this platform: the page cannot run here.
   Future<T> _hosted<T>(Future<T> Function() invoke) async {
     try {
       return await invoke();
@@ -149,8 +174,8 @@ class RailgunHostChannel implements RailgunHost {
     }
   }
 
-  // A platform without the Kotlin host has no page and no page storage, so
-  // there is nothing to close or wipe.
+  // A platform without a host has no page and no page storage, so there is
+  // nothing to close or wipe.
   @override
   Future<void> close() async {
     try {

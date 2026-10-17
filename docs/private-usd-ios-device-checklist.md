@@ -42,7 +42,7 @@ Plan: `docs/private-usd-ios-plan.md` (§3.5 invariants, §10 test strategy, MI8)
 
 ## iPhone rounds (testnet and Sepolia)
 
-Each command starts with `scripts/private-usd/ios/run_device_round.sh --device <udid>` (written in MI3.5). The flags mirror Android's: `--m5`, `--m6`, `--m6-refund`, `--m7 --m7-to 0x…`, `--m8-route` and `--keyed-rpc <json>`.
+Each command starts with `scripts/private-usd/ios/run_device_round.sh --device <udid>` (written in MI3.5; `--simulator <udid>` for a booted simulator). The flags mirror Android's: `--m5`, `--m6`, `--m6-refund`, `--m7 --m7-to 0x…`, `--m8-route` and `--keyed-rpc <json>`. As built in MI3.5 the runner has the M3 round only; the other flags come with MI4 to MI6 and MI8 (plan VI-13). On an iPhone it reaches its driver over the local network, so accept the Local Network prompt on the first run, and it captures with rvictl and tcpdump, which ask for your password.
 
 1. **M3: the wallet, the balance, Tor and the lock.** No flags. It creates the round's testnet wallet; the mnemonic is never printed.
 2. **Fund the wallet**, as in step 2 of the Android checklist.

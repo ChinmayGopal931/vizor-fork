@@ -9,17 +9,18 @@ Tracks `docs/private-usd-ios-plan.md` §4. A task is done only when its line is 
 
 ## Where things stand (2026-10-17; read this first)
 
-- **MI1's code is done** (2026-10-17): one bundle for both platforms, with the iOS transport, `deleteWallet` and `WALLET_SOURCE = 'vizor'`. Android's state is in `docs/private-usd-progress.md`.
-- **Open for the owner:** BI-3, when Dart deletes an account's Railgun wallet.
+- **MI1 to MI3's code is done** (2026-10-17, VI-1: no simulator or device ran): one bundle for both platforms (MI1), the Swift host (MI2), and the iOS gates, backups, device test and runner (MI3). With `VIZOR_PRIVATE_USD_ENABLED`, an iOS 17 build now shows Private USD to a software account. Android's state is in `docs/private-usd-progress.md`.
+- **Open for the owner:** BI-3, when Dart deletes an account's Railgun wallet; VI-14, a keep-awake through a first sync.
+- **The first device session** owes: MI0's checks, MI1.7 (the A35 round with the new bundle), the Swift tests and the simulator drive of MI2, MI3.3 and MI3.6, then MI4 to MI6.
 - **Decisions.** The owner confirmed DI2 (hide below iOS 17), DI6 (exclude from backups) and DI7 (the full rebuild) on 2026-10-17. DI1, DI3–DI5 and DI8 are still proposals; their defaults hold. DI3, the licensing review, blocks only external distribution.
 - **Order (owner, 2026-10-17; VI-1).** Code first: MI1–MI3 without any simulator or device run. The MI0 checks, the device parts of MI1–MI3 and the Swift test runs wait for the first session with a phone connected. If space runs short, the Android Rust cache (`build/rust_lib_zcash_wallet/build/aarch64-linux-android`, about 3.5 GB) may be deleted; nothing else.
 - **Deliverables.** EI1 (a test iPhone) and EI2 (signing for device builds) gate every device step. The simulator covers MI0's function checks.
 - **Simulator.**
   - The iPhone 17 Pro simulator (iOS 26.5), UDID `2F355481-7C3B-47C9-ACBD-A9E08938C039`, already runs the app with the neon redesign: testnet, with a wallet created on 2026-10-17.
-  - Private USD is hidden there, as it should be: the platform gate is Android-only (`private_usd_available_provider.dart:59`).
+  - Private USD was hidden there, as the platform gate was Android-only. Since MI3 a build with the define shows it on iOS 17 and later; nothing has run on it yet (VI-1).
 - **No iPhone yet.**
-- **Disk.** About 10 GB was free after `rust/target` was deleted on 2026-10-17, and an iOS simulator build needs 5–6 GB of it. Check before each build.
-- **Next.** MI1, MI2 and MI3's code (VI-1). The owner rules on DI8 before the first device build.
+- **Disk.** About 10 GB was free after `rust/target` was deleted on 2026-10-17, and an iOS simulator build needs 5–6 GB of it. Check before each build. After MI1–MI3's builds (the bundle's `node_modules`, `rust/target` for the bridge tests, the simulator build in DerivedData) about 20 GB was free.
+- **Next.** The first device session (above). The owner rules on DI8 before the first device build, and on BI-3.
 
 ## MI0. Spikes (go/no-go)
 
@@ -72,12 +73,19 @@ MI2 evidence (2026-10-17, code only):
 
 ## MI3. Availability, balance and lifecycle on iOS
 
-- [ ] MI3.1 The bootstrap's `hostSupported`; both gates; the availability-matrix tests
-- [ ] MI3.2 Backup exclusion (DI6)
-- [ ] MI3.3 Lifecycle checks: lock, route change, account switch, idle close, background, reset
-- [ ] MI3.4 The device test's platform checks
-- [ ] MI3.5 `scripts/private-usd/ios/run_device_round.sh`
-- [ ] MI3.6 iOS M3 device round (iPhone)
+- [x] MI3.1 The bootstrap's `hostSupported`; both gates; the availability-matrix tests (VI-10)
+- [x] MI3.2 Backup exclusion (DI6): the `private_usd_*` directories, and `Library/WebKit` after each page load (VI-11)
+- [ ] MI3.3 Lifecycle checks: lock, route change, account switch, idle close, background, reset: deferred to the first device session (VI-1)
+- [x] MI3.4 The device test's platform checks (VI-12)
+- [x] MI3.5 `scripts/private-usd/ios/run_device_round.sh`, the M3 round (VI-13)
+- [ ] MI3.6 iOS M3 device round (iPhone): deferred to the first device session (VI-1)
+
+MI3 evidence (2026-10-17, code only):
+
+- The gates: `privateUsdAvailableFor` and `privateUsdEngineEnabledFor` take the host's answer through `privateUsdPlatformHostsPage` (Android, or iOS with `supported`). The matrix passes: iOS 16 hidden, iOS 17 shown, Android unchanged whatever its answer, desktop platforms hidden (`private_usd_available_provider_test.dart`, 11 of 11, seven new, with the bootstrap's answer, the ask after the first frame, and the query's three outcomes).
+- Backups: `private_usd_dir_backup_test.dart`, 2 of 2 (the mark when the directory is made, once per process, again after a reset, and a failed mark that never blocks).
+- The device test and the iOS runner are analyzer- and shellcheck-clean; the driver's helpers were checked on sample data. Nothing ran on a simulator or an iPhone.
+- The Swift side of MI3.2 (`excludeWebDataFromBackup`) is in MI2's commit.
 - [ ] MI3 gate
 
 ## MI4. Forward conversion on iOS
@@ -136,6 +144,11 @@ Number them VI-1, VI-2, and so on. Each entry says what the plan said, what real
 - **VI-7 (MI2.4): where the page sits.** Reference §6.3 said "the key window's root view at index 0, behind the Flutter view". A subview of the Flutter view is drawn over Flutter's own content, not behind it, so the page is inserted into the key window itself at index 0, beneath the root view controller's view, which covers it. It moves when another window becomes key, and a memory warning closes an idle page. Reference §6.3 updated.
 - **VI-8 (MI2.5): the bridge after the background, without MI0.6.** The plan left the choice between updating a live page's proxy and reloading it to MI0.6. Built now, the reload path, which needs nothing unverified: on iOS, when the app is shown again, Dart probes the bridge's port over loopback; a refusal closes the page and stops the bridge, and the next use reopens the page on a new bridge (invariant 21). A page interrupted mid-sync starts it again (plan §11's accepted risk). Plan MI2.5 and reference §6.8 updated.
 - **VI-9 (MI2.1): the delivery returns a value.** The plan's delivery is `callAsyncJavaScript("__railgunHostDeliver(m)", …)`. A body that returns nothing may reach the completion as an unsupported result, so the body is `__railgunHostDeliver(m); return true;`, and a delivery that fails fails its call `CLOSED` (Kotlin's failed post). Reference §6.2 updated.
+- **VI-10 (MI3.1): only builds with Private USD ask.** The plan had `loadAppBootstrap()` ask `supported` once. As built, only builds with `VIZOR_PRIVATE_USD_ENABLED` and the mobile form factor ask (the gates are constant `false` in the rest), so desktop and builds without the define make no channel call. An iOS answer still unknown (`MissingPluginException`) counts as no until `railgunHostSupportedProvider` asks again after the first frame. Plan XI9 and reference §8.2 updated.
+- **VI-11 (MI3.2): how the backup marks are made.** The plan named the `excludeFromBackup` channel or a twin. As built, its Dart helper moved from `network_privacy_provider.dart` to `lib/src/core/storage/device_backup.dart`, unchanged, and `getPrivateUsdDirPath` uses it: it marks the directory whenever it makes it, and once per process for one made earlier (the mark goes with the directory). A failed mark is tried again on the next call and never stops the call: a conversion under way must not stall for a weaker backup posture, so invariant 25's "before the first write" holds whenever the mark can be set. Swift marks all of `Library/WebKit` after every page load, before any call can bring the wallet in, until MI0.7 finds the store's own directory. Plan MI3.2 and invariant 25, and reference §8.4, updated.
+- **VI-12 (MI3.4): how the device test splits by platform.** The plan said to split the socket sampling by platform. As built: the five Android-only failures are one host-support check (`_requireRailgunHost`); a checkpoint section the host could not sample comes back `measured: false`, and the test then asks the page host whether the page runs and probes from the app every bridge port it has seen (the engine's `bridgePort`); per-sample socket counts that an iPhone's host can't take are left to the runner's capture and noted as unsampled in the results; on iOS the test removes the page's store itself for a true first sync (a Mac can't reach an iPhone's files), and it posts `tor-off` events so the capture knows its Tor windows. Android's checkpoints are all measured, so its round is unchanged. Plan MI3.4 updated.
+- **VI-13 (MI3.5): the runner covers the M3 round.** The device checklist expected Android's flags. As built, `scripts/private-usd/ios/run_device_round.sh` runs the M3 round on a booted simulator (`--simulator`) or an iPhone (`--device`), with its driver `scripts/private-usd/ios/device_round_ios.py`; `--m5` to `--m8-route` and `--keyed-rpc` stop with a message. The M5 and M7 rounds kill the app between two `flutter test` runs, and AGENTS.md notes that on the simulator each run reinstalls the app, so they wait for MI4 to MI6. An iPhone reaches the driver over the local network, under a random token (iOS has no `adb reverse`); its sockets are judged from an rvictl capture, which sees the whole iPhone, so only connections to a Railgun host or DNS queries for one while Tor was on fail the round, and other remotes are listed for review. The release-build check, the screen and an iPhone's memory stay manual. Plan MI3.5 and the device checklist updated.
+- **VI-14 (MI3 trap): no first-sync keep-awake yet.** The plan's MI3 trap says to extend the keep-awake to a first sync "as on Android". Android has none: `privateUsdKeepAwakeProvider` covers a conversion's progress only, and the Dart is shared, so adding it would change Android too. Left for the owner; the device checklist already keeps the screen on through Auto-Lock for rounds. Plan MI3 Traps updated.
 
 ## Blocked
 

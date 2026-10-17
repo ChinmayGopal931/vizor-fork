@@ -45,19 +45,23 @@ final privateUsdSendBackendProvider = Provider<PrivateUsdSendBackend>(
   (ref) => RustPrivateUsdSendBackend(() => privateUsdSwapContextOf(ref)),
 );
 
-/// Whether this build runs the swap engine at all: the define, a mobile
-/// Android build, and a deployment for the network. It does not follow the
-/// active account or the kill switch: conversions under way keep being
-/// driven for every account (D14, D16).
+/// Whether this build runs the swap engine at all: the define, a mobile build
+/// on a platform that hosts the page, and a deployment for the network. It
+/// does not follow the active account or the kill switch: conversions under
+/// way keep being driven for every account (D14, D16).
 bool privateUsdEngineEnabledFor({
   required bool enabled,
   required AppFormFactor formFactor,
   required TargetPlatform platform,
+  required bool hostSupported,
   required bool hasDeployment,
 }) =>
     enabled &&
     formFactor == AppFormFactor.mobile &&
-    platform == TargetPlatform.android &&
+    privateUsdPlatformHostsPage(
+      platform: platform,
+      hostSupported: hostSupported,
+    ) &&
     hasDeployment;
 
 final privateUsdEngineEnabledProvider = Provider<bool>((ref) {
@@ -68,9 +72,9 @@ final privateUsdEngineEnabledProvider = Provider<bool>((ref) {
   return privateUsdEngineEnabledFor(
     enabled: true,
     formFactor: kAppFormFactor,
-    // The Railgun host and the conversions are Android only for now (an OS
-    // behaviour, not a layout choice).
+    // Which OS hosts the Railgun page is an OS behaviour, not a layout choice.
     platform: defaultTargetPlatform,
+    hostSupported: ref.watch(railgunHostSupportedProvider),
     hasDeployment: ref.watch(privateUsdCurrentDeploymentProvider) != null,
   );
 });

@@ -5,7 +5,8 @@ import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -63,13 +64,19 @@ import 'support/mobile_regtest_flow.dart';
 
 // The Private USD device round (plan §10): the M3 device checks on a physical
 // Android phone, against Zcash testnet and Ethereum Sepolia, with no funds.
+// On iOS (iOS plan MI3) the same round runs on an iPhone or the simulator
+// through `scripts/private-usd/ios/run_device_round.sh`, whose driver
+// (`device_round_ios.py`) answers the same checkpoints. A Mac cannot sample
+// an iPhone's listeners, per-process sockets or WebKit processes: those come
+// back unmeasured, the round then checks the page and its bridge from the app,
+// and the runner's packet capture (rvictl) judges the iPhone's sockets.
 //
-// Run it only through `scripts/private-usd/run_device_round.sh`. The runner
-// refuses a phone whose app is not a debuggable build, keeps the screen on,
-// wipes the page storage for a true first sync, serves the host checkpoints
-// this test calls over `adb reverse` (WebView renderer process, the app UID's
-// loopback listeners and sockets, memory, screenshots), samples the phone in
-// parallel, and then checks the R8 release build from the host.
+// On Android, run it only through `scripts/private-usd/run_device_round.sh`.
+// The runner refuses a phone whose app is not a debuggable build, keeps the
+// screen on, wipes the page storage for a true first sync, serves the host
+// checkpoints this test calls over `adb reverse` (WebView renderer process,
+// the app UID's loopback listeners and sockets, memory, screenshots), samples
+// the phone in parallel, and then checks the R8 release build from the host.
 //
 // It resets this build's testnet wallet and creates a fresh one, whose
 // mnemonic is never printed. The `private-usd-device` tag keeps it out of
@@ -238,7 +245,7 @@ void main() {
       return _log('a conversion, send or route round: M3 not run');
     }
     tolerateRenderOverflows();
-    _requireRoundSetup();
+    await _requireRoundSetup();
     await _Round(tester).run();
   }, timeout: const Timeout(Duration(minutes: 50)));
 
@@ -287,7 +294,7 @@ void main() {
   ) async {
     if (_m5Phase != 'start') return _log('not the M5 start round');
     tolerateRenderOverflows();
-    _requireM5Setup();
+    await _requireM5Setup();
     await _M5Round(tester).start();
   }, timeout: const Timeout(Duration(minutes: 40)));
 
@@ -296,7 +303,7 @@ void main() {
   ) async {
     if (_m5Phase != 'resume') return _log('not the M5 resume round');
     tolerateRenderOverflows();
-    _requireM5Setup();
+    await _requireM5Setup();
     await _M5Round(tester).resume();
   }, timeout: const Timeout(Duration(minutes: 70)));
 
@@ -305,7 +312,7 @@ void main() {
   ) async {
     if (_m6Phase != 'run') return _log('not the M6 round');
     tolerateRenderOverflows();
-    _requireM6Setup();
+    await _requireM6Setup();
     await _M6Round(tester).convertBack();
   }, timeout: Timeout(Duration(minutes: _m6Refund ? 330 : 150)));
 
@@ -313,7 +320,7 @@ void main() {
       'is held before its post', (tester) async {
     if (_m7Phase != 'start') return _log('not the M7 start round');
     tolerateRenderOverflows();
-    _requireM7Setup();
+    await _requireM7Setup();
     await _M7Round(tester).start();
   }, timeout: const Timeout(Duration(minutes: 120)));
 
@@ -321,7 +328,7 @@ void main() {
       'again', (tester) async {
     if (_m7Phase != 'resume') return _log('not the M7 resume round');
     tolerateRenderOverflows();
-    _requireM7Setup();
+    await _requireM7Setup();
     await _M7Round(tester).resume();
   }, timeout: const Timeout(Duration(minutes: 40)));
 
@@ -329,13 +336,13 @@ void main() {
       'fails closed and resumes', (tester) async {
     if (_m8Route.isEmpty) return _log('not the M8 route round');
     tolerateRenderOverflows();
-    _requireM8Setup();
+    await _requireM8Setup();
     await _M8RouteRound(tester).flip();
   }, timeout: const Timeout(Duration(minutes: 480)));
 }
 
-void _requireM8Setup() {
-  if (!Platform.isAndroid) fail('The swap engine is Android only.');
+Future<void> _requireM8Setup() async {
+  await _requireRailgunHost();
   if (kZcashDefaultNetworkName != ZcashNetwork.testnet.name) {
     fail('Run on testnet: --dart-define=ZCASH_DEFAULT_NETWORK=test.');
   }
@@ -364,8 +371,8 @@ void _requireM8Setup() {
   }
 }
 
-void _requireM7Setup() {
-  if (!Platform.isAndroid) fail('The Railgun host is Android only.');
+Future<void> _requireM7Setup() async {
+  await _requireRailgunHost();
   if (kZcashDefaultNetworkName != ZcashNetwork.testnet.name) {
     fail('Run on testnet: --dart-define=ZCASH_DEFAULT_NETWORK=test.');
   }
@@ -388,8 +395,8 @@ void _requireM7Setup() {
   }
 }
 
-void _requireM6Setup() {
-  if (!Platform.isAndroid) fail('The swap engine is Android only.');
+Future<void> _requireM6Setup() async {
+  await _requireRailgunHost();
   if (kZcashDefaultNetworkName != ZcashNetwork.testnet.name) {
     fail('Run on testnet: --dart-define=ZCASH_DEFAULT_NETWORK=test.');
   }
@@ -406,8 +413,8 @@ void _requireM6Setup() {
   }
 }
 
-void _requireM5Setup() {
-  if (!Platform.isAndroid) fail('The swap engine is Android only.');
+Future<void> _requireM5Setup() async {
+  await _requireRailgunHost();
   if (kZcashDefaultNetworkName != ZcashNetwork.testnet.name) {
     fail('Run on testnet: --dart-define=ZCASH_DEFAULT_NETWORK=test.');
   }
@@ -423,8 +430,8 @@ void _requireM5Setup() {
   if (parseZecAmount(_m5Zec) == null) fail('Bad VIZOR_PUSD_DEVICE_M5_ZEC.');
 }
 
-void _requireRoundSetup() {
-  if (!Platform.isAndroid) fail('The Railgun host is Android only.');
+Future<void> _requireRoundSetup() async {
+  await _requireRailgunHost();
   if (kZcashDefaultNetworkName != ZcashNetwork.testnet.name) {
     fail('Run on testnet: --dart-define=ZCASH_DEFAULT_NETWORK=test.');
   }
@@ -442,7 +449,19 @@ void _requireRoundSetup() {
   }
 }
 
-/// A host checkpoint's result (`scripts/private-usd/device_round.py`).
+/// The page needs a host that runs it here: every Android build, or iOS 17
+/// and later (iOS plan XI9). The swap engine follows the same rule.
+Future<void> _requireRailgunHost() async {
+  if (await queryRailgunHostSupported() != true) {
+    fail(
+      'This device cannot host the Railgun page: it needs Android, or iOS 17 '
+      'and later ($defaultTargetPlatform).',
+    );
+  }
+}
+
+/// A host checkpoint's result (`scripts/private-usd/device_round.py`, or
+/// `scripts/private-usd/ios/device_round_ios.py` on iOS).
 /// Loopback listeners present right after the wallet is created, before any
 /// Private USD use (set once by the round): never the Railgun bridge.
 Set<int> _baselineListenPorts = <int>{};
@@ -472,6 +491,12 @@ class _Checkpoint {
 
   Map<String, Object?> _section(String key) =>
       (raw[key] as Map?)?.cast<String, Object?>() ?? const {};
+
+  /// Whether the host sampled [key]. A Mac cannot see an iPhone's listeners,
+  /// per-process sockets or WebKit processes: the iOS driver marks those
+  /// unmeasured, the round checks the page and its bridge from the app
+  /// instead, and the round's packet capture judges the iPhone's sockets.
+  bool measured(String key) => _section(key)['measured'] != false;
 
   bool get rendererRunning => _section('renderer')['running'] == true;
 
@@ -612,6 +637,12 @@ class _Round {
       inSupport('private_usd_tokens_${ZcashNetwork.testnet.name}.json'),
     );
     if (tokens.existsSync()) tokens.deleteSync();
+    // On iOS the page's data store is the app's to remove (a Mac can't reach
+    // an iPhone's), and removing it creates no web view. Android's runner
+    // wipes app_webview before the app starts.
+    if (_freshPage && defaultTargetPlatform == TargetPlatform.iOS) {
+      await _host.wipe();
+    }
   }
 
   /// Welcome → create → passcode → (biometrics offer) → home. The mnemonic
@@ -676,12 +707,12 @@ class _Round {
     await _screenshot('m3-01-home-before-first-use');
     final checkpoint = await _checkpoint('before-first-use');
     expect(
-      checkpoint.rendererRunning,
+      await _pageRunning(checkpoint),
       isFalse,
       reason: 'a WebView renderer runs before first use: $checkpoint',
     );
     expect(
-      checkpoint.otherListenPorts,
+      await _bridgeListeners(checkpoint),
       isEmpty,
       reason: 'a loopback listener before first use: $checkpoint',
     );
@@ -769,13 +800,14 @@ class _Round {
     await _checkAddress();
     await _screenshot('m3-02-private-usd-first-balance');
     final open = await _checkpoint('page-open-direct');
-    expect(open.rendererRunning, isTrue, reason: '$open');
+    expect(await _pageRunning(open), isTrue, reason: '$open');
+    final openBridge = await _bridgeListeners(open);
     expect(
-      open.otherListenPorts,
+      openBridge,
       hasLength(1),
       reason: 'the open page has exactly one bridge listener: $open',
     );
-    _results['check2_bridge_port_direct'] = open.otherListenPorts.single;
+    _results['check2_bridge_port_direct'] = openBridge.single;
   }
 
   /// The address shown is Rust's derivation for the account, and the page
@@ -846,12 +878,13 @@ class _Round {
     // closing; this sample counts for Railgun hosts only.
     final closed = await _checkpoint('tor-connected-page-closed');
     expect(
-      closed.otherListenPorts,
+      await _bridgeListeners(closed),
       isEmpty,
       reason: 'the route change must stop the bridge: $closed',
     );
     expect(closed.sockets('railgun-host'), 0, reason: '$closed');
     _results['check3_tor_connected_sample'] = closed.socketCounts;
+    _noteUnsampledSockets('check3_tor_connected_sample', [closed]);
 
     final torSamples = <_Checkpoint>[];
     if (_torFirstSync) {
@@ -874,8 +907,8 @@ class _Round {
     _results['check3_tor_refresh_s'] = refresh;
     final after = await _checkpoint('tor-after-refresh');
     torSamples.add(after);
-    expect(after.rendererRunning, isTrue, reason: '$after');
-    expect(after.otherListenPorts, hasLength(1), reason: '$after');
+    expect(await _pageRunning(after), isTrue, reason: '$after');
+    expect(await _bridgeListeners(after), hasLength(1), reason: '$after');
     await _screenshot('m3-03-private-usd-tor');
 
     // With Tor on, the page's traffic leaves the phone only through Tor.
@@ -892,6 +925,7 @@ class _Round {
     _results['check3_tor_railgun_host_total'] = railgunHost;
     _results['check3_tor_unexplained_samples'] = unexplained.length;
     _results['check3_tor_relay_total'] = relays;
+    _noteUnsampledSockets('check3_tor_socket_samples', torSamples);
     expect(railgunHost, 0, reason: 'a direct Railgun socket with Tor on');
     expect(
       unexplained,
@@ -902,6 +936,8 @@ class _Round {
     );
 
     _log('check 3: Tor off');
+    // An iPhone's capture judges sockets between the Tor events.
+    await _event('tor-off', const {});
     final offStarted = DateTime.now();
     unawaited(privacy.setTorEnabled(false));
     await _waitUntil(
@@ -920,13 +956,17 @@ class _Round {
       'tor-off-page-closed',
       checks: const ['renderer', 'listen', 'mem'],
     );
-    expect(directClosed.otherListenPorts, isEmpty, reason: '$directClosed');
+    expect(
+      await _bridgeListeners(directClosed),
+      isEmpty,
+      reason: '$directClosed',
+    );
     _results['check3_direct_refresh_s'] = await _syncOnce(
       'direct-refresh',
       timeout: _refreshTimeout,
     );
     final direct = await _checkpoint('direct-after-refresh');
-    expect(direct.otherListenPorts, hasLength(1), reason: '$direct');
+    expect(await _bridgeListeners(direct), hasLength(1), reason: '$direct');
   }
 
   /// Taps refresh and waits for the engine's next sync of this account,
@@ -1015,7 +1055,7 @@ class _Round {
       'before-lock',
       checks: const ['renderer', 'listen', 'mem'],
     );
-    final bridge = before.otherListenPorts;
+    final bridge = await _bridgeListeners(before);
     expect(bridge, hasLength(1), reason: '$before');
 
     // The mobile lock sequence (BackgroundAutoLockHost).
@@ -1044,14 +1084,15 @@ class _Round {
       checks: const ['renderer', 'listen', 'mem'],
     );
     await _screenshot('m3-04-after-lock');
+    final afterBridge = await _bridgeListeners(after);
     expect(
-      after.otherListenPorts,
+      afterBridge,
       isEmpty,
       reason: 'a loopback listener survived the lock: $after',
     );
     _results['check4_bridge_port_before_lock'] = bridge.single;
-    _results['check4_listeners_after_lock'] = after.otherListenPorts.toList();
-    _results['check4_renderer_after_lock'] = after.rendererRunning
+    _results['check4_listeners_after_lock'] = afterBridge.toList();
+    _results['check4_renderer_after_lock'] = await _pageRunning(after)
         ? 'running ${after.rendererPids}'
         : 'gone';
     await _pumpFor(const Duration(seconds: 20));
@@ -1059,8 +1100,8 @@ class _Round {
       'after-lock-20s',
       checks: const ['renderer', 'listen', 'mem'],
     );
-    expect(later.otherListenPorts, isEmpty, reason: '$later');
-    _results['check4_renderer_after_lock_20s'] = later.rendererRunning
+    expect(await _bridgeListeners(later), isEmpty, reason: '$later');
+    _results['check4_renderer_after_lock_20s'] = await _pageRunning(later)
         ? 'running ${later.rendererPids}'
         : 'gone';
   }
@@ -1085,11 +1126,41 @@ class _Round {
       'home-after-unlock',
       checks: const ['renderer', 'listen', 'mem'],
     );
-    expect(home.otherListenPorts, isEmpty, reason: '$home');
+    expect(await _bridgeListeners(home), isEmpty, reason: '$home');
     _results['unlock_strip'] = textForKey(tester, _stripAmountKey);
   }
 
   // ── Helpers ────────────────────────────────────────────────────────
+
+  // Every bridge port this round has seen, for the app's own probe.
+  final _bridgePorts = <int>{};
+
+  /// Whether the page runs: the host's renderer sample where it can take
+  /// one, else the page host's own answer.
+  Future<bool> _pageRunning(_Checkpoint checkpoint) async =>
+      checkpoint.measured('renderer')
+      ? checkpoint.rendererRunning
+      : await _host.isOpen();
+
+  /// The loopback listeners the page's bridge adds: the host's sample where
+  /// it can take one, else every bridge port this round has seen that still
+  /// accepts a connection, probed from the app.
+  Future<Set<int>> _bridgeListeners(_Checkpoint checkpoint) async {
+    if (checkpoint.measured('listen')) return checkpoint.otherListenPorts;
+    final port = _container.read(railgunEngineProvider).bridgePort;
+    if (port != null) _bridgePorts.add(port);
+    return {
+      for (final port in _bridgePorts)
+        if (await loopbackAccepts(port)) port,
+    };
+  }
+
+  /// Notes in the results when the host took no socket sample: the round's
+  /// packet capture judges those sockets instead (iPhone).
+  void _noteUnsampledSockets(String key, Iterable<_Checkpoint> samples) {
+    final unsampled = samples.where((s) => !s.measured('sockets')).length;
+    if (unsampled > 0) _results['${key}_unsampled'] = unsampled;
+  }
 
   Future<_Checkpoint> _checkpoint(
     String name, {
@@ -2842,6 +2913,10 @@ class _M8RouteRound extends _Round {
       checks: _sampleChecks,
     );
     _results['m8_${phase}_connecting_samples'] = connecting.length;
+    _noteUnsampledSockets('m8_${phase}_connecting_samples', [
+      ...connecting,
+      connected,
+    ]);
     for (final sample in [...connecting, connected]) {
       expect(
         sample.sockets('railgun-host'),
@@ -2854,6 +2929,7 @@ class _M8RouteRound extends _Round {
 
   Future<void> _torOff(String phase) async {
     _log('$phase: Tor off');
+    await _event('m8-$phase-tor-off', const {});
     final privacy = _container.read(networkPrivacyProvider.notifier);
     unawaited(privacy.setTorEnabled(false));
     await _waitUntil('Tor to turn off', () {
@@ -2925,6 +3001,7 @@ class _M8RouteRound extends _Round {
       0,
       (n, s) => n + s.sockets('tor-relay'),
     );
+    _noteUnsampledSockets('m8_${phase}_tor_samples', samples);
     expect(railgunHost, 0, reason: '$phase: a direct Railgun socket, Tor on');
     expect(
       unexplained,

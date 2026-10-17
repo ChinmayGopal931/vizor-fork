@@ -9,13 +9,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart' show log;
 import 'core/profile_pictures.dart';
 import 'core/config/app_version_config.dart';
+import 'core/config/private_usd_feature_config.dart';
 import 'core/config/rpc_endpoint_config.dart';
 import 'core/config/swap_remote_enable_config.dart';
 import 'core/config/zcash_explorer.dart';
+import 'core/layout/app_form_factor.dart';
 import 'core/storage/app_secure_store.dart';
 import 'core/storage/enhance_pir_preference_store.dart';
 import 'core/storage/wallet_paths.dart';
 import 'core/storage/secure_storage_diagnostics.dart';
+import 'features/private_usd/services/railgun_host_channel.dart';
 import 'providers/account_models.dart';
 import 'rust/api/sync.dart' as rust_sync;
 import 'rust/api/wallet.dart' as rust_wallet;
@@ -67,6 +70,7 @@ class AppBootstrapState {
     this.portfolioChartMarketPrices = false,
     this.portfolioChartRange,
     this.enhancePirEnabled = false,
+    this.railgunHostSupported = false,
     this.failureKind,
     this.failureMessage,
   });
@@ -95,6 +99,12 @@ class AppBootstrapState {
   /// An unreadable setting is private for this launch, but unconfirmed: see
   /// [readEnhancePirEnabledPreference].
   final bool? enhancePirEnabled;
+
+  /// Whether this platform's Railgun host can run Private USD's page (iOS
+  /// plan XI9): Android always, iOS from iOS 17, nothing else. `null` when the
+  /// iOS handler did not answer yet; it is asked again after the first frame.
+  /// Only builds with Private USD ask; the rest keep `false`.
+  final bool? railgunHostSupported;
 
   /// Whether biometric unlock was enabled at startup, read synchronously from
   /// secure storage. The unlock screen uses this to paint the biometric
@@ -299,6 +309,11 @@ Future<AppBootstrapState> loadAppBootstrap({
     );
     final portfolioChart = await readPortfolioChartPreferences(storage);
     final enhancePirEnabled = await readEnhancePirEnabledPreference(storage);
+    // Known before the first frame, so the router's synchronous guards see it.
+    final railgunHostSupported =
+        kVizorPrivateUsdEnabled && kAppFormFactor == AppFormFactor.mobile
+        ? await queryRailgunHostSupported()
+        : false;
     var isPasswordConfigured = await storage.isPasswordConfigured();
     var isUnlocked = storage.hasSessionPassword;
     final dbPath = await _getDbPath();
@@ -495,6 +510,7 @@ Future<AppBootstrapState> loadAppBootstrap({
       portfolioChartMarketPrices: portfolioChart.marketPrices,
       portfolioChartRange: portfolioChart.range,
       enhancePirEnabled: enhancePirEnabled,
+      railgunHostSupported: railgunHostSupported,
       isPasswordConfigured: isPasswordConfigured,
       isUnlocked: isUnlocked,
       passwordRotationRecoveryFailed: passwordRotationRecoveryFailed,

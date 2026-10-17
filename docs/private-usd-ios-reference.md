@@ -300,11 +300,12 @@ configuration.websiteDataStore = store
 
 - `privateUsdAvailableFor` (`private_usd_available_provider.dart:49-59`) and `privateUsdEngineEnabledFor` (`private_usd_engine_provider.dart:55-61`) gain a `hostSupported` argument. The rule becomes `platform == TargetPlatform.android || (platform == TargetPlatform.iOS && hostSupported)`. Android also passes its own `supported`, which is `true`.
 - `hostSupported` comes from the bootstrap: `loadAppBootstrap()` (`lib/src/app_bootstrap.dart:254`), injected through `appBootstrapProvider`.
-  - It makes one `supported` call before `runApp`.
+  - It makes one `supported` call before `runApp` (as built, only in builds with `VIZOR_PRIVATE_USD_ENABLED` and the mobile form factor; plan VI-10).
   - Any error or a missing plugin gives `false` (desktop has no host).
   - On iOS, a `MissingPluginException` means the handler was not registered yet: treat the answer as unknown and ask again after the first frame (plan MI2 traps).
 - `RailgunHostChannel` (`railgun_host_channel.dart:113-197`) does not change: the same names, arguments and codes.
-- The five `Platform.isAndroid` failures in `integration_test/private_usd_device_test.dart` (`:338, 368, 392, 410, 427`) become a host-support check.
+- The five `Platform.isAndroid` failures in `integration_test/private_usd_device_test.dart` (`:338, 368, 392, 410, 427`) become a host-support check (as built: `_requireRailgunHost`, over `queryRailgunHostSupported`).
+- As built (MI3.1): `queryRailgunHostSupported` (`railgun_host_channel.dart`) answers `true`, `false`, or `null` for an iOS handler not registered yet; `railgunHostSupportedProvider` (`private_usd_available_provider.dart`) starts from the bootstrap's answer and asks again after the first frame when it was `null`; `privateUsdPlatformHostsPage` is the rule both gates share.
 
 ### 8.3 Lifecycle hooks
 
@@ -316,7 +317,7 @@ Unchanged from A-ref §8.4: the lock, the background, an account switch, a delet
 
 ### 8.4 Backups
 
-`com.zcash.wallet/network_privacy` `excludeFromBackup {path}` already exists (`AppDelegate.swift:427-465`). It creates the directory if needed and sets `isExcludedFromBackup`. Reuse it, or add a twin on a Private USD channel, for:
+`com.zcash.wallet/network_privacy` `excludeFromBackup {path}` already exists (`AppDelegate.swift:427-465`). It creates the directory if needed and sets `isExcludedFromBackup`. Reuse it, or add a twin on a Private USD channel, for the items below. As built (plan VI-11) it is reused: its Dart helper is `excludeFromDeviceBackup` (`lib/src/core/storage/device_backup.dart`), and the page's store is marked from Swift (`RailgunPageHost.excludeWebDataFromBackup`, all of `Library/WebKit` until MI0.7).
 
 - each `private_usd_<walletDbName>_<network>` directory, when `getPrivateUsdDirPath` creates it
 - the token state's directory (MI7)

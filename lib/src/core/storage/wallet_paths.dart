@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'app_secure_store.dart';
+import 'device_backup.dart';
 
 const kPaymentLinkClaimWalletDirectoryPrefix = 'payment_link_claim_';
 
@@ -184,9 +186,24 @@ Future<void> deleteGiftCardTrackingDirectories() async {
 const _privateUsdPrefix = 'private_usd_';
 const _privateUsdTokenStorePrefix = 'private_usd_tokens_';
 
+// The Private USD directories this process has kept out of backups.
+final _privateUsdBackupMarked = <String>{};
+
 /// Private USD's `swaps.db` and `joint.db` directory for one wallet and
 /// network (plan §3.4): `<support>/private_usd_<walletDbName>_<network>`.
-Future<String> getPrivateUsdDirPath(String network) async {
+///
+/// The swap records hold relayer tickets and token blinding secrets, so on iOS
+/// the directory stays out of iCloud and device backups (iOS plan DI6),
+/// marked before anything is written in it. The mark goes with the directory,
+/// so it is set whenever the directory is made, and once per process for one
+/// made earlier. A failed mark is tried again on the next call: a weaker
+/// backup posture must not stop a conversion that is under way.
+Future<String> getPrivateUsdDirPath(
+  String network, {
+  @visibleForTesting
+  Future<void> Function(String directory) excludeFromBackup =
+      excludeFromDeviceBackup,
+}) async {
   if (!RegExp(r'^[a-z0-9]+$').hasMatch(network)) {
     throw ArgumentError.value(network, 'network');
   }
@@ -195,7 +212,18 @@ Future<String> getPrivateUsdDirPath(String network) async {
   final directory = Directory(
     '${support.path}${Platform.pathSeparator}$_privateUsdPrefix${walletName}_$network',
   );
+  final made = !await directory.exists();
   await directory.create(recursive: true);
+  if (_privateUsdBackupMarked.add(directory.path) || made) {
+    try {
+      await excludeFromBackup(directory.path);
+    } catch (error) {
+      _privateUsdBackupMarked.remove(directory.path);
+      if (kDebugMode) {
+        debugPrint('Private USD directory not kept out of backups: $error');
+      }
+    }
+  }
   return directory.path;
 }
 
