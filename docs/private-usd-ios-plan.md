@@ -226,7 +226,7 @@ Signature level only. The milestone that creates each file is in brackets. The c
 ios/Runner/Railgun/
 ├── RailgunHostHandler.swift     [MI2] channel binding, com.zcash.wallet/railgun (+ /events); exactly-once replies; BAD_ARGS
 ├── RailgunPageHost.swift        [MI2] @MainActor process singleton: the current page, the store, the rule list, the event buffer
-├── RailgunPage.swift            [MI2] one WKWebView page: load, ready wait, calls with timeouts, delivery, close; its delegates
+├── RailgunPage.swift            [MI2] one WKWebView page: load, ready wait, calls with timeouts, delivery, close; its delegates. As built it also holds RailgunChannel, the pending calls and their exactly-once answers (Kotlin's RailgunChannel), which the tests drive without WebKit
 ├── RailgunSchemeHandler.swift   [MI2] WKURLSchemeHandler for veylor-railgun://app/… from Bundle.main's railgun/
 ├── RailgunContentRules.swift    [MI2] the WKContentRuleList JSON, built from RailgunEndpoints and compiled once
 ├── RailgunProtocol.swift        [MI2] wire methods and timeouts, the envelope (JSONSerialization)
@@ -401,7 +401,7 @@ Every milestone also follows these rules:
    - **iOS** answers `#available(iOS 17, *)`.
    - **Android** answers `true` without loading the WebView package (minSdk 30; today's `UNAVAILABLE` from `load` stays for a phone whose WebView lacks `PROXY_OVERRIDE`).
 4. Put the page in the window (XI7, following MI0's result), and move it when the scene's window changes. `webViewWebContentProcessDidTerminate` closes the page (`CLOSED`), like Android's `onRenderProcessGone`.
-5. The bridge after the background (XI14), following MI0.6's result: on return, if the page is open, check that the bridge accepts connections. If it doesn't, restart the bridge, then either update the proxy or reload the page.
+5. The bridge after the background (XI14), following MI0.6's result: on return, if the page is open, check that the bridge accepts connections. If it doesn't, restart the bridge, then either update the proxy or reload the page. **As built without MI0.6 (VI-8):** on iOS, when the app is shown again, Dart probes the bridge's port over loopback (`RailgunEngine.replaceDeadBridge`); one that refuses closes the page and stops the bridge, and the next use reopens the page on a new bridge (invariant 21). Updating a live page's proxy waits for MI0.6.
 6. Swift tests:
    - the envelope: every message kind decodes; an unreadable reply fails its call; unknown events are dropped
    - the methods and timeouts table equals Kotlin's

@@ -30,6 +30,16 @@
 		NUMPADIOS010000000000001 /* NumericKeyboardHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = NUMPADIOS000000000000001 /* NumericKeyboardHandler.swift */; };
 		LEDGERIOS010000000000002 /* BleTransport in Frameworks */ = {isa = PBXBuildFile; productRef = LEDGERIOS030000000000001 /* BleTransport */; };
 		LEDGERIOS010000000000003 /* LedgerMobileHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = LEDGERIOS000000000000002 /* LedgerMobileHandlerTests.swift */; };
+		RAILGUNIOS01000000000001 /* RailgunHostHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000001 /* RailgunHostHandler.swift */; };
+		RAILGUNIOS01000000000002 /* RailgunPageHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000002 /* RailgunPageHost.swift */; };
+		RAILGUNIOS01000000000003 /* RailgunPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000003 /* RailgunPage.swift */; };
+		RAILGUNIOS01000000000004 /* RailgunSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000004 /* RailgunSchemeHandler.swift */; };
+		RAILGUNIOS01000000000005 /* RailgunContentRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000005 /* RailgunContentRules.swift */; };
+		RAILGUNIOS01000000000006 /* RailgunProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000006 /* RailgunProtocol.swift */; };
+		RAILGUNIOS01000000000007 /* RailgunEndpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000007 /* RailgunEndpoints.swift */; };
+		RAILGUNIOS01000000000008 /* RailgunError.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000008 /* RailgunError.swift */; };
+		RAILGUNIOS01000000000009 /* railgun in Resources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000009 /* railgun */; };
+		RAILGUNIOS01000000000010 /* RailgunHostTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000010 /* RailgunHostTests.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */; };
 		8108A5A50BC98B3D741F1711 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8FED55156EBDEE425125AD2C /* Pods_Runner.framework */; };
@@ -115,6 +125,16 @@
 		LEDGERIOS000000000000001 /* LedgerMobileHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerMobileHandler.swift; sourceTree = "<group>"; };
 		NUMPADIOS000000000000001 /* NumericKeyboardHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumericKeyboardHandler.swift; sourceTree = "<group>"; };
 		LEDGERIOS000000000000002 /* LedgerMobileHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerMobileHandlerTests.swift; sourceTree = "<group>"; };
+		RAILGUNIOS00000000000001 /* RailgunHostHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunHostHandler.swift; sourceTree = "<group>"; };
+		RAILGUNIOS00000000000002 /* RailgunPageHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunPageHost.swift; sourceTree = "<group>"; };
+		RAILGUNIOS00000000000003 /* RailgunPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunPage.swift; sourceTree = "<group>"; };
+		RAILGUNIOS00000000000004 /* RailgunSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunSchemeHandler.swift; sourceTree = "<group>"; };
+		RAILGUNIOS00000000000005 /* RailgunContentRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunContentRules.swift; sourceTree = "<group>"; };
+		RAILGUNIOS00000000000006 /* RailgunProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunProtocol.swift; sourceTree = "<group>"; };
+		RAILGUNIOS00000000000007 /* RailgunEndpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunEndpoints.swift; sourceTree = "<group>"; };
+		RAILGUNIOS00000000000008 /* RailgunError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunError.swift; sourceTree = "<group>"; };
+		RAILGUNIOS00000000000009 /* railgun */ = {isa = PBXFileReference; lastKnownFileType = folder; path = railgun; sourceTree = "<group>"; };
+		RAILGUNIOS00000000000010 /* RailgunHostTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunHostTests.swift; sourceTree = "<group>"; };
 		603F096B051231C6A1C6A5B1 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		64501DB95B6D078121FE7DE1 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 		6A4D4F9C0A149C751B796E19 /* DynamicIslandManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DynamicIslandManager.swift; sourceTree = "<group>"; };
@@ -199,6 +219,22 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		RAILGUNIOS00000000000000 /* Railgun */ = {
+			isa = PBXGroup;
+			children = (
+				RAILGUNIOS00000000000001 /* RailgunHostHandler.swift */,
+				RAILGUNIOS00000000000002 /* RailgunPageHost.swift */,
+				RAILGUNIOS00000000000003 /* RailgunPage.swift */,
+				RAILGUNIOS00000000000004 /* RailgunSchemeHandler.swift */,
+				RAILGUNIOS00000000000005 /* RailgunContentRules.swift */,
+				RAILGUNIOS00000000000006 /* RailgunProtocol.swift */,
+				RAILGUNIOS00000000000007 /* RailgunEndpoints.swift */,
+				RAILGUNIOS00000000000008 /* RailgunError.swift */,
+				RAILGUNIOS00000000000009 /* railgun */,
+			);
+			path = Railgun;
+			sourceTree = "<group>";
+		};
 		0137C73AF9D2EE23C2922EA0 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -217,6 +253,7 @@
 				LEDGERIOS000000000000002 /* LedgerMobileHandlerTests.swift */,
 				OUTBOX000000000000000003 /* BackgroundMigrationOutboxTests.swift */,
 				OUTBOX000000000000000008 /* BackgroundMigrationOutboxExecutionGateTests.swift */,
+				RAILGUNIOS00000000000010 /* RailgunHostTests.swift */,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
@@ -282,6 +319,7 @@
 				1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */,
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
+				RAILGUNIOS00000000000000 /* Railgun */,
 				OUTBOX000000000000000001 /* BackgroundMigrationOutbox.swift */,
 				OUTBOX000000000000000002 /* BackgroundMigrationOutboxStore.swift */,
 				OUTBOX000000000000000004 /* BackgroundMigrationOutboxRunner.swift */,
@@ -448,6 +486,7 @@
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				8A0F5C512F8B001200A1C001 /* AppIcon.icon in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
+				RAILGUNIOS01000000000009 /* railgun in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -564,6 +603,7 @@
 				LEDGERIOS010000000000003 /* LedgerMobileHandlerTests.swift in Sources */,
 				OUTBOX010000000000000003 /* BackgroundMigrationOutboxTests.swift in Sources */,
 				OUTBOX010000000000000008 /* BackgroundMigrationOutboxExecutionGateTests.swift in Sources */,
+				RAILGUNIOS01000000000010 /* RailgunHostTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -573,6 +613,14 @@
 			files = (
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				LEDGERIOS010000000000001 /* LedgerMobileHandler.swift in Sources */,
+				RAILGUNIOS01000000000001 /* RailgunHostHandler.swift in Sources */,
+				RAILGUNIOS01000000000002 /* RailgunPageHost.swift in Sources */,
+				RAILGUNIOS01000000000003 /* RailgunPage.swift in Sources */,
+				RAILGUNIOS01000000000004 /* RailgunSchemeHandler.swift in Sources */,
+				RAILGUNIOS01000000000005 /* RailgunContentRules.swift in Sources */,
+				RAILGUNIOS01000000000006 /* RailgunProtocol.swift in Sources */,
+				RAILGUNIOS01000000000007 /* RailgunEndpoints.swift in Sources */,
+				RAILGUNIOS01000000000008 /* RailgunError.swift in Sources */,
 				NUMPADIOS010000000000001 /* NumericKeyboardHandler.swift in Sources */,
 				A9E010010000000000000001 /* AppReviewHandler.swift in Sources */,
 				OUTBOX010000000000000001 /* BackgroundMigrationOutbox.swift in Sources */,

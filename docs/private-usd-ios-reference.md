@@ -73,7 +73,7 @@ Amounts are decimal strings, unknown events are dropped, and an unreadable reply
 |---|---|---|
 | Hello | The host posts `WebMessage(INIT, [port])` to the page origin. The page takes the first port with `event.source === null` (`rw/src/index.js:53-58`). | At startup the page finds `globalThis.webkit.messageHandlers.railgunHost` and posts `{event: "ready", data: null}` through it, once. |
 | Page to host | `port.postMessage(json)` | `webkit.messageHandlers.railgunHost.postMessage(json)`, as a string |
-| Host to page | `port.postMessage(json)` | `webView.callAsyncJavaScript("__railgunHostDeliver(m)", arguments: ["m": json], in: nil, in: .page)` |
+| Host to page | `port.postMessage(json)` | `webView.callAsyncJavaScript("__railgunHostDeliver(m)", arguments: ["m": json], in: nil, in: .page)`. As built (plan VI-9) the body is `__railgunHostDeliver(m); return true;`, so the completion always gets a value it can carry, and a delivery that fails fails its call `CLOSED`. |
 
 **The page side** (`rw/src/index.js`, MI1). A sketch; the real code keeps `index.js`'s dispatch (`:8-58`):
 
@@ -150,7 +150,7 @@ New on both platforms:
 
 - **Open, close, wipe and `isOpen`** behave as in Kotlin (A-ref §6.2; `kt/RailgunWebViewHost.kt:84-148`). The wipe is §6.5.
 - **Where the page lives** (plan XI7, settled in MI0):
-  - a 1×1 `WKWebView` added to the key window's root view at index 0, behind the Flutter view
+  - a 1×1 `WKWebView` added to the key window's root view at index 0, behind the Flutter view. As built (plan VI-7): inserted into the key window itself at index 0, beneath the root view controller's view, which covers it; a subview of the Flutter view would be drawn over Flutter's own content instead
   - `isUserInteractionEnabled = false`, `accessibilityElementsHidden = true`, `isAccessibilityElement = false`
   - the app uses scenes (`ios/Runner/SceneDelegate.swift`): when the key window changes, move the page to the new one; while there is no window (the app is in the background), leave it where it is
 - **Termination.** `webViewWebContentProcessDidTerminate` closes the page. Its pending calls fail `CLOSED`, and Dart reopens the page lazily (the `CLOSED` row in A-ref §6.2). The bridge stops with the close (plan invariant 21).
@@ -221,7 +221,7 @@ The last line repeats once per host in `RailgunEndpoints`.
 - The CSP (A-ref §6.4) is unchanged, and now also arrives as a response header.
 - `shims.js:11-14` deletes `RTCPeerConnection`, `webkitRTCPeerConnection` and `RTCDataChannel` on iOS too. WebKit's WebRTC would otherwise send STUN traffic outside the proxy.
 
-**The console.** `console` output reaches the host only as `log` events, and only when `debug` is set. A release build drops it, as Kotlin's `Chrome` does (`:301-312`).
+**The console.** `console` output reaches the host only as `log` events, and only when `debug` is set. A release build drops it, as Kotlin's `Chrome` does (`:301-312`). As built (plan VI-6): WebKit has no console callback, and hooking the console would mean injecting a script, which this section rules out. So the page's console never reaches the host; the engine's own `log` events still arrive from a page loaded with `debug`, and a debug build reads the console in Safari's Web Inspector (plan XI12).
 
 ### 6.5 Storage, artifacts and threading on iOS
 
@@ -268,7 +268,7 @@ configuration.websiteDataStore = store
   - The fix is `ProxyConfiguration(httpCONNECTProxy:)`, plus a small HTTP front end in the bridge that accepts only `CONNECT host:443` and applies the same allowlist and route checks (about 60 lines of Rust).
 - **No DNS leak** follows from hostname `CONNECT`s: the Tor exit resolves the name, or the bridge resolves it under the direct-route lease.
 - **A route change:** close the page, stop the bridge, start a new one (a new port), set the proxy, and reload (plan invariant 21).
-- **After the background** (plan XI14, UI16). iOS may reclaim a suspended app's listening socket (Apple TN2277). On return, if the page is open, try a loopback connection to the bridge's port.
+- **After the background** (plan XI14, UI16). iOS may reclaim a suspended app's listening socket (Apple TN2277). On return, if the page is open, try a loopback connection to the bridge's port. As built (plan VI-8): Dart makes the probe when the app is shown again (`AppLifecycleListener.onShow`, iOS only), and a bridge that refuses takes the page down with it; the next use reopens both.
   - If it fails, stop and restart the bridge.
   - Then, following MI0.6's result, either assign the store a new `proxyConfigurations`, if WebKit honours that for a live page, or close and reload the page.
 - **The residual risk** is as in A-ref §6.8: a no-auth loopback proxy, reachable by other running apps while the page is open, and limited to Railgun hosts on 443.
@@ -364,7 +364,7 @@ Unchanged from A-ref §8.4: the lock, the background, an account switch, a delet
 | `RailgunWebViewHost.kt` `load`, `close`, `wipe` | 84-148 | `RailgunPageHost.swift` | The proxy moves from `ProxyController` to the store; the wipe moves from `deleteOrigin` to `remove(forIdentifier:)` |
 | `Page` | 150-233 | `RailgunPage.swift` | |
 | `Client`: `shouldInterceptRequest`, `shouldOverrideUrlLoading`, `onRenderProcessGone`, `onPageFinished`, a failed own asset | 235-299 | the `RailgunPage` delegates, `RailgunContentRules`, `RailgunSchemeHandler` | No per-request interception (plan XI4) |
-| `Chrome` (the console) | 301-312 | a page console hook, as `log` events in debug | |
+| `Chrome` (the console) | 301-312 | none: no script is injected (plan VI-6) | The engine's own `log` events still arrive in debug |
 | `OwnAssets` | 315-321 | `RailgunSchemeHandler` | |
 | `RailgunRequests` | 345-372 | the `RailgunSchemeHandler` constants and `RailgunContentRules` | `PAGE_URL` becomes `veylor-railgun://app/index.html` |
 | `RailgunChannel.kt` | 14-66 | `RailgunPage` (the pending calls) | |

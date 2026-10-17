@@ -9,6 +9,7 @@ import UIKit
   private var numericKeyboardHandler: NumericKeyboardHandler?
   private var customHapticEngine: CHHapticEngine?
   private var ledgerMobileHandler: LedgerMobileHandler?
+  private var railgunHostHandler: RailgunHostHandler?
 
   override func application(
     _ application: UIApplication,
@@ -88,6 +89,15 @@ import UIKit
       binaryMessenger: messenger
     )
     ledgerMobileDiscoveryChannel.setStreamHandler(ledgerMobileHandler)
+
+    // Private USD's hidden Railgun page (docs/private-usd-ios-plan.md). The page itself is a process singleton; this
+    // only binds the engine to it, before Dart's bootstrap asks whether it is supported.
+    let railgunHostHandler = RailgunHostHandler()
+    self.railgunHostHandler = railgunHostHandler
+    FlutterMethodChannel(name: RailgunHostHandler.channelName, binaryMessenger: messenger)
+      .setMethodCallHandler { call, result in railgunHostHandler.handle(call, result: result) }
+    FlutterEventChannel(name: RailgunHostHandler.eventsName, binaryMessenger: messenger)
+      .setStreamHandler(railgunHostHandler)
 
     let keychainAccessibilityMigrationHandler =
       KeychainAccessibilityMigrationChannel()

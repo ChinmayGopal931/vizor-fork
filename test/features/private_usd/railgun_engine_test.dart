@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
@@ -62,6 +63,82 @@ void main() {
     await engine.dispose();
   });
 
+  // iOS plan XI14: iOS may reclaim a suspended app's listening socket.
+  group('the bridge after the background', () {
+    test(
+      'a bridge that stopped accepting takes the page down with it',
+      () async {
+        final log = <String>[];
+        final probed = <int>[];
+        final engine = _engine(
+          log,
+          pageAddress: _address,
+          bridgeAccepts: (port) async {
+            probed.add(port);
+            return false;
+          },
+        );
+        await engine.sync('account');
+        log.clear();
+
+        await engine.replaceDeadBridge();
+
+        expect(probed, [4242]);
+        expect(log, ['close', 'stop']);
+        // The next use reopens the page, on a new bridge.
+        await engine.sync('account');
+        expect(log.sublist(2, 4), ['start bridge', 'load 4242']);
+        await engine.dispose();
+      },
+    );
+
+    test('a bridge that still accepts keeps the page', () async {
+      final log = <String>[];
+      final engine = _engine(
+        log,
+        pageAddress: _address,
+        bridgeAccepts: (_) async => true,
+      );
+      await engine.sync('account');
+      log.clear();
+
+      await engine.replaceDeadBridge();
+      await engine.sync('account');
+
+      expect(log, ['call refresh']);
+      await engine.dispose();
+    });
+
+    test('without an open page there is nothing to check', () async {
+      final log = <String>[];
+      var probes = 0;
+      final engine = _engine(
+        log,
+        pageAddress: _address,
+        bridgeAccepts: (_) async {
+          probes++;
+          return false;
+        },
+      );
+      await engine.replaceDeadBridge();
+      await engine.sync('account');
+      await engine.close();
+      await engine.replaceDeadBridge();
+
+      expect(probes, 0);
+      await engine.dispose();
+    });
+
+    test('the loopback probe tells a listener from a closed port', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final port = server.port;
+      server.listen((socket) => socket.destroy());
+      expect(await loopbackAccepts(port), isTrue);
+      await server.close();
+      expect(await loopbackAccepts(port), isFalse);
+    });
+  });
+
   test('a drained engine refuses uses until it resumes', () async {
     final log = <String>[];
     final engine = _engine(log, pageAddress: _address);
@@ -83,6 +160,7 @@ RailgunEngine _engine(
   List<String> log, {
   required String pageAddress,
   Completer<String>? refresh,
+  Future<bool> Function(int port)? bridgeAccepts,
 }) => RailgunEngine(
   host: _FakeHost(log, pageAddress: pageAddress, refresh: refresh),
   wallets: _FakeWallets(),
@@ -91,6 +169,7 @@ RailgunEngine _engine(
     return 4242;
   },
   stopBridge: () async => log.add('stop'),
+  bridgeAccepts: bridgeAccepts ?? (_) async => true,
 );
 
 Future<void> _until(bool Function() condition) async {

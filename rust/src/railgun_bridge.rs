@@ -498,11 +498,11 @@ mod tests {
 
     /// The bridge's allowlist is one of several copies of the page's hosts
     /// (reference §8.2, iOS plan XI10). A host missing from any copy fails
-    /// silently on a device, so pin them together: Kotlin's
+    /// silently on a device, so pin them together: Kotlin's and Swift's
     /// `RailgunEndpoints.hosts`, and the CSP `connect-src` of the bundle's
     /// source, of the Android bundle and of its iOS copy.
     #[test]
-    fn the_page_hosts_match_the_kotlin_filter_and_the_page_csp() {
+    fn the_page_hosts_match_the_host_filters_and_the_page_csp() {
         let mut expected = RAILGUN_PAGE_HOSTS.map(str::to_owned).to_vec();
         expected.sort();
         expected.dedup();
@@ -518,6 +518,8 @@ mod tests {
             "android/app/src/main/kotlin/com/keplr/vizor/railgun/RailgunEndpoints.kt",
         ));
         assert_eq!(kotlin, expected, "RailgunEndpoints.hosts");
+        let swift = swift_hosts(&read("ios/Runner/Railgun/RailgunEndpoints.swift"));
+        assert_eq!(swift, expected, "RailgunEndpoints.swift hosts");
         for page in [
             "android/railgun-web/src/index.html",
             "android/app/src/main/assets/railgun/index.html",
@@ -535,6 +537,24 @@ mod tests {
         let set = &source[start..];
         let open = set.find("setOf(").expect("`setOf(` after `val hosts`") + "setOf(".len();
         let body = &set[open..open + set[open..].find(')').expect("the end of `setOf(`")];
+        let mut hosts: Vec<String> = body
+            .split('"')
+            .skip(1)
+            .step_by(2)
+            .map(str::to_owned)
+            .collect();
+        hosts.sort();
+        hosts
+    }
+
+    /// The string literals inside `static let hosts: [String] = […]`, sorted.
+    fn swift_hosts(source: &str) -> Vec<String> {
+        let start = source
+            .find("static let hosts")
+            .expect("`static let hosts` in RailgunEndpoints.swift");
+        let list = &source[start..];
+        let open = list.find("= [").expect("`= [` after `static let hosts`") + "= [".len();
+        let body = &list[open..open + list[open..].find(']').expect("the end of the hosts")];
         let mut hosts: Vec<String> = body
             .split('"')
             .skip(1)

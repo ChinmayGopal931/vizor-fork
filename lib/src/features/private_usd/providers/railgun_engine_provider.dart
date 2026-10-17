@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app_bootstrap.dart';
@@ -19,7 +20,7 @@ import '../services/railgun_engine_key_store.dart';
 import '../services/railgun_host_channel.dart';
 import 'private_usd_available_provider.dart';
 
-/// The Kotlin page host; replaced by a fake in tests.
+/// The platform's page host (Kotlin or Swift); replaced by a fake in tests.
 final railgunHostProvider = Provider<RailgunHost>(
   (_) => const RailgunHostChannel(),
 );
@@ -84,7 +85,16 @@ final railgunEngineProvider = Provider<RailgunEngine>((ref) {
   ref.listen(networkPrivacyProvider, (previous, next) {
     if (isRailgunRouteChange(previous, next)) unawaited(engine.close());
   });
+  // iOS may reclaim a suspended app's listening socket, so back from the
+  // background the bridge is checked (iOS plan XI14). An OS behaviour, not a
+  // layout choice; Android's bridge is never reclaimed.
+  final returns = defaultTargetPlatform == TargetPlatform.iOS
+      ? AppLifecycleListener(
+          onShow: () => unawaited(engine.replaceDeadBridge()),
+        )
+      : null;
   ref.onDispose(() {
+    returns?.dispose();
     lifecycle.unregister(engine);
     unawaited(engine.dispose());
   });

@@ -32,6 +32,9 @@ class RailgunHostHandler(
         result: MethodChannel.Result,
     ) {
         when (call.method) {
+            // Every Android build can host the page (minSdk 30); answered without loading the WebView package. A
+            // WebView without `PROXY_OVERRIDE` still fails `load` with UNAVAILABLE.
+            "supported" -> result.success(true)
             "load" -> {
                 val port = (call.arg("proxyPort") as? Number)?.toInt()
                 if (port == null || port !in 1..65535) return result.error(BAD_ARGS, "proxyPort", null)

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
@@ -143,6 +144,8 @@ class RailgunEngineState {
 /// - After [idleClose] without a use, the page closes by itself.
 /// - Built once per process, it first closes whatever page and bridge an
 ///   earlier Flutter engine left running.
+/// - On iOS, back from the background, a bridge that stopped accepting takes
+///   the page down with it ([replaceDeadBridge]).
 ///
 /// Never log a call's params or results, or a page failure's message: `start`
 /// can carry keyed RPC URLs and `openWallet` the wallet's mnemonic.
@@ -152,6 +155,7 @@ class RailgunEngine {
     required RailgunWalletSource wallets,
     required Future<int> Function() startBridge,
     required Future<void> Function() stopBridge,
+    Future<bool> Function(int port) bridgeAccepts = loopbackAccepts,
     this.debugPage = false,
     this.idleClose = const Duration(minutes: 10),
     DateTime Function()? now,
@@ -159,6 +163,7 @@ class RailgunEngine {
        _wallets = wallets,
        _startBridge = startBridge,
        _stopBridge = stopBridge,
+       _bridgeAccepts = bridgeAccepts,
        _now = now ?? DateTime.now {
     _events = _host.events.listen(_onEvent, onError: (Object _) {});
     // The page and its bridge can outlive a Flutter engine whose Activity
@@ -170,6 +175,7 @@ class RailgunEngine {
   final RailgunWalletSource _wallets;
   final Future<int> Function() _startBridge;
   final Future<void> Function() _stopBridge;
+  final Future<bool> Function(int port) _bridgeAccepts;
   final DateTime Function() _now;
 
   /// Whether the page may be inspected and send `log` events (debug builds).
@@ -183,12 +189,20 @@ class RailgunEngine {
   RailgunSession? _session;
   Timer? _idleTimer;
 
+  // The port of the bridge the open page goes through; null once it stopped.
+  int? _bridgePort;
+
   // Bumped by every close; a use or an open from an older epoch is stale.
   int _epoch = 0;
   int _pauseDepth = 0;
   bool _disposed = false;
 
   bool get isPaused => _pauseDepth > 0;
+
+  /// The port of the bridge the open page goes through, or null: for device
+  /// rounds that probe it from the app where the host can't list listeners.
+  @visibleForTesting
+  int? get bridgePort => _bridgePort;
 
   /// Runs [use] on [accountUuid]'s open wallet, opening it first if needed.
   /// Uses run one at a time.
@@ -278,6 +292,27 @@ class RailgunEngine {
     if (_pauseDepth > 0) _pauseDepth--;
   }
 
+  /// iOS may reclaim a suspended app's listening socket (iOS plan XI14, UI16).
+  /// Back from the background with a page open, a bridge that no longer
+  /// accepts connections leaves the page without its route, so the page closes
+  /// and stops the bridge, and the next use reopens it on a new one
+  /// (invariant 21). Whether WebKit would take a new port on a live page is
+  /// MI0.6's question; until then the page is reloaded rather than repointed.
+  Future<void> replaceDeadBridge() async {
+    final port = _bridgePort;
+    if (_disposed || _session == null || port == null) return;
+    final epoch = _epoch;
+    bool accepts;
+    try {
+      accepts = await _bridgeAccepts(port);
+    } catch (_) {
+      accepts = false;
+    }
+    if (accepts || epoch != _epoch || _disposed) return;
+    _debugLog('the bridge stopped accepting in the background');
+    await close();
+  }
+
   /// Stops listening; the page and bridge close. [state] stays readable.
   Future<void> dispose() async {
     _disposed = true;
@@ -315,6 +350,7 @@ class RailgunEngine {
       final secrets = opening.secrets;
       _ensureCurrent(epoch);
       final port = await _startBridge();
+      _bridgePort = port;
       _ensureCurrent(epoch);
       await _host.load(proxyPort: port, debug: debugPage);
       _ensureCurrent(epoch);
@@ -402,6 +438,7 @@ class RailgunEngine {
   }
 
   Future<void> _stopBridgeQuietly() async {
+    _bridgePort = null;
     try {
       await _stopBridge();
     } catch (e) {
@@ -623,5 +660,21 @@ class _SerialLock {
     final result = _tail.then((_) => action());
     _tail = result.then<void>((_) {}, onError: (Object _) {});
     return result;
+  }
+}
+
+/// Whether something accepts TCP connections on the loopback [port]: a
+/// connection made and dropped at once, which the bridge refuses quietly.
+Future<bool> loopbackAccepts(int port) async {
+  try {
+    final socket = await Socket.connect(
+      InternetAddress.loopbackIPv4,
+      port,
+      timeout: const Duration(seconds: 2),
+    );
+    socket.destroy();
+    return true;
+  } on SocketException {
+    return false;
   }
 }

@@ -54,12 +54,20 @@ MI1 evidence (2026-10-17, code only):
 
 ## MI2. The Swift host
 
-- [ ] MI2.1 The `ios/Runner/Railgun/` files and the folder reference
-- [ ] MI2.2 Channel registration in `AppDelegate`
-- [ ] MI2.3 `supported` on iOS and Android (with a Kotlin test)
-- [ ] MI2.4 The page in the window; handling a terminated page
-- [ ] MI2.5 The bridge after the background (XI14)
-- [ ] MI2.6 Swift tests (`RailgunHostTests.swift`)
+- [x] MI2.1 The `ios/Runner/Railgun/` files and the folder reference (the project file edited by hand: VI-5)
+- [x] MI2.2 Channel registration in `AppDelegate`
+- [x] MI2.3 `supported` on iOS and Android (with a Kotlin test)
+- [x] MI2.4 The page in the window; handling a terminated page (VI-7)
+- [x] MI2.5 The bridge after the background (XI14): the reload path; the live proxy update waits for MI0.6 (VI-8)
+- [x] MI2.6 Swift tests (`RailgunHostTests.swift`): written and compiled; they run in the first device session (VI-1)
+
+MI2 evidence (2026-10-17, code only):
+
+- `xcodebuild build-for-testing -workspace ios/Runner.xcworkspace -scheme Runner -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO` succeeds: the eight host files and `RailgunHostTests.swift` compile with no warning, and `Runner.app/railgun/` holds the bundle byte for byte, `COPYING` included. Nothing was booted and no test ran.
+- The first compile stopped at `[CP] Check Pods Manifest.lock`: the untracked `ios/Pods/Manifest.lock` said `COCOAPODS: 1.15.2` (a local `pod install`), the committed `Podfile.lock` 1.16.2. Only that line of the untracked manifest was aligned; no tracked file changed.
+- Kotlin railgun tests: 22 of 22 pass (one new, `RailgunHostHandlerTest`). Rust `railgun_bridge`: 8 pass, 1 ignored; the pin test now reads `RailgunEndpoints.swift` too.
+- Dart: `railgun_engine_test.dart`, 8 of 8 (four new: the bridge after the background).
+- Invariant 20 holds in Swift too: `load` refuses with `UNAVAILABLE` unless the bridge's port accepts a loopback connection, before the store's proxy is set and the web view made (`RailgunPageHost.loopbackAccepts`, with a Swift test).
 - [ ] MI2 gate
 
 ## MI3. Availability, balance and lifecycle on iOS
@@ -123,6 +131,11 @@ Number them VI-1, VI-2, and so on. Each entry says what the plan said, what real
   `check.mjs` gained a delete check, which passes in Chrome. Dart does not call `deleteWallet` yet: when and how is the owner's choice (BI-3). Plan MI1 tasks 2 and 4 and §3.6, iOS reference §6.2 and §6.5, the Android reference's §6.2 method table and the A-plan's E5 and U15 rows updated.
 - **VI-3 (MI1.2): `WALLET_SOURCE` does not touch stored wallets.** The plan left it unverified (UI10, A-plan U17) and the owner accepted that the A35's wallet might rescan. The SDK writes the wallet source only into the encrypted annotations of the notes a wallet sends (AES under the sender's viewing key). The wallet's id is `sha256(seed ‖ index)` and its record `['wallet', id]`, neither of which depends on it, so existing wallets open unchanged and nothing rescans. Plan MI1 Traps and UI10, and the A-plan's U17 row, updated.
 - **VI-4 (MI1.3): the `safari17` target changes nothing.** The plan expected it might change esbuild's lowering for Android (UI11). A `chrome100`-only build of the same source is byte-identical to the `chrome100` + `safari17` build, so Android gets exactly the code it would get without the Safari target. The A35 round (MI1.7) still gates the source changes. Plan MI1 Traps and UI11 updated.
+- **VI-5 (MI2.1): the project file is edited by hand.** The brief was to add the files with the `xcodeproj` gem. The only copies here (1.24.0, system and CocoaPods' own) cannot open the project: its SyncWidget folder is a `PBXFileSystemSynchronizedRootGroup`, which xcodeproj supports from 1.25. So `project.pbxproj` gained its entries by a script with asserted anchors, using readable ids in the repository's style (`RAILGUNIOS…`, as `LEDGERIOS…` and `OUTBOX…`): the `Railgun` group with the eight sources and the `railgun` folder reference (Copy Bundle Resources), and `RailgunHostTests.swift` in RunnerTests. `plutil -lint` and `xcodebuild -list` read it, and the build uses it. No plan text changes.
+- **VI-6 (MI2.1): no console hook.** Reference §12 mapped Kotlin's `Chrome` to "a page console hook, as `log` events in debug", while §6.4 rules out injecting any script, and WebKit has no console callback. No script is injected: the page's console never reaches the host, the engine's own `log` events still arrive from a page loaded with `debug`, and a debug build reads the console in Safari's Web Inspector. Reference §6.4 and §12 updated.
+- **VI-7 (MI2.4): where the page sits.** Reference §6.3 said "the key window's root view at index 0, behind the Flutter view". A subview of the Flutter view is drawn over Flutter's own content, not behind it, so the page is inserted into the key window itself at index 0, beneath the root view controller's view, which covers it. It moves when another window becomes key, and a memory warning closes an idle page. Reference §6.3 updated.
+- **VI-8 (MI2.5): the bridge after the background, without MI0.6.** The plan left the choice between updating a live page's proxy and reloading it to MI0.6. Built now, the reload path, which needs nothing unverified: on iOS, when the app is shown again, Dart probes the bridge's port over loopback; a refusal closes the page and stops the bridge, and the next use reopens the page on a new bridge (invariant 21). A page interrupted mid-sync starts it again (plan §11's accepted risk). Plan MI2.5 and reference §6.8 updated.
+- **VI-9 (MI2.1): the delivery returns a value.** The plan's delivery is `callAsyncJavaScript("__railgunHostDeliver(m)", …)`. A body that returns nothing may reach the completion as an unsupported result, so the body is `__railgunHostDeliver(m); return true;`, and a delivery that fails fails its call `CLOSED` (Kotlin's failed post). Reference §6.2 updated.
 
 ## Blocked
 
