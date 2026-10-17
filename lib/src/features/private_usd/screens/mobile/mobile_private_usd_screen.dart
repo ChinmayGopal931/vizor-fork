@@ -26,6 +26,7 @@ import '../../../activity/activity_feed_sections.dart'
 import '../../../activity/models/activity_row_data.dart';
 import '../../../activity/widgets/activity_feed.dart' show ActivityFeedRowGroup;
 import '../../models/private_usd_balances.dart';
+import '../../models/private_usd_pending_payment.dart';
 import '../../models/private_usd_record_key.dart';
 import '../../private_usd_copy.dart';
 import '../../providers/private_usd_available_provider.dart';
@@ -40,6 +41,7 @@ import '../../widgets/mobile/private_usd_home_strip.dart';
 import '../../widgets/mobile/private_usd_activity_rows.dart';
 import '../../widgets/mobile/private_usd_banner.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
+import '../../widgets/mobile/private_usd_pending_payment_line.dart';
 import '../../widgets/mobile/private_usd_sync_line.dart';
 
 /// `/private-usd` (plan reference §9.4 S2): the balance with its screening
@@ -137,6 +139,7 @@ class _MobilePrivateUsdScreenState
       onWithdraw: sends ? () => context.push('/private-usd/withdraw') : null,
       canSend: spending.canSend && hasDollars,
       spendNote: privateUsdSpendMessage(spending),
+      pendingPayment: ref.watch(privateUsdPendingPaymentProvider(uuid)),
     );
   }
 }
@@ -163,6 +166,7 @@ class MobilePrivateUsdView extends StatelessWidget {
     this.onWithdraw,
     this.canSend = false,
     this.spendNote,
+    this.pendingPayment,
     this.onRefunds,
     super.key,
   });
@@ -206,6 +210,9 @@ class MobilePrivateUsdView extends StatelessWidget {
 
   /// Why sending or converting cannot start now (the spending note).
   final String? spendNote;
+
+  /// Where an outgoing payment in flight stands, above the spending note.
+  final PrivateUsdPendingPayment? pendingPayment;
 
   /// "Refunds" beside the Activity heading, once a conversion was refunded.
   final VoidCallback? onRefunds;
@@ -306,6 +313,14 @@ class MobilePrivateUsdView extends StatelessWidget {
                                   ),
                                 ),
                               ],
+                            ),
+                          ),
+                        ],
+                        if (pendingPayment case final payment?) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          NeonSyncOcclude(
+                            child: PrivateUsdPendingPaymentLine(
+                              payment: payment,
                             ),
                           ),
                         ],

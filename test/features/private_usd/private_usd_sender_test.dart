@@ -25,6 +25,7 @@ class _Page implements PrivateUsdSendPage {
   final bool holdProof;
   var fee = BigInt.from(500000);
   var proofs = 0;
+  var syncs = 0;
   final proving = Completer<void>();
   final _proof = Completer<RailgunRelayedProof>();
   static const json = '{"chainId":11155111,"to":"$_proxy","data":"0x1234"}';
@@ -69,7 +70,7 @@ class _Page implements PrivateUsdSendPage {
   }
 
   @override
-  Future<void> sync(String accountUuid) async {}
+  Future<void> sync(String accountUuid) async => syncs++;
 }
 
 /// Rust's send calls over an in-memory log: a settlement pass confirms what
@@ -159,14 +160,15 @@ class _Harness {
       readMnemonic: (_) async => Uint8List.fromList(List.filled(64, 7)),
       allowed: () => foreground && !locked,
     );
+    guard = PrivateUsdSpendGuard(
+      readLog: backend.list,
+      unfinishedCount: (_) async => 0,
+    );
     sender = PrivateUsdSender(
       engine: engine,
       page: page,
       backend: backend,
-      guard: PrivateUsdSpendGuard(
-        readLog: backend.list,
-        unfinishedCount: (_) async => 0,
-      ),
+      guard: guard,
       maxRelayerFee: _cap,
       landingPoll: Duration.zero,
     );
@@ -174,6 +176,7 @@ class _Harness {
 
   final _Page page;
   final backend = _Backend();
+  late final PrivateUsdSpendGuard guard;
   late final PrivateUsdEngine engine;
   late final PrivateUsdSender sender;
   var foreground = true;
@@ -320,5 +323,43 @@ void main() {
     expect(retried.page.proofs, 1);
     await h.engine.dispose();
     await retried.engine.dispose();
+  });
+  test('a send seen in a block syncs the wallet once, so the balance '
+      'follows it (owner, 2026-10-17)', () async {
+    // Found by the landing wait: the send's own sync, once.
+    final h = _Harness();
+    expect(
+      await h.sender.send(_account, h.request, h.cost()),
+      isA<PrivateUsdSendSent>(),
+    );
+    await pumpEventQueue();
+    expect(h.page.syncs, 1);
+    expect(h.guard.landedAt(_account), isNotNull);
+
+    // Found by a later settlement pass: that pass syncs it.
+    final later = _Harness();
+    later.backend.answer = const ApiTransactResult(
+      kind: ApiTransactKind.retry,
+      transactions: [],
+      retryAfterSecs: 30,
+    );
+    expect(
+      await later.sender.send(_account, later.request, later.cost()),
+      isA<PrivateUsdSendUnconfirmed>(),
+    );
+    await pumpEventQueue();
+    expect(later.page.syncs, 1, reason: "the send's own");
+    expect(later.guard.landedAt(_account), isNull);
+    await later.sender.settle(_account);
+    await pumpEventQueue();
+    expect(later.page.syncs, 2);
+    expect(later.guard.landedAt(_account), isNotNull);
+
+    // A pass that finds nothing new syncs nothing.
+    await later.sender.settle(_account);
+    await pumpEventQueue();
+    expect(later.page.syncs, 2);
+    await h.engine.dispose();
+    await later.engine.dispose();
   });
 }

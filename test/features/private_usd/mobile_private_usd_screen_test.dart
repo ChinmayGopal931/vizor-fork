@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
+import 'package:zcash_wallet/src/features/private_usd/models/private_usd_pending_payment.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_screen.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
+import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_pending_payment_line.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
 // The Private USD screen's states (plan reference §9.4 S2).
@@ -35,6 +37,8 @@ void main() {
     WidgetTester tester,
     PrivateUsdBalanceState state, {
     String? address = previewPrivateUsdAddress,
+    PrivateUsdPendingPayment? pendingPayment,
+    String? spendNote,
   }) async {
     refreshes = 0;
     await tester.pumpWidget(
@@ -49,6 +53,8 @@ void main() {
             screening: const Duration(hours: 1),
             onBack: () {},
             onRefresh: () => refreshes++,
+            pendingPayment: pendingPayment,
+            spendNote: spendNote,
           ),
         ),
       ),
@@ -81,6 +87,60 @@ void main() {
     // Send and Withdraw arrive with M7.
     expect(find.text(PrivateUsdCopy.actionConvert), findsNothing);
     expect(find.text(PrivateUsdCopy.actionSend), findsNothing);
+  });
+
+  testWidgets('a payment in flight shows its stage, with observed numbers '
+      'only (owner, 2026-10-17)', (tester) async {
+    String line() => tester
+        .widget<Text>(
+          find.byKey(const ValueKey('mobile_private_usd_pending_payment')),
+        )
+        .data!;
+
+    await pumpScreen(tester, previewPrivateUsdBalance(available: 100));
+    expect(
+      find.byKey(const ValueKey('mobile_private_usd_pending_payment')),
+      findsNothing,
+    );
+
+    await pumpScreen(
+      tester,
+      previewPrivateUsdBalance(available: 100),
+      pendingPayment: const PrivateUsdPaymentProving(42),
+      spendNote: PrivateUsdCopy.paymentPending,
+    );
+    expect(line(), PrivateUsdCopy.paymentProving(42));
+    expect(find.text(PrivateUsdCopy.paymentPending), findsOneWidget);
+
+    await pumpScreen(
+      tester,
+      previewPrivateUsdBalance(available: 100),
+      pendingPayment: const PrivateUsdPaymentUpdatingBalance(),
+    );
+    expect(line(), PrivateUsdCopy.paymentUpdatingBalance);
+  });
+
+  testWidgets('the wait for a block counts up from the post', (tester) async {
+    var now = DateTime(2026, 10, 17, 12);
+    final posted = now.subtract(const Duration(seconds: 65));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppTheme(
+          data: AppThemeData.dark,
+          child: Center(
+            child: PrivateUsdPendingPaymentLine(
+              payment: PrivateUsdPaymentWaitingForBlock(posted),
+              now: () => now,
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text(PrivateUsdCopy.paymentWaitingForBlock('1:05')), findsOne);
+
+    now = now.add(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text(PrivateUsdCopy.paymentWaitingForBlock('1:06')), findsOne);
   });
 
   testWidgets('an empty balance shows the empty state', (tester) async {

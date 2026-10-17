@@ -3,9 +3,13 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../rust/api/private_usd.dart' as rust;
+import '../models/private_usd_pending_payment.dart';
 import '../services/private_usd_spend_guard.dart';
+import '../services/railgun_engine.dart';
+import 'private_usd_balance_provider.dart';
 import 'private_usd_engine_provider.dart';
 import 'private_usd_unfinished_provider.dart';
+import 'railgun_engine_provider.dart';
 
 /// [accountUuid]'s spend status (reference §6.7, §9.4 S2): `checking` until
 /// its send log is read, then `sending` while a send runs or the log holds
@@ -71,3 +75,33 @@ class PrivateUsdSendRecordsNotifier extends Notifier<List<rust.ApiSendRecord>> {
     return guard.recordsFor(accountUuid);
   }
 }
+
+/// [accountUuid]'s outgoing payment in flight, as the Private USD screen
+/// shows it (owner, 2026-10-17): the proof's progress while the page proves
+/// one (a send, a withdrawal or a conversion's escrow payment), how long a
+/// kept send has waited for a block, and "Updating your balance" from its
+/// block until the balance syncs. Null when none is in flight.
+final privateUsdPendingPaymentProvider = Provider.autoDispose
+    .family<PrivateUsdPendingPayment?, String>((ref, accountUuid) {
+      final proofProgress = ref.watch(
+        railgunEngineStateProvider.select(
+          (engine) =>
+              engine.phase == RailgunEnginePhase.proving &&
+                  engine.accountUuid == accountUuid
+              ? engine.proof?.progress ?? 0.0
+              : null,
+        ),
+      );
+      // The guard notes a landing as it notes the rows, so a new list comes
+      // with every landing.
+      final sends = ref.watch(privateUsdSendRecordsProvider(accountUuid));
+      final balanceUpdatedAt = ref.watch(
+        privateUsdBalanceProvider(accountUuid).select((s) => s.updatedAt),
+      );
+      return privateUsdPendingPayment(
+        proofProgress: proofProgress,
+        sends: sends,
+        landedAt: ref.read(privateUsdSpendGuardProvider).landedAt(accountUuid),
+        balanceUpdatedAt: balanceUpdatedAt,
+      );
+    });

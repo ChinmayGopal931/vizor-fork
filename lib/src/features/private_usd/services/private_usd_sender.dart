@@ -300,13 +300,22 @@ class PrivateUsdSender {
 
   /// One settlement pass over [accountUuid]'s unconfirmed sends (the rows
   /// after it), only in the foreground while unlocked; null when it did
-  /// not run.
-  Future<List<rust.ApiSendRecord>?> settle(String accountUuid) {
+  /// not run. A send the pass finds in a block syncs the wallet, so the
+  /// balance follows it ([syncOnLanding]; the landing wait syncs once it
+  /// returns instead).
+  Future<List<rust.ApiSendRecord>?> settle(
+    String accountUuid, {
+    bool syncOnLanding = true,
+  }) {
     if (!_canRun) return Future.value();
     return _track(() async {
       try {
+        final before = _guard.recordsFor(accountUuid);
         final rows = await _backend.settleAll(accountUuid);
         _guard.noteSends(accountUuid, rows);
+        if (syncOnLanding && privateUsdSendsLanded(before, rows)) {
+          unawaited(_syncQuietly(accountUuid));
+        }
         return rows;
       } on rust.ApiPrivateUsdError catch (error) {
         if (error.code == rust.ApiPrivateUsdErrorCode.storeUnreadable) {
@@ -495,7 +504,8 @@ class PrivateUsdSender {
     while (true) {
       await Future<void>.delayed(landingPoll);
       if (!_canRun) return PrivateUsdSendUnconfirmed(txHash);
-      final rows = await settle(accountUuid);
+      // The send syncs the wallet once this returns.
+      final rows = await settle(accountUuid, syncOnLanding: false);
       if (rows != null) {
         final row = rows.where((r) => r.sendId == sendId).firstOrNull;
         // Gone: it reverted, or another proof took part of its notes.

@@ -47,6 +47,23 @@ typedef PrivateUsdSendLogReader =
 /// Counts an account's conversions under way in Rust's store.
 typedef PrivateUsdUnfinishedCounter = Future<int> Function(String accountUuid);
 
+/// Whether a send that [before] holds unconfirmed is confirmed in [after]:
+/// it was seen landing between two reads of the log.
+bool privateUsdSendsLanded(
+  List<rust.ApiSendRecord> before,
+  List<rust.ApiSendRecord> after,
+) {
+  final waiting = {
+    for (final row in before)
+      if (row.state == rust.ApiSendState.unconfirmed) row.sendId,
+  };
+  return after.any(
+    (row) =>
+        row.state == rust.ApiSendState.confirmed &&
+        waiting.contains(row.sendId),
+  );
+}
+
 /// One outgoing Railgun payment at a time per account, across screens and
 /// restarts (zapp `PrivateUsdSpendGuard`):
 ///
@@ -64,17 +81,21 @@ class PrivateUsdSpendGuard extends ChangeNotifier {
     PrivateUsdSendLogReader? readLog,
     PrivateUsdUnfinishedCounter? unfinishedCount,
     this.retryAfter = const Duration(seconds: 30),
+    DateTime Function()? now,
   }) : _readLog = readLog,
-       _unfinishedCount = unfinishedCount;
+       _unfinishedCount = unfinishedCount,
+       _now = now ?? DateTime.now;
 
   final PrivateUsdSendLogReader? _readLog;
   final PrivateUsdUnfinishedCounter? _unfinishedCount;
+  final DateTime Function() _now;
 
   /// How soon an unreadable log is read again (zapp: 30 s).
   final Duration retryAfter;
 
   final _starting = <String, PrivateUsdSpendStatus>{};
   final _rows = <String, List<rust.ApiSendRecord>>{};
+  final _landedAt = <String, DateTime>{};
   final _unreadable = <String>{};
   final _reads = <String, Future<void>>{};
   final _retries = <String, Timer>{};
@@ -113,6 +134,11 @@ class PrivateUsdSpendGuard extends ChangeNotifier {
   bool hasUnsettled(String accountUuid) =>
       (_rows[accountUuid] ?? const []).any(_unsettled);
 
+  /// When a send of [accountUuid]'s was last seen landing: read as
+  /// unconfirmed, then as confirmed (the device's clock). Null when none was
+  /// seen this run.
+  DateTime? landedAt(String accountUuid) => _landedAt[accountUuid];
+
   /// Reads [accountUuid]'s log now (one read at a time per account). A log
   /// that does not read is `unreadable`, and read again after [retryAfter].
   Future<void> check(String accountUuid) {
@@ -138,6 +164,9 @@ class PrivateUsdSpendGuard extends ChangeNotifier {
     if (_disposed) return;
     _retries.remove(accountUuid)?.cancel();
     _unreadable.remove(accountUuid);
+    if (privateUsdSendsLanded(_rows[accountUuid] ?? const [], rows)) {
+      _landedAt[accountUuid] = _now();
+    }
     _rows[accountUuid] = List.unmodifiable(rows);
     notifyListeners();
   }
@@ -157,6 +186,7 @@ class PrivateUsdSpendGuard extends ChangeNotifier {
   /// Drops what the guard knows about [accountUuid] (deleted).
   void forget(String accountUuid) {
     _rows.remove(accountUuid);
+    _landedAt.remove(accountUuid);
     _unreadable.remove(accountUuid);
     _retries.remove(accountUuid)?.cancel();
     if (!_disposed) notifyListeners();

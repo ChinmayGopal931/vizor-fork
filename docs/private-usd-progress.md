@@ -60,6 +60,15 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     head in the front layer, from just above it down past the readout, so
     the top bar or a scroll fade no longer cuts it there (Home and Private
     USD, `NeonSyncLinePart`). The two layers split it on whole pixels.
+  - A payment in flight shows its stage on the Private USD screen, with
+    observed numbers only (`privateUsdPendingPaymentProvider`): "Proving
+    your payment · n%" (the SDK's proof), "Waiting for a block · m:ss" (a
+    kept send, timed from when it was kept: the log keeps only the last
+    post's time), then "Updating your balance" from its block until the
+    balance syncs; a settlement pass that finds a send landing now syncs
+    the wallet. A conversion's escrow payment shows only its proof: no post
+    time is kept for it and its block cannot be told from its
+    confirmations, so the banner's own steps carry it from there.
 - **Handoff (2026-10-16): start here.**
   - **State.** `feature/private-usd-android` is pushed to `origin` (the
     owner's fork) with everything below, the Gotham files included: the owner

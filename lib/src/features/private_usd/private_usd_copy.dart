@@ -1058,6 +1058,17 @@ abstract final class PrivateUsdCopy {
   static String reverseProving(int percent) =>
       'Proving your payment · $percent%';
 
+  /// New (owner, 2026-10-17): an outgoing payment in flight on the Private
+  /// USD screen (a send, a withdrawal or a conversion's escrow payment),
+  /// with observed numbers only: the proof's progress, then the time since
+  /// the send was posted.
+  static String paymentProving(int percent) => reverseProving(percent);
+
+  static String paymentWaitingForBlock(String elapsed) =>
+      'Waiting for a block · $elapsed';
+
+  static const paymentUpdatingBalance = 'Updating your balance';
+
   /// New (F): under the proof.
   static const reverseProvingNote =
       'Your phone builds a zero-knowledge proof of the payment. This can take '
