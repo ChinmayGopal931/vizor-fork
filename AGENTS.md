@@ -1295,7 +1295,9 @@ read `docs/private-usd-android-plan.md`: §3.5 lists the invariants and why
 each one exists. The pinned config and defines are in
 `docs/private-usd-reference.md` §7. Progress and deviations are in
 `docs/private-usd-progress.md`, and the device runs in
-`docs/private-usd-device-checklist.md`.
+`docs/private-usd-device-checklist.md`. The iOS port is planned, not built:
+`docs/private-usd-ios-plan.md`, with its reference, progress and device
+checklist beside it (`docs/private-usd-ios-*.md`).
 
 Code:
 

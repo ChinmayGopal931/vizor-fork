@@ -48,7 +48,9 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     the Dynamic Island, the tab bar's 16 px gap, sheets, and Gotham's thin
     weights. Private USD stays Android-only: on iOS it would need a native
     host for the Railgun page (a WKWebView with the same allowlist and
-    routing), which the owner deferred on 2026-10-17.
+    routing), which the owner deferred on 2026-10-17; the port is planned
+    in `docs/private-usd-ios-plan.md` (with its reference, progress and
+    device checklist).
     (1) Both test lanes ran on the redesign's tree (2026-10-17): mobile
     2,328 passed and none failed; default 6,030 passed and 13 failed, the
     same 13 that fail at `25af59f48`, before it (listed under "Checks on the
