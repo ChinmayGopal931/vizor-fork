@@ -14,6 +14,11 @@ abstract interface class RailgunEngineKeyStore {
   /// Throws [RailgunEngineKeyLockedException] while the wallet is locked.
   Future<String> keyFor(String accountUuid);
 
+  /// Whether [accountUuid] has a key, which [keyFor] makes when the page
+  /// first opens the account's wallet: whether the account used Private USD.
+  /// Reads no secret, so it works while locked.
+  Future<bool> has(String accountUuid);
+
   Future<void> delete(String accountUuid);
 }
 
@@ -57,6 +62,11 @@ class SecureRailgunEngineKeyStore implements RailgunEngineKeyStore {
     await _storage.writeSecretString(key, created);
     return created;
   }
+
+  // The stored value stays encrypted: only whether there is one counts.
+  @override
+  Future<bool> has(String accountUuid) async =>
+      await _storage.readString(storageKey(accountUuid)) != null;
 
   @override
   Future<void> delete(String accountUuid) =>

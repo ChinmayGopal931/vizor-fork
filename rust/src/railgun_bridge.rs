@@ -19,6 +19,12 @@
 //! closes the page, stops the bridge and starts a new one: Chromium keeps its
 //! pooled tunnels otherwise, and a bridge whose route no longer matches the
 //! policy refuses every new connection.
+//!
+//! An offline bridge has no route at all and refuses every `CONNECT`. A page
+//! loaded only to delete an account's wallet reaches nothing, yet no page
+//! loads without its proxy, so it gets one of these: it needs no Tor and never
+//! waits for one. A bridge keeps the kind it started as; asking for the other
+//! kind stops it and starts a new one.
 
 use std::{future::Future, io, sync::OnceLock, time::Duration};
 
@@ -82,6 +88,18 @@ enum Session {
     /// One isolated client for the whole page session, so the page's sockets
     /// share an isolation group instead of each building a fresh circuit.
     Tor(TorClient),
+    /// No route: every `CONNECT` is refused (see the module docs).
+    Offline,
+}
+
+impl Session {
+    /// The hosts a client may ask for: none on an offline bridge.
+    fn allowed(&self) -> &'static [&'static str] {
+        match self {
+            Self::Direct | Self::Tor(_) => &RAILGUN_PAGE_HOSTS,
+            Self::Offline => &[],
+        }
+    }
 }
 
 trait Tunnel: AsyncRead + AsyncWrite + Unpin + Send {}
@@ -89,6 +107,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Send> Tunnel for T {}
 
 struct BridgeState {
     port: u16,
+    offline: bool,
     shutdown: oneshot::Sender<()>,
     task: JoinHandle<()>,
 }
@@ -99,7 +118,7 @@ fn bridge() -> &'static Mutex<Option<BridgeState>> {
     BRIDGE.get_or_init(|| Mutex::new(None))
 }
 
-/// Starts the bridge, or returns the port of the one already running.
+/// Starts the bridge, or returns the port of the routed one already running.
 ///
 /// A bridge whose accept loop has ended (an accept error, as when iOS
 /// reclaims a suspended app's listening socket) is replaced rather than handed
@@ -108,17 +127,37 @@ fn bridge() -> &'static Mutex<Option<BridgeState>> {
 /// Fails closed: while Tor is on but bootstrapping (past the route wait),
 /// failed or unavailable, there is no bridge and so no page traffic.
 pub(crate) async fn start() -> Result<u16, String> {
+    start_bridge(false).await
+}
+
+/// Starts a bridge that refuses every connection, or returns the port of the
+/// offline one already running. It needs no route, so it never waits for Tor.
+pub(crate) async fn start_offline() -> Result<u16, String> {
+    start_bridge(true).await
+}
+
+async fn start_bridge(offline: bool) -> Result<u16, String> {
     let mut state = bridge().lock().await;
-    if let Some(running) = state.as_ref() {
-        if !running.task.is_finished() {
-            return Ok(running.port);
+    if let Some(running) = state.take() {
+        if running.task.is_finished() {
+            log::warn!("network privacy: Railgun bridge had stopped; starting a new one");
+        } else if running.offline == offline {
+            let port = running.port;
+            *state = Some(running);
+            return Ok(port);
+        } else {
+            // The other kind: an offline page must never get a route, and a
+            // routed one must never be left without.
+            shut_down(running).await;
         }
-        *state = None;
-        log::warn!("network privacy: Railgun bridge had stopped; starting a new one");
     }
-    let session = match network_privacy::tor_client_for_route(true, || false).await? {
-        Some(tor) => Session::Tor(tor),
-        None => Session::Direct,
+    let session = if offline {
+        Session::Offline
+    } else {
+        match network_privacy::tor_client_for_route(true, || false).await? {
+            Some(tor) => Session::Tor(tor),
+            None => Session::Direct,
+        }
     };
     let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
         .await
@@ -131,21 +170,31 @@ pub(crate) async fn start() -> Result<u16, String> {
     let task = tokio::spawn(run(listener, session, shutdown_rx));
     *state = Some(BridgeState {
         port,
+        offline,
         shutdown,
         task,
     });
-    log::info!("network privacy: Railgun bridge started");
+    if offline {
+        log::info!("network privacy: offline Railgun bridge started");
+    } else {
+        log::info!("network privacy: Railgun bridge started");
+    }
     Ok(port)
 }
 
-/// Stops the bridge and closes every tunnel it carries. Idempotent.
+/// Stops the bridge, whichever kind runs, and closes every tunnel it carries.
+/// Idempotent.
 pub(crate) async fn stop() {
     let state = bridge().lock().await.take();
     if let Some(state) = state {
-        let _ = state.shutdown.send(());
-        let _ = state.task.await;
+        shut_down(state).await;
         log::info!("network privacy: Railgun bridge stopped");
     }
+}
+
+async fn shut_down(state: BridgeState) {
+    let _ = state.shutdown.send(());
+    let _ = state.task.await;
 }
 
 async fn run(listener: TcpListener, session: Session, mut shutdown: oneshot::Receiver<()>) {
@@ -157,10 +206,11 @@ async fn run(listener: TcpListener, session: Session, mut shutdown: oneshot::Rec
                 Ok((stream, _)) => {
                     let session = session.clone();
                     connections.spawn(async move {
+                        let allowed = session.allowed();
                         let connect = |host, port| connect_upstream(session, host, port);
                         // Per-connection outcomes are not logged: they would
                         // record the page's activity.
-                        let _ = serve(stream, &RAILGUN_PAGE_HOSTS, connect).await;
+                        let _ = serve(stream, allowed, connect).await;
                     });
                 }
                 Err(error) => {
@@ -266,12 +316,15 @@ async fn write_reply<S: AsyncWrite + Unpin>(stream: &mut S, reply: Reply) -> io:
 
 /// Opens the upstream socket on the session's route. A session whose route no
 /// longer matches the process policy (a flip, or Tor no longer usable) is
-/// refused rather than re-routed.
+/// refused rather than re-routed, and an offline one is always refused.
 async fn connect_upstream(
     session: Session,
     host: String,
     port: u16,
 ) -> Result<Box<dyn Tunnel>, Reply> {
+    if matches!(session, Session::Offline) {
+        return Err(Reply::NotAllowed);
+    }
     match (session, network_privacy::try_tor_client_for_route(false)) {
         (Session::Tor(tor), Ok(Some(_))) => tor
             .connect_stream(&host, port)
@@ -518,6 +571,72 @@ mod tests {
             .await
             .is_ok());
         stop().await;
+    }
+
+    /// The bridge an account deletion loads its page behind (iOS progress
+    /// VI-17): no route, so it starts while Tor is still coming up, and no
+    /// client gets through, the page's own hosts included.
+    #[tokio::test]
+    async fn an_offline_bridge_needs_no_route_and_refuses_every_connect() {
+        let _policy = lock_route_policy();
+        // Tor requested and not usable yet: a routed bridge would wait here.
+        network_privacy::begin_tor_enable();
+        let port = tokio::time::timeout(Duration::from_secs(5), start_offline())
+            .await
+            .expect("an offline bridge never waits for Tor")
+            .unwrap();
+
+        for host in RAILGUN_PAGE_HOSTS {
+            let mut client = TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, port))
+                .await
+                .unwrap();
+            greet(&mut client).await;
+            client
+                .write_all(&connect_request(ATYP_DOMAIN, host.as_bytes(), 443))
+                .await
+                .unwrap();
+            assert_eq!(reply_code(&mut client).await, Reply::NotAllowed as u8);
+        }
+        assert!(matches!(
+            connect_upstream(Session::Offline, HOST.into(), 443).await,
+            Err(Reply::NotAllowed)
+        ));
+        stop().await;
+    }
+
+    async fn running_offline() -> Option<bool> {
+        bridge()
+            .lock()
+            .await
+            .as_ref()
+            .map(|running| running.offline)
+    }
+
+    #[tokio::test]
+    async fn asking_for_the_other_kind_stops_the_bridge_and_starts_a_new_one() {
+        let _policy = lock_route_policy();
+        let routed = start().await.unwrap();
+        assert_eq!(running_offline().await, Some(false));
+
+        let offline = start_offline().await.unwrap();
+        assert_eq!(running_offline().await, Some(true));
+        // The OS may hand the freed port straight back.
+        if offline != routed {
+            assert!(TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, routed))
+                .await
+                .is_err());
+        }
+        assert_eq!(start_offline().await.unwrap(), offline);
+
+        let routed_again = start().await.unwrap();
+        assert_eq!(running_offline().await, Some(false));
+        if routed_again != offline {
+            assert!(TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, offline))
+                .await
+                .is_err());
+        }
+        stop().await;
+        assert_eq!(running_offline().await, None);
     }
 
     #[tokio::test]

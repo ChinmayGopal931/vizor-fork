@@ -7,9 +7,10 @@ import 'railgun_engine_key_store.dart';
 /// only after the Rust account delete succeeded. A full reset's `deleteAll`
 /// removes both for every account.
 ///
-/// The page's stored wallet itself stays until a reset wipes the page
-/// origin: the bundle has no `deleteWallet` yet (E5). Without its key it is
-/// an unreadable blob.
+/// The page's stored wallet goes separately, through the page's
+/// `deleteWallet` (`PrivateUsdLifecycle.deleteRailgunWallet`), best effort;
+/// one that stays is unreadable without its key until a reset wipes the
+/// page's storage.
 Future<void> deletePrivateUsdAccountData(
   AppSecureStore storage,
   String accountUuid,

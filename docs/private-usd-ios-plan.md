@@ -359,7 +359,7 @@ Every milestone also follows these rules:
 **Tasks.**
 
 1. `rw/src/index.js`: the transport abstraction (§6.2). Android keeps the `MessagePort` hello (`event.source === null`, exactly one port), and iOS uses `railgunHost` and `__railgunHostDeliver`. `INIT` becomes `vizor-railgun-init` (E5, X2).
-2. E5: `deleteWallet` (D15) and `WALLET_SOURCE = 'vizor'` (X2) in `rw/src/wallet.js`. **As built (VI-2):** `deleteWallet {network, mnemonic}` runs on a page of its own with only the database open (no provider, no screening nodes, so no network). It deletes the wallet's encrypted keys (`deleteWalletByID`) and also the notes syncs decrypted for it, which the engine keeps unencrypted. It joins the host method tables with a 1-minute timeout. Dart does not call it yet (BI-3).
+2. E5: `deleteWallet` (D15) and `WALLET_SOURCE = 'vizor'` (X2) in `rw/src/wallet.js`. **As built (VI-2):** `deleteWallet {network, mnemonic}` runs on a page of its own with only the database open (no provider, no screening nodes, so no network). It deletes the wallet's encrypted keys (`deleteWalletByID`) and also the notes syncs decrypted for it, which the engine keeps unencrypted. It joins the host method tables with a 1-minute timeout. Since progress VI-17 (BI-3, option (a)) an account deletion calls it, on a fresh page behind an offline bridge.
 3. `rw/build.mjs`:
    - `target: ['chrome100', 'safari17']`
    - write the bundle to `android/app/src/main/assets/railgun` as today

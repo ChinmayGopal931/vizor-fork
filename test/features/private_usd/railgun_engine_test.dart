@@ -139,6 +139,197 @@ void main() {
     });
   });
 
+  // A bridge started while a close is still stopping its own could be the
+  // one that close stops (iOS plan invariant 21).
+  test(
+    'a page reopens only once a close under way stopped its bridge',
+    () async {
+      final log = <String>[];
+      final host = _FakeHost(log, pageAddress: _address);
+      final engine = _engineWith(host, log);
+      await engine.sync('account');
+      log.clear();
+
+      final closeGate = Completer<void>();
+      host.closeGate = closeGate;
+      final closing = engine.close();
+      final sync = engine.sync('account');
+      await pumpEventQueue();
+      expect(log, ['close']);
+
+      closeGate.complete();
+      await closing;
+      await sync;
+      expect(log, [
+        'close',
+        'stop',
+        'start bridge',
+        'load 4242',
+        'call start',
+        'call openWallet',
+        'call refresh',
+      ]);
+      await engine.dispose();
+    },
+  );
+
+  // iOS progress BI-3 and VI-17: an account deletion deletes the account's
+  // wallet from the page's storage.
+  group('deleting a wallet', () {
+    RailgunWalletDeletion deletion() => RailgunWalletDeletion(
+      accountUuid: 'gone',
+      network: 'sepolia',
+      mnemonic: 'railgun words',
+    );
+
+    test('happens on a fresh page behind an offline bridge, which both close '
+        'after', () async {
+      final log = <String>[];
+      final host = _FakeHost(log, pageAddress: _address);
+      final engine = _engineWith(host, log);
+      final gone = deletion();
+
+      await engine.deleteWallet(gone);
+
+      // The first close is the build's, of what an earlier engine left.
+      expect(log, [
+        'close',
+        'stop',
+        'close',
+        'stop',
+        'start offline bridge',
+        'load 4343',
+        'call deleteWallet',
+        'close',
+        'stop',
+      ]);
+      expect(jsonDecode(host.params['deleteWallet']!), {
+        'network': 'sepolia',
+        'mnemonic': 'railgun words',
+      });
+      expect(gone.isDiscarded, isTrue);
+      await engine.dispose();
+    });
+
+    test(
+      'closes the open page first and runs while the engine is drained',
+      () async {
+        final log = <String>[];
+        final engine = _engine(log, pageAddress: _address);
+        await engine.sync('account');
+        await engine.quiesceAndDrain();
+        log.clear();
+
+        await engine.deleteWallet(deletion());
+
+        expect(log, [
+          'close',
+          'stop',
+          'start offline bridge',
+          'load 4343',
+          'call deleteWallet',
+          'close',
+          'stop',
+        ]);
+        // Still drained: uses wait for the account deletion to end.
+        await expectLater(
+          engine.sync('account'),
+          throwsA(isA<RailgunEngineUnavailableException>()),
+        );
+        engine.resume();
+        expect((await engine.sync('account')).address, _address);
+        await engine.dispose();
+      },
+    );
+
+    test('a page that fails to delete fails it, and the page and bridge '
+        'close', () async {
+      final log = <String>[];
+      final host = _FakeHost(log, pageAddress: _address)
+        ..failing.add('deleteWallet');
+      final engine = _engineWith(host, log);
+      final gone = deletion();
+
+      await expectLater(
+        engine.deleteWallet(gone),
+        throwsA(isA<RailgunHostException>()),
+      );
+
+      expect(log.sublist(log.length - 2), ['close', 'stop']);
+      expect(gone.isDiscarded, isTrue);
+      await engine.dispose();
+    });
+
+    test(
+      'a close meanwhile stops it before the page gets the mnemonic',
+      () async {
+        final log = <String>[];
+        final loaded = Completer<void>();
+        final host = _FakeHost(log, pageAddress: _address)..loadGate = loaded;
+        final engine = _engineWith(host, log);
+        final gone = deletion();
+
+        final deleting = engine.deleteWallet(gone);
+        await _until(() => log.contains('load 4343'));
+        await engine.close();
+        loaded.complete();
+
+        await expectLater(
+          deleting,
+          throwsA(isA<RailgunEngineInterruptedException>()),
+        );
+        expect(host.params, isNot(contains('deleteWallet')));
+        expect(gone.isDiscarded, isTrue);
+        expect(log.sublist(log.length - 2), ['close', 'stop']);
+        await engine.dispose();
+      },
+    );
+
+    test('one that outlives its timeout closes the page and drops the '
+        'mnemonic', () async {
+      final log = <String>[];
+      final loaded = Completer<void>();
+      final host = _FakeHost(log, pageAddress: _address)..loadGate = loaded;
+      final engine = _engineWith(host, log);
+      final gone = deletion();
+
+      await expectLater(
+        engine.deleteWallet(gone, timeout: const Duration(milliseconds: 50)),
+        throwsA(isA<TimeoutException>()),
+      );
+      expect(gone.isDiscarded, isTrue);
+      expect(log.sublist(log.length - 2), ['close', 'stop']);
+
+      loaded.complete();
+      await pumpEventQueue();
+      expect(host.params, isNot(contains('deleteWallet')));
+      await engine.dispose();
+    });
+
+    test('needs an offline bridge: without one nothing loads', () async {
+      final log = <String>[];
+      final engine = RailgunEngine(
+        host: _FakeHost(log, pageAddress: _address),
+        wallets: _FakeWallets(),
+        startBridge: () async => 4242,
+        stopBridge: () async => log.add('stop'),
+      );
+      final gone = deletion();
+
+      await expectLater(
+        engine.deleteWallet(gone),
+        throwsA(isA<RailgunEngineUnavailableException>()),
+      );
+      expect(log, isNot(contains('load 4343')));
+      expect(gone.isDiscarded, isTrue);
+      await engine.dispose();
+    });
+
+    test('never shows the mnemonic in its description', () {
+      expect(deletion().toString(), isNot(contains('railgun words')));
+    });
+  });
+
   test('a drained engine refuses uses until it resumes', () async {
     final log = <String>[];
     final engine = _engine(log, pageAddress: _address);
@@ -161,14 +352,28 @@ RailgunEngine _engine(
   required String pageAddress,
   Completer<String>? refresh,
   Future<bool> Function(int port)? bridgeAccepts,
+}) => _engineWith(
+  _FakeHost(log, pageAddress: pageAddress, refresh: refresh),
+  log,
+  bridgeAccepts: bridgeAccepts,
+);
+
+RailgunEngine _engineWith(
+  _FakeHost host,
+  List<String> log, {
+  Future<bool> Function(int port)? bridgeAccepts,
 }) => RailgunEngine(
-  host: _FakeHost(log, pageAddress: pageAddress, refresh: refresh),
+  host: host,
   wallets: _FakeWallets(),
   startBridge: () async {
     log.add('start bridge');
     return 4242;
   },
   stopBridge: () async => log.add('stop'),
+  startOfflineBridge: () async {
+    log.add('start offline bridge');
+    return 4343;
+  },
   bridgeAccepts: bridgeAccepts ?? (_) async => true,
 );
 
@@ -194,6 +399,10 @@ class _FakeWallets implements RailgunWalletSource {
         ),
         expectedAddress: _address,
       );
+
+  @override
+  Future<RailgunWalletDeletion?> prepareDeletion(String accountUuid) =>
+      throw UnimplementedError('the engine never derives');
 }
 
 class _FakeHost implements RailgunHost {
@@ -202,11 +411,24 @@ class _FakeHost implements RailgunHost {
   final List<String> log;
   final String pageAddress;
   final Completer<String>? refresh;
+
+  /// The params of each method's last call.
+  final params = <String, String>{};
+
+  /// Methods the page fails.
+  final failing = <String>{};
+
+  /// Holds `load` until completed.
+  Completer<void>? loadGate;
+
+  /// Holds `close` until completed.
+  Completer<void>? closeGate;
   var _open = false;
 
   @override
   Future<void> load({required int proxyPort, required bool debug}) async {
     log.add('load $proxyPort');
+    await loadGate?.future;
     _open = true;
   }
 
@@ -214,6 +436,10 @@ class _FakeHost implements RailgunHost {
   Future<String> call(String method, String paramsJson) async {
     log.add('call $method');
     if (!_open) throw RailgunHostException(RailgunHostErrorCode.closed);
+    params[method] = paramsJson;
+    if (failing.contains(method)) {
+      throw RailgunHostException(RailgunHostErrorCode.failed);
+    }
     if (method == 'refresh' && refresh != null) return refresh!.future;
     return switch (method) {
       'start' => '{"fees":{"unshield":25,"shield":25}}',
@@ -221,6 +447,7 @@ class _FakeHost implements RailgunHost {
       'refresh' =>
         '{"Spendable":[{"token":"0x5764d0044bef5aa839e0ddafe2073421101b9ed8",'
             '"amount":"5"}]}',
+      'deleteWallet' => 'null',
       _ => throw RailgunHostException(RailgunHostErrorCode.badArgs),
     };
   }
@@ -229,6 +456,7 @@ class _FakeHost implements RailgunHost {
   Future<void> close() async {
     log.add('close');
     _open = false;
+    await closeGate?.future;
   }
 
   @override

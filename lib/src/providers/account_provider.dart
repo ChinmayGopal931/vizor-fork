@@ -25,6 +25,8 @@ import '../core/storage/linux_keyring_coordinator.dart';
 import '../core/storage/wallet_paths.dart';
 import '../features/payment_links/providers/gift_card_tracking_lifecycle_provider.dart';
 import '../features/private_usd/services/private_usd_account_data.dart';
+import '../features/private_usd/services/railgun_engine.dart'
+    show RailgunWalletDeletion;
 import '../features/swap/providers/swap_activity_store.dart';
 import '../features/migration/services/ironwood_migration_background_credential_store.dart';
 import '../features/migration/services/ironwood_migration_operation_registry.dart';
@@ -1751,12 +1753,16 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
     ];
     final dbPath = await _getDbPath();
     final network = await _getNetwork();
+    final privateUsd = ref.read(privateUsdLifecycleProvider);
     final migrationRevocation = await IronwoodMigrationOperationRegistry
         .instance
         .revokeAndWait(network: network, accountUuid: uuid);
     final migrationLifecycle = IronwoodMigrationBackgroundLifecycle.instance;
     final migrationQuiescenceManagedByCaller =
         migrationLifecycle.isQuiescenceManagedByCaller;
+    // Its Railgun wallet's mnemonic, which Rust derives only while the
+    // account exists; the wallet leaves the page's storage last, below.
+    RailgunWalletDeletion? railgunWallet;
     try {
       if (!migrationQuiescenceManagedByCaller) {
         await migrationLifecycle.quiesce();
@@ -1766,6 +1772,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         network: network,
         accountUuid: uuid,
       );
+      railgunWallet = await privateUsd.prepareRailgunWalletDeletion(uuid);
       final rustDeleteWatch = Stopwatch()..start();
       await rust_wallet.deleteAccount(
         dbPath: dbPath,
@@ -1778,6 +1785,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         '${rustDeleteWatch.elapsedMilliseconds}ms uuid=$uuid',
       );
     } catch (_) {
+      railgunWallet?.discard();
       migrationRevocation.rollback();
       if (!migrationQuiescenceManagedByCaller) {
         try {
@@ -1810,8 +1818,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
           .deleteForAccount(accountUuid: uuid);
     } catch (_) {}
     // Its Railgun engine key and balance cache; the page's stored wallet
-    // stays encrypted under the deleted key until a reset (no `deleteWallet`
-    // in the bundle yet, E5).
+    // goes last, below.
     try {
       await deletePrivateUsdAccountData(_storage, uuid);
     } catch (e, st) {
@@ -1822,9 +1829,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
     // Its conversion records and joint accounts, only now that the wallet
     // account is gone (the user confirmed losing any under way).
     try {
-      await ref
-          .read(privateUsdLifecycleProvider)
-          .deleteAccountConversions(uuid);
+      await privateUsd.deleteAccountConversions(uuid);
     } catch (e, st) {
       log(
         'removeAccount: failed to delete Private USD conversions for '
@@ -1908,6 +1913,10 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         );
       }
     }
+    // Its wallet in the Railgun page's storage, now that the account is gone
+    // and saved as gone, while the engine is still drained: best effort and
+    // bounded, so a failure leaves it until a reset and never fails this.
+    await privateUsd.deleteRailgunWallet(railgunWallet);
     log('removeAccount: $uuid');
   }
 

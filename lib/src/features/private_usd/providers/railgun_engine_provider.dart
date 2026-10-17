@@ -27,17 +27,28 @@ final railgunHostProvider = Provider<RailgunHost>(
 
 /// The Rust loopback SOCKS5 bridge the page goes through (reference §6.8).
 class RailgunBridge {
-  const RailgunBridge({required this.start, required this.stop});
+  const RailgunBridge({
+    required this.start,
+    required this.startOffline,
+    required this.stop,
+  });
 
   /// Starts it, or returns the running bridge's port. Waits out a Tor
   /// bootstrap (up to 3 minutes) and fails closed when Tor is unusable.
   final Future<int> Function() start;
+
+  /// Starts one that refuses every connection, for a page that must reach
+  /// nothing (deleting a wallet); it never waits for Tor.
+  final Future<int> Function() startOffline;
+
+  /// Stops whichever kind runs.
   final Future<void> Function() stop;
 }
 
 final railgunBridgeProvider = Provider<RailgunBridge>(
   (_) => const RailgunBridge(
     start: rust_network_privacy.startRailgunBridge,
+    startOffline: rust_network_privacy.startOfflineRailgunBridge,
     stop: rust_network_privacy.stopRailgunBridge,
   ),
 );
@@ -60,6 +71,7 @@ final railgunEngineProvider = Provider<RailgunEngine>((ref) {
     wallets: ref.watch(railgunWalletSourceProvider),
     startBridge: bridge.start,
     stopBridge: bridge.stop,
+    startOfflineBridge: bridge.startOffline,
     debugPage: kDebugMode,
   );
   final lifecycle = ref.watch(privateUsdLifecycleProvider);
@@ -133,6 +145,25 @@ bool isRailgunRouteChange(
       next.status == NetworkPrivacyConnectionStatus.connected);
 }
 
+/// Deletes a deleted account's Railgun wallet (iOS progress BI-3, VI-17)
+/// with [container]'s wallet source and engine; the engine is built for it
+/// when no use built it yet. It reads through the container, not a provider's
+/// ref: the engine watches the lifecycle fence that holds this, so a ref read
+/// from there would be a dependency loop.
+class RailgunEngineWallets implements PrivateUsdRailgunWallets {
+  const RailgunEngineWallets(this.container);
+
+  final ProviderContainer container;
+
+  @override
+  Future<RailgunWalletDeletion?> prepareDeletion(String accountUuid) =>
+      container.read(railgunWalletSourceProvider).prepareDeletion(accountUuid);
+
+  @override
+  Future<void> delete(RailgunWalletDeletion deletion) =>
+      container.read(railgunEngineProvider).deleteWallet(deletion);
+}
+
 /// Opens an account's Railgun wallet from its stored seed: Rust derives the
 /// Railgun mnemonic and the `0zk` address after checking the seed against
 /// the account (plan §3.3). Only while unlocked.
@@ -194,6 +225,39 @@ class RustRailgunWalletSource implements RailgunWalletSource {
       ),
       expectedAddress: address,
       secrets: [?keyed],
+    );
+  }
+
+  @override
+  Future<RailgunWalletDeletion?> prepareDeletion(String accountUuid) async {
+    final network = _ref.read(appBootstrapProvider).network;
+    final deployment = _ref.read(privateUsdDeploymentProvider(network));
+    if (deployment == null) return null;
+    // Only an account whose wallet the page opened has one to delete.
+    if (!await _ref.read(railgunEngineKeyStoreProvider).has(accountUuid)) {
+      return null;
+    }
+    final dbPath = await getWalletDbPath();
+    final mnemonicBytes = await _ref
+        .read(accountProvider.notifier)
+        .getMnemonicBytesForAccount(accountUuid);
+    if (mnemonicBytes == null || mnemonicBytes.isEmpty) return null;
+    final Future<String> derived;
+    try {
+      // The call copies the bytes as it starts; they are zeroed right after.
+      derived = rust_private_usd.privateUsdRailgunMnemonic(
+        dbPath: dbPath,
+        network: network,
+        accountUuid: accountUuid,
+        mnemonicBytes: mnemonicBytes,
+      );
+    } finally {
+      mnemonicBytes.fillRange(0, mnemonicBytes.length, 0);
+    }
+    return RailgunWalletDeletion(
+      accountUuid: accountUuid,
+      network: deployment.railgunNetwork,
+      mnemonic: await derived,
     );
   }
 }

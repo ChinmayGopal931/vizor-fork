@@ -29,10 +29,55 @@ class RailgunWalletOpening {
   String toString() => 'RailgunWalletOpening(${start.network})';
 }
 
+/// What deleting one account's Railgun wallet from the page's storage takes
+/// (iOS progress BI-3, VI-17): its Railgun network and mnemonic, the params of
+/// the page's `deleteWallet`. Rust derives the mnemonic only while the
+/// account exists, so this is made before the Rust account delete and used
+/// after it. The mnemonic is dropped at its first use or [discard]; never log
+/// it.
+class RailgunWalletDeletion {
+  RailgunWalletDeletion({
+    required this.accountUuid,
+    required this.network,
+    required String mnemonic,
+  }) : _mnemonic = mnemonic;
+
+  final String accountUuid;
+
+  /// The Railgun network whose database holds the wallet: `sepolia` or
+  /// `mainnet`.
+  final String network;
+
+  // A Dart string, which cannot be zeroed: only the reference is dropped.
+  String? _mnemonic;
+
+  bool get isDiscarded => _mnemonic == null;
+
+  /// Drops the mnemonic, used or not.
+  void discard() => _mnemonic = null;
+
+  /// `deleteWallet`'s params, once: the mnemonic is dropped here.
+  String? _takeParams() {
+    final mnemonic = _mnemonic;
+    _mnemonic = null;
+    if (mnemonic == null) return null;
+    return jsonEncode({'network': network, 'mnemonic': mnemonic});
+  }
+
+  @override
+  String toString() => 'RailgunWalletDeletion($network)';
+}
+
 /// Derives what [RailgunEngine] opens for an account. Throws while the
 /// wallet is locked, or when the account cannot use Private USD.
 abstract interface class RailgunWalletSource {
   Future<RailgunWalletOpening> prepare(String accountUuid);
+
+  /// What deleting [accountUuid]'s wallet from the page takes, derived after
+  /// Rust checks the seed against the account. Null when the account never
+  /// opened its Railgun wallet (it has no engine key), or when its seed can't
+  /// be read now (locked).
+  Future<RailgunWalletDeletion?> prepareDeletion(String accountUuid);
 }
 
 /// The engine closed the page under a running use: a lock, an account
@@ -146,6 +191,9 @@ class RailgunEngineState {
 ///   earlier Flutter engine left running.
 /// - On iOS, back from the background, a bridge that stopped accepting takes
 ///   the page down with it ([replaceDeadBridge]).
+/// - A bridge starts only once every close under way has stopped its own, so
+///   no close stops the bridge a newer page goes through.
+/// - [deleteWallet] deletes a deleted account's wallet on a page of its own.
 ///
 /// Never log a call's params or results, or a page failure's message: `start`
 /// can carry keyed RPC URLs and `openWallet` the wallet's mnemonic.
@@ -155,6 +203,7 @@ class RailgunEngine {
     required RailgunWalletSource wallets,
     required Future<int> Function() startBridge,
     required Future<void> Function() stopBridge,
+    Future<int> Function()? startOfflineBridge,
     Future<bool> Function(int port) bridgeAccepts = loopbackAccepts,
     this.debugPage = false,
     this.idleClose = const Duration(minutes: 10),
@@ -163,6 +212,7 @@ class RailgunEngine {
        _wallets = wallets,
        _startBridge = startBridge,
        _stopBridge = stopBridge,
+       _startOfflineBridge = startOfflineBridge,
        _bridgeAccepts = bridgeAccepts,
        _now = now ?? DateTime.now {
     _events = _host.events.listen(_onEvent, onError: (Object _) {});
@@ -175,6 +225,9 @@ class RailgunEngine {
   final RailgunWalletSource _wallets;
   final Future<int> Function() _startBridge;
   final Future<void> Function() _stopBridge;
+
+  // A bridge that refuses every connection, for [deleteWallet]'s page.
+  final Future<int> Function()? _startOfflineBridge;
   final Future<bool> Function(int port) _bridgeAccepts;
   final DateTime Function() _now;
 
@@ -194,6 +247,10 @@ class RailgunEngine {
 
   // Bumped by every close; a use or an open from an older epoch is stale.
   int _epoch = 0;
+
+  // Closes still stopping their page and bridge; a bridge started before one
+  // ends could be the one it stops.
+  final _closing = <Future<void>>{};
   int _pauseDepth = 0;
   bool _disposed = false;
 
@@ -260,7 +317,79 @@ class RailgunEngine {
   /// The next use reopens it. For lock, an account switch and route changes.
   Future<void> close() async {
     _invalidate();
-    await _shutdown();
+    final shutdown = _shutdown();
+    _closing.add(shutdown);
+    try {
+      await shutdown;
+    } finally {
+      _closing.remove(shutdown);
+    }
+  }
+
+  /// Deletes [deletion]'s wallet from the page's storage, for an account
+  /// deletion once the Rust account delete went through (iOS progress BI-3,
+  /// VI-17): a fresh page behind a bridge that refuses every connection (the
+  /// page reaches nothing, so it never waits for Tor), the page's
+  /// `deleteWallet`, then the page and the bridge close.
+  ///
+  /// - It is one use: whatever page is open closes first (one per process),
+  ///   and it never runs beside another use. It runs while the engine is
+  ///   drained, since it is the deletion's own step.
+  /// - A close meanwhile (a lock, a route change) interrupts it. So does
+  ///   [timeout], which closes the page.
+  /// - The mnemonic is dropped whatever happens.
+  Future<void> deleteWallet(
+    RailgunWalletDeletion deletion, {
+    Duration timeout = const Duration(minutes: 2),
+  }) async {
+    final startOfflineBridge = _startOfflineBridge;
+    try {
+      if (_disposed || startOfflineBridge == null) {
+        throw const RailgunEngineUnavailableException();
+      }
+      await _lock
+          .run(() => _deleteWallet(deletion, startOfflineBridge))
+          .timeout(timeout);
+    } on TimeoutException {
+      _debugLog('deleting a wallet timed out');
+      // Ends a page still loading or deleting; a deletion still waiting for
+      // its turn finds its mnemonic gone.
+      deletion.discard();
+      await close();
+      rethrow;
+    } finally {
+      deletion.discard();
+    }
+  }
+
+  Future<void> _deleteWallet(
+    RailgunWalletDeletion deletion,
+    Future<int> Function() startOfflineBridge,
+  ) async {
+    if (_disposed || deletion.isDiscarded) {
+      throw const RailgunEngineInterruptedException();
+    }
+    await close();
+    await _settleCloses();
+    final epoch = _epoch;
+    // Unlike a use, it runs while the engine is drained.
+    void ensureCurrent() {
+      if (epoch != _epoch || _disposed) {
+        throw const RailgunEngineInterruptedException();
+      }
+    }
+
+    try {
+      final port = await startOfflineBridge();
+      ensureCurrent();
+      await _host.load(proxyPort: port, debug: debugPage);
+      ensureCurrent();
+      final params = deletion._takeParams();
+      if (params == null) throw const RailgunEngineInterruptedException();
+      await _host.call('deleteWallet', params);
+    } finally {
+      await _shutdown();
+    }
   }
 
   /// Closes the page and deletes everything the page origin stored, every
@@ -349,6 +478,8 @@ class RailgunEngine {
       final expected = opening.expectedAddress;
       final secrets = opening.secrets;
       _ensureCurrent(epoch);
+      await _settleCloses();
+      _ensureCurrent(epoch);
       final port = await _startBridge();
       _bridgePort = port;
       _ensureCurrent(epoch);
@@ -420,6 +551,9 @@ class RailgunEngine {
           : RailgunEngineState(lastSync: state.value.lastSync),
     );
   }
+
+  // Every close under way has stopped its bridge.
+  Future<void> _settleCloses() => Future.wait(_closing.toList());
 
   // The page is gone or about to be: drop the session and stop its bridge.
   Future<void> _forget() async {

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart' show ThemeMode;
@@ -8,6 +10,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
+import 'package:zcash_wallet/src/core/storage/app_secure_store.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_available_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/railgun_engine_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/services/railgun_host_channel.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/private_usd_lifecycle_provider.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
@@ -178,6 +184,239 @@ void main() {
 
     expect(_rust.deletedAccounts, ['account-2']);
   });
+
+  // iOS progress BI-3 and VI-17: the account's Railgun wallet leaves the
+  // page's storage too. Its mnemonic is derived before the Rust delete (Rust
+  // checks the seed against the account), and the page deletes the wallet
+  // after it, behind a bridge that reaches nothing. Best effort throughout.
+  group("the account's Railgun wallet", () {
+    late _PageHost page;
+    late _SeedAccounts accounts;
+
+    setUp(() {
+      conversions.unfinishedCounts['account-2'] = 0;
+      page = _PageHost(events);
+    });
+
+    Future<ProviderContainer> walletContainer({bool usedPrivateUsd = true}) {
+      FlutterSecureStorage.setMockInitialValues({
+        if (usedPrivateUsd) _engineKey: 'stored',
+      });
+      final container = ProviderContainer(
+        overrides: [
+          appBootstrapProvider.overrideWithValue(_bootstrap(isUnlocked: true)),
+          accountProvider.overrideWith(() => accounts = _SeedAccounts()),
+          privateUsdLifecycleProvider.overrideWith((ref) {
+            final wallets = PrivateUsdLifecycle(
+              host: page,
+              conversions: conversions,
+              railgunWallets: RailgunEngineWallets(ref.container),
+            );
+            wallets.register(
+              owner: Object(),
+              quiesceAndDrain: () async => events.add('drain'),
+              resume: () => events.add('resume'),
+            );
+            return wallets;
+          }),
+          privateUsdDeploymentProvider.overrideWith((ref, network) => _sepolia),
+          railgunHostProvider.overrideWithValue(page),
+          railgunBridgeProvider.overrideWithValue(
+            RailgunBridge(
+              start: () async {
+                events.add('bridge start');
+                return 4242;
+              },
+              startOffline: () async {
+                events.add('bridge start offline');
+                return 4343;
+              },
+              stop: () async => events.add('bridge stop'),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container.read(accountProvider.future).then((_) => container);
+    }
+
+    test('is derived before the Rust delete and deleted from the page '
+        'after it', () async {
+      final container = await walletContainer();
+
+      await container.read(accountProvider.notifier).removeAccount('account-2');
+
+      int at(String event) {
+        expect(events, contains(event));
+        return events.indexOf(event);
+      }
+
+      expect(events.first, 'drain');
+      expect(at('derive account-2'), lessThan(at('rust-delete account-2')));
+      expect(at('rust-delete account-2'), lessThan(at('bridge start offline')));
+      expect(at('bridge start offline'), lessThan(at('page load 4343')));
+      expect(at('page load 4343'), lessThan(at('page deleteWallet')));
+      expect(events.sublist(at('page deleteWallet') + 1), [
+        'page close',
+        'bridge stop',
+        'resume',
+      ]);
+      // Nothing routed: the page reaches nothing, and no Tor wait.
+      expect(events, isNot(contains('bridge start')));
+      expect(jsonDecode(page.deleteParams.single), {
+        'network': 'sepolia',
+        'mnemonic': 'railgun words of account-2',
+      });
+      // Rust got the seed; the copy Dart read is zeroed.
+      expect(_rust.derivedFrom, [utf8.encode('seed of account-2')]);
+      expect(accounts.seedReads.single.every((byte) => byte == 0), isTrue);
+      expect(
+        await AppSecureStore.instance.readString(_engineKey),
+        isNull,
+        reason: 'the engine key goes too',
+      );
+      expect(
+        container.read(accountProvider).value!.accounts.map((a) => a.uuid),
+        ['account-1'],
+      );
+    });
+
+    test('an account that never used Private USD derives nothing and loads '
+        'no page', () async {
+      final container = await walletContainer(usedPrivateUsd: false);
+
+      await container.read(accountProvider.notifier).removeAccount('account-2');
+
+      expect(events, [
+        'drain',
+        'rust-delete account-2',
+        'conversions-delete account-2',
+        'resume',
+      ]);
+      expect(accounts.seedReads, isEmpty);
+      expect(_rust.derivedFrom, isEmpty);
+    });
+
+    test(
+      'a page that fails to delete never fails the account deletion',
+      () async {
+        page.failDelete = true;
+        final container = await walletContainer();
+
+        await container
+            .read(accountProvider.notifier)
+            .removeAccount('account-2');
+
+        expect(_rust.deletedAccounts, ['account-2']);
+        expect(
+          container.read(accountProvider).value!.accounts.map((a) => a.uuid),
+          ['account-1'],
+        );
+        expect(events, contains('page deleteWallet'));
+        expect(events.sublist(events.length - 3), [
+          'page close',
+          'bridge stop',
+          'resume',
+        ]);
+      },
+    );
+
+    test('a derivation that fails never blocks the deletion', () async {
+      _rust.failDerive = true;
+      final container = await walletContainer();
+
+      await container.read(accountProvider.notifier).removeAccount('account-2');
+
+      expect(_rust.deletedAccounts, ['account-2']);
+      expect(events, isNot(contains('bridge start offline')));
+      expect(page.deleteParams, isEmpty);
+    });
+
+    test('a failed Rust delete keeps the wallet and loads no page', () async {
+      _rust.failDelete = true;
+      final container = await walletContainer();
+
+      await expectLater(
+        container.read(accountProvider.notifier).removeAccount('account-2'),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(events, contains('derive account-2'));
+      expect(events, isNot(contains('bridge start offline')));
+      expect(page.deleteParams, isEmpty);
+    });
+  });
+}
+
+const _engineKey = '${kRailgunEncryptionKeyStoragePrefix}account-2';
+
+const _sepolia = ApiDeployment(
+  network: 'testnet',
+  railgunNetwork: 'sepolia',
+  chainId: 11155111,
+  token: '0x1c7d4b196cb0c7b01d743fbc6116a902379c7238',
+  tokenDecimals: 6,
+  keylessRpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
+  poiNodeUrl: 'https://ppoi.fdi.network/',
+  railgunProxy: '0xeCFCf3b4eC647c4Ca6D49108b311b7a7C9543fea',
+  relayAdapt: '0x7e3d929EbD5bDC84d02Bd3205c777578f33A214D',
+  relayerRailgunAddress: '0zk1relayer',
+  allowedHosts: ['ethereum-sepolia-rpc.publicnode.com'],
+  explorerTxPrefix: 'https://sepolia.etherscan.io/tx/',
+  railscanTxPrefix: 'https://railscan.io/tx/',
+  zcashConfirmations: 2,
+  escrowConfirmations: 2,
+  screeningSeconds: 3600,
+  maxRelayerFee: '2000000',
+  usdTokens: [],
+);
+
+/// The account notifier as built, with each account's seed readable.
+class _SeedAccounts extends AccountNotifier {
+  final seedReads = <Uint8List>[];
+
+  @override
+  Future<Uint8List?> getMnemonicBytesForAccount(String uuid) async {
+    final bytes = Uint8List.fromList(utf8.encode('seed of $uuid'));
+    seedReads.add(bytes);
+    return bytes;
+  }
+}
+
+/// The page's host: loads, `deleteWallet` and closes, in [log].
+class _PageHost implements RailgunHost {
+  _PageHost(this.log);
+
+  final List<String> log;
+  final deleteParams = <String>[];
+  bool failDelete = false;
+
+  @override
+  Future<void> load({required int proxyPort, required bool debug}) async =>
+      log.add('page load $proxyPort');
+
+  @override
+  Future<String> call(String method, String paramsJson) async {
+    log.add('page $method');
+    if (method != 'deleteWallet') {
+      throw RailgunHostException(RailgunHostErrorCode.badArgs);
+    }
+    deleteParams.add(paramsJson);
+    if (failDelete) throw RailgunHostException(RailgunHostErrorCode.failed);
+    return 'null';
+  }
+
+  @override
+  Future<void> close() async => log.add('page close');
+
+  @override
+  Future<void> wipe() async => log.add('page wipe');
+
+  @override
+  Future<bool> isOpen() async => false;
+
+  @override
+  Stream<String> get events => const Stream.empty();
 }
 
 class _LoggingBackend extends FakePrivateUsdBackend {
@@ -258,12 +497,30 @@ void _failPathProvider() {
 class _RemovalRustApiFake implements RustLibApi {
   List<String> _events = [];
   final deletedAccounts = <String>[];
+  final derivedFrom = <List<int>>[];
   bool failDelete = false;
+  bool failDerive = false;
 
   void reset(List<String> events) {
     _events = events;
     deletedAccounts.clear();
+    derivedFrom.clear();
     failDelete = false;
+    failDerive = false;
+  }
+
+  @override
+  Future<String> crateApiPrivateUsdPrivateUsdRailgunMnemonic({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required List<int> mnemonicBytes,
+  }) async {
+    // As FRB does, the bytes are copied as the call starts.
+    derivedFrom.add(List.of(mnemonicBytes));
+    _events.add('derive $accountUuid');
+    if (failDerive) throw StateError('the wallet DB is busy');
+    return 'railgun words of $accountUuid';
   }
 
   @override

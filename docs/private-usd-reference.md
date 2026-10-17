@@ -812,7 +812,7 @@ A call whose coroutine is cancelled is answered `CLOSED`, so every call gets exa
 - **Background:** stop polling. The idle close takes the page down after 10 minutes. A key-using step never runs in the background (D9).
 - **Account switch:** close the page and reopen it lazily for the new active account. Only one wallet is allowed per page.
 - **Route change:** close and reopen the page, so Chromium drops pooled connections (§6.8).
-- **Account delete:** call `deleteWallet` for that account's wallet id (D15, E5), delete `vizor_railgun_encryption_key_{uuid}` and the balance cache, and close the page if it is open.
+- **Account delete:** call `deleteWallet` for that account's wallet id (D15, E5), delete `vizor_railgun_encryption_key_{uuid}` and the balance cache, and close the page if it is open. As built (iOS progress VI-17): `RailgunEngine.deleteWallet` closes any open page, then deletes on a fresh page behind an offline bridge, as one use of the drained engine.
 - **Full reset:** call `wipe()`.
 - Both deletions are drained by `privateUsdLifecycle` (§8.4).
 - **The forward path never needs the page.** The payout note is built in Rust (§3.3). Reverse funding, the balance and sends need it.
@@ -985,6 +985,7 @@ Every name used exists at `391d0b0`: `Timeouts.connect` (`tor.rs:28-40`), `ensur
      - anything else (a route change, Tor failed) → refuse. Fail closed; the caller restarts the bridge.
    - Then `copy_bidirectional`. Nothing per connection is logged.
    - FRB, in `rust/src/api/network_privacy.rs`: `start_railgun_bridge() -> Result<u16, String>` (idempotent: it returns the running bridge's port) and `stop_railgun_bridge()` (idempotent). Dart: `startRailgunBridge()` → `Future<int>`, `stopRailgunBridge()` → `Future<void>`.
+   - The offline kind (iOS progress VI-17): `start_offline_railgun_bridge()` (Dart `startOfflineRailgunBridge()`) starts a bridge that refuses every `CONNECT`, the page's hosts included. It needs no route, so it never waits for Tor; the page an account deletion loads to call `deleteWallet` reaches nothing, yet must load behind its proxy. A bridge keeps its kind: asking for the other stops it first, and `stop_railgun_bridge()` stops either.
 2. **Kotlin.** Before loading the page, call `setProxyOverride(ProxyConfig.Builder().addProxyRule("socks://127.0.0.1:$port").build(), …)`, and wait for its listener callback before `loadUrl`. Call `clearProxyOverride` on close and wipe, and whenever the page closes itself (timeout, renderer gone). If `!WebViewFeature.isFeatureSupported(PROXY_OVERRIDE)`, refuse to start the page (`RailgunException.Unavailable`).
 3. **Dart.** On every route change (`ref.listen(networkPrivacyProvider…)`), close and reopen the page, so Chromium drops pooled connections. M0.3 showed that Chromium does **not** tear down pooled sockets by itself (U19), so this close and reopen is required.
 
@@ -1516,7 +1517,7 @@ pub fn private_usd_send_settle_all(store_dir: String, network: String, eth_rpc_u
      - delete its Railgun engine key `vizor_railgun_encryption_key_{uuid}`
      - delete its balance cache
      - close the page if this account is open
-  4. **Railgun storage.** All accounts share one WebView origin and one IndexedDB per network (`railgun-<network>`). Call the page's `deleteWallet` for this account's wallet id (D15, E5). Until E5 lands, deleting the per-account encryption key alone leaves an unreadable blob (U15).
+  4. **Railgun storage.** All accounts share one WebView origin and one IndexedDB per network (`railgun-<network>`). Call the page's `deleteWallet` for this account's wallet id (D15, E5). Until E5 lands, deleting the per-account encryption key alone leaves an unreadable blob (U15). As built (iOS progress VI-17): for an account with a Railgun engine key, `PrivateUsdLifecycle.prepareRailgunWalletDeletion` derives the wallet's mnemonic just before the Rust delete, and `deleteRailgunWallet` deletes the wallet through a fresh page as the deletion's last step, behind an offline bridge (§6.8), best effort and bounded at 2 minutes. A failure leaves the unreadable blob until a reset.
 - **Last account.** Removing the last account is a full reset (AGENTS.md), so it goes through the reset path below.
 
 **Full reset.**

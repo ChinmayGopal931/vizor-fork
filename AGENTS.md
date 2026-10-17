@@ -1361,6 +1361,13 @@ into account lists, sync, voting, PIR and the migration. Never let losing
 rows. A full reset removes the whole directory (`deletePrivateUsdDirectories`)
 and the page's WebView origin.
 
+Account deletion also deletes the account's Railgun wallet from the page's
+storage, best effort, if it has a Railgun engine key. Its mnemonic is
+derived before the Rust delete (Rust checks the seed only while the account
+exists). After it, a fresh page behind an offline bridge
+(`start_offline_railgun_bridge`: it refuses every connection, so no Tor wait)
+calls `deleteWallet`. A failure leaves the wallet until a reset.
+
 **Invariants (plan §3.5).** Each one guards funds or privacy. Keep them, and
 keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 `test/features/private_usd/`.

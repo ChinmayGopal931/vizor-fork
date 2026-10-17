@@ -5,8 +5,17 @@ is checked. Each milestone also has a gate line: acceptance met, tests written,
 `cargo test` / `fvm flutter analyze` / `fvm flutter test` (and the mobile lane
 for UI milestones) passing, and its Pitfalls re-read against the diff.
 
-## Where things stand (2026-10-16; read this first)
+## Where things stand (2026-10-17; read this first)
 
+- **Owner decisions of 2026-10-17 (shared Dart, so Android changes too;
+  details in `docs/private-usd-ios-progress.md`).**
+  - **Account deletion deletes the Railgun wallet (BI-3, option (a);
+    iOS VI-17).** For an account that used Private USD (it has a Railgun
+    engine key), the deletion derives the wallet's mnemonic just before the
+    Rust account delete, then, as its last step, loads a fresh page behind a
+    new offline bridge (it refuses every connection, so no Tor wait) and
+    calls `deleteWallet`. Best effort: a failure leaves the wallet until a
+    reset, as before. Not yet run on the A35.
 - **Handoff (2026-10-16): start here.**
   - **State.** `feature/private-usd-android` is pushed to `origin` (the
     owner's fork) with everything below, the Gotham files included: the owner
@@ -1775,7 +1784,8 @@ M8 status (2026-10-14): the non-device parts are done.
   - After the Rust delete, `removeAccount` calls
     `deletePrivateUsdAccountData` (the engine key and the balance cache);
     without `deleteWallet` (E5) the page's stored wallet stays, unreadable
-    without its key.
+    without its key. (Since 2026-10-17 the page deletes it: iOS progress
+    VI-17.)
   - Once the wallet DB is gone, `resetWallet` calls `wipeRailgunPage()` (the
     engine's wipe, or the channel's when this run built no engine; a
     platform without the host has nothing to wipe), then
