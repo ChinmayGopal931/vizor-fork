@@ -33,7 +33,7 @@ Port `kt/` to Swift (plan XI1). Read on 2026-10-17 from `kt/` at `ef7b2e067`.
 | `RailgunSchemeHandler.swift` | serves `veylor-railgun://app/…` from the bundle | `OwnAssets` (`:315-321`) and `WebViewAssetLoader` |
 | `RailgunContentRules.swift` | the allowlist as a `WKContentRuleList` | `RailgunRequests.route` (`:359-371`) |
 | `RailgunProtocol.swift` | wire methods, timeouts, the envelope | `RailgunProtocol.kt:12-128` |
-| `RailgunEndpoints.swift` | the nine hosts and `POI_NODE_URL` | `RailgunEndpoints.kt:9-26` |
+| `RailgunEndpoints.swift` | the ten hosts and `POI_NODE_URL` | `RailgunEndpoints.kt:9-26` |
 | `RailgunError.swift` | error kinds, mapped to `FlutterError` codes | `RailgunException.kt` and `RailgunHostHandler.kt:123-134` |
 
 **The bundle on iOS.** It is built once (plan DI7, MI1) by `rw/build.mjs`. The build writes `android/app/src/main/assets/railgun/`, then copies the same files to `sw/railgun/`. Today's Android build:
@@ -192,7 +192,7 @@ New on both platforms:
   - `Cache-Control: no-store`
 - `webView(_:stop:)` drops the task.
 
-**The content rule list** (`RailgunContentRules`). It is compiled once with `WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "railgun-allowlist-v1", encodedContentRuleList:)`, from `RailgunEndpoints`:
+**The content rule list** (`RailgunContentRules`). It is compiled once with `WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "railgun-allowlist-v2", encodedContentRuleList:)`, from `RailgunEndpoints`:
 
 ```json
 [
@@ -204,7 +204,7 @@ New on both platforms:
 ]
 ```
 
-The last line repeats once per host in `RailgunEndpoints`.
+The last line repeats once per host in `RailgunEndpoints`: the ten of A-ref §6.4, the artifact mirror `railgun-artifacts.pepeman931.workers.dev` included (progress VI-20).
 
 - WebKit's rule regexes are a subset of the full syntax: no alternation, and no `{n}` quantifiers. Keep one rule per host, and escape the dots.
 - The identifier carries a version: change it whenever the hosts change, so a stale compiled list is never reused.
@@ -227,7 +227,7 @@ The last line repeats once per host in `RailgunEndpoints`.
 
 - **The store.** `RailgunPageHost.storeID` is a fixed UUID constant. `WKWebsiteDataStore(forIdentifier:)` creates the store on first use and reopens it afterwards.
   - It holds the IndexedDB databases `railgun-mainnet` or `railgun-sepolia`, and `railgun-artifacts` (A-ref §6.5).
-  - Proving artifacts download lazily, as on Android.
+  - Proving artifacts download lazily, as on Android: from `ipfs-lb.com`, and from veylor's mirror `https://railgun-artifacts.pepeman931.workers.dev` when that fails (A-ref §6.5, progress VI-20).
 - **The wipe.**
   1. Close the page and release the `WKWebView`.
   2. `try await WKWebsiteDataStore.remove(forIdentifier: storeID)`.

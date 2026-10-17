@@ -4,6 +4,7 @@ import { build } from 'esbuild';
 import { copyFile, cp, mkdir, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { artifactMirror } from './artifact-mirror-plugin.mjs';
 
 const require = createRequire(import.meta.url);
 const out = path.resolve('../app/src/main/assets/railgun');
@@ -57,7 +58,8 @@ const result = await build({
     crypto: 'crypto-browserify',
     stream: 'stream-browserify',
   },
-  plugins: [browserBuilds],
+  // The SDK's circuit artifacts come from its own gateway, and from our mirror when that fails.
+  plugins: [browserBuilds, artifactMirror],
   logLevel: 'warning',
 });
 

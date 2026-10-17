@@ -42,7 +42,7 @@ pub(crate) const MAX_LOGS_BODY: usize = 8 << 20;
 /// What the Railgun page may reach besides its own assets, on both networks.
 /// Kotlin's `RailgunEndpoints.hosts` and the bundle's CSP list the same hosts
 /// (reference §6.4), and a keyed RPC URL must use one of them.
-pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 9] = [
+pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 10] = [
     "ethereum-rpc.publicnode.com",
     "ethereum-sepolia-rpc.publicnode.com",
     "eth-mainnet.g.alchemy.com",
@@ -51,7 +51,10 @@ pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 9] = [
     "sepolia.infura.io",
     "ppoi.fdi.network",
     "rail-squid.squids.live",
+    // The proving artifacts: the SDK's own gateway, then our mirror when the
+    // gateway fails.
     "ipfs-lb.com",
+    "railgun-artifacts.pepeman931.workers.dev",
 ];
 
 pub(crate) const POI_NODE_URL: &str = "https://ppoi.fdi.network/";

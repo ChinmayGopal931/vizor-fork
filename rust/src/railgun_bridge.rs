@@ -661,7 +661,7 @@ mod tests {
         let mut expected = RAILGUN_PAGE_HOSTS.map(str::to_owned).to_vec();
         expected.sort();
         expected.dedup();
-        assert_eq!(expected.len(), 9, "the allowlist has duplicates");
+        assert_eq!(expected.len(), 10, "the allowlist has duplicates");
 
         let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let read = |path: &str| {

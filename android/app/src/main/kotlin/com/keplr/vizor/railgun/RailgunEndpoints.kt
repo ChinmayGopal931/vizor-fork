@@ -9,8 +9,8 @@ package com.keplr.vizor.railgun
 internal object RailgunEndpoints {
     const val POI_NODE_URL = "https://ppoi.fdi.network/"
 
-    // Ethereum RPC (keyless publicnode, then the keyed providers), the screening node, and the SDK's own quick
-    // sync and the gateway it downloads proving artifacts from.
+    // Ethereum RPC (keyless publicnode, then the keyed providers), the screening node, the SDK's own quick sync,
+    // and where the proving artifacts come from: the SDK's own gateway, then our mirror when the gateway fails.
     val hosts =
         setOf(
             "ethereum-rpc.publicnode.com",
@@ -22,5 +22,6 @@ internal object RailgunEndpoints {
             "ppoi.fdi.network",
             "rail-squid.squids.live",
             "ipfs-lb.com",
+            "railgun-artifacts.pepeman931.workers.dev",
         )
 }

@@ -5,8 +5,8 @@
 enum RailgunEndpoints {
   static let poiNodeURL = "https://ppoi.fdi.network/"
 
-  // Ethereum RPC (keyless publicnode, then the keyed providers), the screening node, and the SDK's own quick sync and
-  // the gateway it downloads proving artifacts from.
+  // Ethereum RPC (keyless publicnode, then the keyed providers), the screening node, the SDK's own quick sync, and
+  // where the proving artifacts come from: the SDK's own gateway, then our mirror when the gateway fails.
   static let hosts: [String] = [
     "ethereum-rpc.publicnode.com",
     "ethereum-sepolia-rpc.publicnode.com",
@@ -17,5 +17,6 @@ enum RailgunEndpoints {
     "ppoi.fdi.network",
     "rail-squid.squids.live",
     "ipfs-lb.com",
+    "railgun-artifacts.pepeman931.workers.dev",
   ]
 }

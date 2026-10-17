@@ -7,7 +7,7 @@ import WebKit
 /// and the page's CSP are defence in depth.
 enum RailgunContentRules {
   /// Versioned: change it whenever the hosts change, so a stale compiled list is never reused.
-  static let identifier = "railgun-allowlist-v1"
+  static let identifier = "railgun-allowlist-v2"
 
   /// The URL patterns let through, one rule each: WebKit's rule regexes have no alternation.
   static var allowedPatterns: [String] {

@@ -1438,6 +1438,9 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   (iOS reference §6).
 - The page's traffic leaves only through the Rust loopback SOCKS5 bridge
   (`railgun_bridge.rs`), which uses arti when Tor is on.
+- The page downloads Railgun's circuit artifacts from ipfs-lb.com and falls
+  back to our mirror (`android/railgun-web/src/artifact-mirror.js`); the
+  mirror's tooling is in `scripts/private-usd/artifacts-mirror/`.
 - On any route change, close the page and stop the bridge, then reopen on a
   new bridge: Chromium keeps pooled sockets (plan U19). The page also
   closes on lock, on an account switch, and after 10 idle minutes.

@@ -230,7 +230,7 @@ ios/Runner/Railgun/
 ├── RailgunSchemeHandler.swift   [MI2] WKURLSchemeHandler for veylor-railgun://app/… from Bundle.main's railgun/
 ├── RailgunContentRules.swift    [MI2] the WKContentRuleList JSON, built from RailgunEndpoints and compiled once
 ├── RailgunProtocol.swift        [MI2] wire methods and timeouts, the envelope (JSONSerialization)
-├── RailgunEndpoints.swift       [MI2] the nine hosts and POI_NODE_URL (pinned by the Rust test, XI10)
+├── RailgunEndpoints.swift       [MI2] the ten hosts and POI_NODE_URL (pinned by the Rust test, XI10)
 ├── RailgunError.swift           [MI2] disconnected | timeout | unavailable | protocol | failed → FlutterError codes
 └── railgun/                     [MI1] the built bundle: a folder reference, copied blind, never opened
 ios/Runner/PrivateUsdAttestationHandler.swift   [MI7] App Attest on com.zcash.wallet/private_usd_attestation
@@ -406,7 +406,7 @@ Every milestone also follows these rules:
    - the envelope: every message kind decodes; an unreadable reply fails its call; unknown events are dropped
    - the methods and timeouts table equals Kotlin's
    - the scheme handler serves only `railgun/` files, refuses path traversal, and uses the right MIME types
-   - the content rule list compiles and allows exactly the scheme, `blob:`, `data:` and the nine hosts
+   - the content rule list compiles and allows exactly the scheme, `blob:`, `data:` and the ten hosts
    - replies stay exactly-once under close, timeout and termination
 
 **Done when.**

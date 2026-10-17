@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { JsonRpcProvider, Mnemonic } from 'ethers';
 import puppeteer from 'puppeteer-core';
+import { ARTIFACT_MIRROR } from '../src/artifact-mirror.js';
 
 const require = createRequire(import.meta.url);
 const ASSETS = path.resolve('../app/src/main/assets/railgun');
@@ -19,6 +20,8 @@ const LOCAL_PROPERTIES = path.resolve('../local.properties');
 const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const RPC_URL = process.env.RAILGUN_CHECK_RPC ?? 'https://ethereum-sepolia-rpc.publicnode.com';
 const POI_NODE = 'https://ppoi.fdi.network/';
+// A small file the page would fetch from the artifact mirror when the SDK's gateway fails.
+const MIRRORED_FILE = `${ARTIFACT_MIRROR}/ipfs/QmUsmnK4PFc7zDp2cmC4wBZxYLjNyRgWfs5GNcJJ2uLcpU/circuits/01x01/vkey.json`;
 const RELAYER_URL = process.env.RAILGUN_CHECK_RELAYER ?? 'https://zecswap-testnet.pepeman931.workers.dev/relayer';
 const SEND_AMOUNT = 10_000n;
 const SPENDABLE_POLL_MS = 30_000;
@@ -118,13 +121,15 @@ function eventPrinter() {
   return print;
 }
 
-/** The page reaches only its own hosts, and names what it refuses. */
+/** The page reaches only its own hosts, the artifact mirror among them, and names what it refuses. */
 async function boundaryCheck(page, call) {
   const outside = await page.evaluate(() => fetch('https://example.com/').then(() => 'reached', () => 'blocked'));
   if (outside !== 'blocked') throw new Error('the page reached a host outside its CSP');
+  const mirror = await page.evaluate((url) => fetch(url).then(({ status }) => status, () => 'blocked'), MIRRORED_FILE);
+  if (mirror !== 200) throw new Error(`the artifact mirror answered the page ${mirror}`);
   const unknown = await call('nonsense', {}).then(() => 'answered', (error) => error.message);
   if (!unknown.startsWith('BAD_REQUEST')) throw new Error(`an unknown method came back as ${unknown}`);
-  console.log('  other hosts are blocked, and an unknown method is a BAD_REQUEST');
+  console.log('  other hosts are blocked, the artifact mirror answers, and an unknown method is a BAD_REQUEST');
 }
 
 async function syncCheck(page, url, onEvent) {

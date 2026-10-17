@@ -843,6 +843,7 @@ A call whose coroutine is cancelled is answered `CLOSED`, so every call gets exa
   - `ppoi.fdi.network` (`POI_NODE_URL = https://ppoi.fdi.network/`)
   - `rail-squid.squids.live`
   - `ipfs-lb.com`
+  - `railgun-artifacts.pepeman931.workers.dev`: veylor's mirror of the proving artifacts, the fallback for `ipfs-lb.com` (§6.5; not in zapp)
 - **The CSP:** `default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; worker-src blob:; connect-src 'self' <hosts>; base-uri 'none'; form-action 'none'`.
 - **WebRTC.** `shims.js:11-14` deletes `RTCPeerConnection`, `webkitRTCPeerConnection` and `RTCDataChannel`, because STUN would bypass both filters.
 
@@ -852,6 +853,7 @@ A call whose coroutine is cancelled is answered `CLOSED`, so every call gets exa
 - **Proving artifacts.** They are downloaded lazily, per circuit variant used. They are brotli files from `https://ipfs-lb.com/ipfs/QmUsmnK4PFc7zDp2cmC4wBZxYLjNyRgWfs5GNcJJ2uLcpU/{circuits/<v>/zkey.br, prover/snarkjs/<v>.wasm.br, circuits/<v>/vkey.json}`. The POI artifacts are under `QmZrP9zaZw2LwErT2yA6VpMWm65UdToQiKj4DtStVsUJHr/POI_{3x3,13x13}/`.
   - Source: `@railgun-community/wallet/dist/services/artifacts/artifact-util.js:9-11, 55-91`.
   - Everything except the vkey is hash-checked against `artifact-v2-hashes.json` (93 variants).
+  - **The mirror (veylor, not in zapp; progress D-114).** The SDK hard-codes `ipfs-lb.com`, with no setting and no fallback. Veylor's build (`android/railgun-web/artifact-mirror-plugin.mjs`) sends the downloader's one request through `src/artifact-mirror.js`, which asks `ipfs-lb.com` first and, when that fails (an HTTP error, a network error, or nothing from it for 30 s), asks `https://railgun-artifacts.pepeman931.workers.dev` for the same path. The mirror holds all 279 files (93 variants, three each). The SDK's hash check runs on whatever arrives; a file that fails it is not fetched again from the mirror.
   - They are cached in a separate IndexedDB, `railgun-artifacts` (`rl/web/src/artifacts.js`).
 - **Artifact sizes.** Measured by HEAD on 2026-10-13:
   - `01x02/zkey.br`: 3.53 MB
@@ -1024,6 +1026,7 @@ Source: `ui/common/atomicswap/AtomicSwapMainnet.kt:18-79` and `AtomicSwapTestnet
 | Keyless RPC (allowlisted) | `https://ethereum-rpc.publicnode.com` | `https://ethereum-sepolia-rpc.publicnode.com` |
 | Keyed RPC (build secret, tried first) | `VIZOR_ETHEREUM_RPC_URL_MAINNET` (zapp: `ETHEREUM_RPC_URL_MAINNET`; D3) | `VIZOR_ETHEREUM_RPC_URL_SEPOLIA` |
 | POI node | `https://ppoi.fdi.network/` | same |
+| Proving artifacts (allowlisted; §6.5) | `https://ipfs-lb.com`, the SDK's gateway; when it fails, veylor's mirror `https://railgun-artifacts.pepeman931.workers.dev` (not in zapp; progress D-114) | same |
 | Beta limits (server side) | `maxSwapUsdc` 50, `maxAwaitingDeposit` 20, `spreadBps` 100; relayer fee floor 500000 (0.5 USDC) | `maxAwaitingDeposit` 20 |
 
 **Token keys** (copied 2026-10-13 from zapp and cross-checked equal to the zecSwap records; one line each, no whitespace):
@@ -1270,7 +1273,7 @@ pub fn private_usd_tokens_status(tokens_path: String, network: String) -> Result
 ```
 
 - Dart reads `db_path` and `network` the way the Gift Card provider does (`ref.read(rpcEndpointFailoverProvider).current.networkName`, `gift_card_tracking_provider.dart:82`; the wallet DB path from `getWalletDbPath()`), and `lightwalletd_url` from `rpcEndpointFailoverProvider.current.normalizedLightwalletdUrl` (the provider is `lib/src/providers/rpc_endpoint_failover_provider.dart:716`; the getter is `lib/src/core/config/rpc_endpoint_config.dart:25`, used at `gift_card_tracking_provider.dart:184`).
-- **Three copies of the host allowlist** (§6.4): Rust `deployment::RAILGUN_PAGE_HOSTS` (the 9 hosts, both networks; the bridge uses it), Kotlin `RailgunEndpoints.hosts`, and the CSP in the bundle's `index.html`. The ported `RailgunBoundaryTest` pins Kotlin against the CSP. The Rust unit test `railgun_bridge::tests::the_page_hosts_match_the_kotlin_filter_and_the_page_csp` (M3) pins all three: it reads the string literals of `RailgunEndpoints.kt`'s `setOf(…)` and the `connect-src` of both `android/app/src/main/assets/railgun/index.html` and `android/railgun-web/src/index.html`, so keep the Kotlin hosts literal. Dart refuses a keyed RPC URL whose host is not in `ApiDeployment.allowed_hosts`.
+- **Three copies of the host allowlist** (§6.4): Rust `deployment::RAILGUN_PAGE_HOSTS` (the 10 hosts, both networks; the bridge uses it), Kotlin `RailgunEndpoints.hosts`, and the CSP in the bundle's `index.html`. The ported `RailgunBoundaryTest` pins Kotlin against the CSP. The Rust unit test `railgun_bridge::tests::the_page_hosts_match_the_kotlin_filter_and_the_page_csp` (M3) pins all three: it reads the string literals of `RailgunEndpoints.kt`'s `setOf(…)` and the `connect-src` of both `android/app/src/main/assets/railgun/index.html` and `android/railgun-web/src/index.html`, so keep the Kotlin hosts literal. Dart refuses a keyed RPC URL whose host is not in `ApiDeployment.allowed_hosts`.
 
 **Exact M5–M7 signatures** (same conventions as M1–M4; every call is `catch` + inner runtime unless marked `sync`). `ctx` expands to `db_path: String, network: String, account_uuid: String, store_dir: String`; `secret` to `mnemonic_bytes: Vec<u8>`; `lwd` to `lightwalletd_url: String`; `rpc` to `eth_rpc_url: String`; `op_id: u32` is allocated by Dart per call (`private_usd_cancel(op_id)` sets its flag). The shorthand is for this doc only; write the parameters out in code. Zatoshi are `u64` (Dart `BigInt`, as `estimate_fee` already is), token amounts decimal `String`, unix seconds `i64` (Dart `int`).
 
