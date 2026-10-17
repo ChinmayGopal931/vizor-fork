@@ -51,7 +51,8 @@ void main() {
   testWidgets('the form: a valid send can be reviewed; a bad recipient, an '
       'amount that leaves no fee or a pending payment cannot', (tester) async {
     await pump(tester, buildMobilePrivateUsdSendUseCase);
-    expect(find.text(PrivateUsdCopy.sendTitle), findsOneWidget);
+    // Page titles are drawn uppercase in the top bar.
+    expect(find.text(PrivateUsdCopy.sendTitle.toUpperCase()), findsOneWidget);
     expect(enabled(tester, 'mobile_private_usd_send_review'), isTrue);
 
     await pump(tester, buildMobilePrivateUsdSendInvalidUseCase);
@@ -59,7 +60,10 @@ void main() {
     expect(enabled(tester, 'mobile_private_usd_send_review'), isFalse);
 
     await pump(tester, buildMobilePrivateUsdWithdrawZeroUseCase);
-    expect(find.text(PrivateUsdCopy.withdrawTitle), findsOneWidget);
+    expect(
+      find.text(PrivateUsdCopy.withdrawTitle.toUpperCase()),
+      findsOneWidget,
+    );
     expect(find.text(PrivateUsdCopy.sendZeroAddress), findsOneWidget);
     expect(enabled(tester, 'mobile_private_usd_send_review'), isFalse);
 
@@ -105,7 +109,10 @@ void main() {
   testWidgets('review, proof, outcome, and Send and Withdraw held back by a '
       'pending payment', (tester) async {
     await pump(tester, buildMobilePrivateUsdWithdrawReviewUseCase);
-    expect(find.text(PrivateUsdCopy.sendReviewTitleWithdraw), findsOneWidget);
+    expect(
+      find.text(PrivateUsdCopy.sendReviewTitleWithdraw.toUpperCase()),
+      findsOneWidget,
+    );
     expect(
       find.text(PrivateUsdCopy.sendReviewRailgunFee('0.25')),
       findsOneWidget,

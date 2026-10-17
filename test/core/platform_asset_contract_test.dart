@@ -46,7 +46,7 @@ void main() {
     );
     expect(
       platformAssetContractErrors(changed, assets),
-      contains(allOf(contains('profile_picture_01.png'), contains('android'))),
+      contains(allOf(contains('profile_picture_01.webp'), contains('android'))),
     );
   });
 

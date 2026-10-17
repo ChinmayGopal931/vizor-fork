@@ -5,8 +5,8 @@ import 'package:zcash_wallet/src/core/theme/app_icon_size.dart';
 import 'package:zcash_wallet/src/core/theme/app_radii.dart';
 import 'package:zcash_wallet/src/core/theme/app_sizing.dart';
 import 'package:zcash_wallet/src/core/theme/app_spacing.dart';
-import 'package:zcash_wallet/src/core/theme/app_theme_data.dart';
 import 'package:zcash_wallet/src/core/theme/app_typography.dart';
+import 'package:zcash_wallet/src/core/theme/colors/app_colors.dart';
 import 'package:zcash_wallet/src/core/theme/primitives.dart';
 
 void main() {
@@ -56,6 +56,11 @@ void main() {
           ? AppButtonSizingMobile.mediumSmallIconSize
           : AppButtonSizingDesktop.mediumSmallIconSize,
     );
+    expect(
+      AppRadii.xLarge,
+      mobile ? AppRadiiMobile.xLarge : AppRadiiDesktop.xLarge,
+    );
+    expect(AppRadii.full, mobile ? AppRadiiMobile.full : AppRadiiDesktop.full);
   });
 
   test('desktop sizing tokens match 1 Sizing-3.zip', () {
@@ -70,12 +75,12 @@ void main() {
     expect(AppSpacing.xl2, 96);
     expect(AppSpacing.xl3, 128);
 
-    expect(AppRadii.xSmall, 8);
-    expect(AppRadii.small, 12);
-    expect(AppRadii.medium, 16);
-    expect(AppRadii.large, 24);
-    expect(AppRadii.xLarge, 32);
-    expect(AppRadii.full, 999);
+    expect(AppRadiiDesktop.xSmall, 8);
+    expect(AppRadiiDesktop.small, 12);
+    expect(AppRadiiDesktop.medium, 16);
+    expect(AppRadiiDesktop.large, 24);
+    expect(AppRadiiDesktop.xLarge, 32);
+    expect(AppRadiiDesktop.full, 999);
 
     expect(AppAssetSizeDesktop.size, 32);
     expect(AppAssetSizeDesktop.icon, 16);
@@ -99,6 +104,14 @@ void main() {
   });
 
   test('mobile sizing tokens match 1 Sizing-3.zip', () {
+    // The neon redesign's near-square corners: even a pill is a 4px slab.
+    expect(AppRadiiMobile.xSmall, 2);
+    expect(AppRadiiMobile.small, 2);
+    expect(AppRadiiMobile.medium, 3);
+    expect(AppRadiiMobile.large, 4);
+    expect(AppRadiiMobile.xLarge, 4);
+    expect(AppRadiiMobile.full, 4);
+
     expect(AppAssetSizeMobile.size, 40);
     expect(AppAssetSizeMobile.icon, 18);
     expect(AppAssetSizeMobile.padding, 0);
@@ -175,8 +188,11 @@ void main() {
     // The current variable export updates mobile body/label/code metrics,
     // but actual mobile app frames still render display headlines with
     // Young Serif. Keep that intentional app-level screen behavior pinned.
+    // The neon redesign sets mobile lighter than Figma: Thin (100) for
+    // headlines and display, Light (300) for body and labels, Book (400)
+    // where a label must stand out.
     expect(AppTypographyMobile.displayLarge.fontFamily, 'Gotham');
-    expect(AppTypographyMobile.displayLarge.fontWeight, FontWeight.w400);
+    expect(AppTypographyMobile.displayLarge.fontWeight, FontWeight.w100);
     expect(AppTypographyMobile.displayLarge.fontSize, 40);
     expect(AppTypographyMobile.displayLarge.height, 40 / 40);
     expect(AppTypographyMobile.displayLarge.letterSpacing, -1.35);
@@ -212,7 +228,7 @@ void main() {
     expect(AppTypographyMobile.bodyMedium.letterSpacing, -0.21);
     expect(AppTypographyMobile.bodyMediumStrong.fontSize, 16);
     expect(AppTypographyMobile.bodyMediumStrong.height, 25 / 16);
-    expect(AppTypographyMobile.bodyMediumStrong.fontWeight, FontWeight.w500);
+    expect(AppTypographyMobile.bodyMediumStrong.fontWeight, FontWeight.w400);
     expect(AppTypographyMobile.bodySmall.fontSize, 14);
     expect(AppTypographyMobile.bodySmall.height, 20 / 14);
     expect(AppTypographyMobile.bodyExtraSmall.fontSize, 13);
@@ -227,8 +243,9 @@ void main() {
   });
 
   test('semantic color tokens match 2 Color Theme-3.zip', () {
-    final light = AppThemeData.light.colors;
-    final dark = AppThemeData.dark.colors;
+    // The Figma faces (desktop); mobile builds select the neon sets.
+    const light = AppColors.figmaLight;
+    const dark = AppColors.figmaDark;
 
     expect(light.background.window, const Color(0xFFF7F7F7));
     expect(dark.background.window, const Color(0xFF0F0F0F));
@@ -308,8 +325,8 @@ void main() {
   });
 
   test('macOS utility color tokens match 2 Color Theme-3.zip', () {
-    final light = AppThemeData.light.colors.macosUtility;
-    final dark = AppThemeData.dark.colors.macosUtility;
+    final light = AppColors.figmaLight.macosUtility;
+    final dark = AppColors.figmaDark.macosUtility;
 
     expect(light.window, const Color(0xFFF7F7F7));
     expect(light.windowTransparent, const Color(0x00F5F5F5));

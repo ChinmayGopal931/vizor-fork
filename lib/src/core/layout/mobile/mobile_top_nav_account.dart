@@ -20,11 +20,15 @@ class MobileTopNavAccount extends ConsumerWidget {
   const MobileTopNavAccount({
     this.onAccountTap,
     this.showSyncStatus = true,
+    this.compact = false,
     super.key,
   });
 
   final VoidCallback? onAccountTap;
   final bool showSyncStatus;
+
+  /// A smaller portrait in a shorter bar, tucked into the corner (Home).
+  final bool compact;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -65,13 +69,18 @@ class MobileTopNavAccount extends ConsumerWidget {
 
     return MobileTopNav.account(
       accountName: account?.name ?? '',
+      height: compact ? 40 : kMobileTopNavHeight,
       avatar: MobileAccountAvatar(
         profilePictureId: account?.profilePictureId ?? kDefaultProfilePictureId,
-        size: AppProfilePictureSize.navLarge,
+        size: compact
+            ? AppProfilePictureSize.large
+            : AppProfilePictureSize.navLarge,
         hardwareSignerKind: account?.hardwareSignerKind,
         badgeRingColor: colors.background.window,
       ),
-      syncLabel: showSyncStatus ? status.label : null,
+      // The neon redesign reads sync from the backdrop's rising line
+      // (`NeonSyncBackdrop`), so the bar carries no status of its own.
+      syncLabel: null,
       syncLabelColor: labelColor,
       syncIndicatorColor: indicatorColor,
       syncAnimated: showSyncStatus && isSyncing,

@@ -367,16 +367,8 @@ class MobileSettingsScreen extends ConsumerWidget {
     ThemeMode.dark => 'Dark',
   };
 
-  static String _profilePictureDisplayLabel(String id) {
-    final option = resolveProfilePictureOption(id);
-    return switch (option.id) {
-      'pfp-01' => 'Knight',
-      'pfp-02' => 'Viking',
-      'pfp-03' => 'Samurai',
-      'pfp-11' => 'Wizard',
-      _ => option.label,
-    };
-  }
+  static String _profilePictureDisplayLabel(String id) =>
+      resolveProfilePictureOption(id).label;
 
   Future<void> _toggleBiometric(BuildContext context, WidgetRef ref) async {
     final notifier = ref.read(biometricUnlockProvider.notifier);
@@ -585,16 +577,32 @@ class _SettingsGroup extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // HUD section head: a red caption with a rule running off it.
           Padding(
             padding: const EdgeInsets.only(
               left: AppSpacing.xxs,
               bottom: AppSpacing.xs,
             ),
-            child: Text(
-              title,
-              style: AppTypography.labelLarge.copyWith(
-                color: context.colors.text.secondary,
-              ),
+            child: Row(
+              children: [
+                Text(
+                  title.toUpperCase(),
+                  style: kNeonHudCaptionStyle.copyWith(
+                    color: context.colors.neon.glow,
+                    shadows: Neon.textGlow(
+                      context.colors.neon.glow,
+                      intensity: 0.35,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Container(
+                    height: 1,
+                    color: context.colors.neon.glow.withValues(alpha: 0.25),
+                  ),
+                ),
+              ],
             ),
           ),
           ...rows,
@@ -748,9 +756,22 @@ class _RowIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Muted per the Figma settings rows — the leading glyphs are
-    // decorative, not max-contrast.
-    return AppIcon(iconName, size: 20, color: context.colors.icon.muted);
+    // Neon redesign: each leading glyph sits on a cut-corner plate with a
+    // lit edge, tinted red.
+    final neon = context.colors.neon;
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: ShapeDecoration(
+        color: neon.glow.withValues(alpha: 0.08),
+        shape: Neon.chamferBorder(
+          cut: AppChamfer.small + 2,
+          side: BorderSide(color: neon.glow.withValues(alpha: 0.45)),
+        ),
+      ),
+      alignment: Alignment.center,
+      child: AppIcon(iconName, size: 17, color: neon.core),
+    );
   }
 }
 

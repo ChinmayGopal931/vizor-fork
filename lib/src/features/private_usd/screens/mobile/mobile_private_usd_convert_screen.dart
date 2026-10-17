@@ -17,6 +17,8 @@ import '../../../../core/widgets/comma_to_dot_input_formatter.dart';
 import '../../../../core/widgets/decimal_amount_input_formatter.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../../core/widgets/mobile/mobile_warning_notice.dart';
+import '../../../../core/widgets/mobile/neon_scramble_text.dart';
+import '../../../../core/widgets/mobile/tron_glyph.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../models/private_usd_balances.dart';
@@ -322,7 +324,10 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
                       onAmountChanged: onAmountChanged,
                       onMax: onMax,
                     ),
-                    PrivateUsdDirectionToggle(onTap: onSwitchDirection),
+                    PrivateUsdDirectionToggle(
+                      onTap: onSwitchDirection,
+                      busy: state.quoting,
+                    ),
                     _EstimateCard(
                       state: state,
                       privacyModeEnabled: privacyModeEnabled,
@@ -425,10 +430,7 @@ class _ZecCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            PrivateUsdCopy.convertAssetZec,
-            style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
-          ),
+          const PrivateUsdPanelCaption(PrivateUsdCopy.convertAssetZec),
           const SizedBox(height: AppSpacing.xs),
           TextField(
             key: const ValueKey('mobile_private_usd_convert_amount'),
@@ -443,7 +445,7 @@ class _ZecCard extends StatelessWidget {
             ],
             onChanged: onAmountChanged,
             style: amountStyle,
-            cursorColor: colors.text.accent,
+            cursorColor: colors.neon.glow,
             decoration: InputDecoration.collapsed(
               hintText: '0',
               hintStyle: amountStyle.copyWith(color: colors.text.muted),
@@ -523,25 +525,38 @@ class _EstimateCard extends StatelessWidget {
             denomination: '',
           );
     final available = privateUsdAvailable;
+    final quoted = quote != null && !state.quoting;
+    final cipherStyle = AppTypography.displayLarge.copyWith(
+      color: colors.neon.glow.withValues(alpha: 0.7),
+    );
     return MobileSurfaceCard(
       key: const ValueKey('mobile_private_usd_convert_estimate'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            PrivateUsdCopy.title,
-            style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
-          ),
+          const PrivateUsdPanelCaption(PrivateUsdCopy.title),
           const SizedBox(height: AppSpacing.xs),
-          Text(
-            estimate,
-            key: const ValueKey('mobile_private_usd_convert_receive'),
-            style: AppTypography.displayLarge.copyWith(
-              color: quote == null || state.quoting
-                  ? colors.text.disabled
-                  : colors.text.accent,
+          // While the quote is on its way the amount churns as cipher; the
+          // quote then decrypts in.
+          if (state.quoting)
+            NeonCipherChurn(
+              key: const ValueKey('mobile_private_usd_convert_receive'),
+              style: cipherStyle,
+              semanticsLabel: PrivateUsdCopy.convertQuoteLoading,
+            )
+          else
+            NeonScrambleText(
+              key: const ValueKey('mobile_private_usd_convert_receive'),
+              text: estimate,
+              decryptOnAppear: quoted,
+              cipherStyle: cipherStyle,
+              style: AppTypography.displayLarge.copyWith(
+                color: quoted ? colors.neon.core : colors.text.disabled,
+                shadows: quoted
+                    ? Neon.textGlow(colors.neon.glow, intensity: 0.4)
+                    : null,
+              ),
             ),
-          ),
           const SizedBox(height: AppSpacing.xxs),
           Text(
             PrivateUsdCopy.convertEstimatedAmount,
@@ -616,41 +631,124 @@ class PrivateUsdQuoteLedger extends StatelessWidget {
       if (networkCost != null && networkCost > BigInt.zero)
         (PrivateUsdCopy.convertMakerCost, formatPrivateUsd(networkCost)),
     ];
+    return PrivateUsdLedgerCard(
+      key: const ValueKey('mobile_private_usd_quote_ledger'),
+      rows: [
+        for (final (label, value) in rows)
+          PrivateUsdLedgerRow(label: label, value: value),
+      ],
+    );
+  }
+}
+
+/// A quote's ledger panel: its rows between hairlines.
+class PrivateUsdLedgerCard extends StatelessWidget {
+  const PrivateUsdLedgerCard({required this.rows, super.key});
+
+  final List<PrivateUsdLedgerRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
     final colors = context.colors;
     return MobileSurfaceCard(
-      key: const ValueKey('mobile_private_usd_quote_ledger'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (var i = 0; i < rows.length; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.xs),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    rows[i].$1,
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: colors.text.secondary,
-                    ),
+          for (var i = 0; i < rows.length; i++)
+            DecoratedBox(
+              decoration: BoxDecoration(
+                border: i == 0
+                    ? null
+                    : Border(
+                        top: BorderSide(color: colors.border.subtleOpacity),
+                      ),
+              ),
+              child: rows[i],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One line of a ledger: the label on the left, the value on the right,
+/// always on one line (a long value shrinks to fit rather than wrap).
+class PrivateUsdLedgerRow extends StatelessWidget {
+  const PrivateUsdLedgerRow({
+    required this.label,
+    required this.value,
+    this.emphasized = false,
+    super.key,
+  });
+
+  final String label;
+  final String value;
+
+  /// The line that matters most (a total), lit.
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final style = AppTypography.bodyExtraSmall;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: style.copyWith(color: colors.text.secondary),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: constraints.maxWidth * 0.64,
+              ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  style: style.copyWith(
+                    color: emphasized ? colors.neon.core : colors.text.accent,
+                    shadows: emphasized
+                        ? Neon.textGlow(colors.neon.glow, intensity: 0.3)
+                        : null,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.s),
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    rows[i].$2,
-                    textAlign: TextAlign.end,
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: colors.text.accent,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A Private USD panel's caption (the asset it holds), as a red HUD caption.
+class PrivateUsdPanelCaption extends StatelessWidget {
+  const PrivateUsdPanelCaption(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final glow = context.colors.neon.glow;
+    return Text(
+      text.toUpperCase(),
+      style: kNeonHudCaptionStyle.copyWith(
+        color: glow,
+        shadows: Neon.textGlow(glow, intensity: 0.3),
       ),
     );
   }
@@ -671,75 +769,166 @@ class PrivateUsdQuoteExpiry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    Widget rule() => Expanded(
-      child: Container(
-        height: 1.5,
-        decoration: BoxDecoration(
-          color: colors.border.subtle,
-          borderRadius: BorderRadius.circular(AppRadii.medium),
+    final glow = colors.neon.glow;
+    // Hairlines that light up toward the label.
+    Widget rule({required bool toRight}) {
+      final lit = glow.withValues(alpha: expired ? 0.7 : 0.45);
+      final dark = glow.withValues(alpha: 0);
+      return Expanded(
+        child: Container(
+          height: 1,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: toRight ? [dark, lit] : [lit, dark],
+            ),
+          ),
         ),
-      ),
-    );
+      );
+    }
+
     return SizedBox(
       key: const ValueKey('mobile_private_usd_quote_expiry'),
       height: 38,
       child: Row(
         children: [
-          rule(),
+          rule(toRight: true),
           const SizedBox(width: AppSpacing.s),
           Text(
-            expired ? PrivateUsdCopy.quoteExpired : label,
-            style: AppTypography.labelLarge.copyWith(
+            (expired ? PrivateUsdCopy.quoteExpired : label).toUpperCase(),
+            style: kNeonHudCaptionStyle.copyWith(
               color: expired ? colors.text.destructive : colors.text.secondary,
             ),
           ),
           const SizedBox(width: AppSpacing.s),
-          rule(),
+          rule(toRight: false),
         ],
       ),
     );
   }
 }
 
-/// The convert screen's direction toggle between its two cards (zapp
-/// `canSwitchDirection`); with no [onTap] only the gap shows.
-class PrivateUsdDirectionToggle extends StatelessWidget {
-  const PrivateUsdDirectionToggle({this.onTap, super.key});
+/// The convert screen's direction switch between its two panels (zapp
+/// `canSwitchDirection`), a cut-corner plate on a lit seam joining them. It
+/// keeps its place when switching is unavailable ([onTap] null), dimmed, and
+/// its edge breathes while a quote is on its way ([busy]).
+class PrivateUsdDirectionToggle extends StatefulWidget {
+  const PrivateUsdDirectionToggle({this.onTap, this.busy = false, super.key});
 
   final VoidCallback? onTap;
+  final bool busy;
+
+  @override
+  State<PrivateUsdDirectionToggle> createState() =>
+      _PrivateUsdDirectionToggleState();
+}
+
+class _PrivateUsdDirectionToggleState extends State<PrivateUsdDirectionToggle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _breath = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncBreath();
+  }
+
+  @override
+  void didUpdateWidget(PrivateUsdDirectionToggle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncBreath();
+  }
+
+  void _syncBreath() {
+    final reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (widget.busy && !reduced) {
+      if (!_breath.isAnimating) unawaited(_breath.repeat(reverse: true));
+    } else {
+      _breath
+        ..stop()
+        ..value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _breath.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final onTap = this.onTap;
-    if (onTap == null) return const SizedBox(height: AppSpacing.s);
     final colors = context.colors;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-      child: Center(
-        child: Semantics(
-          button: true,
-          label: PrivateUsdCopy.convertSwapDirection,
-          excludeSemantics: true,
-          child: GestureDetector(
-            key: const ValueKey('mobile_private_usd_convert_direction'),
-            behavior: HitTestBehavior.opaque,
-            onTap: onTap,
+    final onTap = widget.onTap;
+    final enabled = onTap != null;
+    final glow = colors.neon.glow;
+    return SizedBox(
+      height: 56,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // The seam joining the two panels.
+          Center(
             child: Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: colors.background.inverse,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: AppIcon(
-                AppIcons.swapArrows,
-                size: 20,
-                color: colors.icon.inverse,
+              width: 1,
+              color: glow.withValues(alpha: enabled ? 0.45 : 0.2),
+            ),
+          ),
+          Semantics(
+            button: true,
+            enabled: enabled,
+            label: PrivateUsdCopy.convertSwapDirection,
+            excludeSemantics: true,
+            child: GestureDetector(
+              key: const ValueKey('mobile_private_usd_convert_direction'),
+              behavior: HitTestBehavior.opaque,
+              onTap: onTap,
+              child: AnimatedBuilder(
+                animation: _breath,
+                builder: (context, child) {
+                  final double breath = widget.busy
+                      ? 0.25 + 0.75 * _breath.value
+                      : 0;
+                  final edge = enabled
+                      ? glow.withValues(alpha: 0.75)
+                      : Color.lerp(
+                          colors.border.subtleOpacity,
+                          glow.withValues(alpha: 0.6),
+                          breath,
+                        )!;
+                  return Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: ShapeDecoration(
+                      color: colors.background.window,
+                      shape: Neon.chamferBorder(side: BorderSide(color: edge)),
+                      shadows: enabled || breath > 0
+                          ? Neon.boxGlow(
+                              glow,
+                              intensity: enabled ? 0.25 : 0.35 * breath,
+                            )
+                          : null,
+                    ),
+                    child: child,
+                  );
+                },
+                child: RotatedBox(
+                  quarterTurns: 1,
+                  child: TronGlyph(
+                    TronGlyphKind.swap,
+                    color: enabled ? glow : colors.icon.disabled,
+                    core: colors.neon.core,
+                    lit: enabled ? 0.6 : 0,
+                    size: 20,
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -108,12 +108,14 @@ class _StorageUnavailablePane extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          const Positioned.fill(
-            child: OnboardingWelcomeBackdrop(
-              fit: BoxFit.fitWidth,
-              alignment: Alignment.bottomCenter,
+          // The neon redesign (mobile) drops the painted welcome art.
+          if (kAppFormFactor != AppFormFactor.mobile)
+            const Positioned.fill(
+              child: OnboardingWelcomeBackdrop(
+                fit: BoxFit.fitWidth,
+                alignment: Alignment.bottomCenter,
+              ),
             ),
-          ),
           Positioned.fill(
             child: LayoutBuilder(
               builder: (context, constraints) {

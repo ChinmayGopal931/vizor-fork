@@ -9,6 +9,8 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_icon_hover_button.dart';
 import '../../../core/widgets/full_address_viewer.dart';
+import '../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../core/widgets/mobile/tron_glyph.dart';
 import '../../../core/widgets/pool_badge.dart';
 import '../../../core/widgets/review_wrap_card.dart';
 import '../models/send_prefill_args.dart' show PaymentRequestSource;
@@ -1140,8 +1142,9 @@ class _PaymentDetailsDisclosure extends StatelessWidget {
 }
 
 /// An illustrated caution screen before any unverified payment values appear.
-/// The background illustration supports the warning without replacing the
-/// app's neutral modal surface or controls.
+/// On desktop a background illustration supports the warning without
+/// replacing the app's neutral modal surface or controls; the mobile (neon)
+/// layout leads the warning with a warning badge instead.
 class _ExternalRequestIntroduction extends StatelessWidget {
   const _ExternalRequestIntroduction({
     required this.onScan,
@@ -1165,46 +1168,47 @@ class _ExternalRequestIntroduction extends StatelessWidget {
       color: background,
       child: Stack(
         children: [
-          PositionedDirectional(
-            top: -24,
-            end: -20,
-            width: 340,
-            height: 340,
-            child: ExcludeSemantics(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Opacity(
-                    opacity: 0.52,
-                    child: Image.asset(
-                      'assets/illustrations/payment_request_letter_caution.webp',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [background, background.withValues(alpha: 0)],
-                        stops: const [0, 0.75],
+          if (!isMobileLayout)
+            PositionedDirectional(
+              top: -24,
+              end: -20,
+              width: 340,
+              height: 340,
+              child: ExcludeSemantics(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Opacity(
+                      opacity: 0.52,
+                      child: Image.asset(
+                        'assets/illustrations/payment_request_letter_caution.webp',
+                        fit: BoxFit.contain,
                       ),
                     ),
-                  ),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [background.withValues(alpha: 0), background],
-                        stops: const [0.22, 0.70],
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [background, background.withValues(alpha: 0)],
+                          stops: const [0, 0.75],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [background.withValues(alpha: 0), background],
+                          stops: const [0.22, 0.70],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
           Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1241,6 +1245,13 @@ class _ExternalRequestIntroduction extends StatelessWidget {
                         ),
                       ],
                       const SizedBox(height: AppSpacing.base),
+                      if (isMobileLayout) ...[
+                        const NeonGlyphBadge(
+                          glyph: TronGlyphKind.warning,
+                          size: 64,
+                        ),
+                        const SizedBox(height: AppSpacing.base),
+                      ],
                       Semantics(
                         key: const ValueKey('external_request_warning'),
                         container: true,
@@ -1251,21 +1262,25 @@ class _ExternalRequestIntroduction extends StatelessWidget {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                SizedBox(
-                                  height:
-                                      MediaQuery.textScalerOf(context).scale(
-                                        AppTypography.headlineLarge.fontSize!,
-                                      ) *
-                                      AppTypography.headlineLarge.height!,
-                                  child: Center(
-                                    child: AppIcon(
-                                      AppIcons.warningCircle,
-                                      size: 20,
-                                      color: colors.text.warning,
+                                // The mobile badge above already carries
+                                // the warning glyph.
+                                if (!isMobileLayout) ...[
+                                  SizedBox(
+                                    height:
+                                        MediaQuery.textScalerOf(context).scale(
+                                          AppTypography.headlineLarge.fontSize!,
+                                        ) *
+                                        AppTypography.headlineLarge.height!,
+                                    child: Center(
+                                      child: AppIcon(
+                                        AppIcons.warningCircle,
+                                        size: 20,
+                                        color: colors.text.warning,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: AppSpacing.xs),
+                                  const SizedBox(width: AppSpacing.xs),
+                                ],
                                 Expanded(
                                   child: Semantics(
                                     header: true,

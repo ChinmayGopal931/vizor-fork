@@ -3,11 +3,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart' show kPrimaryButton;
 import 'package:flutter/widgets.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/feedback/app_haptics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/mobile/tron_glyph.dart';
 
 /// Layout box of a single diamond dot (a rotated square → ~20 px diamond,
 /// matching the Figma index). [PasscodePromptField] uses it to centre the
@@ -31,7 +31,7 @@ const EdgeInsets _kPasscodeBackspaceInsets = EdgeInsets.fromLTRB(
 );
 
 /// Diamond progress dots for passcode entry — Figma `Passcode 1/2`
-/// (4394:82593 / 4394:82878): six rotated squares that fill crimson as
+/// (4394:82593 / 4394:82878): six rotated squares that light up crimson as
 /// digits are typed; errors are conveyed by the plum message below, not
 /// by tinting the dots.
 class PasscodeDots extends StatelessWidget {
@@ -58,7 +58,9 @@ class PasscodeDots extends StatelessWidget {
                   color: i < filled
                       ? colors.icon.brandCrimson
                       : colors.background.neutralSubtleOpacity,
-                  borderRadius: BorderRadius.circular(3),
+                  boxShadow: i < filled
+                      ? Neon.boxGlow(colors.icon.brandCrimson, intensity: 0.6)
+                      : null,
                 ),
               ),
             ),
@@ -147,10 +149,10 @@ class PasscodePromptField extends StatelessWidget {
   }
 }
 
-/// Serif numpad — Figma `Passcode 1/2` and `Sign In Passcode`
-/// (4885:23167). The bottom row carries an optional help action on the
-/// left and a delete key on the right that only appears once at least
-/// one digit is entered.
+/// Numpad — Figma `Passcode 1/2` and `Sign In Passcode` (4885:23167),
+/// with the neon redesign's cut-corner keys. The bottom row carries an
+/// optional help action on the left and a delete key on the right that only
+/// appears once at least one digit is entered.
 class PasscodeNumpad extends StatelessWidget {
   const PasscodeNumpad({
     required this.onDigit,
@@ -201,24 +203,7 @@ class PasscodeNumpad extends StatelessWidget {
     }
 
     Widget digitKey(int digit) => keySlot(
-      DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.background.neutralSubtleOpacity,
-          shape: BoxShape.circle,
-        ),
-        child: Center(
-          child: Text(
-            '$digit',
-            // Figma `_Passcode Button`: Young Serif 40 / 33 inside
-            // an 80px circular neutral-alpha key.
-            style: AppTypography.headlineLarge.copyWith(
-              fontSize: 40,
-              height: 33 / 40,
-              color: enabled ? colors.text.accent : colors.text.disabled,
-            ),
-          ),
-        ),
-      ),
+      _PasscodeDigitKey(digit: digit, enabled: enabled),
       onTap: () {
         unawaited(AppHaptics.digit());
         onDigit(digit);
@@ -393,6 +378,77 @@ class PasscodeBiometricButton extends StatelessWidget {
   }
 }
 
+/// A digit key: a cut-corner glass plate (80 px, as Figma's circular
+/// `_Passcode Button`) that lights up red under the finger.
+class _PasscodeDigitKey extends StatefulWidget {
+  const _PasscodeDigitKey({required this.digit, required this.enabled});
+
+  final int digit;
+  final bool enabled;
+
+  @override
+  State<_PasscodeDigitKey> createState() => _PasscodeDigitKeyState();
+}
+
+class _PasscodeDigitKeyState extends State<_PasscodeDigitKey> {
+  var _pressed = false;
+
+  void _setPressed(bool pressed) {
+    if (_pressed != pressed) setState(() => _pressed = pressed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final glow = colors.neon.glow;
+    return Listener(
+      onPointerDown: widget.enabled ? (_) => _setPressed(true) : null,
+      onPointerUp: (_) => _setPressed(false),
+      onPointerCancel: (_) => _setPressed(false),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 0, end: _pressed ? 1 : 0),
+        // Lights at once, fades out as the finger lifts.
+        duration: Duration(milliseconds: _pressed ? 50 : 280),
+        builder: (context, light, _) {
+          return DecoratedBox(
+            decoration: ShapeDecoration(
+              color: Color.lerp(
+                colors.background.neutralSubtleOpacity,
+                glow.withValues(alpha: 0.18),
+                light,
+              ),
+              shape: Neon.chamferBorder(
+                cut: AppChamfer.large,
+                side: BorderSide(
+                  color: Color.lerp(colors.border.subtleOpacity, glow, light)!,
+                ),
+              ),
+              shadows: light > 0
+                  ? Neon.boxGlow(glow, intensity: 0.7 * light)
+                  : null,
+            ),
+            child: Center(
+              child: Text(
+                '${widget.digit}',
+                style: AppTypography.headlineLarge.copyWith(
+                  fontSize: 40,
+                  height: 33 / 40,
+                  color: widget.enabled
+                      ? Color.lerp(colors.text.accent, colors.neon.core, light)
+                      : colors.text.disabled,
+                  shadows: light > 0
+                      ? Neon.textGlow(glow, intensity: light)
+                      : null,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _PasscodeBackspaceIcon extends StatelessWidget {
   const _PasscodeBackspaceIcon({required this.color});
 
@@ -410,11 +466,10 @@ class _PasscodeBackspaceIcon extends StatelessWidget {
           key: const ValueKey('passcode_backspace_glyph'),
           width: _kPasscodeBackspaceGlyphWidth,
           height: _kPasscodeBackspaceGlyphHeight,
-          child: SvgPicture.asset(
-            'assets/icons/${AppIcons.backspace}.svg',
-            width: _kPasscodeBackspaceGlyphWidth,
-            height: _kPasscodeBackspaceGlyphHeight,
-            colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+          child: TronGlyph(
+            TronGlyphKind.backspace,
+            color: color,
+            size: _kPasscodeBackspaceGlyphWidth,
           ),
         ),
       ),

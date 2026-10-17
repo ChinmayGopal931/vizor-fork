@@ -482,7 +482,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Redeem the Card'), findsOneWidget);
+      expect(find.text('REDEEM THE CARD'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byKey(
@@ -761,7 +761,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('Review a Card'), findsOneWidget);
+      expect(find.text('REVIEW A CARD'), findsOneWidget);
       expect(find.text(fiat), findsOneWidget);
       expect(loading, findsNothing);
       expect(source.fetchCount, 1);

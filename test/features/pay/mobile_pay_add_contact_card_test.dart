@@ -122,7 +122,7 @@ void main() {
 
     for (final label in ['Address label', 'Chain & address']) {
       final text = tester.widget<Text>(find.text(label));
-      expect(text.style?.fontWeight, FontWeight.w500);
+      expect(text.style?.fontWeight, AppTypography.labelMedium.fontWeight);
       expect(text.style?.fontSize, AppTypography.labelMedium.fontSize);
       expect(text.style?.height, AppTypography.labelMedium.height);
     }

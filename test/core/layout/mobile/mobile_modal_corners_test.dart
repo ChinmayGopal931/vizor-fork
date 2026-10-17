@@ -83,7 +83,7 @@ void main() {
     await pump(tester);
     await tester.pumpAndSettle();
     final r = radius(tester);
-    expect(r.topLeft.x, 32);
+    expect(r.topLeft.x, AppRadii.xLarge);
     expect(r.bottomLeft.x, 46);
     expect(r.bottomRight.x, 48);
     expect(calls, hasLength(1));
@@ -120,7 +120,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
       final intermediate = radius(tester).bottomLeft.x;
-      expect(intermediate, greaterThan(32));
+      expect(intermediate, greaterThan(AppRadii.xLarge));
       expect(intermediate, lessThan(46));
       tester.view.viewInsets = const FakeViewPadding();
       await tester.pump();
@@ -130,8 +130,8 @@ void main() {
       expect(calls, hasLength(2));
       tester.view.viewInsets = const FakeViewPadding(bottom: 1005);
       await tester.pumpAndSettle();
-      expect(radius(tester).bottomLeft.x, 32);
-      expect(radius(tester).topLeft.x, 32);
+      expect(radius(tester).bottomLeft.x, AppRadii.xLarge);
+      expect(radius(tester).topLeft.x, AppRadii.xLarge);
     },
   );
 
@@ -145,50 +145,54 @@ void main() {
     await tester.pump();
     pending.complete({'bottomLeft': 62.0, 'bottomRight': 62.0});
     await tester.pumpAndSettle();
-    expect(radius(tester).bottomLeft.x, 32);
+    expect(radius(tester).bottomLeft.x, AppRadii.xLarge);
   });
 
-  iosTest('unavailable, malformed and timed-out native calls retain 32', (
-    tester,
-  ) async {
-    reply = (_) async => throw PlatformException(code: 'unavailable');
-    await pump(tester);
-    await tester.pumpAndSettle();
-    expect(radius(tester).bottomLeft.x, 32);
-    for (final bad in [
-      null,
-      'bad',
-      {'bottomLeft': -1, 'bottomRight': 46},
-      {'bottomLeft': double.nan, 'bottomRight': 46},
-      {'bottomLeft': 1000, 'bottomRight': 46},
-    ]) {
-      reply = (_) async => bad;
+  iosTest(
+    'unavailable, malformed and timed-out native calls keep the fallback',
+    (tester) async {
+      reply = (_) async => throw PlatformException(code: 'unavailable');
+      await pump(tester);
+      await tester.pumpAndSettle();
+      expect(radius(tester).bottomLeft.x, AppRadii.xLarge);
+      for (final bad in [
+        null,
+        'bad',
+        {'bottomLeft': -1, 'bottomRight': 46},
+        {'bottomLeft': double.nan, 'bottomRight': 46},
+        {'bottomLeft': 1000, 'bottomRight': 46},
+      ]) {
+        reply = (_) async => bad;
+        final future = NativeModalCorners.resolve(
+          rect: const Rect.fromLTWH(16, 618, 370, 240),
+          viewSize: const Size(402, 874),
+          scale: 3,
+        );
+        await tester.pump();
+        expect(await future, isNull);
+      }
+      final pending = Completer<Object?>();
+      reply = (_) => pending.future;
       final future = NativeModalCorners.resolve(
         rect: const Rect.fromLTWH(16, 618, 370, 240),
         viewSize: const Size(402, 874),
         scale: 3,
       );
-      await tester.pump();
+      await tester.pump(NativeModalCorners.timeout);
       expect(await future, isNull);
-    }
-    final pending = Completer<Object?>();
-    reply = (_) => pending.future;
-    final future = NativeModalCorners.resolve(
-      rect: const Rect.fromLTWH(16, 618, 370, 240),
-      viewSize: const Size(402, 874),
-      scale: 3,
-    );
-    await tester.pump(NativeModalCorners.timeout);
-    expect(await future, isNull);
-    pending.complete(null);
-  });
+      pending.complete(null);
+    },
+  );
 
   iosTest('centered dialog is a fixed squircle without native queries', (
     tester,
   ) async {
     await pump(tester, centered: true);
     await tester.pumpAndSettle();
-    expect(radius(tester), const BorderRadius.all(Radius.circular(32)));
+    expect(
+      radius(tester),
+      const BorderRadius.all(Radius.circular(AppRadii.xLarge)),
+    );
     expect(calls, isEmpty);
   });
 
@@ -266,12 +270,12 @@ void main() {
       await tester.pump();
       for (var i = 0; i < 35; i++) {
         await tester.pump(const Duration(milliseconds: 16));
-        expect(radius(tester).bottomLeft.x, timeout ? 32 : 46);
+        expect(radius(tester).bottomLeft.x, timeout ? AppRadii.xLarge : 46);
       }
       if (timeout) {
         pending.complete({'bottomLeft': 62, 'bottomRight': 62});
         await tester.pumpAndSettle();
-        expect(radius(tester).bottomLeft.x, 32);
+        expect(radius(tester).bottomLeft.x, AppRadii.xLarge);
       }
       expect(calls, hasLength(1));
       navigator.currentState!.pop();
@@ -453,7 +457,7 @@ void main() {
     expect(
       material.shape,
       const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(32)),
+        borderRadius: BorderRadius.all(Radius.circular(AppRadii.xLarge)),
       ),
     );
     expect(calls, isEmpty);

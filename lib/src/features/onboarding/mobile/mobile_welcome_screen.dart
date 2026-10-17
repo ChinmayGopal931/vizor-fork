@@ -15,13 +15,14 @@ import 'mobile_onboarding_progress_scope.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/mobile/neon_horizon.dart';
 import '../shared/onboarding_welcome_art.dart' show VizorWordmark;
-import 'mobile_welcome_backdrop.dart';
 import '../shared/welcome_accent_button.dart';
 import '../shared/welcome_button_tokens.dart';
 import '../shared/welcome_gift_card_button.dart';
 
-/// Figma `Welcome` (8635:103040): native video with create and import entry paths.
+/// Figma `Welcome` (8635:103040) with create and import entry paths. The neon
+/// look replaces the Figma's knight video with a lit neon horizon.
 class MobileWelcomeScreen extends ConsumerStatefulWidget {
   const MobileWelcomeScreen({
     this.showBackButton = false,
@@ -31,6 +32,9 @@ class MobileWelcomeScreen extends ConsumerStatefulWidget {
 
   /// `/add-account` returns home and offers the same Gift Card setup choices.
   final bool showBackButton;
+
+  /// Whether the horizon flickers on like a neon sign when the screen
+  /// appears. Previews and captures pass false for a steady frame.
   final bool animateBackground;
 
   @override
@@ -91,19 +95,29 @@ class _MobileWelcomeScreenState extends ConsumerState<MobileWelcomeScreen> {
         backgroundColor: const Color(0xff0f0f0f),
         body: LayoutBuilder(
           builder: (context, constraints) {
-            final videoHeight = (constraints.maxWidth + 1) * 700 / 394;
-            final fadeEnd = math.min(1.0, videoHeight / constraints.maxHeight);
+            // The Figma's 394×700 video slot (393×852 reference) still sets
+            // where the art fades into the page.
+            final artHeight = (constraints.maxWidth + 1) * 700 / 394;
+            final fadeEnd = math.min(1.0, artHeight / constraints.maxHeight);
+            final horizonHeight = constraints.maxHeight * 0.42;
             return Stack(
               fit: StackFit.expand,
               children: [
-                // 394×700 video slot at x=-1 in the 393×852 reference.
                 Positioned(
-                  top: 0,
-                  left: -1,
-                  width: constraints.maxWidth + 1,
-                  height: videoHeight,
-                  child: MobileWelcomeBackdrop(
-                    animate: widget.animateBackground,
+                  top: MediaQuery.paddingOf(context).top,
+                  left: 0,
+                  right: 0,
+                  height: horizonHeight,
+                  child: NeonIgnition(
+                    enabled: widget.animateBackground,
+                    builder: (context, light) => Opacity(
+                      opacity: light,
+                      child: NeonHorizon(
+                        key: const ValueKey('mobile_welcome_horizon'),
+                        width: constraints.maxWidth,
+                        height: horizonHeight,
+                      ),
+                    ),
                   ),
                 ),
                 Positioned.fill(
@@ -146,11 +160,7 @@ class _MobileWelcomeScreenState extends ConsumerState<MobileWelcomeScreen> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const VizorWordmark(
-                                    width: 106,
-                                    height: 40,
-                                    color: Color(0xffffffff),
-                                  ),
+                                  const VizorWordmark(width: 106, height: 40),
                                   const SizedBox(height: AppSpacing.md),
                                   Text(
                                     'Shielded\nby default',

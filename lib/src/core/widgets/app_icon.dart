@@ -1,8 +1,10 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../layout/app_form_factor.dart';
 import '../theme/app_theme.dart';
 import 'app_loading_icon.dart';
+import 'mobile/tron_glyph.dart';
 
 /// Name-based handles for every design-system icon.
 ///
@@ -145,6 +147,8 @@ abstract final class AppIcons {
 ///    without the caller having to thread the color through.
 /// 3. [AppColors.icon.regular] from the ambient [AppTheme] — default
 ///    "neutral icon" when no other context has spoken.
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
+
 class AppIcon extends StatelessWidget {
   const AppIcon(
     this.name, {
@@ -185,6 +189,27 @@ class AppIcon extends StatelessWidget {
         animated: animated,
         semanticLabel: semanticLabel,
       );
+    }
+    // The neon redesign (mobile) draws its round icons as angular glyphs.
+    if (_mobile) {
+      final glyph = switch (name) {
+        AppIcons.checkCircle => TronGlyphKind.check,
+        AppIcons.arrowDownCircle => TronGlyphKind.receive,
+        AppIcons.addNew => TronGlyphKind.plus,
+        AppIcons.warningCircle => TronGlyphKind.warning,
+        AppIcons.cancel => TronGlyphKind.cancel,
+        AppIcons.help => TronGlyphKind.help,
+        _ => null,
+      };
+      if (glyph != null) {
+        // The same semantics as the SVG it replaces.
+        return Semantics(
+          container: semanticLabel != null,
+          image: true,
+          label: semanticLabel ?? '',
+          child: TronGlyph(glyph, color: resolved, size: size),
+        );
+      }
     }
     return SvgPicture.asset(
       'assets/icons/$name.svg',

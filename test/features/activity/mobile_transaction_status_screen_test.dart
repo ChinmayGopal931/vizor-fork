@@ -374,7 +374,8 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
-      expect(find.text('Redeeming a card...'), findsOneWidget);
+      // Receipt titles are drawn uppercase in the top bar.
+      expect(find.text('REDEEMING A CARD...'), findsOneWidget);
       expect(find.text('Redeeming…'), findsOneWidget);
       expect(
         find.ancestor(
@@ -494,7 +495,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Redeemed a gift card'), findsOneWidget);
+      expect(find.text('REDEEMED A GIFT CARD'), findsOneWidget);
       // Redeeming a card is a receive, so it shows no network fee.
       expect(find.text('Tx fee'), findsNothing);
       expect(find.text('Card fee'), findsNothing);
@@ -672,8 +673,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Created a gift card'), findsOneWidget);
-    expect(find.text('Sent successfully'), findsNothing);
+    expect(find.text('CREATED A GIFT CARD'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsNothing);
     // The single-use link address is not a counterparty worth verifying.
     expect(find.text('To'), findsNothing);
     expect(
@@ -713,7 +714,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Created a gift card'), findsOneWidget);
+      expect(find.text('CREATED A GIFT CARD'), findsOneWidget);
       expect(find.byType(PaymentLinkGiftCard), findsOneWidget);
 
       // account-2's index knows nothing about this txid, so the receipt must
@@ -721,10 +722,10 @@ void main() {
       accountNotifier.setActiveAccount('account-2');
       await tester.pumpAndSettle();
 
-      expect(find.text('Created a gift card'), findsNothing);
+      expect(find.text('CREATED A GIFT CARD'), findsNothing);
       expect(find.byType(PaymentLinkGiftCard), findsNothing);
       expect(find.text('Message'), findsNothing);
-      expect(find.text('Sent successfully'), findsOneWidget);
+      expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
       expect(find.text('To'), findsOneWidget);
     },
   );
@@ -746,7 +747,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Created a gift card'), findsOneWidget);
+    expect(find.text('CREATED A GIFT CARD'), findsOneWidget);
     expect(find.text('0.001'), findsOneWidget);
     expect(find.text('Amount'), findsNothing);
     // Not the raw funding total the transaction carries.
@@ -759,7 +760,7 @@ void main() {
     await tester.pumpWidget(_app(_tx()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(find.text('Completed'), findsOneWidget);
     expect(find.text('Amount'), findsOneWidget);
     expect(find.text('123.12 ZEC'), findsOneWidget);
@@ -827,8 +828,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Transaction'), findsOneWidget);
-    expect(find.text('Sent successfully'), findsNothing);
+    expect(find.text('TRANSACTION'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsNothing);
     expect(find.text(kNetChangeText), findsOneWidget);
     expect(find.text('0.00065 ZEC'), findsOneWidget);
     expect(find.text('Amount'), findsNothing);
@@ -862,8 +863,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Transaction'), findsOneWidget);
-      expect(find.text('Sent successfully'), findsNothing);
+      expect(find.text('TRANSACTION'), findsOneWidget);
+      expect(find.text('SENT SUCCESSFULLY'), findsNothing);
       expect(find.text('Network fee'), findsNothing);
       expect(find.text(kNetChangeText), findsOneWidget);
       expect(find.text('0.0002 ZEC'), findsNWidgets(2));
@@ -891,8 +892,8 @@ void main() {
     await tester.pumpWidget(_app(tx, detail: _detail()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Transaction'), findsOneWidget);
-    expect(find.text('Sent successfully'), findsNothing);
+    expect(find.text('TRANSACTION'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsNothing);
     expect(find.text(kNetChangeText), findsOneWidget);
     expect(find.text('Amount'), findsNothing);
     // Nothing is subtracted, and the fee keeps its own line.
@@ -1056,7 +1057,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(find.text('TEX'), findsOneWidget);
     expect(find.text('Transparent'), findsNothing);
     expect(
@@ -1082,7 +1083,7 @@ void main() {
       expect(find.text(label), findsOneWidget);
       expect(find.text('To'), findsOneWidget);
       expect(find.text('From'), findsNothing);
-      expect(find.text('Sent successfully'), findsOneWidget);
+      expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     }
   });
 
@@ -1110,7 +1111,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Created a gift card'), findsOneWidget);
+      expect(find.text('CREATED A GIFT CARD'), findsOneWidget);
       expect(find.text('Ironwood'), findsNothing);
       expect(find.text('Shielded'), findsNothing);
       expect(find.text('Orchard'), findsNothing);
@@ -1152,7 +1153,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Orchard'), findsOneWidget);
     expect(find.text('Shielded'), findsNothing);
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
   });
 
   testWidgets('unmined sent tx shows the in-progress state', (tester) async {
@@ -1161,7 +1162,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Sending...'), findsOneWidget);
+    expect(find.text('SENDING...'), findsOneWidget);
     expect(find.text('In progress'), findsOneWidget);
   });
 
@@ -1171,7 +1172,7 @@ void main() {
     await tester.pumpWidget(_app(_tx(minedHeight: BigInt.zero, expired: true)));
     await tester.pumpAndSettle();
 
-    expect(find.text('Send failed'), findsOneWidget);
+    expect(find.text('SEND FAILED'), findsOneWidget);
     expect(find.text('Failed, funds returned'), findsOneWidget);
 
     final addressText = tester.widget<Text>(
@@ -1195,7 +1196,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Received'), findsOneWidget);
+    expect(find.text('RECEIVED'), findsOneWidget);
     expect(find.text('From'), findsOneWidget);
     final fromY = tester.getTopLeft(find.text('From')).dy;
     final amountY = tester.getTopLeft(find.text('Amount')).dy;
@@ -1345,7 +1346,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Received'), findsOneWidget);
+    expect(find.text('RECEIVED'), findsOneWidget);
     expect(find.text('0.00 ZEC'), findsOneWidget);
     await tester.tap(
       find.byKey(const ValueKey('mobile_tx_status_message_toggle')),
@@ -1365,7 +1366,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Sent successfully'), findsOneWidget);
+    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
     expect(find.text('0.00 ZEC'), findsOneWidget);
     expect(find.text('0.00015 ZEC'), findsOneWidget);
     expect(find.text('Message'), findsOneWidget);
@@ -1398,9 +1399,9 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.text('Transaction'), findsOneWidget);
-      expect(find.text('Sent successfully'), findsNothing);
-      expect(find.text('Sending...'), findsNothing);
+      expect(find.text('TRANSACTION'), findsOneWidget);
+      expect(find.text('SENT SUCCESSFULLY'), findsNothing);
+      expect(find.text('SENDING...'), findsNothing);
       expect(find.text('To'), findsNothing);
       expect(find.text('--'), findsOneWidget);
     }
@@ -1484,7 +1485,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Migrated to Ironwood'), findsOneWidget);
+    expect(find.text('MIGRATED TO IRONWOOD'), findsOneWidget);
     expect(find.text('Amount'), findsOneWidget);
     expect(find.text('From Orchard balance'), findsOneWidget);
     expect(find.text('To'), findsOneWidget);

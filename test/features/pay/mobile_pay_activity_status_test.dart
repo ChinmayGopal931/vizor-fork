@@ -172,8 +172,9 @@ void main() {
     expect(find.text('Mike'), findsOneWidget);
     expect(find.text('0x12351...76123'), findsOneWidget);
     expect(find.text('Full address'), findsOneWidget);
-    expect(find.text('Payment progress'), findsOneWidget);
-    expect(find.text('Transaction details'), findsOneWidget);
+    // The tabs are HUD captions, drawn uppercase.
+    expect(find.text('PAYMENT PROGRESS'), findsOneWidget);
+    expect(find.text('TRANSACTION DETAILS'), findsOneWidget);
     expect(find.text('In progress'), findsOneWidget);
     expect(find.text('Timestamp'), findsOneWidget);
     expect(find.text('Tx ID'), findsOneWidget);
@@ -200,7 +201,7 @@ void main() {
     expect(statusLabel.style?.fontSize, AppTypography.labelLarge.fontSize);
     expect(statusLabel.style?.fontWeight, AppTypography.labelLarge.fontWeight);
     expect(statusValue.style?.fontSize, AppTypography.labelLarge.fontSize);
-    expect(statusValue.style?.fontWeight, FontWeight.w500);
+    expect(statusValue.style?.fontWeight, AppTypography.labelLarge.fontWeight);
     expect(statusValue.style?.color, AppThemeData.light.colors.text.primary);
 
     final statusRowRect = tester.getRect(
@@ -225,9 +226,10 @@ void main() {
       );
     }
 
+    // The in-progress spinner is the neon red.
     expect(
       tester.widget<AppIcon>(_appIcon(AppIcons.loader)).color,
-      AppThemeData.light.colors.icon.regular,
+      AppThemeData.light.colors.neon.glow,
     );
     expect(
       tester.widget<AppIcon>(_appIcon(AppIcons.arrowTopRight)).color,
@@ -254,8 +256,8 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Completed'), findsOneWidget);
     expect(find.text('You paid'), findsOneWidget);
-    expect(find.text('Payment progress'), findsNothing);
-    expect(find.text('Transaction details'), findsNothing);
+    expect(find.text('PAYMENT PROGRESS'), findsNothing);
+    expect(find.text('TRANSACTION DETAILS'), findsNothing);
 
     final header = tester.getRect(
       find.byKey(const ValueKey('mobile_pay_status_header')),

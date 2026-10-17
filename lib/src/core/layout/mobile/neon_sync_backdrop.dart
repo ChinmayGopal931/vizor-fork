@@ -1,0 +1,459 @@
+import 'dart:math' as math;
+
+import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../providers/network_privacy_provider.dart';
+import '../../../providers/sync_display_progress_provider.dart';
+import '../../../providers/sync_provider.dart';
+import '../../formatting/sync_status_label.dart';
+import '../../theme/app_theme.dart';
+
+/// Which of the two sync layers a [NeonSyncBackdrop] draws.
+enum NeonSyncLayer {
+  /// Behind the content: the Tron floor, and the sync line once synced.
+  back,
+
+  /// Over the content (ignoring touches): the sync line while it climbs, and
+  /// the readout at its head.
+  front,
+}
+
+/// Home's backdrop in the neon redesign, in two layers around the content.
+///
+/// A Tron floor recedes to a red horizon low on the screen and flows toward
+/// the viewer while Veylor scans. The sync line, a lit tube in the right part
+/// of the screen, rises from the bottom with the scan's progress and reads
+/// the percentage at its head. While it climbs it is drawn over the content;
+/// once synced it runs the full height behind the content, out of the way,
+/// and only its "SYNCED" readout stays on top. It replaces the top bar's
+/// "Veylor is synced" status.
+class NeonSyncBackdrop extends ConsumerWidget {
+  const NeonSyncBackdrop({this.layer = NeonSyncLayer.back, super.key});
+
+  final NeonSyncLayer layer;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sync = ref.watch(syncProvider).value ?? SyncState();
+    final whole = ref.watch(syncDisplayWholePercentageProvider);
+    final status = SyncStatusLabel.from(
+      sync,
+      displayWholePercentage: whole,
+      networkPrivacy: ref.watch(networkPrivacyProvider),
+    );
+    // A wallet a few blocks behind is catching up, not syncing: its line
+    // stays full and behind the content instead of dropping and climbing
+    // again on every new block.
+    final gap = sync.chainTipHeight - sync.scannedHeight;
+    final catchingUp =
+        status.kind == SyncStatusKind.syncing &&
+        status.label != kSyncStatusConnectingToTorLabel &&
+        sync.lastSyncCompletedAt != null &&
+        sync.chainTipHeight > 0 &&
+        gap <= _catchUpBlocks;
+    final syncing = status.kind == SyncStatusKind.syncing && !catchingUp;
+    final progress = switch (status.kind) {
+      _ when catchingUp => 1.0,
+      SyncStatusKind.synced => 1.0,
+      SyncStatusKind.syncing =>
+        ref.watch(syncDisplayPercentageProvider).clamp(0.03, 0.99),
+      SyncStatusKind.failed => sync.percentage.clamp(0.03, 0.99),
+    };
+    final readout = switch (status.kind) {
+      _ when catchingUp => 'SYNCED',
+      SyncStatusKind.synced => 'SYNCED',
+      SyncStatusKind.failed =>
+        status.label == kSyncStatusTorFailedLabel
+            ? 'TOR OFFLINE'
+            : 'SYNC FAILED',
+      SyncStatusKind.syncing =>
+        status.label == kSyncStatusConnectingToTorLabel
+            ? 'TOR …'
+            : '${sync.isChecking ? 'CHECK' : 'SYNC'} $whole%',
+    };
+
+    final front = layer == NeonSyncLayer.front;
+    final view = NeonSyncBackdropView(
+      progress: progress.toDouble(),
+      readout: readout,
+      active: syncing,
+      failed: status.kind == SyncStatusKind.failed,
+      drawFloor: !front,
+      drawLine: front == syncing,
+      drawReadout: front,
+    );
+    if (!front) return ExcludeSemantics(child: view);
+    return IgnorePointer(
+      child: Semantics(
+        container: true,
+        liveRegion: true,
+        label: status.semanticsLabel,
+        child: ExcludeSemantics(child: view),
+      ),
+    );
+  }
+}
+
+/// The backdrop's drawing, free of providers so previews can show any state.
+class NeonSyncBackdropView extends StatefulWidget {
+  const NeonSyncBackdropView({
+    required this.progress,
+    required this.readout,
+    required this.active,
+    this.failed = false,
+    this.drawFloor = true,
+    this.drawLine = true,
+    this.drawReadout = true,
+    super.key,
+  });
+
+  /// Which parts this layer draws.
+  final bool drawFloor;
+  final bool drawLine;
+  final bool drawReadout;
+
+  /// How far the sync line has climbed, 0..1.
+  final double progress;
+
+  /// The text at the line's head.
+  final String readout;
+
+  /// Scanning: the floor flows faster and a pulse runs up the line.
+  final bool active;
+  final bool failed;
+
+  @override
+  State<NeonSyncBackdropView> createState() => _NeonSyncBackdropViewState();
+}
+
+class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
+    with SingleTickerProviderStateMixin {
+  /// One floor cycle; a scanning wallet runs it four times as fast.
+  static const _idlePeriod = Duration(seconds: 9);
+
+  late final AnimationController _flow = AnimationController(
+    vsync: this,
+    duration: _idlePeriod,
+  );
+
+  bool get _motion => !(MediaQuery.maybeDisableAnimationsOf(context) ?? false);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncFlow();
+  }
+
+  @override
+  void didUpdateWidget(NeonSyncBackdropView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active != widget.active) _syncFlow();
+  }
+
+  void _syncFlow() {
+    if (!_motion) {
+      _flow.stop();
+      return;
+    }
+    final period = widget.active
+        ? Duration(milliseconds: _idlePeriod.inMilliseconds ~/ 4)
+        : _idlePeriod;
+    if (_flow.duration != period || !_flow.isAnimating) {
+      final at = _flow.value;
+      _flow
+        ..duration = period
+        ..repeat()
+        ..value = at;
+    }
+  }
+
+  @override
+  void dispose() {
+    _flow.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final neon = context.colors.neon;
+    final dark = context.colors.background.window.computeLuminance() < 0.2;
+    final padding = MediaQuery.paddingOf(context);
+    return RepaintBoundary(
+      child: CustomPaint(
+        painter: _BackdropPainter(
+          flow: _flow,
+          progress: widget.progress,
+          active: widget.active,
+          failed: widget.failed,
+          drawFloor: widget.drawFloor,
+          drawLine: widget.drawLine,
+          glow: neon.glow,
+          core: neon.core,
+          floorStrength: dark ? 0.6 : 0.35,
+          topLimit: padding.top + AppSpacing.xs,
+        ),
+        child: widget.drawReadout
+            ? _Readout(
+                progress: widget.progress,
+                text: widget.readout,
+                color: neon.glow,
+                core: neon.core,
+                topLimit: padding.top + AppSpacing.xs,
+              )
+            : null,
+      ),
+    );
+  }
+}
+
+/// How far behind the tip a scan may start and still count as caught up.
+const _catchUpBlocks = 20;
+
+/// Where the sync line stands: in the right part of the screen, behind the
+/// balance and the rows (which are glass), not along the edge.
+const _lineXFactor = 0.85;
+double _lineX(double width) => (width * _lineXFactor).roundToDouble() + 0.5;
+
+class _Readout extends StatelessWidget {
+  const _Readout({
+    required this.progress,
+    required this.text,
+    required this.color,
+    required this.core,
+    required this.topLimit,
+  });
+
+  final double progress;
+  final String text;
+  final Color color;
+  final Color core;
+  final double topLimit;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height = constraints.maxHeight;
+        final headY = _headY(height, progress, topLimit);
+        // Read bottom to top, hanging just under the head, left of the line.
+        return Stack(
+          children: [
+            Positioned(
+              right: constraints.maxWidth - _lineX(constraints.maxWidth) + 7,
+              top: headY + 10,
+              child: RotatedBox(
+                quarterTurns: 3,
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontFamily: 'Gotham',
+                    fontSize: 9,
+                    height: 1,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 2.2,
+                    color: core,
+                    shadows: Neon.textGlow(color, intensity: 0.5),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+double _headY(double height, double progress, double topLimit) {
+  final travel = height - topLimit;
+  return height - travel * progress.clamp(0.0, 1.0);
+}
+
+class _BackdropPainter extends CustomPainter {
+  _BackdropPainter({
+    required this.flow,
+    required this.progress,
+    required this.active,
+    required this.failed,
+    required this.drawFloor,
+    required this.drawLine,
+    required this.glow,
+    required this.core,
+    required this.floorStrength,
+    required this.topLimit,
+  }) : super(repaint: flow);
+
+  final Animation<double> flow;
+  final double progress;
+  final bool active;
+  final bool failed;
+  final bool drawFloor;
+  final bool drawLine;
+  final Color glow;
+  final Color core;
+  final double floorStrength;
+  final double topLimit;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (drawFloor) _paintFloor(canvas, size);
+    if (drawLine) _paintSyncLine(canvas, size);
+  }
+
+  /// A grid floor in perspective below a red horizon, flowing toward the
+  /// viewer.
+  void _paintFloor(Canvas canvas, Size size) {
+    final horizon = size.height * 0.8;
+    final floorHeight = size.height - horizon;
+    final k = floorStrength;
+
+    // The horizon: a thin lit seam with a soft bloom over the floor.
+    final seam = Rect.fromLTWH(0, horizon - 40, size.width, 80);
+    canvas.drawRect(
+      seam,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            glow.withValues(alpha: 0),
+            glow.withValues(alpha: 0.05 * k),
+            glow.withValues(alpha: 0),
+          ],
+        ).createShader(seam),
+    );
+    canvas.drawLine(
+      Offset(0, horizon),
+      Offset(size.width, horizon),
+      Paint()
+        ..color = glow.withValues(alpha: 0.1 * k)
+        ..strokeWidth = 1,
+    );
+
+    final fade = Paint()
+      ..strokeWidth = 1
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          glow.withValues(alpha: 0.02 * k),
+          glow.withValues(alpha: 0.20 * k),
+        ],
+      ).createShader(Rect.fromLTWH(0, horizon, size.width, floorHeight));
+
+    // Rows: squared spacing reads as depth; the phase walks them forward.
+    const rows = 9;
+    final phase = flow.value;
+    for (var i = 0; i < rows + 1; i++) {
+      final t = (i + phase) / rows;
+      if (t > 1) continue;
+      final y = horizon + floorHeight * t * t;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), fade);
+    }
+
+    // Columns fan out from a vanishing point on the horizon.
+    final vanishing = Offset(size.width / 2, horizon);
+    const columns = 14;
+    final spread = size.width * 2.6;
+    for (var j = 0; j <= columns; j++) {
+      final x = size.width / 2 + (j / columns - 0.5) * spread;
+      canvas.drawLine(vanishing, Offset(x, size.height), fade);
+    }
+  }
+
+  /// The rising tube along the right edge, with a pulse while scanning.
+  void _paintSyncLine(Canvas canvas, Size size) {
+    final x = _lineX(size.width);
+    final headY = _headY(size.height, progress, topLimit);
+    final intensity = failed ? 0.4 : 0.8;
+
+    // Synced, the line steps back behind the content: Home's blocks hide it,
+    // so it shows only in the gaps between them.
+    final quiet = !active && !failed;
+    if (quiet) {
+      Neon.strokeTube(
+        canvas,
+        Path()
+          ..moveTo(x, size.height)
+          ..lineTo(x, headY),
+        glow: glow,
+        core: core,
+        width: 1.4,
+        intensity: 0.6,
+      );
+      _paintHead(canvas, Offset(x, headY), 0.7);
+      return;
+    }
+
+    // The unlit rest of the track, so the climb has a scale.
+    canvas.drawLine(
+      Offset(x, topLimit),
+      Offset(x, size.height),
+      Paint()
+        ..color = glow.withValues(alpha: 0.10)
+        ..strokeWidth = 1,
+    );
+
+    final line = Path()
+      ..moveTo(x, size.height)
+      ..lineTo(x, headY);
+    Neon.strokeTube(
+      canvas,
+      line,
+      glow: glow,
+      core: core,
+      width: 1.6,
+      intensity: intensity,
+    );
+
+    if (active) {
+      // A bright packet climbing the lit part.
+      final travel = size.height - headY;
+      final packetY = size.height - travel * ((flow.value * 4) % 1);
+      final packet = Path()
+        ..moveTo(x, math.min(size.height, packetY + 18))
+        ..lineTo(x, math.max(headY, packetY - 18));
+      Neon.strokeTube(
+        canvas,
+        packet,
+        glow: glow,
+        core: core,
+        width: 2.4,
+        intensity: 0.85,
+      );
+    }
+
+    _paintHead(canvas, Offset(x, headY), intensity);
+  }
+
+  void _paintHead(Canvas canvas, Offset center, double intensity) {
+    final head = Rect.fromCenter(center: center, width: 7, height: 7);
+    canvas
+      ..drawRect(
+        head.inflate(5),
+        Paint()
+          ..color = glow.withValues(alpha: 0.6 * intensity)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      )
+      ..drawRect(head, Paint()..color = glow.withValues(alpha: intensity))
+      ..drawRect(
+        head.deflate(2),
+        Paint()..color = core.withValues(alpha: intensity),
+      );
+  }
+
+  @override
+  bool shouldRepaint(_BackdropPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.active != active ||
+        oldDelegate.drawFloor != drawFloor ||
+        oldDelegate.drawLine != drawLine ||
+        oldDelegate.failed != failed ||
+        oldDelegate.glow != glow ||
+        oldDelegate.core != core ||
+        oldDelegate.floorStrength != floorStrength ||
+        oldDelegate.topLimit != topLimit;
+  }
+}

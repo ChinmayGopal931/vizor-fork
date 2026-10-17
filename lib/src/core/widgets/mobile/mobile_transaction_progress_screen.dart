@@ -19,10 +19,6 @@ const _statusCircleSize = 64.0;
 const _statusIconSize = 32.0;
 const _statusButtonWidth = 230.0;
 
-const mobileTransactionProgressBackgroundImage = AssetImage(
-  'assets/illustrations/mobile_send_status_background.webp',
-);
-
 /// Shared full-page presentation for a transaction being submitted.
 ///
 /// The caller owns execution, copy, navigation, and haptics. This widget owns
@@ -88,127 +84,112 @@ class MobileTransactionProgressScreen extends StatelessWidget {
       },
       child: Scaffold(
         backgroundColor: colors.background.window,
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            const Positioned.fill(
-              child: Image(
-                image: mobileTransactionProgressBackgroundImage,
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                excludeFromSemantics: true,
-              ),
-            ),
-            SafeArea(
-              child: Column(
-                children: [
-                  // The Figma shell reserves the nav slot but hides its
-                  // content while the transaction is in flight.
-                  const SizedBox(height: kMobileTopNavHeight),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm,
-                        vertical: AppSpacing.s,
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            MobileTransactionProgressBadge(
-                              phase: phase,
-                              badgeKey: statusBadgeKey,
-                              progressIconKey: progressIconKey,
-                              successIconKey: successIconKey,
-                              failureIconKey: failureIconKey,
-                              successRippleKey: successRippleKey,
-                            ),
-                            const SizedBox(height: AppSpacing.xl),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.md,
-                              ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    title,
-                                    key: titleKey,
-                                    textAlign: TextAlign.center,
-                                    style: AppTypography.displayLarge.copyWith(
-                                      color: titleColor,
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.s),
-                                  LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      final requestedWidth = bodyMaxWidth;
-                                      final maxWidth = requestedWidth == null
-                                          ? constraints.maxWidth
-                                          : math.min(
-                                              requestedWidth,
-                                              constraints.maxWidth,
-                                            );
-                                      return ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          maxWidth: maxWidth,
-                                        ),
-                                        child: Text(
-                                          body,
-                                          key: bodyKey,
-                                          textAlign: TextAlign.center,
-                                          style: AppTypography.bodyMediumStrong
-                                              .copyWith(
-                                                color: colors.text.primary,
-                                              ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.xl),
-                            SizedBox(
-                              width: _statusButtonWidth,
-                              child: showPrimary || showSecondary
-                                  ? Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        if (showPrimary)
-                                          AppButton(
-                                            key: primaryActionKey,
-                                            onPressed: onPrimaryAction,
-                                            expand: true,
-                                            constrainContent: true,
-                                            child: Text(primaryActionLabel!),
-                                          ),
-                                        if (showPrimary && showSecondary)
-                                          const SizedBox(height: AppSpacing.s),
-                                        if (showSecondary)
-                                          AppButton(
-                                            key: secondaryActionKey,
-                                            onPressed: onSecondaryAction,
-                                            expand: true,
-                                            constrainContent: true,
-                                            variant: AppButtonVariant.ghost,
-                                            child: Text(secondaryActionLabel!),
-                                          ),
-                                      ],
-                                    )
-                                  : const SizedBox(
-                                      height: AppButtonSizing.largeHeight,
-                                    ),
-                            ),
-                          ],
+        body: SafeArea(
+          child: Column(
+            children: [
+              // The Figma shell reserves the nav slot but hides its
+              // content while the transaction is in flight.
+              const SizedBox(height: kMobileTopNavHeight),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.s,
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        MobileTransactionProgressBadge(
+                          phase: phase,
+                          badgeKey: statusBadgeKey,
+                          progressIconKey: progressIconKey,
+                          successIconKey: successIconKey,
+                          failureIconKey: failureIconKey,
+                          successRippleKey: successRippleKey,
                         ),
-                      ),
+                        const SizedBox(height: AppSpacing.xl),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                title,
+                                key: titleKey,
+                                textAlign: TextAlign.center,
+                                style: AppTypography.displayLarge.copyWith(
+                                  color: titleColor,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.s),
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final requestedWidth = bodyMaxWidth;
+                                  final maxWidth = requestedWidth == null
+                                      ? constraints.maxWidth
+                                      : math.min(
+                                          requestedWidth,
+                                          constraints.maxWidth,
+                                        );
+                                  return ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxWidth: maxWidth,
+                                    ),
+                                    child: Text(
+                                      body,
+                                      key: bodyKey,
+                                      textAlign: TextAlign.center,
+                                      style: AppTypography.bodyMediumStrong
+                                          .copyWith(color: colors.text.primary),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        SizedBox(
+                          width: _statusButtonWidth,
+                          child: showPrimary || showSecondary
+                              ? Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (showPrimary)
+                                      AppButton(
+                                        key: primaryActionKey,
+                                        onPressed: onPrimaryAction,
+                                        expand: true,
+                                        constrainContent: true,
+                                        child: Text(primaryActionLabel!),
+                                      ),
+                                    if (showPrimary && showSecondary)
+                                      const SizedBox(height: AppSpacing.s),
+                                    if (showSecondary)
+                                      AppButton(
+                                        key: secondaryActionKey,
+                                        onPressed: onSecondaryAction,
+                                        expand: true,
+                                        constrainContent: true,
+                                        variant: AppButtonVariant.ghost,
+                                        child: Text(secondaryActionLabel!),
+                                      ),
+                                  ],
+                                )
+                              : const SizedBox(
+                                  height: AppButtonSizing.largeHeight,
+                                ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

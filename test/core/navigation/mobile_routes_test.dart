@@ -184,7 +184,8 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel('Settings').last);
     await tester.pumpAndSettle();
-    expect(find.text('Settings'), findsOneWidget);
+    // The page title is drawn as an uppercase caption.
+    expect(find.text('SETTINGS'), findsOneWidget);
     expect(find.bySemanticsLabel('Back'), findsNothing);
     expect(find.byType(AppMobileShell), findsOneWidget);
   });

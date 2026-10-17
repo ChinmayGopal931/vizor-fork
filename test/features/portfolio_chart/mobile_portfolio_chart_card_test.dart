@@ -48,13 +48,16 @@ String _sourceLine(WidgetTester tester) => tester
     .data!;
 
 void main() {
-  testWidgets('the source line names the pricing server, or says nothing '
-      'leaves the device', (tester) async {
+  testWidgets('the source line never names the pricing server, and says '
+      'when nothing leaves the device', (tester) async {
+    // Settings names the server; the card stays quiet about healthy prices.
     await tester.pumpWidget(
       _card(PortfolioChartReady(_data()), source: 'zapp-pricing-engine'),
     );
-    expect(_sourceLine(tester), 'Prices from zapp-pricing-engine');
-    expect(find.text('Portfolio value'), findsOneWidget);
+    expect(_sourceLine(tester), isEmpty);
+    expect(find.textContaining('zapp-pricing-engine'), findsNothing);
+    // The title is a HUD caption, drawn uppercase.
+    expect(find.text('PORTFOLIO VALUE'), findsOneWidget);
 
     await tester.pumpWidget(
       _card(
@@ -65,13 +68,14 @@ void main() {
         source: 'zapp-pricing-engine',
       ),
     );
-    expect(_sourceLine(tester), 'Prices from zapp-pricing-engine');
+    expect(_sourceLine(tester), isEmpty);
+    expect(find.textContaining('zapp-pricing-engine'), findsNothing);
 
     await tester.pumpWidget(
       _card(PortfolioChartReady(_data(mode: PortfolioChartMode.zec))),
     );
     expect(_sourceLine(tester), 'On this device');
-    expect(find.text('ZEC balance'), findsOneWidget);
+    expect(find.text('ZEC BALANCE'), findsOneWidget);
 
     await tester.pumpWidget(
       _card(
@@ -119,7 +123,7 @@ void main() {
     expect(PortfolioChartRange.all.description, 'All time');
   });
 
-  testWidgets('Home takes the server name from the build configuration', (
+  testWidgets('the chart names no server whatever the build configures', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -140,8 +144,10 @@ void main() {
       ),
     );
 
-    // The default build: the zapp pricing engine, named by its service.
-    expect(_sourceLine(tester), 'Prices from zapp-pricing-engine');
+    // The default build prices from the zapp pricing engine; the card does
+    // not say so (Settings does).
+    expect(_sourceLine(tester), isEmpty);
+    expect(find.textContaining('zapp-pricing-engine'), findsNothing);
   });
 
   testWidgets('dragging along a daily price shows the UTC day it belongs to', (
@@ -171,7 +177,7 @@ void main() {
 
     await gesture.up();
     await tester.pump();
-    expect(_sourceLine(tester), 'Prices from zapp-pricing-engine');
+    expect(_sourceLine(tester), isEmpty);
   });
 
   test(

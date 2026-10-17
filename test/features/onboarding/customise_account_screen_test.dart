@@ -486,7 +486,8 @@ void main() {
       );
       await tester.pump();
       expect(submittedName, 'Resolute Herald');
-      expect(submittedPicture, 'pfp-09');
+      // The third draw (8) picks among the seven portraits: 8 % 7 = 1.
+      expect(submittedPicture, 'pfp-02');
       expect(random.nextIntCallCount, 9);
       expect(tester.takeException(), isNull);
     });

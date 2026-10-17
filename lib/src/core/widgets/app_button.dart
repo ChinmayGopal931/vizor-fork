@@ -23,6 +23,13 @@ typedef AppButtonDecorationBuilder =
 
 const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
+/// How far a mobile button's corner cuts reach, by button height.
+double _mobileChamfer(double height) => height >= 44
+    ? AppChamfer.medium
+    : height >= 30
+    ? 6
+    : AppChamfer.small;
+
 class _Sizing {
   const _Sizing({
     required this.height,
@@ -155,10 +162,17 @@ _VariantPalette _paletteFor(AppButtonVariant variant, AppColors c) {
         bg: c.button.secondary.bg,
         bgHover: c.button.secondary.bgHover,
         bgPressed: c.button.secondary.bgPressed,
-        border: c.background.ground.withValues(alpha: 0),
-        borderHover: c.background.ground.withValues(alpha: 0),
-        borderPressed: c.background.ground.withValues(alpha: 0),
-        borderWidth: 0,
+        // Mobile glass buttons carry a hairline edge; desktop has none.
+        border: _mobile
+            ? c.border.subtleOpacity
+            : c.background.ground.withValues(alpha: 0),
+        borderHover: _mobile
+            ? c.border.subtleOpacity
+            : c.background.ground.withValues(alpha: 0),
+        borderPressed: _mobile
+            ? c.border.subtleOpacity
+            : c.background.ground.withValues(alpha: 0),
+        borderWidth: _mobile ? 1 : 0,
         label: c.button.secondary.label,
         labelHover: c.button.secondary.label,
         focusRing: c.state.focusRing,
@@ -382,9 +396,16 @@ class _AppButtonState extends State<AppButton> {
     final borderWidth = _enabled ? palette.borderWidth : 0.0;
     final iconGap = widget.iconGap ?? sizing.gap;
     final contentPadding = widget.contentPadding ?? sizing.padding;
-    final OutlinedBorder shape = widget.borderRadius == null
-        ? const StadiumBorder()
-        : RoundedRectangleBorder(borderRadius: widget.borderRadius!);
+    // Mobile (the neon redesign) cuts the corners at 45° instead of the
+    // desktop pill; composed rows that pass a radius keep their own shape.
+    final mobileCut = _mobileChamfer(height);
+    final OutlinedBorder shape = widget.borderRadius != null
+        ? RoundedRectangleBorder(borderRadius: widget.borderRadius!)
+        : _mobile
+        ? Neon.chamferBorder(cut: mobileCut)
+        : const StadiumBorder();
+    final glowing =
+        _mobile && _enabled && widget.variant == AppButtonVariant.primary;
 
     final rowChildren = <Widget>[];
     if (widget.leading != null) {
@@ -450,6 +471,10 @@ class _AppButtonState extends State<AppButton> {
                 ? BorderSide.none
                 : BorderSide(color: borderColor, width: borderWidth),
           ),
+          // A lit slab casts its colour on the black around it.
+          shadows: glowing
+              ? Neon.boxGlow(currentBg, intensity: _pressed ? 0.9 : 0.5)
+              : null,
         ),
         padding: contentPadding,
         child: IconTheme.merge(
@@ -484,12 +509,14 @@ class _AppButtonState extends State<AppButton> {
       AppButtonVariant.destructive => 3.5,
       AppButtonVariant.secondary || AppButtonVariant.ghost => 2.0,
     };
-    final OutlinedBorder focusShape = widget.borderRadius == null
-        ? const StadiumBorder()
-        : RoundedRectangleBorder(
+    final OutlinedBorder focusShape = widget.borderRadius != null
+        ? RoundedRectangleBorder(
             borderRadius:
                 widget.borderRadius! + BorderRadius.circular(focusRingOutset),
-          );
+          )
+        : _mobile
+        ? Neon.chamferBorder(cut: mobileCut + focusRingOutset / 2)
+        : const StadiumBorder();
 
     // Keep the stack's layout size equal to the pill's design height and
     // paint the focus ring outside via overflow. Reserving outer padding

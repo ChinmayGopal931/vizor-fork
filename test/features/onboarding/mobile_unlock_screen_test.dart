@@ -745,10 +745,6 @@ void main() {
 
       expect(find.byType(MobileBiometricSignInView), findsOneWidget);
       expect(
-        find.byKey(const ValueKey('mobile_biometric_sign_in_background')),
-        findsOneWidget,
-      );
-      expect(
         find.byKey(const ValueKey('mobile_biometric_sign_in_badge')),
         findsOneWidget,
       );

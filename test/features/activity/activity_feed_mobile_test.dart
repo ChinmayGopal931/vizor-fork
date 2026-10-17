@@ -17,12 +17,14 @@ void main() {
   ) async {
     await _pumpActivityFeed(tester, rows: [_row(title: 'Sent')]);
 
+    // The neon avatar is a cut-corner plate, not a circle.
     final avatar = tester.getSize(
       find.byWidgetPredicate(
         (widget) =>
             widget is DecoratedBox &&
-            widget.decoration is BoxDecoration &&
-            (widget.decoration as BoxDecoration).shape == BoxShape.circle,
+            widget.decoration is ShapeDecoration &&
+            (widget.decoration as ShapeDecoration).shape
+                is BeveledRectangleBorder,
       ),
     );
     expect(avatar.width, AppAssetSizeMobile.size);

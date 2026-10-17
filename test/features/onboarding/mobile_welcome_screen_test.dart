@@ -425,18 +425,23 @@ void main() {
     expect(find.text('home-route'), findsOneWidget);
   });
 
-  testWidgets('reduced motion uses the poster at the Figma video slot', (
+  testWidgets('the neon horizon replaces the knight video and poster', (
     tester,
   ) async {
     await pump(tester);
-    final poster = find.byWidgetPredicate(
-      (widget) =>
-          widget is Image &&
-          widget.image is AssetImage &&
-          (widget.image as AssetImage).assetName == kMobileWelcomePosterAsset,
+    final horizon = find.byKey(const ValueKey('mobile_welcome_horizon'));
+    expect(horizon, findsOneWidget);
+    expect(tester.getSize(horizon).width, 393);
+    expect(find.byType(MobileWelcomeBackdrop), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName == kMobileWelcomePosterAsset,
+      ),
+      findsNothing,
     );
-    expect(poster, findsOneWidget);
-    expect(tester.getSize(poster).width, 394);
   });
 
   for (final theme in {

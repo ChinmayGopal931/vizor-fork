@@ -1,6 +1,9 @@
 import 'package:flutter/painting.dart';
 
+import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
+
+const _neon = kAppFormFactor == AppFormFactor.mobile;
 
 /// Navigation-panel colors from the Figma `Semantic/Nav Panel` tokens.
 class AppNavPanelColors {
@@ -16,17 +19,35 @@ class AppNavPanelColors {
   final Color activeIcon;
   final Color activeLabel;
 
-  static const dark = AppNavPanelColors(
+  /// Figma faces on desktop, the neon redesign on mobile builds.
+  static const dark = _neon ? neonDark : figmaDark;
+  static const light = _neon ? neonLight : figmaLight;
+
+  static const figmaDark = AppNavPanelColors(
     badgeBg: CrimsonPrimitives.p300Dark,
     activeBg: CrimsonPrimitives.p400Alpha15Dark,
     activeIcon: CrimsonPrimitives.p400Dark,
     activeLabel: CrimsonPrimitives.p900Dark,
   );
 
-  static const light = AppNavPanelColors(
+  static const figmaLight = AppNavPanelColors(
     badgeBg: CrimsonPrimitives.p300Light,
     activeBg: CrimsonPrimitives.p300Alpha10Light,
     activeIcon: CrimsonPrimitives.p300Light,
     activeLabel: CrimsonPrimitives.p800Light,
+  );
+
+  static const neonDark = AppNavPanelColors(
+    badgeBg: NeonPrimitives.red,
+    activeBg: NeonPrimitives.red14,
+    activeIcon: NeonPrimitives.red,
+    activeLabel: NeonPrimitives.redCore,
+  );
+
+  static const neonLight = AppNavPanelColors(
+    badgeBg: NeonPrimitives.redOnLight,
+    activeBg: NeonPrimitives.redOnLight10,
+    activeIcon: NeonPrimitives.redOnLight,
+    activeLabel: NeonPrimitives.redOnLightPressed,
   );
 }

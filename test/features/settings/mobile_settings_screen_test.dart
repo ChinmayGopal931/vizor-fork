@@ -1076,9 +1076,10 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pump();
 
-    expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('Account'), findsOneWidget);
-    expect(find.text('System'), findsOneWidget);
+    // The page title and group heads are drawn as uppercase captions.
+    expect(find.text('SETTINGS'), findsOneWidget);
+    expect(find.text('ACCOUNT'), findsOneWidget);
+    expect(find.text('SYSTEM'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('mobile_settings_gift_cards_row')),
       findsOneWidget,
@@ -1086,7 +1087,8 @@ void main() {
     expect(find.text('My gift cards'), findsOneWidget);
     expect(find.text('New'), findsOneWidget);
     expect(find.text('John'), findsOneWidget);
-    expect(find.text('Knight'), findsOneWidget);
+    // The default portrait's own label.
+    expect(find.text('Light cycle'), findsOneWidget);
     final pfpRow = find.byKey(const ValueKey('mobile_settings_pfp_row'));
     final pfp = find.descendant(
       of: pfpRow,
@@ -1094,7 +1096,7 @@ void main() {
     );
     expect(
       tester.getTopLeft(pfp).dx,
-      lessThan(tester.getTopLeft(find.text('Knight')).dx),
+      lessThan(tester.getTopLeft(find.text('Light cycle')).dx),
     );
     expect(
       _chevronIn(tester, const ValueKey('mobile_settings_seed_row')).color,
@@ -1152,15 +1154,16 @@ void main() {
 
     // The System group is located by its first row because "System" is
     // also a theme value.
-    expect(top('Personal'), lessThan(top('Account')));
-    expect(top('Account'), lessThan(top('Endpoint')));
+    // Group heads are drawn uppercase; the Privacy card keeps its own head.
+    expect(top('PERSONAL'), lessThan(top('ACCOUNT')));
+    expect(top('ACCOUNT'), lessThan(top('Endpoint')));
     expect(top('Endpoint'), lessThan(top('Privacy')));
 
     // Personal owns the gift cards and address book entries.
     expect(find.text('Address book'), findsOneWidget);
     expect(find.text('Contacts'), findsNothing);
     expect(top('My gift cards'), lessThan(top('Address book')));
-    expect(top('Address book'), lessThan(top('Account')));
+    expect(top('Address book'), lessThan(top('ACCOUNT')));
 
     // Mobile keeps its own pieces and never offers to link to itself.
     expect(find.text('Syncing'), findsOneWidget);

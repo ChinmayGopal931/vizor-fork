@@ -1,6 +1,9 @@
 import 'package:flutter/painting.dart';
 
+import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
+
+const _neon = kAppFormFactor == AppFormFactor.mobile;
 
 /// Icon color hierarchy retained from the OLDSemantic icon tokens.
 ///
@@ -44,7 +47,11 @@ class AppIconColors {
   final Color success;
   final Color brandCrimson;
 
-  static const dark = AppIconColors(
+  /// Figma faces on desktop, the neon redesign on mobile builds.
+  static const dark = _neon ? neonDark : figmaDark;
+  static const light = _neon ? neonLight : figmaLight;
+
+  static const figmaDark = AppIconColors(
     accent: Primitives.p800Dark,
     regular: Primitives.p700Dark,
     muted: Primitives.p500Dark,
@@ -58,7 +65,7 @@ class AppIconColors {
     brandCrimson: CrimsonPrimitives.p400Dark,
   );
 
-  static const light = AppIconColors(
+  static const figmaLight = AppIconColors(
     accent: Primitives.p900Light,
     regular: Primitives.p700Light,
     muted: Primitives.p500Light,
@@ -70,5 +77,33 @@ class AppIconColors {
     destructiveLight: PlumPrimitives.p200Light,
     success: GreenPrimitives.p500Light,
     brandCrimson: CrimsonPrimitives.p300Light,
+  );
+
+  static const neonDark = AppIconColors(
+    accent: NeonPrimitives.n800Dark,
+    regular: NeonPrimitives.n700Dark,
+    muted: NeonPrimitives.n500Dark,
+    disabled: NeonPrimitives.n300Dark,
+    inverse: NeonPrimitives.n0Dark,
+    onPrimary: NeonPrimitives.n0Dark,
+    warning: GoldPrimitives.p500Dark,
+    destructive: NeonPrimitives.red,
+    destructiveLight: NeonPrimitives.redPressed,
+    success: GreenPrimitives.p300Dark,
+    brandCrimson: NeonPrimitives.red,
+  );
+
+  static const neonLight = AppIconColors(
+    accent: NeonPrimitives.n800Light,
+    regular: NeonPrimitives.n700Light,
+    muted: NeonPrimitives.n500Dark,
+    disabled: NeonPrimitives.n300Light,
+    inverse: NeonPrimitives.n0Light,
+    onPrimary: NeonPrimitives.white,
+    warning: GoldPrimitives.p300Light,
+    destructive: NeonPrimitives.redOnLight,
+    destructiveLight: NeonPrimitives.redHot,
+    success: GreenPrimitives.p500Light,
+    brandCrimson: NeonPrimitives.redOnLight,
   );
 }

@@ -17,6 +17,7 @@ import '../../../../core/formatting/zec_amount.dart';
 import '../../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../../core/layout/mobile/app_mobile_tab_bar.dart';
 import '../../../../core/layout/mobile/mobile_top_nav_account.dart';
+import '../../../../core/layout/mobile/neon_sync_backdrop.dart';
 import '../../../../core/layout/mobile/mobile_top_scroll_fade.dart';
 import '../../../../core/privacy/privacy_mask.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -24,6 +25,8 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/mobile/mobile_home_entry_card.dart';
+import '../../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../../core/widgets/mobile/neon_scramble_text.dart';
 import '../../../../core/widgets/app_tooltip.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/enhance_pir_provider.dart';
@@ -49,7 +52,9 @@ import '../../../activity/screens/mobile/mobile_transaction_status_screen.dart';
 import '../../../activity/swap_activity_row_items_provider.dart';
 import '../../../activity/swap_activity_row_mapper.dart';
 import '../../../activity/widgets/activity_feed.dart';
-import '../../../portfolio_chart/widgets/mobile/mobile_portfolio_chart_card.dart';
+import '../../../portfolio_chart/models/portfolio_chart_models.dart';
+import '../../../portfolio_chart/providers/portfolio_chart_provider.dart';
+import '../../../portfolio_chart/widgets/mobile/neon_plot.dart';
 import '../../../migration/models/mobile_ironwood_migration_status_entry.dart';
 import '../../../migration/models/mobile_ironwood_migration_attention_state.dart';
 import '../../../migration/providers/ironwood_migration_announcement_provider.dart';
@@ -104,14 +109,17 @@ class MobileHomeScreen extends ConsumerWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (isImporting) const _ImportingBackground(),
+          // The neon backdrop: Tron floor and the rising sync line, behind
+          // the balance and everything else on Home.
+          const Positioned.fill(child: NeonSyncBackdrop()),
           SafeArea(
             bottom: false,
             child: Column(
               children: [
-                const SizedBox(height: AppSpacing.s),
+                const SizedBox(height: AppSpacing.xxs),
                 Builder(
                   builder: (context) => MobileTopNavAccount(
+                    compact: true,
                     showSyncStatus: !isImporting,
                     onAccountTap: () => showMobileAccountsSheet(context),
                   ),
@@ -134,6 +142,10 @@ class MobileHomeScreen extends ConsumerWidget {
                 ),
               ],
             ),
+          ),
+          // The sync line while it climbs, and its readout, over the content.
+          const Positioned.fill(
+            child: NeonSyncBackdrop(layer: NeonSyncLayer.front),
           ),
           const _SyncKeepAwakePromptHost(),
           const _IronwoodMigrationAnnouncementHost(),
@@ -541,24 +553,6 @@ const _mobileHomeLabelMStyle = TextStyle(
   letterSpacing: -0.06,
 );
 
-const _mobileHomeBalanceAmountStyle = TextStyle(
-  fontFamily: 'Gotham',
-  fontWeight: FontWeight.w400,
-  fontSize: 45,
-  height: 48 / 45,
-  letterSpacing: -1.35,
-  fontFeatures: [FontFeature.enable('case')],
-);
-
-const _mobileHomeBalanceTickerStyle = TextStyle(
-  fontFamily: 'Gotham',
-  fontWeight: FontWeight.w400,
-  fontSize: 32,
-  height: 33 / 32,
-  letterSpacing: -1.35,
-  fontFeatures: [FontFeature.enable('case')],
-);
-
 const _mobileHomeActionButtonHeight = AppButtonSizing.largeHeight;
 
 class _SyncKeepAwakePromptHost extends ConsumerStatefulWidget {
@@ -782,22 +776,6 @@ class _SyncKeepAwakePromptBullet extends StatelessWidget {
         const SizedBox(width: AppSpacing.xxs),
         Expanded(child: Text(text, style: textStyle)),
       ],
-    );
-  }
-}
-
-class _ImportingBackground extends StatelessWidget {
-  const _ImportingBackground();
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: Image.asset(
-        'assets/illustrations/home_importing_background.webp',
-        key: const ValueKey('mobile_home_importing_background'),
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
-      ),
     );
   }
 }
@@ -1083,6 +1061,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     );
 
     final uuid = activeAccountUuid;
+    final chartState = ref.watch(portfolioChartViewProvider);
     final showPrivateUsd =
         uuid != null && ref.watch(privateUsdAvailableProvider);
     final giftCardActivityIndex = uuid == null
@@ -1177,7 +1156,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.sm,
-        AppSpacing.sm,
+        AppSpacing.xxs,
         AppSpacing.sm,
         kMobileTabBarHeight + AppSpacing.lg,
       ),
@@ -1194,127 +1173,136 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
         ],
         Column(
           children: [
-            _BalanceCard(
-              balanceText: privacyModeEnabled
-                  ? fixedPrivacyMask()
-                  : ZecAmount.fromZatoshi(
-                      shieldedBalance,
-                    ).compactBalance.amountText,
-              fiatBalanceText: shieldedFiatBalanceText,
-              priceChange24hPct: priceChange24hPct,
-              transparentBalanceText: transparentBalance.text(
-                (amount) =>
-                    ZecAmount.fromZatoshi(amount).compactBalance.amountText,
+            _Occlude(
+              child: _BalanceCard(
+                balanceText: privacyModeEnabled
+                    ? fixedPrivacyMask()
+                    : ZecAmount.fromZatoshi(
+                        shieldedBalance,
+                      ).compactBalance.amountText,
+                fiatBalanceText: shieldedFiatBalanceText,
+                priceChange24hPct: priceChange24hPct,
+                transparentBalanceText: transparentBalance.text(
+                  (amount) =>
+                      ZecAmount.fromZatoshi(amount).compactBalance.amountText,
+                ),
+                transparentBalanceHint: transparentBalance.hint,
+                hasTransparentBalance: transparentBalance.visible,
+                canShieldBalance: sync.canShieldTransparentBalance,
+                isShieldingBalance: _isShieldingBalance,
+                privacyModeEnabled: privacyModeEnabled,
+                ironwoodMigrationCta: widget.ironwoodMigrationCta,
+                balanceDisabled: migrationRequired,
+                onTogglePrivacyMode: widget.onTogglePrivacyMode,
+                onIronwoodMigrationTap: () {
+                  final target = switch (widget.ironwoodMigrationCta.mode) {
+                    IronwoodHomeMigrationCtaMode.start => '/migration/intro',
+                    IronwoodHomeMigrationCtaMode.resume =>
+                      '/migration/private/status',
+                    IronwoodHomeMigrationCtaMode.hidden => null,
+                  };
+                  if (target != null) context.push(target);
+                },
+                onShieldBalancePressed: () => unawaited(
+                  duringAppReviewBusy(ref, _shieldTransparentBalance),
+                ),
+                privateUsdStrip: showPrivateUsd
+                    ? PrivateUsdHomeStrip(
+                        accountUuid: uuid,
+                        privacyModeEnabled: privacyModeEnabled,
+                        onTap: () => _pushUsedScreen('/private-usd'),
+                      )
+                    : null,
+                // The history chart lives behind the sign: its line is the
+                // sign's light trail, and a tap opens the full chart.
+                chartState: chartState,
+                onOpenChart: chartState is PortfolioChartHidden
+                    ? null
+                    : () => _pushUsedScreen('/portfolio-chart'),
               ),
-              transparentBalanceHint: transparentBalance.hint,
-              hasTransparentBalance: transparentBalance.visible,
-              canShieldBalance: sync.canShieldTransparentBalance,
-              isShieldingBalance: _isShieldingBalance,
-              privacyModeEnabled: privacyModeEnabled,
-              ironwoodMigrationCta: widget.ironwoodMigrationCta,
-              balanceDisabled: migrationRequired,
-              onTogglePrivacyMode: widget.onTogglePrivacyMode,
-              onIronwoodMigrationTap: () {
-                final target = switch (widget.ironwoodMigrationCta.mode) {
-                  IronwoodHomeMigrationCtaMode.start => '/migration/intro',
-                  IronwoodHomeMigrationCtaMode.resume =>
-                    '/migration/private/status',
-                  IronwoodHomeMigrationCtaMode.hidden => null,
-                };
-                if (target != null) context.push(target);
-              },
-              onShieldBalancePressed: () => unawaited(
-                duringAppReviewBusy(ref, _shieldTransparentBalance),
-              ),
-              privateUsdStrip: showPrivateUsd
-                  ? PrivateUsdHomeStrip(
-                      accountUuid: uuid,
-                      privacyModeEnabled: privacyModeEnabled,
-                      onTap: () => _pushUsedScreen('/private-usd'),
-                    )
-                  : null,
             ),
-            // History chart: the wallet's own balance over time, valued at
-            // public prices when that is on. Absent when off or without history.
-            const MobilePortfolioChartSlot(),
-            const SizedBox(height: AppSpacing.s),
+            const SizedBox(height: AppSpacing.sm),
             if (hasBalance)
-              Row(
-                children: [
-                  Expanded(
-                    child: AppButton(
-                      key: const ValueKey('mobile_home_send'),
-                      expand: true,
-                      constrainContent: true,
-                      onPressed: sendDisabled
-                          ? null
-                          : () => _pushUsedScreen('/send'),
-                      leading: const _ButtonIcon(AppIcons.plane),
-                      height: _mobileHomeActionButtonHeight,
-                      child: const Text(
-                        'Send',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Expanded(
-                    child: AppButton(
-                      key: const ValueKey('mobile_home_receive'),
-                      expand: true,
-                      constrainContent: true,
-                      variant: AppButtonVariant.secondary,
-                      onPressed: () => _pushUsedScreen('/receive'),
-                      leading: const _ButtonIcon(AppIcons.arrowDownCircle),
-                      height: _mobileHomeActionButtonHeight,
-                      child: const Text(
-                        'Receive',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                  // The Pay entry follows the swap feature flag: pay
-                  // rides the swap engine, so a server-side swap disable
-                  // hides the button, mirroring desktop's `onPay == null`
-                  // gating.
-                  if (showPayEntry) ...[
-                    const SizedBox(width: AppSpacing.xs),
-                    SizedBox(
-                      width: _mobileHomeActionButtonHeight,
-                      height: _mobileHomeActionButtonHeight,
-                      child: Semantics(
-                        button: true,
-                        label: 'Pay',
-                        child: AppButton(
-                          key: const ValueKey('mobile_home_pay'),
-                          minWidth: _mobileHomeActionButtonHeight,
-                          height: _mobileHomeActionButtonHeight,
-                          contentPadding: EdgeInsets.zero,
-                          variant: AppButtonVariant.secondary,
-                          onPressed: () => duringAppReviewBusy(ref, _openPay),
-                          child: const _ButtonIcon(AppIcons.paid),
+              _Occlude(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: AppButton(
+                        key: const ValueKey('mobile_home_send'),
+                        expand: true,
+                        constrainContent: true,
+                        onPressed: sendDisabled
+                            ? null
+                            : () => _pushUsedScreen('/send'),
+                        leading: const _ButtonIcon(AppIcons.plane),
+                        height: _mobileHomeActionButtonHeight,
+                        child: const Text(
+                          'Send',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: AppButton(
+                        key: const ValueKey('mobile_home_receive'),
+                        expand: true,
+                        constrainContent: true,
+                        variant: AppButtonVariant.secondary,
+                        onPressed: () => _pushUsedScreen('/receive'),
+                        leading: const _ButtonIcon(AppIcons.arrowDownCircle),
+                        height: _mobileHomeActionButtonHeight,
+                        child: const Text(
+                          'Receive',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                    // The Pay entry follows the swap feature flag: pay
+                    // rides the swap engine, so a server-side swap disable
+                    // hides the button, mirroring desktop's `onPay == null`
+                    // gating.
+                    if (showPayEntry) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      SizedBox(
+                        width: _mobileHomeActionButtonHeight,
+                        height: _mobileHomeActionButtonHeight,
+                        child: Semantics(
+                          button: true,
+                          label: 'Pay',
+                          child: AppButton(
+                            key: const ValueKey('mobile_home_pay'),
+                            minWidth: _mobileHomeActionButtonHeight,
+                            height: _mobileHomeActionButtonHeight,
+                            contentPadding: EdgeInsets.zero,
+                            variant: AppButtonVariant.secondary,
+                            onPressed: () => duringAppReviewBusy(ref, _openPay),
+                            child: const _ButtonIcon(AppIcons.paid),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               )
             else
-              AppButton(
-                // Same key as the funded-state Receive button — only one
-                // of the two renders at a time.
-                key: const ValueKey('mobile_home_receive'),
-                expand: true,
-                constrainContent: true,
-                onPressed: () => _pushUsedScreen('/receive'),
-                leading: const _ButtonIcon(AppIcons.addNew),
-                height: _mobileHomeActionButtonHeight,
-                child: const Text(
-                  'Receive your first ZEC',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              _Occlude(
+                child: AppButton(
+                  // Same key as the funded-state Receive button — only one
+                  // of the two renders at a time.
+                  key: const ValueKey('mobile_home_receive'),
+                  expand: true,
+                  constrainContent: true,
+                  onPressed: () => _pushUsedScreen('/receive'),
+                  leading: const _ButtonIcon(AppIcons.addNew),
+                  height: _mobileHomeActionButtonHeight,
+                  child: const Text(
+                    'Receive your first ZEC',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
             if (uuid != null)
@@ -1362,18 +1350,22 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _RecentActivityHeader(
-                  onSeeAll: () {
-                    _expectReviewVisit('/activity');
-                    context.go('/activity');
-                  },
+                _Occlude(
+                  child: _RecentActivityHeader(
+                    onSeeAll: () {
+                      _expectReviewVisit('/activity');
+                      context.go('/activity');
+                    },
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 for (var i = 0; i < recentRows.length; i++) ...[
                   if (i > 0) const SizedBox(height: AppSpacing.s),
                   KeyedSubtree(
                     key: ValueKey('mobile_home_activity_row_$i'),
-                    child: ActivityFeedRowGroup(row: recentRows[i]),
+                    child: _Occlude(
+                      child: ActivityFeedRowGroup(row: recentRows[i]),
+                    ),
                   ),
                 ],
               ],
@@ -1382,6 +1374,19 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
       ],
     );
   }
+}
+
+/// A solid backing for a Home block: the synced line, drawn behind the
+/// content, shows only in the gaps between blocks, never across one. While
+/// the wallet syncs the line is drawn above everything instead.
+class _Occlude extends StatelessWidget {
+  const _Occlude({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      ColoredBox(color: context.colors.background.window, child: child);
 }
 
 class _PrivateStatusCoverageNotice extends StatelessWidget {
@@ -1676,6 +1681,8 @@ class _BalanceCard extends StatelessWidget {
     required this.onIronwoodMigrationTap,
     required this.onShieldBalancePressed,
     this.privateUsdStrip,
+    this.chartState = const PortfolioChartHidden(),
+    this.onOpenChart,
   });
 
   final String balanceText;
@@ -1699,11 +1706,17 @@ class _BalanceCard extends StatelessWidget {
   /// USD is unavailable, so the card is unchanged then.
   final Widget? privateUsdStrip;
 
+  /// The portfolio chart's state: its line is the sign's light trail.
+  final PortfolioChartViewState chartState;
+
+  /// Opens the full chart; null while the chart is off or has no history.
+  final VoidCallback? onOpenChart;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final neon = colors.neon;
     final cardText = colors.text.homeCard;
-    final cardRadius = BorderRadius.circular(AppRadii.large);
     final roundedPriceChangePct = priceChange24hPct == null
         ? null
         : roundZecPriceChange24hPct(priceChange24hPct!);
@@ -1714,132 +1727,120 @@ class _BalanceCard extends StatelessWidget {
         : roundedPriceChangePct < 0
         ? colors.text.destructive
         : cardText;
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.background.ground,
-        borderRadius: cardRadius,
-        boxShadow: appSurfaceShadow(colors),
-      ),
-      child: ClipRRect(
-        borderRadius: cardRadius,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                color: colors.background.homeCard,
-                borderRadius: cardRadius,
-                border: Border.all(
-                  color: const Color(0xFFFFFFFF).withValues(alpha: 0.07),
-                  width: 1.5,
+    final migrationRequired =
+        ironwoodMigrationCta.mode == IronwoodHomeMigrationCtaMode.start;
+
+    return NeonIgnition(
+      builder: (context, light) {
+        final lit = balanceDisabled ? light * 0.35 : light;
+        final sign = Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.sm,
+            AppSpacing.xs,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (migrationRequired) ...[
+                _MobileIronwoodMigrationPill(onTap: onIronwoodMigrationTap),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+              if (fiatBalanceText != null)
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        fiatBalanceText!,
+                        key: const ValueKey('mobile_home_balance_fiat_text'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: _neonSignCaptionStyle.copyWith(
+                          color: cardText.withValues(
+                            alpha: balanceDisabled ? 0.4 : 0.75,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (priceChangeColor != null) ...[
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        formatZecPriceChange24hPct(priceChange24hPct!),
+                        key: const ValueKey(
+                          'mobile_home_balance_price_change_text',
+                        ),
+                        style: _neonSignCaptionStyle.copyWith(
+                          color: priceChangeColor,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-              ),
-              child: Stack(
-                fit: StackFit.expand,
+              const SizedBox(height: AppSpacing.xxs),
+              Row(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(AppSpacing.sm),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            if (ironwoodMigrationCta.mode ==
-                                IronwoodHomeMigrationCtaMode.start)
-                              Expanded(
-                                child: _MobileIronwoodMigrationPill(
-                                  onTap: onIronwoodMigrationTap,
-                                ),
-                              )
-                            else ...[
-                              AppIcon(
-                                AppIcons.shieldKeyhole,
-                                size: 20,
-                                color: cardText,
-                              ),
-                              const SizedBox(width: AppSpacing.s),
-                              Expanded(
-                                child: Text(
-                                  'Shielded balance',
-                                  style: _mobileHomeLabelMStyle.copyWith(
-                                    color: cardText,
-                                  ),
-                                ),
-                              ),
-                            ],
-                            _PrivacyEyeButton(
-                              enabled: privacyModeEnabled,
-                              onTap: onTogglePrivacyMode,
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: NeonScrambleText(
+                        key: const ValueKey('mobile_home_shielded_balance'),
+                        // Hiding or showing the balance re-encrypts it.
+                        text: balanceText,
+                        style: _neonBalanceAmountStyle.copyWith(
+                          color: neon.signCore,
+                          shadows: Neon.textGlow(neon.signGlow, intensity: lit),
+                        ),
+                        cipherStyle: _neonBalanceAmountStyle.copyWith(
+                          color: neon.signGlow,
+                          shadows: Neon.textGlow(
+                            neon.signGlow,
+                            intensity: 0.5 * lit,
+                          ),
+                        ),
+                        trailing: TextSpan(
+                          text: ' $kZcashDefaultCurrencyTicker',
+                          style: _neonBalanceTickerStyle.copyWith(
+                            color: neon.signGlow,
+                            shadows: Neon.textGlow(
+                              neon.signGlow,
+                              intensity: 0.6 * lit,
                             ),
-                          ],
-                        ),
-                        const Spacer(),
-                        if (fiatBalanceText != null) ...[
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  fiatBalanceText!,
-                                  key: const ValueKey(
-                                    'mobile_home_balance_fiat_text',
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: _mobileHomeLabelMStyle.copyWith(
-                                    color: cardText.withValues(
-                                      alpha: balanceDisabled ? 0.4 : 0.8,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              if (priceChangeColor != null) ...[
-                                const SizedBox(width: AppSpacing.xs),
-                                Text(
-                                  formatZecPriceChange24hPct(
-                                    priceChange24hPct!,
-                                  ),
-                                  key: const ValueKey(
-                                    'mobile_home_balance_price_change_text',
-                                  ),
-                                  style: _mobileHomeLabelMStyle.copyWith(
-                                    color: priceChangeColor,
-                                  ),
-                                ),
-                              ],
-                            ],
                           ),
-                          const SizedBox(height: AppSpacing.xs),
-                        ],
-                        Text.rich(
-                          key: const ValueKey('mobile_home_shielded_balance'),
-                          TextSpan(
-                            children: [
-                              TextSpan(
-                                text: '$balanceText ',
-                                style: _mobileHomeBalanceAmountStyle.copyWith(
-                                  color: cardText.withValues(
-                                    alpha: balanceDisabled ? 0.4 : 1,
-                                  ),
-                                ),
-                              ),
-                              TextSpan(
-                                text: kZcashDefaultCurrencyTicker,
-                                style: _mobileHomeBalanceTickerStyle.copyWith(
-                                  color: cardText.withValues(
-                                    alpha: balanceDisabled ? 0.4 : 1,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ],
+                      ),
                     ),
                   ),
+                  const SizedBox(width: AppSpacing.s),
+                  _PrivacyEyeButton(
+                    enabled: privacyModeEnabled,
+                    onTap: onTogglePrivacyMode,
+                  ),
                 ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              _NeonBalanceTrail(
+                chartState: chartState,
+                light: lit,
+                showOpenHint: onOpenChart != null,
+              ),
+            ],
+          ),
+        );
+
+        // Frameless: the balance floats on the backdrop.
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Semantics(
+              button: onOpenChart != null,
+              label: onOpenChart == null ? null : 'Open balance chart',
+              child: GestureDetector(
+                key: const ValueKey('mobile_home_balance_sign'),
+                behavior: HitTestBehavior.opaque,
+                onTap: onOpenChart,
+                child: sign,
               ),
             ),
             _AnimatedMobileTransparentBalanceStrip(
@@ -1851,12 +1852,146 @@ class _BalanceCard extends StatelessWidget {
               privacyModeEnabled: privacyModeEnabled,
               onShieldBalancePressed: onShieldBalancePressed,
             ),
-            ?privateUsdStrip,
+            if (privateUsdStrip case final strip?)
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: neon.frameGlow.withValues(alpha: 0.2),
+                    ),
+                  ),
+                ),
+                child: strip,
+              ),
           ],
-        ),
+        );
+      },
+    );
+  }
+}
+
+const _neonSignCaptionStyle = TextStyle(
+  fontFamily: 'Gotham',
+  fontWeight: FontWeight.w400,
+  fontSize: 13,
+  height: 16 / 13,
+  letterSpacing: 0.4,
+);
+
+/// Neon numerals: Gotham Thin, whose hairline strokes read as tubes.
+const _neonBalanceAmountStyle = TextStyle(
+  fontFamily: 'Gotham',
+  fontWeight: FontWeight.w100,
+  fontSize: 60,
+  height: 1.1,
+  letterSpacing: -0.5,
+);
+
+const _neonBalanceTickerStyle = TextStyle(
+  fontFamily: 'Gotham',
+  fontWeight: FontWeight.w300,
+  fontSize: 22,
+  height: 1.1,
+  letterSpacing: 2.4,
+);
+
+/// The sign's light trail: the balance history's line when the chart has one,
+/// otherwise a steady tail-light bar. Never drawn from data in privacy mode
+/// (the chart state is private then).
+class _NeonBalanceTrail extends StatelessWidget {
+  const _NeonBalanceTrail({
+    required this.chartState,
+    required this.light,
+    required this.showOpenHint,
+  });
+
+  final PortfolioChartViewState chartState;
+  final double light;
+  final bool showOpenHint;
+
+  static const _height = 72.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final neon = context.colors.neon;
+    final data = switch (chartState) {
+      PortfolioChartReady(:final data) when data.points.length > 1 => data,
+      _ => null,
+    };
+    return SizedBox(
+      height: _height,
+      child: Row(
+        children: [
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final size = Size(constraints.maxWidth, _height);
+                return CustomPaint(
+                  size: size,
+                  painter: data == null
+                      ? _TailLightPainter(
+                          glow: neon.signGlow,
+                          core: neon.signCore,
+                          light: light,
+                        )
+                      : NeonPlotPainter(
+                          geometry: PortfolioPlotGeometry(data.points, size),
+                          glow: neon.signGlow,
+                          core: neon.signCore,
+                          gridColor: neon.grid,
+                          grid: false,
+                          light: light,
+                        ),
+                );
+              },
+            ),
+          ),
+          if (showOpenHint) ...[
+            const SizedBox(width: AppSpacing.xs),
+            AppIcon(
+              AppIcons.chevronForward,
+              size: 18,
+              color: neon.signCore.withValues(alpha: 0.85),
+            ),
+          ],
+        ],
       ),
     );
   }
+}
+
+/// A steady red bar, as the Roadster's tail light.
+class _TailLightPainter extends CustomPainter {
+  _TailLightPainter({
+    required this.glow,
+    required this.core,
+    required this.light,
+  });
+
+  final Color glow;
+  final Color core;
+  final double light;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final y = size.height / 2;
+    Neon.strokeTube(
+      canvas,
+      Path()
+        ..moveTo(4, y)
+        ..lineTo(size.width - 4, y),
+      glow: glow,
+      core: core,
+      width: 2,
+      intensity: light,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_TailLightPainter oldDelegate) =>
+      oldDelegate.glow != glow ||
+      oldDelegate.core != core ||
+      oldDelegate.light != light;
 }
 
 String? _mobileIronwoodRemainingAmountText(SyncState sync) {
@@ -2218,7 +2353,9 @@ class _PrivacyEyeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Its own button: the sign around it is one too.
     return Semantics(
+      container: true,
       label: enabled ? 'Show balance' : 'Hide balance',
       button: true,
       child: GestureDetector(
@@ -2227,19 +2364,16 @@ class _PrivacyEyeButton extends StatelessWidget {
           unawaited(AppHaptics.privacyToggle());
           onTap();
         },
-        child: Container(
+        // Just the glyph: no plate, no border. The box is the tap target.
+        child: SizedBox(
           key: const ValueKey('mobile_home_privacy_button'),
           width: 32,
           height: 32,
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFFFFF).withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(AppRadii.full),
-          ),
           child: Center(
             child: AppIcon(
               enabled ? AppIcons.eyeClosed : AppIcons.eye,
               size: 16,
-              color: context.colors.text.homeCard,
+              color: context.colors.neon.signCore.withValues(alpha: 0.85),
             ),
           ),
         ),
@@ -2271,11 +2405,8 @@ class _RecentActivityHeader extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            'Recent activity',
-            style: AppTypography.labelLarge.copyWith(
-              color: colors.text.accent,
-              fontWeight: FontWeight.w600,
-            ),
+            'Recent activity'.toUpperCase(),
+            style: kNeonHudCaptionStyle.copyWith(color: colors.neon.glow),
           ),
         ),
         Semantics(
@@ -2291,9 +2422,9 @@ class _RecentActivityHeader extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'See all',
-                      style: AppTypography.labelLarge.copyWith(
-                        color: colors.button.ghost.label,
+                      'See all'.toUpperCase(),
+                      style: kNeonHudCaptionStyle.copyWith(
+                        color: colors.text.secondary,
                       ),
                     ),
                     const SizedBox(width: AppSpacing.xxs),
@@ -2354,42 +2485,29 @@ class _EmptyActivity extends StatelessWidget {
   }
 }
 
+/// Where the knight illustration used to rest: a neon horizon, an 80s
+/// sun sliced by stripes setting behind a grid floor.
 class _MobileRestImage extends StatelessWidget {
   const _MobileRestImage();
 
   static const canvasWidth = 340.0;
-  static const _canvasHeight = 220.0;
-  static const _imageLeft = 47.0;
-  static const _imageTop = 28.0;
-  static const _imageWidth = 246.0;
-  static const _imageHeight = 192.0;
+  static const _canvasHeight = 150.0;
 
   @override
   Widget build(BuildContext context) {
+    final neon = context.colors.neon;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final scale =
+        final width =
             constraints.hasBoundedWidth && constraints.maxWidth < canvasWidth
-            ? constraints.maxWidth / canvasWidth
-            : 1.0;
+            ? constraints.maxWidth
+            : canvasWidth;
         return SizedBox(
           key: const ValueKey('mobile_home_rest_canvas'),
-          width: canvasWidth * scale,
-          height: _canvasHeight * scale,
-          child: Stack(
-            children: [
-              Positioned(
-                left: _imageLeft * scale,
-                top: _imageTop * scale,
-                child: Image.asset(
-                  'assets/illustrations/home_rest_character.webp',
-                  key: const ValueKey('mobile_home_rest_image'),
-                  width: _imageWidth * scale,
-                  height: _imageHeight * scale,
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ],
+          width: width,
+          height: _canvasHeight,
+          child: CustomPaint(
+            painter: NeonHorizonPainter(glow: neon.glow, core: neon.core),
           ),
         );
       },

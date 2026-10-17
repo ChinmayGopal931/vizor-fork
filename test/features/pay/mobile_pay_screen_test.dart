@@ -421,7 +421,7 @@ void main() {
       scaffold.backgroundColor,
       AppThemeData.dark.colors.background.window,
     );
-    expect(find.text('Pay in USDC'), findsOneWidget);
+    expect(find.text('PAY IN USDC'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('mobile_pay_amount_step')),
       findsOneWidget,
@@ -456,7 +456,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('mobile_pay_recipient_step')),
       findsOneWidget,
@@ -527,7 +527,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
-    expect(find.text('Pay in USDC'), findsOneWidget);
+    expect(find.text('PAY IN USDC'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('mobile_pay_amount_step')),
       findsOneWidget,
@@ -908,7 +908,7 @@ void main() {
     );
     await tester.tap(find.bySemanticsLabel('Back'));
     await tester.pump();
-    expect(find.text('Pay in USDC'), findsOneWidget);
+    expect(find.text('PAY IN USDC'), findsOneWidget);
 
     notifier.completeQuote();
     await tester.pumpAndSettle();

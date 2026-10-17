@@ -19,7 +19,7 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(MobileSendScreen), findsOneWidget);
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
     expect(find.text('Zcash Address'), findsOneWidget);
     expect(find.text('Paste'), findsNothing);
     expect(find.text('Scan a QR Code'), findsOneWidget);
@@ -157,7 +157,7 @@ void main() {
     await _pumpMobileSendUseCase(tester, buildMobileSendAmountEmptyUseCase);
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
     expect(find.text('Enter amount to continue'), findsOneWidget);
     expect(
       tester
@@ -396,7 +396,7 @@ void main() {
     await _pumpMobileSendUseCase(tester, buildMobileSendReviewDefaultUseCase);
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(find.text('123.12 ZEC'), findsOneWidget);
     expect(find.text('Contact label'), findsOneWidget);
     expect(find.text('u1tvg24 .... 23hhq6d'), findsOneWidget);

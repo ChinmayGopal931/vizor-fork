@@ -21,6 +21,7 @@ import '../../../../core/widgets/app_icon_hover_button.dart';
 import '../../../../core/widgets/app_profile_picture.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
+import '../../../../core/widgets/mobile/neon_horizon.dart';
 import '../../../../core/widgets/mobile_text_field.dart';
 import '../../../accounts/widgets/mobile/account_edit_sheets.dart'
     show MobileSheetCancel, showProfilePictureSheet;
@@ -36,7 +37,7 @@ import '../../widgets/address_book_network_icon.dart';
 /// Mobile Contacts screen — Figma `CONTACTS` mobile frames (node 5032:83888).
 ///
 /// Mirrors the desktop address book behavior (network-grouped contacts,
-/// per-row Copy/Send/Edit/Remove menu, search, illustration empty states)
+/// per-row Copy/Send/Edit/Remove menu, search, neon empty states)
 /// in the mobile idiom: a back-nav header with a `+` add affordance, a
 /// full-width search field, ground surface cards per network, and bottom
 /// sheets for add/edit/remove/network-pick.
@@ -832,7 +833,7 @@ class _ContactRowMenuButtonState extends State<_ContactRowMenuButton> {
   }
 }
 
-/// No-contacts empty state (Figma `Contacts Empty`): illustration, serif
+/// No-contacts empty state (Figma `Contacts Empty`): the neon horizon, serif
 /// headline, subtitle, and a centered add-contact button.
 class _NoContactsState extends StatelessWidget {
   const _NoContactsState({required this.onAdd});
@@ -841,7 +842,7 @@ class _NoContactsState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Center the illustration + text + CTA in the full available height (the
+    // Center the horizon + text + CTA in the full available height (the
     // Figma `Contacts Empty` frame centers the block vertically), scrolling
     // only if it can't fit.
     return LayoutBuilder(
@@ -852,12 +853,7 @@ class _NoContactsState extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset(
-                _emptyContactsAsset,
-                width: 280,
-                height: 220,
-                fit: BoxFit.contain,
-              ),
+              const NeonHorizon(),
               const SizedBox(height: AppSpacing.base),
               Text(
                 'No contacts yet',
@@ -910,12 +906,7 @@ class _EmptySearchState extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset(
-                _emptySearchAsset,
-                width: 170,
-                height: 170,
-                fit: BoxFit.contain,
-              ),
+              const NeonHorizon(width: 200, height: 88),
               const SizedBox(height: AppSpacing.base),
               Text(
                 'No contacts were found',
@@ -942,10 +933,6 @@ class _EmptySearchState extends StatelessWidget {
     );
   }
 }
-
-const _emptyContactsAsset =
-    'assets/illustrations/address_book_empty_contacts.webp';
-const _emptySearchAsset = 'assets/illustrations/address_book_empty_search.webp';
 
 class _ContactDraft {
   const _ContactDraft({

@@ -1073,10 +1073,17 @@ void main() {
       ),
       const Size(72, 72),
     );
-    for (final suffix in ['01', '02', '03', '04', '05', '06', '15']) {
+    // The seven neon portraits; the retired knights are no longer offered.
+    for (final suffix in ['01', '02', '03', '04', '05', '06', '07']) {
       expect(
         find.byKey(ValueKey('mobile_account_pfp_option_pfp-$suffix')),
         findsOneWidget,
+      );
+    }
+    for (final suffix in ['08', '15']) {
+      expect(
+        find.byKey(ValueKey('mobile_account_pfp_option_pfp-$suffix')),
+        findsNothing,
       );
     }
     final firstRowTop = tester

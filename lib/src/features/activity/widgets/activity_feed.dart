@@ -22,6 +22,8 @@ const _activityRowInnerLineGap = AppSpacing.xxs;
 /// wider than Geist, and at 16px a title such as "Redeemed a gift card" was
 /// ellipsized in the 159 px slot beside the timestamp column. The 17px line
 /// box is unchanged.
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
+
 final _activityRowLabelStyle = kAppFormFactor == AppFormFactor.mobile
     ? AppTypography.labelLarge.copyWith(fontSize: 15, height: 17 / 15)
     : AppTypography.labelLarge;
@@ -370,11 +372,13 @@ class _ActivityFeedSectionHeaderSegment extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.xxs),
             child: Text(
-              title,
-              style: AppTypography.labelLarge.copyWith(
-                color: colors.text.secondary,
-                fontWeight: FontWeight.w600,
-              ),
+              _mobile ? title.toUpperCase() : title,
+              style: _mobile
+                  ? kNeonHudCaptionStyle.copyWith(color: colors.neon.glow)
+                  : AppTypography.labelLarge.copyWith(
+                      color: colors.text.secondary,
+                      fontWeight: FontWeight.w600,
+                    ),
             ),
           ),
         ),
@@ -664,11 +668,13 @@ class _ActivityFeedCard extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.xxs),
                   child: Text(
-                    section.title,
-                    style: AppTypography.labelLarge.copyWith(
-                      color: colors.text.secondary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    _mobile ? section.title.toUpperCase() : section.title,
+                    style: _mobile
+                        ? kNeonHudCaptionStyle.copyWith(color: colors.neon.glow)
+                        : AppTypography.labelLarge.copyWith(
+                            color: colors.text.secondary,
+                            fontWeight: FontWeight.w600,
+                          ),
                   ),
                 ),
               ),
@@ -1041,7 +1047,7 @@ class _ActivityAmountValue extends StatelessWidget {
       textAlign: TextAlign.end,
       style: _activityRowLabelStyle.copyWith(
         color: color,
-        fontWeight: FontWeight.w600,
+        fontWeight: _mobile ? FontWeight.w300 : FontWeight.w600,
       ),
     );
     final iconName = row.amountIconName;
@@ -1149,10 +1155,21 @@ class _ActivityIconFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: row.leadingBackgroundColor,
-        shape: BoxShape.circle,
-      ),
+      // Mobile (neon redesign): a cut-corner plate with a lit edge.
+      decoration: kAppFormFactor == AppFormFactor.mobile
+          ? ShapeDecoration(
+              color: row.leadingBackgroundColor,
+              shape: Neon.chamferBorder(
+                cut: AppChamfer.small + 3,
+                side: BorderSide(
+                  color: context.colors.neon.glow.withValues(alpha: 0.35),
+                ),
+              ),
+            )
+          : BoxDecoration(
+              color: row.leadingBackgroundColor,
+              shape: BoxShape.circle,
+            ),
       child: Center(
         child: AppIcon(
           row.leadingIconName,

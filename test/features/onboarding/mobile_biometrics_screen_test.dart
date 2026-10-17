@@ -195,10 +195,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Unlock your wallet\nwith Touch ID'), findsOneWidget);
     expect(find.text('Enable Touch ID'), findsOneWidget);
-    expect(
-      find.byWidgetPredicate((w) => w is AppIcon && w.name == AppIcons.touchId),
-      findsOneWidget,
+    // Apple's Touch ID art on the enable button and on the neon hero badge.
+    final touchIdIcon = find.byWidgetPredicate(
+      (w) => w is AppIcon && w.name == AppIcons.touchId,
     );
+    for (final key in ['mobile_biometrics_enable', 'mobile_biometrics_hero']) {
+      expect(
+        find.descendant(of: find.byKey(ValueKey(key)), matching: touchIdIcon),
+        findsOneWidget,
+      );
+    }
     expect(find.byIcon(Icons.fingerprint), findsNothing);
     await tester.tap(find.text('Enable Touch ID'));
     await tester.pumpAndSettle();

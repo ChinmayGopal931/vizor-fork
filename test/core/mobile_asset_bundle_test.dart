@@ -32,7 +32,7 @@ void main() {
     final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
     final assets = manifest.listAssets();
 
-    expect(assets, contains('assets/profile_pictures/profile_picture_01.png'));
+    expect(assets, contains('assets/profile_pictures/profile_picture_01.webp'));
     expect(assets, contains('assets/animations/mobile_welcome.mp4'));
     expect(
       assets.where((asset) => asset.contains('/desktop/')),

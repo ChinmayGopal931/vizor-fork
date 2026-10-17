@@ -77,7 +77,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Coinholder voting'), findsOneWidget);
+    expect(find.text('COINHOLDER VOTING'), findsOneWidget);
     expect(find.bySemanticsLabel('Back'), findsOneWidget);
     expect(find.bySemanticsLabel('Voting config settings'), findsOneWidget);
     expect(find.byType(MobileBottomSafeArea), findsOneWidget);
@@ -187,7 +187,7 @@ void main() {
       findsNothing,
     );
     expect(container.read(showTestVotingRoundsProvider).value, isTrue);
-    expect(find.text('Coinholder voting'), findsOneWidget);
+    expect(find.text('COINHOLDER VOTING'), findsOneWidget);
     await tester.tap(
       find.byKey(const ValueKey('mobile_voting_settings_button')),
     );

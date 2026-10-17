@@ -64,7 +64,8 @@ void main() {
       previewPrivateUsdBalance(available: 100, arriving: 20, processing: 5),
     );
 
-    expect(find.text(PrivateUsdCopy.title), findsOneWidget);
+    // The page title is drawn uppercase in the top bar.
+    expect(find.text(PrivateUsdCopy.title.toUpperCase()), findsOneWidget);
     expect(find.text(PrivateUsdCopy.subtitle), findsOneWidget);
     expect(find.text(r'$105.00'), findsOneWidget);
     expect(find.text(PrivateUsdCopy.rowAvailable), findsOneWidget);

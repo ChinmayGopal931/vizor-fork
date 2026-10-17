@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart' show MaterialApp;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
+import 'package:zcash_wallet/src/core/profile_pictures.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/widgetbook/screen_use_cases.dart';
 
@@ -48,7 +50,7 @@ void main() {
         return key is ValueKey<String> &&
             key.value.startsWith('profile_picture_option_');
       }),
-      findsNWidgets(15),
+      findsNWidgets(kProfilePictureOptions.length),
     );
 
     await _pumpAccountsUseCase(tester, buildAccountsRemoveUseCase);
@@ -178,7 +180,12 @@ void main() {
   testWidgets('mobile home use cases render target states', (tester) async {
     await _pumpMobileHomeUseCase(tester, buildMobileHomeDefaultUseCase);
     _expectNoFlutterException(tester);
-    expect(find.text('Shielded balance'), findsOneWidget);
+    // The balance is a frameless sign; no "Shielded balance" header.
+    expect(
+      find.byKey(const ValueKey('mobile_home_shielded_balance')),
+      findsOneWidget,
+    );
+    expect(find.text('Shielded balance'), findsNothing);
     expect(find.text('Send'), findsOneWidget);
     expect(find.text('Receive'), findsOneWidget);
 
@@ -189,10 +196,12 @@ void main() {
     await _pumpMobileHomeUseCase(tester, buildMobileHomeImportingUseCase);
     _expectNoFlutterException(tester);
     expect(find.text('34%'), findsOneWidget);
+    // The neon backdrop's two layers replace the importing background.
     expect(
       find.byKey(const ValueKey('mobile_home_importing_background')),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(find.byType(NeonSyncBackdrop), findsNWidgets(2));
   });
 
   testWidgets('mobile home accounts modal use case opens the switcher sheet', (

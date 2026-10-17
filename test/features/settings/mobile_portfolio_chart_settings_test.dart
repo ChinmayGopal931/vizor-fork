@@ -92,7 +92,8 @@ void main() {
     // turning prices on would do.
     expect(_isOn(tester, 'toggle'), isTrue);
     expect(_description(tester), portfolioChartPricesOffCopy(_host));
-    expect(find.text('Default range'), findsOneWidget);
+    // The range is picked on the chart itself; the card has no range row.
+    expect(find.text('Default range'), findsNothing);
 
     await tester.tap(
       find.byKey(const ValueKey('mobile_settings_portfolio_chart_row')),
@@ -161,18 +162,15 @@ void main() {
     expect(_isOn(tester, 'prices_toggle'), isFalse);
     expect(_description(tester), portfolioChartPricesOffCopy(_host));
 
-    await tester.tap(
+    // No range chips: the card never changes the default range.
+    expect(
       find.byKey(const ValueKey('mobile_settings_portfolio_chart_range_1y')),
+      findsNothing,
     );
-    await tester.pumpAndSettle();
-    expect(notifier.changes.last, 'range=1y');
-
-    // All is a chip like the rest, and is stored as its label.
-    await tester.tap(
-      find.byKey(const ValueKey('mobile_settings_portfolio_chart_range_All')),
+    expect(
+      notifier.changes.where((change) => change.startsWith('range=')),
+      isEmpty,
     );
-    await tester.pumpAndSettle();
-    expect(notifier.changes.last, 'range=All');
   });
 
   testWidgets('names the host the build is configured with, port included', (

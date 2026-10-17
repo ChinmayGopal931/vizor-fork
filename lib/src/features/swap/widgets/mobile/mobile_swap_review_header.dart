@@ -39,11 +39,12 @@ class MobileSwapReviewHeaderRow {
   final String? addressNetworkLabel;
 }
 
-/// Serif paying/receiving block shared by the mobile swap review,
-/// progress, and completed screens — Figma `Review Info`
-/// (4731:85563): two 90px rows joined by the flow arrow, each with a
-/// 32px asset coin (chain badge on external assets), the small grey
-/// label, the Headline L serif amount, and a bottom strip.
+/// Paying/receiving block shared by the mobile swap review, progress, and
+/// completed screens — Figma `Review Info` (4731:85563): two 90px rows joined
+/// by the flow arrow, each with a 32px asset coin (chain badge on external
+/// assets), the small grey label, the Headline L amount (Gotham Thin on
+/// mobile), and a bottom strip. The arrow is the neon redesign's: a straight
+/// stem with a 45° head, faintly lit.
 class MobileSwapReviewHeader extends StatelessWidget {
   const MobileSwapReviewHeader({
     required this.pay,
@@ -62,21 +63,66 @@ class MobileSwapReviewHeader extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _HeaderRow(row: pay),
-          SizedBox(
+          const SizedBox(
             width: 40,
-            child: Center(
-              child: AppIcon(
-                AppIcons.arrowDown,
-                size: AppIconSize.large,
-                color: context.colors.icon.accent,
-              ),
-            ),
+            child: Center(child: MobileSwapFlowArrow()),
           ),
           _HeaderRow(row: receive),
         ],
       ),
     );
   }
+}
+
+/// The downward flow arrow between a paying and a receiving row: a straight
+/// stem and a 45° head drawn as a faint neon tube, in place of the round
+/// Figma arrow.
+class MobileSwapFlowArrow extends StatelessWidget {
+  const MobileSwapFlowArrow({super.key});
+
+  /// The arrow's square, the size of the icon it replaces.
+  static const size = AppIconSize.large;
+
+  @override
+  Widget build(BuildContext context) {
+    final neon = context.colors.neon;
+    return CustomPaint(
+      size: const Size.square(size),
+      painter: _FlowArrowPainter(glow: neon.glow, core: neon.core),
+    );
+  }
+}
+
+class _FlowArrowPainter extends CustomPainter {
+  _FlowArrowPainter({required this.glow, required this.core});
+
+  final Color glow;
+  final Color core;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // On a 24-unit grid. The stem stops short of the tip so its square end
+    // does not poke through the head.
+    final u = size.width / 24;
+    final arrow = Path()
+      ..moveTo(12 * u, 3 * u)
+      ..lineTo(12 * u, 19 * u)
+      ..moveTo(6.5 * u, 14.5 * u)
+      ..lineTo(12 * u, 20 * u)
+      ..lineTo(17.5 * u, 14.5 * u);
+    Neon.strokeTube(
+      canvas,
+      arrow,
+      glow: glow,
+      core: core,
+      width: 1.3 * u,
+      intensity: 0.55,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_FlowArrowPainter oldDelegate) =>
+      oldDelegate.glow != glow || oldDelegate.core != core;
 }
 
 class _HeaderRow extends StatelessWidget {

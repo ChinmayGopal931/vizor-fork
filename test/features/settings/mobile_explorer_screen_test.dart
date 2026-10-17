@@ -86,7 +86,8 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pump();
 
-    expect(find.text('Explorer'), findsOneWidget);
+    // The page title is drawn as an uppercase caption.
+    expect(find.text('EXPLORER'), findsOneWidget);
     expect(find.text('ZecBlock'), findsOneWidget);
     expect(find.text('Any explorer you prefer'), findsOneWidget);
 

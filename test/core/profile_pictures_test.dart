@@ -5,7 +5,8 @@ void main() {
   test(
     'profile picture options use stable ids and labels in display order',
     () {
-      expect(kProfilePictureOptions, hasLength(15));
+      // The seven neon portraits; ids stay `pfp-NN` so stored picks survive.
+      expect(kProfilePictureOptions, hasLength(7));
       expect(kProfilePictureOptions.map((option) => option.id), [
         'pfp-01',
         'pfp-02',
@@ -14,35 +15,19 @@ void main() {
         'pfp-05',
         'pfp-06',
         'pfp-07',
-        'pfp-08',
-        'pfp-09',
-        'pfp-10',
-        'pfp-11',
-        'pfp-12',
-        'pfp-13',
-        'pfp-14',
-        'pfp-15',
       ]);
       expect(kProfilePictureOptions.map((option) => option.label), [
-        'Knight',
-        'Viking',
-        'Samurai',
-        'Monarch',
-        'Iron helm',
-        'Ronin',
-        'Skull knight',
-        'Seer',
-        'Berserker',
-        'Rogue',
-        'Mage',
-        'Masked cat',
-        'Warden',
-        'Bronze helm',
-        'Fish knight',
+        'Light cycle',
+        'Halo',
+        'Red line',
+        'Crosshair',
+        'Scanner',
+        'Goggles',
+        'Frame',
       ]);
       expect(
         kProfilePictureOptions.first.assetPath,
-        'assets/profile_pictures/profile_picture_01.png',
+        'assets/profile_pictures/profile_picture_01.webp',
       );
     },
   );
@@ -52,8 +37,38 @@ void main() {
 
     expect(option, isNotNull);
     expect(option!.id, 'pfp-02');
-    expect(option.label, 'Viking');
-    expect(option.assetPath, 'assets/profile_pictures/profile_picture_02.png');
+    expect(option.label, 'Halo');
+    expect(option.assetPath, 'assets/profile_pictures/profile_picture_02.webp');
+  });
+
+  test('retired knight ids land on a portrait of the new set', () {
+    expect(
+      {
+        for (final id in [
+          'pfp-08',
+          'pfp-09',
+          'pfp-10',
+          'pfp-11',
+          'pfp-12',
+          'pfp-13',
+          'pfp-14',
+          'pfp-15',
+        ])
+          id: normalizeProfilePictureId(id),
+      },
+      {
+        'pfp-08': 'pfp-01',
+        'pfp-09': 'pfp-02',
+        'pfp-10': 'pfp-03',
+        'pfp-11': 'pfp-04',
+        'pfp-12': 'pfp-05',
+        'pfp-13': 'pfp-06',
+        'pfp-14': 'pfp-07',
+        'pfp-15': 'pfp-01',
+      },
+    );
+    expect(isKnownProfilePictureId('pfp-15'), isTrue);
+    expect(resolveProfilePictureOption('pfp-09').id, 'pfp-02');
   });
 
   test('legacy semantic ids normalize to the closest numbered option', () {
@@ -62,7 +77,8 @@ void main() {
     expect(normalizeProfilePictureId('knight-05'), 'pfp-05');
     expect(normalizeProfilePictureId('samurai'), 'pfp-03');
     expect(normalizeProfilePictureId('viking'), 'pfp-02');
-    expect(normalizeProfilePictureId('wizard'), 'pfp-11');
+    // The wizard was the retired pfp-11, which now lands on pfp-04.
+    expect(normalizeProfilePictureId('wizard'), 'pfp-04');
     expect(resolveProfilePictureOption('samurai').id, 'pfp-03');
   });
 

@@ -59,6 +59,7 @@ import '../../features/send/screens/mobile/mobile_send_screen.dart';
 import '../../features/send/screens/mobile/mobile_send_status_screen.dart';
 import '../../rust/api/sync.dart' as rust_sync;
 import '../../features/about/screens/mobile/mobile_about_screens.dart';
+import '../../features/portfolio_chart/screens/mobile/mobile_portfolio_chart_screen.dart';
 import '../../features/settings/screens/mobile/mobile_change_passcode_screen.dart';
 import '../../features/settings/screens/mobile/mobile_endpoint_screen.dart';
 import '../../features/settings/screens/mobile/mobile_explorer_screen.dart';
@@ -799,6 +800,13 @@ List<RouteBase> buildMobileRoutes({required List<RouteBase> entryRoutes}) {
         child: const MobileIronwoodMigrationFlowScreen(
           step: MobileIronwoodMigrationStep.fastReview,
         ),
+      ),
+    ),
+    GoRoute(
+      path: '/portfolio-chart',
+      pageBuilder: (context, state) => CupertinoPage(
+        key: state.pageKey,
+        child: const MobilePortfolioChartScreen(),
       ),
     ),
     GoRoute(

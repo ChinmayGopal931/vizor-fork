@@ -14,6 +14,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/biometric_icon.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/mobile/neon_horizon.dart';
 import '../../payment_links/providers/payment_link_intake_provider.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
@@ -28,16 +29,6 @@ import 'forgot_passcode_sheet.dart';
 import 'mobile_passcode_screen.dart' show kMobilePasscodeLength;
 import 'passcode_widgets.dart';
 
-const mobileBiometricSignInBackgroundAsset =
-    'assets/illustrations/mobile_onboarding_auth_background.webp';
-
-/// Backdrop assets shared by [MobileBiometricSignInView] and the unlock
-/// screen's precache, so the warmed [ImageCache] entries match the providers
-/// painted behind the Face ID sheet (same key -> cache hit, no blank frame).
-const _authBackgroundImage = AssetImage(mobileBiometricSignInBackgroundAsset);
-const _welcomeBadgeImage = AssetImage(
-  'assets/illustrations/welcome_badge_mobile.webp',
-);
 const _biometricBackdropMaxWait = Duration(milliseconds: 350);
 
 /// Mobile unlock — Figma `Sign In Passcode` (4885:23041): "Welcome Back",
@@ -64,33 +55,7 @@ class _MobileUnlockScreenState extends ConsumerState<MobileUnlockScreen> {
   // branded backdrop stays up across submit instead of flipping back to the
   // numpad while the Face ID sheet dismisses.
   var _biometricUnlocking = false;
-  var _didPrecacheBackdrop = false;
   String? _error;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_didPrecacheBackdrop) return;
-    _didPrecacheBackdrop = true;
-    // Warm the backdrop assets opportunistically. The auto-prompt waits for
-    // the backdrop shell frame, but image decode must not delay Face ID.
-    unawaited(_precacheBiometricBackdrop());
-  }
-
-  Future<void> _precacheBiometricBackdrop() async {
-    await Future.wait<void>([
-      precacheImage(
-        _authBackgroundImage,
-        context,
-        onError: (_, _) {},
-      ).catchError((_) {}),
-      precacheImage(
-        _welcomeBadgeImage,
-        context,
-        onError: (_, _) {},
-      ).catchError((_) {}),
-    ]);
-  }
 
   /// iOS presents no new frame until the app is active again, so a prompt
   /// raised while returning from the background covers the pre-background
@@ -473,48 +438,22 @@ class _MobileUnlockScreenState extends ConsumerState<MobileUnlockScreen> {
 
 /// Biometric sign-in backdrop shown behind the native biometric prompt.
 /// Figma `Sign In Face ID` (4596:50062 / 4596:50202) also shows iOS chrome and
-/// the system prompt layer; those are not app-rendered content.
+/// the system prompt layer; those are not app-rendered content. The neon look
+/// drops the Figma's castle backdrop and knight badge for a lit lock on the
+/// plain window.
 class MobileBiometricSignInView extends StatelessWidget {
   const MobileBiometricSignInView({super.key});
 
-  static const _figmaFrameWidth = 393.0;
-  static const _backgroundWidth = 392.0;
-  static const _backgroundHeight = 720.0;
-
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     return ColoredBox(
-      color: colors.background.window,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final scale = constraints.maxWidth / _figmaFrameWidth;
-              return Align(
-                alignment: Alignment.topRight,
-                child: SizedBox(
-                  width: _backgroundWidth * scale,
-                  height: _backgroundHeight * scale,
-                  child: Image(
-                    image: _authBackgroundImage,
-                    key: const ValueKey('mobile_biometric_sign_in_background'),
-                    fit: BoxFit.fill,
-                  ),
-                ),
-              );
-            },
-          ),
-          Center(
-            child: Image(
-              image: _welcomeBadgeImage,
-              key: const ValueKey('mobile_biometric_sign_in_badge'),
-              width: 130,
-              height: 130,
-            ),
-          ),
-        ],
+      color: context.colors.background.window,
+      child: const Center(
+        child: NeonGlyphBadge(
+          key: ValueKey('mobile_biometric_sign_in_badge'),
+          iconName: AppIcons.lock,
+          size: 130,
+        ),
       ),
     );
   }

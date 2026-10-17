@@ -296,11 +296,11 @@ void main() {
   ) async {
     await _pumpMobileFixture(tester, buildMobileVotingIneligibleUseCase);
 
-    final header = tester.widget<Text>(find.text('Coinholder voting'));
+    // The page title is a spaced uppercase caption in Gotham Thin.
+    final header = tester.widget<Text>(find.text('COINHOLDER VOTING'));
     expect(header.style?.fontFamily, 'Gotham');
-    // Gotham: the mobile Headline L is 28 px, not Figma's 32 (see
-    // `_headlineLMobile`).
-    expect(header.style?.fontSize, AppTypography.headlineLarge.fontSize);
+    expect(header.style?.fontWeight, AppTypography.headlineLarge.fontWeight);
+    expect(header.style?.letterSpacing, greaterThan(0));
     final badge = find.byKey(const ValueKey('voting_detail_ineligible_badge'));
     expect(badge, findsOneWidget);
     expect(tester.getTopLeft(badge).dy, 140.5);
@@ -329,7 +329,10 @@ void main() {
     );
     final label = find.descendant(of: option, matching: find.byType(Text));
     expect(tester.getSize(label).width, 305);
-    expect(tester.widget<Text>(label).style?.fontWeight, FontWeight.w400);
+    expect(
+      tester.widget<Text>(label).style?.fontWeight,
+      AppTypography.bodyMedium.fontWeight,
+    );
 
     await tester.tap(find.text('Show description'));
     await tester.pumpAndSettle();
@@ -898,9 +901,11 @@ void main() {
         tester.getSize(find.byKey(const ValueKey('voting-result-1-option-2'))),
         const Size(329, 101),
       );
-      final nav = tester.widget<Text>(find.text('Voting results'));
+      // The page title is a spaced uppercase caption in Gotham Thin.
+      final nav = tester.widget<Text>(find.text('VOTING RESULTS'));
       expect(nav.style?.fontFamily, 'Gotham');
-      expect(nav.style?.fontSize, AppTypography.headlineLarge.fontSize);
+      expect(nav.style?.fontWeight, AppTypography.headlineLarge.fontWeight);
+      expect(nav.style?.letterSpacing, greaterThan(0));
       await tester.tap(find.text('Show description'));
       await tester.pumpAndSettle();
       expect(find.text('Hide description'), findsOneWidget);
@@ -1181,7 +1186,10 @@ void main() {
       firstOptionInkWell.overlayColor?.resolve({WidgetState.focused}),
       isNull,
     );
-    expect(tester.widget<Text>(label).style?.fontWeight, FontWeight.w400);
+    expect(
+      tester.widget<Text>(label).style?.fontWeight,
+      AppTypography.bodyMedium.fontWeight,
+    );
 
     await tester.tap(firstOption);
     await tester.pumpAndSettle();
@@ -1190,7 +1198,10 @@ void main() {
     expect(tester.getRect(firstOption), initialFirstOptionRect);
     expect(tester.getRect(secondOption), initialSecondOptionRect);
     expect(tester.getRect(label), initialLabelRect);
-    expect(tester.widget<Text>(label).style?.fontWeight, FontWeight.w400);
+    expect(
+      tester.widget<Text>(label).style?.fontWeight,
+      AppTypography.bodyMedium.fontWeight,
+    );
     expect(
       find.byKey(const ValueKey('voting_selected_choice_indicator')),
       findsOneWidget,

@@ -704,6 +704,9 @@ class ReceiptTitles {
     required this.receiveFailed,
     required this.shielded,
     required this.sending,
+    required this.sent,
+    required this.sendFailed,
+    required this.transaction,
   });
 
   final String received;
@@ -711,6 +714,11 @@ class ReceiptTitles {
   final String receiveFailed;
   final String shielded;
   final String sending;
+  final String sent;
+  final String sendFailed;
+
+  /// A receipt whose role is not established.
+  final String transaction;
 }
 
 const _shieldedRecipientAddress =
@@ -836,7 +844,7 @@ void transparentReceiptParityTests({
         transaction: transparentSend(),
         privateQueries: private,
       );
-      expect(find.text('Sent successfully'), findsOneWidget);
+      expect(find.text(titles.sent), findsOneWidget);
       expect(find.text('To'), findsOneWidget);
       expect(_showsAddress(transparentRecipientAddress), findsWidgets);
       expect(find.text('Show full address'), findsOneWidget);
@@ -888,7 +896,7 @@ void transparentReceiptParityTests({
         transaction: mixedSend(),
         privateQueries: private,
       );
-      expect(find.text('Sent successfully'), findsOneWidget);
+      expect(find.text(titles.sent), findsOneWidget);
       expect(_showsAddress(_shieldedRecipientAddress), findsWidgets);
       expect(_showsAddress(transparentRecipientAddress), findsNothing);
       expect(find.text('Show full address'), findsOneWidget);
@@ -906,7 +914,7 @@ void transparentReceiptParityTests({
       transaction: transparentSend(),
       privateQueries: true,
     );
-    _expectUnknownRecipientShell(title: 'Sent successfully');
+    _expectUnknownRecipientShell(title: titles.sent);
     // The other party's output stays listed, attributed to no one, and the
     // receipt says its details are incomplete.
     _expectNeutralOutputs(listed: [0], hidden: [1]);
@@ -930,7 +938,7 @@ void transparentReceiptParityTests({
       transaction: mixedSend(),
       privateQueries: true,
     );
-    _expectUnknownRecipientShell(title: 'Sent successfully');
+    _expectUnknownRecipientShell(title: titles.sent);
     _expectNeutralOutputs(listed: [0], hidden: [1]);
     await tester.pumpWidget(const SizedBox());
   });
@@ -968,7 +976,7 @@ void transparentReceiptParityTests({
       transaction: transparentSend(),
       privateQueries: true,
     );
-    _expectUnknownRecipientShell(title: 'Sent successfully');
+    _expectUnknownRecipientShell(title: titles.sent);
     _expectNeutralOutputs(listed: [1, 2], hidden: [0]);
     await tester.pumpWidget(const SizedBox());
   });
@@ -989,7 +997,7 @@ void transparentReceiptParityTests({
       privateQueries: true,
       privacy: true,
     );
-    _expectUnknownRecipientShell(title: 'Sent successfully');
+    _expectUnknownRecipientShell(title: titles.sent);
     _expectNeutralOutputs(listed: [0, 2], hidden: [1]);
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('transaction_output_0'))).dy,
@@ -1033,7 +1041,7 @@ void transparentReceiptParityTests({
         privateQueries: true,
       );
       _expectUnknownRecipientShell(
-        title: expired ? 'Send failed' : titles.sending,
+        title: expired ? titles.sendFailed : titles.sending,
       );
       await tester.pumpWidget(const SizedBox());
     });
@@ -1390,7 +1398,7 @@ void transparentReceiptParityTests({
       transaction: tx,
       privateQueries: true,
     );
-    expect(find.text('Transaction'), findsOneWidget);
+    expect(find.text(titles.transaction), findsOneWidget);
     expect(find.text('To'), findsNothing);
     expect(find.text(kUnknownRecipientText), findsNothing);
     // The fee is the entry's one line.

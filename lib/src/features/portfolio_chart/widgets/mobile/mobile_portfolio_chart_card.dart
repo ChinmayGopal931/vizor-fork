@@ -1,17 +1,15 @@
-import 'dart:math' as math;
-
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/privacy/privacy_mask.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../models/portfolio_chart_models.dart';
 import '../../providers/portfolio_chart_provider.dart';
 import '../../providers/portfolio_chart_settings_provider.dart';
 import '../../services/portfolio_chart_format.dart';
 import '../portfolio_chart_range_selector.dart';
+import 'neon_plot.dart';
 
 /// The Home portfolio chart's place under the balance card: nothing while the
 /// chart is off or has no history, otherwise the card with a gap above it.
@@ -40,12 +38,6 @@ class MobilePortfolioChartSlot extends ConsumerWidget {
 /// read, short enough that Send and Receive stay on screen.
 const kPortfolioChartPlotHeight = 104.0;
 
-/// How a point on the line is marked: an 8px dot in a 2px ring of the surface.
-const _dotRadius = 4.0;
-const _dotRingWidth = 2.0;
-const _plotInsetX = _dotRadius + _dotRingWidth;
-const _plotInsetY = _dotRadius + _dotRingWidth;
-
 /// The chart card: title and where the numbers come from, the value and its
 /// change over the range, the line, and the range chips. A drag along the line
 /// shows the value and time at that point instead.
@@ -54,10 +46,14 @@ class MobilePortfolioChartCard extends StatefulWidget {
     required this.state,
     required this.onRangeSelected,
     this.priceSourceName = 'the pricing server',
+    this.plotHeight = kPortfolioChartPlotHeight,
     super.key,
   });
 
   final PortfolioChartViewState state;
+
+  /// The plot's height; the full chart screen gives it most of the page.
+  final double plotHeight;
   final ValueChanged<PortfolioChartRange> onRangeSelected;
 
   /// Who the prices come from, as the source line names it.
@@ -69,15 +65,18 @@ class MobilePortfolioChartCard extends StatefulWidget {
 }
 
 class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
-  /// The point under the finger while scrubbing.
-  int? _selected;
+  /// Where the finger is while scrubbing, in plot coordinates.
+  double? _scrubX;
+
+  /// The plot's last laid-out size, to read the line under [_scrubX].
+  Size? _plotSize;
 
   @override
   void didUpdateWidget(MobilePortfolioChartCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     final data = _dataOf(widget.state);
     if (data == null || !identical(data, _dataOf(oldWidget.state))) {
-      _selected = null;
+      _scrubX = null;
     }
   }
 
@@ -100,8 +99,8 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
     PortfolioChartHidden() => PortfolioChartMode.zec,
   };
 
-  void _select(int? index) {
-    if (index != _selected) setState(() => _selected = index);
+  void _scrub(double? x) {
+    if (x != _scrubX) setState(() => _scrubX = x);
   }
 
   @override
@@ -109,16 +108,23 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
     final colors = context.colors;
     final state = widget.state;
     final data = _dataOf(state);
-    final selected = data == null || _selected == null
+    final plotSize = _plotSize;
+    final selected = data == null || _scrubX == null || plotSize == null
         ? null
-        : data.points[_selected!.clamp(0, data.points.length - 1)];
+        : PortfolioPlotGeometry(data.points, plotSize).pointAt(_scrubX!).point;
     final change = data == null ? null : describePortfolioChange(data);
     final title = _mode == PortfolioChartMode.usd
         ? 'Portfolio value'
         : 'ZEC balance';
 
-    final valueStyle = AppTypography.headlineSmall.copyWith(
-      color: colors.text.primary,
+    final valueStyle = TextStyle(
+      fontFamily: 'Gotham',
+      fontWeight: FontWeight.w300,
+      fontSize: 30,
+      height: 1.15,
+      letterSpacing: -0.3,
+      color: colors.neon.core,
+      shadows: Neon.textGlow(colors.neon.glow, intensity: 0.8),
     );
     final Widget value;
     if (data != null) {
@@ -180,24 +186,22 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
             ),
           );
 
-    return MobileSurfaceCard(
-      cornerRadius: AppRadii.large,
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.sm,
-        AppSpacing.sm,
-        AppSpacing.sm,
-        AppSpacing.xs,
-      ),
+    return _NeonChartFrame(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
               Text(
-                title,
+                title.toUpperCase(),
                 maxLines: 1,
-                style: AppTypography.labelLarge.copyWith(
-                  color: colors.text.secondary,
+                style: TextStyle(
+                  fontFamily: 'Gotham',
+                  fontWeight: FontWeight.w500,
+                  fontSize: 11,
+                  height: 1.2,
+                  letterSpacing: 2.2,
+                  color: colors.neon.glow,
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),
@@ -233,9 +237,10 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
           ),
           const SizedBox(height: AppSpacing.s),
           SizedBox(
-            height: kPortfolioChartPlotHeight,
+            height: widget.plotHeight,
             child: _plot(context, state, data),
           ),
+          const SizedBox(height: AppSpacing.xs),
           PortfolioChartRangeSelector(
             selected: _range,
             onSelected: widget.onRangeSelected,
@@ -269,7 +274,7 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
     if (data == null) {
       return _Skeleton(
         width: double.infinity,
-        height: kPortfolioChartPlotHeight,
+        height: widget.plotHeight,
         radius: AppRadii.small,
         color: colors.background.raised,
       );
@@ -283,27 +288,28 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
       excludeSemantics: true,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final size = Size(constraints.maxWidth, kPortfolioChartPlotHeight);
-          final geometry = _PlotGeometry(data.points, size);
+          final size = Size(constraints.maxWidth, widget.plotHeight);
+          _plotSize = size;
+          final geometry = PortfolioPlotGeometry(data.points, size);
           return GestureDetector(
             key: const ValueKey('mobile_home_portfolio_chart_plot'),
             behavior: HitTestBehavior.opaque,
             // Only horizontal drags: vertical ones keep scrolling Home.
             dragStartBehavior: DragStartBehavior.down,
             onHorizontalDragStart: (details) =>
-                _select(geometry.nearestIndex(details.localPosition.dx)),
+                _scrub(details.localPosition.dx),
             onHorizontalDragUpdate: (details) =>
-                _select(geometry.nearestIndex(details.localPosition.dx)),
-            onHorizontalDragEnd: (_) => _select(null),
-            onHorizontalDragCancel: () => _select(null),
+                _scrub(details.localPosition.dx),
+            onHorizontalDragEnd: (_) => _scrub(null),
+            onHorizontalDragCancel: () => _scrub(null),
             child: CustomPaint(
               size: size,
-              painter: _PlotPainter(
+              painter: NeonPlotPainter(
                 geometry: geometry,
-                lineColor: colors.icon.accent,
-                surfaceColor: colors.background.ground,
-                guideColor: colors.border.medium,
-                selected: _selected,
+                glow: colors.neon.glow,
+                core: colors.neon.core,
+                gridColor: colors.neon.grid,
+                scrubX: _scrubX,
               ),
             ),
           );
@@ -312,10 +318,11 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
     );
   }
 
-  /// Names what the chart contacts, or that it contacts nothing. Always on the
-  /// card, so the source is never something to look up in Settings.
+  /// What the card says about its numbers: only when prices failed or are
+  /// old. The owner asked for the price server not to be named on the card;
+  /// Settings, Portfolio chart still names it and what a request carries.
   String _sourceLabel(PortfolioChartViewState state) {
-    final fromServer = 'Prices from ${widget.priceSourceName}';
+    const fromServer = '';
     final data = _dataOf(state);
     if (data == null) {
       return _mode == PortfolioChartMode.usd ? fromServer : 'On this device';
@@ -354,136 +361,61 @@ class _Skeleton extends StatelessWidget {
   }
 }
 
-/// Where each point lands in the plot, shared by painting and touch.
-class _PlotGeometry {
-  _PlotGeometry(this.points, this.size) {
-    final first = points.first.time.millisecondsSinceEpoch.toDouble();
-    final last = points.last.time.millisecondsSinceEpoch.toDouble();
-    var low = double.infinity;
-    var high = double.negativeInfinity;
-    for (final point in points) {
-      low = math.min(low, point.value);
-      high = math.max(high, point.value);
-    }
-    final width = size.width - 2 * _plotInsetX;
-    final height = size.height - 2 * _plotInsetY;
-    offsets = [
-      for (final point in points)
-        Offset(
-          _plotInsetX +
-              (last == first
-                  ? 0
-                  : (point.time.millisecondsSinceEpoch - first) /
-                        (last - first) *
-                        width),
-          _plotInsetY +
-              (high == low
-                  ? height / 2
-                  : (high - point.value) / (high - low) * height),
+/// The chart's panel: dark glass inside a dim cut-corner tube.
+class _NeonChartFrame extends StatelessWidget {
+  const _NeonChartFrame({required this.child});
+
+  final Widget child;
+
+  static const _cut = AppChamfer.large;
+
+  @override
+  Widget build(BuildContext context) {
+    final neon = context.colors.neon;
+    return CustomPaint(
+      foregroundPainter: _FramePainter(glow: neon.glow, core: neon.core),
+      child: ClipPath(
+        clipper: ShapeBorderClipper(shape: Neon.wedgeBorder(cut: _cut)),
+        child: ColoredBox(
+          color: context.colors.background.window.withValues(alpha: 0.55),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.sm,
+              AppSpacing.sm,
+              AppSpacing.sm,
+              AppSpacing.xs,
+            ),
+            child: child,
+          ),
         ),
-    ];
-  }
-
-  final List<PortfolioChartPoint> points;
-  final Size size;
-  late final List<Offset> offsets;
-
-  /// The point nearest to [dx], so the finger need not be on the line.
-  int nearestIndex(double dx) {
-    var best = 0;
-    var bestDistance = double.infinity;
-    for (var i = 0; i < offsets.length; i++) {
-      final distance = (offsets[i].dx - dx).abs();
-      if (distance < bestDistance) {
-        best = i;
-        bestDistance = distance;
-      }
-    }
-    return best;
+      ),
+    );
   }
 }
 
-class _PlotPainter extends CustomPainter {
-  _PlotPainter({
-    required this.geometry,
-    required this.lineColor,
-    required this.surfaceColor,
-    required this.guideColor,
-    required this.selected,
-  });
+class _FramePainter extends CustomPainter {
+  _FramePainter({required this.glow, required this.core});
 
-  final _PlotGeometry geometry;
-  final Color lineColor;
-  final Color surfaceColor;
-  final Color guideColor;
-  final int? selected;
+  final Color glow;
+  final Color core;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final offsets = geometry.offsets;
-    final line = Path()..moveTo(offsets.first.dx, offsets.first.dy);
-    for (final offset in offsets.skip(1)) {
-      line.lineTo(offset.dx, offset.dy);
-    }
-
-    // A wash under the line, never a block of colour.
-    final area = Path.from(line)
-      ..lineTo(offsets.last.dx, size.height)
-      ..lineTo(offsets.first.dx, size.height)
-      ..close();
-    canvas.drawPath(
-      area,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            lineColor.withValues(alpha: 0.10),
-            lineColor.withValues(alpha: 0),
-          ],
-        ).createShader(Offset.zero & size),
+    Neon.strokeTube(
+      canvas,
+      Neon.chamferedRect(
+        (Offset.zero & size).deflate(0.75),
+        topLeft: _NeonChartFrame._cut,
+        bottomRight: _NeonChartFrame._cut,
+      ),
+      glow: glow,
+      core: core,
+      width: 1.2,
+      intensity: 0.6,
     );
-    canvas.drawPath(
-      line,
-      Paint()
-        ..color = lineColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
-    );
-
-    final index = selected;
-    if (index != null && index < offsets.length) {
-      final x = offsets[index].dx;
-      canvas.drawLine(
-        Offset(x, 0),
-        Offset(x, size.height),
-        Paint()
-          ..color = guideColor
-          ..strokeWidth = 1,
-      );
-      _paintDot(canvas, offsets[index]);
-    } else {
-      _paintDot(canvas, offsets.last);
-    }
-  }
-
-  void _paintDot(Canvas canvas, Offset center) {
-    canvas.drawCircle(
-      center,
-      _dotRadius + _dotRingWidth,
-      Paint()..color = surfaceColor,
-    );
-    canvas.drawCircle(center, _dotRadius, Paint()..color = lineColor);
   }
 
   @override
-  bool shouldRepaint(_PlotPainter oldDelegate) {
-    return oldDelegate.geometry != geometry ||
-        oldDelegate.lineColor != lineColor ||
-        oldDelegate.surfaceColor != surfaceColor ||
-        oldDelegate.guideColor != guideColor ||
-        oldDelegate.selected != selected;
-  }
+  bool shouldRepaint(_FramePainter oldDelegate) =>
+      oldDelegate.glow != glow || oldDelegate.core != core;
 }

@@ -102,7 +102,7 @@ const _headlineMDesktop = TextStyle(
 /// so vertical rhythm and the nav height hold. Desktop keeps 32 px.
 const _headlineLMobile = TextStyle(
   fontFamily: 'Gotham',
-  fontWeight: FontWeight.w400,
+  fontWeight: FontWeight.w100,
   fontSize: 28,
   height: 33 / 28,
   letterSpacing: 0,
@@ -116,7 +116,7 @@ const _headlineLMobile = TextStyle(
 /// Headline L (28 / 24 px, as 32 / 28 px was). The 30 px line box is unchanged.
 const _headlineMMobile = TextStyle(
   fontFamily: 'Gotham',
-  fontWeight: FontWeight.w400,
+  fontWeight: FontWeight.w100,
   fontSize: 24,
   height: 30 / 24,
   letterSpacing: -0.24,
@@ -135,7 +135,7 @@ const _codeMDesktop = TextStyle(
 /// Figma `Code M`, Mobile mode — Geist Mono Medium, 16 / 21 px.
 const _codeMMobile = TextStyle(
   fontFamily: 'Gotham',
-  fontWeight: FontWeight.w500,
+  fontWeight: FontWeight.w400,
   fontSize: 16,
   height: 21 / 16,
   letterSpacing: 0,
@@ -250,10 +250,14 @@ abstract final class AppTypographyDesktop {
 /// export. The display headline scale intentionally follows the actual
 /// mobile screen frames, which still use Young Serif.
 abstract final class AppTypographyMobile {
+  // Veylor's neon redesign sets the mobile weights lighter than Figma, to
+  // read thin and futuristic: Thin (100) for headlines and display numerals,
+  // Light (300) for body and labels, Book (400) where a label must stand out.
+
   /// Figma mobile app `Headline XL` — Young Serif, 40 / 40 px, −1.35.
   static const displayLarge = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w100,
     fontSize: 40,
     height: 40 / 40,
     letterSpacing: -1.35,
@@ -268,7 +272,7 @@ abstract final class AppTypographyMobile {
   /// Figma `Headline S` — Geist Medium, 18 / 22 px.
   static const headlineSmall = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w300,
     fontSize: 18,
     height: 22 / 18,
     letterSpacing: 0,
@@ -277,7 +281,7 @@ abstract final class AppTypographyMobile {
   /// Figma `Body L` — Geist Medium, 18 / 26 px, −0.24.
   static const bodyLarge = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w300,
     fontSize: 18,
     height: 26 / 18,
     letterSpacing: -0.24,
@@ -286,7 +290,7 @@ abstract final class AppTypographyMobile {
   /// Figma `Body M` — Geist Regular, 16 / 25 px, −0.21.
   static const bodyMedium = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w300,
     fontSize: 16,
     height: 25 / 16,
     letterSpacing: -0.21,
@@ -295,7 +299,7 @@ abstract final class AppTypographyMobile {
   /// Figma `Body M Medium` — Geist Medium, 16 / 25 px, −0.21.
   static const bodyMediumStrong = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w400,
     fontSize: 16,
     height: 25 / 16,
     letterSpacing: -0.21,
@@ -304,7 +308,7 @@ abstract final class AppTypographyMobile {
   /// Figma `Body S` — Geist Regular, 14 / 20 px, −0.12.
   static const bodySmall = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w300,
     fontSize: 14,
     height: 20 / 14,
     letterSpacing: -0.12,
@@ -313,7 +317,7 @@ abstract final class AppTypographyMobile {
   /// Figma `Body XS` — Geist Regular, 13 / 18 px, −0.055.
   static const bodyExtraSmall = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w300,
     fontSize: 13,
     height: 18 / 13,
     letterSpacing: -0.055,
@@ -322,7 +326,7 @@ abstract final class AppTypographyMobile {
   /// Figma `Label M` — Geist Medium, 16 / 17 px, −0.06.
   static const labelLarge = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w300,
     fontSize: 16,
     height: 17 / 16,
     letterSpacing: -0.06,
@@ -331,7 +335,7 @@ abstract final class AppTypographyMobile {
   /// Figma `Label S` — Geist Medium, 14 / 15 px.
   static const labelMedium = TextStyle(
     fontFamily: 'Gotham',
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w300,
     fontSize: 14,
     height: 15 / 14,
     letterSpacing: 0,

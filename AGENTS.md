@@ -130,9 +130,11 @@ Untagged tests may run in either lane and must be lane-agnostic:
   both modes inside one binary (widgetbook galleries, token tests).
 - New tokens with per-mode values follow the same pattern: a `*Desktop`
   + `*Mobile` const namespace pair plus a const selector in the
-  unsuffixed class. The `Spacing`, `Radii`, `Units`, and `Window` groups
-  are identical across Figma modes and stay single-mode (`AppSpacing`,
-  `AppRadii`, `AppWindowSizing`).
+  unsuffixed class. The `Spacing`, `Units`, and `Window` groups are
+  identical across Figma modes and stay single-mode (`AppSpacing`,
+  `AppWindowSizing`). `AppRadii` is per-mode only because of the neon
+  redesign (`AppRadiiDesktop` / `AppRadiiMobile`; see "Mobile neon
+  redesign").
 - Form-factor branching in app code uses `kAppFormFactor` (const, so the
   dead branch is tree-shaken) — never `Platform.isIOS`-style checks.
   Runtime `Platform` checks remain only for OS-specific *behavior*
@@ -142,6 +144,102 @@ Untagged tests may run in either lane and must be lane-agnostic:
   mobile tokens on a desktop host is legitimate —
   `fvm flutter run -t lib/widgetbook.dart --dart-define=VIZOR_FORM_FACTOR=mobile`.
   Only `lib/main.dart` asserts the match.
+
+## Mobile neon redesign (Veylor)
+
+The mobile form factor (iOS and Android) has its own look: true black, neon
+red, white light, Gotham Thin and Light, and 45° cuts instead of rounded
+corners, after the Tesla Roadster teaser frames, Tron and Cyberpunk 2077.
+Desktop keeps the Figma design. The owner directs it on a device rather than
+in Figma, so the Figma comparison rules above do not apply to these
+surfaces. Behaviour is unchanged unless a bullet below says otherwise.
+
+- **Palette.** Every semantic colour group has four named sets: `figmaDark`
+  / `figmaLight` (desktop) and `neonDark` / `neonLight` (mobile), with
+  `dark` / `light` selecting by `kAppFormFactor` (as `AppColors.dark`
+  does). Tests that must pin one design regardless of lane read the named
+  sets. The neon faces come from `NeonPrimitives` (`primitives.dart`).
+  `AppNeonColors` (`colors.neon`) carries the lit elements' colours: the
+  tube glow and its white-hot core on the page, the balance sign's light,
+  the grid, and the white "headlight" frame. Light mode is brushed steel
+  with the same red; the balance sign stays black in both.
+- **Shapes.** `AppRadiiMobile` is near-square (2 to 4 px, `full` is 4).
+  `AppChamfer` sizes the 45° cuts drawn with `BeveledRectangleBorder`
+  (`Neon.chamferBorder`, two-corner `Neon.wedgeBorder`). `AppButton` cuts
+  its corners on mobile, and the primary slab casts a red glow;
+  secondary buttons are glass with a hairline edge. `MobileSurfaceCard` is
+  a glass panel with lit cut corners (`NeonGlassPanelPainter`). Avatars
+  are cut-corner plates with a red edge.
+- **Light.** `lib/src/core/theme/neon.dart`: `Neon.textGlow`,
+  `Neon.boxGlow`, `Neon.strokeTube` (halo, glow and core: every lit line
+  uses it), `NeonIgnition` (a sign's switch-on flicker, off under reduced
+  motion) and `kNeonHudCaptionStyle`.
+- **Type.** Gotham everywhere, lighter on mobile: `AppTypographyMobile`
+  uses Thin (100) for headlines and display numerals and Light (300) for
+  body and labels. Page titles (`MobileTopNav.back`) are spaced uppercase
+  Thin; section heads (Settings groups, Activity dates, Home's recent
+  activity) are uppercase red HUD captions. These uppercase captions are a
+  deliberate exception to the sentence-case rule; the strings themselves
+  stay sentence case and are upper-cased where drawn.
+- **Home.** The balance is a frameless neon sign: Thin red digits with a
+  glow, the privacy eye (a bare glyph) to their right, the fiat line
+  above, and the portfolio chart's line as a light trail below
+  (`NeonPlotPainter`). Toggling the eye re-encrypts the digits
+  (`NeonScrambleText`). Tapping the sign opens the full chart at
+  `/portfolio-chart` (`MobilePortfolioChartScreen`), with the holdings
+  under it (`MobileHoldingsPanel`: Ironwood, Orchard, Sapling and
+  transparent ZEC with what is pending, the shielded total, and Private
+  USD); a hidden chart (off, or no history) leaves the sign inert. The
+  account sits in the top-left
+  corner as a portrait only: a tap decrypts the name beside it for a few
+  seconds, a second tap (or a long press) opens the account switcher, and
+  screen readers get the name and the switcher directly.
+- **Sync line.** `NeonSyncBackdrop` replaces the top bar's sync label on
+  Home. A Tron floor flows behind the content (faster while scanning), and
+  a red line at 85% of the width rises from the bottom with the progress,
+  its head reading `SYNC n%`, `SYNCED`, `SYNC FAILED` or `TOR …`. It has two
+  layers: while syncing the line is drawn over the content
+  (`NeonSyncLayer.front`, ignoring touches); once synced it runs behind,
+  and Home backs its blocks with solid black (`_Occlude`) so the line shows
+  only in the gaps. A scan that starts at most 20 blocks behind the tip
+  counts as synced, so the line does not drop and re-climb every block.
+- **Tab bar.** Glyphs only: no slab, border or caption. `TronGlyph` draws
+  the tab icons (and, on mobile, `AppIcon` draws its round icons —
+  check, arrow-down, plus, warning, cancel, help — as angular glyphs). The active
+  glyph is lit with a pool of light sliding under it; content fades to
+  black beneath the bar.
+- **Art.** The medieval illustrations are gone from mobile: empty states use
+  `NeonHorizon` (a striped 80s sun over a grid floor), hero and status
+  spots `NeonGlyphBadge`, and painted backgrounds are dropped. The account
+  pictures are the seven neon portraits in `assets/profile_pictures/`
+  (`pfp-01` to `pfp-07`, lossless WebP); ids of the retired knights
+  (`pfp-08` to `pfp-15`) map onto them. Payment-link gift card designs are
+  unchanged. `VizorWordmark` draws a VEYLOR wordmark in tube strokes on
+  mobile (`VeylorWordmarkPainter`: lit red, or plain lines where a caller
+  sets a colour); desktop keeps `vizor_logo.svg`.
+- **Keys and money flows.** The passcode keys are cut-corner glass plates
+  that light red under the finger. Private USD's convert screens put red
+  captions on their panels and a direction switch between them that keeps
+  its place (dimmed while unavailable, its edge breathing while a quote is
+  on its way); the estimate churns as cipher (`NeonCipherChurn`) until the
+  quote decrypts in, and every ledger row stays on one line
+  (`PrivateUsdLedgerRow`, smaller type, hairlines between rows). Swap and
+  conversion progress (`mobile_swap_status_content.dart`) is a red
+  timeline: lit checks for done steps, the spinner kept for the current
+  one, and a packet of light running down the rail into it.
+- **Chart card.** The chart is drawn as a neon trail on a Tron grid; a
+  scrub reads the line under the finger (interpolated value and time), not
+  the nearest data point. The card no longer names the price server; the
+  Settings card still does. Settings no longer offers a default range:
+  the saved one (a week unless changed before) still opens the chart.
+- **iOS.** The sync and transaction Live Activities
+  (`ios/SyncWidget/SyncWidgetLiveActivity.swift`) are black and neon red
+  with thin type and a thin red progress line; nothing starts them yet
+  (`DynamicIslandManager` has no callers). The launch screen paints the
+  `LaunchBackground` colour (black in dark mode, steel in light), and the
+  numeric keyboard's Done check is neon red. Sheets keep 4 px top corners
+  and, on iOS, bottom corners that follow the display's curve, which would
+  clip square ones.
 
 ## Google Play opt-out (VIZOR_DEGOOGLED)
 
@@ -717,7 +815,8 @@ Key files:
 
 ### Home portfolio chart
 
-Mobile Home shows a chart under the balance card
+Mobile Home draws the chart's line as the balance sign's light trail, and a
+tap on the sign opens the full chart at `/portfolio-chart`
 (`lib/src/features/portfolio_chart/`). Its wallet side is read from the local
 wallet DB alone: `getTransactionHistory`, `account_balance_delta` per mined
 block, folded into a balance step function once a sync has completed (nothing

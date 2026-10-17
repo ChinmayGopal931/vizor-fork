@@ -1,6 +1,9 @@
 import 'package:flutter/painting.dart';
 
+import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
+
+const _neon = kAppFormFactor == AppFormFactor.mobile;
 
 /// Depth hierarchy for the app shell.
 ///
@@ -64,7 +67,11 @@ class AppBackgroundColors {
   final Color utilitySuccessAlpha;
   final Color homeCard;
 
-  static const dark = AppBackgroundColors(
+  /// Figma faces on desktop, the neon redesign on mobile builds.
+  static const dark = _neon ? neonDark : figmaDark;
+  static const light = _neon ? neonLight : figmaLight;
+
+  static const figmaDark = AppBackgroundColors(
     window: Color(0xFF0F0F0F),
     ground: Primitives.p50Dark,
     base: Primitives.p100Dark,
@@ -87,7 +94,7 @@ class AppBackgroundColors {
     homeCard: Primitives.p50Dark,
   );
 
-  static const light = AppBackgroundColors(
+  static const figmaLight = AppBackgroundColors(
     window: Color(0xFFF7F7F7),
     ground: Primitives.p0Light,
     base: Primitives.p50Light,
@@ -108,5 +115,52 @@ class AppBackgroundColors {
     utilitySuccessStrong: GoldPrimitives.p300Light,
     utilitySuccessAlpha: GreenPrimitives.p300Alpha15Light,
     homeCard: Primitives.p800Light,
+  );
+
+  static const neonDark = AppBackgroundColors(
+    window: NeonPrimitives.n0Dark,
+    ground: NeonPrimitives.n50Dark,
+    base: NeonPrimitives.n100Dark,
+    raised: NeonPrimitives.n150Dark,
+    overlay: NeonPrimitives.n200Dark,
+    inverse: NeonPrimitives.n800Dark,
+    neutralScrim: NeonPrimitives.black70,
+    neutralSubtleOpacity: NeonPrimitives.n400Alpha20Dark,
+    neutralStrongOpacity: NeonPrimitives.n400Alpha50Dark,
+    brandCrimsonSubtle: NeonPrimitives.redSubtle,
+    brandCrimsonStrong: NeonPrimitives.red,
+    brandCrimsonAlpha: NeonPrimitives.red22,
+    utilityDestructiveSubtle: NeonPrimitives.redSubtle,
+    utilityDestructiveStrong: NeonPrimitives.redPressed,
+    utilityDestructiveAlphaSubtle: NeonPrimitives.red8,
+    utilityDestructiveAlpha: NeonPrimitives.red22,
+    utilitySuccessSubtle: GoldPrimitives.p150Dark,
+    utilitySuccessStrong: GoldPrimitives.p500Dark,
+    utilitySuccessAlpha: GreenPrimitives.p300Alpha15Dark,
+    homeCard: NeonPrimitives.n0Dark,
+  );
+
+  /// Steel faces; the home card stays black so the neon sign reads lit.
+  static const neonLight = AppBackgroundColors(
+    window: NeonPrimitives.n100Light,
+    ground: NeonPrimitives.n0Light,
+    base: NeonPrimitives.n50Light,
+    raised: NeonPrimitives.n150Light,
+    overlay: NeonPrimitives.n200Light,
+    inverse: NeonPrimitives.n800Light,
+    neutralScrim: NeonPrimitives.ink50,
+    neutralSubtleOpacity: NeonPrimitives.n300Alpha20Light,
+    neutralStrongOpacity: NeonPrimitives.n300Alpha35Light,
+    brandCrimsonSubtle: NeonPrimitives.redSubtleOnLight,
+    brandCrimsonStrong: NeonPrimitives.redOnLight,
+    brandCrimsonAlpha: NeonPrimitives.redOnLight10,
+    utilityDestructiveSubtle: NeonPrimitives.redSubtleOnLight,
+    utilityDestructiveStrong: NeonPrimitives.redOnLight,
+    utilityDestructiveAlphaSubtle: NeonPrimitives.redOnLight10,
+    utilityDestructiveAlpha: NeonPrimitives.redOnLight18,
+    utilitySuccessSubtle: GoldPrimitives.p50Light,
+    utilitySuccessStrong: GoldPrimitives.p300Light,
+    utilitySuccessAlpha: GreenPrimitives.p300Alpha15Light,
+    homeCard: NeonPrimitives.n0Dark,
   );
 }

@@ -819,7 +819,8 @@ ShapeDecoration _continueButtonDecoration(WidgetTester tester) {
   return containers
       .map((container) => container.decoration)
       .whereType<ShapeDecoration>()
-      .firstWhere((decoration) => decoration.shape is StadiumBorder);
+      // Mobile buttons are cut-corner slabs, not pills.
+      .firstWhere((decoration) => decoration.shape is BeveledRectangleBorder);
 }
 
 void main() {
@@ -924,7 +925,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('mobile_send_continue')));
     await tester.pump();
-    expect(find.text('Enter Amount'), findsNothing);
+    expect(find.text('ENTER AMOUNT'), findsNothing);
 
     validation.complete(
       const AddressValidationResult(
@@ -969,18 +970,18 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
     expect(_sendRouteCanPop(tester), isFalse);
 
     await _toAmountStep(tester, _shieldedAddress);
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
     expect(_sendRouteCanPop(tester), isFalse);
 
     await _enterAmount(tester, '1.5');
     await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(_sendRouteCanPop(tester), isFalse);
   });
 
@@ -990,13 +991,13 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
     expect(find.text('home'), findsOneWidget);
-    expect(find.text('Select Recipient'), findsNothing);
+    expect(find.text('SELECT RECIPIENT'), findsNothing);
   });
 
   testWidgets(
@@ -1024,7 +1025,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Select Recipient'), findsOneWidget);
+      expect(find.text('SELECT RECIPIENT'), findsOneWidget);
       expect(_sendRouteCanPop(tester), isFalse);
 
       await tester.tap(find.byKey(const ValueKey('mobile_send_scan_row')));
@@ -1049,7 +1050,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('home'), findsOneWidget);
-      expect(find.text('Select Recipient'), findsNothing);
+      expect(find.text('SELECT RECIPIENT'), findsNothing);
     },
   );
 
@@ -1065,7 +1066,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
     expect(_sendRouteCanPop(tester), isFalse);
 
     await tester.binding.handlePopRoute();
@@ -1074,7 +1075,7 @@ void main() {
     // The amount step of a deep-linked /send is the same page, so there is
     // nothing to pop: it steps back to the recipient in place and stays on
     // /send instead of exiting the app.
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
     expect(find.text('home'), findsNothing);
     final continueButton = tester.widget<AppButton>(
       find.byKey(const ValueKey('mobile_send_continue')),
@@ -1100,7 +1101,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(_sendRouteCanPop(tester), isFalse);
 
     await tester.binding.handlePopRoute();
@@ -1108,13 +1109,13 @@ void main() {
 
     // Same page, earlier step — not an exception and not an exit.
     expect(tester.takeException(), isNull);
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
     expect(find.text('home'), findsNothing);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
   });
 
   testWidgets('the payment URI amount survives the in-place step back', (
@@ -1129,18 +1130,18 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('mobile_send_continue')));
     await tester.pumpAndSettle();
 
     // Continue pushes the real /send/amount page: the payee-requested amount
     // has to travel in the args, or it is stranded in the hidden root state.
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
     final amountInput = tester.widget<TextField>(
       find.byKey(const ValueKey('mobile_send_amount_input')),
     );
@@ -1160,12 +1161,12 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
 
     // Step back in place, then push the real amount page with the carried 1.5.
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('mobile_send_continue')));
     await tester.pumpAndSettle();
@@ -1184,11 +1185,11 @@ void main() {
     await _enterAmount(tester, '2.0');
     await tester.tap(find.bySemanticsLabel('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('mobile_send_continue')));
     await tester.pumpAndSettle();
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
     expect(
       tester
           .widget<TextField>(
@@ -1214,7 +1215,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('mobile_send_continue')));
     await tester.pumpAndSettle();
@@ -1224,7 +1225,7 @@ void main() {
     // must survive it all the same.
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('mobile_send_continue')));
     await tester.pumpAndSettle();
@@ -1258,9 +1259,9 @@ void main() {
     // 'invalid' does, so leaving the user on the amount step strands them
     // behind a dead button. Bounce to the recipient step, where the failure is
     // visible and editing the address re-runs validation.
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
     expect(find.text('Address validation failed'), findsOneWidget);
-    expect(find.text('Enter Amount'), findsNothing);
+    expect(find.text('ENTER AMOUNT'), findsNothing);
   });
 
   for (final systemBack in [false, true]) {
@@ -1347,8 +1348,8 @@ void main() {
       await _enterAmount(tester, '2');
       await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
       await tester.pumpAndSettle();
-      expect(find.text('Review Send'), findsOneWidget);
-      expect(find.text('Review Payment'), findsNothing);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
+      expect(find.text('REVIEW PAYMENT'), findsNothing);
       expect(find.text('request memo'), findsNothing);
     },
   );
@@ -1365,7 +1366,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Enter Amount'), findsOneWidget);
+      expect(find.text('ENTER AMOUNT'), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('mobile_send_continue')));
@@ -1373,7 +1374,7 @@ void main() {
       await _enterAmount(tester, '1');
       await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
       await tester.pumpAndSettle();
-      expect(find.text('Review Payment'), findsOneWidget);
+      expect(find.text('REVIEW PAYMENT'), findsOneWidget);
       expect(find.text('amountless request memo'), findsOneWidget);
     },
   );
@@ -1415,23 +1416,23 @@ void main() {
     await tester.pumpAndSettle();
 
     await _toAmountStep(tester, _shieldedAddress);
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
     expect(_sendRouteCanPop(tester), isTrue);
 
     await _enterAmount(tester, '1.5');
     await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(_sendRouteCanPop(tester), isTrue);
 
     await tester.tap(find.bySemanticsLabel('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
 
     await tester.tap(find.bySemanticsLabel('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
   });
 
   testWidgets('a memo edited on the pushed review page survives a second '
@@ -1441,7 +1442,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_send_open_from_home')));
     await tester.pumpAndSettle();
     await _toReviewStep(tester);
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('mobile_send_memo_row')));
     await tester.pumpAndSettle();
@@ -1458,11 +1459,11 @@ void main() {
     // as a copy before the edit and must not re-push that stale copy.
     await tester.tap(find.bySemanticsLabel('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
     await tester.pumpAndSettle();
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(find.text('edited on review'), findsOneWidget);
   });
 
@@ -1491,13 +1492,13 @@ void main() {
       // must re-quote rather than dead-end.
       await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
-      expect(find.text('Enter Amount'), findsOneWidget);
+      expect(find.text('ENTER AMOUNT'), findsOneWidget);
       expect(find.text('Finish & review'), findsOneWidget);
 
       // Cancelling the amount step discards the memo as well as the amount.
       await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
-      expect(find.text('Select Recipient'), findsOneWidget);
+      expect(find.text('SELECT RECIPIENT'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('mobile_send_continue')));
       await tester.pumpAndSettle();
       expect(
@@ -1512,7 +1513,7 @@ void main() {
       await _enterAmount(tester, '1.5');
       await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
       await tester.pumpAndSettle();
-      expect(find.text('Review Send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
       expect(find.text('relayed memo'), findsNothing);
     },
   );
@@ -1526,7 +1527,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_send_open_from_home')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
     // Home is still underneath, so the normal flow keeps the plain pop.
     expect(_sendRouteCanPop(tester), isTrue);
 
@@ -1534,7 +1535,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('home'), findsOneWidget);
-    expect(find.text('Select Recipient'), findsNothing);
+    expect(find.text('SELECT RECIPIENT'), findsNothing);
   });
 
   testWidgets('route-step mode preserves ZIP-321 memo whitespace on propose', (
@@ -1581,7 +1582,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Payment'), findsOneWidget);
+    expect(find.text('REVIEW PAYMENT'), findsOneWidget);
     expect(find.text('Requested by'), findsOneWidget);
     expect(
       find.text('Blue Door Coffee'),
@@ -1595,7 +1596,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.bySemanticsLabel('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('mobile_send_continue')));
     await tester.pumpAndSettle();
@@ -1603,7 +1604,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Payment'), findsOneWidget);
+    expect(find.text('REVIEW PAYMENT'), findsOneWidget);
     expect(find.text('Requested by'), findsOneWidget);
     expect(find.textContaining('1.5'), findsWidgets);
   });
@@ -1640,7 +1641,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(feeCalls, greaterThanOrEqualTo(2));
     final feeText = tester.widget<Text>(
       find.byKey(const ValueKey('mobile_send_fee')),
@@ -1872,7 +1873,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('mobile_send_confirm')));
         await tester.pumpAndSettle();
 
-        expect(find.text('Review Send'), findsOneWidget);
+        expect(find.text('REVIEW SEND'), findsOneWidget);
         expect(
           find.text('Fee updated after sync. Review and confirm again.'),
           findsOneWidget,
@@ -2045,7 +2046,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('home'), findsOneWidget);
-    expect(find.text('Review Send'), findsNothing);
+    expect(find.text('REVIEW SEND'), findsNothing);
   });
 
   testWidgets(
@@ -2162,7 +2163,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_send_keystone_cancel')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(
       container.read(externalActionGuardProvider).activeHoldCount,
       1,
@@ -2196,7 +2197,7 @@ void main() {
         find.byKey(const ValueKey('mobile_send_keystone_cancel')),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Review Send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
       expect(_confirmButton(tester).onPressed, isNull);
       expect(sync.refreshCalls, 0);
       expect(container.read(externalActionGuardProvider).activeHoldCount, 1);
@@ -2243,7 +2244,7 @@ void main() {
     sync.refreshGate = Completer<void>();
     await tester.tap(find.byKey(const ValueKey('mobile_send_ledger_cancel')));
     await tester.pumpAndSettle();
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(_confirmButton(tester).onPressed, isNull);
     expect(sync.refreshCalls, 0);
     expect(container.read(externalActionGuardProvider).activeHoldCount, 1);
@@ -2369,7 +2370,7 @@ void main() {
           await tester.tap(find.byKey(const ValueKey('mobile_send_cancel')));
         }
         await tester.pumpAndSettle();
-        expect(find.text('Review Send'), findsOneWidget);
+        expect(find.text('REVIEW SEND'), findsOneWidget);
         expect(find.text('home'), findsNothing);
         expect(_discardCalls, discardsBeforeRetry);
         expect(sync.refreshCalls, refreshesBeforeRetry);
@@ -2394,7 +2395,7 @@ void main() {
         if (systemBack) {
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
-          expect(find.text('Review Send'), findsNothing);
+          expect(find.text('REVIEW SEND'), findsNothing);
         } else {
           await tester.tap(find.byKey(const ValueKey('mobile_send_cancel')));
           await tester.pumpAndSettle();
@@ -2480,7 +2481,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(find.text('Preparing...'), findsOneWidget);
 
     proposalCompleter.complete(
@@ -2501,7 +2502,7 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
     expect(find.text('Scan a QR Code'), findsOneWidget);
     // The unfocused empty state carries no Continue button.
     expect(find.byKey(const ValueKey('mobile_send_continue')), findsNothing);
@@ -2527,7 +2528,7 @@ void main() {
     expect(find.text('Invalid address'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('mobile_send_continue')));
     await tester.pumpAndSettle();
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
   });
 
   testWidgets('an address for another network says so and gates continue', (
@@ -2622,7 +2623,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(scannerOpenCount, 1);
-    expect(find.text('Select Recipient'), findsOneWidget);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
     expect(find.text('scanner'), findsNothing);
     final editable = tester.widget<EditableText>(
       find.descendant(
@@ -2852,7 +2853,7 @@ void main() {
     await _enterAddress(tester, _shieldedAddress);
 
     decoration = _continueButtonDecoration(tester);
-    final focusedEnabledBorder = decoration.shape as StadiumBorder;
+    final focusedEnabledBorder = decoration.shape as BeveledRectangleBorder;
     expect(decoration.color, colors.button.primary.bg);
     expect(focusedEnabledBorder.side.color, colors.border.subtleOpacity);
     expect(focusedEnabledBorder.side.width, 1.5);
@@ -2861,7 +2862,7 @@ void main() {
     await tester.pumpAndSettle();
 
     decoration = _continueButtonDecoration(tester);
-    final normalEnabledBorder = decoration.shape as StadiumBorder;
+    final normalEnabledBorder = decoration.shape as BeveledRectangleBorder;
     expect(decoration.color, colors.button.primary.bg);
     expect(normalEnabledBorder.side.color, colors.button.primary.border);
     expect(normalEnabledBorder.side.width, 1.5);
@@ -2891,7 +2892,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('mobile_send_continue')));
     await tester.pumpAndSettle();
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
     expect(find.text('Alice'), findsOneWidget);
   });
 
@@ -3492,7 +3493,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(find.text('1.50 ZEC'), findsOneWidget);
   });
 
@@ -3576,7 +3577,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
     await tester.pumpAndSettle();
-    expect(find.text('Review Send'), findsNothing);
+    expect(find.text('REVIEW SEND'), findsNothing);
   });
 
   testWidgets(
@@ -3664,7 +3665,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
     await tester.pumpAndSettle();
-    expect(find.text('Review Send'), findsNothing);
+    expect(find.text('REVIEW SEND'), findsNothing);
   });
 
   testWidgets('Max ignores a stale pending amount fee validation', (
@@ -3759,7 +3760,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(find.text('4.9999 ZEC'), findsOneWidget);
     expect(
       find.text(ZecAmount.fromZatoshi(BigInt.from(10000)).fee.toString()),
@@ -3806,7 +3807,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
     await tester.pump();
-    expect(find.text('Review Send'), findsNothing);
+    expect(find.text('REVIEW SEND'), findsNothing);
 
     // Once the re-validation settles, 1.5 ZEC is spendable again.
     await tester.pumpAndSettle();
@@ -3837,7 +3838,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Enter Amount'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsOneWidget);
     final pendingReview = tester.widget<AppButton>(
       find.byKey(const ValueKey('mobile_send_review_button')),
     );
@@ -3845,7 +3846,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
     await tester.pump();
-    expect(find.text('Review Send'), findsNothing);
+    expect(find.text('REVIEW SEND'), findsNothing);
 
     validation.complete(
       const AddressValidationResult(
@@ -3864,7 +3865,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_send_review_button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(find.text('shielded memo'), findsOneWidget);
   });
 
@@ -3875,7 +3876,7 @@ void main() {
     await tester.pumpAndSettle();
     await _toReviewStep(tester);
 
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
     expect(find.text(r'$105.00'), findsOneWidget);
     expect(find.text('Add short encrypted message'), findsOneWidget);
     expect(find.text('Tx fee'), findsOneWidget);
@@ -4221,11 +4222,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_send_confirm')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Send failed'), findsNWidgets(2)); // nav title + headline
+    // The nav title is drawn uppercase; the headline keeps sentence case.
+    expect(find.text('SEND FAILED'), findsOneWidget);
+    expect(find.text('Send failed'), findsOneWidget);
     expect(_sendRouteCanPop(tester), isFalse);
     await tester.tap(find.byKey(const ValueKey('mobile_send_try_again')));
     await tester.pumpAndSettle();
-    expect(find.text('Review Send'), findsOneWidget);
+    expect(find.text('REVIEW SEND'), findsOneWidget);
   });
 
   group('payment request framing', () {
@@ -4245,15 +4248,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Review Payment'), findsOneWidget);
+      expect(find.text('REVIEW PAYMENT'), findsOneWidget);
       expect(
         tester
-            .renderObject<RenderParagraph>(find.text('Review Payment'))
+            .renderObject<RenderParagraph>(find.text('REVIEW PAYMENT'))
             .didExceedMaxLines,
         isFalse,
         reason: 'the payment request title must fit the mobile top bar',
       );
-      expect(find.text('Review Send'), findsNothing);
+      expect(find.text('REVIEW SEND'), findsNothing);
       expect(find.text('Requested by'), findsOneWidget);
       expect(find.text('To'), findsNothing);
       expect(
@@ -4356,7 +4359,7 @@ void main() {
       await tester.pumpAndSettle();
       await _toReviewStep(tester, address: _shieldedAddress, amount: '0.75');
 
-      expect(find.text('Review Payment'), findsOneWidget);
+      expect(find.text('REVIEW PAYMENT'), findsOneWidget);
       expect(find.text('Requested by'), findsOneWidget);
       expect(find.text('Requested 0.50 ZEC'), findsOneWidget);
     });
@@ -4388,7 +4391,7 @@ void main() {
       );
       expect(find.text('Coffee shop'), findsNothing);
       expect(find.text('To'), findsOneWidget);
-      expect(find.text('Review Send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
       expect(find.textContaining('Requested'), findsNothing);
     });
 
@@ -4404,7 +4407,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Review Send'), findsOneWidget);
+      expect(find.text('REVIEW SEND'), findsOneWidget);
       expect(find.text('To'), findsOneWidget);
       expect(find.textContaining('Requested'), findsNothing);
     });

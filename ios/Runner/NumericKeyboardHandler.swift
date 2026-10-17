@@ -64,11 +64,11 @@ final class NumericKeyboardHandler {
       }
       configuration.cornerStyle = .capsule
       // Glass renders template symbols monochromatically, even with a
-      // foreground transformer. Preserve the Figma blue in the image itself.
-      let checkColor = UIColor(red: 0, green: 136.0 / 255.0, blue: 1, alpha: 1)
+      // foreground transformer. Keep the neon red (#FF2E3E) in the image itself.
+      let checkColor = UIColor(red: 1, green: 46.0 / 255.0, blue: 62.0 / 255.0, alpha: 1)
       configuration.image = UIImage(
         systemName: "checkmark",
-        withConfiguration: UIImage.SymbolConfiguration(pointSize: 19, weight: .semibold)
+        withConfiguration: UIImage.SymbolConfiguration(pointSize: 19, weight: .regular)
       )?.withTintColor(checkColor, renderingMode: .alwaysOriginal)
       control.configuration = configuration
       control.accessibilityLabel = "Done"

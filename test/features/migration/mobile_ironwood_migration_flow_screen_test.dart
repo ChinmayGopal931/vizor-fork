@@ -1895,7 +1895,7 @@ void main() {
           .widget<Text>(find.text('Choose how you migrate'))
           .style
           ?.fontWeight,
-      FontWeight.w500,
+      AppTypography.labelLarge.fontWeight,
     );
     expect(tester.widget<Text>(find.text('1')).style?.fontSize, 16);
     expect(
@@ -2012,7 +2012,7 @@ void main() {
           )
           .style
           ?.fontWeight,
-      FontWeight.w500,
+      AppTypography.bodyMediumStrong.fontWeight,
     );
     final immediateIconOpacity = tester.widget<Opacity>(
       find.ancestor(
@@ -2039,7 +2039,7 @@ void main() {
     );
     expect(
       (unselectedRadio.decoration! as BoxDecoration).color,
-      const Color(0x33B8B8B8),
+      AppThemeData.light.colors.background.neutralSubtleOpacity,
     );
 
     final privateOption = find.byKey(
@@ -3050,13 +3050,17 @@ void main() {
         matching: find.byType(AppButton),
       ),
     );
-    expect(allowButton.enabledBackgroundColor, const Color(0xFF052C1B));
-    expect(allowButton.pressedBackgroundColor, isNotNull);
+    // The page is no longer green: the app's own primary and ghost buttons,
+    // with no colour overrides.
+    expect(allowButton.variant, AppButtonVariant.primary);
+    expect(allowButton.enabledBackgroundColor, isNull);
+    expect(allowButton.pressedBackgroundColor, isNull);
     final notNowButton = tester.widget<AppButton>(
       find.ancestor(of: find.text('Not now'), matching: find.byType(AppButton)),
     );
     expect(notNowButton.variant, AppButtonVariant.ghost);
-    expect(notNowButton.pressedBackgroundColor, isNotNull);
+    expect(notNowButton.enabledBackgroundColor, isNull);
+    expect(notNowButton.pressedBackgroundColor, isNull);
 
     await tester.tap(find.text('Allow notifications'));
     await tester.pumpAndSettle();

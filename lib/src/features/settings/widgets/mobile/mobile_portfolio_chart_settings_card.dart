@@ -9,7 +9,6 @@ import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../portfolio_chart/providers/portfolio_chart_settings_provider.dart';
 import '../../../portfolio_chart/services/portfolio_chart_format.dart';
-import '../../../portfolio_chart/widgets/portfolio_chart_range_selector.dart';
 import 'mobile_tor_control.dart' show MobilePrivacyToggle;
 
 const _rowHeight = 44.0;
@@ -125,30 +124,6 @@ class MobilePortfolioChartSettingsCard extends ConsumerWidget {
                   ref
                       .read(portfolioChartSettingsProvider.notifier)
                       .setMarketPrices(!settings.marketPrices),
-                ),
-              ),
-            ),
-          ],
-          if (settings.enabled) ...[
-            const SizedBox(height: AppSpacing.s),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
-              child: Text(
-                'Default range',
-                style: AppTypography.labelLarge.copyWith(
-                  color: colors.text.accent,
-                ),
-              ),
-            ),
-            PortfolioChartRangeSelector(
-              selected: settings.defaultRange,
-              keyPrefix: 'mobile_settings_portfolio_chart_range',
-              onSelected: (range) => unawaited(
-                _apply(
-                  context,
-                  ref
-                      .read(portfolioChartSettingsProvider.notifier)
-                      .setDefaultRange(range),
                 ),
               ),
             ),

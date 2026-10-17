@@ -15,6 +15,7 @@ import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balan
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_banner.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/neon_scramble_text.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
@@ -85,11 +86,22 @@ void main() {
       expect(find.text(PrivateUsdCopy.convertNetworkFee), findsOneWidget);
       expect(find.text(PrivateUsdCopy.convertYouReceive), findsOneWidget);
       expect(find.text(PrivateUsdCopy.convertMakerCost), findsOneWidget);
+      // The expiry is a HUD caption, drawn uppercase.
       expect(
-        find.text(PrivateUsdCopy.convertQuoteExpires('2:35')),
+        find.text(PrivateUsdCopy.convertQuoteExpires('2:35').toUpperCase()),
         findsOneWidget,
       );
-      expect(find.text(r'$15.50'), findsNWidgets(2));
+      // The ledger's line, and the estimate above it, which decrypts the
+      // quote in.
+      expect(find.text(r'$15.50'), findsOneWidget);
+      expect(
+        tester
+            .widget<NeonScrambleText>(
+              find.byKey(const ValueKey('mobile_private_usd_convert_receive')),
+            )
+            .text,
+        r'$15.50',
+      );
       expect(
         button(tester, 'mobile_private_usd_convert_review').onPressed,
         isNotNull,
@@ -181,11 +193,15 @@ void main() {
         ),
       );
 
-      expect(find.text(PrivateUsdCopy.convertReviewTitle), findsOneWidget);
+      // The page title and the expiry caption are drawn uppercase.
+      expect(
+        find.text(PrivateUsdCopy.convertReviewTitle.toUpperCase()),
+        findsOneWidget,
+      );
       expect(find.text('0.5 ZEC'), findsOneWidget);
       expect(find.text(r'$15.50'), findsOneWidget);
       expect(
-        find.text(PrivateUsdCopy.convertQuoteHolds('2:35')),
+        find.text(PrivateUsdCopy.convertQuoteHolds('2:35').toUpperCase()),
         findsOneWidget,
       );
       expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsOneWidget);
@@ -207,7 +223,10 @@ void main() {
         ),
       );
 
-      expect(find.text(PrivateUsdCopy.quoteExpired), findsOneWidget);
+      expect(
+        find.text(PrivateUsdCopy.quoteExpired.toUpperCase()),
+        findsOneWidget,
+      );
       expect(find.text(PrivateUsdCopy.convertQuoteRanOut), findsOneWidget);
       expect(find.text(PrivateUsdCopy.convertNewQuote), findsOneWidget);
       expect(

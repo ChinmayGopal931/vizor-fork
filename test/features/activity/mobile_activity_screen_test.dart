@@ -411,10 +411,11 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(find.byType(MobileTransactionStatusScreen), findsOneWidget);
+    // The receipt's title is drawn uppercase in its top bar.
     expect(
       find.descendant(
         of: find.byType(MobileTransactionStatusScreen),
-        matching: find.text('Received'),
+        matching: find.text('RECEIVED'),
       ),
       findsOneWidget,
     );
@@ -442,7 +443,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Activity'), findsOneWidget);
+    // The page title and the date heads are drawn as uppercase captions.
+    expect(find.text('ACTIVITY'), findsOneWidget);
     expect(
       find.byWidgetPredicate(
         (widget) =>
@@ -456,7 +458,7 @@ void main() {
       tester.getTopLeft(find.byKey(const ValueKey('mobile_activity_feed'))).dy,
       moreOrLessEquals(kMobileTopNavHeight + AppSpacing.s),
     );
-    expect(find.text('This week'), findsOneWidget);
+    expect(find.text('THIS WEEK'), findsOneWidget);
     // The older entry lands in a month-year section.
     final olderDate = now.subtract(const Duration(days: 70));
     expect(find.textContaining('${olderDate.year}'), findsOneWidget);

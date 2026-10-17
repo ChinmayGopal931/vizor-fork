@@ -13,6 +13,7 @@ import '../../../../core/widgets/app_loading_icon.dart';
 import '../../../../core/widgets/comma_to_dot_input_formatter.dart';
 import '../../../../core/widgets/decimal_amount_input_formatter.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
+import '../../../../core/widgets/mobile/neon_scramble_text.dart';
 import '../../../../core/widgets/mobile/mobile_warning_notice.dart';
 import '../../../../rust/api/private_usd.dart' show ApiReverseRecord;
 import '../../../swap/domain/swap_asset.dart';
@@ -99,7 +100,10 @@ class MobilePrivateUsdReverseConvertView extends StatelessWidget {
                       onAmountChanged: onAmountChanged,
                       onMax: onMax,
                     ),
-                    PrivateUsdDirectionToggle(onTap: onSwitchDirection),
+                    PrivateUsdDirectionToggle(
+                      onTap: onSwitchDirection,
+                      busy: busy,
+                    ),
                     _ZecCard(
                       state: state,
                       privacyModeEnabled: privacyModeEnabled,
@@ -211,10 +215,7 @@ class _UsdCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            PrivateUsdCopy.title,
-            style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
-          ),
+          const PrivateUsdPanelCaption(PrivateUsdCopy.title),
           const SizedBox(height: AppSpacing.xs),
           TextField(
             key: const ValueKey('mobile_private_usd_convert_amount'),
@@ -230,7 +231,7 @@ class _UsdCard extends StatelessWidget {
             ],
             onChanged: onAmountChanged,
             style: amountStyle,
-            cursorColor: colors.text.accent,
+            cursorColor: colors.neon.glow,
             decoration: InputDecoration.collapsed(
               hintText: '0',
               hintStyle: amountStyle.copyWith(color: colors.text.muted),
@@ -291,23 +292,37 @@ class _ZecCard extends StatelessWidget {
             denomination: '',
           )
         : PrivateUsdCopy.unknown;
+    final cipherStyle = AppTypography.displayLarge.copyWith(
+      color: colors.neon.glow.withValues(alpha: 0.7),
+    );
     return MobileSurfaceCard(
       key: const ValueKey('mobile_private_usd_convert_estimate'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            PrivateUsdCopy.convertAssetZec,
-            style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
-          ),
+          const PrivateUsdPanelCaption(PrivateUsdCopy.convertAssetZec),
           const SizedBox(height: AppSpacing.xs),
-          Text(
-            estimate,
-            key: const ValueKey('mobile_private_usd_convert_receive'),
-            style: AppTypography.displayLarge.copyWith(
-              color: known ? colors.text.accent : colors.text.disabled,
+          // While the quote is on its way the amount churns as cipher; the
+          // quote then decrypts in.
+          if (state.quoting)
+            NeonCipherChurn(
+              key: const ValueKey('mobile_private_usd_convert_receive'),
+              style: cipherStyle,
+              semanticsLabel: PrivateUsdCopy.convertQuoteLoading,
+            )
+          else
+            NeonScrambleText(
+              key: const ValueKey('mobile_private_usd_convert_receive'),
+              text: estimate,
+              decryptOnAppear: known,
+              cipherStyle: cipherStyle,
+              style: AppTypography.displayLarge.copyWith(
+                color: known ? colors.neon.core : colors.text.disabled,
+                shadows: known
+                    ? Neon.textGlow(colors.neon.glow, intensity: 0.4)
+                    : null,
+              ),
             ),
-          ),
           const SizedBox(height: AppSpacing.xxs),
           Text(
             PrivateUsdCopy.convertEstimatedAmount,
@@ -374,38 +389,12 @@ class PrivateUsdReverseLedger extends StatelessWidget {
         ),
       ),
     ];
-    final colors = context.colors;
-    return MobileSurfaceCard(
+    return PrivateUsdLedgerCard(
       key: const ValueKey('mobile_private_usd_quote_ledger'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < rows.length; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.xs),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    rows[i].$1,
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: colors.text.secondary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.s),
-                Text(
-                  rows[i].$2,
-                  textAlign: TextAlign.end,
-                  style: AppTypography.bodyMedium.copyWith(
-                    color: colors.text.accent,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
+      rows: [
+        for (final (label, value) in rows)
+          PrivateUsdLedgerRow(label: label, value: value),
+      ],
     );
   }
 }

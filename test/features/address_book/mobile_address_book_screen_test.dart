@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:zcash_wallet/src/core/profile_pictures.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/neon_horizon.dart';
 import 'package:zcash_wallet/src/features/address_book/models/address_book_contact.dart';
 import 'package:zcash_wallet/src/features/address_book/providers/address_book_provider.dart';
 import 'package:zcash_wallet/src/features/address_book/screens/mobile/mobile_address_book_screen.dart';
@@ -24,12 +25,15 @@ void main() {
     await tester.pumpWidget(_harness(_FakeRepo()));
     await tester.pumpAndSettle();
 
-    // Top nav title is present; the top-nav + is hidden when there are no
-    // contacts (the centered CTA covers adding the first one).
-    expect(find.text('Contacts'), findsOneWidget);
+    // Top nav title is present (drawn uppercase); the top-nav + is hidden
+    // when there are no contacts (the centered CTA covers adding the first
+    // one).
+    expect(find.text('CONTACTS'), findsOneWidget);
     expect(find.byKey(const ValueKey('mobile_contacts_add')), findsNothing);
 
-    // Empty state: headline + centered add button, no search field.
+    // Empty state: the neon horizon, headline + centered add button, no
+    // search field.
+    expect(find.byType(NeonHorizon), findsOneWidget);
     expect(find.text('No contacts yet'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('mobile_contacts_add_empty')),

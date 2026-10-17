@@ -123,7 +123,7 @@ void main() {
     ) async {
       await _pumpUseCase(tester, entry.value);
       await tester.pumpAndSettle();
-      expect(find.text('Gift Cards'), findsWidgets);
+      expect(find.text('GIFT CARDS'), findsWidgets);
       expect(tester.takeException(), isNull);
     });
   }
@@ -298,7 +298,7 @@ void main() {
     await tester.tap(amountContinue);
     await tester.pump();
 
-    expect(find.text('Enter a message'), findsOneWidget);
+    expect(find.text('ENTER A MESSAGE'), findsOneWidget);
     final messageEditor = find.byKey(
       const ValueKey('mobile_payment_link_interactive_message_editor'),
     );
@@ -318,7 +318,7 @@ void main() {
     await tester.tap(messageContinue);
     await tester.pump();
 
-    expect(find.text('Review a Card'), findsOneWidget);
+    expect(find.text('REVIEW A CARD'), findsOneWidget);
     expect(find.text(r'$1,112.50'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('payment_link_fiat_loading_placeholder')),

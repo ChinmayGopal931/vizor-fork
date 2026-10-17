@@ -2410,7 +2410,8 @@ void main() {
       await tester.tap(find.text('Yes'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Review answers').hitTestable());
-      await _pumpUntilFound(tester, find.text('Review your answers'));
+      // The mobile review's page title is drawn uppercase.
+      await _pumpUntilFound(tester, find.text('REVIEW YOUR ANSWERS'));
 
       router.pop();
       await _pumpUntilFound(tester, find.text('Review answers'));
@@ -2470,10 +2471,11 @@ void main() {
         ),
       );
       unawaited(router.push(votingReviewRoute(_roundId)));
-      await _pumpUntilFound(tester, find.text('Review your answers'));
+      // The mobile review's page title is drawn uppercase.
+      await _pumpUntilFound(tester, find.text('REVIEW YOUR ANSWERS'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Review your answers'), findsOneWidget);
+      expect(find.text('REVIEW YOUR ANSWERS'), findsOneWidget);
       expect(find.text('Review vote'), findsNothing);
       final reviewScroll = find.byKey(
         const ValueKey('mobile_voting_review_scroll'),

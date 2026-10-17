@@ -393,8 +393,8 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final base = _MigrationPreviewPage(
       navTitle: 'Enable notifications',
-      backgroundColor: const Color(0xFF007F49),
-      navForegroundColor: const Color(0xFFFFFFFF),
+      backgroundColor: context.colors.background.window,
+      navForegroundColor: context.colors.text.accent,
       onBack: onBack,
       bottom: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -404,7 +404,7 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
               errorMessage!,
               textAlign: TextAlign.center,
               style: AppTypography.bodySmall.copyWith(
-                color: const Color(0xFFFFFFFF),
+                color: context.colors.text.destructive,
               ),
             ),
             const SizedBox(height: AppSpacing.s),
@@ -415,10 +415,6 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
             expand: true,
             height: 50,
             onPressed: busy ? null : onNotNow ?? () {},
-            enabledBackgroundColor: const Color(0x00000000),
-            pressedBackgroundColor: const Color(0x1A052C1B),
-            enabledLabelColor: const Color(0xFF052C1B),
-            pressedLabelColor: const Color(0xFF052C1B),
             child: const Text('Not now'),
           ),
           const SizedBox(height: AppSpacing.s),
@@ -429,11 +425,6 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
             constrainContent: true,
             height: 50,
             onPressed: busy ? null : onAllow ?? () {},
-            enabledBackgroundColor: const Color(0xFF052C1B),
-            pressedBackgroundColor: GreenPrimitives.p50Dark,
-            enabledLabelColor: const Color(0xFFDDEAE4),
-            pressedLabelColor: const Color(0xFFDDEAE4),
-            enabledBorderColor: const Color(0x1AFFFFFF),
             leading: const AppIcon(AppIcons.notificationBell, size: 20),
             child: Text(busy ? 'Checking...' : 'Allow notifications'),
           ),
@@ -448,9 +439,9 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
               child: Column(
                 children: [
                   SizedBox(
-                    height: compact ? 190 : 280,
+                    height: compact ? 136 : 192,
                     child: _MigrationNotificationIllustration(
-                      size: compact ? 180 : 256,
+                      size: compact ? 96 : 128,
                     ),
                   ),
                   Center(
@@ -460,7 +451,7 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
                         'Keep your migration on schedule',
                         textAlign: TextAlign.center,
                         style: AppTypography.displayLarge.copyWith(
-                          color: const Color(0xFFFFFFFF),
+                          color: context.colors.text.accent,
                         ),
                       ),
                     ),
@@ -475,7 +466,7 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
                         'avoid unnecessary delays.',
                         textAlign: TextAlign.center,
                         style: AppTypography.bodyMedium.copyWith(
-                          color: const Color(0xFFFFFFFF),
+                          color: context.colors.text.secondary,
                         ),
                       ),
                     ),
@@ -580,21 +571,16 @@ class _MigrationNotificationConfirmationContent extends StatelessWidget {
   }
 }
 
+/// The notification page's hero: a lit bell on the neon badge plate.
 class _MigrationNotificationIllustration extends StatelessWidget {
-  const _MigrationNotificationIllustration({this.size = 256});
+  const _MigrationNotificationIllustration({this.size = 128});
 
   final double size;
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: SizedBox.square(
-        dimension: size,
-        child: Image.asset(
-          'assets/illustrations/ironwood_notification_bell.webp',
-          fit: BoxFit.contain,
-        ),
-      ),
+      child: NeonGlyphBadge(iconName: AppIcons.notificationBell, size: size),
     );
   }
 }
@@ -2350,47 +2336,24 @@ class _MigrationCompletePreview extends StatelessWidget {
     return _MigrationPreviewPage(
       navTitle: 'You’re all set!',
       onBack: onDone,
-      backgroundColor: const Color(0xFF007F49),
-      navForegroundColor: const Color(0xFFFFFFFF),
-      bottom: Semantics(
-        button: true,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onDone ?? () {},
-          child: Container(
-            height: 50,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7F7F7),
-              borderRadius: BorderRadius.circular(AppRadii.full),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              'Done',
-              style: AppTypography.labelLarge.copyWith(
-                color: const Color(0xFF1B1F1F),
-              ),
-            ),
-          ),
-        ),
+      backgroundColor: context.colors.background.window,
+      navForegroundColor: context.colors.text.accent,
+      bottom: AppButton(
+        expand: true,
+        height: 50,
+        onPressed: onDone ?? () {},
+        child: const Text('Done'),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox.square(
-            dimension: 256,
-            child: Image(
-              image: AssetImage(
-                'assets/illustrations/ironwood_migration_done_coins.webp',
-              ),
-              fit: BoxFit.contain,
-            ),
-          ),
+          const NeonGlyphBadge(glyph: TronGlyphKind.check, size: 128),
           const SizedBox(height: AppSpacing.xl),
           Text(
             'Your\n$amountText\nare on Ironwood!',
             textAlign: TextAlign.center,
             style: AppTypography.displayLarge.copyWith(
-              color: const Color(0xFFFFFFFF),
+              color: context.colors.text.accent,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -2399,7 +2362,7 @@ class _MigrationCompletePreview extends StatelessWidget {
             'usual.',
             textAlign: TextAlign.center,
             style: AppTypography.bodyMedium.copyWith(
-              color: const Color(0xFFFFFFFF),
+              color: context.colors.text.secondary,
             ),
           ),
         ],
