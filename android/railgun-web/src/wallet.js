@@ -2,9 +2,12 @@ import { RailgunWallet } from '@railgun-community/engine';
 import { MerkletreeScanStatus, NETWORK_CONFIG, NetworkName, TXIDVersion } from '@railgun-community/shared-models';
 import {
   createRailgunWallet,
+  deleteWalletByID,
   generatePOIsForWallet,
+  getEngine,
   getProver,
   getSerializedERC20Balances,
+  hasEngine,
   loadProvider,
   loadWalletByID,
   refreshBalances,
@@ -19,10 +22,13 @@ import LevelJS from 'level-js';
 import { groth16 } from 'snarkjs';
 import { artifactStore } from './artifacts.js';
 import { badRequest } from './errors.js';
+import { walletNamespaces } from './wallet-namespaces.js';
 
 export const TXID_VERSION = TXIDVersion.V2_PoseidonMerkle;
 const NETWORKS = { sepolia: NetworkName.EthereumSepolia, mainnet: NetworkName.Ethereum };
-const WALLET_SOURCE = 'zapp';
+// Only in the encrypted annotations of the notes this wallet sends: neither the wallet's id nor where it is stored
+// depends on it, so stored wallets open as before.
+const WALLET_SOURCE = 'vizor';
 // The engine's listener catches spends a scan misses, as it reads nullifiers from the latest commitment's block on.
 const POLLING_INTERVAL_MS = 15_000;
 const NOTES_SCAN_ATTEMPTS = 20;
@@ -31,6 +37,8 @@ const NOTES_SCAN_RETRY_MS = 3_000;
 const NOTES_SCAN_START = 0.03;
 
 let starting;
+// The engine a page opened to delete wallets: its database alone, with no provider. Such a page is never started.
+let deleting;
 let network;
 let fees;
 let wallet;
@@ -54,6 +62,7 @@ export function start({ network: name, rpcUrls, poiNodeUrls, debug: debugging = 
   const networkName = NETWORKS[name];
   if (networkName === undefined) throw badRequest(`unknown network ${name}`);
   if (!rpcUrls?.length) throw badRequest('no RPC URLs');
+  if (deleting !== undefined) throw badRequest('this page deletes wallets');
   if (starting === undefined) {
     debug = debugging === true;
     const promise = startEngine(networkName, `railgun-${name}`, rpcUrls, poiNodeUrls, debug, emit);
@@ -109,6 +118,37 @@ async function open(encryptionKey, mnemonic, creationBlock) {
   }
   wallet = { walletId: info.id, encryptionKey, address: info.railgunAddress };
   return { address: info.railgunAddress };
+}
+
+/**
+ * Deletes the wallet `mnemonic` derives at index 0, as `openWallet` would find it, from `network`'s database: its
+ * encrypted keys, and the notes syncs decrypted for it, which the engine keeps unencrypted. Only the database opens,
+ * with no provider and no screening nodes, so nothing leaves the page. The host loads a fresh page to delete and
+ * closes it after; a page that deletes is never started, and one that started never deletes. Deleting a wallet that
+ * isn't stored does nothing.
+ */
+export async function deleteWallet({ network: name, mnemonic }) {
+  const networkName = NETWORKS[name];
+  if (networkName === undefined) throw badRequest(`unknown network ${name}`);
+  if (typeof mnemonic !== 'string' || mnemonic === '') throw badRequest('no mnemonic');
+  // A start that failed may have left its engine, over its own network's database.
+  if (starting !== undefined || (deleting === undefined && hasEngine())) {
+    throw badRequest('wallets are deleted on a page of their own');
+  }
+  if (deleting === undefined) {
+    const database = new LevelJS(`railgun-${name}`);
+    deleting = { networkName, promise: startRailgunEngine(WALLET_SOURCE, database, false, artifactStore, false, false) };
+  } else if (deleting.networkName !== networkName) {
+    throw badRequest(`the engine runs ${deleting.networkName}`);
+  }
+  await deleting.promise;
+  const id = RailgunWallet.generateID(mnemonic, 0);
+  await deleteWalletByID(id);
+  const { db } = getEngine();
+  for (const namespace of walletNamespaces(id, NETWORK_CONFIG[networkName].chain)) {
+    await db.clearNamespace(namespace);
+  }
+  return null;
 }
 
 /** Scans to the chain's tip, then has the screening nodes check the notes, and returns balances. */

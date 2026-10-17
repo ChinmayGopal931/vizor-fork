@@ -19,6 +19,9 @@ internal enum class RailgunMethod(
     // A wallet's first sync reads all of Railgun's history, half an hour or more on Ethereum, and keeps none of it
     // until it's done; a timeout closes the page, which starts it over.
     REFRESH("refresh", 2.hours),
+
+    // Local only: it opens the page's database without a provider, on a page loaded for it alone.
+    DELETE_WALLET("deleteWallet", 1.minutes),
     TRANSFER("transfer", 10.minutes),
     UNSHIELD("unshield", 10.minutes),
     BROADCASTER_FEE("broadcasterFee", 2.minutes),
@@ -33,11 +36,8 @@ internal enum class RailgunMethod(
 
 /** The page's wire format. Params, results and events stay raw JSON text; Dart owns the typed models. */
 internal object RailgunProtocol {
-    /**
-     * The page's hello on the port it was handed; it must equal `INIT` in `index.js`. It becomes
-     * `vizor-railgun-init` with the E5 bundle rebuild.
-     */
-    const val INIT = "zapp-railgun-init"
+    /** The page's hello on the port it was handed; it must equal `INIT` in `index.js`. */
+    const val INIT = "vizor-railgun-init"
 
     /** Engine and console lines; forwarded only from a page loaded with `debug`. */
     const val LOG = "log"

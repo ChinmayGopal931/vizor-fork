@@ -496,10 +496,11 @@ mod tests {
         stop().await;
     }
 
-    /// The bridge's allowlist is one of three copies of the page's hosts
-    /// (reference §8.2). A host missing from any copy fails silently on a
-    /// device, so pin them together: Kotlin's `RailgunEndpoints.hosts`, and the
-    /// CSP `connect-src` of the shipped bundle and of its source.
+    /// The bridge's allowlist is one of several copies of the page's hosts
+    /// (reference §8.2, iOS plan XI10). A host missing from any copy fails
+    /// silently on a device, so pin them together: Kotlin's
+    /// `RailgunEndpoints.hosts`, and the CSP `connect-src` of the bundle's
+    /// source, of the Android bundle and of its iOS copy.
     #[test]
     fn the_page_hosts_match_the_kotlin_filter_and_the_page_csp() {
         let mut expected = RAILGUN_PAGE_HOSTS.map(str::to_owned).to_vec();
@@ -507,19 +508,20 @@ mod tests {
         expected.dedup();
         assert_eq!(expected.len(), 9, "the allowlist has duplicates");
 
-        let android = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../android");
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let read = |path: &str| {
-            std::fs::read_to_string(android.join(path))
-                .unwrap_or_else(|error| panic!("read android/{path}: {error}"))
+            std::fs::read_to_string(repo.join(path))
+                .unwrap_or_else(|error| panic!("read {path}: {error}"))
         };
 
         let kotlin = kotlin_hosts(&read(
-            "app/src/main/kotlin/com/keplr/vizor/railgun/RailgunEndpoints.kt",
+            "android/app/src/main/kotlin/com/keplr/vizor/railgun/RailgunEndpoints.kt",
         ));
         assert_eq!(kotlin, expected, "RailgunEndpoints.hosts");
         for page in [
-            "app/src/main/assets/railgun/index.html",
-            "railgun-web/src/index.html",
+            "android/railgun-web/src/index.html",
+            "android/app/src/main/assets/railgun/index.html",
+            "ios/Runner/Railgun/railgun/index.html",
         ] {
             assert_eq!(csp_connect_hosts(&read(page)), expected, "{page}");
         }

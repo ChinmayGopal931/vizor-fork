@@ -1,0 +1,135 @@
+Bundled license information:
+
+ieee754/index.js:
+  /*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> */
+
+buffer/index.js:
+  /*!
+   * The buffer module from node.js, for the browser.
+   *
+   * @author   Feross Aboukhadijeh <https://feross.org>
+   * @license  MIT
+   */
+
+@noble/hashes/utils.js:
+@noble/hashes/utils.js:
+@noble/hashes/utils.js:
+@noble/hashes/utils.js:
+@noble/hashes/utils.js:
+@noble/hashes/utils.js:
+@noble/hashes/esm/utils.js:
+snarkjs/build/browser.esm.js:
+  /*! noble-hashes - MIT License (c) 2022 Paul Miller (paulmillr.com) */
+
+@noble/curves/abstract/utils.js:
+@noble/curves/abstract/modular.js:
+@noble/curves/abstract/curve.js:
+@noble/curves/abstract/weierstrass.js:
+@noble/curves/_shortw_utils.js:
+@noble/curves/secp256k1.js:
+@noble/curves/abstract/utils.js:
+@noble/curves/abstract/modular.js:
+@noble/curves/abstract/curve.js:
+@noble/curves/abstract/weierstrass.js:
+@noble/curves/_shortw_utils.js:
+@noble/curves/secp256k1.js:
+  /*! noble-curves - MIT License (c) 2022 Paul Miller (paulmillr.com) */
+
+aes-js/lib.commonjs/aes.js:
+  /*! MIT License. Copyright 2015-2022 Richard Moore <me@ricmoo.com>. See LICENSE.txt. */
+
+axios/dist/browser/axios.cjs:
+  /*! Axios v1.20.0 Copyright (c) 2026 Matt Zabriskie and contributors */
+
+safe-buffer/index.js:
+  /*! safe-buffer. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> */
+
+assert/build/internal/util/comparisons.js:
+  /*!
+   * The buffer module from node.js, for the browser.
+   *
+   * @author   Feross Aboukhadijeh <feross@feross.org> <http://feross.org>
+   * @license  MIT
+   */
+
+utf8/utf8.js:
+  /*! https://mths.be/utf8js v3.0.0 by @mathias */
+
+@noble/ed25519/lib/index.js:
+  /*! noble-ed25519 - MIT License (c) 2019 Paul Miller (paulmillr.com) */
+
+@scure/base/lib/index.js:
+@scure/base/lib/index.js:
+@scure/base/lib/index.js:
+  /*! scure-base - MIT License (c) 2022 Paul Miller (paulmillr.com) */
+
+@scure/bip32/lib/index.js:
+  /*! scure-bip32 - MIT License (c) 2022 Patricio Palladino, Paul Miller (paulmillr.com) */
+
+@scure/bip39/index.js:
+  /*! scure-bip39 - MIT License (c) 2022 Patricio Palladino, Paul Miller (paulmillr.com) */
+
+is-buffer/index.js:
+  /*!
+   * Determine if an object is a Buffer
+   *
+   * @author   Feross Aboukhadijeh <https://feross.org>
+   * @license  MIT
+   */
+
+queue-microtask/index.js:
+  /*! queue-microtask. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> */
+
+event-lite/event-lite.js:
+  /**
+   * event-lite.js - Light-weight EventEmitter (less than 1KB when gzipped)
+   *
+   * @copyright Yusuke Kawasaki
+   * @license MIT
+   * @constructor
+   * @see https://github.com/kawanet/event-lite
+   * @see http://kawanet.github.io/event-lite/EventLite.html
+   * @example
+   * var EventLite = require("event-lite");
+   *
+   * function MyClass() {...}             // your class
+   *
+   * EventLite.mixin(MyClass.prototype);  // import event methods
+   *
+   * var obj = new MyClass();
+   * obj.on("foo", function() {...});     // add event listener
+   * obj.once("bar", function() {...});   // add one-time event listener
+   * obj.emit("foo");                     // dispatch event
+   * obj.emit("bar");                     // dispatch another event
+   * obj.off("foo");                      // remove event listener
+   */
+
+@noble/ciphers/utils.js:
+  /*! noble-ciphers - MIT License (c) 2023 Paul Miller (paulmillr.com) */
+
+localforage/dist/localforage.js:
+  /*!
+      localForage -- Offline Storage, Improved
+      Version 1.10.0
+      https://localforage.github.io/localForage
+      (c) 2013-2017 Mozilla, Apache License 2.0
+  */
+
+@repeaterjs/repeater/cjs/repeater.js:
+  /*! *****************************************************************************
+  Copyright (c) Microsoft Corporation.
+  
+  Permission to use, copy, modify, and/or distribute this software for any
+  purpose with or without fee is hereby granted.
+  
+  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+  REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+  AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+  INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+  LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+  OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+  PERFORMANCE OF THIS SOFTWARE.
+  ***************************************************************************** */
+
+run-parallel-limit/index.js:
+  /*! run-parallel-limit. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> */

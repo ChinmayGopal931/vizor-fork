@@ -260,8 +260,8 @@ final class RailgunHostHandler: NSObject, FlutterStreamHandler {
 
 // RailgunProtocol.swift
 enum RailgunMethod: String, CaseIterable {
-  case start, openWallet, refresh, broadcasterFee, transfer, unshield, reverseCost, prepareReverse
-  var timeout: TimeInterval { get }  // 120, 60, 7200, 120, 600, 600, 30, 600 (kt/RailgunProtocol.kt:16-26)
+  case start, openWallet, refresh, deleteWallet, broadcasterFee, transfer, unshield, reverseCost, prepareReverse
+  var timeout: TimeInterval { get }  // 120, 60, 7200, 60, 120, 600, 600, 30, 600 (kt/RailgunProtocol.kt; deleteWallet VI-2)
 }
 enum RailgunMessage {
   case ready
@@ -359,12 +359,12 @@ Every milestone also follows these rules:
 **Tasks.**
 
 1. `rw/src/index.js`: the transport abstraction (§6.2). Android keeps the `MessagePort` hello (`event.source === null`, exactly one port), and iOS uses `railgunHost` and `__railgunHostDeliver`. `INIT` becomes `vizor-railgun-init` (E5, X2).
-2. E5: `deleteWallet` (D15) and `WALLET_SOURCE = 'vizor'` (X2) in `rw/src/wallet.js`.
+2. E5: `deleteWallet` (D15) and `WALLET_SOURCE = 'vizor'` (X2) in `rw/src/wallet.js`. **As built (VI-2):** `deleteWallet {network, mnemonic}` runs on a page of its own with only the database open (no provider, no screening nodes, so no network). It deletes the wallet's encrypted keys (`deleteWalletByID`) and also the notes syncs decrypted for it, which the engine keeps unencrypted. It joins the host method tables with a 1-minute timeout. Dart does not call it yet (BI-3).
 3. `rw/build.mjs`:
    - `target: ['chrome100', 'safari17']`
    - write the bundle to `android/app/src/main/assets/railgun` as today
    - then copy it, with `COPYING` and `railgun.js.LEGAL.txt`, to `ios/Runner/Railgun/railgun`
-4. Kotlin: `RailgunProtocol.INIT`, and the tests that parse `index.js` (`theHelloIsThePageOwn`, `thePageAnswersEveryMethod`). `rw/dev/check.mjs` dispatches the new `INIT` (`:92`).
+4. Kotlin: `RailgunProtocol.INIT`, and the tests that parse `index.js` (`theHelloIsThePageOwn`, `thePageAnswersEveryMethod`). `rw/dev/check.mjs` dispatches the new `INIT` (`:92`), and (as built) ends with a delete check: a fresh page deletes the synced wallet and every one of its IndexedDB keys is gone.
 5. The Rust pin test also reads the iOS copy of `index.html` now, and `sw/RailgunEndpoints.swift` once MI2 adds it.
 6. Optional (XI13): `rw/dev/check-webkit.mjs` in Playwright's WebKit.
 7. An Android device round on the A35 with the new bundle: the A-plan M3 device checks.
@@ -378,8 +378,8 @@ Every milestone also follows these rules:
 **Traps.**
 
 - **`build.mjs` deletes its output directory** (`:34-35`). The iOS copy must be its own step after the Android write, and both outputs carry `COPYING`.
-- **Whether the stored wallet's lookup depends on `WALLET_SOURCE`** is unverified (A-plan U17). If changing `'zapp'` to `'vizor'` changes it, existing Android users rescan once. Record the result before shipping, or keep `'zapp'` (UI10).
-- **`safari17` may change esbuild's lowering for Android too.** The A35 round is the gate (UI11).
+- **`WALLET_SOURCE` does not affect stored wallets** (settled in MI1, VI-3). The SDK writes it only into the encrypted annotations of the notes a wallet sends. The wallet's id is `sha256(seed ‖ index)` and its record is `['wallet', id]`, so existing Android wallets open as before, with no rescan (UI10).
+- **`safari17` changes nothing in the output** (MI1, VI-4): a `chrome100`-only build of the same source is byte-identical. The A35 round still gates the source changes (UI11).
 - **Never open `railgun.js`.** Compare builds by size and hash only.
 
 ### MI2. The Swift host
@@ -643,8 +643,8 @@ Skip unit tests for the delegates' glue and the window placement; the device rou
 | UI7 | `WKContentRuleList` also applies to worker fetches | MI0.4 | None needed: the bridge's allowlist stays authoritative |
 | UI8 | The loopback proxy hop raises no Local Network prompt and no ATS error | MI0.4 | None expected: it is loopback, and the tunnelled bytes are TLS |
 | UI9 | A WebContent process killed in the background is reported, and the next use reopens cleanly | MI3 | — |
-| UI10 | Changing `WALLET_SOURCE` (X2) keeps existing Android Railgun wallets readable | MI1 | Keep `'zapp'` (A-plan U17) |
-| UI11 | The bundle built with the `safari17` target still runs on the Android WebView | MI1.7 | Separate builds per platform |
+| UI10 | Changing `WALLET_SOURCE` (X2) keeps existing Android Railgun wallets readable. **Settled in MI1 (VI-3):** it only enters the encrypted annotations of sent notes; the wallet's id and record don't depend on it | MI1 | Keep `'zapp'` (A-plan U17) |
+| UI11 | The bundle built with the `safari17` target still runs on the Android WebView. **The target itself is settled (VI-4):** it changes no byte of the output; MI1.7 still checks the source changes | MI1.7 | Separate builds per platform |
 | UI12 | App Store acceptance (guideline 3.1.5, a privacy protocol) | MI8 | DI4: the kill switch; developer-only distribution |
 | UI13 | GPL and AGPL code in an App Store binary | DI3 (legal review) | DI3's options |
 | UI14 | The issuer accepts App Attest | MI7, EI6 | None needed while makers don't require tokens |

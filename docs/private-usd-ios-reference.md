@@ -47,7 +47,7 @@ Port `kt/` to Swift (plan XI1). Read on 2026-10-17 from `kt/` at `ef7b2e067`.
 | `railgun.js.LEGAL.txt` | 4,586 |
 | `index.html` | 617 |
 
-The MI1 rebuild changes these sizes; record the new ones in the progress doc.
+The MI1 rebuild changes these sizes; record the new ones in the progress doc. As built, only `railgun.js` changed (9,768,846 bytes), and the build reproduces byte for byte.
 
 - **In Xcode.** Add `ios/Runner/Railgun/railgun` once, as a **folder reference** (a blue folder), to the Runner target's Copy Bundle Resources phase. The files then ship under `Runner.app/railgun/` with their names, and a rebuild needs no project edit. As a group (a yellow folder) every file would need its own project entry.
 - **Not a Flutter asset**, exactly as on Android: never add it to `pubspec.yaml`.
@@ -78,7 +78,7 @@ Amounts are decimal strings, unknown events are dropped, and an unreadable reply
 **The page side** (`rw/src/index.js`, MI1). A sketch; the real code keeps `index.js`'s dispatch (`:8-58`):
 
 ```js
-const INIT = 'vizor-railgun-init';           // E5; 'zapp-railgun-init' until then (:7)
+const INIT = 'vizor-railgun-init';           // E5 (as built in MI1)
 
 function connect(onMessage) {
   const ios = globalThis.webkit?.messageHandlers?.railgunHost;
@@ -122,6 +122,7 @@ function connect(onMessage) {
   - `unshield` 10 min
   - `reverseCost` 30 s
   - `prepareReverse` 10 min
+  - `deleteWallet` 1 min (new in MI1, VI-2; local only)
 
 New on both platforms:
 
@@ -232,7 +233,7 @@ The last line repeats once per host in `RailgunEndpoints`.
   2. `try await WKWebsiteDataStore.remove(forIdentifier: storeID)`.
   3. WebKit refuses while the store is still in use, so retry up to 5 times, 500 ms apart.
   4. If it still fails, answer `FAILED`. Dart's reset logs a failed wipe and carries on (`account_provider.dart:2152-2165`).
-- **Deleting one account** uses the page's `deleteWallet` (plan DI7, A-plan E5), as on Android.
+- **Deleting one account** uses the page's `deleteWallet` (plan DI7, A-plan E5), as on Android. As built in MI1 (plan VI-2): `deleteWallet {network, mnemonic}` runs on a fresh page with only the database open, removes the wallet's encrypted record and the notes syncs decrypted for it (stored unencrypted), and needs no network. When and how Dart calls it is open (progress BI-3).
 - **Backups** (plan DI6). After the store's first use, find its directory under `Library/WebKit/` (MI0.7 records the path) and set `isExcludedFromBackup` on it. Until MI0 confirms the path, exclude `Library/WebKit` as a whole: the app has no other web content.
 - **Threading.** The page's workers run inside WebKit's own process. The host does nothing off the main actor except its timeout tasks.
 

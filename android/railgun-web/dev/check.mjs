@@ -1,5 +1,5 @@
 // Drives the built bundle in headless Chrome through the same MessagePort protocol as the app.
-//   npm run check                 syncs a fresh wallet on Sepolia, then reopens it from IndexedDB
+//   npm run check                 syncs a fresh wallet on Sepolia, reopens it from IndexedDB, then deletes it
 //   npm run check -- --transact   sends privately to itself through the relayer, which pays the gas, with
 //                                 the wallet RAILGUN_DEV_MNEMONIC in local.properties names, which must hold
 //                                 the relayer's token; Chrome keeps dev/.profile between runs
@@ -89,7 +89,7 @@ async function connect(page, url, onEvent) {
         port1.postMessage(JSON.stringify({ id, method, params }));
       });
     // As the app's postWebMessage does, with no source window.
-    window.dispatchEvent(new MessageEvent('message', { data: 'zapp-railgun-init', ports: [port2] }));
+    window.dispatchEvent(new MessageEvent('message', { data: 'vizor-railgun-init', ports: [port2] }));
   });
   return async (method, params) => {
     const started = performance.now();
@@ -151,6 +151,54 @@ async function syncCheck(page, url, onEvent) {
     if (scans < 2) throw new Error(`two syncs at once started ${scans} notes scan(s)`);
     console.log('  two syncs at once each started a notes scan');
   }
+  await deleteCheck(page, url, onEvent, mnemonic);
+}
+
+/**
+ * How many keys the engine stores for `mnemonic`'s wallet: its record `<wallet>:<id>`, and the notes under it. level-js
+ * keeps the keys as bytes, so the range is too.
+ */
+async function walletKeys(page, mnemonic) {
+  const { Database, RailgunWallet } = require('@railgun-community/engine');
+  const record = Database.pathToKey(RailgunWallet.dbPath(RailgunWallet.generateID(mnemonic, 0)));
+  return page.evaluate(
+    (location, from) =>
+      new Promise((resolve, reject) => {
+        const request = indexedDB.open(`level-js-${location}`);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const bytes = (text) => new TextEncoder().encode(text);
+          const range = IDBKeyRange.bound(bytes(from), bytes(`${from}~`));
+          const count = db.transaction(location, 'readonly').objectStore(location).count(range);
+          count.onsuccess = () => {
+            db.close();
+            resolve(count.result);
+          };
+          count.onerror = () => reject(count.error);
+        };
+      }),
+    'railgun-sepolia',
+    record,
+  );
+}
+
+/** A fresh page deletes the synced wallet with no network, and then refuses to start. */
+async function deleteCheck(page, url, onEvent, mnemonic) {
+  console.log('delete:');
+  const stored = await walletKeys(page, mnemonic);
+  if (stored === 0) throw new Error('the synced wallet left nothing in IndexedDB');
+  const call = await connect(page, url, onEvent);
+  await call('deleteWallet', { network: 'sepolia', mnemonic });
+  const left = await walletKeys(page, mnemonic);
+  if (left !== 0) throw new Error(`deleting the wallet left ${left} of its ${stored} keys`);
+  await call('deleteWallet', { network: 'sepolia', mnemonic });
+  const started = await call('start', { network: 'sepolia', rpcUrls: [RPC_URL], poiNodeUrls: [POI_NODE] }).then(
+    () => 'started',
+    (error) => error.message,
+  );
+  if (!started.startsWith('BAD_REQUEST')) throw new Error(`the page that deleted came back from start as ${started}`);
+  console.log(`  deleteWallet removed all ${stored} of the wallet's keys, again harmlessly, and the page won't start`);
 }
 
 /** Posts what the page proved to the relayer, as the app does, and waits for its block from here. */

@@ -698,7 +698,7 @@ The bundle contains GPL-3.0 code. It ships as a separately licensed asset, with 
 JSON strings go over one `WebMessagePort`. The page side is `rl/web/src/index.js:1-58` and the host side is `RailgunProtocol.kt:162-282`.
 
 - **Handshake.**
-  1. After `onPageFinished(PAGE_URL)`, the host creates a message channel and posts `WebMessage("zapp-railgun-init", [pagePort])` (`"vizor-railgun-init"` after X2) to origin `https://railgun.appassets.androidplatform.net` (`RailgunWebViewHost.kt:137-153`).
+  1. After `onPageFinished(PAGE_URL)`, the host creates a message channel and posts `WebMessage("vizor-railgun-init", [pagePort])` (`"zapp-railgun-init"` before the iOS MI1 rebuild) to origin `https://railgun.appassets.androidplatform.net` (`RailgunWebViewHost.kt:137-153`).
   2. The page takes only the first port handed over, and only when `event.source === null` and `data === INIT` (`index.js:53-58`).
   3. The page answers `{event:"ready", data:null}`.
   4. The host waits for it for 30 s (`LOAD_TIMEOUT`, `:262`).
@@ -721,6 +721,7 @@ JSON strings go over one `WebMessagePort`. The page side is `rl/web/src/index.js
 | `unshield` | 10 min | `{to: 0x, token, amount, fee, broadcaster: B}` | same as `transfer` | `transact.js:79-95` |
 | `reverseCost` | 30 s | `{amount, railgun: proxy, fee}` | `{debit, railgunFee}` | `reverse.js:14-20` |
 | `prepareReverse` | 10 min | `{amount, railgun, token, calls:[{to,data}]×3, relayAdapt, fee}` | `{to: relayAdapt, data, value, cost:{debit, railgunFee}}` | `reverse.js:22-50` |
+| `deleteWallet` | 1 min | `{network: "mainnet"\|"sepolia", mnemonic: String}` | `null` | `wallet.js` (iOS MI1, VI-2): on a fresh page, with only the database open (no network); removes the wallet's record and its decrypted notes. A page that deleted refuses `start`, and one that started refuses `deleteWallet`. |
 | `openNewWallet` (debug only) | — | `{encryptionKey, mnemonic, creationBlock}` | `{address}` | `wallet.js:94` |
 
 - **The broadcaster object `B`.** It is `{chainId, railgunProxy, railgunAddress, token, minFee, feePerUnitGas?, maxGasPrice}` (`RailgunProtocol.kt:128-150`).

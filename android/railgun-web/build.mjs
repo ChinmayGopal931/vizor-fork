@@ -1,11 +1,14 @@
-// Bundles src/ into the assets the hidden WebView loads: `npm ci --ignore-scripts && npm run build`.
+// Bundles src/ into the assets the hidden page loads: `npm ci --ignore-scripts && npm run build`. One bundle serves
+// both platforms: Android's WebView reads the APK's assets, and the iOS host the app bundle's `railgun/` folder.
 import { build } from 'esbuild';
-import { copyFile, mkdir, rm } from 'node:fs/promises';
+import { copyFile, cp, mkdir, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const out = path.resolve('../app/src/main/assets/railgun');
+// A folder reference in the Runner target, copied byte for byte (iOS reference §6.1).
+const ios = path.resolve('../../ios/Runner/Railgun/railgun');
 
 // wasm-bindgen's loaders fetch these next to the bundle (`new URL(file, import.meta.url)`).
 const wasm = [
@@ -40,7 +43,8 @@ const result = await build({
   bundle: true,
   format: 'esm',
   platform: 'browser',
-  target: ['chrome100'],
+  // Android's WebView and the iOS host's WebKit (Private USD needs iOS 17).
+  target: ['chrome100', 'safari17'],
   minify: true,
   legalComments: 'external',
   metafile: true,
@@ -64,5 +68,9 @@ for (const file of wasm) {
   await copyFile(require.resolve(file), path.join(out, path.basename(file)));
 }
 
+// The iOS copy is made from the finished Android output, so the two are the same files, COPYING included.
+await rm(ios, { recursive: true, force: true });
+await cp(out, ios, { recursive: true });
+
 const bytes = Object.values(result.metafile.outputs).reduce((sum, { bytes }) => sum + bytes, 0);
-console.log(`railgun.js and legal notices: ${(bytes / 1024 / 1024).toFixed(2)} MiB in ${out}`);
+console.log(`railgun.js and legal notices: ${(bytes / 1024 / 1024).toFixed(2)} MiB in ${out}, copied to ${ios}`);
