@@ -73,6 +73,10 @@ final class RailgunPageHost {
       throw RailgunError.unavailable("the bridge is not running")
     }
 
+    // Invariant 25: the store's directory is out of backups before the store is first used; whatever WebKit
+    // creates in it later is covered by the mark.
+    Self.excludeWebDataFromBackup()
+
     // Invariant 20: the store's proxy is set before the web view that uses it exists, and no request may go
     // around a proxy that refuses it.
     let store = WKWebsiteDataStore(forIdentifier: Self.storeID)
@@ -91,7 +95,7 @@ final class RailgunPageHost {
     place(page)
     try await page.load()
     guard loading == generation, page.isOpen else { throw RailgunError.disconnected("closed while loading") }
-    // Before any call can bring the wallet in (invariant 25).
+    // Again, in case WebKit made the directory anew; still before any call can bring the wallet in.
     Self.excludeWebDataFromBackup()
   }
 
@@ -219,16 +223,26 @@ final class RailgunPageHost {
     }
   }
 
-  /// The page's IndexedDB holds the encrypted Railgun wallet and its decrypted notes: keep it out of iCloud and
-  /// device backups (plan DI6). Until MI0 finds the store's own directory, all of `Library/WebKit` is excluded;
-  /// the app has no other web content. The mark is lost when the directory is made again, so it is set after every
-  /// load.
-  static func excludeWebDataFromBackup() {
-    guard let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first else { return }
+  /// The page's IndexedDB holds the encrypted Railgun wallet and the notes the engine decrypted for it, which it
+  /// keeps unencrypted: keep it out of iCloud and device backups (plan DI6). Until MI0 finds the store's own
+  /// directory, all of `Library/WebKit` is excluded; the app has no other web content. The directory is made if
+  /// WebKit hasn't made it yet, because a mark on a directory covers what is created inside it later; the mark is
+  /// lost when the directory is made anew, so it is set before every load and again after. A failed mark never
+  /// blocks the load (plan VI-11, VI-15); the next load tries again.
+  @discardableResult
+  nonisolated static func excludeWebDataFromBackup(
+    library: URL? = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first
+  ) -> Bool {
+    guard let library else { return false }
     var webKit = library.appendingPathComponent("WebKit", isDirectory: true)
-    guard FileManager.default.fileExists(atPath: webKit.path) else { return }
-    var values = URLResourceValues()
-    values.isExcludedFromBackup = true
-    try? webKit.setResourceValues(values)
+    do {
+      try FileManager.default.createDirectory(at: webKit, withIntermediateDirectories: true)
+      var values = URLResourceValues()
+      values.isExcludedFromBackup = true
+      try webKit.setResourceValues(values)
+      return true
+    } catch {
+      return false
+    }
   }
 }

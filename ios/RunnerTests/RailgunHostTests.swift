@@ -265,6 +265,25 @@ final class RailgunHostTests: XCTestCase {
     XCTAssertFalse(RailgunPageHost.loopbackAccepts(port: port))
   }
 
+  // MARK: Backups
+
+  /// Plan DI6 and invariant 25: the page's web data directory is made and marked before the store is first used,
+  /// and marking it again, once it exists, holds.
+  func testTheWebDataDirectoryIsOutOfBackupsBeforeFirstUse() throws {
+    let library = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: library, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: library) }
+    let webKit = library.appendingPathComponent("WebKit", isDirectory: true)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: webKit.path))
+
+    XCTAssertTrue(RailgunPageHost.excludeWebDataFromBackup(library: library))
+    XCTAssertEqual(try webKit.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup, true)
+
+    XCTAssertTrue(RailgunPageHost.excludeWebDataFromBackup(library: library))
+    let again = library.appendingPathComponent("WebKit", isDirectory: true)
+    XCTAssertEqual(try again.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup, true)
+  }
+
   // MARK: Exactly once
 
   @MainActor

@@ -101,12 +101,20 @@ fn bridge() -> &'static Mutex<Option<BridgeState>> {
 
 /// Starts the bridge, or returns the port of the one already running.
 ///
+/// A bridge whose accept loop has ended (an accept error, as when iOS
+/// reclaims a suspended app's listening socket) is replaced rather than handed
+/// back with a port nothing listens on.
+///
 /// Fails closed: while Tor is on but bootstrapping (past the route wait),
 /// failed or unavailable, there is no bridge and so no page traffic.
 pub(crate) async fn start() -> Result<u16, String> {
     let mut state = bridge().lock().await;
-    if let Some(state) = state.as_ref() {
-        return Ok(state.port);
+    if let Some(running) = state.as_ref() {
+        if !running.task.is_finished() {
+            return Ok(running.port);
+        }
+        *state = None;
+        log::warn!("network privacy: Railgun bridge had stopped; starting a new one");
     }
     let session = match network_privacy::tor_client_for_route(true, || false).await? {
         Some(tor) => Session::Tor(tor),
@@ -481,6 +489,34 @@ mod tests {
             .expect("an answer through the tunnel")
             .unwrap();
         assert_eq!(read, 1);
+        stop().await;
+    }
+
+    #[tokio::test]
+    async fn start_replaces_a_bridge_whose_accept_loop_ended() {
+        let _policy = lock_route_policy();
+        let port = start().await.unwrap();
+        // End the accept loop but leave the state, as an accept error does.
+        let shutdown = {
+            let mut state = bridge().lock().await;
+            let running = state.as_mut().unwrap();
+            std::mem::replace(&mut running.shutdown, oneshot::channel().0)
+        };
+        let _ = shutdown.send(());
+        for _ in 0..200 {
+            if bridge().lock().await.as_ref().unwrap().task.is_finished() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert!(TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, port))
+            .await
+            .is_err());
+
+        let replaced = start().await.unwrap();
+        assert!(TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, replaced))
+            .await
+            .is_ok());
         stop().await;
     }
 

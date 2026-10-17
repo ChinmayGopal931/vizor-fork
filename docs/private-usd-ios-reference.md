@@ -234,12 +234,12 @@ The last line repeats once per host in `RailgunEndpoints`.
   3. WebKit refuses while the store is still in use, so retry up to 5 times, 500 ms apart.
   4. If it still fails, answer `FAILED`. Dart's reset logs a failed wipe and carries on (`account_provider.dart:2152-2165`).
 - **Deleting one account** uses the page's `deleteWallet` (plan DI7, A-plan E5), as on Android. As built in MI1 (plan VI-2): `deleteWallet {network, mnemonic}` runs on a fresh page with only the database open, removes the wallet's encrypted record and the notes syncs decrypted for it (stored unencrypted), and needs no network. When and how Dart calls it is open (progress BI-3).
-- **Backups** (plan DI6). After the store's first use, find its directory under `Library/WebKit/` (MI0.7 records the path) and set `isExcludedFromBackup` on it. Until MI0 confirms the path, exclude `Library/WebKit` as a whole: the app has no other web content.
+- **Backups** (plan DI6). After the store's first use, find its directory under `Library/WebKit/` (MI0.7 records the path) and set `isExcludedFromBackup` on it. Until MI0 confirms the path, exclude `Library/WebKit` as a whole: the app has no other web content. As built (plan VI-15): `load` makes `Library/WebKit` if it is missing and marks it before the store is first used, since a mark on a directory covers what WebKit creates inside it later, and marks it again after the load in case WebKit made it anew; a failed mark never blocks the load.
 - **Threading.** The page's workers run inside WebKit's own process. The host does nothing off the main actor except its timeout tasks.
 
 ### 6.8 Tor bridge on iOS
 
-**Unchanged in Rust** (A-ref §6.8). `start()`:
+**Unchanged in Rust** (A-ref §6.8), but for one fix (plan VI-16): `start()` replaces a bridge whose accept loop has ended. `start()`:
 
 - resolves the route once
 - binds `127.0.0.1:0`
@@ -317,7 +317,7 @@ Unchanged from A-ref §8.4: the lock, the background, an account switch, a delet
 
 ### 8.4 Backups
 
-`com.zcash.wallet/network_privacy` `excludeFromBackup {path}` already exists (`AppDelegate.swift:427-465`). It creates the directory if needed and sets `isExcludedFromBackup`. Reuse it, or add a twin on a Private USD channel, for the items below. As built (plan VI-11) it is reused: its Dart helper is `excludeFromDeviceBackup` (`lib/src/core/storage/device_backup.dart`), and the page's store is marked from Swift (`RailgunPageHost.excludeWebDataFromBackup`, all of `Library/WebKit` until MI0.7).
+`com.zcash.wallet/network_privacy` `excludeFromBackup {path}` already exists (`AppDelegate.swift:427-465`). It creates the directory if needed and sets `isExcludedFromBackup`. Reuse it, or add a twin on a Private USD channel, for the items below. As built (plan VI-11) it is reused: its Dart helper is `excludeFromDeviceBackup` (`lib/src/core/storage/device_backup.dart`), and the page's store is marked from Swift (`RailgunPageHost.excludeWebDataFromBackup`, all of `Library/WebKit` until MI0.7, made and marked before the store's first use: plan VI-15).
 
 - each `private_usd_<walletDbName>_<network>` directory, when `getPrivateUsdDirPath` creates it
 - the token state's directory (MI7)
