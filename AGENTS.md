@@ -850,9 +850,8 @@ the chart no longer reads that define.
 - **Opt-in.** "Show on home" is on by default; "Use market prices" is off, so a
   fresh install makes no chart request and the chart is the ZEC balance. A
   saved choice is kept as written, and an unreadable "Use market prices" reads
-  as off. Settings, Portfolio chart names the host, what a request carries,
-  that the server sees the IP address unless Tor is on, and that prices are
-  USD only.
+  as off. The mobile settings card has no explanatory text under its
+  switches (the owner removed it on 2026-10-17).
 - **What a request carries.** The coin (`asset=ZEC`), the currency
   (`fiat=USD`), `resolution=1d`, two UTC dates (`from`, `to`) and `limit=1000`,
   in that order (the order is part of the server's cache key), and nothing

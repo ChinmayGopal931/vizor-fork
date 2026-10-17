@@ -8,34 +8,9 @@ import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../portfolio_chart/providers/portfolio_chart_settings_provider.dart';
-import '../../../portfolio_chart/services/portfolio_chart_format.dart';
 import 'mobile_tor_control.dart' show MobilePrivacyToggle;
 
 const _rowHeight = 44.0;
-
-/// With market prices on: which server the chart asks, what a request carries,
-/// and who sees the IP address. The host is named in full so what the chart
-/// contacts is never a surprise.
-String portfolioChartMarketPricesCopy(String host) =>
-    'Charts your balance in USD over time. Your balance history is built on '
-    'this device. Daily prices are requested from $host. A request names only '
-    'ZEC, USD, daily prices and a date range, and nothing from your wallet. '
-    'That server sees your IP address unless Tor is on. Prices are USD only.';
-
-/// With market prices off (the default) on a build that offers them: nothing is
-/// requested, and what turning them on would do is said before it is done.
-String portfolioChartPricesOffCopy(String host) =>
-    'Charts your ZEC balance over time, built on this device. Nothing is '
-    'requested from any server. Turning on market prices would request daily '
-    'USD prices from $host, which then sees your IP address unless Tor is on.';
-
-/// On a build with no market prices to offer.
-const kPortfolioChartLocalCopy =
-    'Charts your ZEC balance over time, built on this device. Nothing is '
-    'requested from any server.';
-
-const kPortfolioChartHiddenCopy =
-    'The chart is hidden. Nothing is requested from any server.';
 
 /// Settings for the Home portfolio chart: show or hide it, whether to value it
 /// with market prices (the only thing that contacts a server), and the range it
@@ -48,16 +23,6 @@ class MobilePortfolioChartSettingsCard extends ConsumerWidget {
     final colors = context.colors;
     final settings = ref.watch(portfolioChartSettingsProvider);
     final pricesAvailable = ref.watch(portfolioChartPricesAvailableProvider);
-    final host = portfolioPricingServerHost(
-      ref.watch(portfolioPricingEngineBaseUriProvider),
-    );
-    final description = !settings.enabled
-        ? kPortfolioChartHiddenCopy
-        : !pricesAvailable
-        ? kPortfolioChartLocalCopy
-        : settings.marketPrices
-        ? portfolioChartMarketPricesCopy(host)
-        : portfolioChartPricesOffCopy(host);
 
     return MobileSurfaceCard(
       cornerRadius: AppRadii.large,
@@ -128,14 +93,6 @@ class MobilePortfolioChartSettingsCard extends ConsumerWidget {
               ),
             ),
           ],
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            description,
-            key: const ValueKey('mobile_settings_portfolio_chart_description'),
-            style: AppTypography.bodyMedium.copyWith(
-              color: colors.text.secondary,
-            ),
-          ),
         ],
       ),
     );

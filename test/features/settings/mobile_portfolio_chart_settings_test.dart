@@ -38,8 +38,6 @@ class _FakeSettingsNotifier extends PortfolioChartSettingsNotifier {
   }
 }
 
-const _host = 'zapp-pricing-engine.majorworker.workers.dev';
-
 Widget _app(
   _FakeSettingsNotifier notifier, {
   bool pricesAvailable = true,
@@ -67,12 +65,6 @@ Widget _app(
   );
 }
 
-String _description(WidgetTester tester) => tester
-    .widget<Text>(
-      find.byKey(const ValueKey('mobile_settings_portfolio_chart_description')),
-    )
-    .data!;
-
 bool _isOn(WidgetTester tester, String toggle) {
   final track = find.byKey(ValueKey('mobile_settings_portfolio_chart_$toggle'));
   final thumb = find.byKey(
@@ -82,16 +74,12 @@ bool _isOn(WidgetTester tester, String toggle) {
 }
 
 void main() {
-  testWidgets('shows or hides the chart, and says what it contacts', (
-    tester,
-  ) async {
+  testWidgets('shows or hides the chart', (tester) async {
     final notifier = _FakeSettingsNotifier();
     await tester.pumpWidget(_app(notifier));
 
-    // Shown by default, and nothing is requested: the card says so, and what
-    // turning prices on would do.
+    // Shown by default.
     expect(_isOn(tester, 'toggle'), isTrue);
-    expect(_description(tester), portfolioChartPricesOffCopy(_host));
     // The range is picked on the chart itself; the card has no range row.
     expect(find.text('Default range'), findsNothing);
 
@@ -102,7 +90,6 @@ void main() {
 
     expect(notifier.changes, ['enabled=false']);
     expect(_isOn(tester, 'toggle'), isFalse);
-    expect(_description(tester), kPortfolioChartHiddenCopy);
     expect(find.text('Default range'), findsNothing);
 
     // The price switch keeps its saved value but cannot be changed while the
@@ -121,17 +108,12 @@ void main() {
     expect(_isOn(tester, 'toggle'), isTrue);
   });
 
-  testWidgets('market prices are off until turned on, and the card then '
-      'says exactly what is contacted', (tester) async {
+  testWidgets('market prices are off until turned on', (tester) async {
     final notifier = _FakeSettingsNotifier();
     await tester.pumpWidget(_app(notifier));
 
     // Opt-in: off by default, with the offer and its cost stated up front.
     expect(_isOn(tester, 'prices_toggle'), isFalse);
-    expect(_description(tester), contains(_host));
-    expect(_description(tester), contains('Nothing is requested'));
-    expect(_description(tester), contains('IP address unless Tor is on'));
-    expect(_description(tester), isNot(contains('CoinGecko')));
 
     await tester.tap(
       find.byKey(const ValueKey('mobile_settings_portfolio_chart_prices_row')),
@@ -140,19 +122,6 @@ void main() {
 
     expect(notifier.changes, ['marketPrices=true']);
     expect(_isOn(tester, 'prices_toggle'), isTrue);
-    final copy = _description(tester);
-    expect(copy, portfolioChartMarketPricesCopy(_host));
-    // The host in full, what a request carries, who sees the address, and the
-    // currency.
-    expect(copy, contains('requested from $_host'));
-    expect(
-      copy,
-      contains('names only ZEC, USD, daily prices and a date range'),
-    );
-    expect(copy, contains('nothing from your wallet'));
-    expect(copy, contains('sees your IP address unless Tor is on'));
-    expect(copy, contains('USD only'));
-    expect(copy, isNot(contains('CoinGecko')));
 
     await tester.tap(
       find.byKey(const ValueKey('mobile_settings_portfolio_chart_prices_row')),
@@ -160,7 +129,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(notifier.changes, ['marketPrices=true', 'marketPrices=false']);
     expect(_isOn(tester, 'prices_toggle'), isFalse);
-    expect(_description(tester), portfolioChartPricesOffCopy(_host));
 
     // No range chips: the card never changes the default range.
     expect(
@@ -173,25 +141,6 @@ void main() {
     );
   });
 
-  testWidgets('names the host the build is configured with, port included', (
-    tester,
-  ) async {
-    final notifier = _FakeSettingsNotifier();
-    await tester.pumpWidget(
-      _app(notifier, pricingServer: Uri.parse('https://prices.example:8443')),
-    );
-    await tester.tap(
-      find.byKey(const ValueKey('mobile_settings_portfolio_chart_prices_row')),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      _description(tester),
-      portfolioChartMarketPricesCopy('prices.example:8443'),
-    );
-    expect(_description(tester), isNot(contains(_host)));
-  });
-
   testWidgets('a build without market prices offers no price switch', (
     tester,
   ) async {
@@ -200,7 +149,6 @@ void main() {
     );
 
     expect(find.text('Use market prices'), findsNothing);
-    expect(_description(tester), kPortfolioChartLocalCopy);
     expect(find.text('Show on home'), findsOneWidget);
   });
 
@@ -213,7 +161,5 @@ void main() {
     );
 
     expect(find.text('Use market prices'), findsNothing);
-    expect(_description(tester), kPortfolioChartLocalCopy);
-    expect(_description(tester), isNot(contains('IP address')));
   });
 }
