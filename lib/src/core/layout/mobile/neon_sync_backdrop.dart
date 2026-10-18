@@ -137,6 +137,8 @@ class NeonSyncLineLayer extends StatelessWidget {
           child: AnimatedOpacity(
             opacity: scrolled && !line.climbing ? 0 : 1,
             duration: const Duration(milliseconds: 200),
+            // Faded out, the head still reports the sync to screen readers.
+            alwaysIncludeSemantics: true,
             child: view,
           ),
         ),

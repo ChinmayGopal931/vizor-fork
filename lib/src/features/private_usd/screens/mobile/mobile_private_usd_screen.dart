@@ -277,6 +277,10 @@ class MobilePrivateUsdView extends StatelessWidget {
     final banner = this.banner;
     final onConvert = this.onConvert;
     final syncLine = privateUsdSyncLine(state, networkPrivacy: networkPrivacy);
+    // A synced line runs wholly behind the blocks, as Home's does once the
+    // page scrolls: its readout is long enough that a head drawn in front
+    // would hang over the total card.
+    final synced = !syncLine.climbing && !syncLine.failed;
     return Scaffold(
       backgroundColor: colors.background.window,
       body: AppToastHost(
@@ -291,7 +295,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                 child: NeonSyncLineLayer(
                   key: const ValueKey('mobile_private_usd_sync_back'),
                   line: syncLine,
-                  scrolled: scrolled,
+                  scrolled: scrolled || synced,
                 ),
               ),
               SafeArea(
@@ -471,7 +475,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                   key: const ValueKey('mobile_private_usd_sync_front'),
                   line: syncLine,
                   layer: NeonSyncLayer.front,
-                  scrolled: scrolled,
+                  scrolled: scrolled || synced,
                 ),
               ),
             ],
@@ -620,31 +624,79 @@ class _TotalCard extends StatelessWidget {
   }
 }
 
-class _RefreshButton extends StatelessWidget {
+/// The total's refresh: its arrow turns while the balance refreshes, and
+/// finishes its turn when the refresh ends. Under reduced motion it holds
+/// still.
+class _RefreshButton extends StatefulWidget {
   const _RefreshButton({required this.busy, required this.onTap});
 
   final bool busy;
   final VoidCallback? onTap;
 
   @override
+  State<_RefreshButton> createState() => _RefreshButtonState();
+}
+
+class _RefreshButtonState extends State<_RefreshButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncTurn();
+  }
+
+  @override
+  void didUpdateWidget(_RefreshButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncTurn();
+  }
+
+  void _syncTurn() {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller
+        ..stop()
+        ..value = 0;
+    } else if (widget.busy) {
+      if (!_controller.isAnimating) _controller.repeat();
+    } else if (_controller.isAnimating) {
+      // Finish the turn rather than snap back.
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Semantics(
       button: true,
-      enabled: onTap != null,
+      enabled: widget.onTap != null,
       label: PrivateUsdCopy.refresh,
       excludeSemantics: true,
       child: GestureDetector(
         key: const ValueKey('mobile_private_usd_refresh'),
         behavior: HitTestBehavior.opaque,
-        onTap: onTap,
+        onTap: widget.onTap,
         child: SizedBox.square(
           dimension: 44,
           child: Center(
-            child: AppIcon(
-              AppIcons.renew,
-              size: 20,
-              color: busy ? colors.text.disabled : colors.text.primary,
+            child: RotationTransition(
+              turns: _controller,
+              child: AppIcon(
+                AppIcons.renew,
+                size: 20,
+                color: widget.busy ? colors.text.disabled : colors.text.primary,
+              ),
             ),
           ),
         ),
