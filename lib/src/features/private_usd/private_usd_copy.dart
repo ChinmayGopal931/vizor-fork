@@ -121,6 +121,14 @@ abstract final class PrivateUsdCopy {
   /// `private_usd_row_arriving`
   static const rowArriving = 'Arriving';
 
+  /// New (owner, 2026-10-17): the row while its funds are screened, with
+  /// the share of the screening time gone by since they landed.
+  static String rowArrivingPercent(int percent) => '$rowArriving · $percent%';
+
+  /// New (owner, 2026-10-17): the row once the screening time has passed
+  /// and the funds are still arriving.
+  static const rowArrivingLate = '$rowArriving · taking longer than usual';
+
   /// `private_usd_row_arriving_info`
   static String rowArrivingInfo(String about) =>
       'Railgun screens new funds before they can be spent. This takes $about.';

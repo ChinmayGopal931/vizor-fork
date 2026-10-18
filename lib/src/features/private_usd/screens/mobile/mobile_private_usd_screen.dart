@@ -25,6 +25,7 @@ import '../../../activity/activity_feed_sections.dart'
     show compareActivityEntries;
 import '../../../activity/models/activity_row_data.dart';
 import '../../../activity/widgets/activity_feed.dart' show ActivityFeedRowGroup;
+import '../../models/private_usd_arrival.dart';
 import '../../models/private_usd_balances.dart';
 import '../../models/private_usd_pending_payment.dart';
 import '../../models/private_usd_record_key.dart';
@@ -87,13 +88,14 @@ class _MobilePrivateUsdScreenState
     final underWay = ref.watch(privateUsdUnderWayProvider(uuid));
     void open(PrivateUsdRoutePath path) => context.push(path.location);
     void openRefunds() => context.push('/private-usd/refunds');
+    final records = ref.watch(privateUsdActivityRecordsProvider(uuid));
     final reverseRecords = ref.watch(
       privateUsdReverseActivityRecordsProvider(uuid),
     );
     final activity = [
       for (final entry in privateUsdActivityEntries(
         context: context,
-        records: ref.watch(privateUsdActivityRecordsProvider(uuid)),
+        records: records,
         reverseRecords: reverseRecords,
         zcashConfirmations: deployment?.zcashConfirmations ?? 2,
         privacyModeEnabled: privacyModeEnabled,
@@ -119,6 +121,11 @@ class _MobilePrivateUsdScreenState
       privacyModeEnabled: privacyModeEnabled,
       receiveAddress: address.value,
       screening: Duration(seconds: deployment?.screeningSeconds ?? 0),
+      arrivingSince: privateUsdArrivingSince(
+        arriving: balance.balances?.arriving ?? BigInt.zero,
+        forward: records,
+        reverse: reverseRecords,
+      ),
       tokenNames: {
         for (final token in deployment?.usdTokens ?? const [])
           token.address.toLowerCase(): PrivateUsdCopy.tokenName(token.symbol),
@@ -155,6 +162,8 @@ class MobilePrivateUsdView extends StatelessWidget {
     required this.screening,
     required this.onBack,
     required this.onRefresh,
+    this.arrivingSince,
+    this.now = DateTime.now,
     this.networkPrivacy,
     this.tokenNames = const {},
     this.banner,
@@ -181,8 +190,17 @@ class MobilePrivateUsdView extends StatelessWidget {
   /// Null until Rust has derived it.
   final String? receiveAddress;
 
-  /// How long Railgun screens new funds, for the explanations.
+  /// How long Railgun screens new funds, for the explanations and the
+  /// Arriving row's estimate.
   final Duration screening;
+
+  /// When the funds arriving now landed (`privateUsdArrivingSince`), for the
+  /// Arriving row's estimate; null when unknown, and the row reads as
+  /// before.
+  final DateTime? arrivingSince;
+
+  /// The clock that estimate reads.
+  final DateTime Function() now;
 
   /// Token names by lowercase address, for the Assets list.
   final Map<String, String> tokenNames;
@@ -359,6 +377,8 @@ class MobilePrivateUsdView extends StatelessWidget {
                               balances: balances,
                               privacyModeEnabled: privacyModeEnabled,
                               screening: screening,
+                              arrivingSince: arrivingSince,
+                              now: now,
                             ),
                           ),
                           if (balances.held.length > 1) ...[
@@ -572,11 +592,15 @@ class _BucketsCard extends StatelessWidget {
     required this.balances,
     required this.privacyModeEnabled,
     required this.screening,
+    required this.arrivingSince,
+    required this.now,
   });
 
   final PrivateUsdBalances balances;
   final bool privacyModeEnabled;
   final Duration screening;
+  final DateTime? arrivingSince;
+  final DateTime Function() now;
 
   @override
   Widget build(BuildContext context) {
@@ -600,14 +624,15 @@ class _BucketsCard extends StatelessWidget {
           info: PrivateUsdCopy.rowProcessingInfo,
         ),
       if (balances.arriving > BigInt.zero)
-        _BucketRow(
+        _ArrivingRow(
           key: const ValueKey('mobile_private_usd_row_arriving'),
-          label: PrivateUsdCopy.rowArriving,
+          since: arrivingSince,
+          screening: screening,
+          now: now,
           amount: _masked(
             formatPrivateUsd(balances.arriving),
             privacyModeEnabled,
           ),
-          info: PrivateUsdCopy.rowArrivingInfo(PrivateUsdCopy.about(screening)),
         ),
       if (balances.blocked > BigInt.zero)
         _BucketRow(
@@ -683,6 +708,76 @@ class _BucketRow extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The Arriving row (owner, 2026-10-17): "Arriving · 40%" while its funds
+/// are screened, from when they landed ([since]) over the [screening]
+/// period, then "Arriving · taking longer than usual"; plain "Arriving"
+/// when no landing time is known. The estimate moves every 10 s while the
+/// row shows.
+class _ArrivingRow extends StatefulWidget {
+  const _ArrivingRow({
+    required this.since,
+    required this.screening,
+    required this.now,
+    required this.amount,
+    super.key,
+  });
+
+  final DateTime? since;
+  final Duration screening;
+  final DateTime Function() now;
+  final String amount;
+
+  @override
+  State<_ArrivingRow> createState() => _ArrivingRowState();
+}
+
+class _ArrivingRowState extends State<_ArrivingRow> {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncTick();
+  }
+
+  @override
+  void didUpdateWidget(_ArrivingRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncTick();
+  }
+
+  // Only a known landing has an estimate to move.
+  void _syncTick() {
+    if (widget.since != null && widget.screening > Duration.zero) {
+      _tick ??= Timer.periodic(const Duration(seconds: 10), (_) {
+        if (mounted) setState(() {});
+      });
+    } else {
+      _tick?.cancel();
+      _tick = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _BucketRow(
+    label: privateUsdArrivingLabel(
+      since: widget.since,
+      screening: widget.screening,
+      now: widget.now(),
+    ),
+    amount: widget.amount,
+    info: PrivateUsdCopy.rowArrivingInfo(
+      PrivateUsdCopy.about(widget.screening),
+    ),
+  );
 }
 
 class _AssetsCard extends StatelessWidget {

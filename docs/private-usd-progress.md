@@ -69,6 +69,13 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     the wallet. A conversion's escrow payment shows only its proof: no post
     time is kept for it and its block cannot be told from its
     confirmations, so the banner's own steps carry it from there.
+  - The Private USD screen's Arriving row shows its screening's progress,
+    "Arriving · 40%": the time since the newest payout the account's
+    conversions made (a paid one's `endedAt`, a refund's `updatedAt`) over
+    `screeningSeconds`, ticking every 10 s, then "Arriving · taking longer
+    than usual". With no such payout, or less arriving than it paid, the row
+    reads "Arriving" as before (`privateUsdArrivingSince`); the home strip
+    and the holdings panel keep their one-line "+$X arriving".
 - **Handoff (2026-10-16): start here.**
   - **State.** `feature/private-usd-android` is pushed to `origin` (the
     owner's fork) with everything below, the Gotham files included: the owner
