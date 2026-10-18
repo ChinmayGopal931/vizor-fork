@@ -909,8 +909,10 @@ class _EmptySearchState extends StatelessWidget {
               Text(
                 'No contacts were found',
                 textAlign: TextAlign.center,
+                // The state's statement: Thin, as "No contacts yet" is.
                 style: AppTypography.headlineSmall.copyWith(
                   color: context.colors.text.accent,
+                  fontWeight: FontWeight.w100,
                 ),
               ),
               const SizedBox(height: AppSpacing.xxs),
@@ -1181,8 +1183,10 @@ class _ContactEditSheetState extends State<_ContactEditSheet> {
               Text(
                 isEdit ? 'Edit contact' : 'Add contact',
                 textAlign: TextAlign.center,
+                // The sheet's title: Thin, as sheet titles are.
                 style: AppTypography.headlineSmall.copyWith(
                   color: colors.text.accent,
+                  fontWeight: FontWeight.w100,
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
