@@ -39,6 +39,7 @@ NeonSyncLine privateUsdSyncLine(
           : PrivateUsdCopy.refreshFailed,
       failed: true,
       lineX: _railgunLineX,
+      readoutType: _railgunFailedReadout,
     );
   }
   if (balances != null) {
@@ -53,6 +54,7 @@ NeonSyncLine privateUsdSyncLine(
           : PrivateUsdCopy.updated(formatDayMonthTime(updatedAt)),
       scanning: state.isRefreshing,
       lineX: _railgunLineX,
+      readoutType: _railgunReadout,
     );
   }
   // The page waits for the bridge, which waits out a Tor bootstrap.
@@ -66,6 +68,7 @@ NeonSyncLine privateUsdSyncLine(
       semanticsLabel: kSyncStatusConnectingToTorSemanticsLabel,
       climbing: true,
       lineX: _railgunLineX,
+      readoutType: _railgunReadout,
     );
   }
   final percent = state.firstSyncPercent;
@@ -78,6 +81,7 @@ NeonSyncLine privateUsdSyncLine(
         : PrivateUsdCopy.firstLoadProgress(whole),
     climbing: true,
     lineX: _railgunLineX,
+    readoutType: _railgunReadout,
   );
 }
 
@@ -86,3 +90,9 @@ double _climbed(int percent) => (percent / 100).clamp(0.03, 0.99);
 
 // A smidge right of Home's line (owner, 2026-10-17).
 const _railgunLineX = 0.87;
+
+// Smaller than Home's, so the longer Railgun readouts end above the total
+// card, which starts close under the top; the failure, the longest, smaller
+// still (owner, 2026-10-18).
+const _railgunReadout = (fontSize: 7.0, letterSpacing: 1.4);
+const _railgunFailedReadout = (fontSize: 5.5, letterSpacing: 0.8);

@@ -277,10 +277,6 @@ class MobilePrivateUsdView extends StatelessWidget {
     final banner = this.banner;
     final onConvert = this.onConvert;
     final syncLine = privateUsdSyncLine(state, networkPrivacy: networkPrivacy);
-    // A synced line runs wholly behind the blocks, as Home's does once the
-    // page scrolls: its readout is long enough that a head drawn in front
-    // would hang over the total card.
-    final synced = !syncLine.climbing && !syncLine.failed;
     return Scaffold(
       backgroundColor: colors.background.window,
       body: AppToastHost(
@@ -295,7 +291,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                 child: NeonSyncLineLayer(
                   key: const ValueKey('mobile_private_usd_sync_back'),
                   line: syncLine,
-                  scrolled: scrolled || synced,
+                  scrolled: scrolled,
                 ),
               ),
               SafeArea(
@@ -475,7 +471,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                   key: const ValueKey('mobile_private_usd_sync_front'),
                   line: syncLine,
                   layer: NeonSyncLayer.front,
-                  scrolled: scrolled || synced,
+                  scrolled: scrolled,
                 ),
               ),
             ],

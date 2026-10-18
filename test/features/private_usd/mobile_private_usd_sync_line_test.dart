@@ -77,16 +77,6 @@ void main() {
         ),
       );
 
-  // How lit the front layer (the head and its readout) is.
-  double frontOpacity(WidgetTester tester) => tester
-      .widget<AnimatedOpacity>(
-        find.descendant(
-          of: find.byKey(const ValueKey('mobile_private_usd_sync_front')),
-          matching: find.byType(AnimatedOpacity),
-        ),
-      )
-      .opacity;
-
   // The text at the line's head, as drawn.
   String readout(WidgetTester tester) => tester
       .widget<Text>(
@@ -157,52 +147,50 @@ void main() {
     expect(layer(tester, NeonSyncLayer.front).linePart, NeonSyncLinePart.whole);
   });
 
-  testWidgets(
-    'a synced balance runs the whole line behind blocks backed solid',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      await pumpView(tester, previewPrivateUsdBalance(available: 100));
+  testWidgets('a synced balance runs the line behind blocks backed solid', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await pumpView(tester, previewPrivateUsdBalance(available: 100));
 
-      final front = layer(tester, NeonSyncLayer.front);
-      final back = layer(tester, NeonSyncLayer.back);
-      expect(readout(tester), 'RAILGUN SYNCED');
-      expect(back.progress, 1);
+    final front = layer(tester, NeonSyncLayer.front);
+    final back = layer(tester, NeonSyncLayer.back);
+    expect(readout(tester), 'RAILGUN SYNCED');
+    expect(back.progress, 1);
+    expect(
+      back.linePart,
+      NeonSyncLinePart.belowHead,
+      reason: 'behind the content',
+    );
+    expect(back.active, isFalse);
+    expect(back.floorFlows, isFalse);
+    expect(
+      front.linePart,
+      NeonSyncLinePart.head,
+      reason: 'its head beside the readout stays in front',
+    );
+    for (final block in const [
+      'mobile_private_usd_total',
+      'mobile_private_usd_buckets',
+      'mobile_private_usd_receive',
+      'mobile_private_usd_activity_empty',
+    ]) {
       expect(
-        back.linePart,
-        NeonSyncLinePart.whole,
-        reason: 'wholly behind the content, head included',
+        find.ancestor(
+          of: find.byKey(ValueKey(block)),
+          matching: find.byType(NeonSyncOcclude),
+        ),
+        findsOneWidget,
+        reason: block,
       );
-      expect(back.active, isFalse);
-      expect(back.floorFlows, isFalse);
-      expect(front.linePart, NeonSyncLinePart.head);
-      expect(
-        frontOpacity(tester),
-        0,
-        reason: 'its long readout would hang over the total card',
-      );
-      for (final block in const [
-        'mobile_private_usd_total',
-        'mobile_private_usd_buckets',
-        'mobile_private_usd_receive',
-        'mobile_private_usd_activity_empty',
-      ]) {
-        expect(
-          find.ancestor(
-            of: find.byKey(ValueKey(block)),
-            matching: find.byType(NeonSyncOcclude),
-          ),
-          findsOneWidget,
-          reason: block,
-        );
-      }
-      final updated = PrivateUsdCopy.updated(
-        formatDayMonthTime(previewPrivateUsdUpdatedAt),
-      );
-      expect(find.text(updated), findsOneWidget);
-      expect(find.bySemanticsLabel(updated), findsOneWidget);
-      semantics.dispose();
-    },
-  );
+    }
+    final updated = PrivateUsdCopy.updated(
+      formatDayMonthTime(previewPrivateUsdUpdatedAt),
+    );
+    expect(find.text(updated), findsOneWidget);
+    expect(find.bySemanticsLabel(updated), findsOneWidget);
+    semantics.dispose();
+  });
 
   testWidgets('a refresh of a synced balance stays synced, with a faster '
       'floor', (tester) async {
@@ -215,10 +203,10 @@ void main() {
     final back = layer(tester, NeonSyncLayer.back);
     expect(readout(tester), 'RAILGUN SYNCED');
     expect(back.progress, 1, reason: 'no drop to 0 and climb again');
-    expect(back.linePart, NeonSyncLinePart.whole);
+    expect(back.linePart, NeonSyncLinePart.belowHead);
     expect(back.active, isFalse);
     expect(back.floorFlows, isTrue);
-    expect(frontOpacity(tester), 0);
+    expect(layer(tester, NeonSyncLayer.front).linePart, NeonSyncLinePart.head);
     expect(find.text(PrivateUsdCopy.updating), findsNothing);
     expect(find.bySemanticsLabel(PrivateUsdCopy.updating), findsOneWidget);
     semantics.dispose();

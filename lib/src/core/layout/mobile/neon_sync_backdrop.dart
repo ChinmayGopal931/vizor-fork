@@ -50,6 +50,13 @@ abstract final class NeonSyncReadout {
       '${checking ? 'Check' : 'Sync'} $percent%';
 }
 
+/// The type size of a sync line's readout.
+typedef NeonSyncReadoutType = ({double fontSize, double letterSpacing});
+
+/// Home's readout type. A screen whose first block sits close under the top
+/// sets a smaller one so a long readout ends above it.
+const kNeonSyncReadoutType = (fontSize: 9.0, letterSpacing: 2.2);
+
 /// What a sync line shows, whatever is syncing: Home's wallet, or the
 /// Railgun wallet on the Private USD screen.
 @immutable
@@ -62,6 +69,7 @@ class NeonSyncLine {
     this.failed = false,
     bool? scanning,
     this.lineX = _lineXFactor,
+    this.readoutType = kNeonSyncReadoutType,
   }) : scanning = scanning ?? climbing;
 
   /// How far the line has climbed, 0..1.
@@ -84,6 +92,9 @@ class NeonSyncLine {
 
   /// Where the line stands, as a fraction of the width.
   final double lineX;
+
+  /// The type size of [readout].
+  final NeonSyncReadoutType readoutType;
 }
 
 /// One layer of [line], below or above the content as Home layers it: the
@@ -126,6 +137,7 @@ class NeonSyncLineLayer extends StatelessWidget {
       },
       drawReadout: front,
       lineX: line.lineX,
+      readoutType: line.readoutType,
     );
     if (!front) return ExcludeSemantics(child: view);
     return IgnorePointer(
@@ -277,11 +289,15 @@ class NeonSyncBackdropView extends StatefulWidget {
     this.linePart = NeonSyncLinePart.whole,
     this.drawReadout = true,
     this.lineX = _lineXFactor,
+    this.readoutType = kNeonSyncReadoutType,
     super.key,
   }) : floorFlows = floorFlows ?? active;
 
   /// Where the line stands, as a fraction of the width.
   final double lineX;
+
+  /// The type size of [readout].
+  final NeonSyncReadoutType readoutType;
 
   /// Which parts this layer draws.
   final bool drawFloor;
@@ -375,7 +391,11 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
           // Both layers measure the same readout, so they split the line in
           // the same place.
           readoutLength: split
-              ? neonSyncReadoutLength(context, widget.readout)
+              ? neonSyncReadoutLength(
+                  context,
+                  widget.readout,
+                  type: widget.readoutType,
+                )
               : 0,
           glow: neon.glow,
           core: neon.core,
@@ -391,6 +411,7 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
                 core: neon.core,
                 topLimit: padding.top + AppSpacing.xs,
                 lineX: widget.lineX,
+                type: widget.readoutType,
               )
             : null,
       ),
@@ -416,12 +437,16 @@ const _headMargin = 12.0;
 const _headAbove = 32.0;
 
 /// The readout's style; its colours aside, what lays it out.
-TextStyle _readoutStyle({Color? color, Color? core}) => TextStyle(
+TextStyle _readoutStyle(
+  NeonSyncReadoutType type, {
+  Color? color,
+  Color? core,
+}) => TextStyle(
   fontFamily: 'Gotham',
-  fontSize: 9,
+  fontSize: type.fontSize,
   height: 1,
   fontWeight: FontWeight.w300,
-  letterSpacing: 2.2,
+  letterSpacing: type.letterSpacing,
   color: core,
   shadows: color == null ? null : Neon.textGlow(color, intensity: 0.5),
 );
@@ -429,11 +454,15 @@ TextStyle _readoutStyle({Color? color, Color? core}) => TextStyle(
 /// How far down from its top the drawn [readout] reaches: its text's width,
 /// as it reads bottom to top.
 @visibleForTesting
-double neonSyncReadoutLength(BuildContext context, String readout) {
+double neonSyncReadoutLength(
+  BuildContext context,
+  String readout, {
+  NeonSyncReadoutType type = kNeonSyncReadoutType,
+}) {
   final painter = TextPainter(
     text: TextSpan(
       text: readout.toUpperCase(),
-      style: DefaultTextStyle.of(context).style.merge(_readoutStyle()),
+      style: DefaultTextStyle.of(context).style.merge(_readoutStyle(type)),
     ),
     textDirection: TextDirection.ltr,
     textScaler: MediaQuery.textScalerOf(context),
@@ -474,6 +503,7 @@ class _Readout extends StatelessWidget {
     required this.core,
     required this.topLimit,
     required this.lineX,
+    required this.type,
   });
 
   final double progress;
@@ -482,6 +512,7 @@ class _Readout extends StatelessWidget {
   final Color core;
   final double topLimit;
   final double lineX;
+  final NeonSyncReadoutType type;
 
   @override
   Widget build(BuildContext context) {
@@ -503,7 +534,7 @@ class _Readout extends StatelessWidget {
                 child: Text(
                   text.toUpperCase(),
                   maxLines: 1,
-                  style: _readoutStyle(color: color, core: core),
+                  style: _readoutStyle(type, color: color, core: core),
                 ),
               ),
             ),
