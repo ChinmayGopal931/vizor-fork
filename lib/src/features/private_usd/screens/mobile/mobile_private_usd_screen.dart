@@ -47,6 +47,10 @@ import '../../widgets/mobile/private_usd_info_sheets.dart';
 import '../../widgets/mobile/private_usd_pending_payment_line.dart';
 import '../../widgets/mobile/private_usd_sync_line.dart';
 
+/// This screen sets all its text in Gotham Thin, lighter than the Light of
+/// the mobile tokens.
+const _textWeight = FontWeight.w100;
+
 /// `/private-usd` (plan reference §9.4 S2): the balance with its screening
 /// buckets, Send and Withdraw with the spending note, the conversion under
 /// way, the receive address, the activity, and "Convert". Railgun's sync is
@@ -322,6 +326,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                             child: Text(
                               PrivateUsdCopy.subtitle,
                               style: AppTypography.bodyMedium.copyWith(
+                                fontWeight: _textWeight,
                                 color: colors.text.secondary,
                               ),
                             ),
@@ -390,6 +395,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                                   'mobile_private_usd_spend_note',
                                 ),
                                 style: AppTypography.bodySmall.copyWith(
+                                  fontWeight: _textWeight,
                                   color: colors.text.secondary,
                                 ),
                               ),
@@ -565,6 +571,7 @@ class _TotalCard extends StatelessWidget {
               zec,
               key: const ValueKey('mobile_private_usd_zec_equivalent'),
               style: AppTypography.bodyMedium.copyWith(
+                fontWeight: _textWeight,
                 color: colors.text.secondary,
               ),
             ),
@@ -577,6 +584,7 @@ class _TotalCard extends StatelessWidget {
                 status,
                 key: const ValueKey('mobile_private_usd_status'),
                 style: AppTypography.bodySmall.copyWith(
+                  fontWeight: _textWeight,
                   color: colors.text.secondary,
                 ),
               ),
@@ -589,6 +597,7 @@ class _TotalCard extends StatelessWidget {
               PrivateUsdCopy.rpcNotAnswering,
               key: const ValueKey('mobile_private_usd_rpc_error'),
               style: AppTypography.bodySmall.copyWith(
+                fontWeight: _textWeight,
                 color: colors.text.destructive,
               ),
             ),
@@ -609,6 +618,7 @@ class _TotalCard extends StatelessWidget {
                 error,
                 key: const ValueKey('mobile_private_usd_error'),
                 style: AppTypography.bodySmall.copyWith(
+                  fontWeight: _textWeight,
                   color: colors.text.destructive,
                 ),
               ),
@@ -801,12 +811,18 @@ class _BucketRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: AppTypography.labelLarge.copyWith(color: color),
+                style: AppTypography.labelLarge.copyWith(
+                  fontWeight: _textWeight,
+                  color: color,
+                ),
               ),
             ),
             Text(
               amount,
-              style: AppTypography.labelLarge.copyWith(color: color),
+              style: AppTypography.labelLarge.copyWith(
+                fontWeight: _textWeight,
+                color: color,
+              ),
             ),
           ],
         ),
@@ -815,6 +831,7 @@ class _BucketRow extends StatelessWidget {
           Text(
             info!,
             style: AppTypography.bodySmall.copyWith(
+              fontWeight: _textWeight,
               color: danger ? colors.text.destructive : colors.text.secondary,
             ),
           ),
@@ -915,7 +932,10 @@ class _AssetsCard extends StatelessWidget {
         children: [
           Text(
             PrivateUsdCopy.assetsTitle,
-            style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
+            style: AppTypography.labelLarge.copyWith(
+              fontWeight: _textWeight,
+              color: colors.text.accent,
+            ),
           ),
           for (final asset in balances.held) ...[
             const SizedBox(height: AppSpacing.s),
@@ -926,6 +946,7 @@ class _AssetsCard extends StatelessWidget {
                     tokenNames[asset.token.address] ??
                         PrivateUsdCopy.tokenName(asset.token.symbol),
                     style: AppTypography.bodyMedium.copyWith(
+                      fontWeight: _textWeight,
                       color: colors.text.primary,
                     ),
                   ),
@@ -936,6 +957,7 @@ class _AssetsCard extends StatelessWidget {
                     privacyModeEnabled,
                   ),
                   style: AppTypography.bodyMedium.copyWith(
+                    fontWeight: _textWeight,
                     color: colors.text.primary,
                   ),
                 ),
@@ -961,12 +983,16 @@ class _EmptyCard extends StatelessWidget {
         children: [
           Text(
             PrivateUsdCopy.emptyTitle,
-            style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
+            style: AppTypography.labelLarge.copyWith(
+              fontWeight: _textWeight,
+              color: colors.text.accent,
+            ),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             PrivateUsdCopy.emptyBody,
             style: AppTypography.bodySmall.copyWith(
+              fontWeight: _textWeight,
               color: colors.text.secondary,
             ),
           ),
@@ -1002,6 +1028,7 @@ class _ReceiveAddressCard extends StatelessWidget {
                 child: Text(
                   PrivateUsdCopy.receiveAddress,
                   style: AppTypography.labelLarge.copyWith(
+                    fontWeight: _textWeight,
                     color: colors.text.accent,
                   ),
                 ),
@@ -1040,6 +1067,7 @@ class _ReceiveAddressCard extends StatelessWidget {
               address,
               key: const ValueKey('mobile_private_usd_address'),
               style: AppTypography.codeSmall.copyWith(
+                fontWeight: _textWeight,
                 color: colors.text.accent,
               ),
             ),
@@ -1072,6 +1100,7 @@ class _ActivitySection extends StatelessWidget {
                   child: Text(
                     PrivateUsdCopy.activityTitle,
                     style: AppTypography.headlineSmall.copyWith(
+                      fontWeight: _textWeight,
                       color: colors.text.accent,
                     ),
                   ),
@@ -1094,6 +1123,7 @@ class _ActivitySection extends StatelessWidget {
                 PrivateUsdCopy.activityEmpty,
                 key: const ValueKey('mobile_private_usd_activity_empty'),
                 style: AppTypography.bodySmall.copyWith(
+                  fontWeight: _textWeight,
                   color: colors.text.secondary,
                 ),
               ),
