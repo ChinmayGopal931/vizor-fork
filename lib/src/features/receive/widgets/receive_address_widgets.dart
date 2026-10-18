@@ -134,7 +134,7 @@ class ReceiveTabs extends StatelessWidget {
   }
 
   /// The neon switch: a cut-corner glass track whose active side is a lit
-  /// plate, its glyph red and its label white-hot.
+  /// plate, its label white-hot. It names the pools without their glyphs.
   Widget _buildNeon(BuildContext context) {
     final colors = context.colors;
     final glow = colors.neon.glow;
@@ -180,7 +180,6 @@ class ReceiveTabs extends StatelessWidget {
               _ReceiveTab(
                 key: const ValueKey('receive_address_type_tab_shielded'),
                 label: 'Shielded',
-                iconName: AppIcons.shieldKeyhole,
                 active: selectedType == ReceiveAddressType.shielded,
                 activeTextColor: colors.neon.core,
                 inactiveTextColor: colors.text.secondary,
@@ -195,7 +194,6 @@ class ReceiveTabs extends StatelessWidget {
               _ReceiveTab(
                 key: const ValueKey('receive_address_type_tab_transparent'),
                 label: 'Transparent',
-                iconName: AppIcons.transparentBalance,
                 active: selectedType == ReceiveAddressType.transparent,
                 activeTextColor: colors.neon.core,
                 inactiveTextColor: colors.text.secondary,
@@ -218,7 +216,6 @@ class ReceiveTabs extends StatelessWidget {
 class _ReceiveTab extends StatelessWidget {
   const _ReceiveTab({
     required this.label,
-    required this.iconName,
     required this.active,
     required this.activeTextColor,
     required this.inactiveTextColor,
@@ -227,13 +224,16 @@ class _ReceiveTab extends StatelessWidget {
     required this.labelStyle,
     required this.labelFontWeight,
     required this.onTap,
+    this.iconName,
     this.activeIconColor,
     this.activeLabelShadows,
     super.key,
   });
 
   final String label;
-  final String iconName;
+
+  /// The pool's glyph before the label; none in the neon switch.
+  final String? iconName;
   final bool active;
   final Color activeTextColor;
   final Color inactiveTextColor;
@@ -262,8 +262,10 @@ class _ReceiveTab extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                AppIcon(iconName, size: iconSize, color: iconColor),
-                SizedBox(width: iconGap),
+                if (iconName case final iconName?) ...[
+                  AppIcon(iconName, size: iconSize, color: iconColor),
+                  SizedBox(width: iconGap),
+                ],
                 Flexible(
                   child: Text(
                     label,
@@ -387,6 +389,9 @@ class ReceiveQrSurface extends StatelessWidget {
 }
 
 abstract final class _ReceiveQrEmbeddedImage {
+  /// The neon redesign (mobile) badges every code with Veylor's helmet, cut
+  /// at the corners; desktop names the pool.
+  static const _veylor = 'assets/icons/receive_qr_veylor.webp';
   static const _shield = 'assets/icons/receive_qr_shield_crimson.png';
   static const _transparentLight =
       'assets/icons/receive_qr_transparent_light.png';
@@ -397,6 +402,7 @@ abstract final class _ReceiveQrEmbeddedImage {
     ReceiveAddressType type, {
     required bool usesDarkQrSurface,
   }) {
+    if (_mobile) return _veylor;
     return switch (type) {
       ReceiveAddressType.shielded => _shield,
       ReceiveAddressType.transparent =>

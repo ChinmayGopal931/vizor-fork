@@ -252,8 +252,11 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   timeline: lit checks for done steps, the spinner kept for the current
   one, and a packet of light running down the rail into it.
 - **Receive.** The address and request codes sit in a lit cut-corner frame
-  (`ReceiveQrFrame`), always dark modules on a light plate; a Keystone
-  account's `ReceiveQrSurface(scanOptimized: true)` renders as before.
+  (`ReceiveQrFrame`), always dark modules on a light plate, with Veylor's
+  helmet as the badge in place of the pool's; the pool switch names the
+  pools without glyphs. A Keystone account's
+  `ReceiveQrSurface(scanOptimized: true)` renders as before, but for the
+  badge.
 - **Sync privacy screen.** The screen over a kept-awake sync
   (`SyncKeepAwakePrivacyLockScreen`) draws the progress as a lit red ring
   (a `Neon.strokeTube` arc to a bright head, unlit ticks ahead of it) that
