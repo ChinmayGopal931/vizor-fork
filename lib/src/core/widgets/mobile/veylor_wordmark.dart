@@ -75,15 +75,15 @@ class VeylorWordmarkPainter extends CustomPainter {
     ],
   ];
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    // A lit tube's glow needs room inside the box.
-    final inset = lit ? 4.0 : 0.0;
+  /// The wordmark's strokes centred in [size], letter by letter in reading
+  /// order, with the tube width that suits them; null when [size] is too
+  /// small. [inset] leaves room for a lit tube's glow.
+  static ({Path path, double width})? geometry(Size size, {double inset = 4}) {
     final scale = math.min(
       (size.width - 2 * inset) / _artWidth,
       (size.height - 2 * inset) / _artHeight,
     );
-    if (scale <= 0) return;
+    if (scale <= 0) return null;
     final left = (size.width - _artWidth * scale) / 2;
     final top = (size.height - _artHeight * scale) / 2;
 
@@ -102,8 +102,15 @@ class VeylorWordmarkPainter extends CustomPainter {
         if (stroke.length > 2 && stroke.first == stroke.last) path.close();
       }
     }
+    return (path: path, width: math.max(1.0, scale * 0.95));
+  }
 
-    final width = math.max(1.0, scale * 0.95);
+  @override
+  void paint(Canvas canvas, Size size) {
+    // A lit tube's glow needs room inside the box.
+    final art = geometry(size, inset: lit ? 4.0 : 0.0);
+    if (art == null) return;
+    final (:path, :width) = art;
     if (lit) {
       Neon.strokeTube(
         canvas,

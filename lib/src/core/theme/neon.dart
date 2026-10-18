@@ -175,6 +175,9 @@ class NeonIgnition extends StatefulWidget {
 
   static const duration = Duration(milliseconds: 900);
 
+  /// The switch-on light level at [t] (0..1) of [duration].
+  static double lightAt(double t) => _NeonIgnitionState.lightAt(t);
+
   @override
   State<NeonIgnition> createState() => _NeonIgnitionState();
 }
@@ -206,7 +209,7 @@ class _NeonIgnitionState extends State<NeonIgnition>
   }
 
   /// Stutter, catch, stutter, then full light.
-  static double _lightAt(double t) {
+  static double lightAt(double t) {
     if (t < 0.10) return 0.15;
     if (t < 0.16) return 0.85;
     if (t < 0.24) return 0.25;
@@ -222,7 +225,7 @@ class _NeonIgnitionState extends State<NeonIgnition>
       animation: _controller,
       builder: (context, _) => widget.builder(
         context,
-        _controller.isCompleted ? 1 : _lightAt(_controller.value),
+        _controller.isCompleted ? 1 : lightAt(_controller.value),
       ),
     );
   }

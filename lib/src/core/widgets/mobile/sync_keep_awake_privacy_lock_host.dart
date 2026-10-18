@@ -21,6 +21,8 @@ import '../app_button.dart';
 import '../app_icon.dart';
 import '../biometric_icon.dart';
 import 'neon_horizon.dart';
+import 'neon_motion.dart';
+import 'neon_scramble_text.dart';
 import 'tron_glyph.dart';
 
 class SyncKeepAwakePrivacyLockHost extends ConsumerStatefulWidget {
@@ -39,8 +41,19 @@ class SyncKeepAwakePrivacyLockHost extends ConsumerStatefulWidget {
 }
 
 class _SyncKeepAwakePrivacyLockHostState
-    extends ConsumerState<SyncKeepAwakePrivacyLockHost> {
+    extends ConsumerState<SyncKeepAwakePrivacyLockHost>
+    with SingleTickerProviderStateMixin {
   Timer? _idleTimer;
+
+  /// The last mode shown, kept on screen while it switches off.
+  SyncKeepAwakePrivacyLockMode? _shownMode;
+  late final AnimationController _crtOff =
+      AnimationController(vsync: this, duration: NeonMotion.crtOff)
+        ..addStatusListener((status) {
+          if (status == AnimationStatus.completed && mounted) {
+            setState(() => _shownMode = null);
+          }
+        });
   AppLifecycleListener? _lifecycleListener;
   bool _isInForeground = true;
   bool _clearScheduled = false;
@@ -71,12 +84,42 @@ class _SyncKeepAwakePrivacyLockHostState
     final visible = mode != SyncKeepAwakePrivacyLockMode.hidden;
     _syncIdleTimer(active: active, interaction: interaction, visible: visible);
 
+    if (visible) {
+      _shownMode = mode;
+      if (_crtOff.value > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _crtOff.value = 0;
+        });
+      }
+    } else if (_shownMode != null && !_crtOff.isAnimating) {
+      if (NeonMotion.reduced(context) ||
+          ref.read(appSecurityProvider).requiresUnlock) {
+        _shownMode = null;
+      } else {
+        // Switch off as a CRT, then drop the screen (see [_crtOff]).
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _shownMode != null && !_crtOff.isAnimating) {
+            unawaited(_crtOff.forward(from: 0));
+          }
+        });
+      }
+    }
+    final shown = _shownMode;
+
     return Stack(
       fit: StackFit.expand,
       children: [
         widget.child,
-        if (visible)
-          Positioned.fill(child: SyncKeepAwakePrivacyLockScreen(mode: mode)),
+        if (shown != null)
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: !visible,
+              child: _CrtSwitchOff(
+                animation: _crtOff,
+                child: SyncKeepAwakePrivacyLockScreen(mode: shown),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -85,6 +128,7 @@ class _SyncKeepAwakePrivacyLockHostState
   void dispose() {
     _lifecycleListener?.dispose();
     _idleTimer?.cancel();
+    _crtOff.dispose();
     super.dispose();
   }
 
@@ -377,6 +421,7 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
         glyphKey: ValueKey('sync_keep_awake_privacy_done_check'),
         title: 'Sync complete',
         body: 'Unlock Veylor to continue',
+        animate: true,
       ),
       SyncKeepAwakePrivacyLockMode.interrupted =>
         const _SyncKeepAwakeStatusLockup(
@@ -423,14 +468,23 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
                   SizedBox(height: layout.logoToMainGap),
                   main,
                   SizedBox(height: layout.mainToButtonGap),
-                  AppButton(
-                    key: const ValueKey(
-                      'sync_keep_awake_privacy_unlock_button',
+                  NeonDelayedIgnition(
+                    key: ValueKey(mode == SyncKeepAwakePrivacyLockMode.done),
+                    delay: mode == SyncKeepAwakePrivacyLockMode.done
+                        ? const Duration(milliseconds: 1500)
+                        : Duration.zero,
+                    builder: (context, light) => Opacity(
+                      opacity: light,
+                      child: AppButton(
+                        key: const ValueKey(
+                          'sync_keep_awake_privacy_unlock_button',
+                        ),
+                        onPressed: onUnlockPressed,
+                        leading: _SyncKeepAwakeUnlockIcon(biometric: biometric),
+                        minWidth: 165,
+                        child: const Text('Unlock Veylor'),
+                      ),
                     ),
-                    onPressed: onUnlockPressed,
-                    leading: _SyncKeepAwakeUnlockIcon(biometric: biometric),
-                    minWidth: 165,
-                    child: const Text('Unlock Veylor'),
                   ),
                 ],
               );
@@ -738,12 +792,17 @@ class _SyncKeepAwakeStatusLockup extends StatelessWidget {
     required this.glyphKey,
     required this.title,
     required this.body,
+    this.animate = false,
   });
 
   final TronGlyphKind glyph;
   final Key glyphKey;
   final String title;
   final String body;
+
+  /// Switch on as a sign: a scanline, a light cycle drawing the badge, then
+  /// the title decrypting in.
+  final bool animate;
 
   static const _badgeSize = 72.0;
   static const _titleTop = 100.0;
@@ -761,11 +820,13 @@ class _SyncKeepAwakeStatusLockup extends StatelessWidget {
             left: 0,
             right: 0,
             child: Center(
-              child: NeonGlyphBadge(
-                key: glyphKey,
-                glyph: glyph,
-                size: _badgeSize,
-              ),
+              child: animate
+                  ? _SyncDoneSign(key: glyphKey, glyph: glyph, size: _badgeSize)
+                  : NeonGlyphBadge(
+                      key: glyphKey,
+                      glyph: glyph,
+                      size: _badgeSize,
+                    ),
             ),
           ),
           Positioned(
@@ -775,7 +836,24 @@ class _SyncKeepAwakeStatusLockup extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _SyncKeepAwakeTitle(title),
+                if (animate)
+                  NeonDelayedIgnition(
+                    delay: const Duration(milliseconds: 1000),
+                    builder: (context, light) => light == 0
+                        ? Opacity(opacity: 0, child: _SyncKeepAwakeTitle(title))
+                        : NeonScrambleText(
+                            text: title.toUpperCase(),
+                            style: kNeonPageTitleStyle.copyWith(
+                              color: colors.text.accent,
+                            ),
+                            cipherStyle: kNeonPageTitleStyle.copyWith(
+                              color: colors.neon.glow,
+                            ),
+                            decryptOnAppear: true,
+                          ),
+                  )
+                else
+                  _SyncKeepAwakeTitle(title),
                 const SizedBox(height: AppSpacing.s),
                 ConstrainedBox(
                   constraints: const BoxConstraints(
@@ -995,4 +1073,259 @@ class _SyncKeepAwakeRingPainter extends CustomPainter {
         oldDelegate.glow != glow ||
         oldDelegate.core != core;
   }
+}
+
+/// A screen switching off as a CRT does: it folds to a bright scanline,
+/// the line pulls in to a dot, and the dot goes out.
+class _CrtSwitchOff extends StatelessWidget {
+  const _CrtSwitchOff({required this.animation, required this.child});
+
+  final Animation<double> animation;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final neon = context.colors.neon;
+    return AnimatedBuilder(
+      animation: animation,
+      child: child,
+      builder: (context, child) {
+        final t = animation.value;
+        final fold = Curves.easeInCubic.transform(NeonMotion.span(t, 0, 0.5));
+        final pull = Curves.easeInCubic.transform(
+          NeonMotion.span(t, 0.45, 0.85),
+        );
+        // One tree throughout, so the screen keeps its state as it folds.
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Transform.scale(scaleY: math.max(0.004, 1 - fold), child: child),
+            if (t > 0)
+              CustomPaint(
+                painter: _CrtLinePainter(
+                  fold: fold,
+                  pull: pull,
+                  fade: 1 - NeonMotion.span(t, 0.85, 1),
+                  glow: neon.glow,
+                  core: neon.core,
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _CrtLinePainter extends CustomPainter {
+  const _CrtLinePainter({
+    required this.fold,
+    required this.pull,
+    required this.fade,
+    required this.glow,
+    required this.core,
+  });
+
+  final double fold;
+  final double pull;
+  final double fade;
+  final Color glow;
+  final Color core;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (fold < 0.6) return;
+    final center = size.center(Offset.zero);
+    final half = size.width / 2 * (1 - pull);
+    paintNeonScanline(
+      canvas,
+      center.dy,
+      center.dx - half,
+      center.dx + half,
+      glow: glow,
+      core: core,
+      width: 1.8,
+      intensity: NeonMotion.span(fold, 0.6, 1) * fade,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_CrtLinePainter oldDelegate) =>
+      oldDelegate.fold != fold ||
+      oldDelegate.pull != pull ||
+      oldDelegate.fade != fade ||
+      oldDelegate.glow != glow ||
+      oldDelegate.core != core;
+}
+
+/// The done badge switching on: a scanline across the screen pulls into
+/// the badge, a light cycle traces its cut plate and then its glyph, and
+/// the badge flickers on in its place.
+class _SyncDoneSign extends StatefulWidget {
+  const _SyncDoneSign({required this.glyph, required this.size, super.key});
+
+  final TronGlyphKind glyph;
+  final double size;
+
+  @override
+  State<_SyncDoneSign> createState() => _SyncDoneSignState();
+}
+
+class _SyncDoneSignState extends State<_SyncDoneSign>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: NeonMotion.syncDone,
+    value: 1,
+  );
+  var _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    if (!NeonMotion.reduced(context)) _controller.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final neon = context.colors.neon;
+    final badge = NeonGlyphBadge(glyph: widget.glyph, size: widget.size);
+    return SizedBox.square(
+      dimension: widget.size,
+      child: AnimatedBuilder(
+        animation: _controller,
+        child: badge,
+        builder: (context, badge) {
+          if (_controller.isCompleted) return badge!;
+          final ms = _controller.value * NeonMotion.syncDone.inMilliseconds;
+          final light = ms < 1350
+              ? 0.0
+              : NeonIgnition.lightAt(NeonMotion.span(ms, 1350, 1800));
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              if (light > 0) Opacity(opacity: light, child: badge),
+              ExcludeSemantics(
+                child: CustomPaint(
+                  size: Size.square(widget.size),
+                  painter: _SyncDoneTrailPainter(
+                    ms: ms,
+                    glow: neon.glow,
+                    core: neon.core,
+                    screenWidth: MediaQuery.sizeOf(context).width,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SyncDoneTrailPainter extends CustomPainter {
+  _SyncDoneTrailPainter({
+    required this.ms,
+    required this.glow,
+    required this.core,
+    required this.screenWidth,
+  });
+
+  final double ms;
+  final Color glow;
+  final Color core;
+  final double screenWidth;
+
+  static NeonTrail? _plate;
+  static NeonTrail? _glyph;
+  static double? _cachedFor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width;
+    if (_cachedFor != s) {
+      _cachedFor = s;
+      // The badge's cut plate, and the check glyph's own plate and tick on
+      // the glyph's 24-unit grid, as `NeonGlyphBadge` and `TronGlyph` draw
+      // them.
+      _plate = NeonTrail(
+        Neon.chamferedRect(
+          (Offset.zero & size).deflate(0.5),
+          topLeft: s * 0.2,
+          topRight: s * 0.2,
+          bottomRight: s * 0.2,
+          bottomLeft: s * 0.2,
+        ),
+      );
+      final inner = s * 0.46;
+      final offset = (s - inner) / 2;
+      Offset p(double x, double y) =>
+          Offset(offset + x / 24 * inner, offset + y / 24 * inner);
+      _glyph = NeonTrail(
+        Path()
+          ..addPolygon([
+            p(6, 2),
+            p(22, 2),
+            p(22, 18),
+            p(18, 22),
+            p(2, 22),
+            p(2, 6),
+          ], true)
+          ..addPolygon([p(7, 12.5), p(10.5, 16), p(17, 8.5)], false),
+      );
+    }
+
+    final center = size.center(Offset.zero);
+    if (ms < 460) {
+      final grow = Curves.easeOutCubic.transform(NeonMotion.span(ms, 0, 260));
+      final shrink = Curves.easeInCubic.transform(
+        NeonMotion.span(ms, 260, 420),
+      );
+      final full = screenWidth / 2;
+      final half = (full * grow) - (full - s / 2) * shrink;
+      paintNeonScanline(
+        canvas,
+        center.dy,
+        center.dx - math.max(0, half),
+        center.dx + math.max(0, half),
+        glow: glow,
+        core: core,
+        intensity: 1 - NeonMotion.span(ms, 380, 460),
+      );
+    }
+    final fade = 1 - NeonMotion.span(ms, 1350, 1600);
+    _plate!.paint(
+      canvas,
+      Curves.easeInOutCubic.transform(NeonMotion.span(ms, 380, 1000)),
+      glow: glow,
+      core: core,
+      width: 1.2,
+      intensity: 0.55 * fade,
+    );
+    _glyph!.paint(
+      canvas,
+      Curves.easeInOutCubic.transform(NeonMotion.span(ms, 950, 1350)),
+      glow: glow,
+      core: core,
+      width: 1.4,
+      intensity: 0.7 * fade,
+      headLength: 10,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_SyncDoneTrailPainter oldDelegate) =>
+      oldDelegate.ms != ms ||
+      oldDelegate.glow != glow ||
+      oldDelegate.core != core ||
+      oldDelegate.screenWidth != screenWidth;
 }

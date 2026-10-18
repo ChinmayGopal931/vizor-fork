@@ -13,6 +13,8 @@ import '../../../core/feedback/app_haptics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/biometric_icon.dart';
+import '../../../core/widgets/mobile/neon_motion.dart';
+import '../../../core/widgets/mobile/unlock_reveal_host.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../../core/widgets/mobile/neon_horizon.dart';
 import '../../payment_links/providers/payment_link_intake_provider.dart';
@@ -214,6 +216,7 @@ class _MobileUnlockScreenState extends ConsumerState<MobileUnlockScreen> {
         final claimed = claimParkedPaymentUriAfterUnlock(ref);
         final hasPendingPaymentLink =
             ref.read(paymentLinkIntakeProvider).pendingLink != null;
+        requestUnlockReveal();
         context.go(hasPendingPaymentLink ? '/payment-links' : '/home');
         final pendingPrefill = claimed.prefill;
         final notice = claimed.notice;
@@ -448,12 +451,21 @@ class MobileBiometricSignInView extends StatelessWidget {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: context.colors.background.window,
-      child: const Center(
-        child: NeonGlyphBadge(
-          key: ValueKey('mobile_biometric_sign_in_badge'),
-          iconName: AppIcons.lock,
-          size: 130,
-        ),
+      child: const Stack(
+        children: [
+          // The unlock reveal's curtain starts from this same spot.
+          Align(
+            alignment: NeonMotion.wordmarkAlignment,
+            child: VeylorWordmarkIntro(),
+          ),
+          Center(
+            child: NeonGlyphBadge(
+              key: ValueKey('mobile_biometric_sign_in_badge'),
+              iconName: AppIcons.lock,
+              size: 130,
+            ),
+          ),
+        ],
       ),
     );
   }

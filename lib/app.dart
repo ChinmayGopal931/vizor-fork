@@ -35,6 +35,7 @@ import 'src/core/theme/app_theme_host.dart';
 import 'src/core/theme/gotham_fonts.dart';
 import 'src/core/theme/legacy_material_theme.dart';
 import 'src/core/widgets/mobile/mobile_numeric_keyboard_toolbar.dart';
+import 'src/core/widgets/mobile/unlock_reveal_host.dart';
 import 'src/core/widgets/mobile/private_usd_engine_host.dart';
 import 'src/core/widgets/app_button.dart';
 import 'src/core/widgets/app_icon.dart';
@@ -1935,7 +1936,9 @@ class ZcashWalletApp extends ConsumerWidget {
                                             child: PrivateUsdEngineHost(
                                               child: AppReviewHost(
                                                 router: router,
-                                                child: child!,
+                                                child: UnlockRevealHost(
+                                                  child: child!,
+                                                ),
                                               ),
                                             ),
                                           ),
