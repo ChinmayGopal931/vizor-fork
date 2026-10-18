@@ -271,19 +271,20 @@ class MobileSettingsScreen extends ConsumerWidget {
                         valueColor: settingsValueColor,
                         chevronColor: settingsChevronColor,
                       ),
-                    MobileListRow(
-                      key: const ValueKey('mobile_settings_theme_row'),
-                      leading: _RowIcon(AppIcons.theme),
-                      label: 'Theme',
-                      value: _themeLabel(themeMode),
-                      minRowHeight: _settingsRowHeight,
-                      textStyle: settingsRowStyle,
-                      valueTextStyle: settingsRowStyle,
-                      valueColor: settingsValueColor,
-                      chevronColor: settingsChevronColor,
-                      showChevron: true,
-                      onTap: () => _showThemeSheet(context, ref, themeMode),
-                    ),
+                    if (!kThemeLockedToDark)
+                      MobileListRow(
+                        key: const ValueKey('mobile_settings_theme_row'),
+                        leading: _RowIcon(AppIcons.theme),
+                        label: 'Theme',
+                        value: _themeLabel(themeMode),
+                        minRowHeight: _settingsRowHeight,
+                        textStyle: settingsRowStyle,
+                        valueTextStyle: settingsRowStyle,
+                        valueColor: settingsValueColor,
+                        chevronColor: settingsChevronColor,
+                        showChevron: true,
+                        onTap: () => _showThemeSheet(context, ref, themeMode),
+                      ),
                     // No Figma frame for this row yet — listed in
                     // design_suggestion. Hidden on devices without
                     // biometric hardware.

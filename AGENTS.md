@@ -162,7 +162,10 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   `AppNeonColors` (`colors.neon`) carries the lit elements' colours: the
   tube glow and its white-hot core on the page, the balance sign's light,
   the grid, and the white "headlight" frame. Light mode is brushed steel
-  with the same red; the balance sign stays black in both.
+  with the same red; the balance sign stays black in both. For now the
+  mobile app is dark only (owner, 2026-10-17): `kThemeLockedToDark` pins
+  the theme and hides Settings' Theme row, and iOS sets
+  `UIUserInterfaceStyle` to Dark.
 - **Shapes.** `AppRadiiMobile` is near-square (2 to 4 px, `full` is 4).
   `AppChamfer` sizes the 45° cuts drawn with `BeveledRectangleBorder`
   (`Neon.chamferBorder`, two-corner `Neon.wedgeBorder`). `AppButton` cuts
@@ -207,7 +210,8 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
 - **Sync line.** `NeonSyncBackdrop` replaces the top bar's sync label on
   Home. A Tron floor lies behind the content and flows only while
   something scans (idle, nothing moves and no frame is drawn), and a red
-  line at 85% of the width rises from the bottom with the progress,
+  line at 85% of the width (87% for Railgun's on the Private USD screen)
+  rises from the bottom with the progress,
   its head reading `SYNC n%`, `SYNCED`, `SYNC FAILED` or `TOR …`
   (`NeonSyncReadout`). It has two layers (`NeonSyncLineLayer`): while
   syncing the line is drawn over the content (`NeonSyncLayer.front`,

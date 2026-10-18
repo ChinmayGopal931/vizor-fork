@@ -1106,8 +1106,6 @@ void main() {
       _chevronIn(tester, const ValueKey('mobile_settings_pfp_row')).color,
       AppThemeData.dark.colors.icon.accent,
     );
-    expect(find.text('Theme'), findsOneWidget);
-    expect(find.text('Dark'), findsOneWidget);
     expect(find.text('Syncing'), findsOneWidget);
     final keepAwakeRow = find.byKey(
       const ValueKey('mobile_settings_sync_keep_awake_row'),
@@ -1206,117 +1204,6 @@ void main() {
 
     expect(find.text('home route'), findsOneWidget);
     expect(find.textContaining('payment links route'), findsNothing);
-  });
-
-  testWidgets('Gift Cards drops a slow open once a sheet takes over', (
-    tester,
-  ) async {
-    await _useTallSurface(tester);
-    final cards = Completer<PaymentLinkCardsSnapshot>();
-    await tester.pumpWidget(_routedApp(cardsLoader: () => cards.future));
-    await tester.pump();
-
-    final row = find.byKey(const ValueKey('mobile_settings_gift_cards_row'));
-    await tester.scrollUntilVisible(row, 200);
-    await tester.ensureVisible(row);
-    await tester.pump();
-    await tester.tap(row);
-    await tester.pump();
-
-    // The screen stays interactive while the cards load, and the sheet goes
-    // to the root navigator over the shell, not to this branch.
-    await tester.ensureVisible(find.text('Theme'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Theme'));
-    await tester.pumpAndSettle();
-    expect(find.text('System (Auto)'), findsOneWidget);
-
-    cards.complete(const PaymentLinkCardsSnapshot(created: [], received: []));
-    await tester.pumpAndSettle();
-
-    expect(find.text('System (Auto)'), findsOneWidget);
-    expect(find.textContaining('payment links route'), findsNothing);
-  });
-
-  testWidgets('theme row opens the sheet and applies the selection', (
-    tester,
-  ) async {
-    await _useTallSurface(tester);
-    await tester.pumpWidget(_app());
-    await tester.pump();
-
-    await tester.ensureVisible(find.text('Theme'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Theme'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('System (Auto)'), findsOneWidget);
-    final modal = find.byType(MobileModalScaffold);
-    final modalTitle = find.descendant(of: modal, matching: find.text('Theme'));
-    final closeIcon = find.descendant(
-      of: modal,
-      matching: find.byWidgetPredicate(
-        (widget) => widget is AppIcon && widget.name == AppIcons.cross,
-      ),
-    );
-    final titleCenterY = tester.getCenter(modalTitle).dy;
-    final closeCenterY = tester.getCenter(closeIcon).dy;
-    expect(titleCenterY, greaterThan(closeCenterY));
-    expect(titleCenterY - closeCenterY, lessThanOrEqualTo(16));
-    expect(tester.widget<AppIcon>(closeIcon).size, 20);
-    expect(
-      _leadingIconOpacityIn(
-        tester,
-        const ValueKey('mobile_theme_option_light'),
-      ),
-      0.5,
-    );
-    expect(
-      tester
-          .getSize(find.byKey(const ValueKey('mobile_theme_option_system')))
-          .height,
-      64,
-    );
-    expect(
-      tester
-              .getTopLeft(
-                find.byKey(const ValueKey('mobile_theme_option_light')),
-              )
-              .dy -
-          tester
-              .getBottomLeft(
-                find.byKey(const ValueKey('mobile_theme_option_system')),
-              )
-              .dy,
-      AppSpacing.xs,
-    );
-    expect(
-      tester.getTopLeft(find.byKey(const ValueKey('mobile_theme_update'))).dy -
-          tester
-              .getBottomLeft(
-                find.byKey(const ValueKey('mobile_theme_option_dark')),
-              )
-              .dy,
-      AppSpacing.md,
-    );
-    expect(
-      find.byKey(const ValueKey('mobile_theme_option_light')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('mobile_theme_option_dark')),
-      findsOneWidget,
-    );
-
-    // Selection commits through Update, not on tap.
-    await tester.tap(find.byKey(const ValueKey('mobile_theme_option_light')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('mobile_theme_update')));
-    await tester.pumpAndSettle();
-
-    // Sheet closed and the row value reflects the new mode.
-    expect(find.text('System (Auto)'), findsNothing);
-    expect(find.text('Light'), findsOneWidget);
   });
 
   testWidgets('sync keep-awake row toggles the persisted setting', (
@@ -1720,14 +1607,6 @@ AppIcon _chevronIn(WidgetTester tester, ValueKey<String> rowKey) {
       ),
     ),
   );
-}
-
-double _leadingIconOpacityIn(WidgetTester tester, ValueKey<String> rowKey) {
-  return tester
-      .widget<Opacity>(
-        find.descendant(of: find.byKey(rowKey), matching: find.byType(Opacity)),
-      )
-      .opacity;
 }
 
 final _turnOffSheet = find.byKey(

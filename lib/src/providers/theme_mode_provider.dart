@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_bootstrap.dart';
+import '../core/layout/app_form_factor.dart';
 import '../core/storage/app_secure_store.dart';
 
 /// Holds the user's selected [ThemeMode] (system / light / dark).
@@ -14,7 +15,9 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
   static final _store = AppSecureStore.instance;
 
   @override
-  ThemeMode build() => ref.watch(appBootstrapProvider).themeMode;
+  ThemeMode build() => kThemeLockedToDark
+      ? ThemeMode.dark
+      : ref.watch(appBootstrapProvider).themeMode;
 
   Future<void> set(ThemeMode mode) async {
     await _store.writePlain(kThemeModeKey, _encode(mode));
@@ -29,6 +32,11 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
     };
   }
 }
+
+/// The mobile app is dark only for now (owner, 2026-10-17): the theme is
+/// pinned to dark and Settings hides its Theme row. A saved choice stays
+/// stored for when the lock is lifted.
+const kThemeLockedToDark = kAppFormFactor == AppFormFactor.mobile;
 
 final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
   ThemeModeNotifier.new,
