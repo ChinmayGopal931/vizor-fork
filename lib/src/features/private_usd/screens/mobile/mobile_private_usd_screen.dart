@@ -283,194 +283,199 @@ class MobilePrivateUsdView extends StatelessWidget {
         // Laid out as Home: the floor (and the line once synced) behind, the
         // blocks backed solid so that line shows only in the gaps, and the
         // climbing line with its readout in front, ignoring touches.
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned.fill(
-              child: NeonSyncLineLayer(
-                key: const ValueKey('mobile_private_usd_sync_back'),
-                line: syncLine,
+        child: NeonSyncScrolled(
+          builder: (context, scrolled) => Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: NeonSyncLineLayer(
+                  key: const ValueKey('mobile_private_usd_sync_back'),
+                  line: syncLine,
+                  scrolled: scrolled,
+                ),
               ),
-            ),
-            SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  MobileTopNav.back(
-                    title: PrivateUsdCopy.title,
-                    onBack: onBack,
-                    trailing: _InfoButton(
-                      onTap: () => showPrivateUsdInfoSheet(
-                        context,
-                        screening: screening,
+              SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    MobileTopNav.back(
+                      title: PrivateUsdCopy.title,
+                      onBack: onBack,
+                      trailing: _InfoButton(
+                        onTap: () => showPrivateUsdInfoSheet(
+                          context,
+                          screening: screening,
+                        ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: ListView(
-                      key: const ValueKey('mobile_private_usd_list'),
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.sm,
-                        AppSpacing.xs,
-                        AppSpacing.sm,
-                        AppSpacing.lg,
-                      ),
-                      children: [
-                        NeonSyncOcclude(
-                          child: Text(
-                            PrivateUsdCopy.subtitle,
-                            style: AppTypography.bodyMedium.copyWith(
-                              color: colors.text.secondary,
-                            ),
-                          ),
+                    Expanded(
+                      child: ListView(
+                        key: const ValueKey('mobile_private_usd_list'),
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.sm,
+                          AppSpacing.xs,
+                          AppSpacing.sm,
+                          AppSpacing.lg,
                         ),
-                        const SizedBox(height: AppSpacing.sm),
-                        NeonSyncOcclude(
-                          child: _TotalCard(
-                            state: state,
-                            zecUsdPrice: zecUsdPrice,
-                            privacyModeEnabled: privacyModeEnabled,
-                            onRefresh: onRefresh,
-                            rpcFailing: rpcFailing,
-                            onUseDefaultRpc: onUseDefaultRpc,
-                          ),
-                        ),
-                        if (onSend != null && onWithdraw != null) ...[
-                          const SizedBox(height: AppSpacing.s),
-                          NeonSyncOcclude(
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: AppButton(
-                                    key: const ValueKey(
-                                      'mobile_private_usd_send',
-                                    ),
-                                    variant: AppButtonVariant.secondary,
-                                    expand: true,
-                                    onPressed: canSend ? onSend : null,
-                                    child: const Text(
-                                      PrivateUsdCopy.actionSend,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: AppSpacing.s),
-                                Expanded(
-                                  child: AppButton(
-                                    key: const ValueKey(
-                                      'mobile_private_usd_withdraw',
-                                    ),
-                                    variant: AppButtonVariant.secondary,
-                                    expand: true,
-                                    onPressed: canSend ? onWithdraw : null,
-                                    child: const Text(
-                                      PrivateUsdCopy.actionWithdraw,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        if (pendingPayment case final payment?) ...[
-                          const SizedBox(height: AppSpacing.xs),
-                          NeonSyncOcclude(
-                            child: PrivateUsdPendingPaymentLine(
-                              payment: payment,
-                            ),
-                          ),
-                        ],
-                        if (spendNote case final note?) ...[
-                          const SizedBox(height: AppSpacing.xs),
+                        children: [
                           NeonSyncOcclude(
                             child: Text(
-                              note,
-                              key: const ValueKey(
-                                'mobile_private_usd_spend_note',
-                              ),
-                              style: AppTypography.bodySmall.copyWith(
+                              PrivateUsdCopy.subtitle,
+                              style: AppTypography.bodyMedium.copyWith(
                                 color: colors.text.secondary,
                               ),
                             ),
                           ),
-                        ],
-                        if (banner != null) ...[
-                          const SizedBox(height: AppSpacing.s),
+                          const SizedBox(height: AppSpacing.sm),
                           NeonSyncOcclude(
-                            child: PrivateUsdConversionBannerView(
-                              banner: banner,
-                              onTap: () => onOpenConversion?.call(banner.path),
-                            ),
-                          ),
-                        ],
-                        if (balances != null &&
-                            balances.total == BigInt.zero &&
-                            banner == null) ...[
-                          const SizedBox(height: AppSpacing.s),
-                          const NeonSyncOcclude(child: _EmptyCard()),
-                        ] else if (balances != null) ...[
-                          const SizedBox(height: AppSpacing.s),
-                          NeonSyncOcclude(
-                            child: _BucketsCard(
-                              balances: balances,
+                            child: _TotalCard(
+                              state: state,
+                              zecUsdPrice: zecUsdPrice,
                               privacyModeEnabled: privacyModeEnabled,
-                              screening: screening,
-                              arrivingSince: arrivingSince,
-                              now: now,
+                              onRefresh: onRefresh,
+                              rpcFailing: rpcFailing,
+                              onUseDefaultRpc: onUseDefaultRpc,
                             ),
                           ),
-                          if (balances.held.length > 1) ...[
+                          if (onSend != null && onWithdraw != null) ...[
                             const SizedBox(height: AppSpacing.s),
                             NeonSyncOcclude(
-                              child: _AssetsCard(
-                                balances: balances,
-                                tokenNames: tokenNames,
-                                privacyModeEnabled: privacyModeEnabled,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: AppButton(
+                                      key: const ValueKey(
+                                        'mobile_private_usd_send',
+                                      ),
+                                      variant: AppButtonVariant.secondary,
+                                      expand: true,
+                                      onPressed: canSend ? onSend : null,
+                                      child: const Text(
+                                        PrivateUsdCopy.actionSend,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.s),
+                                  Expanded(
+                                    child: AppButton(
+                                      key: const ValueKey(
+                                        'mobile_private_usd_withdraw',
+                                      ),
+                                      variant: AppButtonVariant.secondary,
+                                      expand: true,
+                                      onPressed: canSend ? onWithdraw : null,
+                                      child: const Text(
+                                        PrivateUsdCopy.actionWithdraw,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
-                        ],
-                        if (receiveAddress case final address?) ...[
-                          const SizedBox(height: AppSpacing.s),
-                          NeonSyncOcclude(
-                            child: _ReceiveAddressCard(address: address),
+                          if (pendingPayment case final payment?) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            NeonSyncOcclude(
+                              child: PrivateUsdPendingPaymentLine(
+                                payment: payment,
+                              ),
+                            ),
+                          ],
+                          if (spendNote case final note?) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            NeonSyncOcclude(
+                              child: Text(
+                                note,
+                                key: const ValueKey(
+                                  'mobile_private_usd_spend_note',
+                                ),
+                                style: AppTypography.bodySmall.copyWith(
+                                  color: colors.text.secondary,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (banner != null) ...[
+                            const SizedBox(height: AppSpacing.s),
+                            NeonSyncOcclude(
+                              child: PrivateUsdConversionBannerView(
+                                banner: banner,
+                                onTap: () =>
+                                    onOpenConversion?.call(banner.path),
+                              ),
+                            ),
+                          ],
+                          if (balances != null &&
+                              balances.total == BigInt.zero &&
+                              banner == null) ...[
+                            const SizedBox(height: AppSpacing.s),
+                            const NeonSyncOcclude(child: _EmptyCard()),
+                          ] else if (balances != null) ...[
+                            const SizedBox(height: AppSpacing.s),
+                            NeonSyncOcclude(
+                              child: _BucketsCard(
+                                balances: balances,
+                                privacyModeEnabled: privacyModeEnabled,
+                                screening: screening,
+                                arrivingSince: arrivingSince,
+                                now: now,
+                              ),
+                            ),
+                            if (balances.held.length > 1) ...[
+                              const SizedBox(height: AppSpacing.s),
+                              NeonSyncOcclude(
+                                child: _AssetsCard(
+                                  balances: balances,
+                                  tokenNames: tokenNames,
+                                  privacyModeEnabled: privacyModeEnabled,
+                                ),
+                              ),
+                            ],
+                          ],
+                          if (receiveAddress case final address?) ...[
+                            const SizedBox(height: AppSpacing.s),
+                            NeonSyncOcclude(
+                              child: _ReceiveAddressCard(address: address),
+                            ),
+                          ],
+                          const SizedBox(height: AppSpacing.md),
+                          _ActivitySection(
+                            rows: activityRows,
+                            onRefunds: onRefunds,
                           ),
                         ],
-                        const SizedBox(height: AppSpacing.md),
-                        _ActivitySection(
-                          rows: activityRows,
-                          onRefunds: onRefunds,
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (onConvert != null)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.sm,
-                        AppSpacing.s,
-                        AppSpacing.sm,
-                        AppSpacing.md,
-                      ),
-                      child: NeonSyncOcclude(
-                        child: AppButton(
-                          key: const ValueKey('mobile_private_usd_convert'),
-                          expand: true,
-                          onPressed: canConvert ? onConvert : null,
-                          child: const Text(PrivateUsdCopy.actionConvert),
-                        ),
                       ),
                     ),
-                ],
+                    if (onConvert != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.sm,
+                          AppSpacing.s,
+                          AppSpacing.sm,
+                          AppSpacing.md,
+                        ),
+                        child: NeonSyncOcclude(
+                          child: AppButton(
+                            key: const ValueKey('mobile_private_usd_convert'),
+                            expand: true,
+                            onPressed: canConvert ? onConvert : null,
+                            child: const Text(PrivateUsdCopy.actionConvert),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            Positioned.fill(
-              child: NeonSyncLineLayer(
-                key: const ValueKey('mobile_private_usd_sync_front'),
-                line: syncLine,
-                layer: NeonSyncLayer.front,
+              Positioned.fill(
+                child: NeonSyncLineLayer(
+                  key: const ValueKey('mobile_private_usd_sync_front'),
+                  line: syncLine,
+                  layer: NeonSyncLayer.front,
+                  scrolled: scrolled,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

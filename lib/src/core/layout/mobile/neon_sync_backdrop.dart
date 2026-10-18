@@ -94,11 +94,18 @@ class NeonSyncLineLayer extends StatelessWidget {
   const NeonSyncLineLayer({
     required this.line,
     this.layer = NeonSyncLayer.back,
+    this.scrolled = false,
     super.key,
   });
 
   final NeonSyncLine line;
   final NeonSyncLayer layer;
+
+  /// The page under the line has scrolled away from its top
+  /// ([NeonSyncScrolled]). A synced line's head and readout, drawn in front,
+  /// then fade out and the whole line runs behind the content, so nothing
+  /// fixed is drawn over the blocks scrolling past (owner, 2026-10-17).
+  final bool scrolled;
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +121,8 @@ class NeonSyncLineLayer extends StatelessWidget {
         (true, true) => NeonSyncLinePart.whole,
         (true, false) => NeonSyncLinePart.none,
         (false, true) => NeonSyncLinePart.head,
-        (false, false) => NeonSyncLinePart.belowHead,
+        (false, false) =>
+          scrolled ? NeonSyncLinePart.whole : NeonSyncLinePart.belowHead,
       },
       drawReadout: front,
       lineX: line.lineX,
@@ -125,10 +133,47 @@ class NeonSyncLineLayer extends StatelessWidget {
         container: true,
         liveRegion: true,
         label: line.semanticsLabel,
-        child: ExcludeSemantics(child: view),
+        child: ExcludeSemantics(
+          child: AnimatedOpacity(
+            opacity: scrolled && !line.climbing ? 0 : 1,
+            duration: const Duration(milliseconds: 200),
+            child: view,
+          ),
+        ),
       ),
     );
   }
+}
+
+/// Whether the page under a sync line has scrolled away from its top, from
+/// the scroll notifications of the content it wraps: its own vertical list,
+/// not lists nested inside it.
+class NeonSyncScrolled extends StatefulWidget {
+  const NeonSyncScrolled({required this.builder, super.key});
+
+  final Widget Function(BuildContext context, bool scrolled) builder;
+
+  @override
+  State<NeonSyncScrolled> createState() => _NeonSyncScrolledState();
+}
+
+class _NeonSyncScrolledState extends State<NeonSyncScrolled> {
+  bool _scrolled = false;
+
+  bool _onScroll(ScrollNotification notification) {
+    if (notification.depth == 0 && notification.metrics.axis == Axis.vertical) {
+      final scrolled = notification.metrics.extentBefore > 4;
+      if (scrolled != _scrolled) setState(() => _scrolled = scrolled);
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      NotificationListener<ScrollNotification>(
+        onNotification: _onScroll,
+        child: widget.builder(context, _scrolled),
+      );
 }
 
 /// A solid backing for a block over a sync line: the synced line, drawn
@@ -154,9 +199,16 @@ class NeonSyncOcclude extends StatelessWidget {
 /// and only its "SYNCED" readout stays on top. It replaces the top bar's
 /// "Veylor is synced" status.
 class NeonSyncBackdrop extends ConsumerWidget {
-  const NeonSyncBackdrop({this.layer = NeonSyncLayer.back, super.key});
+  const NeonSyncBackdrop({
+    this.layer = NeonSyncLayer.back,
+    this.scrolled = false,
+    super.key,
+  });
 
   final NeonSyncLayer layer;
+
+  /// See [NeonSyncLineLayer.scrolled].
+  final bool scrolled;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -199,6 +251,7 @@ class NeonSyncBackdrop extends ConsumerWidget {
     };
     return NeonSyncLineLayer(
       layer: layer,
+      scrolled: scrolled,
       line: NeonSyncLine(
         progress: progress.toDouble(),
         readout: readout,

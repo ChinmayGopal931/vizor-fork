@@ -106,53 +106,59 @@ class MobileHomeScreen extends ConsumerWidget {
         sync.failure == null;
 
     return SwapActivityStatusAutoRefresh(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // The neon backdrop: Tron floor and the rising sync line, behind
-          // the balance and everything else on Home.
-          const Positioned.fill(child: NeonSyncBackdrop()),
-          SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                const SizedBox(height: AppSpacing.xxs),
-                Builder(
-                  builder: (context) => MobileTopNavAccount(
-                    compact: true,
-                    showSyncStatus: !isImporting,
-                    onAccountTap: () => showMobileAccountsSheet(context),
+      child: NeonSyncScrolled(
+        builder: (context, scrolled) => Stack(
+          fit: StackFit.expand,
+          children: [
+            // The neon backdrop: Tron floor and the rising sync line, behind
+            // the balance and everything else on Home.
+            Positioned.fill(child: NeonSyncBackdrop(scrolled: scrolled)),
+            SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  const SizedBox(height: AppSpacing.xxs),
+                  Builder(
+                    builder: (context) => MobileTopNavAccount(
+                      compact: true,
+                      showSyncStatus: !isImporting,
+                      onAccountTap: () => showMobileAccountsSheet(context),
+                    ),
                   ),
-                ),
-                Expanded(
-                  // VZR-74: dissolve scrolled content under the top nav
-                  // with a soft eased fade instead of a hard clip line.
-                  child: MobileTopScrollFade(
-                    child: isImporting
-                        ? const _MobileHomeImportingProgress()
-                        : _HomeContent(
-                            sync: sync,
-                            activeAccountUuid: activeAccountUuid,
-                            privacyModeEnabled: privacyModeEnabled,
-                            ironwoodMigrationCta: ironwoodMigrationCta,
-                            onTogglePrivacyMode: () =>
-                                ref.read(privacyModeProvider.notifier).toggle(),
-                          ),
+                  Expanded(
+                    // VZR-74: dissolve scrolled content under the top nav
+                    // with a soft eased fade instead of a hard clip line.
+                    child: MobileTopScrollFade(
+                      child: isImporting
+                          ? const _MobileHomeImportingProgress()
+                          : _HomeContent(
+                              sync: sync,
+                              activeAccountUuid: activeAccountUuid,
+                              privacyModeEnabled: privacyModeEnabled,
+                              ironwoodMigrationCta: ironwoodMigrationCta,
+                              onTogglePrivacyMode: () => ref
+                                  .read(privacyModeProvider.notifier)
+                                  .toggle(),
+                            ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          // The sync line while it climbs, and its readout, over the content.
-          const Positioned.fill(
-            child: NeonSyncBackdrop(layer: NeonSyncLayer.front),
-          ),
-          const _SyncKeepAwakePromptHost(),
-          const _IronwoodMigrationAnnouncementHost(),
-          _IronwoodMigrationAttentionMountGate(
-            isHomeCurrent: isCurrentHomeRoute,
-          ),
-        ],
+            // The sync line while it climbs, and its readout, over the content.
+            Positioned.fill(
+              child: NeonSyncBackdrop(
+                layer: NeonSyncLayer.front,
+                scrolled: scrolled,
+              ),
+            ),
+            const _SyncKeepAwakePromptHost(),
+            const _IronwoodMigrationAnnouncementHost(),
+            _IronwoodMigrationAttentionMountGate(
+              isHomeCurrent: isCurrentHomeRoute,
+            ),
+          ],
+        ),
       ),
     );
   }
