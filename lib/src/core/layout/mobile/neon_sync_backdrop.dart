@@ -61,6 +61,7 @@ class NeonSyncLine {
     this.climbing = false,
     this.failed = false,
     bool? scanning,
+    this.lineX = _lineXFactor,
   }) : scanning = scanning ?? climbing;
 
   /// How far the line has climbed, 0..1.
@@ -80,6 +81,9 @@ class NeonSyncLine {
   /// Something scans: the floor flows. A synced line's refresh scans
   /// without climbing.
   final bool scanning;
+
+  /// Where the line stands, as a fraction of the width.
+  final double lineX;
 }
 
 /// One layer of [line], below or above the content as Home layers it: the
@@ -113,6 +117,7 @@ class NeonSyncLineLayer extends StatelessWidget {
         (false, false) => NeonSyncLinePart.belowHead,
       },
       drawReadout: front,
+      lineX: line.lineX,
     );
     if (!front) return ExcludeSemantics(child: view);
     return IgnorePointer(
@@ -216,8 +221,12 @@ class NeonSyncBackdropView extends StatefulWidget {
     this.drawFloor = true,
     this.linePart = NeonSyncLinePart.whole,
     this.drawReadout = true,
+    this.lineX = _lineXFactor,
     super.key,
   }) : floorFlows = floorFlows ?? active;
+
+  /// Where the line stands, as a fraction of the width.
+  final double lineX;
 
   /// Which parts this layer draws.
   final bool drawFloor;
@@ -317,6 +326,7 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
           core: neon.core,
           floorStrength: dark ? 0.6 : 0.35,
           topLimit: padding.top + AppSpacing.xs,
+          lineX: widget.lineX,
         ),
         child: widget.drawReadout
             ? _Readout(
@@ -325,6 +335,7 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
                 color: neon.glow,
                 core: neon.core,
                 topLimit: padding.top + AppSpacing.xs,
+                lineX: widget.lineX,
               )
             : null,
       ),
@@ -338,7 +349,8 @@ const _catchUpBlocks = 20;
 /// Where the sync line stands: in the right part of the screen, behind the
 /// balance and the rows (which are glass), not along the edge.
 const _lineXFactor = 0.85;
-double _lineX(double width) => (width * _lineXFactor).roundToDouble() + 0.5;
+double _lineX(double width, double factor) =>
+    (width * factor).roundToDouble() + 0.5;
 
 /// How far below the head the readout starts.
 const _readoutDrop = 10.0;
@@ -406,6 +418,7 @@ class _Readout extends StatelessWidget {
     required this.color,
     required this.core,
     required this.topLimit,
+    required this.lineX,
   });
 
   final double progress;
@@ -413,6 +426,7 @@ class _Readout extends StatelessWidget {
   final Color color;
   final Color core;
   final double topLimit;
+  final double lineX;
 
   @override
   Widget build(BuildContext context) {
@@ -424,7 +438,10 @@ class _Readout extends StatelessWidget {
         return Stack(
           children: [
             Positioned(
-              right: constraints.maxWidth - _lineX(constraints.maxWidth) + 7,
+              right:
+                  constraints.maxWidth -
+                  _lineX(constraints.maxWidth, lineX) +
+                  7,
               top: headY + _readoutDrop,
               child: RotatedBox(
                 quarterTurns: 3,
@@ -460,6 +477,7 @@ class _BackdropPainter extends CustomPainter {
     required this.core,
     required this.floorStrength,
     required this.topLimit,
+    required this.lineX,
   }) : super(repaint: flow);
 
   final Animation<double> flow;
@@ -475,6 +493,7 @@ class _BackdropPainter extends CustomPainter {
   final Color core;
   final double floorStrength;
   final double topLimit;
+  final double lineX;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -568,7 +587,7 @@ class _BackdropPainter extends CustomPainter {
 
   /// The rising tube along the right edge, with a pulse while scanning.
   void _paintSyncLine(Canvas canvas, Size size) {
-    final x = _lineX(size.width);
+    final x = _lineX(size.width, lineX);
     final headY = _headY(size.height, progress, topLimit);
     final intensity = failed ? 0.4 : 0.8;
 
@@ -658,6 +677,7 @@ class _BackdropPainter extends CustomPainter {
         oldDelegate.glow != glow ||
         oldDelegate.core != core ||
         oldDelegate.floorStrength != floorStrength ||
-        oldDelegate.topLimit != topLimit;
+        oldDelegate.topLimit != topLimit ||
+        oldDelegate.lineX != lineX;
   }
 }

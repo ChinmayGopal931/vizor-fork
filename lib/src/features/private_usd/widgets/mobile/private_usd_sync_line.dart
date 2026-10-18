@@ -38,6 +38,7 @@ NeonSyncLine privateUsdSyncLine(
           ? PrivateUsdCopy.loadFailed
           : PrivateUsdCopy.refreshFailed,
       failed: true,
+      lineX: _railgunLineX,
     );
   }
   if (balances != null) {
@@ -51,6 +52,7 @@ NeonSyncLine privateUsdSyncLine(
           ? ''
           : PrivateUsdCopy.updated(formatDayMonthTime(updatedAt)),
       scanning: state.isRefreshing,
+      lineX: _railgunLineX,
     );
   }
   // The page waits for the bridge, which waits out a Tor bootstrap.
@@ -63,6 +65,7 @@ NeonSyncLine privateUsdSyncLine(
       readout: NeonSyncReadout.torWaiting,
       semanticsLabel: kSyncStatusConnectingToTorSemanticsLabel,
       climbing: true,
+      lineX: _railgunLineX,
     );
   }
   final percent = state.firstSyncPercent;
@@ -74,8 +77,12 @@ NeonSyncLine privateUsdSyncLine(
         ? PrivateUsdCopy.firstLoad
         : PrivateUsdCopy.firstLoadProgress(whole),
     climbing: true,
+    lineX: _railgunLineX,
   );
 }
 
 // As Home's: a climbing line always shows a stub, and never reaches the top.
 double _climbed(int percent) => (percent / 100).clamp(0.03, 0.99);
+
+// A smidge right of Home's line (owner, 2026-10-17).
+const _railgunLineX = 0.87;
