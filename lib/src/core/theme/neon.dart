@@ -14,6 +14,17 @@ const kNeonHudCaptionStyle = TextStyle(
   letterSpacing: 2.4,
 );
 
+/// The neon redesign's page title: Gotham Thin, uppercase (the caller
+/// upper-cases the sentence-case text), wide-tracked. `MobileTopNav.back`
+/// draws its titles in it, and screens without a top bar their own.
+const kNeonPageTitleStyle = TextStyle(
+  fontFamily: 'Gotham',
+  fontWeight: FontWeight.w100,
+  fontSize: 20,
+  height: 1.2,
+  letterSpacing: 5,
+);
+
 /// Light effects for Veylor's neon redesign (mobile): glowing glyphs, lit
 /// tubes along chamfered outlines, and the flicker of a sign switching on.
 ///

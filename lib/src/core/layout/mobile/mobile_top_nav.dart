@@ -272,14 +272,14 @@ class MobileTopNav extends StatelessWidget {
             padding: const EdgeInsets.symmetric(
               horizontal: _backButtonSize + AppSpacing.s,
             ),
-            // Neon redesign: a page title is a Gotham HUD caption, bold,
-            // uppercase and wide-tracked. Screens with their own style keep it.
+            // Neon redesign: a page title is Gotham Thin, uppercase and
+            // wide-tracked. Screens with their own style keep it.
             child: Text(
               titleStyle == null ? title.toUpperCase() : title,
               maxLines: titleMaxLines,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: (titleStyle ?? _hudTitleStyle).copyWith(
+              style: (titleStyle ?? kNeonPageTitleStyle).copyWith(
                 color: foregroundColor ?? colors.text.accent,
               ),
             ),
@@ -619,14 +619,6 @@ class _SyncEdgeIndicator extends StatelessWidget {
     );
   }
 }
-
-const _hudTitleStyle = TextStyle(
-  fontFamily: 'Gotham',
-  fontWeight: FontWeight.w100,
-  fontSize: 20,
-  height: 1.2,
-  letterSpacing: 5,
-);
 
 /// The account in the top bar: only its portrait until tapped. A tap
 /// decrypts the name in beside it, which folds away again after a moment;

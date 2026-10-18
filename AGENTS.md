@@ -176,7 +176,8 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
 - **Light.** `lib/src/core/theme/neon.dart`: `Neon.textGlow`,
   `Neon.boxGlow`, `Neon.strokeTube` (halo, glow and core: every lit line
   uses it), `NeonIgnition` (a sign's switch-on flicker, off under reduced
-  motion) and `kNeonHudCaptionStyle`.
+  motion), `kNeonHudCaptionStyle` and `kNeonPageTitleStyle` (the page
+  title).
 - **Type.** Gotham everywhere, lighter on mobile, and nothing on mobile is
   Book (400) or heavier. Headings are Thin (100): screen, step, page and
   sheet titles, a state's statement (Home's "We're importing your
@@ -253,6 +254,12 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
 - **Receive.** The address and request codes sit in a lit cut-corner frame
   (`ReceiveQrFrame`), always dark modules on a light plate; a Keystone
   account's `ReceiveQrSurface(scanOptimized: true)` renders as before.
+- **Sync privacy screen.** The screen over a kept-awake sync
+  (`SyncKeepAwakePrivacyLockScreen`) draws the progress as a lit red ring
+  (a `Neon.strokeTube` arc to a bright head, unlit ticks ahead of it) that
+  switches on around Thin glowing numerals, done and paused as
+  `NeonGlyphBadge`s, and every title, its passcode prompt's included, as
+  the page title.
 - **Chart card.** The chart is drawn as a neon trail on a Tron grid; a
   scrub reads the line under the finger (interpolated value and time), not
   the nearest data point. The card no longer names the price server; the
