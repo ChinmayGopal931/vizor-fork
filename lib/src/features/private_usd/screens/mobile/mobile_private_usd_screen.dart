@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app_bootstrap.dart';
 import '../../../../core/feedback/app_haptics.dart';
 import '../../../../core/formatting/date_format.dart';
 import '../../../../core/layout/mobile/mobile_top_nav.dart';
@@ -34,6 +35,7 @@ import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_balance_provider.dart';
 import '../../providers/private_usd_activity_provider.dart';
 import '../../providers/private_usd_conversion_provider.dart';
+import '../../providers/private_usd_custom_rpc_provider.dart';
 import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_receive_address_provider.dart';
 import '../../providers/private_usd_spend_status_provider.dart';
@@ -114,7 +116,19 @@ class _MobilePrivateUsdScreenState
     final spending = ref.watch(privateUsdSpendStatusProvider(uuid));
     final hasDollars =
         balance.balances?.assets.any((a) => a.available > BigInt.zero) ?? false;
+    // A sync or a conversion step failing while the user's own Ethereum RPC
+    // (Settings) is set is put on it, with the way back to the default.
+    final network = ref.watch(appBootstrapProvider).network;
+    final customRpc = ref.watch(privateUsdCustomRpcProvider(network)).value;
+    final rpcFailing =
+        customRpc != null &&
+        (balance.refreshFailed ||
+            ref.watch(privateUsdEthereumUnreachableProvider(uuid)));
     return MobilePrivateUsdView(
+      rpcFailing: rpcFailing,
+      onUseDefaultRpc: rpcFailing
+          ? () => unawaited(_useDefaultRpc(network, uuid))
+          : null,
       state: balance,
       networkPrivacy: ref.watch(networkPrivacyProvider),
       zecUsdPrice: ref.watch(zecHomeUsdUnitPriceProvider),
@@ -149,6 +163,20 @@ class _MobilePrivateUsdScreenState
       pendingPayment: ref.watch(privateUsdPendingPaymentProvider(uuid)),
     );
   }
+
+  /// Clears the user's own Ethereum RPC (which closes the Railgun page) and
+  /// syncs again on the default.
+  Future<void> _useDefaultRpc(String network, String uuid) async {
+    try {
+      await ref.read(privateUsdCustomRpcProvider(network).notifier).clear();
+    } catch (_) {
+      if (mounted) showAppToast(context, PrivateUsdCopy.rpcErrorSave);
+      return;
+    }
+    if (!mounted) return;
+    showAppToast(context, PrivateUsdCopy.rpcCleared);
+    ref.read(privateUsdBalanceProvider(uuid).notifier).refresh();
+  }
 }
 
 /// The screen's content for a given balance, address and price. Widgetbook,
@@ -177,6 +205,8 @@ class MobilePrivateUsdView extends StatelessWidget {
     this.spendNote,
     this.pendingPayment,
     this.onRefunds,
+    this.rpcFailing = false,
+    this.onUseDefaultRpc,
     super.key,
   });
 
@@ -234,6 +264,11 @@ class MobilePrivateUsdView extends StatelessWidget {
 
   /// "Refunds" beside the Activity heading, once a conversion was refunded.
   final VoidCallback? onRefunds;
+
+  /// A sync or a conversion step fails while the user's own Ethereum RPC is
+  /// set: the card says so in place of its error, with [onUseDefaultRpc].
+  final bool rpcFailing;
+  final VoidCallback? onUseDefaultRpc;
 
   @override
   Widget build(BuildContext context) {
@@ -296,6 +331,8 @@ class MobilePrivateUsdView extends StatelessWidget {
                             zecUsdPrice: zecUsdPrice,
                             privacyModeEnabled: privacyModeEnabled,
                             onRefresh: onRefresh,
+                            rpcFailing: rpcFailing,
+                            onUseDefaultRpc: onUseDefaultRpc,
                           ),
                         ),
                         if (onSend != null && onWithdraw != null) ...[
@@ -452,12 +489,16 @@ class _TotalCard extends StatelessWidget {
     required this.zecUsdPrice,
     required this.privacyModeEnabled,
     required this.onRefresh,
+    required this.rpcFailing,
+    required this.onUseDefaultRpc,
   });
 
   final PrivateUsdBalanceState state;
   final double? zecUsdPrice;
   final bool privacyModeEnabled;
   final VoidCallback onRefresh;
+  final bool rpcFailing;
+  final VoidCallback? onUseDefaultRpc;
 
   @override
   Widget build(BuildContext context) {
@@ -536,7 +577,27 @@ class _TotalCard extends StatelessWidget {
               ),
             ),
           ],
-          if (error != null) ...[
+          if (rpcFailing) ...[
+            const SizedBox(height: AppSpacing.xs),
+            // Read out: the sync line says only that the sync failed.
+            Text(
+              PrivateUsdCopy.rpcNotAnswering,
+              key: const ValueKey('mobile_private_usd_rpc_error'),
+              style: AppTypography.bodySmall.copyWith(
+                color: colors.text.destructive,
+              ),
+            ),
+            if (onUseDefaultRpc case final onUseDefault?) ...[
+              const SizedBox(height: AppSpacing.xs),
+              AppButton(
+                key: const ValueKey('mobile_private_usd_rpc_default'),
+                variant: AppButtonVariant.secondary,
+                size: AppButtonSize.small,
+                onPressed: onUseDefault,
+                child: const Text(PrivateUsdCopy.rpcUseDefault),
+              ),
+            ],
+          ] else if (error != null) ...[
             const SizedBox(height: AppSpacing.xs),
             ExcludeSemantics(
               child: Text(

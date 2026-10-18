@@ -19,6 +19,7 @@ import '../services/railgun_engine.dart';
 import '../services/railgun_engine_key_store.dart';
 import '../services/railgun_host_channel.dart';
 import 'private_usd_available_provider.dart';
+import 'private_usd_custom_rpc_provider.dart';
 
 /// The platform's page host (Kotlin or Swift); replaced by a fake in tests.
 final railgunHostProvider = Provider<RailgunHost>(
@@ -97,6 +98,16 @@ final railgunEngineProvider = Provider<RailgunEngine>((ref) {
   ref.listen(networkPrivacyProvider, (previous, next) {
     if (isRailgunRouteChange(previous, next)) unawaited(engine.close());
   });
+  // The user's own Ethereum RPC saved or cleared in Settings: the page's
+  // `start` took the old one, so close as for a route change; the next use
+  // starts with the new one. The first read is no change.
+  ref.listen(
+    privateUsdCustomRpcProvider(ref.read(appBootstrapProvider).network),
+    (previous, next) {
+      if (previous == null || !previous.hasValue || !next.hasValue) return;
+      if (previous.value != next.value) unawaited(engine.close());
+    },
+  );
   // iOS may reclaim a suspended app's listening socket, so back from the
   // background the bridge is checked (iOS plan XI14). An OS behaviour, not a
   // layout choice; Android's bridge is never reclaimed.
@@ -177,6 +188,7 @@ class RustRailgunWalletSource implements RailgunWalletSource {
     final network = _ref.read(appBootstrapProvider).network;
     final deployment = _ref.read(privateUsdDeploymentProvider(network));
     if (deployment == null) throw const RailgunEngineUnavailableException();
+    final custom = await privateUsdCustomRpcUrlOf(_ref, network);
     final encryptionKey = await _ref
         .read(railgunEngineKeyStoreProvider)
         .keyFor(accountUuid);
@@ -208,15 +220,19 @@ class RustRailgunWalletSource implements RailgunWalletSource {
       mnemonicBytes.fillRange(0, mnemonicBytes.length, 0);
     }
     final [mnemonic, address] = await Future.wait(derived);
-    final keyed = privateUsdKeyedRpcUrl(
-      deployment.railgunNetwork,
-      allowedHosts: deployment.allowedHosts,
-    );
+    final keyed = custom != null
+        ? null
+        : privateUsdKeyedRpcUrl(
+            deployment.railgunNetwork,
+            allowedHosts: deployment.allowedHosts,
+          );
     return RailgunWalletOpening(
       start: RailgunStartParams(
         network: deployment.railgunNetwork,
-        // The keyed endpoint first; publicnode keeps the page going without.
-        rpcUrls: [?keyed, deployment.keylessRpcUrl],
+        // The user's own RPC (Settings) alone, with no fallback (owner,
+        // 2026-10-17). Else the keyed endpoint first; publicnode keeps the
+        // page going without.
+        rpcUrls: custom != null ? [custom] : [?keyed, deployment.keylessRpcUrl],
         poiNodeUrls: [deployment.poiNodeUrl],
       ),
       wallet: RailgunOpenWalletParams(
@@ -224,7 +240,7 @@ class RustRailgunWalletSource implements RailgunWalletSource {
         mnemonic: mnemonic,
       ),
       expectedAddress: address,
-      secrets: [?keyed],
+      secrets: [?custom, ?keyed],
     );
   }
 

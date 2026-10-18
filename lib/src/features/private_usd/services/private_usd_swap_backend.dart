@@ -56,7 +56,8 @@ class PrivateUsdSwapContext {
     required this.lightwalletdUrl,
     this.railgunNetwork,
     this.allowedHosts = const [],
-  });
+    Future<String?> Function()? customRpcUrl,
+  }) : _customRpcUrl = customRpcUrl;
 
   /// `main` or `test`.
   final String network;
@@ -68,9 +69,17 @@ class PrivateUsdSwapContext {
   final String? railgunNetwork;
   final List<String> allowedHosts;
 
-  /// The keyed RPC URL when the build has one on an allowed host, else
-  /// empty (Rust then uses publicnode). A secret: never log it.
-  String get ethRpcUrl {
+  /// Reads the user's own RPC URL (Settings), null for the default.
+  final Future<String?> Function()? _customRpcUrl;
+
+  /// The Ethereum RPC URL for Rust: the user's own when set (alone, Rust
+  /// never falls back from it), else the keyed URL when the build has one on
+  /// an allowed host, else empty (Rust then uses publicnode). A secret: never
+  /// log it. Resolve it before reading a seed, which must go to Rust in the
+  /// same synchronous step.
+  Future<String> ethRpcUrl() async {
+    final custom = await _customRpcUrl?.call();
+    if (custom != null) return custom;
     final railgun = railgunNetwork;
     if (railgun == null) return '';
     return privateUsdKeyedRpcUrl(railgun, allowedHosts: allowedHosts) ?? '';
@@ -290,6 +299,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     // A quote takes the wallet's first swap index: the store may not exist.
     final storeDir = await PrivateUsdPaths.storeDir(context.network);
     final dbPath = await getWalletDbPath();
+    final ethRpcUrl = await context.ethRpcUrl();
     final mnemonic = await _read(secret);
     late final Future<rust.ApiForwardQuote> call;
     try {
@@ -300,7 +310,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         storeDir: storeDir,
         mnemonicBytes: mnemonic,
         lightwalletdUrl: context.lightwalletdUrl,
-        ethRpcUrl: context.ethRpcUrl,
+        ethRpcUrl: ethRpcUrl,
         units: units,
       );
     } finally {
@@ -319,6 +329,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     final context = _context();
     final storeDir = await PrivateUsdPaths.storeDir(context.network);
     final dbPath = await getWalletDbPath();
+    final ethRpcUrl = await context.ethRpcUrl();
     final mnemonic = await _read(secret);
     late final Future<rust.ApiAcceptResult> call;
     try {
@@ -329,7 +340,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         storeDir: storeDir,
         mnemonicBytes: mnemonic,
         lightwalletdUrl: context.lightwalletdUrl,
-        ethRpcUrl: context.ethRpcUrl,
+        ethRpcUrl: ethRpcUrl,
         index: index,
         maxTotalZat: maxTotalZat,
       );
@@ -349,6 +360,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     final context = _context();
     final storeDir = await PrivateUsdPaths.storeDir(context.network);
     final dbPath = await getWalletDbPath();
+    final ethRpcUrl = await context.ethRpcUrl();
     final mnemonic = await _read(secret);
     late final Future<rust.ApiForwardAdvance> call;
     try {
@@ -359,7 +371,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         storeDir: storeDir,
         mnemonicBytes: mnemonic,
         lightwalletdUrl: context.lightwalletdUrl,
-        ethRpcUrl: context.ethRpcUrl,
+        ethRpcUrl: ethRpcUrl,
         opId: opId,
         index: index,
       );
@@ -380,7 +392,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
       network: context.network,
       accountUuid: accountUuid,
       storeDir: storeDir,
-      ethRpcUrl: context.ethRpcUrl,
+      ethRpcUrl: await context.ethRpcUrl(),
       index: index,
     );
   }
@@ -405,6 +417,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     // A quote may write the wallet's first record: the store may not exist.
     final storeDir = await PrivateUsdPaths.storeDir(context.network);
     final dbPath = await getWalletDbPath();
+    final ethRpcUrl = await context.ethRpcUrl();
     return _withSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseQuote(
@@ -414,7 +427,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         storeDir: storeDir,
         mnemonicBytes: mnemonic,
         lightwalletdUrl: context.lightwalletdUrl,
-        ethRpcUrl: context.ethRpcUrl,
+        ethRpcUrl: ethRpcUrl,
         units: units,
       ),
     );
@@ -462,7 +475,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
       network: context.network,
       accountUuid: accountUuid,
       storeDir: await PrivateUsdPaths.storeDir(context.network),
-      ethRpcUrl: context.ethRpcUrl,
+      ethRpcUrl: await context.ethRpcUrl(),
       index: index,
     );
   }
@@ -476,6 +489,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     final context = _context();
     final storeDir = await PrivateUsdPaths.storeDir(context.network);
     final dbPath = await getWalletDbPath();
+    final ethRpcUrl = await context.ethRpcUrl();
     return _withSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseAccept(
@@ -485,7 +499,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         storeDir: storeDir,
         mnemonicBytes: mnemonic,
         lightwalletdUrl: context.lightwalletdUrl,
-        ethRpcUrl: context.ethRpcUrl,
+        ethRpcUrl: ethRpcUrl,
         index: index,
       ),
     );
@@ -501,6 +515,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     final context = _context();
     final storeDir = await PrivateUsdPaths.storeDir(context.network);
     final dbPath = await getWalletDbPath();
+    final ethRpcUrl = await context.ethRpcUrl();
     return _withSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseFundingRequest(
@@ -509,7 +524,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         accountUuid: accountUuid,
         storeDir: storeDir,
         mnemonicBytes: mnemonic,
-        ethRpcUrl: context.ethRpcUrl,
+        ethRpcUrl: ethRpcUrl,
         index: index,
         railgunAddress: railgunAddress,
       ),
@@ -525,13 +540,14 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
   }) async {
     final context = _context();
     final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final ethRpcUrl = await context.ethRpcUrl();
     // Asked after the last await: nothing can lock between it and the call.
     if (!stillCurrent()) throw const PrivateUsdStaleStepException();
     return rust.privateUsdReverseSubmitFunding(
       network: context.network,
       accountUuid: accountUuid,
       storeDir: storeDir,
-      ethRpcUrl: context.ethRpcUrl,
+      ethRpcUrl: ethRpcUrl,
       index: index,
       to: proof.to,
       data: proof.data,
@@ -551,6 +567,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     final context = _context();
     final storeDir = await PrivateUsdPaths.storeDir(context.network);
     final dbPath = await getWalletDbPath();
+    final ethRpcUrl = await context.ethRpcUrl();
     return _withSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseAdvance(
@@ -560,7 +577,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         storeDir: storeDir,
         mnemonicBytes: mnemonic,
         lightwalletdUrl: context.lightwalletdUrl,
-        ethRpcUrl: context.ethRpcUrl,
+        ethRpcUrl: ethRpcUrl,
         opId: opId,
         index: index,
       ),
@@ -576,6 +593,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     final context = _context();
     final storeDir = await PrivateUsdPaths.storeDir(context.network);
     final dbPath = await getWalletDbPath();
+    final ethRpcUrl = await context.ethRpcUrl();
     return _withSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseAuthorizeReady(
@@ -585,7 +603,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         storeDir: storeDir,
         mnemonicBytes: mnemonic,
         lightwalletdUrl: context.lightwalletdUrl,
-        ethRpcUrl: context.ethRpcUrl,
+        ethRpcUrl: ethRpcUrl,
         index: index,
       ),
     );
@@ -600,6 +618,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     final context = _context();
     final storeDir = await PrivateUsdPaths.storeDir(context.network);
     final dbPath = await getWalletDbPath();
+    final ethRpcUrl = await context.ethRpcUrl();
     return _withSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseCancel(
@@ -609,7 +628,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         storeDir: storeDir,
         mnemonicBytes: mnemonic,
         lightwalletdUrl: context.lightwalletdUrl,
-        ethRpcUrl: context.ethRpcUrl,
+        ethRpcUrl: ethRpcUrl,
         index: index,
       ),
     );
@@ -627,7 +646,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
       network: context.network,
       accountUuid: accountUuid,
       storeDir: storeDir,
-      ethRpcUrl: context.ethRpcUrl,
+      ethRpcUrl: await context.ethRpcUrl(),
       index: index,
     );
   }
@@ -641,6 +660,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     final context = _context();
     final storeDir = await PrivateUsdPaths.storeDir(context.network);
     final dbPath = await getWalletDbPath();
+    final ethRpcUrl = await context.ethRpcUrl();
     return _withSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseRescue(
@@ -649,7 +669,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         accountUuid: accountUuid,
         storeDir: storeDir,
         mnemonicBytes: mnemonic,
-        ethRpcUrl: context.ethRpcUrl,
+        ethRpcUrl: ethRpcUrl,
         index: index,
       ),
     );

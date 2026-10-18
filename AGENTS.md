@@ -1346,7 +1346,10 @@ Code:
   `--dart-define-from-file=<gitignored json>`. Their host must be
   `eth-{mainnet,sepolia}.g.alchemy.com` or `{mainnet,sepolia}.infura.io`. Any
   other host needs a bundle rebuild and changes to the Kotlin, Swift and
-  Rust allowlists.
+  Rust allowlists. Users can set their own URL in Settings (Ethereum RPC),
+  on the network's Alchemy, Infura or publicnode host; it replaces the
+  build's keyed URL with no fallback, and is checked with `eth_chainId`
+  before it is saved.
 - `VIZOR_PRIVATE_USD_FLAG_URL` is the kill switch. Only an explicit `false`
   hides the feature. A missing key or a failed fetch keeps the last value,
   which defaults to available. Even `false` never stops conversions already

@@ -22,7 +22,8 @@ class RailgunWalletOpening {
   final RailgunOpenWalletParams wallet;
   final String expectedAddress;
 
-  /// The keyed RPC URLs in [start], to redact from debug output.
+  /// The RPC URLs in [start] that can hold a key (the build's keyed URL, or
+  /// the user's own from Settings), to redact from debug output.
   final List<String> secrets;
 
   @override

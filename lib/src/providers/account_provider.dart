@@ -24,6 +24,8 @@ import '../core/storage/app_secure_store.dart';
 import '../core/storage/linux_keyring_coordinator.dart';
 import '../core/storage/wallet_paths.dart';
 import '../features/payment_links/providers/gift_card_tracking_lifecycle_provider.dart';
+import '../features/private_usd/providers/private_usd_custom_rpc_provider.dart'
+    show privateUsdCustomRpcProvider;
 import '../features/private_usd/services/private_usd_account_data.dart';
 import '../features/private_usd/services/railgun_engine.dart'
     show RailgunWalletDeletion;
@@ -2192,6 +2194,9 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
       } catch (e, st) {
         recordError('secure storage wipe', e, st);
       }
+      // The wipe took the user's own Ethereum RPC URL for Private USD; the
+      // copy held in memory is read again.
+      ref.invalidate(privateUsdCustomRpcProvider);
       // The saved Private queries choice is install-scoped and survives this
       // wipe. After the reset succeeds, its runtime is reapplied below and the
       // deleted wallet's pending transition is cleared. The

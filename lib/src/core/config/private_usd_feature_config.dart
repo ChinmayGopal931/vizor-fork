@@ -53,17 +53,64 @@ String? privateUsdKeyedRpcUrl(
     _ => '',
   }.trim();
   if (keyed.isEmpty) return null;
-  final uri = Uri.tryParse(keyed);
-  if (uri == null ||
+  final allowed = _privateUsdRpcUrlOn(keyed, allowedHosts);
+  if (allowed == null && kDebugMode) {
+    debugPrint('privateUsd: the keyed RPC URL is not on an allowed host');
+  }
+  return allowed;
+}
+
+/// The rule every Ethereum RPC URL the page and Rust are given follows:
+/// https on port 443, on one of [hosts]. The trimmed URL, or null.
+String? _privateUsdRpcUrlOn(String url, List<String> hosts) {
+  final trimmed = url.trim();
+  final uri = Uri.tryParse(trimmed);
+  if (trimmed.isEmpty ||
+      uri == null ||
       uri.scheme != 'https' ||
       (uri.hasPort && uri.port != 443) ||
-      !allowedHosts.contains(uri.host)) {
-    if (kDebugMode) {
-      debugPrint('privateUsd: the keyed RPC URL is not on an allowed host');
-    }
+      !hosts.contains(uri.host)) {
     return null;
   }
-  return keyed;
+  return trimmed;
+}
+
+/// The hosts a user's own Ethereum RPC URL may use, per Railgun network
+/// (Settings; owner, 2026-10-17): the RPC providers the page already
+/// reaches, so the page's filters (Kotlin, Swift, the Rust bridge and the
+/// CSP) stay as they are.
+const _kPrivateUsdCustomRpcHosts = <String, List<String>>{
+  'mainnet': [
+    'eth-mainnet.g.alchemy.com',
+    'mainnet.infura.io',
+    'ethereum-rpc.publicnode.com',
+  ],
+  'sepolia': [
+    'eth-sepolia.g.alchemy.com',
+    'sepolia.infura.io',
+    'ethereum-sepolia-rpc.publicnode.com',
+  ],
+};
+
+/// [input] as a user's own Ethereum RPC URL for [railgunNetwork], or null
+/// when it can't be one: the keyed URL's rule, on that network's RPC hosts
+/// the page may reach ([allowedHosts], the deployment's). A URL carrying
+/// credentials or a fragment is refused too: the page's `fetch` rejects the
+/// first, and Rust's URL parser the second. It can hold a key: never log it.
+String? privateUsdCustomRpcUrl(
+  String input,
+  String railgunNetwork, {
+  required List<String> allowedHosts,
+}) {
+  final hosts = [
+    for (final host
+        in _kPrivateUsdCustomRpcHosts[railgunNetwork] ?? const <String>[])
+      if (allowedHosts.contains(host)) host,
+  ];
+  final url = _privateUsdRpcUrlOn(input, hosts);
+  if (url == null) return null;
+  final uri = Uri.parse(url);
+  return uri.userInfo.isEmpty && !uri.hasFragment ? url : null;
 }
 
 const kPrivateUsdAvailableKey = 'private_usd_available';

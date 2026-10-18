@@ -109,7 +109,7 @@ class RustPrivateUsdSendBackend implements PrivateUsdSendBackend {
       storeDir: storeDir,
       network: context.network,
       // A secret: never log it.
-      ethRpcUrl: context.ethRpcUrl,
+      ethRpcUrl: await context.ethRpcUrl(),
       accountUuid: accountUuid,
     );
   }

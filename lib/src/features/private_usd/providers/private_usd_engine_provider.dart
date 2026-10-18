@@ -17,11 +17,13 @@ import '../services/private_usd_sender.dart';
 import '../services/private_usd_spend_guard.dart';
 import '../services/private_usd_swap_backend.dart';
 import 'private_usd_available_provider.dart';
+import 'private_usd_custom_rpc_provider.dart';
 import 'private_usd_unfinished_provider.dart';
 import 'railgun_engine_provider.dart';
 
-/// This wallet's swap context now: the network, the lightwalletd endpoint
-/// and the deployment's Railgun network for the keyed Ethereum RPC.
+/// This wallet's swap context now: the network, the lightwalletd endpoint,
+/// and for the Ethereum RPC the user's own URL (Settings) or else the
+/// deployment's Railgun network for the keyed one.
 PrivateUsdSwapContext privateUsdSwapContextOf(Ref ref) {
   final endpoint = ref.read(rpcEndpointFailoverProvider).current;
   final deployment = ref.read(
@@ -32,6 +34,9 @@ PrivateUsdSwapContext privateUsdSwapContextOf(Ref ref) {
     lightwalletdUrl: endpoint.normalizedLightwalletdUrl,
     railgunNetwork: deployment?.railgunNetwork,
     allowedHosts: deployment?.allowedHosts ?? const [],
+    customRpcUrl: deployment == null
+        ? null
+        : () => privateUsdCustomRpcUrlOf(ref, endpoint.networkName),
   );
 }
 

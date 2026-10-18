@@ -30,6 +30,20 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
     balance's time and the errors. The floor, which never moved (on Home
     either), now flows only while something scans: the owner's choice on
     2026-10-17 (VI-19). Not yet seen on the A35.
+- **A user-set Ethereum RPC (owner, 2026-10-17; the small version).**
+  Settings shows an "Ethereum RPC" row where Private USD is available (and
+  while a URL is set): "Default", or the URL's host, never the whole URL.
+  Its sheet takes an https URL on the network's Alchemy, Infura or
+  publicnode host (RPC hosts the page already reaches, so no filter
+  changes), checks it with `eth_chainId` through `NetworkHttpClient`, and
+  keeps it in secure storage per Railgun network (a reset's wipe takes it).
+  Set, it replaces the build's keyed URL alone in the page's `start` and
+  every Rust call, with no publicnode fallback; saving or clearing it closes
+  the page. A sync or a conversion step failing meanwhile shows "Your
+  Ethereum RPC isn't answering." with "Use the default". `fvm flutter
+  analyze` clean; the mobile lane 2,352 passed; the desktop lane 6,066
+  passed, 168 skipped, and the same 13 known failures. Not yet run on a
+  phone.
 - **The proving artifacts fall back to our mirror (owner, 2026-10-17;
   D-114).** `ipfs-lb.com`, the one gateway Railgun's SDK downloads its
   circuit artifacts from, went down, so a fresh install could make no proof.

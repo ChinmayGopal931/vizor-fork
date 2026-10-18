@@ -7,6 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../payment_links/providers/payment_link_cards_provider.dart';
+import '../../../private_usd/private_usd_copy.dart';
+import '../../../private_usd/providers/private_usd_custom_rpc_provider.dart';
+import '../../../private_usd/widgets/mobile/private_usd_rpc_sheet.dart';
+import '../../../../app_bootstrap.dart';
 import '../../../../core/config/app_version_config.dart';
 import '../../../../core/config/zcash_explorer.dart';
 import '../../../../core/layout/mobile/app_mobile_sheet.dart';
@@ -65,6 +69,7 @@ class MobileSettingsScreen extends ConsumerWidget {
     final settingsChevronColor = context.colors.icon.accent;
     final seedPhraseEnabled = account != null && !account.isHardware;
     final viewingKeyEnabled = account != null;
+    final showEthereumRpc = ref.watch(privateUsdRpcSettingVisibleProvider);
 
     return SafeArea(
       bottom: false,
@@ -260,6 +265,12 @@ class MobileSettingsScreen extends ConsumerWidget {
                       showChevron: true,
                       onTap: () => context.push('/settings/explorer'),
                     ),
+                    if (showEthereumRpc)
+                      _EthereumRpcRow(
+                        textStyle: settingsRowStyle,
+                        valueColor: settingsValueColor,
+                        chevronColor: settingsChevronColor,
+                      ),
                     MobileListRow(
                       key: const ValueKey('mobile_settings_theme_row'),
                       leading: _RowIcon(AppIcons.theme),
@@ -748,6 +759,46 @@ class _SyncKeepAwakeToggle extends StatelessWidget {
 }
 
 const _settingsRowHeight = 44.0;
+
+/// Private USD's Ethereum RPC (owner, 2026-10-17): "Default", or the host of
+/// the user's own URL; never the whole URL, which can hold a key.
+class _EthereumRpcRow extends ConsumerWidget {
+  const _EthereumRpcRow({
+    required this.textStyle,
+    required this.valueColor,
+    required this.chevronColor,
+  });
+
+  final TextStyle textStyle;
+  final Color valueColor;
+  final Color chevronColor;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final network = ref.watch(appBootstrapProvider).network;
+    final custom = ref.watch(privateUsdCustomRpcProvider(network)).value;
+    return MobileListRow(
+      key: const ValueKey('mobile_settings_ethereum_rpc_row'),
+      leading: const _RowIcon(AppIcons.link),
+      label: PrivateUsdCopy.rpcTitle,
+      value: custom == null
+          ? PrivateUsdCopy.rpcDefault
+          : privateUsdCustomRpcHost(custom),
+      minRowHeight: _settingsRowHeight,
+      textStyle: textStyle,
+      valueTextStyle: textStyle,
+      valueColor: valueColor,
+      chevronColor: chevronColor,
+      showChevron: true,
+      onTap: () => unawaited(_open(context)),
+    );
+  }
+
+  Future<void> _open(BuildContext context) async {
+    final done = await showPrivateUsdRpcSheet(context);
+    if (done != null && context.mounted) showAppToast(context, done);
+  }
+}
 
 class _RowIcon extends StatelessWidget {
   const _RowIcon(this.iconName);

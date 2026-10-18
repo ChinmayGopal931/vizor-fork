@@ -1346,6 +1346,53 @@ abstract final class PrivateUsdCopy {
   /// `private_usd_withdraw_info_note_fee`
   static String withdrawInfoNoteFee(String percent) =>
       'Railgun keeps $percent% of what you withdraw.';
+
+  // ── Settings: the user's own Ethereum RPC (new; owner, 2026-10-17) ────
+
+  static const rpcTitle = 'Ethereum RPC';
+
+  /// The row's value and the sheet's state with no URL of the user's set.
+  static const rpcDefault = 'Default';
+
+  /// The sheet's state, as the endpoint settings word it: [value] is
+  /// [rpcDefault] or the URL's host.
+  static String rpcCurrent(String value) => 'Current: $value';
+
+  /// What the chain is called in the sheet, for a Railgun network.
+  static String rpcNetwork(String railgunNetwork) =>
+      railgunNetwork == 'sepolia' ? 'Sepolia' : 'Ethereum mainnet';
+
+  static String rpcBody(String network) =>
+      'Use your own Alchemy, Infura or publicnode URL for $network. Private '
+      'USD then uses only it.';
+
+  static const rpcSees =
+      "The RPC sees the app's Ethereum requests, and your IP address unless "
+      'Tor is on.';
+
+  static const rpcHint = 'https://';
+  static const rpcPaste = 'Paste';
+  static const rpcCheckAndSave = 'Check and save';
+  static const rpcChecking = 'Checking…';
+  static const rpcUseDefault = 'Use the default';
+
+  static String rpcErrorUrl(String network) =>
+      'Use an https Alchemy, Infura or publicnode URL for $network.';
+
+  static const rpcErrorUnreachable =
+      "That RPC didn't answer. Check the URL, or try again in a moment.";
+
+  static String rpcErrorWrongChain(String network) =>
+      'That RPC is for another network. Use one for $network.';
+
+  static const rpcErrorSave = "Couldn't save the setting. Try again.";
+
+  static const rpcSaved = 'Ethereum RPC saved';
+  static const rpcCleared = 'Using the default Ethereum RPC';
+
+  /// The Private USD screen, when a sync or a conversion step fails while
+  /// the user's own RPC is set; [rpcUseDefault] clears it.
+  static const rpcNotAnswering = "Your Ethereum RPC isn't answering.";
 }
 
 /// The spending note on `/private-usd` and the send screens (reference §9.4
