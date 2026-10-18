@@ -101,7 +101,7 @@ abstract final class PrivateUsdCopy {
   // ── Private USD screen ─────────────────────────────────────────────────
 
   /// `private_usd_subtitle`
-  static const subtitle = 'Dollars held privately on Ethereum, in Railgun';
+  static const subtitle = '0zkUSDC held on Ethereum';
 
   /// `private_usd_breakdown_note`
   static const breakdownNote =

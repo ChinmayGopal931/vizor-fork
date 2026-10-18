@@ -1960,7 +1960,7 @@ Rules are zapp's unless marked **veylor**. Data references point to §6.6 (balan
 
 #### S2. Private USD screen (zapp 3)
 
-- **Header:** title "Private USD", subtitle "Dollars held privately on Ethereum, in Railgun" (`str:25`), and an info button.
+- **Header:** title "Private USD", subtitle "0zkUSDC held on Ethereum" (`str:25`), and an info button.
 - **Total** (`pu/PrivateUsdView.kt:89-156`): headline `spendable`, greyed while unknown. The status line says "Updated {time}", or "Updating…", or the first-load line with its percentage. A refresh button; an explicit refresh ignores back-off (§6.6). A refresh error shows below in the danger colour: "Couldn't update the balance. Showing the last known amounts." with a balance, or "Couldn't load the balance. Try again in a moment." without one (`pu/PrivateUsdVM.kt:164-169`). **veylor:** add the `≈ ZEC` line here; drop the currency toggle. **As built (iOS progress VI-19, owner 2026-10-17):** the sync is Home's neon sync line over the whole screen (`privateUsdSyncLine`): a first sync's percentage (`SYNC n%`, or `TOR …`) climbs over the content, a refresh of a wallet that synced before stays `SYNCED` behind blocks backed solid, and a failure reads `SYNC FAILED` (`TOR OFFLINE`). The status line keeps the first-load line without its percentage and "Updated {time}", and the errors stay; screen readers hear the old status text from the line's live region.
 - **Banner:** the in-flight conversion, as on home.
 - **Buckets** (`pu/PrivateUsdVM.kt:171-203`): "Available" always; "Processing", "Arriving" and "Screening refused" only when non-zero, each with an explanation. "Screening refused" is in the danger colour.
@@ -2250,7 +2250,7 @@ Flags:
 
 | Key | Text | Flag |
 |---|---|---|
-| `private_usd_subtitle` | Dollars held privately on Ethereum, in Railgun | |
+| `private_usd_subtitle` | 0zkUSDC held on Ethereum | |
 | `private_usd_breakdown_note` | Held separately and privately, on Ethereum through Railgun. | |
 | `private_usd_row_available` | Available | |
 | `private_usd_row_processing` | Processing | |

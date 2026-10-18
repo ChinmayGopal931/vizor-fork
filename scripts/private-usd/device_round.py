@@ -412,7 +412,7 @@ def release_check(out, passcode, timeout):
         before = checkpoint("release-home-before-open")
         opened_at = time.time()
         tap(strip)
-        wait_for(lambda l: "Your receive address" in l or "Dollars held privately" in l, "/private-usd", 60, log)
+        wait_for(lambda l: "Your receive address" in l or "0zkUSDC held on Ethereum" in l, "/private-usd", 60, log)
         log("/private-usd is showing")
         screenshot(os.path.join(out, "release-03-private-usd-open.png"))
         last_status, saw_busy, last_probe = None, False, 0.0
