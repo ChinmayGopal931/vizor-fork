@@ -22,6 +22,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/amount_price_loading_bar.dart';
 import '../../../../core/widgets/app_icon.dart';
+import '../../../../core/widgets/mobile/mobile_surface_card.dart';
+import '../mobile/receive_qr_frame.dart';
 import 'request_amount_card.dart'
     show RequestAmountErrorRow, RequestMessageField;
 import 'request_amount_formatters.dart';
@@ -185,10 +187,13 @@ class RequestAmountSheetResult extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: AppSpacing.xs),
+          // The code keeps its light plate; only the frame around it is lit.
           Center(
-            child: RequestQrSurface(
-              data: request.qrData,
-              size: kRequestSheetQrSize,
+            child: ReceiveQrFrame(
+              child: RequestQrSurface(
+                data: request.qrData,
+                size: kRequestSheetQrSize,
+              ),
             ),
           ),
           if (summary != null) ...[
@@ -298,7 +303,7 @@ class _SerifAmountDisplay extends StatelessWidget {
                   onChanged: onChanged,
                   style: amountStyle,
                   hintStyle: amountStyle.copyWith(color: colors.text.disabled),
-                  cursorColor: colors.text.accent,
+                  cursorColor: colors.neon.glow,
                   isUsd: request.amountInputIsUsd,
                 ),
         ),
@@ -431,7 +436,7 @@ class _AmountUnitToggle extends StatelessWidget {
   }
 }
 
-/// The message row on step one.
+/// The message row on step one, a glass panel with lit cut corners.
 ///
 /// Empty it is the prompt; filled it shows the message it will attach, so the
 /// user can see what a payer will read without opening the editor again.
@@ -447,22 +452,15 @@ class RequestMessageRow extends StatelessWidget {
     final text = message?.trim();
     final hasMessage = text != null && text.isNotEmpty;
 
-    final row = Container(
+    final row = MobileSurfaceCard(
       key: const ValueKey('request_message_row'),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s,
-        vertical: AppSpacing.s,
-      ),
-      decoration: BoxDecoration(
-        color: colors.surface.input.primary,
-        borderRadius: BorderRadius.circular(AppRadii.medium),
-      ),
+      padding: const EdgeInsets.all(AppSpacing.s),
       child: Row(
         children: [
           AppIcon(
             AppIcons.scroll,
             size: AppIconSize.medium,
-            color: colors.icon.accent,
+            color: colors.neon.glow,
           ),
           const SizedBox(width: AppSpacing.xs),
           Expanded(

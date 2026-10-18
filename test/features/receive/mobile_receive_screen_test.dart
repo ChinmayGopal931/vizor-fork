@@ -164,8 +164,8 @@ void main() {
   ) async {
     await _pumpReceive(tester, _FakeReceiveAddressService());
 
-    expect(find.text('Receive ZEC'), findsOneWidget);
-    expect(find.text('Account Name'), findsOneWidget);
+    expect(find.text('RECEIVE ZEC'), findsOneWidget);
+    expect(find.text('ACCOUNT NAME'), findsOneWidget);
     expect(find.text('Share shielded address'), findsOneWidget);
     expect(find.text('Copy shielded address'), findsOneWidget);
     // Compact address line: leading 13 chars visible.
@@ -509,7 +509,7 @@ void main() {
       ),
     );
     await _settle(tester);
-    expect(find.text('Shielded address'), findsOneWidget);
+    expect(find.text('SHIELDED ADDRESS'), findsOneWidget);
     expect(find.text('Strong privacy by default.'), findsOneWidget);
     // The mobile explainer adapts the renew bullet to touch.
     expect(
@@ -530,7 +530,7 @@ void main() {
       ),
     );
     await _settle(tester);
-    expect(find.text('Transparent address'), findsOneWidget);
+    expect(find.text('TRANSPARENT ADDRESS'), findsOneWidget);
     expect(find.text('Publicly visible'), findsOneWidget);
     expect(
       find.textContaining('publicly visible on-chain', findRichText: true),

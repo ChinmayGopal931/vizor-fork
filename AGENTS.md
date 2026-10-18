@@ -246,6 +246,9 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   conversion progress (`mobile_swap_status_content.dart`) is a red
   timeline: lit checks for done steps, the spinner kept for the current
   one, and a packet of light running down the rail into it.
+- **Receive.** The address and request codes sit in a lit cut-corner frame
+  (`ReceiveQrFrame`), always dark modules on a light plate; a Keystone
+  account's `ReceiveQrSurface(scanOptimized: true)` renders as before.
 - **Chart card.** The chart is drawn as a neon trail on a Tron grid; a
   scrub reads the line under the finger (interpolated value and time), not
   the nearest data point. The card no longer names the price server; the
