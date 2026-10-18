@@ -38,10 +38,6 @@ bool _shouldRefreshTransparentAddressAfterSyncUpdate(
       (failedAt != null && failedAt != previous.lastSyncFailedAt);
 }
 
-/// This screen sets all its text in Gotham Thin, lighter than the Light of
-/// the mobile tokens.
-const _textWeight = FontWeight.w100;
-
 /// Mobile receive screen — Figma `Receive` (4514:110524) in the neon look:
 /// pool tabs, the QR in a lit frame with the renew control set into its
 /// bottom edge, the account as a red caption over the compact address line,
@@ -260,9 +256,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                         height: _MobileReceiveMetrics.tabsHeight,
                         iconSize: _MobileReceiveMetrics.tabsIconSize,
                         iconGap: AppSpacing.xs,
-                        labelStyle: AppTypography.labelLarge.copyWith(
-                          fontWeight: _textWeight,
-                        ),
+                        labelStyle: AppTypography.labelLarge,
                         // Null keeps the label style's Light weight.
                         labelFontWeight: null,
                         alwaysDarkSelected: true,
@@ -359,9 +353,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                                     ),
                                     child: Text(
                                       'Share $poolLabel address',
-                                      style: AppTypography.labelMedium.copyWith(
-                                        fontWeight: _textWeight,
-                                      ),
+                                      style: AppTypography.labelMedium,
                                     ),
                                   ),
                                 ),
@@ -558,9 +550,6 @@ class _ReceiveAddressSummary extends StatelessWidget {
               helpIconColor: colors.icon.muted,
               helpGap: 10,
               scaleToFit: true,
-              textStyle: AppTypography.labelLarge.copyWith(
-                fontWeight: _textWeight,
-              ),
               onShowHelp: onShowHelp,
             ),
           ),
@@ -610,7 +599,6 @@ class _ReceiveAccountCaption extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
             style: kNeonHudCaptionStyle.copyWith(
-              fontWeight: _textWeight,
               color: glow,
               shadows: Neon.textGlow(glow, intensity: 0.35),
             ),
@@ -664,7 +652,7 @@ class _CopyAddressTextButton extends StatelessWidget {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTypography.labelMedium.copyWith(fontWeight: _textWeight),
+            style: AppTypography.labelMedium,
           ),
         ),
       ),

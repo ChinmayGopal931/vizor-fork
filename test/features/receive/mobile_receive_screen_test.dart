@@ -177,8 +177,7 @@ void main() {
     final shieldedTab = tester.widget<Text>(find.text('Shielded'));
     expect(shieldedTab.style?.fontSize, 16);
     expect(shieldedTab.style?.height, 17 / 16);
-    // The screen sets its text in Thin, lighter than the token.
-    expect(shieldedTab.style?.fontWeight, FontWeight.w100);
+    expect(shieldedTab.style?.fontWeight, AppTypography.labelLarge.fontWeight);
     expect(
       tester.getSize(find.byKey(const ValueKey('receive_address_type_tabs'))),
       const Size(320, 44),
