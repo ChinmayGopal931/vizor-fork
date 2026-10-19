@@ -11,11 +11,12 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   software account has Ethereum deposit addresses of its own; once one holds
   the relayer's minimum, the app signs, keeps and posts an EIP-3009
   authorization on its own while unlocked and in the foreground, and only
-  the chain settles it. Testnet only (mainnet pins no Deposits contract).
+  the chain settles it. On testnet, and on mainnet since 2026-10-19 (M9.7).
   The testnet swap token moved to the deposits' tUSD for swaps too. Built
   and checked on the host (four unit tests, live read-only checks against
   Sepolia, `fvm flutter analyze`); the device round has a `--deposits`
-  step; the testnet check with the owner's funds is next (M9.6).
+  step. The first testnet deposit landed on the phone (M9.6); the mainnet
+  check with the owner's funds is next (M9.7).
 
 - **Owner decisions of 2026-10-17 (shared Dart, so Android changes too;
   details in `docs/private-usd-ios-progress.md`).**
@@ -1606,6 +1607,27 @@ M8 status (2026-10-14): the non-device parts are done.
       as `deposits.rs` reads it.
     - The three buttons (Send, Withdraw and Receive) overflowed on the
       phone's 360 dp width; fixed in `5250d4c8f`.
+- [ ] M9.7 Mainnet (2026-10-19): the pin, then a deposit on the phone with
+  the owner's funds
+  - **The pin.** zecSwap's mainnet Deposits went live at 03:48 UTC on
+    2026-10-19 (`deployments/mainnet-deposits.json` on `feature/deposits`,
+    `52aba50`). `deployment.rs` pins the contract `0xebc7…8cb6` (block
+    26,224,004), the deposits account `0x6ae4…2135`, USDC and Multicall3.
+  - **Checked live, read-only** (publicnode and the hosted terms):
+    - The contract's `TOKEN()` is USDC, `RAILGUN()` the pinned proxy and
+      `SANCTIONS()` `0x40C5…C8fb`. Its deployment receipt is at the pinned
+      block.
+    - The record's first deposit (1 USDC,
+      `0xabdd88dbc52fe8ff15d6dff55cd913b67da8af79ed542399478b61b52832649e`)
+      was sent by the deposits account. Its `DepositShielded` names that
+      account, with value 893,786 after a 106,214 fee.
+    - USDC reads `"USD Coin"`, `"2"`, with a matching `DOMAIN_SEPARATOR()`,
+      and Multicall3 has code.
+    - The relayer's terms name the pinned three: a fee of 0.103843 plus
+      0.1%, far under the D23 cap, and a minimum of 1 USDC.
+  - **The pin test** now takes mainnet's live terms and refuses testnet's
+    relabelled as mainnet's (D-127's third test).
+  - **Flashbots** changed when a named deposit is posted again (D-129).
 - [ ] M9 gate
 
 ## Deviations
@@ -1651,7 +1673,7 @@ M8 status (2026-10-14): the non-device parts are done.
   still recognized if it lands after all; a replacement and the request it
   replaces are written in one transaction. A request the relayer named a
   transaction for is never signed again: a re-post of it (its transaction
-  unknown to the node for 3 minutes) keeps it named whatever the answer,
+  not mined in a minute, D-129) keeps it named whatever the answer,
   and only the chain or its expiry ends it. An address with a request under
   way at a pass's start is not signed for again in that pass (its scanned
   balance may be the one that request just moved). A refused re-signing
@@ -1738,6 +1760,24 @@ M8 status (2026-10-14): the non-device parts are done.
     with no prompt; iOS needs none.
   - **D9 holds.** It works only in the foreground and unlocked, with no
     notification or background work, so a closed app cannot buzz.
+  - **On the phone.** The owner confirmed it on the OnePlus 15
+    (`b6f0b3e62`, 2026-10-19).
+- **D-129 (M9.7): a named deposit is posted again after a minute.**
+  zecSwap changed this after the brief's `9185466` (`0889bae`, `094c1fe`).
+  - **Why.** Mainnet's relayer sends deposits through Flashbots Protect
+    (`blockRange=10`, one at a time). The node never sees such a
+    transaction before it mines, and Flashbots drops one it could not land.
+    The relayer takes it as dropped 5 blocks later and sends the deposit
+    anew when it is posted again.
+  - **What the doc says.** `docs/deposits.md` now says to post the same
+    bytes again when a named transaction has not mined within a minute
+    (`REPOST`).
+  - **The change.** `follow` posted again only for a transaction unknown to
+    the node, after 3 minutes. It now posts again for an unknown or pending
+    one after 60 s (`REPOST_SECONDS`). A named request is still never
+    signed again (D-119).
+  - **Nothing else.** The new `503` for a send the private RPC refused
+    (`Retry-After` 30) is handled as any other `503`.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

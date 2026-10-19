@@ -1023,7 +1023,7 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
 
 **Goal.** Each software account gets Ethereum deposit addresses of its own, derived from its seed, that take public USDC (tUSD on Sepolia) from an exchange or any wallet. Once an address holds at least the relayer's `minValue`, the wallet signs one EIP-3009 `receiveWithAuthorization` of its whole balance to zecSwap's Deposits contract; the relayer sends it and keeps a fee, and the contract shields the rest into the account's own `0zk` balance, to a note the wallet built. The wallet never holds ETH, and the relayer can delay a deposit but never redirect it: the authorization's nonce commits to the note, the fee and the relayer. The fixed `0zk` receive address stays, as the way to receive from another Railgun wallet.
 
-**Needs.** The testnet Deposits deployment (live since 2026-10-18 23:42 UTC); testnet funds from the owner for the device check. Mainnet has no Deposits contract yet, so it has no pin and the feature is hidden there.
+**Needs.** The testnet Deposits deployment (live since 2026-10-18 23:42 UTC); testnet funds from the owner for the device check. Mainnet had no Deposits contract then, so it had no pin and the feature was hidden there; its contract went live on 2026-10-19 and is pinned since (progress M9.7).
 
 **Inputs.**
 - zecSwap `feature/deposits` (`~/dev/zapp/zecSwap-deposits` at `9185466`, read-only): `docs/deposits.md` (the wallet–relayer contract; it wins over this plan), `crates/zecswap-client/src/{deposits.rs,api.rs}` (the reference wallet), `crates/zecswap-api/src/relayer.rs`, `crates/zecswap-chain/src/evm/deposits.rs`, `crates/zecswap-core/src/{deposit.rs,auth.rs}`, `deployments/sepolia-deposits.json`.

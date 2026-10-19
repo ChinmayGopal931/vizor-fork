@@ -81,9 +81,12 @@ const REFUSED_PAUSE_SECONDS: u64 = 60 * 60;
 /// The relayer holds an address back this long after a deposit of it
 /// reverted.
 const REVERTED_PAUSE_SECONDS: u64 = 60 * 60;
-/// A transaction the relayer named that the node does not know is asked
-/// about again after this (as a send's is).
-const ASK_AGAIN_AFTER_SECONDS: u64 = 3 * 60;
+/// A transaction the relayer named that has not mined within this is posted
+/// again, the same bytes (zecSwap `REPOST`): the relayer names it again while
+/// it can still land, and sends the deposit anew once it cannot. Mainnet's
+/// relayer sends through Flashbots Protect, which the node never sees before
+/// a transaction mines, and which drops one it could not land in 10 blocks.
+const REPOST_SECONDS: u64 = 60;
 /// The most a deposit request may be (the relayer's limit).
 const MAX_REQUEST_BODY: usize = 16 * 1024;
 /// The deposit fee cap's percentage part (D23): a deposit pays the relayer
@@ -561,7 +564,7 @@ impl DepositRecord {
         self
     }
 
-    /// A named request posted again (its transaction unknown to the node):
+    /// A named request posted again (its transaction not mined in a minute):
     /// still named, whatever the relayer answered, so it is never signed
     /// again while that transaction may land.
     fn asked_again(mut self, now: u64) -> Self {
@@ -805,7 +808,7 @@ pub(crate) struct Deposits<'a, T: HttpTransport, C: DepositChain, K: Clock> {
 }
 
 impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
-    /// `Unavailable` where no Deposits contract is pinned (mainnet today).
+    /// `Unavailable` where no Deposits contract is pinned.
     pub(crate) fn new(
         pins: &'static Deployment,
         account: &'a str,
@@ -1463,12 +1466,12 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
                 // Not on chain and past its validity: it can never land.
                 keep(store, self.account, &[&record.ended(DepositState::Expired, now)])
             }
-            TransactionStatus::Unknown
+            TransactionStatus::Unknown | TransactionStatus::Pending
                 if context.may_post
-                    && now.saturating_sub(record.posted_at.unwrap_or(0))
-                        >= ASK_AGAIN_AFTER_SECONDS =>
+                    && now.saturating_sub(record.posted_at.unwrap_or(0)) >= REPOST_SECONDS =>
             {
-                // The same bytes again: the relayer names what sends them now.
+                // Not mined in a minute: the same bytes again, and the
+                // relayer names what sends them now.
                 self.post_kept(store, record, context).await
             }
             TransactionStatus::Unknown | TransactionStatus::Pending => Ok(()),
@@ -1962,7 +1965,7 @@ mod tests {
 
     /// The terms are the pin's or refused: another chain, Deposits contract,
     /// deposits account or token is never followed, and a relayer without
-    /// deposits (or a network without a pin) has none.
+    /// deposits has none. Mainnet's pin is checked against its live terms.
     #[test]
     fn terms_that_are_not_the_pins_are_refused() {
         let pins = deployment::deployment(PrivateUsdNetwork::Testnet);
@@ -2028,13 +2031,43 @@ mod tests {
         let mut unreadable = hosted.clone();
         unreadable["deposits"]["minValue"] = json!(2_000_000);
         assert_eq!(read(&unreadable).unwrap_err().code, ErrorCode::Unavailable);
-        // Mainnet pins no Deposits contract: hidden, whatever the relayer says.
+        // Mainnet's live terms (2026-10-19) name its pin; testnet's,
+        // relabelled as mainnet's, do not.
         let mainnet = deployment::deployment(PrivateUsdNetwork::Mainnet);
-        let mut on_mainnet: RelayerTerms = serde_json::from_value(hosted.clone()).unwrap();
-        on_mainnet.chain_id = mainnet.chain_id;
+        let live = json!({
+            "relayer": "0xcbcb5f57c79c88a0e4bb450289de2088958a017f",
+            "chainId": 1,
+            "contract": "0x4708d7d36992b7e33ad97a1ab0a31c3ac6c4fe6d",
+            "fee": "500000",
+            "deposits": {
+                "contract": "0xebc7508e20bd4467491ee7e7589d5c7d4c5e8cb6",
+                "relayer": "0x6ae40b34c32d3feaa0eef53d7e4724160b7a2135",
+                "token": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+                "fee": "103843",
+                "feeBps": 10,
+                "feeExpiresAt": 1_792_386_913u64,
+                "minValue": "1000000",
+                "maxValidity": 86_400,
+                "maxGasPriceWei": "20000000000",
+            },
+        });
+        let on_mainnet = |terms: &serde_json::Value| {
+            let terms: RelayerTerms = serde_json::from_value(terms.clone()).unwrap();
+            pinned_terms(&terms, mainnet)
+        };
         assert_eq!(
-            pinned_terms(&on_mainnet, mainnet).unwrap_err().code,
-            ErrorCode::Unavailable
+            on_mainnet(&live).unwrap(),
+            DepositTerms {
+                relayer: hex_bytes("0x6ae40b34c32d3feaa0eef53d7e4724160b7a2135")
+                    .try_into()
+                    .unwrap(),
+                fee: 103_843,
+                fee_bps: 10,
+                fee_expires_at: Some(1_792_386_913),
+                min_value: 1_000_000,
+                max_validity: 86_400,
+            }
         );
+        assert_eq!(on_mainnet(&chain).unwrap_err().code, ErrorCode::WrongDeployment);
     }
 }

@@ -57,9 +57,8 @@ final privateUsdDepositBackendProvider = Provider<PrivateUsdDepositBackend>(
 );
 
 /// Whether this build follows deposits at all: the swap engine runs and the
-/// network pins a Deposits contract (testnet today; mainnet has none, so
-/// deposits are hidden there). It does not follow the kill switch, which
-/// only stops new deposits (D16).
+/// network pins a Deposits contract (testnet and mainnet both do). It does
+/// not follow the kill switch, which only stops new deposits (D16).
 final privateUsdDepositsEnabledProvider = Provider<bool>(
   (ref) =>
       ref.watch(privateUsdEngineEnabledProvider) &&

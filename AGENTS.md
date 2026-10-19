@@ -1455,7 +1455,7 @@ shielded into its private balance by an EIP-3009 authorization the relayer
 sends (`rust/src/wallet/private_usd/deposits.rs`, zecSwap's
 `docs/deposits.md`). The Receive USDC sheet shows the address; the
 `0zk` card stays, for transfers from another Railgun wallet. Only a network
-with a Deposits pin shows it (testnet; mainnet has none yet).
+with a Deposits pin shows it: testnet and, since 2026-10-19, mainnet.
 
 - Pin the Deposits contract, the relayer's deposits account (not the
   top-level relayer) and the token; refuse terms that differ, never follow
@@ -1467,6 +1467,9 @@ with a Deposits pin shows it (testnet; mainnet has none yet).
   kept, and re-sign one only while the relayer named no transaction for
   it. Only a mined receipt with the pinned contract's event for this
   address and one of this wallet's notes settles a deposit.
+- Post the same bytes again when a named transaction has not mined in a
+  minute: mainnet's relayer sends through Flashbots Protect, which the node
+  never sees before a transaction mines and which drops one it cannot land.
 - The deposit key signs only the authorization and a rescue: never
   delegate a deposit address (EIP-7702) or use one otherwise.
 - Deposits follow the active account only, in the foreground and unlocked,

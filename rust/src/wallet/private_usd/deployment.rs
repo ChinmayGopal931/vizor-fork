@@ -150,7 +150,7 @@ const MAINNET_USDC: [u8; 20] = address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB
 /// balances no longer count.
 const SEPOLIA_TEST_USD: [u8; 20] = address("0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c");
 /// Multicall3, at its canonical address on every chain (it has code on
-/// Sepolia, checked 2026-10-18).
+/// Sepolia, checked 2026-10-18, and on mainnet, 2026-10-19).
 const MULTICALL3: [u8; 20] = address("0xcA11bde05977b3631167028862bE2a173976CA11");
 /// Circle's test USDC, the one Railgun accepts on Sepolia.
 const SEPOLIA_USDC: [u8; 20] = address("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238");
@@ -185,8 +185,16 @@ const MAINNET: Deployment = Deployment {
     railscan_tx_prefix: "https://railscan.io/ethereum/tx/",
     keyless_rpc_url: "https://ethereum-rpc.publicnode.com",
     poi_node_url: POI_NODE_URL,
-    // No mainnet Deposits contract yet (owner, 2026-10-18): hidden.
-    deposits: None,
+    // zecSwap `deployments/mainnet-deposits.json` (branch
+    // `feature/deposits`), live since 03:48 UTC on 2026-10-19. Its relayer
+    // sends deposits through Flashbots Protect, one at a time.
+    deposits: Some(DepositsPin {
+        contract: address("0xebc7508e20bd4467491ee7e7589d5c7d4c5e8cb6"),
+        contract_block: 26_224_004,
+        relayer: address("0x6ae40b34c32d3feaa0eef53d7e4724160b7a2135"),
+        token: MAINNET_USDC,
+        multicall: MULTICALL3,
+    }),
 };
 
 const TESTNET: Deployment = Deployment {
