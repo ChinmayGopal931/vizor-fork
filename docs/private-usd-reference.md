@@ -1759,7 +1759,7 @@ Read from zapp at `60bcf0b30` and veylor at `4a859bee0`. **No Figma exists for t
 
 ### 9.2 Routes, screens, providers and reuse
 
-**Module.** Build a new feature, `lib/src/features/private_usd/`, with `models/`, `providers/`, `services/`, `screens/mobile/` and `widgets/mobile/`. Do not extend `SwapNotifier`: veylor's swap UI is tied to NEAR models. `MobileSwapComposerTicket` and `MobilePayAmountStep` take a `SwapState`, and `MobileSwapReviewContent` takes a `SwapQuote`. Reuse only the presentational pieces. Keep Private USD out of the Swap tab, which disappears whenever NEAR is disabled.
+**Module.** Build a new feature, `lib/src/features/private_usd/`, with `models/`, `providers/`, `services/`, `screens/mobile/` and `widgets/mobile/`. Do not extend `SwapNotifier`: veylor's swap UI is tied to NEAR models. `MobileSwapComposerTicket` and `MobilePayAmountStep` take a `SwapState`, and `MobileSwapReviewContent` takes a `SwapQuote`. Reuse only the presentational pieces. Keep Private USD out of the Swap screen, whose Home button (a tab until 2026-10-19) disappears whenever NEAR is disabled.
 
 **Routes.** All routes are mobile-tree `CupertinoPage`s over the shell, next to `/pay` in `lib/src/core/navigation/mobile_routes.dart` (`/pay` at `:339`). Route arguments go through `state.extra`, with a `redirect` back when the extra has the wrong type (`:289-297`). Titles are sentence case.
 

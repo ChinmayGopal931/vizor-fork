@@ -68,14 +68,13 @@ import '../../features/settings/screens/mobile/mobile_settings_screen.dart';
 import '../../features/settings/screens/mobile/mobile_viewing_key_screen.dart';
 import '../../features/swap/screens/mobile/mobile_swap_screen.dart';
 import '../../features/voting/screens/mobile/mobile_voting_screens.dart';
-import '../config/swap_feature_config.dart';
 import '../layout/mobile/app_mobile_shell.dart';
 import '../layout/mobile/app_mobile_tab_bar.dart';
 import '../widgets/app_icon.dart';
 import 'payload_page_key.dart';
 
 /// The mobile route tree: the shared entry/onboarding routes, a
-/// stateful tab shell (home / swap / activity / settings), and
+/// stateful tab shell (home / activity / settings), and
 /// full-screen flows pushed over the shell as [CupertinoPage]s so iOS
 /// edge-swipe back works.
 ///
@@ -289,6 +288,13 @@ List<RouteBase> buildMobileRoutes({required List<RouteBase> entryRoutes}) {
         };
         return CupertinoPage(key: state.pageKey, child: child);
       },
+    ),
+    // Swap opens from Home's Swap button, over the tabs, as Pay does; the
+    // tab bar keeps Home, Activity and Settings.
+    GoRoute(
+      path: '/swap',
+      pageBuilder: (context, state) =>
+          CupertinoPage(key: state.pageKey, child: const MobileSwapScreen()),
     ),
     GoRoute(
       path: '/swap/review',
@@ -843,11 +849,6 @@ const List<_MobileTab> _allMobileTabs = [
     screen: MobileHomeScreen(),
   ),
   _MobileTab(
-    path: '/swap',
-    item: AppMobileTabItem(iconName: AppIcons.swapArrows, label: 'Swap'),
-    screen: MobileSwapScreen(),
-  ),
-  _MobileTab(
     path: '/activity',
     item: AppMobileTabItem(iconName: AppIcons.history, label: 'Activity'),
     screen: MobileActivityScreen(),
@@ -867,38 +868,27 @@ class _MobileTabShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final swapFeatureEnabled = ref.watch(swapFeatureEnabledProvider);
-    final visibleTabs = [
-      for (final tab in tabs)
-        if (swapFeatureEnabled || tab.path != '/swap') tab,
-    ];
     final currentBranchIndex = navigationShell.currentIndex;
-    final currentTab =
+    final tabBarCurrentIndex =
         currentBranchIndex >= 0 && currentBranchIndex < tabs.length
-        ? tabs[currentBranchIndex]
-        : tabs.first;
-    final currentVisibleIndex = visibleTabs.indexOf(currentTab);
-    final tabBarCurrentIndex = currentVisibleIndex < 0
-        ? 0
-        : currentVisibleIndex;
+        ? currentBranchIndex
+        : 0;
 
     return AppMobileShell(
       body: navigationShell,
       tabBar: AppMobileTabBar(
-        items: [for (final tab in visibleTabs) tab.item],
+        items: [for (final tab in tabs) tab.item],
         currentIndex: tabBarCurrentIndex,
         onSelect: (index) {
-          final targetTab = visibleTabs[index];
-          final targetBranchIndex = tabs.indexOf(targetTab);
-          if (targetBranchIndex != currentBranchIndex &&
-              targetTab.path != '/home') {
+          final targetTab = tabs[index];
+          if (index != currentBranchIndex && targetTab.path != '/home') {
             expectAppReviewVisit(ref, targetTab.path);
           }
           navigationShell.goBranch(
-            targetBranchIndex,
+            index,
             // Re-selecting the active tab resets that tab to its root,
             // the platform-conventional behavior.
-            initialLocation: targetBranchIndex == currentBranchIndex,
+            initialLocation: index == currentBranchIndex,
           );
         },
       ),

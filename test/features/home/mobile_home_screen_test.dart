@@ -1596,7 +1596,7 @@ void main() {
           .onPressed,
       isNotNull,
     );
-    expect(find.byKey(const ValueKey('mobile_home_pay')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mobile_home_swap')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('mobile_home_send')));
     await tester.pumpAndSettle();
@@ -1678,7 +1678,7 @@ void main() {
           .onPressed,
       isNotNull,
     );
-    expect(find.byKey(const ValueKey('mobile_home_pay')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mobile_home_swap')), findsOneWidget);
   });
 
   testWidgets('includes locked Orchard holdings in the migrating amount', (
@@ -1790,7 +1790,6 @@ void main() {
             .onPressed,
         isNull,
       );
-      expect(find.byKey(const ValueKey('mobile_home_pay')), findsNothing);
     },
   );
 
@@ -2695,14 +2694,8 @@ void main() {
     final receiveRect = tester.getRect(
       find.byKey(const ValueKey('mobile_home_receive')),
     );
-    final payRect = tester.getRect(
-      find.byKey(const ValueKey('mobile_home_pay')),
-    );
-    final payIcon = tester.widget<AppIcon>(
-      find.descendant(
-        of: find.byKey(const ValueKey('mobile_home_pay')),
-        matching: find.byType(AppIcon),
-      ),
+    final swapRect = tester.getRect(
+      find.byKey(const ValueKey('mobile_home_swap')),
     );
     final sendLabelStyle = _effectiveTextStyle(tester, find.text('Send'));
     final receiveLabelStyle = _effectiveTextStyle(tester, find.text('Receive'));
@@ -2719,14 +2712,12 @@ void main() {
 
     expect(privacyButtonRect.size, const Size(32, 32));
     expect(privacyIcon.size, 16);
-    expect(payIcon.name, AppIcons.paid);
-    expect(payIcon.size, 20);
-    expect(find.bySemanticsLabel('Pay'), findsOneWidget);
-    expect(payRect.top, moreOrLessEquals(sendRect.top, epsilon: 0.1));
-    expect(payRect.bottom, moreOrLessEquals(sendRect.bottom, epsilon: 0.1));
-    expect(payRect.size, const Size(50, 50));
     expect(receiveRect.left, greaterThan(sendRect.right));
-    expect(payRect.left, greaterThan(receiveRect.right));
+    expect(receiveRect.width, moreOrLessEquals(sendRect.width, epsilon: 0.1));
+    expect(swapRect.top, greaterThan(sendRect.bottom));
+    expect(swapRect.left, moreOrLessEquals(sendRect.left, epsilon: 0.1));
+    expect(swapRect.right, moreOrLessEquals(receiveRect.right, epsilon: 0.1));
+    expect(swapRect.height, sendRect.height);
     expect(find.text('NEW'), findsNothing);
     expect(find.bySemanticsLabel('New: Pay in USDC'), findsNothing);
     expect(sendRect.height, AppButtonSizing.largeHeight);
@@ -2771,20 +2762,7 @@ void main() {
     expect(find.text('receive route'), findsOneWidget);
   });
 
-  testWidgets('pay action opens exact-output pay route', (tester) async {
-    await tester.pumpWidget(
-      _app(_syncedState(orchardBalance: BigInt.from(14312000000))),
-    );
-    await tester.pump();
-    await tester.pump();
-
-    await tester.tap(find.byKey(const ValueKey('mobile_home_pay')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('pay route zecToExternal exactOutput'), findsOneWidget);
-  });
-
-  testWidgets('hides the pay entry when swap is disabled', (tester) async {
+  testWidgets('hides the swap entry when swap is disabled', (tester) async {
     await tester.pumpWidget(
       _app(
         _syncedState(orchardBalance: BigInt.from(14312000000)),
@@ -2794,7 +2772,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.byKey(const ValueKey('mobile_home_pay')), findsNothing);
+    expect(find.byKey(const ValueKey('mobile_home_swap')), findsNothing);
     // Send/Receive remain.
     expect(find.byKey(const ValueKey('mobile_home_send')), findsOneWidget);
     expect(find.byKey(const ValueKey('mobile_home_receive')), findsOneWidget);
@@ -3263,8 +3241,8 @@ void main() {
     final sendRect = tester.getRect(
       find.byKey(const ValueKey('mobile_home_send')),
     );
-    final payRect = tester.getRect(
-      find.byKey(const ValueKey('mobile_home_pay')),
+    final receiveRect = tester.getRect(
+      find.byKey(const ValueKey('mobile_home_receive')),
     );
     final rowRect = tester.getRect(
       find.byKey(const ValueKey('mobile_home_activity_row_0')),
@@ -3290,7 +3268,7 @@ void main() {
     );
     expect(
       rowRect.right,
-      moreOrLessEquals(payRect.right - AppSpacing.xs, epsilon: 0.1),
+      moreOrLessEquals(receiveRect.right - AppSpacing.xs, epsilon: 0.1),
     );
     expect(headerRect.left, rowRect.left);
     expect(seeAllRect.height, 24);

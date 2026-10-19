@@ -231,7 +231,10 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   the tab icons (and, on mobile, `AppIcon` draws its round icons —
   check, arrow-down, plus, warning, cancel, help — as angular glyphs). The active
   glyph is lit with a pool of light sliding under it; content fades to
-  black beneath the bar.
+  black beneath the bar. It has three tabs, Home, Activity and Settings
+  (owner, 2026-10-19). Swap opens over them from a full-width button on
+  Home, under Send and Receive, which split their row in half. Home has
+  no Pay button.
 - **Art.** The medieval illustrations are gone from mobile: empty states use
   `NeonHorizon` (a striped 80s sun over a grid floor), hero and status
   spots `NeonGlyphBadge`, and painted backgrounds are dropped. The account

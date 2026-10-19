@@ -172,7 +172,6 @@ void main() {
       find.byKey(const ValueKey('mobile_home_receive')),
     );
     expect(receive.onPressed, isNotNull);
-    expect(find.byKey(const ValueKey('mobile_home_pay')), findsNothing);
     await tester.pump(const Duration(seconds: 6));
     await _advance(tester);
     expect(

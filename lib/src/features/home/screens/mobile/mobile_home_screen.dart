@@ -70,7 +70,6 @@ import '../../../private_usd/widgets/mobile/private_usd_home_strip.dart';
 import '../../../../rust/api/private_usd.dart'
     show ApiDepositRecord, ApiForwardRecord, ApiReverseRecord;
 import '../../../swap/models/swap_activity_navigation.dart';
-import '../../../swap/providers/swap_state_provider.dart';
 import '../../../swap/widgets/swap_activity_status_auto_refresh.dart';
 import '../../services/transparent_balance_display.dart';
 import '../../providers/backup_reminder_provider.dart';
@@ -913,37 +912,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     );
   }
 
-  Future<void> _openPay() async {
-    final accountUuid = ref
-        .read(accountProvider)
-        .value
-        ?.activeAccountUuid
-        ?.trim();
-    if (accountUuid == null || accountUuid.isEmpty) return;
-
-    final router = GoRouter.of(context);
-    final swapNotifier = ref.read(swapStateProvider.notifier);
-    final selectedAssetFuture = swapNotifier.resolvePaySelectedAssetForEntry(
-      accountUuid: accountUuid,
-    );
-    final selectedAsset = await selectedAssetFuture;
-    if (!mounted ||
-        selectedAsset == null ||
-        router.routerDelegate.currentConfiguration.uri.path != '/home') {
-      return;
-    }
-    final prepared = swapNotifier.preparePayFromShieldedZec(
-      preferredAsset: selectedAsset,
-      expectedAccountUuid: accountUuid,
-    );
-    if (!prepared) return;
-    _expectReviewVisit('/pay');
-    router.push(
-      '/pay',
-      extra: const PayComposerNavigationArgs(preservePreparedComposer: true),
-    );
-  }
-
   Future<void> _shieldTransparentBalance() async {
     if (_isShieldingBalance) return;
 
@@ -1052,10 +1020,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
         ? fixedPrivacyMask()
         : fiatBalanceText;
     final priceChange24hPct = ref.watch(zecPriceChange24hPctProvider);
-    final payEnabled = ref.watch(swapFeatureEnabledProvider);
-    final showPayEntry =
-        payEnabled &&
-        (!migrationInProgress || sync.ironwoodBalance > BigInt.zero);
+    final swapEnabled = ref.watch(swapFeatureEnabledProvider);
     final migrationAttention = mobileIronwoodMigrationAttention(
       widget.ironwoodMigrationCta.status,
       currentHeight: _mobileIronwoodSafelyObservedHeight(sync),
@@ -1281,30 +1246,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                         ),
                       ),
                     ),
-                    // The Pay entry follows the swap feature flag: pay
-                    // rides the swap engine, so a server-side swap disable
-                    // hides the button, mirroring desktop's `onPay == null`
-                    // gating.
-                    if (showPayEntry) ...[
-                      const SizedBox(width: AppSpacing.xs),
-                      SizedBox(
-                        width: _mobileHomeActionButtonHeight,
-                        height: _mobileHomeActionButtonHeight,
-                        child: Semantics(
-                          button: true,
-                          label: 'Pay',
-                          child: AppButton(
-                            key: const ValueKey('mobile_home_pay'),
-                            minWidth: _mobileHomeActionButtonHeight,
-                            height: _mobileHomeActionButtonHeight,
-                            contentPadding: EdgeInsets.zero,
-                            variant: AppButtonVariant.secondary,
-                            onPressed: () => duringAppReviewBusy(ref, _openPay),
-                            child: const _ButtonIcon(AppIcons.paid),
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               )
@@ -1326,6 +1267,28 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                   ),
                 ),
               ),
+            // Swap opens from here rather than from a tab. Like the tab it
+            // replaced, it follows the swap feature flag (mainnet, unless
+            // the server turned swaps off).
+            if (swapEnabled) ...[
+              const SizedBox(height: AppSpacing.xs),
+              NeonSyncOcclude(
+                child: AppButton(
+                  key: const ValueKey('mobile_home_swap'),
+                  expand: true,
+                  constrainContent: true,
+                  variant: AppButtonVariant.secondary,
+                  onPressed: () => _pushUsedScreen('/swap'),
+                  leading: const _ButtonIcon(AppIcons.swapArrows),
+                  height: _mobileHomeActionButtonHeight,
+                  child: const Text(
+                    'Swap',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ],
             if (uuid != null)
               PrivateUsdConversionBanner(
                 accountUuid: uuid,
