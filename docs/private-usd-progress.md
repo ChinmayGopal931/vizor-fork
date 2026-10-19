@@ -1580,9 +1580,16 @@ M8 status (2026-10-14): the non-device parts are done.
   `0zk` card and `infoReceive`, deposit activity rows on the screen, the
   Activity tab and Home, landed deposits in Arriving, deposit rescue on
   Refunds (D-124 to D-126)
-- [ ] M9.5 Checks: the four unit tests pass; `fvm flutter analyze` is clean;
-  the device round's `--deposits` step is written, not run (D-127). The
-  testnet APK is the last item
+- [x] M9.5 Checks (2026-10-18): the four unit tests pass, and the Private
+  USD module's Rust tests (80 passed, 2 ignored); the four Dart tests with
+  the moved token (36 passed) and the Railgun page's fee test pass;
+  `fvm flutter analyze` is clean; live read-only checks against Sepolia
+  passed (D-121). The testnet APK builds at `8f3a382ee` (`fvm flutter build
+  apk --debug --target-platform android-arm64` with
+  `VIZOR_FORM_FACTOR=mobile`, `VIZOR_PRIVATE_USD_ENABLED=true`,
+  `ZCASH_DEFAULT_NETWORK=test`; 222.6 MB, `com.keplr.vizor`); nothing was
+  installed. The device round's `--deposits` step is written, not run
+  (D-127). The whole suites were left to the owner
 - [ ] M9.6 Testnet on the phone, with the owner's funds (task 5 of the
   brief): two deposits shielded, the shown index moving, and recovery
 - [ ] M9 gate
