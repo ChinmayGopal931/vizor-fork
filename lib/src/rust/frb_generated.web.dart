@@ -17,15 +17,11 @@ import 'api/sync.dart';
 import 'api/voting.dart';
 import 'api/voting_session.dart';
 import 'api/wallet.dart';
-
 import 'dart:async';
 import 'dart:convert';
-
 import 'frb_generated.dart';
 import 'network_privacy.dart';
-
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
-
 import 'third_party/zcash_voting/config.dart';
 import 'third_party/zcash_voting/delegate.dart';
 import 'third_party/zcash_voting/share_policy.dart';
@@ -137,6 +133,36 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiDeployment dco_decode_api_deployment(dynamic raw);
+
+  @protected
+  ApiDepositAddress dco_decode_api_deposit_address(dynamic raw);
+
+  @protected
+  ApiDepositAddressUse dco_decode_api_deposit_address_use(dynamic raw);
+
+  @protected
+  ApiDepositKind dco_decode_api_deposit_kind(dynamic raw);
+
+  @protected
+  ApiDepositPass dco_decode_api_deposit_pass(dynamic raw);
+
+  @protected
+  ApiDepositQuote dco_decode_api_deposit_quote(dynamic raw);
+
+  @protected
+  ApiDepositRecord dco_decode_api_deposit_record(dynamic raw);
+
+  @protected
+  ApiDepositRescuable dco_decode_api_deposit_rescuable(dynamic raw);
+
+  @protected
+  ApiDepositState dco_decode_api_deposit_state(dynamic raw);
+
+  @protected
+  ApiDepositTerms dco_decode_api_deposit_terms(dynamic raw);
+
+  @protected
+  ApiDepositsPin dco_decode_api_deposits_pin(dynamic raw);
 
   @protected
   ApiDynamicConfigAttempt dco_decode_api_dynamic_config_attempt(dynamic raw);
@@ -330,6 +356,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiDeployment dco_decode_box_autoadd_api_deployment(dynamic raw);
+
+  @protected
+  ApiDepositQuote dco_decode_box_autoadd_api_deposit_quote(dynamic raw);
+
+  @protected
+  ApiDepositTerms dco_decode_box_autoadd_api_deposit_terms(dynamic raw);
+
+  @protected
+  ApiDepositsPin dco_decode_box_autoadd_api_deposits_pin(dynamic raw);
 
   @protected
   ApiForwardOutcome dco_decode_box_autoadd_api_forward_outcome(dynamic raw);
@@ -732,6 +767,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ApiBallotIntent> dco_decode_list_api_ballot_intent(dynamic raw);
 
   @protected
+  List<ApiDepositAddressUse> dco_decode_list_api_deposit_address_use(
+    dynamic raw,
+  );
+
+  @protected
+  List<ApiDepositRecord> dco_decode_list_api_deposit_record(dynamic raw);
+
+  @protected
+  List<ApiDepositRescuable> dco_decode_list_api_deposit_rescuable(dynamic raw);
+
+  @protected
   List<ApiDynamicConfigAttempt> dco_decode_list_api_dynamic_config_attempt(
     dynamic raw,
   );
@@ -1058,6 +1104,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiDeployment? dco_decode_opt_box_autoadd_api_deployment(dynamic raw);
+
+  @protected
+  ApiDepositQuote? dco_decode_opt_box_autoadd_api_deposit_quote(dynamic raw);
+
+  @protected
+  ApiDepositTerms? dco_decode_opt_box_autoadd_api_deposit_terms(dynamic raw);
+
+  @protected
+  ApiDepositsPin? dco_decode_opt_box_autoadd_api_deposits_pin(dynamic raw);
 
   @protected
   ApiForwardOutcome? dco_decode_opt_box_autoadd_api_forward_outcome(
@@ -1665,6 +1720,42 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiDeployment sse_decode_api_deployment(SseDeserializer deserializer);
 
   @protected
+  ApiDepositAddress sse_decode_api_deposit_address(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiDepositAddressUse sse_decode_api_deposit_address_use(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiDepositKind sse_decode_api_deposit_kind(SseDeserializer deserializer);
+
+  @protected
+  ApiDepositPass sse_decode_api_deposit_pass(SseDeserializer deserializer);
+
+  @protected
+  ApiDepositQuote sse_decode_api_deposit_quote(SseDeserializer deserializer);
+
+  @protected
+  ApiDepositRecord sse_decode_api_deposit_record(SseDeserializer deserializer);
+
+  @protected
+  ApiDepositRescuable sse_decode_api_deposit_rescuable(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiDepositState sse_decode_api_deposit_state(SseDeserializer deserializer);
+
+  @protected
+  ApiDepositTerms sse_decode_api_deposit_terms(SseDeserializer deserializer);
+
+  @protected
+  ApiDepositsPin sse_decode_api_deposits_pin(SseDeserializer deserializer);
+
+  @protected
   ApiDynamicConfigAttempt sse_decode_api_dynamic_config_attempt(
     SseDeserializer deserializer,
   );
@@ -1922,6 +2013,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiDeployment sse_decode_box_autoadd_api_deployment(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiDepositQuote sse_decode_box_autoadd_api_deposit_quote(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiDepositTerms sse_decode_box_autoadd_api_deposit_terms(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiDepositsPin sse_decode_box_autoadd_api_deposits_pin(
     SseDeserializer deserializer,
   );
 
@@ -2444,6 +2550,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<ApiDepositAddressUse> sse_decode_list_api_deposit_address_use(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ApiDepositRecord> sse_decode_list_api_deposit_record(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ApiDepositRescuable> sse_decode_list_api_deposit_rescuable(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<ApiDynamicConfigAttempt> sse_decode_list_api_dynamic_config_attempt(
     SseDeserializer deserializer,
   );
@@ -2856,6 +2977,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiDeployment? sse_decode_opt_box_autoadd_api_deployment(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiDepositQuote? sse_decode_opt_box_autoadd_api_deposit_quote(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiDepositTerms? sse_decode_opt_box_autoadd_api_deposit_terms(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiDepositsPin? sse_decode_opt_box_autoadd_api_deposits_pin(
     SseDeserializer deserializer,
   );
 
@@ -3634,6 +3770,66 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_api_deployment(ApiDeployment self, SseSerializer serializer);
 
   @protected
+  void sse_encode_api_deposit_address(
+    ApiDepositAddress self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_deposit_address_use(
+    ApiDepositAddressUse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_deposit_kind(
+    ApiDepositKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_deposit_pass(
+    ApiDepositPass self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_deposit_quote(
+    ApiDepositQuote self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_deposit_record(
+    ApiDepositRecord self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_deposit_rescuable(
+    ApiDepositRescuable self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_deposit_state(
+    ApiDepositState self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_deposit_terms(
+    ApiDepositTerms self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_deposits_pin(
+    ApiDepositsPin self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_api_dynamic_config_attempt(
     ApiDynamicConfigAttempt self,
     SseSerializer serializer,
@@ -3972,6 +4168,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_api_deployment(
     ApiDeployment self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_api_deposit_quote(
+    ApiDepositQuote self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_api_deposit_terms(
+    ApiDepositTerms self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_api_deposits_pin(
+    ApiDepositsPin self,
     SseSerializer serializer,
   );
 
@@ -4600,6 +4814,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_api_deposit_address_use(
+    List<ApiDepositAddressUse> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_api_deposit_record(
+    List<ApiDepositRecord> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_api_deposit_rescuable(
+    List<ApiDepositRescuable> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_api_dynamic_config_attempt(
     List<ApiDynamicConfigAttempt> self,
     SseSerializer serializer,
@@ -5106,6 +5338,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_api_deployment(
     ApiDeployment? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_deposit_quote(
+    ApiDepositQuote? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_deposit_terms(
+    ApiDepositTerms? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_deposits_pin(
+    ApiDepositsPin? self,
     SseSerializer serializer,
   );
 

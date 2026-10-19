@@ -139,7 +139,7 @@ void main() {
 const _account = 'account';
 
 const _balancesJson =
-    '{"Spendable":[{"token":"0x5764d0044bef5aa839e0ddafe2073421101b9ed8",'
+    '{"Spendable":[{"token":"0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c",'
     '"amount":"5"}]}';
 
 class _Security extends AppSecurityNotifier {

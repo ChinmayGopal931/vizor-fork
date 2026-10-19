@@ -1038,6 +1038,8 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
 5. Checks: the unit tests below; `fvm flutter analyze`; the testnet APK builds. A deposits step in the device round (`run_device_round.sh --deposits`).
 6. Device check on testnet, with the owner's funds: a withdrawal of at least 3 tUSD to the shown address shields on its own; the shown address moves to index 1; a second deposit there shields to a note of its own; a restore of the same seed finds both used addresses and shows index 2.
 
+**As built (progress D-115 to D-127).** Rust: `deposits.rs` (the pass, the records, rescue), `abi.rs` (Multicall3 `aggregate3`, `string`, Railgun's `Shield`), `evm_rpc.rs`'s `DepositChain`, `store.rs` schema 2, six FRB calls. Dart: `private_usd_deposit_backend.dart`, the engine's deposit lane, `private_usd_deposits_provider.dart`, `private_usd_deposits.dart` (what to show), the Receive USDC sheet, the screen's card and button, activity rows, Arriving and Refunds. The device round's `--deposits [--deposits-usd 3] [--deposits-twice]` withdraws private tUSD to the account's own shown address and waits for it to shield back and the shown index to move.
+
 **Done when.** Unit tests pass: the deposit addresses against zecSwap's `deposit-vectors.json`; the fee cap with `deposit_fee`'s cases; terms that do not match the pin, refused; the store's 1 → 2 migration keeping existing records (owner, 2026-10-18: these four, end-to-end for the rest). The device check (task 6) passes.
 
 **Traps.**

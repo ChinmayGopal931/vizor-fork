@@ -36,6 +36,7 @@ import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_conv
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_record_key.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_amount.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_reverse_funding.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_deposits_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_engine_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_unfinished_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_spend_status_provider.dart';
@@ -51,6 +52,8 @@ import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart' as rust_private_usd;
 import 'package:zcash_wallet/src/rust/api/private_usd.dart'
     show
+        ApiDepositPass,
+        ApiDepositState,
         ApiForwardOutcome,
         ApiForwardPhase,
         ApiProvedSend,
@@ -199,6 +202,17 @@ const _m7SkipWithdraw = bool.fromEnvironment(
   'VIZOR_PUSD_DEVICE_M7_SKIP_WITHDRAW',
 );
 // '' or a comma list of forward, reverse and send: the M8 route round.
+/// The deposits round (M9): `run`, the private tUSD each deposit withdraws
+/// to the account's own deposit address, and whether a second one follows
+/// at the next address.
+const _depositsPhase = String.fromEnvironment('VIZOR_PUSD_DEVICE_DEPOSITS');
+const _depositsUsd = String.fromEnvironment(
+  'VIZOR_PUSD_DEVICE_DEPOSITS_USD',
+  defaultValue: '3',
+);
+const _depositsTwice = bool.fromEnvironment(
+  'VIZOR_PUSD_DEVICE_DEPOSITS_TWICE',
+);
 const _m8Route = String.fromEnvironment('VIZOR_PUSD_DEVICE_M8_ROUTE');
 const _m8AllPhases = ['forward', 'reverse', 'send'];
 final _m8Phases = [
@@ -254,8 +268,9 @@ void main() {
     if (_m5Phase.isNotEmpty ||
         _m6Phase.isNotEmpty ||
         _m7Phase.isNotEmpty ||
+        _depositsPhase.isNotEmpty ||
         _m8Route.isNotEmpty) {
-      return _log('a conversion, send or route round: M3 not run');
+      return _log('a conversion, send, deposits or route round: M3 not run');
     }
     tolerateRenderOverflows();
     await _requireRoundSetup();
@@ -345,6 +360,15 @@ void main() {
     await _M7Round(tester).resume();
   }, timeout: const Timeout(Duration(minutes: 40)));
 
+  testWidgets('Deposits: private tUSD withdrawn to the account\'s own '
+      'deposit address shields back on its own, and the shown address '
+      'moves on', (tester) async {
+    if (_depositsPhase != 'run') return _log('not the deposits round');
+    tolerateRenderOverflows();
+    await _requireDepositsSetup();
+    await _DepositsRound(tester).run();
+  }, timeout: const Timeout(Duration(minutes: 90)));
+
   testWidgets('M8 (route): a Tor flip mid-claim, mid-funding and mid-send '
       'fails closed and resumes', (tester) async {
     if (_m8Route.isEmpty) return _log('not the M8 route round');
@@ -405,6 +429,28 @@ Future<void> _requireM7Setup() async {
   }
   if (_m7Phase == 'start' && !isValidEvmAddress(_m7To)) {
     fail('Bad VIZOR_PUSD_DEVICE_M7_TO: a 0x address to withdraw to.');
+  }
+}
+
+Future<void> _requireDepositsSetup() async {
+  await _requireRailgunHost();
+  if (kZcashDefaultNetworkName != ZcashNetwork.testnet.name) {
+    fail('Run on testnet: --dart-define=ZCASH_DEFAULT_NETWORK=test.');
+  }
+  if (!kVizorPrivateUsdEnabled || kAppFormFactor != AppFormFactor.mobile) {
+    fail('Build with VIZOR_PRIVATE_USD_ENABLED and VIZOR_FORM_FACTOR=mobile.');
+  }
+  if (_driverUrl.isEmpty) {
+    fail('Run through scripts/private-usd/run_device_round.sh --deposits.');
+  }
+  // It withdraws the private tUSD an M5 round left: never the reset round.
+  if (_allowReset) fail('A deposits round never resets the wallet.');
+  // The relayer's minimum is 2 tUSD, and the withdrawal pays Railgun 0.25%.
+  if (privateUsdTokenUnits(_depositsUsd, 6) case final units?
+      when units >= BigInt.from(2100000)) {
+    // Fine.
+  } else {
+    fail('Bad VIZOR_PUSD_DEVICE_DEPOSITS_USD: dollars, at least 2.10.');
   }
 }
 
@@ -2094,7 +2140,10 @@ class _CountingSendPage implements PrivateUsdSendPage {
 /// wallet. Never prints the mnemonic, an address, a transaction or any
 /// secret: the events carry outcomes, buckets and timings.
 class _M7Round extends _Round {
-  _M7Round(super.tester);
+  _M7Round(super.tester, {this.usd = _m7Usd});
+
+  /// Dollars per send and withdrawal (the deposits round withdraws its own).
+  final String usd;
 
   static const _sendKey = ValueKey('mobile_private_usd_send');
   static const _withdrawKey = ValueKey('mobile_private_usd_withdraw');
@@ -2106,7 +2155,7 @@ class _M7Round extends _Round {
   static const _statusKey = ValueKey('mobile_private_usd_send_status_title');
 
   late final GoRouter _router;
-  late final BigInt _units = privateUsdTokenUnits(_m7Usd, 6)!;
+  late final BigInt _units = privateUsdTokenUnits(usd, 6)!;
 
   /// What a send needs: its amount and the relayer's fee, at most 2 USDC.
   // The amount plus a fee allowance: real relayer fees are cents, so this is
@@ -2223,7 +2272,7 @@ class _M7Round extends _Round {
         'active=${_activeUuidOf(tester) == _uuid}',
       );
     }
-    await tester.enterText(find.byKey(_amountKey), _m7Usd);
+    await tester.enterText(find.byKey(_amountKey), usd);
     await tester.enterText(find.byKey(_recipientKey), to);
     await tester.pump(const Duration(milliseconds: 300));
     await tapAppButton(tester, _reviewKey, timeout: const Duration(minutes: 1));
@@ -2500,6 +2549,155 @@ class _M7Round extends _Round {
 /// M7 rounds' screen steps on its own app. Events carry the swap index,
 /// phases, steps, outcomes and timings only: never an address, a txid, a URL
 /// or a secret.
+/// The deposits round (plan M9): private tUSD from the device wallet is
+/// withdrawn, through the Withdraw screens, to the account's own shown
+/// deposit address; the engine shields it back on its own (signed, kept,
+/// posted, mined, believed), and the shown address moves to the next index.
+/// With `--deposits-twice`, a second deposit to that next address shields to
+/// a note of its own. Events carry indices, states and timings; the
+/// transaction hash and the fee are public on Sepolia.
+class _DepositsRound extends _M7Round {
+  _DepositsRound(super.tester) : super(usd: _depositsUsd);
+
+  /// The active account's last deposit pass that read the chain.
+  ApiDepositPass? get _pass {
+    final status = _container.read(privateUsdDepositsProvider);
+    if (status?.accountUuid != _uuid) return null;
+    final pass = status?.pass;
+    return pass != null && pass.scanned ? pass : null;
+  }
+
+  /// Asks for a pass now and waits for one newer than [after].
+  Future<ApiDepositPass> _freshPass(String why, {DateTime? after}) async {
+    final since = after ?? DateTime.now();
+    _container.read(privateUsdDepositActionsProvider).refresh();
+    await _waitUntil(
+      why,
+      () {
+        final status = _container.read(privateUsdDepositsProvider);
+        final checked = status?.checkedAt;
+        return _pass != null && checked != null && !checked.isBefore(since);
+      },
+      timeout: const Duration(minutes: 3),
+      every: const Duration(seconds: 20),
+      onTick: (_) async =>
+          _container.read(privateUsdDepositActionsProvider).refresh(),
+    );
+    return _pass!;
+  }
+
+  @override
+  Future<void> run() async {
+    await _unlockToHome(const []);
+    await _event('deposits-start', {
+      'usd': _depositsUsd,
+      'twice': _depositsTwice,
+    });
+    await _home();
+    expect(
+      _container.read(privateUsdDepositsAvailableProvider),
+      isTrue,
+      reason: 'deposits need the testnet pin and Private USD available',
+    );
+    final first = await _deposit('first');
+    _results['deposit_first'] = first;
+    if (_depositsTwice) {
+      _results['deposit_second'] = await _deposit('second');
+    }
+    _log('results: $_results');
+    await _event('deposits-end', _results);
+  }
+
+  /// One deposit: the shown address read, private tUSD withdrawn to it, the
+  /// deposit followed until it landed, and the shown index moved on.
+  Future<Map<String, Object?>> _deposit(String which) async {
+    await _openPrivateUsdScreen(tester);
+    final before = await _freshPass('the $which deposit address');
+    final index = before.index;
+    final address = before.address;
+    expect(isValidEvmAddress(address), isTrue, reason: 'an EIP-55 address');
+    expect(
+      before.terms,
+      isNotNull,
+      reason: 'the relayer\'s deposit terms (${before.termsError})',
+    );
+    await _screenshot('deposits-$which-shown');
+    await _event('deposits-$which-shown', {'index': index});
+    _goHome();
+    await waitForHome(tester);
+
+    // Withdraw to it, as a sender from any wallet would pay it.
+    await _waitForDollars();
+    await _sendThroughTheScreens(
+      PrivateUsdSendMode.withdraw,
+      address,
+      'deposit-$which',
+    );
+    await _outcome(PrivateUsdSendMode.withdraw, 'deposit-$which');
+    final withdrawn = DateTime.now();
+
+    // The screen's cadence and the engine's follow-ups shield it.
+    await _openPrivateUsdScreen(tester);
+    var sawSent = false;
+    await _waitUntil(
+      'the $which deposit to land',
+      () {
+        final pass = _pass;
+        if (pass == null) return false;
+        final records = pass.records.where((r) => r.index == index);
+        sawSent |= records.any((r) => r.state == ApiDepositState.sent);
+        return records.any((r) => r.state == ApiDepositState.landed);
+      },
+      timeout: const Duration(minutes: 30),
+      every: const Duration(seconds: 20),
+      onTick: (_) async =>
+          _container.read(privateUsdDepositActionsProvider).refresh(),
+    );
+    final landed = _pass!.records.firstWhere(
+      (r) => r.index == index && r.state == ApiDepositState.landed,
+    );
+    final afterS = DateTime.now().difference(withdrawn).inSeconds;
+    await _screenshot('deposits-$which-landed');
+    await _event('deposits-$which-landed', {
+      'index': index,
+      'tx': landed.txHash,
+      'fee': landed.fee,
+      'arrives': landed.arrives,
+      'sawMakingPrivate': sawSent,
+      'afterS': afterS,
+    });
+
+    // Once its vault is there, the next address is shown.
+    final moved = DateTime.now();
+    await _waitUntil(
+      'the shown deposit address to move past $index',
+      () => (_pass?.index ?? index) > index,
+      timeout: const Duration(minutes: 5),
+      every: const Duration(seconds: 20),
+      onTick: (_) async =>
+          _container.read(privateUsdDepositActionsProvider).refresh(),
+    );
+    final after = _pass!;
+    expect(after.index, index + 1, reason: 'the next index is shown');
+    expect(after.address, isNot(address));
+    await _event('deposits-$which-moved', {
+      'from': index,
+      'to': after.index,
+      'afterS': DateTime.now().difference(moved).inSeconds,
+    });
+    _goHome();
+    await waitForHome(tester);
+    return {
+      'index': index,
+      'tx': landed.txHash,
+      'fee': landed.fee,
+      'arrives': landed.arrives,
+      'afterS': afterS,
+      'next_index': after.index,
+    };
+  }
+}
+
 class _M8RouteRound extends _Round {
   _M8RouteRound(super.tester);
 

@@ -1444,6 +1444,31 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   `privateUsdLifecycleProvider` first, and clean up only after the Rust
   delete succeeds.
 
+**Deposits (plan M9).** Public USDC sent to the account's own deposit
+addresses (`m/44'/60'|1'/(1000 + zip32)'/0/index`, from the seed) is
+shielded into its private balance by an EIP-3009 authorization the relayer
+sends (`rust/src/wallet/private_usd/deposits.rs`, zecSwap's
+`docs/deposits.md`). The Receive USDC sheet shows the address; the
+`0zk` card stays, for transfers from another Railgun wallet. Only a network
+with a Deposits pin shows it (testnet; mainnet has none yet).
+
+- Pin the Deposits contract, the relayer's deposits account (not the
+  top-level relayer) and the token; refuse terms that differ, never follow
+  them. Read the token's EIP-712 domain from the token and check its
+  `DOMAIN_SEPARATOR()`.
+- Sign only within the cap: `fee ≤ 2 USDC + ⌈value × 0.5%⌉` and
+  `fee < value` (D23); a rescue pays the terms' `fee` alone, at most 2 USDC.
+- Keep every request in `swaps.db` before posting it, post only what was
+  kept, and re-sign one only while the relayer named no transaction for
+  it. Only a mined receipt with the pinned contract's event for this
+  address and one of this wallet's notes settles a deposit.
+- The deposit key signs only the authorization and a rescue: never
+  delegate a deposit address (EIP-7702) or use one otherwise.
+- Deposits follow the active account only, in the foreground and unlocked,
+  on a lane of their own in the engine; the kill switch stops new ones,
+  never one under way. `swaps.db` is at schema 2 since deposits: a build
+  that knows only 1 refuses it as newer.
+
 **Network: Tor and the Railgun page.**
 
 - All engine HTTP (maker, relayer, Ethereum RPC) goes through `routed_http`.

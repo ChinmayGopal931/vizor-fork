@@ -28,6 +28,7 @@ import '../../../activity/models/activity_row_data.dart';
 import '../../../activity/widgets/activity_feed.dart' show ActivityFeedRowGroup;
 import '../../models/private_usd_arrival.dart';
 import '../../models/private_usd_balances.dart';
+import '../../models/private_usd_deposits.dart';
 import '../../models/private_usd_pending_payment.dart';
 import '../../models/private_usd_record_key.dart';
 import '../../private_usd_copy.dart';
@@ -36,6 +37,7 @@ import '../../providers/private_usd_balance_provider.dart';
 import '../../providers/private_usd_activity_provider.dart';
 import '../../providers/private_usd_conversion_provider.dart';
 import '../../providers/private_usd_custom_rpc_provider.dart';
+import '../../providers/private_usd_deposits_provider.dart';
 import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_receive_address_provider.dart';
 import '../../providers/private_usd_spend_status_provider.dart';
@@ -43,6 +45,7 @@ import '../../services/private_usd_balance_repository.dart';
 import '../../widgets/mobile/private_usd_home_strip.dart';
 import '../../widgets/mobile/private_usd_activity_rows.dart';
 import '../../widgets/mobile/private_usd_banner.dart';
+import '../../widgets/mobile/private_usd_deposit_sheet.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
 import '../../widgets/mobile/private_usd_pending_payment_line.dart';
 import '../../widgets/mobile/private_usd_sync_line.dart';
@@ -59,20 +62,37 @@ class MobilePrivateUsdScreen extends ConsumerStatefulWidget {
       _MobilePrivateUsdScreenState();
 }
 
+/// How often the screen asks for a deposit pass while it is open (plan M9's
+/// default cadence).
+const _depositRefresh = Duration(seconds: 60);
+
 class _MobilePrivateUsdScreenState
     extends ConsumerState<MobilePrivateUsdScreen> {
+  Timer? _depositTimer;
+
   @override
   void initState() {
     super.initState();
-    // On open: a balance older than 30 s refreshes.
+    // On open: a balance older than 30 s refreshes, and the deposits are
+    // read (with the vaults, for "Refunds").
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      ref.read(privateUsdDepositActionsProvider).refresh(checkVaults: true);
       final uuid = ref.read(accountProvider).value?.activeAccountUuid;
       if (uuid == null) return;
       ref
           .read(privateUsdBalanceProvider(uuid).notifier)
           .refresh(maxAge: PrivateUsdBalanceTiming.arrivingPoll);
     });
+    _depositTimer = Timer.periodic(_depositRefresh, (_) {
+      if (mounted) ref.read(privateUsdDepositActionsProvider).refresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    _depositTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -94,11 +114,15 @@ class _MobilePrivateUsdScreenState
     final reverseRecords = ref.watch(
       privateUsdReverseActivityRecordsProvider(uuid),
     );
+    final depositRecords = ref.watch(privateUsdDepositRecordsProvider(uuid));
+    final screening = Duration(seconds: deployment?.screeningSeconds ?? 0);
     final activity = [
       for (final entry in privateUsdActivityEntries(
         context: context,
         records: records,
         reverseRecords: reverseRecords,
+        depositRecords: depositRecords,
+        screening: screening,
         zcashConfirmations: deployment?.zcashConfirmations ?? 2,
         privacyModeEnabled: privacyModeEnabled,
         onOpenConversion: open,
@@ -108,9 +132,13 @@ class _MobilePrivateUsdScreenState
       )..sort(compareActivityEntries))
         entry.row,
     ];
-    final hasRefunds = reverseRecords.any(
-      (record) => record.phase == ApiReversePhase.refunded,
-    );
+    // Deposits (M9): their state now, and a vault that can be rescued.
+    final depositPass = ref.watch(privateUsdDepositPassProvider(uuid));
+    final hasRefunds =
+        reverseRecords.any(
+          (record) => record.phase == ApiReversePhase.refunded,
+        ) ||
+        ref.watch(privateUsdDepositRescuesProvider(uuid)).isNotEmpty;
     final balance = ref.watch(privateUsdBalanceProvider(uuid));
     final sends = ref.watch(privateUsdEngineEnabledProvider);
     final spending = ref.watch(privateUsdSpendStatusProvider(uuid));
@@ -134,12 +162,24 @@ class _MobilePrivateUsdScreenState
       zecUsdPrice: ref.watch(zecHomeUsdUnitPriceProvider),
       privacyModeEnabled: privacyModeEnabled,
       receiveAddress: address.value,
-      screening: Duration(seconds: deployment?.screeningSeconds ?? 0),
+      screening: screening,
       arrivingSince: privateUsdArrivingSince(
         arriving: balance.balances?.arriving ?? BigInt.zero,
         forward: records,
         reverse: reverseRecords,
+        deposits: depositRecords,
       ),
+      depositLines: depositPass == null
+          ? const []
+          : privateUsdDepositLines(
+              depositPass,
+              now: DateTime.now(),
+              screening: screening,
+            ),
+      depositMinimum: BigInt.tryParse(depositPass?.terms?.minValue ?? ''),
+      onReceive: ref.watch(privateUsdDepositsAvailableProvider)
+          ? () => showPrivateUsdDepositSheet(context, accountUuid: uuid)
+          : null,
       tokenNames: {
         for (final token in deployment?.usdTokens ?? const [])
           token.address.toLowerCase(): PrivateUsdCopy.tokenName(token.symbol),
@@ -207,6 +247,9 @@ class MobilePrivateUsdView extends StatelessWidget {
     this.onRefunds,
     this.rpcFailing = false,
     this.onUseDefaultRpc,
+    this.onReceive,
+    this.depositLines = const [],
+    this.depositMinimum,
     super.key,
   });
 
@@ -269,6 +312,14 @@ class MobilePrivateUsdView extends StatelessWidget {
   /// set: the card says so in place of its error, with [onUseDefaultRpc].
   final bool rpcFailing;
   final VoidCallback? onUseDefaultRpc;
+
+  /// "Receive" (M9): the Receive USDC sheet for public USDC. Hidden when
+  /// null (no deposits on this network, or Private USD unavailable).
+  final VoidCallback? onReceive;
+
+  /// The deposits' state now (M9), and the relayer's minimum.
+  final List<PrivateUsdDepositLine> depositLines;
+  final BigInt? depositMinimum;
 
   @override
   Widget build(BuildContext context) {
@@ -337,38 +388,63 @@ class MobilePrivateUsdView extends StatelessWidget {
                               onUseDefaultRpc: onUseDefaultRpc,
                             ),
                           ),
-                          if (onSend != null && onWithdraw != null) ...[
+                          if ((onSend != null && onWithdraw != null) ||
+                              onReceive != null) ...[
                             const SizedBox(height: AppSpacing.s),
                             NeonSyncOcclude(
                               child: Row(
                                 children: [
-                                  Expanded(
-                                    child: AppButton(
-                                      key: const ValueKey(
-                                        'mobile_private_usd_send',
-                                      ),
-                                      variant: AppButtonVariant.secondary,
-                                      expand: true,
-                                      onPressed: canSend ? onSend : null,
-                                      child: const Text(
-                                        PrivateUsdCopy.actionSend,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.s),
-                                  Expanded(
-                                    child: AppButton(
-                                      key: const ValueKey(
-                                        'mobile_private_usd_withdraw',
-                                      ),
-                                      variant: AppButtonVariant.secondary,
-                                      expand: true,
-                                      onPressed: canSend ? onWithdraw : null,
-                                      child: const Text(
-                                        PrivateUsdCopy.actionWithdraw,
+                                  if (onSend != null &&
+                                      onWithdraw != null) ...[
+                                    Expanded(
+                                      child: AppButton(
+                                        key: const ValueKey(
+                                          'mobile_private_usd_send',
+                                        ),
+                                        variant: AppButtonVariant.secondary,
+                                        expand: true,
+                                        onPressed: canSend ? onSend : null,
+                                        child: const Text(
+                                          PrivateUsdCopy.actionSend,
+                                        ),
                                       ),
                                     ),
-                                  ),
+                                    const SizedBox(width: AppSpacing.s),
+                                    Expanded(
+                                      child: AppButton(
+                                        key: const ValueKey(
+                                          'mobile_private_usd_withdraw',
+                                        ),
+                                        variant: AppButtonVariant.secondary,
+                                        expand: true,
+                                        onPressed: canSend
+                                            ? onWithdraw
+                                            : null,
+                                        child: const Text(
+                                          PrivateUsdCopy.actionWithdraw,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  // Incoming, so the spend guard never
+                                  // holds it.
+                                  if (onReceive case final onReceive?) ...[
+                                    if (onSend != null && onWithdraw != null)
+                                      const SizedBox(width: AppSpacing.s),
+                                    Expanded(
+                                      child: AppButton(
+                                        key: const ValueKey(
+                                          'mobile_private_usd_receive_usdc',
+                                        ),
+                                        variant: AppButtonVariant.secondary,
+                                        expand: true,
+                                        onPressed: onReceive,
+                                        child: const Text(
+                                          PrivateUsdCopy.actionReceive,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -392,6 +468,18 @@ class MobilePrivateUsdView extends StatelessWidget {
                                 style: AppTypography.bodySmall.copyWith(
                                   color: colors.text.secondary,
                                 ),
+                              ),
+                            ),
+                          ],
+                          if (depositLines.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.s),
+                            NeonSyncOcclude(
+                              child: _DepositsCard(
+                                lines: depositLines,
+                                minimum: depositMinimum,
+                                screening: screening,
+                                privacyModeEnabled: privacyModeEnabled,
+                                onTap: onReceive,
                               ),
                             ),
                           ],
@@ -1028,6 +1116,12 @@ class _ReceiveAddressCard extends StatelessWidget {
               ),
             ],
           ),
+          Text(
+            PrivateUsdCopy.receiveAddressNote,
+            style: AppTypography.bodySmall.copyWith(
+              color: colors.text.secondary,
+            ),
+          ),
           const SizedBox(height: AppSpacing.xs),
           Container(
             width: double.infinity,
@@ -1045,6 +1139,57 @@ class _ReceiveAddressCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The deposits' state now (M9): what each deposit address received, what
+/// is being made private, and what is being screened. Opens the Receive
+/// USDC sheet.
+class _DepositsCard extends StatelessWidget {
+  const _DepositsCard({
+    required this.lines,
+    required this.minimum,
+    required this.screening,
+    required this.privacyModeEnabled,
+    required this.onTap,
+  });
+
+  final List<PrivateUsdDepositLine> lines;
+  final BigInt? minimum;
+  final Duration screening;
+  final bool privacyModeEnabled;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return GestureDetector(
+      key: const ValueKey('mobile_private_usd_deposits'),
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: MobileSurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              PrivateUsdCopy.depositsTitle,
+              style: AppTypography.labelLarge.copyWith(
+                color: colors.text.accent,
+              ),
+            ),
+            for (final line in lines) ...[
+              const SizedBox(height: AppSpacing.xs),
+              PrivateUsdDepositLineText(
+                line: line,
+                minimum: minimum,
+                screening: screening,
+                privacyModeEnabled: privacyModeEnabled,
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

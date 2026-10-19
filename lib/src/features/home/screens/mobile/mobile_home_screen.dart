@@ -63,11 +63,12 @@ import '../../../migration/providers/ironwood_migration_coordinator_provider.dar
 import '../../../migration/widgets/mobile/mobile_ironwood_migration_announcement_sheet.dart';
 import '../../../private_usd/providers/private_usd_available_provider.dart';
 import '../../../private_usd/providers/private_usd_activity_provider.dart';
+import '../../../private_usd/providers/private_usd_deposits_provider.dart';
 import '../../../private_usd/widgets/mobile/private_usd_activity_rows.dart';
 import '../../../private_usd/widgets/mobile/private_usd_banner.dart';
 import '../../../private_usd/widgets/mobile/private_usd_home_strip.dart';
 import '../../../../rust/api/private_usd.dart'
-    show ApiForwardRecord, ApiReverseRecord;
+    show ApiDepositRecord, ApiForwardRecord, ApiReverseRecord;
 import '../../../swap/models/swap_activity_navigation.dart';
 import '../../../swap/providers/swap_state_provider.dart';
 import '../../../swap/widgets/swap_activity_status_auto_refresh.dart';
@@ -1093,6 +1094,10 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     final privateUsdReverseRecords = uuid == null
         ? const <ApiReverseRecord>[]
         : ref.watch(privateUsdReverseActivityRecordsProvider(uuid));
+    // Public USDC deposits (M9) join them.
+    final privateUsdDepositRecords = uuid == null
+        ? const <ApiDepositRecord>[]
+        : ref.watch(privateUsdDepositRecordsProvider(uuid));
     final privateUsdTxids = privateUsdActivityTxids(
       privateUsdRecords,
       reverse: privateUsdReverseRecords,
@@ -1137,11 +1142,21 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
           ),
         ),
       // No rows, no deployment read (an FRB call desktop never makes).
-      if (privateUsdRecords.isNotEmpty || privateUsdReverseRecords.isNotEmpty)
+      if (privateUsdRecords.isNotEmpty ||
+          privateUsdReverseRecords.isNotEmpty ||
+          privateUsdDepositRecords.isNotEmpty)
         ...privateUsdActivityEntries(
           context: context,
           records: privateUsdRecords,
           reverseRecords: privateUsdReverseRecords,
+          depositRecords: privateUsdDepositRecords,
+          screening: Duration(
+            seconds:
+                ref
+                    .watch(privateUsdCurrentDeploymentProvider)
+                    ?.screeningSeconds ??
+                0,
+          ),
           onOpenRefunds: () => _pushUsedScreen('/private-usd/refunds'),
           zcashConfirmations:
               ref

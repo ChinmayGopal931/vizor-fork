@@ -183,7 +183,7 @@ void main() {
 const _zeroK =
     '0zk1qyrs4qyrd08p6uep0fc2y8njktgcpezts3rpaq6q0ln948ecjkw8prv7j6f'
     'e3z53llz8ursderja0juwv5pgnv8x5klmmwkv8q38h9n704h4d4qjyw7n5qk68nx';
-const _token = '0x5764d0044bef5aa839e0ddafe2073421101b9ed8';
+const _token = '0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c';
 const _chainId = 11155111;
 const _proxy = '0xeCFCf3b4eC647c4Ca6D49108b311b7a7C9543fea';
 const _data = '0xd8ae136a00';

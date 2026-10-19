@@ -13,7 +13,8 @@ use rand_0_10::{rand_core::UnwrapErr, rngs::SysRng};
 use secrecy::{ExposeSecret, SecretVec};
 use zcash_client_backend::data_api::{Account as _, WalletRead};
 use zecswap_core::{
-    derive_user_keys, JointAccount, Payout, PublicShare, ShareProof, SwapContext, UserSwapKeys,
+    derive_deposit_keys, derive_user_keys, DepositKeys, JointAccount, Payout, PublicShare,
+    ShareProof, SwapContext, UserSwapKeys,
 };
 use zeroize::Zeroizing;
 use zip32::fingerprint::SeedFingerprint;
@@ -225,5 +226,21 @@ impl SwapKeyContext {
     /// differs is refused.
     pub(crate) fn railgun_address(&self) -> Result<String> {
         Ok(self.railgun_keys()?.address())
+    }
+
+    /// Deposit address `index` of the account (M9): its Ethereum key at
+    /// `m/44'/60'/(1000 + zip32)'/0/index` on mainnet, coin type `1'` on
+    /// testnet, from the seed with its passphrase (D7) and the account's
+    /// ZIP-32 index (D8), and what the notes its deposits pay are built
+    /// from. The key signs only a deposit's EIP-3009 authorization and a
+    /// rescue: never delegate the address (EIP-7702) or use it otherwise.
+    pub(crate) fn deposit_keys(&self, index: u32) -> Result<DepositKeys> {
+        derive_deposit_keys(
+            self.seed.expose_secret(),
+            self.network.zcash(),
+            self.zip32_index,
+            index,
+        )
+        .map_err(|error| PrivateUsdError::new(ErrorCode::Other, format!("deposit keys: {error}")))
     }
 }

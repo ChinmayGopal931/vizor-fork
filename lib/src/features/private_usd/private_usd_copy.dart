@@ -197,8 +197,13 @@ abstract final class PrivateUsdCopy {
       'Convert ZEC into dollars nobody else can see: not your balance, and '
       'not who you pay.';
 
-  /// `private_usd_receive_address`
-  static const receiveAddress = 'Your receive address';
+  /// `private_usd_receive_address`: since M9 the `0zk` card is the way to
+  /// receive from another Railgun wallet.
+  static const receiveAddress = 'Receive from a Railgun wallet';
+
+  /// New (M9): under that card's title.
+  static const receiveAddressNote =
+      'Private USD from another Railgun wallet arrives here, with no fee.';
 
   /// `private_usd_copy_address`
   static const copyAddress = 'Copy your private USD address';
@@ -225,10 +230,12 @@ abstract final class PrivateUsdCopy {
   /// `private_usd_info_step_convert` (S)
   static const infoConvert = 'Convert: exchange ZEC and private USD.';
 
-  /// `private_usd_info_receive` (B)
+  /// `private_usd_info_receive` (B; M9: both ways money comes in)
   static const infoReceive =
-      'Receive: share your receive address on this screen. Anyone with a '
-      'Railgun wallet can send you private USD there.';
+      'Receive: public USDC from an exchange or any wallet goes to your '
+      'deposit address (Receive), and Veylor makes it private for a small '
+      'fee. Private USD from another Railgun wallet goes to your Railgun '
+      'address on this screen, with no fee.';
 
   /// `private_usd_info_send`
   static const infoSend =
@@ -1137,6 +1144,126 @@ abstract final class PrivateUsdCopy {
   /// New: the refresh button's label.
   static const refundsRefresh = 'Refresh';
 
+  /// New (M9): a refund pinned to the retired testnet token, which this
+  /// build's relayer no longer serves.
+  static const refundsOtherDeployment =
+      "This refund is from an earlier test deployment. It can't be "
+      'recovered in this version.';
+
+  /// New (M9): a deposit Railgun's screening sent back to its vault.
+  static const refundsDepositTitle = 'Deposit sent back by screening';
+
+  /// New (M9)
+  static String refundsDepositBody(String usd) =>
+      "Railgun's screening sent $usd back to your deposit address's vault. "
+      'Recover it to make it private again.';
+
+  /// New (M9)
+  static const refundsDepositRecover = 'Recover deposit';
+
+  /// New (M9)
+  static const refundsDepositRecovering = 'Recovering your deposit…';
+
+  /// New (M9)
+  static const refundsDepositRecoverFailed =
+      "Couldn't recover this deposit. Try again.";
+
+  /// New (M9, D18)
+  static const refundsDepositConfirmTitle = 'Recover this deposit?';
+
+  /// New (M9, D18): a rescue pays the relayer's fee alone, at most the cap.
+  static String refundsDepositConfirmBody(String fee) =>
+      "The relayer's fee, $fee, comes out of it.";
+
+  // ── Deposits (M9) ──────────────────────────────────────────────────────
+
+  /// The button beside Send and Withdraw.
+  static const actionReceive = 'Receive';
+
+  /// The sheet's title: "Receive USDC", or "Receive tUSD" on testnet.
+  static String depositTitle(String symbol) => 'Receive $symbol';
+
+  /// The one token and network the address takes.
+  static String depositOnly(String symbol, String chain) =>
+      'Only $symbol on $chain';
+
+  /// What happens to it.
+  static const depositHow =
+      'Send it from an exchange or any wallet. Veylor makes it private on '
+      'its own while it is open and unlocked.';
+
+  /// The minimum, from the relayer's terms.
+  static String depositMinimum(String usd) => 'Minimum $usd';
+
+  /// The relayer's fee: its fixed part and its percentage.
+  static String depositRelayerFee(String fixed, String percent) =>
+      'Relayer fee: $fixed + $percent%';
+
+  /// Railgun's shield fee.
+  static String depositRailgunFee(String percent) =>
+      "Railgun's fee: $percent%";
+
+  /// The terms are being read.
+  static const depositFeesLoading = 'Loading the fees…';
+
+  /// The terms could not be read (Tor starting, the relayer down).
+  static const depositFeesFailed =
+      "Couldn't load the fees. Money sent here waits safely at this address.";
+
+  /// The relayer takes no deposits, or not the pinned ones.
+  static const depositUnavailable =
+      'Deposits are unavailable right now. Nothing sent to an earlier '
+      'deposit address is lost: it waits there.';
+
+  /// The address is being derived.
+  static const depositAddressLoading = 'Loading your deposit address…';
+
+  /// The address could not be derived (locked, say).
+  static const depositAddressFailed =
+      "Couldn't load your deposit address. Try again in a moment.";
+
+  /// The copy button's label.
+  static const depositCopy = 'Copy deposit address';
+
+  /// The address holds money not yet made private.
+  static String depositReceived(String usd) => 'Received $usd';
+
+  /// It holds less than the minimum.
+  static String depositUnderMinimum(String usd, String minimum) =>
+      'Received $usd, under the $minimum minimum. Send more to this address.';
+
+  /// Posted, until it mines.
+  static const depositMakingPrivate = 'Making it private…';
+
+  /// Mined: Railgun screens it before it can be spent.
+  static String depositPrivate(String about) => 'Private, available in $about';
+
+  /// The relayer asked to wait long, or could not be reached.
+  static const depositWaiting =
+      'Waiting for the network; your money is safe at your deposit address';
+
+  /// Refused, or the relayer's fee is above the cap.
+  static const depositNotShielding =
+      "Received, but not made private yet. Veylor tries again later; your "
+      'money is safe at your deposit address.';
+
+  /// The relayer's fee is above what Veylor pays (D23).
+  static const depositFeeTooHigh =
+      "The relayer's fee is above what Veylor pays. Your money waits safely "
+      'at your deposit address.';
+
+  /// The status card's title on the Private USD screen.
+  static const depositsTitle = 'Deposits';
+
+  /// Activity: a deposit.
+  static const activityDeposit = 'Deposit';
+
+  /// Activity: a rescued deposit.
+  static const activityDepositRescue = 'Recovered deposit';
+
+  /// Activity: a deposit that landed.
+  static const activityDepositPrivate = 'Now private';
+
   // ── Accounts and reset (new for vizor; §8.4 refusal) ──────────────────
 
   /// New: `delete_unfinished_title`
@@ -1424,8 +1551,10 @@ String privateUsdSendErrorMessage(ApiPrivateUsdErrorCode code) =>
 /// never a failure. Dart never branches on an error's message text.
 String? privateUsdErrorMessage(ApiPrivateUsdErrorCode code) => switch (code) {
   ApiPrivateUsdErrorCode.cancelled => null,
-  ApiPrivateUsdErrorCode.relayerUnreachable =>
-    PrivateUsdCopy.convertErrorRelayer,
+  // A service serving another deployment reads as the relayer being
+  // unreachable, as zapp holds it.
+  ApiPrivateUsdErrorCode.relayerUnreachable ||
+  ApiPrivateUsdErrorCode.wrongDeployment => PrivateUsdCopy.convertErrorRelayer,
   ApiPrivateUsdErrorCode.relayerRefused =>
     PrivateUsdCopy.convertErrorRelayerRefused,
   // At quote, Rust refuses a fee above the 2 USDC cap (D11).

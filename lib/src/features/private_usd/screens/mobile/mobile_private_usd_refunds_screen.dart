@@ -16,20 +16,82 @@ import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../../core/widgets/mobile/mobile_warning_notice.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
+import '../../../../rust/api/private_usd.dart' as rust;
 import '../../models/private_usd_balances.dart';
 import '../../private_usd_copy.dart';
 import '../../providers/private_usd_available_provider.dart';
+import '../../providers/private_usd_deposits_provider.dart';
+import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_refunds_provider.dart';
+import '../../services/private_usd_engine.dart';
 import '../../widgets/mobile/private_usd_confirm_sheets.dart';
 
 /// `/private-usd/refunds` (plan reference §9.4 S7): every refunded
 /// conversion, whether its refund can be recovered, and "Recover refund"
-/// behind a confirmation sheet (D18).
-class MobilePrivateUsdRefundsScreen extends ConsumerWidget {
+/// behind a confirmation sheet (D18). Since M9, also each deposit that
+/// Railgun's screening sent back to its vault, with "Recover deposit".
+class MobilePrivateUsdRefundsScreen extends ConsumerStatefulWidget {
   const MobilePrivateUsdRefundsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MobilePrivateUsdRefundsScreen> createState() =>
+      _MobilePrivateUsdRefundsScreenState();
+}
+
+class _MobilePrivateUsdRefundsScreenState
+    extends ConsumerState<MobilePrivateUsdRefundsScreen> {
+  /// The deposit address being recovered, and why a recovery did not go.
+  int? _depositRecovering;
+  final _depositErrors = <int, String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    // The vaults are read on open.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(privateUsdDepositActionsProvider).refresh(checkVaults: true);
+      }
+    });
+  }
+
+  Future<void> _recoverDeposit(
+    String account,
+    rust.ApiDepositRescuable rescue,
+  ) async {
+    if (_depositRecovering != null) return;
+    final confirmed = await confirmPrivateUsdDepositRescue(
+      context,
+      fee: formatPrivateUsd(BigInt.tryParse(rescue.fee) ?? BigInt.zero),
+    );
+    if (!confirmed || !mounted) return;
+    setState(() {
+      _depositRecovering = rescue.index;
+      _depositErrors.remove(rescue.index);
+    });
+    String? error;
+    try {
+      await ref
+          .read(privateUsdEngineProvider)
+          .rescueDeposit(account, index: rescue.index);
+    } on rust.ApiPrivateUsdError catch (failure) {
+      if (failure.code != rust.ApiPrivateUsdErrorCode.cancelled) {
+        error = PrivateUsdCopy.refundsDepositRecoverFailed;
+      }
+    } catch (failure) {
+      if (failure is! PrivateUsdEngineInterruptedException) {
+        error = PrivateUsdCopy.refundsDepositRecoverFailed;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _depositRecovering = null;
+      if (error != null) _depositErrors[rescue.index] = error;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final account = ref.watch(
       accountProvider.select((s) => s.value?.activeAccountUuid),
     );
@@ -47,14 +109,23 @@ class MobilePrivateUsdRefundsScreen extends ConsumerWidget {
       if (confirmed) await notifier.recover(index);
     }
 
+    final canGoBack = state.canGoBack && _depositRecovering == null;
     return PopScope(
-      canPop: state.canGoBack,
+      canPop: canGoBack,
       child: MobilePrivateUsdRefundsView(
         state: state,
         privacyModeEnabled: ref.watch(privacyModeProvider),
-        onBack: state.canGoBack ? () => context.pop() : null,
-        onRefresh: () => unawaited(notifier.refresh()),
+        onBack: canGoBack ? () => context.pop() : null,
+        onRefresh: () {
+          ref.read(privateUsdDepositActionsProvider).refresh(checkVaults: true);
+          unawaited(notifier.refresh());
+        },
         onRecover: (index) => unawaited(recover(index)),
+        depositRescues: ref.watch(privateUsdDepositRescuesProvider(account)),
+        depositRecovering: _depositRecovering,
+        depositErrors: Map.unmodifiable(_depositErrors),
+        onRecoverDeposit: (rescue) =>
+            unawaited(_recoverDeposit(account, rescue)),
       ),
     );
   }
@@ -69,6 +140,10 @@ class MobilePrivateUsdRefundsView extends StatelessWidget {
     required this.onRefresh,
     required this.onRecover,
     this.privacyModeEnabled = false,
+    this.depositRescues = const [],
+    this.depositRecovering,
+    this.depositErrors = const {},
+    this.onRecoverDeposit,
     super.key,
   });
 
@@ -77,6 +152,13 @@ class MobilePrivateUsdRefundsView extends StatelessWidget {
   final VoidCallback? onBack;
   final VoidCallback onRefresh;
   final ValueChanged<int> onRecover;
+
+  /// Deposits Railgun's screening sent back to their vaults (M9), the one
+  /// being recovered, and why a recovery did not go.
+  final List<rust.ApiDepositRescuable> depositRescues;
+  final int? depositRecovering;
+  final Map<int, String> depositErrors;
+  final ValueChanged<rust.ApiDepositRescuable>? onRecoverDeposit;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +218,24 @@ class MobilePrivateUsdRefundsView extends StatelessWidget {
                     MobileWarningNotice(message: error),
                   ],
                   const SizedBox(height: AppSpacing.s),
-                  if (state.rows.isEmpty)
+                  for (final rescue in depositRescues) ...[
+                    _DepositRescueCard(
+                      key: ValueKey(
+                        'mobile_private_usd_deposit_rescue_${rescue.index}',
+                      ),
+                      rescue: rescue,
+                      recovering: depositRecovering == rescue.index,
+                      canRecover:
+                          depositRecovering == null && state.recovering == null,
+                      error: depositErrors[rescue.index],
+                      privacyModeEnabled: privacyModeEnabled,
+                      onRecover: onRecoverDeposit == null
+                          ? null
+                          : () => onRecoverDeposit!(rescue),
+                    ),
+                    const SizedBox(height: AppSpacing.s),
+                  ],
+                  if (state.rows.isEmpty && depositRescues.isEmpty)
                     Text(
                       state.loaded
                           ? PrivateUsdCopy.refundsEmpty
@@ -198,6 +297,8 @@ class _RefundCard extends StatelessWidget {
     );
     final status = recovering
         ? PrivateUsdCopy.refundsRecovering
+        : row.otherDeployment
+        ? PrivateUsdCopy.refundsOtherDeployment
         : row.checkFailed
         ? PrivateUsdCopy.refundsCheckFailed
         : row.recoverable == null
@@ -255,6 +356,73 @@ class _RefundCard extends StatelessWidget {
               child: const Text(PrivateUsdCopy.refundsRecover),
             ),
           ],
+          if (error != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            MobileWarningNotice(message: error),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A deposit Railgun's screening sent back to its address's vault (M9):
+/// what the vault holds, and "Recover deposit".
+class _DepositRescueCard extends StatelessWidget {
+  const _DepositRescueCard({
+    required this.rescue,
+    required this.recovering,
+    required this.canRecover,
+    required this.error,
+    required this.privacyModeEnabled,
+    required this.onRecover,
+    super.key,
+  });
+
+  final rust.ApiDepositRescuable rescue;
+  final bool recovering;
+  final bool canRecover;
+  final String? error;
+  final bool privacyModeEnabled;
+  final VoidCallback? onRecover;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final held = hideAmountIfPrivacyMode(
+      formatPrivateUsd(BigInt.tryParse(rescue.held) ?? BigInt.zero),
+      privacyModeEnabled: privacyModeEnabled,
+      denomination: '',
+    );
+    final error = this.error;
+    return MobileSurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            PrivateUsdCopy.refundsDepositTitle,
+            style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            recovering
+                ? PrivateUsdCopy.refundsDepositRecovering
+                : PrivateUsdCopy.refundsDepositBody(held),
+            style: AppTypography.bodySmall.copyWith(
+              color: colors.text.secondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s),
+          AppButton(
+            key: const ValueKey('mobile_private_usd_deposit_recover'),
+            size: AppButtonSize.medium,
+            expand: true,
+            onPressed: canRecover ? onRecover : null,
+            leading: recovering
+                ? const AppLoadingIcon(size: AppIconSize.medium)
+                : null,
+            child: const Text(PrivateUsdCopy.refundsDepositRecover),
+          ),
           if (error != null) ...[
             const SizedBox(height: AppSpacing.xs),
             MobileWarningNotice(message: error),

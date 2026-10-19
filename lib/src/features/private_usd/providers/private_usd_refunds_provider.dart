@@ -26,6 +26,7 @@ class PrivateUsdRefundRow {
     required this.record,
     this.recoverable,
     this.checkFailed = false,
+    this.otherDeployment = false,
     this.error,
   });
 
@@ -35,6 +36,10 @@ class PrivateUsdRefundRow {
   /// checked.
   final bool? recoverable;
   final bool checkFailed;
+
+  /// Pinned to another deployment than this build's (the retired testnet
+  /// token, M9): never checked or recovered here.
+  final bool otherDeployment;
 
   /// Why its last recovery did not go through.
   final String? error;
@@ -49,6 +54,7 @@ class PrivateUsdRefundRow {
     record: record ?? this.record,
     recoverable: recoverable ?? this.recoverable,
     checkFailed: checkFailed ?? this.checkFailed,
+    otherDeployment: otherDeployment,
     error: clearError ? null : (error ?? this.error),
   );
 }
@@ -230,10 +236,16 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
         final index = pending.removeAt(0);
         bool? recoverable;
         var failed = false;
+        var otherDeployment = false;
         try {
           recoverable = await _engine
               .reverseCanRescue(accountUuid, index: index)
               .timeout(PrivateUsdRefundsTiming.timeout);
+        } on rust.ApiPrivateUsdError catch (error) {
+          // A record of the retired testnet token: said so, never retried.
+          otherDeployment =
+              error.code == rust.ApiPrivateUsdErrorCode.wrongDeployment;
+          failed = !otherDeployment;
         } catch (_) {
           failed = true;
         }
@@ -244,8 +256,11 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
               row.record.index == index
                   ? PrivateUsdRefundRow(
                       record: row.record,
-                      recoverable: failed ? null : recoverable,
+                      recoverable: failed || otherDeployment
+                          ? null
+                          : recoverable,
                       checkFailed: failed,
+                      otherDeployment: otherDeployment,
                       error: row.error,
                     )
                   : row,

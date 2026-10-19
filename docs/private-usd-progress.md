@@ -7,6 +7,16 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **Deposits (M9, 2026-10-18): public USDC into private USD.** Each
+  software account has Ethereum deposit addresses of its own; once one holds
+  the relayer's minimum, the app signs, keeps and posts an EIP-3009
+  authorization on its own while unlocked and in the foreground, and only
+  the chain settles it. Testnet only (mainnet pins no Deposits contract).
+  The testnet swap token moved to the deposits' tUSD for swaps too. Built
+  and checked on the host (four unit tests, live read-only checks against
+  Sepolia, `fvm flutter analyze`); the device round has a `--deposits`
+  step; the testnet check with the owner's funds is next (M9.6).
+
 - **Owner decisions of 2026-10-17 (shared Dart, so Android changes too;
   details in `docs/private-usd-ios-progress.md`).**
   - **Account deletion deletes the Railgun wallet (BI-3, option (a);
@@ -1554,19 +1564,146 @@ M8 status (2026-10-14): the non-device parts are done.
   suites), and `Cargo.lock` gained two lines only, `bip32` and `secp256k1`
   under `zecswap-core`, with no new package. The note's five words are
   built in `deposits.rs` (M9.3)
-- [ ] M9.2 Pins: the testnet token moved to the deposits' tUSD, the deposits
-  pin, the terms checked against it, the old-token fixtures decided
-- [ ] M9.3 Rust `deposits.rs`: keys, watching, signing, posting, belief,
-  rescue, the `deposits` table (schema 2), FRB and the bindings
-- [ ] M9.4 Dart and UI: the engine's deposits, the Receive USDC sheet, the
-  relabelled `0zk` card, the states, activity rows, Arriving and rescue
-- [ ] M9.5 Checks: the four unit tests, `fvm flutter analyze`, the testnet
-  APK, and the device round's deposits step (written, not run)
+- [x] M9.2 Pins: the testnet swap token moved to the deposits' tUSD
+  (`0x64c4…727c`, for swaps too); `Deployment.deposits` (testnet: the
+  Deposits contract, the relayer's deposits account, the token, Multicall3;
+  mainnet: none), exposed as `ApiDeployment.deposits`; `/v1/terms`'
+  `deposits` held to it (D-115, D-116); old-token cases decided (D-117)
+- [x] M9.3 Rust `deposits.rs` (with `abi.rs` and `evm_rpc`'s
+  `DepositChain`): deposit keys, the scan, signing within the cap, keep
+  before post, the Answers table, belief from the chain, rescue, the
+  `deposits` and `deposit_scans` tables (`swaps.db` schema 2), six FRB calls
+  and the bindings (D-118 to D-123)
+- [x] M9.4 Dart and UI: deposits on the engine's own lane (active account,
+  foreground and unlocked, drained with the rest), the Receive USDC sheet,
+  "Receive" beside Send and Withdraw, the deposits card, the relabelled
+  `0zk` card and `infoReceive`, deposit activity rows on the screen, the
+  Activity tab and Home, landed deposits in Arriving, deposit rescue on
+  Refunds (D-124 to D-126)
+- [ ] M9.5 Checks: the four unit tests pass; `fvm flutter analyze` is clean;
+  the device round's `--deposits` step is written, not run (D-127). The
+  testnet APK is the last item
 - [ ] M9.6 Testnet on the phone, with the owner's funds (task 5 of the
   brief): two deposits shielded, the shown index moving, and recovery
 - [ ] M9 gate
 
 ## Deviations
+
+- **D-115 (M9.2): the deposits account is pinned too.** zecSwap's
+  reference wallet checks the terms' Deposits contract and token only; the
+  brief also pins the relayer's deposits account
+  (`0xedc4…a446`, not the top-level relayer), so a tampered answer cannot
+  take even the fee: `deposits::pinned_terms` refuses another chain,
+  contract, account or token (`WrongDeployment`) and a relayer without
+  deposits or with unusable terms (`Unavailable`; a `maxValidity` under 17
+  minutes counts as unusable, since a request would go stale on arrival).
+  Checked live on 2026-10-18: the hosted terms name exactly the pinned
+  three, the Deposits contract's `TOKEN()` is the new tUSD, the token reads
+  `"ZecSwap Test USD"`, `"2"` with a matching `DOMAIN_SEPARATOR()`, and
+  Multicall3 has code on Sepolia.
+- **D-116 (M9.2): `RelayerTerms.deposits` is kept unparsed.** It is a
+  `serde_json::Value` that `pinned_terms` reads, so a deposits part this
+  build cannot read never fails the terms the swaps and sends need (the
+  brief's point that old builds ignore it holds for new ones too).
+- **D-117 (M9.2): old-tUSD cases.** The pin moved in `deployment.rs`,
+  `maker_client.rs`'s test, the four Dart tests, `broadcaster-fee.test.mjs`
+  and the reference's table. `store.rs`'s fixtures keep the old token: they
+  are zapp's historical records, on the retired contract `0xbd9a…e225`, and
+  never reach `require_served`. A reverse record pinned to the old token
+  fails `require_served` with `WrongDeployment`, which now reaches Dart as
+  its own code (`ApiPrivateUsdErrorCode.wrongDeployment`): the Refunds
+  screen says such a refund is from an earlier test deployment and cannot
+  be recovered in this version, instead of "Couldn't check this refund"
+  every 15 s. Every other Dart mapping treats the new code as
+  `relayerUnreachable`, as before.
+- **D-118 (M9.3): the scan follows zecSwap's `recover`.** Windows of 20
+  from index 0, each one Multicall3 `aggregate3` reading the token's
+  `balanceOf` and the contract's `deposited` for its 20 addresses, until a
+  window holds none used (so 20 in a row unused), at most 50 windows. The
+  shown index is the lowest whose `deposited` is false. Each account's last
+  scan is kept (`deposit_scans`), so the sheet shows an address with no
+  network (while Tor starts, say).
+- **D-119 (M9.3): the pass as a persisted state machine.** States `signed`
+  (kept, nothing named yet), `sent` (named), and the ends `landed`,
+  `refused`, `reverted`, `replaced`, `expired`. One record per signing,
+  keyed `shield-<index>-<validBefore>`, so a replaced request's note is
+  still recognized if it lands after all; a replacement and the request it
+  replaces are written in one transaction. A request the relayer named a
+  transaction for is never signed again: a re-post of it (its transaction
+  unknown to the node for 3 minutes) keeps it named whatever the answer,
+  and only the chain or its expiry ends it. An address with a request under
+  way at a pass's start is not signed for again in that pass (its scanned
+  balance may be the one that request just moved). A refused re-signing
+  drops the request; the address then waits out the hour.
+- **D-120 (M9.3): a `409` naming nothing.** The reference gives up; here the
+  chain decides. The shield's EIP-3009 nonce used on the token
+  (`authorizationState`) means it landed (only the Deposits contract can
+  use it, for this note, fee and relayer; the wallet never cancels one), so
+  it is recorded landed with no transaction; a balance under its value
+  means another deposit took its funds (`replaced`); otherwise it waits and
+  is posted again. A rescue whose nonce the vault moved past landed too.
+- **D-121 (M9.3): belief.** A `200`'s transaction is believed only with the
+  pinned contract's `DepositShielded` (a rescue's `Rescued`) naming the
+  address and this request's note; a `409`'s, with any of the address's
+  kept notes or, as the reference checks, a note in the same receipt's
+  Railgun `Shield` that the account's Railgun keys open. Not believed, the
+  request is posted again later. Checked live on 2026-10-18 against the
+  CLI's deposit (`0xd7667941…`): the decoders read its `DepositShielded`
+  (value 4,895,000, fee 105,000: the event's `value` is what was shielded,
+  after the relayer's fee) and Railgun's `Shield`, whose note's commitment,
+  and the keccak of its five words, are the event's note; and this build's
+  nonce and commitment for a test note equal the contract's own
+  `depositNonce` and `noteCommitment`. These checks ran as a temporary
+  read-only test, removed afterwards (D-127).
+- **D-122 (M9.3): the FRB calls.** `private_usd_deposit_terms`,
+  `private_usd_deposit_quote` (sync: the fee and what arrives, or none above
+  the cap), `private_usd_deposit_address` (the last scan's, no network),
+  `private_usd_deposit_pass`, `private_usd_deposit_records` and
+  `private_usd_deposit_rescue`. A pass with `only_if_used` (one nothing
+  asked for: unlock, the foreground, an account switch) returns just the
+  address for an account that never scanned or kept a deposit, with no
+  network and no store created, so a wallet that never looked at deposits
+  sends nothing on each resume. Deposits take a lock of their own per
+  account (`deposits::lock_account`), never the conversions' driver lock,
+  and account deletion takes both.
+- **D-123 (M9.3): schema 2.** `swaps.db` gains `deposits` and
+  `deposit_scans`; a store at 1 migrates in place, keeping every row; a
+  build that knows only 1 refuses a store at 2 as newer than itself, never
+  resetting it. `delete_account` removes both tables' rows.
+- **D-124 (M9.4): the cadence as built.** As the brief's defaults: a pass on
+  opening Private USD and the Receive USDC sheet, on unlock, the foreground
+  and an account switch (those three only for an account that used
+  deposits, D-122), every 60 s while Private USD is open and every 15 s
+  while the sheet is, and while a deposit is posted every 10 s (the pass's
+  `next_poll`); 60 s while an address holds enough but could not be signed
+  for. Never while locked or in the background. Deposits run on a lane of
+  the engine's own, so a deposit pass (up to 90 s while the relayer is
+  busy) never holds a conversion step back; the vaults are read on opening
+  Private USD and Refunds.
+- **D-125 (M9.4): the button and the sheet.** "Receive" sits beside Send and
+  Withdraw (three across; the sheet's title says "Receive USDC", "Receive
+  tUSD" on testnet). It shows only where the network pins deposits and
+  Private USD is available (the kill switch included); a deposit under way
+  is followed regardless (D16). The QR is the EIP-55 address in
+  `ReceiveQrFrame`, drawn as the Receive screen's codes (`ReceiveQrSurface`,
+  transparent type, so a short address keeps a version the badge cannot
+  spoil). EIP-55 is computed in Rust (`deposits::eip55`), which every
+  address crossing to Dart goes through.
+- **D-126 (M9.4): rescue on Refunds.** A deposit Railgun's screening sent
+  back to its vault shows on the Refunds screen with "Recover deposit"
+  behind a confirmation sheet (D18); the Refunds button shows for it too.
+  Getting a refused note back to the vault (Railgun's unshield to origin)
+  is not in the Railgun page, so today a vault holds funds only if that was
+  done from another Railgun wallet.
+- **D-127 (owner, 2026-10-18): four unit tests, end to end for the rest.**
+  The owner cut §5's unit list to the deposit addresses (ten of zecSwap's
+  vectors, both networks, accounts and indices above 0, compared as EIP-55
+  strings), the fee cap with `deposit_fee`'s cases, terms that are not the
+  pin's, and the store's 1 → 2 migration. The rest is the device round's
+  `--deposits` step (written, not run: it needs the phone and testnet
+  tUSD) and the testnet check with the owner's funds. No new widget tests
+  or capture scenarios (owner's rules); Widgetbook use cases were optional
+  and are not added.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

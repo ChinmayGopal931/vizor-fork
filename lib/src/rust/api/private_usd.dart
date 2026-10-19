@@ -6,8 +6,8 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `forward_call`, `internal_hex`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `reverse_call`, `seconds`, `swap_network`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `forward_call`, `internal_hex`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `reverse_call`, `seconds`, `swap_network`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 /// The deployment for the wallet network `"main"` or `"test"`; `None` on
 /// regtest or an unknown network, where Private USD is hidden.
@@ -588,6 +588,117 @@ Future<List<ApiSendRecord>> privateUsdSendSettleAll({
   accountUuid: accountUuid,
 );
 
+/// The relayer's deposit terms (`GET /v1/terms`' `deposits`), held to the
+/// pin. `Unavailable` where nothing is pinned or the relayer takes none,
+/// `WrongDeployment` for another deployment's: say deposits are
+/// unavailable. Anything else (Tor starting, the relayer down): show the
+/// address and say the fees could not load.
+Future<ApiDepositTerms> privateUsdDepositTerms({required String network}) =>
+    RustLib.instance.api.crateApiPrivateUsdPrivateUsdDepositTerms(
+      network: network,
+    );
+
+/// What a deposit of `value` costs and brings under the relayer's `fee`
+/// and `fee_bps`; `None` when its fee is above the cap (D23) or not under
+/// the value, so nothing would be signed.
+ApiDepositQuote? privateUsdDepositQuote({
+  required String fee,
+  required int feeBps,
+  required String value,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdDepositQuote(
+  fee: fee,
+  feeBps: feeBps,
+  value: value,
+);
+
+/// The deposit address to show now, from the last scan kept (index 0 before
+/// any): no network, so it shows while Tor starts. Checks the seed against
+/// the account first.
+Future<ApiDepositAddress> privateUsdDepositAddress({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdDepositAddress(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+);
+
+/// One deposit pass for the account (the active one): scans its deposit
+/// addresses (Multicall3, twenty a call, until a window holds none used),
+/// posts again what was kept, follows what the relayer named, and with
+/// `sign_new` signs, keeps and posts a deposit for each address holding at
+/// least the minimum. A deposit already under way is followed and posted
+/// whatever `sign_new` says (the kill switch never stops one). With
+/// `check_vaults` it also reads which vaults can be rescued. With
+/// `only_if_used` (the passes nothing asked for: unlock, the foreground, an
+/// account switch) an account that never scanned or kept a deposit gets the
+/// address to show and nothing else: no network, and no store created.
+/// `Busy` while another pass or a rescue of the account runs; stops with
+/// `Cancelled` once `private_usd_cancel(op_id)` is called. Run it only while
+/// unlocked and in the foreground.
+Future<ApiDepositPass> privateUsdDepositPass({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+  required String ethRpcUrl,
+  required int opId,
+  required bool signNew,
+  required bool checkVaults,
+  required bool onlyIfUsed,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdDepositPass(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+  ethRpcUrl: ethRpcUrl,
+  opId: opId,
+  signNew: signNew,
+  checkVaults: checkVaults,
+  onlyIfUsed: onlyIfUsed,
+);
+
+/// The account's deposits and rescues, newest first; empty when none was
+/// ever kept. No network and no key.
+Future<List<ApiDepositRecord>> privateUsdDepositRecords({
+  required String accountUuid,
+  required String storeDir,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdDepositRecords(
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+);
+
+/// "Recover" a deposit whose note Railgun's screening refused and sent back
+/// to the address's vault (the user's action, behind a confirmation, D18):
+/// signs a rescue with the vault's next nonce, keeps it and posts it. It
+/// pays the relayer's `fee` alone, at most 2 USDC (X6). `Unavailable` when
+/// the vault holds no more than the fee, `Busy` while a rescue of the
+/// address or a pass runs.
+Future<ApiDepositRecord> privateUsdDepositRescue({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+  required String ethRpcUrl,
+  required int index,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdDepositRescue(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+  ethRpcUrl: ethRpcUrl,
+  index: index,
+);
+
 enum ApiAcceptKind {
   /// The maker opened the swap, or is opening it: show its progress.
   accepted,
@@ -675,6 +786,10 @@ class ApiDeployment {
   /// first. Each has `token_decimals`.
   final List<ApiUsdToken> usdTokens;
 
+  /// Where public USDC is shielded into the private balance (M9); `None`
+  /// where no Deposits contract is pinned, which hides deposits.
+  final ApiDepositsPin? deposits;
+
   const ApiDeployment({
     required this.network,
     required this.railgunNetwork,
@@ -694,6 +809,7 @@ class ApiDeployment {
     required this.screeningSeconds,
     required this.maxRelayerFee,
     required this.usdTokens,
+    this.deposits,
   });
 
   @override
@@ -715,7 +831,8 @@ class ApiDeployment {
       escrowConfirmations.hashCode ^
       screeningSeconds.hashCode ^
       maxRelayerFee.hashCode ^
-      usdTokens.hashCode;
+      usdTokens.hashCode ^
+      deposits.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -739,7 +856,379 @@ class ApiDeployment {
           escrowConfirmations == other.escrowConfirmations &&
           screeningSeconds == other.screeningSeconds &&
           maxRelayerFee == other.maxRelayerFee &&
-          usdTokens == other.usdTokens;
+          usdTokens == other.usdTokens &&
+          deposits == other.deposits;
+}
+
+/// The deposit address to show and its index.
+class ApiDepositAddress {
+  final int index;
+
+  /// EIP-55, as exchanges' withdrawal forms take it.
+  final String address;
+
+  const ApiDepositAddress({required this.index, required this.address});
+
+  @override
+  int get hashCode => index.hashCode ^ address.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiDepositAddress &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          address == other.address;
+}
+
+/// A used deposit address: it holds tokens or has deposited.
+class ApiDepositAddressUse {
+  final int index;
+  final String address;
+  final String balance;
+  final bool deposited;
+
+  const ApiDepositAddressUse({
+    required this.index,
+    required this.address,
+    required this.balance,
+    required this.deposited,
+  });
+
+  @override
+  int get hashCode =>
+      index.hashCode ^ address.hashCode ^ balance.hashCode ^ deposited.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiDepositAddressUse &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          address == other.address &&
+          balance == other.balance &&
+          deposited == other.deposited;
+}
+
+enum ApiDepositKind {
+  /// An address's balance shielded on its authorization.
+  shield,
+
+  /// What Railgun sent back to an address's vault, shielded again.
+  rescue,
+}
+
+/// One deposit pass: the address to show, the used ones, the account's
+/// deposits, the terms and when to pass again.
+class ApiDepositPass {
+  final int index;
+  final String address;
+  final List<ApiDepositAddressUse> used;
+  final List<ApiDepositRecord> records;
+
+  /// The terms, or why they did not read: `Unavailable` or
+  /// `WrongDeployment` means deposits are unavailable (show no address);
+  /// anything else only that the fees could not load.
+  final ApiDepositTerms? terms;
+  final ApiPrivateUsdErrorCode? termsError;
+  final List<ApiDepositRescuable> rescuable;
+
+  /// Whether this pass read the addresses from the chain, and when they
+  /// were last read.
+  final bool scanned;
+  final PlatformInt64? scannedAt;
+
+  /// When to pass again; none while nothing is posted or due.
+  final int? nextPollMs;
+
+  /// The first step that failed (a scan, a signing, a post).
+  final ApiPrivateUsdErrorCode? problem;
+
+  const ApiDepositPass({
+    required this.index,
+    required this.address,
+    required this.used,
+    required this.records,
+    this.terms,
+    this.termsError,
+    required this.rescuable,
+    required this.scanned,
+    this.scannedAt,
+    this.nextPollMs,
+    this.problem,
+  });
+
+  @override
+  int get hashCode =>
+      index.hashCode ^
+      address.hashCode ^
+      used.hashCode ^
+      records.hashCode ^
+      terms.hashCode ^
+      termsError.hashCode ^
+      rescuable.hashCode ^
+      scanned.hashCode ^
+      scannedAt.hashCode ^
+      nextPollMs.hashCode ^
+      problem.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiDepositPass &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          address == other.address &&
+          used == other.used &&
+          records == other.records &&
+          terms == other.terms &&
+          termsError == other.termsError &&
+          rescuable == other.rescuable &&
+          scanned == other.scanned &&
+          scannedAt == other.scannedAt &&
+          nextPollMs == other.nextPollMs &&
+          problem == other.problem;
+}
+
+/// What a deposit of an amount costs and brings.
+class ApiDepositQuote {
+  /// The relayer's fee.
+  final String fee;
+
+  /// What reaches the private balance after both fees.
+  final String arrives;
+
+  const ApiDepositQuote({required this.fee, required this.arrives});
+
+  @override
+  int get hashCode => fee.hashCode ^ arrives.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiDepositQuote &&
+          runtimeType == other.runtimeType &&
+          fee == other.fee &&
+          arrives == other.arrives;
+}
+
+/// One kept deposit or rescue, for the screen and the activity rows.
+class ApiDepositRecord {
+  final String id;
+  final ApiDepositKind kind;
+
+  /// The deposit address's index, and the address (EIP-55).
+  final int index;
+  final String address;
+  final ApiDepositState state;
+
+  /// What it moves (a rescue: its vault's balance when signed).
+  final String value;
+
+  /// The relayer's fee.
+  final String fee;
+
+  /// What reaches the private balance: the contract's own figure once it
+  /// landed, else what the request should bring.
+  final String arrives;
+
+  /// Unix seconds when it was signed, and when it ended.
+  final PlatformInt64 createdAt;
+  final PlatformInt64? endedAt;
+
+  /// The transaction that landed it, or the last the relayer named.
+  final String? txHash;
+
+  /// The relayer asked to wait over 30 s, or could not be reached.
+  final bool waiting;
+
+  const ApiDepositRecord({
+    required this.id,
+    required this.kind,
+    required this.index,
+    required this.address,
+    required this.state,
+    required this.value,
+    required this.fee,
+    required this.arrives,
+    required this.createdAt,
+    this.endedAt,
+    this.txHash,
+    required this.waiting,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      kind.hashCode ^
+      index.hashCode ^
+      address.hashCode ^
+      state.hashCode ^
+      value.hashCode ^
+      fee.hashCode ^
+      arrives.hashCode ^
+      createdAt.hashCode ^
+      endedAt.hashCode ^
+      txHash.hashCode ^
+      waiting.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiDepositRecord &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          kind == other.kind &&
+          index == other.index &&
+          address == other.address &&
+          state == other.state &&
+          value == other.value &&
+          fee == other.fee &&
+          arrives == other.arrives &&
+          createdAt == other.createdAt &&
+          endedAt == other.endedAt &&
+          txHash == other.txHash &&
+          waiting == other.waiting;
+}
+
+/// A vault holding more than a rescue's fee: "Recover" is offered.
+class ApiDepositRescuable {
+  final int index;
+  final String address;
+  final String held;
+  final String fee;
+
+  const ApiDepositRescuable({
+    required this.index,
+    required this.address,
+    required this.held,
+    required this.fee,
+  });
+
+  @override
+  int get hashCode =>
+      index.hashCode ^ address.hashCode ^ held.hashCode ^ fee.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiDepositRescuable &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          address == other.address &&
+          held == other.held &&
+          fee == other.fee;
+}
+
+/// Where a deposit stands (`docs/deposits.md`, "What to show").
+enum ApiDepositState {
+  /// Kept, not yet answered with a transaction: "Received $X" (or, with
+  /// `waiting`, "Waiting for the network").
+  signed,
+
+  /// Posted, until it mines: "Making it private…".
+  sent,
+
+  /// Mined and believed: "Private, available in …".
+  landed,
+
+  /// Refused: the address shows as received but not shielding.
+  refused,
+
+  /// Its transaction reverted: nothing moved; signed again after an hour.
+  reverted,
+
+  /// Signed again in its place: not shown.
+  replaced,
+
+  /// Its validity ran out first: not shown.
+  expired,
+}
+
+/// The relayer's deposit terms, held to the pin, for the Receive USDC sheet
+/// (amounts in token base units).
+class ApiDepositTerms {
+  /// The relayer's fee before its percentage; a rescue pays it alone.
+  final String fee;
+
+  /// The relayer's percentage of a deposit, in basis points.
+  final int feeBps;
+
+  /// Until when an authorization signed with `fee` is taken (Unix
+  /// seconds), where gas prices the fee.
+  final PlatformInt64? feeExpiresAt;
+
+  /// The least a deposit moves.
+  final String minValue;
+
+  /// Railgun's shield fee, in basis points.
+  final int railgunFeeBps;
+
+  const ApiDepositTerms({
+    required this.fee,
+    required this.feeBps,
+    this.feeExpiresAt,
+    required this.minValue,
+    required this.railgunFeeBps,
+  });
+
+  @override
+  int get hashCode =>
+      fee.hashCode ^
+      feeBps.hashCode ^
+      feeExpiresAt.hashCode ^
+      minValue.hashCode ^
+      railgunFeeBps.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiDepositTerms &&
+          runtimeType == other.runtimeType &&
+          fee == other.fee &&
+          feeBps == other.feeBps &&
+          feeExpiresAt == other.feeExpiresAt &&
+          minValue == other.minValue &&
+          railgunFeeBps == other.railgunFeeBps;
+}
+
+/// A network's pinned Deposits deployment (M9).
+class ApiDepositsPin {
+  /// The Deposits contract, `0x` lowercase.
+  final String contract;
+
+  /// The token deposits take (the swap token), `0x` lowercase.
+  final String token;
+
+  /// `USDC`, or `tUSD` on testnet.
+  final String tokenSymbol;
+
+  /// The network a sender picks: `Ethereum`, or `Sepolia` on testnet.
+  final String chainName;
+
+  const ApiDepositsPin({
+    required this.contract,
+    required this.token,
+    required this.tokenSymbol,
+    required this.chainName,
+  });
+
+  @override
+  int get hashCode =>
+      contract.hashCode ^
+      token.hashCode ^
+      tokenSymbol.hashCode ^
+      chainName.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiDepositsPin &&
+          runtimeType == other.runtimeType &&
+          contract == other.contract &&
+          token == other.token &&
+          tokenSymbol == other.tokenSymbol &&
+          chainName == other.chainName;
 }
 
 class ApiForwardAdvance {
@@ -1104,6 +1593,11 @@ enum ApiPrivateUsdErrorCode {
 
   /// The call was cancelled (`private_usd_cancel`): never a failure.
   cancelled,
+
+  /// A record, a service or the node belongs to another deployment than
+  /// this build pins: a conversion pinned to the retired testnet token, or
+  /// deposit terms that are not the pin's. Never followed.
+  wrongDeployment,
 }
 
 /// A proved send or withdrawal, as Dart hands it to Rust to keep before it is

@@ -57,6 +57,21 @@
 #                        bytes; nothing is proved again). Implies --skip-release.
 #   --m7-to ADDRESS      the 0x address the withdrawal pays (required with --m7)
 #   --m7-usd AMOUNT      private USD per send and withdrawal (default 1)
+#   --deposits           the deposits round (M9), off by default. Run it after
+#                        an M5 round left private tUSD (the token deposits
+#                        take) in the same wallet, or together with --m5,
+#                        after it. It never resets the wallet and keeps the
+#                        page storage. It reads the account's shown deposit
+#                        address, withdraws --deposits-usd of private tUSD to
+#                        it through the Withdraw screens (Railgun keeps 0.25%,
+#                        and the relayer's minimum is 2), waits until the
+#                        engine shields it back on its own (signed, posted,
+#                        mined, believed: "Making it private…", then landed),
+#                        and checks the shown address moved to the next
+#                        index. Implies --skip-release.
+#   --deposits-usd AMOUNT  private tUSD per deposit (default 3)
+#   --deposits-twice     also a second deposit, to that next address, which
+#                        shields to a note of its own
 #   --m8-route           the M8 route round, off by default: Tor turns on in the
 #                        middle of a forward claim (converting --m5-zec), a
 #                        reverse funding (--m6-usd, while the page proves the
@@ -120,6 +135,7 @@ RELEASE_APK=""
 RUN_TEST=1 RUN_RELEASE=1 RUN_RESTORE=1 KEEP_PAGE=0 TOR_FIRST_SYNC=true
 M5=0 M5_ZEC=0.01 M6=0 M6_USD=2 M6_REFUND=false M6_COMPLETE_ONLY=false M6_FEE_MARGIN=2.5 M7=0 M7_USD=1 M7_TO="" M7_SKIP_SEND=false M7_SKIP_WITHDRAW=false
 M8_ROUTE=0 M8_PHASES=forward,reverse,send KEYED_RPC=""
+DEPOSITS=0 DEPOSITS_USD=3 DEPOSITS_TWICE=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --m5) M5=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
@@ -134,6 +150,9 @@ while [[ $# -gt 0 ]]; do
     --m7-skip-send) M7_SKIP_SEND=true; shift ;;
     --m7-skip-withdraw) M7_SKIP_WITHDRAW=true; shift ;;
     --m7-usd) M7_USD=$2; shift 2 ;;
+    --deposits) DEPOSITS=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
+    --deposits-usd) DEPOSITS_USD=$2; shift 2 ;;
+    --deposits-twice) DEPOSITS_TWICE=true; shift ;;
     --m8-route) M8_ROUTE=1; RUN_RELEASE=0; KEEP_PAGE=1; shift ;;
     --m8-route-phases) M8_PHASES=$2; shift 2 ;;
     --keyed-rpc) KEYED_RPC=$2; shift 2 ;;
@@ -371,6 +390,21 @@ if [[ $RUN_TEST == 1 ]]; then
       TEST_STATUS=$?
     fi
   fi
+  if [[ $DEPOSITS == 1 && $TEST_STATUS == 0 ]]; then
+    # Never VIZOR_PUSD_DEVICE_RESET: the round withdraws the private tUSD an
+    # M5 round left in the phone's wallet to the account's deposit address.
+    log "deposits round: $DEPOSITS_USD tUSD to the shown deposit address (twice: $DEPOSITS_TWICE)"
+    fvm flutter test integration_test/private_usd_device_test.dart \
+      -d "$SERIAL" --tags private-usd-device --run-skipped --no-uninstall \
+      "${DEFINES[@]}" \
+      --dart-define=ZCASH_E2E_NETWORK=testnet \
+      --dart-define=VIZOR_PUSD_DEVICE_DRIVER_URL="http://127.0.0.1:$PORT" \
+      --dart-define=VIZOR_PUSD_DEVICE_DEPOSITS=run \
+      --dart-define=VIZOR_PUSD_DEVICE_DEPOSITS_USD="$DEPOSITS_USD" \
+      --dart-define=VIZOR_PUSD_DEVICE_DEPOSITS_TWICE=$DEPOSITS_TWICE \
+      2>&1 | tee "$OUT/flutter-test-deposits.log"
+    TEST_STATUS=${PIPESTATUS[0]}
+  fi
   if [[ $M8_ROUTE == 1 && $TEST_STATUS == 0 ]]; then
     # Never VIZOR_PUSD_DEVICE_RESET: the round converts and sends what the
     # earlier rounds left in the phone's wallet.
@@ -387,7 +421,7 @@ if [[ $RUN_TEST == 1 ]]; then
       2>&1 | tee "$OUT/flutter-test-m8-route.log"
     TEST_STATUS=${PIPESTATUS[0]}
   fi
-  if [[ $M5 == 0 && $M6 == 0 && $M7 == 0 && $M8_ROUTE == 0 ]]; then
+  if [[ $M5 == 0 && $M6 == 0 && $M7 == 0 && $DEPOSITS == 0 && $M8_ROUTE == 0 ]]; then
     log "running the integration test (fresh page storage: $fresh, Tor first sync: $TOR_FIRST_SYNC)"
     fvm flutter test integration_test/private_usd_device_test.dart \
       -d "$SERIAL" --tags private-usd-device --run-skipped --no-uninstall \

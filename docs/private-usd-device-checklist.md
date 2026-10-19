@@ -31,6 +31,7 @@ strategy, M8). Progress and deviations: `docs/private-usd-progress.md`.
   | `--m5`, `--m8-route` (forward) | Testnet ZEC on the round's wallet; the testnet maker and relayer (E8) |
   | `--m6`, `--m7`, `--m8-route` (reverse, send) | Private USD that an M5 round left in the wallet |
   | `--m7` | A Sepolia `0x` address of the owner's to withdraw to (`--m7-to`) |
+  | `--deposits` | Private tUSD (`0x64c4…727c`) that an M5 round left in the wallet: `--deposits-usd` (default 3) per deposit, plus a few cents of relayer fee |
   | `--keyed-rpc` | The keyed RPC JSON (E6), outside the repo or gitignored |
   | The kill-switch run (M-13) | The flag URL (E7) |
   | Mainnet release QA | Mainnet keyed RPC (E6), a small mainnet balance, and the owner's sign-off (M8.7) |
@@ -102,6 +103,7 @@ finish it first, from its banner or with `--m5` or `--m6`.
 | Reverse conversion (USD → ZEC) | `--m6` | A lock mid-proof pays nothing. The unpaid conversion, cancelled, ends `CANCELLED`. A new one is paid, settlement is authorized, and it reaches `COMPLETE`. |
 | Reverse refund | `--m6 --m6-refund` | A paid conversion, cancelled, ends `REFUNDED` and shows on Refunds. |
 | Private send and withdraw | `--m7 --m7-to 0x…` | A send arrives at a second account's `0zk` and stays Processing on Sepolia. The withdrawal reaches the `0x` address. A kill between proving and the post resends the kept bytes, with no new proof and no new row. |
+| Deposits (M9) | `--deposits [--deposits-usd 3] [--deposits-twice]` | The account's shown deposit address (EIP-55) and the relayer's pinned terms read. Private tUSD withdrawn to it through the Withdraw screens shields back on its own: the pass signs, keeps and posts it ("Making it private…"), and it lands, believed from the pinned contract's event. The shown address then moves to the next index. With `--deposits-twice`, a second deposit there shields to a note of its own. The events record each deposit's index, transaction, fee and what arrived. |
 | Route change in each phase (M8.1) | `--m8-route` | Tor turns on at three points: when the claim starts, while the page proves a reverse payment, and while it proves a send. From the flip on, no sample shows a direct Railgun socket. Once Tor is connected, no sample shows anything but loopback and Tor relays. A proof the flip cut off pays and keeps nothing. Each phase then finishes over Tor (Paid, `COMPLETE`, the send landed, exactly one kept proof). |
 | The keyed RPC never leaks (M8.3) | `--keyed-rpc <json>` | No file matches the URL's host and path, or its key. The files scanned: the app's `swaps.db` (with its WAL), `joint.db`, the token state and `shared_prefs`, read with run-as; a final logcat dump; and every log and evidence file of the round. |
 | Memory and timing | every round | `sample_device.sh` samples throughout, and `summary.json` reports the peaks. |
