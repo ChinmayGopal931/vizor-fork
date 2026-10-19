@@ -503,6 +503,8 @@ import UIKit
         result(self.performSendSuccessHaptic())
       case "sendFailure":
         result(self.performSendFailureHaptic())
+      case "settlementDeadline":
+        result(self.performSettlementDeadlineHaptic())
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -902,6 +904,68 @@ import UIKit
             ),
           ],
           parameters: []
+        )
+        let player = try engine.makePlayer(with: pattern)
+        try player.start(atTime: 0)
+        return true
+      } catch {
+        return false
+      }
+    #endif
+  }
+
+  /// Private USD's "Authorize settlement" is about to close: 0.8 s at full
+  /// strength, then 1.6 s fading out, as on Android.
+  private func performSettlementDeadlineHaptic() -> Bool {
+    #if targetEnvironment(simulator)
+      return false
+    #else
+      guard #available(iOS 13.0, *) else {
+        return false
+      }
+      guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else {
+        return false
+      }
+
+      do {
+        let engine: CHHapticEngine
+        if let existingEngine = customHapticEngine {
+          engine = existingEngine
+        } else {
+          engine = try CHHapticEngine()
+          customHapticEngine = engine
+          engine.stoppedHandler = { [weak self] _ in
+            self?.customHapticEngine = nil
+          }
+          engine.resetHandler = { [weak self] in
+            try? self?.customHapticEngine?.start()
+          }
+        }
+
+        try engine.start()
+        let pattern = try CHHapticPattern(
+          events: [
+            CHHapticEvent(
+              eventType: .hapticContinuous,
+              parameters: [
+                CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.00),
+                CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.30),
+              ],
+              relativeTime: 0,
+              duration: 2.4
+            )
+          ],
+          parameterCurves: [
+            CHHapticParameterCurve(
+              parameterID: .hapticIntensityControl,
+              controlPoints: [
+                CHHapticParameterCurve.ControlPoint(relativeTime: 0, value: 1.0),
+                CHHapticParameterCurve.ControlPoint(relativeTime: 0.8, value: 1.0),
+                CHHapticParameterCurve.ControlPoint(relativeTime: 2.4, value: 0.0),
+              ],
+              relativeTime: 0
+            )
+          ]
         )
         let player = try engine.makePlayer(with: pattern)
         try player.start(atTime: 0)

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../features/private_usd/providers/private_usd_engine_provider.dart';
 import '../../../features/private_usd/providers/private_usd_send_provider.dart';
+import '../../../features/private_usd/providers/private_usd_settlement_reminder_provider.dart';
 
 /// Starts the Private USD swap engine (plan reference §5.10) for the app's
 /// lifetime: it keeps advancing every account's conversions under way while
@@ -12,7 +13,8 @@ import '../../../features/private_usd/providers/private_usd_send_provider.dart';
 ///
 /// The engine itself listens to the lock and the app lifecycle; this widget
 /// only keeps it alive, with the sender, whose settlement posts and settles
-/// the sends a crash or a kill left unconfirmed (M7).
+/// the sends a crash or a kill left unconfirmed (M7), and the buzz before
+/// "Authorize settlement" closes.
 class PrivateUsdEngineHost extends ConsumerWidget {
   const PrivateUsdEngineHost({required this.child, super.key});
 
@@ -23,6 +25,7 @@ class PrivateUsdEngineHost extends ConsumerWidget {
     if (ref.watch(privateUsdEngineEnabledProvider)) {
       ref.watch(privateUsdEngineProvider);
       ref.watch(privateUsdSenderProvider);
+      ref.watch(privateUsdSettlementReminderProvider);
     }
     return child;
   }

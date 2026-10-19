@@ -1725,6 +1725,19 @@ M8 status (2026-10-14): the non-device parts are done.
   tUSD) and the testnet check with the owner's funds. No new widget tests
   or capture scenarios (owner's rules); Widgetbook use cases were optional
   and are not added.
+- **D-128 (owner, 2026-10-19): a buzz before "Authorize settlement"
+  closes.** The owner asked for the phone to vibrate, then gradually stop,
+  as a USD → ZEC conversion nears its settlement deadline.
+  - **When.** It buzzes once per conversion, two minutes before
+    `readyDeadline − 120 s`, while the button is still offered.
+  - **Pattern.** It holds 0.8 s at full strength, then fades over 1.6 s:
+    an Android waveform with alarm usage (a motor without amplitude control
+    fades by shortening its pulses), iOS Core Haptics, or Dart taps
+    elsewhere.
+  - **Permission.** Android needs `VIBRATE`, an install-time permission
+    with no prompt; iOS needs none.
+  - **D9 holds.** It works only in the foreground and unlocked, with no
+    notification or background work, so a closed app cannot buzz.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

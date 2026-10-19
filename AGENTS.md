@@ -1383,6 +1383,11 @@ Code:
   conversion's progress shows with a key step to come, and through a
   Railgun first sync while unlocked (`privateUsdKeepAwakeProvider`, through
   `SyncKeepAwakeNativeHost`'s one native flag, foreground only).
+- Two minutes before "Authorize settlement" closes on a USD → ZEC
+  conversion, the phone buzzes once: it holds, then fades out
+  (`privateUsdSettlementReminderProvider`, `AppHaptics.settlementDeadline`;
+  on Android under the install-time `VIBRATE` permission). It too needs the
+  app in the foreground and unlocked, so a closed app cannot buzz.
 - While unlocked, the engine (`PrivateUsdEngineHost` in `lib/app.dart`)
   advances the conversions of every software account, not only the active
   one (D14).
