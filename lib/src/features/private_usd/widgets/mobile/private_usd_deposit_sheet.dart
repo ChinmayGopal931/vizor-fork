@@ -95,7 +95,22 @@ class _PrivateUsdDepositSheetState
       seconds:
           ref.watch(privateUsdCurrentDeploymentProvider)?.screeningSeconds ?? 0,
     );
+    // What the minimum brings, from Rust's own fee and cap.
+    final terms = pass?.terms;
+    final example = terms == null
+        ? null
+        : rust.privateUsdDepositQuote(
+            fee: terms.fee,
+            feeBps: terms.feeBps,
+            value: terms.minValue,
+          );
     return PrivateUsdDepositSheetBody(
+      example: example == null || terms == null
+          ? null
+          : PrivateUsdCopy.depositExample(
+              formatPrivateUsd(BigInt.tryParse(terms.minValue) ?? BigInt.zero),
+              formatPrivateUsd(BigInt.tryParse(example.arrives) ?? BigInt.zero),
+            ),
       symbol: pin?.tokenSymbol ?? 'USDC',
       chain: pin?.chainName ?? 'Ethereum',
       address: pass?.address ?? fallback?.value?.address,
@@ -130,8 +145,12 @@ class PrivateUsdDepositSheetBody extends StatelessWidget {
     this.lines = const [],
     this.screening = Duration.zero,
     this.privacyModeEnabled = false,
+    this.example,
     super.key,
   });
+
+  /// What a deposit at the minimum brings after both fees.
+  final String? example;
 
   /// `USDC`, or `tUSD` on testnet; and `Ethereum`, or `Sepolia`.
   final String symbol;
@@ -262,6 +281,10 @@ class PrivateUsdDepositSheetBody extends StatelessWidget {
             ),
             style: body,
           ),
+          if (example case final example?) ...[
+            const SizedBox(height: AppSpacing.xxs),
+            Text(example, style: note),
+          ],
         ] else
           Text(
             termsError == null

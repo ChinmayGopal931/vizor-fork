@@ -1203,6 +1203,10 @@ abstract final class PrivateUsdCopy {
   static String depositRailgunFee(String percent) =>
       "Railgun's fee: $percent%";
 
+  /// What a deposit of [sent] brings after both fees.
+  static String depositExample(String sent, String arrives) =>
+      'Sending $sent brings $arrives after both fees.';
+
   /// The terms are being read.
   static const depositFeesLoading = 'Loading the fees…';
 
