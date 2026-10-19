@@ -1592,6 +1592,20 @@ M8 status (2026-10-14): the non-device parts are done.
   (D-127). The whole suites were left to the owner
 - [ ] M9.6 Testnet on the phone, with the owner's funds (task 5 of the
   brief): two deposits shielded, the shown index moving, and recovery
+  - **First deposit (2026-10-19, 02:31 UTC).** It ran on the OnePlus 15's
+    side-by-side build at `03e33fe88`. The owner withdrew 200 tUSD to index 0
+    (`0x4efA32956C01382B1859F96Dc472eD64a5614C9C`) in
+    `0xc3ee3047079aa1521b3d3267df33b8cb96fbacca4bd3dce726b84867cd988c7e`
+    (block 11,945,227).
+    - The app shielded it on its own in the next block, 12 s later:
+      `0xc56236050119c1f11cd3eabcc26cc0cf343ffbd908c1d2be00d49d9dd818b616`
+      (block 11,945,228), through the pinned deposits account.
+    - The relayer's fee was 0.30 (0.10 + 0.1%) and 199.70 was shielded,
+      about 199.20 after Railgun's 0.25%. The address now holds 0.
+    - The event's `value` is the amount shielded, after the relayer's fee,
+      as `deposits.rs` reads it.
+    - The three buttons (Send, Withdraw and Receive) overflowed on the
+      phone's 360 dp width; fixed in `5250d4c8f`.
 - [ ] M9 gate
 
 ## Deviations
