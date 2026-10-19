@@ -397,32 +397,24 @@ class MobilePrivateUsdView extends StatelessWidget {
                                   if (onSend != null &&
                                       onWithdraw != null) ...[
                                     Expanded(
-                                      child: AppButton(
-                                        key: const ValueKey(
+                                      child: _ActionButton(
+                                        buttonKey: const ValueKey(
                                           'mobile_private_usd_send',
                                         ),
-                                        variant: AppButtonVariant.secondary,
-                                        expand: true,
+                                        label: PrivateUsdCopy.actionSend,
                                         onPressed: canSend ? onSend : null,
-                                        child: const Text(
-                                          PrivateUsdCopy.actionSend,
-                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: AppSpacing.s),
                                     Expanded(
-                                      child: AppButton(
-                                        key: const ValueKey(
+                                      child: _ActionButton(
+                                        buttonKey: const ValueKey(
                                           'mobile_private_usd_withdraw',
                                         ),
-                                        variant: AppButtonVariant.secondary,
-                                        expand: true,
+                                        label: PrivateUsdCopy.actionWithdraw,
                                         onPressed: canSend
                                             ? onWithdraw
                                             : null,
-                                        child: const Text(
-                                          PrivateUsdCopy.actionWithdraw,
-                                        ),
                                       ),
                                     ),
                                   ],
@@ -432,16 +424,12 @@ class MobilePrivateUsdView extends StatelessWidget {
                                     if (onSend != null && onWithdraw != null)
                                       const SizedBox(width: AppSpacing.s),
                                     Expanded(
-                                      child: AppButton(
-                                        key: const ValueKey(
+                                      child: _ActionButton(
+                                        buttonKey: const ValueKey(
                                           'mobile_private_usd_receive_usdc',
                                         ),
-                                        variant: AppButtonVariant.secondary,
-                                        expand: true,
+                                        label: PrivateUsdCopy.actionReceive,
                                         onPressed: onReceive,
-                                        child: const Text(
-                                          PrivateUsdCopy.actionReceive,
-                                        ),
                                       ),
                                     ),
                                   ],
@@ -575,6 +563,41 @@ String _masked(String usd, bool privacyModeEnabled) => hideAmountIfPrivacyMode(
   privacyModeEnabled: privacyModeEnabled,
   denomination: '',
 );
+
+/// Send, Withdraw or Receive. The three share a row, about 100 dp each on a
+/// 360 dp phone, where the large button's side padding left "Withdraw" 17 px
+/// short: the padding is tight, and a label that still doesn't fit scales
+/// down instead of overflowing the button.
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.buttonKey,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final Key buttonKey;
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppButton(
+      key: buttonKey,
+      variant: AppButtonVariant.secondary,
+      expand: true,
+      constrainContent: true,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xxs,
+        vertical: AppSpacing.xs,
+      ),
+      onPressed: onPressed,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(label, maxLines: 1),
+      ),
+    );
+  }
+}
 
 class _TotalCard extends StatelessWidget {
   const _TotalCard({
