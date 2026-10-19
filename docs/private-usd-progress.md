@@ -367,7 +367,14 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 - **Owner items:** E1's zecSwap Zakura build must carry the
   `zakura-protocol =2.2.0` pin (bumped locally, uncommitted, in
   `~/dev/zapp/zecSwap-zakura/crates/zecswap-core/Cargo.toml` lines 21 and
-  31); upstream veylor has the same testnet NU7 gap; N1 (tokens, M4), E6, E7,
+  31) and, since M9 (2026-10-18), the deposit code
+  (`~/dev/zapp/zecSwap-zakura-deposits.patch`, applied there uncommitted:
+  `feature/deposits`' `zecswap-core` and `zecswap-railgun/src` with `bip32
+  =0.6.0-pre.1` on `secp256k1 0.29`). The patch is temporary: the owner
+  will move upstream zecSwap, or a published `zecswap-core`, onto the
+  Zakura crates, and Veylor then pins a pushed rev with no patch. Every
+  deposit import goes through `zecswap_core` and `zecswap_railgun`, so that
+  switch changes only `rust/Cargo.toml`; upstream veylor has the same testnet NU7 gap; N1 (tokens, M4), E6, E7,
   E4, and sign-off for M8.7. E2 (relicensing) is dropped: the owner said
   none is needed (2026-10-14); sign off at the end, then commit and push.
 
@@ -1537,6 +1544,27 @@ M8 status (2026-10-14): the non-device parts are done.
     --dart-define=VIZOR_FORM_FACTOR=mobile`): `+2304 -10`. The 10 are the
     pre-existing `app_review_payment_handoff_test.dart` failures (the "Edit"
     and "Review" cases, 5 each).
+
+## M9. Deposits (public USDC into private USD)
+
+- [x] M9.1 Bring the deposit code in: `git apply
+  ~/dev/zapp/zecSwap-zakura-deposits.patch` to the E1 stand-in
+  (`~/dev/zapp/zecSwap-zakura`) applied cleanly (2026-10-18); `cargo test`
+  in `rust/` passed (1,518 library tests, 12 ignored, and the integration
+  suites), and `Cargo.lock` gained two lines only, `bip32` and `secp256k1`
+  under `zecswap-core`, with no new package. The note's five words are
+  built in `deposits.rs` (M9.3)
+- [ ] M9.2 Pins: the testnet token moved to the deposits' tUSD, the deposits
+  pin, the terms checked against it, the old-token fixtures decided
+- [ ] M9.3 Rust `deposits.rs`: keys, watching, signing, posting, belief,
+  rescue, the `deposits` table (schema 2), FRB and the bindings
+- [ ] M9.4 Dart and UI: the engine's deposits, the Receive USDC sheet, the
+  relabelled `0zk` card, the states, activity rows, Arriving and rescue
+- [ ] M9.5 Checks: the four unit tests, `fvm flutter analyze`, the testnet
+  APK, and the device round's deposits step (written, not run)
+- [ ] M9.6 Testnet on the phone, with the owner's funds (task 5 of the
+  brief): two deposits shielded, the shown index moving, and recovery
+- [ ] M9 gate
 
 ## Deviations
 
@@ -3054,8 +3082,12 @@ M8 status (2026-10-14): the non-device parts are done.
   `ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh --m5`.
 - **B-6. E1, E2 and E4 are not delivered.** Local stand-ins:
   `~/dev/zapp/zecSwap-zakura` (detached worktree at `d69e3fb` with the §12
-  diff; zecSwap has no LICENSE yet) and `~/dev/wallet-libraries-e4` (`391d0b0`
-  plus the §6.8 `connect_stream` patch). Nothing built on them, and nothing
+  diff, and since M9 (2026-10-18) the deposits patch
+  `~/dev/zapp/zecSwap-zakura-deposits.patch` applied on top, uncommitted;
+  zecSwap has no LICENSE yet) and `~/dev/wallet-libraries-e4` (`391d0b0`
+  plus the §6.8 `connect_stream` patch). The deposits patch goes away when
+  E1 lands: upstream zecSwap or a published `zecswap-core` on the Zakura
+  crates, pinned by a pushed rev, with only `rust/Cargo.toml` changing. Nothing built on them, and nothing
   ported from zapp, may be pushed or merged; the M0.3 spike lives on the local
   branch `spike/private-usd-m0`. Since M3 this branch depends on both through
   `rust/Cargo.toml` paths (D-18), and carries zapp's Railgun bundle, JS source
