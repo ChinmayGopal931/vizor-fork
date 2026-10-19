@@ -472,7 +472,7 @@ void main() {
     expect(find.byType(MobileSwapScreen), findsOneWidget);
   });
 
-  testWidgets('swap tab has no back or close button while editing amounts', (
+  testWidgets('swap keeps one back button and no close while editing amounts', (
     tester,
   ) async {
     addTearDown(tester.view.resetViewInsets);
@@ -480,7 +480,7 @@ void main() {
     await tester.pumpAndSettle();
     await _openSwap(tester);
 
-    expect(find.bySemanticsLabel('Back'), findsNothing);
+    expect(find.bySemanticsLabel('Back'), findsOneWidget);
     expect(find.bySemanticsLabel('Close'), findsNothing);
     final field = find.descendant(
       of: find.byKey(const ValueKey('swap_amount_field')),
@@ -492,7 +492,7 @@ void main() {
 
     expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
     expect(tester.widget<TextField>(field).controller!.text, '0.25');
-    expect(find.bySemanticsLabel('Back'), findsNothing);
+    expect(find.bySemanticsLabel('Back'), findsOneWidget);
     expect(find.bySemanticsLabel('Close'), findsNothing);
 
     // The existing native keyboard action can still dismiss the input.
@@ -500,7 +500,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(field).focusNode!.hasFocus, isFalse);
     expect(tester.widget<TextField>(field).controller!.text, '0.25');
-    expect(find.bySemanticsLabel('Back'), findsNothing);
+    expect(find.bySemanticsLabel('Back'), findsOneWidget);
     expect(find.bySemanticsLabel('Close'), findsNothing);
   });
 

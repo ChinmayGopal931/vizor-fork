@@ -239,7 +239,7 @@ void main() {
 
   for (final path in ['/swap/keystone-sign', '/swap/ledger-sign']) {
     for (final extra in [null, 'invalid signing arguments']) {
-      testWidgets('$path with invalid arguments returns to the swap tab '
+      testWidgets('$path with invalid arguments returns to Swap '
           '($extra)', (tester) async {
         final router = GoRouter(
           initialLocation: path,
@@ -251,10 +251,9 @@ void main() {
 
         expect(router.routeInformationProvider.value.uri.path, '/swap');
         expect(find.byType(MobileSwapScreen), findsOneWidget);
-        expect(find.byType(AppMobileShell), findsOneWidget);
-        expect(find.bySemanticsLabel('Back'), findsNothing);
+        // Nothing is under it, so its back button goes home.
         expect(router.canPop(), isFalse);
-        await tester.tap(find.bySemanticsLabel('Home').last);
+        await tester.tap(find.bySemanticsLabel('Back').last);
         await tester.pumpAndSettle();
         expect(find.byType(MobileHomeScreen), findsOneWidget);
       });
