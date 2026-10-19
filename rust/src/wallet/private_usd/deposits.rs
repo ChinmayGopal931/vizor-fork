@@ -1115,7 +1115,9 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
                             record.index == address.index && !record.state.finished()
                         })
                 }),
-                (Err(_), false) => view.used.iter().any(|address| address.balance.0 > 0),
+                // Terms that did not read for now (never ones that are
+                // unavailable or not the pin's): tried again soon.
+                (Err(_), false) => may_post && view.used.iter().any(|address| address.balance.0 > 0),
             };
             (due && sign_new).then_some(SIGN_RETRY)
         });
