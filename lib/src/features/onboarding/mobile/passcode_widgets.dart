@@ -312,28 +312,7 @@ class PasscodeBiometricOptIn extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 22,
-                height: 22,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: selected ? colors.background.inverse : null,
-                  border: Border.all(
-                    color: enabled
-                        ? colors.border.regular
-                        : colors.border.subtle,
-                    width: 1.5,
-                  ),
-                  borderRadius: BorderRadius.circular(AppRadii.xSmall),
-                ),
-                child: selected
-                    ? AppIcon(
-                        AppIcons.check,
-                        size: 13,
-                        color: colors.icon.inverse,
-                      )
-                    : null,
-              ),
+              _PasscodeOptInBox(selected: selected, enabled: enabled),
               const SizedBox(width: AppSpacing.xs),
               Flexible(
                 child: Text(
@@ -349,6 +328,107 @@ class PasscodeBiometricOptIn extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The opt-in's box: the check glyph's cut-corner plate with a lit red edge,
+/// and the glyph's tick lit inside it when checked. Disabled, both are unlit.
+class _PasscodeOptInBox extends StatelessWidget {
+  const _PasscodeOptInBox({required this.selected, required this.enabled});
+
+  final bool selected;
+  final bool enabled;
+
+  static const _size = 22.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: selected ? 1 : 0),
+      // The tick lights at once and fades as it clears, as a key does.
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : Duration(milliseconds: selected ? 90 : 220),
+      builder: (context, tick, _) => CustomPaint(
+        size: const Size.square(_size),
+        painter: _PasscodeOptInBoxPainter(
+          glow: enabled ? colors.neon.glow : colors.text.disabled,
+          core: enabled ? colors.neon.core : null,
+          tick: tick,
+        ),
+      ),
+    );
+  }
+}
+
+class _PasscodeOptInBoxPainter extends CustomPainter {
+  _PasscodeOptInBoxPainter({
+    required this.glow,
+    required this.core,
+    required this.tick,
+  });
+
+  /// The lit edge's colour, or the line's when unlit.
+  final Color glow;
+
+  /// The lit tube's centre; null draws the box unlit.
+  final Color? core;
+
+  /// How lit the tick is, 0..1.
+  final double tick;
+
+  /// How lit the edge of an empty box is.
+  static const _edge = 0.5;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const glyph = 24.0;
+    final offset = Offset((size.width - glyph) / 2, (size.height - glyph) / 2);
+    final plate = TronGlyph.platePath(glyph).shift(offset);
+    final check = TronGlyph.pathFor(TronGlyphKind.check, glyph).shift(offset);
+    // The glyph's own line widths, lit and unlit.
+    const tube = 1.7;
+    const line = 1.6;
+    final core = this.core;
+    if (core == null) {
+      Neon.strokeUnlit(
+        canvas,
+        tick > 0 ? check : plate,
+        color: glow,
+        width: line,
+      );
+      return;
+    }
+    Neon.strokeTube(
+      canvas,
+      plate,
+      glow: glow,
+      core: core,
+      width: tube,
+      intensity: _edge,
+    );
+    Neon.strokeUnlit(
+      canvas,
+      plate,
+      color: glow.withValues(alpha: 1 - _edge),
+      width: line,
+    );
+    // The check glyph over the plate lights its edge brighter with the tick.
+    Neon.strokeTube(
+      canvas,
+      check,
+      glow: glow,
+      core: core,
+      width: tube,
+      intensity: tick,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PasscodeOptInBoxPainter oldDelegate) =>
+      oldDelegate.glow != glow ||
+      oldDelegate.core != core ||
+      oldDelegate.tick != tick;
 }
 
 /// Bottom Face ID / biometric retry action for the sign-in screen.

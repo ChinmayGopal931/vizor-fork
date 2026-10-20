@@ -895,6 +895,31 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    testWidgets('the opt-in box lights its check without a fill', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app(biometric: FakeBiometricUnlock(avail: faceAvailability)),
+      );
+      await tester.pumpAndSettle();
+      final option = find.byType(PasscodeBiometricOptIn);
+      expect(tester.getSize(option).height, greaterThanOrEqualTo(44));
+      final box = find.descendant(
+        of: option,
+        matching: find.byType(CustomPaint),
+      );
+      expect(tester.getSize(box), const Size.square(22));
+      // The plate's edge: a lit tube (halo, glow, core) and its unlit line.
+      expect(box, paintsExactlyCountTimes(#drawPath, 4));
+
+      await tester.tap(option);
+      await tester.pumpAndSettle();
+      // The check glyph lit over the plate, and nothing filled.
+      expect(box, paintsExactlyCountTimes(#drawPath, 7));
+      expect(box, paintsExactlyCountTimes(#drawRect, 0));
+      expect(box, paintsExactlyCountTimes(#drawRRect, 0));
+    });
   });
 
   group('haptics', () {
