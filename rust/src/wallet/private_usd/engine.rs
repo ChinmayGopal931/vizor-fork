@@ -432,8 +432,9 @@ pub(crate) fn problem(code: ErrorCode) -> ErrorCode {
     use ErrorCode::*;
     match code {
         RelayerUnreachable | RelayerRefused | RelayerFee | EthereumUnreachable | RailgunClosed
-        | ClaimTurn | ZcashWallet | DepositUnpayable | ZcashRejected | Mismatch
-        | RouteBlocked => code,
+        | ClaimTurn | ZcashWallet | DepositUnpayable | ZcashRejected | Mismatch | RouteBlocked => {
+            code
+        }
         ChainLagging | ChainUnreadable => EthereumUnreachable,
         // A service serving another deployment reads as the relayer being
         // unreachable.

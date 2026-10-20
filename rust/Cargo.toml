@@ -2,29 +2,29 @@
 name = "rust_lib_zcash_wallet"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.92"
+rust-version = "1.97"
 
 [lib]
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 zakura-pir-status = { version = "=0.0.1-rc1" }
-zakura-transaction-status = { version = "=0.0.1-rc1" }
-zcash_note_encryption = "0.4"
+zakura-transaction-status = { version = "=0.0.1-rc2" }
+zcash_note_encryption = { package = "zakura-note-encryption", version = "=3.0.0" }
 flutter_rust_bridge = "=2.11.1"
 
-zcash_script = "0.4.3"
-voting-crypto-deps = { version = "=0.2.4" }
-sapling-crypto = { package = "zakura-sapling-crypto", version = "=2.0.0", default-features = false, features = ["circuit"] }
+zcash_script = "0.6"
+voting-crypto-deps = "=0.3.0"
+sapling-crypto = { package = "zakura-sapling-crypto", version = "=3.0.0", default-features = false, features = ["circuit"] }
 uuid = "1.1"
 zip32 = "0.2"
-pasta_curves = { package = "zakura-pasta-curves", version = "=2.0.0" }
+pasta_curves = { package = "zakura-pasta-curves", version = "=3.0.0" }
 ff = "0.14"
 # Required by no-op Sapling prover trait impls
-jubjub = { package = "zakura-jubjub", version = "=2.0.0" }
-bls12_381 = { package = "zakura-bls12-381", version = "=2.0.0" }
+jubjub = { package = "zakura-jubjub", version = "=3.0.0" }
+bls12_381 = { package = "zakura-bls12-381", version = "=3.0.0" }
 rand_core = "0.6"
-secp256k1 = "0.29"
+secp256k1 = "0.33"
 
 # Key generation
 bip0039 = "0.12"
@@ -93,8 +93,8 @@ tendermint-light-client-verifier = "0.40.4"
 zecswap-core    = { git = "https://github.com/JustZappIt/zecSwap", rev = "d69e3fb2d5c3bfc99fd20844dfdcd0d9d2509a11" }
 zecswap-railgun = { git = "https://github.com/JustZappIt/zecSwap", rev = "d69e3fb2d5c3bfc99fd20844dfdcd0d9d2509a11" }
 # The Railgun wallet's BIP-32 path, over the same secp256k1 as the rest of the
-# wallet. The version zakura-client-backend locks.
-bip32  = { version = "=0.6.0-pre.1", default-features = false, features = ["alloc", "secp256k1-ffi"] }
+# wallet: the bip32 and secp256k1 releases the Zakura transparent crates use.
+bip32  = { version = "=0.6.0", default-features = false, features = ["alloc", "secp256k1-ffi"] }
 hmac   = "0.12"  # BIP-85 entropy
 sha3   = "0.10"  # Keccak-256 for ids and ABI
 bech32 = "0.11"  # 0zk address validation
@@ -107,30 +107,28 @@ rand_0_10 = { package = "rand", version = "0.10", default-features = false, feat
 # `use orchard` / `use zcash_client_backend` keep working.
 [dependencies.zcash_primitives]
 package = "zakura-primitives"
-version = "=2.0.0"
+version = "=3.0.0"
 
 [dependencies.zcash_address]
 package = "zakura-address"
-version = "=2.0.0"
+version = "=3.0.0"
 
 [dependencies.zcash_keys]
 package = "zakura-keys"
-version = "=2.0.0"
+version = "=3.0.0"
 features = ["orchard"]
 
 [dependencies.zcash_protocol]
 package = "zakura-protocol"
-# 2.2.0 sets the testnet NU7 activation (4,465,026, branch 0x77190AD9);
-# mainnet is unchanged. Testnet sends are rejected without it.
-version = "=2.2.0"
+version = "=3.0.0"
 
 [dependencies.transparent]
 package = "zakura-transparent"
-version = "=2.0.0"
+version = "=3.0.0"
 
 [dependencies.zcash_client_backend]
 package = "zakura-client-backend"
-version = "=0.1.0-rc8"
+version = "=0.1.0-rc9"
 features = [
     "orchard",
     "transparent-inputs",
@@ -143,26 +141,26 @@ features = [
 
 [dependencies.zcash_client_sqlite]
 package = "zakura-client-sqlite"
-version = "=0.1.0-rc8"
+version = "=0.1.0-rc9"
 features = ["orchard", "transparent-inputs", "unstable", "serde"]
 
 [dependencies.zcash_voting]
-version = "=5.1.1-rc.3"
+version = "=5.2.0-rc.1"
 
 [dependencies.orchard]
 package = "zakura-orchard"
-version = "=2.0.0"
+version = "=3.0.0"
 # Cargo unifies this feature with wallet-library Orchard and Ironwood tree hashing.
 features = ["weighted-merkle"]
 
 [dependencies.zcash_proofs]
 package = "zakura-proofs"
-version = "=2.0.0"
+version = "=3.0.0"
 features = ["local-prover"]
 
 [dependencies.pczt]
 package = "zakura-pczt"
-version = "=0.1.0-rc5"
+version = "=0.1.0-rc6"
 features = [
     "orchard",
     "io-finalizer",
@@ -181,14 +179,13 @@ default-features = false
 features = ["std"]
 
 [dependencies.zakura-pir-enhance]
-version = "=0.0.1-rc2"
+version = "=0.0.1-rc3"
 default-features = false
 features = ["wallet"]
 
-# Transparent PIR recovery adapter. A git dependency rather than a patched
-# crates.io package; see the `[patch.crates-io]` comment below.
+# Transparent PIR recovery adapter from the published Common v3 wallet family.
 [dependencies.zakura-pir-transparent]
-path = "../../wallet-libraries-e4/zakura/pir-transparent"   # local stand-in; see [patch.crates-io]
+version = "=0.0.1-rc1"
 default-features = false
 # `sqlite` applies a batch to the wallet and acknowledges it in one call.
 features = ["sqlite"]
@@ -222,24 +219,24 @@ regex = "1"
 # Builds wallets through real private recovery for the history mapping tests.
 [dev-dependencies.zcash_client_sqlite]
 package = "zakura-client-sqlite"
-version = "=0.1.0-rc8"
+version = "=0.1.0-rc9"
 features = ["test-dependencies"]
 
 [dev-dependencies.zcash_client_backend]
 package = "zakura-client-backend"
-version = "=0.1.0-rc8"
+version = "=0.1.0-rc9"
 features = ["test-dependencies"]
 
 [dev-dependencies.zcash_voting]
-version = "=5.1.1-rc.3"
+version = "=5.2.0-rc.1"
 features = ["test-fixtures"]
 
 # Real adapter batches for the coordinator's fixture source, the fake txid
 # display publication the loop-4 tests serve, and a real shard service in
-# process, with the wallet-pir crates it publishes with. Same rev as the
-# dependency above.
+# process, with the wallet-pir crates it publishes with. Keep the version
+# aligned with the runtime dependency above.
 [dev-dependencies.zakura-pir-transparent]
-path = "../../wallet-libraries-e4/zakura/pir-transparent"   # local stand-in; see [patch.crates-io]
+version = "=0.0.1-rc1"
 default-features = false
 features = ["sqlite", "testing"]
 
@@ -247,7 +244,7 @@ features = ["sqlite", "testing"]
 version = "=0.1.0-rc.7"
 
 [dev-dependencies.vote-commitment-tree]
-version = "=0.6.3"
+version = "=0.7.0"
 default-features = false
 features = ["zakura"]
 
@@ -267,66 +264,24 @@ should_implement_trait = "allow"
 items_after_test_module = "allow"
 assertions_on_constants = "allow"
 
-# The transparent PIR ledger is in wallet-libraries but not released. Patch the
-# crates.io packages rather than depending on git directly: other dependencies
-# (including zakura-pir-enhance) reach these crates through
-# crates.io, and a direct git dependency would duplicate them. `zakura-pczt`
-# and `zakura-pir-enhance-types` are patched because the git
-# `zakura-client-backend` depends on them by path. Drop this once a release
-# includes the revision.
+# Wallet and voting dependencies use their coordinated published releases.
+# Voting 5.2 is an explicit opt-in; keep the exact prerelease pin during validation.
 #
-# `zakura-pir-transparent` is the exception, a direct git dependency: it is
-# not released on crates.io yet. Keep its rev equal to these so its path
-# dependencies on the backend and SQLite crates resolve to the patched sources.
-#
-# Pinned to wallet-libraries main at PR #177 (release packaging checks only),
-# after PR #175 (the testing fake txid display publication on txid-4k8),
-# PR #174 (the wallet-pir transparent crates from crates.io at 0.1.0-rc.3,
-# which read the 4,096-row txid display tables),
-# PR #169 (the ipir-sp family at 0.1.0-rc.7), PR #167 (the 8-bit txid
-# display), PR #165 (the 8-bit history profile and the /v2 API) and PR #153
-# (discovery that continues past its
-# budget, and the in-process shard service under `testing`), after PR #152
-# (rewound receives stay pending, deferrals carry the policy generation), PR #151
-# (unused transparent-recovery API removed), PR #147 (account activity, unattributed fees and the receipt
-# read), PR #150 (forget refuses a policy changed
-# since it began), PR #149 (interrupted settlements skip, policy changes stop,
-# timed-out lookups back off), PR #148 (a rewound private receive stays pending),
-# PR #146 (the recovery pass driver), PR #144 (typed transparent authority refusals and the ordered private-recovery
-# forget), PR #145 (the txid detail run driver and preferred receipts), the
-# transparent-ledger renames (activation, recovery suspension, address watch
-# sets), PR #137 (Enhance queries over only the rows a domain can hold), PR #140
-# (the same for a growing Transparent tail's pages), PR #139 (import-time account
-# discovery), PR #138 (the gated settlement this wallet uses to lock one commit
-# at a time), PR #134 (forget transparent ledger facts under `Public`), PR #133
-# (dithered 44-bit native queries for Transparent, Enhance and Status) and
-# PR #135 (the raw HTTP exchange, companion directory, settlement actions, txid
-# display service and `testing` feature this wallet builds on).
-# `zakura-pir-enhance` is patched too so its client uploads the dithered query.
-# The status response hook also needs its status/native path dependencies here
-# so their public types stay unified. Keep every wallet-libraries dependency at
-# this exact revision.
-#
-# LOCAL STAND-IN, DO NOT MERGE. Every wallet-libraries reference (these eight
-# and both `zakura-pir-transparent` entries) points at
-# ~/dev/wallet-libraries-e4: wallet-libraries at
-# 391d0b0247f0e07cfdea855ce87fcdf8ba376aae plus the `connect_stream` patch the
-# Railgun bridge needs. Before anything here is pushed, point all ten back at
-# `git = "https://github.com/..."` refs on a rev that carries the patch.
+# `zakura-client-backend` is the published 0.1.0-rc9 (crates.io checksum
+# 5992381bcb58449536da7823a777a97b178077d7e2be468a1163603f0def778e), vendored
+# with one change: `tor::Client::connect_stream`, the raw Tor stream the
+# Railgun bridge tunnels through (`vendor/zakura-client-backend.patch`).
+# Patching the crates.io package keeps one backend in the graph: the SQLite,
+# PIR, transaction-status and voting crates reach it through crates.io. Drop
+# this and the vendored copy once a published release carries `connect_stream`.
 [patch.crates-io]
-zakura-client-backend = { path = "../../wallet-libraries-e4/librustzcash/zcash_client_backend" }
-zakura-client-sqlite = { path = "../../wallet-libraries-e4/librustzcash/zcash_client_sqlite" }
-zakura-pczt = { path = "../../wallet-libraries-e4/librustzcash/pczt" }
-zakura-pir-enhance-types = { path = "../../wallet-libraries-e4/zakura/pir-enhance-types" }
-zakura-transaction-status = { path = "../../wallet-libraries-e4/zakura/transaction-status" }
-zakura-pir-status = { path = "../../wallet-libraries-e4/zakura/pir-status" }
-zakura-pir-native = { path = "../../wallet-libraries-e4/zakura/pir-native" }
-zakura-pir-enhance = { path = "../../wallet-libraries-e4/zakura/pir-enhance" }
+zakura-client-backend = { path = "vendor/zakura-client-backend" }
 
-# Local Zakura build of zecswap-core. DO NOT MERGE: drop this once the zecSwap
-# rev above carries the Zakura manifest.
+# LOCAL STAND-IN, DO NOT MERGE: a Zakura Common v3 build of zecswap-core,
+# outside this repository. Drop this once the zecSwap rev above carries the
+# Zakura manifest.
 [patch."https://github.com/JustZappIt/zecSwap"]
-zecswap-core = { path = "../../zapp/zecSwap-zakura/crates/zecswap-core" }   # relative to rust/
+zecswap-core = { path = "../../zapp/zecSwap-zakura-v3/crates/zecswap-core" }   # relative to rust/
 
 # Flutter debug builds use Cargokit + Cargo's dev profile (`cargo build`
 # without `--release`). Rust crypto and voting flows are slow under the default

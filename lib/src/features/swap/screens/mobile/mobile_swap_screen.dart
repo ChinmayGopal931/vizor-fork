@@ -1,3 +1,4 @@
+import '../../../../core/navigation/mobile_sidebar_exit.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart' show Scaffold;
@@ -73,6 +74,8 @@ class _MobileSwapScreenState extends ConsumerState<MobileSwapScreen> {
       ref.read(swapStateProvider.notifier).prepareSwapComposer();
     });
   }
+
+  int _sidebarExitGeneration = 0;
 
   @override
   void dispose() {
@@ -248,20 +251,28 @@ class _MobileSwapScreenState extends ConsumerState<MobileSwapScreen> {
             // side margins, bottom gap and keyboard avoidance — the same
             // chrome as showAppMobileSheet — so the swap modals match the
             // other mobile modals. Bottom-anchored and full-width.
-            return SafeArea(
-              bottom: false,
-              child: surface == _SwapModalSurface.slippageSettings
-                  ? Align(
-                      alignment: Alignment.bottomCenter,
-                      child: MobileModalCard(child: surfaceContent),
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Spacer(),
-                        MobileModalCard(child: surfaceContent),
-                      ],
-                    ),
+            return MobileSidebarExitScope(
+              canSwitchAccount: !swapState.quoteLoading,
+              onExit: () async {
+                _sidebarExitGeneration++;
+                swapNotifier.cancelReviewQuote();
+                return true;
+              },
+              child: SafeArea(
+                bottom: false,
+                child: surface == _SwapModalSurface.slippageSettings
+                    ? Align(
+                        alignment: Alignment.bottomCenter,
+                        child: MobileModalCard(child: surfaceContent),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Spacer(),
+                          MobileModalCard(child: surfaceContent),
+                        ],
+                      ),
+              ),
             );
           },
         );
@@ -337,9 +348,10 @@ class _MobileSwapScreenState extends ConsumerState<MobileSwapScreen> {
     ).pretty(denomStyle: ZecDenomStyle.upper).toString();
 
     void openReview() {
+      final generation = _sidebarExitGeneration;
       unawaited(() async {
         await swapNotifier.showReview();
-        if (!context.mounted) return;
+        if (!context.mounted || generation != _sidebarExitGeneration) return;
         final next = ref.read(swapStateProvider);
         if (next.reviewVisible &&
             next.reviewQuote != null &&

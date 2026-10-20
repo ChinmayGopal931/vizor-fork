@@ -7,6 +7,10 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **Zakura Common v3 (2026-10-20, D-136).** The branch builds on upstream
+  `main` at `75d3fae57` and the published Common 3.0.0 crates. Both
+  stand-ins moved (B-6). Not yet run on the A35.
+
 - **Deposits (M9, 2026-10-18): public USDC into private USD.** Each
   software account has Ethereum deposit addresses of its own; once one holds
   the relayer's minimum, the app signs, keeps and posts an EIP-3009
@@ -1941,6 +1945,24 @@ M8 status (2026-10-14): the non-device parts are done.
   deployment's; the other kind of address is refused by name, pointing to
   the action that takes it. ZEC Send's row now reads "Scan a QR code", in
   sentence case like Pay's.
+- **D-136 (owner, 2026-10-20): upstream merged, on Zakura Common v3.** The
+  branch took upstream `main` at `75d3fae57` (134 commits since the fork
+  point), which moved the Rust side to the published Zakura Common 3.0.0
+  crates and wallet-libraries rc9 (MSRV 1.97; the toolchain is Rust 1.99.1).
+  `zakura-protocol` 3.0.0 carries the testnet NU7 activation, so the 2.2.0
+  pin is gone (D-113). Both stand-ins moved (B-6):
+  - E4 is `rust/vendor/zakura-client-backend`, the published rc9 with the
+    `connect_stream` patch, in the repo; `~/dev/wallet-libraries-e4` is no
+    longer used.
+  - E1 is `~/dev/zapp/zecSwap-zakura-v3`, a standalone copy of the stand-in
+    whose Zakura pins are on 3.0.0 (orchard's `zip32-addresses` feature on,
+    for `address_at`), with bip32 0.6.0 and secp256k1 0.33. The Railgun keys
+    use the same bip32 release on the same secp256k1.
+  - v3's builder makes no Orchard transaction before NU6.3, so the
+    pre-activation regtest variant has zcashd pay the joint deposit.
+  - rc9's migrations (one-time IVKs) run on `zcash_wallet.db` and
+    `joint.db` and cannot be undone: an older build cannot open them, so
+    never install one while a conversion is under way.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
@@ -3334,7 +3356,7 @@ M8 status (2026-10-14): the non-device parts are done.
   `=2.0.0`; the lockfile changes only that crate. `zecswap-core`'s two exact
   pins in the local E1 stand-in (`~/dev/zapp/zecSwap-zakura`, uncommitted,
   with the owner's go-ahead) moved with it; E1's Zakura build must carry
-  the same bump. zapp-android is unaffected: it builds from
+  the same bump. (Superseded by D-136: Common 3.0.0 carries the activation.) zapp-android is unaffected: it builds from
   `~/dev/zapp/zecSwap` with upstream crates. The M5 round also gained a wait
   for earlier conversions before converting, and the device test an opt-in
   fund phase (`VIZOR_PUSD_DEVICE_FUND=<zec>`): it sends that much from the
@@ -3454,12 +3476,13 @@ M8 status (2026-10-14): the non-device parts are done.
   on the phone (or let the M3 round create one, then fund its receive
   address), attach the phone over USB, unlock it, and run
   `ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh --m5`.
-- **B-6. E1, E2 and E4 are not delivered.** Local stand-ins:
-  `~/dev/zapp/zecSwap-zakura` (detached worktree at `d69e3fb` with the §12
-  diff, and since M9 (2026-10-18) the deposits patch
-  `~/dev/zapp/zecSwap-zakura-deposits.patch` applied on top, uncommitted;
-  zecSwap has no LICENSE yet) and `~/dev/wallet-libraries-e4` (`391d0b0`
-  plus the §6.8 `connect_stream` patch). The deposits patch goes away when
+- **B-6. E1, E2 and E4 are not delivered.** Stand-ins (since
+  D-136): `~/dev/zapp/zecSwap-zakura-v3` (a standalone copy of the detached
+  worktree at `d69e3fb` with the §12 diff and, since M9 (2026-10-18), the
+  deposits patch `~/dev/zapp/zecSwap-zakura-deposits.patch`, moved to Zakura
+  Common v3 on its branch `zakura-v3`; zecSwap has no LICENSE yet) and, in
+  the repo, `rust/vendor/zakura-client-backend` (the published rc9 plus the
+  §6.8 `connect_stream` patch). The deposits patch goes away when
   E1 lands: upstream zecSwap or a published `zecswap-core` on the Zakura
   crates, pinned by a pushed rev, with only `rust/Cargo.toml` changing. Nothing built on them, and nothing
   ported from zapp, may be pushed or merged; the M0.3 spike lives on the local

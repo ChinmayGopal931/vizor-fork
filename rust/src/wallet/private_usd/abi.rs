@@ -182,9 +182,11 @@ pub(crate) fn words(data: &[u8], count: usize) -> Result<Vec<[u8; WORD]>> {
         );
     }
     Ok(data
-        .chunks_exact(WORD)
+        .as_chunks::<WORD>()
+        .0
+        .iter()
         .take(count)
-        .map(|word| word.try_into().expect("32 bytes"))
+        .copied()
         .collect())
 }
 

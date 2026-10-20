@@ -33,9 +33,11 @@ class AppMobileTabBar extends StatelessWidget {
     required this.items,
     required this.currentIndex,
     required this.onSelect,
+    this.axis = Axis.horizontal,
     super.key,
   });
 
+  final Axis axis;
   final List<AppMobileTabItem> items;
   final int currentIndex;
   final ValueChanged<int> onSelect;
@@ -58,14 +60,19 @@ class AppMobileTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final motion = !(MediaQuery.maybeDisableAnimationsOf(context) ?? false);
+    final vertical = axis == Axis.vertical;
+    final selection = items.length > 1
+        ? -1 + 2 * currentIndex / (items.length - 1)
+        : 0.0;
     final poolAlignment = Alignment(
-      items.length > 1 ? -1 + 2 * currentIndex / (items.length - 1) : 0,
-      0,
+      vertical ? 0 : selection,
+      vertical ? selection : 0,
     );
     final light = colors.navPanel.activeIcon;
 
     return SizedBox(
-      height: kMobileTabBarHeight,
+      height: vertical ? _itemHeight * items.length + 8 : kMobileTabBarHeight,
+      width: vertical ? kMobileTabBarHeight : null,
       child: Stack(
         children: [
           AnimatedAlign(
@@ -74,7 +81,8 @@ class AppMobileTabBar extends StatelessWidget {
             curve: _selectCurve,
             alignment: poolAlignment,
             child: FractionallySizedBox(
-              widthFactor: 1 / items.length,
+              widthFactor: vertical ? 1 : 1 / items.length,
+              heightFactor: vertical ? 1 / items.length : null,
               child: Center(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -90,7 +98,8 @@ class AppMobileTabBar extends StatelessWidget {
               ),
             ),
           ),
-          Row(
+          Flex(
+            direction: axis,
             children: [
               for (var i = 0; i < items.length; i++)
                 Expanded(

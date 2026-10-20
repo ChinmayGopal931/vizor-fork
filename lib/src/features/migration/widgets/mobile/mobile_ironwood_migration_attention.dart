@@ -58,6 +58,7 @@ class MobileIronwoodMigrationAttentionSheetBody extends StatelessWidget {
           const SizedBox(height: AppSpacing.base),
           AppButton(
             expand: true,
+            constrainContent: true,
             height: 50,
             onPressed: onOpenMigration,
             child: const Text('Go to migration page'),
@@ -65,6 +66,7 @@ class MobileIronwoodMigrationAttentionSheetBody extends StatelessWidget {
           const SizedBox(height: AppSpacing.s),
           AppButton(
             expand: true,
+            constrainContent: true,
             height: 50,
             variant: AppButtonVariant.ghost,
             onPressed: onLater,

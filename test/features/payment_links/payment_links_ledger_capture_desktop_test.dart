@@ -53,9 +53,9 @@ void main() {
     expect(find.text('Up to 4 with Ledger'), findsOneWidget);
     expect(find.text('For a group'), findsNothing);
     await capture('01-ledger-entry');
-    await tester.binding.setSurfaceSize(const Size(1080, 720));
+    tester.view.physicalSize = const Size(1080, 720);
     await capture('01b-ledger-entry-compact');
-    await tester.binding.setSurfaceSize(const Size(1280, 800));
+    tester.view.physicalSize = const Size(1280, 800);
     await tester.pumpAndSettle();
 
     await tester.tap(
@@ -98,9 +98,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Review 4 cards'), findsOneWidget);
     await capture('02-ledger-create-four');
-    await tester.binding.setSurfaceSize(const Size(1080, 720));
+    tester.view.physicalSize = const Size(1080, 720);
     await capture('02b-ledger-create-four-compact');
-    await tester.binding.setSurfaceSize(const Size(1280, 800));
+    tester.view.physicalSize = const Size(1280, 800);
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Review 4 cards'));
@@ -135,7 +135,7 @@ void main() {
     );
     checkNoOverlap();
     await _capture(tester, boundary, output, '05-ledger-cards-list-entry');
-    await tester.binding.setSurfaceSize(const Size(1080, 720));
+    tester.view.physicalSize = const Size(1080, 720);
     await tester.pumpAndSettle();
     checkNoOverlap();
     await _capture(

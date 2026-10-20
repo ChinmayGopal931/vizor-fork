@@ -90,11 +90,11 @@ fn joint_account_round_trip(deposit_before_activation: bool) {
         joint.fvk().to_ovk(Scope::Internal),
     ];
 
-    // The funder holds one pre-activation Orchard note. Its account is also
-    // where the sweep goes home.
+    // After activation the funder pays the deposit from one pre-activation
+    // Orchard note. Its account is also where the sweep goes home.
     let funder = import("Funder", FUNDER_MNEMONIC, 1);
-    run_harness("fund-orchard.sh", &[&funder.address, "2.0", "10", "1", "1"]);
     if !deposit_before_activation {
+        run_harness("fund-orchard.sh", &[&funder.address, "2.0", "10", "1", "1"]);
         run_harness("activate-ironwood.sh", &[]);
     }
     mine(ORDINARY_UNTRUSTED_CONFIRMATIONS);
@@ -116,65 +116,72 @@ fn joint_account_round_trip(deposit_before_activation: bool) {
         .block_on(sync_joint(&joint_db))
         .expect("a joint DB born above the tip syncs");
 
-    // 3. Deposit through the split: propose, create and store, find, send.
-    let deposit = sync::propose_swap_deposit(
-        &funder.db,
-        NETWORK,
-        &funder.account,
-        "deposit",
-        &joint_ua,
-        DEPOSIT_ZATOSHI,
-        DEPOSIT_ZATOSHI + MAX_DEPOSIT_FEE_ZATOSHI,
-    )
-    .expect("propose the deposit");
-    let created = runtime
-        .block_on(sync::create_stored_proposal_transactions(
-            &funder.db,
-            &lwd,
-            deposit.proposal_id,
-            "deposit",
-            seed(FUNDER_MNEMONIC),
-            None,
-            None,
-        ))
-        .expect("create and store the deposit");
-    let [deposit_tx] = created.as_slice() else {
-        panic!("a deposit is one transaction: {created:?}");
-    };
-    assert_eq!(
-        joint::find_deposit(&funder.db, NETWORK, &funder.account, &joint_ua)
-            .expect("find the deposit")
-            .map(|found| found.txid),
-        Some(deposit_tx.txid),
-        "a stored, unsent deposit is found"
-    );
-    runtime
-        .block_on(sync::broadcast_raw(&lwd, &deposit_tx.raw))
-        .expect("send the deposit");
-    runtime
-        .block_on(sync::broadcast_raw(&lwd, &deposit_tx.raw))
-        .expect("sending it again is harmless");
-    // The same joint UA receives in Orchard before NU6.3, Ironwood after it.
-    // Both pools must record the recipient for `find_deposit`.
-    let deposit_raw = Transaction::read(&deposit_tx.raw[..], BranchId::Nu6_3).expect("parse");
-    if deposit_before_activation {
-        assert!(deposit_raw.orchard_bundle().is_some());
-        assert!(deposit_raw.ironwood_bundle().is_none());
+    // 3. The deposit. Before activation zcashd pays it, since the builder
+    // makes no Orchard transaction before NU6.3. After it the wallet pays it
+    // through the split: propose, create and store, find, send.
+    let deposit_tx = if deposit_before_activation {
+        let zec = format!(
+            "{}.{:08}",
+            DEPOSIT_ZATOSHI / 100_000_000,
+            DEPOSIT_ZATOSHI % 100_000_000
+        );
+        run_harness("fund-orchard.sh", &[&joint_ua, &zec, "1", "1", "1"]);
+        None
     } else {
+        let deposit = sync::propose_swap_deposit(
+            &funder.db,
+            NETWORK,
+            &funder.account,
+            "deposit",
+            &joint_ua,
+            DEPOSIT_ZATOSHI,
+            DEPOSIT_ZATOSHI + MAX_DEPOSIT_FEE_ZATOSHI,
+        )
+        .expect("propose the deposit");
+        let created = runtime
+            .block_on(sync::create_stored_proposal_transactions(
+                &funder.db,
+                &lwd,
+                deposit.proposal_id,
+                "deposit",
+                seed(FUNDER_MNEMONIC),
+                None,
+                None,
+            ))
+            .expect("create and store the deposit");
+        let [deposit_tx] = created.as_slice() else {
+            panic!("a deposit is one transaction: {created:?}");
+        };
+        assert_eq!(
+            joint::find_deposit(&funder.db, NETWORK, &funder.account, &joint_ua)
+                .expect("find the deposit")
+                .map(|found| found.txid),
+            Some(deposit_tx.txid),
+            "a stored, unsent deposit is found"
+        );
+        runtime
+            .block_on(sync::broadcast_raw(&lwd, &deposit_tx.raw))
+            .expect("send the deposit");
+        runtime
+            .block_on(sync::broadcast_raw(&lwd, &deposit_tx.raw))
+            .expect("sending it again is harmless");
+        // The joint UA receives in Ironwood, and the pool records the recipient
+        // for `find_deposit`.
+        let deposit_raw = Transaction::read(&deposit_tx.raw[..], BranchId::Nu6_3).expect("parse");
         assert!(deposit_raw.ironwood_bundle().is_some());
-    }
-    assert_eq!(
-        sent_output_pool(&funder.db, &deposit_tx.txid, &joint_ua),
-        if deposit_before_activation { 3 } else { 4 }
-    );
-    let funder_ovk = funder_ovk();
-    assert!(
-        recovered_outputs(&deposit_tx.raw, &[funder_ovk]) >= 1,
-        "control: the deposit keeps the sender OVK"
-    );
+        assert_eq!(sent_output_pool(&funder.db, &deposit_tx.txid, &joint_ua), 4);
+        let funder_ovk = funder_ovk();
+        assert!(
+            recovered_outputs(&deposit_tx.raw, &[funder_ovk]) >= 1,
+            "control: the deposit keeps the sender OVK"
+        );
+        Some((deposit_tx.txid, deposit_tx.expiry_height))
+    };
 
-    // 4. Scan to two confirmations.
-    mine(1);
+    // 4. Scan to two confirmations. zcashd's deposit is mined already.
+    if !deposit_before_activation {
+        mine(1);
+    }
     runtime.block_on(sync_joint(&joint_db)).expect("joint sync");
     let receipts = joint::joint_receipts(&joint_db, NETWORK, &joint_uuid, SWEEP_CONFIRMATIONS)
         .expect("receipts");
@@ -192,17 +199,14 @@ fn joint_account_round_trip(deposit_before_activation: bool) {
         (receipts.spendable_zatoshi, receipts.pending_zatoshi),
         (DEPOSIT_ZATOSHI, 0)
     );
-    runtime.block_on(scan(&funder.db));
-    assert!(matches!(
-        joint::swap_tx_status(
-            &funder.db,
-            NETWORK,
-            &deposit_tx.txid,
-            deposit_tx.expiry_height
-        )
-        .expect("deposit status"),
-        SwapTxStatus::Mined { .. }
-    ));
+    if let Some((deposit_txid, deposit_expiry)) = deposit_tx {
+        runtime.block_on(scan(&funder.db));
+        assert!(matches!(
+            joint::swap_tx_status(&funder.db, NETWORK, &deposit_txid, deposit_expiry)
+                .expect("deposit status"),
+            SwapTxStatus::Mined { .. }
+        ));
+    }
 
     if deposit_before_activation {
         run_harness("activate-ironwood.sh", &[]);

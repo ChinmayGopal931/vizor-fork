@@ -19,6 +19,8 @@ import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_hardware_sele
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_keystone_screens.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_method_selection_screen.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_wallet_link_screens.dart';
+import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_welcome_screen.dart';
+import 'package:zcash_wallet/src/features/payment_links/screens/gift_claim_screen.dart';
 import 'package:zcash_wallet/src/features/onboarding/shared/welcome_button_tokens.dart';
 import '../../figma_compare/figma_compare_font_loader.dart';
 
@@ -29,6 +31,8 @@ Widget _app({
   AppThemeData theme = AppThemeData.light,
   String network = 'main',
   TargetPlatform platform = TargetPlatform.iOS,
+  EdgeInsets padding = EdgeInsets.zero,
+  EdgeInsets viewInsets = EdgeInsets.zero,
 }) {
   final router = GoRouter(
     initialLocation: initialLocation,
@@ -59,7 +63,12 @@ Widget _app({
     child: MaterialApp.router(
       routerConfig: router,
       builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(disableAnimations: true),
+        data: MediaQuery.of(context).copyWith(
+          disableAnimations: true,
+          padding: padding,
+          viewPadding: padding,
+          viewInsets: viewInsets,
+        ),
         child: AppTheme(data: theme, child: child!),
       ),
     ),
@@ -78,6 +87,11 @@ double _stepsProgress(WidgetTester tester) {
   );
   return fill.widthFactor!;
 }
+
+const _horizon = ValueKey('mobile_welcome_horizon');
+
+/// Present only in the wide composition, where the actions sit in a pane.
+const _widePane = ValueKey('mobile_welcome_wide_pane');
 
 void main() {
   setUpAll(loadFigmaCompareFonts);
@@ -316,8 +330,8 @@ void main() {
     String location = '/welcome',
     AppThemeData theme = AppThemeData.light,
   }) async {
-    await tester.binding.setSurfaceSize(const Size(393, 852));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.view.physicalSize = const Size(393, 852);
+    addTearDown(tester.view.resetPhysicalSize);
     await tester.pumpWidget(_app(initialLocation: location, theme: theme));
     await tester.pumpAndSettle();
   }
@@ -426,9 +440,173 @@ void main() {
 
   testWidgets('the neon horizon spans the welcome screen', (tester) async {
     await pump(tester);
-    final horizon = find.byKey(const ValueKey('mobile_welcome_horizon'));
+    final horizon = find.byKey(_horizon);
     expect(horizon, findsOneWidget);
     expect(tester.getSize(horizon).width, 393);
+  });
+
+  for (final entry in ['/welcome', '/add-account']) {
+    testWidgets('$entry adapts its composition without replacing route state', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(466, 678);
+      addTearDown(tester.view.resetPhysicalSize);
+      await tester.pumpWidget(_app(initialLocation: entry));
+      await tester.pumpAndSettle();
+      expect(find.byKey(_widePane), findsNothing);
+      final welcomeState = tester.state(find.byType(MobileWelcomeScreen));
+      final originalButton = tester.getRect(
+        find.byKey(const ValueKey('mobile_welcome_get_started')),
+      );
+
+      tester.view.physicalSize = const Size(951, 669);
+      await tester.pumpAndSettle();
+      expect(
+        tester.state(find.byType(MobileWelcomeScreen)),
+        same(welcomeState),
+      );
+      // The horizon moves beside the pane instead of behind the buttons.
+      final pane = tester.getRect(find.byKey(_widePane));
+      final horizon = tester.getRect(find.byKey(_horizon));
+      expect(horizon.left, greaterThanOrEqualTo(pane.right));
+      expect(horizon.right, lessThanOrEqualTo(951));
+      for (final key in [
+        'mobile_welcome_get_started',
+        'mobile_welcome_import',
+        'mobile_welcome_redeem_card',
+      ]) {
+        final rect = tester.getRect(find.byKey(ValueKey(key)));
+        expect(rect.width, closeTo(240, 1e-8));
+        expect(rect.right, lessThan(420));
+        expect(rect.bottom, lessThanOrEqualTo(669));
+        expect(rect.top, greaterThanOrEqualTo(0));
+      }
+      expect(tester.takeException(), isNull);
+
+      tester.view.physicalSize = const Size(466, 678);
+      await tester.pumpAndSettle();
+      expect(
+        tester.state(find.byType(MobileWelcomeScreen)),
+        same(welcomeState),
+      );
+      expect(find.byKey(_widePane), findsNothing);
+      expect(
+        tester.getRect(
+          find.byKey(const ValueKey('mobile_welcome_get_started')),
+        ),
+        originalButton,
+      );
+
+      // The expanded composition keeps the same onboarding entry and return.
+      tester.view.physicalSize = const Size(951, 669);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('mobile_welcome_import')));
+      await tester.pumpAndSettle();
+      expect(find.byType(MobileMethodSelectionScreen), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Back'));
+      await tester.pumpAndSettle();
+      expect(
+        GoRouterState.of(
+          tester.element(find.byType(MobileWelcomeScreen)),
+        ).uri.path,
+        entry,
+      );
+    });
+  }
+
+  testWidgets('wide short windows can scroll to the final welcome action', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(951, 320);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(_app(initialLocation: '/add-account'));
+    await tester.pumpAndSettle();
+    final gift = find.byKey(const ValueKey('mobile_welcome_redeem_card'));
+    await tester.ensureVisible(gift);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(gift).bottom, lessThanOrEqualTo(320));
+    expect(tester.takeException(), isNull);
+    await tester.tap(gift);
+    await tester.pumpAndSettle();
+    expect(
+      GoRouterState.of(
+        tester.element(find.byType(GiftClaimScreen)),
+      ).uri.queryParameters['addAccount'],
+      'true',
+    );
+  });
+
+  testWidgets('composition and corner controls honor available safe width', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(650, 500);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(_app(padding: const EdgeInsets.only(right: 120)));
+    await tester.pumpAndSettle();
+    expect(find.byKey(_widePane), findsNothing);
+
+    tester.view.physicalSize = const Size(951, 669);
+    await tester.pumpAndSettle();
+    expect(find.byKey(_widePane), findsOneWidget);
+    expect(
+      tester.getRect(find.byKey(_horizon)).right,
+      lessThanOrEqualTo(951 - 120),
+    );
+    expect(
+      tester
+          .getRect(
+            find.byKey(const ValueKey('mobile_welcome_network_settings')),
+          )
+          .right,
+      lessThanOrEqualTo(951 - 120),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final sample in [
+    (size: const Size(690, 829), wide: false),
+    (size: const Size(800, 800), wide: false),
+    (size: const Size(829, 690), wide: true),
+    (size: const Size(700, 600), wide: true),
+    (size: const Size(568, 400), wide: true),
+  ]) {
+    testWidgets('welcome uses the common window ratio at ${sample.size}', (
+      tester,
+    ) async {
+      tester.view.physicalSize = sample.size;
+      addTearDown(tester.view.resetPhysicalSize);
+      await tester.pumpWidget(_app(initialLocation: '/add-account'));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(_widePane),
+        sample.wide ? findsOneWidget : findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+      if (sample.wide) {
+        expect(
+          tester
+              .getSize(find.byKey(const ValueKey('mobile_welcome_import')))
+              .width,
+          closeTo(240, 1e-8),
+        );
+      }
+    });
+  }
+
+  testWidgets('keyboard resize preserves the portrait welcome composition', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(690, 829);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(
+      _app(
+        initialLocation: '/add-account',
+        viewInsets: const EdgeInsets.only(bottom: 500),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(_widePane), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   for (final theme in {

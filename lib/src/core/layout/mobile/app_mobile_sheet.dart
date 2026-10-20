@@ -8,9 +8,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../theme/app_theme.dart';
+import '../../widgets/app_button.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/app_modal_shape.dart';
 import 'mobile_modal_corners.dart';
+import 'mobile_window_policy.dart';
 import 'prepared_modal_sheet_route.dart';
 import 'controlled_modal_sheet_route.dart';
 
@@ -154,8 +156,14 @@ class MobileModalCard extends StatelessWidget {
     this.transparentBackground = false,
     this.margin,
     this.followsScreenCorners = true,
+    this.onBack,
+    this.backEnabled = true,
     super.key,
   });
+
+  /// Wide-window cap including outer margins. Portrait windows retain the
+  /// original route/theme constraints instead of imposing this extra limit.
+  static const double maxWidth = 440;
 
   final Widget child;
 
@@ -170,6 +178,10 @@ class MobileModalCard extends StatelessWidget {
   /// Only bottom-anchored sheets adapt to the display. Centered dialogs still
   /// use iOS continuous corners, with the original fixed radius.
   final bool followsScreenCorners;
+
+  /// A floating return action above the card for a nested sheet.
+  final VoidCallback? onBack;
+  final bool backEnabled;
 
   /// Default bottom clearance shared by the card and content that sizes
   /// itself to the space above it. Explicit [margin] overrides this gap.
@@ -230,15 +242,61 @@ class MobileModalCard extends StatelessWidget {
     // is already its own card and owns its horizontal sizing, so only the
     // bottom gap applies there.
     final double sideMargin = transparentBackground ? 0 : AppSpacing.sm;
-    return Padding(
-      padding:
-          margin ??
-          EdgeInsets.only(
-            left: sideMargin,
-            right: sideMargin,
-            bottom: bottomGapFor(context),
+    return Align(
+      alignment: Alignment.bottomCenter,
+      widthFactor: 1,
+      heightFactor: 1,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MobileWindowPolicyScope.of(context).usesWideLayout
+              ? maxWidth
+              : double.infinity,
+        ),
+        child: Padding(
+          padding:
+              margin ??
+              EdgeInsets.only(
+                left: sideMargin,
+                right: sideMargin,
+                bottom: bottomGapFor(context),
+              ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (onBack != null) ...[
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Semantics(
+                    container: true,
+                    button: true,
+                    enabled: backEnabled,
+                    label: 'Back',
+                    child: AppButton(
+                      key: const ValueKey('mobile_modal_back_button'),
+                      variant: AppButtonVariant.secondary,
+                      minWidth: 44,
+                      height: 44,
+                      contentPadding: EdgeInsets.zero,
+                      enabledBackgroundColor: colors.background.base,
+                      onPressed: backEnabled ? onBack : null,
+                      child: const ExcludeSemantics(
+                        child: AppIcon(AppIcons.arrowBack, size: 20),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+              // Revealing Back must preserve stateful device/approval owners.
+              Flexible(
+                key: const ValueKey('mobile_modal_content'),
+                child: card,
+              ),
+            ],
           ),
-      child: card,
+        ),
+      ),
     );
   }
 }

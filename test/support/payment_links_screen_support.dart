@@ -79,8 +79,11 @@ Future<void> pumpPaymentLinksScreen(
     RustLib.initMock(api: FakeGiftLinkRustApi());
     addTearDown(RustLib.dispose);
   }
-  await tester.binding.setSurfaceSize(logicalSize);
-  addTearDown(() => tester.binding.setSurfaceSize(null));
+  // Size the view, not only the render surface: the mobile shell chooses its
+  // layout from MediaQuery, which follows the view.
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = logicalSize;
+  addTearDown(tester.view.reset);
   final paymentLinkOperations = operations ?? FakePaymentLinkOperations();
   final paymentLinkClipboard = clipboard ?? FakePaymentLinkClipboard();
   final appBootstrap = bootstrap ?? paymentLinksBootstrap;

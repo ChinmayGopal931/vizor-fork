@@ -66,15 +66,10 @@ class AppProfilePicture extends StatelessWidget {
       );
     }
 
-    return Container(
+    return SizedBox(
       width: size.dimension,
       height: size.dimension,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: context.colors.background.raised,
-        shape: BoxShape.circle,
-      ),
-      child: image,
+      child: ClipOval(child: image),
     );
   }
 }

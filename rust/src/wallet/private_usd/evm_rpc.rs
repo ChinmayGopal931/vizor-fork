@@ -660,11 +660,13 @@ impl<T: HttpTransport> DepositChain for EvmRpc<'_, T> {
             .collect();
         let answers = self.aggregate(&pin.multicall, &calls).await?;
         answers
-            .chunks_exact(2)
-            .map(|pair| {
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|[balance, deposited]| {
                 Ok(AddressUse {
-                    balance: u128_word(&exact_word(&pair[0])?)?,
-                    deposited: bool_word(&exact_word(&pair[1])?)?,
+                    balance: u128_word(&exact_word(balance)?)?,
+                    deposited: bool_word(&exact_word(deposited)?)?,
                 })
             })
             .collect()
