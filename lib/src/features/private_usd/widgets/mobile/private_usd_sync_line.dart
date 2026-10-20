@@ -2,19 +2,25 @@ import '../../../../core/formatting/date_format.dart';
 import '../../../../core/formatting/sync_status_label.dart';
 import '../../../../core/layout/mobile/neon_sync_backdrop.dart';
 import '../../../../providers/network_privacy_provider.dart';
+import '../../models/private_usd_screening_status.dart';
 import '../../private_usd_copy.dart';
 import '../../services/private_usd_balance_repository.dart';
 
 /// Railgun's sync as Home's sync line, for the Private USD screen (iOS
-/// progress VI-19). It follows the balance's own syncs, on open and on
-/// refresh; nothing here starts one.
+/// progress VI-19), standing where Home's does (owner, 2026-10-19). It
+/// follows the balance's own syncs, on open and on refresh; nothing here
+/// starts one.
 ///
 /// - A first sync (nothing shown yet) climbs over the content with its
 ///   percentage ("Railgun sync n%"), or reads "Tor …" while the page waits
 ///   for Tor to come up.
 /// - A wallet that synced before stays synced ("Railgun synced") through a
 ///   refresh, behind the content, with the floor flowing: like Home's
-///   catch-up, the line never drops to 0 and climbs again.
+///   catch-up, the line never drops to 0 and climbs again. Except while the
+///   page catches up on Railgun's transaction list ([txidCatchUp], which it
+///   reports only 1,000 or more behind): screening a send's change waits on
+///   that list, so it climbs with its percentage (owner, 2026-10-19). A
+///   phone's list once sat 13,000 behind for days under "Railgun synced".
 /// - A failure reads "Railgun sync failed", or "Tor offline" when Tor failed.
 ///
 /// Screen readers hear what the card used to show: the first-load progress,
@@ -22,6 +28,7 @@ import '../../services/private_usd_balance_repository.dart';
 NeonSyncLine privateUsdSyncLine(
   PrivateUsdBalanceState state, {
   NetworkPrivacyState? networkPrivacy,
+  double? txidCatchUp,
 }) {
   final balances = state.balances;
   if (state.refreshFailed && !state.isRefreshing) {
@@ -38,8 +45,17 @@ NeonSyncLine privateUsdSyncLine(
           ? PrivateUsdCopy.loadFailed
           : PrivateUsdCopy.refreshFailed,
       failed: true,
-      lineX: _railgunLineX,
       readoutType: _railgunFailedReadout,
+    );
+  }
+  if (balances != null && txidCatchUp != null && txidCatchUp < 1) {
+    final whole = privateUsdScreeningPercent(txidCatchUp).clamp(0, 99);
+    return NeonSyncLine(
+      progress: _climbed(whole),
+      readout: PrivateUsdCopy.syncReadoutProgress(whole),
+      semanticsLabel: PrivateUsdCopy.screeningSyncingList(whole),
+      climbing: true,
+      readoutType: _railgunReadout,
     );
   }
   if (balances != null) {
@@ -53,7 +69,6 @@ NeonSyncLine privateUsdSyncLine(
           ? ''
           : PrivateUsdCopy.updated(formatDayMonthTime(updatedAt)),
       scanning: state.isRefreshing,
-      lineX: _railgunLineX,
       readoutType: _railgunReadout,
     );
   }
@@ -67,7 +82,6 @@ NeonSyncLine privateUsdSyncLine(
       readout: NeonSyncReadout.torWaiting,
       semanticsLabel: kSyncStatusConnectingToTorSemanticsLabel,
       climbing: true,
-      lineX: _railgunLineX,
       readoutType: _railgunReadout,
     );
   }
@@ -80,16 +94,12 @@ NeonSyncLine privateUsdSyncLine(
         ? PrivateUsdCopy.firstLoad
         : PrivateUsdCopy.firstLoadProgress(whole),
     climbing: true,
-    lineX: _railgunLineX,
     readoutType: _railgunReadout,
   );
 }
 
 // As Home's: a climbing line always shows a stub, and never reaches the top.
 double _climbed(int percent) => (percent / 100).clamp(0.03, 0.99);
-
-// A smidge right of Home's line (owner, 2026-10-17).
-const _railgunLineX = 0.87;
 
 // Smaller than Home's, so the longer Railgun readouts end above the total
 // card, which starts close under the top; the failure, the longest, smaller

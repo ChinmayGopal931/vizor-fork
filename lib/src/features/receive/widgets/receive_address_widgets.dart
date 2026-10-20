@@ -19,6 +19,7 @@ import '../../../core/layout/app_form_factor.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/dot_qr_shape.dart';
+import '../../../core/widgets/mobile/neon_switch_tabs.dart';
 
 /// The neon redesign (mobile) restyles these blocks; desktop keeps Figma's.
 const _mobile = kAppFormFactor == AppFormFactor.mobile;
@@ -133,84 +134,25 @@ class ReceiveTabs extends StatelessWidget {
     );
   }
 
-  /// The neon switch: a cut-corner glass track whose active side is a lit
-  /// plate, its label white-hot. It names the pools without their glyphs.
-  Widget _buildNeon(BuildContext context) {
-    final colors = context.colors;
-    final glow = colors.neon.glow;
-    final labelGlow = Neon.textGlow(glow, intensity: 0.4);
-
-    return Container(
-      key: const ValueKey('receive_address_type_tabs'),
-      width: width,
-      height: height,
-      decoration: ShapeDecoration(
-        color: colors.button.secondary.bg,
-        shape: Neon.chamferBorder(
-          side: BorderSide(color: colors.border.subtleOpacity),
-        ),
-      ),
-      child: Stack(
-        children: [
-          AnimatedAlign(
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOut,
-            alignment: selectedType == ReceiveAddressType.shielded
-                ? Alignment.centerLeft
-                : Alignment.centerRight,
-            child: Padding(
-              padding: const EdgeInsets.all(2),
-              child: Container(
-                key: const ValueKey('receive_address_type_tabs_indicator'),
-                width: (width - 8) / 2,
-                decoration: ShapeDecoration(
-                  color: glow.withValues(alpha: 0.1),
-                  // One step inside the track's cut, so the two run parallel.
-                  shape: Neon.chamferBorder(
-                    cut: AppChamfer.medium - 1,
-                    side: BorderSide(color: glow.withValues(alpha: 0.85)),
-                  ),
-                  shadows: Neon.boxGlow(glow, intensity: 0.3),
-                ),
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              _ReceiveTab(
-                key: const ValueKey('receive_address_type_tab_shielded'),
-                label: 'Shielded',
-                active: selectedType == ReceiveAddressType.shielded,
-                activeTextColor: colors.neon.core,
-                inactiveTextColor: colors.text.secondary,
-                activeIconColor: glow,
-                activeLabelShadows: labelGlow,
-                iconSize: iconSize,
-                iconGap: iconGap,
-                labelStyle: labelStyle,
-                labelFontWeight: labelFontWeight,
-                onTap: () => onChanged(ReceiveAddressType.shielded),
-              ),
-              _ReceiveTab(
-                key: const ValueKey('receive_address_type_tab_transparent'),
-                label: 'Transparent',
-                active: selectedType == ReceiveAddressType.transparent,
-                activeTextColor: colors.neon.core,
-                inactiveTextColor: colors.text.secondary,
-                activeIconColor: glow,
-                activeLabelShadows: labelGlow,
-                iconSize: iconSize,
-                iconGap: iconGap,
-                labelStyle: labelStyle,
-                labelFontWeight: labelFontWeight,
-                onTap: () => onChanged(ReceiveAddressType.transparent),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  /// The neon switch ([NeonSwitchTabs]): it names the pools without their
+  /// glyphs.
+  Widget _buildNeon(BuildContext context) => NeonSwitchTabs(
+    key: const ValueKey('receive_address_type_tabs'),
+    labels: ('Shielded', 'Transparent'),
+    selected: selectedType == ReceiveAddressType.shielded ? 0 : 1,
+    onChanged: (index) => onChanged(
+      index == 0 ? ReceiveAddressType.shielded : ReceiveAddressType.transparent,
+    ),
+    width: width,
+    height: height,
+    labelStyle: labelStyle,
+    labelFontWeight: labelFontWeight,
+    indicatorKey: const ValueKey('receive_address_type_tabs_indicator'),
+    tabKeys: (
+      const ValueKey('receive_address_type_tab_shielded'),
+      const ValueKey('receive_address_type_tab_transparent'),
+    ),
+  );
 }
 
 class _ReceiveTab extends StatelessWidget {
@@ -225,14 +167,12 @@ class _ReceiveTab extends StatelessWidget {
     required this.labelFontWeight,
     required this.onTap,
     this.iconName,
-    this.activeIconColor,
-    this.activeLabelShadows,
     super.key,
   });
 
   final String label;
 
-  /// The pool's glyph before the label; none in the neon switch.
+  /// The pool's glyph before the label.
   final String? iconName;
   final bool active;
   final Color activeTextColor;
@@ -243,15 +183,9 @@ class _ReceiveTab extends StatelessWidget {
   final FontWeight? labelFontWeight;
   final VoidCallback onTap;
 
-  /// The neon switch lights the active glyph red and its label with a glow;
-  /// without these the glyph takes the label colour, as on desktop.
-  final Color? activeIconColor;
-  final List<Shadow>? activeLabelShadows;
-
   @override
   Widget build(BuildContext context) {
     final color = active ? activeTextColor : inactiveTextColor;
-    final iconColor = active ? (activeIconColor ?? color) : color;
     return Expanded(
       child: MouseRegion(
         cursor: active ? SystemMouseCursors.basic : SystemMouseCursors.click,
@@ -263,7 +197,7 @@ class _ReceiveTab extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (iconName case final iconName?) ...[
-                  AppIcon(iconName, size: iconSize, color: iconColor),
+                  AppIcon(iconName, size: iconSize, color: color),
                   SizedBox(width: iconGap),
                 ],
                 Flexible(
@@ -273,7 +207,6 @@ class _ReceiveTab extends StatelessWidget {
                     style: (labelStyle ?? AppTypography.labelMedium).copyWith(
                       color: color,
                       fontWeight: labelFontWeight,
-                      shadows: active ? activeLabelShadows : null,
                     ),
                   ),
                 ),

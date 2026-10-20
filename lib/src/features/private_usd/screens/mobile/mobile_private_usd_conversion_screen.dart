@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/feedback/app_haptics.dart';
 import '../../../../core/layout/mobile/mobile_top_nav.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
@@ -27,6 +28,7 @@ import '../../providers/private_usd_conversion_provider.dart';
 import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_keep_awake_provider.dart';
 import '../../services/private_usd_balance_repository.dart';
+import '../../widgets/mobile/private_usd_bridged_hero.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
 import '../../widgets/mobile/private_usd_logo.dart';
 import 'mobile_private_usd_convert_screen.dart';
@@ -51,6 +53,12 @@ class _MobilePrivateUsdConversionScreenState
   PrivateUsdProgressVisibleNotifier? _visibility;
   var _tab = SwapStatusTab.progress;
   var _detailsExpanded = false;
+
+  /// Whether the last presentation shown was bridged; null before one.
+  bool? _wasBridged;
+
+  /// The bridge finished in view (not opened finished): its sign plays.
+  var _celebrate = false;
 
   @override
   void initState() {
@@ -162,6 +170,10 @@ class _MobilePrivateUsdConversionScreenState
             privacyModeEnabled: ref.watch(privacyModeProvider),
             explorerTxPrefix: deployment?.explorerTxPrefix,
           );
+    if (presentation != null) {
+      if (presentation.bridged && _wasBridged == false) _celebrate = true;
+      _wasBridged = presentation.bridged;
+    }
     final notifier = ref.read(privateUsdConversionProvider(key).notifier);
     return PopScope(
       canPop: !state.callingOff,
@@ -169,6 +181,8 @@ class _MobilePrivateUsdConversionScreenState
         presentation: presentation,
         callingOff: state.callingOff,
         callOffError: state.callOffError,
+        celebrate: _celebrate,
+        onBridgedImpact: () => unawaited(AppHaptics.sendSuccess()),
         activeTab: _tab,
         detailsExpanded: _detailsExpanded,
         onTabChanged: (tab) => setState(() => _tab = tab),
@@ -202,6 +216,8 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
     required this.onTryAgain,
     this.callingOff = false,
     this.callOffError,
+    this.celebrate = false,
+    this.onBridgedImpact,
     this.activeTab = SwapStatusTab.progress,
     this.detailsExpanded = false,
     this.onTabChanged,
@@ -213,6 +229,12 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
   final PrivateUsdProgressPresentation? presentation;
   final bool callingOff;
   final String? callOffError;
+
+  /// Plays the "Bridged" sign: the bridge finished while it showed.
+  final bool celebrate;
+
+  /// As the sign lights, for the success haptic.
+  final VoidCallback? onBridgedImpact;
   final SwapStatusTab activeTab;
   final bool detailsExpanded;
   final ValueChanged<SwapStatusTab>? onTabChanged;
@@ -236,7 +258,7 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             MobileTopNav.back(
-              title: PrivateUsdCopy.convertProgressTitle,
+              title: presentation?.title ?? PrivateUsdCopy.convertProgressTitle,
               onBack: onBack,
               trailing: PrivateUsdInfoButton(onTap: onInfo),
             ),
@@ -299,7 +321,13 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
     final problem = presentation.problem;
     final error = callOffError;
     return [
-      if (resultTitle != null) ...[
+      if (presentation.bridged)
+        PrivateUsdBridgedHero(
+          body: presentation.resultBody ?? '',
+          celebrate: celebrate,
+          onImpact: onBridgedImpact,
+        )
+      else if (resultTitle != null) ...[
         const SizedBox(height: AppSpacing.s),
         MobileSurfaceCard(
           key: const ValueKey('mobile_private_usd_progress_result'),
@@ -364,6 +392,7 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
           amountText: presentation.payAmountText,
           asset: status.payAsset,
           icon: privateUsdHeaderIcon(status.payAsset),
+          bottomText: PrivateUsdCopy.shieldedZec,
         ),
         receiveHeaderRow: MobileSwapReviewHeaderRow(
           label: status.receiveLabel,
@@ -372,6 +401,7 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
           icon: privateUsdHeaderIcon(status.receiveAsset),
           bottomText: PrivateUsdCopy.title,
         ),
+        headerToBodyGap: AppSpacing.xs,
         activeTab: activeTab,
         detailsExpanded: detailsExpanded,
         onTabChanged: onTabChanged ?? (_) {},

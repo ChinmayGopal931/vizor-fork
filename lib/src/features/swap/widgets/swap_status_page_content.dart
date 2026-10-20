@@ -1188,9 +1188,11 @@ class _SwapAnimatedProgressRouteState extends State<SwapAnimatedProgressRoute> {
     super.dispose();
   }
 
+  /// [index] within the steps; one past the last (every step done) stays
+  /// there, so a finished route keeps no step current.
   int _bounded(int index) {
     if (widget.steps.isEmpty) return 0;
-    return index.clamp(0, widget.steps.length - 1);
+    return index.clamp(0, widget.steps.length);
   }
 
   bool get _animate {

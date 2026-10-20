@@ -46,6 +46,7 @@ class MobileSwapStatusContent extends StatelessWidget {
     required this.onTabChanged,
     required this.onToggleDetails,
     this.paymentHeader,
+    this.headerToBodyGap = _mobileStatusHeaderToBodyGap,
     super.key,
   });
 
@@ -57,6 +58,10 @@ class MobileSwapStatusContent extends StatelessWidget {
   final ValueChanged<SwapStatusTab> onTabChanged;
   final VoidCallback onToggleDetails;
   final Widget? paymentHeader;
+
+  /// Between the header and the tabs (or the status panel). Private USD's
+  /// bridge screens close it up: their rows carry no fiat line.
+  final double headerToBodyGap;
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +75,7 @@ class MobileSwapStatusContent extends StatelessWidget {
               pay: payHeaderRow,
               receive: receiveHeaderRow,
             ),
-        const SizedBox(height: _mobileStatusHeaderToBodyGap),
+        SizedBox(height: headerToBodyGap),
         if (presentation.showTabs) ...[
           _MobileStatusTabs(
             activeTab: activeTab,

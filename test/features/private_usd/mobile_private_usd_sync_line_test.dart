@@ -50,9 +50,6 @@ void main() {
             networkPrivacy: networkPrivacy,
             zecUsdPrice: 50,
             privacyModeEnabled: false,
-            receiveAddress: state.balances == null
-                ? null
-                : previewPrivateUsdAddress,
             screening: const Duration(hours: 1),
             onBack: () {},
             onRefresh: () => refreshes++,
@@ -172,7 +169,6 @@ void main() {
     for (final block in const [
       'mobile_private_usd_total',
       'mobile_private_usd_buckets',
-      'mobile_private_usd_receive',
       'mobile_private_usd_activity_empty',
     ]) {
       expect(

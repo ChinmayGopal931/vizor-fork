@@ -2357,6 +2357,27 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     mobile: true,
   ),
   FigmaCompareScenario(
+    id: 'mobile-private-usd-receive',
+    description: 'Private USD Receive sheet on public USDC (the default)',
+    builder: buildMobilePrivateUsdReceiveUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-receive-shielded',
+    description: 'Private USD Receive sheet switched to 0zkUSDC',
+    builder: buildMobilePrivateUsdReceiveShieldedUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-progress-bridged',
+    description: 'Private USD progress paid and screened: the Bridged sign',
+    builder: buildMobilePrivateUsdProgressBridgedUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
     id: 'mobile-private-usd-progress-refunding',
     description: 'Private USD progress bringing the ZEC back',
     builder: buildMobilePrivateUsdProgressRefundingUseCase,

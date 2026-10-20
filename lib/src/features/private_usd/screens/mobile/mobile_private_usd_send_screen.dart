@@ -20,14 +20,17 @@ import '../../../../core/widgets/mobile/mobile_warning_notice.dart';
 import '../../../../core/widgets/mobile_text_field.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
+import '../../../address_scan/widgets/mobile_scan_address_row.dart';
 import '../../models/private_usd_balances.dart';
 import '../../models/private_usd_send.dart';
 import '../../private_usd_copy.dart';
+import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_balance_provider.dart';
 import '../../providers/private_usd_send_provider.dart';
 import '../../providers/private_usd_spend_status_provider.dart';
 import '../../services/private_usd_spend_guard.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
+import '../../widgets/mobile/private_usd_scan_sheet.dart';
 import 'mobile_private_usd_convert_screen.dart';
 
 /// `/private-usd/send` and `/private-usd/withdraw` (plan reference §9.4
@@ -77,6 +80,17 @@ class _MobilePrivateUsdSendScreenState
     _notifier.setRecipient(text);
   }
 
+  Future<void> _scan() async {
+    final address = await showPrivateUsdScanSheet(
+      context,
+      mode: widget.mode,
+      chainId: ref.read(privateUsdCurrentDeploymentProvider)?.chainId,
+    );
+    if (!mounted || address == null) return;
+    _setText(_recipient, address);
+    _notifier.setRecipient(address);
+  }
+
   Future<void> _review() async {
     FocusScope.of(context).unfocus();
     if (!await _notifier.review() || !mounted) return;
@@ -122,6 +136,7 @@ class _MobilePrivateUsdSendScreenState
           if (text != null) _setText(_amount, text);
         },
         onPaste: _paste,
+        onScan: _scan,
         onReview: _review,
         onBack: _back,
       ),
@@ -146,6 +161,7 @@ class MobilePrivateUsdSendView extends StatelessWidget {
     required this.onBack,
     this.onChooseToken,
     this.onPaste,
+    this.onScan,
     this.amountFocus,
     this.recipientFocus,
     this.isRailgunAddress = privateUsdIsRailgunAddress,
@@ -166,6 +182,9 @@ class MobilePrivateUsdSendView extends StatelessWidget {
   final ValueChanged<PrivateUsdToken>? onChooseToken;
   final VoidCallback onUseAll;
   final VoidCallback? onPaste;
+
+  /// Opens the camera scanner for the recipient; null hides its row.
+  final VoidCallback? onScan;
   final VoidCallback onReview;
   final VoidCallback onBack;
   final PrivateUsdRailgunAddressCheck isRailgunAddress;
@@ -250,6 +269,7 @@ class MobilePrivateUsdSendView extends StatelessWidget {
                       focusNode: recipientFocus,
                       onChanged: onRecipientChanged,
                       onPaste: onPaste,
+                      onScan: onScan,
                     ),
                     if (message != null) ...[
                       const SizedBox(height: AppSpacing.s),
@@ -454,6 +474,7 @@ class _RecipientCard extends StatelessWidget {
     required this.focusNode,
     required this.onChanged,
     required this.onPaste,
+    required this.onScan,
   });
 
   final bool private;
@@ -463,12 +484,14 @@ class _RecipientCard extends StatelessWidget {
   final FocusNode? focusNode;
   final ValueChanged<String> onChanged;
   final VoidCallback? onPaste;
+  final VoidCallback? onScan;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final error = this.error;
     final onPaste = this.onPaste;
+    final onScan = this.onScan;
     return MobileSurfaceCard(
       key: const ValueKey('mobile_private_usd_send_recipient_card'),
       child: Column(
@@ -520,6 +543,15 @@ class _RecipientCard extends StatelessWidget {
               style: AppTypography.bodySmall.copyWith(
                 color: colors.text.destructive,
               ),
+            ),
+          ],
+          // As ZEC Send's recipient picker: the Receive sheet shows both
+          // kinds of address as a code.
+          if (onScan != null) ...[
+            const SizedBox(height: AppSpacing.s),
+            MobileScanAddressRow(
+              key: const ValueKey('mobile_private_usd_send_scan'),
+              onTap: enabled ? onScan : null,
             ),
           ],
         ],

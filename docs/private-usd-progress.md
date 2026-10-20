@@ -1778,6 +1778,169 @@ M8 status (2026-10-14): the non-device parts are done.
     signed again (D-119).
   - **Nothing else.** The new `503` for a send the private RPC refused
     (`Retry-After` 30) is handled as any other `503`.
+- **D-130 (owner, 2026-10-19): txids keep their progress, and Processing
+  says when the screening fails.** On the OnePlus 15, $29.11 of change from
+  two Oct 13 withdrawals stayed Processing for six days.
+  - **Txids.** The engine kept its txid tree one batch at a time, 10,000 by
+    default, which is exactly one subgraph answer and over ten minutes on
+    the phone. A page closed (lock) or frozen (background) before an answer
+    ended kept none of it, so the wallet sat at 130,000 txids (Aug 30) and
+    could not link its sends to prove them. The page now sets the batch to
+    1,000 (`TXID_SYNC_BATCH_SIZE`), the engine's own knob for clients
+    "that may be killed mid-scan". The engine reads on only while an answer
+    is one batch long, so `refresh` syncs again with the SDK's
+    `syncRailgunTransactionsV2` (`catchUpTxids` in `src/txid-catch-up.js`,
+    at most 50 passes, waiting out a sync the engine started itself) until
+    one adds nothing. Txid `Complete`s wait for the catch-up's end
+    (`txidCompleteHold`), so the first-sync percentage does not jump to
+    99 % between passes.
+  - **Screening.** `generatePOIsForWallet` only starts the engine's
+    screening (`refreshPOIsForAllTXIDVersions` does not await it), so a
+    proof's failure never reached the page's catch. It arrives as a POI
+    proof event, which the page now follows
+    (`setOnWalletPOIProofProgressCallback`). `refresh` answers
+    `{balances, screening: "ok" | "failed"}` (`RailgunRefresh`; zapp's page
+    answered the bucket map alone, reference §6.4). A failed one marks the
+    balance (`screeningFailed`, never cached), and the Processing row reads
+    "Processing · screening delayed" with its own explanation instead of
+    "A send is being confirmed".
+  - **The node.** Once the txids caught up, the wallet's proofs for its
+    three sends were valid (checked with snarkjs against the POI_3x3 vkey,
+    public inputs built as the node builds them), yet `ppoi.fdi.network`
+    answered every one `Invalid proof` while `ipfs-lb.com` returned 502.
+    That is outside the app; the new row is what the user sees meanwhile.
+  - **Tests.** The bundle's Node tests 25 passed, 8 of them new
+    (`dev/txid-catch-up.test.mjs`); `check.mjs` passed on Sepolia; the Dart
+    Private USD tests 100 passed (7 mobile-tagged skipped) and the mobile
+    lane 53 passed, with new cases for `RailgunRefresh.parse`, a sync's
+    screening, the balance's flag and the row; `fvm flutter analyze` clean.
+    `railgun.js` is 1,190 bytes larger (9,770,719), and the build still
+    reproduces byte for byte. Not yet run on a phone.
+  - **Mainnet.** A throwaway wallet's first sync on the built page saved its
+    txids 1,000 at a time; closed at 26,000 and reopened, it still held
+    26,000 (it fell back to the last 10,000 before). One refresh then caught
+    up to the POI node's validated index (143,189 txids) in 530 s over 13
+    syncs, with one txid Complete, at its end.
+- **D-131 (owner, 2026-10-19): wallet 11.2.0, for the POI circuits the nodes
+  now verify.** `ppoi.fdi.network`'s `Invalid proof` (D-130) was ours: wallet
+  11.2.0 (2026-09-30) replaced the POI circuits, and proofs from either set
+  do not verify against the other's keys. The three proofs the phone sent
+  verify against the old POI_3x3 vkey and fail against the new one, exported
+  from the new zkey once it matched 11.2.0's hash (and equal to the vkey
+  railgun-rust embeds). Railgun's wallet issue #145 (open) reports the same
+  `Invalid proof`, and a proof from 11.2.0's circuits, fetched by their own
+  CIDs, accepted on 2026-10-17.
+  - **The bump.** `@railgun-community/wallet` 11.1.0 → 11.2.0; the engine
+    (9.8.0) and shared models (8.2.0) stay. Besides the POI circuits it
+    reads txids one page per call and adds Base's indexer, which Ethereum
+    never asks; no page host changes. The new circuits live under their own
+    local path, so a phone never reuses the old ones it cached.
+  - **Sends need them too.** Every send and withdrawal proves POIs before
+    the broadcaster gets it (`sendWithPublicWallet` false), so with
+    `ipfs-lb.com` still down the mirror had to hold the new circuits before
+    any build with 11.2.0 ships. Their directory resolves on no public
+    gateway, only their files: `fetch-verify.mjs` now gets each by its own
+    CID, keeps the vkeys in `poi-v2/`, and keeps the old POI files for
+    earlier builds; the new 13x13 zkey (28 MB) is split like the old one.
+  - **Nothing to resubmit.** The engine proves missing POIs again after
+    every scan, now with the new circuits.
+  - **Done.** The mirror was rebuilt from itself (285 files, every hash
+    checked; the new POI files placed first) and deployed with the owner's
+    go-ahead (version `05c1c940`, 7 new files, 280 unchanged); a fresh
+    download of all 285 from the live mirror at the SDK's paths verified,
+    the joined 13x13 zkey and both vkeys included. The bundle's Node tests
+    25 passed and `check.mjs` passed on the 11.2.0 bundle; `railgun.js` is
+    9,775,560 bytes and names only the new POI directory.
+  - **On the phone.** Installed on the OnePlus 15 the same night: the page
+    fetched the new POI_3x3 files from the mirror (ipfs-lb.com still
+    failing), and `ppoi.fdi.network` took all three proofs (HTTP 200, no
+    error). Two minutes later the three notes read `Valid` and $30.43 of
+    change was spendable.
+- **D-132 (owner, 2026-10-19): the bridge tries IPv6 and IPv4 together, and
+  the Processing row says what screening is doing.**
+  - **Bridge.** On the owner's home Wi-Fi the phone has IPv6 addresses and a
+    route but no IPv6 traffic gets through. The bridge's direct connect tried
+    a host's addresses one by one, IPv6 first, so every dual-stack host
+    (`ppoi.fdi.network`, `rail-squid.squids.live`, publicnode, the mirror)
+    hung in `SYN_SENT` until Chromium gave up (`ERR_TIMED_OUT`), while Infura
+    (IPv4 only) worked. That is the earlier "couldn't update the balance". It
+    now connects with hyper-util's `HttpConnector`, like
+    `DirectRouteConnector`: the second family joins after 300 ms, 10 s for all
+    of a host's addresses. On that Wi-Fi the page then held
+    `51.159.166.34:443` (the POI node over IPv4) and refreshed. A Rust test
+    resolves to an unreachable IPv6 address before a working IPv4 one.
+  - **Live line.** The page publishes a `screening` event, the whole state on
+    every change (`src/screening-activity.js`): a long txid catch-up's share
+    (only 1,000 or more behind, against the POI node's validated index),
+    downloads of the proving files (`setArtifactProgressListener` in
+    `artifact-mirror.js`, bytes summed across files) and POI proofs (from the
+    proof callback). Kotlin and Swift forward the new event; Dart keeps it in
+    `RailgunEngineState.screening`. Under Processing, in a smaller size and
+    the accent colour (owner), the row reads what runs, proof first:
+    "Building screening proof 1 of 3 · 40%", "Downloading proving files ·
+    25%", "Syncing Railgun's transaction list · 42%", or, with nothing
+    running, "Waiting for Railgun's screening service" while a node holds
+    proofs (`ProofSubmitted`, now `PrivateUsdBalances.submitted`).
+  - **Sync line.** A long txid catch-up climbs as `RAILGUN SYNC n%` instead
+    of reading synced (owner: it read synced for six days with the list
+    13,000 behind).
+- **D-133 (owner, 2026-10-19): a buzz when "Authorize settlement" is
+  offered.** D-128 buzzed only two minutes before the step closes; the owner
+  expected one when the step comes up, mid-conversion, to call them back to
+  it. The reminder now buzzes when the step is first offered, and again two
+  minutes before it closes if still unauthorized; one buzz when the offer
+  comes inside those two minutes (`privateUsdSettlementBuzzDue`, four unit
+  tests). D9 holds: foreground and unlocked only, so a step offered while the
+  app was away buzzes on its return.
+
+- **D-134 (owner, 2026-10-19): "bridge" in place of "convert", a "Bridged"
+  sign, Receive's switch, and the sync line's fixes.** UI only; no swap,
+  key or funds logic changed.
+  - Every user-facing string says bridge, bridging or bridged (title
+    "Bridging", tab "Bridge progress", button "Bridge", "New bridge",
+    activity "Bridged to ZEC" and "Bridged to 0zkUSDC"; the forward banner
+    reads "Bridging to 0zkUSDC"). Identifiers, keys and routes keep
+    `convert`.
+  - A finished bridge kept its last step ("Moving ZEC to your shielded
+    wallet") spinning beside an enabled "New conversion": the timeline
+    capped its current step at the last row. `SwapAnimatedProgressRoute`
+    now lets the index sit one past the last step, so nothing stays current
+    (swaps never pass it). The step reads "Moving ZEC to your wallet", which
+    no longer ellipsizes.
+  - A bridge that finishes in view lights a "Bridged" sign: the sync
+    screen's done badge (now the shared `NeonDoneSign`) with a shockwave of
+    two lit rings, the send screen's ripple as neon, and the send success
+    haptic as the badge lights. Opened later, the sign is simply lit. The
+    top bar reads "Bridge" once a bridge ended, and its amounts "You paid"
+    and "You received".
+  - The gap under the header closed: the bridge screens set it to 8 px
+    (`MobileSwapStatusContent.headerToBodyGap`, swaps keep theirs) and name
+    the ZEC side "Shielded ZEC", as the dollar side is "Private USD".
+  - Railgun's sync line stands at Home's 85%. Right after a bridge it ran
+    full height with no `RAILGUN SYNCED` and gaps: the finished bridge's
+    banner going away shrank a scrolled page, the list was clamped back to
+    its top without a scroll notification, and `NeonSyncScrolled` kept it
+    "scrolled" (readout faded, the line behind the blocks). It now follows
+    metrics notifications too; a widget test fails on the old listener.
+  - The "Receive from a Railgun wallet" card is gone. Receive opens one
+    sheet with ZEC Receive's switch (`NeonSwitchTabs`, now shared): USDC at
+    the deposit address by default, 0zkUSDC at the 0zk address. Without a
+    Deposits pin the sheet shows the 0zk address alone. The M3 device round
+    reads the address from the sheet.
+
+- **D-135 (owner, 2026-10-19): Send and Withdraw scan their recipient.** Now
+  that Receive shows both kinds of address as a code, the send form has ZEC
+  Send's "Scan a QR code" row under the address field. The row is one
+  widget for all three pickers (`MobileScanAddressRow`: ZEC Send, Pay and
+  Private USD), and the scanner is ZEC Send's card (`MobileAddressScanCard`,
+  `showPrivateUsdScanSheet`). `privateUsdScanOutcome` takes what typing takes
+  (`privateUsdSendDestination`): a 0zk address on Send (an all-capitals one
+  lowercased, as bech32 QR codes often carry it), a 0x one on Withdraw. An
+  `ethereum:` request gives up its recipient (a token transfer's `address`,
+  never the token) and is refused when it names another chain than the
+  deployment's; the other kind of address is refused by name, pointing to
+  the action that takes it. ZEC Send's row now reads "Scan a QR code", in
+  sentence case like Pay's.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

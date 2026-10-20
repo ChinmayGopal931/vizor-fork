@@ -3,6 +3,8 @@
 
 import 'package:flutter/widgets.dart';
 
+import '../src/core/layout/mobile/app_mobile_sheet.dart';
+import '../src/core/theme/app_theme.dart';
 import '../src/features/activity/models/activity_row_data.dart';
 import '../src/features/private_usd/models/private_usd_balances.dart';
 import '../src/features/private_usd/models/private_usd_record_key.dart';
@@ -19,6 +21,7 @@ import '../src/features/private_usd/services/private_usd_balance_repository.dart
 import '../src/features/private_usd/services/private_usd_engine.dart';
 import '../src/features/private_usd/services/private_usd_zec_quote_search.dart';
 import '../src/features/private_usd/widgets/mobile/private_usd_activity_rows.dart';
+import '../src/features/private_usd/widgets/mobile/private_usd_receive_sheet.dart';
 import '../src/rust/api/private_usd.dart';
 
 /// Deterministic Private USD fixtures (plan reference §9.7): fixed balances,
@@ -198,7 +201,6 @@ class _PrivateUsdScreenPreview extends StatelessWidget {
           state: state,
           zecUsdPrice: 70,
           privacyModeEnabled: privacyModeEnabled,
-          receiveAddress: previewPrivateUsdAddress,
           screening: const Duration(hours: 1),
           tokenNames: {
             previewPrivateUsdUsdc.address: PrivateUsdCopy.tokenName(
@@ -227,6 +229,7 @@ class _PrivateUsdScreenPreview extends StatelessWidget {
           onConvert: () {},
           onSend: () {},
           onWithdraw: () {},
+          onReceive: () {},
           canSend: canSend,
           canConvert: canConvert,
           spendNote: spendNote,
@@ -235,6 +238,52 @@ class _PrivateUsdScreenPreview extends StatelessWidget {
     );
   }
 }
+
+/// A deposit address, EIP-55 (the EIP's own example).
+const previewPrivateUsdDepositAddress =
+    '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed';
+
+// As `showAppMobileSheet` presents it: the modal card at the bottom.
+Widget _receivePreview(PrivateUsdReceiveKind kind) => PrivateUsdPreviewFrame(
+  child: Builder(
+    builder: (context) => ColoredBox(
+      color: context.colors.background.window,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Spacer(),
+          MobileModalCard(child: _receiveBody(kind)),
+        ],
+      ),
+    ),
+  ),
+);
+
+Widget _receiveBody(PrivateUsdReceiveKind kind) => PrivateUsdReceiveSheetBody(
+  kind: kind,
+  onKindChanged: (_) {},
+  symbol: 'USDC',
+  chain: 'Ethereum',
+  address: previewPrivateUsdDepositAddress,
+  railgunAddress: previewPrivateUsdAddress,
+  terms: const ApiDepositTerms(
+    fee: '250000',
+    feeBps: 50,
+    minValue: '10000000',
+    railgunFeeBps: 25,
+  ),
+  example: PrivateUsdCopy.depositExample(r'$10.00', r'$9.68'),
+  screening: const Duration(hours: 1),
+  onClose: () {},
+);
+
+/// Receive, public USDC (the default): the deposit address and its terms.
+Widget buildMobilePrivateUsdReceiveUseCase(BuildContext context) =>
+    _receivePreview(PrivateUsdReceiveKind.usdc);
+
+/// Receive, switched to 0zkUSDC: the 0zk address for a Railgun wallet.
+Widget buildMobilePrivateUsdReceiveShieldedUseCase(BuildContext context) =>
+    _receivePreview(PrivateUsdReceiveKind.shielded);
 
 /// A 393 × 852 phone frame with its safe area, for the Private USD
 /// previews.
@@ -552,6 +601,22 @@ Widget buildMobilePrivateUsdProgressPaidUseCase(BuildContext context) =>
         ),
       ),
       balance: previewPrivateUsdBalance(available: 1250.4, arriving: 15.5),
+    );
+
+/// Paid and screened: bridged.
+Widget buildMobilePrivateUsdProgressBridgedUseCase(BuildContext context) =>
+    _progressPreview(
+      PrivateUsdConversionStatus(
+        record: previewPrivateUsdRecord(
+          phase: ApiForwardPhase.paid,
+          outcome: ApiForwardOutcome.paid,
+          ago: const Duration(minutes: 20),
+        ),
+      ),
+      // Read after the payout settled, with nothing left arriving.
+      balance: previewPrivateUsdBalance(
+        available: 1265.9,
+      ).copyWith(updatedAt: previewPrivateUsdNow),
     );
 
 /// The maker called it off: bringing the ZEC back.

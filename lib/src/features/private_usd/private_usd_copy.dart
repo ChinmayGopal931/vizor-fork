@@ -81,13 +81,13 @@ abstract final class PrivateUsdCopy {
   static const homeOpen = 'Open private USD';
 
   /// `private_usd_banner_title`
-  static const bannerToUsd = 'Converting to private USD';
+  static const bannerToUsd = 'Bridging to 0zkUSDC';
 
   /// `private_usd_converting_zec`
-  static const bannerToZec = 'Converting to ZEC';
+  static const bannerToZec = 'Bridging to ZEC';
 
   /// `private_usd_banner_attention_title`
-  static const bannerAttention = 'Conversion needs attention';
+  static const bannerAttention = 'Bridge needs attention';
 
   /// `private_usd_banner_view`
   static const bannerView = 'View';
@@ -118,6 +118,35 @@ abstract final class PrivateUsdCopy {
       'A send is being confirmed. These funds are available again once it '
       'settles.';
 
+  /// New: the row while the last sync found Railgun's screening failing,
+  /// its nodes unreachable or refusing the proofs a send needs.
+  static const rowProcessingStalled = '$rowProcessing · screening delayed';
+
+  /// New: [rowProcessingStalled]'s explanation.
+  static const rowProcessingStalledInfo =
+      "Railgun's screening hasn't accepted these funds yet. They're still "
+      'yours and become available once it does. Veylor keeps trying while '
+      "it's open.";
+
+  /// New (owner, 2026-10-19): the Processing row's live line while the page
+  /// catches up on Railgun's transaction list.
+  static String screeningSyncingList(int percent) =>
+      "Syncing Railgun's transaction list · $percent%";
+
+  /// New (owner, 2026-10-19): while the proving files download; [percent] is
+  /// null while their size is unknown.
+  static String screeningDownloading(int? percent) => percent == null
+      ? 'Downloading proving files'
+      : 'Downloading proving files · $percent%';
+
+  /// New (owner, 2026-10-19): while a screening proof is built.
+  static String screeningProving(int index, int count, int percent) => count > 1
+      ? 'Building screening proof $index of $count · $percent%'
+      : 'Building screening proof · $percent%';
+
+  /// New (owner, 2026-10-19): once a screening node has taken the proofs.
+  static const screeningWaiting = "Waiting for Railgun's screening service";
+
   /// `private_usd_row_arriving`
   static const rowArriving = 'Arriving';
 
@@ -139,7 +168,7 @@ abstract final class PrivateUsdCopy {
   /// `private_usd_row_blocked_info` (B, D17)
   static const rowBlockedInfo =
       "Railgun's screening refused these funds, so they can't be spent or "
-      'sent. They can only go back to where they came from, the conversion '
+      'sent. They can only go back to where they came from, the bridge '
       'contract. $supportSentence';
 
   /// `private_usd_assets_title`
@@ -156,7 +185,7 @@ abstract final class PrivateUsdCopy {
       symbol == 'tUSD' ? tokenTestUsd : tokenUsdc;
 
   /// `private_usd_action_convert`
-  static const actionConvert = 'Convert';
+  static const actionConvert = 'Bridge';
 
   /// `private_usd_action_send`
   static const actionSend = 'Send';
@@ -194,19 +223,23 @@ abstract final class PrivateUsdCopy {
 
   /// `private_usd_empty_body`
   static const emptyBody =
-      'Convert ZEC into dollars nobody else can see: not your balance, and '
+      'Bridge ZEC into dollars nobody else can see: not your balance, and '
       'not who you pay.';
 
-  /// `private_usd_receive_address`: since M9 the `0zk` card is the way to
-  /// receive from another Railgun wallet.
-  static const receiveAddress = 'Receive from a Railgun wallet';
+  /// New (owner, 2026-10-19): the Receive sheet's switch names shielded
+  /// USDC as Railgun does, "0zkUSDC" (or "0zktUSD" on testnet); public USDC
+  /// is its symbol alone.
+  static String receiveShieldedTab(String symbol) => '0zk$symbol';
 
-  /// New (M9): under that card's title.
+  /// New: the 0zk address takes private transfers only.
+  static const receiveShieldedOnly = 'Only from a Railgun wallet';
+
+  /// New: under the 0zk address (the screen's card, before 2026-10-19).
   static const receiveAddressNote =
       'Private USD from another Railgun wallet arrives here, with no fee.';
 
-  /// `private_usd_copy_address`
-  static const copyAddress = 'Copy your private USD address';
+  /// New: copies the 0zk address.
+  static const receiveShieldedCopy = 'Copy Railgun address';
 
   /// New: the toast after copying the address.
   static const addressCopied = 'Address copied';
@@ -216,19 +249,19 @@ abstract final class PrivateUsdCopy {
 
   /// `private_usd_payment_pending`
   static const paymentPending =
-      "A previous payment is still pending. You can send or convert again "
+      "A previous payment is still pending. You can send or bridge again "
       "once it's confirmed.";
 
   /// `private_usd_conversion_pending`
   static const conversionPending =
-      'A conversion is in progress. Sending will be available when it '
+      'A bridge is in progress. Sending will be available when it '
       'finishes.';
 
   /// `private_usd_info_title`
   static const infoTitle = 'About private USD';
 
   /// `private_usd_info_step_convert` (S)
-  static const infoConvert = 'Convert: exchange ZEC and private USD.';
+  static const infoConvert = 'Bridge: move between ZEC and private USD.';
 
   /// `private_usd_info_receive` (B; M9: both ways money comes in)
   static const infoReceive =
@@ -261,14 +294,14 @@ abstract final class PrivateUsdCopy {
 
   /// New (F)
   static const infoKeepOpen =
-      'Conversions, sends and refunds run only while Veylor is open and '
+      'Bridges, sends and refunds run only while Veylor is open and '
       'unlocked.';
 
   /// New (T): only if the D4 bridge had failed. It did not (M0.3), so
   /// nothing shows it today.
   static const torUnavailable =
       'Private USD is unavailable while Tor is on. Turn off Tor in Settings '
-      'to use it. Conversions already under way continue.';
+      'to use it. Bridges already under way continue.';
 
   /// New: the close button of the info sheet.
   static const close = 'Close';
@@ -280,22 +313,22 @@ abstract final class PrivateUsdCopy {
 
   /// `private_usd_activity_empty`
   static const activityEmpty =
-      'Your conversions, sends and withdrawals will show here.';
+      'Your bridges, sends and withdrawals will show here.';
 
   /// `private_usd_activity_converting`
-  static const activityConverting = 'Converting ZEC';
+  static const activityConverting = 'Bridging to 0zkUSDC';
 
   /// `private_usd_activity_converted`
-  static const activityConverted = 'Converted ZEC';
+  static const activityConverted = 'Bridged to 0zkUSDC';
 
   /// `private_usd_activity_converted_zec`
-  static const activityConvertedToZec = 'Converted to ZEC';
+  static const activityConvertedToZec = 'Bridged to ZEC';
 
   /// Reverse under way (reference §9.4 S2).
-  static const activityConvertingToZec = 'Converting to ZEC';
+  static const activityConvertingToZec = 'Bridging to ZEC';
 
   /// `private_usd_activity_refunded`
-  static const activityRefunded = 'Conversion called off';
+  static const activityRefunded = 'Bridge called off';
 
   /// `private_usd_activity_refunded_detail`
   static const activityRefundedDetail = 'your ZEC came back';
@@ -328,7 +361,7 @@ abstract final class PrivateUsdCopy {
   static const activityUnconfirmed = 'not in a block yet';
 
   /// `private_usd_activity_open_conversion`
-  static const activityOpenConversion = 'Open conversion';
+  static const activityOpenConversion = 'Open bridge';
 
   /// `private_usd_activity_open_transaction`
   static const activityOpenTransaction = 'View transaction';
@@ -339,7 +372,7 @@ abstract final class PrivateUsdCopy {
   // ── Convert (both directions): amount and quote ─────────────────────
 
   /// `convert_title`
-  static const convertTitle = 'Convert';
+  static const convertTitle = 'Bridge';
 
   /// `convert_asset_zec`
   static const convertAssetZec = 'ZEC';
@@ -360,7 +393,7 @@ abstract final class PrivateUsdCopy {
   static const convertYouReceive = 'You receive about';
 
   /// `convert_fees`
-  static const convertFees = 'Conversion fees';
+  static const convertFees = 'Bridge fees';
 
   /// `convert_fees_value`
   static String convertFeesValue(String relayerUsd, String railgunPercent) =>
@@ -422,18 +455,18 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_error_maker_cant_fill`
   static const convertErrorMakerCantFill =
-      "The market maker can't convert this much right now. Try a smaller "
+      "The market maker can't bridge this much right now. Try a smaller "
       'amount, or try again later.';
 
   /// `convert_error_maker_busy`
   static const convertErrorMakerBusy =
-      'The market maker is busy with other conversions. Try again in a few '
+      'The market maker is busy with other bridges. Try again in a few '
       'minutes.';
 
   /// `convert_error_amount_refused`
   static const convertErrorAmountRefused =
-      "The market maker won't convert this amount. It may be over the limit "
-      "for one conversion, or too small to cover the swap's network cost.";
+      "The market maker won't bridge this amount. It may be over the limit "
+      "for one bridge, or too small to cover the swap's network cost.";
 
   /// `convert_error_below_fee`
   static const convertErrorBelowFee =
@@ -446,33 +479,33 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_error_no_tokens_today`
   static const convertErrorNoTokensToday =
-      "This phone has used today's conversions. More are available after "
+      "This phone has used today's bridges. More are available after "
       'midnight UTC.';
 
   /// `convert_error_tokens_unavailable` (B, T)
   static const convertErrorTokensUnavailable =
-      "Couldn't get this conversion's token, so nothing was sent. Try again "
+      "Couldn't get this bridge's token, so nothing was sent. Try again "
       'in a moment.';
 
   /// `convert_error_device_refused` (B)
   static const convertErrorDeviceRefused =
-      "This phone can't get conversion tokens. The token service turns away "
+      "This phone can't get bridge tokens. The token service turns away "
       'emulators, phones with an unlocked bootloader or a modified system, '
       "and app builds it doesn't recognize.";
 
   /// `convert_error_keystore` (B)
   static const convertErrorKeystore =
-      "Veylor couldn't use this phone's secure key storage to get a conversion "
+      "Veylor couldn't use this phone's secure key storage to get a bridge "
       'token, so nothing was sent. Try again in a moment.';
 
   /// `convert_error_relayer`
   static const convertErrorRelayer =
-      "The relayer that completes conversions can't be reached right now. "
+      "The relayer that completes bridges can't be reached right now. "
       'Try again in a moment.';
 
   /// `convert_error_relayer_refused`
   static const convertErrorRelayerRefused =
-      'The relayer that completes conversions turned this down. Try again in '
+      'The relayer that completes bridges turned this down. Try again in '
       'a moment.';
 
   /// `convert_error_ethereum` (B)
@@ -491,7 +524,7 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_error_store` (B, D17)
   static const convertErrorStore =
-      "Veylor can't read its saved conversions. $supportSentence";
+      "Veylor can't read its saved bridges. $supportSentence";
 
   /// `convert_error_generic`
   static const convertErrorGeneric =
@@ -499,7 +532,7 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_start_failed`
   static const convertStartFailed =
-      "The conversion couldn't start. Nothing was sent. Try again in a "
+      "The bridge couldn't start. Nothing was sent. Try again in a "
       'moment.';
 
   /// New (T): `route_blocked`
@@ -516,11 +549,11 @@ abstract final class PrivateUsdCopy {
   static const convertReviewArrow = 'for about';
 
   /// `convert_info_title`
-  static const convertInfoTitle = 'How converting works';
+  static const convertInfoTitle = 'How bridging works';
 
   /// `convert_info_step_quote`
   static const convertInfoStepQuote =
-      'Enter the ZEC you want to convert, including the network fee. The '
+      'Enter the ZEC you want to bridge, including the network fee. The '
       'market maker quotes how much private USD you receive. The quote holds '
       'for a few minutes.';
 
@@ -546,7 +579,7 @@ abstract final class PrivateUsdCopy {
       'your ZEC comes back, less a network fee.';
 
   /// `convert_review_info_title`
-  static const convertReviewInfoTitle = 'Before you convert';
+  static const convertReviewInfoTitle = 'Before you bridge';
 
   /// `convert_review_info_pay`
   static const convertReviewInfoPay =
@@ -561,7 +594,7 @@ abstract final class PrivateUsdCopy {
   /// `convert_review_info_quote` (S)
   static const convertReviewInfoQuote =
       'The quote holds for a few minutes. If it expires, refresh it: nothing '
-      'is sent until you convert.';
+      'is sent until you bridge.';
 
   /// New (T, D10): `tor_off_disclosure`. Shown only once Vizor fetches
   /// conversion tokens (M4); M5 converts without them.
@@ -572,7 +605,25 @@ abstract final class PrivateUsdCopy {
   // ── Convert: progress (forward) ───────────────────────────────────────
 
   /// `convert_progress_title`
-  static const convertProgressTitle = 'Converting';
+  static const convertProgressTitle = 'Bridging';
+
+  /// New (owner, 2026-10-19): the progress screen's title once a bridge
+  /// ended, either way; [convertProgressTitle] while it runs.
+  static const bridgeEndedTitle = 'Bridge';
+
+  /// New (owner, 2026-10-19): a finished bridge's sign, both directions.
+  static const bridgedTitle = 'Bridged';
+
+  /// New (owner, 2026-10-19): under a ZEC amount on the bridge screens, as
+  /// [title] is under a dollar one.
+  static const shieldedZec = 'Shielded ZEC';
+
+  /// New: a finished bridge's amounts, in place of [convertYouPay] and
+  /// [convertYouReceive] (no longer an estimate).
+  static const bridgedYouPaid = 'You paid';
+
+  /// New: see [bridgedYouPaid].
+  static const bridgedYouReceived = 'You received';
 
   /// `convert_progress_amounts`
   static String convertProgressAmounts(String zec, String usd) =>
@@ -684,7 +735,7 @@ abstract final class PrivateUsdCopy {
       'back, less a small network fee.';
 
   /// New: the progress tab of the step list.
-  static const progressTab = 'Conversion progress';
+  static const progressTab = 'Bridge progress';
 
   /// New: the details tab's rows.
   static const detailSwapId = 'Swap ID';
@@ -712,12 +763,12 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_problem_relayer_refused` (B, F)
   static const convertProblemRelayerRefused =
-      "The relayer keeps turning down this conversion's transaction. Veylor "
+      "The relayer keeps turning down this bridge's transaction. Veylor "
       "keeps trying while it's open.";
 
   /// `convert_problem_relayer_fee` (B, N)
   static const convertProblemRelayerFee =
-      "The relayer's fee is more than this conversion pays out, or above the "
+      "The relayer's fee is more than this bridge pays out, or above the "
       '2 USDC limit, so Veylor waits for it to come down.';
 
   /// `convert_problem_ethereum` (B, F)
@@ -748,17 +799,17 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_problem_tokens` (B, T, F)
   static const convertProblemTokens =
-      "Veylor can't get this conversion's token right now. It keeps trying "
+      "Veylor can't get this bridge's token right now. It keeps trying "
       "while it's open.";
 
   /// `convert_problem_rejected` (B)
   static const convertProblemRejected =
-      'The Zcash network turned down a transaction of this conversion. Veylor '
+      'The Zcash network turned down a transaction of this bridge. Veylor '
       'keeps sending it until it goes through or expires.';
 
   /// `convert_problem_mismatch` (B)
   static const convertProblemMismatch =
-      "What's on the chain doesn't match this conversion, so Veylor only "
+      "What's on the chain doesn't match this bridge, so Veylor only "
       'brings your funds back.';
 
   /// New (T): a step held up by the Tor route (`RouteBlocked`).
@@ -806,12 +857,12 @@ abstract final class PrivateUsdCopy {
 
   /// `convert_result_maker_refused`
   static const convertResultMakerRefused =
-      'The market maker turned the conversion down. Your ZEC never left your '
+      'The market maker turned the bridge down. Your ZEC never left your '
       'wallet.';
 
   /// `convert_result_maker_unavailable`
   static const convertResultMakerUnavailable =
-      "The market maker isn't taking conversions right now. Your ZEC never "
+      "The market maker isn't taking bridges right now. Your ZEC never "
       'left your wallet.';
 
   /// `convert_result_never_opened`
@@ -842,7 +893,7 @@ abstract final class PrivateUsdCopy {
   // ── Reverse (M6): amount, review and info ───────────────────────────
 
   /// `convert_swap_direction`: the direction toggle's label.
-  static const convertSwapDirection = 'Swap conversion direction';
+  static const convertSwapDirection = 'Swap bridge direction';
 
   /// `reverse_insufficient` (S)
   static const reverseInsufficient =
@@ -850,14 +901,14 @@ abstract final class PrivateUsdCopy {
 
   /// `reverse_error_max`
   static const reverseErrorMax =
-      "Couldn't work out the most you can convert. Try again in a moment.";
+      "Couldn't work out the most you can bridge. Try again in a moment.";
 
   /// New: a reverse amount takes whole cents (Rust refuses more decimals).
   static const reverseAmountCents = 'Use at most 2 decimal places.';
 
   /// `reverse_error_funding_unavailable` (S)
   static const reverseErrorFundingUnavailable =
-      'Conversion to ZEC is unavailable right now. Try again later.';
+      'Bridging to ZEC is unavailable right now. Try again later.';
 
   /// `reverse_error_cost_changed`
   static const reverseErrorCostChanged =
@@ -945,13 +996,13 @@ abstract final class PrivateUsdCopy {
       'your private USD and move ZEC to your shielded wallet.';
 
   /// `reverse_step_settle`
-  static const reverseStepSettle = 'Settling your conversion';
+  static const reverseStepSettle = 'Settling your bridge';
 
   /// `reverse_settling`
   static const reverseSettling = 'Waiting for settlement';
 
   /// `reverse_sweeping`
-  static const reverseSweeping = 'Moving ZEC to your shielded wallet';
+  static const reverseSweeping = 'Moving ZEC to your wallet';
 
   /// `reverse_sweep_confirmations`
   static String reverseSweepConfirmations(int count) =>
@@ -976,7 +1027,7 @@ abstract final class PrivateUsdCopy {
 
   /// `reverse_cancelled` (S)
   static const reverseCancelled =
-      'Conversion cancelled. No escrow payment remains.';
+      'Bridge cancelled. No escrow payment remains.';
 
   /// `reverse_progress_amounts`
   static String reverseProgressAmounts(String usd, String zec) =>
@@ -997,19 +1048,19 @@ abstract final class PrivateUsdCopy {
   static const reverseResultRefunded = 'Refund sent';
 
   /// `reverse_result_cancelled`
-  static const reverseResultCancelled = 'Conversion cancelled';
+  static const reverseResultCancelled = 'Bridge cancelled';
 
   /// `reverse_new`
-  static const reverseNew = 'New conversion';
+  static const reverseNew = 'New bridge';
 
   /// `reverse_cancel`
-  static const reverseCancel = 'Cancel conversion';
+  static const reverseCancel = 'Cancel bridge';
 
   /// `reverse_request_refund` (S)
   static const reverseRequestRefund = 'Request refund';
 
   /// New (D18): `reverse_cancel_confirm_title`
-  static const reverseCancelConfirmTitle = 'Cancel this conversion?';
+  static const reverseCancelConfirmTitle = 'Cancel this bridge?';
 
   /// New (D18): `reverse_cancel_confirm_body`, once private USD was paid.
   static const reverseCancelConfirmBody =
@@ -1041,12 +1092,12 @@ abstract final class PrivateUsdCopy {
 
   /// `reverse_refund_unavailable` (B)
   static const reverseRefundUnavailable =
-      'This conversion has already settled and can no longer be refunded. '
+      'This bridge has already settled and can no longer be refunded. '
       'Veylor will finish moving your ZEC to your wallet.';
 
   /// `reverse_error` (B)
   static const reverseError =
-      'Unable to complete this step. Your saved conversion resumes after '
+      'Unable to complete this step. Your saved bridge resumes after '
       'Veylor checks both chains. A payment is never repeated because a '
       'request timed out.';
 
@@ -1056,7 +1107,7 @@ abstract final class PrivateUsdCopy {
 
   /// `reverse_error_too_late`
   static const reverseErrorTooLate =
-      "It's too late for this step, so the conversion ends by itself. "
+      "It's too late for this step, so the bridge ends by itself. "
       'Anything you paid comes back.';
 
   /// `reverse_error_rescue`
@@ -1095,7 +1146,7 @@ abstract final class PrivateUsdCopy {
   static const refundsTitle = 'Refunds';
 
   /// `refunds_subtitle`
-  static const refundsSubtitle = 'Refunds from earlier conversions';
+  static const refundsSubtitle = 'Refunds from earlier bridges';
 
   /// `refunds_info`
   static const refundsInfo =
@@ -1103,10 +1154,10 @@ abstract final class PrivateUsdCopy {
       'Railgun screening may delay availability.';
 
   /// `refunds_original_amount`
-  static const refundsOriginalAmount = 'Original conversion amount';
+  static const refundsOriginalAmount = 'Original bridge amount';
 
   /// `refunds_empty`
-  static const refundsEmpty = 'No refunded conversions yet.';
+  static const refundsEmpty = 'No refunded bridges yet.';
 
   /// `refunds_checking`
   static const refundsChecking = 'Checking refunds…';
@@ -1200,8 +1251,7 @@ abstract final class PrivateUsdCopy {
       'Relayer fee: $fixed + $percent%';
 
   /// Railgun's shield fee.
-  static String depositRailgunFee(String percent) =>
-      "Railgun's fee: $percent%";
+  static String depositRailgunFee(String percent) => "Railgun's fee: $percent%";
 
   /// What a deposit of [sent] brings after both fees.
   static String depositExample(String sent, String arrives) =>
@@ -1271,7 +1321,7 @@ abstract final class PrivateUsdCopy {
   // ── Accounts and reset (new for vizor; §8.4 refusal) ──────────────────
 
   /// New: `delete_unfinished_title`
-  static const deleteUnfinishedTitle = 'Conversion in progress';
+  static const deleteUnfinishedTitle = 'Bridge in progress';
 
   /// New (F): `delete_unfinished_body`
   static String deleteUnfinishedBody(int count) =>
@@ -1296,8 +1346,7 @@ abstract final class PrivateUsdCopy {
   static String accountsPendingConversions(int count) =>
       '$count ${_conversions(count)} in progress';
 
-  static String _conversions(int count) =>
-      count == 1 ? 'conversion' : 'conversions';
+  static String _conversions(int count) => count == 1 ? 'bridge' : 'bridges';
 
   // ── Send and withdraw (M7) ────────────────────────────────────────────
 
@@ -1337,6 +1386,33 @@ abstract final class PrivateUsdCopy {
   /// `private_usd_send_zero_address`
   static const sendZeroAddress =
       "That's the zero address: anything sent there is lost for good.";
+
+  /// New (owner, 2026-10-19): under the scanner's viewfinder, sending
+  /// privately.
+  static const scanCaptionPrivate = 'Scan a Railgun 0zk address';
+
+  /// New: under the scanner's viewfinder, withdrawing.
+  static const scanCaptionWithdraw = 'Scan an Ethereum 0x address';
+
+  /// New: the scanner's camera permission title.
+  static const scanPermissionTitle = "Scan the recipient's address";
+
+  /// New: a scanned code that holds no `0zk` address.
+  static const scanNot0zk = "This QR code isn't a Railgun 0zk address.";
+
+  /// New: a scanned code that holds no `0x` address.
+  static const scanNot0x = "This QR code isn't an Ethereum address.";
+
+  /// New: a `0x` address scanned to send privately.
+  static const scanUseWithdraw =
+      'This is a public 0x address. To send to it, use Withdraw.';
+
+  /// New: a `0zk` address scanned to withdraw.
+  static const scanUseSend =
+      'This is a private 0zk address. To pay it, use Send.';
+
+  /// New: an `ethereum:` request for another chain.
+  static const scanOtherNetwork = 'This QR code is for another network.';
 
   /// `private_usd_send_too_much`
   static const sendTooMuch = 'More than you have available.';
@@ -1471,7 +1547,7 @@ abstract final class PrivateUsdCopy {
 
   /// `private_usd_withdraw_info_note_private`
   static const withdrawInfoNotePrivate =
-      "To stay private, don't withdraw the exact amount you just converted, "
+      "To stay private, don't withdraw the exact amount you just bridged, "
       'wait a while first, and use a fresh address each time.';
 
   /// `private_usd_withdraw_info_note_fee`

@@ -168,4 +168,41 @@ void main() {
     );
     expect(moving(tester), isFalse);
   });
+
+  // A finished bridge's banner going away shrank the Private USD page under
+  // a scrolled position: the list was clamped back to its top without a
+  // scroll notification, and the page kept its readout hidden.
+  testWidgets('a list clamped back to its top no longer reads as scrolled', (
+    tester,
+  ) async {
+    final rows = ValueNotifier(40);
+    addTearDown(rows.dispose);
+    bool? scrolled;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NeonSyncScrolled(
+          builder: (context, value) {
+            scrolled = value;
+            return ValueListenableBuilder<int>(
+              valueListenable: rows,
+              builder: (context, count, _) => ListView(
+                children: [
+                  for (var i = 0; i < count; i++) const SizedBox(height: 50),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    expect(scrolled, isFalse);
+
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pumpAndSettle();
+    expect(scrolled, isTrue);
+
+    rows.value = 2;
+    await tester.pumpAndSettle();
+    expect(scrolled, isFalse);
+  });
 }

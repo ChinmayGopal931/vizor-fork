@@ -211,8 +211,8 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
 - **Sync line.** `NeonSyncBackdrop` replaces the top bar's sync label on
   Home. A Tron floor lies behind the content and flows only while
   something scans (idle, nothing moves and no frame is drawn), and a red
-  line at 85% of the width (87% for Railgun's on the Private USD screen)
-  rises from the bottom with the progress,
+  line at 85% of the width (Railgun's on the Private USD screen too, since
+  2026-10-19) rises from the bottom with the progress,
   its head reading `SYNC n%`, `SYNCED`, `SYNC FAILED` or `TOR …`
   (`NeonSyncReadout`). It has two layers (`NeonSyncLineLayer`): while
   syncing the line is drawn over the content (`NeonSyncLayer.front`,
@@ -220,13 +220,24 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   with solid black (`NeonSyncOcclude`) so the line shows only in the gaps.
   Its head, from just above it down past the readout, stays in the front
   layer (`NeonSyncLinePart.head`), so nothing between the layers (the top
-  bar, a scroll fade) cuts the line beside its readout.
+  bar, a scroll fade) cuts the line beside its readout. Scrolled away from
+  the top (`NeonSyncScrolled`), a synced line's head and readout fade and
+  the whole line runs behind; it follows the list's metrics notifications
+  as well as its scroll ones, since a list clamped back to its top when
+  its content shrinks sends no scroll notification (a finished bridge's
+  banner going away once left the readout hidden at the top).
   A scan that starts at most 20 blocks behind the tip counts as synced, so
   the line does not drop and re-climb every block. The Private USD screen
   draws Railgun's sync the same way (`privateUsdSyncLine`), with readouts
   that name Railgun (`RAILGUN SYNC n%`, `RAILGUN SYNCED`, `RAILGUN SYNC
   FAILED`; the Tor ones are Home's): a first sync climbs, and a refresh of
-  a wallet that synced before stays `RAILGUN SYNCED` while the floor flows.
+  a wallet that synced before stays `RAILGUN SYNCED` while the floor flows,
+  unless the page reports a long catch-up on Railgun's transaction list
+  (1,000 or more behind): that climbs as `RAILGUN SYNC n%`, since screening a
+  send's change waits on the list. Private USD's Processing row adds a live
+  line (smaller, in the accent colour) saying what the screening work is
+  doing: syncing that list, downloading proving files, building a proof, or
+  waiting on the screening service (`privateUsdScreeningStatus`).
 - **Tab bar.** Glyphs only: no slab, border or caption. `TronGlyph` draws
   the tab icons (and, on mobile, `AppIcon` draws its round icons —
   check, arrow-down, plus, warning, cancel, help — as angular glyphs). The active
@@ -245,7 +256,10 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   mobile (`VeylorWordmarkPainter`: lit red, or plain lines where a caller
   sets a colour); desktop keeps `vizor_logo.svg`.
 - **Keys and money flows.** The passcode keys are cut-corner glass plates
-  that light red under the finger. Private USD's convert screens put red
+  that light red under the finger. Private USD calls a conversion a bridge
+  in every user-facing string (owner, 2026-10-19: "Bridge", "Bridging",
+  "Bridge progress", "Bridged to ZEC", "Bridged to 0zkUSDC"); code, keys
+  and routes keep `convert`. Private USD's convert screens put red
   captions on their panels and a direction switch between them that keeps
   its place (dimmed while unavailable, its edge breathing while a quote is
   on its way); the estimate churns as cipher (`NeonCipherChurn`) until the
@@ -253,7 +267,13 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   (`PrivateUsdLedgerRow`, smaller type, hairlines between rows). Swap and
   conversion progress (`mobile_swap_status_content.dart`) is a red
   timeline: lit checks for done steps, the spinner kept for the current
-  one, and a packet of light running down the rail into it.
+  one, and a packet of light running down the rail into it; a finished
+  bridge keeps no step current (`SwapAnimatedProgressRoute` lets its index
+  sit one past the last step). A bridge that finishes in view lights a
+  "Bridged" sign (`PrivateUsdBridgedHero`): `NeonDoneSign`, the sync
+  screen's done badge, with a shockwave of two lit rings (the send
+  screen's ripple as neon) and the send success haptic; opened later, the
+  sign is simply lit.
 - **Receive.** The address and request codes sit in a lit cut-corner frame
   (`ReceiveQrFrame`), always dark modules on a light plate, with Veylor's
   helmet as the badge in place of the pool's; the pool switch names the
@@ -1386,11 +1406,13 @@ Code:
   conversion's progress shows with a key step to come, and through a
   Railgun first sync while unlocked (`privateUsdKeepAwakeProvider`, through
   `SyncKeepAwakeNativeHost`'s one native flag, foreground only).
-- Two minutes before "Authorize settlement" closes on a USD → ZEC
-  conversion, the phone buzzes once: it holds, then fades out
-  (`privateUsdSettlementReminderProvider`, `AppHaptics.settlementDeadline`;
+- On a USD → ZEC conversion the phone buzzes when "Authorize settlement" is
+  first offered (the user's turn), and again two minutes before it closes if
+  still unauthorized, once when the two fall together: it holds, then fades
+  out (`privateUsdSettlementReminderProvider`, `AppHaptics.settlementDeadline`;
   on Android under the install-time `VIBRATE` permission). It too needs the
-  app in the foreground and unlocked, so a closed app cannot buzz.
+  app in the foreground and unlocked, so a closed app cannot buzz; a step
+  offered while the app was away buzzes on its return.
 - While unlocked, the engine (`PrivateUsdEngineHost` in `lib/app.dart`)
   advances the conversions of every software account, not only the active
   one (D14).
@@ -1456,9 +1478,17 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 addresses (`m/44'/60'|1'/(1000 + zip32)'/0/index`, from the seed) is
 shielded into its private balance by an EIP-3009 authorization the relayer
 sends (`rust/src/wallet/private_usd/deposits.rs`, zecSwap's
-`docs/deposits.md`). The Receive USDC sheet shows the address; the
-`0zk` card stays, for transfers from another Railgun wallet. Only a network
-with a Deposits pin shows it: testnet and, since 2026-10-19, mainnet.
+`docs/deposits.md`). The Receive sheet (`private_usd_receive_sheet.dart`)
+switches, as ZEC's Receive does its pools (`NeonSwitchTabs`), between public
+USDC at the deposit address (the default) and 0zkUSDC at the account's 0zk
+address, for another Railgun wallet; it replaced the screen's 0zk card
+(owner, 2026-10-19). Only a network with a Deposits pin shows the USDC side:
+testnet and, since 2026-10-19, mainnet; elsewhere the sheet shows the 0zk
+address alone. Send and Withdraw scan their recipient as ZEC Send does (the
+shared `MobileScanAddressRow` and `MobileAddressScanCard`): Send takes a 0zk
+address and Withdraw a 0x one (`privateUsdScanOutcome`); an `ethereum:`
+request gives up its recipient, never its token, and one for another chain
+is refused.
 
 - Pin the Deposits contract, the relayer's deposits account (not the
   top-level relayer) and the token; refuse terms that differ, never follow
@@ -1496,10 +1526,17 @@ with a Deposits pin shows it: testnet and, since 2026-10-19, mainnet.
   proxy is the bridge (no failover), with a `WKContentRuleList` allowlist
   (iOS reference §6).
 - The page's traffic leaves only through the Rust loopback SOCKS5 bridge
-  (`railgun_bridge.rs`), which uses arti when Tor is on.
+  (`railgun_bridge.rs`), which uses arti when Tor is on. Its direct
+  connections try IPv6 and IPv4 side by side (hyper-util's connector, as
+  every other direct path): a network that hands out IPv6 it cannot carry
+  otherwise stalls the page on its first IPv6 address.
 - The page downloads Railgun's circuit artifacts from ipfs-lb.com and falls
   back to our mirror (`android/railgun-web/src/artifact-mirror.js`); the
   mirror's tooling is in `scripts/private-usd/artifacts-mirror/`.
+- The POI nodes verify only proofs from the POI circuits wallet 11.2.0 ships
+  (older ones get `Invalid proof`). A wallet bump that changes circuit
+  artifacts needs the mirror refreshed and deployed first: every send and
+  withdrawal proves POIs too, so a build the mirror cannot serve cannot send.
 - On any route change, close the page and stop the bridge, then reopen on a
   new bridge: Chromium keeps pooled sockets (plan U19). The page also
   closes on lock, on an account switch, and after 10 idle minutes.

@@ -41,6 +41,8 @@ class PrivateUsdProgressPresentation {
     this.showsKeepOpen = false,
     this.action,
     this.keyStepPending = false,
+    this.title = PrivateUsdCopy.convertProgressTitle,
+    this.bridged = false,
   });
 
   final SwapActivityStatusPresentation status;
@@ -66,6 +68,13 @@ class PrivateUsdProgressPresentation {
   /// A key-using step (deposit, claim, sweep) is still to come: the screen
   /// stays awake while this progress shows (X8).
   final bool keyStepPending;
+
+  /// The top bar's: "Bridging" while it runs (screening included),
+  /// "Bridge" once it ended.
+  final String title;
+
+  /// It finished, screened: the "Bridged" sign in place of the result card.
+  final bool bridged;
 }
 
 /// The forward progress for [status] at [now]. [balance] is the account's
@@ -105,8 +114,13 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
     receiveFiatText: '',
     payAmountText: zecText,
     receiveAmountText: usdText,
-    payLabel: PrivateUsdCopy.convertYouPay,
-    receiveLabel: PrivateUsdCopy.convertYouReceive,
+    // A finished bridge's amounts are no longer an estimate.
+    payLabel: badgeKind == SwapStatusBadgeKind.completed
+        ? PrivateUsdCopy.bridgedYouPaid
+        : PrivateUsdCopy.convertYouPay,
+    receiveLabel: badgeKind == SwapStatusBadgeKind.completed
+        ? PrivateUsdCopy.bridgedYouReceived
+        : PrivateUsdCopy.convertYouReceive,
     badgeKind: badgeKind,
     progressIndex: progressIndex,
     steps: steps,
@@ -138,6 +152,10 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
     resultTitle: title,
     resultBody: body,
     action: action,
+    title: badgeKind == SwapStatusBadgeKind.liveQuote
+        ? PrivateUsdCopy.convertProgressTitle
+        : PrivateUsdCopy.bridgeEndedTitle,
+    bridged: badgeKind == SwapStatusBadgeKind.completed,
   );
 
   switch (record.outcome) {

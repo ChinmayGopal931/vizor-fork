@@ -229,6 +229,8 @@ const _statusKey = ValueKey('mobile_private_usd_status');
 const _errorKey = ValueKey('mobile_private_usd_error');
 const _emptyKey = ValueKey('mobile_private_usd_empty');
 const _addressKey = ValueKey('mobile_private_usd_address');
+const _receiveKey = ValueKey('mobile_private_usd_receive_usdc');
+const _receiveShieldedKey = ValueKey('private_usd_receive_shielded');
 const _refreshKey = ValueKey('mobile_private_usd_refresh');
 // The sync line's front layer, whose readout carries a first sync's
 // percentage (iOS progress VI-19).
@@ -880,11 +882,25 @@ class _Round {
   /// The address shown is Rust's derivation for the account, and the page
   /// opened the same wallet (the engine refuses a mismatch, too).
   Future<void> _checkAddress() async {
+    // The 0zk address shows in the Receive sheet, switched to 0zkUSDC (the
+    // screen's card went on 2026-10-19).
+    await _waitUntil(
+      'the Receive button',
+      () => tester.any(find.byKey(_receiveKey)),
+    );
+    await tester.tap(find.byKey(_receiveKey));
+    await _pumpFor(const Duration(seconds: 1));
+    if (tester.any(find.byKey(_receiveShieldedKey))) {
+      await tester.tap(find.byKey(_receiveShieldedKey));
+      await _pumpFor(const Duration(seconds: 1));
+    }
     await _waitUntil(
       'the receive address',
       () => textForKey(tester, _addressKey) != null,
     );
     final shown = textForKey(tester, _addressKey)!;
+    await tester.tap(find.text(PrivateUsdCopy.close));
+    await _pumpFor(const Duration(seconds: 1));
     final engine = _container.read(railgunEngineStateProvider);
     final derived = await _rustAddress();
     expect(derived, startsWith('0zk'));
