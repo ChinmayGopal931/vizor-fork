@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/formatting/number_format.dart';
 import '../../../rust/api/private_usd.dart' as rust;
 import '../../address_book/models/address_format_validator.dart';
 import '../private_usd_copy.dart';
@@ -7,12 +8,11 @@ import '../services/private_usd_spend_guard.dart';
 import 'private_usd_balances.dart';
 import 'railgun_models.dart';
 
-/// Private USD sends and withdrawals (plan M7; reference §6.7, §9.4 S8):
-/// what the form asks for, what a send costs, how it ended, and the form's
-/// rules (zapp `PrivateUsdSendForm`). Amounts are token base units
-/// ([BigInt]), worked out from the typed digits only.
+// Private USD sends and withdrawals: what the form asks for, what a send
+// costs, how it ended, and the form's rules. Amounts are token base units
+// ([BigInt]), worked out from the typed digits only.
 
-/// Fixed by the button that opened the screen (reference §9.1 rule 1).
+/// Fixed by the button that opened the screen.
 enum PrivateUsdSendMode {
   /// To another Railgun `0zk` address: it stays private.
   private,
@@ -27,7 +27,7 @@ enum PrivateUsdSendMode {
   };
 }
 
-/// Where the send flow is (zapp `PrivateUsdSendPhase`).
+/// Where the send flow is.
 enum PrivateUsdSendPhase { form, review, sending, done }
 
 /// What a running send is doing, for its status screen.
@@ -38,7 +38,7 @@ enum PrivateUsdSendStep {
   /// The page proves it (`proof` events).
   proving,
 
-  /// Kept: the relayer is asked to send it, then Vizor waits for a block.
+  /// Kept: the relayer is asked to send it, then the app waits for a block.
   posting,
 }
 
@@ -122,7 +122,7 @@ class PrivateUsdSendCost {
   );
 }
 
-/// How one send ended (zapp `PrivateUsdSendOutcome`).
+/// How one send ended.
 sealed class PrivateUsdSendOutcome {
   const PrivateUsdSendOutcome();
 }
@@ -144,7 +144,7 @@ class PrivateUsdSendUnconfirmed extends PrivateUsdSendOutcome {
 }
 
 /// Nothing left the wallet. [message] says why when it is not the usual
-/// "Nothing was sent. Try again in a moment.".
+/// [PrivateUsdCopy.sendNotSent].
 class PrivateUsdSendNotSent extends PrivateUsdSendOutcome {
   const PrivateUsdSendNotSent([this.message]);
 
@@ -168,7 +168,7 @@ class PrivateUsdSendRepriced extends PrivateUsdSendOutcome {
 }
 
 /// What a send leaves for the relayer's fee in the token it is paid in: the
-/// last quote, else the relayer's floor (zapp `PrivateUsdNetworkFee`).
+/// last quote, else the relayer's floor.
 @immutable
 class PrivateUsdNetworkFee {
   const PrivateUsdNetworkFee({required this.token, this.minimum, this.quoted});
@@ -261,13 +261,20 @@ String? privateUsdRecipientError(
 
 final _decimal = RegExp(r'^(\d*)(?:\.(\d*))?$');
 
+/// [text]'s whole and fraction digits, or null when it does not read as a
+/// decimal.
+({String whole, String fraction})? privateUsdDecimalDigits(String text) {
+  final match = _decimal.firstMatch(text.trim());
+  if (match == null) return null;
+  return (whole: match[1] ?? '', fraction: match[2] ?? '');
+}
+
 /// [text] in base units of a token with [decimals], or null while nothing
 /// is typed, it does not read, or it is finer than the token goes.
 BigInt? privateUsdTokenUnits(String text, int decimals) {
-  final match = _decimal.firstMatch(text.trim());
-  if (match == null) return null;
-  final whole = match[1] ?? '';
-  final fraction = match[2] ?? '';
+  final digits = privateUsdDecimalDigits(text);
+  if (digits == null) return null;
+  final (:whole, :fraction) = digits;
   if ((whole.isEmpty && fraction.isEmpty) || fraction.length > decimals) {
     return null;
   }
@@ -277,36 +284,18 @@ BigInt? privateUsdTokenUnits(String text, int decimals) {
 }
 
 /// More decimals were typed than [decimals].
-bool privateUsdTooPrecise(String text, int decimals) {
-  final match = _decimal.firstMatch(text.trim());
-  return match != null && (match[2] ?? '').length > decimals;
-}
-
-/// [units] of a token with [decimals] as the amount field shows it: "12.5",
-/// "0.123456", "1250".
-String privateUsdTokenText(BigInt units, int decimals) {
-  final scale = BigInt.from(10).pow(decimals);
-  final whole = units ~/ scale;
-  var fraction = (units % scale).toString().padLeft(decimals, '0');
-  fraction = fraction.replaceFirst(RegExp(r'0+$'), '');
-  return fraction.isEmpty ? '$whole' : '$whole.$fraction';
-}
+bool privateUsdTooPrecise(String text, int decimals) =>
+    (privateUsdDecimalDigits(text)?.fraction.length ?? 0) > decimals;
 
 /// [units] of a token with [decimals] as dollars, exactly: "$1,250.40",
 /// "$0.123456" (at least cents, never rounded).
 String formatPrivateUsdExact(BigInt units, int decimals) {
-  final negative = units.isNegative;
   final scale = BigInt.from(10).pow(decimals);
-  final whole = (units.abs() ~/ scale).toString();
+  final whole = formatGroupedInteger((units.abs() ~/ scale).toInt());
   var fraction = (units.abs() % scale).toString().padLeft(decimals, '0');
   fraction = fraction.replaceFirst(RegExp(r'0+$'), '');
   if (fraction.length < 2) fraction = fraction.padRight(2, '0');
-  final grouped = StringBuffer();
-  for (var i = 0; i < whole.length; i++) {
-    if (i > 0 && (whole.length - i) % 3 == 0) grouped.write(',');
-    grouped.write(whole[i]);
-  }
-  return '${negative ? '−' : ''}\$$grouped.$fraction';
+  return '${units.isNegative ? '-' : ''}\$$whole.$fraction';
 }
 
 /// Basis points as a percentage: 25 → "0.25", 100 → "1".
@@ -319,12 +308,7 @@ String privateUsdPercentText(int basisPoints) {
   return fraction.isEmpty ? '$whole' : '$whole.$fraction';
 }
 
-/// "0zk1qy86…l4zu": the first 8 and last 4 characters (reference §9.4 S2).
-String privateUsdShortAddress(String address) => address.length <= 14
-    ? address
-    : '${address.substring(0, 8)}…${address.substring(address.length - 4)}';
-
-/// One send's form, review and outcome (zapp `PrivateUsdSendForm`).
+/// One send's form, review and outcome.
 @immutable
 class PrivateUsdSendForm {
   const PrivateUsdSendForm({
@@ -364,8 +348,7 @@ class PrivateUsdSendForm {
   /// What a send of the fee's token leaves for the relayer.
   final PrivateUsdNetworkFee? networkFee;
 
-  /// Withdrawals pay out the relayer's fee token only: it refuses any other
-  /// (zapp `SwapClientsTest` 382).
+  /// Withdrawals pay out the relayer's fee token only: it refuses any other.
   bool _offers(PrivateUsdToken token) =>
       mode == PrivateUsdSendMode.private ||
       networkFee == null ||
@@ -507,8 +490,9 @@ class PrivateUsdSendForm {
   );
 }
 
-/// The review's rows (reference §9.4 S8): asset, amount, Railgun's fee on a
-/// withdrawal, the network fee, what they receive and the full address.
+/// The review's ledger rows: asset, amount, Railgun's fee on a withdrawal,
+/// the network fee and what they receive. The address, too long for a row,
+/// shows under them.
 List<(String, String)> privateUsdSendReviewRows(
   PrivateUsdSendRequest request,
   PrivateUsdSendCost cost, {
@@ -533,6 +517,5 @@ List<(String, String)> privateUsdSendReviewRows(
         amount(cost.networkFee, feeToken?.decimals),
       ),
     (PrivateUsdCopy.sendReviewReceives, amount(cost.received(request.amount))),
-    (PrivateUsdCopy.sendReviewTo, request.to.text),
   ];
 }

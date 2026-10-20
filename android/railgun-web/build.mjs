@@ -4,12 +4,15 @@ import { build } from 'esbuild';
 import { copyFile, cp, mkdir, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { artifactMirror } from './artifact-mirror-plugin.mjs';
 
 const require = createRequire(import.meta.url);
-const out = path.resolve('../app/src/main/assets/railgun');
-// A folder reference in the Runner target, copied byte for byte (iOS reference §6.1).
-const ios = path.resolve('../../ios/Runner/Railgun/railgun');
+// From this file, not the working directory: both outputs are deleted before each build.
+const here = path.dirname(fileURLToPath(import.meta.url));
+const out = path.join(here, '../app/src/main/assets/railgun');
+// A folder reference in the Runner target, copied byte for byte.
+const ios = path.join(here, '../../ios/Runner/Railgun/railgun');
 
 // wasm-bindgen's loaders fetch these next to the bundle (`new URL(file, import.meta.url)`).
 const wasm = [
@@ -39,6 +42,7 @@ await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
 
 const result = await build({
+  absWorkingDir: here,
   entryPoints: ['src/index.js'],
   outfile: path.join(out, 'railgun.js'),
   bundle: true,
@@ -63,9 +67,9 @@ const result = await build({
   logLevel: 'warning',
 });
 
-await copyFile('src/index.html', path.join(out, 'index.html'));
+await copyFile(path.join(here, 'src/index.html'), path.join(out, 'index.html'));
 // The bundle includes GPL-3.0 code (snarkjs, ffjavascript, circomlibjs); its license text ships beside it.
-await copyFile('COPYING', path.join(out, 'COPYING'));
+await copyFile(path.join(here, 'COPYING'), path.join(out, 'COPYING'));
 for (const file of wasm) {
   await copyFile(require.resolve(file), path.join(out, path.basename(file)));
 }

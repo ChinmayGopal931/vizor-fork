@@ -15,8 +15,9 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/biometric_icon.dart';
 import '../../../core/widgets/mobile/neon_motion.dart';
 import '../../../core/widgets/mobile/unlock_reveal_host.dart';
+import '../../../core/widgets/mobile/veylor_wordmark_intro.dart';
 import '../../../core/widgets/app_toast.dart';
-import '../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../payment_links/providers/payment_link_intake_provider.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
@@ -34,8 +35,9 @@ import 'passcode_widgets.dart';
 const _biometricBackdropMaxWait = Duration(milliseconds: 350);
 
 /// Mobile unlock — Figma `Sign In Passcode` (4885:23041): "Welcome Back",
-/// crimson-filling dots, round numpad keys, a bottom biometric retry action,
-/// and the numpad's help action opening the Forgot Passcode reset sheet.
+/// crimson-filling dots, cut-corner numpad keys, a bottom biometric retry
+/// action, and the numpad's help action opening the Forgot Passcode reset
+/// sheet.
 class MobileUnlockScreen extends ConsumerStatefulWidget {
   const MobileUnlockScreen({this.autoPromptBiometric = true, super.key});
 
@@ -216,7 +218,7 @@ class _MobileUnlockScreenState extends ConsumerState<MobileUnlockScreen> {
         final claimed = claimParkedPaymentUriAfterUnlock(ref);
         final hasPendingPaymentLink =
             ref.read(paymentLinkIntakeProvider).pendingLink != null;
-        requestUnlockReveal();
+        ref.read(unlockRevealProvider.notifier).request();
         context.go(hasPendingPaymentLink ? '/payment-links' : '/home');
         final pendingPrefill = claimed.prefill;
         final notice = claimed.notice;
@@ -441,9 +443,7 @@ class _MobileUnlockScreenState extends ConsumerState<MobileUnlockScreen> {
 
 /// Biometric sign-in backdrop shown behind the native biometric prompt.
 /// Figma `Sign In Face ID` (4596:50062 / 4596:50202) also shows iOS chrome and
-/// the system prompt layer; those are not app-rendered content. The neon look
-/// drops the Figma's castle backdrop and knight badge for a lit lock on the
-/// plain window.
+/// the system prompt layer; those are not app-rendered content.
 class MobileBiometricSignInView extends StatelessWidget {
   const MobileBiometricSignInView({super.key});
 

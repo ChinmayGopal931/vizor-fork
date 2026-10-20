@@ -7,12 +7,12 @@ import '../../../rust/api/private_usd.dart' as rust;
 import '../models/private_usd_record_key.dart';
 import '../private_usd_copy.dart';
 import '../services/private_usd_engine.dart';
+import '../services/private_usd_pause.dart';
 import 'private_usd_engine_provider.dart';
 import 'private_usd_unfinished_provider.dart';
 
-/// The Refunds screen's checks (zapp `PrivateUsdRefundsVM`): every refunded
-/// row is checked again this often, at most [concurrent] at a time, each
-/// given up after [timeout].
+/// The Refunds screen's checks: every refunded row is checked again this
+/// often, at most [concurrent] at a time, each given up after [timeout].
 abstract final class PrivateUsdRefundsTiming {
   static const checkEvery = Duration(seconds: 15);
   static const concurrent = 4;
@@ -38,7 +38,7 @@ class PrivateUsdRefundRow {
   final bool checkFailed;
 
   /// Pinned to another deployment than this build's (the retired testnet
-  /// token, M9): never checked or recovered here.
+  /// token): never checked or recovered here.
   final bool otherDeployment;
 
   /// Why its last recovery did not go through.
@@ -59,7 +59,7 @@ class PrivateUsdRefundRow {
   );
 }
 
-/// The Refunds screen (plan reference §9.4 S7).
+/// The Refunds screen.
 @immutable
 class PrivateUsdRefundsState {
   const PrivateUsdRefundsState({
@@ -102,7 +102,7 @@ class PrivateUsdRefundsState {
 
 /// [accountUuid]'s refunded conversions and whether each can be recovered.
 /// The checks are chain reads only; a recovery (`rescue`) needs the seed
-/// and is the user's alone, behind a confirmation sheet (D18).
+/// and is the user's alone, behind a confirmation sheet.
 final privateUsdRefundsProvider = NotifierProvider.autoDispose
     .family<PrivateUsdRefundsNotifier, PrivateUsdRefundsState, String>(
       PrivateUsdRefundsNotifier.new,
@@ -117,12 +117,11 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
 
   @override
   PrivateUsdRefundsState build() {
-    ref.listen(
-      privateUsdReverseConversionsProvider.select(
-        (all) => _Refunded(_refunded(all)),
-      ),
-      (_, next) => _withRecords(next.records),
-    );
+    ref.listen(privateUsdReverseConversionsProvider, (_, all) {
+      final records = _refunded(all);
+      final shown = [for (final row in state.rows) row.record];
+      if (!listEquals(records, shown)) _withRecords(records);
+    });
     _timer = Timer.periodic(PrivateUsdRefundsTiming.checkEvery, (_) {
       unawaited(_checkAll());
     });
@@ -185,7 +184,7 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
   }
 
   /// "Recover refund", once its sheet was confirmed: the relayer's fee
-  /// comes out of it (at most 2 USDC, X6). One at a time.
+  /// comes out of it (at most the deployment's cap). One at a time.
   Future<void> recover(int index) async {
     if (state.recovering != null) return;
     final row = state.rows
@@ -207,7 +206,7 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
         error = PrivateUsdCopy.refundsRecoverFailed;
       }
     } catch (failure) {
-      if (failure is! PrivateUsdEngineInterruptedException) {
+      if (failure is! PrivateUsdPause) {
         error = PrivateUsdCopy.refundsRecoverFailed;
       }
     }
@@ -275,18 +274,4 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
     if (!ref.mounted || pass != _pass) return;
     state = state.copyWith(refreshing: false);
   }
-}
-
-@immutable
-class _Refunded {
-  const _Refunded(this.records);
-
-  final List<rust.ApiReverseRecord> records;
-
-  @override
-  bool operator ==(Object other) =>
-      other is _Refunded && listEquals(other.records, records);
-
-  @override
-  int get hashCode => Object.hashAll(records);
 }

@@ -399,12 +399,10 @@ class MobileModalScaffold extends StatelessWidget {
                             title,
                             maxLines: titleMaxLines,
                             overflow: TextOverflow.ellipsis,
-                            // A sheet's title is its heading: Thin, as the
-                            // screen titles are.
                             style:
                                 titleStyle ??
                                 AppTypography.bodyLarge.copyWith(
-                                  fontWeight: FontWeight.w100,
+                                  fontWeight: AppFontWeight.heading,
                                   color: colors.text.accent,
                                 ),
                           ),

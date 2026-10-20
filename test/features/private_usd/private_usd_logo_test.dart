@@ -11,26 +11,23 @@ import 'package:zcash_wallet/src/features/activity/widgets/activity_feed.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_presentation.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_status_presentation.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_convert_provider.dart';
-import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_conversion_screen.dart';
-import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_convert_review_screen.dart';
-import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_convert_screen.dart';
-import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_reverse_conversion_screen.dart';
-import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_reverse_convert_view.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_activity_rows.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_banner.dart';
+import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_convert_views.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_home_strip.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_logo.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_conversion_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_progress_views.dart';
 import 'package:zcash_wallet/src/features/swap/domain/swap_asset.dart';
 import 'package:zcash_wallet/src/features/swap/widgets/swap_asset_icon.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
-// Private USD's logo (owner, 2026-10-17): zapp's USDC token with its Railgun
-// badge, wherever Private USD shows an image, and ZEC's coin beside it where
-// a conversion names both.
+// Private USD's logo, the USDC token with its Railgun badge, wherever
+// Private USD shows an image, and ZEC's coin beside it where a conversion
+// names both.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 

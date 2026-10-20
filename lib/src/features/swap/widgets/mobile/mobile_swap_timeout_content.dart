@@ -3,13 +3,13 @@ import 'package:flutter/widgets.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
-import '../../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../../../core/widgets/mobile/tron_glyph.dart';
 
 /// Mobile deposit-timeout state — Figma `Swap failed` (4755:89127):
-/// a neon warning badge, the "Time's up" tag, the serif headline, and the
-/// restart action. The host's top nav carries the "Swap failed" title, so it
-/// doesn't repeat here.
+/// a neon warning badge, the "Time's up" tag, the headline, and the restart
+/// action. The host's top nav carries the "Swap failed" title, so it doesn't
+/// repeat here.
 class MobileSwapTimeoutContent extends StatelessWidget {
   const MobileSwapTimeoutContent({required this.onRestart, super.key});
 

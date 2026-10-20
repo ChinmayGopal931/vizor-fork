@@ -4,9 +4,9 @@ import Network
 import UIKit
 import WebKit
 
-/// The process-wide Railgun page (iOS reference §6.2–§6.5): one page at a time, in a data store of its own whose
-/// every connection goes through the Rust bridge's loopback SOCKS5 port, so the page follows the wallet's route. It
-/// outlives Flutter engines; the Dart engine closes a leftover page when it starts.
+/// The process-wide Railgun page: one page at a time, in a data store of its own whose every connection goes through
+/// the Rust bridge's loopback SOCKS5 port, so the page follows the wallet's route. It outlives Flutter engines; the
+/// Dart engine closes a leftover page when it starts.
 @MainActor
 final class RailgunPageHost {
   static let shared = RailgunPageHost()
@@ -14,7 +14,7 @@ final class RailgunPageHost {
   /// The page's only data store, fixed so a wipe finds it again.
   nonisolated static let storeID = UUID(uuidString: "5C1F5E3A-8B2D-4F6E-9A7C-3D2B1E0F4A6B")!
 
-  /// The store and its proxy are iOS 17 APIs; below that Private USD stays hidden (plan DI2).
+  /// The store and its proxy are iOS 17 APIs; below that Private USD stays hidden.
   nonisolated static var isSupported: Bool {
     if #available(iOS 17.0, *) { return true }
     return false
@@ -52,14 +52,11 @@ final class RailgunPageHost {
 
   /// Loads a fresh page, closing the one before it, with its traffic sent to the bridge at `proxyPort`. Returns
   /// once the page says it is ready.
-  func load(proxyPort: Int, debug: Bool) async throws {
+  func load(proxyPort port: NWEndpoint.Port, debug: Bool) async throws {
     closePage(.disconnected("a new page replaced it"))
     let loading = generation
     guard #available(iOS 17.0, *) else {
       throw RailgunError.unavailable("Private USD needs iOS 17")
-    }
-    guard let port = UInt16(exactly: proxyPort).flatMap(NWEndpoint.Port.init(rawValue:)), proxyPort > 0 else {
-      throw RailgunError.protocol("proxyPort")
     }
     let rules: WKContentRuleList
     do {
@@ -68,17 +65,17 @@ final class RailgunPageHost {
       throw RailgunError.unavailable("the page's content rules did not compile")
     }
     guard loading == generation else { throw RailgunError.disconnected("closed while loading") }
-    // Invariant 20: never a page without its proxy.
+    // Never a page without its proxy.
     guard Self.loopbackAccepts(port: port.rawValue) else {
       throw RailgunError.unavailable("the bridge is not running")
     }
 
-    // Invariant 25: the store's directory is out of backups before the store is first used; whatever WebKit
-    // creates in it later is covered by the mark.
+    // The store's directory is out of backups before the store is first used; whatever WebKit creates in it later
+    // is covered by the mark.
     Self.excludeWebDataFromBackup()
 
-    // Invariant 20: the store's proxy is set before the web view that uses it exists, and no request may go
-    // around a proxy that refuses it.
+    // The store's proxy is set before the web view that uses it exists, and no request may go around a proxy that
+    // refuses it.
     let store = WKWebsiteDataStore(forIdentifier: Self.storeID)
     var proxy = ProxyConfiguration(socksv5Proxy: .hostPort(host: "127.0.0.1", port: port))
     proxy.allowFailover = false
@@ -167,7 +164,7 @@ final class RailgunPageHost {
   // MARK: The window
 
   /// In the key window, 1×1 and behind the Flutter view, which covers it: WebKit treats a web view outside a window
-  /// as hidden and throttles it (plan XI7). With no window yet, it waits for one.
+  /// as hidden and throttles it. With no window yet, it waits for one.
   private func place(_ page: RailgunPage) {
     guard let view = page.webView, let window = Self.keyWindow() else { return }
     put(view, in: window)
@@ -224,11 +221,11 @@ final class RailgunPageHost {
   }
 
   /// The page's IndexedDB holds the encrypted Railgun wallet and the notes the engine decrypted for it, which it
-  /// keeps unencrypted: keep it out of iCloud and device backups (plan DI6). Until MI0 finds the store's own
-  /// directory, all of `Library/WebKit` is excluded; the app has no other web content. The directory is made if
-  /// WebKit hasn't made it yet, because a mark on a directory covers what is created inside it later; the mark is
-  /// lost when the directory is made anew, so it is set before every load and again after. A failed mark never
-  /// blocks the load (plan VI-11, VI-15); the next load tries again.
+  /// keeps unencrypted: keep it out of iCloud and device backups. WebKit doesn't say which directory the store
+  /// uses, so all of `Library/WebKit` is excluded; the app has no other web content. The directory is made if WebKit
+  /// hasn't made it yet, because a mark on a directory covers what is created inside it later; the mark is lost when
+  /// the directory is made anew, so it is set before every load and again after. A failed mark never blocks the
+  /// load; the next load tries again.
   @discardableResult
   nonisolated static func excludeWebDataFromBackup(
     library: URL? = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first

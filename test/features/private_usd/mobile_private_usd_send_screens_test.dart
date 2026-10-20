@@ -12,8 +12,7 @@ import 'package:zcash_wallet/src/features/private_usd/services/private_usd_spend
 import 'package:zcash_wallet/widgetbook/private_usd_send_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
-// The send and withdraw screens (plan reference §9.4 S2, S8), built from
-// the Widgetbook fixtures.
+// The send and withdraw screens, built from the Widgetbook fixtures.
 void main() {
   setUp(() {
     final view = TestWidgetsFlutterBinding.ensureInitialized()
@@ -61,7 +60,7 @@ void main() {
 
     await pump(tester, buildMobilePrivateUsdWithdrawZeroUseCase);
     expect(
-      find.text(PrivateUsdCopy.withdrawTitle.toUpperCase()),
+      find.text(PrivateUsdCopy.actionWithdraw.toUpperCase()),
       findsOneWidget,
     );
     expect(find.text(PrivateUsdCopy.sendZeroAddress), findsOneWidget);
@@ -106,8 +105,8 @@ void main() {
     expect(enabled(tester, 'mobile_private_usd_send_review'), isFalse);
   });
 
-  // As ZEC Send's recipient picker (owner, 2026-10-19): the Receive sheet
-  // shows both kinds of address as a code.
+  // As ZEC Send's recipient picker: the Receive sheet shows both kinds of
+  // address as a code.
   testWidgets('Send and Withdraw scan their recipient; not while busy', (
     tester,
   ) async {

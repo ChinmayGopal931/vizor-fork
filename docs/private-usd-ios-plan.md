@@ -210,10 +210,10 @@ Every row of A-plan §3.4 applies on iOS. The iOS locations:
 
 **All 19 invariants of A-plan §3.5 apply unchanged on iOS.** The shared Rust and Dart enforce them. iOS adds these:
 
-20. **The page never loads without its proxy.** Set `proxyConfigurations` to the bridge's port, with failover off, on the store **before** the `WKWebView` is created for each load. If the bridge is not running or the store cannot be configured, `load` fails `UNAVAILABLE`. *Why:* the bridge is the only thing that holds the page to the route policy (A-plan invariant 13).
+20. **The page never loads without its proxy.** Set `proxyConfigurations` to the bridge's port, with failover off, on the store **before** the `WKWebView` is created for each load. If the bridge is not running or the store cannot be configured, `load` fails `unavailable`. *Why:* the bridge is the only thing that holds the page to the route policy (A-plan invariant 13).
 21. **One page, one port, one bridge.** A route change, the lock, an account switch, the idle close and a reset all close the page **and** stop the bridge, and the next `load` gets a new port. After the background, a bridge that no longer accepts is replaced (XI14). *Why:* pooled connections can outlive a close (Android U19), and a suspended app's listening socket can be reclaimed (UI16).
 22. **Only the page's own main frame talks to the host.** Accept a `railgunHost` message only from `frameInfo.isMainFrame`, the page world and the origin `veylor-railgun://app`. Deliver host messages only as `callAsyncJavaScript` arguments. *Why:* the host boundary is the page's key boundary (A-ref §6.4).
-23. **Every channel call is answered exactly once.** A page that timed out, closed or was terminated answers its pending calls `CLOSED` or `TIMEOUT`, and a late page reply is dropped. *Why:* a second `FlutterResult` call crashes the app, and a missing one hangs the Dart engine's single-use mutex.
+23. **Every channel call is answered exactly once.** A page that timed out, closed or was terminated answers its pending calls `closed` or `timeout`, and a late page reply is dropped. *Why:* a second `FlutterResult` call crashes the app, and a missing one hangs the Dart engine's single-use mutex.
 24. **The page is never interactive and never inspectable in a release build.** It takes no touches, is hidden from accessibility, and is inspectable only in debug builds with `debug` set (XI12).
 25. **Private USD data stays out of backups** (DI6), marked before the first write that could hold a secret. As built (VI-11), a mark that fails is tried again on the next use and never stops a conversion under way: a weaker backup posture must not cost funds.
 26. **A development build never installs over a real wallet** (XI11).
@@ -224,13 +224,13 @@ Signature level only. The milestone that creates each file is in brackets. The c
 
 ```text
 ios/Runner/Railgun/
-├── RailgunHostHandler.swift     [MI2] channel binding, com.zcash.wallet/railgun (+ /events); exactly-once replies; BAD_ARGS
+├── RailgunHostHandler.swift     [MI2] channel binding, com.zcash.wallet/railgun (+ /events); exactly-once replies; bad_args
 ├── RailgunPageHost.swift        [MI2] @MainActor process singleton: the current page, the store, the rule list, the event buffer
 ├── RailgunPage.swift            [MI2] one WKWebView page: load, ready wait, calls with timeouts, delivery, close; its delegates. As built it also holds RailgunChannel, the pending calls and their exactly-once answers (Kotlin's RailgunChannel), which the tests drive without WebKit
 ├── RailgunSchemeHandler.swift   [MI2] WKURLSchemeHandler for veylor-railgun://app/… from Bundle.main's railgun/
 ├── RailgunContentRules.swift    [MI2] the WKContentRuleList JSON, built from RailgunEndpoints and compiled once
 ├── RailgunProtocol.swift        [MI2] wire methods and timeouts, the envelope (JSONSerialization)
-├── RailgunEndpoints.swift       [MI2] the ten hosts and POI_NODE_URL (pinned by the Rust test, XI10)
+├── RailgunEndpoints.swift       [MI2] the ten hosts (pinned by the Rust test, XI10)
 ├── RailgunError.swift           [MI2] disconnected | timeout | unavailable | protocol | failed → FlutterError codes
 └── railgun/                     [MI1] the built bundle: a folder reference, copied blind, never opened
 ios/Runner/PrivateUsdAttestationHandler.swift   [MI7] App Attest on com.zcash.wallet/private_usd_attestation
@@ -252,7 +252,7 @@ final class RailgunHostHandler: NSObject, FlutterStreamHandler {
   var isSupported: Bool                                         // if #available(iOS 17, *)
   func load(proxyPort: UInt16, debug: Bool) async throws        // closes any page; proxy before WKWebView; waits for "ready" (30 s)
   func call(_ method: RailgunMethod, paramsJSON: String) async throws -> String  // per-method timeout; a timeout closes the page
-  func close()                                                  // idempotent; fails pending calls CLOSED
+  func close()                                                  // idempotent; fails pending calls `closed`
   func wipe() async throws                                      // close, then WKWebsiteDataStore.remove(forIdentifier:), retried
   var isOpen: Bool { get }
   var onEvent: ((String) -> Void)?                              // raw {"event","data"} JSON; 256 buffered, oldest dropped
@@ -399,8 +399,8 @@ Every milestone also follows these rules:
 2. Register the method and event channels in `AppDelegate.didInitializeImplicitFlutterEngine`, beside the existing channels.
 3. `supported` on both platforms:
    - **iOS** answers `#available(iOS 17, *)`.
-   - **Android** answers `true` without loading the WebView package (minSdk 30; today's `UNAVAILABLE` from `load` stays for a phone whose WebView lacks `PROXY_OVERRIDE`).
-4. Put the page in the window (XI7, following MI0's result), and move it when the scene's window changes. `webViewWebContentProcessDidTerminate` closes the page (`CLOSED`), like Android's `onRenderProcessGone`.
+   - **Android** answers `true` without loading the WebView package (minSdk 30; today's `unavailable` from `load` stays for a phone whose WebView lacks `PROXY_OVERRIDE`).
+4. Put the page in the window (XI7, following MI0's result), and move it when the scene's window changes. `webViewWebContentProcessDidTerminate` closes the page (`closed`), like Android's `onRenderProcessGone`.
 5. The bridge after the background (XI14), following MI0.6's result: on return, if the page is open, check that the bridge accepts connections. If it doesn't, restart the bridge, then either update the proxy or reload the page. **As built without MI0.6 (VI-8):** on iOS, when the app is shown again, Dart probes the bridge's port over loopback (`RailgunEngine.replaceDeadBridge`); one that refuses closes the page and stops the bridge, and the next use reopens the page on a new bridge (invariant 21). Updating a live page's proxy waits for MI0.6.
 6. Swift tests:
    - the envelope: every message kind decodes; an unreadable reply fails its call; unknown events are dropped

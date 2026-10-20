@@ -41,8 +41,8 @@ class AppProfilePicture extends StatelessWidget {
     );
 
     if (_mobile) {
-      // The neon redesign frames a portrait as a cut-corner plate with a lit
-      // red edge, not a circle.
+      // Mobile frames a portrait as a cut-corner plate with a lit red edge,
+      // not a circle.
       final cut = size.dimension * 0.24;
       final colors = context.colors;
       return SizedBox(

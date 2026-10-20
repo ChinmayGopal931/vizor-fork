@@ -36,19 +36,8 @@ import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 import kotlin.time.Duration.Companion.seconds
 
-internal interface RailgunPage {
-    val isOpen: Boolean
-
-    suspend fun call(
-        method: RailgunMethod,
-        paramsJson: String,
-    ): String
-
-    suspend fun close()
-}
-
 /**
- * Hidden WebViews that load only this module's assets, one page at a time, each over a port of its own. Every
+ * Hidden WebViews that load only the page's own assets, one page at a time, each over a port of its own. Every
  * request the page makes to the network goes through the Rust bridge's loopback SOCKS5 port, so it follows the
  * wallet's route (Tor or direct).
  *
@@ -57,6 +46,7 @@ internal interface RailgunPage {
 internal class RailgunWebViewHost(
     private val context: Context,
 ) {
+    // With no collector an event is dropped, where iOS buffers it: Dart listens before it loads a page.
     private val mutableEvents =
         MutableSharedFlow<String>(
             extraBufferCapacity = EVENT_BUFFER,
@@ -77,6 +67,10 @@ internal class RailgunWebViewHost(
     // nothing to lift from loading the WebView package.
     private var proxied = false
 
+    /** A loaded page that is still open. */
+    val isOpen: Boolean
+        @MainThread get() = current?.let { it.isLoaded && it.isOpen } == true
+
     /**
      * Loads a fresh page, closing the one before it. Its traffic goes through the bridge at [proxyPort]. [debug]
      * enables content debugging and forwards the page's `log` events.
@@ -84,14 +78,24 @@ internal class RailgunWebViewHost(
     suspend fun load(
         proxyPort: Int,
         debug: Boolean,
-    ): RailgunPage =
+    ) =
         withContext(Dispatchers.Main) {
             current?.close(RailgunException.Disconnected("a new page replaced it"))
             val page = Page(createWebView(debug), debug)
             current = page
             page.load(proxyPort)
-            page
         }
+
+    /** Calls [method] on the loaded page; one that times out closes it. */
+    suspend fun call(
+        method: RailgunMethod,
+        paramsJson: String,
+    ): String {
+        val page =
+            withContext(Dispatchers.Main) { current?.takeIf { it.isLoaded && it.isOpen } }
+                ?: throw RailgunException.Disconnected("no page")
+        return page.call(method, paramsJson)
+    }
 
     /** Closes the page, if any, and lifts the proxy override. Idempotent. */
     suspend fun close() =
@@ -150,7 +154,7 @@ internal class RailgunWebViewHost(
     private inner class Page(
         private val view: WebView,
         private val debug: Boolean,
-    ) : RailgunPage {
+    ) {
         private val channel =
             RailgunChannel(::post) { event ->
                 if (debug || event.name != RailgunProtocol.LOG) mutableEvents.tryEmit(event.raw)
@@ -161,7 +165,7 @@ internal class RailgunWebViewHost(
         var isLoaded = false
             private set
 
-        override val isOpen: Boolean get() = channel.isOpen
+        val isOpen: Boolean get() = channel.isOpen
 
         @MainThread
         suspend fun load(proxyPort: Int) {
@@ -179,7 +183,7 @@ internal class RailgunWebViewHost(
             }
         }
 
-        override suspend fun call(
+        suspend fun call(
             method: RailgunMethod,
             paramsJson: String,
         ): String =
@@ -189,8 +193,6 @@ internal class RailgunWebViewHost(
                 withContext(NonCancellable + Dispatchers.Main) { close(e) }
                 throw e
             }
-
-        override suspend fun close() = withContext(Dispatchers.Main) { close(RailgunException.Disconnected("closed")) }
 
         @MainThread
         fun handshake() {

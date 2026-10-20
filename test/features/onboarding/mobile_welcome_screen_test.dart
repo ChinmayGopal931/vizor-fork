@@ -19,7 +19,6 @@ import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_hardware_sele
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_keystone_screens.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_method_selection_screen.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_wallet_link_screens.dart';
-import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_welcome_backdrop.dart';
 import 'package:zcash_wallet/src/features/onboarding/shared/welcome_button_tokens.dart';
 import '../../figma_compare/figma_compare_font_loader.dart';
 
@@ -425,23 +424,11 @@ void main() {
     expect(find.text('home-route'), findsOneWidget);
   });
 
-  testWidgets('the neon horizon replaces the knight video and poster', (
-    tester,
-  ) async {
+  testWidgets('the neon horizon spans the welcome screen', (tester) async {
     await pump(tester);
     final horizon = find.byKey(const ValueKey('mobile_welcome_horizon'));
     expect(horizon, findsOneWidget);
     expect(tester.getSize(horizon).width, 393);
-    expect(find.byType(MobileWelcomeBackdrop), findsNothing);
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Image &&
-            widget.image is AssetImage &&
-            (widget.image as AssetImage).assetName == kMobileWelcomePosterAsset,
-      ),
-      findsNothing,
-    );
   });
 
   for (final theme in {

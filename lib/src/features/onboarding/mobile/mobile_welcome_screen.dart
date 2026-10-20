@@ -16,13 +16,13 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../core/widgets/mobile/neon_motion.dart';
 import '../shared/onboarding_welcome_art.dart' show VizorWordmark;
 import '../shared/welcome_accent_button.dart';
 import '../shared/welcome_button_tokens.dart';
 import '../shared/welcome_gift_card_button.dart';
 
-/// Figma `Welcome` (8635:103040) with create and import entry paths. The neon
-/// look replaces the Figma's knight video with a lit neon horizon.
+/// Figma `Welcome` (8635:103040) with create and import entry paths.
 class MobileWelcomeScreen extends ConsumerStatefulWidget {
   const MobileWelcomeScreen({
     this.showBackButton = false,
@@ -95,8 +95,8 @@ class _MobileWelcomeScreenState extends ConsumerState<MobileWelcomeScreen> {
         backgroundColor: const Color(0xff0f0f0f),
         body: LayoutBuilder(
           builder: (context, constraints) {
-            // The Figma's 394×700 video slot (393×852 reference) still sets
-            // where the art fades into the page.
+            // The Figma's 394×700 video slot (393×852 reference) sets where
+            // the art fades into the page.
             final artHeight = (constraints.maxWidth + 1) * 700 / 394;
             final fadeEnd = math.min(1.0, artHeight / constraints.maxHeight);
             final horizonHeight = constraints.maxHeight * 0.42;

@@ -1,7 +1,9 @@
-import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
+
+import 'neon_motion.dart';
 
 /// Glyphs a scrambling character cycles through. All are in Gotham, so the
 /// effect never falls back to another face.
@@ -17,6 +19,8 @@ class NeonScrambleText extends StatefulWidget {
     required this.style,
     required this.cipherStyle,
     this.trailing,
+    this.semanticsLabel,
+    this.overflow,
     this.duration = const Duration(milliseconds: 650),
     this.decryptOnAppear = false,
     super.key,
@@ -31,6 +35,13 @@ class NeonScrambleText extends StatefulWidget {
 
   /// A span after the text that never scrambles (the ticker).
   final InlineSpan? trailing;
+
+  /// What screen readers hear: [text] and [trailing] unless set. They never
+  /// hear the cipher glyphs.
+  final String? semanticsLabel;
+
+  /// How the text ends when it does not fit its one line.
+  final TextOverflow? overflow;
   final Duration duration;
 
   @override
@@ -38,7 +49,7 @@ class NeonScrambleText extends StatefulWidget {
 }
 
 class _NeonScrambleTextState extends State<NeonScrambleText>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, NeonAppearMotion<NeonScrambleText> {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: widget.duration,
@@ -47,23 +58,17 @@ class _NeonScrambleTextState extends State<NeonScrambleText>
 
   final _random = math.Random();
   String _from = '';
-  var _appeared = false;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_appeared || !widget.decryptOnAppear) return;
-    _appeared = true;
-    final reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    if (!reduced) _controller.forward(from: 0);
+  void onAppear() {
+    if (widget.decryptOnAppear) _controller.forward(from: 0);
   }
 
   @override
   void didUpdateWidget(NeonScrambleText oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.text == widget.text) return;
-    final reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    if (reduced) {
+    if (NeonMotion.reduced(context)) {
       _controller.value = 1;
       return;
     }
@@ -77,19 +82,20 @@ class _NeonScrambleTextState extends State<NeonScrambleText>
     super.dispose();
   }
 
+  Widget _line(List<InlineSpan> spans, {String? semanticsLabel}) => Text.rich(
+    TextSpan(children: [...spans, ?widget.trailing]),
+    semanticsLabel: semanticsLabel,
+    maxLines: 1,
+    overflow: widget.overflow,
+  );
+
   @override
   Widget build(BuildContext context) {
     final t = _controller.value;
     if (t >= 1) {
-      return Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(text: widget.text, style: widget.style),
-            ?widget.trailing,
-          ],
-        ),
-        maxLines: 1,
-      );
+      return _line([
+        TextSpan(text: widget.text, style: widget.style),
+      ], semanticsLabel: widget.semanticsLabel);
     }
 
     // The field keeps the longer of the two lengths while it scrambles, then
@@ -117,15 +123,14 @@ class _NeonScrambleTextState extends State<NeonScrambleText>
         scrambling.write(_cipherGlyphs[_random.nextInt(_cipherGlyphs.length)]);
       }
     }
-    return Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(text: settled.toString(), style: widget.style),
-          TextSpan(text: scrambling.toString(), style: widget.cipherStyle),
-          ?widget.trailing,
-        ],
-      ),
-      maxLines: 1,
+    return _line(
+      [
+        TextSpan(text: settled.toString(), style: widget.style),
+        TextSpan(text: scrambling.toString(), style: widget.cipherStyle),
+      ],
+      semanticsLabel:
+          widget.semanticsLabel ??
+          '$target${widget.trailing?.toPlainText() ?? ''}',
     );
   }
 }
@@ -148,33 +153,41 @@ class NeonCipherChurn extends StatefulWidget {
   State<NeonCipherChurn> createState() => _NeonCipherChurnState();
 }
 
-class _NeonCipherChurnState extends State<NeonCipherChurn> {
+class _NeonCipherChurnState extends State<NeonCipherChurn>
+    with SingleTickerProviderStateMixin {
+  /// How long each set of glyphs shows.
+  static const _step = Duration(milliseconds: 70);
+
   final _random = math.Random();
-  Timer? _timer;
+  late final Ticker _ticker = createTicker(_tick);
   late String _text = _next();
+  var _shownAt = Duration.zero;
 
   String _next() => String.fromCharCodes([
     for (var i = 0; i < widget.length; i++)
       _cipherGlyphs.codeUnitAt(_random.nextInt(_cipherGlyphs.length)),
   ]);
 
+  void _tick(Duration elapsed) {
+    if (elapsed - _shownAt < _step) return;
+    _shownAt = elapsed;
+    setState(() => _text = _next());
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    if (reduced) {
-      _timer?.cancel();
-      _timer = null;
-    } else {
-      _timer ??= Timer.periodic(const Duration(milliseconds: 70), (_) {
-        setState(() => _text = _next());
-      });
+    if (NeonMotion.reduced(context)) {
+      _ticker.stop();
+    } else if (!_ticker.isActive) {
+      _shownAt = Duration.zero;
+      _ticker.start();
     }
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _ticker.dispose();
     super.dispose();
   }
 

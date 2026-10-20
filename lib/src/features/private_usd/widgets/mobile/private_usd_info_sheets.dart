@@ -6,9 +6,9 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../private_usd_copy.dart';
 
-/// "About private USD" (zapp's info sheet on the Private USD screen): what
-/// each action does, then the notes on screening, privacy and keeping Vizor
-/// open. [screening] is the deployment's screening time.
+/// The Private USD screen's info sheet: what each action does, then the
+/// notes on screening, privacy and keeping the app open. [screening] is the
+/// deployment's screening time.
 Future<void> showPrivateUsdInfoSheet(
   BuildContext context, {
   required Duration screening,
@@ -22,7 +22,7 @@ Future<void> showPrivateUsdInfoSheet(
   );
 }
 
-/// "How converting works" (the convert screen's info).
+/// The convert screen's info sheet.
 Future<void> showPrivateUsdConvertInfoSheet(
   BuildContext context, {
   required Duration takes,
@@ -40,7 +40,7 @@ Future<void> showPrivateUsdConvertInfoSheet(
   ],
 );
 
-/// "Before you convert" (the review's info).
+/// The review's info sheet.
 Future<void> showPrivateUsdReviewInfoSheet(
   BuildContext context, {
   required String railgunPercent,
@@ -55,7 +55,7 @@ Future<void> showPrivateUsdReviewInfoSheet(
   notes: const [PrivateUsdCopy.infoKeepOpen],
 );
 
-/// "What's happening" (the progress screen's info).
+/// The progress screen's info sheet.
 Future<void> showPrivateUsdProgressInfoSheet(
   BuildContext context, {
   required int zcashConfirmations,
@@ -76,8 +76,8 @@ Future<void> showPrivateUsdProgressInfoSheet(
   ],
 );
 
-/// "Private USD to ZEC" (the reverse screens' info): the two approvals,
-/// and when a refund can follow.
+/// The reverse screens' info sheet: the two approvals, and when a refund
+/// can follow.
 Future<void> showPrivateUsdReverseInfoSheet(BuildContext context) => _show(
   context,
   title: PrivateUsdCopy.reverseTitle,
@@ -85,7 +85,7 @@ Future<void> showPrivateUsdReverseInfoSheet(BuildContext context) => _show(
   notes: const [PrivateUsdCopy.reverseRefundNote, PrivateUsdCopy.infoKeepOpen],
 );
 
-/// "Sending privately" (the send screens' info): three steps.
+/// The send screens' info sheet.
 Future<void> showPrivateUsdSendInfoSheet(BuildContext context) => _show(
   context,
   title: PrivateUsdCopy.sendInfoTitle,
@@ -97,8 +97,8 @@ Future<void> showPrivateUsdSendInfoSheet(BuildContext context) => _show(
   notes: const [],
 );
 
-/// "Withdrawing makes it public" (the withdraw screens' info): two steps
-/// and three notes, with Railgun's fee as [railgunPercent].
+/// The withdraw screens' info sheet, with Railgun's fee as
+/// [railgunPercent].
 Future<void> showPrivateUsdWithdrawInfoSheet(
   BuildContext context, {
   required String railgunPercent,
@@ -162,7 +162,8 @@ class PrivateUsdInfoSheetBody extends StatelessWidget {
   );
 }
 
-/// An info sheet: a title, what happens in order, then notes, and "Close".
+/// An info sheet: a title, what happens in order, then notes, and a close
+/// button.
 class PrivateUsdTextSheetBody extends StatelessWidget {
   const PrivateUsdTextSheetBody({
     required this.title,

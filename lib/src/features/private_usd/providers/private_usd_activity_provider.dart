@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../rust/api/private_usd.dart' as rust;
 import '../models/private_usd_record_key.dart';
 import '../services/private_usd_engine.dart';
+import 'private_usd_available_provider.dart';
+import 'private_usd_deposits_provider.dart';
 import 'private_usd_engine_provider.dart';
 import 'private_usd_unfinished_provider.dart';
 
@@ -16,16 +18,16 @@ final _privateUsdHistoryProvider = FutureProvider.autoDispose
       await engine.loadReverseRecords(accountUuid);
     });
 
-/// [accountUuid]'s forward conversions for activity rows, newest first
-/// (plan reference §9.4 S2). Empty in builds without the swap engine
-/// (desktop among them), which never read any.
+/// [accountUuid]'s forward conversions for activity rows, newest first.
+/// Empty in builds without the swap engine (desktop among them), which never
+/// read any.
 final privateUsdActivityRecordsProvider = Provider.autoDispose
     .family<List<rust.ApiForwardRecord>, String>((ref, accountUuid) {
       if (!ref.watch(privateUsdEngineEnabledProvider)) return const [];
       ref.watch(_privateUsdHistoryProvider(accountUuid));
       final records = ref.watch(
         privateUsdConversionsProvider.select(
-          (all) => _Records([
+          (all) => _SameRecords([
             for (final entry in all.entries)
               if (entry.key.accountUuid == accountUuid &&
                   entry.key.direction == PrivateUsdDirection.forward)
@@ -39,16 +41,15 @@ final privateUsdActivityRecordsProvider = Provider.autoDispose
       );
     });
 
-/// [accountUuid]'s reverse conversions for activity rows (M6), newest
-/// first: every one that moved money, so no `quoted` draft and nothing
-/// `cancelled` (reference §9.4 S2).
+/// [accountUuid]'s reverse conversions for activity rows, newest first:
+/// every one that moved money, so no `quoted` draft and nothing `cancelled`.
 final privateUsdReverseActivityRecordsProvider = Provider.autoDispose
     .family<List<rust.ApiReverseRecord>, String>((ref, accountUuid) {
       if (!ref.watch(privateUsdEngineEnabledProvider)) return const [];
       ref.watch(_privateUsdHistoryProvider(accountUuid));
       final records = ref.watch(
         privateUsdReverseConversionsProvider.select(
-          (all) => _ReverseRecords([
+          (all) => _SameRecords([
             for (final entry in all.entries)
               if (entry.key.accountUuid == accountUuid &&
                   entry.value.record.phase != rust.ApiReversePhase.quoted &&
@@ -83,7 +84,7 @@ DateTime privateUsdActivityTime(rust.ApiForwardRecord record) =>
 /// The main-wallet transactions conversions made (deposits and refund
 /// sweeps), in the internal byte order history rows carry: their own rows
 /// stand in for them, so these rows are dropped from the feeds.
-Set<String> privateUsdActivityTxids(
+Set<String> _privateUsdActivityTxids(
   Iterable<rust.ApiForwardRecord> records, {
   Iterable<rust.ApiReverseRecord> reverse = const [],
 }) => {
@@ -95,29 +96,72 @@ Set<String> privateUsdActivityTxids(
   for (final record in reverse) ?record.receiveTxid?.toLowerCase(),
 };
 
+/// An account's Private USD activity for a feed (Home, Activity and
+/// `/private-usd`): its conversions and deposits, the deployment's numbers
+/// their rows show, and the main-wallet transactions they stand in for.
 @immutable
-class _Records {
-  const _Records(this.list);
+class PrivateUsdActivity {
+  const PrivateUsdActivity({
+    this.records = const [],
+    this.reverseRecords = const [],
+    this.depositRecords = const [],
+    this.txids = const {},
+    this.zcashConfirmations = 0,
+    this.screening = Duration.zero,
+  });
 
-  final List<rust.ApiForwardRecord> list;
+  static const empty = PrivateUsdActivity();
 
-  @override
-  bool operator ==(Object other) =>
-      other is _Records && listEquals(other.list, list);
+  /// Newest first, as the activity providers keep them.
+  final List<rust.ApiForwardRecord> records;
+  final List<rust.ApiReverseRecord> reverseRecords;
+  final List<rust.ApiDepositRecord> depositRecords;
 
-  @override
-  int get hashCode => Object.hashAll(list);
+  /// The main-wallet transactions these rows stand in for, in the internal
+  /// byte order history rows carry: a feed drops those rows.
+  final Set<String> txids;
+  final int zcashConfirmations;
+
+  /// How long Railgun screens new funds.
+  final Duration screening;
 }
 
-@immutable
-class _ReverseRecords {
-  const _ReverseRecords(this.list);
+/// [accountUuid]'s [PrivateUsdActivity]. With no rows it reads no
+/// deployment (an FRB call desktop never makes).
+final privateUsdActivityProvider = Provider.autoDispose
+    .family<PrivateUsdActivity, String>((ref, accountUuid) {
+      final records = ref.watch(privateUsdActivityRecordsProvider(accountUuid));
+      final reverse = ref.watch(
+        privateUsdReverseActivityRecordsProvider(accountUuid),
+      );
+      final deposits = ref.watch(privateUsdDepositRecordsProvider(accountUuid));
+      if (records.isEmpty && reverse.isEmpty && deposits.isEmpty) {
+        return PrivateUsdActivity.empty;
+      }
+      // Rows come only from a running engine, which runs on a deployment.
+      final deployment = ref.watch(privateUsdCurrentDeploymentProvider);
+      if (deployment == null) return PrivateUsdActivity.empty;
+      return PrivateUsdActivity(
+        records: records,
+        reverseRecords: reverse,
+        depositRecords: deposits,
+        txids: _privateUsdActivityTxids(records, reverse: reverse),
+        zcashConfirmations: deployment.zcashConfirmations,
+        screening: Duration(seconds: deployment.screeningSeconds),
+      );
+    });
 
-  final List<rust.ApiReverseRecord> list;
+/// Records that compare by their elements, so a `select` of them notifies
+/// only when they change rather than on every engine publish.
+@immutable
+class _SameRecords<T> {
+  const _SameRecords(this.list);
+
+  final List<T> list;
 
   @override
   bool operator ==(Object other) =>
-      other is _ReverseRecords && listEquals(other.list, list);
+      other is _SameRecords<T> && listEquals(other.list, list);
 
   @override
   int get hashCode => Object.hashAll(list);

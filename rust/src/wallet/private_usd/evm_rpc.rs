@@ -1,9 +1,8 @@
-//! The swap contract and Railgun's proxy over Ethereum JSON-RPC (plan
-//! reference §5.4; zapp `of/AtomicSwapChain.kt`).
+//! The swap and Deposits contracts and Railgun's proxy over Ethereum
+//! JSON-RPC.
 //!
 //! One JSON-RPC 2.0 request per call (publicnode limits batches), through the
-//! engine's [`HttpTransport`]. The ABI here has no dynamic types: arguments
-//! are 32-byte words, answers are sliced by word.
+//! engine's [`HttpTransport`]. Calls and answers are encoded by [`abi`].
 //!
 //! Only [`ChainReader::confirmed_swap`] (and the reverse equivalent) reads a
 //! confirmed block, `head − confirmations + 1`, after checking the node's
@@ -22,16 +21,15 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use zecswap_core::Terms;
 
-use super::abi::{self, Call3};
-use super::deployment::{
-    hex_address, Deployment, DepositsPin, MAX_LOGS_BODY, MAX_SERVICE_BODY, QUICK_TIMEOUT,
+use super::abi::{
+    self, address_of_word, address_word, bool_word, call_data, exact_word, hex0x, keccak,
+    u128_word, u64_word, uint_word, words, Call, WORD,
 };
-use super::terms::{address_word, keccak};
+use super::deployment::{Deployment, DepositsPin, MAX_LOGS_BODY, MAX_SERVICE_BODY, QUICK_TIMEOUT};
 use super::transport::HttpTransport;
 use super::{fail, ErrorCode, PrivateUsdError, Result};
 use crate::wallet::routed_http::RoutedRequest;
 
-const WORD: usize = 32;
 /// `getSwap`'s static struct: termsHash, stage, paidOut, claimLockUntil,
 /// refundLockUntil, secret.
 const GET_SWAP_WORDS: usize = 6;
@@ -52,8 +50,8 @@ pub(crate) const PAID_OUT_EVENT: &str = "PaidOut(bytes32,address,uint256)";
 pub(crate) const NULLIFIERS: &str = "nullifiers(uint256,bytes32)";
 /// A relayed send counts as landed once its receipt has this many blocks.
 pub(crate) const SEND_CONFIRMATIONS: u32 = 1;
-/// The Deposits contract (M9; zecSwap `IDeposits`). Unlike the swap
-/// contract's `bytes32` versions, these take an address.
+/// The Deposits contract. Unlike the swap contract's `bytes32` versions,
+/// these take an address.
 pub(crate) const DEPOSITED: &str = "deposited(address)";
 pub(crate) const DEPOSITS_VAULT_OF: &str = "vaultOf(address)";
 pub(crate) const DEPOSITS_RESCUE_NONCES: &str = "rescueNonces(address)";
@@ -66,12 +64,6 @@ pub(crate) const AUTHORIZATION_STATE: &str = "authorizationState(address,bytes32
 /// A deposit, or a rescue, counts as landed once its receipt has this many
 /// blocks, as a relayed send does.
 pub(crate) const DEPOSIT_CONFIRMATIONS: u32 = SEND_CONFIRMATIONS;
-
-/// The first four bytes of `keccak256(signature)`.
-pub(crate) fn selector(signature: &str) -> [u8; 4] {
-    let hash = keccak(&[signature.as_bytes()]);
-    [hash[0], hash[1], hash[2], hash[3]]
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Head {
@@ -140,8 +132,8 @@ pub(crate) enum TransactionStatus {
     Reverted,
 }
 
-/// Every contract read the swap driver makes (plan §3.6). Implemented over
-/// JSON-RPC by [`EvmRpc`]; engine tests fake it.
+/// Every contract read the swap driver makes. Implemented over JSON-RPC by
+/// [`EvmRpc`]; engine tests fake it.
 pub(crate) trait ChainReader {
     async fn chain_id(&self) -> Result<u64>;
     async fn head(&self) -> Result<Head>;
@@ -167,9 +159,9 @@ pub(crate) trait ChainReader {
     ) -> Result<TransactionStatus>;
 }
 
-/// What settles a relayed Railgun send (zapp `up/PrivateUsdSendChain.kt`):
-/// its transaction's receipt, or the nullifiers it spends. Implemented over
-/// JSON-RPC by [`EvmRpc`]; the send tests fake it.
+/// What settles a relayed Railgun send: its transaction's receipt, or the
+/// nullifiers it spends. Implemented over JSON-RPC by [`EvmRpc`]; the send
+/// tests fake it.
 pub(crate) trait SendChain {
     /// The transaction's receipt with [`SEND_CONFIRMATIONS`].
     async fn send_status(&self, transaction: &[u8; 32]) -> Result<TransactionStatus>;
@@ -186,7 +178,7 @@ pub(crate) struct AddressUse {
 }
 
 impl AddressUse {
-    /// Given out: it holds tokens or has deposited (zecSwap `Used::used`).
+    /// Given out: it holds tokens or has deposited.
     pub(crate) fn used(&self) -> bool {
         self.balance > 0 || self.deposited
     }
@@ -200,17 +192,19 @@ pub(crate) struct ReceiptLog {
     pub data: Vec<u8>,
 }
 
-/// What deposits read from Ethereum (plan M9; zecSwap
-/// `crates/zecswap-chain/src/evm/deposits.rs`). Implemented over JSON-RPC by
-/// [`EvmRpc`], one request per call; deposit tests fake it.
+/// What deposits read from Ethereum. Implemented over JSON-RPC by [`EvmRpc`],
+/// one request per call.
 pub(crate) trait DepositChain {
     /// The node's chain id (named apart from `ChainReader::chain_id`, which
     /// `EvmRpc` also has).
     async fn node_chain_id(&self) -> Result<u64>;
     /// Each owner's token balance and whether it has deposited, in one
     /// Multicall3 `aggregate3` at `latest`.
-    async fn deposit_addresses(&self, pin: &DepositsPin, owners: &[[u8; 20]])
-        -> Result<Vec<AddressUse>>;
+    async fn deposit_addresses(
+        &self,
+        pin: &DepositsPin,
+        owners: &[[u8; 20]],
+    ) -> Result<Vec<AddressUse>>;
     /// The Deposits contract's `TOKEN()`.
     async fn deposits_token(&self, pin: &DepositsPin) -> Result<[u8; 20]>;
     /// The token's own `name()`, `version()` and `DOMAIN_SEPARATOR()`.
@@ -286,12 +280,12 @@ pub(crate) struct EvmRpc<'a, T: HttpTransport> {
 }
 
 impl<'a, T: HttpTransport> EvmRpc<'a, T> {
-    /// `url` is the keyed URL when the build has one, else publicnode
-    /// (`Deployment::rpc_url`).
-    pub(crate) fn new(transport: &'a T, url: impl Into<String>, pins: &'static Deployment) -> Self {
+    /// Over the build's keyed RPC URL, or publicnode when `keyed_rpc_url` is
+    /// empty.
+    pub(crate) fn new(transport: &'a T, pins: &'static Deployment, keyed_rpc_url: &str) -> Self {
         Self {
             transport,
-            url: url.into(),
+            url: pins.rpc_url(keyed_rpc_url).to_owned(),
             pins,
             lock_duration: OnceLock::new(),
             next_id: AtomicU64::new(1),
@@ -323,10 +317,17 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
                 message,
             ))
         };
-        let response =
-            self.transport.send(request).await.map_err(|error| {
-                offline(format!("Ethereum node unreachable ({method}): {error}"))
-            })?;
+        let response = self.transport.send(request).await.map_err(|error| {
+            let code = if error.route_blocked {
+                ErrorCode::RouteBlocked
+            } else {
+                ErrorCode::EthereumUnreachable
+            };
+            RpcError::Failed(PrivateUsdError::new(
+                code,
+                format!("Ethereum node unreachable ({method}): {error}"),
+            ))
+        })?;
         if !response.is_success() {
             return Err(offline(format!(
                 "Ethereum node answered HTTP {} ({method})",
@@ -369,7 +370,7 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
             .rpc(
                 "eth_call",
                 json!([
-                    { "to": hex_address(to), "data": format!("0x{}", hex::encode(data)) },
+                    { "to": hex0x(to), "data": hex0x(&data) },
                     block
                 ]),
             )
@@ -385,7 +386,7 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
         block: &str,
     ) -> Result<Vec<u8>> {
         Ok(self
-            .eth_call(&self.pins.contract, call_data(signature, &[word]), block)
+            .eth_call(&self.pins.contract, call_data(signature, &[*word]), block)
             .await?)
     }
 
@@ -402,9 +403,7 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
     }
 
     async fn lookup(&self, transaction: &[u8; 32], method: &str) -> Result<Option<Value>> {
-        let result = self
-            .rpc(method, json!([format!("0x{}", hex::encode(transaction))]))
-            .await?;
+        let result = self.rpc(method, json!([hex0x(transaction)])).await?;
         Ok((!result.is_null()).then_some(result))
     }
 }
@@ -483,7 +482,7 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
         let balance = self
             .eth_call(
                 &self.pins.token,
-                call_data(BALANCE_OF, &[&address_word(&vault)]),
+                call_data(BALANCE_OF, &[address_word(&vault)]),
                 "latest",
             )
             .await?;
@@ -497,7 +496,7 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
     }
 
     async fn railgun_accepts(&self) -> Result<bool> {
-        let call = call_data(TOKEN_BLOCKLIST, &[&address_word(&self.pins.token)]);
+        let call = call_data(TOKEN_BLOCKLIST, &[address_word(&self.pins.token)]);
         match self
             .eth_call(&self.pins.railgun_proxy, call, "latest")
             .await
@@ -518,9 +517,9 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
         let elapsed = head.timestamp - since.min(head.timestamp);
         let around = head.number.saturating_sub(elapsed / SECONDS_PER_BLOCK);
         let earliest = around.saturating_sub(LOG_WINDOW_BLOCKS).min(confirmed);
-        let topic = format!("0x{}", hex::encode(keccak(&[PAID_OUT_EVENT.as_bytes()])));
-        let id_topic = format!("0x{}", hex::encode(id));
-        let contract = hex_address(&self.pins.contract);
+        let topic = hex0x(&keccak(&[PAID_OUT_EVENT.as_bytes()]));
+        let id_topic = hex0x(id);
+        let contract = hex0x(&self.pins.contract);
         let mut to = confirmed;
         loop {
             let from = (to + 1).saturating_sub(LOG_WINDOW_BLOCKS).max(earliest);
@@ -605,12 +604,10 @@ impl<T: HttpTransport> SendChain for EvmRpc<'_, T> {
     }
 
     async fn nullifier_spent(&self, tree: u32, nullifier: &[u8; 32]) -> Result<bool> {
-        let mut tree_word = [0u8; WORD];
-        tree_word[WORD - 4..].copy_from_slice(&tree.to_be_bytes());
         let data = self
             .eth_call(
                 &self.pins.railgun_proxy,
-                call_data(NULLIFIERS, &[&tree_word, nullifier]),
+                call_data(NULLIFIERS, &[uint_word(tree.into()), *nullifier]),
                 "latest",
             )
             .await?;
@@ -621,15 +618,17 @@ impl<T: HttpTransport> SendChain for EvmRpc<'_, T> {
 impl<T: HttpTransport> EvmRpc<'_, T> {
     /// Each call's return data, from one `aggregate3` on Multicall3 at
     /// `latest`; any call failing fails the read.
-    async fn aggregate(&self, multicall: &[u8; 20], calls: &[Call3]) -> Result<Vec<Vec<u8>>> {
-        let data = abi::encode_aggregate3(selector(abi::AGGREGATE3), calls);
+    async fn aggregate(&self, multicall: &[u8; 20], calls: &[Call]) -> Result<Vec<Vec<u8>>> {
+        let data = abi::encode_aggregate3(calls);
         let answer = self.eth_call(multicall, data, "latest").await?;
         abi::decode_aggregate3(&answer, calls.len())
     }
 
     /// `signature()` on `to` at `latest`.
     async fn bare_call(&self, to: &[u8; 20], signature: &str) -> Result<Vec<u8>> {
-        Ok(self.eth_call(to, call_data(signature, &[]), "latest").await?)
+        Ok(self
+            .eth_call(to, call_data(signature, &[]), "latest")
+            .await?)
     }
 }
 
@@ -643,18 +642,18 @@ impl<T: HttpTransport> DepositChain for EvmRpc<'_, T> {
         pin: &DepositsPin,
         owners: &[[u8; 20]],
     ) -> Result<Vec<AddressUse>> {
-        let calls: Vec<Call3> = owners
+        let calls: Vec<Call> = owners
             .iter()
             .flat_map(|owner| {
                 let word = address_word(owner);
                 [
-                    Call3 {
-                        target: pin.token,
-                        data: call_data(BALANCE_OF, &[&word]),
+                    Call {
+                        to: pin.token,
+                        data: call_data(BALANCE_OF, &[word]),
                     },
-                    Call3 {
-                        target: pin.contract,
-                        data: call_data(DEPOSITED, &[&word]),
+                    Call {
+                        to: pin.contract,
+                        data: call_data(DEPOSITED, &[word]),
                     },
                 ]
             })
@@ -672,7 +671,9 @@ impl<T: HttpTransport> DepositChain for EvmRpc<'_, T> {
     }
 
     async fn deposits_token(&self, pin: &DepositsPin) -> Result<[u8; 20]> {
-        address_of_word(&exact_word(&self.bare_call(&pin.contract, DEPOSITS_TOKEN).await?)?)
+        address_of_word(&exact_word(
+            &self.bare_call(&pin.contract, DEPOSITS_TOKEN).await?,
+        )?)
     }
 
     async fn token_domain(&self, token: &[u8; 20]) -> Result<(String, String, [u8; 32])> {
@@ -686,11 +687,11 @@ impl<T: HttpTransport> DepositChain for EvmRpc<'_, T> {
         if owners.is_empty() {
             return Ok(Vec::new());
         }
-        let vault_calls: Vec<Call3> = owners
+        let vault_calls: Vec<Call> = owners
             .iter()
-            .map(|owner| Call3 {
-                target: pin.contract,
-                data: call_data(DEPOSITS_VAULT_OF, &[&address_word(owner)]),
+            .map(|owner| Call {
+                to: pin.contract,
+                data: call_data(DEPOSITS_VAULT_OF, &[address_word(owner)]),
             })
             .collect();
         let vaults = self
@@ -699,11 +700,11 @@ impl<T: HttpTransport> DepositChain for EvmRpc<'_, T> {
             .iter()
             .map(|answer| address_of_word(&exact_word(answer)?))
             .collect::<Result<Vec<_>>>()?;
-        let balance_calls: Vec<Call3> = vaults
+        let balance_calls: Vec<Call> = vaults
             .iter()
-            .map(|vault| Call3 {
-                target: pin.token,
-                data: call_data(BALANCE_OF, &[&address_word(vault)]),
+            .map(|vault| Call {
+                to: pin.token,
+                data: call_data(BALANCE_OF, &[address_word(vault)]),
             })
             .collect();
         self.aggregate(&pin.multicall, &balance_calls)
@@ -717,7 +718,7 @@ impl<T: HttpTransport> DepositChain for EvmRpc<'_, T> {
         let data = self
             .eth_call(
                 &pin.contract,
-                call_data(DEPOSITS_RESCUE_NONCES, &[&address_word(from)]),
+                call_data(DEPOSITS_RESCUE_NONCES, &[address_word(from)]),
                 "latest",
             )
             .await?;
@@ -733,7 +734,7 @@ impl<T: HttpTransport> DepositChain for EvmRpc<'_, T> {
         let data = self
             .eth_call(
                 token,
-                call_data(AUTHORIZATION_STATE, &[&address_word(from), nonce]),
+                call_data(AUTHORIZATION_STATE, &[address_word(from), *nonce]),
                 "latest",
             )
             .await?;
@@ -783,33 +784,6 @@ impl<T: HttpTransport> DepositChain for EvmRpc<'_, T> {
     }
 }
 
-/// Exactly one word: a static answer of another length is not this ABI's.
-fn exact_word(data: &[u8]) -> Result<[u8; 32]> {
-    if data.len() != WORD {
-        return fail(
-            ErrorCode::ChainUnreadable,
-            format!("expected one word, the node answered {} bytes", data.len()),
-        );
-    }
-    Ok(data.try_into().expect("32 bytes"))
-}
-
-/// An ABI `bool`: zero or one, nothing else.
-fn bool_word(word: &[u8; 32]) -> Result<bool> {
-    if word[..WORD - 1].iter().any(|byte| *byte != 0) || word[WORD - 1] > 1 {
-        return fail(ErrorCode::ChainUnreadable, "a bool that is neither 0 nor 1");
-    }
-    Ok(word[WORD - 1] == 1)
-}
-
-/// An ABI `address`: twelve zero bytes, then the address.
-fn address_of_word(word: &[u8; 32]) -> Result<[u8; 20]> {
-    if word[..12].iter().any(|byte| *byte != 0) {
-        return fail(ErrorCode::ChainUnreadable, "an address word with high bytes");
-    }
-    Ok(word[12..].try_into().expect("20 bytes"))
-}
-
 impl SwapState {
     /// This state, once its terms hash is `terms`' (`MISMATCH` otherwise):
     /// the chain shows nothing else of them.
@@ -857,48 +831,6 @@ pub(crate) fn decode_swap_state(data: &[u8]) -> Result<Option<SwapState>> {
     }))
 }
 
-/// `selector ‖ word…`.
-fn call_data(signature: &str, arguments: &[&[u8; 32]]) -> Vec<u8> {
-    let mut data = selector(signature).to_vec();
-    for argument in arguments {
-        data.extend_from_slice(*argument);
-    }
-    data
-}
-
-/// At least `count` words of `data`; a shorter answer does not read.
-fn words(data: &[u8], count: usize) -> Result<Vec<[u8; 32]>> {
-    if data.len() < count * WORD {
-        return fail(
-            ErrorCode::ChainUnreadable,
-            format!("the node answered {} bytes", data.len()),
-        );
-    }
-    Ok(data
-        .chunks_exact(WORD)
-        .take(count)
-        .map(|word| word.try_into().expect("32 bytes"))
-        .collect())
-}
-
-/// A word that must fit `u64`; anything else is not this contract's.
-fn u64_word(word: &[u8; 32]) -> Result<u64> {
-    if word[..24].iter().any(|byte| *byte != 0) {
-        return fail(ErrorCode::WrongDeployment, "a time or count beyond u64");
-    }
-    Ok(u64::from_be_bytes(word[24..].try_into().expect("8 bytes")))
-}
-
-/// A word that must fit `u128`.
-fn u128_word(word: &[u8; 32]) -> Result<u128> {
-    if word[..16].iter().any(|byte| *byte != 0) {
-        return fail(ErrorCode::ChainUnreadable, "an amount beyond u128");
-    }
-    Ok(u128::from_be_bytes(
-        word[16..].try_into().expect("16 bytes"),
-    ))
-}
-
 fn block_tag(number: u64) -> String {
     format!("0x{number:x}")
 }
@@ -928,7 +860,7 @@ mod tests {
 
     use super::*;
     use crate::wallet::private_usd::{
-        deployment::{self, hex_address},
+        deployment,
         transport::test_support::{rpc_error, rpc_result, ScriptedTransport},
         PrivateUsdNetwork,
     };
@@ -986,19 +918,16 @@ mod tests {
         let reverting = ScriptedTransport::new(|request: &RoutedRequest| {
             let (method, params) = method(request);
             assert_eq!(method, "eth_call");
-            assert_eq!(params[0]["to"], hex_address(&pins.railgun_proxy));
+            assert_eq!(params[0]["to"], hex0x(&pins.railgun_proxy));
             Ok::<RoutedResponse, RoutedError>(rpc_error(3, "execution reverted"))
         });
-        let rpc = EvmRpc::new(&reverting, "https://rpc.invalid", pins);
+        let rpc = EvmRpc::new(&reverting, pins, "https://rpc.invalid");
         assert!(!rpc.railgun_accepts().await.unwrap());
 
         let open = ScriptedTransport::new(|_: &RoutedRequest| {
-            Ok::<RoutedResponse, RoutedError>(rpc_result(json!(format!(
-                "0x{}",
-                hex::encode(word(0))
-            ))))
+            Ok::<RoutedResponse, RoutedError>(rpc_result(json!(hex0x(&word(0)))))
         });
-        assert!(EvmRpc::new(&open, "https://rpc.invalid", pins)
+        assert!(EvmRpc::new(&open, pins, "https://rpc.invalid")
             .railgun_accepts()
             .await
             .unwrap());
@@ -1015,7 +944,7 @@ mod tests {
             );
             Ok::<RoutedResponse, RoutedError>(rpc_result(json!("0x1")))
         });
-        let rpc = EvmRpc::new(&mainnet_node, "https://rpc.invalid", pins);
+        let rpc = EvmRpc::new(&mainnet_node, pins, "https://rpc.invalid");
         let terms = zecswap_core::Terms {
             maker: pins.maker,
             token: pins.token,

@@ -1,12 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// The spans the Home portfolio chart offers.
-///
-/// Each but [all] is a fixed run of whole UTC days of daily prices, counted back
-/// from the last completed UTC day, so the request for one is the same for
-/// everybody on a given day. [all] starts where the pricing server's own
-/// history does (its `availableFrom`), which is the server's to say, not the
-/// wallet's.
+/// The spans the portfolio chart offers.
 enum PortfolioChartRange {
   week('1w', 'Past week', Duration(days: 7)),
   month('1m', 'Past month', Duration(days: 30)),
@@ -25,12 +19,10 @@ enum PortfolioChartRange {
   /// How far back the span reaches, or `null` for all of the history there is.
   final Duration? window;
 
-  /// The whole days of [window], or `null` for [all].
   int? get days => window?.inDays;
 
   static const defaultRange = PortfolioChartRange.week;
 
-  /// The range stored under [raw], or `null` for anything unrecognised.
   static PortfolioChartRange? tryParse(String? raw) {
     for (final range in values) {
       if (range.label == raw) return range;
@@ -39,13 +31,11 @@ enum PortfolioChartRange {
   }
 }
 
-/// What the chart plots.
 enum PortfolioChartMode {
-  /// The balance valued at public ZEC/USD prices. Asks the pricing server for
-  /// daily prices over the range; nothing about the wallet is sent.
+  /// The balance valued at the pricing server's daily ZEC/USD prices.
   usd,
 
-  /// The ZEC balance alone, built from the wallet database. No network.
+  /// The ZEC balance alone, from the wallet database.
   zec,
 }
 
@@ -56,7 +46,7 @@ enum PortfolioChartNotice {
   /// USD was asked for but no prices could be had, so the ZEC balance is shown.
   pricesUnavailable,
 
-  /// USD prices are shown from an earlier fetch, because a refresh failed.
+  /// USD prices are shown, but the newest is more than a day behind.
   pricesStale,
 }
 
@@ -96,7 +86,6 @@ class PortfolioChartData {
   double? get changeFraction => startValue > 0 ? change / startValue : null;
 }
 
-/// What the Home chart slot shows.
 sealed class PortfolioChartViewState {
   const PortfolioChartViewState();
 }
@@ -106,28 +95,27 @@ final class PortfolioChartHidden extends PortfolioChartViewState {
   const PortfolioChartHidden();
 }
 
-/// Waiting on the balance history or the prices.
-final class PortfolioChartLoading extends PortfolioChartViewState {
-  const PortfolioChartLoading(this.range, this.mode);
+/// A chart for [range] in [mode] that shows a placeholder instead of a line.
+sealed class PortfolioChartPlaceholder extends PortfolioChartViewState {
+  const PortfolioChartPlaceholder(this.range, this.mode);
 
   final PortfolioChartRange range;
   final PortfolioChartMode mode;
+}
+
+/// Waiting on the balance history or the prices.
+final class PortfolioChartLoading extends PortfolioChartPlaceholder {
+  const PortfolioChartLoading(super.range, super.mode);
 }
 
 /// A balance history that is too short for [range].
-final class PortfolioChartEmpty extends PortfolioChartViewState {
-  const PortfolioChartEmpty(this.range, this.mode);
-
-  final PortfolioChartRange range;
-  final PortfolioChartMode mode;
+final class PortfolioChartEmpty extends PortfolioChartPlaceholder {
+  const PortfolioChartEmpty(super.range, super.mode);
 }
 
 /// Privacy mode is on: the shape and values of the history stay hidden.
-final class PortfolioChartPrivate extends PortfolioChartViewState {
-  const PortfolioChartPrivate(this.range, this.mode);
-
-  final PortfolioChartRange range;
-  final PortfolioChartMode mode;
+final class PortfolioChartPrivate extends PortfolioChartPlaceholder {
+  const PortfolioChartPrivate(super.range, super.mode);
 }
 
 final class PortfolioChartReady extends PortfolioChartViewState {

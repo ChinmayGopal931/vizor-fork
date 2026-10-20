@@ -33,7 +33,10 @@ void main() {
     final assets = manifest.listAssets();
 
     expect(assets, contains('assets/profile_pictures/profile_picture_01.webp'));
-    expect(assets, contains('assets/animations/mobile_welcome.mp4'));
+    expect(
+      assets,
+      contains('assets/illustrations/mobile_onboarding_intro_pattern.svg'),
+    );
     expect(
       assets.where((asset) => asset.contains('/desktop/')),
       isEmpty,
@@ -46,7 +49,7 @@ void main() {
     expect(svg, contains('<svg'));
 
     final bytes = await rootBundle.load(
-      'assets/illustrations/mobile_welcome_poster.webp',
+      'assets/illustrations/payment_links/payment_link_card_knight.webp',
     );
     final codec = await ui.instantiateImageCodec(
       bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),

@@ -8,13 +8,11 @@ import '../../../../core/theme/app_theme.dart';
 import '../../models/portfolio_chart_models.dart';
 import '../../providers/portfolio_chart_provider.dart';
 import '../../providers/portfolio_chart_settings_provider.dart';
-import '../../services/portfolio_chart_format.dart';
 import '../../widgets/mobile/mobile_holdings_panel.dart';
 import '../../widgets/mobile/mobile_portfolio_chart_card.dart';
 
-/// The full neon chart, opened from the Home balance sign: the same chart the
-/// card shows (value, change, source, ranges, scrubbing) given most of the
-/// page, and under it what the account holds, pool by pool.
+/// The full chart, opened from the Home balance sign: the chart card given most
+/// of the page, and under it what the account holds, pool by pool.
 class MobilePortfolioChartScreen extends ConsumerWidget {
   const MobilePortfolioChartScreen({super.key});
 
@@ -56,9 +54,6 @@ class MobilePortfolioChartScreen extends ConsumerWidget {
                       key: const ValueKey('mobile_portfolio_chart_screen_card'),
                       state: state,
                       plotHeight: _plotHeight,
-                      priceSourceName: portfolioPriceSourceName(
-                        ref.watch(portfolioPricingEngineBaseUriProvider),
-                      ),
                       onRangeSelected: ref
                           .read(portfolioChartRangeProvider.notifier)
                           .select,

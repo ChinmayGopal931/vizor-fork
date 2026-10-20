@@ -1,7 +1,5 @@
-//! The send log and its settlement (plan M7 "Done when"): keep before post,
-//! the spend guard across restarts, and the settlement's `when` (zapp
-//! `RelayedPrivateUsdSenderTest` 63, 104, 132, 180, 209 and 230,
-//! `PrivateUsdSendLogTest` 52 and 98), on a scripted relayer and a fake
+//! The send log and its settlement: keep before post, the spend guard across
+//! restarts, and the settlement's `when`, on a scripted relayer and a fake
 //! chain. The relayer's answer mapping is `relayer_client`'s test.
 
 use std::cell::{Cell, RefCell};
@@ -11,7 +9,7 @@ use std::time::Duration;
 use serde_json::{json, Value};
 
 use crate::wallet::private_usd::{
-    deployment::{self, hex_address, Deployment},
+    deployment::{self, Deployment},
     engine::Clock,
     evm_rpc::{SendChain, TransactionStatus},
     models::{Amount, Hex},
@@ -21,7 +19,7 @@ use crate::wallet::private_usd::{
     transport::test_support::ScriptedTransport,
     ErrorCode, PrivateUsdNetwork, Result,
 };
-use crate::wallet::routed_http::{RoutedError, RoutedPhase, RoutedRequest, RoutedResponse};
+use crate::wallet::routed_http::{RoutedError, RoutedRequest, RoutedResponse};
 
 const NOW: u64 = 1_790_000_000;
 const RELAYER: &str = "https://relayer.invalid/relayer";
@@ -122,7 +120,7 @@ impl Answer {
         let (status, body, retry_after) = self.0.borrow().clone();
         if status == 0 {
             return Err(RoutedError {
-                phase: RoutedPhase::AfterDispatch,
+                route_blocked: false,
                 message: "connection reset".into(),
             });
         }
@@ -152,7 +150,7 @@ fn page_proof(nullifiers: &[[u8; 32]]) -> Value {
     let nullifiers: Vec<String> = nullifiers.iter().map(|n| hex0x(n)).collect();
     json!({
         "chainId": pins().chain_id,
-        "to": hex_address(&pins().railgun_proxy).to_uppercase().replace("0X", "0x"),
+        "to": hex0x(&pins().railgun_proxy).to_uppercase().replace("0X", "0x"),
         "data": DATA,
         "value": "0",
         "spends": [{ "tree": 1, "nullifiers": nullifiers }],
@@ -165,7 +163,7 @@ fn kept_body() -> String {
     format!(
         r#"{{"chainId":{},"to":"{}","data":"{}","value":"0"}}"#,
         pins().chain_id,
-        hex_address(&pins().railgun_proxy),
+        hex0x(&pins().railgun_proxy),
         DATA.to_lowercase()
     )
 }
@@ -212,7 +210,7 @@ async fn a_send_is_kept_before_it_is_posted_and_posted_from_the_store() {
     };
     for bad in [
         edited("chainId", json!(1)),
-        edited("to", json!(hex_address(&pins().relay_adapt))),
+        edited("to", json!(hex0x(&pins().relay_adapt))),
         edited("value", json!("1")),
         edited("data", json!("0x12")),
         edited("spends", json!([])),

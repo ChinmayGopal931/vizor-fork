@@ -2,8 +2,8 @@ import Foundation
 import WebKit
 
 /// Serves `veylor-railgun://app/<path>` from the app bundle's `railgun/` folder and nothing else: no path outside it,
-/// no directory, only `GET`, and only the types the page loads (iOS reference §6.4). WebKit can't intercept `https`,
-/// so the page gets an origin of its own on a custom scheme, as hybrid shells do.
+/// no directory, only `GET`, and only the types the page loads. WebKit can't intercept `https`, so the page gets an
+/// origin of its own on a custom scheme, as hybrid shells do.
 final class RailgunSchemeHandler: NSObject, WKURLSchemeHandler {
   nonisolated static let scheme = "veylor-railgun"
   nonisolated static let host = "app"

@@ -1,51 +1,26 @@
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/widgets.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/privacy/privacy_mask.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/mobile/mobile_surface_card.dart';
+import '../../../../core/widgets/receipt_loading_skeleton.dart';
 import '../../models/portfolio_chart_models.dart';
-import '../../providers/portfolio_chart_provider.dart';
-import '../../providers/portfolio_chart_settings_provider.dart';
 import '../../services/portfolio_chart_format.dart';
 import '../portfolio_chart_range_selector.dart';
 import 'neon_plot.dart';
 
-/// The Home portfolio chart's place under the balance card: nothing while the
-/// chart is off or has no history, otherwise the card with a gap above it.
-class MobilePortfolioChartSlot extends ConsumerWidget {
-  const MobilePortfolioChartSlot({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(portfolioChartViewProvider);
-    if (state is PortfolioChartHidden) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.s),
-      child: MobilePortfolioChartCard(
-        key: const ValueKey('mobile_home_portfolio_chart'),
-        state: state,
-        priceSourceName: portfolioPriceSourceName(
-          ref.watch(portfolioPricingEngineBaseUriProvider),
-        ),
-        onRangeSelected: ref.read(portfolioChartRangeProvider.notifier).select,
-      ),
-    );
-  }
-}
-
-/// Plot height. Taller than a sparkline so a week of hourly prices has room to
-/// read, short enough that Send and Receive stay on screen.
+/// The plot's default height: a compact chart, with room for a week of daily
+/// prices to read.
 const kPortfolioChartPlotHeight = 104.0;
 
-/// The chart card: title and where the numbers come from, the value and its
-/// change over the range, the line, and the range chips. A drag along the line
-/// shows the value and time at that point instead.
+/// The chart card: title and a note on its numbers, the value and its change
+/// over the range, the line, and the range chips. A drag along the line shows
+/// the value and time at that point instead.
 class MobilePortfolioChartCard extends StatefulWidget {
   const MobilePortfolioChartCard({
     required this.state,
     required this.onRangeSelected,
-    this.priceSourceName = 'the pricing server',
     this.plotHeight = kPortfolioChartPlotHeight,
     super.key,
   });
@@ -55,9 +30,6 @@ class MobilePortfolioChartCard extends StatefulWidget {
   /// The plot's height; the full chart screen gives it most of the page.
   final double plotHeight;
   final ValueChanged<PortfolioChartRange> onRangeSelected;
-
-  /// Who the prices come from, as the source line names it.
-  final String priceSourceName;
 
   @override
   State<MobilePortfolioChartCard> createState() =>
@@ -84,17 +56,13 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
       state is PortfolioChartReady ? state.data : null;
 
   PortfolioChartRange get _range => switch (widget.state) {
-    PortfolioChartLoading(:final range) => range,
-    PortfolioChartEmpty(:final range) => range,
-    PortfolioChartPrivate(:final range) => range,
+    PortfolioChartPlaceholder(:final range) => range,
     PortfolioChartReady(:final data) => data.range,
     PortfolioChartHidden() => PortfolioChartRange.defaultRange,
   };
 
   PortfolioChartMode get _mode => switch (widget.state) {
-    PortfolioChartLoading(:final mode) => mode,
-    PortfolioChartEmpty(:final mode) => mode,
-    PortfolioChartPrivate(:final mode) => mode,
+    PortfolioChartPlaceholder(:final mode) => mode,
     PortfolioChartReady(:final data) => data.mode,
     PortfolioChartHidden() => PortfolioChartMode.zec,
   };
@@ -117,12 +85,7 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
         ? 'Portfolio value'
         : 'ZEC balance';
 
-    final valueStyle = TextStyle(
-      fontFamily: 'Gotham',
-      fontWeight: FontWeight.w300,
-      fontSize: 30,
-      height: 1.15,
-      letterSpacing: -0.3,
+    final valueStyle = AppTypography.headlineLarge.copyWith(
       color: colors.neon.core,
       shadows: Neon.textGlow(colors.neon.glow, intensity: 0.8),
     );
@@ -144,21 +107,14 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
     } else if (state is PortfolioChartEmpty) {
       value = const SizedBox(height: 22);
     } else {
-      value = _Skeleton(
-        width: 132,
-        height: 22,
-        radius: AppRadii.xSmall / 2,
-        color: colors.background.raised,
-      );
+      value = const ReceiptValueSkeleton(width: 132, height: 22);
     }
 
-    // Top right: where the numbers come from, or the time under the finger.
-    // The server's name is part of what the card discloses, so on a narrow
-    // phone it shrinks to fit rather than being cut short.
+    // Top right: a note on the numbers, or the time under the finger.
     final Widget source = Text(
       data != null && selected != null
           ? formatPortfolioPointTime(selected.time, data.range, data.mode)
-          : _sourceLabel(state),
+          : _sourceLabel(data),
       key: const ValueKey('mobile_home_portfolio_chart_source'),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
@@ -186,7 +142,13 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
             ),
           );
 
-    return _NeonChartFrame(
+    return MobileSurfaceCard(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.sm,
+        AppSpacing.sm,
+        AppSpacing.sm,
+        AppSpacing.xs,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -195,14 +157,7 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
               Text(
                 title.toUpperCase(),
                 maxLines: 1,
-                style: TextStyle(
-                  fontFamily: 'Gotham',
-                  fontWeight: FontWeight.w300,
-                  fontSize: 11,
-                  height: 1.2,
-                  letterSpacing: 2.2,
-                  color: colors.neon.glow,
-                ),
+                style: kNeonHudCaptionStyle.copyWith(color: colors.neon.glow),
               ),
               const SizedBox(width: AppSpacing.xs),
               Expanded(
@@ -238,7 +193,7 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
           const SizedBox(height: AppSpacing.s),
           SizedBox(
             height: widget.plotHeight,
-            child: _plot(context, state, data),
+            child: _plot(context, data, title: title, change: change),
           ),
           const SizedBox(height: AppSpacing.xs),
           PortfolioChartRangeSelector(
@@ -253,11 +208,12 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
 
   Widget _plot(
     BuildContext context,
-    PortfolioChartViewState state,
-    PortfolioChartData? data,
-  ) {
+    PortfolioChartData? data, {
+    required String title,
+    required PortfolioChartChange? change,
+  }) {
     final colors = context.colors;
-    final message = switch (state) {
+    final message = switch (widget.state) {
       PortfolioChartEmpty() => 'Not enough history for this range yet.',
       PortfolioChartPrivate() => 'Hidden in privacy mode.',
       _ => null,
@@ -271,19 +227,15 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
         ),
       );
     }
-    if (data == null) {
-      return _Skeleton(
+    if (data == null || change == null) {
+      return ReceiptValueSkeleton(
         width: double.infinity,
         height: widget.plotHeight,
-        radius: AppRadii.small,
-        color: colors.background.raised,
       );
     }
-    final change = describePortfolioChange(data);
     return Semantics(
       label:
-          '${data.mode == PortfolioChartMode.usd ? 'Portfolio value' : 'ZEC balance'}, '
-          '${data.range.description}, ${change.text}. '
+          '$title, ${data.range.description}, ${change.text}. '
           'Drag to inspect values.',
       excludeSemantics: true,
       child: LayoutBuilder(
@@ -294,7 +246,7 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
           return GestureDetector(
             key: const ValueKey('mobile_home_portfolio_chart_plot'),
             behavior: HitTestBehavior.opaque,
-            // Only horizontal drags: vertical ones keep scrolling Home.
+            // Only horizontal drags: vertical ones keep scrolling the page.
             dragStartBehavior: DragStartBehavior.down,
             onHorizontalDragStart: (details) =>
                 _scrub(details.localPosition.dx),
@@ -318,104 +270,11 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
     );
   }
 
-  /// What the card says about its numbers: only when prices failed or are
-  /// old. The owner asked for the price server not to be named on the card;
-  /// Settings, Portfolio chart still names it and what a request carries.
-  String _sourceLabel(PortfolioChartViewState state) {
-    const fromServer = '';
-    final data = _dataOf(state);
-    if (data == null) {
-      return _mode == PortfolioChartMode.usd ? fromServer : 'On this device';
-    }
-    return switch (data.notice) {
-      PortfolioChartNotice.pricesUnavailable => 'Prices unavailable',
-      PortfolioChartNotice.pricesStale => 'Older prices',
-      PortfolioChartNotice.none =>
-        data.mode == PortfolioChartMode.usd ? fromServer : 'On this device',
-    };
-  }
-}
-
-class _Skeleton extends StatelessWidget {
-  const _Skeleton({
-    required this.width,
-    required this.height,
-    required this.radius,
-    required this.color,
-  });
-
-  final double width;
-  final double height;
-  final double radius;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(radius),
-      ),
-      child: SizedBox(width: width, height: height),
-    );
-  }
-}
-
-/// The chart's panel: dark glass inside a dim cut-corner tube.
-class _NeonChartFrame extends StatelessWidget {
-  const _NeonChartFrame({required this.child});
-
-  final Widget child;
-
-  static const _cut = AppChamfer.large;
-
-  @override
-  Widget build(BuildContext context) {
-    final neon = context.colors.neon;
-    return CustomPaint(
-      foregroundPainter: _FramePainter(glow: neon.glow, core: neon.core),
-      child: ClipPath(
-        clipper: ShapeBorderClipper(shape: Neon.wedgeBorder(cut: _cut)),
-        child: ColoredBox(
-          color: context.colors.background.window.withValues(alpha: 0.55),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.sm,
-              AppSpacing.sm,
-              AppSpacing.sm,
-              AppSpacing.xs,
-            ),
-            child: child,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FramePainter extends CustomPainter {
-  _FramePainter({required this.glow, required this.core});
-
-  final Color glow;
-  final Color core;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    Neon.strokeTube(
-      canvas,
-      Neon.chamferedRect(
-        (Offset.zero & size).deflate(0.75),
-        topLeft: _NeonChartFrame._cut,
-        bottomRight: _NeonChartFrame._cut,
-      ),
-      glow: glow,
-      core: core,
-      width: 1.2,
-      intensity: 0.6,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_FramePainter oldDelegate) =>
-      oldDelegate.glow != glow || oldDelegate.core != core;
+  /// The note beside the title: that the ZEC balance is the device's own, or
+  /// that prices failed or are old. Healthy prices get none.
+  String _sourceLabel(PortfolioChartData? data) => switch (data?.notice) {
+    PortfolioChartNotice.pricesUnavailable => 'Prices unavailable',
+    PortfolioChartNotice.pricesStale => 'Older prices',
+    _ => _mode == PortfolioChartMode.zec ? 'On this device' : '',
+  };
 }

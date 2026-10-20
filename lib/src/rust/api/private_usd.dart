@@ -6,7 +6,7 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `forward_call`, `internal_hex`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `reverse_call`, `seconds`, `swap_network`
+// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 /// The deployment for the wallet network `"main"` or `"test"`; `None` on
@@ -72,15 +72,15 @@ Future<String> privateUsdRailgunAddress({
 void privateUsdCancel({required int opId}) =>
     RustLib.instance.api.crateApiPrivateUsdPrivateUsdCancel(opId: opId);
 
-/// What call `op_id` is doing now, while it runs (zapp `onActivity`); poll it
-/// about every 500 ms during an advance.
+/// What call `op_id` is doing now, while it runs; poll it about every 500 ms
+/// during an advance.
 ApiActivity? privateUsdActivity({required int opId}) =>
     RustLib.instance.api.crateApiPrivateUsdPrivateUsdActivity(opId: opId);
 
 /// Forgets every in-memory session: call it on lock. A forward quote made
 /// before the lock is never accepted after it, a reverse funding proved
 /// across the lock is never submitted, and each maker's `/v1/info` is
-/// checked again. (M4 adds its token issuance sessions here.)
+/// checked again.
 void privateUsdClearSessions() =>
     RustLib.instance.api.crateApiPrivateUsdPrivateUsdClearSessions();
 
@@ -96,7 +96,7 @@ Future<int> privateUsdUnfinishedCount({
 );
 
 /// Every account with a conversion under way: the engine loop advances each
-/// of them while the app is open and unlocked (D14).
+/// of them while the app is open and unlocked.
 Future<List<String>> privateUsdAccountsWithUnfinished({
   required String storeDir,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdAccountsWithUnfinished(
@@ -194,10 +194,10 @@ Future<ApiForwardAdvance> privateUsdForwardAdvance({
   index: index,
 );
 
-/// Drops swap `index` before it reached the chain (§5.6 step 12): an
-/// unanswered accept ends `MakerUnavailable` (a turn-away at the token gate
-/// included), an answered one `NeverOpened`. `TooLate` once a deposit
-/// started or the chain shows the swap. No key is needed.
+/// Drops swap `index` before it reached the chain: an unanswered accept ends
+/// `MakerUnavailable` (a turn-away at the token gate included), an answered
+/// one `NeverOpened`. `TooLate` once a deposit started or the chain shows
+/// the swap. No key is needed.
 Future<ApiForwardRecord> privateUsdForwardAbandon({
   required String network,
   required String accountUuid,
@@ -305,8 +305,8 @@ Future<ApiReverseRecord> privateUsdReverseGoAhead({
 
 /// The maker's acceptance of swap `index`, posted once, and its joint account
 /// imported (idempotent: call it again after an error). `TokensNeeded`: the
-/// maker wants a token and no tokens client exists before M4; nothing
-/// opened, so cancel the conversion. `NothingSent`: the maker's last word
+/// maker wants a token, which this build cannot get; nothing opened, so
+/// cancel the conversion. `NothingSent`: the maker's last word
 /// ended it (`CANCELLED`), with the cause when known.
 Future<ApiAcceptResult> privateUsdReverseAccept({
   required String dbPath,
@@ -527,9 +527,9 @@ Future<ApiRailgunSendsTerms> privateUsdRailgunSendsTerms({
   network: network,
 );
 
-/// Keeps a proved send before it is posted (zapp `PrivateUsdSendLog.prove`).
-/// Call it only while still unlocked and in the foreground, then post it
-/// with `private_usd_relayer_transact`. On any error nothing was kept and
+/// Keeps a proved send before it is posted. Call it only while still
+/// unlocked and in the foreground, then post it with
+/// `private_usd_relayer_transact`. On any error nothing was kept and
 /// nothing goes out: `Mismatch` (the proof is not this deployment's or not
 /// this send's, or another proof is kept under the id), `RelayerFee` (a fee
 /// above the cap), `Busy` (another payment of the account is unsettled, or
@@ -571,11 +571,11 @@ Future<ApiTransactResult> privateUsdRelayerTransact({
   sendId: sendId,
 );
 
-/// One settlement pass over the account's unconfirmed sends (zapp
-/// `PrivateUsdSender.settleAll`): each is marked confirmed from its receipt
-/// (1 confirmation) or its nullifiers, dropped once it reverted or another
-/// proof took part of its notes, or posted again as the same bytes. A pass
-/// asked for while one runs returns at once. Returns the sends after it.
+/// One settlement pass over the account's unconfirmed sends: each is marked
+/// confirmed from its receipt (1 confirmation) or its nullifiers, dropped
+/// once it reverted or another proof took part of its notes, or posted again
+/// as the same bytes. A pass asked for while one runs returns at once.
+/// Returns the sends after it.
 Future<List<ApiSendRecord>> privateUsdSendSettleAll({
   required String storeDir,
   required String network,
@@ -599,8 +599,8 @@ Future<ApiDepositTerms> privateUsdDepositTerms({required String network}) =>
     );
 
 /// What a deposit of `value` costs and brings under the relayer's `fee`
-/// and `fee_bps`; `None` when its fee is above the cap (D23) or not under
-/// the value, so nothing would be signed.
+/// and `fee_bps`; `None` when its fee is above the cap or not under the
+/// value, so nothing would be signed.
 ApiDepositQuote? privateUsdDepositQuote({
   required String fee,
   required int feeBps,
@@ -676,9 +676,9 @@ Future<List<ApiDepositRecord>> privateUsdDepositRecords({
 );
 
 /// "Recover" a deposit whose note Railgun's screening refused and sent back
-/// to the address's vault (the user's action, behind a confirmation, D18):
-/// signs a rescue with the vault's next nonce, keeps it and posts it. It
-/// pays the relayer's `fee` alone, at most 2 USDC (X6). `Unavailable` when
+/// to the address's vault (the user's action, behind a confirmation): signs
+/// a rescue with the vault's next nonce, keeps it and posts it. It pays the
+/// relayer's `fee` alone, at most 2 USDC. `Unavailable` when
 /// the vault holds no more than the fee, `Busy` while a rescue of the
 /// address or a pass runs.
 Future<ApiDepositRecord> privateUsdDepositRescue({
@@ -703,8 +703,8 @@ enum ApiAcceptKind {
   /// The maker opened the swap, or is opening it: show its progress.
   accepted,
 
-  /// The maker wants a Privacy Pass token and none is held (no tokens
-  /// client before M4). Nothing opened; abandon the conversion.
+  /// The maker wants a Privacy Pass token, which this build cannot get.
+  /// Nothing opened; abandon the conversion.
   tokensNeeded,
 
   /// Over before anything was sent; `cause` says why.
@@ -731,8 +731,7 @@ class ApiAcceptResult {
           index == other.index;
 }
 
-/// What a call is doing now, for the progress screen (zapp
-/// `AtomicSwapActivity`, and the reverse steps).
+/// What a call is doing now, for the progress screen.
 enum ApiActivity {
   depositing,
   claiming,
@@ -751,8 +750,7 @@ enum ApiActivity {
   refunding,
 }
 
-/// A network's pinned deployment: everything Dart and Kotlin need, so they
-/// never duplicate config.
+/// A network's pinned deployment, as Dart reads it.
 class ApiDeployment {
   /// `"mainnet"` or `"testnet"`.
   final String network;
@@ -786,8 +784,8 @@ class ApiDeployment {
   /// first. Each has `token_decimals`.
   final List<ApiUsdToken> usdTokens;
 
-  /// Where public USDC is shielded into the private balance (M9); `None`
-  /// where no Deposits contract is pinned, which hides deposits.
+  /// Where public USDC is shielded into the private balance; `None` where
+  /// no Deposits contract is pinned, which hides deposits.
   final ApiDepositsPin? deposits;
 
   const ApiDeployment({
@@ -1120,7 +1118,7 @@ class ApiDepositRescuable {
           fee == other.fee;
 }
 
-/// Where a deposit stands (`docs/deposits.md`, "What to show").
+/// Where a deposit stands.
 enum ApiDepositState {
   /// Kept, not yet answered with a transaction: "Received $X" (or, with
   /// `waiting`, "Waiting for the network").
@@ -1192,7 +1190,7 @@ class ApiDepositTerms {
           railgunFeeBps == other.railgunFeeBps;
 }
 
-/// A network's pinned Deposits deployment (M9).
+/// A network's pinned Deposits deployment.
 class ApiDepositsPin {
   /// The Deposits contract, `0x` lowercase.
   final String contract;
@@ -1239,7 +1237,7 @@ class ApiForwardAdvance {
   final int nextPollMs;
 
   /// The step failed: the problem to show once steps have failed for a
-  /// minute in a row (reference §5.8).
+  /// minute in a row.
   final ApiPrivateUsdErrorCode? problem;
 
   const ApiForwardAdvance({
@@ -1571,12 +1569,8 @@ enum ApiPrivateUsdErrorCode {
   depositUnpayable,
   zcashRejected,
   mismatch,
-  tokensUnreachable,
   tokensRefused,
-  tokensDeviceRefused,
-  noTokensToday,
   tokensNeeded,
-  keystore,
   chainLagging,
   quoteExpired,
   makerUnavailable,
@@ -1654,10 +1648,9 @@ class ApiProvedSend {
 }
 
 /// The relayer's terms for private sends and withdrawals, already held to
-/// the deployment's pins (reference §6.7 steps 1–2). The page's broadcaster
-/// is `{chainId, railgunProxy, railgunAddress, token, minFee: fee_floor,
-/// feePerUnitGas?, maxGasPrice: max_gas_price_wei}`. Amounts are decimal
-/// base units of `token`.
+/// the deployment's pins. The page's broadcaster is `{chainId, railgunProxy,
+/// railgunAddress, token, minFee: fee_floor, feePerUnitGas?, maxGasPrice:
+/// max_gas_price_wei}`. Amounts are decimal base units of `token`.
 class ApiRailgunSendsTerms {
   final PlatformInt64 chainId;
 
@@ -1733,7 +1726,7 @@ class ApiReverseAdvance {
   final int nextPollMs;
 
   /// The step failed: the problem to show once steps have failed for a
-  /// minute in a row (reference §5.8).
+  /// minute in a row.
   final ApiPrivateUsdErrorCode? problem;
 
   /// The user's approval is needed: "Pay {debit}" in `AwaitingFunding`,
@@ -1840,7 +1833,7 @@ class ApiReverseCostRequest {
           feeExpiresAt == other.feeExpiresAt;
 }
 
-/// Where a reverse conversion stands (zapp `ReversePhase`).
+/// Where a reverse conversion stands.
 enum ApiReversePhase {
   /// A reviewed draft: nothing accepted or paid, not under way.
   quoted,

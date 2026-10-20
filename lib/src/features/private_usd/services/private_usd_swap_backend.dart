@@ -3,15 +3,39 @@ import 'dart:typed_data';
 import '../../../core/config/private_usd_feature_config.dart';
 import '../../../core/storage/wallet_paths.dart';
 import '../../../rust/api/private_usd.dart' as rust;
-import 'private_usd_paths.dart';
+import 'private_usd_pause.dart';
 
 /// Reads an account's stored seed bytes for one key-using call: null while
 /// the wallet is locked, or once the engine moved on (a lock, the background
 /// or a drain) since the call was queued.
 typedef PrivateUsdSecretReader = Future<Uint8List?> Function();
 
+/// Reads the seed through [secret], hands it to [call] and zeroes it.
+/// Throws [PrivateUsdKeyLockedException] while the wallet is locked.
+Future<T> withPrivateUsdSeed<T>(
+  PrivateUsdSecretReader secret,
+  Future<T> Function(Uint8List seed) call,
+) async {
+  final seed = await secret();
+  if (seed == null || seed.isEmpty) throw const PrivateUsdKeyLockedException();
+  return startWithPrivateUsdSeed(seed, call);
+}
+
+/// Hands [seed] to [call] and zeroes it right after. [call] must start its
+/// FRB calls synchronously: FRB copies the bytes as a call starts.
+Future<T> startWithPrivateUsdSeed<T>(
+  Uint8List seed,
+  Future<T> Function(Uint8List seed) call,
+) {
+  try {
+    return call(seed);
+  } finally {
+    seed.fillRange(0, seed.length, 0);
+  }
+}
+
 /// A key-using call found the wallet locked: nothing reached Rust.
-class PrivateUsdKeyLockedException implements Exception {
+class PrivateUsdKeyLockedException implements PrivateUsdPause {
   const PrivateUsdKeyLockedException();
 
   @override
@@ -20,8 +44,8 @@ class PrivateUsdKeyLockedException implements Exception {
 
 /// A step bound to an earlier moment found the app locked, in the
 /// background or the engine moved on just before it reached Rust, so it
-/// never started (a funding proof that finished too late, plan M6 traps).
-class PrivateUsdStaleStepException implements Exception {
+/// never started (a funding proof that finished too late).
+class PrivateUsdStaleStepException implements PrivateUsdPause {
   const PrivateUsdStaleStepException();
 
   @override
@@ -64,8 +88,8 @@ class PrivateUsdSwapContext {
   final String lightwalletdUrl;
 
   /// The deployment's Railgun network (`mainnet`, `sepolia`) and the hosts
-  /// its pages may reach, to pick the keyed Ethereum RPC (§8.2). Without
-  /// them Rust uses the deployment's keyless endpoint.
+  /// its pages may reach, to pick the keyed Ethereum RPC. Without them Rust
+  /// uses the deployment's keyless endpoint.
   final String? railgunNetwork;
   final List<String> allowedHosts;
 
@@ -86,16 +110,16 @@ class PrivateUsdSwapContext {
   }
 }
 
-/// The Rust swap engine's calls (reference §8.2, M5) for this wallet. The
-/// engine and the screens reach Rust only through it, so tests can fake it.
+/// The Rust swap engine's calls for this wallet. The engine and the screens
+/// reach Rust only through it, so tests can fake it.
 ///
 /// Key-using calls take a [PrivateUsdSecretReader] rather than the bytes:
-/// the seed is read only once everything else the call needs is known, is
-/// handed to Rust in the same synchronous step (FRB copies it as the call
-/// starts), and is zeroed right after, as `swap_deposit_sender.dart` does.
+/// the seed is read only once everything else the call needs is known, and
+/// [withPrivateUsdSeed] hands it to Rust and zeroes it, as
+/// `swap_deposit_sender.dart` does.
 abstract interface class PrivateUsdSwapBackend {
-  /// Every account with a conversion under way (the engine loop's input,
-  /// D14). Empty for a wallet that never converted; creates nothing.
+  /// Every account with a conversion under way (the engine loop's input).
+  /// Empty for a wallet that never converted; creates nothing.
   Future<List<String>> accountsWithUnfinished();
 
   /// The account's conversions under way, in either direction (the
@@ -138,7 +162,7 @@ abstract interface class PrivateUsdSwapBackend {
     required int index,
   });
 
-  // ── Reverse (M6, reference §5.7) ──────────────────────────────────
+  // ── Reverse ───────────────────────────────────────────────────────
 
   /// The account's reverse conversions: the active one first (a `quoted`
   /// draft too), then the rest, newest first.
@@ -249,14 +273,14 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
 
   @override
   Future<List<String>> accountsWithUnfinished() async {
-    final storeDir = await PrivateUsdPaths.existingStoreDir(_context().network);
+    final storeDir = await getExistingPrivateUsdDirPath(_context().network);
     if (storeDir == null) return const [];
     return rust.privateUsdAccountsWithUnfinished(storeDir: storeDir);
   }
 
   @override
   Future<int> unfinishedCount(String accountUuid) async {
-    final storeDir = await PrivateUsdPaths.existingStoreDir(_context().network);
+    final storeDir = await getExistingPrivateUsdDirPath(_context().network);
     if (storeDir == null) return 0;
     return rust.privateUsdUnfinishedCount(
       storeDir: storeDir,
@@ -267,7 +291,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
   @override
   Future<void> deleteAccount(String accountUuid) async {
     final network = _context().network;
-    final storeDir = await PrivateUsdPaths.existingStoreDir(network);
+    final storeDir = await getExistingPrivateUsdDirPath(network);
     if (storeDir == null) return;
     await rust.privateUsdDeleteAccount(
       storeDir: storeDir,
@@ -279,7 +303,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
   @override
   Future<List<rust.ApiForwardRecord>> forwardRecords(String accountUuid) async {
     final network = _context().network;
-    final storeDir = await PrivateUsdPaths.existingStoreDir(network);
+    final storeDir = await getExistingPrivateUsdDirPath(network);
     if (storeDir == null) return const [];
     return rust.privateUsdForwardRecords(
       dbPath: await getWalletDbPath(),
@@ -297,13 +321,12 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
   }) async {
     final context = _context();
     // A quote takes the wallet's first swap index: the store may not exist.
-    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final storeDir = await getPrivateUsdDirPath(context.network);
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
-    final mnemonic = await _read(secret);
-    late final Future<rust.ApiForwardQuote> call;
-    try {
-      call = rust.privateUsdForwardQuote(
+    return withPrivateUsdSeed(
+      secret,
+      (mnemonic) => rust.privateUsdForwardQuote(
         dbPath: dbPath,
         network: context.network,
         accountUuid: accountUuid,
@@ -312,11 +335,8 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         lightwalletdUrl: context.lightwalletdUrl,
         ethRpcUrl: ethRpcUrl,
         units: units,
-      );
-    } finally {
-      mnemonic.fillRange(0, mnemonic.length, 0);
-    }
-    return call;
+      ),
+    );
   }
 
   @override
@@ -327,13 +347,12 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     required BigInt maxTotalZat,
   }) async {
     final context = _context();
-    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final storeDir = await getPrivateUsdDirPath(context.network);
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
-    final mnemonic = await _read(secret);
-    late final Future<rust.ApiAcceptResult> call;
-    try {
-      call = rust.privateUsdForwardAccept(
+    return withPrivateUsdSeed(
+      secret,
+      (mnemonic) => rust.privateUsdForwardAccept(
         dbPath: dbPath,
         network: context.network,
         accountUuid: accountUuid,
@@ -343,11 +362,8 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         ethRpcUrl: ethRpcUrl,
         index: index,
         maxTotalZat: maxTotalZat,
-      );
-    } finally {
-      mnemonic.fillRange(0, mnemonic.length, 0);
-    }
-    return call;
+      ),
+    );
   }
 
   @override
@@ -358,13 +374,12 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     required int index,
   }) async {
     final context = _context();
-    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final storeDir = await getPrivateUsdDirPath(context.network);
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
-    final mnemonic = await _read(secret);
-    late final Future<rust.ApiForwardAdvance> call;
-    try {
-      call = rust.privateUsdForwardAdvance(
+    return withPrivateUsdSeed(
+      secret,
+      (mnemonic) => rust.privateUsdForwardAdvance(
         dbPath: dbPath,
         network: context.network,
         accountUuid: accountUuid,
@@ -374,11 +389,8 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         ethRpcUrl: ethRpcUrl,
         opId: opId,
         index: index,
-      );
-    } finally {
-      mnemonic.fillRange(0, mnemonic.length, 0);
-    }
-    return call;
+      ),
+    );
   }
 
   @override
@@ -387,7 +399,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     required int index,
   }) async {
     final context = _context();
-    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final storeDir = await getPrivateUsdDirPath(context.network);
     return rust.privateUsdForwardAbandon(
       network: context.network,
       accountUuid: accountUuid,
@@ -399,7 +411,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
 
   @override
   Future<List<rust.ApiReverseRecord>> reverseRecords(String accountUuid) async {
-    final storeDir = await PrivateUsdPaths.existingStoreDir(_context().network);
+    final storeDir = await getExistingPrivateUsdDirPath(_context().network);
     if (storeDir == null) return const [];
     return rust.privateUsdReverseRecords(
       accountUuid: accountUuid,
@@ -415,10 +427,10 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
   }) async {
     final context = _context();
     // A quote may write the wallet's first record: the store may not exist.
-    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final storeDir = await getPrivateUsdDirPath(context.network);
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
-    return _withSeed(
+    return withPrivateUsdSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseQuote(
         dbPath: dbPath,
@@ -442,7 +454,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     return rust.privateUsdReverseCostRequest(
       network: network,
       accountUuid: accountUuid,
-      storeDir: await PrivateUsdPaths.storeDir(network),
+      storeDir: await getPrivateUsdDirPath(network),
       index: index,
     );
   }
@@ -458,7 +470,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     return rust.privateUsdReverseSetCost(
       network: network,
       accountUuid: accountUuid,
-      storeDir: await PrivateUsdPaths.storeDir(network),
+      storeDir: await getPrivateUsdDirPath(network),
       index: index,
       debit: debit,
       railgunFee: railgunFee,
@@ -474,7 +486,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     return rust.privateUsdReverseGoAhead(
       network: context.network,
       accountUuid: accountUuid,
-      storeDir: await PrivateUsdPaths.storeDir(context.network),
+      storeDir: await getPrivateUsdDirPath(context.network),
       ethRpcUrl: await context.ethRpcUrl(),
       index: index,
     );
@@ -487,10 +499,10 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     required int index,
   }) async {
     final context = _context();
-    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final storeDir = await getPrivateUsdDirPath(context.network);
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
-    return _withSeed(
+    return withPrivateUsdSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseAccept(
         dbPath: dbPath,
@@ -513,10 +525,10 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     required String railgunAddress,
   }) async {
     final context = _context();
-    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final storeDir = await getPrivateUsdDirPath(context.network);
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
-    return _withSeed(
+    return withPrivateUsdSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseFundingRequest(
         dbPath: dbPath,
@@ -539,7 +551,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     required bool Function() stillCurrent,
   }) async {
     final context = _context();
-    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final storeDir = await getPrivateUsdDirPath(context.network);
     final ethRpcUrl = await context.ethRpcUrl();
     // Asked after the last await: nothing can lock between it and the call.
     if (!stillCurrent()) throw const PrivateUsdStaleStepException();
@@ -565,10 +577,10 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     required int index,
   }) async {
     final context = _context();
-    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final storeDir = await getPrivateUsdDirPath(context.network);
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
-    return _withSeed(
+    return withPrivateUsdSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseAdvance(
         dbPath: dbPath,
@@ -591,10 +603,10 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     required int index,
   }) async {
     final context = _context();
-    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final storeDir = await getPrivateUsdDirPath(context.network);
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
-    return _withSeed(
+    return withPrivateUsdSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseAuthorizeReady(
         dbPath: dbPath,
@@ -616,10 +628,10 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     required int index,
   }) async {
     final context = _context();
-    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final storeDir = await getPrivateUsdDirPath(context.network);
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
-    return _withSeed(
+    return withPrivateUsdSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseCancel(
         dbPath: dbPath,
@@ -640,7 +652,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     required int index,
   }) async {
     final context = _context();
-    final storeDir = await PrivateUsdPaths.existingStoreDir(context.network);
+    final storeDir = await getExistingPrivateUsdDirPath(context.network);
     if (storeDir == null) return false;
     return rust.privateUsdReverseCanRescue(
       network: context.network,
@@ -658,10 +670,10 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     required int index,
   }) async {
     final context = _context();
-    final storeDir = await PrivateUsdPaths.storeDir(context.network);
+    final storeDir = await getPrivateUsdDirPath(context.network);
     final dbPath = await getWalletDbPath();
     final ethRpcUrl = await context.ethRpcUrl();
-    return _withSeed(
+    return withPrivateUsdSeed(
       secret,
       (mnemonic) => rust.privateUsdReverseRescue(
         dbPath: dbPath,
@@ -683,28 +695,4 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
 
   @override
   void clearSessions() => rust.privateUsdClearSessions();
-
-  /// Reads the seed last, hands it to [call] (which must start the FRB call
-  /// synchronously: FRB copies the bytes as it starts) and zeroes it.
-  static Future<T> _withSeed<T>(
-    PrivateUsdSecretReader secret,
-    Future<T> Function(Uint8List mnemonic) call,
-  ) async {
-    final mnemonic = await _read(secret);
-    late final Future<T> started;
-    try {
-      started = call(mnemonic);
-    } finally {
-      mnemonic.fillRange(0, mnemonic.length, 0);
-    }
-    return started;
-  }
-
-  static Future<Uint8List> _read(PrivateUsdSecretReader secret) async {
-    final bytes = await secret();
-    if (bytes == null || bytes.isEmpty) {
-      throw const PrivateUsdKeyLockedException();
-    }
-    return bytes;
-  }
 }

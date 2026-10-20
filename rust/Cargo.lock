@@ -5205,6 +5205,7 @@ dependencies = [
  "base64 0.22.1",
  "bech32",
  "bip0039",
+ "bip32",
  "bytes",
  "ed25519-consensus",
  "ff 0.14.0",

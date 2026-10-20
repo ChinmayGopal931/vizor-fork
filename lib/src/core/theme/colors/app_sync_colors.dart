@@ -3,7 +3,7 @@ import 'package:flutter/painting.dart';
 import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
 
-const _neon = kAppFormFactor == AppFormFactor.mobile;
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Sync-specific sidebar colors retained from the OLDSemantic sync tokens.
 class AppSyncColors {
@@ -23,9 +23,8 @@ class AppSyncColors {
   final Color lightSuccess;
   final Color lightError;
 
-  /// Figma faces on desktop, the neon redesign on mobile builds.
-  static const dark = _neon ? neonDark : figmaDark;
-  static const light = _neon ? neonLight : figmaLight;
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
 
   static const figmaDark = AppSyncColors(
     text: GreenPrimitives.p900Dark,
@@ -45,8 +44,7 @@ class AppSyncColors {
     lightError: Primitives.p500Light,
   );
 
-  /// Synced is white light, as the headlights in the Roadster frames;
-  /// a failure lights the bar red.
+  /// Synced is white light; a failure lights the bar red.
   static const neonDark = AppSyncColors(
     text: NeonPrimitives.n800Dark,
     textSyncing: NeonPrimitives.white60,

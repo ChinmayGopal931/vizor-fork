@@ -2,23 +2,20 @@ import 'package:flutter/widgets.dart';
 
 import '../../../swap/domain/swap_asset.dart';
 
-/// Private USD's logo, as zapp draws it: the USDC token with Railgun's badge
-/// (a round chrome helix) at its bottom right.
+/// Private USD's logo: the USDC token with Railgun's badge at its bottom
+/// right.
 class PrivateUsdLogo extends StatelessWidget {
   const PrivateUsdLogo({this.size = 32, super.key});
 
-  /// The token's side. The badge overhangs it a little, as in zapp.
+  /// The token's side; the badge overhangs it a little.
   final double size;
 
-  /// zapp's `ic_token_usdc`, which is pixel for pixel the swap screens' USDC.
   static const tokenAsset = 'assets/swap/tokens/usdc.webp';
-
-  /// zapp's `ic_private_usd_badge`.
   static const badgeAsset = 'assets/private_usd/railgun_badge.webp';
 
   @override
   Widget build(BuildContext context) {
-    // zapp: a 14 dp badge on a 32 dp token, 2 dp past its bottom right.
+    // A 14 dp badge on a 32 dp token, 2 dp past its bottom right.
     final badge = size * 14 / 32;
     final overhang = size * 2 / 32;
     return SizedBox.square(

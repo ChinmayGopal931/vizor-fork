@@ -80,12 +80,10 @@ class MobileSwapReviewHeader extends StatelessWidget {
 }
 
 /// The downward flow arrow between a paying and a receiving row: a straight
-/// stem and a 45° head drawn as a faint neon tube, in place of the round
-/// Figma arrow.
+/// stem and a 45° head drawn as a faint neon tube.
 class MobileSwapFlowArrow extends StatelessWidget {
   const MobileSwapFlowArrow({super.key});
 
-  /// The arrow's square, the size of the icon it replaces.
   static const size = AppIconSize.large;
 
   @override

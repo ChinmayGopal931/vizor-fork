@@ -115,7 +115,7 @@ const _darkColorScheme = ColorScheme(
 // every one of them in Light. Unstyled text inherits `bodyMedium` here.
 // ---------------------------------------------------------------------------
 
-const _bodyFamily = 'Gotham';
+const _bodyFamily = kGothamFamily;
 
 TextTheme _buildTextTheme(Color textColor) {
   return TextTheme(

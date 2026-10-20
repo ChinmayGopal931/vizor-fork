@@ -28,11 +28,7 @@ import '../../swap_activity_row_mapper.dart';
 import '../../widgets/activity_feed.dart';
 import 'mobile_transaction_status_screen.dart';
 import '../../../private_usd/providers/private_usd_activity_provider.dart';
-import '../../../private_usd/providers/private_usd_deposits_provider.dart';
-import '../../../private_usd/providers/private_usd_available_provider.dart';
 import '../../../private_usd/widgets/mobile/private_usd_activity_rows.dart';
-import '../../../../rust/api/private_usd.dart'
-    show ApiDepositRecord, ApiForwardRecord, ApiReverseRecord;
 
 /// Loads the full transaction history for one account; injectable so
 /// widget tests can avoid the Rust FFI.
@@ -287,27 +283,14 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen> {
             transactions: transactions,
           );
     final swapReceiveTxByIntent = absorption.receiveTxByIntent;
-    // Private USD conversions stand in for the deposits and refund sweeps
-    // they made (plan reference §9.2).
-    final privateUsdRecords = accountUuid == null
-        ? const <ApiForwardRecord>[]
-        : ref.watch(privateUsdActivityRecordsProvider(accountUuid));
-    final privateUsdReverseRecords = accountUuid == null
-        ? const <ApiReverseRecord>[]
-        : ref.watch(privateUsdReverseActivityRecordsProvider(accountUuid));
-    // Public USDC deposits (M9) join them.
-    final privateUsdDepositRecords = accountUuid == null
-        ? const <ApiDepositRecord>[]
-        : ref.watch(privateUsdDepositRecordsProvider(accountUuid));
-    final privateUsdTxids = privateUsdActivityTxids(
-      privateUsdRecords,
-      reverse: privateUsdReverseRecords,
-    );
+    final privateUsd = accountUuid == null
+        ? PrivateUsdActivity.empty
+        : ref.watch(privateUsdActivityProvider(accountUuid));
 
     final entries = <ActivityEntry>[
       for (final tx in giftCardActivityIndex.withPendingClaims(transactions))
         if (!absorption.absorbs(tx) &&
-            !privateUsdTxids.contains(tx.txidHex.toLowerCase()))
+            !privateUsd.txids.contains(tx.txidHex.toLowerCase()))
           _transactionEntry(
             context,
             tx,
@@ -338,32 +321,14 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen> {
             },
           ),
         ),
-      // No rows, no deployment read (an FRB call desktop never makes).
-      if (privateUsdRecords.isNotEmpty ||
-          privateUsdReverseRecords.isNotEmpty ||
-          privateUsdDepositRecords.isNotEmpty)
-        ...privateUsdActivityEntries(
-          context: context,
-          records: privateUsdRecords,
-          reverseRecords: privateUsdReverseRecords,
-          depositRecords: privateUsdDepositRecords,
-          screening: Duration(
-            seconds:
-                ref
-                    .watch(privateUsdCurrentDeploymentProvider)
-                    ?.screeningSeconds ??
-                0,
-          ),
-          onOpenRefunds: () => context.push('/private-usd/refunds'),
-          zcashConfirmations:
-              ref
-                  .watch(privateUsdCurrentDeploymentProvider)
-                  ?.zcashConfirmations ??
-              2,
-          privacyModeEnabled: privacyModeEnabled,
-          onOpenConversion: (path) => context.push(path.location),
-          onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
-        ),
+      ...privateUsdFeedEntries(
+        context: context,
+        activity: privateUsd,
+        privacyModeEnabled: privacyModeEnabled,
+        onOpenConversion: (path) => context.push(path.location),
+        onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
+        onOpenRefunds: () => context.push('/private-usd/refunds'),
+      ),
     ];
     final sections = buildActivityFeedSections(entries);
 

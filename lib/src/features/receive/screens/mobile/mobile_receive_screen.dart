@@ -257,8 +257,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                         iconSize: _MobileReceiveMetrics.tabsIconSize,
                         iconGap: AppSpacing.xs,
                         labelStyle: AppTypography.labelLarge,
-                        // Null keeps the label style's Light weight.
-                        labelFontWeight: null,
+                        labelFontWeight: FontWeight.w500,
                         alwaysDarkSelected: true,
                         selectedType: _selectedType,
                         onChanged: _selectType,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/config/pricing_engine_config.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_toast.dart';
@@ -12,9 +13,8 @@ import 'mobile_tor_control.dart' show MobilePrivacyToggle;
 
 const _rowHeight = 44.0;
 
-/// Settings for the Home portfolio chart: show or hide it, whether to value it
-/// with market prices (the only thing that contacts a server), and the range it
-/// opens on.
+/// Settings for the portfolio chart: whether Home shows it, and whether it is
+/// valued at market prices.
 class MobilePortfolioChartSettingsCard extends ConsumerWidget {
   const MobilePortfolioChartSettingsCard({super.key});
 
@@ -25,7 +25,6 @@ class MobilePortfolioChartSettingsCard extends ConsumerWidget {
     final pricesAvailable = ref.watch(portfolioChartPricesAvailableProvider);
 
     return MobileSurfaceCard(
-      cornerRadius: AppRadii.large,
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.sm,
         AppSpacing.base,
@@ -64,9 +63,6 @@ class MobilePortfolioChartSettingsCard extends ConsumerWidget {
               ),
             ),
           ),
-          // Only builds that can value the chart at market prices (a Home price
-          // and a usable pricing server) offer the switch; on the rest the
-          // chart is the ZEC balance and nothing could be requested.
           if (pricesAvailable) ...[
             const SizedBox(height: AppSpacing.xxs),
             _ToggleRow(

@@ -2,11 +2,9 @@ import 'package:flutter/foundation.dart';
 
 import '../../../rust/api/private_usd.dart' as rust;
 
-/// Where an account's outgoing private payment in flight stands, for the
-/// Private USD screen (owner, 2026-10-17): a send, a withdrawal or a
-/// conversion's escrow payment. Only what the app observes, never an
-/// estimate: the page's proof progress, the send log's states and the
-/// balance's syncs.
+/// Where an account's outgoing private payment in flight stands (a send, a
+/// withdrawal or a conversion's escrow payment): only what the app observes,
+/// never an estimate.
 @immutable
 sealed class PrivateUsdPendingPayment {
   const PrivateUsdPendingPayment();
@@ -54,16 +52,10 @@ final class PrivateUsdPaymentUpdatingBalance extends PrivateUsdPendingPayment {
 }
 
 /// The stage an account's payment in flight is at, or null when none is:
-///
-/// - [proofProgress] (0..1) while the page proves one of the account's
-///   payments: a send's, or a conversion's escrow payment;
-/// - a send of [sends] not in a block yet;
-/// - a send seen landing at [landedAt], until the balance was synced after
-///   it ([balanceUpdatedAt]).
-///
-/// A conversion's escrow payment shows only its proof: the app keeps no
-/// time it was posted and cannot tell its block from its confirmations, so
-/// its later stages are the conversion's own steps.
+/// proving ([proofProgress], 0..1), a send of [sends] not in a block yet, or
+/// a send seen landing at [landedAt] until the balance synced after it. A
+/// conversion's escrow payment shows only its proof: its later stages are
+/// the conversion's own steps.
 PrivateUsdPendingPayment? privateUsdPendingPayment({
   double? proofProgress,
   List<rust.ApiSendRecord> sends = const [],

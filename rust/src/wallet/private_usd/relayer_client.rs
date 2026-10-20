@@ -1,35 +1,42 @@
 //! The relayer, which sends the transactions of a user with no Ethereum
-//! account (plan reference §5.3; zapp `of/SwapClients.kt`).
+//! account.
 //!
 //! Every request for a swap carries the swap's terms, and its ticket in the
 //! `ZecSwap-Ticket` header where the record keeps one. Never retried here: a
-//! request that timed out may have sent its transaction. The fee caps (D11,
-//! X6) are the engine's to apply before it signs.
+//! request that timed out may have sent its transaction. The fee caps are the
+//! engine's to apply before it signs.
 //!
 //! The relayer also broadcasts the wallet's private Railgun sends and
-//! withdrawals for a fee note (reference §6.7; zapp
-//! `of/RailgunSendsClient.kt`, `up/PrivateUsdRelayer.kt`): its terms for
-//! them are held to the deployment's pins, and each post's answer says
-//! whether the send is dropped or posted again as the same bytes.
+//! withdrawals for a fee note, and its deposits: its terms for sends are held
+//! to the deployment's pins, and each post's answer says whether the send is
+//! dropped or posted again as the same bytes.
 
 use serde::Serialize;
 use zecswap_core::Terms;
 
-use super::deployment::{Deployment, CLIENT_TIMEOUT, MAX_RELAYER_FEE, TICKET_HEADER};
+use super::deployment::{require_within_fee_cap, Deployment, CLIENT_TIMEOUT, TICKET_HEADER};
+use super::deposits::{RescueRequest as DepositRescueRequest, ShieldRequest};
 use super::models::{
     Amount, Hex, RailgunSendsTerms, RailgunTransactRequest, RelayerTerms, ReverseFundingRequest,
     Sent, Signature, SwapAuthorization, SwapNote, SwapPayout, SwapRescue, Ticket, WireTerms, Word,
 };
-use super::transport::{get_json, post_json, HttpTransport, Service, SwapErrorCode, SwapHttpError};
-use super::{fail, ErrorCode};
+use super::transport::{
+    get_json, post_json, HttpTransport, Refusal, Service, SwapErrorCode, SwapHttpError,
+};
 
-/// The longest wait a relayer's `Retry-After` holds a send for: the hour it
-/// holds the notes of a send that reverted (zapp `MAX_RETRY_AFTER`). A
-/// longer one, which it never asks, would hold a send on a bad answer.
-pub(crate) const MAX_RETRY_AFTER_SECONDS: u64 = 60 * 60;
+/// The longest wait a relayer's `Retry-After` holds a post for: the hour it
+/// holds the notes of a send that reverted. A longer one, which it never
+/// asks, would hold a post on a bad answer.
+const MAX_RETRY_AFTER_SECONDS: u64 = 60 * 60;
 
-/// What the relayer did with a Railgun transaction it was asked to send
-/// (zapp `RailgunBroadcast`).
+/// How long `refusal` asked to wait, at most [`MAX_RETRY_AFTER_SECONDS`].
+pub(crate) fn retry_after(refusal: &Refusal) -> Option<u64> {
+    refusal
+        .retry_after_secs
+        .map(|seconds| seconds.min(MAX_RETRY_AFTER_SECONDS))
+}
+
+/// What the relayer did with a Railgun transaction it was asked to send.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum RailgunBroadcast {
     /// Submitted in this transaction, not mined yet: the same bytes posted
@@ -46,7 +53,7 @@ pub(crate) enum RailgunBroadcast {
 }
 
 /// The relayer as the broadcaster of private sends and withdrawals, held to
-/// the deployment's pins (zapp `RailgunSendsPin`, `RailgunBroadcaster`).
+/// the deployment's pins.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct SendsBroadcaster {
     pub chain_id: u64,
@@ -138,11 +145,10 @@ impl<'a, T: HttpTransport> RelayerClient<'a, T> {
         .await
     }
 
-    /// The relayer's terms for private sends, held to `pins` (zapp
-    /// `PrivateUsdRelayer.broadcaster`): `None` when it sends none, or none
-    /// the pins allow (another chain, proxy, `0zk` or fee token, no positive
-    /// gas price, or a rate without its expiry). A least fee above the cap
-    /// (D11) is `RelayerFee`: no send could pay it.
+    /// The relayer's terms for private sends, held to `pins`: `None` when it
+    /// sends none, or none the pins allow (another chain, proxy, `0zk` or fee
+    /// token, no positive gas price, or a rate without its expiry). A least
+    /// fee above the cap is `RelayerFee`: no send could pay it.
     pub(crate) async fn railgun_sends(
         &self,
         pins: &Deployment,
@@ -152,22 +158,16 @@ impl<'a, T: HttpTransport> RelayerClient<'a, T> {
             return Ok(None);
         };
         let Some(broadcaster) = pinned_sends(&terms, sends, pins) else {
-            log::warn!("Private USD: the relayer's terms for sends aren't the pinned ones");
+            log::warn!("private usd: the relayer's terms for sends aren't the pinned ones");
             return Ok(None);
         };
-        if broadcaster.min_fee.0 > MAX_RELAYER_FEE {
-            return fail(
-                ErrorCode::RelayerFee,
-                "the relayer's least fee for a send is above the cap",
-            );
-        }
+        require_within_fee_cap(broadcaster.min_fee.0)?;
         Ok(Some(broadcaster))
     }
 
     /// `POST /v1/railgun/transact`: a proved Railgun transaction, sent as it
-    /// is (zapp `RailgunSendsClient.transact`, zecswap-client's
-    /// `railgun_transact`). A 409 `alreadySpent` is spent, any other 4xx
-    /// refused, and anything else, a lost answer included, unknown.
+    /// is. A 409 `alreadySpent` is spent, any other 4xx refused, and anything
+    /// else, a lost answer included, unknown.
     pub(crate) async fn railgun_transact(
         &self,
         request: &RailgunTransactRequest,
@@ -193,9 +193,7 @@ impl<'a, T: HttpTransport> RelayerClient<'a, T> {
                     }
                 } else {
                     RailgunBroadcast::Retry {
-                        retry_after_secs: refusal
-                            .retry_after_secs
-                            .map(|seconds| seconds.min(MAX_RETRY_AFTER_SECONDS)),
+                        retry_after_secs: retry_after(&refusal),
                     }
                 }
             }
@@ -233,7 +231,7 @@ impl<'a, T: HttpTransport> RelayerClient<'a, T> {
     }
 
     /// `POST /v1/claim`: reveals `secret` (`z`, big-endian) and pays out.
-    /// Send only under a fresh, held claim lock (plan §3.5 item 5).
+    /// Send only under a fresh, held claim lock.
     pub(crate) async fn claim(
         &self,
         secret: &[u8; 32],
@@ -313,6 +311,24 @@ impl<'a, T: HttpTransport> RelayerClient<'a, T> {
             signature: &rescue.signature,
         };
         self.send("/v1/reverse/rescue", &body, ticket, |_: &Sent| Ok(()))
+            .await
+    }
+
+    /// `POST /v1/deposits/shield`: a kept deposit, as it was signed.
+    pub(crate) async fn deposit_shield(
+        &self,
+        request: &ShieldRequest,
+    ) -> Result<Sent, SwapHttpError> {
+        self.send("/v1/deposits/shield", request, None, |_: &Sent| Ok(()))
+            .await
+    }
+
+    /// `POST /v1/deposits/rescue`: a kept deposit rescue, as it was signed.
+    pub(crate) async fn deposit_rescue(
+        &self,
+        request: &DepositRescueRequest,
+    ) -> Result<Sent, SwapHttpError> {
+        self.send("/v1/deposits/rescue", request, None, |_: &Sent| Ok(()))
             .await
     }
 
@@ -397,9 +413,9 @@ fn payout_request<'a>(payout: &'a SwapPayout, terms: &'a WireTerms) -> PayoutReq
     }
 }
 
-/// `sends` as the pins allow them (zapp `PrivateUsdRelayer.pinned`). Without
-/// the pin, a gateway that rewrote the terms and kept the post could take
-/// the fee note and send the transaction itself.
+/// `sends` as the pins allow them. Without the pin, a gateway that rewrote
+/// the terms and kept the post could take the fee note and send the
+/// transaction itself.
 fn pinned_sends(
     terms: &RelayerTerms,
     sends: &RailgunSendsTerms,
@@ -451,12 +467,10 @@ mod tests {
     use crate::wallet::private_usd::models::Redacted;
     use crate::wallet::private_usd::transport::{
         test_support::{Reply, TestServer},
-        RoutedTransport, SwapErrorCode,
+        SwapErrorCode,
     };
-    use crate::wallet::private_usd::{
-        deployment::{self, hex_address},
-        PrivateUsdNetwork,
-    };
+    use crate::wallet::private_usd::{abi::hex0x, deployment, ErrorCode, PrivateUsdNetwork};
+    use crate::wallet::routed_http::RoutedHttp;
     use serde_json::{json, Value};
 
     fn terms() -> Terms {
@@ -478,7 +492,7 @@ mod tests {
     }
 
     /// Requests carry the swap's terms and ticket; refusals keep the code and
-    /// the transactions they name, and a 5xx may have sent.
+    /// the transactions they name.
     #[tokio::test]
     async fn classifies_the_relayers_answers() {
         let _policy = lock_route_policy();
@@ -499,7 +513,7 @@ mod tests {
             Reply::json(502, "bad gateway"),
             Reply::json(200, &sent),
         ]);
-        let transport = RoutedTransport::new();
+        let transport = RoutedHttp::new();
         let relayer = RelayerClient::new(&transport, &format!("{}/relayer", server.url));
         let ticket: Ticket = Redacted(format!("0x{}.{}", "5c".repeat(32), "3f".repeat(32)));
         let authorization = SwapAuthorization {
@@ -523,13 +537,11 @@ mod tests {
         };
         assert_eq!(refusal.code, Some(SwapErrorCode::AlreadySpent));
         assert_eq!(refusal.transactions, vec![[0xef; 32]]);
-        assert!(!spent.may_have_sent());
 
-        let gateway = relayer
+        relayer
             .ready(&authorization, &terms(), None)
             .await
             .unwrap_err();
-        assert!(gateway.may_have_sent(), "{gateway:?}");
 
         let funding = ReverseFundingRequest {
             swap_id: Hex([0x5c; 32]),
@@ -560,9 +572,8 @@ mod tests {
         assert_eq!(received[3].path, "/relayer/v1/reverse/fund");
     }
 
-    /// zapp `SwapClientsTest` 228 and 355: a Railgun send goes out as proved,
-    /// and each answer says whether to drop it or post the same bytes again,
-    /// honouring `Retry-After` up to an hour.
+    /// A Railgun send goes out as proved, and each answer says whether to drop
+    /// it or post the same bytes again, honouring `Retry-After` up to an hour.
     #[tokio::test]
     async fn railgun_send_answers_say_whether_to_drop_it_or_post_it_again() {
         let _policy = lock_route_policy();
@@ -601,7 +612,7 @@ mod tests {
         replies.push(Reply::Hangup);
         let count = replies.len();
         let server = TestServer::start(replies);
-        let transport = RoutedTransport::new();
+        let transport = RoutedHttp::new();
         let relayer = RelayerClient::new(&transport, &format!("{}/relayer", server.url));
         let request = RailgunTransactRequest {
             chain_id: 11_155_111,
@@ -648,9 +659,8 @@ mod tests {
         }
     }
 
-    /// zapp `PrivateUsdRelayer.pinned` (`RelayedPrivateUsdSenderTest` 247
-    /// and 296): only the pinned relayer's terms send, a rate needs its
-    /// expiry, and the least fee is held to the 2 USDC cap (D11).
+    /// Only the pinned relayer's terms send, a rate needs its expiry, and the
+    /// least fee is held to the 2 USDC cap.
     #[tokio::test]
     async fn railgun_sends_terms_are_held_to_the_pins_and_the_fee_cap() {
         let _policy = lock_route_policy();
@@ -658,8 +668,8 @@ mod tests {
         let mainnet = deployment::deployment(PrivateUsdNetwork::Mainnet);
         let sends = json!({
             "railgunAddress": pins.relayer_railgun_address,
-            "railgunProxy": hex_address(&pins.railgun_proxy),
-            "token": hex_address(&pins.token),
+            "railgunProxy": hex0x(&pins.railgun_proxy),
+            "token": hex0x(&pins.token),
             "fee": "500000",
             "feePerUnitGas": "2726271000",
             "feeExpiresAt": 1_791_504_000u64,
@@ -669,9 +679,9 @@ mod tests {
         });
         let terms = |chain_id: u64, sends: Option<Value>| {
             let mut terms = json!({
-                "relayer": hex_address(&pins.relayer),
+                "relayer": hex0x(&pins.relayer),
                 "chainId": chain_id,
-                "contract": hex_address(&pins.contract),
+                "contract": hex0x(&pins.contract),
                 "fee": "20000",
             });
             if let Some(sends) = sends {
@@ -689,8 +699,8 @@ mod tests {
             terms(pins.chain_id, None),
             terms(mainnet.chain_id, Some(sends.clone())),
             edited(&|sends| sends["railgunAddress"] = json!(mainnet.relayer_railgun_address)),
-            edited(&|sends| sends["railgunProxy"] = json!(hex_address(&mainnet.railgun_proxy))),
-            edited(&|sends| sends["token"] = json!(hex_address(&mainnet.token))),
+            edited(&|sends| sends["railgunProxy"] = json!(hex0x(&mainnet.railgun_proxy))),
+            edited(&|sends| sends["token"] = json!(hex0x(&mainnet.token))),
             edited(&|sends| {
                 sends.as_object_mut().unwrap().remove("feeExpiresAt");
             }),
@@ -702,7 +712,7 @@ mod tests {
             }),
         ];
         let server = TestServer::start(replies);
-        let transport = RoutedTransport::new();
+        let transport = RoutedHttp::new();
         let relayer = RelayerClient::new(&transport, &format!("{}/relayer", server.url));
 
         let pinned = relayer.railgun_sends(pins).await.unwrap().unwrap();
@@ -735,7 +745,7 @@ mod tests {
         let error = relayer.railgun_sends(pins).await.unwrap_err();
         assert_eq!(error.code, ErrorCode::RelayerFee);
         let at_cap = relayer.railgun_sends(pins).await.unwrap().unwrap();
-        assert_eq!(at_cap.min_fee, Amount(MAX_RELAYER_FEE));
+        assert_eq!(at_cap.min_fee, Amount(deployment::MAX_RELAYER_FEE));
         assert_eq!(
             (at_cap.fee_per_unit_gas, at_cap.fee_expires_at),
             (None, None),

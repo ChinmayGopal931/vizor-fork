@@ -23,7 +23,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_profile_picture.dart';
-import '../../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../../../core/widgets/mobile/tron_glyph.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/network_privacy_provider.dart';

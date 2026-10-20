@@ -617,7 +617,7 @@ pub(crate) fn delete_account(store_dir, network, account) -> Result<()>;   // dr
 | R2 | Type dollars; 700 ms → `private_usd_reverse_quote` (saves QUOTED, index spent) → page `reverseCost` → `…_set_cost`. | convert provider → Rust → page → Rust | QUOTED survives; it is not "under way" | the quote stays; cost re-asked after unlock |
 | R3 | Review → "Convert": `…_go_ahead` (ACCEPTING) → `…_accept` (TokensNeeded loop; imports the joint account; AWAITING_FUNDING). | review screen, engine queue | resume runs `accepted` again (idempotent) | resume after unlock |
 | R4 | Spend guard `startConversion`. `…_funding_request` (signs OpenReverse). | Dart guard → Rust | nothing saved | — |
-| R5 | Page `prepareReverse` (≤ 10 min; `proof` events; keep-awake). | `RailgunEngine` | proof lost; nothing paid; "Pay {debit}" proves again | lock closes the page → `CLOSED`; background → the result is dropped unless still foreground, unlocked and same epoch |
+| R5 | Page `prepareReverse` (≤ 10 min; `proof` events; keep-awake). | `RailgunEngine` | proof lost; nothing paid; "Pay {debit}" proves again | lock closes the page → `closed`; background → the result is dropped unless still foreground, unlocked and same epoch |
 | R6 | `…_submit_funding`: cost changed → saved, `FundingCostChanged`, AWAITING_FUNDING ("Pay {debit}"); else save `funding` + SENDING_USDC, then POST. | Rust | after the save: resume resends the same bytes only while the node does not know the hash and `now < fundingDeadline` | as F3 |
 | R7 | Advance (15 s naps): escrow confirmed → RECEIVING_ZEC; the maker deposits ZEC; `sync_joint_db`; 2 confirmations → AWAITING_READY (banner "needs attention"). | engine → Rust | read-only | paused |
 | R8 | "Authorize settlement" → `…_authorize_ready`: sign, save `ready`, SETTLING, then POST. | progress screen → Rust | resume resends the saved `ready` until its deadline; never re-signs | — |
@@ -745,8 +745,8 @@ JSON strings go over one `WebMessagePort`. The page side is `rl/web/src/index.js
 
 | Method | Args | Result | Notes |
 |---|---|---|---|
-| `load` | `{proxyPort: int, debug: bool}` | `null` once the page says `ready` | Closes any previous page. Sets the proxy override, waits for its callback (at most 10 s, else `TIMEOUT`), then `loadUrl`. `debug` enables content debugging and `log` events (pass `kDebugMode`); Kotlin ANDs it with `BuildConfig.DEBUG`, so a release build never debugs the page. |
-| `call` | `{method: String, paramsJson: String}` | `resultJson: String` | `method` must be one of the §6.2 table names except the debug-only `openNewWallet`, which is not exposed (`BAD_ARGS`); Kotlin picks the timeout from it. With no open page: `CLOSED`. |
+| `load` | `{proxyPort: int, debug: bool}` | `null` once the page says `ready` | Closes any previous page. Sets the proxy override, waits for its callback (at most 10 s, else `timeout`), then `loadUrl`. `debug` enables content debugging and `log` events (pass `kDebugMode`); Kotlin ANDs it with `BuildConfig.DEBUG`, so a release build never debugs the page. |
+| `call` | `{method: String, paramsJson: String}` | `resultJson: String` | `method` must be one of the §6.2 table names except the debug-only `openNewWallet`, which is not exposed (`bad_args`); Kotlin picks the timeout from it. With no open page: `closed`. |
 | `close` | — | `null` | Idempotent. Clears the proxy override, also when no page is open (as built, only when this host set one, so a close with nothing to clear does not load the WebView package). |
 | `wipe` | — | `null` | `close`, then `WebStorage.getInstance().deleteOrigin(PAGE_ORIGIN)`. |
 | `isOpen` | — | `bool` | |
@@ -755,14 +755,14 @@ Errors are `PlatformException(code, message)`, mapped from `RailgunException`:
 
 | `code` | From | Dart action |
 |---|---|---|
-| `CLOSED` | `Disconnected` (page closed, renderer gone, replaced) | reopen lazily on the next use |
-| `TIMEOUT` | `Timeout` (the page is closed) | as `CLOSED`; a first-sync `refresh` timeout restarts from zero (§6.3) |
-| `UNAVAILABLE` | `Unavailable` (no WebView package, no `PROXY_OVERRIDE`) | show unavailable; do not retry in a loop |
-| `PROTOCOL` | `Protocol` (`BAD_REQUEST`, unreadable reply) | a bug: log the method only, never params |
-| `FAILED` | `Failed` (engine, chain or POI error) | retry per caller. The message is the engine's own text and can quote a keyed RPC URL (ethers puts request URLs in its errors): never log it, and redact the keyed URL before showing it |
-| `BAD_ARGS` | handler-level argument check | a bug |
+| `closed` | `Disconnected` (page closed, renderer gone, replaced) | reopen lazily on the next use |
+| `timeout` | `Timeout` (the page is closed) | as `closed`; a first-sync `refresh` timeout restarts from zero (§6.3) |
+| `unavailable` | `Unavailable` (no WebView package, no `PROXY_OVERRIDE`) | show unavailable; do not retry in a loop |
+| `protocol` | `Protocol` (`BAD_REQUEST`, unreadable reply) | a bug: log the method only, never params |
+| `failed` | `Failed` (engine, chain or POI error) | retry per caller. The message is the engine's own text and can quote a keyed RPC URL (ethers puts request URLs in its errors): never log it, and redact the keyed URL before showing it |
+| `bad_args` | handler-level argument check | a bug |
 
-A call whose coroutine is cancelled is answered `CLOSED`, so every call gets exactly one answer.
+A call whose coroutine is cancelled is answered `closed`, so every call gets exactly one answer.
 
 `EventChannel com.zcash.wallet/railgun/events`: each event is the page's raw JSON `{event, data}` as a `String`, forwarded unparsed. Dart decodes `scan` and `proof`; `log` is forwarded only when `debug`. The page also emits `log` without `debug` (a failed screening refresh, `wallet.js:123`), so Kotlin drops page `log` events from a page loaded without `debug`.
 
@@ -773,7 +773,7 @@ A call whose coroutine is cancelled is answered `CLOSED`, so every call gets exa
 
 | Method | Args | Result | Errors |
 |---|---|---|---|
-| `sign` | `{issuerName: String, message: Uint8List}` | `{chain: List<String>, signature: String}`, base64url without padding, leaf first | `KEYSTORE` (any `GeneralSecurityException`/`ProviderException`), `BAD_ARGS` |
+| `sign` | `{issuerName: String, message: Uint8List}` | `{chain: List<String>, signature: String}`, base64url without padding, leaf first | `KEYSTORE` (any `GeneralSecurityException`/`ProviderException`), `bad_args` |
 
 **What to port and what to reuse.**
 
@@ -1668,7 +1668,7 @@ printf '\n# Railgun bundle build\n/android/railgun-web/node_modules/\n' >> .giti
 | `$RLK/RailgunChannel.kt` (67) | `$K/` | copy with edits | `JsonElement` → `String` (raw JSON) for `call` params and result; `onEvent: (RailgunEvent) -> Unit` → `(RailgunProtocol.Message.Event) -> Unit`, the event's name and raw JSON, so the host can drop `log` events (D-16); drop the `kotlinx.serialization` import |
 | `$RLK/RailgunWebViewHost.kt` (305) | `$K/` | copy with edits | `JsonElement` → `String`; `MutableSharedFlow<RailgunEvent>` → `MutableSharedFlow<String>`; the console `RailgunEvent.Log(…)` (`:243`) → a `{"event":"log","data":…}` string built with `JSONObject`, emitted only when `debug`; in `Page.load()` set the proxy override and wait for its callback before `loadUrl`, and clear it in `close` (§6.8). Keep `RailgunRequests` (`:278-305`) as is. As built (D-16): `debug` is a `load` parameter, not a constructor one, and page `log` events are dropped unless `debug`. |
 | `$RLK/RailgunProtocol.kt` (298) | `$K/` | rewrite down to ~90 lines | keep `INIT` (`:163`; `"zapp-railgun-init"` until the E5 rebuild, it must equal `index.js:7`), `RailgunMethod` as a plain enum of wire name + timeout (`:30-58`), and `request`/`decode` (`:162-282`) over `org.json`: `Message.{Ready, Event(name: String, raw: String), Reply(id, resultJson: String), Failure(id, RailgunException)}`. Drop every serializer, `DecimalSerializer` and `Address`. |
-| `$RLK/RailgunModels.kt` (250) | `$K/RailgunEndpoints.kt` | trim | keep only `object RailgunEndpoints` (`:28-58`) minus `SEPOLIA_KEYED_RPC_URL`/`MAINNET_KEYED_RPC_URL` (they read zapp's `BuildConfig`); keep `hosts` and `POI_NODE_URL`. As built: `internal`, the hosts written as literals inside `setOf(…)` (a Rust test reads them, §8.2), and the unused `SEPOLIA_RPC_URL`/`MAINNET_RPC_URL` dropped |
+| `$RLK/RailgunModels.kt` (250) | `$K/RailgunEndpoints.kt` | trim | keep only `object RailgunEndpoints` (`:28-58`) minus `SEPOLIA_KEYED_RPC_URL`/`MAINNET_KEYED_RPC_URL` (they read zapp's `BuildConfig`); keep `hosts`. As built: `internal`, the hosts written as literals inside `setOf(…)` (a Rust test reads them, §8.2), and the unused `SEPOLIA_RPC_URL`/`MAINNET_RPC_URL` and `POI_NODE_URL` dropped (Rust's deployment pins the POI node) |
 | `$RLK/{RailgunWallet,RailgunReverseFunding,Bech32m}.kt` | — | do not copy | their logic moves to Dart (models, session) and Rust (address check) |
 | `$RLT/RailgunChannelTest.kt` (117) | `$KT/` | copy with edits | JSON types → strings; needs `kotlin-test` (§8.6) and `kotlinx-coroutines-test` |
 | `$RLT/RailgunProtocolTest.kt` (144) | `$KT/` | copy with edits | delete the two `RailgunAddress` checksum tests; `File("web/src/index.js")` → `File("../railgun-web/src/index.js")` (unit tests run in `android/app`); Robolectric runner for `org.json` |
@@ -1854,7 +1854,7 @@ services/
   railgun_host_channel.dart, railgun_engine.dart, railgun_engine_key_store.dart       [M3]
   private_usd_balance_repository.dart, private_usd_balance_cache.dart                 [M3]
   private_usd_attestation.dart, private_usd_tokens_service.dart                       [M4]
-  private_usd_paths.dart                    [M4/M5] storeDir(network), existingStoreDir(network) (never creates; M5 added getExistingPrivateUsdDirPath), tokensPath(network) over wallet_paths.dart; M3 added getPrivateUsdDirPath, getPrivateUsdTokenStorePath, deletePrivateUsdDirectories and deletePrivateUsdTokenStores there (D-26)
+  (no paths wrapper)                        the services call wallet_paths.dart directly: getPrivateUsdDirPath, getExistingPrivateUsdDirPath (never creates a directory or assigns a wallet DB name), deletePrivateUsdDirectories and deletePrivateUsdTokenStores
   private_usd_swap_backend.dart             [M5] PrivateUsdSwapBackend: the FRB calls with this wallet's context; key-using calls take a PrivateUsdSecretReader (read the seed last, zero it once Rust copied it) (D-51)
   private_usd_account_data.dart             [M3] deletePrivateUsdAccountData(storage, uuid): the engine key and the balance cache
   private_usd_engine.dart                   [M5] class PrivateUsdEngine {   // as built (D-51)
@@ -1887,9 +1887,9 @@ providers/
   private_usd_send_provider.dart            [M7] NotifierProvider.autoDispose.family<…, PrivateUsdSendState, PrivateUsdSendMode>
   private_usd_spend_status_provider.dart    [M7] StreamProvider.family<PrivateUsdSpendStatus, String>
 screens/mobile/  mobile_private_usd_{,convert_,convert_review_,conversion_,refunds_,send_,send_review_,send_status_}screen.dart
-widgets/mobile/  private_usd_home_strip.dart, private_usd_banner.dart, private_usd_activity_rows.dart, private_usd_info_sheets.dart, private_usd_confirm_sheets.dart (M6). As built (M6): the reverse amount and review views are mobile_private_usd_reverse_convert_view.dart, the reverse progress mobile_private_usd_reverse_conversion_screen.dart, and models/private_usd_reverse_{amount,presentation}.dart hold the 2-decimal amounts, Max, the "Authorize settlement" window and the progress presentation. As built (M5) the amount step is in mobile_private_usd_convert_screen.dart with the quote ledger and expiry divider, and the banner reuses MobileHomeEntryCard (lib/src/core/widgets/mobile/, extracted from home)
+widgets/mobile/  private_usd_home_strip.dart, private_usd_banner.dart, private_usd_activity_rows.dart, private_usd_info_sheets.dart, private_usd_confirm_sheets.dart (M6). As built: both directions' amount and review views are in private_usd_convert_views.dart over the shared panels in private_usd_convert_widgets.dart and private_usd_flow_widgets.dart, the progress bodies in private_usd_progress_views.dart (screens/ keeps the screens), and models/private_usd_reverse_{amount,presentation}.dart hold the 2-decimal amounts, Max, the "Authorize settlement" window and the progress presentation. The banner reuses MobileHomeEntryCard (lib/src/core/widgets/mobile/, extracted from home)
 lib/src/providers/private_usd_lifecycle_provider.dart   [M3] register / quiesceAndDrain / resume (GiftCardTrackingLifecycle shape, several owners) + wipeRailgunPage for a reset; M5 registers the swap engine (run / cancel)
-lib/src/core/widgets/mobile/private_usd_engine_host.dart [M5] ConsumerWidget; watches privateUsdEngineProvider when privateUsdEngineEnabledProvider (define, mobile, Android, a deployment; not the kill switch or the active account). As built (D-51) the AppLifecycleListener and the lock listener live in privateUsdEngineProvider (Gift Card's shape)
+lib/src/features/private_usd/widgets/mobile/private_usd_engine_host.dart [M5] ConsumerWidget; watches privateUsdEngineProvider when privateUsdEngineEnabledProvider (define, mobile, Android, a deployment; not the kill switch or the active account). As built (D-51) the AppLifecycleListener and the lock listener live in privateUsdEngineProvider (Gift Card's shape)
 ```
 
 The home strip and banner widgets are passed into `_BalanceCard` and the home `ListView` from `mobile_home_screen.dart` (§8.3); they are separate files so `mobile_home_screen.dart` grows only by the wiring.

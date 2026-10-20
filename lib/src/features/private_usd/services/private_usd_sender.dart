@@ -1,19 +1,19 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
-
+import '../../../core/config/private_usd_feature_config.dart';
+import '../../../core/storage/wallet_paths.dart';
 import '../../../rust/api/private_usd.dart' as rust;
+import '../models/private_usd_messages.dart';
 import '../models/private_usd_send.dart';
 import '../models/railgun_models.dart';
 import '../private_usd_copy.dart';
 import 'private_usd_engine.dart';
-import 'private_usd_paths.dart';
 import 'private_usd_spend_guard.dart';
 import 'private_usd_swap_backend.dart';
 import 'railgun_engine.dart';
 
-/// The relayer's fee is above the 2 USDC cap (D11): nothing is proved.
+/// The relayer's fee is above the deployment's cap: nothing is proved.
 class PrivateUsdSendFeeCapException implements Exception {
   const PrivateUsdSendFeeCapException();
 
@@ -21,9 +21,9 @@ class PrivateUsdSendFeeCapException implements Exception {
   String toString() => "The relayer's fee is above the cap.";
 }
 
-/// The Rust send calls (reference §8.2 M7, progress D-90) for this wallet;
-/// tests fake them. Nothing here takes a key: the page proves with the
-/// wallet it opened, and Rust posts only bytes it kept.
+/// The Rust send calls for this wallet; tests fake them. Nothing here takes
+/// a key: the page proves with the wallet it opened, and Rust posts only
+/// bytes it kept.
 abstract interface class PrivateUsdSendBackend {
   /// The relayer's `railgunSends` terms, held to the pins and the cap.
   Future<rust.ApiRailgunSendsTerms> terms();
@@ -64,7 +64,7 @@ class RustPrivateUsdSendBackend implements PrivateUsdSendBackend {
     required bool Function() stillCurrent,
   }) async {
     final network = _context().network;
-    final storeDir = await PrivateUsdPaths.storeDir(network);
+    final storeDir = await getPrivateUsdDirPath(network);
     // Asked after the last await: nothing can lock between it and the call.
     if (!stillCurrent()) throw const PrivateUsdStaleStepException();
     return rust.privateUsdSendLogPut(
@@ -77,7 +77,7 @@ class RustPrivateUsdSendBackend implements PrivateUsdSendBackend {
 
   @override
   Future<List<rust.ApiSendRecord>> list(String accountUuid) async {
-    final storeDir = await PrivateUsdPaths.existingStoreDir(_context().network);
+    final storeDir = await getExistingPrivateUsdDirPath(_context().network);
     if (storeDir == null) return const [];
     return rust.privateUsdSendLogList(
       storeDir: storeDir,
@@ -91,7 +91,7 @@ class RustPrivateUsdSendBackend implements PrivateUsdSendBackend {
     String sendId,
   ) async {
     final network = _context().network;
-    final storeDir = await PrivateUsdPaths.storeDir(network);
+    final storeDir = await getPrivateUsdDirPath(network);
     return rust.privateUsdRelayerTransact(
       storeDir: storeDir,
       network: network,
@@ -103,7 +103,7 @@ class RustPrivateUsdSendBackend implements PrivateUsdSendBackend {
   @override
   Future<List<rust.ApiSendRecord>> settleAll(String accountUuid) async {
     final context = _context();
-    final storeDir = await PrivateUsdPaths.existingStoreDir(context.network);
+    final storeDir = await getExistingPrivateUsdDirPath(context.network);
     if (storeDir == null) return const [];
     return rust.privateUsdSendSettleAll(
       storeDir: storeDir,
@@ -115,8 +115,8 @@ class RustPrivateUsdSendBackend implements PrivateUsdSendBackend {
   }
 }
 
-/// The Railgun page's calls a send needs (reference §6.2): Railgun's fees,
-/// the relayer's fee for a transfer, the proof, and a sync. Tests fake it.
+/// The Railgun page's calls a send needs: Railgun's fees, the relayer's fee
+/// for a transfer, the proof, and a sync. Tests fake it.
 abstract interface class PrivateUsdSendPage {
   Future<RailgunFees> fees(String accountUuid);
 
@@ -187,11 +187,11 @@ class _Quote {
   BigInt get fee => cost.networkFee;
 }
 
-/// Sends from the private balance through the deployment's relayer (zapp
-/// `RelayedPrivateUsdSender`, plan M7): price, prove, keep, then post.
+/// Sends from the private balance through the deployment's relayer: price,
+/// prove, keep, then post.
 ///
 /// - Nothing is proved for a fee above the one the user confirmed, or above
-///   the 2 USDC cap (D11).
+///   the deployment's cap (any fee, without one).
 /// - Keep before post: the page's proof goes to Rust (`send_log_put`) only
 ///   while the app is still unlocked, in the foreground and at the engine's
 ///   epoch of the tap ([PrivateUsdEngine.isCurrent], asked right before the
@@ -200,7 +200,7 @@ class _Quote {
 /// - Once a proof is kept it is never proved again: after a crash,
 ///   settlement posts the same bytes.
 /// - After a `sent` answer it settles every [landingPoll] for up to
-///   [landingWait] (zapp's landing wait), only while the app may run.
+///   [landingWait], only while the app may run.
 ///
 /// It never logs a request, a proof, an amount, an address or the RPC URL.
 class PrivateUsdSender {
@@ -209,7 +209,7 @@ class PrivateUsdSender {
     required PrivateUsdSendPage page,
     required PrivateUsdSendBackend backend,
     required PrivateUsdSpendGuard guard,
-    required BigInt maxRelayerFee,
+    required BigInt? maxRelayerFee,
     DateTime Function()? now,
     this.landingPoll = const Duration(seconds: 4),
     this.landingWait = const Duration(minutes: 2),
@@ -226,20 +226,25 @@ class PrivateUsdSender {
   final PrivateUsdSendPage _page;
   final PrivateUsdSendBackend _backend;
   final PrivateUsdSpendGuard _guard;
-  final BigInt _maxRelayerFee;
+  final BigInt? _maxRelayerFee;
   final DateTime Function() _now;
   final String Function() _newSendId;
   final Duration landingPoll;
   final Duration landingWait;
 
-  /// A proof is held this long before the relayer must still hold its fee
-  /// (zapp `PROVING_TIME`).
+  /// A proof is held this long before the relayer must still hold its fee.
   static const provingTime = Duration(minutes: 2);
 
   final _running = <Future<void>>{};
   bool _quiesced = false;
 
   bool get _canRun => !_quiesced && _engine.canRun;
+
+  // Without a cap from the deployment, no fee is within it.
+  bool _aboveCap(BigInt fee) {
+    final cap = _maxRelayerFee;
+    return cap == null || fee > cap;
+  }
 
   /// The relayer's terms as the page's broadcaster `B`.
   Future<RailgunBroadcaster> broadcaster() async {
@@ -270,7 +275,7 @@ class PrivateUsdSender {
     PrivateUsdSendRequest request,
   ) async {
     final quote = await _quote(accountUuid, request, await broadcaster());
-    if (quote.fee > _maxRelayerFee) throw const PrivateUsdSendFeeCapException();
+    if (_aboveCap(quote.fee)) throw const PrivateUsdSendFeeCapException();
     return quote.cost;
   }
 
@@ -286,16 +291,24 @@ class PrivateUsdSender {
   }) {
     if (!_canRun) return Future.value(const PrivateUsdSendNotSent());
     final ticket = _engine.ticket();
-    return _track(
-      _guard.send<PrivateUsdSendOutcome>(
-        accountUuid,
-        () =>
-            _sendNow(accountUuid, request, confirmed, ticket, onStep ?? (_) {}),
-        busy: PrivateUsdSendBusy.new,
-        unreadable: () =>
-            const PrivateUsdSendNotSent(PrivateUsdCopy.sendErrorStore),
-      ),
-    );
+    return _track(() async {
+      try {
+        return await _guard.send(
+          accountUuid,
+          () => _sendNow(
+            accountUuid,
+            request,
+            confirmed,
+            ticket,
+            onStep ?? (_) {},
+          ),
+        );
+      } on PrivateUsdSpendBusyException catch (busy) {
+        return busy.status == PrivateUsdSpendStatus.unreadable
+            ? const PrivateUsdSendNotSent(PrivateUsdCopy.sendErrorStore)
+            : PrivateUsdSendBusy(busy.status);
+      }
+    }());
   }
 
   /// One settlement pass over [accountUuid]'s unconfirmed sends (the rows
@@ -323,7 +336,7 @@ class PrivateUsdSender {
         }
         return null;
       } catch (error) {
-        _debugLog('a settlement pass failed (${error.runtimeType})');
+        privateUsdLog('a settlement pass failed (${error.runtimeType})');
         return null;
       }
     }());
@@ -368,11 +381,11 @@ class PrivateUsdSender {
     } on rust.ApiPrivateUsdError catch (error) {
       return PrivateUsdSendNotSent(privateUsdSendErrorMessage(error.code));
     } catch (error) {
-      _debugLog('no send cost (${error.runtimeType})');
+      privateUsdLog('no send cost (${error.runtimeType})');
       return const PrivateUsdSendNotSent();
     }
     // Never proved above the cap, nor above the fee the user confirmed.
-    if (quote.fee > _maxRelayerFee) {
+    if (_aboveCap(quote.fee)) {
       return const PrivateUsdSendNotSent(PrivateUsdCopy.sendErrorFeeCap);
     }
     if (quote.fee > confirmed.networkFee) {
@@ -390,7 +403,7 @@ class PrivateUsdSender {
         quote.fee,
       );
     } catch (error) {
-      _debugLog('nothing was proved (${error.runtimeType})');
+      privateUsdLog('nothing was proved (${error.runtimeType})');
       return const PrivateUsdSendNotSent();
     }
     try {
@@ -436,7 +449,7 @@ class PrivateUsdSender {
         }
       } catch (error) {
         // Unknown: ask the log whether it was kept before saying anything.
-        _debugLog('the keep failed (${error.runtimeType})');
+        privateUsdLog('the keep failed (${error.runtimeType})');
         await _guard.check(accountUuid);
         final kept = _guard
             .recordsFor(accountUuid)
@@ -461,7 +474,7 @@ class PrivateUsdSender {
     PrivateUsdSendRequest request,
     _Quote quote,
   ) async {
-    // Kept and not posted: settlement posts it on the next pass (D9).
+    // Kept and not posted: settlement posts it on the next pass.
     if (!_canRun) return const PrivateUsdSendUnconfirmed(null);
     final rust.ApiTransactResult answer;
     try {
@@ -474,7 +487,7 @@ class PrivateUsdSender {
       }
       return const PrivateUsdSendUnconfirmed(null);
     } catch (error) {
-      _debugLog('the first post failed (${error.runtimeType})');
+      privateUsdLog('the first post failed (${error.runtimeType})');
       return const PrivateUsdSendUnconfirmed(null);
     }
     final named = answer.transactions.firstOrNull;
@@ -492,8 +505,8 @@ class PrivateUsdSender {
     }
   }
 
-  /// zapp's landing wait: settle until the send is in a block, dropped, or
-  /// [landingWait] has passed.
+  /// Settles until the send is in a block, dropped, or [landingWait] has
+  /// passed.
   Future<PrivateUsdSendOutcome> _land(
     String accountUuid,
     String sendId,
@@ -527,18 +540,18 @@ class PrivateUsdSender {
     try {
       final quote = await _quote(accountUuid, request, await broadcaster());
       if (quote.fee > proved) {
-        return quote.fee > _maxRelayerFee
+        return _aboveCap(quote.fee)
             ? const PrivateUsdSendNotSent(PrivateUsdCopy.sendErrorFeeCap)
             : PrivateUsdSendRepriced(quote.cost);
       }
     } catch (error) {
-      _debugLog('no quote after a refusal (${error.runtimeType})');
+      privateUsdLog('no quote after a refusal (${error.runtimeType})');
     }
     return const PrivateUsdSendNotSent();
   }
 
   /// [confirmed] while the relayer still holds it once a proof is made and
-  /// its floor is not above it; else the fee it asks now (zapp `held`).
+  /// its floor is not above it; else the fee it asks now.
   Future<_Quote> _held(
     String accountUuid,
     PrivateUsdSendRequest request,
@@ -596,10 +609,6 @@ class PrivateUsdSender {
     _running.add(done);
     unawaited(done.whenComplete(() => _running.remove(done)));
     return work;
-  }
-
-  static void _debugLog(String line) {
-    if (kDebugMode) debugPrint('privateUsd: $line');
   }
 
   static final _random = Random.secure();

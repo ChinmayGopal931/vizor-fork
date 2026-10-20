@@ -6,8 +6,8 @@ import '../../address_scan/widgets/mobile_address_scan_view.dart'
 import '../private_usd_copy.dart';
 import 'private_usd_send.dart';
 
-/// What a scanned code has to be for [mode]'s recipient (owner, 2026-10-19):
-/// a `0zk` address to send privately, a `0x` one to withdraw, as
+/// What a scanned code has to be for [mode]'s recipient: a `0zk` address to
+/// send privately, a `0x` one to withdraw, as
 /// [privateUsdSendDestination] takes typed ones. The Receive sheet shows
 /// both kinds as plain strings.
 ///

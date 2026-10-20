@@ -1,11 +1,11 @@
-//! Known-answer vectors (plan §3.3, reference §5.4 and §5.5), pinned in
-//! `vectors.json`. Signatures are deterministic (RFC 6979), so they compare
-//! byte for byte. `joint` holds the joint-account and deposit tests (M2),
-//! `ironwood_regtest` the ignored test against the regtest stack, `forward`
-//! the forward conversion's fund-safety tests on the `fakes` (M5),
-//! `lifecycle` the account deletion and drain guards (M5), `reverse` the
-//! reverse conversion's fund-safety tests and its funding calldata (M6), and
-//! `sends` the send log's keep-before-post, guard and settlement (M7).
+//! Known-answer vectors, pinned in `vectors.json`. Signatures are
+//! deterministic (RFC 6979), so they compare byte for byte. `joint` holds the
+//! joint-account and deposit tests, `ironwood_regtest` the ignored test
+//! against the regtest stack, `forward` the forward conversion's fund-safety
+//! tests on the `fakes`, `lifecycle` the account deletion and drain guards,
+//! `reverse` the reverse conversion's fund-safety tests and its funding
+//! calldata, and `sends` the send log's keep-before-post, guard and
+//! settlement.
 
 use serde_json::Value;
 use zecswap_core::{
@@ -13,7 +13,9 @@ use zecswap_core::{
 };
 use zecswap_railgun::Keys;
 
-use super::{evm_rpc, keys::SwapKeyContext, railgun_keys, terms, ErrorCode, PrivateUsdNetwork};
+use super::{
+    abi, evm_rpc, keys::SwapKeyContext, railgun_keys, terms, ErrorCode, PrivateUsdNetwork,
+};
 use crate::wallet::{keys, network::WalletNetwork};
 use secrecy::ExposeSecret;
 
@@ -44,40 +46,10 @@ fn hex0x(bytes: &[u8]) -> String {
     format!("0x{}", hex::encode(bytes))
 }
 
-/// Base58Check, for the BIP-85 specification's `xprv`.
-fn base58check(text: &str) -> Vec<u8> {
-    const ALPHABET: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-    let mut number: Vec<u8> = Vec::new();
-    for c in text.bytes() {
-        let mut carry = ALPHABET.iter().position(|a| *a == c).unwrap() as u32;
-        for byte in number.iter_mut().rev() {
-            carry += u32::from(*byte) * 58;
-            *byte = carry as u8;
-            carry >>= 8;
-        }
-        while carry > 0 {
-            number.insert(0, carry as u8);
-            carry >>= 8;
-        }
-    }
-    let zeros = text.bytes().take_while(|c| *c == b'1').count();
-    let decoded = [vec![0; zeros], number].concat();
-    let (payload, checksum) = decoded.split_at(decoded.len() - 4);
-    use sha2::{Digest, Sha256};
-    assert_eq!(&Sha256::digest(Sha256::digest(payload))[..4], checksum);
-    payload.to_vec()
-}
-
 #[test]
 fn bip85_matches_the_specification() {
     let vector = &vectors()["bip85"];
-    let xprv = base58check(text(&vector["xprv"]));
-    assert_eq!(xprv.len(), 78);
-    let chain_code: [u8; 32] = xprv[13..45].try_into().unwrap();
-    assert_eq!(xprv[45], 0);
-    let key: [u8; 32] = xprv[46..78].try_into().unwrap();
-
-    let entropy = railgun_keys::tests::entropy_from_xprv_parts(key, chain_code, 0);
+    let entropy = railgun_keys::tests::entropy_from_xprv(text(&vector["xprv"]), 0);
     assert_eq!(hex::encode(*entropy), text(&vector["entropy"]));
     assert_eq!(
         keys::mnemonic_from_entropy(entropy.to_vec()).unwrap(),
@@ -85,8 +57,9 @@ fn bip85_matches_the_specification() {
     );
 }
 
-/// zapp's vector, and vizor's: a BIP-39 passphrase (D7) and ZIP-32 index 1
-/// (D8) give their own Railgun wallet.
+/// The seed's Railgun wallet as other wallets derive it (no passphrase,
+/// ZIP-32 index 0), and vizor's: a BIP-39 passphrase and ZIP-32 index 1 give
+/// their own.
 #[test]
 fn railgun_wallets_match_zapp_and_pin_d7_and_d8() {
     for case in vectors()["railgun"].as_array().unwrap() {
@@ -115,9 +88,9 @@ fn railgun_wallets_match_zapp_and_pin_d7_and_d8() {
     }
 }
 
-/// The vizor vector through an account: the stored passphrase envelope
-/// (D7) and the ZIP-32 index the wallet DB records (D8). Any other seed,
-/// here the same words without the passphrase, is refused.
+/// The vizor vector through an account: the stored passphrase envelope and
+/// the ZIP-32 index the wallet DB records. Any other seed, here the same
+/// words without the passphrase, is refused.
 #[test]
 fn the_vizor_vector_through_an_account() {
     let case = vectors()["railgun"][1].clone();
@@ -328,18 +301,9 @@ fn swap_keys_notes_ids_and_eip712_match_zecswap() {
         payout_note: railgun_note,
         ..pays_account.clone()
     };
-    assert_eq!(
-        hex0x(&terms::terms_hash(&pays_account)),
-        text(&hashes["paysAccount"])
-    );
-    assert_eq!(
-        hex0x(&terms::terms_hash(&pays_railgun)),
-        text(&hashes["paysRailgun"])
-    );
-    assert_eq!(
-        hex0x(&terms::terms_hash(&terms::reverse_terms(&open))),
-        text(&hashes["reverse"])
-    );
+    assert_eq!(hex0x(&pays_account.hash()), text(&hashes["paysAccount"]));
+    assert_eq!(hex0x(&pays_railgun.hash()), text(&hashes["paysRailgun"]));
+    assert_eq!(hex0x(&open.terms().hash()), text(&hashes["reverse"]));
 }
 
 /// The contract reads' selectors, and Keccak (not SHA3) under them.
@@ -348,14 +312,10 @@ fn selectors_match_the_contract() {
     for (signature, expected) in vectors()["selectors"].as_object().unwrap() {
         let expected = text(expected);
         if expected.len() == 2 + 8 {
-            assert_eq!(
-                hex0x(&evm_rpc::selector(signature)),
-                expected,
-                "{signature}"
-            );
+            assert_eq!(hex0x(&abi::selector(signature)), expected, "{signature}");
         } else {
             assert_eq!(
-                hex0x(&terms::keccak(&[signature.as_bytes()])),
+                hex0x(&abi::keccak(&[signature.as_bytes()])),
                 expected,
                 "{signature}"
             );

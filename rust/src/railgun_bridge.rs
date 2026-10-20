@@ -1,13 +1,13 @@
-//! Loopback SOCKS5 bridge that carries the Railgun page's traffic over the
-//! wallet's network route (Private USD, `docs/private-usd-reference.md` §6.8).
+//! Loopback SOCKS5 bridge that carries the Private USD Railgun page's traffic
+//! over the wallet's network route.
 //!
-//! The page runs in an Android WebView, which cannot use the in-process Tor
-//! client. The host points the WebView at this listener through androidx
-//! `ProxyController`, so every page connection follows the route setting: an
-//! isolated Tor circuit while Tor is on, a leased direct socket otherwise, and
-//! nothing at all while Tor is starting or has failed. Only `CONNECT` to an
-//! allowlisted host on port 443 is served; the tunnelled bytes are the page's
-//! own TLS, so the bridge never sees a URL, let alone a keyed one.
+//! The page runs in a WebView, on Android and on iOS, which cannot use the
+//! in-process Tor client, so its host points the WebView's proxy at this
+//! listener. Every page connection follows the route the bridge started on:
+//! an isolated Tor circuit while Tor is on, a leased direct socket otherwise,
+//! and nothing at all while Tor is starting or has failed. Only `CONNECT` to
+//! an allowlisted host on port 443 is served; the tunnelled bytes are the
+//! page's own TLS, so the bridge never sees a URL, let alone a keyed one.
 //!
 //! Chromium speaks SOCKS5 without authentication and sends hostnames (ATYP 3),
 //! which are resolved on this side, so a Tor-routed page never touches local
@@ -15,16 +15,15 @@
 //! open; the allowlist limits that to the Railgun hosts, over the wallet's
 //! route.
 //!
-//! A bridge keeps the route it started on. After a route change the caller
-//! closes the page, stops the bridge and starts a new one: Chromium keeps its
-//! pooled tunnels otherwise, and a bridge whose route no longer matches the
-//! policy refuses every new connection.
+//! A bridge whose route no longer matches the policy refuses every new
+//! connection, so after a route change the caller closes the page, stops the
+//! bridge and starts a new one: the WebView keeps its pooled tunnels
+//! otherwise.
 //!
-//! An offline bridge has no route at all and refuses every `CONNECT`. A page
-//! loaded only to delete an account's wallet reaches nothing, yet no page
-//! loads without its proxy, so it gets one of these: it needs no Tor and never
-//! waits for one. A bridge keeps the kind it started as; asking for the other
-//! kind stops it and starts a new one.
+//! An offline bridge has no route and refuses every `CONNECT`. A page loaded
+//! only to delete an account's wallet reaches nothing, yet no page loads
+//! without its proxy, so it gets one of these. A bridge keeps the kind it
+//! started as; asking for the other kind stops it and starts a new one.
 
 use std::{future::Future, io, sync::OnceLock, time::Duration};
 
@@ -91,15 +90,14 @@ struct Target {
     port: u16,
 }
 
-/// The route a bridge was started on. It never changes: a route change makes
-/// the bridge refuse new connections until the caller restarts it.
+/// The route a bridge was started on, for its whole life.
 #[derive(Clone)]
 enum Session {
     Direct,
     /// One isolated client for the whole page session, so the page's sockets
     /// share an isolation group instead of each building a fresh circuit.
-    Tor(TorClient),
-    /// No route: every `CONNECT` is refused (see the module docs).
+    Tor(Box<TorClient>),
+    /// No route: every `CONNECT` is refused.
     Offline,
 }
 
@@ -123,53 +121,68 @@ struct BridgeState {
     task: JoinHandle<()>,
 }
 
-static BRIDGE: OnceLock<Mutex<Option<BridgeState>>> = OnceLock::new();
-
-fn bridge() -> &'static Mutex<Option<BridgeState>> {
-    BRIDGE.get_or_init(|| Mutex::new(None))
+#[derive(Default)]
+struct Bridge {
+    running: Option<BridgeState>,
+    /// Bumped by every start and stop. A start whose route resolved while
+    /// another call changed the bridge yields to that call.
+    changes: u64,
 }
 
-/// Starts the bridge, or returns the port of the routed one already running.
-///
-/// A bridge whose accept loop has ended (an accept error, as when iOS
-/// reclaims a suspended app's listening socket) is replaced rather than handed
-/// back with a port nothing listens on.
-///
-/// Fails closed: while Tor is on but bootstrapping (past the route wait),
-/// failed or unavailable, there is no bridge and so no page traffic.
+static BRIDGE: OnceLock<Mutex<Bridge>> = OnceLock::new();
+
+fn bridge() -> &'static Mutex<Bridge> {
+    BRIDGE.get_or_init(Default::default)
+}
+
+/// Starts the routed bridge, or returns the port of the one running. Fails
+/// closed while Tor is on but not usable.
 pub(crate) async fn start() -> Result<u16, String> {
     start_bridge(false).await
 }
 
-/// Starts a bridge that refuses every connection, or returns the port of the
-/// offline one already running. It needs no route, so it never waits for Tor.
+/// Starts the offline bridge, or returns the port of the one running.
 pub(crate) async fn start_offline() -> Result<u16, String> {
     start_bridge(true).await
 }
 
 async fn start_bridge(offline: bool) -> Result<u16, String> {
+    let seen = {
+        let state = bridge().lock().await;
+        // A bridge whose accept loop ended (iOS reclaims a suspended app's
+        // listening socket) is replaced, never handed back.
+        let live = state
+            .running
+            .as_ref()
+            .filter(|running| running.offline == offline && !running.task.is_finished());
+        if let Some(running) = live {
+            return Ok(running.port);
+        }
+        state.changes
+    };
+    // Resolved outside the lock: a routed session can wait minutes for Tor,
+    // and a stop must never wait behind it.
+    let session = if offline {
+        Session::Offline
+    } else {
+        match network_privacy::tor_client_for_route(true, || false).await? {
+            Some(tor) => Session::Tor(Box::new(tor)),
+            None => Session::Direct,
+        }
+    };
     let mut state = bridge().lock().await;
-    if let Some(running) = state.take() {
+    if state.changes != seen {
+        return Err("The Railgun bridge changed while it started".into());
+    }
+    if let Some(running) = state.running.take() {
         if running.task.is_finished() {
             log::warn!("network privacy: Railgun bridge had stopped; starting a new one");
-        } else if running.offline == offline {
-            let port = running.port;
-            *state = Some(running);
-            return Ok(port);
         } else {
             // The other kind: an offline page must never get a route, and a
             // routed one must never be left without.
             shut_down(running).await;
         }
     }
-    let session = if offline {
-        Session::Offline
-    } else {
-        match network_privacy::tor_client_for_route(true, || false).await? {
-            Some(tor) => Session::Tor(tor),
-            None => Session::Direct,
-        }
-    };
     let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
         .await
         .map_err(|error| format!("Bind Railgun bridge: {error}"))?;
@@ -179,12 +192,13 @@ async fn start_bridge(offline: bool) -> Result<u16, String> {
         .port();
     let (shutdown, shutdown_rx) = oneshot::channel();
     let task = tokio::spawn(run(listener, session, shutdown_rx));
-    *state = Some(BridgeState {
+    state.running = Some(BridgeState {
         port,
         offline,
         shutdown,
         task,
     });
+    state.changes += 1;
     if offline {
         log::info!("network privacy: offline Railgun bridge started");
     } else {
@@ -196,16 +210,20 @@ async fn start_bridge(offline: bool) -> Result<u16, String> {
 /// Stops the bridge, whichever kind runs, and closes every tunnel it carries.
 /// Idempotent.
 pub(crate) async fn stop() {
-    let state = bridge().lock().await.take();
-    if let Some(state) = state {
-        shut_down(state).await;
+    let running = {
+        let mut state = bridge().lock().await;
+        state.changes += 1;
+        state.running.take()
+    };
+    if let Some(running) = running {
+        shut_down(running).await;
         log::info!("network privacy: Railgun bridge stopped");
     }
 }
 
-async fn shut_down(state: BridgeState) {
-    let _ = state.shutdown.send(());
-    let _ = state.task.await;
+async fn shut_down(running: BridgeState) {
+    let _ = running.shutdown.send(());
+    let _ = running.task.await;
 }
 
 async fn run(listener: TcpListener, session: Session, mut shutdown: oneshot::Receiver<()>) {
@@ -225,7 +243,7 @@ async fn run(listener: TcpListener, session: Session, mut shutdown: oneshot::Rec
                     });
                 }
                 Err(error) => {
-                    log::warn!("Railgun bridge accept failed: {error}");
+                    log::warn!("network privacy: Railgun bridge accept failed: {error}");
                     break;
                 }
             },
@@ -361,12 +379,10 @@ async fn connect_upstream(
     }
 }
 
-/// The connector of every other direct path (`DirectRouteConnector`): both
-/// address families, the second joining after [`HAPPY_EYEBALLS_TIMEOUT`]. A
-/// plain connect tries a host's addresses one by one, IPv6 first on a phone with
-/// an IPv6 address, and on a network that hands out IPv6 it cannot carry each
-/// attempt hung there until Chromium gave up on the request: the page reached no
-/// host with an IPv6 address (a phone on one home Wi-Fi, 2026-10-19).
+/// Tries both address families, the second joining after
+/// [`HAPPY_EYEBALLS_TIMEOUT`], as every other direct path does. A network that
+/// hands out IPv6 it cannot carry otherwise stalls each connection on its
+/// first IPv6 address until the page gives up.
 fn direct_connector<R>(resolver: R) -> HttpConnector<R> {
     let mut connector = HttpConnector::new_with_resolver(resolver);
     connector.enforce_http(false);
@@ -647,12 +663,20 @@ mod tests {
         // End the accept loop but leave the state, as an accept error does.
         let shutdown = {
             let mut state = bridge().lock().await;
-            let running = state.as_mut().unwrap();
+            let running = state.running.as_mut().unwrap();
             std::mem::replace(&mut running.shutdown, oneshot::channel().0)
         };
         let _ = shutdown.send(());
         for _ in 0..200 {
-            if bridge().lock().await.as_ref().unwrap().task.is_finished() {
+            if bridge()
+                .lock()
+                .await
+                .running
+                .as_ref()
+                .unwrap()
+                .task
+                .is_finished()
+            {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(10)).await;
@@ -662,15 +686,17 @@ mod tests {
             .is_err());
 
         let replaced = start().await.unwrap();
-        assert!(TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, replaced))
-            .await
-            .is_ok());
+        assert!(
+            TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, replaced))
+                .await
+                .is_ok()
+        );
         stop().await;
     }
 
-    /// The bridge an account deletion loads its page behind (iOS progress
-    /// VI-17): no route, so it starts while Tor is still coming up, and no
-    /// client gets through, the page's own hosts included.
+    /// The bridge an account deletion loads its page behind: no route, so it
+    /// starts while Tor is still coming up, and no client gets through, the
+    /// page's own hosts included.
     #[tokio::test]
     async fn an_offline_bridge_needs_no_route_and_refuses_every_connect() {
         let _policy = lock_route_policy();
@@ -703,6 +729,7 @@ mod tests {
         bridge()
             .lock()
             .await
+            .running
             .as_ref()
             .map(|running| running.offline)
     }
@@ -746,11 +773,11 @@ mod tests {
         stop().await;
     }
 
-    /// The bridge's allowlist is one of several copies of the page's hosts
-    /// (reference §8.2, iOS plan XI10). A host missing from any copy fails
-    /// silently on a device, so pin them together: Kotlin's and Swift's
-    /// `RailgunEndpoints.hosts`, and the CSP `connect-src` of the bundle's
-    /// source, of the Android bundle and of its iOS copy.
+    /// The bridge's allowlist is one of several copies of the page's hosts. A
+    /// host missing from any copy fails silently on a device, so pin them
+    /// together: Kotlin's and Swift's `RailgunEndpoints.hosts`, and the CSP
+    /// `connect-src` of the bundle's source, of the Android bundle and of its
+    /// iOS copy.
     #[test]
     fn the_page_hosts_match_the_host_filters_and_the_page_csp() {
         let mut expected = RAILGUN_PAGE_HOSTS.map(str::to_owned).to_vec();

@@ -127,6 +127,8 @@ abstract final class AppIcons {
   static const zcashCurrency = 'zcash_currency';
 }
 
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
+
 /// Renders a Figma-exported icon from `assets/icons/<name>.svg`.
 ///
 /// SVGs preserve their Figma icon frame in the viewBox, so the art's
@@ -147,8 +149,6 @@ abstract final class AppIcons {
 ///    without the caller having to thread the color through.
 /// 3. [AppColors.icon.regular] from the ambient [AppTheme] — default
 ///    "neutral icon" when no other context has spoken.
-const _mobile = kAppFormFactor == AppFormFactor.mobile;
-
 class AppIcon extends StatelessWidget {
   const AppIcon(
     this.name, {
@@ -190,7 +190,7 @@ class AppIcon extends StatelessWidget {
         semanticLabel: semanticLabel,
       );
     }
-    // The neon redesign (mobile) draws its round icons as angular glyphs.
+    // Mobile draws the round icons as angular glyphs.
     if (_mobile) {
       final glyph = switch (name) {
         AppIcons.checkCircle => TronGlyphKind.check,

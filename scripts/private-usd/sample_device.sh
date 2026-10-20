@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Samples an app's memory, and its WebView renderer's, every 10 s; and every
 # 30 s checks the app's sockets (check_sockets.py --onionoo). Used in Private
-# USD device rounds (docs/private-usd-android-plan.md §10). Stop it with Ctrl-C,
-# or pass a duration.
+# USD device rounds. Stop it with Ctrl-C, or pass a duration.
 #
 # Usage: ANDROID_SERIAL=<serial> scripts/private-usd/sample_device.sh <out prefix> [seconds] [package]
 # Writes <out prefix>-mem.txt and <out prefix>-sockets.txt.

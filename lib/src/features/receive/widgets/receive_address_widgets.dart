@@ -146,7 +146,6 @@ class ReceiveTabs extends StatelessWidget {
     width: width,
     height: height,
     labelStyle: labelStyle,
-    labelFontWeight: labelFontWeight,
     indicatorKey: const ValueKey('receive_address_type_tabs_indicator'),
     tabKeys: (
       const ValueKey('receive_address_type_tab_shielded'),
@@ -158,6 +157,7 @@ class ReceiveTabs extends StatelessWidget {
 class _ReceiveTab extends StatelessWidget {
   const _ReceiveTab({
     required this.label,
+    required this.iconName,
     required this.active,
     required this.activeTextColor,
     required this.inactiveTextColor,
@@ -166,14 +166,11 @@ class _ReceiveTab extends StatelessWidget {
     required this.labelStyle,
     required this.labelFontWeight,
     required this.onTap,
-    this.iconName,
     super.key,
   });
 
   final String label;
-
-  /// The pool's glyph before the label.
-  final String? iconName;
+  final String iconName;
   final bool active;
   final Color activeTextColor;
   final Color inactiveTextColor;
@@ -196,10 +193,8 @@ class _ReceiveTab extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (iconName case final iconName?) ...[
-                  AppIcon(iconName, size: iconSize, color: color),
-                  SizedBox(width: iconGap),
-                ],
+                AppIcon(iconName, size: iconSize, color: color),
+                SizedBox(width: iconGap),
                 Flexible(
                   child: Text(
                     label,

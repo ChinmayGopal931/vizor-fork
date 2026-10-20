@@ -362,16 +362,14 @@ abstract final class GreenPrimitives {
   static const p900Alpha65Light = Color(0xA6001E0A);
 }
 
-/// Veylor's mobile "neon" palette: true black, neon red and white light,
-/// after the Roadster teaser frames (a red tail-light bar and white beams on
-/// black). Mobile builds only: the semantic categories pick these faces when
+/// Veylor's mobile "neon" palette: true black, neon red and white light.
+/// Mobile builds only: the semantic categories pick these faces when
 /// `kAppFormFactor` is mobile, and desktop keeps the Figma ladders above.
 ///
 /// `*Dark` faces are near-black steps with a faint cool cast; `*Light` faces
 /// are brushed-steel greys. Like the ladders above, widgets never reference
 /// these directly.
 abstract final class NeonPrimitives {
-  static const black = Color(0xFF000000);
   static const white = Color(0xFFFFFFFF);
 
   static const n0Dark = Color(0xFF000000);
@@ -397,7 +395,7 @@ abstract final class NeonPrimitives {
   static const n700Light = Color(0xFF26262B);
   static const n800Light = Color(0xFF0B0B0D);
 
-  /// White light with a cool cast: the headlights and beams.
+  /// White light with a cool cast.
   static const headlight = Color(0xFFDCE4FF);
 
   /// The tube colour: what a lit neon line and the primary fill are.
@@ -424,7 +422,6 @@ abstract final class NeonPrimitives {
   static const red8 = Color(0x14FF2E3E);
   static const red14 = Color(0x24FF2E3E);
   static const red22 = Color(0x38FF2E3E);
-  static const red35 = Color(0x59FF2E3E);
   static const redOnLight10 = Color(0x1ADC1027);
   static const redOnLight18 = Color(0x2EDC1027);
 
@@ -433,13 +430,11 @@ abstract final class NeonPrimitives {
   static const black30 = Color(0x4D000000);
   static const black50 = Color(0x80000000);
   static const black70 = Color(0xB3000000);
-  static const white4 = Color(0x0AFFFFFF);
   static const white6 = Color(0x0FFFFFFF);
   static const white8 = Color(0x14FFFFFF);
   static const white14 = Color(0x24FFFFFF);
   static const white50 = Color(0x80FFFFFF);
   static const white60 = Color(0x99FFFFFF);
-  static const white80 = Color(0xCCFFFFFF);
   static const ink5 = Color(0x0D0B0B0D);
   static const ink10 = Color(0x1A0B0B0D);
   static const ink50 = Color(0x800B0B0D);

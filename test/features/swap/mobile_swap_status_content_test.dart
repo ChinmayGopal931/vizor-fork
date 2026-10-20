@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/mobile_surface_card.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_presentation.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_status_presentation.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
@@ -572,13 +573,11 @@ void main() {
     final detailsRect = tester.getRect(
       find.byKey(const ValueKey('mobile_swap_transaction_details')),
     );
-    final card = tester.widget<Container>(
-      find
-          .descendant(
-            of: find.byKey(const ValueKey('mobile_swap_status_card')),
-            matching: find.byType(Container),
-          )
-          .first,
+    final card = tester.widget<MobileSurfaceCard>(
+      find.descendant(
+        of: find.byKey(const ValueKey('mobile_swap_status_card')),
+        matching: find.byType(MobileSurfaceCard),
+      ),
     );
     expect(
       card.padding,

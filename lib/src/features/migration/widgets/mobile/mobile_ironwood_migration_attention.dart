@@ -198,7 +198,6 @@ class _MobileIronwoodMigrationBannerState
               color: const Color(0xFFFFFFFF).withValues(alpha: 0.07),
             ),
           ),
-          // The neon look drops the Figma's faded tree art behind the label.
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(

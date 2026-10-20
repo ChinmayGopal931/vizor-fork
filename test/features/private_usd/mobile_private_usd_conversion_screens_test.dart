@@ -7,21 +7,19 @@ import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_status_presentation.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_convert_provider.dart';
-import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_conversion_screen.dart';
-import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_convert_review_screen.dart';
-import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_convert_screen.dart';
 import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_screen.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_banner.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_scramble_text.dart';
+import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_convert_views.dart';
+import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_progress_views.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
-// The forward conversion's screens (plan reference §9.4 S3, S5; §9.5) and
-// the banner and activity on `/private-usd` (S1, S2), built from the
-// Widgetbook fixtures.
+// The forward conversion's screens, and the banner and activity on
+// `/private-usd`, built from the Widgetbook fixtures.
 void main() {
   setUp(() {
     final view = TestWidgetsFlutterBinding.ensureInitialized()
@@ -168,14 +166,12 @@ void main() {
   group('review', () {
     Future<void> pumpReview(
       WidgetTester tester,
-      PrivateUsdConvertState state, {
-      bool torOff = false,
-    }) => pump(
+      PrivateUsdConvertState state,
+    ) => pump(
       tester,
       MobilePrivateUsdConvertReviewView(
         state: state,
         privacyModeEnabled: false,
-        showsTorOffDisclosure: torOff,
         onBack: () {},
         onConfirm: () {},
         onRefreshQuote: () {},
@@ -194,10 +190,7 @@ void main() {
       );
 
       // The page title and the expiry caption are drawn uppercase.
-      expect(
-        find.text(PrivateUsdCopy.convertReviewTitle.toUpperCase()),
-        findsOneWidget,
-      );
+      expect(find.text(PrivateUsdCopy.review.toUpperCase()), findsOneWidget);
       expect(find.text('0.5 ZEC'), findsOneWidget);
       expect(find.text(r'$15.50'), findsOneWidget);
       expect(
@@ -205,7 +198,6 @@ void main() {
         findsOneWidget,
       );
       expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.torOffDisclosure), findsNothing);
       expect(
         button(tester, 'mobile_private_usd_review_convert').onPressed,
         isNotNull,
@@ -233,21 +225,6 @@ void main() {
         find.byKey(const ValueKey('mobile_private_usd_review_convert')),
         findsNothing,
       );
-    });
-
-    testWidgets('the Tor-off disclosure shows only when asked for', (
-      tester,
-    ) async {
-      await pumpReview(
-        tester,
-        previewPrivateUsdConvertState(
-          quote: previewPrivateUsdQuote(),
-          step: PrivateUsdConvertStep.review,
-        ),
-        torOff: true,
-      );
-
-      expect(find.text(PrivateUsdCopy.torOffDisclosure), findsOneWidget);
     });
   });
 
@@ -391,7 +368,7 @@ void main() {
       );
       expect(find.text(PrivateUsdCopy.convertResultPaidTitle), findsNothing);
       expect(
-        find.text(PrivateUsdCopy.bridgeEndedTitle.toUpperCase()),
+        find.text(PrivateUsdCopy.actionConvert.toUpperCase()),
         findsOneWidget,
       );
     });
@@ -472,7 +449,7 @@ void main() {
       ),
     );
 
-    expect(find.text(PrivateUsdCopy.bannerToUsd), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.convertingToUsd), findsOneWidget);
     expect(
       find.text(
         'Waiting for confirmations · 1 of 2\n${PrivateUsdCopy.bannerKeepOpen}',
@@ -520,19 +497,19 @@ void main() {
 
     // A zero balance with a conversion under way is not "empty".
     expect(find.text(PrivateUsdCopy.emptyTitle), findsNothing);
-    // The banner and the bridge's own row read alike ("Bridging to
-    // 0zkUSDC"), so each is found where it stands.
+    // The banner and the bridge's own row read alike, so each is found
+    // where it stands.
     expect(
       find.descendant(
         of: find.byType(PrivateUsdConversionBannerView),
-        matching: find.text(PrivateUsdCopy.bannerToUsd),
+        matching: find.text(PrivateUsdCopy.convertingToUsd),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('mobile_private_usd_activity_row_0')),
-        matching: find.text(PrivateUsdCopy.activityConverting),
+        matching: find.text(PrivateUsdCopy.convertingToUsd),
       ),
       findsOneWidget,
     );

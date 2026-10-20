@@ -7,8 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 ///
 /// Work that talks to a server for a screen nobody can see waits on this, so a
 /// request is never made on behalf of a hidden app. It reads
-/// [AppLifecycleState] the way `AppLifecycleListener.onHide` / `onResume` do,
-/// which is also how the other foreground-only providers decide.
+/// [AppLifecycleState] the way `AppLifecycleListener.onHide` / `onResume` do.
+/// Private USD's engine is stricter: it counts a start only from `resumed`.
 class AppForegroundNotifier extends Notifier<bool> {
   @override
   bool build() {

@@ -387,14 +387,11 @@ class _StatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MobileSurfaceCard(
-      padding: EdgeInsets.zero,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.base,
-        ),
-        child: child,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.base,
       ),
+      child: child,
     );
   }
 }
@@ -559,12 +556,10 @@ class _TabUnderlinePainter extends CustomPainter {
 
 // --- The neon step timeline -------------------------------------------------
 //
-// Each step keeps the layout it had: a 24px marker column, a 24px title row,
-// and the same minimum heights. Done steps are lit check plates; the current
-// one keeps the loading spinner, now red with a faint glow behind it; steps
-// ahead are unlit plates. A rail joins them: a lit tube from the top down
-// into the spinner, dim after it. A packet of light runs down the lit rail
-// into the spinner over and over (not under reduced motion).
+// Done steps are lit check plates, the current one the loading spinner over a
+// faint red glow, and steps ahead unlit plates. A rail joins them: a lit tube
+// from the top down into the spinner, dim after it. A packet of light runs
+// down the lit rail into the spinner over and over (not under reduced motion).
 
 /// Each marker sits in a square of this size at the top of its step.
 const _routeMarkerBox = 24.0;
@@ -893,7 +888,6 @@ class _NeonProgressStep extends StatelessWidget {
                 Text(
                   step.lastCheckedLabel!,
                   style: AppTypography.labelMedium.copyWith(
-                    fontWeight: FontWeight.w100,
                     color: sublineColor,
                   ),
                 ),
@@ -902,10 +896,7 @@ class _NeonProgressStep extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xs),
                 Text(
                   step.description!,
-                  style: AppTypography.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w100,
-                    color: sublineColor,
-                  ),
+                  style: AppTypography.bodyMedium.copyWith(color: sublineColor),
                 ),
               ],
             ],
@@ -1027,20 +1018,14 @@ class _UnlitPlatePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // The check glyph's plate: 20 of its 24 units, two corners cut by 4.
-    const u = _routePlateGlyphSize / 24;
-    final plate = Rect.fromCenter(
-      center: size.center(Offset.zero),
-      width: 20 * u,
-      height: 20 * u,
-    );
-    canvas.drawPath(
-      Neon.chamferedRect(plate, topLeft: 4 * u, bottomRight: 4 * u),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6 * u
-        ..strokeJoin = StrokeJoin.miter
-        ..color = color,
+    const glyph = _routePlateGlyphSize;
+    Neon.strokeUnlit(
+      canvas,
+      TronGlyph.platePath(
+        glyph,
+      ).shift(Offset((size.width - glyph) / 2, (size.height - glyph) / 2)),
+      color: color,
+      width: 1.6 * glyph / 24,
     );
   }
 
@@ -1269,7 +1254,6 @@ class _MobileStatusChipRow extends StatelessWidget {
                       const SizedBox(width: AppSpacing.xs),
                       Text(
                         text,
-                        // Gotham Light, as the rest of the panel.
                         style: AppTypography.labelLarge.copyWith(
                           color: textColor,
                         ),
@@ -1309,17 +1293,9 @@ class _RefundGlyphPainter extends CustomPainter {
       ..lineTo(18, 7);
     canvas
       ..save()
-      ..scale(size.width / 24)
-      ..drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.6
-          ..strokeJoin = StrokeJoin.miter
-          ..strokeCap = StrokeCap.square
-          ..color = color,
-      )
-      ..restore();
+      ..scale(size.width / 24);
+    Neon.strokeUnlit(canvas, path, color: color, width: 1.6);
+    canvas.restore();
   }
 
   @override

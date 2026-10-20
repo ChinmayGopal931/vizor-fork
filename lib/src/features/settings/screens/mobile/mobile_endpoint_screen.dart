@@ -346,8 +346,7 @@ class _MobileEndpointScreenState extends ConsumerState<MobileEndpointScreen> {
       ),
       children: [
         // Dark hero card with the host:port field — Figma `Custom
-        // endpoint` card (4083:457541): 200 high. The neon look drops the
-        // Figma's faded castle-library art along the bottom edge.
+        // endpoint` card (4083:457541): 200 high.
         Container(
           key: const ValueKey('mobile_endpoint_custom_card'),
           height: 200,

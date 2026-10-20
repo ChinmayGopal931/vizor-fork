@@ -3,22 +3,24 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/private_usd_feature_config.dart';
 import '../../../core/formatting/zec_amount.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../../rust/api/private_usd.dart' as rust;
 import '../../migration/providers/ironwood_migration_announcement_provider.dart';
+import '../models/private_usd_messages.dart';
 import '../models/private_usd_record_key.dart';
 import '../private_usd_copy.dart';
 import '../services/private_usd_engine.dart';
-import '../services/private_usd_swap_backend.dart';
+import '../services/private_usd_pause.dart';
 import '../services/private_usd_zec_quote_search.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_engine_provider.dart';
 
-/// The convert flow's timing (plan reference §9.1, §9.4 S3).
+/// The convert flows' timing.
 abstract final class PrivateUsdConvertTiming {
-  /// Typing pauses this long before its amount is quoted (X10).
+  /// Typing pauses this long before its amount is quoted.
   static const typingDebounce = Duration(milliseconds: 700);
 
   /// A quote stops being offered this long before it expires: the driver
@@ -87,34 +89,33 @@ final privateUsdZecHoldingsProvider = Provider.autoDispose
       );
     });
 
-/// The convert flow's clock; tests replace it.
+/// The convert flows' clock; tests replace it.
 final privateUsdConvertClockProvider = Provider<DateTime Function()>(
   (_) => DateTime.now,
 );
 
 enum PrivateUsdConvertStep { amount, review, confirming }
 
-/// The convert screens' state (plan reference §9.4 S3): the amount, the
-/// quote it got, and which step is up. The rules that decide what may be
-/// tapped are getters, so the amount and review screens share them.
+/// What both convert flows' states hold: the amount, the quote's lifetime,
+/// which step is up, and the rules that follow from them, so the amount and
+/// review screens share them.
 @immutable
-class PrivateUsdConvertState {
-  const PrivateUsdConvertState({
+abstract class PrivateUsdConvertFlowState<
+  S extends PrivateUsdConvertFlowState<S>
+> {
+  const PrivateUsdConvertFlowState({
     required this.now,
     this.amountText = '',
-    this.quote,
     this.quoting = false,
     this.quoteError,
     this.startError,
     this.step = PrivateUsdConvertStep.amount,
     this.quoteSpent = false,
-    this.holdings = const PrivateUsdZecHoldings(),
     this.underWay,
   });
 
   final DateTime now;
   final String amountText;
-  final PrivateUsdZecQuote? quote;
   final bool quoting;
 
   /// Why the last quote did not come.
@@ -124,14 +125,271 @@ class PrivateUsdConvertState {
   final String? startError;
   final PrivateUsdConvertStep step;
 
-  /// The quote was consumed by an accept that did not open a conversion: it
+  /// The quote was taken by a "Convert" that did not start a conversion: it
   /// cannot be accepted again.
   final bool quoteSpent;
-  final PrivateUsdZecHoldings holdings;
 
   /// A conversion found under way (opening the screen, a quote refused as
-  /// `busy`, or an accept that may have opened): its progress shows instead.
+  /// `busy`, or a start that may have opened one): its progress shows
+  /// instead.
   final PrivateUsdRoutePath? underWay;
+
+  /// When the quote stops being offered; null without one.
+  DateTime? get offeredUntil;
+
+  /// What "Review" and "Convert" need.
+  bool get canGoOn;
+
+  /// The quote stopped being offered: taken, or past [offeredUntil].
+  bool get isExpired {
+    final until = offeredUntil;
+    if (until == null) return false;
+    return quoteSpent || !now.isBefore(until);
+  }
+
+  /// Time left until the quote stops being offered.
+  Duration get expiresIn {
+    final until = offeredUntil;
+    if (until == null) return Duration.zero;
+    final left = until.difference(now);
+    return left.isNegative ? Duration.zero : left;
+  }
+
+  bool get canReview => step == PrivateUsdConvertStep.amount && canGoOn;
+  bool get canConfirm => step == PrivateUsdConvertStep.review && canGoOn;
+  bool get isConfirming => step == PrivateUsdConvertStep.confirming;
+
+  /// The line on the review: why "Convert" did not start, a refresh asked
+  /// for there that did not come, or a quote that ran out.
+  String? get reviewMessage {
+    if (startError != null) return startError;
+    if (quoteError != null) return quoteError;
+    if (isExpired && !quoting) return PrivateUsdCopy.convertQuoteRanOut;
+    return null;
+  }
+
+  S copyWith({
+    DateTime? now,
+    String? amountText,
+    bool? quoting,
+    String? quoteError,
+    bool clearQuoteError = false,
+    String? startError,
+    bool clearStartError = false,
+    PrivateUsdConvertStep? step,
+    bool? quoteSpent,
+    PrivateUsdRoutePath? underWay,
+  });
+}
+
+/// What both convert flows' notifiers share: the review steps, quotes asked
+/// for after typing stops and held while the engine cannot run, and the
+/// conversion under way that shows instead of a new one. Every quote spends
+/// a swap index, so a quote is never asked for on opening or per keystroke.
+abstract class PrivateUsdConvertFlowNotifier<
+  S extends PrivateUsdConvertFlowState<S>
+>
+    extends Notifier<S> {
+  @protected
+  late DateTime Function() clock;
+
+  /// The active account when the flow opened.
+  @protected
+  String? account;
+
+  Timer? _pending;
+  int _generation = 0;
+
+  /// Moves on with every quote asked for, every edit and disposal: a quote
+  /// asked for before is dropped.
+  @protected
+  int get quoteGeneration => _generation;
+
+  /// For [build]: the clock, the active account, the tick, and what
+  /// disposal cancels.
+  @protected
+  void setUpFlow() {
+    clock = ref.watch(privateUsdConvertClockProvider);
+    account = ref.read(accountProvider).value?.activeAccountUuid;
+    final tick = Timer.periodic(PrivateUsdConvertTiming.tick, (_) => _onTick());
+    ref.onDispose(() {
+      _generation++;
+      _pending?.cancel();
+      tick.cancel();
+    });
+  }
+
+  /// Asks again for the quote that ran out on the amount step, when it may.
+  @protected
+  void replaceExpiredQuote();
+
+  /// Opens the review; false when the quote cannot be reviewed.
+  bool openReview() {
+    if (!state.canReview) return false;
+    state = state.copyWith(
+      step: PrivateUsdConvertStep.review,
+      clearStartError: true,
+    );
+    return true;
+  }
+
+  /// Back from the review to the amount; false (blocked) while confirming.
+  bool leaveReview() {
+    if (state.isConfirming) return false;
+    if (state.step == PrivateUsdConvertStep.review) {
+      state = state.copyWith(
+        step: PrivateUsdConvertStep.amount,
+        clearStartError: true,
+      );
+    }
+    return true;
+  }
+
+  /// Looks for a conversion under way for the account (opening the screen):
+  /// one shows instead of a new conversion.
+  Future<void> findUnderWay() async {
+    final account = this.account;
+    if (account == null) return;
+    final path = await privateUsdFindUnderWay(
+      ref.read(privateUsdEngineProvider),
+      account,
+    );
+    if (!ref.mounted || path == null) return;
+    state = state.copyWith(underWay: path);
+  }
+
+  /// Back to the review after a pause stopped "Convert": never stuck in
+  /// `confirming`, and a conversion under way shows instead.
+  @protected
+  PrivateUsdRoutePath? backToReview() {
+    if (ref.mounted) {
+      state = state.copyWith(step: PrivateUsdConvertStep.review);
+      unawaited(findUnderWay());
+    }
+    return null;
+  }
+
+  /// "Convert" did not start a conversion: [message] says why, and the
+  /// quote is spent.
+  @protected
+  void startFailed(String message) {
+    state = state.copyWith(
+      step: PrivateUsdConvertStep.review,
+      startError: message,
+      quoteSpent: true,
+    );
+  }
+
+  @protected
+  void cancelQuote() {
+    _generation++;
+    _pending?.cancel();
+    _pending = null;
+  }
+
+  /// Asks for a quote through [run] after [debounce]. Backgrounded or locked
+  /// meanwhile, the request waits until the engine can run: no swap index or
+  /// seed is touched while paused, and an edit or disposal cancels it. [run]
+  /// answers null once it finds itself no longer `current`.
+  @protected
+  void requestQuote<Q extends Object>(
+    Future<Q?> Function(bool Function() current) run, {
+    required void Function(Q quote) onQuote,
+    required void Function(Object error) onFailure,
+    Duration debounce = Duration.zero,
+  }) {
+    cancelQuote();
+    final generation = _generation;
+    bool current() => ref.mounted && generation == _generation;
+    state = state.copyWith(quoting: true, clearQuoteError: true);
+    _pending = Timer(debounce, () async {
+      if (!current()) return;
+      if (!ref.read(privateUsdEngineProvider).canRun) {
+        requestQuote(
+          run,
+          onQuote: onQuote,
+          onFailure: onFailure,
+          debounce: PrivateUsdConvertTiming.tick,
+        );
+        return;
+      }
+      Q? quote;
+      Object? failure;
+      try {
+        quote = await run(current);
+      } catch (error) {
+        failure = error;
+      }
+      if (!current()) return;
+      if (quote != null) {
+        onQuote(quote);
+      } else if (failure != null) {
+        onFailure(failure);
+      }
+    });
+  }
+
+  /// Whether a quote that just came is taken: one that lands while the
+  /// review is up is dropped unless the review asked for it, and none is
+  /// taken while confirming.
+  @protected
+  bool takesQuote({required bool forReview}) {
+    final onReview = state.step != PrivateUsdConvertStep.amount;
+    if (!state.isConfirming && (!onReview || forReview)) return true;
+    state = state.copyWith(quoting: false);
+    return false;
+  }
+
+  /// A quote refused as `busy` means a conversion is under way, which shows
+  /// instead; whether [error] was that.
+  @protected
+  bool showsUnderWay(Object error) {
+    if (error is! rust.ApiPrivateUsdError ||
+        error.code != rust.ApiPrivateUsdErrorCode.busy) {
+      return false;
+    }
+    state = state.copyWith(quoting: false);
+    unawaited(findUnderWay());
+    return true;
+  }
+
+  void _onTick() {
+    if (!ref.mounted) return;
+    state = state.copyWith(now: clock());
+    // A quote left to run out on the amount step is replaced; on the review
+    // the user decides. Never in the background or locked, and a failed
+    // replacement is not retried every tick (each quote spends a swap
+    // index): editing the amount asks again.
+    if (state.step == PrivateUsdConvertStep.amount &&
+        state.isExpired &&
+        !state.quoting &&
+        state.quoteError == null &&
+        ref.read(privateUsdEngineProvider).canRun) {
+      replaceExpiredQuote();
+    }
+  }
+}
+
+/// The ZEC → private USD convert screens' state: the amount, the quote it
+/// got, and which step is up.
+@immutable
+class PrivateUsdConvertState
+    extends PrivateUsdConvertFlowState<PrivateUsdConvertState> {
+  const PrivateUsdConvertState({
+    required super.now,
+    super.amountText,
+    this.quote,
+    super.quoting,
+    super.quoteError,
+    super.startError,
+    super.step,
+    super.quoteSpent,
+    this.holdings = const PrivateUsdZecHoldings(),
+    super.underWay,
+  });
+
+  final PrivateUsdZecQuote? quote;
+  final PrivateUsdZecHoldings holdings;
 
   static final _maxZatoshi = BigInt.from(2100000000000000);
 
@@ -160,32 +418,15 @@ class PrivateUsdConvertState {
 
   bool get isAmountInvalid => isShort || (isPositive && totalZat == null);
 
-  /// The quote stopped being offered: spent, or within the margin of its
-  /// expiry.
-  bool get isExpired {
-    final quote = this.quote;
-    if (quote == null) return false;
-    return quoteSpent ||
-        !now.isBefore(
-          quote.expiresAt.subtract(PrivateUsdConvertTiming.expiryMargin),
-        );
-  }
-
-  /// Time left until the quote stops being offered.
-  Duration get expiresIn {
-    final quote = this.quote;
-    if (quote == null) return Duration.zero;
-    final left = quote.expiresAt
-        .subtract(PrivateUsdConvertTiming.expiryMargin)
-        .difference(now);
-    return left.isNegative ? Duration.zero : left;
-  }
+  @override
+  DateTime? get offeredUntil =>
+      quote?.expiresAt.subtract(PrivateUsdConvertTiming.expiryMargin);
 
   /// The quote leaves something after the relayer's fee.
   bool get paysOut => quote != null && quote!.receives > BigInt.zero;
 
-  /// What "Review" and "Convert" need: a quote that pays out and holds,
-  /// and a known balance that covers it.
+  /// A quote that pays out and holds, and a known balance that covers it.
+  @override
   bool get canGoOn {
     final quote = this.quote;
     final spendable = holdings.spendable;
@@ -196,10 +437,6 @@ class PrivateUsdConvertState {
         spendable != null &&
         quote.totalZat <= spendable;
   }
-
-  bool get canReview => step == PrivateUsdConvertStep.amount && canGoOn;
-  bool get canConfirm => step == PrivateUsdConvertStep.review && canGoOn;
-  bool get isConfirming => step == PrivateUsdConvertStep.confirming;
 
   /// "Use it all": on the amount step, with a balance Rust vouches for, and
   /// not while the wallet catches up.
@@ -214,13 +451,7 @@ class PrivateUsdConvertState {
 
   /// The line under the amount, or on the review.
   String? get message {
-    if (step != PrivateUsdConvertStep.amount) {
-      if (startError != null) return startError;
-      // A refresh asked for on the review that did not come.
-      if (quoteError != null) return quoteError;
-      if (isExpired && !quoting) return PrivateUsdCopy.convertQuoteRanOut;
-      return null;
-    }
+    if (step != PrivateUsdConvertStep.amount) return reviewMessage;
     if (isShort) {
       return PrivateUsdCopy.convertInsufficient(
         ZecAmount.fromZatoshi(holdings.spendable!).activity.toString(),
@@ -233,6 +464,7 @@ class PrivateUsdConvertState {
     return null;
   }
 
+  @override
   PrivateUsdConvertState copyWith({
     DateTime? now,
     String? amountText,
@@ -261,35 +493,29 @@ class PrivateUsdConvertState {
   );
 }
 
-/// The forward convert flow (plan reference §9.4 S3, zapp
-/// `PrivateUsdConvertVM`). Every quote spends a swap index, so quotes come
-/// only 700 ms after typing stops, for "Use it all" once the balance is
-/// Rust's, and to replace a quote that ran out on the amount step: never on
-/// opening, and never while the review is up unless asked to refresh.
+/// The ZEC → private USD convert flow. Quotes come 700 ms after typing
+/// stops, for "Use it all" once the balance is Rust's, and to replace a
+/// quote that ran out on the amount step; never while the review is up
+/// unless asked to refresh.
 final privateUsdConvertProvider =
     NotifierProvider.autoDispose<
       PrivateUsdConvertNotifier,
       PrivateUsdConvertState
     >(PrivateUsdConvertNotifier.new);
 
-class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
-  late DateTime Function() _clock;
+class PrivateUsdConvertNotifier
+    extends PrivateUsdConvertFlowNotifier<PrivateUsdConvertState> {
   late PrivateUsdZecQuoteSearch _search;
-  String? _account;
-  Timer? _pending;
-  Timer? _tick;
-  int _generation = 0;
 
   @override
   PrivateUsdConvertState build() {
-    _clock = ref.watch(privateUsdConvertClockProvider);
-    _account = ref.read(accountProvider).value?.activeAccountUuid;
+    setUpFlow();
     _search = PrivateUsdZecQuoteSearch(
       (units) =>
-          ref.read(privateUsdEngineProvider).quote(_account!, units: units),
-      nowSeconds: () => _clock().millisecondsSinceEpoch ~/ 1000,
+          ref.read(privateUsdEngineProvider).quote(this.account!, units: units),
+      nowSeconds: () => clock().millisecondsSinceEpoch ~/ 1000,
     );
-    final account = _account;
+    final account = this.account;
     var holdings = const PrivateUsdZecHoldings();
     if (account != null) {
       holdings = ref.read(privateUsdZecHoldingsProvider(account));
@@ -297,19 +523,13 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
         state = state.copyWith(holdings: next);
       });
     }
-    _tick = Timer.periodic(PrivateUsdConvertTiming.tick, (_) => _onTick());
-    ref.onDispose(() {
-      _generation++;
-      _pending?.cancel();
-      _tick?.cancel();
-    });
-    return PrivateUsdConvertState(now: _clock(), holdings: holdings);
+    return PrivateUsdConvertState(now: clock(), holdings: holdings);
   }
 
   /// The amount field changed: an amount to quote, after typing stops.
   void onAmountChanged(String text) {
     if (state.step != PrivateUsdConvertStep.amount) return;
-    _cancelQuote();
+    cancelQuote();
     state = state.copyWith(
       amountText: text,
       clearQuote: true,
@@ -329,35 +549,13 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
   void onMax() {
     if (!state.canMax) return;
     final spendable = state.holdings.spendable!;
-    _cancelQuote();
+    cancelQuote();
     state = state.copyWith(
       amountText: formatZecAmount(spendable),
       clearQuote: true,
       clearQuoteError: true,
     );
     _requestQuote(() => _search.quote(spendable), fillsAmount: true);
-  }
-
-  /// Opens the review; false when the quote cannot be reviewed.
-  bool openReview() {
-    if (!state.canReview) return false;
-    state = state.copyWith(
-      step: PrivateUsdConvertStep.review,
-      clearStartError: true,
-    );
-    return true;
-  }
-
-  /// Back from the review to the amount; false (blocked) while confirming.
-  bool leaveReview() {
-    if (state.isConfirming) return false;
-    if (state.step == PrivateUsdConvertStep.review) {
-      state = state.copyWith(
-        step: PrivateUsdConvertStep.amount,
-        clearStartError: true,
-      );
-    }
-    return true;
   }
 
   /// "Refresh quote" on the review, once the quote ran out: the same size
@@ -383,7 +581,7 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
   /// was saved), or null with [PrivateUsdConvertState.startError] set.
   Future<PrivateUsdRoutePath?> confirm() async {
     if (!state.canConfirm) return null;
-    final account = _account;
+    final account = this.account;
     final quote = state.quote!;
     if (account == null) return null;
     state = state.copyWith(
@@ -406,13 +604,13 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
         case rust.ApiAcceptKind.accepted:
           return path;
         case rust.ApiAcceptKind.tokensNeeded:
-          // No tokens client before M4 (D-33): nothing opened. End the
-          // record; never ask again in a loop.
+          // The maker wants a Privacy Pass token and none is held: nothing
+          // opened. End the record; never ask again in a loop.
           unawaited(_abandonQuietly(engine, account, quote.index));
-          _startFailed(PrivateUsdCopy.convertResultMakerUnavailable);
+          startFailed(PrivateUsdCopy.convertResultMakerUnavailable);
           return null;
         case rust.ApiAcceptKind.nothingSent:
-          _startFailed(privateUsdNothingSentMessage(result.cause));
+          startFailed(privateUsdNothingSentMessage(result.cause));
           return null;
       }
     } on rust.ApiPrivateUsdError catch (error) {
@@ -420,52 +618,41 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
       switch (error.code) {
         // Refused before anything was saved.
         case rust.ApiPrivateUsdErrorCode.quoteExpired:
-          _startFailed(PrivateUsdCopy.convertQuoteRanOut);
+          startFailed(PrivateUsdCopy.convertQuoteRanOut);
           return null;
         case rust.ApiPrivateUsdErrorCode.relayerFee:
-          _startFailed(
+          startFailed(
             _aboveCap(quote.relayerFee)
                 ? PrivateUsdCopy.convertErrorFeeCap
                 : PrivateUsdCopy.convertErrorBelowFee,
           );
           return null;
         case rust.ApiPrivateUsdErrorCode.depositUnpayable:
-          _startFailed(PrivateUsdCopy.convertErrorUnpayable);
+          startFailed(PrivateUsdCopy.convertErrorUnpayable);
           return null;
         default:
           break;
       }
-    } on PrivateUsdEngineInterruptedException {
-      // Locked or backgrounded mid-accept: Rust may have saved it, and the
-      // engine picks a saved record up. Back to the review, never stuck in
-      // `confirming`; a conversion under way shows instead.
-      return _backToReview();
-    } on PrivateUsdKeyLockedException {
-      return _backToReview();
+    } on PrivateUsdPause {
+      // Rust may have saved it, and the engine picks a saved record up.
+      return backToReview();
     } catch (error) {
-      if (kDebugMode) {
-        debugPrint('privateUsd: accept failed (${error.runtimeType})');
-      }
+      privateUsdLog('accept failed (${error.runtimeType})');
     }
     // Maybe opened: an accept that failed after its record was saved is
     // under way all the same.
     if (await _isUnderWay(engine, account, quote.index)) return path;
     if (!ref.mounted) return null;
-    _startFailed(PrivateUsdCopy.convertStartFailed);
+    startFailed(PrivateUsdCopy.convertStartFailed);
     return null;
   }
 
-  /// Looks for a conversion under way for the account (opening the screen):
-  /// one shows instead of a new conversion.
-  Future<void> findUnderWay() async {
-    final account = _account;
-    if (account == null) return;
-    final path = await privateUsdFindUnderWay(
-      ref.read(privateUsdEngineProvider),
-      account,
-    );
-    if (!ref.mounted || path == null) return;
-    state = state.copyWith(underWay: path);
+  @override
+  void replaceExpiredQuote() {
+    final total = state.totalZat;
+    if (total == null || state.isShort) return;
+    final requested = state.quote!.requestedUnits;
+    _requestQuote(() => _search.quote(total, requestedUnits: requested));
   }
 
   Future<bool> _isUnderWay(
@@ -491,60 +678,16 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
     try {
       await engine.abandon(account, index: index);
     } catch (error) {
-      if (kDebugMode) debugPrint('privateUsd: abandon failed');
+      privateUsdLog('abandon failed (${error.runtimeType})');
     }
   }
 
+  // Without a cap from the deployment, no fee is within it.
   bool _aboveCap(BigInt fee) {
-    final cap = ref.read(privateUsdCurrentDeploymentProvider)?.maxRelayerFee;
-    final limit = cap == null ? null : BigInt.tryParse(cap);
-    return limit == null || fee > limit;
-  }
-
-  PrivateUsdRoutePath? _backToReview() {
-    if (ref.mounted) {
-      state = state.copyWith(step: PrivateUsdConvertStep.review);
-      unawaited(findUnderWay());
-    }
-    return null;
-  }
-
-  void _startFailed(String message) {
-    state = state.copyWith(
-      step: PrivateUsdConvertStep.review,
-      startError: message,
-      quoteSpent: true,
+    final cap = privateUsdRelayerFeeCap(
+      ref.read(privateUsdCurrentDeploymentProvider),
     );
-  }
-
-  void _onTick() {
-    if (!ref.mounted) return;
-    state = state.copyWith(now: _clock());
-    // A quote left to run out on the amount step is replaced, its size
-    // first; on the review the user decides. Never in the background or
-    // locked: each quote spends a swap index.
-    final quote = state.quote;
-    if (state.step != PrivateUsdConvertStep.amount ||
-        quote == null ||
-        !state.isExpired ||
-        state.quoting ||
-        // A failed replacement is not retried every tick: each try spends a
-        // swap index. Editing the amount asks again.
-        state.quoteError != null ||
-        !ref.read(privateUsdEngineProvider).canRun) {
-      return;
-    }
-    final total = state.totalZat;
-    if (total == null || state.isShort) return;
-    _requestQuote(
-      () => _search.quote(total, requestedUnits: quote.requestedUnits),
-    );
-  }
-
-  void _cancelQuote() {
-    _generation++;
-    _pending?.cancel();
-    _pending = null;
+    return cap == null || fee > cap;
   }
 
   void _requestQuote(
@@ -552,53 +695,23 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
     Duration debounce = Duration.zero,
     bool fillsAmount = false,
     bool forReview = false,
-  }) {
-    _cancelQuote();
-    final generation = _generation;
-    state = state.copyWith(quoting: true, clearQuoteError: true);
-    _pending = Timer(debounce, () async {
-      if (!ref.mounted || generation != _generation) return;
-      // Backgrounded or locked during the debounce: keep the request pending
-      // until the engine can run. Editing or disposal cancels this timer; no
-      // swap index or seed is touched while paused.
-      if (!ref.read(privateUsdEngineProvider).canRun) {
-        _requestQuote(
-          run,
-          debounce: PrivateUsdConvertTiming.tick,
-          fillsAmount: fillsAmount,
-          forReview: forReview,
-        );
-        return;
-      }
-      PrivateUsdZecQuote? quote;
-      Object? failure;
-      try {
-        quote = await run();
-      } catch (error) {
-        failure = error;
-      }
-      if (!ref.mounted || generation != _generation) return;
-      if (quote != null) {
-        _withQuote(quote, fillsAmount: fillsAmount, forReview: forReview);
-      } else {
-        _quoteFailed(failure!);
-      }
-    });
-  }
+  }) => requestQuote<PrivateUsdZecQuote>(
+    (_) => run(),
+    debounce: debounce,
+    onQuote: (quote) =>
+        _withQuote(quote, fillsAmount: fillsAmount, forReview: forReview),
+    onFailure: _quoteFailed,
+  );
 
-  // A quote that lands while the review is up is dropped unless the review
-  // asked for it; one that arrives already expired says the clock is off.
+  // One that arrives already expired says the clock is off.
   void _withQuote(
     PrivateUsdZecQuote quote, {
     required bool fillsAmount,
     required bool forReview,
   }) {
+    if (!takesQuote(forReview: forReview)) return;
     final onReview = state.step != PrivateUsdConvertStep.amount;
-    if (state.isConfirming || (onReview && !forReview)) {
-      state = state.copyWith(quoting: false);
-      return;
-    }
-    final arrivedExpired = !_clock().isBefore(
+    final arrivedExpired = !clock().isBefore(
       quote.expiresAt.subtract(PrivateUsdConvertTiming.expiryMargin),
     );
     if (arrivedExpired) {
@@ -620,17 +733,11 @@ class PrivateUsdConvertNotifier extends Notifier<PrivateUsdConvertState> {
   }
 
   void _quoteFailed(Object error) {
-    if (error is rust.ApiPrivateUsdError &&
-        error.code == rust.ApiPrivateUsdErrorCode.busy) {
-      // A conversion is under way: it shows instead.
-      state = state.copyWith(quoting: false);
-      unawaited(findUnderWay());
-      return;
-    }
+    if (showsUnderWay(error)) return;
     final message = switch (error) {
       PrivateUsdNoQuoteFitsException() => PrivateUsdCopy.convertZecNoQuote,
       rust.ApiPrivateUsdError(:final code) => privateUsdErrorMessage(code),
-      PrivateUsdKeyLockedException() => null,
+      PrivateUsdPause() => null,
       _ => PrivateUsdCopy.convertErrorGeneric,
     };
     state = state.copyWith(
@@ -669,7 +776,7 @@ Future<PrivateUsdRoutePath?> privateUsdFindUnderWay(
       }
     }
   } catch (error) {
-    if (kDebugMode) debugPrint('privateUsd: reading conversions failed');
+    privateUsdLog('reading conversions failed (${error.runtimeType})');
   }
   return null;
 }

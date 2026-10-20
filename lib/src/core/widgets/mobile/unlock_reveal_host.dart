@@ -1,23 +1,36 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/app_security_provider.dart';
+import '../../feedback/app_haptics.dart';
 import '../../layout/app_form_factor.dart';
 import '../../theme/app_theme.dart';
 import 'neon_motion.dart';
 import 'veylor_wordmark.dart';
 
-final _revealRequests = ValueNotifier<int>(0);
+/// Counts the unlock reveals asked for; [UnlockRevealHost] plays one for
+/// each.
+class UnlockRevealNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
 
-/// Plays the unlock reveal over whatever the router shows next. Call it
-/// only after a successful unlock, just before navigating into the app.
-void requestUnlockReveal() {
-  if (kAppFormFactor != AppFormFactor.mobile) return;
-  _revealRequests.value++;
+  /// Plays the reveal over whatever the router shows next. Call it only
+  /// after a successful unlock, just before navigating into the app.
+  void request() {
+    if (kAppFormFactor != AppFormFactor.mobile) return;
+    state++;
+  }
 }
+
+final unlockRevealProvider = NotifierProvider<UnlockRevealNotifier, int>(
+  UnlockRevealNotifier.new,
+);
+
+/// When, in ms of [NeonMotion.reveal], the wordmark has folded flat and the
+/// black starts to split along it.
+const _splitAtMs = 300;
 
 /// The curtain that carries the unlock backdrop into the app: the lit
 /// wordmark collapses into a scanline and the black splits along it,
@@ -46,14 +59,7 @@ class _UnlockRevealHostState extends ConsumerState<UnlockRevealHost>
   var _hapticDone = false;
 
   @override
-  void initState() {
-    super.initState();
-    _revealRequests.addListener(_start);
-  }
-
-  @override
   void dispose() {
-    _revealRequests.removeListener(_start);
     _timeout?.cancel();
     _controller.dispose();
     super.dispose();
@@ -69,9 +75,10 @@ class _UnlockRevealHostState extends ConsumerState<UnlockRevealHost>
   }
 
   void _onTick() {
-    if (_hapticDone || _controller.value < _splitStart) return;
+    final ms = _controller.value * NeonMotion.reveal.inMilliseconds;
+    if (_hapticDone || ms < _splitAtMs) return;
     _hapticDone = true;
-    unawaited(HapticFeedback.lightImpact());
+    unawaited(AppHaptics.unlockReveal());
   }
 
   void _end() {
@@ -81,10 +88,9 @@ class _UnlockRevealHostState extends ConsumerState<UnlockRevealHost>
     if (_active && mounted) setState(() => _active = false);
   }
 
-  static const _splitStart = 300 / 760;
-
   @override
   Widget build(BuildContext context) {
+    ref.listen(unlockRevealProvider, (_, _) => _start());
     ref.listen(appSecurityProvider.select((s) => s.requiresUnlock), (
       _,
       locked,
@@ -133,12 +139,13 @@ class _RevealPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final ms = animation.value * NeonMotion.reveal.inMilliseconds;
+    final end = NeonMotion.reveal.inMilliseconds;
+    final ms = animation.value * end;
     final w = size.width;
     final h = size.height;
     final cy = h * (1 + NeonMotion.wordmarkAlignment.y) / 2;
     final split = Curves.easeInOutCubic.transform(
-      NeonMotion.span(ms, 300, 760),
+      NeonMotion.span(ms, _splitAtMs, end),
     );
     final top = cy - split * cy;
     final bottom = cy + split * (h - cy);
@@ -147,7 +154,7 @@ class _RevealPainter extends CustomPainter {
       ..drawRect(Rect.fromLTRB(0, 0, w, top), fill)
       ..drawRect(Rect.fromLTRB(0, bottom, w, h), fill);
 
-    if (ms < 300) {
+    if (ms < _splitAtMs) {
       // The wordmark brightens, then folds flat into a scanline.
       final box = Rect.fromCenter(
         center: Offset(w / 2, cy),
@@ -175,7 +182,7 @@ class _RevealPainter extends CustomPainter {
         canvas.restore();
       }
       final reach = Curves.easeOutCubic.transform(
-        NeonMotion.span(ms, 180, 300),
+        NeonMotion.span(ms, 180, _splitAtMs),
       );
       if (collapse > 0) {
         final half = box.width / 2 + (w / 2 - box.width / 2) * reach;
@@ -193,7 +200,7 @@ class _RevealPainter extends CustomPainter {
     }
 
     // The two halves part, their lit edges fading as they go.
-    final edge = 1 - NeonMotion.span(ms, 300, 640);
+    final edge = 1 - NeonMotion.span(ms, _splitAtMs, 640);
     for (final y in [top, bottom]) {
       paintNeonScanline(
         canvas,

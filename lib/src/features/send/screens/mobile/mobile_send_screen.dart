@@ -2302,6 +2302,7 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppAssetSize.padding,
                 ),
+                scalesText: false,
                 onTap: () => unawaited(_openScanner()),
               ),
               if (contacts.isNotEmpty) ...[

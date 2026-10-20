@@ -9,11 +9,7 @@ import '../src/features/private_usd/screens/mobile/mobile_private_usd_send_statu
 import '../src/features/private_usd/services/private_usd_spend_guard.dart';
 import 'private_usd_use_cases.dart';
 
-// ── Send and withdraw (M7, plan reference §9.4 S8, §9.7) ─────────────────
-
-/// An EIP-55 address (the standard's own test vector) to withdraw to.
-const previewPrivateUsdWithdrawAddress =
-    '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed';
+// ── Send and withdraw ────────────────────────────────────────────────────
 
 /// Previews have no Rust: a full-length `0zk1` address reads as valid.
 bool previewPrivateUsdIsRailgunAddress(String address) =>
@@ -40,49 +36,28 @@ PrivateUsdSendForm _form(
   networkFee: _networkFee,
 );
 
-Widget _send(PrivateUsdSendForm form) =>
-    PrivateUsdPreviewFrame(child: _SendFormPreview(form: form));
+Widget _send(PrivateUsdSendForm form) => PrivateUsdPreviewFrame(
+  child: PrivateUsdPreviewControllers(
+    texts: [form.amountText, form.recipient],
+    builder: (context, controllers) => MobilePrivateUsdSendView(
+      form: form,
+      balances: _balances,
+      status: PrivateUsdSpendStatus.available,
+      amountController: controllers.first,
+      recipientController: controllers.last,
+      onAmountChanged: (_) {},
+      onRecipientChanged: (_) {},
+      onUseAll: () {},
+      onScan: () {},
+      onReview: () {},
+      onBack: () {},
+      isRailgunAddress: previewPrivateUsdIsRailgunAddress,
+      autofocus: false,
+    ),
+  ),
+);
 
-class _SendFormPreview extends StatefulWidget {
-  const _SendFormPreview({required this.form});
-
-  final PrivateUsdSendForm form;
-
-  @override
-  State<_SendFormPreview> createState() => _SendFormPreviewState();
-}
-
-class _SendFormPreviewState extends State<_SendFormPreview> {
-  late final _amount = TextEditingController(text: widget.form.amountText);
-  late final _recipient = TextEditingController(text: widget.form.recipient);
-
-  @override
-  void dispose() {
-    _amount.dispose();
-    _recipient.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => MobilePrivateUsdSendView(
-    form: widget.form,
-    balances: _balances,
-    status: PrivateUsdSpendStatus.available,
-    amountController: _amount,
-    recipientController: _recipient,
-    onAmountChanged: (_) {},
-    onRecipientChanged: (_) {},
-    onUseAll: () {},
-    onPaste: () {},
-    onScan: () {},
-    onReview: () {},
-    onBack: () {},
-    isRailgunAddress: previewPrivateUsdIsRailgunAddress,
-    autofocus: false,
-  );
-}
-
-/// $25 to another Railgun address: "Review" is enabled.
+/// $25 to another Railgun address, ready to review.
 Widget buildMobilePrivateUsdSendUseCase(BuildContext context) => _send(
   _form(
     PrivateUsdSendMode.private,
@@ -134,7 +109,7 @@ final _privateCost = PrivateUsdSendCost(
 final _withdrawRequest = PrivateUsdSendRequest(
   token: previewPrivateUsdUsdc,
   amount: BigInt.from(100000000),
-  to: const RailgunPublicDestination(previewPrivateUsdWithdrawAddress),
+  to: const RailgunPublicDestination(previewPrivateUsdEthereumAddress),
 );
 
 final _withdrawCost = PrivateUsdSendCost(
@@ -210,15 +185,12 @@ Widget buildMobilePrivateUsdSendProvingUseCase(BuildContext context) => _status(
   proofPercent: 42,
 );
 
-const _txHash =
-    '0x4b2e6a8c0d1f3a5c7e9b1d3f5a7c9e0b2d4f6a8c1e3b5d7f9a0c2e4b6d8f1a3c';
-
-/// In a block: "View on Etherscan" and "Done".
+/// In a block, with its transaction.
 Widget buildMobilePrivateUsdSendDoneUseCase(BuildContext context) => _status(
   _reviewed(
     PrivateUsdSendMode.private,
     phase: PrivateUsdSendPhase.done,
-    outcome: const PrivateUsdSendSent(_txHash),
+    outcome: const PrivateUsdSendSent(previewPrivateUsdTxHash),
   ),
 );
 
@@ -228,7 +200,7 @@ Widget buildMobilePrivateUsdSendUnconfirmedUseCase(BuildContext context) =>
       _reviewed(
         PrivateUsdSendMode.withdraw,
         phase: PrivateUsdSendPhase.done,
-        outcome: const PrivateUsdSendUnconfirmed(_txHash),
+        outcome: const PrivateUsdSendUnconfirmed(previewPrivateUsdTxHash),
       ),
     );
 

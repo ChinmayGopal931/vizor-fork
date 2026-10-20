@@ -50,9 +50,10 @@ async function joined(request, env, path, parts) {
     return new Response(null, { headers });
   }
   const { readable, writable } = new TransformStream();
+  // A part that fails errors the response rather than leaving it open.
   (async () => {
     for (const r of responses) await r.body.pipeTo(writable, { preventClose: true });
     await writable.close();
-  })();
+  })().catch((error) => writable.abort(error));
   return new Response(readable, { headers });
 }

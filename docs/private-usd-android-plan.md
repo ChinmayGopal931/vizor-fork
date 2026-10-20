@@ -688,7 +688,7 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
 1. **Bundle.** Run the §8.7 commands 1, 2 and 5, plus the `build.mjs` edit; ship `railgun.js.LEGAL.txt` and the GPL-3.0 text (X12). With E5: `deleteWallet`, X2's identifiers, and a rebuild.
 2. **Kotlin host.** Bring over the spike's `railgun/` package and `RailgunHostHandler` (§6.2 contract). Add a process singleton built with `applicationContext`, and close the page in `onDestroy` only when `isFinishing`.
 3. **Gradle and manifest.**
-   - `androidx.webkit:webkit:1.17.1`, `kotlinx-coroutines-android:1.10.2` and `kotlin-test-junit:2.2.20`
+   - `androidx.webkit:webkit:1.17.1` and `kotlinx-coroutines-android:1.10.2`
    - the backup exclusion `domain="root" path="app_webview"` in `data_extraction_rules.xml` (path confirmed, U12)
 4. **Rust bridge.** Bring over `rust/src/railgun_bridge.rs` and the tokio I/O for `DirectRouteIo`.
    - Take the allowlist from `deployment::RAILGUN_PAGE_HOSTS`.

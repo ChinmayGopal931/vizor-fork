@@ -1,20 +1,12 @@
-import 'dart:async';
-
-import 'package:flutter/material.dart'
-    show InputDecoration, Scaffold, TextField;
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show TextInputAction;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/layout/mobile/mobile_top_nav.dart';
 import '../../../../core/privacy/privacy_mask.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
-import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_loading_icon.dart';
-import '../../../../core/widgets/comma_to_dot_input_formatter.dart';
-import '../../../../core/widgets/decimal_amount_input_formatter.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../../core/widgets/mobile/mobile_warning_notice.dart';
 import '../../../../core/widgets/mobile_text_field.dart';
@@ -22,6 +14,7 @@ import '../../../../providers/account_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../../address_scan/widgets/mobile_scan_address_row.dart';
 import '../../models/private_usd_balances.dart';
+import '../../models/private_usd_messages.dart';
 import '../../models/private_usd_send.dart';
 import '../../private_usd_copy.dart';
 import '../../providers/private_usd_available_provider.dart';
@@ -29,13 +22,15 @@ import '../../providers/private_usd_balance_provider.dart';
 import '../../providers/private_usd_send_provider.dart';
 import '../../providers/private_usd_spend_status_provider.dart';
 import '../../services/private_usd_spend_guard.dart';
+import '../../widgets/mobile/private_usd_convert_widgets.dart';
+import '../../widgets/mobile/private_usd_flow_widgets.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
+import '../../widgets/mobile/private_usd_paste_button.dart';
 import '../../widgets/mobile/private_usd_scan_sheet.dart';
-import 'mobile_private_usd_convert_screen.dart';
 
-/// `/private-usd/send` and `/private-usd/withdraw` (plan reference §9.4
-/// S8): the amount, the recipient and "Review", which prices the send and
-/// opens its review. The mode is fixed by the button that opened it.
+/// `/private-usd/send` and `/private-usd/withdraw`: the amount, the
+/// recipient and Review, which prices the send and opens its review. The
+/// mode is fixed by the button that opened it.
 class MobilePrivateUsdSendScreen extends ConsumerStatefulWidget {
   const MobilePrivateUsdSendScreen({required this.mode, super.key});
 
@@ -70,14 +65,6 @@ class _MobilePrivateUsdSendScreenState
       text: text,
       selection: TextSelection.collapsed(offset: text.length),
     );
-  }
-
-  Future<void> _paste() async {
-    final data = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = data?.text?.trim();
-    if (!mounted || text == null || text.isEmpty) return;
-    _setText(_recipient, text);
-    _notifier.setRecipient(text);
   }
 
   Future<void> _scan() async {
@@ -135,7 +122,6 @@ class _MobilePrivateUsdSendScreenState
           final text = _notifier.useAll();
           if (text != null) _setText(_amount, text);
         },
-        onPaste: _paste,
         onScan: _scan,
         onReview: _review,
         onBack: _back,
@@ -145,8 +131,7 @@ class _MobilePrivateUsdSendScreenState
 }
 
 /// The send form's content for a given form, balance and spend status.
-/// Widgetbook, capture scenarios and tests build it directly; they pass
-/// their own `0zk` check, as there is no Rust there.
+/// Previews pass their own `0zk` check, as there is no Rust there.
 class MobilePrivateUsdSendView extends StatelessWidget {
   const MobilePrivateUsdSendView({
     required this.form,
@@ -160,7 +145,6 @@ class MobilePrivateUsdSendView extends StatelessWidget {
     required this.onReview,
     required this.onBack,
     this.onChooseToken,
-    this.onPaste,
     this.onScan,
     this.amountFocus,
     this.recipientFocus,
@@ -178,10 +162,11 @@ class MobilePrivateUsdSendView extends StatelessWidget {
   final FocusNode? amountFocus;
   final FocusNode? recipientFocus;
   final ValueChanged<String> onAmountChanged;
+
+  /// Hears the recipient typed or pasted.
   final ValueChanged<String> onRecipientChanged;
   final ValueChanged<PrivateUsdToken>? onChooseToken;
   final VoidCallback onUseAll;
-  final VoidCallback? onPaste;
 
   /// Opens the camera scanner for the recipient; null hides its row.
   final VoidCallback? onScan;
@@ -208,99 +193,86 @@ class MobilePrivateUsdSendView extends StatelessWidget {
     final message =
         form.error ?? (form.isBusy ? null : privateUsdSpendMessage(status));
     final canReview = request != null && status.canSend && !form.isBusy;
-    return Scaffold(
-      backgroundColor: colors.background.window,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            MobileTopNav.back(
-              title: _private
-                  ? PrivateUsdCopy.sendTitle
-                  : PrivateUsdCopy.withdrawTitle,
-              onBack: onBack,
-              trailing: PrivateUsdInfoButton(
-                onTap: () => _private
-                    ? showPrivateUsdSendInfoSheet(context)
-                    : showPrivateUsdWithdrawInfoSheet(
-                        context,
-                        railgunPercent: kPrivateUsdRailgunFeePercent,
-                      ),
+    return PrivateUsdFlowScaffold(
+      title: _private
+          ? PrivateUsdCopy.sendTitle
+          : PrivateUsdCopy.actionWithdraw,
+      onBack: onBack,
+      onInfo: () => _private
+          ? showPrivateUsdSendInfoSheet(context)
+          : showPrivateUsdWithdrawInfoSheet(
+              context,
+              railgunPercent: kPrivateUsdRailgunFeePercent,
+            ),
+      body: PrivateUsdFlowColumn(
+        key: const ValueKey('mobile_private_usd_send_scroll'),
+        children: [
+          if (assets.length > 1) ...[
+            _AssetChooser(
+              assets: assets,
+              selected: asset?.token,
+              enabled: !form.isBusy,
+              onChoose: onChooseToken,
+            ),
+            const SizedBox(height: AppSpacing.s),
+          ],
+          PrivateUsdAmountPanel(
+            key: const ValueKey('mobile_private_usd_send_amount_card'),
+            keyPrefix: 'mobile_private_usd_send',
+            caption: Text(
+              PrivateUsdCopy.sendAmount,
+              style: AppTypography.labelLarge.copyWith(
+                color: colors.text.accent,
               ),
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                key: const ValueKey('mobile_private_usd_send_scroll'),
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.sm,
-                  AppSpacing.xs,
-                  AppSpacing.sm,
-                  AppSpacing.sm,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (assets.length > 1) ...[
-                      _AssetChooser(
-                        assets: assets,
-                        selected: asset?.token,
-                        enabled: !form.isBusy,
-                        onChoose: onChooseToken,
-                      ),
-                      const SizedBox(height: AppSpacing.s),
-                    ],
-                    _AmountCard(
-                      form: form,
-                      asset: asset,
-                      error: amountError,
-                      controller: amountController,
-                      focusNode: amountFocus,
-                      autofocus: autofocus,
-                      privacyModeEnabled: privacyModeEnabled,
-                      onChanged: onAmountChanged,
-                      onUseAll: onUseAll,
+            controller: amountController,
+            focusNode: amountFocus,
+            autofocus: autofocus,
+            readOnly: form.isBusy,
+            // Finer than the token goes is flagged, not swallowed.
+            maxFractionDigits: 18,
+            invalid: amountError != null,
+            error: amountError,
+            available: asset == null
+                ? PrivateUsdCopy.unknown
+                : hideAmountIfPrivacyMode(
+                    formatPrivateUsdExact(
+                      asset.available,
+                      asset.token.decimals,
                     ),
-                    const SizedBox(height: AppSpacing.s),
-                    _RecipientCard(
-                      private: _private,
-                      error: recipientError,
-                      enabled: !form.isBusy,
-                      controller: recipientController,
-                      focusNode: recipientFocus,
-                      onChanged: onRecipientChanged,
-                      onPaste: onPaste,
-                      onScan: onScan,
-                    ),
-                    if (message != null) ...[
-                      const SizedBox(height: AppSpacing.s),
-                      MobileWarningNotice(
-                        key: const ValueKey('mobile_private_usd_send_message'),
-                        message: message,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.sm,
-                AppSpacing.s,
-                AppSpacing.sm,
-                AppSpacing.md,
-              ),
-              child: AppButton(
-                key: const ValueKey('mobile_private_usd_send_review'),
-                expand: true,
-                onPressed: canReview ? onReview : null,
-                leading: form.isBusy
-                    ? const AppLoadingIcon(size: AppIconSize.medium)
-                    : null,
-                child: const Text(PrivateUsdCopy.review),
-              ),
+                    privacyModeEnabled: privacyModeEnabled,
+                    denomination: '',
+                  ),
+            onMax: asset != null && !form.isBusy ? onUseAll : null,
+            onChanged: onAmountChanged,
+          ),
+          const SizedBox(height: AppSpacing.s),
+          _RecipientCard(
+            private: _private,
+            error: recipientError,
+            enabled: !form.isBusy,
+            controller: recipientController,
+            focusNode: recipientFocus,
+            onChanged: onRecipientChanged,
+            onScan: onScan,
+          ),
+          if (message != null) ...[
+            const SizedBox(height: AppSpacing.s),
+            MobileWarningNotice(
+              key: const ValueKey('mobile_private_usd_send_message'),
+              message: message,
             ),
           ],
-        ),
+        ],
+      ),
+      action: AppButton(
+        key: const ValueKey('mobile_private_usd_send_review'),
+        expand: true,
+        onPressed: canReview ? onReview : null,
+        leading: form.isBusy
+            ? const AppLoadingIcon(size: AppIconSize.medium)
+            : null,
+        child: const Text(PrivateUsdCopy.review),
       ),
     );
   }
@@ -355,116 +327,6 @@ class _AssetChooser extends StatelessWidget {
   }
 }
 
-class _AmountCard extends StatelessWidget {
-  const _AmountCard({
-    required this.form,
-    required this.asset,
-    required this.error,
-    required this.controller,
-    required this.focusNode,
-    required this.autofocus,
-    required this.privacyModeEnabled,
-    required this.onChanged,
-    required this.onUseAll,
-  });
-
-  final PrivateUsdSendForm form;
-  final PrivateUsdAsset? asset;
-  final String? error;
-  final TextEditingController controller;
-  final FocusNode? focusNode;
-  final bool autofocus;
-  final bool privacyModeEnabled;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onUseAll;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final asset = this.asset;
-    final error = this.error;
-    final amountStyle = AppTypography.displayLarge.copyWith(
-      color: error != null ? colors.text.destructive : colors.text.accent,
-    );
-    final available = asset == null
-        ? PrivateUsdCopy.unknown
-        : hideAmountIfPrivacyMode(
-            formatPrivateUsdExact(asset.available, asset.token.decimals),
-            privacyModeEnabled: privacyModeEnabled,
-            denomination: '',
-          );
-    return MobileSurfaceCard(
-      key: const ValueKey('mobile_private_usd_send_amount_card'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            PrivateUsdCopy.sendAmount,
-            style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          TextField(
-            key: const ValueKey('mobile_private_usd_send_amount'),
-            controller: controller,
-            focusNode: focusNode,
-            autofocus: autofocus,
-            readOnly: form.isBusy,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            // Finer than the token goes is flagged, not swallowed.
-            inputFormatters: const [
-              CommaToDotInputFormatter(),
-              DecimalAmountInputFormatter(maxFractionDigits: 18),
-            ],
-            onChanged: onChanged,
-            style: amountStyle,
-            cursorColor: colors.text.accent,
-            decoration: InputDecoration.collapsed(
-              hintText: '0',
-              hintStyle: amountStyle.copyWith(color: colors.text.muted),
-            ),
-          ),
-          if (error != null) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              error,
-              key: const ValueKey('mobile_private_usd_send_amount_error'),
-              style: AppTypography.bodySmall.copyWith(
-                color: colors.text.destructive,
-              ),
-            ),
-          ],
-          const SizedBox(height: AppSpacing.s),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '${PrivateUsdCopy.rowAvailable}: $available',
-                  key: const ValueKey('mobile_private_usd_send_available'),
-                  style: AppTypography.bodySmall.copyWith(
-                    color: colors.text.secondary,
-                  ),
-                ),
-              ),
-              Semantics(
-                label: PrivateUsdCopy.useAvailable,
-                button: true,
-                excludeSemantics: true,
-                child: AppButton(
-                  key: const ValueKey('mobile_private_usd_send_max'),
-                  variant: AppButtonVariant.secondary,
-                  size: AppButtonSize.small,
-                  onPressed: asset != null && !form.isBusy ? onUseAll : null,
-                  child: const Text(PrivateUsdCopy.max),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _RecipientCard extends StatelessWidget {
   const _RecipientCard({
     required this.private,
@@ -473,7 +335,6 @@ class _RecipientCard extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.onChanged,
-    required this.onPaste,
     required this.onScan,
   });
 
@@ -483,14 +344,12 @@ class _RecipientCard extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode? focusNode;
   final ValueChanged<String> onChanged;
-  final VoidCallback? onPaste;
   final VoidCallback? onScan;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final error = this.error;
-    final onPaste = this.onPaste;
     final onScan = this.onScan;
     return MobileSurfaceCard(
       key: const ValueKey('mobile_private_usd_send_recipient_card'),
@@ -512,28 +371,12 @@ class _RecipientCard extends StatelessWidget {
                 ? PrivateUsdCopy.sendHintPrivate
                 : PrivateUsdCopy.sendHintWithdraw,
             onChanged: onChanged,
-            trailing: onPaste == null
-                ? null
-                : Semantics(
-                    button: true,
-                    label: PrivateUsdCopy.sendPaste,
-                    excludeSemantics: true,
-                    child: GestureDetector(
-                      key: const ValueKey('mobile_private_usd_send_paste'),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: enabled ? onPaste : null,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.s,
-                        ),
-                        child: AppIcon(
-                          AppIcons.paste,
-                          size: 20,
-                          color: colors.text.primary,
-                        ),
-                      ),
-                    ),
-                  ),
+            trailing: PrivateUsdPasteButton(
+              key: const ValueKey('mobile_private_usd_send_paste'),
+              controller: controller,
+              enabled: enabled,
+              onPasted: onChanged,
+            ),
           ),
           if (error != null) ...[
             const SizedBox(height: AppSpacing.xs),
@@ -545,8 +388,6 @@ class _RecipientCard extends StatelessWidget {
               ),
             ),
           ],
-          // As ZEC Send's recipient picker: the Receive sheet shows both
-          // kinds of address as a code.
           if (onScan != null) ...[
             const SizedBox(height: AppSpacing.s),
             MobileScanAddressRow(
@@ -561,7 +402,7 @@ class _RecipientCard extends StatelessWidget {
 }
 
 /// The address field: [MobileTextField] needs a focus node, so it owns one
-/// when the caller has none (previews).
+/// when the caller has none.
 class _RecipientField extends StatefulWidget {
   const _RecipientField({
     required this.controller,
@@ -577,7 +418,7 @@ class _RecipientField extends StatefulWidget {
   final bool enabled;
   final String hint;
   final ValueChanged<String> onChanged;
-  final Widget? trailing;
+  final Widget trailing;
 
   @override
   State<_RecipientField> createState() => _RecipientFieldState();

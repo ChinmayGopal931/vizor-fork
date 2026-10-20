@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/formatting/address_display.dart';
 import '../../../../core/widgets/mobile/mobile_transaction_progress_screen.dart';
+import '../../models/private_usd_explorer.dart';
 import '../../models/private_usd_send.dart';
 import '../../private_usd_copy.dart';
 import '../../providers/private_usd_available_provider.dart';
@@ -11,11 +13,10 @@ import '../../providers/private_usd_send_provider.dart';
 import '../../providers/railgun_engine_provider.dart';
 import '../../services/railgun_engine.dart';
 
-/// `/private-usd/send/status` (`extra`: the mode; plan reference §9.4 S8,
-/// §9.1): the proof's progress while it proves, then "Sent" or "Withdrawn"
-/// (pending while it is not in a block yet). Back is blocked while it runs.
-/// When nothing was sent (busy, not sent, repriced) it pops back to the
-/// review; "Done" pops with `true`.
+/// `/private-usd/send/status` (`extra`: the mode): the proof's progress
+/// while it proves, then the outcome, pending while it is not in a block
+/// yet. Back is blocked while it runs. When nothing was sent (busy, not
+/// sent, repriced) it pops back to the review; Done pops with `true`.
 class MobilePrivateUsdSendStatusScreen extends ConsumerStatefulWidget {
   const MobilePrivateUsdSendStatusScreen({required this.mode, super.key});
 
@@ -65,9 +66,7 @@ class _MobilePrivateUsdSendStatusScreenState
       PrivateUsdSendUnconfirmed(:final txHash) => txHash,
       _ => null,
     };
-    final uri = txHash == null || prefix == null
-        ? null
-        : Uri.tryParse('$prefix$txHash');
+    final uri = txHash == null ? null : privateUsdExplorerUri(prefix, txHash);
     return MobilePrivateUsdSendStatusView(
       form: form,
       proofPercent: proving && engine.proof != null
@@ -81,8 +80,7 @@ class _MobilePrivateUsdSendStatusScreenState
   }
 }
 
-/// The status's content for a given form. Widgetbook, capture scenarios
-/// and tests build it directly.
+/// The status's content for a given form.
 class MobilePrivateUsdSendStatusView extends StatelessWidget {
   const MobilePrivateUsdSendStatusView({
     required this.form,
@@ -122,10 +120,11 @@ class MobilePrivateUsdSendStatusView extends StatelessWidget {
       );
     }
     final unconfirmed = outcome is PrivateUsdSendUnconfirmed;
-    final sent = PrivateUsdCopy.sendDoneBody(
-      formatPrivateUsdExact(request.amount, request.token.decimals),
-      privateUsdShortAddress(request.to.text),
+    final amount = formatPrivateUsdExact(
+      request.amount,
+      request.token.decimals,
     );
+    final address = truncatedAddress(request.to.text);
     return MobileTransactionProgressScreen(
       phase: unconfirmed
           ? MobileTransactionProgressPhase.pending
@@ -133,7 +132,9 @@ class MobilePrivateUsdSendStatusView extends StatelessWidget {
       title: form.mode == PrivateUsdSendMode.private
           ? PrivateUsdCopy.sendDoneTitlePrivate
           : PrivateUsdCopy.sendDoneTitleWithdraw,
-      body: unconfirmed ? '$sent ${PrivateUsdCopy.sendUnconfirmed}' : sent,
+      body: unconfirmed
+          ? PrivateUsdCopy.sendDoneUnconfirmedBody(amount, address)
+          : PrivateUsdCopy.sendDoneBody(amount, address),
       canPop: true,
       primaryActionLabel: PrivateUsdCopy.done,
       onPrimaryAction: onDone,

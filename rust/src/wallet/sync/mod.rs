@@ -105,8 +105,9 @@ pub(crate) use send::{
 };
 // Private USD: the deposit split, its fee preview and the joint sweep proposal.
 pub(crate) use send::{
-    broadcast_raw, create_stored_proposal_transactions, estimate_swap_deposit_fee,
-    propose_joint_sweep, propose_swap_deposit, CreatedTransaction, SwapProposal,
+    broadcast_raw, broadcast_rejected, create_stored_proposal_transactions,
+    estimate_swap_deposit_fee, propose_joint_sweep, propose_swap_deposit, CreatedTransaction,
+    SwapDepositError, SwapProposal,
 };
 pub(crate) use send::{get_orchard_migration_immediate_plan, get_orchard_migration_private_plan};
 // Internal-only re-export for `sync_engine::run_sync_impl`'s

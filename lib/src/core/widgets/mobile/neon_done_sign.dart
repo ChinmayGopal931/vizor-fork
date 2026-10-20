@@ -4,13 +4,13 @@ import 'dart:ui' show lerpDouble;
 import 'package:flutter/widgets.dart';
 
 import '../../theme/app_theme.dart';
-import 'neon_horizon.dart';
+import 'neon_glyph_badge.dart';
 import 'neon_motion.dart';
 import 'tron_glyph.dart';
 
-/// A done badge switching on as a sign (`docs/neon-motion-plan.md`): a
-/// scanline across the screen pulls into the badge, a light cycle traces its
-/// cut plate and then its glyph, and the badge flickers on in its place.
+/// A done badge switching on as a sign: a scanline across the screen pulls
+/// into the badge, a light cycle traces its cut plate and then its glyph, and
+/// the badge flickers on in its place.
 ///
 /// With [shockwave] (a finished bridge), two rings of the plate's cut outline
 /// then spread from it across the screen and fade: the send screen's ripple,
@@ -40,17 +40,20 @@ class NeonDoneSign extends StatefulWidget {
 }
 
 class _NeonDoneSignState extends State<NeonDoneSign>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, NeonAppearMotion<NeonDoneSign> {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: widget.shockwave ? NeonMotion.bridged : NeonMotion.syncDone,
     value: 1,
   )..addListener(_watchIgnition);
   late final AppLifecycleListener _lifecycle;
-  var _started = false;
 
   /// [NeonDoneSign.onIgnite] ran, or must not (a jump to the end).
   var _ignited = true;
+
+  /// The plate and the glyph as light-cycle paths, traced for the sign's
+  /// current glyph and size.
+  ({NeonTrail plate, NeonTrail glyph})? _trails;
 
   @override
   void initState() {
@@ -64,21 +67,26 @@ class _NeonDoneSignState extends State<NeonDoneSign>
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_started) return;
-    _started = true;
-    if (NeonMotion.reduced(context)) {
-      final onIgnite = widget.onIgnite;
-      if (onIgnite != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) onIgnite();
-        });
-      }
-      return;
+  void didUpdateWidget(NeonDoneSign oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.glyph != widget.glyph || oldWidget.size != widget.size) {
+      _trails = null;
     }
+  }
+
+  @override
+  void onAppear() {
     _ignited = false;
     _controller.forward(from: 0);
+  }
+
+  @override
+  void onAppearReduced() {
+    final onIgnite = widget.onIgnite;
+    if (onIgnite == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) onIgnite();
+    });
   }
 
   void _watchIgnition() {
@@ -96,6 +104,20 @@ class _NeonDoneSignState extends State<NeonDoneSign>
     super.dispose();
   }
 
+  /// The badge's cut plate, and the glyph on its 24-unit grid centred in
+  /// it, as [NeonGlyphBadge] and [TronGlyph] draw them.
+  ({NeonTrail plate, NeonTrail glyph}) _trace() {
+    final s = widget.size;
+    final inner = s * NeonGlyphBadge.markScale;
+    final inset = (s - inner) / 2;
+    return (
+      plate: NeonTrail(_cutSquare(Rect.fromLTWH(0, 0, s, s).deflate(0.5))),
+      glyph: NeonTrail(
+        TronGlyph.pathFor(widget.glyph, inner).shift(Offset(inset, inset)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final neon = context.colors.neon;
@@ -111,8 +133,13 @@ class _NeonDoneSignState extends State<NeonDoneSign>
           final light = ms < NeonDoneSign.ignitesAt
               ? 0.0
               : NeonIgnition.lightAt(
-                  NeonMotion.span(ms, NeonDoneSign.ignitesAt, 1800),
+                  NeonMotion.span(
+                    ms,
+                    NeonDoneSign.ignitesAt,
+                    NeonMotion.syncDone.inMilliseconds,
+                  ),
                 );
+          final trails = _trails ??= _trace();
           return Stack(
             clipBehavior: Clip.none,
             children: [
@@ -122,6 +149,8 @@ class _NeonDoneSignState extends State<NeonDoneSign>
                   size: Size.square(widget.size),
                   painter: _DoneTrailPainter(
                     ms: ms,
+                    plate: trails.plate,
+                    glyph: trails.glyph,
                     glow: neon.glow,
                     core: neon.core,
                     screenWidth: MediaQuery.sizeOf(context).width,
@@ -137,9 +166,23 @@ class _NeonDoneSignState extends State<NeonDoneSign>
   }
 }
 
+/// A square with the badge's cuts.
+Path _cutSquare(Rect rect) {
+  final cut = rect.width * NeonGlyphBadge.cutScale;
+  return Neon.chamferedRect(
+    rect,
+    topLeft: cut,
+    topRight: cut,
+    bottomRight: cut,
+    bottomLeft: cut,
+  );
+}
+
 class _DoneTrailPainter extends CustomPainter {
   _DoneTrailPainter({
     required this.ms,
+    required this.plate,
+    required this.glyph,
     required this.glow,
     required this.core,
     required this.screenWidth,
@@ -147,42 +190,16 @@ class _DoneTrailPainter extends CustomPainter {
   });
 
   final double ms;
+  final NeonTrail plate;
+  final NeonTrail glyph;
   final Color glow;
   final Color core;
   final double screenWidth;
   final bool shockwave;
 
-  static NeonTrail? _plate;
-  static NeonTrail? _glyph;
-  static double? _cachedFor;
-
   @override
   void paint(Canvas canvas, Size size) {
     final s = size.width;
-    if (_cachedFor != s) {
-      _cachedFor = s;
-      // The badge's cut plate, and the check glyph's own plate and tick on
-      // the glyph's 24-unit grid, as `NeonGlyphBadge` and `TronGlyph` draw
-      // them.
-      _plate = NeonTrail(_cutSquare((Offset.zero & size).deflate(0.5)));
-      final inner = s * 0.46;
-      final offset = (s - inner) / 2;
-      Offset p(double x, double y) =>
-          Offset(offset + x / 24 * inner, offset + y / 24 * inner);
-      _glyph = NeonTrail(
-        Path()
-          ..addPolygon([
-            p(6, 2),
-            p(22, 2),
-            p(22, 18),
-            p(18, 22),
-            p(2, 22),
-            p(2, 6),
-          ], true)
-          ..addPolygon([p(7, 12.5), p(10.5, 16), p(17, 8.5)], false),
-      );
-    }
-
     final center = size.center(Offset.zero);
     if (ms < 460) {
       final grow = Curves.easeOutCubic.transform(NeonMotion.span(ms, 0, 260));
@@ -202,7 +219,7 @@ class _DoneTrailPainter extends CustomPainter {
       );
     }
     final fade = 1 - NeonMotion.span(ms, NeonDoneSign.ignitesAt, 1600);
-    _plate!.paint(
+    plate.paint(
       canvas,
       Curves.easeInOutCubic.transform(NeonMotion.span(ms, 380, 1000)),
       glow: glow,
@@ -210,7 +227,7 @@ class _DoneTrailPainter extends CustomPainter {
       width: 1.2,
       intensity: 0.55 * fade,
     );
-    _glyph!.paint(
+    glyph.paint(
       canvas,
       Curves.easeInOutCubic.transform(
         NeonMotion.span(ms, 950, NeonDoneSign.ignitesAt),
@@ -228,7 +245,12 @@ class _DoneTrailPainter extends CustomPainter {
         s,
         NeonMotion.span(ms, NeonDoneSign.ignitesAt, 2350),
       );
-      _ring(canvas, center, s, NeonMotion.span(ms, 1550, 2600));
+      _ring(
+        canvas,
+        center,
+        s,
+        NeonMotion.span(ms, 1550, NeonMotion.bridged.inMilliseconds),
+      );
     }
   }
 
@@ -251,21 +273,11 @@ class _DoneTrailPainter extends CustomPainter {
     );
   }
 
-  /// A square with the badge's cuts: a fifth of its side at every corner.
-  static Path _cutSquare(Rect rect) {
-    final cut = rect.width * 0.2;
-    return Neon.chamferedRect(
-      rect,
-      topLeft: cut,
-      topRight: cut,
-      bottomRight: cut,
-      bottomLeft: cut,
-    );
-  }
-
   @override
   bool shouldRepaint(_DoneTrailPainter oldDelegate) =>
       oldDelegate.ms != ms ||
+      oldDelegate.plate != plate ||
+      oldDelegate.glyph != glyph ||
       oldDelegate.glow != glow ||
       oldDelegate.core != core ||
       oldDelegate.screenWidth != screenWidth ||

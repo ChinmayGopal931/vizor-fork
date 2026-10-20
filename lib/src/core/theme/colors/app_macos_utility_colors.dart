@@ -1,7 +1,8 @@
 import 'package:flutter/painting.dart';
+
 import '../../layout/app_form_factor.dart';
 
-const _neon = kAppFormFactor == AppFormFactor.mobile;
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// macOS utility colors from the Desktop color-token export.
 class AppMacosUtilityColors {
@@ -21,9 +22,8 @@ class AppMacosUtilityColors {
   final Color thinBorder;
   final Color innerBorder;
 
-  /// Figma faces on desktop, the neon redesign on mobile builds.
-  static const dark = _neon ? neonDark : figmaDark;
-  static const light = _neon ? neonLight : figmaLight;
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
 
   static const figmaDark = AppMacosUtilityColors(
     window: Color(0xFF0F0F0F),
@@ -45,7 +45,6 @@ class AppMacosUtilityColors {
     innerBorder: Color(0x26FFFFFF),
   );
 
-  /// The mobile tab bar's glass reads these: near-opaque black and steel.
   static const neonDark = AppMacosUtilityColors(
     window: Color(0xFF000000),
     windowTransparent: Color(0x00000000),

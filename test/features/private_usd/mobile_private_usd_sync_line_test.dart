@@ -12,9 +12,9 @@ import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balan
 import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
-// iOS progress VI-19: Railgun's sync on the Private USD screen is Home's sync
-// line, with Home's layers and catch-up rule. Its readouts name Railgun
-// (owner, 2026-10-17); the Tor ones are Home's.
+// Railgun's sync on the Private USD screen is Home's sync line, with Home's
+// layers and catch-up rule. Its readouts name Railgun; the Tor ones are
+// Home's.
 void main() {
   setUp(() {
     final view = TestWidgetsFlutterBinding.ensureInitialized()
@@ -60,17 +60,14 @@ void main() {
     await tester.pump();
   }
 
-  NeonSyncBackdropView layer(WidgetTester tester, NeonSyncLayer which) =>
-      tester.widget<NeonSyncBackdropView>(
-        find.descendant(
-          of: find.byKey(
-            ValueKey(
-              which == NeonSyncLayer.front
-                  ? 'mobile_private_usd_sync_front'
-                  : 'mobile_private_usd_sync_back',
-            ),
+  NeonSyncLineLayer layer(WidgetTester tester, NeonSyncLayer which) =>
+      tester.widget<NeonSyncLineLayer>(
+        find.byKey(
+          ValueKey(
+            which == NeonSyncLayer.front
+                ? 'mobile_private_usd_sync_front'
+                : 'mobile_private_usd_sync_back',
           ),
-          matching: find.byType(NeonSyncBackdropView),
         ),
       );
 
@@ -96,18 +93,18 @@ void main() {
     final front = layer(tester, NeonSyncLayer.front);
     final back = layer(tester, NeonSyncLayer.back);
     expect(readout(tester), 'RAILGUN SYNC 42%');
-    expect(front.progress, 0.42);
+    expect(front.line.progress, 0.42);
     expect(
       front.linePart,
       NeonSyncLinePart.whole,
       reason: 'climbing, over the content',
     );
-    expect(front.active, isTrue);
+    expect(front.line.climbing, isTrue);
     expect(back.linePart, NeonSyncLinePart.none);
-    expect(back.drawFloor, isTrue);
-    expect(back.floorFlows, isTrue);
+    expect(back.drawsFloor, isTrue);
+    expect(back.line.scanning, isTrue);
     expect(
-      find.ancestor(
+      find.descendant(
         of: find.byWidget(front),
         matching: find.byType(IgnorePointer),
       ),
@@ -127,7 +124,7 @@ void main() {
     await pumpView(tester, previewPrivateUsdLoading);
 
     expect(readout(tester), 'RAILGUN SYNC 0%');
-    expect(layer(tester, NeonSyncLayer.front).progress, 0.03);
+    expect(layer(tester, NeonSyncLayer.front).line.progress, 0.03);
   });
 
   testWidgets('a page waiting for Tor reads TOR …', (tester) async {
@@ -153,14 +150,14 @@ void main() {
     final front = layer(tester, NeonSyncLayer.front);
     final back = layer(tester, NeonSyncLayer.back);
     expect(readout(tester), 'RAILGUN SYNCED');
-    expect(back.progress, 1);
+    expect(back.line.progress, 1);
     expect(
       back.linePart,
       NeonSyncLinePart.belowHead,
       reason: 'behind the content',
     );
-    expect(back.active, isFalse);
-    expect(back.floorFlows, isFalse);
+    expect(back.line.climbing, isFalse);
+    expect(back.line.scanning, isFalse);
     expect(
       front.linePart,
       NeonSyncLinePart.head,
@@ -198,10 +195,10 @@ void main() {
 
     final back = layer(tester, NeonSyncLayer.back);
     expect(readout(tester), 'RAILGUN SYNCED');
-    expect(back.progress, 1, reason: 'no drop to 0 and climb again');
+    expect(back.line.progress, 1, reason: 'no drop to 0 and climb again');
     expect(back.linePart, NeonSyncLinePart.belowHead);
-    expect(back.active, isFalse);
-    expect(back.floorFlows, isTrue);
+    expect(back.line.climbing, isFalse);
+    expect(back.line.scanning, isTrue);
     expect(layer(tester, NeonSyncLayer.front).linePart, NeonSyncLinePart.head);
     expect(find.text(PrivateUsdCopy.updating), findsNothing);
     expect(find.bySemanticsLabel(PrivateUsdCopy.updating), findsOneWidget);
@@ -218,7 +215,7 @@ void main() {
     await pumpView(tester, failed);
 
     expect(readout(tester), 'RAILGUN SYNC FAILED');
-    expect(layer(tester, NeonSyncLayer.back).failed, isTrue);
+    expect(layer(tester, NeonSyncLayer.back).line.failed, isTrue);
     expect(find.text(PrivateUsdCopy.refreshFailed), findsOneWidget);
     expect(find.bySemanticsLabel(PrivateUsdCopy.refreshFailed), findsOneWidget);
 

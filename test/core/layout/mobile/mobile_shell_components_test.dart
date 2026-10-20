@@ -211,7 +211,6 @@ void main() {
     final taps = <int>[];
     const items = [
       AppMobileTabItem(iconName: 'home', label: 'Home'),
-      AppMobileTabItem(iconName: 'swap_arrows', label: 'Swap'),
       AppMobileTabItem(iconName: 'history', label: 'Activity'),
       AppMobileTabItem(iconName: 'cog', label: 'Settings'),
     ];
@@ -241,7 +240,6 @@ void main() {
     // The app's tabs are drawn as Tron glyphs, never the icon set.
     expect(glyphs().map((glyph) => glyph.kind), [
       TronGlyphKind.home,
-      TronGlyphKind.swap,
       TronGlyphKind.activity,
       TronGlyphKind.settings,
     ]);
@@ -265,22 +263,22 @@ void main() {
     expect(pool.colors.last.a, 0);
     expect(glyphs()[0].color, colors.navPanel.activeIcon);
     expect(glyphs()[0].lit, 1);
-    expect(glyphs()[2].color, colors.icon.muted);
-    expect(glyphs()[2].lit, 0);
+    expect(glyphs()[1].color, colors.icon.muted);
+    expect(glyphs()[1].lit, 0);
 
     await tester.tap(find.bySemanticsLabel('Activity'));
     await tester.pumpAndSettle();
-    expect(taps, [2]);
+    expect(taps, [1]);
 
     // Selection is owned by the caller — rebuilding with the new index
     // slides the pool there and moves the light to its glyph.
-    await tester.pumpWidget(bar(2));
+    await tester.pumpWidget(bar(1));
     await tester.pumpAndSettle();
-    expect(poolAlignment().x, closeTo(-1 + 2 * 2 / 3, 1e-9));
+    expect(poolAlignment().x, closeTo(-1 + 2 * 1 / 2, 1e-9));
     expect(glyphs()[0].color, colors.icon.muted);
     expect(glyphs()[0].lit, 0);
-    expect(glyphs()[2].color, colors.navPanel.activeIcon);
-    expect(glyphs()[2].lit, 1);
+    expect(glyphs()[1].color, colors.navPanel.activeIcon);
+    expect(glyphs()[1].lit, 1);
   });
 
   testWidgets('AppMobileShell extends body behind the floating tab bar', (

@@ -229,11 +229,11 @@ class ZecHomeMarketDataState {
   }
 }
 
-/// Whether this build shows ZEC market prices at all: mainnet with swap on,
-/// or Private USD, which shows an indicative ZEC equivalent (also on testnet).
-/// The Home price and every other market-price display, such as the portfolio
-/// chart, share this one gate, so none of them reaches a price service on a
-/// build where the Home price would not.
+/// Whether ZEC market prices are shown at all: with swap on (mainnet), or
+/// while the active account has Private USD, which shows an indicative ZEC
+/// equivalent (also on testnet). The Home price and every other market-price
+/// display, such as the portfolio chart, share this one gate, so none of them
+/// reaches a price service where the Home price would not.
 final zecMarketDataAvailableProvider = Provider<bool>((ref) {
   return ref.watch(swapFeatureEnabledProvider) ||
       ref.watch(privateUsdAvailableProvider);
@@ -242,7 +242,7 @@ final zecMarketDataAvailableProvider = Provider<bool>((ref) {
 /// Latest usable non-swap ZEC market data. A persisted value less than one
 /// hour old is exposed while the first network refresh is in flight; transient
 /// failures retain it only until that TTL expires. Null while market-price UI
-/// is disabled on non-mainnet builds.
+/// is disabled ([zecMarketDataAvailableProvider]).
 final zecHomeMarketDataStateProvider =
     NotifierProvider.autoDispose<
       ZecHomeMarketDataNotifier,

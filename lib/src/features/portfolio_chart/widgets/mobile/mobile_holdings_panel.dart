@@ -13,86 +13,10 @@ import '../../../../providers/privacy_mode_provider.dart';
 import '../../../../providers/sync_provider.dart';
 import '../../../../providers/zec_price_change_provider.dart';
 import '../../../../rust/api/sync.dart' as rust_sync;
-import '../../../home/services/transparent_balance_display.dart';
 import '../../../private_usd/providers/private_usd_available_provider.dart';
 import '../../../private_usd/widgets/mobile/private_usd_home_strip.dart';
-import '../../services/portfolio_chart_format.dart';
-
-/// One shielded pool's ZEC as Home's balance counts it: [total] is the
-/// spendable and pending notes, of which [pending] still waits for
-/// confirmations.
-typedef ShieldedPoolHoldings = ({BigInt total, BigInt pending});
-
-/// The active account's ZEC by pool, as Home's balance counts it.
-///
-/// It reads the fields the Home sign reads: each shielded pool's spendable
-/// and pending amounts, and [TransparentBalanceDisplay] for transparent funds.
-/// Not the `display*` snapshot that desktop Home and the migration surfaces
-/// read: there is none for Sapling or transparent funds, so mixing the two
-/// could leave the rows disagreeing with their own total, and with the sign
-/// this page was opened from.
-@immutable
-class ZecPoolHoldings {
-  ZecPoolHoldings.of(SyncState sync)
-    : hasBalance = sync.hasBalanceData,
-      ironwood = (
-        total: sync.ironwoodBalance + sync.ironwoodPendingBalance,
-        pending: sync.ironwoodPendingBalance,
-      ),
-      orchard = (
-        total: sync.orchardBalance + sync.orchardPendingBalance,
-        pending: sync.orchardPendingBalance,
-      ),
-      sapling = (
-        total: sync.saplingBalance + sync.saplingPendingBalance,
-        pending: sync.saplingPendingBalance,
-      ),
-      transparent = TransparentBalanceDisplay.of(sync),
-      transparentPending = sync.transparentPendingBalance;
-
-  /// Whether the account's balances have been read. Until then every amount
-  /// is unknown, never zero.
-  final bool hasBalance;
-  final ShieldedPoolHoldings ironwood;
-  final ShieldedPoolHoldings orchard;
-  final ShieldedPoolHoldings sapling;
-
-  /// Home's transparent row: the amount, or why it is not known.
-  final TransparentBalanceDisplay transparent;
-
-  /// The part of a current transparent amount that waits for confirmations.
-  final BigInt transparentPending;
-
-  /// Home's shielded balance: the three shielded pools, pending included.
-  ShieldedPoolHoldings get shielded => (
-    total: ironwood.total + orchard.total + sapling.total,
-    pending: ironwood.pending + orchard.pending + sapling.pending,
-  );
-
-  @override
-  bool operator ==(Object other) =>
-      other is ZecPoolHoldings &&
-      other.hasBalance == hasBalance &&
-      other.ironwood == ironwood &&
-      other.orchard == orchard &&
-      other.sapling == sapling &&
-      other.transparent.amount == transparent.amount &&
-      other.transparent.authority == transparent.authority &&
-      other.transparent.stop == transparent.stop &&
-      other.transparentPending == transparentPending;
-
-  @override
-  int get hashCode => Object.hash(
-    hasBalance,
-    ironwood,
-    orchard,
-    sapling,
-    transparent.amount,
-    transparent.authority,
-    transparent.stop,
-    transparentPending,
-  );
-}
+import '../../../send/services/send_amount_conversion.dart';
+import '../../models/zec_pool_holdings.dart';
 
 /// The full chart page's holdings: the active account's ZEC in each pool, the
 /// shielded total the Home balance shows, and Private USD where the account
@@ -130,9 +54,7 @@ class MobileHoldingsPanel extends ConsumerWidget {
   }
 }
 
-/// [MobileHoldingsPanel] drawn from given values: a neon glass panel with a
-/// row per pool (a zero row dimmed), the shielded total, and the Private USD
-/// row when there is one.
+/// [MobileHoldingsPanel] drawn from given values.
 ///
 /// Privacy mode masks every amount and drops what would hint at one: USD
 /// worth, pending amounts and dimmed rows. Status words ("Unavailable",
@@ -175,17 +97,18 @@ class MobileHoldingsPanelView extends StatelessWidget {
       ? 'Includes ${_zec(zatoshi)} pending'
       : null;
 
+  /// The USD worth as Home's balance line writes it: in full, or compact from
+  /// a million dollars up.
   String? _usd(BigInt zatoshi) {
     final price = zecUsdUnitPrice;
-    if (!_amountsVisible ||
-        zatoshi <= BigInt.zero ||
-        price == null ||
-        !price.isFinite ||
-        price <= 0) {
-      return null;
-    }
-    final value = zatoshi.toDouble() / zatoshiPerZec.toDouble() * price;
-    return value.isFinite ? formatPortfolioUsd(value) : null;
+    final compact = _amountsVisible
+        ? fiatTextForZatoshi(zatoshi, zecUsdUnitPrice: price)
+        : null;
+    if (compact == null || price == null) return null;
+    final usd = zatoshi.toDouble() / zatoshiPerZec.toDouble() * price;
+    return usd < 1000000
+        ? '\$${sendUsdDisplayTextForZatoshi(zatoshi, price)}'
+        : compact;
   }
 
   Widget _poolRow(String id, String name, ShieldedPoolHoldings pool) {
@@ -211,7 +134,6 @@ class MobileHoldingsPanelView extends StatelessWidget {
     final privateUsd = this.privateUsd;
 
     return MobileSurfaceCard(
-      cornerRadius: AppRadii.large,
       // Rows pad themselves, as the Private USD strip does, so all of their
       // icons line up.
       padding: const EdgeInsets.fromLTRB(0, AppSpacing.md, 0, AppSpacing.s),
@@ -342,10 +264,7 @@ class _HoldingsRow extends StatelessWidget {
   final String? icon;
   final bool shielded;
 
-  /// "Includes … pending", under the name.
   final String? pending;
-
-  /// The amount's USD worth, under it.
   final String? usd;
 
   /// An explanation under the row, aligned with the name.

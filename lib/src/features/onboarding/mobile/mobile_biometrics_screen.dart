@@ -11,7 +11,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/biometric_icon.dart';
 import '../../../core/widgets/app_toast.dart';
-import '../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/biometric_unlock_provider.dart';
 import '../../../services/biometric_unlock.dart';
@@ -160,6 +160,8 @@ class _BiometricHero extends StatelessWidget {
         iconName: AppIcons.touchId,
         size: _badgeSize,
       ),
+      // Android's fingerprint has no `AppIcons` artwork, and Apple's Touch ID
+      // glyph is kept for Touch ID alone (see [BiometricIcon]).
       BiometricKind.fingerprint => NeonGlyphBadge(
         size: _badgeSize,
         child: BiometricIcon(
@@ -175,7 +177,3 @@ class _BiometricHero extends StatelessWidget {
     );
   }
 }
-
-/// [NeonGlyphBadge]'s plate around Material's fingerprint glyph. Android's
-/// fingerprint has no `AppIcons` artwork, and Apple's Touch ID glyph is kept
-/// for Touch ID alone (see [BiometricIcon]).

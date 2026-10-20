@@ -1,6 +1,6 @@
-// Private USD Railgun host harness (plan §10): drives the Railgun page
-// through the Rust SOCKS5 bridge on a device, over the same channel wrapper
-// and page models the app uses. Debug builds only; never part of the app.
+// Dev-only device harness for the Railgun page: drives it through the Rust
+// SOCKS5 bridge, over the channel wrapper and page models the app uses.
+// Debug builds only; never part of the app.
 //
 //   fvm flutter run -t lib/railgun_spike_main.dart \
 //     --dart-define=VIZOR_FORM_FACTOR=mobile --dart-define=SPIKE_MODE=direct
@@ -8,9 +8,9 @@
 // SPIKE_MODE: direct | tor | flip (Tor, then the route flips to direct
 // mid-sync) | fail (Tor fails while the page is up). SPIKE_MNEMONIC is an
 // optional funded Sepolia test wallet's Railgun mnemonic; otherwise a fresh
-// one is generated. Every line is also printed with the "[spike]" prefix for
-// `adb logcat`. Nothing secret is printed: no params, no results beyond
-// counts and the public address, and page lines with keyed URLs redacted.
+// one is generated. Lines print with a "[spike]" prefix and never carry a
+// secret: no params, no results beyond counts and the public address, and
+// page lines with keyed URLs redacted.
 
 import 'dart:async';
 import 'dart:convert';
@@ -127,7 +127,7 @@ Future<void> _session({required bool tor}) async {
   _log('bridge on 127.0.0.1:$port');
   await _openPage(port);
   await _timedRefresh();
-  // The wait shows whether Chromium drops its pooled sockets by itself (U19).
+  // The wait shows whether Chromium drops its pooled sockets by itself.
   await _host.close();
   _log('page closed; waiting 10 s before stopping the bridge');
   await Future<void>.delayed(const Duration(seconds: 10));

@@ -1,7 +1,7 @@
 import Foundation
 
-/// Every call the page answers, its wire name, and how long it may take: Kotlin's `RailgunMethod` table
-/// (`kt/RailgunProtocol.kt`), which `RailgunHostTests` pins. The page's side is `index.js`.
+/// Every call the page answers, its wire name, and how long it may take: the same table as Kotlin's `RailgunMethod`,
+/// which `RailgunHostTests` checks against it. The page's side is `index.js`.
 enum RailgunMethod: String, CaseIterable {
   case start
   case openWallet
@@ -40,8 +40,7 @@ enum RailgunMessage: Equatable {
   case failure(id: Int64, error: RailgunError)
 }
 
-/// The page's wire format (Android reference §6.2). Params, results and events stay raw JSON text; Dart owns the
-/// typed models.
+/// The page's wire format. Params, results and events stay raw JSON text; Dart owns the typed models.
 enum RailgunProtocol {
   /// Engine lines; forwarded only from a page loaded with `debug`.
   static let log = "log"

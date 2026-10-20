@@ -1,12 +1,10 @@
-//! The swap engine's process-wide state (plan §5.10, reference §5.10 "vizor
-//! engine"): one driver step per account at a time, the forward offers quoted
-//! but not accepted yet, the reverse fundings handed to the Railgun page to
-//! prove, and the FRB calls in flight with their cancel flags and current
-//! activity. None of it is persisted.
+//! The swap engine's process-wide state: one driver step per account at a
+//! time, the forward offers quoted but not accepted yet, the reverse fundings
+//! handed to the Railgun page to prove, and the FRB calls in flight with their
+//! cancel flags and current activity. None of it is persisted.
 //!
-//! - A driver step holds its account's [`DriverGuard`] for its whole run,
-//!   network I/O included; a second caller gets `Busy`. `OPERATIONS` is never
-//!   held across I/O.
+//! - A driver step holds its account's guard for its whole run, network I/O
+//!   included; a second caller gets `Busy`.
 //! - An offer lives until its quote expires or the wallet locks
 //!   ([`clear_sessions`]). The forward quote is never persisted and never
 //!   crosses to Dart: a missing offer at accept is `QuoteExpired`.
@@ -14,61 +12,69 @@
 //!   the wallet locks or the account is deleted: a proof that finishes after
 //!   a lock is never submitted.
 //! - A call registered with [`OpHandle::begin`] can be cancelled by its id and
-//!   reports what it is doing (zapp `onActivity`) until it returns.
+//!   reports what it is doing until it returns.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, LazyLock, Mutex, MutexGuard};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
-use super::forward::joint_db_path;
-use super::joint;
+use super::joint::{self, joint_db_path};
 use super::models::{Amount, ReverseRecord, SwapQuote};
 use super::store::SwapStore;
-use super::{ErrorCode, PrivateUsdError, PrivateUsdNetwork, Result, OPERATIONS};
+use super::{lock, with_operations, ErrorCode, PrivateUsdError, PrivateUsdNetwork, Result};
 use crate::wallet::network::WalletNetwork;
 
-fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|error| error.into_inner())
+// ---- per-account locks ----
+
+/// One async lock per account.
+pub(crate) struct AccountLocks(LazyLock<Mutex<HashMap<String, Arc<AsyncMutex<()>>>>>);
+
+impl AccountLocks {
+    pub(crate) const fn new() -> Self {
+        Self(LazyLock::new(Default::default))
+    }
+
+    /// `account`'s lock, to wait for or try.
+    pub(crate) fn of(&self, account: &str) -> Arc<AsyncMutex<()>> {
+        lock(&self.0).entry(account.to_owned()).or_default().clone()
+    }
+
+    /// Takes `account`'s lock, or `Busy` with `busy` while another holds it.
+    pub(crate) fn try_lock(&self, account: &str, busy: &str) -> Result<AccountGuard> {
+        self.of(account)
+            .try_lock_owned()
+            .map(|guard| AccountGuard { _guard: guard })
+            .map_err(|_| PrivateUsdError::new(ErrorCode::Busy, busy))
+    }
 }
 
-// ---- driver locks ----
-
-static DRIVER_LOCKS: LazyLock<Mutex<HashMap<String, Arc<AsyncMutex<()>>>>> =
-    LazyLock::new(Default::default);
-
-/// An account's driver step, released when dropped. Without it, an accept and
-/// the engine loop would overwrite each other's `t0` and ticket.
-pub(crate) struct DriverGuard {
+/// An account's lock, released when dropped.
+pub(crate) struct AccountGuard {
     _guard: OwnedMutexGuard<()>,
 }
 
+/// Driver steps: without the lock, an accept and the engine loop would
+/// overwrite each other's `t0` and ticket.
+static DRIVER_LOCKS: AccountLocks = AccountLocks::new();
+
 /// Takes `account`'s driver lock, or `Busy` while another step holds it.
-pub(crate) fn lock_account(account: &str) -> Result<DriverGuard> {
-    let mutex = lock(&DRIVER_LOCKS)
-        .entry(account.to_owned())
-        .or_default()
-        .clone();
-    mutex
-        .try_lock_owned()
-        .map(|guard| DriverGuard { _guard: guard })
-        .map_err(|_| {
-            PrivateUsdError::new(
-                ErrorCode::Busy,
-                "another step of this account's conversion is running",
-            )
-        })
+pub(crate) fn lock_account(account: &str) -> Result<AccountGuard> {
+    DRIVER_LOCKS.try_lock(
+        account,
+        "another step of this account's conversion is running",
+    )
 }
 
-/// Removes everything Private USD keeps for `account` (reference §8.4): its
-/// joint accounts in `joint.db` first, then its rows in `swaps.db` (its
-/// deposits included), so a failure leaves the rows to retry with. `Busy`
-/// while one of its driver steps or deposit passes runs: a step that saved
-/// after the delete would bring a record back. The caller warned the user
-/// and drained the engine first (§3.5 item 15).
+/// Removes everything Private USD keeps for `account`: its joint accounts in
+/// `joint.db` first, then its rows in `swaps.db` (its deposits included), so
+/// a failure leaves the rows to retry with. `Busy` while one of its driver
+/// steps or deposit passes runs: a step that saved after the delete would
+/// bring a record back. The caller warned the user and drained the engine
+/// first.
 pub(crate) fn delete_account(
     store_dir: &Path,
     network: WalletNetwork,
@@ -89,14 +95,12 @@ pub(crate) fn delete_account(
     {
         joint::forget_joint_account(&joint_db, network, &row.joint_uuid)?;
     }
-    let _guard = OPERATIONS.lock().unwrap_or_else(|error| error.into_inner());
-    store.delete_account(account)
+    with_operations(|| store.delete_account(account))
 }
 
 // ---- forward offers ----
 
-/// A forward quote for one swap index, not accepted yet (zapp
-/// `AtomicSwapOffer`).
+/// A forward quote for one swap index, not accepted yet.
 #[derive(Clone, Debug)]
 pub(crate) struct Offer {
     pub network: PrivateUsdNetwork,
@@ -109,13 +113,13 @@ pub(crate) struct Offer {
     pub receives: Amount,
     /// The deposit's network fee from this wallet now; `None` when one
     /// transaction cannot pay it, which makes the offer unpayable.
-    pub deposit_fee_zat: Option<u64>,
+    pub deposit_fee_zatoshi: Option<u64>,
 }
 
 impl Offer {
     /// What the deposit may cost in all: the amount and its fee.
-    pub(crate) fn max_total_zat(&self) -> Option<u64> {
-        self.deposit_fee_zat
+    pub(crate) fn max_total_zatoshi(&self) -> Option<u64> {
+        self.deposit_fee_zatoshi
             .and_then(|fee| self.quote.deposit_zat.checked_add(fee))
     }
 
@@ -174,8 +178,8 @@ pub(crate) fn remove_account_offers(account: &str) {
 }
 
 /// Which makers' `/v1/info` already matched the pins this session, for which
-/// direction (zapp checks once per driver; reverse also needs
-/// `reverseEnabled`). Cleared with the offers.
+/// direction (a reverse conversion also needs `reverseEnabled`). Cleared with
+/// the offers.
 #[derive(Default)]
 pub(crate) struct MakerChecks(Mutex<HashSet<(PrivateUsdNetwork, bool)>>);
 
@@ -195,9 +199,9 @@ impl MakerChecks {
 
 pub(crate) static MAKER_CHECKS: LazyLock<MakerChecks> = LazyLock::new(Default::default);
 
-/// Forgets every offer, reverse funding and maker check: the wallet locked
-/// (D9). A quote made before the lock is never accepted after it, and a
-/// funding proved across it is never submitted.
+/// Forgets every offer, reverse funding and maker check: the wallet locked.
+/// A quote made before the lock is never accepted after it, and a funding
+/// proved across it is never submitted.
 pub(crate) fn clear_sessions() {
     let mut offers = lock(&OFFERS);
     SESSION.fetch_add(1, Ordering::AcqRel);
@@ -209,13 +213,13 @@ pub(crate) fn clear_sessions() {
 
 // ---- reverse fundings ----
 
-/// A reverse swap's funding as Rust handed it to the Railgun page to prove
-/// (reference §5.7 step 4): kept in memory only, until the proof comes back.
+/// A reverse swap's funding as Rust handed it to the Railgun page to prove:
+/// kept in memory only, until the proof comes back.
 #[derive(Clone, Debug)]
 pub(crate) struct FundingSession {
     pub network: PrivateUsdNetwork,
     /// The record when its `OpenReverse` was signed: a proof is submitted
-    /// only while the record is unchanged (zapp `fund`'s check).
+    /// only while the record is unchanged.
     pub record: ReverseRecord,
     /// The relayer fee the calls pay, and until when the relayer takes it.
     pub fee: Amount,
@@ -258,8 +262,7 @@ pub(crate) fn remove_account_fundings(account: &str) {
 
 // ---- calls in flight ----
 
-/// What a call is doing now, for the progress screen (zapp
-/// `AtomicSwapActivity`, plus the reverse steps).
+/// What a call is doing now, for the progress screen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Activity {
     Depositing,
@@ -332,7 +335,7 @@ impl OpHandle {
         self.state.cancel.clone()
     }
 
-    pub(crate) fn set_activity(&self, activity: Activity) {
+    fn set_activity(&self, activity: Activity) {
         *lock(&self.state.activity) = Some(activity);
     }
 }
@@ -373,13 +376,28 @@ pub(crate) fn op_activity(id: u32) -> Option<Activity> {
     activity
 }
 
+/// Shows `activity` as what the call `op` does now.
+pub(crate) fn set_activity(op: Option<&OpHandle>, activity: Activity) {
+    if let Some(op) = op {
+        op.set_activity(activity);
+    }
+}
+
+/// Stops at a safe point once the call `op` is cancelled.
+pub(crate) fn check_cancelled(op: Option<&OpHandle>) -> Result<()> {
+    if op.is_some_and(OpHandle::cancelled) {
+        return Err(cancelled());
+    }
+    Ok(())
+}
+
 /// A call that stopped because it was cancelled: never a failure, so never a
 /// problem shown to the user.
 pub(crate) fn cancelled() -> PrivateUsdError {
     PrivateUsdError::new(ErrorCode::Cancelled, "cancelled")
 }
 
-// ---- seams ----
+// ---- the clock ----
 
 /// The device's clock, and waiting. Engine tests fake both.
 pub(crate) trait Clock {
@@ -403,45 +421,22 @@ impl Clock for SystemClock {
     }
 }
 
-/// Privacy Pass tokens for a maker's accept (reference §5.9). M4 implements
-/// it; until then [`NoTokens`] holds none, so a maker that asks for one turns
-/// the accept away as `TokensNeeded` and the engine never retries by itself.
-pub(crate) trait TokenSource {
-    /// The `Authorization` an accept carries, from a token already held for
-    /// this maker; `None` sends it unpaid.
-    fn accept_authorization(&self) -> Option<String>;
-    /// The maker answered an accept `tokenRequired` with this challenge.
-    fn token_required(&self, challenge: Option<&str>);
-}
-
-/// No tokens client yet (M4 waits for N1): nothing is ever held or awaited.
-pub(crate) struct NoTokens;
-
-impl TokenSource for NoTokens {
-    fn accept_authorization(&self) -> Option<String> {
-        None
-    }
-
-    fn token_required(&self, _challenge: Option<&str>) {}
-}
-
 // ---- problems ----
 
-/// A failed step is tried again after this (zapp `RETRY_DELAY`).
+/// A failed step is tried again after this.
 pub(crate) const RETRY_DELAY: Duration = Duration::from_secs(15);
 
-/// The problem a failed step shows, after a minute of failures (reference
-/// §5.8; zapp `ua/SwapLoop.kt` block → hold): the codes the progress screens
-/// have copy for, and `Other` for the unexpected.
+/// The problem a failed step shows, after a minute of failures: the codes
+/// the progress screens have copy for, and `Other` for the unexpected.
 pub(crate) fn problem(code: ErrorCode) -> ErrorCode {
     use ErrorCode::*;
     match code {
         RelayerUnreachable | RelayerRefused | RelayerFee | EthereumUnreachable | RailgunClosed
         | ClaimTurn | ZcashWallet | DepositUnpayable | ZcashRejected | Mismatch
-        | TokensUnreachable | RouteBlocked => code,
+        | RouteBlocked => code,
         ChainLagging | ChainUnreadable => EthereumUnreachable,
-        // zapp holds a service serving another deployment as the relayer
-        // being unreachable.
+        // A service serving another deployment reads as the relayer being
+        // unreachable.
         WrongDeployment => RelayerUnreachable,
         _ => Other,
     }

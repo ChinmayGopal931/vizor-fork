@@ -6,10 +6,10 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../private_usd_copy.dart';
 
-/// Asks before a reverse conversion is called off (D18: no app-lock prompt
-/// once unlocked, so a sheet guards it). [action] is the button that asked
-/// ("Cancel conversion" or "Request refund"); [paid] says whether private
-/// USD was paid already. True once confirmed.
+/// Asks before a reverse conversion is called off: once unlocked there is
+/// no app-lock prompt, so a sheet guards it. [action] is the label of the
+/// button that asked, cancelling or requesting a refund; [paid] says whether
+/// private USD was paid already. True once confirmed.
 Future<bool> confirmPrivateUsdReverseCancel(
   BuildContext context, {
   required String action,
@@ -32,8 +32,8 @@ Future<bool> confirmPrivateUsdReverseCancel(
   return confirmed ?? false;
 }
 
-/// Asks before a refund is recovered (D18): the relayer's fee, at most
-/// [feeCap], comes out of it. True once confirmed.
+/// Asks before a refund is recovered: the relayer's fee, at most [feeCap],
+/// comes out of it. True once confirmed.
 Future<bool> confirmPrivateUsdRefundRecovery(
   BuildContext context, {
   required String feeCap,
@@ -52,8 +52,8 @@ Future<bool> confirmPrivateUsdRefundRecovery(
   return confirmed ?? false;
 }
 
-/// Asks before a deposit Railgun's screening sent back is recovered (M9,
-/// D18): the relayer's [fee] comes out of it. True once confirmed.
+/// Asks before a deposit Railgun's screening sent back is recovered: the
+/// relayer's [fee] comes out of it. True once confirmed.
 Future<bool> confirmPrivateUsdDepositRescue(
   BuildContext context, {
   required String fee,
@@ -72,7 +72,7 @@ Future<bool> confirmPrivateUsdDepositRescue(
   return confirmed ?? false;
 }
 
-/// A confirmation sheet: a title, what follows, the action and "Not now".
+/// A confirmation sheet: a title, what follows, the action and a way out.
 class PrivateUsdConfirmSheetBody extends StatelessWidget {
   const PrivateUsdConfirmSheetBody({
     required this.title,

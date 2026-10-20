@@ -33,7 +33,7 @@ Port `kt/` to Swift (plan XI1). Read on 2026-10-17 from `kt/` at `ef7b2e067`.
 | `RailgunSchemeHandler.swift` | serves `veylor-railgun://app/…` from the bundle | `OwnAssets` (`:315-321`) and `WebViewAssetLoader` |
 | `RailgunContentRules.swift` | the allowlist as a `WKContentRuleList` | `RailgunRequests.route` (`:359-371`) |
 | `RailgunProtocol.swift` | wire methods, timeouts, the envelope | `RailgunProtocol.kt:12-128` |
-| `RailgunEndpoints.swift` | the ten hosts and `POI_NODE_URL` | `RailgunEndpoints.kt:9-26` |
+| `RailgunEndpoints.swift` | the ten hosts | `RailgunEndpoints.kt:9-26` |
 | `RailgunError.swift` | error kinds, mapped to `FlutterError` codes | `RailgunException.kt` and `RailgunHostHandler.kt:123-134` |
 
 **The bundle on iOS.** It is built once (plan DI7, MI1) by `rw/build.mjs`. The build writes `android/app/src/main/assets/railgun/`, then copies the same files to `sw/railgun/`. Today's Android build:
@@ -73,7 +73,7 @@ Amounts are decimal strings, unknown events are dropped, and an unreadable reply
 |---|---|---|
 | Hello | The host posts `WebMessage(INIT, [port])` to the page origin. The page takes the first port with `event.source === null` (`rw/src/index.js:53-58`). | At startup the page finds `globalThis.webkit.messageHandlers.railgunHost` and posts `{event: "ready", data: null}` through it, once. |
 | Page to host | `port.postMessage(json)` | `webkit.messageHandlers.railgunHost.postMessage(json)`, as a string |
-| Host to page | `port.postMessage(json)` | `webView.callAsyncJavaScript("__railgunHostDeliver(m)", arguments: ["m": json], in: nil, in: .page)`. As built (plan VI-9) the body is `__railgunHostDeliver(m); return true;`, so the completion always gets a value it can carry, and a delivery that fails fails its call `CLOSED`. |
+| Host to page | `port.postMessage(json)` | `webView.callAsyncJavaScript("__railgunHostDeliver(m)", arguments: ["m": json], in: nil, in: .page)`. As built (plan VI-9) the body is `__railgunHostDeliver(m); return true;`, so the completion always gets a value it can carry, and a delivery that fails fails its call `closed`. |
 
 **The page side** (`rw/src/index.js`, MI1). A sketch; the real code keeps `index.js`'s dispatch (`:8-58`):
 
@@ -106,12 +106,12 @@ function connect(onMessage) {
 
 **Ready.**
 
-- After `webView.load(URLRequest(url: veylor-railgun://app/index.html))`, wait up to 30 s for `ready` (`LOAD_TIMEOUT`, as Kotlin `:175, :327`). A timeout fails `load` with `TIMEOUT` and closes the page.
+- After `webView.load(URLRequest(url: veylor-railgun://app/index.html))`, wait up to 30 s for `ready` (`LOAD_TIMEOUT`, as Kotlin `:175, :327`). A timeout fails `load` with `timeout` and closes the page.
 - If one of the page's own files fails to load, close the page at once (`didFailProvisionalNavigation` and `didFail`), as Kotlin does (`:291-298`).
 
 **The channel contract.**
 
-- It is identical to the tables in A-ref §6.2: the methods `load`, `call`, `close`, `wipe` and `isOpen`; the codes `CLOSED`, `TIMEOUT`, `UNAVAILABLE`, `PROTOCOL`, `FAILED` and `BAD_ARGS`.
+- It is identical to the tables in A-ref §6.2: the methods `load`, `call`, `close`, `wipe` and `isOpen`; the codes `closed`, `timeout`, `unavailable`, `protocol`, `failed` and `bad_args`.
 - Events are forwarded raw, and `log` only when `debug` is set.
 - The method table and its timeouts are `kt/RailgunProtocol.kt:16-26`:
   - `start` 2 min
@@ -128,12 +128,12 @@ New on both platforms:
 
 | Method | Args | Result | Notes |
 |---|---|---|---|
-| `supported` | — | `bool` | iOS answers `#available(iOS 17, *)`. Android answers `true` without loading the WebView package (minSdk 30); a phone whose WebView lacks `PROXY_OVERRIDE` still fails `load` with `UNAVAILABLE`, as today. Dart asks once, from the bootstrap (plan XI9). |
+| `supported` | — | `bool` | iOS answers `#available(iOS 17, *)`. Android answers `true` without loading the WebView package (minSdk 30); a phone whose WebView lacks `PROXY_OVERRIDE` still fails `load` with `unavailable`, as today. Dart asks once, from the bootstrap (plan XI9). |
 
 **`load {proxyPort, debug}` on iOS**, in order:
 
 1. Close any open page.
-2. Require `1 ≤ proxyPort ≤ 65535` (else `BAD_ARGS`) and `supported` (else `UNAVAILABLE`).
+2. Require `1 ≤ proxyPort ≤ 65535` (else `bad_args`) and `supported` (else `unavailable`).
 3. Set the store's proxy (§6.8).
 4. Build the configuration: the store, the scheme handler, the message handler, the rule list and the preferences (§6.4).
 5. Create the `WKWebView`, put it in the window (§6.3) and load the page.
@@ -142,7 +142,7 @@ New on both platforms:
 **Threading.**
 
 - Everything runs on the main actor.
-- Each `call` registers a continuation under its `id`, plus a timeout `Task`. The task sleeps for the method's timeout, then fails the call `TIMEOUT` and closes the page, as `RailgunChannel.kt:33-47` does.
+- Each `call` registers a continuation under its `id`, plus a timeout `Task`. The task sleeps for the method's timeout, then fails the call `timeout` and closes the page, as `RailgunChannel.kt:33-47` does.
 - `FlutterResult` is called exactly once per call; a per-call `replied` flag guards it (plan invariant 23).
 - The EventChannel sink is called on the main thread only. With no listener, events go into a ring buffer of 256 that drops the oldest first (Kotlin `RailgunWebViewHost.kt:60-67`).
 
@@ -153,7 +153,7 @@ New on both platforms:
   - a 1×1 `WKWebView` added to the key window's root view at index 0, behind the Flutter view. As built (plan VI-7): inserted into the key window itself at index 0, beneath the root view controller's view, which covers it; a subview of the Flutter view would be drawn over Flutter's own content instead
   - `isUserInteractionEnabled = false`, `accessibilityElementsHidden = true`, `isAccessibilityElement = false`
   - the app uses scenes (`ios/Runner/SceneDelegate.swift`): when the key window changes, move the page to the new one; while there is no window (the app is in the background), leave it where it is
-- **Termination.** `webViewWebContentProcessDidTerminate` closes the page. Its pending calls fail `CLOSED`, and Dart reopens the page lazily (the `CLOSED` row in A-ref §6.2). The bridge stops with the close (plan invariant 21).
+- **Termination.** `webViewWebContentProcessDidTerminate` closes the page. Its pending calls fail `closed`, and Dart reopens the page lazily (the `closed` row in A-ref §6.2). The bridge stops with the close (plan invariant 21).
 - **App states.**
   - `inactive` (Face ID, Control Center, the app switcher): nothing changes.
   - `background`: Dart pauses the engine and polling (D9). The page stays, and iOS suspends its process along with the app.
@@ -192,7 +192,7 @@ New on both platforms:
   - `Cache-Control: no-store`
 - `webView(_:stop:)` drops the task.
 
-**The content rule list** (`RailgunContentRules`). It is compiled once with `WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "railgun-allowlist-v2", encodedContentRuleList:)`, from `RailgunEndpoints`:
+**The content rule list** (`RailgunContentRules`). It is compiled once with `WKContentRuleListStore.default().compileContentRuleList(forIdentifier: "railgun-allowlist", encodedContentRuleList:)`, from `RailgunEndpoints`:
 
 ```json
 [
@@ -232,7 +232,7 @@ The last line repeats once per host in `RailgunEndpoints`: the ten of A-ref §6.
   1. Close the page and release the `WKWebView`.
   2. `try await WKWebsiteDataStore.remove(forIdentifier: storeID)`.
   3. WebKit refuses while the store is still in use, so retry up to 5 times, 500 ms apart.
-  4. If it still fails, answer `FAILED`. Dart's reset logs a failed wipe and carries on (`account_provider.dart:2152-2165`).
+  4. If it still fails, answer `failed`. Dart's reset logs a failed wipe and carries on (`account_provider.dart:2152-2165`).
 - **Deleting one account** uses the page's `deleteWallet` (plan DI7, A-plan E5), as on Android. As built in MI1 (plan VI-2): `deleteWallet {network, mnemonic}` runs on a fresh page with only the database open, removes the wallet's encrypted record and the notes syncs decrypted for it (stored unencrypted), and needs no network. As built (progress VI-17, BI-3 option (a)): an account deletion derives the account's Railgun mnemonic before the Rust account delete, only for an account with a Railgun engine key; after it, the engine closes any open page, loads a fresh one behind an offline bridge (one that refuses every connection, so it never waits for Tor), calls `deleteWallet`, then closes the page and stops the bridge. Best effort: a failure leaves the wallet until a reset.
 - **Backups** (plan DI6). After the store's first use, find its directory under `Library/WebKit/` (MI0.7 records the path) and set `isExcludedFromBackup` on it. Until MI0 confirms the path, exclude `Library/WebKit` as a whole: the app has no other web content. As built (plan VI-15): `load` makes `Library/WebKit` if it is missing and marks it before the store is first used, since a mark on a directory covers what WebKit creates inside it later, and marks it again after the load in case WebKit made it anew; a failed mark never blocks the load.
 - **Threading.** The page's workers run inside WebKit's own process. The host does nothing off the main actor except its timeout tasks.
@@ -340,7 +340,7 @@ Unchanged from A-ref §8.4: the lock, the background, an account switch, a delet
 - **Setup.**
   - The entitlement `com.apple.developer.devicecheck.appattest-environment` (`development` or `production`).
   - The App Attest capability on the App ID, under the owner's team (DI8).
-- **Errors** keep the existing codes, so Dart's mapping does not change: a DeviceCheck error is `KEYSTORE`, and an argument error is `BAD_ARGS`.
+- **Errors** keep the existing codes, so Dart's mapping does not change: a DeviceCheck error is `KEYSTORE`, and an argument error is `bad_args`.
 
 ### 8.7 Xcode project, Info.plist, entitlements and signing
 

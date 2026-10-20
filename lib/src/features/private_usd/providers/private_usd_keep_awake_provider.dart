@@ -5,7 +5,7 @@ import '../models/private_usd_record_key.dart';
 import 'private_usd_unfinished_provider.dart';
 
 /// The progress screens showing now, so the screen stays awake while a key
-/// step is pending (X8).
+/// step is pending.
 final privateUsdProgressVisibleProvider =
     NotifierProvider<
       PrivateUsdProgressVisibleNotifier,
@@ -34,8 +34,8 @@ class PrivateUsdFirstSync {
   void end() => _syncs._end(this);
 }
 
-/// The Railgun first syncs running now (iOS progress VI-18), whichever
-/// screen started them: the sync goes on in the page when its screen closes.
+/// The Railgun first syncs running now, whichever screen started them: the
+/// sync goes on in the page when its screen closes.
 final privateUsdFirstSyncsProvider =
     NotifierProvider<PrivateUsdFirstSyncsNotifier, Set<PrivateUsdFirstSync>>(
       PrivateUsdFirstSyncsNotifier.new,
@@ -58,17 +58,17 @@ class PrivateUsdFirstSyncsNotifier extends Notifier<Set<PrivateUsdFirstSync>> {
 }
 
 /// Keeps the screen awake while a Railgun first sync runs and the wallet is
-/// unlocked (iOS progress VI-18). One can take an hour, and under D9
-/// screen-off means background, where Android may throttle the page and iOS
-/// suspends it. Locked, the page closes and the sync with it.
+/// unlocked. One can take an hour, and screen-off means background, where
+/// Android may throttle the page and iOS suspends it. Locked, the page
+/// closes and the sync with it.
 final privateUsdFirstSyncKeepAwakeProvider = Provider<bool>((ref) {
   if (ref.watch(privateUsdFirstSyncsProvider).isEmpty) return false;
   return !ref.watch(appSecurityProvider.select((s) => s.requiresUnlock));
 });
 
 /// Keeps the screen awake while a conversion's progress shows and a key
-/// step (deposit, claim, sweep) is still to come: under D9 screen-off means
-/// background, and background means pause (X8). Also through a Railgun first
+/// step (deposit, claim, sweep) is still to come: screen-off means
+/// background, and background means pause. Also through a Railgun first
 /// sync ([privateUsdFirstSyncKeepAwakeProvider]). OR-ed into
 /// `SyncKeepAwakeNativeHost`, which owns the one native flag and lets go in
 /// the background.

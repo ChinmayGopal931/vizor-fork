@@ -3,7 +3,7 @@ import 'package:flutter/painting.dart';
 import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
 
-const _neon = kAppFormFactor == AppFormFactor.mobile;
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Depth hierarchy for the app shell.
 ///
@@ -67,9 +67,8 @@ class AppBackgroundColors {
   final Color utilitySuccessAlpha;
   final Color homeCard;
 
-  /// Figma faces on desktop, the neon redesign on mobile builds.
-  static const dark = _neon ? neonDark : figmaDark;
-  static const light = _neon ? neonLight : figmaLight;
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
 
   static const figmaDark = AppBackgroundColors(
     window: Color(0xFF0F0F0F),

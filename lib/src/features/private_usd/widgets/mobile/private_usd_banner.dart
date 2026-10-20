@@ -8,10 +8,9 @@ import '../../private_usd_copy.dart';
 import '../../providers/private_usd_conversion_provider.dart';
 import 'private_usd_logo.dart';
 
-/// The in-flight conversion banner on home and on `/private-usd` (plan
-/// reference §8.3, §9.4 S1): it stays while a conversion is unfinished,
-/// even when Private USD is otherwise unavailable (D16), and opens its
-/// progress.
+/// The banner of a conversion under way, on Home and on `/private-usd`: it
+/// stays while a conversion is unfinished, even when Private USD is
+/// otherwise unavailable, and opens its progress.
 class PrivateUsdConversionBanner extends ConsumerWidget {
   const PrivateUsdConversionBanner({
     required this.accountUuid,
@@ -56,9 +55,8 @@ class PrivateUsdConversionBannerView extends StatelessWidget {
       // Private USD's logo, unless it asks for attention.
       leading: banner.attention ? null : const PrivateUsdLogo(),
       title: banner.title,
-      // Every step still to come needs the seed, so the app must stay open
-      // (D9).
-      subtitle: '${banner.detail}\n${PrivateUsdCopy.bannerKeepOpen}',
+      // Every step still to come needs the seed, so the app must stay open.
+      subtitle: PrivateUsdCopy.bannerDetail(banner.detail),
       emphasized: true,
       onTap: onTap,
     );

@@ -2,14 +2,14 @@ import 'package:flutter/widgets.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/mobile/neon_done_sign.dart';
-import '../../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../../../core/widgets/mobile/neon_motion.dart';
 import '../../../../core/widgets/mobile/neon_scramble_text.dart';
 import '../../../../core/widgets/mobile/tron_glyph.dart';
 import '../../private_usd_copy.dart';
 
-/// A finished bridge as a lit sign (owner, 2026-10-19): the done badge,
-/// "BRIDGED" in thin capitals, and what arrived under it.
+/// A finished bridge as a lit sign: the done badge, the title in thin
+/// capitals, and what arrived under it.
 ///
 /// [celebrate] is for a bridge that finished in view: the badge switches on
 /// as [NeonDoneSign] does, with its shockwave (the send screen's ripple as
@@ -31,11 +31,8 @@ class PrivateUsdBridgedHero extends StatelessWidget {
   static const _bodyWidth = 280.0;
 
   /// The page title's face, a size up: the sign, not the page's name.
-  static const _titleStyle = TextStyle(
-    fontFamily: 'Gotham',
-    fontWeight: FontWeight.w100,
+  static final _titleStyle = kNeonPageTitleStyle.copyWith(
     fontSize: 28,
-    height: 1.2,
     letterSpacing: 8,
   );
 
@@ -74,7 +71,7 @@ class PrivateUsdBridgedHero extends StatelessWidget {
             label: PrivateUsdCopy.bridgedTitle,
             excludeSemantics: true,
             child: celebrate
-                ? NeonDelayedIgnition(
+                ? NeonIgnition(
                     delay: const Duration(milliseconds: 1000),
                     builder: (context, light) => light == 0
                         ? Opacity(opacity: 0, child: Text(title, style: lit))

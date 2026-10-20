@@ -129,7 +129,7 @@ pub(crate) enum SendPurpose {
     /// Spends a Gift Card's bearer wallet into the recipient's account.
     PaymentLinkClaim,
     /// Sweeps a Private USD joint account home with the combined key. The
-    /// maker holds the joint viewing key, so the sweep discards its OVK (D12).
+    /// maker holds the joint viewing key, so the sweep discards its OVK.
     JointSweep,
 }
 
@@ -1004,7 +1004,7 @@ fn proposal_needs_sapling(proposal: &Proposal<WalletFeeRule, ReceivedNoteId>) ->
 }
 
 /// The one transaction a swap proposal may make: a Private USD deposit or a
-/// joint sweep is never split across several (§3.5 item 3).
+/// joint sweep is never split across several.
 fn single_swap_transaction(
     proposal: &Proposal<WalletFeeRule, ReceivedNoteId>,
 ) -> Result<&zcash_client_backend::proposal::Step<ReceivedNoteId>, String> {
@@ -1027,11 +1027,28 @@ pub(crate) struct SwapProposal {
     pub amount_zatoshi: u64,
 }
 
+/// Why a Private USD deposit was not proposed.
+#[derive(Debug)]
+pub(crate) enum SwapDepositError {
+    /// It does not fit: input selection cannot pay it, it takes more than
+    /// one transaction, or it costs more than approved.
+    Unpayable(String),
+    Wallet(String),
+}
+
+impl std::fmt::Display for SwapDepositError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unpayable(message) | Self::Wallet(message) => f.write_str(message),
+        }
+    }
+}
+
 /// Proposes a Private USD deposit from the account to a swap's joint address
-/// (`docs/private-usd-reference.md` §8.1.2) and stores it like any send:
-/// inputs locked, sender OVK kept so the account still recovers it. The
-/// deposit must be one transaction whose amount plus fee stays within the
-/// approved `max_total_zatoshi`; otherwise nothing is locked or stored.
+/// and stores it like any send: inputs locked, sender OVK kept so the account
+/// still recovers it. The deposit must be one transaction whose amount plus
+/// fee stays within the approved `max_total_zatoshi`; otherwise nothing is
+/// locked or stored.
 pub(crate) fn propose_swap_deposit(
     db_path: &str,
     network: WalletNetwork,
@@ -1040,39 +1057,36 @@ pub(crate) fn propose_swap_deposit(
     joint_ua: &str,
     deposit_zatoshi: u64,
     max_total_zatoshi: u64,
-) -> Result<SwapProposal, String> {
+) -> Result<SwapProposal, SwapDepositError> {
     if send_flow_id.is_empty() {
-        return Err("Send flow id is required".to_string());
+        return Err(SwapDepositError::Wallet(
+            "Send flow id is required".to_string(),
+        ));
     }
 
     with_wallet_db_write_lock("send.propose_swap_deposit", || {
-        super::proposal_locks::require_active_session()?;
-        let mut db = open_wallet_db(db_path, network)?;
-        let account_id = parse_account_uuid(account_uuid)?;
-        let (proposal, stored_tx_version) = propose_request(
+        super::proposal_locks::require_active_session().map_err(SwapDepositError::Wallet)?;
+        let mut db = open_wallet_db(db_path, network).map_err(SwapDepositError::Wallet)?;
+        let account_id = parse_account_uuid(account_uuid).map_err(SwapDepositError::Wallet)?;
+        let (proposal, stored_tx_version) = propose_swap_deposit_request(
             &db,
             db_path,
             network,
             account_uuid,
             account_id,
-            SendRequest::Single {
-                to_address: joint_ua,
-                amount_zatoshi: deposit_zatoshi,
-                memo_str: None,
-            },
-            SendPurpose::Ordinary,
+            joint_ua,
+            deposit_zatoshi,
             "creating a swap deposit",
         )?;
-        single_swap_transaction(&proposal)?;
         let fee_zatoshi = proposal_fee_zatoshi(&proposal);
         let total = deposit_zatoshi
             .checked_add(fee_zatoshi)
-            .ok_or("Swap deposit total overflows")?;
+            .ok_or_else(|| SwapDepositError::Wallet("Swap deposit total overflows".to_string()))?;
         if total > max_total_zatoshi {
-            return Err(format!(
+            return Err(SwapDepositError::Unpayable(format!(
                 "The swap deposit costs {total} zatoshi with its fee, more than the approved \
                  {max_total_zatoshi}"
-            ));
+            )));
         }
         let stored = lock_and_store_proposal(
             &mut db,
@@ -1083,7 +1097,8 @@ pub(crate) fn propose_swap_deposit(
             proposal,
             stored_tx_version,
             SendPurpose::Ordinary,
-        )?;
+        )
+        .map_err(SwapDepositError::Wallet)?;
         Ok(SwapProposal {
             proposal_id: stored.proposal_id,
             needs_sapling_params: stored.needs_sapling_params,
@@ -1094,10 +1109,9 @@ pub(crate) fn propose_swap_deposit(
 }
 
 /// The network fee of a Private USD deposit of `deposit_zatoshi` from the
-/// account to `joint_ua`, were it proposed now: the quote screen's preview
-/// (`docs/private-usd-reference.md` §5.6 step 1.8). `None` unless one
-/// transaction pays it without the Sapling proving parameters, or when no
-/// proposal can be made (too little funds). Nothing is locked or stored.
+/// account to `joint_ua`, were it proposed now: the quote screen's preview.
+/// `None` when it does not fit, or would need the Sapling proving parameters.
+/// Nothing is locked or stored.
 pub(crate) fn estimate_swap_deposit_fee(
     db_path: &str,
     network: WalletNetwork,
@@ -1107,8 +1121,37 @@ pub(crate) fn estimate_swap_deposit_fee(
 ) -> Result<Option<u64>, String> {
     let db = open_wallet_db_for_read(db_path, network)?;
     let account_id = parse_account_uuid(account_uuid)?;
-    let Ok((proposal, _)) = propose_request(
+    match propose_swap_deposit_request(
         &db,
+        db_path,
+        network,
+        account_uuid,
+        account_id,
+        joint_ua,
+        deposit_zatoshi,
+        "estimating a swap deposit fee",
+    ) {
+        Ok((proposal, _)) if !proposal_needs_sapling(&proposal) => {
+            Ok(Some(proposal_fee_zatoshi(&proposal)))
+        }
+        Ok(_) | Err(SwapDepositError::Unpayable(_)) => Ok(None),
+        Err(SwapDepositError::Wallet(error)) => Err(error),
+    }
+}
+
+/// A deposit of `deposit_zatoshi` to `joint_ua` as one ordinary send.
+fn propose_swap_deposit_request(
+    db: &WalletDatabase,
+    db_path: &str,
+    network: WalletNetwork,
+    account_uuid: &str,
+    account_id: AccountUuid,
+    joint_ua: &str,
+    deposit_zatoshi: u64,
+    context: &str,
+) -> Result<(Proposal<WalletFeeRule, ReceivedNoteId>, Option<TxVersion>), SwapDepositError> {
+    let (proposal, tx_version) = propose_request(
+        db,
         db_path,
         network,
         account_uuid,
@@ -1119,22 +1162,26 @@ pub(crate) fn estimate_swap_deposit_fee(
             memo_str: None,
         },
         SendPurpose::Ordinary,
-        "estimating a swap deposit fee",
-    ) else {
-        return Ok(None);
-    };
-    if single_swap_transaction(&proposal).is_err() || proposal_needs_sapling(&proposal) {
-        return Ok(None);
-    }
-    Ok(Some(proposal_fee_zatoshi(&proposal)))
+        context,
+    )
+    .map_err(|error| {
+        // Input selection (`propose_send_with_reserved_notes`) words a request
+        // the account's funds cannot pay this way.
+        if error.starts_with("Propose failed") {
+            SwapDepositError::Unpayable(error)
+        } else {
+            SwapDepositError::Wallet(error)
+        }
+    })?;
+    single_swap_transaction(&proposal).map_err(SwapDepositError::Unpayable)?;
+    Ok((proposal, tx_version))
 }
 
 /// Proposes sending everything in a Private USD joint account to `home_ua`
-/// with no change (`docs/private-usd-reference.md` §8.1.1). Every note must be
-/// spendable under the sweep's two-confirmation policy, or the proposal fails
-/// rather than leave one behind. The sweep discards its OVK (D12). It must be
-/// one transaction with a fee of at most `max_fee_zatoshi`; otherwise nothing
-/// is locked or stored.
+/// with no change. Every note must be spendable under the sweep's
+/// two-confirmation policy, or the proposal fails rather than leave one
+/// behind. The sweep discards its OVK. It must be one transaction with a fee
+/// of at most `max_fee_zatoshi`; otherwise nothing is locked or stored.
 pub(crate) fn propose_joint_sweep(
     joint_db: &str,
     network: WalletNetwork,
@@ -1792,12 +1839,11 @@ impl std::fmt::Debug for CreatedTransaction {
     }
 }
 
-/// The create half of [`execute_proposal`], for a Private USD deposit
-/// (`docs/private-usd-reference.md` §8.1.2): consumes the stored proposal,
-/// signs its transactions and stores them in the wallet DB, and returns them
-/// without broadcasting. The caller keeps the bytes before it sends them with
-/// [`broadcast_raw`]; until they are mined or expire, the main sync's
-/// resubmission sends them too.
+/// The create half of [`execute_proposal`], for a Private USD deposit:
+/// consumes the stored proposal, signs its transactions and stores them in
+/// the wallet DB, and returns them without broadcasting. The caller keeps the
+/// bytes before it sends them with [`broadcast_raw`]; until they are mined or
+/// expire, the main sync's resubmission sends them too.
 ///
 /// A failure before storage releases the proposal's inputs. If storage
 /// succeeds but the bytes cannot be read back, the error says so and the
@@ -1866,6 +1912,11 @@ fn read_created_transactions(
 /// until it is mined.
 pub(crate) async fn broadcast_raw(lightwalletd_url: &str, raw_tx: &[u8]) -> Result<(), String> {
     broadcast_raw_transaction_isolated(lightwalletd_url, raw_tx).await
+}
+
+/// Whether a broadcast failed because the node refused the transaction.
+pub(crate) fn broadcast_rejected(error: &str) -> bool {
+    migration_broadcast_failure_requires_rebuild(error)
 }
 
 /// Signs and stores a consumed proposal's transactions, releasing its inputs

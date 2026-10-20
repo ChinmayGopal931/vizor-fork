@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_amount.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_presentation.dart';
+import 'package:zcash_wallet/src/features/private_usd/models/private_usd_send.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 
@@ -26,8 +27,8 @@ void main() {
     ]) {
       expect(privateUsdDollarUnits(refused), isNull, reason: refused);
     }
-    expect(privateUsdDollarTooPrecise('1.234'), isTrue);
-    expect(privateUsdDollarTooPrecise('1.23'), isFalse);
+    expect(privateUsdTooPrecise('1.234', 2), isTrue);
+    expect(privateUsdTooPrecise('1.23', 2), isFalse);
     expect(privateUsdDollarIsPositive('0.0'), isFalse);
     expect(privateUsdDollarIsPositive('0.001'), isTrue);
     expect(privateUsdDollarText(BigInt.from(12345678)), '12.34');

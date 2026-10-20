@@ -26,6 +26,7 @@ import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/mobile/mobile_home_entry_card.dart';
 import '../../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../../core/widgets/mobile/neon_motion.dart';
 import '../../../../core/widgets/mobile/neon_scramble_text.dart';
 import '../../../../core/widgets/app_tooltip.dart';
 import '../../../../providers/account_provider.dart';
@@ -63,12 +64,9 @@ import '../../../migration/providers/ironwood_migration_coordinator_provider.dar
 import '../../../migration/widgets/mobile/mobile_ironwood_migration_announcement_sheet.dart';
 import '../../../private_usd/providers/private_usd_available_provider.dart';
 import '../../../private_usd/providers/private_usd_activity_provider.dart';
-import '../../../private_usd/providers/private_usd_deposits_provider.dart';
 import '../../../private_usd/widgets/mobile/private_usd_activity_rows.dart';
 import '../../../private_usd/widgets/mobile/private_usd_banner.dart';
 import '../../../private_usd/widgets/mobile/private_usd_home_strip.dart';
-import '../../../../rust/api/private_usd.dart'
-    show ApiDepositRecord, ApiForwardRecord, ApiReverseRecord;
 import '../../../swap/models/swap_activity_navigation.dart';
 import '../../../swap/widgets/swap_activity_status_auto_refresh.dart';
 import '../../services/transparent_balance_display.dart';
@@ -121,7 +119,6 @@ class MobileHomeScreen extends ConsumerWidget {
                   Builder(
                     builder: (context) => MobileTopNavAccount(
                       compact: true,
-                      showSyncStatus: !isImporting,
                       onAccountTap: () => showMobileAccountsSheet(context),
                     ),
                   ),
@@ -1051,28 +1048,15 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             transactions: sync.recentTransactions,
           );
     final swapReceiveTxByIntent = absorption.receiveTxByIntent;
-    // Private USD conversions stand in for the deposits and refund sweeps
-    // they made (plan reference §9.2).
-    final privateUsdRecords = uuid == null
-        ? const <ApiForwardRecord>[]
-        : ref.watch(privateUsdActivityRecordsProvider(uuid));
-    final privateUsdReverseRecords = uuid == null
-        ? const <ApiReverseRecord>[]
-        : ref.watch(privateUsdReverseActivityRecordsProvider(uuid));
-    // Public USDC deposits (M9) join them.
-    final privateUsdDepositRecords = uuid == null
-        ? const <ApiDepositRecord>[]
-        : ref.watch(privateUsdDepositRecordsProvider(uuid));
-    final privateUsdTxids = privateUsdActivityTxids(
-      privateUsdRecords,
-      reverse: privateUsdReverseRecords,
-    );
+    final privateUsd = uuid == null
+        ? PrivateUsdActivity.empty
+        : ref.watch(privateUsdActivityProvider(uuid));
     final entries = <ActivityEntry>[
       for (final tx in giftCardActivityIndex.withPendingClaims(
         sync.recentTransactions,
       ))
         if (!absorption.absorbs(tx) &&
-            !privateUsdTxids.contains(tx.txidHex.toLowerCase()))
+            !privateUsd.txids.contains(tx.txidHex.toLowerCase()))
           _transactionEntry(
             context,
             ref,
@@ -1106,33 +1090,15 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             },
           ),
         ),
-      // No rows, no deployment read (an FRB call desktop never makes).
-      if (privateUsdRecords.isNotEmpty ||
-          privateUsdReverseRecords.isNotEmpty ||
-          privateUsdDepositRecords.isNotEmpty)
-        ...privateUsdActivityEntries(
-          context: context,
-          records: privateUsdRecords,
-          reverseRecords: privateUsdReverseRecords,
-          depositRecords: privateUsdDepositRecords,
-          screening: Duration(
-            seconds:
-                ref
-                    .watch(privateUsdCurrentDeploymentProvider)
-                    ?.screeningSeconds ??
-                0,
-          ),
-          onOpenRefunds: () => _pushUsedScreen('/private-usd/refunds'),
-          zcashConfirmations:
-              ref
-                  .watch(privateUsdCurrentDeploymentProvider)
-                  ?.zcashConfirmations ??
-              2,
-          privacyModeEnabled: privacyModeEnabled,
-          dateOnlyTimestamp: true,
-          onOpenConversion: (path) => _pushUsedScreen(path.location),
-          onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
-        ),
+      ...privateUsdFeedEntries(
+        context: context,
+        activity: privateUsd,
+        privacyModeEnabled: privacyModeEnabled,
+        dateOnlyTimestamp: true,
+        onOpenConversion: (path) => _pushUsedScreen(path.location),
+        onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
+        onOpenRefunds: () => _pushUsedScreen('/private-usd/refunds'),
+      ),
     ]..sort(compareActivityEntries);
     final recentRows = [
       for (final entry in entries.take(MobileHomeScreen._recentActivityLimit))
@@ -1267,9 +1233,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                   ),
                 ),
               ),
-            // Swap opens from here rather than from a tab. Like the tab it
-            // replaced, it follows the swap feature flag (mainnet, unless
-            // the server turned swaps off).
             if (swapEnabled) ...[
               const SizedBox(height: AppSpacing.xs),
               NeonSyncOcclude(
@@ -1632,9 +1595,9 @@ String? _mobileHomeFiatTextForZatoshi(
   return '\$$grouped.${parts.last}';
 }
 
-/// The dark shielded-balance card — Figma `Full Width Card`
-/// (4394:88394): 200px tall, home-card surface, chip + privacy eye on
-/// top, fiat line and serif ZEC balance at the bottom.
+/// The shielded balance as a frameless neon sign: the fiat line over the
+/// digits and the privacy eye, the chart's line as a light trail below, and
+/// the transparent and Private USD rows under the sign.
 class _BalanceCard extends StatelessWidget {
   const _BalanceCard({
     required this.balanceText,
@@ -1931,7 +1894,7 @@ class _NeonBalanceTrail extends StatelessWidget {
   }
 }
 
-/// A steady red bar, as the Roadster's tail light.
+/// The trail without a chart line: a steady lit bar.
 class _TailLightPainter extends CustomPainter {
   _TailLightPainter({
     required this.glow,
@@ -2453,8 +2416,6 @@ class _EmptyActivity extends StatelessWidget {
   }
 }
 
-/// Where the knight illustration used to rest: a neon horizon, an 80s
-/// sun sliced by stripes setting behind a grid floor.
 class _MobileRestImage extends StatelessWidget {
   const _MobileRestImage();
 
@@ -2462,25 +2423,11 @@ class _MobileRestImage extends StatelessWidget {
   static const _canvasHeight = 150.0;
 
   @override
-  Widget build(BuildContext context) {
-    final neon = context.colors.neon;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width =
-            constraints.hasBoundedWidth && constraints.maxWidth < canvasWidth
-            ? constraints.maxWidth
-            : canvasWidth;
-        return SizedBox(
-          key: const ValueKey('mobile_home_rest_canvas'),
-          width: width,
-          height: _canvasHeight,
-          child: CustomPaint(
-            painter: NeonHorizonPainter(glow: neon.glow, core: neon.core),
-          ),
-        );
-      },
-    );
-  }
+  Widget build(BuildContext context) => const NeonHorizon(
+    key: ValueKey('mobile_home_rest_canvas'),
+    width: canvasWidth,
+    height: _canvasHeight,
+  );
 }
 
 /// Full-tab importing state — Figma `Importing` (4394:88886).

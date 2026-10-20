@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/private_usd_feature_config.dart';
 import '../../../rust/api/private_usd.dart' as rust;
 import '../models/private_usd_record_key.dart';
 import '../models/private_usd_reverse_presentation.dart';
@@ -18,7 +19,7 @@ import 'private_usd_unfinished_provider.dart';
 /// the maker's deadline notes).
 const kPrivateUsdProgressTick = Duration(seconds: 15);
 
-/// One conversion as its progress screen shows it (plan reference §9.4 S5).
+/// One conversion as its progress screen shows it.
 @immutable
 class PrivateUsdConversionState {
   const PrivateUsdConversionState({
@@ -57,9 +58,9 @@ class PrivateUsdConversionState {
   );
 }
 
-/// One conversion's progress, driven by the foreground engine loop (§8.2
-/// `forward_advance`): it follows the engine's snapshot, reads the records
-/// once if the engine has not, and offers "Try now" and "Call it off".
+/// One conversion's progress, driven by the foreground engine loop: it
+/// follows the engine's snapshot, reads the records once if the engine has
+/// not, and offers "Try now" and "Call it off".
 final privateUsdConversionProvider = NotifierProvider.autoDispose
     .family<
       PrivateUsdConversionNotifier,
@@ -99,7 +100,7 @@ class PrivateUsdConversionNotifier extends Notifier<PrivateUsdConversionState> {
     try {
       await ref.read(privateUsdEngineProvider).loadRecords(key.accountUuid);
     } catch (error) {
-      if (kDebugMode) debugPrint('privateUsd: reading conversions failed');
+      privateUsdLog('reading conversions failed (${error.runtimeType})');
     }
     if (!ref.mounted) return;
     state = state.copyWith(
@@ -111,7 +112,7 @@ class PrivateUsdConversionNotifier extends Notifier<PrivateUsdConversionState> {
   /// "Try now": cuts the loop's nap short.
   void retryNow() => ref.read(privateUsdEngineProvider).nudge();
 
-  /// "Call it off" (§5.6 step 12): only before anything reached the chain.
+  /// "Call it off": only before anything reached the chain.
   Future<void> callOff() async {
     if (state.callingOff) return;
     state = state.copyWith(callingOff: true, clearCallOffError: true);
@@ -136,8 +137,8 @@ class PrivateUsdConversionNotifier extends Notifier<PrivateUsdConversionState> {
   }
 }
 
-/// The in-flight conversion banner (plan reference §9.4 S1): its progress
-/// route, the title, and the stage it is at.
+/// The in-flight conversion banner: its progress route, the title, and the
+/// stage it is at.
 @immutable
 class PrivateUsdBannerState {
   const PrivateUsdBannerState({
@@ -165,8 +166,8 @@ class PrivateUsdBannerState {
 }
 
 /// [accountUuid]'s conversion under way as a banner, or null. It stays while
-/// a conversion is unfinished, even when Private USD is otherwise unavailable
-/// (D16): only one runs at a time per account.
+/// a conversion is unfinished, even when Private USD is otherwise
+/// unavailable: only one runs at a time per account.
 final privateUsdConversionBannerProvider = Provider.autoDispose
     .family<PrivateUsdBannerState?, String>((ref, accountUuid) {
       final status = ref.watch(
@@ -189,7 +190,7 @@ final privateUsdConversionBannerProvider = Provider.autoDispose
         path: status.key.path,
         title: attention
             ? PrivateUsdCopy.bannerAttention
-            : PrivateUsdCopy.bannerToUsd,
+            : PrivateUsdCopy.convertingToUsd,
         detail: privateUsdForwardStageLabel(
           status.value,
           zcashConfirmations: confirmations,
@@ -198,9 +199,9 @@ final privateUsdConversionBannerProvider = Provider.autoDispose
       );
     });
 
-/// [accountUuid]'s reverse conversion under way as a banner (M6): it asks
-/// for attention while it waits on the user's payment or settlement
-/// approval (`needs_you`), or once its steps keep failing.
+/// [accountUuid]'s reverse conversion under way as a banner: it asks for
+/// attention while it waits on the user's payment or settlement approval
+/// (`needs_you`), or once its steps keep failing.
 PrivateUsdBannerState? _reverseBanner(Ref ref, String accountUuid) {
   final entry = ref.watch(
     privateUsdReverseConversionsProvider.select((all) {
@@ -219,7 +220,7 @@ PrivateUsdBannerState? _reverseBanner(Ref ref, String accountUuid) {
     path: entry.key.path,
     title: attention
         ? PrivateUsdCopy.bannerAttention
-        : PrivateUsdCopy.bannerToZec,
+        : PrivateUsdCopy.convertingToZec,
     detail: privateUsdReverseStageLabel(status.record),
     attention: attention,
   );

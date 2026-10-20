@@ -16,25 +16,26 @@ use zeroize::Zeroizing;
 use crate::wallet::keys;
 use crate::wallet::network::WalletNetwork;
 use crate::wallet::private_usd::{
-    deployment::{self, hex_address},
-    deposits,
+    abi::hex0x,
+    deployment, deposits,
     engine::{self, Activity, Clock, OpHandle, SystemClock},
     evm_rpc::EvmRpc,
     forward::{self, AcceptOutcome, AdvanceReport, ForwardWait, Quoted},
     joint::{self as joint_ops, SwapTxStatus},
     keys::{account_derivation, SwapKeyContext},
     models::{
-        Address, Amount, Direction, ForwardOutcome, ForwardRecord, NothingSentCause, RefundCause,
-        ReversePhase, ReverseRecord, ZcashTxId,
+        Address, Amount, Direction, ForwardOutcome, ForwardPhase, ForwardRecord, NothingSentCause,
+        RefundCause, ReversePhase, ReverseRecord, ZcashTxId,
     },
     railgun_keys,
     relayer_client::{RailgunBroadcast, RelayerClient},
     reverse::{self, FundingPrice, FundingRequest, ProvedFunding, ReverseAccept, ReverseReport},
     sends::{self, ProvedSend, SendRecord, Sends},
     store::SwapStore,
-    transport::RoutedTransport,
+    swap::{self, SwapCall},
     ErrorCode, PrivateUsdError, PrivateUsdNetwork,
 };
+use crate::wallet::routed_http::RoutedHttp;
 
 /// Why a Private USD call failed. Copy follows the code, never the message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,12 +50,8 @@ pub enum ApiPrivateUsdErrorCode {
     DepositUnpayable,
     ZcashRejected,
     Mismatch,
-    TokensUnreachable,
     TokensRefused,
-    TokensDeviceRefused,
-    NoTokensToday,
     TokensNeeded,
-    Keystore,
     ChainLagging,
     QuoteExpired,
     MakerUnavailable,
@@ -111,12 +108,8 @@ fn api_code(code: ErrorCode) -> ApiPrivateUsdErrorCode {
         ErrorCode::DepositUnpayable => Api::DepositUnpayable,
         ErrorCode::ZcashRejected => Api::ZcashRejected,
         ErrorCode::Mismatch => Api::Mismatch,
-        ErrorCode::TokensUnreachable => Api::TokensUnreachable,
         ErrorCode::TokensRefused => Api::TokensRefused,
-        ErrorCode::TokensDeviceRefused => Api::TokensDeviceRefused,
-        ErrorCode::NoTokensToday => Api::NoTokensToday,
         ErrorCode::TokensNeeded => Api::TokensNeeded,
-        ErrorCode::Keystore => Api::Keystore,
         ErrorCode::ChainLagging => Api::ChainLagging,
         ErrorCode::QuoteExpired => Api::QuoteExpired,
         ErrorCode::MakerUnavailable => Api::MakerUnavailable,
@@ -147,8 +140,7 @@ impl From<String> for ApiPrivateUsdError {
     }
 }
 
-/// A network's pinned deployment: everything Dart and Kotlin need, so they
-/// never duplicate config.
+/// A network's pinned deployment, as Dart reads it.
 pub struct ApiDeployment {
     /// `"mainnet"` or `"testnet"`.
     pub network: String,
@@ -176,12 +168,12 @@ pub struct ApiDeployment {
     /// The tokens the private USD balance counts as dollars, the swap token
     /// first. Each has `token_decimals`.
     pub usd_tokens: Vec<ApiUsdToken>,
-    /// Where public USDC is shielded into the private balance (M9); `None`
-    /// where no Deposits contract is pinned, which hides deposits.
+    /// Where public USDC is shielded into the private balance; `None` where
+    /// no Deposits contract is pinned, which hides deposits.
     pub deposits: Option<ApiDepositsPin>,
 }
 
-/// A network's pinned Deposits deployment (M9).
+/// A network's pinned Deposits deployment.
 pub struct ApiDepositsPin {
     /// The Deposits contract, `0x` lowercase.
     pub contract: String,
@@ -211,12 +203,12 @@ pub fn private_usd_deployment(network: String) -> Option<ApiDeployment> {
         network: network.record_name().into(),
         railgun_network: network.railgun_name().into(),
         chain_id: pins.chain_id as i64,
-        token: hex_address(&pins.token),
+        token: hex0x(&pins.token),
         token_decimals: deployment::TOKEN_DECIMALS,
         keyless_rpc_url: pins.keyless_rpc_url.into(),
         poi_node_url: pins.poi_node_url.into(),
-        railgun_proxy: hex_address(&pins.railgun_proxy),
-        relay_adapt: hex_address(&pins.relay_adapt),
+        railgun_proxy: hex0x(&pins.railgun_proxy),
+        relay_adapt: hex0x(&pins.relay_adapt),
         relayer_railgun_address: pins.relayer_railgun_address.into(),
         allowed_hosts: deployment::RAILGUN_PAGE_HOSTS
             .iter()
@@ -232,13 +224,13 @@ pub fn private_usd_deployment(network: String) -> Option<ApiDeployment> {
             .usd_tokens
             .iter()
             .map(|token| ApiUsdToken {
-                address: hex_address(&token.address),
+                address: hex0x(&token.address),
                 symbol: token.symbol.to_owned(),
             })
             .collect(),
         deposits: pins.deposits.map(|pin| ApiDepositsPin {
-            contract: hex_address(&pin.contract),
-            token: hex_address(&pin.token),
+            contract: hex0x(&pin.contract),
+            token: hex0x(&pin.token),
             token_symbol: pins
                 .usd_tokens
                 .iter()
@@ -309,10 +301,9 @@ pub fn private_usd_railgun_address(
     }))
 }
 
-// ---- conversions (M5) ----
+// ---- conversions ----
 
-/// What a call is doing now, for the progress screen (zapp
-/// `AtomicSwapActivity`, and the reverse steps).
+/// What a call is doing now, for the progress screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApiActivity {
     Depositing,
@@ -337,8 +328,8 @@ pub fn private_usd_cancel(op_id: u32) {
     engine::cancel_op(op_id);
 }
 
-/// What call `op_id` is doing now, while it runs (zapp `onActivity`); poll it
-/// about every 500 ms during an advance.
+/// What call `op_id` is doing now, while it runs; poll it about every 500 ms
+/// during an advance.
 #[frb(sync)]
 pub fn private_usd_activity(op_id: u32) -> Option<ApiActivity> {
     engine::op_activity(op_id).map(|activity| match activity {
@@ -355,7 +346,7 @@ pub fn private_usd_activity(op_id: u32) -> Option<ApiActivity> {
 /// Forgets every in-memory session: call it on lock. A forward quote made
 /// before the lock is never accepted after it, a reverse funding proved
 /// across the lock is never submitted, and each maker's `/v1/info` is
-/// checked again. (M4 adds its token issuance sessions here.)
+/// checked again.
 #[frb(sync)]
 pub fn private_usd_clear_sessions() {
     engine::clear_sessions();
@@ -377,7 +368,7 @@ pub fn private_usd_unfinished_count(
 }
 
 /// Every account with a conversion under way: the engine loop advances each
-/// of them while the app is open and unlocked (D14).
+/// of them while the app is open and unlocked.
 pub fn private_usd_accounts_with_unfinished(
     store_dir: String,
 ) -> Result<Vec<String>, ApiPrivateUsdError> {
@@ -434,8 +425,8 @@ pub struct ApiForwardQuote {
 pub enum ApiAcceptKind {
     /// The maker opened the swap, or is opening it: show its progress.
     Accepted,
-    /// The maker wants a Privacy Pass token and none is held (no tokens
-    /// client before M4). Nothing opened; abandon the conversion.
+    /// The maker wants a Privacy Pass token, which this build cannot get.
+    /// Nothing opened; abandon the conversion.
     TokensNeeded,
     /// Over before anything was sent; `cause` says why.
     NothingSent,
@@ -536,7 +527,7 @@ pub struct ApiForwardAdvance {
     /// How long to nap before the next advance; 0 once the record ended.
     pub next_poll_ms: u32,
     /// The step failed: the problem to show once steps have failed for a
-    /// minute in a row (reference §5.8).
+    /// minute in a row.
     pub problem: Option<ApiPrivateUsdErrorCode>,
 }
 
@@ -555,21 +546,20 @@ pub fn private_usd_forward_quote(
 ) -> Result<ApiForwardQuote, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
-        let network = parse_network_and_migrate(&db_path, &network)?;
-        let keys = SwapKeyContext::open(&db_path, network, &account_uuid, &secret)?;
-        let _driver = engine::lock_account(&account_uuid)?;
-        let call = forward_call(
+        let quoted = drive(
             &db_path,
-            network,
+            &network,
             &account_uuid,
             &store_dir,
+            &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            &keys,
-        );
-        let quoted = block_on(call.run(None, async |forward, store| {
-            forward.quote(store, units).await
-        }))?;
+            None,
+            async |call, op| {
+                call.forward(op, async |forward, store| forward.quote(store, units).await)
+                    .await
+            },
+        )?;
         Ok(api_quote(&quoted))
     }))
 }
@@ -592,21 +582,22 @@ pub fn private_usd_forward_accept(
 ) -> Result<ApiAcceptResult, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
-        let network = parse_network_and_migrate(&db_path, &network)?;
-        let keys = SwapKeyContext::open(&db_path, network, &account_uuid, &secret)?;
-        let _driver = engine::lock_account(&account_uuid)?;
-        let call = forward_call(
+        let outcome = drive(
             &db_path,
-            network,
+            &network,
             &account_uuid,
             &store_dir,
+            &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            &keys,
-        );
-        let outcome = block_on(call.run(None, async |forward, store| {
-            forward.accept(store, index, max_total_zat).await
-        }))?;
+            None,
+            async |call, op| {
+                call.forward(op, async |forward, store| {
+                    forward.accept(store, index, max_total_zat).await
+                })
+                .await
+            },
+        )?;
         let (kind, cause) = match outcome {
             AcceptOutcome::Accepted => (ApiAcceptKind::Accepted, None),
             AcceptOutcome::TokensNeeded => (ApiAcceptKind::TokensNeeded, None),
@@ -637,33 +628,31 @@ pub fn private_usd_forward_advance(
 ) -> Result<ApiForwardAdvance, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
-        let op = OpHandle::begin(op_id)?;
-        let network = parse_network_and_migrate(&db_path, &network)?;
-        let keys = SwapKeyContext::open(&db_path, network, &account_uuid, &secret)?;
-        let _driver = engine::lock_account(&account_uuid)?;
-        if op.cancelled() {
-            return Err(engine::cancelled().into());
-        }
-        let call = forward_call(
+        drive(
             &db_path,
-            network,
+            &network,
             &account_uuid,
             &store_dir,
+            &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            &keys,
-        );
-        let report = block_on(call.run(Some(&op), async |forward, store| {
-            forward.advance_report(store, index).await
-        }))?;
-        Ok(api_advance(&report, &db_path, network))
+            Some(op_id),
+            async |call, op| {
+                let report = call
+                    .forward(op, async |forward, store| {
+                        forward.advance_report(store, index).await
+                    })
+                    .await?;
+                Ok(api_advance(&report, call.main_db, call.network))
+            },
+        )
     }))
 }
 
-/// Drops swap `index` before it reached the chain (§5.6 step 12): an
-/// unanswered accept ends `MakerUnavailable` (a turn-away at the token gate
-/// included), an answered one `NeverOpened`. `TooLate` once a deposit
-/// started or the chain shows the swap. No key is needed.
+/// Drops swap `index` before it reached the chain: an unanswered accept ends
+/// `MakerUnavailable` (a turn-away at the token gate included), an answered
+/// one `NeverOpened`. `TooLate` once a deposit started or the chain shows
+/// the swap. No key is needed.
 pub fn private_usd_forward_abandon(
     network: String,
     account_uuid: String,
@@ -672,14 +661,7 @@ pub fn private_usd_forward_abandon(
     index: u32,
 ) -> Result<ApiForwardRecord, ApiPrivateUsdError> {
     catch(|| {
-        let network = keys::parse_network(&network)?;
-        let Some(network) = PrivateUsdNetwork::from_wallet(network) else {
-            return Err(PrivateUsdError::new(
-                ErrorCode::Unavailable,
-                "no Private USD deployment on this network",
-            )
-            .into());
-        };
+        let network = swap_network(&network)?;
         let _driver = engine::lock_account(&account_uuid)?;
         let record = block_on(forward::abandon_with(
             Path::new(&store_dir),
@@ -705,16 +687,16 @@ pub fn private_usd_forward_records(
         let Some(store) = SwapStore::open_existing(Path::new(&store_dir))? else {
             return Ok(Vec::new());
         };
-        Ok(forward::records(&store, &account_uuid)?
+        Ok(swap::records::<ForwardRecord>(&store, &account_uuid)?
             .iter()
             .map(|record| api_record(record, deposit_confirmations(&db_path, network, record)))
             .collect())
     })
 }
 
-// ---- reverse conversions (M6) ----
+// ---- reverse conversions ----
 
-/// Where a reverse conversion stands (zapp `ReversePhase`).
+/// Where a reverse conversion stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApiReversePhase {
     /// A reviewed draft: nothing accepted or paid, not under way.
@@ -833,7 +815,7 @@ pub struct ApiReverseAdvance {
     /// How long to nap before the next advance; 0 once it ended.
     pub next_poll_ms: u32,
     /// The step failed: the problem to show once steps have failed for a
-    /// minute in a row (reference §5.8).
+    /// minute in a row.
     pub problem: Option<ApiPrivateUsdErrorCode>,
     /// The user's approval is needed: "Pay {debit}" in `AwaitingFunding`,
     /// "Authorize settlement" in `AwaitingReady`.
@@ -857,25 +839,26 @@ pub fn private_usd_reverse_quote(
 ) -> Result<ApiReverseQuote, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
-        let network = parse_network_and_migrate(&db_path, &network)?;
-        let keys = SwapKeyContext::open(&db_path, network, &account_uuid, &secret)?;
-        let _driver = engine::lock_account(&account_uuid)?;
-        let call = reverse_call(
+        drive(
             &db_path,
-            network,
+            &network,
             &account_uuid,
             &store_dir,
+            &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            &keys,
-        );
-        Ok(block_on(call.run(None, async |reverse, store| {
-            let quoted = reverse.quote(store, units).await?;
-            Ok(ApiReverseQuote {
-                record: api_reverse_record(store, &account_uuid, &quoted.record),
-                cost_request: api_cost_request(&quoted.price),
-            })
-        }))?)
+            None,
+            async |call, op| {
+                call.reverse(op, async |reverse, store| {
+                    let quoted = reverse.quote(store, units).await?;
+                    Ok(ApiReverseQuote {
+                        record: api_reverse_record(store, &account_uuid, &quoted.record),
+                        cost_request: api_cost_request(&quoted.price),
+                    })
+                })
+                .await
+            },
+        )
     }))
 }
 
@@ -961,8 +944,8 @@ pub fn private_usd_reverse_go_ahead(
 
 /// The maker's acceptance of swap `index`, posted once, and its joint account
 /// imported (idempotent: call it again after an error). `TokensNeeded`: the
-/// maker wants a token and no tokens client exists before M4; nothing
-/// opened, so cancel the conversion. `NothingSent`: the maker's last word
+/// maker wants a token, which this build cannot get; nothing opened, so
+/// cancel the conversion. `NothingSent`: the maker's last word
 /// ended it (`CANCELLED`), with the cause when known.
 pub fn private_usd_reverse_accept(
     db_path: String,
@@ -976,21 +959,22 @@ pub fn private_usd_reverse_accept(
 ) -> Result<ApiAcceptResult, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
-        let network = parse_network_and_migrate(&db_path, &network)?;
-        let keys = SwapKeyContext::open(&db_path, network, &account_uuid, &secret)?;
-        let _driver = engine::lock_account(&account_uuid)?;
-        let call = reverse_call(
+        let outcome = drive(
             &db_path,
-            network,
+            &network,
             &account_uuid,
             &store_dir,
+            &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            &keys,
-        );
-        let outcome = block_on(call.run(None, async |reverse, store| {
-            reverse.accept(store, index).await
-        }))?;
+            None,
+            async |call, op| {
+                call.reverse(op, async |reverse, store| {
+                    reverse.accept(store, index).await
+                })
+                .await
+            },
+        )?;
         let (kind, cause) = match outcome {
             ReverseAccept::Accepted => (ApiAcceptKind::Accepted, None),
             ReverseAccept::TokensNeeded => (ApiAcceptKind::TokensNeeded, None),
@@ -1020,23 +1004,24 @@ pub fn private_usd_reverse_funding_request(
 ) -> Result<ApiFundingRequest, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
-        let network = parse_network_and_migrate(&db_path, &network)?;
-        let keys = SwapKeyContext::open(&db_path, network, &account_uuid, &secret)?;
-        let _driver = engine::lock_account(&account_uuid)?;
-        let call = reverse_call(
+        let request = drive(
             &db_path,
-            network,
+            &network,
             &account_uuid,
             &store_dir,
+            &secret,
             "",
             &eth_rpc_url,
-            &keys,
-        );
-        let request = block_on(call.run(None, async |reverse, store| {
-            reverse
-                .funding_request(store, index, &railgun_address)
+            None,
+            async |call, op| {
+                call.reverse(op, async |reverse, store| {
+                    reverse
+                        .funding_request(store, index, &railgun_address)
+                        .await
+                })
                 .await
-        }))?;
+            },
+        )?;
         Ok(api_funding_request(&request))
     }))
 }
@@ -1105,26 +1090,23 @@ pub fn private_usd_reverse_advance(
 ) -> Result<ApiReverseAdvance, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
-        let op = OpHandle::begin(op_id)?;
-        let network = parse_network_and_migrate(&db_path, &network)?;
-        let keys = SwapKeyContext::open(&db_path, network, &account_uuid, &secret)?;
-        let _driver = engine::lock_account(&account_uuid)?;
-        if op.cancelled() {
-            return Err(engine::cancelled().into());
-        }
-        let call = reverse_call(
+        drive(
             &db_path,
-            network,
+            &network,
             &account_uuid,
             &store_dir,
+            &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            &keys,
-        );
-        Ok(block_on(call.run(Some(&op), async |reverse, store| {
-            let report = reverse.advance_report(store, index).await?;
-            Ok(api_reverse_advance(store, &account_uuid, &report))
-        }))?)
+            Some(op_id),
+            async |call, op| {
+                call.reverse(op, async |reverse, store| {
+                    let report = reverse.advance_report(store, index).await?;
+                    Ok(api_reverse_advance(store, &account_uuid, &report))
+                })
+                .await
+            },
+        )
     }))
 }
 
@@ -1146,22 +1128,23 @@ pub fn private_usd_reverse_authorize_ready(
 ) -> Result<ApiReverseRecord, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
-        let network = parse_network_and_migrate(&db_path, &network)?;
-        let keys = SwapKeyContext::open(&db_path, network, &account_uuid, &secret)?;
-        let _driver = engine::lock_account(&account_uuid)?;
-        let call = reverse_call(
+        drive(
             &db_path,
-            network,
+            &network,
             &account_uuid,
             &store_dir,
+            &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            &keys,
-        );
-        Ok(block_on(call.run(None, async |reverse, store| {
-            let record = reverse.authorize_ready(store, index).await?;
-            Ok(api_reverse_record(store, &account_uuid, &record))
-        }))?)
+            None,
+            async |call, op| {
+                call.reverse(op, async |reverse, store| {
+                    let record = reverse.authorize_ready(store, index).await?;
+                    Ok(api_reverse_record(store, &account_uuid, &record))
+                })
+                .await
+            },
+        )
     }))
 }
 
@@ -1183,22 +1166,23 @@ pub fn private_usd_reverse_cancel(
 ) -> Result<ApiReverseRecord, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
-        let network = parse_network_and_migrate(&db_path, &network)?;
-        let keys = SwapKeyContext::open(&db_path, network, &account_uuid, &secret)?;
-        let _driver = engine::lock_account(&account_uuid)?;
-        let call = reverse_call(
+        drive(
             &db_path,
-            network,
+            &network,
             &account_uuid,
             &store_dir,
+            &secret,
             &lightwalletd_url,
             &eth_rpc_url,
-            &keys,
-        );
-        Ok(block_on(call.run(None, async |reverse, store| {
-            let record = reverse.cancel(store, index).await?;
-            Ok(api_reverse_record(store, &account_uuid, &record))
-        }))?)
+            None,
+            async |call, op| {
+                call.reverse(op, async |reverse, store| {
+                    let record = reverse.cancel(store, index).await?;
+                    Ok(api_reverse_record(store, &account_uuid, &record))
+                })
+                .await
+            },
+        )
     }))
 }
 
@@ -1240,22 +1224,23 @@ pub fn private_usd_reverse_rescue(
 ) -> Result<ApiReverseRecord, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
-        let network = parse_network_and_migrate(&db_path, &network)?;
-        let keys = SwapKeyContext::open(&db_path, network, &account_uuid, &secret)?;
-        let _driver = engine::lock_account(&account_uuid)?;
-        let call = reverse_call(
+        drive(
             &db_path,
-            network,
+            &network,
             &account_uuid,
             &store_dir,
+            &secret,
             "",
             &eth_rpc_url,
-            &keys,
-        );
-        Ok(block_on(call.run(None, async |reverse, store| {
-            let record = reverse.rescue(store, index).await?;
-            Ok(api_reverse_record(store, &account_uuid, &record))
-        }))?)
+            None,
+            async |call, op| {
+                call.reverse(op, async |reverse, store| {
+                    let record = reverse.rescue(store, index).await?;
+                    Ok(api_reverse_record(store, &account_uuid, &record))
+                })
+                .await
+            },
+        )
     }))
 }
 
@@ -1269,20 +1254,19 @@ pub fn private_usd_reverse_records(
         let Some(store) = SwapStore::open_existing(Path::new(&store_dir))? else {
             return Ok(Vec::new());
         };
-        Ok(reverse::records(&store, &account_uuid)?
+        Ok(swap::records::<ReverseRecord>(&store, &account_uuid)?
             .iter()
             .map(|record| api_reverse_record(&store, &account_uuid, record))
             .collect())
     })
 }
 
-// ---- private sends and withdrawals (M7) ----
+// ---- private sends and withdrawals ----
 
 /// The relayer's terms for private sends and withdrawals, already held to
-/// the deployment's pins (reference §6.7 steps 1–2). The page's broadcaster
-/// is `{chainId, railgunProxy, railgunAddress, token, minFee: fee_floor,
-/// feePerUnitGas?, maxGasPrice: max_gas_price_wei}`. Amounts are decimal
-/// base units of `token`.
+/// the deployment's pins. The page's broadcaster is `{chainId, railgunProxy,
+/// railgunAddress, token, minFee: fee_floor, feePerUnitGas?, maxGasPrice:
+/// max_gas_price_wei}`. Amounts are decimal base units of `token`.
 pub struct ApiRailgunSendsTerms {
     pub chain_id: i64,
     /// The relayer's `0zk`, which the fee note pays.
@@ -1378,7 +1362,7 @@ pub fn private_usd_railgun_sends_terms(
     catch(|| {
         let network = swap_network(&network)?;
         let pins = deployment::deployment(network);
-        let transport = RoutedTransport::new();
+        let transport = RoutedHttp::new();
         let relayer = RelayerClient::new(&transport, pins.relayer_url);
         let terms = block_on(relayer.railgun_sends(pins))?.ok_or_else(|| {
             PrivateUsdError::new(
@@ -1389,8 +1373,8 @@ pub fn private_usd_railgun_sends_terms(
         Ok(ApiRailgunSendsTerms {
             chain_id: terms.chain_id as i64,
             railgun_address: terms.railgun_address.to_owned(),
-            railgun_proxy: hex_address(&terms.railgun_proxy),
-            token: hex_address(&terms.fee_token),
+            railgun_proxy: hex0x(&terms.railgun_proxy),
+            token: hex0x(&terms.fee_token),
             fee_floor: terms.min_fee.0.to_string(),
             fee_per_unit_gas: terms.fee_per_unit_gas,
             fee_expires_at: terms.fee_expires_at.map(seconds),
@@ -1401,9 +1385,9 @@ pub fn private_usd_railgun_sends_terms(
     })
 }
 
-/// Keeps a proved send before it is posted (zapp `PrivateUsdSendLog.prove`).
-/// Call it only while still unlocked and in the foreground, then post it
-/// with `private_usd_relayer_transact`. On any error nothing was kept and
+/// Keeps a proved send before it is posted. Call it only while still
+/// unlocked and in the foreground, then post it with
+/// `private_usd_relayer_transact`. On any error nothing was kept and
 /// nothing goes out: `Mismatch` (the proof is not this deployment's or not
 /// this send's, or another proof is kept under the id), `RelayerFee` (a fee
 /// above the cap), `Busy` (another payment of the account is unsettled, or
@@ -1471,7 +1455,7 @@ pub fn private_usd_relayer_transact(
         let Some(mut store) = SwapStore::open_existing(Path::new(&store_dir))? else {
             return Err(PrivateUsdError::new(ErrorCode::Other, "no such send").into());
         };
-        let transport = RoutedTransport::new();
+        let transport = RoutedHttp::new();
         let clock = SystemClock;
         let relay = Sends::new(&transport, pins.relayer_url, &clock, &account_uuid);
         let answer = block_on(relay.transact(&mut store, &send_id))?;
@@ -1479,11 +1463,11 @@ pub fn private_usd_relayer_transact(
     })
 }
 
-/// One settlement pass over the account's unconfirmed sends (zapp
-/// `PrivateUsdSender.settleAll`): each is marked confirmed from its receipt
-/// (1 confirmation) or its nullifiers, dropped once it reverted or another
-/// proof took part of its notes, or posted again as the same bytes. A pass
-/// asked for while one runs returns at once. Returns the sends after it.
+/// One settlement pass over the account's unconfirmed sends: each is marked
+/// confirmed from its receipt (1 confirmation) or its nullifiers, dropped
+/// once it reverted or another proof took part of its notes, or posted again
+/// as the same bytes. A pass asked for while one runs returns at once.
+/// Returns the sends after it.
 pub fn private_usd_send_settle_all(
     store_dir: String,
     network: String,
@@ -1496,8 +1480,8 @@ pub fn private_usd_send_settle_all(
             return Ok(Vec::new());
         };
         let pins = deployment::deployment(network);
-        let transport = RoutedTransport::new();
-        let chain = EvmRpc::new(&transport, pins.rpc_url(&eth_rpc_url), pins);
+        let transport = RoutedHttp::new();
+        let chain = EvmRpc::new(&transport, pins, &eth_rpc_url);
         let clock = SystemClock;
         let relay = Sends::new(&transport, pins.relayer_url, &clock, &account_uuid);
         Ok(block_on(relay.settle_all(&mut store, &chain))?
@@ -1511,7 +1495,7 @@ fn api_send_record(send: &SendRecord) -> ApiSendRecord {
     let relay = send.relay.as_ref();
     ApiSendRecord {
         send_id: send.id.clone(),
-        token: hex_address(&send.token.0),
+        token: hex0x(&send.token.0),
         amount: send.amount.0.to_string(),
         fee: send.fee.0.to_string(),
         to: send.to.clone(),
@@ -1530,7 +1514,7 @@ fn api_send_record(send: &SendRecord) -> ApiSendRecord {
 }
 
 fn api_transact(answer: &RailgunBroadcast) -> ApiTransactResult {
-    let to_hex = |transaction: &[u8; 32]| format!("0x{}", hex::encode(transaction));
+    let to_hex = |transaction: &[u8; 32]| hex0x(transaction);
     let (kind, transactions, retry_after_secs) = match answer {
         RailgunBroadcast::Sent(transaction) => {
             (ApiTransactKind::Sent, vec![to_hex(transaction)], None)
@@ -1554,7 +1538,7 @@ fn api_transact(answer: &RailgunBroadcast) -> ApiTransactResult {
     }
 }
 
-// ---- deposits (M9) ----
+// ---- deposits ----
 
 /// The relayer's deposit terms, held to the pin, for the Receive USDC sheet
 /// (amounts in token base units).
@@ -1595,7 +1579,7 @@ pub enum ApiDepositKind {
     Rescue,
 }
 
-/// Where a deposit stands (`docs/deposits.md`, "What to show").
+/// Where a deposit stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ApiDepositState {
     /// Kept, not yet answered with a transaction: "Received $X" (or, with
@@ -1687,7 +1671,7 @@ pub fn private_usd_deposit_terms(network: String) -> Result<ApiDepositTerms, Api
     catch(|| {
         let network = swap_network(&network)?;
         let pins = deployment::deployment(network);
-        let transport = RoutedTransport::new();
+        let transport = RoutedHttp::new();
         let relayer = RelayerClient::new(&transport, pins.relayer_url);
         let terms = block_on(async {
             let terms = relayer.terms().await?;
@@ -1698,20 +1682,16 @@ pub fn private_usd_deposit_terms(network: String) -> Result<ApiDepositTerms, Api
 }
 
 /// What a deposit of `value` costs and brings under the relayer's `fee`
-/// and `fee_bps`; `None` when its fee is above the cap (D23) or not under
-/// the value, so nothing would be signed.
+/// and `fee_bps`; `None` when its fee is above the cap or not under the
+/// value, so nothing would be signed.
 #[frb(sync)]
-pub fn private_usd_deposit_quote(fee: String, fee_bps: u32, value: String) -> Option<ApiDepositQuote> {
+pub fn private_usd_deposit_quote(
+    fee: String,
+    fee_bps: u32,
+    value: String,
+) -> Option<ApiDepositQuote> {
     let (fee, value) = (fee.parse::<u128>().ok()?, value.parse::<u128>().ok()?);
-    let terms = deposits::DepositTerms {
-        relayer: [0; 20],
-        fee,
-        fee_bps,
-        fee_expires_at: None,
-        min_value: 0,
-        max_validity: 0,
-    };
-    let fee = deposits::capped_fee(&terms, value).ok()?;
+    let fee = deposits::capped_fee(fee, fee_bps, value).ok()?;
     Some(ApiDepositQuote {
         fee: fee.to_string(),
         arrives: deposits::arrives(value, fee).to_string(),
@@ -1739,8 +1719,9 @@ pub fn private_usd_deposit_address(
             .into());
         }
         let index = match SwapStore::open_existing(Path::new(&store_dir))? {
-            Some(store) => deposits::last_scan(&store, &account_uuid)?
-                .map_or(0, |(_, scan)| scan.showing),
+            Some(store) => {
+                deposits::last_scan(&store, &account_uuid)?.map_or(0, |(_, scan)| scan.showing)
+            }
             None => 0,
         };
         let address = keys.deposit_keys(index)?.key.address();
@@ -1794,19 +1775,7 @@ pub fn private_usd_deposit_pass(
             };
             if !used {
                 let address = keys.deposit_keys(0)?.key.address();
-                return Ok(ApiDepositPass {
-                    index: 0,
-                    address: deposits::eip55(&address),
-                    used: Vec::new(),
-                    records: Vec::new(),
-                    terms: None,
-                    terms_error: None,
-                    rescuable: Vec::new(),
-                    scanned: false,
-                    scanned_at: None,
-                    next_poll_ms: None,
-                    problem: None,
-                });
+                return Ok(api_deposit_pass(&deposits::PassReport::unused(address)));
             }
         }
         let report = block_on(deposits::run(
@@ -1839,9 +1808,9 @@ pub fn private_usd_deposit_records(
 }
 
 /// "Recover" a deposit whose note Railgun's screening refused and sent back
-/// to the address's vault (the user's action, behind a confirmation, D18):
-/// signs a rescue with the vault's next nonce, keeps it and posts it. It
-/// pays the relayer's `fee` alone, at most 2 USDC (X6). `Unavailable` when
+/// to the address's vault (the user's action, behind a confirmation): signs
+/// a rescue with the vault's next nonce, keeps it and posts it. It pays the
+/// relayer's `fee` alone, at most 2 USDC. `Unavailable` when
 /// the vault holds no more than the fee, `Busy` while a rescue of the
 /// address or a pass runs.
 pub fn private_usd_deposit_rescue(
@@ -1926,8 +1895,16 @@ fn api_deposit_pass(report: &deposits::PassReport) -> ApiDepositPass {
             })
             .collect(),
         records: report.records.iter().map(api_deposit_record).collect(),
-        terms: report.terms.as_ref().ok().map(api_deposit_terms),
-        terms_error: report.terms.as_ref().err().map(|code| api_code(*code)),
+        terms: report
+            .terms
+            .as_ref()
+            .and_then(|terms| terms.as_ref().ok())
+            .map(api_deposit_terms),
+        terms_error: report
+            .terms
+            .as_ref()
+            .and_then(|terms| terms.as_ref().err())
+            .map(|code| api_code(*code)),
         rescuable: report
             .rescuable
             .iter()
@@ -1949,26 +1926,6 @@ fn api_deposit_pass(report: &deposits::PassReport) -> ApiDepositPass {
             .next_poll
             .map(|nap| u32::try_from(nap.as_millis()).unwrap_or(u32::MAX)),
         problem: report.problem.map(api_code),
-    }
-}
-
-fn reverse_call<'s>(
-    db_path: &'s str,
-    network: WalletNetwork,
-    account_uuid: &'s str,
-    store_dir: &'s str,
-    lightwalletd_url: &'s str,
-    eth_rpc_url: &'s str,
-    keys: &'s SwapKeyContext,
-) -> reverse::ReverseCall<'s> {
-    reverse::ReverseCall {
-        main_db: db_path,
-        network,
-        account: account_uuid,
-        store_dir: Path::new(store_dir),
-        lightwalletd_url,
-        eth_rpc_url,
-        keys,
     }
 }
 
@@ -2005,7 +1962,7 @@ fn api_cost_request(price: &FundingPrice) -> ApiReverseCostRequest {
     ApiReverseCostRequest {
         index: price.index,
         amount: price.amount.0.to_string(),
-        railgun_proxy: hex_address(&price.railgun_proxy),
+        railgun_proxy: hex0x(&price.railgun_proxy),
         fee: price.fee.0.to_string(),
         fee_expires_at: price.fee_expires_at.map(seconds),
     }
@@ -2014,19 +1971,11 @@ fn api_cost_request(price: &FundingPrice) -> ApiReverseCostRequest {
 fn api_funding_request(request: &FundingRequest) -> ApiFundingRequest {
     ApiFundingRequest {
         amount: request.amount.0.to_string(),
-        railgun_proxy: hex_address(&request.railgun_proxy),
-        token: hex_address(&request.token),
-        calls_to: request
-            .calls
-            .iter()
-            .map(|call| hex_address(&call.to))
-            .collect(),
-        calls_data: request
-            .calls
-            .iter()
-            .map(|call| format!("0x{}", hex::encode(&call.data)))
-            .collect(),
-        relay_adapt: hex_address(&request.relay_adapt),
+        railgun_proxy: hex0x(&request.railgun_proxy),
+        token: hex0x(&request.token),
+        calls_to: request.calls.iter().map(|call| hex0x(&call.to)).collect(),
+        calls_data: request.calls.iter().map(|call| hex0x(&call.data)).collect(),
+        relay_adapt: hex0x(&request.relay_adapt),
         fee: request.fee.0.to_string(),
         already_funded: request.already_funded,
     }
@@ -2122,24 +2071,37 @@ fn api_reverse_phase(phase: ReversePhase) -> ApiReversePhase {
     }
 }
 
-fn forward_call<'s>(
-    db_path: &'s str,
-    network: WalletNetwork,
-    account_uuid: &'s str,
-    store_dir: &'s str,
-    lightwalletd_url: &'s str,
-    eth_rpc_url: &'s str,
-    keys: &'s SwapKeyContext,
-) -> forward::ForwardCall<'s> {
-    forward::ForwardCall {
+/// A key-using conversion call: registers `op_id` when given, checks the
+/// seed against the account, takes the account's driver lock (`Busy` if
+/// taken), and runs `step` over the account's paths and endpoints.
+fn drive<T>(
+    db_path: &str,
+    network: &str,
+    account_uuid: &str,
+    store_dir: &str,
+    secret: &[u8],
+    lightwalletd_url: &str,
+    eth_rpc_url: &str,
+    op_id: Option<u32>,
+    step: impl AsyncFnOnce(&SwapCall<'_>, Option<&OpHandle>) -> Result<T, PrivateUsdError>,
+) -> Result<T, ApiPrivateUsdError> {
+    let op = op_id.map(OpHandle::begin).transpose()?;
+    let network = parse_network_and_migrate(db_path, network)?;
+    let keys = SwapKeyContext::open(db_path, network, account_uuid, secret)?;
+    let _driver = engine::lock_account(account_uuid)?;
+    if op.as_ref().is_some_and(OpHandle::cancelled) {
+        return Err(engine::cancelled().into());
+    }
+    let call = SwapCall {
         main_db: db_path,
         network,
         account: account_uuid,
         store_dir: Path::new(store_dir),
         lightwalletd_url,
         eth_rpc_url,
-        keys,
-    }
+        keys: &keys,
+    };
+    block_on(step(&call, op.as_ref()))
 }
 
 /// Runs an engine future on a runtime of its own. Never call it from async
@@ -2161,8 +2123,8 @@ fn api_quote(quoted: &Quoted) -> ApiForwardQuote {
         relayer_fee: offer.relayer_fee.0.to_string(),
         receives: offer.receives.0.to_string(),
         deposit_zat: offer.quote.deposit_zat,
-        deposit_fee_zat: offer.deposit_fee_zat,
-        max_total_zat: offer.max_total_zat(),
+        deposit_fee_zat: offer.deposit_fee_zatoshi,
+        max_total_zat: offer.max_total_zatoshi(),
         fee_expires_at: offer.fee_expires_at.map(seconds),
     }
 }
@@ -2203,15 +2165,15 @@ fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> Api
             Some(api_cause(*cause)),
         ),
     };
-    let phase = match record.phase_name() {
-        "PAID" => ApiForwardPhase::Paid,
-        "REFUNDED" => ApiForwardPhase::Refunded,
-        "NOTHING_SENT" => ApiForwardPhase::NothingSent,
-        "REFUNDING" => ApiForwardPhase::Refunding,
-        "CLAIMING" => ApiForwardPhase::Claiming,
-        "CONFIRMING" => ApiForwardPhase::Confirming,
-        "DEPOSITING" => ApiForwardPhase::Depositing,
-        _ => ApiForwardPhase::Opening,
+    let phase = match record.phase() {
+        ForwardPhase::Opening => ApiForwardPhase::Opening,
+        ForwardPhase::Depositing => ApiForwardPhase::Depositing,
+        ForwardPhase::Confirming => ApiForwardPhase::Confirming,
+        ForwardPhase::Claiming => ApiForwardPhase::Claiming,
+        ForwardPhase::Refunding => ApiForwardPhase::Refunding,
+        ForwardPhase::Paid => ApiForwardPhase::Paid,
+        ForwardPhase::Refunded => ApiForwardPhase::Refunded,
+        ForwardPhase::NothingSent => ApiForwardPhase::NothingSent,
     };
     ApiForwardRecord {
         index: record.index,
@@ -2254,7 +2216,7 @@ fn deposit_confirmations(
         return None;
     }
     let deposit = record.deposit.as_ref()?;
-    let txid = forward::internal_txid(&deposit.tx_id).ok()?;
+    let txid = joint_ops::internal_txid(&deposit.tx_id).ok()?;
     let expiry = u32::try_from(deposit.expiry_height).unwrap_or(u32::MAX);
     match joint_ops::swap_tx_status(db_path, network, &txid, expiry).ok()? {
         SwapTxStatus::Mined { confirmations, .. } => Some(confirmations),
@@ -2265,7 +2227,7 @@ fn deposit_confirmations(
 /// A record's transaction id in the wallet DB's byte order, as history rows
 /// carry it.
 fn internal_hex(tx_id: &ZcashTxId) -> Option<String> {
-    forward::internal_txid(tx_id)
+    joint_ops::internal_txid(tx_id)
         .ok()
         .map(|txid| hex::encode(txid.as_ref()))
 }

@@ -1,52 +1,38 @@
 import 'dart:math';
 
 import '../../../core/storage/app_secure_store.dart';
+import 'private_usd_pause.dart';
 
-/// The random 32-byte key that encrypts one account's Railgun wallet in the
-/// page's IndexedDB (plan §3.3, §3.4). It is stored as an app-managed secret,
-/// encrypted under the session password and rotated with it, like the voting
-/// hotkeys: together with the page's storage it opens the Railgun wallet.
-///
-/// Losing it costs a rescan, never funds: the page recreates a wallet whose
-/// stored copy no longer opens.
-abstract interface class RailgunEngineKeyStore {
-  /// The key for [accountUuid] as 64 hex characters, created on first use.
-  /// Throws [RailgunEngineKeyLockedException] while the wallet is locked.
-  Future<String> keyFor(String accountUuid);
-
-  /// Whether [accountUuid] has a key, which [keyFor] makes when the page
-  /// first opens the account's wallet: whether the account used Private USD.
-  /// Reads no secret, so it works while locked.
-  Future<bool> has(String accountUuid);
-
-  Future<void> delete(String accountUuid);
-}
-
-class RailgunEngineKeyLockedException implements Exception {
+class RailgunEngineKeyLockedException implements PrivateUsdPause {
   const RailgunEngineKeyLockedException();
 
   @override
   String toString() => 'The wallet is locked.';
 }
 
-class SecureRailgunEngineKeyStore implements RailgunEngineKeyStore {
-  SecureRailgunEngineKeyStore(this._storage, {Random? random})
+/// The random 32-byte key that encrypts one account's Railgun wallet in the
+/// page's IndexedDB. It is stored as an app-managed secret, encrypted under
+/// the session password and rotated with it, like the voting hotkeys:
+/// together with the page's storage it opens the Railgun wallet.
+///
+/// Losing it costs a rescan, never funds: the page recreates a wallet whose
+/// stored copy no longer opens.
+class RailgunEngineKeyStore {
+  RailgunEngineKeyStore(this._storage, {Random? random})
     : _random = random ?? Random.secure();
 
   final AppSecureStore _storage;
   final Random _random;
 
-  static String storageKey(String accountUuid) =>
-      '$kRailgunEncryptionKeyStoragePrefix$accountUuid';
-
   static final _hexKey = RegExp(r'^[0-9a-f]{64}$');
 
-  @override
+  /// The key for [accountUuid] as 64 hex characters, created on first use.
+  /// Throws [RailgunEngineKeyLockedException] while the wallet is locked.
   Future<String> keyFor(String accountUuid) async {
     if (!_storage.hasSessionPassword) {
       throw const RailgunEngineKeyLockedException();
     }
-    final key = storageKey(accountUuid);
+    final key = AppSecureStore.railgunEncryptionKeyStorageKey(accountUuid);
     final stored = await _storage.readSecretStringWithOptions(
       key,
       requireUnlockedSession: true,
@@ -63,12 +49,17 @@ class SecureRailgunEngineKeyStore implements RailgunEngineKeyStore {
     return created;
   }
 
-  // The stored value stays encrypted: only whether there is one counts.
-  @override
+  /// Whether [accountUuid] has a key, which [keyFor] makes when the page
+  /// first opens the account's wallet: whether the account used Private USD.
+  /// Reads no secret (the stored value stays encrypted), so it works while
+  /// locked.
   Future<bool> has(String accountUuid) async =>
-      await _storage.readString(storageKey(accountUuid)) != null;
+      await _storage.readString(
+        AppSecureStore.railgunEncryptionKeyStorageKey(accountUuid),
+      ) !=
+      null;
 
-  @override
-  Future<void> delete(String accountUuid) =>
-      _storage.delete(storageKey(accountUuid));
+  Future<void> delete(String accountUuid) => _storage.delete(
+    AppSecureStore.railgunEncryptionKeyStorageKey(accountUuid),
+  );
 }

@@ -761,8 +761,8 @@ class _SyncKeepAwakeToggle extends StatelessWidget {
 
 const _settingsRowHeight = 44.0;
 
-/// Private USD's Ethereum RPC (owner, 2026-10-17): "Default", or the host of
-/// the user's own URL; never the whole URL, which can hold a key.
+/// Private USD's Ethereum RPC: "Default", or the host of the user's own URL;
+/// never the whole URL, which can hold a key.
 class _EthereumRpcRow extends ConsumerWidget {
   const _EthereumRpcRow({
     required this.textStyle,
@@ -808,8 +808,6 @@ class _RowIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Neon redesign: each leading glyph sits on a cut-corner plate with a
-    // lit edge, tinted red.
     final neon = context.colors.neon;
     return Container(
       width: 30,

@@ -27,7 +27,7 @@ enum NeonSyncLinePart {
   head,
 }
 
-/// Which of the two sync layers a [NeonSyncBackdrop] draws.
+/// Which of the two sync layers a [NeonSyncLineLayer] draws.
 enum NeonSyncLayer {
   /// Behind the content: the Tron floor, and the sync line once synced.
   back,
@@ -50,12 +50,15 @@ abstract final class NeonSyncReadout {
       '${checking ? 'Check' : 'Sync'} $percent%';
 }
 
-/// The type size of a sync line's readout.
-typedef NeonSyncReadoutType = ({double fontSize, double letterSpacing});
-
-/// Home's readout type. A screen whose first block sits close under the top
-/// sets a smaller one so a long readout ends above it.
-const kNeonSyncReadoutType = (fontSize: 9.0, letterSpacing: 2.2);
+/// Home's readout style. A screen whose first block sits close under the top
+/// sets a smaller one, so a long readout ends above it.
+const kNeonSyncReadoutStyle = TextStyle(
+  fontFamily: kGothamFamily,
+  fontWeight: FontWeight.w300,
+  fontSize: 9,
+  height: 1,
+  letterSpacing: 2.2,
+);
 
 /// What a sync line shows, whatever is syncing: Home's wallet, or the
 /// Railgun wallet on the Private USD screen.
@@ -69,7 +72,7 @@ class NeonSyncLine {
     this.failed = false,
     bool? scanning,
     this.lineX = _lineXFactor,
-    this.readoutType = kNeonSyncReadoutType,
+    this.readoutStyle = kNeonSyncReadoutStyle,
   }) : scanning = scanning ?? climbing;
 
   /// How far the line has climbed, 0..1.
@@ -78,7 +81,7 @@ class NeonSyncLine {
   /// A [NeonSyncReadout].
   final String readout;
 
-  /// What a screen reader hears, in a live region.
+  /// What a screen reader hears.
   final String semanticsLabel;
 
   /// Climbing: the line is drawn over the content, lit, with a pulse. Once
@@ -93,8 +96,8 @@ class NeonSyncLine {
   /// Where the line stands, as a fraction of the width.
   final double lineX;
 
-  /// The type size of [readout].
-  final NeonSyncReadoutType readoutType;
+  /// The style of [readout], drawn in the line's colours.
+  final TextStyle readoutStyle;
 }
 
 /// One layer of [line], below or above the content as Home layers it: the
@@ -115,42 +118,40 @@ class NeonSyncLineLayer extends StatelessWidget {
   /// The page under the line has scrolled away from its top
   /// ([NeonSyncScrolled]). A synced line's head and readout, drawn in front,
   /// then fade out and the whole line runs behind the content, so nothing
-  /// fixed is drawn over the blocks scrolling past (owner, 2026-10-17).
+  /// fixed is drawn over the blocks scrolling past.
   final bool scrolled;
+
+  /// The part of the line this layer draws.
+  NeonSyncLinePart get linePart => switch ((line.climbing, layer)) {
+    (true, NeonSyncLayer.front) => NeonSyncLinePart.whole,
+    (true, NeonSyncLayer.back) => NeonSyncLinePart.none,
+    (false, NeonSyncLayer.front) => NeonSyncLinePart.head,
+    (false, NeonSyncLayer.back) =>
+      scrolled ? NeonSyncLinePart.whole : NeonSyncLinePart.belowHead,
+  };
+
+  /// Whether this layer draws the floor: the back one does.
+  bool get drawsFloor => layer == NeonSyncLayer.back;
 
   @override
   Widget build(BuildContext context) {
-    final front = layer == NeonSyncLayer.front;
-    final view = NeonSyncBackdropView(
-      progress: line.progress,
-      readout: line.readout,
-      active: line.climbing,
-      floorFlows: line.scanning,
-      failed: line.failed,
-      drawFloor: !front,
-      linePart: switch ((line.climbing, front)) {
-        (true, true) => NeonSyncLinePart.whole,
-        (true, false) => NeonSyncLinePart.none,
-        (false, true) => NeonSyncLinePart.head,
-        (false, false) =>
-          scrolled ? NeonSyncLinePart.whole : NeonSyncLinePart.belowHead,
-      },
-      drawReadout: front,
-      lineX: line.lineX,
-      readoutType: line.readoutType,
+    final view = _NeonSyncLineView(
+      line: line,
+      drawFloor: drawsFloor,
+      linePart: linePart,
+      drawReadout: !drawsFloor,
     );
-    if (!front) return ExcludeSemantics(child: view);
+    if (drawsFloor) return ExcludeSemantics(child: view);
+    // The label sits outside the fade, so screen readers still hear the sync
+    // while the head is faded out.
     return IgnorePointer(
       child: Semantics(
         container: true,
-        liveRegion: true,
         label: line.semanticsLabel,
         child: ExcludeSemantics(
           child: AnimatedOpacity(
             opacity: scrolled && !line.climbing ? 0 : 1,
             duration: const Duration(milliseconds: 200),
-            // Faded out, the head still reports the sync to screen readers.
-            alwaysIncludeSemantics: true,
             child: view,
           ),
         ),
@@ -218,15 +219,14 @@ class NeonSyncOcclude extends StatelessWidget {
       ColoredBox(color: context.colors.background.window, child: child);
 }
 
-/// Home's backdrop in the neon redesign, in two layers around the content.
+/// Home's backdrop, in two layers around the content.
 ///
 /// A Tron floor recedes to a red horizon low on the screen and flows toward
-/// the viewer while Veylor scans; otherwise it stands still. The sync line, a lit tube in the right part
-/// of the screen, rises from the bottom with the scan's progress and reads
-/// the percentage at its head. While it climbs it is drawn over the content;
-/// once synced it runs the full height behind the content, out of the way,
-/// and only its "SYNCED" readout stays on top. It replaces the top bar's
-/// "Veylor is synced" status.
+/// the viewer while Veylor scans; otherwise it stands still. The sync line,
+/// a lit tube in the right part of the screen, rises from the bottom with
+/// the scan's progress and reads the percentage at its head. While it climbs
+/// it is drawn over the content; once synced it runs the full height behind
+/// the content, out of the way, and only its "SYNCED" readout stays on top.
 class NeonSyncBackdrop extends ConsumerWidget {
   const NeonSyncBackdrop({
     this.layer = NeonSyncLayer.back,
@@ -243,18 +243,25 @@ class NeonSyncBackdrop extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final sync = ref.watch(syncProvider).value ?? SyncState();
     final whole = ref.watch(syncDisplayWholePercentageProvider);
+    final networkPrivacy = ref.watch(networkPrivacyProvider);
     final status = SyncStatusLabel.from(
       sync,
       displayWholePercentage: whole,
-      networkPrivacy: ref.watch(networkPrivacyProvider),
+      networkPrivacy: networkPrivacy,
     );
+    // The Tor states as [SyncStatusLabel.from] decides them: a failed Tor
+    // route wins over everything, and only then can the sync wait on Tor.
+    final torFailed =
+        networkPrivacy.torRouteRetained &&
+        networkPrivacy.status == NetworkPrivacyConnectionStatus.failed;
+    final waitingOnTor = !torFailed && syncIsWaitingOnTor(networkPrivacy, sync);
     // A wallet a few blocks behind is catching up, not syncing: its line
     // stays full and behind the content instead of dropping and climbing
     // again on every new block.
     final gap = sync.chainTipHeight - sync.scannedHeight;
     final catchingUp =
         status.kind == SyncStatusKind.syncing &&
-        status.label != kSyncStatusConnectingToTorLabel &&
+        !waitingOnTor &&
         sync.lastSyncCompletedAt != null &&
         sync.chainTipHeight > 0 &&
         gap <= _catchUpBlocks;
@@ -270,11 +277,9 @@ class NeonSyncBackdrop extends ConsumerWidget {
       _ when catchingUp => NeonSyncReadout.synced,
       SyncStatusKind.synced => NeonSyncReadout.synced,
       SyncStatusKind.failed =>
-        status.label == kSyncStatusTorFailedLabel
-            ? NeonSyncReadout.torOffline
-            : NeonSyncReadout.failed,
+        torFailed ? NeonSyncReadout.torOffline : NeonSyncReadout.failed,
       SyncStatusKind.syncing =>
-        status.label == kSyncStatusConnectingToTorLabel
+        waitingOnTor
             ? NeonSyncReadout.torWaiting
             : NeonSyncReadout.progress(whole, checking: sync.isChecking),
     };
@@ -284,7 +289,9 @@ class NeonSyncBackdrop extends ConsumerWidget {
       line: NeonSyncLine(
         progress: progress.toDouble(),
         readout: readout,
-        semanticsLabel: status.semanticsLabel,
+        semanticsLabel: catchingUp
+            ? _syncedSemanticsLabel
+            : status.semanticsLabel,
         climbing: syncing,
         failed: status.kind == SyncStatusKind.failed,
       ),
@@ -292,52 +299,31 @@ class NeonSyncBackdrop extends ConsumerWidget {
   }
 }
 
-/// The backdrop's drawing, free of providers so previews can show any state.
-class NeonSyncBackdropView extends StatefulWidget {
-  const NeonSyncBackdropView({
-    required this.progress,
-    required this.readout,
-    required this.active,
-    bool? floorFlows,
-    this.failed = false,
-    this.drawFloor = true,
-    this.linePart = NeonSyncLinePart.whole,
-    this.drawReadout = true,
-    this.lineX = _lineXFactor,
-    this.readoutType = kNeonSyncReadoutType,
-    super.key,
-  }) : floorFlows = floorFlows ?? active;
+/// What [SyncStatusLabel] says once synced; a wallet catching up reads as
+/// synced, so it says the same.
+const _syncedSemanticsLabel = 'Veylor is synced';
 
-  /// Where the line stands, as a fraction of the width.
-  final double lineX;
+/// The drawing of one layer, free of providers.
+class _NeonSyncLineView extends StatefulWidget {
+  const _NeonSyncLineView({
+    required this.line,
+    required this.drawFloor,
+    required this.linePart,
+    required this.drawReadout,
+  });
 
-  /// The type size of [readout].
-  final NeonSyncReadoutType readoutType;
+  final NeonSyncLine line;
 
   /// Which parts this layer draws.
   final bool drawFloor;
   final NeonSyncLinePart linePart;
   final bool drawReadout;
 
-  /// How far the sync line has climbed, 0..1.
-  final double progress;
-
-  /// The text at the line's head, drawn uppercase.
-  final String readout;
-
-  /// Scanning: the floor flows and a pulse runs up the line.
-  final bool active;
-
-  /// Whether the floor flows; [active] unless set. A synced line's refresh
-  /// scans without the line's pulse.
-  final bool floorFlows;
-  final bool failed;
-
   @override
-  State<NeonSyncBackdropView> createState() => _NeonSyncBackdropViewState();
+  State<_NeonSyncLineView> createState() => _NeonSyncLineViewState();
 }
 
-class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
+class _NeonSyncLineViewState extends State<_NeonSyncLineView>
     with SingleTickerProviderStateMixin {
   /// One floor cycle while something scans; the line's pulse climbs four
   /// times a cycle.
@@ -357,19 +343,18 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
   }
 
   @override
-  void didUpdateWidget(NeonSyncBackdropView oldWidget) {
+  void didUpdateWidget(_NeonSyncLineView oldWidget) {
     super.didUpdateWidget(oldWidget);
     _syncFlow();
   }
 
   // Something moves only while something scans: the floor, and the climbing
-  // line's pulse. Idle, nothing does, so no frame is drawn (the owner's
-  // choice on 2026-10-17, iOS progress VI-19): a constant flow would repaint
-  // a full-screen layer every frame while Home shows.
+  // line's pulse. Idle, nothing does, so no frame is drawn: a constant flow
+  // would repaint a full-screen layer every frame while Home shows.
   bool get _moves =>
       _motion &&
-      ((widget.drawFloor && widget.floorFlows) ||
-          (widget.linePart != NeonSyncLinePart.none && widget.active));
+      ((widget.drawFloor && widget.line.scanning) ||
+          (widget.linePart != NeonSyncLinePart.none && widget.line.climbing));
 
   void _syncFlow() {
     if (!_moves) {
@@ -388,9 +373,10 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
 
   @override
   Widget build(BuildContext context) {
+    final line = widget.line;
     final neon = context.colors.neon;
-    final dark = context.colors.background.window.computeLuminance() < 0.2;
-    final padding = MediaQuery.paddingOf(context);
+    final dark = AppTheme.of(context) == AppThemeData.dark;
+    final topLimit = MediaQuery.paddingOf(context).top + AppSpacing.xs;
     final split =
         widget.linePart == NeonSyncLinePart.head ||
         widget.linePart == NeonSyncLinePart.belowHead;
@@ -398,9 +384,7 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
       child: CustomPaint(
         painter: _BackdropPainter(
           flow: _flow,
-          progress: widget.progress,
-          active: widget.active,
-          failed: widget.failed,
+          line: line,
           drawFloor: widget.drawFloor,
           linePart: widget.linePart,
           // Both layers measure the same readout, so they split the line in
@@ -408,25 +392,21 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
           readoutLength: split
               ? neonSyncReadoutLength(
                   context,
-                  widget.readout,
-                  type: widget.readoutType,
+                  line.readout,
+                  style: line.readoutStyle,
                 )
               : 0,
           glow: neon.glow,
           core: neon.core,
           floorStrength: dark ? 0.6 : 0.35,
-          topLimit: padding.top + AppSpacing.xs,
-          lineX: widget.lineX,
+          topLimit: topLimit,
         ),
         child: widget.drawReadout
             ? _Readout(
-                progress: widget.progress,
-                text: widget.readout,
+                line: line,
                 color: neon.glow,
                 core: neon.core,
-                topLimit: padding.top + AppSpacing.xs,
-                lineX: widget.lineX,
-                type: widget.readoutType,
+                topLimit: topLimit,
               )
             : null,
       ),
@@ -437,8 +417,8 @@ class _NeonSyncBackdropViewState extends State<NeonSyncBackdropView>
 /// How far behind the tip a scan may start and still count as caught up.
 const _catchUpBlocks = 20;
 
-/// Where the sync line stands: in the right part of the screen, behind the
-/// balance and the rows (which are glass), not along the edge.
+/// Where the sync line stands, as a fraction of the width: in the right part
+/// of the screen, not along its edge.
 const _lineXFactor = 0.85;
 double _lineX(double width, double factor) =>
     (width * factor).roundToDouble() + 0.5;
@@ -451,33 +431,18 @@ const _readoutDrop = 10.0;
 const _headMargin = 12.0;
 const _headAbove = 32.0;
 
-/// The readout's style; its colours aside, what lays it out.
-TextStyle _readoutStyle(
-  NeonSyncReadoutType type, {
-  Color? color,
-  Color? core,
-}) => TextStyle(
-  fontFamily: 'Gotham',
-  fontSize: type.fontSize,
-  height: 1,
-  fontWeight: FontWeight.w300,
-  letterSpacing: type.letterSpacing,
-  color: core,
-  shadows: color == null ? null : Neon.textGlow(color, intensity: 0.5),
-);
-
 /// How far down from its top the drawn [readout] reaches: its text's width,
 /// as it reads bottom to top.
 @visibleForTesting
 double neonSyncReadoutLength(
   BuildContext context,
   String readout, {
-  NeonSyncReadoutType type = kNeonSyncReadoutType,
+  TextStyle style = kNeonSyncReadoutStyle,
 }) {
   final painter = TextPainter(
     text: TextSpan(
       text: readout.toUpperCase(),
-      style: DefaultTextStyle.of(context).style.merge(_readoutStyle(type)),
+      style: DefaultTextStyle.of(context).style.merge(style),
     ),
     textDirection: TextDirection.ltr,
     textScaler: MediaQuery.textScalerOf(context),
@@ -512,44 +477,41 @@ Rect neonSyncHeadBand(
 
 class _Readout extends StatelessWidget {
   const _Readout({
-    required this.progress,
-    required this.text,
+    required this.line,
     required this.color,
     required this.core,
     required this.topLimit,
-    required this.lineX,
-    required this.type,
   });
 
-  final double progress;
-  final String text;
+  final NeonSyncLine line;
   final Color color;
   final Color core;
   final double topLimit;
-  final double lineX;
-  final NeonSyncReadoutType type;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final height = constraints.maxHeight;
-        final headY = _headY(height, progress, topLimit);
+        final headY = _headY(height, line.progress, topLimit);
         // Read bottom to top, hanging just under the head, left of the line.
         return Stack(
           children: [
             Positioned(
               right:
                   constraints.maxWidth -
-                  _lineX(constraints.maxWidth, lineX) +
+                  _lineX(constraints.maxWidth, line.lineX) +
                   7,
               top: headY + _readoutDrop,
               child: RotatedBox(
                 quarterTurns: 3,
                 child: Text(
-                  text.toUpperCase(),
+                  line.readout.toUpperCase(),
                   maxLines: 1,
-                  style: _readoutStyle(type, color: color, core: core),
+                  style: line.readoutStyle.copyWith(
+                    color: core,
+                    shadows: Neon.textGlow(color, intensity: 0.5),
+                  ),
                 ),
               ),
             ),
@@ -568,9 +530,7 @@ double _headY(double height, double progress, double topLimit) {
 class _BackdropPainter extends CustomPainter {
   _BackdropPainter({
     required this.flow,
-    required this.progress,
-    required this.active,
-    required this.failed,
+    required this.line,
     required this.drawFloor,
     required this.linePart,
     required this.readoutLength,
@@ -578,13 +538,10 @@ class _BackdropPainter extends CustomPainter {
     required this.core,
     required this.floorStrength,
     required this.topLimit,
-    required this.lineX,
   }) : super(repaint: flow);
 
   final Animation<double> flow;
-  final double progress;
-  final bool active;
-  final bool failed;
+  final NeonSyncLine line;
   final bool drawFloor;
   final NeonSyncLinePart linePart;
 
@@ -594,7 +551,6 @@ class _BackdropPainter extends CustomPainter {
   final Color core;
   final double floorStrength;
   final double topLimit;
-  final double lineX;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -608,7 +564,7 @@ class _BackdropPainter extends CustomPainter {
         // The same line in both layers, each clipped to its share.
         final band = neonSyncHeadBand(
           size,
-          progress: progress,
+          progress: line.progress,
           topLimit: topLimit,
           readoutLength: readoutLength,
         );
@@ -629,7 +585,6 @@ class _BackdropPainter extends CustomPainter {
   /// viewer.
   void _paintFloor(Canvas canvas, Size size) {
     final horizon = size.height * 0.8;
-    final floorHeight = size.height - horizon;
     final k = floorStrength;
 
     // The horizon: a thin lit seam with a soft bloom over the floor.
@@ -655,46 +610,39 @@ class _BackdropPainter extends CustomPainter {
         ..strokeWidth = 1,
     );
 
-    final fade = Paint()
-      ..strokeWidth = 1
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          glow.withValues(alpha: 0.02 * k),
-          glow.withValues(alpha: 0.20 * k),
-        ],
-      ).createShader(Rect.fromLTWH(0, horizon, size.width, floorHeight));
-
-    // Rows: squared spacing reads as depth; the phase walks them forward.
-    const rows = 9;
-    final phase = flow.value;
-    for (var i = 0; i < rows + 1; i++) {
-      final t = (i + phase) / rows;
-      if (t > 1) continue;
-      final y = horizon + floorHeight * t * t;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), fade);
-    }
-
-    // Columns fan out from a vanishing point on the horizon.
-    final vanishing = Offset(size.width / 2, horizon);
-    const columns = 14;
-    final spread = size.width * 2.6;
-    for (var j = 0; j <= columns; j++) {
-      final x = size.width / 2 + (j / columns - 0.5) * spread;
-      canvas.drawLine(vanishing, Offset(x, size.height), fade);
-    }
+    Neon.perspectiveGrid(
+      canvas,
+      size,
+      horizon: horizon,
+      paint: Paint()
+        ..strokeWidth = 1
+        ..shader =
+            LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                glow.withValues(alpha: 0.02 * k),
+                glow.withValues(alpha: 0.20 * k),
+              ],
+            ).createShader(
+              Rect.fromLTWH(0, horizon, size.width, size.height - horizon),
+            ),
+      rows: 9,
+      columns: 14,
+      spread: size.width * 2.6,
+      phase: flow.value,
+    );
   }
 
-  /// The rising tube along the right edge, with a pulse while scanning.
+  /// The rising tube, with a pulse while scanning.
   void _paintSyncLine(Canvas canvas, Size size) {
-    final x = _lineX(size.width, lineX);
-    final headY = _headY(size.height, progress, topLimit);
-    final intensity = failed ? 0.4 : 0.8;
+    final x = _lineX(size.width, line.lineX);
+    final headY = _headY(size.height, line.progress, topLimit);
+    final intensity = line.failed ? 0.4 : 0.8;
 
     // Synced, the line steps back behind the content: Home's blocks hide it,
     // so it shows only in the gaps between them.
-    final quiet = !active && !failed;
+    final quiet = !line.climbing && !line.failed;
     if (quiet) {
       Neon.strokeTube(
         canvas,
@@ -719,19 +667,19 @@ class _BackdropPainter extends CustomPainter {
         ..strokeWidth = 1,
     );
 
-    final line = Path()
+    final lit = Path()
       ..moveTo(x, size.height)
       ..lineTo(x, headY);
     Neon.strokeTube(
       canvas,
-      line,
+      lit,
       glow: glow,
       core: core,
       width: 1.6,
       intensity: intensity,
     );
 
-    if (active) {
+    if (line.climbing) {
       // A bright packet climbing the lit part.
       final travel = size.height - headY;
       final packetY = size.height - travel * ((flow.value * 4) % 1);
@@ -751,34 +699,29 @@ class _BackdropPainter extends CustomPainter {
     _paintHead(canvas, Offset(x, headY), intensity);
   }
 
-  void _paintHead(Canvas canvas, Offset center, double intensity) {
-    final head = Rect.fromCenter(center: center, width: 7, height: 7);
-    canvas
-      ..drawRect(
-        head.inflate(5),
-        Paint()
-          ..color = glow.withValues(alpha: 0.6 * intensity)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-      )
-      ..drawRect(head, Paint()..color = glow.withValues(alpha: intensity))
-      ..drawRect(
-        head.deflate(2),
-        Paint()..color = core.withValues(alpha: intensity),
-      );
-  }
+  void _paintHead(Canvas canvas, Offset center, double intensity) => Neon.bead(
+    canvas,
+    center,
+    glow: glow,
+    core: core,
+    size: 7,
+    blur: 6,
+    rim: 2,
+    intensity: intensity,
+  );
 
   @override
   bool shouldRepaint(_BackdropPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.active != active ||
+    return oldDelegate.line.progress != line.progress ||
+        oldDelegate.line.climbing != line.climbing ||
+        oldDelegate.line.failed != line.failed ||
+        oldDelegate.line.lineX != line.lineX ||
         oldDelegate.drawFloor != drawFloor ||
         oldDelegate.linePart != linePart ||
         oldDelegate.readoutLength != readoutLength ||
-        oldDelegate.failed != failed ||
         oldDelegate.glow != glow ||
         oldDelegate.core != core ||
         oldDelegate.floorStrength != floorStrength ||
-        oldDelegate.topLimit != topLimit ||
-        oldDelegate.lineX != lineX;
+        oldDelegate.topLimit != topLimit;
   }
 }

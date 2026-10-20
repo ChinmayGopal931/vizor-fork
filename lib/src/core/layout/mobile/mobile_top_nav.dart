@@ -18,16 +18,14 @@ const double kMobileTopNavHeight = 72;
 ///   Used by the tab roots.
 /// - [MobileTopNav.steps] — back button + centered progress track. Used
 ///   by multi-step flows (onboarding, send wizard).
-/// - [MobileTopNav.back] — back button + centered serif title. Used by
+/// - [MobileTopNav.back] — back button + centered title. Used by
 ///   pushed detail screens; with a null [onBack] the button is omitted
 ///   and only the centered title remains (tab roots like Activity).
 ///
 /// Metrics come from Figma node 4237:92733 (393×72; not tokenized as
 /// variables yet, so they live here as constants). The Back-variant
-/// title uses [AppTypography.headlineLarge], which on mobile resolves to
-/// the 32 px Headline L (Young Serif in Figma, Gotham in the app) — the size
-/// the shared Mobile Top Nav component's Back variant uses across the mobile
-/// screen frames.
+/// title is a page title ([kNeonPageTitleStyle]) unless the screen passes
+/// its own [titleStyle].
 class MobileTopNav extends StatelessWidget {
   const MobileTopNav.account({
     required this.accountName,
@@ -138,7 +136,7 @@ class MobileTopNav extends StatelessWidget {
   final Color? progressTrackColor;
   final bool showBackButton;
 
-  /// Back variant: centered serif title.
+  /// Back variant: centered title.
   final String title;
   final TextStyle? titleStyle;
   final int titleMaxLines;
@@ -272,8 +270,8 @@ class MobileTopNav extends StatelessWidget {
             padding: const EdgeInsets.symmetric(
               horizontal: _backButtonSize + AppSpacing.s,
             ),
-            // Neon redesign: a page title is Gotham Thin, uppercase and
-            // wide-tracked. Screens with their own style keep it.
+            // A page title is drawn uppercase; a screen's own style keeps
+            // its case.
             child: Text(
               titleStyle == null ? title.toUpperCase() : title,
               maxLines: titleMaxLines,
@@ -699,44 +697,50 @@ class _AccountBadgeState extends State<_AccountBadge> {
           mainAxisSize: MainAxisSize.min,
           children: [
             widget.avatar,
-            AnimatedSize(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              alignment: Alignment.centerLeft,
-              child: _revealed
-                  ? Padding(
-                      padding: const EdgeInsets.only(left: AppSpacing.s),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          NeonScrambleText(
-                            key: const ValueKey('mobile_top_nav_account_name'),
-                            text: widget.accountName,
-                            decryptOnAppear: true,
-                            style: nameStyle,
-                            cipherStyle: nameStyle.copyWith(
-                              color: colors.neon.glow,
-                              shadows: Neon.textGlow(
-                                colors.neon.glow,
-                                intensity: 0.5,
+            Flexible(
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.centerLeft,
+                child: _revealed
+                    ? Padding(
+                        padding: const EdgeInsets.only(left: AppSpacing.s),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            NeonScrambleText(
+                              key: const ValueKey(
+                                'mobile_top_nav_account_name',
+                              ),
+                              text: widget.accountName,
+                              decryptOnAppear: true,
+                              overflow: TextOverflow.ellipsis,
+                              style: nameStyle,
+                              cipherStyle: nameStyle.copyWith(
+                                color: colors.neon.glow,
+                                shadows: Neon.textGlow(
+                                  colors.neon.glow,
+                                  intensity: 0.5,
+                                ),
                               ),
                             ),
-                          ),
-                          if (widget.balanceLabel case final label?) ...[
-                            const SizedBox(height: AppSpacing.xxs),
-                            Text(
-                              label,
-                              maxLines: 1,
-                              style: AppTypography.labelLarge.copyWith(
-                                color: colors.text.secondary,
+                            if (widget.balanceLabel case final label?) ...[
+                              const SizedBox(height: AppSpacing.xxs),
+                              Text(
+                                label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.labelLarge.copyWith(
+                                  color: colors.text.secondary,
+                                ),
                               ),
-                            ),
+                            ],
                           ],
-                        ],
-                      ),
-                    )
-                  : const SizedBox(height: 1),
+                        ),
+                      )
+                    : const SizedBox(height: 1),
+              ),
             ),
           ],
         ),

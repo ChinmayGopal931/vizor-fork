@@ -1,23 +1,3 @@
-/// Public ZEC/USD daily price history for the Home portfolio chart, from the
-/// pricing engine.
-///
-/// Privacy contract. A request names the coin (`ZEC`), the currency (`USD`),
-/// the resolution (`1d`), a first and a last UTC date, and a page size, and
-/// nothing else: no address, viewing key, seed, balance, account or wallet
-/// identifier, and no date derived from the wallet (no transaction date, no
-/// birthday). The dates are whole UTC days that end at the last completed UTC
-/// day and span one of the chart's fixed ranges, so every device asks for the
-/// same thing on the same day. The balance side of the chart is read from the
-/// local wallet database and joined to these prices on the device.
-/// [pricingEnginePricesUri] is the only place the request is built, and
-/// `portfolio_chart_history_test.dart` pins its shape, so adding a parameter
-/// fails a test.
-///
-/// The answer is untrusted data. [parsePricingEnginePage] and
-/// [assemblePriceSeries] accept a series only when every check passes, and
-/// otherwise there is no series: a wrong chart is worse than none.
-library;
-
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -34,14 +14,11 @@ class PricePoint {
   final double usd;
 }
 
-/// Rows asked for per page. Part of the request, so every device sends the
-/// same value.
 const kPricingEnginePageLimit = 1000;
 
 /// A series that needs more pages than this is refused, not truncated.
 const kPricingEngineMaxPages = 4;
 
-/// The longest run of days the pages can carry.
 const kPricingEngineMaxDays = kPricingEnginePageLimit * kPricingEngineMaxPages;
 
 /// A ZEC price above this is not a price. It bounds what a hostile answer can
@@ -54,7 +31,7 @@ const _resolution = '1d';
 
 /// The pricing engine publishes a day a short while after it ends, so for the
 /// first minutes of a UTC day the last completed day is still the day before
-/// yesterday. Matches zapp's `latestCompletedUtcDate`.
+/// yesterday.
 const _publishGraceMinutes = 10;
 
 const _oneDay = Duration(days: 1);
@@ -64,6 +41,9 @@ DateTime utcDay(DateTime time) {
   final utc = time.toUtc();
   return DateTime.utc(utc.year, utc.month, utc.day);
 }
+
+/// Whether [time] is a UTC midnight, the instant every daily price is dated.
+bool isUtcMidnight(DateTime time) => utcDay(time).isAtSameMomentAs(time);
 
 /// `2026-10-14`: the UTC date, as the request writes it.
 String utcDateText(DateTime time) {
@@ -123,7 +103,13 @@ class PriceWindow {
 
 /// The one place a price request is built: `GET <base>/v1/prices` with exactly
 /// these query keys, in this order (the order is part of the server's cache
-/// key), and values that depend on nothing but the date.
+/// key), and `portfolio_chart_history_test.dart` pins them.
+///
+/// Nothing about the wallet goes into it: no address, key, balance, account,
+/// or date taken from the wallet's history. The dates are whole UTC days, [to]
+/// the last completed one and [from] the start of a fixed window or a page's
+/// cursor, so every device sends the same request on a given day. Balances and
+/// prices are joined on the device.
 Uri pricingEnginePricesUri(
   Uri baseUri, {
   required DateTime from,
@@ -205,14 +191,6 @@ DateTime? _parseInstant(Object? value) {
       : null;
 }
 
-bool _isUtcMidnight(DateTime time) =>
-    time.isUtc &&
-    time.hour == 0 &&
-    time.minute == 0 &&
-    time.second == 0 &&
-    time.millisecond == 0 &&
-    time.microsecond == 0;
-
 double? _number(Object? value) =>
     value is num && value.isFinite ? value.toDouble() : null;
 
@@ -233,14 +211,9 @@ double? _parsePointPrice(Map<dynamic, dynamic> point) {
 }
 
 /// Parses and validates one page of the answer to a request for [from]..[to].
-///
-/// Returns `null` for anything unexpected: a body that is not the documented
-/// document, another asset, currency or resolution, bounds that differ from the
-/// request, availability that contradicts itself or is not whole UTC days, a
-/// `complete` flag that is missing or that contradicts `nextCursor`, a point
-/// that is not a UTC midnight inside both the request and the availability, out
-/// of order or repeated, or whose prices are not finite, positive, and
-/// consistent. Fields it does not know are ignored.
+/// The answer is untrusted, and a wrong chart is worse than none, so anything
+/// but the documented answer to this request is `null`. Fields it does not
+/// know are ignored.
 PricingEnginePage? parsePricingEnginePage(
   String body, {
   required DateTime from,
@@ -265,7 +238,7 @@ PricingEnginePage? parsePricingEnginePage(
     if (availableFrom == null || availableTo == null || dataAsOf == null) {
       return null;
     }
-    if (!_isUtcMidnight(availableFrom) || !_isUtcMidnight(availableTo)) {
+    if (!isUtcMidnight(availableFrom) || !isUtcMidnight(availableTo)) {
       return null;
     }
     if (availableFrom.isAfter(availableTo) || dataAsOf != availableTo) {
@@ -286,7 +259,7 @@ PricingEnginePage? parsePricingEnginePage(
       if (raw is! Map) return null;
       final time = _parseInstant(raw['timestamp']);
       final usd = _parsePointPrice(raw);
-      if (time == null || usd == null || !_isUtcMidnight(time)) return null;
+      if (time == null || usd == null || !isUtcMidnight(time)) return null;
       if (time.isBefore(from) || time.isAfter(to)) return null;
       if (time.isBefore(availableFrom) || time.isAfter(availableTo)) {
         return null;
@@ -317,7 +290,6 @@ class PriceSeries {
     required this.availableTo,
   });
 
-  /// What was asked for.
   final PriceWindow window;
 
   /// At least two, one per UTC day, ascending.
@@ -327,7 +299,6 @@ class PriceSeries {
   final DateTime availableFrom;
   final DateTime availableTo;
 
-  /// The newest day with a price.
   DateTime get lastDay => points.last.time;
 
   /// Whether the server had every day up to the window's end. When it had not,
@@ -335,14 +306,10 @@ class PriceSeries {
   bool get reachesWindowEnd => !availableTo.isBefore(window.to);
 }
 
-/// Joins validated [pages] of one answer into the series for [window].
-///
-/// `null` unless the pages describe the same availability, join without a
-/// repeated or missing day, hold at least two prices, and cover every day the
-/// server has inside the window: from the later of the window's start and the
-/// server's first day to the earlier of the window's end and its last. A
-/// price repeated at the seam between two pages is accepted once, when both
-/// copies agree.
+/// Joins validated [pages] of one answer into the series for [window], or
+/// `null` unless they join without a repeated or missing day and cover every
+/// day the server has inside the window. A price repeated at the seam between
+/// two pages is accepted once, when both copies agree.
 PriceSeries? assemblePriceSeries(
   PriceWindow window,
   List<PricingEnginePage> pages,

@@ -2787,9 +2787,6 @@ class _HomeDesktopActivityGlyph extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    if (row.leading case final leading?) {
-      return SizedBox.square(dimension: 32, child: Center(child: leading));
-    }
     final progress = row.leadingProgressValue;
     if (progress != null) {
       return SizedBox(

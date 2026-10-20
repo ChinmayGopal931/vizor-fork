@@ -831,7 +831,7 @@ class _ContactRowMenuButtonState extends State<_ContactRowMenuButton> {
   }
 }
 
-/// No-contacts empty state (Figma `Contacts Empty`): the neon horizon, serif
+/// No-contacts empty state (Figma `Contacts Empty`): the neon horizon,
 /// headline, subtitle, and a centered add-contact button.
 class _NoContactsState extends StatelessWidget {
   const _NoContactsState({required this.onAdd});
@@ -909,10 +909,9 @@ class _EmptySearchState extends StatelessWidget {
               Text(
                 'No contacts were found',
                 textAlign: TextAlign.center,
-                // The state's statement: Thin, as "No contacts yet" is.
                 style: AppTypography.headlineSmall.copyWith(
                   color: context.colors.text.accent,
-                  fontWeight: FontWeight.w100,
+                  fontWeight: AppFontWeight.heading,
                 ),
               ),
               const SizedBox(height: AppSpacing.xxs),
@@ -1183,10 +1182,9 @@ class _ContactEditSheetState extends State<_ContactEditSheet> {
               Text(
                 isEdit ? 'Edit contact' : 'Add contact',
                 textAlign: TextAlign.center,
-                // The sheet's title: Thin, as sheet titles are.
                 style: AppTypography.headlineSmall.copyWith(
                   color: colors.text.accent,
-                  fontWeight: FontWeight.w100,
+                  fontWeight: AppFontWeight.heading,
                 ),
               ),
               const SizedBox(height: AppSpacing.md),

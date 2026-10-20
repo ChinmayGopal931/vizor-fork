@@ -3,7 +3,7 @@ import 'package:flutter/painting.dart';
 import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
 
-const _neon = kAppFormFactor == AppFormFactor.mobile;
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Fade / scrim tokens retained from the OLDSemantic fade group.
 ///
@@ -17,9 +17,8 @@ class AppFadeColors {
 
   final Color illustration;
 
-  /// Figma faces on desktop, the neon redesign on mobile builds.
-  static const dark = _neon ? neonDark : figmaDark;
-  static const light = _neon ? neonLight : figmaLight;
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
 
   static const figmaDark = AppFadeColors(
     illustration: Primitives.p0Alpha50Dark,

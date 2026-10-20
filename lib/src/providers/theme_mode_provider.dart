@@ -33,9 +33,9 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
   }
 }
 
-/// The mobile app is dark only for now (owner, 2026-10-17): the theme is
-/// pinned to dark and Settings hides its Theme row. A saved choice stays
-/// stored for when the lock is lifted.
+/// The mobile app is dark only for now: the theme is pinned to dark and
+/// Settings hides its Theme row. A saved choice stays stored for when the
+/// lock is lifted.
 const kThemeLockedToDark = kAppFormFactor == AppFormFactor.mobile;
 
 final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(

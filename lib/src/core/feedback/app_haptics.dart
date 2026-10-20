@@ -28,6 +28,9 @@ abstract final class AppHaptics {
   /// Completing the last unanswered ballot item — one light confirmation tap.
   static Future<void> votingAnswersComplete() => HapticFeedback.lightImpact();
 
+  /// The unlock reveal parting to show the app — a light tap.
+  static Future<void> unlockReveal() => HapticFeedback.lightImpact();
+
   /// Send success confirmation — native custom haptic where available:
   /// 30ms pulse, then 40ms full-intensity pulse after a 60ms delay.
   static Future<void> sendSuccess() async {

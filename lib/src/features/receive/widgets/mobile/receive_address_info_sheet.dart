@@ -97,10 +97,9 @@ class ReceiveAddressInfoSheet extends StatelessWidget {
                       receiveAddressInfoSubtitle(type),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      // A sheet's heading: Thin, as sheet titles are.
                       style: AppTypography.bodyLarge.copyWith(
                         color: colors.text.accent,
-                        fontWeight: FontWeight.w100,
+                        fontWeight: AppFontWeight.heading,
                       ),
                     ),
                   ],
@@ -197,7 +196,6 @@ class _ReceiveAddressInfoSheetItem extends StatelessWidget {
           height: 25,
           child: Align(
             alignment: Alignment.centerLeft,
-            // The neon look lights each point's glyph red.
             child: AppIcon(iconName, size: 20, color: colors.neon.glow),
           ),
         ),

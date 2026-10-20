@@ -1,10 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config/private_usd_feature_config.dart';
-import '../core/layout/app_form_factor.dart';
 import '../features/private_usd/providers/railgun_engine_provider.dart'
     show RailgunEngineWallets;
 import '../features/private_usd/services/private_usd_swap_backend.dart';
@@ -18,8 +16,7 @@ final privateUsdLifecycleProvider = Provider(
   (ref) => PrivateUsdLifecycle(
     // Const, so builds without Private USD (desktop among them) never look
     // for conversions or Railgun wallets: they have none.
-    conversions:
-        kVizorPrivateUsdEnabled && kAppFormFactor == AppFormFactor.mobile
+    conversions: kPrivateUsdBuildEnabled
         ? RustPrivateUsdSwapBackend(
             () => PrivateUsdSwapContext(
               network: ref
@@ -30,43 +27,32 @@ final privateUsdLifecycleProvider = Provider(
             ),
           )
         : null,
-    railgunWallets:
-        kVizorPrivateUsdEnabled && kAppFormFactor == AppFormFactor.mobile
+    railgunWallets: kPrivateUsdBuildEnabled
         ? RailgunEngineWallets(ref.container)
         : null,
   ),
 );
 
-/// What an account deletion needs to delete the account's Railgun wallet
-/// from the page's storage (iOS progress BI-3, VI-17).
-abstract interface class PrivateUsdRailgunWallets {
-  /// Derives the deletion, before the Rust account delete. Null when the
-  /// account never used Private USD, or its seed can't be read now.
-  Future<RailgunWalletDeletion?> prepareDeletion(String accountUuid);
-
-  /// Deletes the wallet from the page's storage, after the Rust account
-  /// delete.
-  Future<void> delete(RailgunWalletDeletion deletion);
-}
-
 /// An account deletion or a wallet reset was refused: the account (or the
 /// wallet) has [count] Private USD conversions under way that the user has
-/// not confirmed losing (plan §3.5, invariant 15). The UI shows the count
-/// and lets the user confirm; it never blocks a confirmed deletion.
+/// not confirmed losing, or they could not be counted ([count] is null). The
+/// UI shows the warning again and lets the user confirm; it never blocks a
+/// confirmed deletion.
 class PrivateUsdUnfinishedConversionsException implements Exception {
-  const PrivateUsdUnfinishedConversionsException({required this.count});
+  const PrivateUsdUnfinishedConversionsException({this.count});
 
-  final int count;
+  final int? count;
 
   @override
-  String toString() =>
-      '$count unfinished private USD conversion(s). Confirm to continue.';
+  String toString() => count == null
+      ? "Couldn't check for private USD conversions. Confirm to continue."
+      : '$count unfinished private USD conversion(s). Confirm to continue.';
 }
 
-/// The Private USD work an account deletion or a wallet reset drains first
-/// (plan reference §8.4): the Railgun page from M3, the swap engine from M5.
-/// Like the Gift Card fence, it holds even before any of that work exists,
-/// so work built during a drain starts drained.
+/// The Private USD work an account deletion or a wallet reset drains first:
+/// the Railgun page, the swap engine and the sender. Like the Gift Card
+/// fence, it holds even before any of that work exists, so work built during
+/// a drain starts drained.
 ///
 /// It also answers how many conversions are under way (the deletion and
 /// reset warnings), and removes a deleted account's conversions and its
@@ -75,14 +61,14 @@ class PrivateUsdLifecycle {
   PrivateUsdLifecycle({
     RailgunHost host = const RailgunHostChannel(),
     PrivateUsdSwapBackend? conversions,
-    PrivateUsdRailgunWallets? railgunWallets,
+    RailgunEngineWallets? railgunWallets,
   }) : _host = host,
        _conversions = conversions,
        _railgunWallets = railgunWallets;
 
   final RailgunHost _host;
   final PrivateUsdSwapBackend? _conversions;
-  final PrivateUsdRailgunWallets? _railgunWallets;
+  final RailgunEngineWallets? _railgunWallets;
   final _owners = <Object, _Registration>{};
   bool _quiesced = false;
   final _pending = <Future<void>>[];
@@ -153,12 +139,12 @@ class PrivateUsdLifecycle {
   }
 
   /// Before the Rust account delete: what deleting [accountUuid]'s Railgun
-  /// wallet from the page takes (iOS progress BI-3, VI-17), or null for an
-  /// account that never used Private USD. Rust derives the wallet's mnemonic
-  /// only after checking the seed against the account, which it can do only
-  /// while the account exists. Best effort: a failure is null and never
-  /// stops the deletion. Hand the result to [deleteRailgunWallet] once the
-  /// account is gone, or discard it if the deletion stops.
+  /// wallet from the page takes, or null for an account that never used
+  /// Private USD. Rust derives the wallet's mnemonic only after checking the
+  /// seed against the account, which it can do only while the account
+  /// exists. Best effort: a failure is null and never stops the deletion.
+  /// Hand the result to [deleteRailgunWallet] once the account is gone, or
+  /// discard it if the deletion stops.
   Future<RailgunWalletDeletion?> prepareRailgunWalletDeletion(
     String accountUuid, {
     Duration timeout = const Duration(seconds: 30),
@@ -168,8 +154,9 @@ class PrivateUsdLifecycle {
     try {
       return await wallets.prepareDeletion(accountUuid).timeout(timeout);
     } catch (error) {
-      // The type only: an error can quote what the page or Rust saw.
-      _debugLog('preparing the Railgun wallet deletion failed', error);
+      privateUsdLog(
+        'preparing the Railgun wallet deletion failed (${error.runtimeType})',
+      );
       return null;
     }
   }
@@ -185,14 +172,12 @@ class PrivateUsdLifecycle {
     try {
       await _railgunWallets?.delete(deletion);
     } catch (error) {
-      _debugLog('deleting the Railgun wallet failed', error);
+      privateUsdLog(
+        'deleting the Railgun wallet failed (${error.runtimeType})',
+      );
     } finally {
       deletion.discard();
     }
-  }
-
-  void _debugLog(String line, Object error) {
-    if (kDebugMode) debugPrint('privateUsd: $line (${error.runtimeType})');
   }
 
   /// Removes [accountUuid]'s conversion records and joint accounts, after

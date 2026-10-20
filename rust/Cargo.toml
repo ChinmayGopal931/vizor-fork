@@ -89,17 +89,18 @@ prost13 = { package = "prost", version = "0.13" }
 tendermint = "0.40.4"
 tendermint-light-client-verifier = "0.40.4"
 
-# Private USD (D3). One zecSwap rev for both crates; E1 replaces it with the
-# Zakura build's rev. `zecswap-tokens` cannot resolve beside this graph yet
-# (docs/private-usd-android-plan.md §2 N1).
+# Private USD. One zecSwap rev for both crates.
 zecswap-core    = { git = "https://github.com/JustZappIt/zecSwap", rev = "d69e3fb2d5c3bfc99fd20844dfdcd0d9d2509a11" }
 zecswap-railgun = { git = "https://github.com/JustZappIt/zecSwap", rev = "d69e3fb2d5c3bfc99fd20844dfdcd0d9d2509a11" }
-hmac   = "0.12"  # BIP-32/85 (transitive only today)
-sha3   = "0.10"  # Keccak-256 for ids and ABI (transitive only today)
-bech32 = "0.11"  # 0zk address validation (transitive only today)
+# The Railgun wallet's BIP-32 path, over the same secp256k1 as the rest of the
+# wallet. The version zakura-client-backend locks.
+bip32  = { version = "=0.6.0-pre.1", default-features = false, features = ["alloc", "secp256k1-ffi"] }
+hmac   = "0.12"  # BIP-85 entropy
+sha3   = "0.10"  # Keccak-256 for ids and ABI
+bech32 = "0.11"  # 0zk address validation
 # `zecswap_core::SwapContext::prove_user` takes a rand 0.10 `CryptoRng`;
-# vizor's `rand` is 0.8. Renamed, and already in the lockfile through
-# `zecswap-core`, which uses the same `sys_rng` feature.
+# the wallet's `rand` is 0.8. `zecswap-core` already locks this one, with the
+# same `sys_rng` feature.
 rand_0_10 = { package = "rand", version = "0.10", default-features = false, features = ["sys_rng"] }
 
 # Zcash core. Package names are the Zakura forks; lib names stay upstream so
@@ -120,7 +121,7 @@ features = ["orchard"]
 [dependencies.zcash_protocol]
 package = "zakura-protocol"
 # 2.2.0 sets the testnet NU7 activation (4,465,026, branch 0x77190AD9);
-# mainnet is unchanged. Testnet sends are rejected without it (B-11).
+# mainnet is unchanged. Testnet sends are rejected without it.
 version = "=2.2.0"
 
 [dependencies.transparent]
@@ -187,7 +188,7 @@ features = ["wallet"]
 # Transparent PIR recovery adapter. A git dependency rather than a patched
 # crates.io package; see the `[patch.crates-io]` comment below.
 [dependencies.zakura-pir-transparent]
-path = "../../wallet-libraries-e4/zakura/pir-transparent"   # local E4 stand-in; see [patch.crates-io]
+path = "../../wallet-libraries-e4/zakura/pir-transparent"   # local stand-in; see [patch.crates-io]
 default-features = false
 # `sqlite` applies a batch to the wallet and acknowledges it in one call.
 features = ["sqlite"]
@@ -238,7 +239,7 @@ features = ["test-fixtures"]
 # process, with the wallet-pir crates it publishes with. Same rev as the
 # dependency above.
 [dev-dependencies.zakura-pir-transparent]
-path = "../../wallet-libraries-e4/zakura/pir-transparent"   # local E4 stand-in; see [patch.crates-io]
+path = "../../wallet-libraries-e4/zakura/pir-transparent"   # local stand-in; see [patch.crates-io]
 default-features = false
 features = ["sqlite", "testing"]
 
@@ -306,13 +307,12 @@ assertions_on_constants = "allow"
 # so their public types stay unified. Keep every wallet-libraries dependency at
 # this exact revision.
 #
-# LOCAL E4 STAND-IN, DO NOT MERGE (docs/private-usd-progress.md B-6). Every
-# wallet-libraries reference (these eight and both `zakura-pir-transparent`
-# entries) points at ~/dev/wallet-libraries-e4: wallet-libraries at
+# LOCAL STAND-IN, DO NOT MERGE. Every wallet-libraries reference (these eight
+# and both `zakura-pir-transparent` entries) points at
+# ~/dev/wallet-libraries-e4: wallet-libraries at
 # 391d0b0247f0e07cfdea855ce87fcdf8ba376aae plus the `connect_stream` patch the
-# Railgun bridge needs (docs/private-usd-reference.md §6.8). Before anything
-# here is pushed, point all ten back at `git = "https://github.com/...` refs
-# on the owner's fork rev that carries the patch (E4, D13).
+# Railgun bridge needs. Before anything here is pushed, point all ten back at
+# `git = "https://github.com/..."` refs on a rev that carries the patch.
 [patch.crates-io]
 zakura-client-backend = { path = "../../wallet-libraries-e4/librustzcash/zcash_client_backend" }
 zakura-client-sqlite = { path = "../../wallet-libraries-e4/librustzcash/zcash_client_sqlite" }
@@ -323,8 +323,8 @@ zakura-pir-status = { path = "../../wallet-libraries-e4/zakura/pir-status" }
 zakura-pir-native = { path = "../../wallet-libraries-e4/zakura/pir-native" }
 zakura-pir-enhance = { path = "../../wallet-libraries-e4/zakura/pir-enhance" }
 
-# Local Zakura build of zecswap-core until E1 lands. Do not merge: drop this
-# once the zecSwap rev above carries the Zakura manifest.
+# Local Zakura build of zecswap-core. DO NOT MERGE: drop this once the zecSwap
+# rev above carries the Zakura manifest.
 [patch."https://github.com/JustZappIt/zecSwap"]
 zecswap-core = { path = "../../zapp/zecSwap-zakura/crates/zecswap-core" }   # relative to rust/
 

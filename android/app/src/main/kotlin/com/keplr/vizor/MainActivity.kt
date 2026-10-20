@@ -172,7 +172,7 @@ class MainActivity : FlutterFragmentActivity() {
         railgunHostHandler = RailgunHostHandler(this, BuildConfig.DEBUG)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            RailgunHostHandler.CHANNEL
+            RailgunHostHandler.METHOD_CHANNEL
         ).setMethodCallHandler { call, result ->
             railgunHostHandler.handle(call, result)
         }

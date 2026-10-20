@@ -1,8 +1,10 @@
 // Copies the RAILGUN circuit artifacts the wallet SDK downloads (snarkjs: zkey, wasm, vkey) from an IPFS gateway
 // into <out>/ipfs/<hash>/..., the same paths the SDK requests, and checks every zkey and wasm the way the SDK does:
-// sha256 of the brotli-decompressed bytes against artifact-v2-hashes.json. A file that fails is deleted, never kept.
+// sha256 of the brotli-decompressed bytes against the SDK's artifact-v2-hashes.json. A file that fails is deleted,
+// never kept.
 //
 // usage: node fetch-verify.mjs <artifact-v2-hashes.json> <out dir> [gateway] [--paths]
+// (the hashes ship in the wallet SDK; README has the path)
 //
 // No gateway resolves the POI circuits' directory since wallet 11.2.0, only its files, so those come by their own
 // CIDs and their vkeys from poi-v2/ (exported from the verified zkeys; see README). With --paths every file is asked

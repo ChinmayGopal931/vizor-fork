@@ -1,72 +1,32 @@
 //! The engine's HTTP seam and the swap services' JSON exchange.
 //!
-//! The maker, relayer and Ethereum clients send through [`HttpTransport`];
-//! [`RoutedTransport`] is the real one, over `crate::wallet::routed_http`, so
-//! every request follows the route policy and fails closed on Tor. Engine
-//! fakes (M5, M6) implement the trait. It is used through generics, never
-//! `dyn`.
+//! The maker, relayer and Ethereum clients send through [`HttpTransport`]:
+//! [`RoutedHttp`] in the app, fakes in the engine tests. It is used through
+//! generics, never `dyn`.
 //!
-//! A swap service's failure is a [`SwapHttpError`]: no answer, an answer that
-//! does not read, or a refusal. Branch on the code and status, never on the
-//! service's text, and use [`SwapHttpError::may_have_sent`] to tell a refused
-//! request from one that may have landed.
+//! A swap service's failure is a [`SwapHttpError`]: a request that could not
+//! be built, no answer, an answer that does not read, or a refusal. Branch on
+//! the code and status, never on the service's text.
 
 use std::fmt;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
 use std::time::Duration;
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use super::deployment::{MAX_SERVICE_BODY, QUICK_TIMEOUT};
 use super::{ErrorCode, PrivateUsdError};
-use crate::wallet::routed_http::{
-    RoutedError, RoutedHttp, RoutedPhase, RoutedRequest, RoutedResponse,
-};
+use crate::wallet::routed_http::{RoutedError, RoutedHttp, RoutedRequest, RoutedResponse};
 
-/// How much of an error body that is not zecSwap's JSON a refusal keeps.
+/// How much of an error body that is not the services' JSON a refusal keeps.
 const ERROR_EXCERPT_CHARS: usize = 200;
 
 pub(crate) trait HttpTransport {
     async fn send(&self, request: RoutedRequest) -> Result<RoutedResponse, RoutedError>;
 }
 
-/// The real transport. Make one per operation: its direct connections are
-/// pooled for its lifetime.
-pub(crate) struct RoutedTransport {
-    http: RoutedHttp,
-    cancel: Option<Arc<AtomicBool>>,
-}
-
-impl RoutedTransport {
-    pub(crate) fn new() -> Self {
-        Self {
-            http: RoutedHttp::new(),
-            cancel: None,
-        }
-    }
-
-    /// Requests stop once `cancel` is set.
-    pub(crate) fn cancellable(cancel: Arc<AtomicBool>) -> Self {
-        Self {
-            http: RoutedHttp::new(),
-            cancel: Some(cancel),
-        }
-    }
-}
-
-impl HttpTransport for RoutedTransport {
+impl HttpTransport for RoutedHttp {
     async fn send(&self, request: RoutedRequest) -> Result<RoutedResponse, RoutedError> {
-        let cancel = self.cancel.clone();
-        self.http
-            .send(request, move || {
-                cancel
-                    .as_ref()
-                    .is_some_and(|cancel| cancel.load(Ordering::Acquire))
-            })
-            .await
+        RoutedHttp::send(self, request).await
     }
 }
 
@@ -85,7 +45,7 @@ impl Service {
     }
 }
 
-/// zecSwap's error codes (`zapi/service.rs`).
+/// The swap services' error codes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SwapErrorCode {
     InvalidRequest,
@@ -103,7 +63,7 @@ pub(crate) enum SwapErrorCode {
     /// Spend a token from the issuer the `WWW-Authenticate` challenge names.
     TokenRequired,
     /// A deposit's authorization is used, or another deposit of the same
-    /// address is on its way (`409`, M9).
+    /// address is on its way (`409`).
     Conflict,
 }
 
@@ -141,17 +101,16 @@ pub(crate) struct Refusal {
     pub transactions: Vec<[u8; 32]>,
     /// How long the service asked to wait (`Retry-After` delay-seconds).
     pub retry_after_secs: Option<u64>,
-    /// RFC 9577's challenge, on a refusal a token would pay for.
-    pub challenge: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum SwapHttpError {
+    /// Nothing went out: the request could not be built.
+    Invalid(PrivateUsdError),
     /// No answer.
     Unreachable {
         service: Service,
-        phase: RoutedPhase,
-        message: String,
+        error: RoutedError,
     },
     /// A success that does not read or fails its checks: the service did act
     /// on the request.
@@ -163,24 +122,6 @@ pub(crate) enum SwapHttpError {
 }
 
 impl SwapHttpError {
-    pub(crate) fn service(&self) -> Service {
-        match self {
-            Self::Unreachable { service, .. } | Self::Unreadable { service, .. } => *service,
-            Self::Refused(refusal) => refusal.service,
-        }
-    }
-
-    /// Whether the service can have acted on the request. A refusal below
-    /// 500 and a failure before dispatch sent nothing; a failure after
-    /// dispatch, a 5xx or a success that does not read may have.
-    pub(crate) fn may_have_sent(&self) -> bool {
-        match self {
-            Self::Unreachable { phase, .. } => *phase != RoutedPhase::BeforeDispatch,
-            Self::Unreadable { .. } => true,
-            Self::Refused(refusal) => refusal.status >= 500,
-        }
-    }
-
     /// The refusal's code, if the service refused.
     pub(crate) fn code(&self) -> Option<SwapErrorCode> {
         match self {
@@ -193,9 +134,10 @@ impl SwapHttpError {
 impl fmt::Display for SwapHttpError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Unreachable {
-                service, message, ..
-            } => write!(f, "the {} is unreachable: {message}", service.label()),
+            Self::Invalid(error) => f.write_str(&error.message),
+            Self::Unreachable { service, error } => {
+                write!(f, "the {} is unreachable: {error}", service.label())
+            }
             Self::Unreadable { service, message } => {
                 write!(
                     f,
@@ -214,22 +156,30 @@ impl fmt::Display for SwapHttpError {
     }
 }
 
-/// The step's problem when nothing more specific applies; the engine (M5,
-/// M6) maps codes per step.
+/// The step's problem when nothing more specific applies; the drivers map
+/// codes per step.
 impl From<SwapHttpError> for PrivateUsdError {
     fn from(error: SwapHttpError) -> Self {
-        let code = match (&error, error.service()) {
-            (SwapHttpError::Refused(refusal), Service::Maker) => match refusal.code {
-                Some(SwapErrorCode::Unavailable | SwapErrorCode::WatchtowerUnavailable) => {
-                    ErrorCode::MakerBusy
-                }
-                Some(SwapErrorCode::UnknownQuote) => ErrorCode::QuoteExpired,
-                Some(SwapErrorCode::TokenRequired) => ErrorCode::TokensNeeded,
-                _ => ErrorCode::MakerUnavailable,
+        let code = match &error {
+            SwapHttpError::Invalid(invalid) => return invalid.clone(),
+            SwapHttpError::Unreachable { error, .. } if error.route_blocked => {
+                ErrorCode::RouteBlocked
+            }
+            SwapHttpError::Refused(refusal) => match (refusal.service, refusal.code) {
+                (
+                    Service::Maker,
+                    Some(SwapErrorCode::Unavailable | SwapErrorCode::WatchtowerUnavailable),
+                ) => ErrorCode::MakerBusy,
+                (Service::Maker, Some(SwapErrorCode::UnknownQuote)) => ErrorCode::QuoteExpired,
+                (Service::Maker, Some(SwapErrorCode::TokenRequired)) => ErrorCode::TokensNeeded,
+                (Service::Maker, _) => ErrorCode::MakerUnavailable,
+                (Service::Relayer, _) => ErrorCode::RelayerRefused,
             },
-            (SwapHttpError::Refused(_), Service::Relayer) => ErrorCode::RelayerRefused,
-            (_, Service::Maker) => ErrorCode::MakerUnavailable,
-            (_, Service::Relayer) => ErrorCode::RelayerUnreachable,
+            SwapHttpError::Unreachable { service, .. }
+            | SwapHttpError::Unreadable { service, .. } => match service {
+                Service::Maker => ErrorCode::MakerUnavailable,
+                Service::Relayer => ErrorCode::RelayerUnreachable,
+            },
         };
         PrivateUsdError::new(code, error.to_string())
     }
@@ -266,10 +216,11 @@ pub(crate) async fn post_json<T: HttpTransport, B: Serialize, R: DeserializeOwne
     headers: &[(&str, &str)],
     check: impl FnOnce(&R) -> Result<(), String>,
 ) -> Result<R, SwapHttpError> {
-    let body = serde_json::to_vec(body).map_err(|error| SwapHttpError::Unreachable {
-        service,
-        phase: RoutedPhase::BeforeDispatch,
-        message: format!("could not encode the request: {error}"),
+    let body = serde_json::to_vec(body).map_err(|error| {
+        SwapHttpError::Invalid(PrivateUsdError::new(
+            ErrorCode::Other,
+            format!("could not encode the request: {error}"),
+        ))
     })?;
     let mut request = RoutedRequest::post(url, body, timeout, MAX_SERVICE_BODY)
         .header("content-type", "application/json")
@@ -289,11 +240,7 @@ async fn exchange<T: HttpTransport, R: DeserializeOwned>(
     let response = transport
         .send(request)
         .await
-        .map_err(|error| SwapHttpError::Unreachable {
-            service,
-            phase: error.phase,
-            message: error.message,
-        })?;
+        .map_err(|error| SwapHttpError::Unreachable { service, error })?;
     if !response.is_success() {
         return Err(SwapHttpError::Refused(refusal(service, &response)));
     }
@@ -334,7 +281,6 @@ fn refusal(service: Service, response: &RoutedResponse) -> Refusal {
         reason,
         transactions,
         retry_after_secs: response.header("retry-after").and_then(delay_seconds),
-        challenge: response.header("www-authenticate").map(str::to_owned),
     }
 }
 
@@ -381,7 +327,6 @@ pub(crate) mod test_support {
     /// A request as the server received it.
     #[derive(Clone, Debug)]
     pub(crate) struct Received {
-        pub method: String,
         pub path: String,
         pub headers: Vec<(String, String)>,
         pub body: Vec<u8>,
@@ -471,9 +416,8 @@ pub(crate) mod test_support {
         };
         let head = String::from_utf8_lossy(&data[..head_end]).to_string();
         let mut lines = head.split("\r\n");
-        let mut start = lines.next()?.split(' ');
-        let method = start.next()?.to_string();
-        let path = start.next()?.to_string();
+        // The request line: the method, then the path.
+        let path = lines.next()?.split(' ').nth(1)?.to_string();
         let headers: Vec<(String, String)> = lines
             .filter_map(|line| line.split_once(':'))
             .map(|(name, value)| (name.trim().to_ascii_lowercase(), value.trim().to_string()))
@@ -491,7 +435,6 @@ pub(crate) mod test_support {
             data.extend_from_slice(&chunk[..read]);
         }
         Some(Received {
-            method,
             path,
             headers,
             body: data[head_end..].to_vec(),

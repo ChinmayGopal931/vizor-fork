@@ -1,3 +1,6 @@
+import 'package:flutter/foundation.dart';
+
+import '../../../core/formatting/number_format.dart';
 import '../../../rust/api/private_usd.dart' show ApiDeployment;
 import 'railgun_models.dart';
 
@@ -122,9 +125,9 @@ class PrivateUsdAsset {
       Object.hash(token, available, arriving, blocked, processing, submitted);
 }
 
-/// The Railgun balance as private USD (plan reference §6.6). Dollar sums are
-/// in micro-dollars (`$0.000001`); 1 USDC is treated as $1. Each asset keeps
-/// its token's own base units.
+/// The Railgun balance as private USD. Dollar sums are in micro-dollars
+/// (`$0.000001`); 1 USDC is treated as $1. Each asset keeps its token's own
+/// base units.
 class PrivateUsdBalances {
   PrivateUsdBalances(List<PrivateUsdAsset> assets)
     : assets = List.unmodifiable(assets);
@@ -190,14 +193,8 @@ class PrivateUsdBalances {
   }
 
   @override
-  bool operator ==(Object other) {
-    if (other is! PrivateUsdBalances) return false;
-    if (other.assets.length != assets.length) return false;
-    for (var i = 0; i < assets.length; i++) {
-      if (other.assets[i] != assets[i]) return false;
-    }
-    return true;
-  }
+  bool operator ==(Object other) =>
+      other is PrivateUsdBalances && listEquals(other.assets, assets);
 
   @override
   int get hashCode => Object.hashAll(assets);
@@ -206,16 +203,10 @@ class PrivateUsdBalances {
 /// `$1,234.56` for [microDollars], rounded down to the cent so a balance is
 /// never overstated.
 String formatPrivateUsd(BigInt microDollars) {
-  final negative = microDollars.isNegative;
   final cents = microDollars.abs() ~/ BigInt.from(10000);
-  final whole = (cents ~/ BigInt.from(100)).toString();
+  final whole = formatGroupedInteger((cents ~/ BigInt.from(100)).toInt());
   final fraction = (cents % BigInt.from(100)).toString().padLeft(2, '0');
-  final grouped = StringBuffer();
-  for (var i = 0; i < whole.length; i++) {
-    if (i > 0 && (whole.length - i) % 3 == 0) grouped.write(',');
-    grouped.write(whole[i]);
-  }
-  return '${negative ? '-' : ''}\$$grouped.$fraction';
+  return '${microDollars.isNegative ? '-' : ''}\$$whole.$fraction';
 }
 
 /// The indicative zatoshi worth of [microDollars] at [zecUsdPrice], or null

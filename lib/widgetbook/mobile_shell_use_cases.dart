@@ -37,25 +37,17 @@ Widget buildMobileTopNavVariantsUseCase(BuildContext context) {
     Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        MobileTopNav.account(
-          accountName: 'Account1',
-          syncLabel: 'Veylor is synced',
-          onAccountTap: () {},
-        ),
+        // Home's bar: the portrait, whose tap reveals the name.
+        MobileTopNav.account(accountName: 'Account1', onAccountTap: () {}),
         MobileTopNav.account(
           accountName: 'Account1',
           balanceLabel: '140.12 ZEC',
-          syncLabel: 'Veylor is synced',
           onAccountTap: () {},
         ),
+        // The migration status screens add the sync label.
         MobileTopNav.account(
           accountName: 'Account1',
           syncLabel: '20% Syncing...',
-          syncLabelColor: context.colors.sync.textSyncing,
-          syncIndicatorColor: context.colors.text.muted,
-          syncHighlightColor: context.colors.sync.lightSuccess,
-          syncAnimated: true,
-          onAccountTap: () {},
         ),
         MobileTopNav.steps(progress: 0.3, onBack: () {}),
         MobileTopNav.back(title: 'Activity', onBack: () {}),
@@ -113,10 +105,7 @@ class _ShellPreviewState extends State<_ShellPreview> {
     return AppMobileShell(
       body: Column(
         children: [
-          MobileTopNav.account(
-            accountName: 'Account1',
-            syncLabel: 'Veylor is synced',
-          ),
+          MobileTopNav.account(accountName: 'Account1'),
           Expanded(
             child: Center(
               child: Text(

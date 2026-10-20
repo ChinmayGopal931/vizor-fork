@@ -18,19 +18,10 @@ import 'mobile_bottom_safe_area.dart';
 /// widened to 16px so all three margins around the bar match (see
 /// [MobileBottomSafeArea]).
 class AppMobileShell extends StatelessWidget {
-  const AppMobileShell({
-    required this.body,
-    required this.tabBar,
-    this.backdrop,
-    super.key,
-  });
+  const AppMobileShell({required this.body, required this.tabBar, super.key});
 
   final Widget body;
   final Widget tabBar;
-
-  /// Painted behind every tab, under the content (the neon sync backdrop in
-  /// the app; previews may leave it out).
-  final Widget? backdrop;
 
   @override
   Widget build(BuildContext context) {
@@ -42,15 +33,7 @@ class AppMobileShell extends StatelessWidget {
       extendBody: true,
       // Desktop hosts toasts inside AppDesktopPane; the mobile shell is
       // the equivalent surface, so it hosts them for all tab content.
-      body: backdrop == null
-          ? AppToastHost(child: body)
-          : Stack(
-              fit: StackFit.expand,
-              children: [
-                Positioned.fill(child: backdrop!),
-                AppToastHost(child: body),
-              ],
-            ),
+      body: AppToastHost(child: body),
       // No bar behind the tab glyphs: content fades into black under them
       // so they stay legible over anything scrolled beneath.
       bottomNavigationBar: DecoratedBox(

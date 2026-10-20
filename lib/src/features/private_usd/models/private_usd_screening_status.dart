@@ -2,9 +2,9 @@ import '../private_usd_copy.dart';
 import 'private_usd_balances.dart';
 import 'railgun_models.dart';
 
-/// The Processing row's live line (owner, 2026-10-19): what the page's
-/// screening work is doing now, the step furthest along first, or else what
-/// the funds wait on. Null when there is nothing to say.
+/// The Processing row's live line: what the page's screening work is doing
+/// now, the step furthest along first, or else what the funds wait on. Null
+/// when there is nothing to say.
 String? privateUsdScreeningStatus({
   required RailgunScreeningEvent? activity,
   required PrivateUsdBalances balances,

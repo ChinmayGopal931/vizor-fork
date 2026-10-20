@@ -7,18 +7,18 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
-// Ported from zapp's railgun-lib `RailgunChannelTest` (plan reference §8.7): params and results are raw JSON text
-// here, and events reach their listener as the page sent them. Robolectric provides `org.json`.
+// Params and results are raw JSON text, and events reach their listener as the page sent them. Robolectric provides
+// `org.json`.
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
@@ -48,7 +48,7 @@ class RailgunChannelTest {
 
             advanceTimeBy(RailgunMethod.REVERSE_COST.timeout + 1.seconds)
 
-            val timeout = assertFailsWith<RailgunException.Timeout> { call.await().getOrThrow() }
+            val timeout = call.await().failure<RailgunException.Timeout>()
             assertEquals("reverseCost timed out", timeout.message)
         }
 
@@ -60,7 +60,7 @@ class RailgunChannelTest {
 
             channel.receive("""{"id":${idOf(0)},"error":"a bare string"}""")
 
-            assertFailsWith<RailgunException.Protocol> { call.await().getOrThrow() }
+            call.await().failure<RailgunException.Protocol>()
         }
 
     @Test
@@ -73,8 +73,8 @@ class RailgunChannelTest {
             channel.receive("""{"id":${idOf(0)},"result":"late"}""")
 
             assertFalse(channel.isOpen)
-            assertFailsWith<RailgunException.Disconnected> { call.await().getOrThrow() }
-            assertFailsWith<RailgunException.Disconnected> { channel.call(RailgunMethod.REFRESH, EMPTY) }
+            call.await().failure<RailgunException.Disconnected>()
+            runCatching { channel.call(RailgunMethod.REFRESH, EMPTY) }.failure<RailgunException.Disconnected>()
             assertEquals(1, posted.size)
         }
 
@@ -84,7 +84,7 @@ class RailgunChannelTest {
             val other = RailgunChannel({}, {})
             other.receive("""{"event":"ready","data":null}""")
 
-            assertFailsWith<RailgunException.Timeout> { channel.awaitReady(1.seconds) }
+            runCatching { channel.awaitReady(1.seconds) }.failure<RailgunException.Timeout>()
 
             channel.receive("""{"event":"ready","data":null}""")
             channel.awaitReady(1.seconds)
@@ -95,7 +95,7 @@ class RailgunChannelTest {
         runTest {
             channel.close(RailgunException.Disconnected("the page did not load"))
 
-            assertFailsWith<RailgunException.Disconnected> { channel.awaitReady(1.seconds) }
+            runCatching { channel.awaitReady(1.seconds) }.failure<RailgunException.Disconnected>()
         }
 
     @Test
@@ -109,6 +109,9 @@ class RailgunChannelTest {
     }
 
     private fun idOf(request: Int): Long = JSONObject(posted[request]).getLong("id")
+
+    // The failure a call ended with: JUnit's assertThrows can't run a suspending call itself.
+    private inline fun <reified T : Throwable> Result<*>.failure(): T = assertThrows(T::class.java) { getOrThrow() }
 
     private companion object {
         const val EMPTY = "{}"

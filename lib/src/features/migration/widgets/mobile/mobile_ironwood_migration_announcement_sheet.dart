@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
-import '../../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../../core/widgets/mobile/neon_glyph_badge.dart';
 
 /// Mobile Ironwood announcement content for the shared floating modal shell.
 ///
@@ -43,8 +43,6 @@ class MobileIronwoodMigrationAnnouncementSheet extends StatelessWidget {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      // The neon look drops the Figma's tree backdrop and
-                      // tree-root Z for a lit Zcash badge in the same slot.
                       const Positioned(
                         top: 32,
                         left: 0,

@@ -47,9 +47,9 @@ const NOTES_SCAN_ATTEMPTS = 20;
 const NOTES_SCAN_RETRY_MS = 3_000;
 // A notes scan reports 3% as it starts, 1% on a full rescan; one the engine skips reports nothing.
 const NOTES_SCAN_START = 0.03;
-// The engine keeps the txids it syncs a batch at a time, and Railgun's subgraph hands them over 10,000 at once, the
-// engine's default batch. A phone takes minutes over that many, and a page closed or paused before the batch ends kept
-// none of it: one phone's wallet sat at 130,000 txids for days, unable to prove its sends. Smaller batches keep theirs.
+// The engine keeps the txids it syncs a batch at a time, and a page closed or paused before a batch ends keeps none of
+// that batch. The engine's default batch is the 10,000 that Railgun's subgraph hands over at once, which takes a phone
+// minutes; a wallet cut off that often never catches up, and can't prove its sends. Smaller batches keep their progress.
 const TXID_SYNC_BATCH_SIZE = 1_000;
 // The engine reads on only while the subgraph's answer is one batch long, so each of its txid syncs now reads one
 // answer of 10,000; a refresh syncs again until one adds nothing. Ethereum's whole history is about 15 answers.

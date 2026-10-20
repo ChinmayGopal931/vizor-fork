@@ -28,8 +28,7 @@ const kPrivacyModeEnabledKey = 'zcash_privacy_mode_enabled';
 const kSyncKeepAwakeEnabledKey = 'zcash_sync_keep_awake_enabled';
 const kSyncKeepAwakePromptSeenKey = 'zcash_sync_keep_awake_prompt_seen';
 
-/// Home portfolio chart preferences. Absent means the default: shown, the ZEC
-/// balance only (market prices are opt-in), starting at one week.
+/// Home portfolio chart preferences; absent means the default.
 const kPortfolioChartEnabledKey = 'zcash_portfolio_chart_enabled';
 const kPortfolioChartMarketPricesKey = 'zcash_portfolio_chart_market_prices';
 const kPortfolioChartRangeKey = 'zcash_portfolio_chart_range';
@@ -66,7 +65,7 @@ const _votingHotkeyKeyPrefix = 'zcash_account_voting_hotkey_';
 
 /// Private USD: one account's Railgun engine encryption key, an app-managed
 /// secret encrypted under the session password and rotated with it.
-const kRailgunEncryptionKeyStoragePrefix = 'vizor_railgun_encryption_key_';
+const _railgunEncryptionKeyPrefix = 'vizor_railgun_encryption_key_';
 
 const _e2eUseFirstUnlockMnemonicKeychain = bool.fromEnvironment(
   'ZCASH_E2E_FIRST_UNLOCK_MNEMONIC_KEYCHAIN',
@@ -745,6 +744,10 @@ class AppSecureStore {
     return '$_votingHotkeyKeyPrefix${accountUuid}_';
   }
 
+  /// Secure-storage key for one account's Railgun engine encryption key.
+  static String railgunEncryptionKeyStorageKey(String accountUuid) =>
+      '$_railgunEncryptionKeyPrefix$accountUuid';
+
   static String ironwoodMigrationPendingTxSaltKey({
     required String network,
     required String accountUuid,
@@ -1221,7 +1224,7 @@ class AppSecureStore {
 
   bool _isAppManagedGeneralSecretKey(String key) {
     return key.startsWith(_votingHotkeyKeyPrefix) ||
-        key.startsWith(kRailgunEncryptionKeyStoragePrefix) ||
+        key.startsWith(_railgunEncryptionKeyPrefix) ||
         key == kPaymentLinkRecoveryStorageKey ||
         key == kPaymentLinkReceivedStorageKey ||
         key == kPendingAccountMnemonicStorageKey;

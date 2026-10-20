@@ -3,11 +3,11 @@ package com.keplr.vizor.railgun
 import com.keplr.vizor.railgun.RailgunRequests.Route
 import java.io.File
 import java.net.URI
-import kotlin.test.Test
-import kotlin.test.assertEquals
+import org.junit.Assert.assertEquals
+import org.junit.Test
 
-// Ported from zapp's railgun-lib `RailgunBoundaryTest` (plan reference §8.7). Unit tests run in `android/app`, so
-// the page source is `../railgun-web/src/` and the built page `src/main/assets/railgun/`.
+// Unit tests run in `android/app`, so the page source is `../railgun-web/src/` and the built page
+// `src/main/assets/railgun/`.
 class RailgunBoundaryTest {
     @Test
     fun thePageReachesItsAssetsAndItsHostsOnly() {
@@ -18,8 +18,7 @@ class RailgunBoundaryTest {
             "https://eth-sepolia.g.alchemy.com/v2/key",
             "https://mainnet.infura.io/v3/key",
             "https://ethereum-rpc.publicnode.com",
-        ).forEach { assertEquals(Route.ALLOWED, route(it), it) }
-        assertEquals(Route.ALLOWED, route(RailgunEndpoints.POI_NODE_URL))
+        ).forEach { assertEquals(it, Route.ALLOWED, route(it)) }
         assertEquals(Route.ALLOWED, route("blob:https://railgun.appassets.androidplatform.net/0f1e"))
         assertEquals(Route.ALLOWED, route("data:application/wasm;base64,AGFzbQ=="))
     }
@@ -34,7 +33,7 @@ class RailgunBoundaryTest {
             "https://appassets.androidplatform.net/assets/railgun/index.html",
             "file:///data/data/com.keplr.vizor/shared_prefs/prefs.xml",
             "content://com.keplr.vizor.provider/x",
-        ).forEach { assertEquals(Route.BLOCKED, route(it), it) }
+        ).forEach { assertEquals(it, Route.BLOCKED, route(it)) }
     }
 
     @Test

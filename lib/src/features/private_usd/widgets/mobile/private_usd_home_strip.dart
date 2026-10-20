@@ -12,8 +12,12 @@ import '../../providers/private_usd_balance_provider.dart';
 import '../../services/private_usd_balance_repository.dart';
 import 'private_usd_logo.dart';
 
-/// Height of the home strip: the transparent-balance strip's.
+/// Height of the home strip: the transparent-balance strip's, a private
+/// constant of Home's.
 const kPrivateUsdHomeStripHeight = 57.0;
+
+const _logoSize = 20.0;
+const _chevronSize = 20.0;
 
 /// `≈ 0.25 ZEC`, the indicative ZEC worth of [microDollars] at the display
 /// price; null without a price.
@@ -31,10 +35,10 @@ String? privateUsdZecEquivalentText(
   );
 }
 
-/// The home balance card's Private USD row (plan reference §8.3, §9.4 S1):
-/// the headline balance, its `≈ ZEC` worth and what is arriving or refused,
-/// and a chevron to `/private-usd`. It keeps the balance fresh only once
-/// Private USD is in use, so before that it shows "—" and starts nothing.
+/// The home balance card's Private USD row: the headline balance, its ZEC
+/// worth and what is arriving or refused, and a chevron to `/private-usd`.
+/// It keeps the balance fresh only once Private USD is in use, so before
+/// that it shows no amount and starts nothing.
 class PrivateUsdHomeStrip extends ConsumerWidget {
   const PrivateUsdHomeStrip({
     required this.accountUuid,
@@ -120,7 +124,7 @@ class PrivateUsdHomeStripView extends StatelessWidget {
       button: true,
       label: PrivateUsdCopy.homeOpen,
       value: [
-        '${PrivateUsdCopy.title} $amountSpoken',
+        PrivateUsdCopy.homeBalanceDescription(amountSpoken),
         ?zec,
         ?detailSpoken,
       ].join(', '),
@@ -144,10 +148,14 @@ class PrivateUsdHomeStripView extends StatelessWidget {
                 // What is left once the logo, chevron and gaps are placed.
                 final room =
                     constraints.maxWidth -
-                    (20 + AppSpacing.xs + AppSpacing.s + AppSpacing.xxs + 20);
+                    (_logoSize +
+                        AppSpacing.xs +
+                        AppSpacing.s +
+                        AppSpacing.xxs +
+                        _chevronSize);
                 return Row(
                   children: [
-                    const PrivateUsdLogo(size: 20),
+                    const PrivateUsdLogo(size: _logoSize),
                     const SizedBox(width: AppSpacing.xs),
                     // The name and the ZEC worth on the left keep whatever the
                     // right side does not need, so "≈ 0.03613 ZEC" is not cut
@@ -226,7 +234,7 @@ class PrivateUsdHomeStripView extends StatelessWidget {
                     const SizedBox(width: AppSpacing.xxs),
                     AppIcon(
                       AppIcons.chevronForward,
-                      size: 20,
+                      size: _chevronSize,
                       color: colors.icon.accent,
                     ),
                   ],

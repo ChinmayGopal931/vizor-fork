@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/config/private_usd_feature_config.dart';
 import '../../../rust/api/private_usd.dart' as rust;
 import '../models/private_usd_record_key.dart';
 import 'private_usd_deposit_backend.dart';
+import 'private_usd_pause.dart';
 import 'private_usd_swap_backend.dart';
 
-/// The foreground loop's timing (plan reference §5.10, zapp `SwapLoop`).
+/// The foreground loop's timing.
 abstract final class PrivateUsdEngineTiming {
   /// After a failed step, or a step another caller held up (`busy`).
   static const retry = Duration(seconds: 15);
@@ -22,10 +24,10 @@ abstract final class PrivateUsdEngineTiming {
   /// How often the step label of a running advance is read.
   static const activityPoll = Duration(milliseconds: 500);
 
-  /// How long a lock waits for the running call to stop (M5 pitfalls).
+  /// How long a lock waits for the running call to stop.
   static const lockDrain = Duration(seconds: 5);
 
-  /// How long an account deletion or a reset waits for it (§8.4).
+  /// How long an account deletion or a reset waits for it.
   static const quiesceDrain = Duration(seconds: 30);
 
   /// The shortest nap, so a record that keeps answering "now" never spins.
@@ -37,7 +39,7 @@ abstract final class PrivateUsdEngineTiming {
 enum PrivateUsdPauseReason { lock, background }
 
 /// Calls are refused while an account deletion or a reset drains the engine.
-class PrivateUsdEngineUnavailableException implements Exception {
+class PrivateUsdEngineUnavailableException implements PrivateUsdPause {
   const PrivateUsdEngineUnavailableException();
 
   @override
@@ -47,21 +49,20 @@ class PrivateUsdEngineUnavailableException implements Exception {
 /// The engine paused (a lock, the background or a drain) under a call, so
 /// its result was dropped. Rust kept whatever it saved; the loop picks the
 /// conversion up again once allowed.
-class PrivateUsdEngineInterruptedException implements Exception {
+class PrivateUsdEngineInterruptedException implements PrivateUsdPause {
   const PrivateUsdEngineInterruptedException();
 
   @override
   String toString() => 'The conversion step was interrupted.';
 }
 
-/// What the loop knows about one conversion: the record as Rust last
-/// returned it, what it waits for, the step running now, and the problem to
-/// show once its steps have failed for [PrivateUsdEngineTiming.problemAfter].
+/// What the loop knows about one conversion, in either direction: the record
+/// as Rust last returned it, the step running now, and the problem to show
+/// once its steps have failed for [PrivateUsdEngineTiming.problemAfter].
 @immutable
-class PrivateUsdConversionStatus {
-  const PrivateUsdConversionStatus({
+abstract class PrivateUsdStepStatus<R, S extends PrivateUsdStepStatus<R, S>> {
+  const PrivateUsdStepStatus({
     required this.record,
-    this.wait,
     this.activity,
     this.problem,
     this.failingSince,
@@ -69,8 +70,7 @@ class PrivateUsdConversionStatus {
     this.checkedAt,
   });
 
-  final rust.ApiForwardRecord record;
-  final rust.ApiForwardWait? wait;
+  final R record;
 
   /// The step a running advance is in (depositing, claiming, …).
   final rust.ApiActivity? activity;
@@ -81,18 +81,57 @@ class PrivateUsdConversionStatus {
   final DateTime? failingSince;
 
   /// Picking up after a restart, a lock or the background, until the first
-  /// advance after it returns ("Picking up where it left off.").
+  /// advance after it returns.
   final bool resuming;
 
   /// When an advance last returned.
   final DateTime? checkedAt;
 
+  int get index;
+
+  bool get isUnderWay;
+
+  S copyWith({
+    R? record,
+    rust.ApiActivity? activity,
+    bool clearActivity = false,
+    rust.ApiPrivateUsdErrorCode? problem,
+    bool clearProblem = false,
+    DateTime? failingSince,
+    bool clearFailingSince = false,
+    bool? resuming,
+    DateTime? checkedAt,
+  });
+}
+
+/// A ZEC → private USD conversion, with what its record waits for.
+class PrivateUsdConversionStatus
+    extends
+        PrivateUsdStepStatus<
+          rust.ApiForwardRecord,
+          PrivateUsdConversionStatus
+        > {
+  const PrivateUsdConversionStatus({
+    required super.record,
+    this.wait,
+    super.activity,
+    super.problem,
+    super.failingSince,
+    super.resuming,
+    super.checkedAt,
+  });
+
+  final rust.ApiForwardWait? wait;
+
+  @override
+  int get index => record.index;
+
+  @override
   bool get isUnderWay => record.outcome == null;
 
+  @override
   PrivateUsdConversionStatus copyWith({
     rust.ApiForwardRecord? record,
-    rust.ApiForwardWait? wait,
-    bool clearWait = false,
     rust.ApiActivity? activity,
     bool clearActivity = false,
     rust.ApiPrivateUsdErrorCode? problem,
@@ -103,7 +142,7 @@ class PrivateUsdConversionStatus {
     DateTime? checkedAt,
   }) => PrivateUsdConversionStatus(
     record: record ?? this.record,
-    wait: clearWait ? null : (wait ?? this.wait),
+    wait: wait,
     activity: clearActivity ? null : (activity ?? this.activity),
     problem: clearProblem ? null : (problem ?? this.problem),
     failingSince: clearFailingSince
@@ -115,7 +154,7 @@ class PrivateUsdConversionStatus {
 }
 
 /// Whether a reverse conversion in [phase] is under way: past its `quoted`
-/// draft and not ended (reference §5.7; drafts are never advanced).
+/// draft and not ended (drafts are never advanced).
 bool privateUsdReverseUnderWay(rust.ApiReversePhase phase) => switch (phase) {
   rust.ApiReversePhase.quoted ||
   rust.ApiReversePhase.complete ||
@@ -124,33 +163,30 @@ bool privateUsdReverseUnderWay(rust.ApiReversePhase phase) => switch (phase) {
   _ => true,
 };
 
-/// What the loop knows about one reverse conversion (M6): the record as
-/// Rust last returned it, the step running now, and the problem to show once
-/// its steps have failed for [PrivateUsdEngineTiming.problemAfter].
-@immutable
-class PrivateUsdReverseStatus {
+/// A private USD → ZEC conversion.
+class PrivateUsdReverseStatus
+    extends
+        PrivateUsdStepStatus<rust.ApiReverseRecord, PrivateUsdReverseStatus> {
   const PrivateUsdReverseStatus({
-    required this.record,
-    this.activity,
-    this.problem,
-    this.failingSince,
-    this.resuming = false,
-    this.checkedAt,
+    required super.record,
+    super.activity,
+    super.problem,
+    super.failingSince,
+    super.resuming,
+    super.checkedAt,
   });
 
-  final rust.ApiReverseRecord record;
-  final rust.ApiActivity? activity;
-  final rust.ApiPrivateUsdErrorCode? problem;
-  final DateTime? failingSince;
-  final bool resuming;
-  final DateTime? checkedAt;
+  @override
+  int get index => record.index;
 
+  @override
   bool get isUnderWay => privateUsdReverseUnderWay(record.phase);
 
-  /// Waiting on the user's payment or settlement approval: the banner turns
-  /// to "Conversion needs attention" (an advance's `needs_you`).
+  /// Waiting on the user's payment or settlement approval (an advance's
+  /// `needs_you`): the banner asks for attention.
   bool get needsYou => record.awaitingUser;
 
+  @override
   PrivateUsdReverseStatus copyWith({
     rust.ApiReverseRecord? record,
     rust.ApiActivity? activity,
@@ -173,7 +209,7 @@ class PrivateUsdReverseStatus {
   );
 }
 
-/// What the engine knows about the active account's deposits (M9): the last
+/// What the engine knows about the active account's deposits: the last
 /// pass, or why it failed.
 @immutable
 class PrivateUsdDepositsStatus {
@@ -190,7 +226,6 @@ class PrivateUsdDepositsStatus {
   /// deposits, the terms.
   final rust.ApiDepositPass? pass;
 
-  /// Why the last pass failed, if it did.
   final rust.ApiPrivateUsdErrorCode? error;
   final DateTime? checkedAt;
 
@@ -214,9 +249,67 @@ class PrivateUsdEngineTicket {
   final int _epoch;
 }
 
-/// The foreground swap loop (plan reference §5.10, D9, D14): it advances
-/// every account's conversions under way while the app is open, in the
-/// foreground and unlocked, and not while a deletion or reset drains it.
+/// What one advance answered: the record (with what it waits for) and the
+/// problem Rust folded a failed step into.
+typedef _Advanced<S> = ({
+  S status,
+  rust.ApiPrivateUsdErrorCode? problem,
+  int nextPollMs,
+});
+
+/// One direction's conversions as the engine knows them, by key, and the
+/// snapshot it publishes of them.
+class _Book<R, S extends PrivateUsdStepStatus<R, S>> {
+  _Book(this.direction, this.fresh);
+
+  final PrivateUsdDirection direction;
+
+  /// A status for [record] with nothing known about its steps.
+  final S Function(R record) fresh;
+
+  final statuses = <PrivateUsdRecordKey, S>{};
+  final snapshot = ValueNotifier<Map<PrivateUsdRecordKey, S>>(const {});
+
+  PrivateUsdRecordKey keyOf(String accountUuid, S status) =>
+      PrivateUsdRecordKey(
+        accountUuid: accountUuid,
+        direction: direction,
+        index: status.index,
+      );
+
+  void publish() => snapshot.value = Map.unmodifiable(statuses);
+
+  /// Marks the conversions under way as being picked up again; whether any
+  /// changed.
+  bool markResuming() => _updateAll(
+    (status) => status.isUnderWay && !status.resuming
+        ? status.copyWith(resuming: true)
+        : null,
+  );
+
+  /// Drops every problem and how long its steps have failed; whether any
+  /// changed.
+  bool forgetProblems() => _updateAll(
+    (status) => status.failingSince != null || status.problem != null
+        ? status.copyWith(clearProblem: true, clearFailingSince: true)
+        : null,
+  );
+
+  bool _updateAll(S? Function(S status) update) {
+    var changed = false;
+    for (final MapEntry(:key, value: status) in statuses.entries.toList()) {
+      final next = update(status);
+      if (next == null) continue;
+      statuses[key] = next;
+      changed = true;
+    }
+    return changed;
+  }
+}
+
+/// The foreground swap loop: it advances every account's conversions under
+/// way while the app is open, in the foreground and unlocked, and not while
+/// a deletion or reset drains it.
 ///
 /// - Every call that touches a record (quote, accept, advance, abandon) runs
 ///   on one serial queue per account, so Rust's per-account driver lock
@@ -262,10 +355,10 @@ class PrivateUsdEngine {
   final bool Function(String accountUuid) _isKnownAccount;
   final DateTime Function() _now;
 
-  /// Deposits (M9): the calls, the account they run for (the active one,
-  /// when it can have deposits; null otherwise), and whether a pass may sign
-  /// a new deposit (the kill switch: off, it still follows and posts the
-  /// ones under way).
+  /// Deposits: the calls, the account they run for (the active one, when it
+  /// can have deposits; null otherwise), and whether a pass may sign a new
+  /// deposit (the kill switch: off, it still follows and posts the ones
+  /// under way).
   final PrivateUsdDepositBackend? _depositBackend;
   final String? Function()? _depositAccount;
   final bool Function()? _depositsSignNew;
@@ -273,20 +366,23 @@ class PrivateUsdEngine {
   /// The active account's deposits as the last pass left them.
   final deposits = ValueNotifier<PrivateUsdDepositsStatus?>(null);
 
-  /// Every conversion the engine has seen, by key.
-  final conversions =
-      ValueNotifier<Map<PrivateUsdRecordKey, PrivateUsdConversionStatus>>(
-        const {},
-      );
+  final _forward = _Book<rust.ApiForwardRecord, PrivateUsdConversionStatus>(
+    PrivateUsdDirection.forward,
+    (record) => PrivateUsdConversionStatus(record: record),
+  );
+  final _reverse = _Book<rust.ApiReverseRecord, PrivateUsdReverseStatus>(
+    PrivateUsdDirection.reverse,
+    (record) => PrivateUsdReverseStatus(record: record),
+  );
+
+  /// Every forward conversion the engine has seen, by key.
+  ValueListenable<Map<PrivateUsdRecordKey, PrivateUsdConversionStatus>>
+  get conversions => _forward.snapshot;
 
   /// Every reverse conversion the engine has seen (drafts too), by key.
-  final reverseConversions =
-      ValueNotifier<Map<PrivateUsdRecordKey, PrivateUsdReverseStatus>>(
-        const {},
-      );
+  ValueListenable<Map<PrivateUsdRecordKey, PrivateUsdReverseStatus>>
+  get reverseConversions => _reverse.snapshot;
 
-  final _statuses = <PrivateUsdRecordKey, PrivateUsdConversionStatus>{};
-  final _reverse = <PrivateUsdRecordKey, PrivateUsdReverseStatus>{};
   final _tails = <String, Future<void>>{};
   final _running = <Future<void>>{};
   final _inFlight = <int>{};
@@ -326,12 +422,7 @@ class PrivateUsdEngine {
 
   bool get isQuiesced => _quiesceDepth > 0;
 
-  /// Whether the loop may run steps now.
   bool get canRun => !_disposed && _quiesceDepth == 0 && _allowed();
-
-  /// Whether the loop is running (a pass or a nap).
-  @visibleForTesting
-  bool get isLooping => _loop != null;
 
   // ── The loop ───────────────────────────────────────────────────────
 
@@ -376,7 +467,7 @@ class PrivateUsdEngine {
       try {
         nap = await _pass(epoch);
       } catch (error) {
-        _debugLog('a pass failed (${error.runtimeType})');
+        privateUsdLog('a pass failed (${error.runtimeType})');
         nap = PrivateUsdEngineTiming.restart;
       }
       if (epoch != _epoch || !canRun) return;
@@ -401,7 +492,7 @@ class PrivateUsdEngine {
     try {
       accounts = await _backend.accountsWithUnfinished();
     } catch (error) {
-      _debugLog('listing conversions failed (${error.runtimeType})');
+      privateUsdLog('listing conversions failed (${error.runtimeType})');
       return _shorter(nap, PrivateUsdEngineTiming.restart);
     }
     if (epoch != _epoch) return null;
@@ -411,24 +502,24 @@ class PrivateUsdEngine {
       try {
         records = await loadRecords(account);
       } catch (error) {
-        _debugLog('reading conversions failed (${error.runtimeType})');
+        privateUsdLog('reading conversions failed (${error.runtimeType})');
         nap = _shorter(nap, PrivateUsdEngineTiming.restart);
         continue;
       }
       if (epoch != _epoch) return null;
       for (final record in records) {
         if (record.outcome != null) continue;
-        final next = await _advance(account, record, epoch);
+        final next = await _advanceForward(account, record, epoch);
         if (epoch != _epoch) return null;
         if (next != null) nap = _shorter(nap, next);
       }
-      // Reverse conversions under way (M6). A `quoted` draft is never
-      // advanced, and the loop never sends a rescue.
+      // A `quoted` draft is never advanced, and the loop never sends a
+      // rescue.
       final List<rust.ApiReverseRecord> reverse;
       try {
         reverse = await loadReverseRecords(account);
       } catch (error) {
-        _debugLog('reading conversions failed (${error.runtimeType})');
+        privateUsdLog('reading conversions failed (${error.runtimeType})');
         nap = _shorter(nap, PrivateUsdEngineTiming.restart);
         continue;
       }
@@ -444,156 +535,68 @@ class PrivateUsdEngine {
     return nap;
   }
 
-  /// Advances one reverse conversion; the nap it asks for, or null once it
-  /// ended.
+  Future<Duration?> _advanceForward(
+    String accountUuid,
+    rust.ApiForwardRecord record,
+    int epoch,
+  ) => _advance(_forward, accountUuid, record, epoch, (opId, secret) async {
+    final result = await _backend.forwardAdvance(
+      accountUuid,
+      secret,
+      opId: opId,
+      index: record.index,
+    );
+    return (
+      status: PrivateUsdConversionStatus(
+        record: result.record,
+        wait: result.wait,
+      ),
+      problem: result.problem,
+      nextPollMs: result.nextPollMs,
+    );
+  });
+
   Future<Duration?> _advanceReverse(
     String accountUuid,
     rust.ApiReverseRecord record,
     int epoch,
-  ) async {
-    final key = PrivateUsdRecordKey(
-      accountUuid: accountUuid,
-      direction: PrivateUsdDirection.reverse,
+  ) => _advance(_reverse, accountUuid, record, epoch, (opId, secret) async {
+    final result = await _backend.reverseAdvance(
+      accountUuid,
+      secret,
+      opId: opId,
       index: record.index,
     );
-    Timer? poller;
-    try {
-      final result = await _queue(accountUuid, epoch, (opId, secret) {
-        poller = Timer.periodic(
-          PrivateUsdEngineTiming.activityPoll,
-          (_) => _showReverseActivity(key, opId),
-        );
-        return _backend.reverseAdvance(
-          accountUuid,
-          secret,
-          opId: opId,
-          index: record.index,
-        );
-      });
-      _advancedReverse(key, result);
-      if (!privateUsdReverseUnderWay(result.record.phase)) return null;
-      final asked = Duration(milliseconds: result.nextPollMs);
-      return asked < PrivateUsdEngineTiming.minNap
-          ? PrivateUsdEngineTiming.minNap
-          : asked;
-    } on rust.ApiPrivateUsdError catch (error) {
-      switch (error.code) {
-        case rust.ApiPrivateUsdErrorCode.cancelled:
-        case rust.ApiPrivateUsdErrorCode.busy:
-          break;
-        default:
-          _failedReverse(key, record, _problemOf(error.code));
-      }
-      return PrivateUsdEngineTiming.retry;
-    } on PrivateUsdEngineInterruptedException {
-      return PrivateUsdEngineTiming.retry;
-    } on PrivateUsdEngineUnavailableException {
-      return PrivateUsdEngineTiming.retry;
-    } on PrivateUsdKeyLockedException {
-      return PrivateUsdEngineTiming.retry;
-    } catch (error) {
-      _debugLog('an advance failed (${error.runtimeType})');
-      _failedReverse(key, record, rust.ApiPrivateUsdErrorCode.other);
-      return PrivateUsdEngineTiming.retry;
-    } finally {
-      poller?.cancel();
-      final status = _reverse[key];
-      if (status != null && status.activity != null) {
-        _putReverse(key, status.copyWith(clearActivity: true));
-      }
-    }
-  }
-
-  void _advancedReverse(
-    PrivateUsdRecordKey key,
-    rust.ApiReverseAdvance result,
-  ) {
-    final now = _now();
-    final problem = result.problem;
-    if (problem == null) {
-      _putReverse(
-        key,
-        PrivateUsdReverseStatus(record: result.record, checkedAt: now),
-      );
-      return;
-    }
-    final since = _reverse[key]?.failingSince ?? now;
-    _putReverse(
-      key,
-      PrivateUsdReverseStatus(
-        record: result.record,
-        problem: _shows(since, now) ? problem : null,
-        failingSince: since,
-        checkedAt: now,
-      ),
+    return (
+      status: PrivateUsdReverseStatus(record: result.record),
+      problem: result.problem,
+      nextPollMs: result.nextPollMs,
     );
-  }
+  });
 
-  void _failedReverse(
-    PrivateUsdRecordKey key,
-    rust.ApiReverseRecord record,
-    rust.ApiPrivateUsdErrorCode problem,
-  ) {
-    final now = _now();
-    final previous = _reverse[key] ?? PrivateUsdReverseStatus(record: record);
-    final since = previous.failingSince ?? now;
-    _putReverse(
-      key,
-      previous.copyWith(
-        problem: _shows(since, now) ? problem : null,
-        clearProblem: !_shows(since, now),
-        failingSince: since,
-        resuming: false,
-        checkedAt: now,
-        clearActivity: true,
-      ),
-    );
-  }
-
-  void _showReverseActivity(PrivateUsdRecordKey key, int opId) {
-    final rust.ApiActivity? activity;
-    try {
-      activity = _backend.activity(opId);
-    } catch (_) {
-      return;
-    }
-    final status = _reverse[key];
-    if (status == null || status.activity == activity) return;
-    _putReverse(
-      key,
-      activity == null
-          ? status.copyWith(clearActivity: true)
-          : status.copyWith(activity: activity),
-    );
-  }
-
-  /// Advances one conversion; the nap it asks for, or null once it ended.
-  Future<Duration?> _advance(
+  /// Advances one conversion through [advance]; the nap it asks for, or null
+  /// once it ended.
+  Future<Duration?> _advance<R, S extends PrivateUsdStepStatus<R, S>>(
+    _Book<R, S> book,
     String accountUuid,
-    rust.ApiForwardRecord record,
+    R record,
     int epoch,
+    Future<_Advanced<S>> Function(int opId, PrivateUsdSecretReader secret)
+    advance,
   ) async {
-    final key = PrivateUsdRecordKey(
-      accountUuid: accountUuid,
-      direction: PrivateUsdDirection.forward,
-      index: record.index,
-    );
+    final current = book.fresh(record);
+    final key = book.keyOf(accountUuid, current);
     Timer? poller;
     try {
       final result = await _queue(accountUuid, epoch, (opId, secret) {
         poller = Timer.periodic(
           PrivateUsdEngineTiming.activityPoll,
-          (_) => _showActivity(key, opId),
+          (_) => _showActivity(book, key, opId),
         );
-        return _backend.forwardAdvance(
-          accountUuid,
-          secret,
-          opId: opId,
-          index: record.index,
-        );
+        return advance(opId, secret);
       });
-      _advanced(key, result);
-      if (result.record.outcome != null) return null;
+      _advanced(book, key, result);
+      if (!result.status.isUnderWay) return null;
       final asked = Duration(milliseconds: result.nextPollMs);
       return asked < PrivateUsdEngineTiming.minNap
           ? PrivateUsdEngineTiming.minNap
@@ -606,50 +609,40 @@ class PrivateUsdEngine {
         case rust.ApiPrivateUsdErrorCode.busy:
           break;
         default:
-          _failed(key, record, _problemOf(error.code));
+          _failed(book, key, current, _problemOf(error.code));
       }
       return PrivateUsdEngineTiming.retry;
-    } on PrivateUsdEngineInterruptedException {
-      return PrivateUsdEngineTiming.retry;
-    } on PrivateUsdEngineUnavailableException {
-      return PrivateUsdEngineTiming.retry;
-    } on PrivateUsdKeyLockedException {
-      // Locked meanwhile: the lock pauses the loop.
+    } on PrivateUsdPause {
       return PrivateUsdEngineTiming.retry;
     } catch (error) {
-      _debugLog('an advance failed (${error.runtimeType})');
-      _failed(key, record, rust.ApiPrivateUsdErrorCode.other);
+      privateUsdLog('an advance failed (${error.runtimeType})');
+      _failed(book, key, current, rust.ApiPrivateUsdErrorCode.other);
       return PrivateUsdEngineTiming.retry;
     } finally {
       poller?.cancel();
-      final status = _statuses[key];
+      final status = book.statuses[key];
       if (status != null && status.activity != null) {
-        _put(key, status.copyWith(clearActivity: true));
+        _put(book, key, status.copyWith(clearActivity: true));
       }
     }
   }
 
-  void _advanced(PrivateUsdRecordKey key, rust.ApiForwardAdvance result) {
+  void _advanced<R, S extends PrivateUsdStepStatus<R, S>>(
+    _Book<R, S> book,
+    PrivateUsdRecordKey key,
+    _Advanced<S> result,
+  ) {
     final now = _now();
     final problem = result.problem;
-    final previous = _statuses[key];
     if (problem == null) {
-      _put(
-        key,
-        PrivateUsdConversionStatus(
-          record: result.record,
-          wait: result.wait,
-          checkedAt: now,
-        ),
-      );
+      _put(book, key, result.status.copyWith(checkedAt: now));
       return;
     }
-    final since = previous?.failingSince ?? now;
+    final since = book.statuses[key]?.failingSince ?? now;
     _put(
+      book,
       key,
-      PrivateUsdConversionStatus(
-        record: result.record,
-        wait: result.wait,
+      result.status.copyWith(
         problem: _shows(since, now) ? problem : null,
         failingSince: since,
         checkedAt: now,
@@ -657,20 +650,24 @@ class PrivateUsdEngine {
     );
   }
 
-  void _failed(
+  /// An advance of [current]'s conversion failed with [problem], shown once
+  /// its steps have failed for long enough.
+  void _failed<R, S extends PrivateUsdStepStatus<R, S>>(
+    _Book<R, S> book,
     PrivateUsdRecordKey key,
-    rust.ApiForwardRecord record,
+    S current,
     rust.ApiPrivateUsdErrorCode problem,
   ) {
     final now = _now();
-    final previous =
-        _statuses[key] ?? PrivateUsdConversionStatus(record: record);
+    final previous = book.statuses[key] ?? current;
     final since = previous.failingSince ?? now;
+    final shows = _shows(since, now);
     _put(
+      book,
       key,
       previous.copyWith(
-        problem: _shows(since, now) ? problem : null,
-        clearProblem: !_shows(since, now),
+        problem: shows ? problem : null,
+        clearProblem: !shows,
         failingSince: since,
         resuming: false,
         checkedAt: now,
@@ -683,12 +680,11 @@ class PrivateUsdEngine {
       now.difference(failingSince) >= PrivateUsdEngineTiming.problemAfter;
 
   /// An error an advance threw, as one of the problems the progress screen
-  /// explains (reference §5.8; Rust folds a failed step's own code).
+  /// explains (Rust folds a failed step's own code).
   static rust.ApiPrivateUsdErrorCode _problemOf(
     rust.ApiPrivateUsdErrorCode code,
   ) => switch (code) {
-    // zapp holds a service serving another deployment as the relayer being
-    // unreachable.
+    // A service that serves another deployment is as good as unreachable.
     rust.ApiPrivateUsdErrorCode.wrongDeployment =>
       rust.ApiPrivateUsdErrorCode.relayerUnreachable,
     rust.ApiPrivateUsdErrorCode.mismatch ||
@@ -700,16 +696,21 @@ class PrivateUsdEngine {
     _ => rust.ApiPrivateUsdErrorCode.other,
   };
 
-  void _showActivity(PrivateUsdRecordKey key, int opId) {
+  void _showActivity<R, S extends PrivateUsdStepStatus<R, S>>(
+    _Book<R, S> book,
+    PrivateUsdRecordKey key,
+    int opId,
+  ) {
     final rust.ApiActivity? activity;
     try {
       activity = _backend.activity(opId);
     } catch (_) {
       return;
     }
-    final status = _statuses[key];
+    final status = book.statuses[key];
     if (status == null || status.activity == activity) return;
     _put(
+      book,
       key,
       activity == null
           ? status.copyWith(clearActivity: true)
@@ -845,7 +846,7 @@ class PrivateUsdEngine {
         ),
       );
     } finally {
-      unawaited(_refreshThenStart(accountUuid));
+      unawaited(_reloadThenStart(() => loadRecords(accountUuid)));
     }
   }
 
@@ -859,66 +860,69 @@ class PrivateUsdEngine {
       (_, _) => _backend.forwardAbandon(accountUuid, index: index),
       dropLateResult: false,
     );
-    _merge(accountUuid, record);
+    _merge(_forward, accountUuid, record);
     return record;
   }
 
   /// Reads [accountUuid]'s forward records and publishes them.
-  Future<List<rust.ApiForwardRecord>> loadRecords(String accountUuid) async {
-    final records = await _backend.forwardRecords(accountUuid);
+  Future<List<rust.ApiForwardRecord>> loadRecords(String accountUuid) =>
+      _load(_forward, accountUuid, () => _backend.forwardRecords(accountUuid));
+
+  /// Reads [accountUuid]'s reverse records (drafts too) and publishes them.
+  Future<List<rust.ApiReverseRecord>> loadReverseRecords(String accountUuid) =>
+      _load(_reverse, accountUuid, () => _backend.reverseRecords(accountUuid));
+
+  Future<List<R>> _load<R, S extends PrivateUsdStepStatus<R, S>>(
+    _Book<R, S> book,
+    String accountUuid,
+    Future<List<R>> Function() read,
+  ) async {
+    final records = await read();
     if (_disposed) return records;
-    final seen = <PrivateUsdRecordKey>{};
-    for (final record in records) {
-      seen.add(_merge(accountUuid, record, publish: false));
-    }
-    _statuses.removeWhere(
+    final seen = {
+      for (final record in records)
+        _merge(book, accountUuid, record, publish: false),
+    };
+    book.statuses.removeWhere(
       (key, _) => key.accountUuid == accountUuid && !seen.contains(key),
     );
-    _publishForward();
+    _publish(book);
     return records;
   }
 
-  Future<void> _refreshThenStart(String accountUuid) async {
+  Future<void> _reloadThenStart(Future<void> Function() load) async {
     try {
-      await loadRecords(accountUuid);
+      await load();
     } catch (error) {
-      _debugLog('reading conversions failed (${error.runtimeType})');
+      privateUsdLog('reading conversions failed (${error.runtimeType})');
     }
     start();
   }
 
-  PrivateUsdRecordKey _merge(
+  PrivateUsdRecordKey _merge<R, S extends PrivateUsdStepStatus<R, S>>(
+    _Book<R, S> book,
     String accountUuid,
-    rust.ApiForwardRecord record, {
+    R record, {
     bool publish = true,
   }) {
-    final key = PrivateUsdRecordKey(
-      accountUuid: accountUuid,
-      direction: PrivateUsdDirection.forward,
-      index: record.index,
-    );
-    final previous = _statuses[key];
-    final PrivateUsdConversionStatus next;
+    final fresh = book.fresh(record);
+    final key = book.keyOf(accountUuid, fresh);
+    final previous = book.statuses[key];
+    final S next;
     if (previous == null) {
-      next = PrivateUsdConversionStatus(
-        record: record,
-        resuming: _resumeLoaded && record.outcome == null,
-      );
-    } else if (record.outcome != null) {
-      // Ended: nothing waits or fails any more.
-      next = PrivateUsdConversionStatus(
-        record: record,
-        checkedAt: previous.checkedAt,
-      );
+      next = fresh.copyWith(resuming: _resumeLoaded && fresh.isUnderWay);
+    } else if (!fresh.isUnderWay) {
+      // A draft or an ended conversion: nothing waits or fails.
+      next = fresh.copyWith(checkedAt: previous.checkedAt);
     } else {
       next = previous.copyWith(record: record);
     }
-    _statuses[key] = next;
-    if (publish) _publishForward();
+    book.statuses[key] = next;
+    if (publish) _publish(book);
     return key;
   }
 
-  // ── Reverse calls (M6) ─────────────────────────────────────────────
+  // ── Reverse calls ──────────────────────────────────────────────────
 
   /// The engine's moment now, for a step that runs outside the queue (the
   /// page's funding proof) and must be dropped if the engine paused since.
@@ -941,7 +945,7 @@ class PrivateUsdEngine {
       (_, secret) => _backend.reverseQuote(accountUuid, secret, units: units),
       dropLateResult: false,
     );
-    _mergeReverse(accountUuid, quote.record);
+    _merge(_reverse, accountUuid, quote.record);
     return quote;
   }
 
@@ -995,7 +999,7 @@ class PrivateUsdEngine {
             _backend.reverseAccept(accountUuid, secret, index: index),
       );
     } finally {
-      unawaited(_refreshReverseThenStart(accountUuid));
+      unawaited(_reloadThenStart(() => loadReverseRecords(accountUuid)));
     }
   }
 
@@ -1040,7 +1044,7 @@ class PrivateUsdEngine {
         ),
         dropLateResult: false,
       );
-      _mergeReverse(accountUuid, record);
+      _merge(_reverse, accountUuid, record);
       return record;
     } on PrivateUsdEngineInterruptedException {
       throw const PrivateUsdStaleStepException();
@@ -1100,78 +1104,14 @@ class PrivateUsdEngine {
   }) async {
     try {
       final record = await runFor(accountUuid, step, dropLateResult: false);
-      _mergeReverse(accountUuid, record);
+      _merge(_reverse, accountUuid, record);
       return record;
     } finally {
       if (nudges) nudge();
     }
   }
 
-  /// Reads [accountUuid]'s reverse records (drafts too) and publishes them.
-  Future<List<rust.ApiReverseRecord>> loadReverseRecords(
-    String accountUuid,
-  ) async {
-    final records = await _backend.reverseRecords(accountUuid);
-    if (_disposed) return records;
-    final seen = <PrivateUsdRecordKey>{};
-    for (final record in records) {
-      seen.add(_mergeReverse(accountUuid, record, publish: false));
-    }
-    _reverse.removeWhere(
-      (key, _) => key.accountUuid == accountUuid && !seen.contains(key),
-    );
-    _publishReverse();
-    return records;
-  }
-
-  Future<void> _refreshReverseThenStart(String accountUuid) async {
-    try {
-      await loadReverseRecords(accountUuid);
-    } catch (error) {
-      _debugLog('reading conversions failed (${error.runtimeType})');
-    }
-    start();
-  }
-
-  PrivateUsdRecordKey _mergeReverse(
-    String accountUuid,
-    rust.ApiReverseRecord record, {
-    bool publish = true,
-  }) {
-    final key = PrivateUsdRecordKey(
-      accountUuid: accountUuid,
-      direction: PrivateUsdDirection.reverse,
-      index: record.index,
-    );
-    final previous = _reverse[key];
-    final underWay = privateUsdReverseUnderWay(record.phase);
-    final PrivateUsdReverseStatus next;
-    if (previous == null) {
-      next = PrivateUsdReverseStatus(
-        record: record,
-        resuming: _resumeLoaded && underWay,
-      );
-    } else if (!underWay) {
-      // A draft or an ended conversion: nothing waits or fails.
-      next = PrivateUsdReverseStatus(
-        record: record,
-        checkedAt: previous.checkedAt,
-      );
-    } else {
-      next = previous.copyWith(record: record);
-    }
-    _reverse[key] = next;
-    if (publish) _publishReverse();
-    return key;
-  }
-
-  void _putReverse(PrivateUsdRecordKey key, PrivateUsdReverseStatus status) {
-    if (_disposed) return;
-    _reverse[key] = status;
-    _publishReverse();
-  }
-
-  // ── Deposits (M9) ──────────────────────────────────────────────────
+  // ── Deposits ───────────────────────────────────────────────────────
 
   static String _depositLane(String accountUuid) => '$accountUuid#deposits';
 
@@ -1253,6 +1193,12 @@ class PrivateUsdEngine {
     bool checkVaults,
     bool onlyIfUsed,
   ) async {
+    // A pause stopped it: the next start reads the deposits again.
+    void again() {
+      _depositDue = true;
+      _depositAsked = _depositAsked || !onlyIfUsed;
+    }
+
     try {
       final pass = await _queue(
         accountUuid,
@@ -1287,20 +1233,20 @@ class PrivateUsdEngine {
       }
     } on rust.ApiPrivateUsdError catch (error) {
       switch (error.code) {
-        // A pause stopped it: the next start reads the deposits again.
         case rust.ApiPrivateUsdErrorCode.cancelled:
-          _depositDue = true;
-          _depositAsked = _depositAsked || !onlyIfUsed;
+          again();
         // Another pass or a rescue held the account.
         case rust.ApiPrivateUsdErrorCode.busy:
           _depositNextAt = _now().add(PrivateUsdEngineTiming.retry);
         default:
-          _debugLog('a deposit pass failed (${error.code.name})');
+          privateUsdLog('a deposit pass failed (${error.code.name})');
           final previous = deposits.value;
           _publishDeposits(
             PrivateUsdDepositsStatus(
               accountUuid: accountUuid,
-              pass: previous?.accountUuid == accountUuid ? previous?.pass : null,
+              pass: previous?.accountUuid == accountUuid
+                  ? previous?.pass
+                  : null,
               error: error.code,
               checkedAt: _now(),
             ),
@@ -1310,17 +1256,10 @@ class PrivateUsdEngine {
             _depositNextAt = _now().add(PrivateUsdEngineTiming.restart);
           }
       }
-    } on PrivateUsdEngineInterruptedException {
-      _depositDue = true;
-      _depositAsked = _depositAsked || !onlyIfUsed;
-    } on PrivateUsdEngineUnavailableException {
-      _depositDue = true;
-      _depositAsked = _depositAsked || !onlyIfUsed;
-    } on PrivateUsdKeyLockedException {
-      _depositDue = true;
-      _depositAsked = _depositAsked || !onlyIfUsed;
+    } on PrivateUsdPause {
+      again();
     } catch (error) {
-      _debugLog('a deposit pass failed (${error.runtimeType})');
+      privateUsdLog('a deposit pass failed (${error.runtimeType})');
       if (deposits.value?.inFlight ?? false) {
         _depositNextAt = _now().add(PrivateUsdEngineTiming.restart);
       }
@@ -1367,9 +1306,10 @@ class PrivateUsdEngine {
     try {
       _backend.clearSessions();
     } catch (error) {
-      _debugLog('clearing sessions failed (${error.runtimeType})');
+      privateUsdLog('clearing sessions failed (${error.runtimeType})');
     }
-    _forgetProblems();
+    if (_forward.forgetProblems()) _publish(_forward);
+    if (_reverse.forgetProblems()) _publish(_reverse);
     await _settle(PrivateUsdEngineTiming.lockDrain);
   }
 
@@ -1391,27 +1331,29 @@ class PrivateUsdEngine {
 
   /// Drops what the engine knows about [accountUuid] (deleted).
   void forgetAccount(String accountUuid) {
-    _statuses.removeWhere((key, _) => key.accountUuid == accountUuid);
-    _reverse.removeWhere((key, _) => key.accountUuid == accountUuid);
+    _forward.statuses.removeWhere((key, _) => key.accountUuid == accountUuid);
+    _reverse.statuses.removeWhere((key, _) => key.accountUuid == accountUuid);
     if (deposits.value?.accountUuid == accountUuid) _publishDeposits(null);
-    _publish();
+    _publish(_forward);
+    _publish(_reverse);
   }
 
   /// Drops everything (the wallet was reset).
   void forgetAll() {
-    _statuses.clear();
-    _reverse.clear();
+    _forward.statuses.clear();
+    _reverse.statuses.clear();
     _depositNextAt = null;
     _publishDeposits(null);
-    _publish();
+    _publish(_forward);
+    _publish(_reverse);
   }
 
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
     _interrupt();
-    conversions.dispose();
-    reverseConversions.dispose();
+    _forward.snapshot.dispose();
+    _reverse.snapshot.dispose();
     deposits.dispose();
   }
 
@@ -1425,7 +1367,7 @@ class PrivateUsdEngine {
       try {
         _backend.cancel(opId);
       } catch (error) {
-        _debugLog('cancel failed (${error.runtimeType})');
+        privateUsdLog('cancel failed (${error.runtimeType})');
       }
     }
   }
@@ -1436,7 +1378,7 @@ class PrivateUsdEngine {
     try {
       await Future.wait(running).timeout(timeout);
     } on TimeoutException {
-      _debugLog('the running call did not stop in time');
+      privateUsdLog('the running call did not stop in time');
     } catch (_) {
       // The loop's failures are its own.
     }
@@ -1444,70 +1386,21 @@ class PrivateUsdEngine {
 
   void _markResuming() {
     _resumeLoaded = true;
-    var changed = false;
-    for (final entry in _statuses.entries.toList()) {
-      if (entry.value.isUnderWay && !entry.value.resuming) {
-        _statuses[entry.key] = entry.value.copyWith(resuming: true);
-        changed = true;
-      }
-    }
-    for (final entry in _reverse.entries.toList()) {
-      if (entry.value.isUnderWay && !entry.value.resuming) {
-        _reverse[entry.key] = entry.value.copyWith(resuming: true);
-        changed = true;
-      }
-    }
-    if (changed) _publish();
+    if (_forward.markResuming()) _publish(_forward);
+    if (_reverse.markResuming()) _publish(_reverse);
   }
 
-  void _forgetProblems() {
-    var changed = false;
-    for (final entry in _statuses.entries.toList()) {
-      final status = entry.value;
-      if (status.failingSince != null || status.problem != null) {
-        _statuses[entry.key] = status.copyWith(
-          clearProblem: true,
-          clearFailingSince: true,
-        );
-        changed = true;
-      }
-    }
-    for (final entry in _reverse.entries.toList()) {
-      final status = entry.value;
-      if (status.failingSince != null || status.problem != null) {
-        _reverse[entry.key] = status.copyWith(
-          clearProblem: true,
-          clearFailingSince: true,
-        );
-        changed = true;
-      }
-    }
-    if (changed) _publish();
-  }
-
-  void _put(PrivateUsdRecordKey key, PrivateUsdConversionStatus status) {
+  void _put<R, S extends PrivateUsdStepStatus<R, S>>(
+    _Book<R, S> book,
+    PrivateUsdRecordKey key,
+    S status,
+  ) {
     if (_disposed) return;
-    _statuses[key] = status;
-    _publishForward();
+    book.statuses[key] = status;
+    book.publish();
   }
 
-  /// Publishes both directions' snapshots.
-  void _publish() {
-    _publishForward();
-    _publishReverse();
-  }
-
-  void _publishForward() {
-    if (_disposed) return;
-    conversions.value = Map.unmodifiable(_statuses);
-  }
-
-  void _publishReverse() {
-    if (_disposed) return;
-    reverseConversions.value = Map.unmodifiable(_reverse);
-  }
-
-  static void _debugLog(String message) {
-    if (kDebugMode) debugPrint('privateUsd engine: $message');
+  void _publish<R, S extends PrivateUsdStepStatus<R, S>>(_Book<R, S> book) {
+    if (!_disposed) book.publish();
   }
 }

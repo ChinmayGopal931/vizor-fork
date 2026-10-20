@@ -2,8 +2,9 @@ import 'package:flutter/widgets.dart';
 
 import '../../theme/app_theme.dart';
 
-/// The neon redesign's two-way switch (Receive's pool tabs): a cut-corner
-/// glass track whose active side is a lit plate, its label white-hot.
+/// A two-way switch (the Receive screen's pools, the Private USD Receive
+/// sheet's tokens): a cut-corner glass track whose active side is a lit
+/// plate, its label white-hot.
 class NeonSwitchTabs extends StatelessWidget {
   const NeonSwitchTabs({
     required this.labels,
@@ -12,7 +13,6 @@ class NeonSwitchTabs extends StatelessWidget {
     this.width = 256,
     this.height = 36,
     this.labelStyle,
-    this.labelFontWeight,
     this.indicatorKey,
     this.tabKeys = (null, null),
     super.key,
@@ -27,7 +27,6 @@ class NeonSwitchTabs extends StatelessWidget {
   final double width;
   final double height;
   final TextStyle? labelStyle;
-  final FontWeight? labelFontWeight;
   final Key? indicatorKey;
   final (Key?, Key?) tabKeys;
 
@@ -76,7 +75,6 @@ class NeonSwitchTabs extends StatelessWidget {
                 label: labels.$1,
                 active: selected == 0,
                 labelStyle: labelStyle,
-                labelFontWeight: labelFontWeight,
                 onTap: () => onChanged(0),
               ),
               _NeonSwitchTab(
@@ -84,7 +82,6 @@ class NeonSwitchTabs extends StatelessWidget {
                 label: labels.$2,
                 active: selected == 1,
                 labelStyle: labelStyle,
-                labelFontWeight: labelFontWeight,
                 onTap: () => onChanged(1),
               ),
             ],
@@ -100,7 +97,6 @@ class _NeonSwitchTab extends StatelessWidget {
     required this.label,
     required this.active,
     required this.labelStyle,
-    required this.labelFontWeight,
     required this.onTap,
     super.key,
   });
@@ -108,7 +104,6 @@ class _NeonSwitchTab extends StatelessWidget {
   final String label;
   final bool active;
   final TextStyle? labelStyle;
-  final FontWeight? labelFontWeight;
   final VoidCallback onTap;
 
   @override
@@ -130,7 +125,6 @@ class _NeonSwitchTab extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: (labelStyle ?? AppTypography.labelMedium).copyWith(
                       color: active ? colors.neon.core : colors.text.secondary,
-                      fontWeight: labelFontWeight,
                       shadows: active
                           ? Neon.textGlow(colors.neon.glow, intensity: 0.4)
                           : null,

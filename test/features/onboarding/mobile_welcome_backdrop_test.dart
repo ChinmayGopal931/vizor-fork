@@ -1,6 +1,3 @@
-@Tags(['mobile'])
-library;
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -11,7 +8,8 @@ import 'package:video_player/video_player.dart';
 // importing it here lets the widget test replace the native decoder.
 // ignore: depend_on_referenced_packages
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
-import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_welcome_backdrop.dart';
+import 'package:zcash_wallet/src/features/onboarding/shared/welcome_video_backdrop.dart';
+import 'package:zcash_wallet/src/features/onboarding/welcome.dart';
 
 class _PendingPlaybackCommand {
   _PendingPlaybackCommand(this.name, this.completer);
@@ -42,7 +40,7 @@ class _FakeVideoPlayerPlatform extends VideoPlayerPlatform {
   @override
   Future<int?> createWithOptions(VideoCreationOptions options) async {
     // A native video decoder is mocked, but its asset must still be available
-    // in the same mobile bundle that supplies the screen's actual images.
+    // in the same bundle that supplies the screen's actual images.
     final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
     expect(manifest.listAssets(), contains(options.dataSource.asset));
     calls.add('create');
@@ -152,7 +150,13 @@ Widget _app({
       ).copyWith(disableAnimations: disableAnimations),
       child: child!,
     ),
-    home: Scaffold(body: MobileWelcomeBackdrop(animate: animate)),
+    home: Scaffold(
+      body: WelcomeVideoBackdrop(
+        videoAsset: kDesktopWelcomeVideoAsset,
+        posterAsset: kDesktopWelcomePosterAsset,
+        animate: animate,
+      ),
+    ),
   );
 }
 
@@ -164,7 +168,7 @@ Future<void> _pumpInitialized(WidgetTester tester, Widget app) async {
 
 Future<void> _disposeBackdrop(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
-  // MobileWelcomeBackdrop deliberately starts controller disposal without
+  // WelcomeVideoBackdrop deliberately starts controller disposal without
   // awaiting it, so flush the controller's subscription-cancellation steps.
   for (var i = 0; i < 4; i++) {
     await tester.pump();
@@ -216,7 +220,7 @@ void main() {
     await _pumpInitialized(tester, _app());
 
     expect(platform.createdSources, hasLength(1));
-    expect(platform.createdSources.single.asset, kMobileWelcomeVideoAsset);
+    expect(platform.createdSources.single.asset, kDesktopWelcomeVideoAsset);
     expect(platform.calls, contains('mix:true'));
     expect(platform.calls, contains('prevent-sleep:false'));
     expect(platform.volumes, contains(0));

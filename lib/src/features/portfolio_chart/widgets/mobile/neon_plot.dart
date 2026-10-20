@@ -4,19 +4,14 @@ import 'package:flutter/widgets.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../models/portfolio_chart_models.dart';
+import '../../services/portfolio_price_history.dart';
 
 /// Room kept around the line so its head and glow are never clipped.
-const kNeonPlotInsetX = 8.0;
-const kNeonPlotInsetY = 8.0;
+const _inset = 8.0;
 
 /// Where each point lands in a plot, shared by painting and touch.
 class PortfolioPlotGeometry {
-  PortfolioPlotGeometry(
-    this.points,
-    this.size, {
-    double insetX = kNeonPlotInsetX,
-    double insetY = kNeonPlotInsetY,
-  }) {
+  PortfolioPlotGeometry(this.points, this.size) {
     final first = points.first.time.millisecondsSinceEpoch.toDouble();
     final last = points.last.time.millisecondsSinceEpoch.toDouble();
     var low = double.infinity;
@@ -25,18 +20,18 @@ class PortfolioPlotGeometry {
       low = math.min(low, point.value);
       high = math.max(high, point.value);
     }
-    final width = size.width - 2 * insetX;
-    final height = size.height - 2 * insetY;
+    final width = size.width - 2 * _inset;
+    final height = size.height - 2 * _inset;
     offsets = [
       for (final point in points)
         Offset(
-          insetX +
+          _inset +
               (last == first
                   ? 0
                   : (point.time.millisecondsSinceEpoch - first) /
                         (last - first) *
                         width),
-          insetY +
+          _inset +
               (high == low
                   ? height / 2
                   : (high - point.value) / (high - low) * height),
@@ -68,7 +63,7 @@ class PortfolioPlotGeometry {
     final t = span <= 0 ? 1.0 : ((x - a.dx) / span).clamp(0.0, 1.0);
     final from = points[i];
     final to = points[i + 1];
-    if (_isUtcMidnight(from.time) && _isUtcMidnight(to.time)) {
+    if (isUtcMidnight(from.time) && isUtcMidnight(to.time)) {
       final day = t < 0.5 ? i : i + 1;
       return (point: points[day], offset: offsets[day]);
     }
@@ -84,20 +79,6 @@ class PortfolioPlotGeometry {
       ),
       offset: Offset(x, a.dy + (b.dy - a.dy) * t),
     );
-  }
-
-  /// The point nearest to [dx], so the finger need not be on the line.
-  int nearestIndex(double dx) {
-    var best = 0;
-    var bestDistance = double.infinity;
-    for (var i = 0; i < offsets.length; i++) {
-      final distance = (offsets[i].dx - dx).abs();
-      if (distance < bestDistance) {
-        best = i;
-        bestDistance = distance;
-      }
-    }
-    return best;
   }
 }
 
@@ -119,11 +100,7 @@ class NeonPlotPainter extends CustomPainter {
   /// The tube's colour and its white-hot centre.
   final Color glow;
   final Color core;
-
-  /// Grid lines; also the scrub guide's base colour.
   final Color gridColor;
-
-  /// Where a finger is scrubbing, if one is.
   final double? scrubX;
 
   /// The full chart draws the grid; the trail in the balance sign does not.
@@ -228,7 +205,10 @@ class NeonPlotPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(NeonPlotPainter oldDelegate) {
-    return oldDelegate.geometry != geometry ||
+    // Callers build a new geometry with every build; it is the same plot
+    // while its points and size are.
+    return !identical(oldDelegate.geometry.points, geometry.points) ||
+        oldDelegate.geometry.size != geometry.size ||
         oldDelegate.glow != glow ||
         oldDelegate.core != core ||
         oldDelegate.gridColor != gridColor ||
@@ -236,13 +216,4 @@ class NeonPlotPainter extends CustomPainter {
         oldDelegate.grid != grid ||
         oldDelegate.light != light;
   }
-}
-
-bool _isUtcMidnight(DateTime time) {
-  final utc = time.toUtc();
-  return utc.hour == 0 &&
-      utc.minute == 0 &&
-      utc.second == 0 &&
-      utc.millisecond == 0 &&
-      utc.microsecond == 0;
 }

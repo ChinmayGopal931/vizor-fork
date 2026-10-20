@@ -1,3 +1,4 @@
+import '../../../core/formatting/address_display.dart';
 import '../../../core/formatting/date_format.dart';
 import '../../../core/formatting/zec_amount.dart';
 import '../../../core/privacy/privacy_mask.dart';
@@ -9,13 +10,15 @@ import '../private_usd_copy.dart';
 import '../services/private_usd_engine.dart';
 import '../services/private_usd_reverse_funding.dart';
 import 'private_usd_balances.dart';
+import 'private_usd_explorer.dart';
+import 'private_usd_messages.dart';
 import 'private_usd_status_presentation.dart';
 
-/// The reverse progress screen's main button (reference §9.5).
+/// The reverse progress screen's main button.
 enum PrivateUsdReverseAction { pay, authorizeSettlement, newConversion }
 
 /// A signed `ready` holds for 120 s, so "Authorize settlement" stops being
-/// offered this long before the ready deadline (§5.7 step 7).
+/// offered this long before the ready deadline.
 const kPrivateUsdReadyMargin = Duration(seconds: 120);
 
 /// The sweep home's fee before the maker's ZEC is in: the estimate's floor.
@@ -40,8 +43,8 @@ DateTime privateUsdReadyBy(ApiReverseRecord record) =>
 BigInt privateUsdReverseDebit(ApiReverseRecord record) =>
     BigInt.parse(record.cost?.debit ?? record.amount);
 
-/// The ZEC figure (reference §9.4 S4): the sweep's own, else the reviewed
-/// estimate, else the deposit less the sweep fee's floor.
+/// The ZEC figure: the sweep's own, else the reviewed estimate, else the
+/// deposit less the sweep fee's floor.
 BigInt privateUsdReverseReceivedZat(ApiReverseRecord record) {
   final estimate =
       record.receivedZat ??
@@ -84,8 +87,7 @@ String privateUsdReverseStageLabel(ApiReverseRecord record) =>
       ApiReversePhase.cancelled => PrivateUsdCopy.reverseCancelled,
     };
 
-/// Everything the reverse progress screen shows for one conversion
-/// (reference §9.5, Reverse).
+/// Everything the reverse progress screen shows for one conversion.
 class PrivateUsdReverseProgressPresentation {
   const PrivateUsdReverseProgressPresentation({
     required this.status,
@@ -125,21 +127,21 @@ class PrivateUsdReverseProgressPresentation {
   final String? actionLabel;
   final bool actionEnabled;
 
-  /// "Cancel conversion" or "Request refund", while it can still be called
-  /// off; null hides it.
+  /// [PrivateUsdCopy.reverseCancel] or [PrivateUsdCopy.reverseRequestRefund]
+  /// while it can still be called off; null hides it.
   final String? callOffLabel;
 
   /// Private USD was paid already: the confirmation says a refund follows.
   final bool callOffPaid;
   final bool showsViewRefunds;
 
-  /// "Keep Vizor open until this finishes" (D9).
+  /// [PrivateUsdCopy.convertBackgroundNote] shows under the progress.
   final bool showsKeepOpen;
 
   /// Under the steps while the page proves the payment.
   final String? provingNote;
 
-  /// A key-using step is still to come: the screen stays awake (X8).
+  /// A key-using step is still to come: the screen stays awake.
   final bool keyStepPending;
 
   /// The top bar's: "Bridging" while it runs, "Bridge" once it ended.
@@ -177,29 +179,16 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     required int progressIndex,
     required SwapStatusBadgeKind badgeKind,
     bool bridged = false,
-  }) => SwapActivityStatusPresentation(
-    title: PrivateUsdCopy.convertProgressTitle,
+  }) => privateUsdSwapStatus(
     payAsset: SwapAsset.usdc,
     receiveAsset: SwapAsset.zec,
-    payFiatText: '',
-    receiveFiatText: '',
     payAmountText: usdText,
     receiveAmountText: zecText,
-    payLabel: bridged
-        ? PrivateUsdCopy.bridgedYouPaid
-        : PrivateUsdCopy.convertYouPay,
-    receiveLabel: bridged
-        ? PrivateUsdCopy.bridgedYouReceived
-        : PrivateUsdCopy.convertYouReceive,
-    badgeKind: badgeKind,
-    progressIndex: progressIndex,
     steps: steps,
+    progressIndex: progressIndex,
+    badgeKind: badgeKind,
     details: details,
-    progressTabLabel: PrivateUsdCopy.progressTab,
-    // Every row is one of the conversion's own (swap ID, its transactions,
-    // when it started): all of them show while it runs.
-    allDetailsInProgress: true,
-    showTabs: steps.isNotEmpty,
+    bridged: bridged,
   );
 
   PrivateUsdReverseProgressPresentation ended({
@@ -227,7 +216,7 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     actionLabel: PrivateUsdCopy.reverseNew,
     actionEnabled: true,
     showsViewRefunds: viewRefunds,
-    title: PrivateUsdCopy.bridgeEndedTitle,
+    title: PrivateUsdCopy.actionConvert,
     bridged: bridged,
   );
 
@@ -262,8 +251,8 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
   final problem = status.problem;
   final proving = funding?.stage == PrivateUsdFundingStage.proving;
   final running = funding?.running ?? false;
-  // "Pay" is offered and not yet tapped: the step is the user's to take
-  // (owner, 2026-10-17), not a payment already going.
+  // "Pay" is offered and not yet tapped: the step is the user's to take, not
+  // a payment already going.
   final awaitingPay =
       record.phase == ApiReversePhase.awaitingFunding &&
       !record.cancelRequested &&
@@ -292,7 +281,7 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
           : PrivateUsdCopy.reverseStepFund,
       description: switch (record.phase) {
         ApiReversePhase.awaitingFunding when proving =>
-          PrivateUsdCopy.reverseProving(
+          PrivateUsdCopy.paymentProving(
             ((proofProgress ?? 0) * 100).floor().clamp(0, 100),
           ),
         ApiReversePhase.awaitingFunding when awaitingPay =>
@@ -384,25 +373,18 @@ List<SwapStatusStepData> _reverseSteps({
   required int active,
   String? description,
   String fundTitle = PrivateUsdCopy.reverseStepFund,
-}) => [
-  for (final (index, title) in [
+}) => privateUsdProgressSteps(
+  [
     PrivateUsdCopy.reverseAccepting,
     fundTitle,
     PrivateUsdCopy.reverseReceiving,
     PrivateUsdCopy.reverseReady,
     PrivateUsdCopy.reverseStepSettle,
     PrivateUsdCopy.reverseSweeping,
-  ].indexed)
-    SwapStatusStepData(
-      title: title,
-      state: index < active
-          ? SwapStatusStepState.complete
-          : index == active
-          ? SwapStatusStepState.active
-          : SwapStatusStepState.pending,
-      description: index == active ? description : null,
-    ),
-];
+  ],
+  active: active,
+  description: description,
+);
 
 List<SwapStatusDetailRowData> _details(
   ApiReverseRecord record, {
@@ -414,24 +396,22 @@ List<SwapStatusDetailRowData> _details(
   return [
     SwapStatusDetailRowData(
       label: PrivateUsdCopy.detailSwapId,
-      value: _short(record.swapId),
+      value: truncatedTxid(record.swapId),
       copyable: true,
       copyText: record.swapId,
     ),
     if (funding != null)
       SwapStatusDetailRowData(
         label: PrivateUsdCopy.detailFunding,
-        value: _short(funding),
+        value: truncatedTxid(funding),
         copyable: true,
         copyText: funding,
-        linkUri: explorerTxPrefix == null
-            ? null
-            : Uri.tryParse('$explorerTxPrefix$funding'),
+        linkUri: privateUsdExplorerUri(explorerTxPrefix, funding),
       ),
     if (receive != null)
       SwapStatusDetailRowData(
         label: PrivateUsdCopy.detailZecReceived,
-        value: _short(privateUsdDisplayTxid(receive)),
+        value: truncatedTxid(privateUsdDisplayTxid(receive)),
         copyable: true,
         copyText: privateUsdDisplayTxid(receive),
       ),
@@ -442,7 +422,3 @@ List<SwapStatusDetailRowData> _details(
       ),
   ];
 }
-
-String _short(String value) => value.length <= 16
-    ? value
-    : '${value.substring(0, 8)}…${value.substring(value.length - 6)}';

@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// Why a Railgun page call failed (plan reference §6.2). Copy and retries
-/// follow the code; the page's own message is never shown or logged.
+/// Why a Railgun page call failed. Copy and retries follow the code; the
+/// page's own message is never shown or logged.
 enum RailgunHostErrorCode {
   /// The page closed, its renderer died, or another replaced it. Reopen on
   /// the next use.
@@ -30,12 +30,12 @@ enum RailgunHostErrorCode {
   unknown;
 
   static RailgunHostErrorCode fromWire(String code) => switch (code) {
-    'CLOSED' => closed,
-    'TIMEOUT' => timeout,
-    'UNAVAILABLE' => unavailable,
-    'PROTOCOL' => protocol,
-    'FAILED' => failed,
-    'BAD_ARGS' => badArgs,
+    'closed' => closed,
+    'timeout' => timeout,
+    'unavailable' => unavailable,
+    'protocol' => protocol,
+    'failed' => failed,
+    'bad_args' => badArgs,
     _ => unknown,
   };
 
@@ -87,11 +87,11 @@ String redactRailgunMessage(
       .replaceAll(_infuraKey, '/v3/<key>');
 }
 
-/// Asks the platform's Railgun host whether the page can run here (iOS plan
-/// XI9): Android always can, iOS from iOS 17. No handler means no host
-/// (desktop), except on iOS, where it can only mean the handler was not
-/// registered yet: the answer is then unknown (`null`), and the caller asks
-/// again after the first frame. Any other failure means no.
+/// Asks the platform's Railgun host whether the page can run here: Android
+/// always can, iOS from iOS 17. No handler means no host (desktop), except
+/// on iOS, where it can only mean the handler was not registered yet: the
+/// answer is then unknown (`null`), and the caller asks again after the
+/// first frame. Any other failure means no.
 Future<bool?> queryRailgunHostSupported({
   MethodChannel channel = const MethodChannel(
     RailgunHostChannel.methodChannelName,
@@ -134,7 +134,7 @@ abstract interface class RailgunHost {
   Stream<String> get events;
 }
 
-/// [RailgunHost] over `com.zcash.wallet/railgun` (reference §6.2, X7).
+/// [RailgunHost] over `com.zcash.wallet/railgun`.
 class RailgunHostChannel implements RailgunHost {
   const RailgunHostChannel({
     MethodChannel methods = const MethodChannel(methodChannelName),

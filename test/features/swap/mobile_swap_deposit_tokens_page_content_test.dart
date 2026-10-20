@@ -11,7 +11,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/core/widgets/dot_qr_shape.dart';
-import 'package:zcash_wallet/src/core/widgets/mobile/neon_horizon.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/neon_glyph_badge.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/tron_glyph.dart';
 import 'package:zcash_wallet/src/features/swap/domain/swap_asset.dart';
 import 'package:zcash_wallet/src/features/swap/widgets/mobile/mobile_swap_timeout_content.dart';

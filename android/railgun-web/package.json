@@ -1,7 +1,7 @@
 {
-  "name": "zapp-railgun-web",
+  "name": "railgun-web",
   "private": true,
-  "description": "Railgun's wallet SDK, bundled for the hidden WebView in railgun-lib",
+  "description": "Railgun's wallet SDK, bundled for the app's hidden Railgun page",
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {

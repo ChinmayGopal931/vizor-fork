@@ -26,30 +26,28 @@ import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_deposits_provider.dart';
 import '../../providers/private_usd_receive_address_provider.dart';
 
-/// How often the sheet asks for a deposit pass while it is open (plan M9's
-/// default cadence).
+/// How often the open sheet asks for a deposit pass: it is open while money
+/// is on its way to the address, so a deposit shows soon after it lands.
 const _sheetRefresh = Duration(seconds: 15);
 
 /// The Receive sheet's two ways in, as ZEC's Receive has its pools.
 enum PrivateUsdReceiveKind {
-  /// Public USDC from an exchange or any wallet, to the deposit address
-  /// (M9), made private on its own.
+  /// Public USDC from an exchange or any wallet, to the deposit address,
+  /// made private on its own.
   usdc,
 
   /// 0zkUSDC from another Railgun wallet, to the account's 0zk address.
   shielded,
 }
 
-/// "Receive USDC" (owner, 2026-10-19): a switch like ZEC's Receive between
-/// public USDC (the default) and shielded 0zkUSDC, in place of the screen's
-/// "Receive from a Railgun wallet" card. [deposits] is false where the
-/// network pins no Deposits contract: then only the 0zk address shows.
+/// The Receive sheet: a switch like ZEC's Receive between public USDC (the
+/// default) and shielded 0zkUSDC. [deposits] is false where the network
+/// pins no Deposits contract: then only the 0zk address shows.
 ///
-/// Public USDC (plan M9): the account's deposit address, as a QR code of the
-/// plain EIP-55 `0x…` string (no `ethereum:` URI, which withdrawal forms
-/// refuse), with the one token and network it takes, the minimum and both
-/// fees, shown before anything is signed. Deposits are read every 15 s while
-/// it is open.
+/// Public USDC: the account's deposit address, as a QR code of the plain
+/// EIP-55 `0x…` string (no `ethereum:` URI, which withdrawal forms refuse),
+/// with the one token and network it takes, the minimum and both fees,
+/// shown before anything is signed.
 Future<void> showPrivateUsdReceiveSheet(
   BuildContext context, {
   required String accountUuid,
@@ -145,8 +143,8 @@ class _PrivateUsdReceiveSheetState
               formatPrivateUsd(BigInt.tryParse(terms.minValue) ?? BigInt.zero),
               formatPrivateUsd(BigInt.tryParse(example.arrives) ?? BigInt.zero),
             ),
-      symbol: pin?.tokenSymbol ?? 'USDC',
-      chain: pin?.chainName ?? 'Ethereum',
+      symbol: pin?.tokenSymbol ?? PrivateUsdCopy.usdcSymbol,
+      chain: pin?.chainName ?? PrivateUsdCopy.ethereum,
       address: pass?.address ?? fallback?.value?.address,
       addressFailed: pass == null && (fallback?.hasError ?? false),
       terms: pass?.terms,
@@ -166,7 +164,6 @@ class _PrivateUsdReceiveSheetState
 }
 
 /// The sheet's content for a given way in, addresses, terms and deposits.
-/// Widgetbook and tests build it directly.
 class PrivateUsdReceiveSheetBody extends StatelessWidget {
   const PrivateUsdReceiveSheetBody({
     required this.symbol,
@@ -528,19 +525,19 @@ class PrivateUsdDepositLineText extends StatelessWidget {
         colors.text.secondary,
       ),
       PrivateUsdDepositPhase.waiting => (
-        '${PrivateUsdCopy.depositReceived(usd)}. ${PrivateUsdCopy.depositWaiting}',
+        PrivateUsdCopy.depositWaitingLine(usd),
         colors.text.secondary,
       ),
       PrivateUsdDepositPhase.makingPrivate => (
-        '${PrivateUsdCopy.depositReceived(usd)}. ${PrivateUsdCopy.depositMakingPrivate}',
+        PrivateUsdCopy.depositMakingPrivateLine(usd),
         colors.text.accent,
       ),
       PrivateUsdDepositPhase.private => (
-        '$usd: ${PrivateUsdCopy.depositPrivate(PrivateUsdCopy.about(screening))}',
+        PrivateUsdCopy.depositPrivateLine(usd, PrivateUsdCopy.about(screening)),
         colors.text.positiveStrong,
       ),
       PrivateUsdDepositPhase.notShielding => (
-        '${PrivateUsdCopy.depositReceived(usd)}. ${PrivateUsdCopy.depositNotShielding}',
+        PrivateUsdCopy.depositNotShieldingLine(usd),
         colors.text.secondary,
       ),
     };

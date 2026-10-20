@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../main.dart' show log;
-import '../../../core/storage/wallet_paths.dart';
+import '../../../core/config/pricing_engine_config.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/app_foreground_provider.dart';
 import '../../../providers/app_security_provider.dart';
@@ -9,28 +9,12 @@ import '../../../providers/privacy_mode_provider.dart';
 import '../../../providers/rpc_endpoint_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../../rust/api/sync.dart' as rust_sync;
+import '../../activity/activity_eta_provider.dart';
 import '../models/portfolio_chart_models.dart';
 import '../services/portfolio_balance_history.dart';
 import '../services/portfolio_price_history_source.dart';
 import '../services/portfolio_valuation.dart';
 import 'portfolio_chart_settings_provider.dart';
-
-/// Reads an account's full transaction history from the local wallet database.
-/// Injectable so tests and previews never reach Rust.
-typedef PortfolioTransactionLoader =
-    Future<List<rust_sync.TransactionInfo>> Function(
-      String accountUuid,
-      String network,
-    );
-
-final portfolioTransactionLoaderProvider = Provider<PortfolioTransactionLoader>(
-  (ref) =>
-      (accountUuid, network) async => rust_sync.getTransactionHistory(
-        dbPath: await getWalletDbPath(),
-        network: network,
-        accountUuid: accountUuid,
-      ),
-);
 
 final portfolioChartNowProvider = Provider<DateTime Function()>(
   (ref) => DateTime.now,
@@ -70,8 +54,8 @@ final _walletKeyProvider = Provider<_WalletKey>((ref) {
   final sync = ref.watch(
     syncProvider.select(
       (state) => (
-        state.value?.isSyncComplete ?? false,
-        state.value?.lastSyncCompletedAt,
+        complete: state.value?.isSyncComplete ?? false,
+        completedAt: state.value?.lastSyncCompletedAt,
       ),
     ),
   );
@@ -80,8 +64,8 @@ final _walletKeyProvider = Provider<_WalletKey>((ref) {
   // nothing, and drops what it held.
   return (
     accountUuid: accountUuid,
-    ready: !locked && (sync.$1 || sync.$2 != null),
-    completedAt: sync.$2,
+    ready: !locked && (sync.complete || sync.completedAt != null),
+    completedAt: sync.completedAt,
   );
 });
 
@@ -121,35 +105,6 @@ final _historyKeyProvider = Provider<_HistoryKey>((ref) {
   );
 });
 
-/// The transactions that moved the balance, as deltas the chart can place in
-/// time. Unmined and expired transactions did not move it. A mined transaction
-/// with no block time cannot be placed, so there is no coherent history: `null`.
-List<BalanceDelta>? balanceDeltasFromTransactions(
-  Iterable<rust_sync.TransactionInfo> transactions,
-) {
-  final deltas = <BalanceDelta>[];
-  for (final transaction in transactions) {
-    if (transaction.expiredUnmined || transaction.minedHeight == BigInt.zero) {
-      continue;
-    }
-    final delta = transaction.accountBalanceDelta;
-    if (delta == 0) continue;
-    if (transaction.blockTime == BigInt.zero) return null;
-    deltas.add(
-      BalanceDelta(
-        height: transaction.minedHeight.toInt(),
-        time: DateTime.fromMillisecondsSinceEpoch(
-          transaction.blockTime.toInt() * 1000,
-          isUtc: true,
-        ),
-        zatoshi: delta,
-      ),
-    );
-  }
-  return deltas;
-}
-
-/// A balance history and the account it belongs to.
 class PortfolioBalanceSnapshot {
   const PortfolioBalanceSnapshot(this.accountUuid, this.history);
 
@@ -157,16 +112,16 @@ class PortfolioBalanceSnapshot {
   final BalanceHistory history;
 }
 
-/// The active account's balance over time, from the local wallet database
-/// alone. `null` while the wallet is locked or still scanning, or when the
-/// transactions do not add up to a history. Reloads when a sync finishes, and
-/// keeps the previous snapshot while it does, so it names its account.
+/// The active account's balance over time: `null` while the wallet is locked
+/// or still scanning, or when its transactions do not add up to a history.
+/// The previous snapshot stays the value while it reloads, so it names its
+/// account.
 final portfolioBalanceHistoryProvider =
     FutureProvider<PortfolioBalanceSnapshot?>((ref) async {
       final key = ref.watch(_historyKeyProvider);
       final accountUuid = key.accountUuid;
       if (accountUuid == null || !key.ready) return null;
-      final loader = ref.watch(portfolioTransactionLoaderProvider);
+      final loader = ref.watch(activityEtaClaimHistoryLoaderProvider);
       final network = ref.watch(
         rpcEndpointProvider.select((endpoint) => endpoint.networkName),
       );
@@ -190,13 +145,13 @@ final portfolioBalanceHistoryProvider =
 ///
 /// - the user turned "Use market prices" on (it is off by default) and the
 ///   chart is shown on Home;
-/// - this build can show market prices at all;
+/// - market prices are available ([portfolioChartPricesAvailableProvider]);
 /// - the wallet is unlocked;
 /// - privacy mode is off, so there is a chart to draw;
 /// - the app is in the foreground.
 ///
 /// This is the single gate in front of the price source. The chart is also not
-/// asked for while Home has no balance history to draw it from, which the view
+/// asked for while there is no balance history to draw it from, which the view
 /// provider decides before it reads prices.
 final portfolioPriceRequestsAllowedProvider = Provider<bool>((ref) {
   final wantsPrices = ref.watch(
@@ -228,8 +183,6 @@ final portfolioPriceHistoryProvider = FutureProvider.autoDispose
       return repository.load(range);
     });
 
-/// USD only where this build can show market prices and the user turned them
-/// on; otherwise the ZEC balance.
 final portfolioChartModeProvider = Provider<PortfolioChartMode>((ref) {
   final wantsPrices = ref.watch(
     portfolioChartSettingsProvider.select((settings) => settings.marketPrices),
@@ -240,7 +193,6 @@ final portfolioChartModeProvider = Provider<PortfolioChartMode>((ref) {
       : PortfolioChartMode.zec;
 });
 
-/// What the Home chart slot shows.
 final portfolioChartViewProvider =
     Provider.autoDispose<PortfolioChartViewState>((ref) {
       if (!ref.watch(

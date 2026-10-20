@@ -4,8 +4,7 @@
 //! Private USD's joint deposit depends on both: the joint UA has one Orchard
 //! receiver, the swap's sweep is an Ironwood spend (only Ironwood allows the
 //! cross-address transfer it needs), and the deposit lookup matches
-//! `sent_notes.to_address` against the joint UA
-//! (`docs/private-usd-reference.md` §5.1, §8.1.2; plan M0).
+//! `sent_notes.to_address` against the joint UA.
 
 use std::convert::Infallible;
 
@@ -89,7 +88,7 @@ fn payment_to_orchard_only_ua_lands_in_ironwood_with_its_address_recorded() {
             ConfirmationsPolicy::MIN,
         )
         .unwrap();
-    // The deposit keeps the sender OVK (plan §8.1.3).
+    // The deposit keeps the sender OVK.
     let created = st
         .create_proposed_transactions::<Infallible, _, Infallible, _>(
             account.usk(),

@@ -7,25 +7,23 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/mobile/tron_glyph.dart';
 
-/// Height of [AppMobileTabBar] — Figma `Mobile Nav` (node 4394:88550):
-/// 56px items inside 4px padding.
+/// Height of [AppMobileTabBar] — Figma `Mobile Nav` (node 4394:88550).
 const double kMobileTabBarHeight = 64;
 
 /// One destination in the floating mobile tab bar.
 class AppMobileTabItem {
   const AppMobileTabItem({required this.iconName, required this.label});
 
-  /// `AppIcons` name rendered at 28px.
+  /// `AppIcons` name, drawn as its [TronGlyph] when it has one.
   final String iconName;
 
   /// Accessibility label; the bar itself is icon-only.
   final String label;
 }
 
-/// The mobile tab bar. The neon redesign keeps only the glyphs: Tron line
-/// icons ([TronGlyph]) floating over a fade, the active one lit, with a pool
-/// of its light sliding under it. (Originally Figma `Mobile Nav`, node
-/// 4394:88550.)
+/// The mobile tab bar: only the glyphs, Tron line icons ([TronGlyph])
+/// floating over a fade, the active one lit, with a pool of its light
+/// sliding under it.
 ///
 /// Selecting slides the light pool on a mild easeOutBack, crossfades the
 /// glyph's light, pops the arriving glyph once, and presses with a light
@@ -45,7 +43,7 @@ class AppMobileTabBar extends StatelessWidget {
   static const _itemHeight = 56.0;
   static const _glyphSize = 26.0;
 
-  /// Selection transition — shared by the sliding pill and the icon
+  /// Selection transition — shared by the sliding light pool and the icon
   /// tint so they read as one move. The curve is easeOutBack
   /// (cubic(0.34, 1.56, 0.64, 1)) with its back overshoot halved by
   /// lowering the second control point: ~5% past the target instead of
@@ -66,8 +64,6 @@ class AppMobileTabBar extends StatelessWidget {
     );
     final light = colors.navPanel.activeIcon;
 
-    // Only the glyphs: no slab, no border, no captions. The active glyph is
-    // lit, and a pool of its light slides along under it.
     return SizedBox(
       height: kMobileTabBarHeight,
       child: Stack(
@@ -133,7 +129,7 @@ class _TabBarItem extends StatefulWidget {
 class _TabBarItemState extends State<_TabBarItem>
     with SingleTickerProviderStateMixin {
   /// One-shot pop when this item becomes the active one — a small
-  /// bounce timed to land with the arriving pill.
+  /// bounce timed to land with the arriving light.
   late final AnimationController _pop = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 250),
@@ -243,7 +239,6 @@ class _TabBarItemState extends State<_TabBarItem>
 /// keeps the icon set.
 TronGlyphKind? _tronGlyphFor(String iconName) => switch (iconName) {
   AppIcons.home => TronGlyphKind.home,
-  AppIcons.swapArrows => TronGlyphKind.swap,
   AppIcons.history => TronGlyphKind.activity,
   AppIcons.cog => TronGlyphKind.settings,
   _ => null,

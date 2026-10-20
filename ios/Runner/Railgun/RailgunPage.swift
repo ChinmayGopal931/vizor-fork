@@ -4,8 +4,8 @@ import WebKit
 
 /// One page's end of the transport: requests out, replies matched back to them, events to their listener. Every
 /// call is answered exactly once, by its reply, its failure, its timeout or the close, and everything fails once the
-/// channel closes (plan invariant 23). Params, results and events stay raw JSON text, as in Kotlin's
-/// `RailgunChannel`; nothing here logs them.
+/// channel closes. Params, results and events stay raw JSON text, as in Kotlin's `RailgunChannel`; nothing here logs
+/// them.
 @MainActor
 final class RailgunChannel {
   /// Hands a request to the page; `failed` is called if the page never took it.
@@ -126,8 +126,8 @@ final class RailgunChannel {
 
 /// One hidden page: a `WKWebView` of its own, configured once before it exists (WebKit copies the configuration),
 /// loading the bundle over the custom scheme and talking to the host through `railgunHost` and
-/// `__railgunHostDeliver` (plan XI5). It never takes touches, is hidden from accessibility and is inspectable only
-/// in a debug build loaded with `debug` (invariant 24).
+/// `__railgunHostDeliver`. It never takes touches, is hidden from accessibility and is inspectable only in a debug
+/// build loaded with `debug`.
 @MainActor
 final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
   static let loadTimeout: TimeInterval = 30
@@ -142,7 +142,7 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
   private let debug: Bool
   private let onClosed: @MainActor (RailgunPage) -> Void
 
-  /// [store] must already carry the bridge's proxy (plan invariant 20).
+  /// `store` must already carry the bridge's proxy.
   init(
     store: WKWebsiteDataStore,
     rules: WKContentRuleList,
@@ -249,7 +249,7 @@ final class RailgunPage: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
   }
 
-  /// Only the page's own main frame, in the page world, on the page's origin talks to the host (invariant 22).
+  /// Only the page's own main frame, in the page world, on the page's origin talks to the host.
   fileprivate func receive(_ message: WKScriptMessage) {
     guard
       let webView,

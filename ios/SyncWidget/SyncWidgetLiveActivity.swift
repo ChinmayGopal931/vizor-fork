@@ -7,9 +7,9 @@ import ActivityKit
 import SwiftUI
 import WidgetKit
 
-/// The sync and transaction Live Activities, in the mobile neon look (see
-/// "Mobile neon redesign" in AGENTS.md): true black, a neon-red tube with a
-/// pale core, thin and light system type, and tracked uppercase captions.
+/// The sync and transaction Live Activities, in the mobile neon look: true
+/// black, a neon-red tube with a pale core, thin and light system type, and
+/// tracked uppercase captions.
 ///
 /// The app writes each state into the shared app group under the activity's
 /// prefixed keys (`displayMode`, `percentage`, `status`, `txStatus`); this
@@ -124,9 +124,6 @@ struct SyncWidgetLiveActivity: Widget {
 }
 
 // MARK: - Neon look
-//
-// Plain SwiftUI from here on (no ActivityKit or WidgetKit types), so the
-// views can also be rendered outside a Live Activity.
 
 /// The neon palette, from `NeonPrimitives` in the app's `primitives.dart`.
 enum NeonActivityPalette {

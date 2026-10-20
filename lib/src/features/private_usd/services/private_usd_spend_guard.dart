@@ -4,10 +4,9 @@ import 'package:flutter/foundation.dart';
 
 import '../../../rust/api/private_usd.dart' as rust;
 
-/// What a wallet's private dollars are doing (zapp `PrivateUsdSpendGuard`,
-/// reference §6.7): one outgoing Railgun payment at a time per account
-/// (one Railgun wallet per software account, D6), conversions included
-/// (plan §3.5, invariant 16).
+/// What a wallet's private dollars are doing: one outgoing Railgun payment
+/// at a time per account (one Railgun wallet per software account),
+/// conversions included.
 enum PrivateUsdSpendStatus {
   /// The send log has not been read yet.
   checking,
@@ -26,7 +25,7 @@ enum PrivateUsdSpendStatus {
   /// Send and Withdraw may start.
   bool get canSend => this == available;
 
-  /// "Convert" may open (zapp: the conversion under way opens instead).
+  /// "Convert" may open (the conversion under way opens instead).
   bool get canStartConversion => this == available || this == converting;
 }
 
@@ -65,7 +64,7 @@ bool privateUsdSendsLanded(
 }
 
 /// One outgoing Railgun payment at a time per account, across screens and
-/// restarts (zapp `PrivateUsdSpendGuard`):
+/// restarts:
 ///
 /// - a payment starting now ([send], [startConversion]) holds the account
 ///   in memory until it returns;
@@ -74,8 +73,8 @@ bool privateUsdSendsLanded(
 /// - a conversion under way blocks a send ([statusFor]'s `converting`, and
 ///   Rust's count just before a send proves).
 ///
-/// Rust enforces the same rule again when it keeps a proof (D-91). The guard
-/// holds the last rows it read, for the activity. It never logs a row.
+/// Rust enforces the same rule again when it keeps a proof. The guard holds
+/// the last rows it read, for the activity. It never logs a row.
 class PrivateUsdSpendGuard extends ChangeNotifier {
   PrivateUsdSpendGuard({
     PrivateUsdSendLogReader? readLog,
@@ -90,7 +89,7 @@ class PrivateUsdSpendGuard extends ChangeNotifier {
   final PrivateUsdUnfinishedCounter? _unfinishedCount;
   final DateTime Function() _now;
 
-  /// How soon an unreadable log is read again (zapp: 30 s).
+  /// How soon an unreadable log is read again.
   final Duration retryAfter;
 
   final _starting = <String, PrivateUsdSpendStatus>{};
@@ -121,10 +120,6 @@ class PrivateUsdSpendGuard extends ChangeNotifier {
         ? PrivateUsdSpendStatus.converting
         : PrivateUsdSpendStatus.available;
   }
-
-  /// Whether "Convert" may open now.
-  bool canStartConversion(String accountUuid, {bool converting = false}) =>
-      statusFor(accountUuid, converting: converting).canStartConversion;
 
   /// The account's sends as last read, newest first; empty until read.
   List<rust.ApiSendRecord> recordsFor(String accountUuid) =>
@@ -192,62 +187,30 @@ class PrivateUsdSpendGuard extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  /// Runs [block], a send, as [accountUuid]'s one outgoing payment. Returns
-  /// [busy] instead, starting nothing, while another payment of the account
-  /// runs, its log holds an unsettled send, or a conversion is under way in
-  /// Rust's store; [unreadable] when the log or the store does not read.
-  Future<T> send<T>(
-    String accountUuid,
-    Future<T> Function() block, {
-    required T Function(PrivateUsdSpendStatus status) busy,
-    required T Function() unreadable,
-  }) async {
-    final current = _starting[accountUuid];
-    if (current != null) return busy(current);
-    // Held from here (zapp's tryLock): nothing else starts meanwhile.
-    _start(accountUuid, PrivateUsdSpendStatus.sending);
-    try {
-      final readLog = _readLog;
-      if (readLog != null) {
-        final List<rust.ApiSendRecord> rows;
-        try {
-          rows = await readLog(accountUuid);
-        } catch (_) {
-          noteUnreadable(accountUuid);
-          return unreadable();
-        }
-        noteSends(accountUuid, rows);
-        if (rows.any(_unsettled)) return busy(PrivateUsdSpendStatus.sending);
-      }
-      final unfinishedCount = _unfinishedCount;
-      if (unfinishedCount != null) {
-        final int count;
-        try {
-          count = await unfinishedCount(accountUuid);
-        } catch (_) {
-          return unreadable();
-        }
-        if (count > 0) return busy(PrivateUsdSpendStatus.converting);
-      }
-      return await block();
-    } finally {
-      _finish(accountUuid);
-      // The send changed the log: read it again.
-      unawaited(check(accountUuid));
-    }
-  }
+  /// Runs [block], a send, as [accountUuid]'s one outgoing payment. Throws
+  /// [PrivateUsdSpendBusyException], starting nothing, while another payment
+  /// of the account runs, its log holds an unsettled send, or a conversion is
+  /// under way in Rust's store; its status is `unreadable` when the log or
+  /// the store does not read.
+  Future<T> send<T>(String accountUuid, Future<T> Function() block) =>
+      _run(accountUuid, PrivateUsdSpendStatus.sending, block, isSend: true);
 
   /// Runs [pay], a conversion's funding, as [accountUuid]'s one outgoing
-  /// payment; throws [PrivateUsdSpendBusyException] while another payment
-  /// of the account runs, or its log holds an unsettled send or does not
-  /// read. Rust's reverse calls do not read the send log, so this does.
-  Future<T> startConversion<T>(
+  /// payment, refused as [send] is, but for the conversion itself: Rust's
+  /// reverse calls do not read the send log, so this does.
+  Future<T> startConversion<T>(String accountUuid, Future<T> Function() pay) =>
+      _run(accountUuid, PrivateUsdSpendStatus.converting, pay);
+
+  Future<T> _run<T>(
     String accountUuid,
-    Future<T> Function() pay,
-  ) async {
+    PrivateUsdSpendStatus holding,
+    Future<T> Function() block, {
+    bool isSend = false,
+  }) async {
     final current = _starting[accountUuid];
     if (current != null) throw PrivateUsdSpendBusyException(current);
-    _start(accountUuid, PrivateUsdSpendStatus.converting);
+    // Held from here: nothing else starts meanwhile.
+    _start(accountUuid, holding);
     try {
       final readLog = _readLog;
       if (readLog != null) {
@@ -267,9 +230,27 @@ class PrivateUsdSpendGuard extends ChangeNotifier {
           );
         }
       }
-      return await pay();
+      final unfinishedCount = _unfinishedCount;
+      if (isSend && unfinishedCount != null) {
+        final int count;
+        try {
+          count = await unfinishedCount(accountUuid);
+        } catch (_) {
+          throw const PrivateUsdSpendBusyException(
+            PrivateUsdSpendStatus.unreadable,
+          );
+        }
+        if (count > 0) {
+          throw const PrivateUsdSpendBusyException(
+            PrivateUsdSpendStatus.converting,
+          );
+        }
+      }
+      return await block();
     } finally {
       _finish(accountUuid);
+      // A send changed the log: read it again.
+      if (isSend) unawaited(check(accountUuid));
     }
   }
 

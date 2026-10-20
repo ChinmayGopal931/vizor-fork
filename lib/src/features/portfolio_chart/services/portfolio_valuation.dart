@@ -1,8 +1,7 @@
+import '../../../core/formatting/zec_amount.dart';
 import '../models/portfolio_chart_models.dart';
 import 'portfolio_balance_history.dart';
 import 'portfolio_price_history.dart';
-
-const _zatoshiPerZec = 100000000.0;
 
 /// Earlier than any wallet history, for a span with no start of its own.
 final _beforeAnyBalance = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
@@ -13,18 +12,12 @@ const kPortfolioChartMaxPoints = 240;
 /// A price sample may be stamped a little ahead of this device's clock.
 const _clockSlack = Duration(minutes: 10);
 
-/// Builds the chart for [range] counted back from [now].
-///
-/// With [prices] the line is the balance valued at each daily price (USD),
-/// from the first of them: the price series is already the range, as whole UTC
-/// days, so it is not cut again at the device's clock. Without, it is the ZEC
-/// balance over the last [PortfolioChartRange.window] (all of it, for
-/// [PortfolioChartRange.all]) as a step function. Either way the line starts at
-/// the first moment the balance was above zero, so a young wallet is not drawn
-/// from a long flat zero.
-///
-/// Returns `null` when fewer than two points remain, or the line would start
-/// at nothing.
+/// Builds the chart for [range] counted back from [now]: with [prices], the
+/// balance valued at each of them (the series is already the range, so it is
+/// not cut again at the device's clock); without, the ZEC balance as a step
+/// function. Either way the line starts once the balance is above zero, so a
+/// young wallet is not drawn from a long flat zero. `null` when fewer than two
+/// points remain, or the line would start at nothing.
 PortfolioChartData? buildPortfolioChart({
   required BalanceHistory balance,
   required PortfolioChartRange range,
@@ -53,7 +46,7 @@ PortfolioChartData? buildPortfolioChart({
   );
 }
 
-double _zec(int zatoshi) => zatoshi / _zatoshiPerZec;
+double _zec(int zatoshi) => zatoshi / zatoshiPerZec.toDouble();
 
 List<PortfolioChartPoint> _balancePoints(
   BalanceHistory balance,

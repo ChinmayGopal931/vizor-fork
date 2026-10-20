@@ -8,8 +8,8 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:zcash_wallet/src/core/storage/app_secure_store.dart';
 import 'package:zcash_wallet/src/core/storage/wallet_paths.dart';
 
-// iOS plan DI6 and invariant 25: the swap records' directory stays out of
-// device backups, marked before anything is written in it.
+// The swap records' directory stays out of device backups, marked before
+// anything is written in it.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory support;

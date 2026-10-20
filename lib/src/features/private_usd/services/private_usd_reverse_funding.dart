@@ -2,19 +2,21 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/config/private_usd_feature_config.dart';
 import '../../../rust/api/private_usd.dart' as rust;
+import '../models/private_usd_messages.dart';
 import '../models/private_usd_record_key.dart';
 import '../models/railgun_models.dart';
 import '../private_usd_copy.dart';
 import 'private_usd_engine.dart';
+import 'private_usd_pause.dart';
 import 'private_usd_spend_guard.dart';
 import 'private_usd_swap_backend.dart';
 import 'railgun_engine.dart';
-import 'railgun_engine_key_store.dart';
 import 'railgun_host_channel.dart';
 
-/// The Railgun page's calls a reverse conversion needs (reference §6.2):
-/// the open wallet's address, pricing and the funding proof. Tests fake it.
+/// The Railgun page's calls a reverse conversion needs: the open wallet's
+/// address, pricing and the funding proof. Tests fake it.
 abstract interface class PrivateUsdReversePage {
   /// [accountUuid]'s `0zk` address, opening its wallet if needed.
   Future<String> address(String accountUuid);
@@ -118,9 +120,9 @@ class PrivateUsdFundingState {
   int get hashCode => Object.hash(stage, error);
 }
 
-/// The reverse funding (plan reference §5.11 R4–R6, M6 part 1 recipe): the
-/// spend guard, `funding_request` (signs `OpenReverse` for the page's own
-/// wallet), the page's `prepareReverse` and `submit_funding`.
+/// The reverse funding: the spend guard, `funding_request` (signs
+/// `OpenReverse` for the page's own wallet), the page's `prepareReverse` and
+/// `submit_funding`.
 ///
 /// - The proof runs outside the account's queue, so a cancel can run
 ///   meanwhile; Rust then refuses the submit.
@@ -153,9 +155,9 @@ class PrivateUsdReverseFunding {
   final _generations = <PrivateUsdRecordKey, int>{};
   bool _disposed = false;
 
-  /// Prices swap [request] for review (§5.11 R2): the page's `reverseCost`,
-  /// then `set_cost`. When the relayer's fee moved meanwhile it asks once
-  /// more at the new fee.
+  /// Prices swap [request] for review: the page's `reverseCost`, then
+  /// `set_cost`. When the relayer's fee moved meanwhile it asks once more at
+  /// the new fee.
   Future<rust.ApiReverseRecord> price(
     String accountUuid,
     rust.ApiReverseCostRequest request,
@@ -190,8 +192,8 @@ class PrivateUsdReverseFunding {
     }
   }
 
-  /// Funds [key]'s conversion once (R4–R6). Never throws: the outcome, and
-  /// [states] say what happened.
+  /// Funds [key]'s conversion once. Never throws: the outcome, and [states]
+  /// say what happened.
   Future<PrivateUsdFundingResult> fund(PrivateUsdRecordKey key) async {
     if (_disposed) return PrivateUsdFundingResult.dropped;
     if (states.value[key]?.running ?? false) {
@@ -223,7 +225,7 @@ class PrivateUsdReverseFunding {
           error = privateUsdReverseStepMessage(failure.code);
       }
     } on PrivateUsdSpendBusyException catch (busy) {
-      // A send not seen in a block yet holds the wallet's notes (M7).
+      // A send not seen in a block yet holds the wallet's notes.
       error = switch (busy.status) {
         PrivateUsdSpendStatus.sending ||
         PrivateUsdSpendStatus.unreadable => privateUsdSpendMessage(busy.status),
@@ -233,9 +235,7 @@ class PrivateUsdReverseFunding {
       if (_isDrop(failure)) {
         result = PrivateUsdFundingResult.dropped;
       } else {
-        if (kDebugMode) {
-          debugPrint('privateUsd: a funding failed (${failure.runtimeType})');
-        }
+        privateUsdLog('a funding failed (${failure.runtimeType})');
         error = PrivateUsdCopy.reverseError;
       }
     } finally {
@@ -269,7 +269,7 @@ class PrivateUsdReverseFunding {
   ) async {
     final account = key.accountUuid;
     // The page's open wallet: Rust refuses a funding for any wallet but the
-    // account's own (invariant 19).
+    // account's own.
     final address = await _page.address(account);
     _ensureCurrent(key, ticket, generation);
     final request = await _engine.reverseFundingRequest(
@@ -353,14 +353,9 @@ class PrivateUsdReverseFunding {
     }
   }
 
+  // A page that died under the proof dropped it too: nothing was paid.
   static bool _isDrop(Object failure) =>
-      failure is PrivateUsdStaleStepException ||
-      failure is PrivateUsdEngineInterruptedException ||
-      failure is PrivateUsdEngineUnavailableException ||
-      failure is PrivateUsdKeyLockedException ||
-      failure is RailgunEngineInterruptedException ||
-      failure is RailgunEngineUnavailableException ||
-      failure is RailgunEngineKeyLockedException ||
+      failure is PrivateUsdPause ||
       (failure is RailgunHostException && failure.code.pageGone);
 
   void _set(PrivateUsdRecordKey key, PrivateUsdFundingState state) {

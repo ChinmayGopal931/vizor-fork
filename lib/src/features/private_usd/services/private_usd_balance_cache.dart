@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/config/private_usd_feature_config.dart';
 import '../../../core/storage/app_secure_store.dart';
 import '../models/railgun_models.dart';
 
@@ -23,8 +24,7 @@ class CachedPrivateUsdBalances {
 }
 
 /// One entry per account in [AppSecureStore], `{address, updatedAt ms,
-/// buckets}` (plan §3.4). Failures are ignored: the cache is only a head
-/// start.
+/// buckets}`. Failures are ignored: the cache is only a head start.
 class PrivateUsdBalanceCache {
   const PrivateUsdBalanceCache(this._storage);
 
@@ -40,7 +40,7 @@ class PrivateUsdBalanceCache {
       if (raw == null || raw.isEmpty) return null;
       return decode(raw);
     } catch (e) {
-      if (kDebugMode) debugPrint('privateUsd: balance cache unreadable');
+      privateUsdLog('balance cache unreadable (${e.runtimeType})');
       return null;
     }
   }
@@ -57,7 +57,7 @@ class PrivateUsdBalanceCache {
         encode(address: address, updatedAt: updatedAt, balances: balances),
       );
     } catch (e) {
-      if (kDebugMode) debugPrint('privateUsd: balance not cached');
+      privateUsdLog('balance not cached (${e.runtimeType})');
     }
   }
 

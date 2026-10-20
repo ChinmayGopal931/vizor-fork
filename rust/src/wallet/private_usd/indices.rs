@@ -1,16 +1,16 @@
-//! Swap index allocation (plan §3.3, zapp `of/SwapIndices.kt`).
+//! Swap index allocation.
 //!
 //! An index is spent once its share has gone to a maker: claiming reveals
 //! `z`, so another swap that shares it becomes spendable by its maker. The
 //! store commits each index as taken before it is used, and an index the chain
 //! already shows in use is skipped (and stays spent), so a reinstall, or the
-//! same seed in zapp and vizor, never reuses one.
+//! same seed in another wallet, never reuses one.
 
 use super::evm_rpc::ChainReader;
 use super::keys::SwapKeyContext;
 use super::store::SwapStore;
 use super::terms::{maker_key_used_key, swap_id};
-use super::{fail, ErrorCode, Result, OPERATIONS};
+use super::{fail, with_operations, ErrorCode, Result};
 
 /// How many indices in a row may be in use before allocation gives up; the
 /// next attempt goes on from there.
@@ -25,10 +25,7 @@ pub(crate) async fn take_index<C: ChainReader>(
     account: &str,
 ) -> Result<u32> {
     for _ in 0..MAX_SKIPPED {
-        let index = {
-            let _guard = OPERATIONS.lock().unwrap_or_else(|error| error.into_inner());
-            store.take_index(account)?
-        };
+        let index = with_operations(|| store.take_index(account))?;
         if !used_on_chain(contracts, keys, index).await? {
             return Ok(index);
         }
@@ -68,6 +65,7 @@ mod tests {
 
     use super::*;
     use crate::wallet::private_usd::{
+        abi::hex0x,
         deployment,
         evm_rpc::EvmRpc,
         transport::test_support::{rpc_result, ScriptedTransport},
@@ -95,7 +93,7 @@ mod tests {
                     answer[63] = 1;
                 }
             }
-            Ok(rpc_result(json!(format!("0x{}", hex::encode(answer)))))
+            Ok(rpc_result(json!(hex0x(&answer))))
         })
     }
 
@@ -109,7 +107,7 @@ mod tests {
 
         // Indices 0 to 2 are in use on chain: 3 is taken, 0 to 2 stay spent.
         let first_three = node((0..3).map(id_of).collect());
-        let chain = EvmRpc::new(&first_three, "https://rpc.invalid", pins);
+        let chain = EvmRpc::new(&first_three, pins, "https://rpc.invalid");
         let contracts = [(&chain, pins.maker)];
         assert_eq!(
             take_index(&mut store, &contracts, &keys, ACCOUNT)
@@ -120,7 +118,7 @@ mod tests {
 
         // Sixteen in a row in use: refused, and all sixteen stay spent.
         let all = node((4..40).map(id_of).collect());
-        let chain = EvmRpc::new(&all, "https://rpc.invalid", pins);
+        let chain = EvmRpc::new(&all, pins, "https://rpc.invalid");
         let contracts = [(&chain, pins.maker)];
         let error = take_index(&mut store, &contracts, &keys, ACCOUNT)
             .await

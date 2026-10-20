@@ -1,10 +1,10 @@
-/// Which way a conversion runs: ZEC → private USD (forward, M5) or private
-/// USD → ZEC (reverse, M6). The name is the progress route's path segment.
+/// Which way a conversion runs: ZEC → private USD (forward) or private USD →
+/// ZEC (reverse). The name is the progress route's path segment.
 enum PrivateUsdDirection { forward, reverse }
 
 /// One conversion: an account's swap index in one direction. Swap indices
-/// are per account and shared by both directions (plan §3.3), so the three
-/// together name a record in `swaps.db`.
+/// are per account and shared by both directions, so the three together
+/// name a record in `swaps.db`.
 class PrivateUsdRecordKey {
   const PrivateUsdRecordKey({
     required this.accountUuid,

@@ -1,18 +1,16 @@
-//! Swap records and wire shapes, in zapp's serialized JSON (`of/SwapWire.kt`,
-//! `of/AtomicSwapModels.kt`, `of/ReverseSwapModels.kt`), so zapp's record
-//! fixtures read here unchanged.
+//! Swap records and wire shapes, in the swap services' JSON.
 //!
-//! The shapes follow zapp's store settings: camelCase, nulls and defaults not
-//! written, fields in declaration order. Ids, shares and addresses read in
-//! either case and are written lowercase; token amounts are decimal strings.
-//! Wire answers ignore unknown fields. Stored records decode strictly
-//! ([`decode_strict`]): one this build would not write back unchanged is an
-//! error, never a reset.
+//! The shapes are camelCase, with nulls and defaults not written and fields
+//! in declaration order. Ids, shares and addresses read in either case and
+//! are written lowercase; token amounts are decimal strings. Wire answers
+//! ignore unknown fields. Stored records decode strictly ([`decode_strict`]):
+//! one this build would not write back unchanged is an error, never a reset.
 
 use std::fmt;
 
 use serde::{de, de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
 
+use super::abi::hex0x;
 use super::deployment::{self, MAX_READY_WAIT_SECONDS};
 use super::PrivateUsdNetwork;
 
@@ -44,8 +42,8 @@ impl<const N: usize> Hex<N> {
         Some(Self(bytes))
     }
 
-    pub(crate) fn to_hex(&self) -> String {
-        format!("0x{}", hex::encode(self.0))
+    pub(crate) fn to_hex(self) -> String {
+        hex0x(&self.0)
     }
 }
 
@@ -171,15 +169,15 @@ impl<T> fmt::Debug for Redacted<T> {
 /// whoever holds it. Never logged.
 pub(crate) type Ticket = Redacted<String>;
 
-fn is_false(value: &bool) -> bool {
+pub(crate) fn is_false(value: &bool) -> bool {
     !*value
 }
 
-fn is_zero(value: &u64) -> bool {
+pub(crate) fn is_zero(value: &u64) -> bool {
     *value == 0
 }
 
-/// `value` is `0x` and exactly `bytes` bytes of hex (zapp `fixedHex`).
+/// `value` is `0x` and exactly `bytes` bytes of hex.
 pub(crate) fn is_fixed_hex(value: &str, bytes: usize) -> bool {
     value.len() == 2 + 2 * bytes
         && value.starts_with("0x")
@@ -209,7 +207,6 @@ pub(crate) struct SwapQuote {
 }
 
 impl SwapQuote {
-    /// zapp `SwapQuote.requireWellFormed`.
     pub(crate) fn check_well_formed(&self) -> Result<(), String> {
         if !is_fixed_hex(&self.quote_id, 32) || !is_fixed_hex(&self.maker_proof, 64) {
             return Err("the quote's id or proof is malformed".into());
@@ -249,7 +246,6 @@ pub(crate) struct ReverseQuote {
 }
 
 impl ReverseQuote {
-    /// zapp `ReverseQuote.requireWellFormed`.
     pub(crate) fn check_well_formed(&self) -> Result<(), String> {
         self.terms.check_well_formed()?;
         if !(0 < self.funding_deadline
@@ -373,21 +369,13 @@ pub(crate) struct SwapAccepted {
 
 impl SwapAccepted {
     /// The ticket, if it is `swap_id`'s (it starts with the id and a dot) and
-    /// a header can carry it as it came (zapp `ticketFor`).
+    /// a header can carry it as it came.
     pub(crate) fn ticket_for(&self, swap_id: &Word) -> Option<Ticket> {
         let ticket = &self.ticket.as_ref()?.0;
         (ticket.starts_with(&format!("{}.", swap_id.to_hex()))
             && ticket.bytes().all(|b| (b'!'..=b'~').contains(&b)))
         .then(|| Redacted(ticket.clone()))
     }
-}
-
-/// A maker's status of a swap, as far as the app reads it: its accept's token
-/// handed back.
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct MakerSwapStatus {
-    pub token_return: Option<String>,
 }
 
 /// `GET /v1/terms`.
@@ -401,9 +389,9 @@ pub(crate) struct RelayerTerms {
     pub reverse_funding: Option<ReverseFundingTerms>,
     pub railgun_sends: Option<RailgunSendsTerms>,
     pub fee_expires_at: Option<u64>,
-    /// Absent when the relayer takes no deposits (M9). Kept unparsed here,
-    /// so a deposits part this build cannot read never fails the terms the
-    /// swaps and sends need; `deposits::pinned_terms` reads and checks it.
+    /// Absent when the relayer takes no deposits. Kept unparsed here, so a
+    /// deposits part this build cannot read never fails the terms the swaps
+    /// and sends need; `deposits::pinned_terms` reads and checks it.
     #[serde(default)]
     pub deposits: Option<serde_json::Value>,
 }
@@ -463,7 +451,7 @@ pub(crate) struct Sent {
     pub transactions: Vec<Word>,
 }
 
-/// A swap's terms as relayer requests carry them (zecswap-api `Terms`).
+/// A swap's terms as relayer requests carry them.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct WireTerms {
@@ -552,7 +540,7 @@ pub(crate) enum ForwardOutcome {
 /// How far a forward swap's deposit got. It is marked started before it is
 /// created, so an interrupted one is never paid twice.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum DepositState<'a> {
+pub(crate) enum DepositProgress<'a> {
     NotStarted,
     /// Started, with no transaction known: an interruption may have cut it
     /// short.
@@ -560,9 +548,8 @@ pub(crate) enum DepositState<'a> {
     Kept(&'a ZcashTransaction),
 }
 
-/// What the app keeps about a forward swap it accepted (zapp
-/// `AtomicSwapRecordSerializer.Stored`, flat). Its keys derive from the seed
-/// and `index` again.
+/// What the app keeps about a forward swap it accepted. Its keys derive from
+/// the seed and `index` again.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ForwardRecord {
@@ -604,12 +591,42 @@ pub(crate) struct ForwardRecord {
     pub ticket: Option<Ticket>,
 }
 
+/// Where a forward swap stands, by what its record keeps: the stage while
+/// under way, the outcome once it ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ForwardPhase {
+    Opening,
+    Depositing,
+    Confirming,
+    Claiming,
+    Refunding,
+    Paid,
+    Refunded,
+    NothingSent,
+}
+
+impl ForwardPhase {
+    /// The store's `phase` column.
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Self::Opening => "OPENING",
+            Self::Depositing => "DEPOSITING",
+            Self::Confirming => "CONFIRMING",
+            Self::Claiming => "CLAIMING",
+            Self::Refunding => "REFUNDING",
+            Self::Paid => "PAID",
+            Self::Refunded => "REFUNDED",
+            Self::NothingSent => "NOTHING_SENT",
+        }
+    }
+}
+
 impl ForwardRecord {
-    pub(crate) fn deposit_state(&self) -> DepositState<'_> {
+    pub(crate) fn deposit_progress(&self) -> DepositProgress<'_> {
         match (&self.deposit, self.deposit_attempted) {
-            (Some(transaction), _) => DepositState::Kept(transaction),
-            (None, true) => DepositState::Started,
-            (None, false) => DepositState::NotStarted,
+            (Some(transaction), _) => DepositProgress::Kept(transaction),
+            (None, true) => DepositProgress::Started,
+            (None, false) => DepositProgress::NotStarted,
         }
     }
 
@@ -617,23 +634,21 @@ impl ForwardRecord {
         self.outcome.is_some()
     }
 
-    /// Where the record stands, by what it keeps: zapp's stage names while
-    /// under way, the outcome once it ended (the store's `phase` column).
-    pub(crate) fn phase_name(&self) -> &'static str {
-        match (&self.outcome, self.deposit_state()) {
-            (Some(ForwardOutcome::Paid), _) => "PAID",
-            (Some(ForwardOutcome::Refunded { .. }), _) => "REFUNDED",
-            (Some(ForwardOutcome::NothingSent { .. }), _) => "NOTHING_SENT",
-            (None, _) if self.sweep.is_some() => "REFUNDING",
-            (None, _) if self.payout.is_some() => "CLAIMING",
-            (None, DepositState::Kept(_)) => "CONFIRMING",
-            (None, DepositState::Started) => "DEPOSITING",
-            (None, DepositState::NotStarted) => "OPENING",
+    pub(crate) fn phase(&self) -> ForwardPhase {
+        match (&self.outcome, self.deposit_progress()) {
+            (Some(ForwardOutcome::Paid), _) => ForwardPhase::Paid,
+            (Some(ForwardOutcome::Refunded { .. }), _) => ForwardPhase::Refunded,
+            (Some(ForwardOutcome::NothingSent { .. }), _) => ForwardPhase::NothingSent,
+            (None, _) if self.sweep.is_some() => ForwardPhase::Refunding,
+            (None, _) if self.payout.is_some() => ForwardPhase::Claiming,
+            (None, DepositProgress::Kept(_)) => ForwardPhase::Confirming,
+            (None, DepositProgress::Started) => ForwardPhase::Depositing,
+            (None, DepositProgress::NotStarted) => ForwardPhase::Opening,
         }
     }
 
     fn check(&self) -> Result<(), String> {
-        // zapp reads an outcome only with the time it ended.
+        // An outcome reads only with the time it ended.
         if self.outcome.is_some() && self.finished_at.is_none() {
             return Err("an ended swap has no end time".into());
         }
@@ -680,8 +695,8 @@ fn is_default_zcash_network(value: &SwapZcashNetwork) -> bool {
     *value == SwapZcashNetwork::Testnet
 }
 
-/// The deployment a reverse record is pinned to (zapp `SwapDeployment`).
-/// `rpc_url` is always the keyless URL: a keyed one is never stored.
+/// The deployment a reverse record is pinned to. `rpc_url` is always the
+/// keyless URL: a keyed one is never stored.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RecordDeployment {
@@ -808,7 +823,7 @@ pub(crate) struct ReverseFundingCost {
 }
 
 /// Exact proved calldata, kept before submission.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ReverseFundingRequest {
     pub swap_id: Word,
@@ -816,6 +831,18 @@ pub(crate) struct ReverseFundingRequest {
     pub to: Address,
     pub data: String,
     pub value: String,
+}
+
+/// Redacted: `data` is the proof.
+impl fmt::Debug for ReverseFundingRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ReverseFundingRequest")
+            .field("swap_id", &self.swap_id)
+            .field("chain_id", &self.chain_id)
+            .field("to", &self.to)
+            .field("data_chars", &self.data.len())
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -874,7 +901,7 @@ impl ReverseReceiveTransaction {
     }
 }
 
-/// A reverse swap (zapp `ReverseSwapRecord`).
+/// A reverse swap.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ReverseRecord {
@@ -941,9 +968,8 @@ impl ReverseRecord {
             || self.receive.is_some()
     }
 
-    /// Whether the user may still call it off (zapp `ReverseSwapStatus`
-    /// `cancellable`): under way, not called off already, not settled, and
-    /// no refund being paid.
+    /// Whether the user may still call it off: under way, not called off
+    /// already, not settled, and no refund being paid.
     pub(crate) fn cancellable(&self) -> bool {
         self.under_way()
             && !self.cancel_requested
@@ -963,7 +989,7 @@ impl ReverseRecord {
     }
 
     /// Waiting on one of the user's two approvals: the funding payment or
-    /// the settlement (zapp `ReverseApproval`).
+    /// the settlement.
     pub(crate) fn awaiting_user(&self) -> bool {
         self.under_way()
             && !self.cancel_requested
@@ -1002,8 +1028,8 @@ impl Direction {
 /// A record as `swaps.db` keeps it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum StoredRecord {
-    Forward(ForwardRecord),
-    Reverse(ReverseRecord),
+    Forward(Box<ForwardRecord>),
+    Reverse(Box<ReverseRecord>),
 }
 
 impl StoredRecord {
@@ -1030,7 +1056,7 @@ impl StoredRecord {
 
     pub(crate) fn phase(&self) -> &'static str {
         match self {
-            Self::Forward(record) => record.phase_name(),
+            Self::Forward(record) => record.phase().name(),
             Self::Reverse(record) => record.phase.name(),
         }
     }
@@ -1066,7 +1092,7 @@ impl StoredRecord {
             Direction::Forward => {
                 let record: ForwardRecord = decode_strict(json)?;
                 record.check()?;
-                Ok(Self::Forward(record))
+                Ok(Self::Forward(Box::new(record)))
             }
             Direction::Reverse => decode_strict(json).map(Self::Reverse),
         }

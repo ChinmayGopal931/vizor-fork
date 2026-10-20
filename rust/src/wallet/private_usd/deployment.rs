@@ -1,15 +1,13 @@
-//! The pinned swap deployments (plan reference §7.1) and the driver constants
-//! (§7.2). Copied from zapp's `AtomicSwapMainnet.kt` / `AtomicSwapTestnet.kt`
-//! and cross-checked with zecSwap's deployment records. A service that
+//! The pinned swap deployments and the driver's constants. A service that
 //! disagrees with a pin is refused, never followed.
 
 use std::time::Duration;
 
-use super::PrivateUsdNetwork;
+use super::{fail, ErrorCode, PrivateUsdNetwork, Result};
 
-/// The highest relayer fee any signature pays: 2 USDC in 6-decimal base units
-/// (D11, X6). Applies to the forward payout, the refund payout, the reverse
-/// funding fee, the rescue fee and Railgun send fees. zapp has no cap.
+/// The highest relayer fee any signature pays: 2 USDC in 6-decimal base
+/// units. It caps the forward payout, the refund payout, the reverse funding
+/// fee, the rescue fee and Railgun send fees.
 pub(crate) const MAX_RELAYER_FEE: u128 = 2_000_000;
 /// The swap token's decimals on both networks.
 pub(crate) const TOKEN_DECIMALS: u32 = 6;
@@ -22,14 +20,14 @@ pub(crate) const REVEAL_MARGIN_SECONDS: u64 = 300;
 pub(crate) const ACCEPT_MARGIN_SECONDS: u64 = 15;
 /// Railgun's shield fee, in basis points.
 pub(crate) const RAILGUN_FEE_BPS: u128 = 25;
+/// Basis points in one.
+pub(crate) const BPS_MAX: u128 = 10_000;
 /// Reads (`/v1/info`, `/v1/terms`, swap status) and quotes.
 pub(crate) const QUICK_TIMEOUT: Duration = Duration::from_secs(20);
 /// Accepts and relayer posts: they may be sending a transaction.
 pub(crate) const CLIENT_TIMEOUT: Duration = Duration::from_secs(180);
 /// The header every relayer request for a swap carries its ticket in.
 pub(crate) const TICKET_HEADER: &str = "ZecSwap-Ticket";
-/// The clock skew allowed against the token issuer.
-pub(crate) const ISSUER_CLOCK_SKEW_SECONDS: u64 = 600;
 /// The soonest `t0` a forward swap may have by default, and the latest.
 pub(crate) const DEFAULT_MIN_SECONDS_TO_T0: u64 = 25 * 60;
 pub(crate) const MAX_SECONDS_TO_T0: u64 = 2 * 60 * 60;
@@ -40,8 +38,8 @@ pub(crate) const MAX_SERVICE_BODY: usize = 1 << 20;
 pub(crate) const MAX_LOGS_BODY: usize = 8 << 20;
 
 /// What the Railgun page may reach besides its own assets, on both networks.
-/// Kotlin's `RailgunEndpoints.hosts` and the bundle's CSP list the same hosts
-/// (reference §6.4), and a keyed RPC URL must use one of them.
+/// Kotlin's and Swift's `RailgunEndpoints.hosts` and the bundle's CSP list the
+/// same hosts, and a keyed RPC URL must use one of them.
 pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 10] = [
     "ethereum-rpc.publicnode.com",
     "ethereum-sepolia-rpc.publicnode.com",
@@ -68,18 +66,12 @@ pub(crate) struct Deployment {
     pub relayer_url: &'static str,
     pub issuer_url: &'static str,
     pub issuer_name: &'static str,
-    /// RFC 9578 token key, base64url SPKI (RSA-PSS SHA-384). Parsed once the
-    /// token client lands (plan §2 N1).
+    /// RFC 9578 token key, base64url SPKI (RSA-PSS SHA-384).
     pub issuer_token_key: &'static str,
     /// The key the maker hands tokens back under, base64url SPKI.
     pub maker_token_return_key: &'static str,
     pub chain_id: u64,
     pub contract: [u8; 20],
-    /// The contract's deployment block, informational.
-    pub contract_block: u64,
-    /// `LOCK_DURATION` at deployment, informational: the driver reads it on
-    /// chain.
-    pub lock_duration_seconds: u64,
     pub token: [u8; 20],
     /// The dollar tokens the private USD balance counts, the swap token
     /// first (Sepolia adds Circle's test USDC, which Railgun accepts). Their
@@ -104,24 +96,22 @@ pub(crate) struct Deployment {
     pub screening_seconds: u32,
     pub explorer_tx_prefix: &'static str,
     pub railscan_tx_prefix: &'static str,
-    /// publicnode, which needs no key. A keyed URL (a build secret) is tried
-    /// first and never stored.
+    /// publicnode, which needs no key: the RPC of a build without a keyed
+    /// URL.
     pub keyless_rpc_url: &'static str,
     pub poi_node_url: &'static str,
-    /// Where public USDC is shielded into the private balance (M9); `None`
-    /// where no Deposits contract is pinned, and deposits are hidden.
+    /// Where public USDC is shielded into the private balance; `None` where no
+    /// Deposits contract is pinned, and deposits are hidden.
     pub deposits: Option<DepositsPin>,
 }
 
-/// What a wallet pins of a Deposits deployment, never what a relayer says
-/// (zecSwap `docs/deposits.md`, "Pin the deployment"). The relayer's terms
-/// must name the same contract, account and token on the pinned chain.
+/// What a wallet pins of a Deposits deployment, never what a relayer says:
+/// the relayer's terms must name the same contract, account and token on the
+/// pinned chain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DepositsPin {
     /// The Deposits contract: every authorization's `to`.
     pub contract: [u8; 20],
-    /// Its deployment block, informational.
-    pub contract_block: u64,
     /// The account the relayer sends deposits from. A deposit's nonce
     /// commits to it, so a tampered answer cannot take even the fee. It is
     /// not the top-level `relayer`, which payouts are signed for.
@@ -142,15 +132,10 @@ pub(crate) struct UsdToken {
 }
 
 const MAINNET_USDC: [u8; 20] = address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
-/// The testnet maker's swap token; it stands in for USDC. `ZecSwap Test
-/// USD`, version `2`, 6 decimals, with EIP-3009 for deposits (Sepolia block
-/// 11,944,315). The hosted maker and relayer moved to it at 23:42 UTC on
-/// 2026-10-18, for swaps too: the retired one
-/// (`0x5764D0044bef5AA839E0dDafE2073421101B9Ed8`) no longer swaps, and its
-/// balances no longer count.
+/// The testnet maker's swap token, standing in for USDC: `ZecSwap Test USD`,
+/// version `2`, 6 decimals, with EIP-3009 for deposits.
 const SEPOLIA_TEST_USD: [u8; 20] = address("0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c");
-/// Multicall3, at its canonical address on every chain (it has code on
-/// Sepolia, checked 2026-10-18, and on mainnet, 2026-10-19).
+/// Multicall3, at its canonical address on every chain.
 const MULTICALL3: [u8; 20] = address("0xcA11bde05977b3631167028862bE2a173976CA11");
 /// Circle's test USDC, the one Railgun accepts on Sepolia.
 const SEPOLIA_USDC: [u8; 20] = address("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238");
@@ -165,8 +150,6 @@ const MAINNET: Deployment = Deployment {
     maker_token_return_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEArte6ewR0iOfbhxrByZ1vj_MMkKiQLQ-2R3OdCyHeKr_G4FrsCHvLhJ0uuu5r-papDogiMb_btM5-nPaOWzC1olxbmEUypJWgz-yCXD3K4wp_jgeqlP7EnlJE3IT5iTwv_S1hK5yV4Fka5mRoyhvZlhvDW3eCWoMix15Fp-TD3AGm7GttqzW4QyLXV_mQcnqlWPwuCacmTYch93eMZ7CaTHHRMmsfqR7_kZdskZh_JM55_lw_puDvvdRtu4vYItvo5wMI5mkwmSEwi6UahZDx_OI8IAF2JpeqRIKwbhT6FVGwahDeu6PRTww71C0i13EOwC3GQ85pxDRIAzF01W14wQIDAQAB",
     chain_id: 1,
     contract: address("0x4708D7d36992b7e33Ad97a1ab0A31c3ac6C4fe6D"),
-    contract_block: 26_178_667,
-    lock_duration_seconds: 1800,
     token: MAINNET_USDC,
     usd_tokens: &[UsdToken {
         address: MAINNET_USDC,
@@ -185,12 +168,8 @@ const MAINNET: Deployment = Deployment {
     railscan_tx_prefix: "https://railscan.io/ethereum/tx/",
     keyless_rpc_url: "https://ethereum-rpc.publicnode.com",
     poi_node_url: POI_NODE_URL,
-    // zecSwap `deployments/mainnet-deposits.json` (branch
-    // `feature/deposits`), live since 03:48 UTC on 2026-10-19. Its relayer
-    // sends deposits through Flashbots Protect, one at a time.
     deposits: Some(DepositsPin {
         contract: address("0xebc7508e20bd4467491ee7e7589d5c7d4c5e8cb6"),
-        contract_block: 26_224_004,
         relayer: address("0x6ae40b34c32d3feaa0eef53d7e4724160b7a2135"),
         token: MAINNET_USDC,
         multicall: MULTICALL3,
@@ -207,8 +186,6 @@ const TESTNET: Deployment = Deployment {
     maker_token_return_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEA5boFzxSM2UDd-NfwWUnT_lVo23Td6wOH5twYjLo2wLDEWmGKSNBgdZy3t3JC2JkzD8j9rVRdehpll_i3GRKmUq0wr6xkHHuHxswr3TehMUqUrztg-nxDS4U2f0V0yYno3I5YPo2SByOz_-jHNWM6Mlx-TZsWzALQTb3NmRXdynqecz3-8hqd_OPhUJtH7M3pK9ikkUbSzV1ofXkyM6FnaNAGkHZ1kAMEF2pGe69tOJJqGq6wpTuZMtzaaxu9t1C4xoR7R7pbdkjPM_Wxd15LoXa1N26V-PToIeD06VmwX51VjrO_2VHWFat4Rtu7eLPeiEX-5kKsyvCY7EhpkNK1DQIDAQAB",
     chain_id: 11_155_111,
     contract: address("0xD75Efc6a157CC0A95f66962DA86DDf35d9F2617c"),
-    contract_block: 11_860_526,
-    lock_duration_seconds: 600,
     token: SEPOLIA_TEST_USD,
     usd_tokens: &[
         UsdToken {
@@ -233,11 +210,8 @@ const TESTNET: Deployment = Deployment {
     railscan_tx_prefix: "https://railscan.io/sepolia/tx/",
     keyless_rpc_url: "https://ethereum-sepolia-rpc.publicnode.com",
     poi_node_url: POI_NODE_URL,
-    // zecSwap `deployments/sepolia-deposits.json`, live since 23:42 UTC on
-    // 2026-10-18.
     deposits: Some(DepositsPin {
         contract: address("0x58324e9a866c9690aca08169d3c67630e84c9019"),
-        contract_block: 11_944_316,
         relayer: address("0xedc4c88a3f6ae8130a2c18babbabd8100cc1a446"),
         token: SEPOLIA_TEST_USD,
         multicall: MULTICALL3,
@@ -260,8 +234,8 @@ pub(crate) fn for_chain_id(chain_id: u64) -> Option<&'static Deployment> {
 
 impl Deployment {
     /// Where the engine reads the chain: the keyed URL when the build has one,
-    /// else publicnode. Never falls back from a keyed URL (zapp does not
-    /// either), and never stored.
+    /// else publicnode. Nothing falls back from a keyed URL, and it is never
+    /// stored.
     pub(crate) fn rpc_url<'a>(&'a self, keyed: &'a str) -> &'a str {
         if keyed.trim().is_empty() {
             self.keyless_rpc_url
@@ -278,9 +252,20 @@ impl Deployment {
     }
 }
 
-/// `0x`-prefixed lowercase hex, as the wire and records write addresses.
-pub(crate) fn hex_address(address: &[u8; 20]) -> String {
-    format!("0x{}", hex::encode(address))
+/// Refuses a relayer fee above [`MAX_RELAYER_FEE`]: no signature pays one.
+pub(crate) fn require_within_fee_cap(fee: u128) -> Result<()> {
+    if fee > MAX_RELAYER_FEE {
+        return fail(
+            ErrorCode::RelayerFee,
+            "the relayer's fee is above the 2 USDC cap",
+        );
+    }
+    Ok(())
+}
+
+/// What Railgun shields of `amount`: its shield fee comes off, rounded down.
+pub(crate) fn after_railgun_fee(amount: u128) -> u128 {
+    amount - amount.saturating_mul(RAILGUN_FEE_BPS) / BPS_MAX
 }
 
 /// A 20-byte address from `0x` hex of either case, at compile time.

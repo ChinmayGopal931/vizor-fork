@@ -2,12 +2,15 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
+import 'package:zcash_wallet/src/core/config/pricing_engine_config.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
 import 'package:zcash_wallet/src/core/profile_pictures.dart';
+import 'package:zcash_wallet/src/features/activity/activity_eta_provider.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/models/portfolio_chart_models.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/providers/portfolio_chart_provider.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/providers/portfolio_chart_settings_provider.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/services/portfolio_balance_history.dart';
+import 'package:zcash_wallet/src/features/portfolio_chart/services/portfolio_chart_format.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/services/portfolio_price_history.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/services/portfolio_price_history_source.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/services/portfolio_valuation.dart';
@@ -383,6 +386,38 @@ void main() {
     });
   });
 
+  test(
+    'dates a daily price by its UTC day and any other point by the clock',
+    () {
+      expect(
+        formatPortfolioPointTime(
+          DateTime.utc(2026, 10, 14),
+          PortfolioChartRange.week,
+          PortfolioChartMode.usd,
+        ),
+        'Oct 14, 2026',
+      );
+      // Midnight UTC of a block time is not a daily price.
+      expect(
+        formatPortfolioPointTime(
+          DateTime.utc(2026, 10, 14),
+          PortfolioChartRange.week,
+          PortfolioChartMode.zec,
+        ),
+        isNot('Oct 14, 2026'),
+      );
+      // A receipt placed between two prices, or now, has a time of day.
+      expect(
+        formatPortfolioPointTime(
+          DateTime.utc(2026, 10, 12, 12, 30),
+          PortfolioChartRange.week,
+          PortfolioChartMode.usd,
+        ),
+        contains(':'),
+      );
+    },
+  );
+
   group('PortfolioPriceHistoryRepository', () {
     late _FakePriceSource source;
     late DateTime clock;
@@ -753,7 +788,7 @@ void main() {
         'returns', () async {
       var clock = _now;
       final source = _FakePriceSource();
-      final foreground = _SwitchableForeground();
+      final foreground = _Foreground(true);
       final container = _container(
         source: source,
         transactions: transactions,
@@ -853,20 +888,15 @@ class _FakePriceSource implements PortfolioPriceHistorySource {
 }
 
 /// The app's foreground state, set by the test.
-class _SwitchableForeground extends AppForegroundNotifier {
+class _Foreground extends AppForegroundNotifier {
+  _Foreground(this.initial);
+
+  final bool initial;
+
   @override
-  bool build() => true;
+  bool build() => initial;
 
   void set(bool value) => state = value;
-}
-
-class _FixedForeground extends AppForegroundNotifier {
-  _FixedForeground(this.value);
-
-  final bool value;
-
-  @override
-  bool build() => value;
 }
 
 /// One way to arrive at the chart with a condition for asking not met.
@@ -964,11 +994,11 @@ ProviderContainer _container({
         pricingServer ? Uri.parse('https://prices.example') : null,
       ),
       appInForegroundProvider.overrideWith(
-        () => foregroundNotifier ?? _FixedForeground(foreground),
+        () => foregroundNotifier ?? _Foreground(foreground),
       ),
       portfolioChartNowProvider.overrideWithValue(now ?? () => _now),
       portfolioPriceHistorySourceProvider.overrideWithValue(source),
-      portfolioTransactionLoaderProvider.overrideWithValue((
+      activityEtaClaimHistoryLoaderProvider.overrideWithValue((
         accountUuid,
         network,
       ) async {

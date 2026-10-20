@@ -189,28 +189,40 @@ const _privateUsdTokenStorePrefix = 'private_usd_tokens_';
 // The Private USD directories this process has kept out of backups.
 final _privateUsdBackupMarked = <String>{};
 
-/// Private USD's `swaps.db` and `joint.db` directory for one wallet and
-/// network (plan §3.4): `<support>/private_usd_<walletDbName>_<network>`.
-///
-/// The swap records hold relayer tickets and token blinding secrets, so on iOS
-/// the directory stays out of iCloud and device backups (iOS plan DI6),
-/// marked before anything is written in it. The mark goes with the directory,
-/// so it is set whenever the directory is made, and once per process for one
-/// made earlier. A failed mark is tried again on the next call: a weaker
-/// backup posture must not stop a conversion that is under way.
-Future<String> getPrivateUsdDirPath(
-  String network, {
-  @visibleForTesting
-  Future<void> Function(String directory) excludeFromBackup =
-      excludeFromDeviceBackup,
-}) async {
+void _checkPrivateUsdNetwork(String network) {
   if (!RegExp(r'^[a-z0-9]+$').hasMatch(network)) {
     throw ArgumentError.value(network, 'network');
   }
+}
+
+Future<Directory> _privateUsdDirectory(
+  String network,
+  String walletName,
+) async {
   final support = await getWalletSupportDirectory();
-  final walletName = await getWalletDbName();
-  final directory = Directory(
+  return Directory(
     '${support.path}${Platform.pathSeparator}$_privateUsdPrefix${walletName}_$network',
+  );
+}
+
+/// Private USD's `swaps.db` and `joint.db` directory for one wallet and
+/// network: `<support>/private_usd_<walletDbName>_<network>`.
+///
+/// The swap records hold relayer tickets and token blinding secrets, so on iOS
+/// the directory stays out of iCloud and device backups, marked before
+/// anything is written in it. The mark goes with the directory, so it is set
+/// whenever the directory is made, and once per process for one made earlier.
+/// A failed mark is tried again on the next call: a weaker backup posture must
+/// not stop a conversion that is under way.
+Future<String> getPrivateUsdDirPath(
+  String network, {
+  Future<void> Function(String directory) excludeFromBackup =
+      excludeFromDeviceBackup,
+}) async {
+  _checkPrivateUsdNetwork(network);
+  final directory = await _privateUsdDirectory(
+    network,
+    await getWalletDbName(),
   );
   final made = !await directory.exists();
   await directory.create(recursive: true);
@@ -230,55 +242,58 @@ Future<String> getPrivateUsdDirPath(
 /// [getPrivateUsdDirPath] when that directory already exists, else null.
 /// Reads that must not create anything use it: a wallet that never
 /// converted has no Private USD directory (and desktop never gets one).
+/// Like [getExistingWalletDbPath], it never assigns a wallet database name.
 Future<String?> getExistingPrivateUsdDirPath(String network) async {
-  if (!RegExp(r'^[a-z0-9]+$').hasMatch(network)) {
-    throw ArgumentError.value(network, 'network');
-  }
-  final support = await getWalletSupportDirectory();
-  final walletName = await getWalletDbName();
-  final directory = Directory(
-    '${support.path}${Platform.pathSeparator}$_privateUsdPrefix${walletName}_$network',
-  );
+  _checkPrivateUsdNetwork(network);
+  final walletName = await AppSecureStore.instance.readPlain(kWalletDbNameKey);
+  if (walletName == null || walletName.isEmpty) return null;
+  final directory = await _privateUsdDirectory(network, walletName);
   return await directory.exists() ? directory.path : null;
 }
 
-/// The device-wide Privacy Pass token store for [network] (M4), written
-/// atomically through a temporary file beside it.
-Future<String> getPrivateUsdTokenStorePath(String network) async {
-  if (!RegExp(r'^[a-z0-9]+$').hasMatch(network)) {
-    throw ArgumentError.value(network, 'network');
-  }
-  final support = await getWalletSupportDirectory();
-  return '${support.path}${Platform.pathSeparator}'
-      '$_privateUsdTokenStorePrefix$network.json';
-}
-
 /// Removes every wallet's Private USD directory (swap records and joint
-/// accounts), for a full reset.
+/// accounts), for a full reset. Attempts every directory and then rethrows
+/// the first failure, so one that cannot be deleted does not leave the others'
+/// swap secrets on disk.
 Future<void> deletePrivateUsdDirectories() async {
   final support = await getWalletSupportDirectory();
+  Object? firstError;
+  StackTrace? firstStackTrace;
   await for (final entity in support.list(followLinks: false)) {
-    if (entity is Directory &&
-        entity.path
-            .split(Platform.pathSeparator)
-            .last
-            .startsWith(_privateUsdPrefix)) {
+    if (entity is! Directory) continue;
+    final directoryName = entity.path.split(Platform.pathSeparator).last;
+    if (!directoryName.startsWith(_privateUsdPrefix)) continue;
+    try {
       await entity.delete(recursive: true);
+    } catch (error, stackTrace) {
+      firstError ??= error;
+      firstStackTrace ??= stackTrace;
     }
+  }
+  if (firstError != null) {
+    Error.throwWithStackTrace(firstError, firstStackTrace!);
   }
 }
 
 /// Removes the device-wide token stores and their temporary files, for a
-/// full reset (X4). The Keystore attestation key stays.
+/// full reset. The Keystore attestation key stays. Attempts every file and
+/// then rethrows the first failure.
 Future<void> deletePrivateUsdTokenStores() async {
   final support = await getWalletSupportDirectory();
+  Object? firstError;
+  StackTrace? firstStackTrace;
   await for (final entity in support.list(followLinks: false)) {
-    if (entity is File &&
-        entity.path
-            .split(Platform.pathSeparator)
-            .last
-            .startsWith(_privateUsdTokenStorePrefix)) {
+    if (entity is! File) continue;
+    final fileName = entity.path.split(Platform.pathSeparator).last;
+    if (!fileName.startsWith(_privateUsdTokenStorePrefix)) continue;
+    try {
       await entity.delete();
+    } catch (error, stackTrace) {
+      firstError ??= error;
+      firstStackTrace ??= stackTrace;
     }
+  }
+  if (firstError != null) {
+    Error.throwWithStackTrace(firstError, firstStackTrace!);
   }
 }

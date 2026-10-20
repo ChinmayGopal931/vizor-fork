@@ -1,5 +1,6 @@
-//! A swap's joint account in `joint.db`, and the swap transactions the wallet
-//! follows (`docs/private-usd-reference.md` §8.1).
+//! The wallet's Zcash side of a swap: a swap's joint account in `joint.db`,
+//! the deposit from the main wallet, and the swap transactions the wallet
+//! follows.
 //!
 //! The joint account is the Orchard-only account whose spend authorizing key
 //! is split: the maker holds `e`, the user holds `z`. The wallet imports it by
@@ -8,38 +9,49 @@
 //! its own, so joint accounts never appear in the main wallet's account list,
 //! sync status, voting or migration.
 //!
-//! The deposit into a joint account comes from the main wallet
-//! (`crate::wallet::sync::propose_swap_deposit`); [`find_deposit`] and
-//! [`swap_tx_status`] follow it there.
-//!
-//! `OPERATIONS` is held around the short local writes here (import, delete),
-//! never across network I/O. librustzcash writes also take the process-wide
-//! wallet write lock. One scan of a `joint.db` runs at a time.
+//! The local writes here (import, delete) run under `with_operations`, never
+//! across network I/O; librustzcash writes also take the process-wide wallet
+//! write lock. One scan of a `joint.db` runs at a time.
 
 use std::collections::HashSet;
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 
 use rusqlite::OptionalExtension;
 use zcash_client_backend::data_api::{Account as _, AccountPurpose, WalletRead, WalletWrite};
 use zcash_keys::keys::UnifiedFullViewingKey;
-use zcash_primitives::transaction::TxId;
+use zcash_primitives::transaction::{fees::zip317, TxId};
 use zcash_protocol::consensus::Parameters;
-use zecswap_core::{SpendKey, SweepIntent};
+use zecswap_core::{JointAccount, SpendKey, SweepIntent};
 
-use super::{fail, ErrorCode, PrivateUsdError, Result, OPERATIONS};
+use super::forward::ForwardZcash;
+use super::keys::SwapKeyContext;
+use super::models::{
+    Direction, JointAccountId, ReverseReceiveEstimate, ReverseReceiveTransaction, ZcashTransaction,
+    ZcashTxId,
+};
+use super::reverse::ReverseZcash;
+use super::store::{JointAccountRow, SwapStore};
+use super::{fail, lock, with_operations, ErrorCode, PrivateUsdError, Result};
 use crate::wallet::db::{
     open_readonly_conn_with_timeout, open_wallet_db_with_timeout, wallet_db_on,
     with_wallet_db_write_lock, ACCOUNT_MUTATION_DB_BUSY_TIMEOUT, READ_DB_BUSY_TIMEOUT,
 };
 use crate::wallet::failure::WalletFailure;
 use crate::wallet::network::WalletNetwork;
-use crate::wallet::sync::{self, CreatedTransaction, StoreAndBroadcastPcztsResult, SwapProposal};
+use crate::wallet::sync::{
+    self, CreatedTransaction, StoreAndBroadcastPcztsResult, SwapDepositError, SwapProposal,
+};
 use crate::wallet::{keys, sync_engine};
 
+/// The joint accounts of one wallet's conversions, beside `swaps.db`.
+const JOINT_DB_FILE: &str = "joint.db";
 /// The name and key source a joint account is imported under.
 const JOINT_ACCOUNT_NAME: &str = "Private USD joint";
 const JOINT_KEY_SOURCE: &str = "vizor-private-usd-joint";
+/// A forward refund's sweep pays at most this fee: 64 ZIP 317 marginal fees.
+const MAX_SWEEP_FEE_ZATOSHI: u64 = 320_000;
 
 fn wallet_error(message: impl Into<String>) -> PrivateUsdError {
     PrivateUsdError::new(ErrorCode::ZcashWallet, message)
@@ -51,9 +63,9 @@ fn sql_error(error: rusqlite::Error) -> PrivateUsdError {
 
 /// Imports a swap's joint account into `joint_db` by its UFVK, at exactly
 /// `birthday_height`: rounding it down would rescan up to 10,000 blocks
-/// inside a swap's deadlines (§3.5 item 12). It is a spending account with no
-/// derivation, never view-only, so the wallet tracks the notes a sweep
-/// spends. Registering the same key again returns the same account.
+/// inside a swap's deadlines. It is a spending account with no derivation,
+/// never view-only, so the wallet tracks the notes a sweep spends.
+/// Registering the same key again returns the same account.
 pub(crate) fn register_joint_account(
     joint_db: &str,
     network: WalletNetwork,
@@ -74,33 +86,39 @@ pub(crate) fn register_joint_account(
     }
     let birthday = keys::make_birthday(network, Some(u64::from(birthday_height)));
 
-    let _guard = OPERATIONS.lock().unwrap_or_else(|error| error.into_inner());
-    keys::ensure_db_migrated_once(joint_db, network).map_err(wallet_error)?;
-    let registered: std::result::Result<Result<String>, String> =
-        with_wallet_db_write_lock("private_usd.register_joint_account", || {
-            let mut db =
-                open_wallet_db_with_timeout(joint_db, network, ACCOUNT_MUTATION_DB_BUSY_TIMEOUT)?;
-            if let Some(account) = db.get_account_for_ufvk(&ufvk).map_err(|e| e.to_string())? {
-                return Ok(match account.purpose() {
-                    AccountPurpose::Spending { .. } => Ok(account.id().expose_uuid().to_string()),
-                    AccountPurpose::ViewOnly => Err(PrivateUsdError::new(
-                        ErrorCode::Mismatch,
-                        "the joint account is imported view-only",
-                    )),
-                });
-            }
-            let account = db
-                .import_account_ufvk(
-                    JOINT_ACCOUNT_NAME,
-                    &ufvk,
-                    &birthday,
-                    AccountPurpose::Spending { derivation: None },
-                    Some(JOINT_KEY_SOURCE),
-                )
-                .map_err(|e| e.to_string())?;
-            Ok(Ok(account.id().expose_uuid().to_string()))
-        });
-    registered.map_err(wallet_error)?
+    with_operations(|| {
+        keys::ensure_db_migrated_once(joint_db, network).map_err(wallet_error)?;
+        let registered: std::result::Result<Result<String>, String> =
+            with_wallet_db_write_lock("private_usd.register_joint_account", || {
+                let mut db = open_wallet_db_with_timeout(
+                    joint_db,
+                    network,
+                    ACCOUNT_MUTATION_DB_BUSY_TIMEOUT,
+                )?;
+                if let Some(account) = db.get_account_for_ufvk(&ufvk).map_err(|e| e.to_string())? {
+                    return Ok(match account.purpose() {
+                        AccountPurpose::Spending { .. } => {
+                            Ok(account.id().expose_uuid().to_string())
+                        }
+                        AccountPurpose::ViewOnly => Err(PrivateUsdError::new(
+                            ErrorCode::Mismatch,
+                            "the joint account is imported view-only",
+                        )),
+                    });
+                }
+                let account = db
+                    .import_account_ufvk(
+                        JOINT_ACCOUNT_NAME,
+                        &ufvk,
+                        &birthday,
+                        AccountPurpose::Spending { derivation: None },
+                        Some(JOINT_KEY_SOURCE),
+                    )
+                    .map_err(|e| e.to_string())?;
+                Ok(Ok(account.id().expose_uuid().to_string()))
+            });
+        registered.map_err(wallet_error)?
+    })
 }
 
 /// Forgets a joint account, once its sweep is confirmed or its swap no longer
@@ -110,8 +128,7 @@ pub(crate) fn delete_joint_account(
     network: WalletNetwork,
     joint_uuid: &str,
 ) -> Result<()> {
-    let _guard = OPERATIONS.lock().unwrap_or_else(|error| error.into_inner());
-    keys::delete_account(joint_db, network, joint_uuid).map_err(wallet_error)
+    with_operations(|| keys::delete_account(joint_db, network, joint_uuid).map_err(wallet_error))
 }
 
 /// Forgets a joint account if `joint_db` still holds it: a cleanup that ran
@@ -145,8 +162,7 @@ struct ScanClaim(String);
 
 impl ScanClaim {
     fn take(joint_db: &str) -> Result<Self> {
-        let mut scanning = SCANNING.lock().unwrap_or_else(|error| error.into_inner());
-        if !scanning.insert(joint_db.to_string()) {
+        if !lock(&SCANNING).insert(joint_db.to_string()) {
             return fail(ErrorCode::Busy, "the joint wallet is already scanning");
         }
         Ok(Self(joint_db.to_string()))
@@ -155,10 +171,7 @@ impl ScanClaim {
 
 impl Drop for ScanClaim {
     fn drop(&mut self) {
-        SCANNING
-            .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .remove(&self.0);
+        lock(&SCANNING).remove(&self.0);
     }
 }
 
@@ -168,7 +181,7 @@ impl Drop for ScanClaim {
 /// A `joint.db` whose accounts are all born above the tip has nothing to scan
 /// yet, and the claim scan's completion checks would fail on it: no block is
 /// stored at the tip. This returns at once until the chain reaches the
-/// birthday (U6; zecSwap's `born_above`).
+/// birthday.
 pub(crate) async fn sync_joint_db(
     joint_db: &str,
     lightwalletd_url: &str,
@@ -315,21 +328,23 @@ pub(crate) struct JointSweep {
     pub transaction: CreatedTransaction,
     pub amount_zatoshi: u64,
     pub fee_zatoshi: u64,
+    #[cfg_attr(not(test), allow(dead_code))]
     pub broadcast: SweepBroadcast,
+    #[cfg_attr(not(test), allow(dead_code))]
     pub message: Option<String>,
 }
 
 /// Sweeps everything in a joint account to `home_ua` with the combined key
 /// `key` (`±(e+z)`): propose, create the PCZT, sign the unredacted base
 /// against a `SweepIntent`, extract the compact signatures, prove, then
-/// broadcast and store through the hardware completion path (§8.1).
+/// broadcast and store through the hardware completion path.
 ///
-/// - The sweep discards its OVK (D12), pays `home_ua` the whole balance less
-///   the fee, and pays at most `max_fee_zatoshi`.
+/// - The sweep discards its OVK, pays `home_ua` the whole balance less the
+///   fee, and pays at most `max_fee_zatoshi`.
 /// - Broadcast comes before storage, so a rejected sweep leaves the joint
-///   notes unspent (§3.5 item 9).
+///   notes unspent.
 /// - PCZT creation consumes the proposal; every other exit discards it, which
-///   never releases a reservation a broadcast has started (item 10).
+///   never releases a reservation a broadcast has started.
 pub(crate) async fn sweep_joint(
     joint_db: &str,
     lightwalletd_url: &str,
@@ -365,7 +380,7 @@ pub(crate) async fn sweep_joint(
     )
     .await;
     if let Err(error) = sync::discard_proposal(proposal.proposal_id, send_flow_id) {
-        log::warn!("private_usd: releasing a joint sweep proposal failed: {error}");
+        log::warn!("private usd: releasing a joint sweep proposal failed: {error}");
     }
     swept
 }
@@ -470,12 +485,18 @@ async fn sweep_proposal(
 }
 
 fn broadcast_error(failure: WalletFailure) -> PrivateUsdError {
-    let code = if failure.message.starts_with("Broadcast rejected:") {
+    broadcast_failure(failure.message)
+}
+
+/// A broadcast's failure: the node refused the transaction, or the wallet
+/// could not send it.
+fn broadcast_failure(message: String) -> PrivateUsdError {
+    let code = if sync::broadcast_rejected(&message) {
         ErrorCode::ZcashRejected
     } else {
         ErrorCode::ZcashWallet
     };
-    PrivateUsdError::new(code, failure.message)
+    PrivateUsdError::new(code, message)
 }
 
 fn stored_raw(db: &str, txid: &TxId) -> Result<Option<Vec<u8>>> {
@@ -492,8 +513,7 @@ fn stored_raw(db: &str, txid: &TxId) -> Result<Option<Vec<u8>>> {
     Ok(raw.flatten())
 }
 
-/// Where a swap's Zcash transaction stands, in the wallet DB that sent it
-/// (zapp `SwapZcashTransactions.status`).
+/// Where a swap's Zcash transaction stands, in the wallet DB that sent it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SwapTxStatus {
     /// Mined at `height`, `confirmations` deep below the fully scanned height
@@ -549,8 +569,7 @@ fn classify(
         };
     }
     // A transaction can still be mined in the block at its expiry height, so
-    // it is expired only once the block after that is scanned too (zecSwap's
-    // `is_expired`).
+    // it is expired only once the block after that is scanned too.
     let expired =
         expiry_height != 0 && fully_scanned.is_some_and(|scanned| scanned > expiry_height);
     match (expired, stored.is_some()) {
@@ -582,7 +601,7 @@ pub(crate) fn scanned_height(db: &str, network: WalletNetwork) -> Result<Option<
 /// The account's sent transaction to `joint_ua` that may still land, if any:
 /// mined, or unmined and not provably expired. A deposit marked started but
 /// never kept is looked up here before anything new is built, so it is never
-/// paid twice (§3.5 item 3, zapp `findDeposit`).
+/// paid twice.
 pub(crate) fn find_deposit(
     main_db: &str,
     network: WalletNetwork,
@@ -691,4 +710,489 @@ pub(crate) fn sent_value_and_fee(db: &str, txid: &TxId) -> Result<(u64, Option<u
         .transpose()
         .map_err(|_| wallet_error("a stored fee is negative"))?;
     Ok((value, fee))
+}
+
+// ---- the wallet's side of a swap ----
+
+/// The Zcash side of a swap over the main wallet DB and `joint.db`.
+pub(crate) struct WalletZcash<'a> {
+    pub main_db: &'a str,
+    pub lightwalletd_url: &'a str,
+    pub network: WalletNetwork,
+    pub account_uuid: &'a str,
+    pub store_dir: &'a Path,
+    pub keys: &'a SwapKeyContext,
+    /// The call's cancel flag: a joint scan stops on it between batches.
+    pub cancel: Arc<AtomicBool>,
+}
+
+/// A deposit proposal in `PROPOSAL_STORE`, under its send flow.
+pub(crate) struct DepositProposal {
+    proposal_id: u64,
+    send_flow_id: String,
+}
+
+/// A joint account's balance swept home.
+pub(crate) struct SweptHome {
+    pub transaction: CreatedTransaction,
+    /// What reached the home address, and the fee, as far as the wallet
+    /// knows them (an earlier sweep found again may not record its fee).
+    pub amount_zatoshi: u64,
+    pub fee_zatoshi: Option<u64>,
+}
+
+impl WalletZcash<'_> {
+    fn joint_db(&self) -> String {
+        joint_db_path(self.store_dir)
+    }
+
+    async fn tip(&self) -> Result<u64> {
+        sync_engine::latest_block_for_transaction(self.lightwalletd_url, self.network)
+            .await
+            .map(|tip| tip.height)
+            .map_err(|error| wallet_error(format!("read the Zcash chain tip: {error}")))
+    }
+
+    /// Imports `direction`'s swap `index`'s joint account at its exact
+    /// birthday, idempotently, and indexes it in `swaps.db`. It takes the
+    /// process-wide wallet write lock, so it may wait on a batch of the main
+    /// sync.
+    fn import_joint(
+        &self,
+        direction: Direction,
+        index: u32,
+        joint: &JointAccount,
+        birthday: u64,
+    ) -> Result<String> {
+        let ufvk = joint.ufvk(self.network.network_type());
+        let birthday = u32::try_from(birthday).map_err(|_| {
+            PrivateUsdError::new(ErrorCode::Other, "the joint account's birthday is too high")
+        })?;
+        let joint_uuid = register_joint_account(&self.joint_db(), self.network, &ufvk, birthday)?;
+        let mut store = SwapStore::open(self.store_dir)?;
+        with_operations(|| {
+            store.put_joint_account(&JointAccountRow {
+                account_uuid: self.account_uuid.to_owned(),
+                direction,
+                swap_index: index,
+                joint_uuid: joint_uuid.clone(),
+                ufvk,
+                birthday: u64::from(birthday),
+            })
+        })?;
+        Ok(joint_uuid)
+    }
+
+    /// The joint account imported (idempotently, so a lost `joint.db` heals
+    /// by rescanning from the exact birthday) and `joint.db` scanned to the
+    /// tip. The scan's writes take the process-wide wallet write lock.
+    async fn synced_joint(
+        &self,
+        direction: Direction,
+        index: u32,
+        joint: &JointAccount,
+        birthday: u64,
+    ) -> Result<String> {
+        let joint_uuid = self.import_joint(direction, index, joint, birthday)?;
+        sync_joint_db(
+            &self.joint_db(),
+            self.lightwalletd_url,
+            self.network,
+            self.cancel.clone(),
+        )
+        .await?;
+        Ok(joint_uuid)
+    }
+
+    /// Where `transaction`, sent from the joint account, stands in
+    /// `joint.db`, once synced.
+    async fn joint_tx_status(
+        &self,
+        direction: Direction,
+        index: u32,
+        joint: &JointAccount,
+        birthday: u64,
+        transaction: &ZcashTransaction,
+    ) -> Result<SwapTxStatus> {
+        self.synced_joint(direction, index, joint, birthday).await?;
+        swap_tx_status(
+            &self.joint_db(),
+            self.network,
+            &internal_txid(&transaction.tx_id)?,
+            expiry(transaction),
+        )
+    }
+
+    /// The joint account's whole balance swept home with the combined `key`
+    /// and Discard OVK: an earlier sweep that may still land is returned
+    /// again, never built twice; `None` until every note is spendable. The
+    /// sweep pays at most `max_fee_zatoshi` (a forward refund's default when
+    /// `None`), and at least ZIP 317's least fee.
+    async fn sweep_home(
+        &self,
+        direction: Direction,
+        index: u32,
+        joint: &JointAccount,
+        key: &SpendKey,
+        birthday: u64,
+        max_fee_zatoshi: Option<u64>,
+        send_flow_id: &str,
+    ) -> Result<Option<SweptHome>> {
+        let joint_uuid = self.synced_joint(direction, index, joint, birthday).await?;
+        let joint_db = self.joint_db();
+        if let Some(earlier) = find_sent(&joint_db, self.network, &joint_uuid, None)? {
+            let (amount_zatoshi, fee_zatoshi) = sent_value_and_fee(&joint_db, &earlier.txid)?;
+            return Ok(Some(SweptHome {
+                transaction: earlier,
+                amount_zatoshi,
+                fee_zatoshi,
+            }));
+        }
+        let receipts = joint_receipts(
+            &joint_db,
+            self.network,
+            &joint_uuid,
+            crate::wallet::JOINT_SWEEP_CONFIRMATIONS,
+        )?;
+        // The whole balance at once, so no note is left behind.
+        if receipts.spendable_zatoshi == 0 || receipts.pending_zatoshi > 0 {
+            return Ok(None);
+        }
+        let fee_limit = max_fee_zatoshi
+            .unwrap_or(MAX_SWEEP_FEE_ZATOSHI)
+            .min(receipts.spendable_zatoshi - 1);
+        if fee_limit < u64::from(zip317::MINIMUM_FEE) {
+            return fail(
+                ErrorCode::ZcashWallet,
+                "the joint account does not cover a sweep's fee",
+            );
+        }
+        let home = keys::get_address_from_db(self.main_db, self.network, Some(self.account_uuid))
+            .map_err(wallet_error)?;
+        let swept = sweep_joint(
+            &joint_db,
+            self.lightwalletd_url,
+            self.network,
+            &joint_uuid,
+            send_flow_id,
+            &home,
+            fee_limit,
+            key,
+        )
+        .await?;
+        Ok(Some(SweptHome {
+            transaction: swept.transaction,
+            amount_zatoshi: swept.amount_zatoshi,
+            fee_zatoshi: Some(swept.fee_zatoshi),
+        }))
+    }
+
+    /// Sends a kept transaction once more.
+    async fn broadcast_kept(&self, transaction: &ZcashTransaction) -> Result<()> {
+        let raw = hex::decode(&transaction.raw).map_err(|_| {
+            PrivateUsdError::new(ErrorCode::StoreUnreadable, "a kept transaction is not hex")
+        })?;
+        sync::broadcast_raw(self.lightwalletd_url, &raw)
+            .await
+            .map_err(broadcast_failure)
+    }
+
+    /// Forgets `direction`'s swap `index`'s joint account once nothing more
+    /// can come from it.
+    fn forget_joint(&self, direction: Direction, index: u32) -> Result<()> {
+        let rows: Vec<JointAccountRow> = SwapStore::open(self.store_dir)?
+            .joint_accounts()?
+            .into_iter()
+            .filter(|row| {
+                row.account_uuid == self.account_uuid
+                    && row.direction == direction
+                    && row.swap_index == index
+            })
+            .collect();
+        for row in rows {
+            forget_joint_account(&self.joint_db(), self.network, &row.joint_uuid)?;
+            let mut store = SwapStore::open(self.store_dir)?;
+            with_operations(|| store.remove_joint_account(self.account_uuid, direction, index))?;
+        }
+        Ok(())
+    }
+}
+
+impl ForwardZcash for WalletZcash<'_> {
+    type Proposal = DepositProposal;
+
+    async fn chain_height(&self) -> Result<u64> {
+        self.tip().await
+    }
+
+    async fn synced(&self) -> Result<bool> {
+        let scanned = scanned_height(self.main_db, self.network)?;
+        let tip = self.tip().await?;
+        Ok(scanned.is_some_and(|scanned| u64::from(scanned) >= tip))
+    }
+
+    async fn deposit_fee(&self, address: &str, zatoshi: u64) -> Result<Option<u64>> {
+        sync::estimate_swap_deposit_fee(
+            self.main_db,
+            self.network,
+            self.account_uuid,
+            address,
+            zatoshi,
+        )
+        .map_err(wallet_error)
+    }
+
+    async fn propose_deposit(
+        &self,
+        index: u32,
+        address: &str,
+        zatoshi: u64,
+        max_total_zatoshi: u64,
+    ) -> Result<DepositProposal> {
+        let send_flow_id = format!("private-usd-deposit:{}:{index}", self.account_uuid);
+        let proposal = sync::propose_swap_deposit(
+            self.main_db,
+            self.network,
+            self.account_uuid,
+            &send_flow_id,
+            address,
+            zatoshi,
+            max_total_zatoshi,
+        )
+        .map_err(|error| match error {
+            SwapDepositError::Unpayable(message) => {
+                PrivateUsdError::new(ErrorCode::DepositUnpayable, message)
+            }
+            SwapDepositError::Wallet(message) => wallet_error(message),
+        })?;
+        let needs_sapling_params = proposal.needs_sapling_params;
+        let proposal = DepositProposal {
+            proposal_id: proposal.proposal_id,
+            send_flow_id,
+        };
+        // Spending Sapling notes needs the Sapling proving parameters, which
+        // Private USD does not download.
+        if needs_sapling_params {
+            self.discard_deposit(proposal);
+            return fail(
+                ErrorCode::DepositUnpayable,
+                "the deposit would spend Sapling funds, which Private USD cannot prove yet",
+            );
+        }
+        Ok(proposal)
+    }
+
+    async fn create_deposit(&self, proposal: DepositProposal) -> Result<ZcashTransaction> {
+        let created = sync::create_stored_proposal_transactions(
+            self.main_db,
+            self.lightwalletd_url,
+            proposal.proposal_id,
+            &proposal.send_flow_id,
+            self.keys.seed(),
+            None,
+            None,
+        )
+        .await
+        .map_err(wallet_error)?;
+        match created.as_slice() {
+            [deposit] => kept_transaction(deposit),
+            _ => fail(
+                ErrorCode::ZcashWallet,
+                "the deposit was not one transaction",
+            ),
+        }
+    }
+
+    fn discard_deposit(&self, proposal: DepositProposal) {
+        if sync::discard_proposal(proposal.proposal_id, &proposal.send_flow_id).is_err() {
+            log::warn!("private usd: releasing a deposit proposal failed");
+        }
+    }
+
+    async fn find_deposit(&self, address: &str) -> Result<Option<ZcashTransaction>> {
+        find_deposit(self.main_db, self.network, self.account_uuid, address)?
+            .as_ref()
+            .map(kept_transaction)
+            .transpose()
+    }
+
+    async fn deposit_status(&self, deposit: &ZcashTransaction) -> Result<SwapTxStatus> {
+        swap_tx_status(
+            self.main_db,
+            self.network,
+            &internal_txid(&deposit.tx_id)?,
+            expiry(deposit),
+        )
+    }
+
+    async fn broadcast(&self, transaction: &ZcashTransaction) -> Result<()> {
+        self.broadcast_kept(transaction).await
+    }
+
+    async fn prepare_sweep(
+        &self,
+        index: u32,
+        joint: &JointAccount,
+        key: &SpendKey,
+        birthday: u64,
+    ) -> Result<Option<ZcashTransaction>> {
+        let send_flow_id = format!("private-usd-sweep:{}:{index}", self.account_uuid);
+        self.sweep_home(
+            Direction::Forward,
+            index,
+            joint,
+            key,
+            birthday,
+            None,
+            &send_flow_id,
+        )
+        .await?
+        .map(|swept| kept_transaction(&swept.transaction))
+        .transpose()
+    }
+
+    async fn sweep_status(
+        &self,
+        index: u32,
+        joint: &JointAccount,
+        birthday: u64,
+        sweep: &ZcashTransaction,
+    ) -> Result<SwapTxStatus> {
+        self.joint_tx_status(Direction::Forward, index, joint, birthday, sweep)
+            .await
+    }
+
+    async fn forget_joint_account(&self, index: u32) -> Result<()> {
+        self.forget_joint(Direction::Forward, index)
+    }
+}
+
+impl ReverseZcash for WalletZcash<'_> {
+    async fn chain_height(&self) -> Result<u64> {
+        self.tip().await
+    }
+
+    async fn import_account(
+        &self,
+        index: u32,
+        joint: &JointAccount,
+        birthday: u64,
+    ) -> Result<JointAccountId> {
+        let joint_uuid = self.import_joint(Direction::Reverse, index, joint, birthday)?;
+        let uuid = uuid::Uuid::parse_str(&joint_uuid)
+            .map_err(|_| wallet_error("a joint account id is not a UUID"))?;
+        Ok(JointAccountId(uuid.into_bytes()))
+    }
+
+    async fn estimate_receive(
+        &self,
+        index: u32,
+        joint: &JointAccount,
+        birthday: u64,
+        confirmations: u32,
+    ) -> Result<ReverseReceiveEstimate> {
+        let joint_uuid = self
+            .synced_joint(Direction::Reverse, index, joint, birthday)
+            .await?;
+        let receipts = joint_receipts(&self.joint_db(), self.network, &joint_uuid, confirmations)?;
+        Ok(ReverseReceiveEstimate {
+            available_zat: receipts.confirmed_zatoshi,
+            fee_zat: sweep_fee_estimate(receipts.confirmed_notes),
+        })
+    }
+
+    async fn prepare_receive(
+        &self,
+        index: u32,
+        joint: &JointAccount,
+        key: &SpendKey,
+        birthday: u64,
+        max_fee_zatoshi: Option<u64>,
+    ) -> Result<Option<ReverseReceiveTransaction>> {
+        let send_flow_id = format!("private-usd-receive:{}:{index}", self.account_uuid);
+        let Some(swept) = self
+            .sweep_home(
+                Direction::Reverse,
+                index,
+                joint,
+                key,
+                birthday,
+                max_fee_zatoshi,
+                &send_flow_id,
+            )
+            .await?
+        else {
+            return Ok(None);
+        };
+        let kept = kept_transaction(&swept.transaction)?;
+        Ok(Some(ReverseReceiveTransaction {
+            tx_id: kept.tx_id,
+            raw: kept.raw,
+            expiry_height: kept.expiry_height,
+            received_zat: swept.amount_zatoshi,
+            fee_zat: swept.fee_zatoshi.unwrap_or_default(),
+        }))
+    }
+
+    async fn receive_status(
+        &self,
+        index: u32,
+        joint: &JointAccount,
+        birthday: u64,
+        receive: &ZcashTransaction,
+    ) -> Result<SwapTxStatus> {
+        self.joint_tx_status(Direction::Reverse, index, joint, birthday, receive)
+            .await
+    }
+
+    async fn broadcast(&self, transaction: &ZcashTransaction) -> Result<()> {
+        self.broadcast_kept(transaction).await
+    }
+
+    async fn forget(&self, index: u32) -> Result<()> {
+        self.forget_joint(Direction::Reverse, index)
+    }
+}
+
+/// ZIP 317's fee for sweeping `notes` notes home in one transaction, the
+/// least charge included: an action a note, and one for the output.
+fn sweep_fee_estimate(notes: u32) -> u64 {
+    let actions = u64::from(notes) + 1;
+    u64::from(zip317::MARGINAL_FEE) * actions.max(zip317::GRACE_ACTIONS as u64)
+}
+
+/// `joint.db` in a wallet's Private USD directory.
+pub(crate) fn joint_db_path(store_dir: &Path) -> String {
+    store_dir.join(JOINT_DB_FILE).to_string_lossy().into_owned()
+}
+
+/// A created transaction as a record keeps it: its id in display order, its
+/// bytes in hex.
+pub(crate) fn kept_transaction(created: &CreatedTransaction) -> Result<ZcashTransaction> {
+    let tx_id = ZcashTxId::parse(&created.txid.to_string())
+        .ok_or_else(|| wallet_error("a created transaction has no id"))?;
+    Ok(ZcashTransaction {
+        tx_id,
+        raw: hex::encode(&created.raw),
+        expiry_height: u64::from(created.expiry_height),
+    })
+}
+
+/// A kept transaction's expiry height, as the wallet DB compares it.
+pub(crate) fn expiry(transaction: &ZcashTransaction) -> u32 {
+    u32::try_from(transaction.expiry_height).unwrap_or(u32::MAX)
+}
+
+/// A record's transaction id (display order) as the wallet DB stores it:
+/// internal byte order.
+pub(crate) fn internal_txid(tx_id: &ZcashTxId) -> Result<TxId> {
+    let mut bytes = [0u8; 32];
+    hex::decode_to_slice(tx_id.as_str(), &mut bytes).map_err(|_| {
+        PrivateUsdError::new(
+            ErrorCode::StoreUnreadable,
+            "a kept transaction id is not hex",
+        )
+    })?;
+    bytes.reverse();
+    Ok(TxId::from_bytes(bytes))
 }

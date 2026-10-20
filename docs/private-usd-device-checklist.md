@@ -44,7 +44,10 @@ strategy, M8). Progress and deviations: `docs/private-usd-progress.md`.
 ## Automated rounds (testnet and Sepolia)
 
 Run them in this order. Each command starts with
-`ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh`.
+`ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh`
+(`--help` lists every option and its default). After the first, every round
+spends what an earlier round left in the wallet: none resets it, and each
+keeps the Railgun page storage and skips the release-build check.
 
 1. **M3: the wallet, balance, Tor and lock.** No flags. It resets this
    build's testnet wallet and creates a new one (passcode `111111`; the
@@ -85,6 +88,9 @@ phase. Do not repeat already completed payments only to reach the next phase.
 
 To run steps 3 and 4 as one command:
 `--m5 --m6 --m7 --m7-to 0x… --m8-route --keyed-rpc <json>`.
+
+The deposits round, `--deposits`, runs after an M5 round left private tUSD in
+the wallet, or together with `--m5`, after it.
 
 A round that died part-way leaves Tor off at the next start. The M5 and M8
 forward phases follow a forward conversion that is already under way. The

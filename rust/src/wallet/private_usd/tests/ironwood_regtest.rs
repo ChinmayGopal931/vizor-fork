@@ -1,17 +1,16 @@
 //! A joint account's round trip on the Dockerized Ironwood regtest stack
-//! (`scripts/ironwood-regtest`), plan M2 task 7. The test resets the chain and
-//! starts the stack itself. Run it only with the owner's go-ahead:
+//! (`scripts/ironwood-regtest`). The test resets the chain and starts the
+//! stack itself. Run it only with the owner's go-ahead:
 //!
 //! ```text
 //! cd rust && cargo test --lib private_usd::tests::ironwood_regtest -- --ignored --nocapture --test-threads=1
 //! ```
 //!
-//! It settles plan §11 U4–U9 on the real stack: the signer accepts the PCZT's
-//! lock-owner field (U4), the compact signatures are exactly the joint spend's
-//! (U5), a joint DB born above the tip syncs (U6), resubmission runs on a
-//! joint DB (U7), the primary store path records an OVK-less sweep as sent
-//! (U8), and PCZT creation works for a spending account without derivation
-//! (U9).
+//! It checks on the real stack that the signer accepts the PCZT's lock-owner
+//! field, the compact signatures are exactly the joint spend's, a joint DB
+//! born above the tip syncs, resubmission runs on a joint DB, the primary
+//! store path records an OVK-less sweep as sent, and PCZT creation works for
+//! a spending account without derivation.
 //!
 //! In test builds the regtest NU6.3 height is per thread, so every wallet call
 //! stays on this thread: async calls run on a current-thread runtime.
@@ -40,7 +39,7 @@ const NETWORK: WalletNetwork = WalletNetwork::Regtest;
 const FUNDER_MNEMONIC: &str = "winter shiver fetch refuse absurd mail pistol eight market lounge manual roast miracle ethics found child scare curve congress renew salute pig better used";
 const DEPOSIT_ZATOSHI: u64 = 50_000_000;
 const MAX_DEPOSIT_FEE_ZATOSHI: u64 = 100_000;
-/// zecSwap's sweep cap: 64 ZIP 317 marginal fees.
+/// The sweep cap: 64 ZIP 317 marginal fees.
 const MAX_SWEEP_FEE_ZATOSHI: u64 = 320_000;
 const SWEEP_CONFIRMATIONS: u32 = 2;
 const ORDINARY_UNTRUSTED_CONFIRMATIONS: u32 = 6;
@@ -79,7 +78,7 @@ fn joint_account_round_trip(deposit_before_activation: bool) {
         .expect("runtime");
     let lwd = lightwalletd_url();
 
-    // 1. The joint key, from the reference §5.5 seed and maker root.
+    // 1. The joint key, from the vector seed and maker root.
     let user = derive_user_keys(&[7; 64], NetworkType::Regtest, 0, 0).expect("user keys");
     let maker = derive_maker_share(&[9; 32], 0).expect("maker share");
     let joint = JointAccount::derive(&maker.public(), &user.share.public(), &user.viewing)
@@ -101,7 +100,7 @@ fn joint_account_round_trip(deposit_before_activation: bool) {
     mine(ORDINARY_UNTRUSTED_CONFIRMATIONS);
     runtime.block_on(scan(&funder.db));
 
-    // 3. Import at the exact birthday, above the tip: nothing to scan yet.
+    // 2. Import at the exact birthday, above the tip: nothing to scan yet.
     let joint_dir = tempfile::tempdir().expect("joint tempdir");
     let joint_db = path_string(&joint_dir.path().join("joint.db"));
     let birthday = u32::try_from(latest_height() + 1).expect("height");
@@ -115,9 +114,9 @@ fn joint_account_round_trip(deposit_before_activation: bool) {
     );
     runtime
         .block_on(sync_joint(&joint_db))
-        .expect("a joint DB born above the tip syncs (U6)");
+        .expect("a joint DB born above the tip syncs");
 
-    // 2. Deposit through the split: propose, create and store, find, send.
+    // 3. Deposit through the split: propose, create and store, find, send.
     let deposit = sync::propose_swap_deposit(
         &funder.db,
         NETWORK,
@@ -156,7 +155,7 @@ fn joint_account_round_trip(deposit_before_activation: bool) {
         .block_on(sync::broadcast_raw(&lwd, &deposit_tx.raw))
         .expect("sending it again is harmless");
     // The same joint UA receives in Orchard before NU6.3, Ironwood after it.
-    // Both pools must record the recipient for `find_deposit` (U3).
+    // Both pools must record the recipient for `find_deposit`.
     let deposit_raw = Transaction::read(&deposit_tx.raw[..], BranchId::Nu6_3).expect("parse");
     if deposit_before_activation {
         assert!(deposit_raw.orchard_bundle().is_some());
@@ -220,9 +219,9 @@ fn joint_account_round_trip(deposit_before_activation: bool) {
         );
     }
 
-    // 6a. Broadcast before store: a sweep that cannot be sent stores nothing,
+    // 5. Broadcast before store: a sweep that cannot be sent stores nothing,
     // and its note stays spendable. Its PCZT carries the lock-owner field the
-    // signer must accept (U4) for a spending account without derivation (U9).
+    // signer must accept for a spending account without derivation.
     let attempt = sync::propose_joint_sweep(
         &joint_db,
         NETWORK,
@@ -240,7 +239,7 @@ fn joint_account_round_trip(deposit_before_activation: bool) {
             attempt.proposal_id,
             "dead-route",
         ))
-        .expect("create the sweep PCZT (U9)");
+        .expect("create the sweep PCZT");
     let attempt_txid = sync::txid_from_io_finalized_pczt(&base).expect("txid");
     let intent = SweepIntent::from_address(
         &funder.address,
@@ -250,14 +249,10 @@ fn joint_account_round_trip(deposit_before_activation: bool) {
     )
     .expect("intent");
     let signed = zecswap_core::sign_pczt_bytes(&base, std::slice::from_ref(&key), &intent)
-        .expect("sign with the combined key (U4)");
+        .expect("sign with the combined key");
     let signatures =
         sync::extract_required_compact_sigs_from_signed_pczt(&base, &signed).expect("signatures");
-    assert_eq!(
-        signatures.len(),
-        1,
-        "exactly the joint spend's signature (U5)"
-    );
+    assert_eq!(signatures.len(), 1, "exactly the joint spend's signature");
     let proofs = sync::add_proofs_to_pczt(&base, None, None).expect("prove");
     let refused = runtime
         .block_on(
@@ -289,7 +284,7 @@ fn joint_account_round_trip(deposit_before_activation: bool) {
         "the unsent sweep left its note spendable"
     );
 
-    // 5. Sweep home with the combined key, discarding the OVK.
+    // 6. Sweep home with the combined key, discarding the OVK.
     let sweep = runtime
         .block_on(joint::sweep_joint(
             &joint_db,
@@ -309,15 +304,15 @@ fn joint_account_round_trip(deposit_before_activation: bool) {
         sweep.message
     );
     assert_eq!(sweep.amount_zatoshi + sweep.fee_zatoshi, DEPOSIT_ZATOSHI);
-    // The primary store path records the sweep as sent without an OVK (U8).
+    // The primary store path records the sweep as sent without an OVK.
     assert_eq!(
         sent_output_pool(&joint_db, &sweep.transaction.txid, &funder.address),
         4
     );
-    // 6b. The maker's joint OVK cannot read where the sweep went.
+    // 7. The maker's joint OVK cannot read where the sweep went.
     assert_eq!(recovered_outputs(&sweep.transaction.raw, &joint_ovks), 0);
 
-    // The joint sync sends the pending sweep again (U7), then sees it mined.
+    // The joint sync sends the pending sweep again, then sees it mined.
     runtime
         .block_on(sync_joint(&joint_db))
         .expect("joint sync resubmits the sweep");

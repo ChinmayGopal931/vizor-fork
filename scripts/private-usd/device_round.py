@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host side of the Private USD device rounds (docs/private-usd-android-plan.md §10).
+"""Host side of the Private USD device rounds on Android.
 
 `scripts/private-usd/run_device_round.sh` drives it; every adb call goes to
 $ANDROID_SERIAL. Run it with `python3 -I`.
@@ -16,30 +16,30 @@ $ANDROID_SERIAL. Run it with `python3 -I`.
   summarize --out DIR           Digest of a round's evidence.
   keyed-rpc-check --file F [--require sepolia|mainnet]
                                 Checks a --dart-define-from-file JSON with the
-                                keyed Ethereum RPC URLs (E6): https, on a host
-                                the app accepts, with a key in its path or
-                                query. Prints the hosts only.
+                                keyed Ethereum RPC URLs: https, on a host the
+                                app accepts, with a key in its path or query.
+                                Prints the hosts only.
   keyed-rpc-scan --file F --out DIR (--app-files | --logs)
-                                The M8.3 check: `--app-files` reads the app's
-                                Private USD files (swaps.db with its WAL,
-                                joint.db, the token state) and shared_prefs
-                                with `run-as` (debug builds only) into memory;
-                                `--logs` reads every file in DIR (logcat,
-                                test and build logs, evidence). It looks for
-                                each keyed URL's host and path, and for its
-                                key, and writes keyed-rpc-scan-*.json. Exit 0
-                                clean, 1 found, 2 could not check. It never
-                                prints or writes the URL or the key, only
-                                labels such as "sepolia key".
+                                Checks that the keyed RPC never leaks:
+                                `--app-files` reads the app's Private USD
+                                files (swaps.db with its WAL, joint.db, the
+                                token state) and shared_prefs with `run-as`
+                                (debug builds only) into memory; `--logs`
+                                reads every file in DIR (logcat, test and
+                                build logs, evidence). It looks for each keyed
+                                URL's host and path, and for its key, and
+                                writes keyed-rpc-scan-*.json. Exit 0 clean,
+                                1 found, 2 could not check. It never prints or
+                                writes the URL or the key, only labels such as
+                                "sepolia key".
 
-The M5, M6, M7 and M8 route rounds (`run_device_round.sh --m5`, `--m6`,
-`--m7`, `--m8-route`) use the same `serve` endpoints: their events (`m5-*`,
-`m6-*`, `m7-*`, `m8-*`: the swap
-index, phases, outcomes and timings, never txids, addresses or secrets) and
-screenshots land in the same evidence directory, and `summarize` lists them
-with the rest. The M7 round also asks `serve` for a public ERC-20 balance
-(`/erc20-balance`, over the deployment's keyless RPC) to see its withdrawal
-arrive.
+The conversion, send, deposit and route rounds (`run_device_round.sh --m5`,
+`--m6`, `--m7`, `--deposits`, `--m8-route`) use the same `serve` endpoints:
+their events (the swap index, phases, outcomes and timings, never txids,
+addresses or secrets) and screenshots land in the same evidence directory, and
+`summarize` lists them with the rest. The send round also asks `serve` for a
+public ERC-20 balance (`/erc20-balance`, over the deployment's keyless RPC) to
+see its withdrawal arrive.
 
 A checkpoint reports, for the app UID: whether a WebView renderer runs for
 the app (the isolated `…:sandboxed_process…` process tagged with the app's
@@ -56,14 +56,14 @@ import re
 import shlex
 import subprocess
 import sys
-import threading
 import time
 import urllib.parse
-import urllib.request
 import xml.etree.ElementTree as ElementTree
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+from device_round_lib import CHECKS, append_jsonl, now, proc_net_address, serve, summary_line  # noqa: E402
+
 PACKAGE = "com.keplr.vizor"
 ACTIVITY = f"{PACKAGE}/.MainActivity"
 ADB = os.path.join(os.environ.get("ANDROID_HOME", os.path.expanduser("~/Library/Android/sdk")), "platform-tools", "adb")
@@ -80,10 +80,6 @@ CRASH_PATTERNS = [
     "ANR in com.keplr.vizor",
 ]
 MONTHS = {m: i for i, m in enumerate(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
-
-
-def now():
-    return datetime.datetime.now().strftime("%H:%M:%S")
 
 
 def adb(*args, binary=False, timeout=120):
@@ -123,21 +119,6 @@ def renderers(package=PACKAGE):
     return {"running": bool(mine), "pids": [r["pid"] for r in mine], "host_tag": tag, "all": every}
 
 
-def decode(hex_addr):
-    import ipaddress
-
-    addr, port = hex_addr.split(":")
-    raw = bytes.fromhex(addr)
-    if len(raw) == 4:
-        ip = ipaddress.IPv4Address(raw[::-1])
-    else:
-        words = [raw[i:i + 4][::-1] for i in range(0, 16, 4)]
-        ip = ipaddress.IPv6Address(b"".join(words))
-        if ip.ipv4_mapped:
-            ip = ip.ipv4_mapped
-    return ip, int(port, 16)
-
-
 def listeners(package=PACKAGE, vm_service_port=None):
     """The app UID's LISTEN (state 0A) rows. The Dart VM service of a debug
     build listens on loopback too; it is labelled, not counted."""
@@ -151,7 +132,7 @@ def listeners(package=PACKAGE, vm_service_port=None):
             cols = line.split()
             if len(cols) < 8 or cols[7] != str(uid) or cols[3] != "0A":
                 continue
-            ip, port = decode(cols[1])
+            ip, port = proc_net_address(cols[1])
             label = "vm-service" if vm_service_port and port == vm_service_port else "other"
             rows.append({"table": table.rsplit("/", 1)[1], "ip": str(ip), "port": port, "loopback": ip.is_loopback, "label": label})
     other = [r for r in rows if r["label"] == "other"]
@@ -206,106 +187,6 @@ def probe(checks, vm_service_port=None, onionoo=True):
     if "sockets" in checks:
         result["sockets"] = sockets(onionoo=onionoo)
     return result
-
-
-def erc20_balance(rpc, token, address):
-    """`balanceOf(address)` of the ERC-20 `token`, over JSON-RPC at `rpc`."""
-    if not re.fullmatch(r"0x[0-9a-fA-F]{40}", token) or not re.fullmatch(r"0x[0-9a-fA-F]{40}", address):
-        raise ValueError("token and address must be 0x addresses")
-    if not rpc.startswith("https://"):
-        raise ValueError("the RPC must be https")
-    data = "0x70a08231" + address[2:].lower().rjust(64, "0")
-    body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "eth_call", "params": [{"to": token, "data": data}, "latest"]}).encode()
-    request = urllib.request.Request(rpc, data=body, headers={"Content-Type": "application/json", "User-Agent": "vizor-device-round/1"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        answer = json.loads(response.read())
-    if "result" not in answer:
-        raise RuntimeError(f"eth_call failed: {answer.get('error')}")
-    return int(answer["result"], 16)
-
-
-def append_jsonl(path, record):
-    with open(path, "a") as f:
-        f.write(json.dumps(record) + "\n")
-
-
-# ── serve: the checkpoint driver ─────────────────────────────────────────
-
-
-def serve(port, out):
-    os.makedirs(out, exist_ok=True)
-    lock = threading.Lock()
-
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self, fmt, *args):
-            sys.stdout.write(f"{now()} driver {fmt % args}\n")
-            sys.stdout.flush()
-
-        def reply(self, payload, status=200):
-            body = json.dumps(payload).encode()
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def do_GET(self):
-            if self.path == "/health":
-                return self.reply({"ok": True})
-            self.reply({"error": "not found"}, 404)
-
-        def do_POST(self):
-            length = int(self.headers.get("Content-Length") or 0)
-            try:
-                request = json.loads(self.rfile.read(length) or b"{}")
-            except ValueError:
-                return self.reply({"error": "bad json"}, 400)
-            try:
-                if self.path == "/checkpoint":
-                    name = str(request.get("name", "unnamed"))
-                    checks = request.get("checks") or ["renderer", "listen", "mem", "sockets"]
-                    result = probe(checks, vm_service_port=request.get("vmServicePort"), onionoo=request.get("onionoo", True))
-                    result["name"] = name
-                    result["note"] = request.get("note")
-                    with lock:
-                        append_jsonl(os.path.join(out, "checkpoints.jsonl"), result)
-                    print(f"{now()} checkpoint {name}: {summary_line(result)}", flush=True)
-                    return self.reply(result)
-                if self.path == "/event":
-                    record = {"at": now(), **request}
-                    with lock:
-                        append_jsonl(os.path.join(out, "events.jsonl"), record)
-                    print(f"{now()} event {json.dumps(request)}", flush=True)
-                    return self.reply({"ok": True})
-                if self.path == "/erc20-balance":
-                    # The M7 round's withdrawal check: a public balance on
-                    # the deployment's keyless RPC, nothing secret.
-                    balance = erc20_balance(str(request["rpc"]), str(request["token"]), str(request["address"]))
-                    return self.reply({"balance": str(balance)})
-                if self.path == "/screenshot":
-                    name = re.sub(r"[^A-Za-z0-9_.-]", "_", str(request.get("name", "shot")))
-                    size = screenshot(os.path.join(out, f"{name}.png"))
-                    return self.reply({"ok": True, "bytes": size})
-            except Exception as error:  # Report it to the test rather than hang it.
-                return self.reply({"error": f"{type(error).__name__}: {error}"}, 500)
-            self.reply({"error": "not found"}, 404)
-
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print(f"{now()} driver listening on 127.0.0.1:{port}, evidence in {out}", flush=True)
-    server.serve_forever()
-
-
-def summary_line(result):
-    parts = []
-    if "renderer" in result:
-        parts.append(f"renderer={'pid ' + ','.join(map(str, result['renderer']['pids'])) if result['renderer']['running'] else 'none'}")
-    if "listen" in result:
-        parts.append(f"listen_other={result['listen']['other_ports']} rows={result['listen']['count']}")
-    if "mem" in result:
-        parts.append(f"app_pss_kb={result['mem']['app_pss_kb']} renderer_pss_kb={result['mem']['renderer_pss_kb']}")
-    if "sockets" in result:
-        parts.append(f"sockets={result['sockets']['counts']}")
-    return " ".join(parts)
 
 
 # ── release-check: drive an installed build from the host ────────────────
@@ -520,10 +401,10 @@ def summarize(out):
     print(json.dumps(digest, indent=2))
 
 
-# ── keyed-rpc-check / keyed-rpc-scan: the keyed RPC never leaks (M8.3) ──
+# ── keyed-rpc-check / keyed-rpc-scan: the keyed RPC never leaks ──────────
 
-# The defines and the hosts the app accepts for each (reference §7.3;
-# `privateUsdKeyedRpcUrl` drops any other host).
+# The defines and the hosts the app accepts for each
+# (`privateUsdKeyedRpcUrl` drops any other host).
 KEYED_RPC_DEFINES = {
     "sepolia": ("VIZOR_ETHEREUM_RPC_URL_SEPOLIA", {"eth-sepolia.g.alchemy.com", "sepolia.infura.io"}),
     "mainnet": ("VIZOR_ETHEREUM_RPC_URL_MAINNET", {"eth-mainnet.g.alchemy.com", "mainnet.infura.io"}),
@@ -693,11 +574,11 @@ def main():
     if not local and not os.environ.get("ANDROID_SERIAL"):
         sys.exit("set ANDROID_SERIAL")
     if args.command == "serve":
-        serve(args.port, args.out)
+        serve(args.port, args.out, probe, screenshot)
     elif args.command == "release-check":
         sys.exit(release_check(args.out, args.passcode, args.timeout))
     elif args.command == "probe":
-        print(json.dumps(probe(["renderer", "listen", "mem", "sockets"], onionoo=args.onionoo), indent=2))
+        print(json.dumps(probe(CHECKS, onionoo=args.onionoo), indent=2))
     elif args.command == "summarize":
         summarize(args.out)
     elif args.command == "keyed-rpc-check":

@@ -4,8 +4,8 @@ import 'package:flutter/widgets.dart';
 
 import '../../theme/app_theme.dart';
 
-/// The neon redesign's wordmark: VEYLOR in straight strokes and 45° cuts,
-/// drawn as a lit tube, or as plain lines where it sits quietly in a footer.
+/// The wordmark: VEYLOR in straight strokes and 45° cuts, drawn as a lit
+/// tube, or as plain lines where it sits quietly in a footer.
 class VeylorWordmarkPainter extends CustomPainter {
   VeylorWordmarkPainter({
     required this.glow,
@@ -122,15 +122,7 @@ class VeylorWordmarkPainter extends CustomPainter {
       );
       return;
     }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = width
-        ..strokeJoin = StrokeJoin.miter
-        ..strokeCap = StrokeCap.square
-        ..color = glow,
-    );
+    Neon.strokeUnlit(canvas, path, color: glow, width: width);
   }
 
   @override

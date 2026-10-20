@@ -1,7 +1,7 @@
 import Flutter
 import Foundation
 
-/// Why a Railgun page call failed. Each kind is one of the channel's error codes (Android reference §6.2), so Dart
+/// Why a Railgun page call failed. Each kind is one of the channel's error codes, the same as Android's, so Dart
 /// treats both hosts alike. A `failed` message is the engine's own text and can quote a keyed RPC URL: it goes to
 /// Dart, which redacts it before anything prints it, and is never logged here.
 enum RailgunError: Error, Equatable {
@@ -18,11 +18,11 @@ enum RailgunError: Error, Equatable {
 
   var code: String {
     switch self {
-    case .disconnected: return "CLOSED"
-    case .timeout: return "TIMEOUT"
-    case .unavailable: return "UNAVAILABLE"
-    case .protocol: return "PROTOCOL"
-    case .failed: return "FAILED"
+    case .disconnected: return "closed"
+    case .timeout: return "timeout"
+    case .unavailable: return "unavailable"
+    case .protocol: return "protocol"
+    case .failed: return "failed"
     }
   }
 

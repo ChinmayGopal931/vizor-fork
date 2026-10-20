@@ -1,7 +1,7 @@
 import '../../../rust/api/private_usd.dart' as rust;
 
 /// An offer the wallet can pay now: the maker's quote for [requestedUnits],
-/// its deposit, and the network fee on it (zapp `ZecQuote`).
+/// its deposit, and the network fee on it.
 class PrivateUsdZecQuote {
   const PrivateUsdZecQuote({required this.quote, required this.requestedUnits});
 
@@ -42,8 +42,7 @@ class PrivateUsdNoQuoteFitsException implements Exception {
   String toString() => 'No quote fits the entered ZEC amount.';
 }
 
-/// Finds the dearest quote whose deposit and network fee fit a ZEC total
-/// (plan reference §9.1 rule 3; zapp `PrivateUsdZecQuotes`).
+/// Finds the dearest quote whose deposit and network fee fit a ZEC total.
 ///
 /// Every quote spends a swap index, so the latest quote prices the next
 /// while it holds, and an amount usually takes one: a search makes at most

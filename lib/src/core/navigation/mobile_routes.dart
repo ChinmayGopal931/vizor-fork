@@ -353,9 +353,9 @@ List<RouteBase> buildMobileRoutes({required List<RouteBase> entryRoutes}) {
         ),
       ),
     ),
-    // Private USD (plan reference §9.2). The shared redirect sends it home
-    // while Private USD is unavailable, except a conversion's progress while
-    // that conversion is unfinished (D16).
+    // Private USD. The shared redirect sends these routes home while Private
+    // USD is unavailable, except a conversion's progress while that
+    // conversion is unfinished.
     GoRoute(
       path: '/private-usd',
       pageBuilder: (context, state) => CupertinoPage(
@@ -375,8 +375,8 @@ List<RouteBase> buildMobileRoutes({required List<RouteBase> entryRoutes}) {
         ),
       ),
     ),
-    // Send and Withdraw (M7, reference §9.2, §9.4 S8): one screen per mode,
-    // its review, and the status while it proves and posts.
+    // Send and Withdraw: one screen per mode, its review, and the status
+    // while it proves and posts.
     GoRoute(
       path: '/private-usd/send',
       pageBuilder: (context, state) => CupertinoPage(

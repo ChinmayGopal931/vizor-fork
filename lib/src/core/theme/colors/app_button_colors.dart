@@ -3,7 +3,7 @@ import 'package:flutter/painting.dart';
 import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
 
-const _neon = kAppFormFactor == AppFormFactor.mobile;
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Button colors grouped by variant.
 ///
@@ -24,9 +24,8 @@ class AppButtonColors {
   final AppDisabledButtonColors disabled;
   final AppDestructiveButtonColors destructive;
 
-  /// Figma faces on desktop, the neon redesign on mobile builds.
-  static const dark = _neon ? neonDark : figmaDark;
-  static const light = _neon ? neonLight : figmaLight;
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
 
   static const figmaDark = AppButtonColors(
     primary: AppPrimaryButtonColors.figmaDark,
@@ -82,9 +81,8 @@ class AppPrimaryButtonColors {
   final Color label;
   final Color labelHover;
 
-  /// Figma faces on desktop, the neon redesign on mobile builds.
-  static const dark = _neon ? neonDark : figmaDark;
-  static const light = _neon ? neonLight : figmaLight;
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
 
   static const figmaDark = AppPrimaryButtonColors(
     bg: Primitives.p800Dark,
@@ -146,9 +144,8 @@ class AppSecondaryButtonColors {
   final Color bgPressed;
   final Color label;
 
-  /// Figma faces on desktop, the neon redesign on mobile builds.
-  static const dark = _neon ? neonDark : figmaDark;
-  static const light = _neon ? neonLight : figmaLight;
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
 
   static const figmaDark = AppSecondaryButtonColors(
     bg: Primitives.p150Dark,
@@ -195,9 +192,8 @@ class AppGhostButtonColors {
   final Color border;
   final Color label;
 
-  /// Figma faces on desktop, the neon redesign on mobile builds.
-  static const dark = _neon ? neonDark : figmaDark;
-  static const light = _neon ? neonLight : figmaLight;
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
 
   static const figmaDark = AppGhostButtonColors(
     bg: Primitives.p0Dark,
@@ -237,9 +233,8 @@ class AppDisabledButtonColors {
   final Color bg;
   final Color label;
 
-  /// Figma faces on desktop, the neon redesign on mobile builds.
-  static const dark = _neon ? neonDark : figmaDark;
-  static const light = _neon ? neonLight : figmaLight;
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
 
   static const figmaDark = AppDisabledButtonColors(
     bg: Primitives.p300Alpha20Dark,
@@ -281,9 +276,8 @@ class AppDestructiveButtonColors {
   final Color borderPressed;
   final Color label;
 
-  /// Figma faces on desktop, the neon redesign on mobile builds.
-  static const dark = _neon ? neonDark : figmaDark;
-  static const light = _neon ? neonLight : figmaLight;
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
 
   static const figmaDark = AppDestructiveButtonColors(
     bg: PlumPrimitives.p200Dark,

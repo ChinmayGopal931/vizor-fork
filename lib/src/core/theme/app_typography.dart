@@ -49,6 +49,9 @@ library;
 import 'package:flutter/widgets.dart';
 
 import '../layout/app_form_factor.dart';
+import 'gotham_fonts.dart' show kGothamFamily;
+
+export 'gotham_fonts.dart' show kGothamFamily;
 
 // ─── Mode-invariant styles (identical in both Figma modes) ───────────
 
@@ -67,7 +70,7 @@ const _youngSerifFigures = [FontFeature.liningFigures()];
 /// serif migration and still said Libre Caslon; the live desktop screen
 /// frames use Young Serif.
 const _headlineLDesktop = TextStyle(
-  fontFamily: 'Gotham',
+  fontFamily: kGothamFamily,
   fontWeight: FontWeight.w400,
   fontSize: 32,
   height: 33 / 32,
@@ -77,7 +80,7 @@ const _headlineLDesktop = TextStyle(
 
 /// Figma desktop `Headline M` — Young Serif, 28 / 30 px, −0.28.
 const _headlineMDesktop = TextStyle(
-  fontFamily: 'Gotham',
+  fontFamily: kGothamFamily,
   fontWeight: FontWeight.w400,
   fontSize: 28,
   height: 30 / 28,
@@ -92,16 +95,12 @@ const _headlineMDesktop = TextStyle(
 /// headline scale with Young Serif. Keep the app token aligned with the
 /// screen frames until the design file and variable export agree.
 ///
-/// **Deviation from Figma: 28 px, not 32.** Gotham Book is 21% wider than
-/// Young Serif at the same size, while its x-height is 17% larger (0.517 em
-/// against 0.440 em). At 32 px the 281 px title slot of the mobile top nav
-/// ellipsized "Coinholder voting", "Secret Passphrase" and "Review
-/// withdrawal", and "Review conversion" (299 px) did not fit. 28 px keeps
-/// Young Serif's x-height (14.5 px against 14.1 px) and fits every one of
-/// them ("Review conversion" takes 262 px). The 33 px line box is unchanged,
-/// so vertical rhythm and the nav height hold. Desktop keeps 32 px.
+/// **Deviation from Figma: 28 px, not 32.** Gotham sets wider than Young
+/// Serif and its x-height is 17% larger (0.517 em against 0.440 em), so
+/// 28 px keeps Young Serif's x-height (14.5 px against 14.1 px). The 33 px
+/// line box is unchanged, so vertical rhythm holds. Desktop keeps 32 px.
 const _headlineLMobile = TextStyle(
-  fontFamily: 'Gotham',
+  fontFamily: kGothamFamily,
   fontWeight: FontWeight.w100,
   fontSize: 28,
   height: 33 / 28,
@@ -115,7 +114,7 @@ const _headlineLMobile = TextStyle(
 /// [_headlineLMobile] for the same reason, so Headline M stays one step below
 /// Headline L (28 / 24 px, as 32 / 28 px was). The 30 px line box is unchanged.
 const _headlineMMobile = TextStyle(
-  fontFamily: 'Gotham',
+  fontFamily: kGothamFamily,
   fontWeight: FontWeight.w100,
   fontSize: 24,
   height: 30 / 24,
@@ -125,17 +124,17 @@ const _headlineMMobile = TextStyle(
 
 /// Figma `Code M` — Geist Mono Medium, 14 / 21 px.
 const _codeMDesktop = TextStyle(
-  fontFamily: 'Gotham',
+  fontFamily: kGothamFamily,
   fontWeight: FontWeight.w500,
   fontSize: 14,
   height: 21 / 14,
   letterSpacing: 0,
 );
 
-/// Figma `Code M`, Mobile mode — Geist Mono Medium, 16 / 21 px. Light on
-/// mobile, with the rest of Veylor's type.
+/// Figma `Code M`, Mobile mode — Geist Mono Medium, 16 / 21 px, set in
+/// Light like the rest of the mobile type.
 const _codeMMobile = TextStyle(
-  fontFamily: 'Gotham',
+  fontFamily: kGothamFamily,
   fontWeight: FontWeight.w300,
   fontSize: 16,
   height: 21 / 16,
@@ -144,7 +143,7 @@ const _codeMMobile = TextStyle(
 
 /// Figma `Code S` — Geist Mono Medium, 13 / 17 px.
 const _codeS = TextStyle(
-  fontFamily: 'Gotham',
+  fontFamily: kGothamFamily,
   fontWeight: FontWeight.w500,
   fontSize: 13,
   height: 17 / 13,
@@ -153,7 +152,7 @@ const _codeS = TextStyle(
 
 /// Figma `Code S`, Mobile mode — the [_codeS] metrics in Light.
 const _codeSMobile = TextStyle(
-  fontFamily: 'Gotham',
+  fontFamily: kGothamFamily,
   fontWeight: FontWeight.w300,
   fontSize: 13,
   height: 17 / 13,
@@ -164,7 +163,7 @@ const _codeSMobile = TextStyle(
 abstract final class AppTypographyDesktop {
   /// Figma `Headline XL` — 45 / 48 px, letter-spacing −1.35.
   static const displayLarge = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w400,
     fontFeatures: _youngSerifCaseFigures,
     fontSize: 45,
@@ -179,7 +178,7 @@ abstract final class AppTypographyDesktop {
 
   /// Figma `Headline S` — Geist Medium, 16 / 20 px.
   static const headlineSmall = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w500,
     fontSize: 16,
     height: 20 / 16,
@@ -188,7 +187,7 @@ abstract final class AppTypographyDesktop {
 
   /// Figma `Body L` — Geist Medium, 16 / 24 px, −0.24.
   static const bodyLarge = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w500,
     fontSize: 16,
     height: 24 / 16,
@@ -197,7 +196,7 @@ abstract final class AppTypographyDesktop {
 
   /// Figma `Body M` — Geist Regular, 14 / 21 px, −0.21.
   static const bodyMedium = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w400,
     fontSize: 14,
     height: 21 / 14,
@@ -206,7 +205,7 @@ abstract final class AppTypographyDesktop {
 
   /// Figma `Body M Medium` — Geist Medium, 14 / 21 px, −0.21.
   static const bodyMediumStrong = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w500,
     fontSize: 14,
     height: 21 / 14,
@@ -215,7 +214,7 @@ abstract final class AppTypographyDesktop {
 
   /// Figma `Body S` — Geist Regular, 12 / 18 px, −0.12.
   static const bodySmall = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w400,
     fontSize: 12,
     height: 18 / 12,
@@ -224,7 +223,7 @@ abstract final class AppTypographyDesktop {
 
   /// Figma `Body XS` — Geist Regular, 11 / 16 px, −0.055.
   static const bodyExtraSmall = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w400,
     fontSize: 11,
     height: 16 / 11,
@@ -233,7 +232,7 @@ abstract final class AppTypographyDesktop {
 
   /// Figma `Label M` — Geist Medium, 14 / 16 px, −0.06.
   static const labelLarge = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w500,
     fontSize: 14,
     height: 16 / 14,
@@ -242,7 +241,7 @@ abstract final class AppTypographyDesktop {
 
   /// Figma `Label S` — Geist Medium, 13 / 14 px.
   static const labelMedium = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w500,
     fontSize: 13,
     height: 14 / 13,
@@ -260,14 +259,14 @@ abstract final class AppTypographyDesktop {
 /// export. The display headline scale intentionally follows the actual
 /// mobile screen frames, which still use Young Serif.
 abstract final class AppTypographyMobile {
-  // Veylor's neon redesign sets the mobile weights lighter than Figma, to
-  // read thin and futuristic: Thin (100) for headlines and display numerals,
-  // Light (300) for everything else. No mobile style is Book (400) or
-  // heavier; emphasis comes from colour and size, not weight.
+  // The mobile weights are lighter than Figma's: Thin (100) for headlines
+  // and display numerals, Light (300) for everything else. No mobile style
+  // is Book (400) or heavier; emphasis comes from colour and size, not
+  // weight.
 
   /// Figma mobile app `Headline XL` — Young Serif, 40 / 40 px, −1.35.
   static const displayLarge = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w100,
     fontSize: 40,
     height: 40 / 40,
@@ -282,7 +281,7 @@ abstract final class AppTypographyMobile {
 
   /// Figma `Headline S` — Geist Medium, 18 / 22 px.
   static const headlineSmall = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w300,
     fontSize: 18,
     height: 22 / 18,
@@ -291,7 +290,7 @@ abstract final class AppTypographyMobile {
 
   /// Figma `Body L` — Geist Medium, 18 / 26 px, −0.24.
   static const bodyLarge = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w300,
     fontSize: 18,
     height: 26 / 18,
@@ -300,7 +299,7 @@ abstract final class AppTypographyMobile {
 
   /// Figma `Body M` — Geist Regular, 16 / 25 px, −0.21.
   static const bodyMedium = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w300,
     fontSize: 16,
     height: 25 / 16,
@@ -310,7 +309,7 @@ abstract final class AppTypographyMobile {
   /// Figma `Body M Medium` — Geist Medium, 16 / 25 px, −0.21. Light like
   /// [bodyMedium]: the mobile type has no heavier weight to emphasise with.
   static const bodyMediumStrong = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w300,
     fontSize: 16,
     height: 25 / 16,
@@ -319,7 +318,7 @@ abstract final class AppTypographyMobile {
 
   /// Figma `Body S` — Geist Regular, 14 / 20 px, −0.12.
   static const bodySmall = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w300,
     fontSize: 14,
     height: 20 / 14,
@@ -328,7 +327,7 @@ abstract final class AppTypographyMobile {
 
   /// Figma `Body XS` — Geist Regular, 13 / 18 px, −0.055.
   static const bodyExtraSmall = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w300,
     fontSize: 13,
     height: 18 / 13,
@@ -337,7 +336,7 @@ abstract final class AppTypographyMobile {
 
   /// Figma `Label M` — Geist Medium, 16 / 17 px, −0.06.
   static const labelLarge = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w300,
     fontSize: 16,
     height: 17 / 16,
@@ -346,7 +345,7 @@ abstract final class AppTypographyMobile {
 
   /// Figma `Label S` — Geist Medium, 14 / 15 px.
   static const labelMedium = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w300,
     fontSize: 14,
     height: 15 / 14,
@@ -461,27 +460,70 @@ abstract final class AppTypography {
       : AppTypographyDesktop.codeSmall;
 }
 
-/// Weights for the one-off emphasis overrides in widgets both form factors
-/// draw, as in `AppTypography.bodyMedium.copyWith(fontWeight:
-/// AppFontWeight.medium)`.
+/// The Desktop weights: the Figma weight each [AppFontWeight] names.
+abstract final class AppFontWeightDesktop {
+  static const regular = FontWeight.w400;
+  static const medium = FontWeight.w500;
+
+  /// Drawn as Gotham Bold: Gotham has no SemiBold.
+  static const semiBold = FontWeight.w600;
+  static const bold = FontWeight.w700;
+
+  /// Drawn as Gotham Black.
+  static const extraBold = FontWeight.w800;
+
+  /// Medium: the Figma weight of the Body L and Headline S tokens that
+  /// sheet titles and a state's statement are set in.
+  static const heading = FontWeight.w500;
+}
+
+/// The Mobile weights: nothing heavier than Light, so every emphasis weight
+/// is Light, and headings are Thin.
+abstract final class AppFontWeightMobile {
+  static const regular = FontWeight.w300;
+  static const medium = FontWeight.w300;
+  static const semiBold = FontWeight.w300;
+  static const bold = FontWeight.w300;
+  static const extraBold = FontWeight.w300;
+  static const heading = FontWeight.w100;
+}
+
+/// Weights for one-off overrides of a token's weight, as in
+/// `AppTypography.bodyMedium.copyWith(fontWeight: AppFontWeight.medium)`,
+/// for the form factor this binary was built for.
 ///
-/// Desktop gets the Figma weight each one names. Veylor's mobile type has
-/// nothing heavier than Light, so on mobile every one of them is Light
-/// (`w300`). Mobile-only code needs none of these: it leaves the token's
-/// weight alone.
+/// The emphasis weights keep the Figma weight they name on desktop and are
+/// Light on mobile, so mobile-only code needs none of them. [heading] is the
+/// one mobile code uses: it sets a sheet title or a state's statement in
+/// Thin, as the screen titles are, over a token that is Light on mobile.
 abstract final class AppFontWeight {
   /// Regular (`w400`) on desktop.
-  static const regular = _mobile ? FontWeight.w300 : FontWeight.w400;
+  static const regular = _mobile
+      ? AppFontWeightMobile.regular
+      : AppFontWeightDesktop.regular;
 
   /// Medium (`w500`) on desktop.
-  static const medium = _mobile ? FontWeight.w300 : FontWeight.w500;
+  static const medium = _mobile
+      ? AppFontWeightMobile.medium
+      : AppFontWeightDesktop.medium;
 
-  /// SemiBold (`w600`, drawn as Gotham Bold) on desktop.
-  static const semiBold = _mobile ? FontWeight.w300 : FontWeight.w600;
+  /// SemiBold (`w600`) on desktop.
+  static const semiBold = _mobile
+      ? AppFontWeightMobile.semiBold
+      : AppFontWeightDesktop.semiBold;
 
   /// Bold (`w700`) on desktop.
-  static const bold = _mobile ? FontWeight.w300 : FontWeight.w700;
+  static const bold = _mobile
+      ? AppFontWeightMobile.bold
+      : AppFontWeightDesktop.bold;
 
-  /// ExtraBold (`w800`, drawn as Gotham Black) on desktop.
-  static const extraBold = _mobile ? FontWeight.w300 : FontWeight.w800;
+  /// ExtraBold (`w800`) on desktop.
+  static const extraBold = _mobile
+      ? AppFontWeightMobile.extraBold
+      : AppFontWeightDesktop.extraBold;
+
+  /// A heading's weight: Thin (`w100`) on mobile, Medium (`w500`) on desktop.
+  static const heading = _mobile
+      ? AppFontWeightMobile.heading
+      : AppFontWeightDesktop.heading;
 }

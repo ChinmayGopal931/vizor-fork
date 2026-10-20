@@ -109,22 +109,20 @@ pub async fn stop_tor_update_relay() {
 }
 
 /// Starts the loopback SOCKS5 bridge the Private USD Railgun page is proxied
-/// through, or returns the running bridge's port (an offline one still
-/// running is stopped first). It serves only `CONNECT` to the page's hosts on
-/// port 443, over the route it started on. Fails closed while Tor is on but
-/// not usable (after waiting out a bootstrap).
+/// through, or returns the running bridge's port; a running offline bridge is
+/// stopped first. Fails closed while Tor is on but not usable, after waiting
+/// out a bootstrap.
 ///
 /// On every route change, close the page, then [`stop_railgun_bridge`], then
-/// start a new bridge and load the page on its port: Chromium keeps pooled
-/// tunnels otherwise, and a bridge whose route changed refuses new ones.
+/// start a new bridge and load the page on its port.
 pub async fn start_railgun_bridge() -> Result<u16, String> {
     crate::railgun_bridge::start().await
 }
 
-/// Starts a Railgun bridge that refuses every connection, or returns the
-/// running offline bridge's port, for a page that must reach nothing: one
-/// loaded only to delete an account's Railgun wallet. It needs no route, so it
-/// never waits for Tor. A routed bridge still running is stopped first.
+/// Starts a Railgun bridge that refuses every connection, for a page that must
+/// reach nothing (one loaded only to delete an account's Railgun wallet), or
+/// returns the running one's port; a running routed bridge is stopped first.
+/// It never waits for Tor.
 pub async fn start_offline_railgun_bridge() -> Result<u16, String> {
     crate::railgun_bridge::start_offline().await
 }

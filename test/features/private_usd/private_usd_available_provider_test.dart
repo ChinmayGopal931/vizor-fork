@@ -6,15 +6,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
 import 'package:zcash_wallet/src/core/layout/app_form_factor.dart';
-import 'package:zcash_wallet/src/core/widgets/mobile/private_usd_engine_host.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_engine_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/railgun_host_channel.dart';
+import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_engine_host.dart';
 import 'package:zcash_wallet/src/providers/account_models.dart';
 
-// Plan reference §8.3: the define, a mobile build on a platform that hosts the
-// page (Android, or iOS 17 and later: iOS plan XI9), a deployment, the kill
-// switch not off, and a software account with a ZIP-32 index.
+// The define, a mobile build on a platform that hosts the page (Android, or
+// iOS 17 and later), a deployment, the kill switch not off, and a software
+// account with a ZIP-32 index.
 void main() {
   const software = AccountInfo(
     uuid: 'software',
@@ -101,7 +101,7 @@ void main() {
     }
   });
 
-  // iOS plan XI9: iOS 16 hidden, iOS 17 shown, Android unchanged.
+  // iOS 16 hidden, iOS 17 shown, Android unchanged.
   test('the availability matrix by platform and host support', () {
     expect(
       available(platform: TargetPlatform.iOS, hostSupported: false),
@@ -154,7 +154,7 @@ void main() {
     );
   });
 
-  // The swap engine runs for every account's conversions (D14) whatever the
+  // The swap engine runs for every account's conversions whatever the
   // kill switch or the active account, but only in mobile builds with the
   // define and a deployment, on a platform that hosts the page: desktop stays
   // inert.
@@ -291,7 +291,7 @@ void main() {
 
     test('a failure is no', () async {
       expect(
-        await ask((call) async => throw PlatformException(code: 'FAILED')),
+        await ask((call) async => throw PlatformException(code: 'failed')),
         isFalse,
       );
     });

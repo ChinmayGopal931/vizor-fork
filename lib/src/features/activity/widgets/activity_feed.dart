@@ -17,14 +17,14 @@ const _activityFeedActivationShortcuts = <ShortcutActivator, Intent>{
 /// amount/timestamp).
 const _activityRowInnerLineGap = AppSpacing.xxs;
 
-/// Label of a row's title, subtitle, amount and timestamp. Desktop uses the
-/// 14px label. Mobile bumps to the 16px label less one point: Gotham is 8%
-/// wider than Geist, and at 16px a title such as "Redeemed a gift card" was
-/// ellipsized in the 159 px slot beside the timestamp column. The 17px line
-/// box is unchanged.
 const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
-final _activityRowLabelStyle = kAppFormFactor == AppFormFactor.mobile
+/// Label of a row's title, subtitle, amount and timestamp. Desktop uses the
+/// 14px label. Mobile bumps to the 16px label less one point: Gotham is 8%
+/// wider than Geist, and at 16px a title such as "Redeemed a gift card" is
+/// ellipsized in the 159 px slot beside the timestamp column. The line box
+/// stays 17px.
+final _activityRowLabelStyle = _mobile
     ? AppTypography.labelLarge.copyWith(fontSize: 15, height: 17 / 15)
     : AppTypography.labelLarge;
 
@@ -362,7 +362,6 @@ class _ActivityFeedSectionHeaderSegment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     return _ActivityFeedCardSegment(
       position: position,
       child: Padding(
@@ -371,18 +370,30 @@ class _ActivityFeedSectionHeaderSegment extends StatelessWidget {
           height: 24,
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.xxs),
-            child: Text(
-              _mobile ? title.toUpperCase() : title,
-              style: _mobile
-                  ? kNeonHudCaptionStyle.copyWith(color: colors.neon.glow)
-                  : AppTypography.labelLarge.copyWith(
-                      color: colors.text.secondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-            ),
+            child: _ActivityFeedSectionTitle(title),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ActivityFeedSectionTitle extends StatelessWidget {
+  const _ActivityFeedSectionTitle(this.title);
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Text(
+      _mobile ? title.toUpperCase() : title,
+      style: _mobile
+          ? kNeonHudCaptionStyle.copyWith(color: colors.neon.glow)
+          : AppTypography.labelLarge.copyWith(
+              color: colors.text.secondary,
+              fontWeight: FontWeight.w600,
+            ),
     );
   }
 }
@@ -654,7 +665,6 @@ class _ActivityFeedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     return SizedBox(
       width: width,
       child: _ActivityFeedCardShell(
@@ -667,15 +677,7 @@ class _ActivityFeedCard extends StatelessWidget {
                 height: 24,
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.xxs),
-                  child: Text(
-                    _mobile ? section.title.toUpperCase() : section.title,
-                    style: _mobile
-                        ? kNeonHudCaptionStyle.copyWith(color: colors.neon.glow)
-                        : AppTypography.labelLarge.copyWith(
-                            color: colors.text.secondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                  ),
+                  child: _ActivityFeedSectionTitle(section.title),
                 ),
               ),
               const SizedBox(height: AppSpacing.s),
@@ -1047,7 +1049,7 @@ class _ActivityAmountValue extends StatelessWidget {
       textAlign: TextAlign.end,
       style: _activityRowLabelStyle.copyWith(
         color: color,
-        fontWeight: _mobile ? FontWeight.w300 : FontWeight.w600,
+        fontWeight: AppFontWeight.semiBold,
       ),
     );
     final iconName = row.amountIconName;
@@ -1161,8 +1163,8 @@ class _ActivityIconFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      // Mobile (neon redesign): a cut-corner plate with a lit edge.
-      decoration: kAppFormFactor == AppFormFactor.mobile
+      // Mobile: a cut-corner plate with a lit edge.
+      decoration: _mobile
           ? ShapeDecoration(
               color: row.leadingBackgroundColor,
               shape: Neon.chamferBorder(

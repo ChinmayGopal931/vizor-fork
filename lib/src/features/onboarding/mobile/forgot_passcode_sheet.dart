@@ -41,7 +41,7 @@ class ForgotPasscodeSheet extends ConsumerWidget {
     final claimsInFlight =
         ref.watch(paymentLinkClaimsInFlightProvider).value ?? 0;
     // Private USD conversions under way are warned about the same way: only
-    // this wallet could finish or refund them (plan §3.5, invariant 15).
+    // this wallet can finish or refund them.
     final conversionsUnderWay =
         ref.watch(privateUsdUnfinishedTotalProvider).value ?? 0;
     return MobileModalScaffold(

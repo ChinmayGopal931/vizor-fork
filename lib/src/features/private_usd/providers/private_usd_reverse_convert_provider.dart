@@ -3,14 +3,16 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../providers/account_provider.dart';
+import '../../../core/config/private_usd_feature_config.dart';
 import '../../../rust/api/private_usd.dart' as rust;
+import '../models/private_usd_messages.dart';
 import '../models/private_usd_record_key.dart';
 import '../models/private_usd_reverse_amount.dart';
+import '../models/private_usd_send.dart';
 import '../private_usd_copy.dart';
 import '../services/private_usd_balance_repository.dart';
 import '../services/private_usd_engine.dart';
-import '../services/private_usd_swap_backend.dart';
+import '../services/private_usd_pause.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_balance_provider.dart';
 import 'private_usd_convert_provider.dart';
@@ -20,41 +22,32 @@ import 'private_usd_unfinished_provider.dart';
 DateTime _at(int seconds) =>
     DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
 
-/// The reverse convert screens' state (plan reference §9.4 S4): the dollars
-/// typed, the priced `quoted` draft they got, and which step is up.
+/// The private USD → ZEC convert screens' state: the dollars typed, the
+/// priced `quoted` draft they got, and which step is up.
 @immutable
-class PrivateUsdReverseConvertState {
+class PrivateUsdReverseConvertState
+    extends PrivateUsdConvertFlowState<PrivateUsdReverseConvertState> {
   const PrivateUsdReverseConvertState({
-    required this.now,
-    this.amountText = '',
+    required super.now,
+    super.amountText,
     this.draft,
-    this.quoting = false,
+    super.quoting,
     this.lookingUp = false,
-    this.quoteError,
-    this.startError,
-    this.step = PrivateUsdConvertStep.amount,
-    this.quoteSpent = false,
+    super.quoteError,
+    super.startError,
+    super.step,
+    super.quoteSpent,
     this.available,
     this.hasRefunds = false,
-    this.underWay,
+    super.underWay,
     this.stale,
   });
 
-  final DateTime now;
-  final String amountText;
-
   /// The priced draft for the typed amount (a `quoted` record).
   final rust.ApiReverseRecord? draft;
-  final bool quoting;
 
   /// Max is working out the most that can be converted.
   final bool lookingUp;
-  final String? quoteError;
-  final String? startError;
-  final PrivateUsdConvertStep step;
-
-  /// The draft was taken by a "Convert" that did not start: quote again.
-  final bool quoteSpent;
 
   /// The swap token's spendable private balance in base units; null while
   /// unknown (no quote until it is known).
@@ -62,9 +55,6 @@ class PrivateUsdReverseConvertState {
 
   /// An earlier conversion was refunded: "View refunds" shows.
   final bool hasRefunds;
-
-  /// A conversion found under way: its progress shows instead.
-  final PrivateUsdRoutePath? underWay;
 
   /// The amount whose quote failed: not asked again until it changes.
   final BigInt? stale;
@@ -74,7 +64,7 @@ class PrivateUsdReverseConvertState {
   BigInt? get units => privateUsdDollarUnits(amountText);
 
   bool get isPositive => privateUsdDollarIsPositive(amountText);
-  bool get isTooPrecise => privateUsdDollarTooPrecise(amountText);
+  bool get isTooPrecise => privateUsdTooPrecise(amountText, 2);
 
   /// The reviewed debit, while the draft prices the typed amount.
   BigInt? get debit {
@@ -96,7 +86,9 @@ class PrivateUsdReverseConvertState {
 
   bool get isAmountInvalid => isShort || (isPositive && units == null);
 
-  DateTime? get _cutoff {
+  /// The draft's expiry or its funding deadline, whichever comes first.
+  @override
+  DateTime? get offeredUntil {
     final draft = this.draft;
     if (draft == null) return null;
     final expiry = _at(draft.quoteExpiresAt);
@@ -106,23 +98,9 @@ class PrivateUsdReverseConvertState {
     );
   }
 
-  /// The draft stopped being offered: taken, or near its expiry or its
-  /// funding deadline.
-  bool get isExpired {
-    final cutoff = _cutoff;
-    if (cutoff == null) return false;
-    return quoteSpent || !now.isBefore(cutoff);
-  }
-
-  Duration get expiresIn {
-    final cutoff = _cutoff;
-    if (cutoff == null) return Duration.zero;
-    final left = cutoff.difference(now);
-    return left.isNegative ? Duration.zero : left;
-  }
-
-  /// What "Review" and "Convert" need: a priced draft for the typed amount
-  /// that holds, and a known balance that covers its debit.
+  /// A priced draft for the typed amount that holds, and a known balance
+  /// that covers its debit.
+  @override
   bool get canGoOn =>
       debit != null &&
       !quoting &&
@@ -130,10 +108,6 @@ class PrivateUsdReverseConvertState {
       !isExpired &&
       available != null &&
       !isShort;
-
-  bool get canReview => step == PrivateUsdConvertStep.amount && canGoOn;
-  bool get canConfirm => step == PrivateUsdConvertStep.review && canGoOn;
-  bool get isConfirming => step == PrivateUsdConvertStep.confirming;
 
   /// Max: on the amount step, with a balance to convert.
   bool get canMax {
@@ -150,17 +124,13 @@ class PrivateUsdReverseConvertState {
 
   /// The line under the amount, or on the review.
   String? get message {
-    if (step != PrivateUsdConvertStep.amount) {
-      if (startError != null) return startError;
-      if (quoteError != null) return quoteError;
-      if (isExpired && !quoting) return PrivateUsdCopy.convertQuoteRanOut;
-      return null;
-    }
+    if (step != PrivateUsdConvertStep.amount) return reviewMessage;
     if (isTooPrecise) return PrivateUsdCopy.reverseAmountCents;
     if (isShort) return PrivateUsdCopy.reverseInsufficient;
     return quoteError;
   }
 
+  @override
   PrivateUsdReverseConvertState copyWith({
     DateTime? now,
     String? amountText,
@@ -197,12 +167,10 @@ class PrivateUsdReverseConvertState {
   );
 }
 
-/// The reverse convert flow (plan reference §9.4 S4, zapp
-/// `PrivateUsdReverseVM`), private USD → ZEC. Each quote spends a swap
-/// index, so quotes come only 700 ms after typing stops, for Max, and once
-/// to replace one that ran out on the amount step. A quote is priced by the
-/// page before it can be reviewed (§5.11 R2), so the direction needs the
-/// page; "Convert" goes ahead, accepts and then pays (R3–R6).
+/// The private USD → ZEC convert flow. Quotes come 700 ms after typing
+/// stops, for Max, and once to replace one that ran out on the amount step.
+/// The page prices a quote before it can be reviewed, so the direction needs
+/// the page; "Convert" goes ahead, accepts and then pays.
 final privateUsdReverseConvertProvider =
     NotifierProvider.autoDispose<
       PrivateUsdReverseConvertNotifier,
@@ -210,20 +178,11 @@ final privateUsdReverseConvertProvider =
     >(PrivateUsdReverseConvertNotifier.new);
 
 class PrivateUsdReverseConvertNotifier
-    extends Notifier<PrivateUsdReverseConvertState> {
-  late DateTime Function() _clock;
-  String? _account;
-  Timer? _pending;
-  Timer? _tick;
-  int _generation = 0;
-
+    extends PrivateUsdConvertFlowNotifier<PrivateUsdReverseConvertState> {
   @override
   PrivateUsdReverseConvertState build() {
-    _clock = ref.watch(privateUsdConvertClockProvider);
-    final account = _account = ref
-        .read(accountProvider)
-        .value
-        ?.activeAccountUuid;
+    setUpFlow();
+    final account = this.account;
     BigInt? available;
     var hasRefunds = false;
     if (account != null) {
@@ -246,14 +205,8 @@ class PrivateUsdReverseConvertNotifier
         state = state.copyWith(hasRefunds: next);
       });
     }
-    _tick = Timer.periodic(PrivateUsdConvertTiming.tick, (_) => _onTick());
-    ref.onDispose(() {
-      _generation++;
-      _pending?.cancel();
-      _tick?.cancel();
-    });
     return PrivateUsdReverseConvertState(
-      now: _clock(),
+      now: clock(),
       available: available,
       hasRefunds: hasRefunds,
     );
@@ -274,10 +227,10 @@ class PrivateUsdReverseConvertNotifier
   }
 
   /// The amount field changed: an amount to quote, after typing stops.
-  /// Typing also cancels a Max look-up (zapp: back cancels a look-up).
+  /// Typing also cancels a Max look-up.
   void onAmountChanged(String text) {
     if (state.step != PrivateUsdConvertStep.amount) return;
-    _cancelQuote();
+    cancelQuote();
     state = state.copyWith(
       amountText: text,
       clearDraft: true,
@@ -291,20 +244,20 @@ class PrivateUsdReverseConvertNotifier
     _requestQuote(units, debounce: PrivateUsdConvertTiming.typingDebounce);
   }
 
-  /// Max (zapp `onMax`): the balance less Railgun's unshield fee and the
-  /// relayer's funding fee, rounded down to the cent, then quoted.
+  /// Max: the balance less Railgun's unshield fee and the relayer's funding
+  /// fee, rounded down to the cent, then quoted.
   Future<void> onMax() async {
-    final account = _account;
+    final account = this.account;
     final available = state.available;
     if (!state.canMax || account == null || available == null) return;
-    _cancelQuote();
-    final generation = _generation;
+    cancelQuote();
+    final generation = quoteGeneration;
     state = state.copyWith(lookingUp: true, clearQuoteError: true);
     try {
       final fees = await ref.read(privateUsdReversePageProvider).fees(account);
       final fundingFee = await _fundingFee(account);
       // Typing meanwhile took over (it cleared the look-up).
-      if (!ref.mounted || generation != _generation) return;
+      if (!ref.mounted || generation != quoteGeneration) return;
       final max = privateUsdReverseMax(
         available: available,
         unshieldBasisPoints: fees.unshieldBasisPoints,
@@ -317,10 +270,8 @@ class PrivateUsdReverseConvertNotifier
       }
       onAmountChanged(privateUsdDollarText(max));
     } catch (error) {
-      if (!ref.mounted || generation != _generation) return;
-      if (kDebugMode) {
-        debugPrint('privateUsd: max failed (${error.runtimeType})');
-      }
+      if (!ref.mounted || generation != quoteGeneration) return;
+      privateUsdLog('max failed (${error.runtimeType})');
       state = state.copyWith(
         lookingUp: false,
         quoteError: PrivateUsdCopy.reverseErrorMax,
@@ -329,8 +280,8 @@ class PrivateUsdReverseConvertNotifier
   }
 
   /// The relayer's funding fee now. Read through a draft an earlier quote
-  /// left, which spends no index; without one, its 2 USDC cap (X6), so Max
-  /// never asks for more than the fees leave (D-83).
+  /// left, which spends no index; without one, the deployment's cap on it,
+  /// so Max never asks for more than the fees leave.
   Future<BigInt> _fundingFee(String account) async {
     final engine = ref.read(privateUsdEngineProvider);
     final draft = ref
@@ -353,33 +304,11 @@ class PrivateUsdReverseConvertNotifier
         // The cap below.
       }
     }
-    final cap = BigInt.tryParse(
-      ref.read(privateUsdCurrentDeploymentProvider)?.maxRelayerFee ?? '',
+    final cap = privateUsdRelayerFeeCap(
+      ref.read(privateUsdCurrentDeploymentProvider),
     );
     if (cap == null) throw StateError('no relayer fee cap');
     return cap;
-  }
-
-  /// Opens the review; false when the draft cannot be reviewed.
-  bool openReview() {
-    if (!state.canReview) return false;
-    state = state.copyWith(
-      step: PrivateUsdConvertStep.review,
-      clearStartError: true,
-    );
-    return true;
-  }
-
-  /// Back from the review to the amount; false (blocked) while confirming.
-  bool leaveReview() {
-    if (state.isConfirming) return false;
-    if (state.step == PrivateUsdConvertStep.review) {
-      state = state.copyWith(
-        step: PrivateUsdConvertStep.amount,
-        clearStartError: true,
-      );
-    }
-    return true;
   }
 
   /// "Refresh quote" on the review: the same amount, a new index.
@@ -395,13 +324,12 @@ class PrivateUsdReverseConvertNotifier
     _requestQuote(units, forReview: true);
   }
 
-  /// "Convert" (zapp's one authorized step): go ahead, accept with the
-  /// maker (which imports the joint account), then pay the reviewed debit.
-  /// Returns the conversion to show once it is under way; the payment's
-  /// proof then shows on its progress. Null with
-  /// [PrivateUsdReverseConvertState.startError] set otherwise.
+  /// "Convert": go ahead, accept with the maker (which imports the joint
+  /// account), then pay the reviewed debit. Returns the conversion to show
+  /// once it is under way; the payment's proof then shows on its progress.
+  /// Null with [PrivateUsdReverseConvertState.startError] set otherwise.
   Future<PrivateUsdRoutePath?> confirm() async {
-    final account = _account;
+    final account = this.account;
     final draft = state.draft;
     if (!state.canConfirm || account == null || draft == null) return null;
     state = state.copyWith(
@@ -424,22 +352,20 @@ class PrivateUsdReverseConvertNotifier
           await _repriced(account, index);
         case rust.ApiPrivateUsdErrorCode.quoteExpired ||
             rust.ApiPrivateUsdErrorCode.tooLate:
-          _startFailed(PrivateUsdCopy.convertQuoteRanOut);
+          startFailed(PrivateUsdCopy.convertQuoteRanOut);
         case rust.ApiPrivateUsdErrorCode.busy:
-          return _backToReview();
+          return backToReview();
         default:
-          _startFailed(
+          startFailed(
             privateUsdReverseQuoteMessage(error.code) ??
                 PrivateUsdCopy.convertStartFailed,
           );
       }
       return null;
-    } on PrivateUsdEngineInterruptedException {
-      return _backToReview();
-    } on PrivateUsdEngineUnavailableException {
-      return _backToReview();
+    } on PrivateUsdPause {
+      return backToReview();
     } catch (_) {
-      if (ref.mounted) _startFailed(PrivateUsdCopy.convertStartFailed);
+      if (ref.mounted) startFailed(PrivateUsdCopy.convertStartFailed);
       return null;
     }
     // Gone ahead: the conversion is under way from here, whatever follows.
@@ -450,45 +376,42 @@ class PrivateUsdReverseConvertNotifier
         case rust.ApiAcceptKind.accepted:
           break;
         case rust.ApiAcceptKind.tokensNeeded:
-          // No tokens client before M4 (D-33): call it off, nothing paid.
+          // The maker wants a Privacy Pass token and none is held: call it
+          // off, nothing paid.
           unawaited(_cancelQuietly(engine, account, index));
-          _startFailed(PrivateUsdCopy.convertResultMakerUnavailable);
+          startFailed(PrivateUsdCopy.convertResultMakerUnavailable);
           return null;
         case rust.ApiAcceptKind.nothingSent:
-          _startFailed(privateUsdReverseNothingSentMessage(result.cause));
+          startFailed(privateUsdReverseNothingSentMessage(result.cause));
           return null;
       }
-    } on PrivateUsdEngineInterruptedException {
-      return _backToReview();
-    } on PrivateUsdKeyLockedException {
-      return _backToReview();
+    } on PrivateUsdPause {
+      return backToReview();
     } catch (error) {
-      if (kDebugMode) {
-        debugPrint('privateUsd: accept failed (${error.runtimeType})');
-      }
+      privateUsdLog('accept failed (${error.runtimeType})');
       // The loop accepts again (idempotent); its progress shows it.
       if (await _isUnderWay(engine, account, index)) return path;
-      if (ref.mounted) _startFailed(PrivateUsdCopy.convertStartFailed);
+      if (ref.mounted) startFailed(PrivateUsdCopy.convertStartFailed);
       return null;
     }
-    // The payment the review showed (R4–R6). It outlives this screen; its
-    // proof and any failure show on the progress, with "Pay" again.
+    // The payment the review showed. It outlives this screen; its proof and
+    // any failure show on the progress, with "Pay" again.
     unawaited(
       ref.read(privateUsdReverseFundingProvider).fund(path.keyFor(account)),
     );
     return path;
   }
 
-  /// Looks for a conversion under way for the account (opening the screen).
-  Future<void> findUnderWay() async {
-    final account = _account;
-    if (account == null) return;
-    final path = await privateUsdFindUnderWay(
-      ref.read(privateUsdEngineProvider),
-      account,
-    );
-    if (!ref.mounted || path == null) return;
-    state = state.copyWith(underWay: path);
+  @override
+  void replaceExpiredQuote() {
+    final units = state.units;
+    if (state.lookingUp ||
+        units == null ||
+        units == state.stale ||
+        state.isShort) {
+      return;
+    }
+    _requestQuote(units);
   }
 
   Future<bool> _isUnderWay(
@@ -514,8 +437,8 @@ class PrivateUsdReverseConvertNotifier
   ) async {
     try {
       await engine.reverseCancel(account, index: index);
-    } catch (_) {
-      if (kDebugMode) debugPrint('privateUsd: cancel failed');
+    } catch (error) {
+      privateUsdLog('cancel failed (${error.runtimeType})');
     }
   }
 
@@ -535,52 +458,8 @@ class PrivateUsdReverseConvertNotifier
         startError: PrivateUsdCopy.reverseErrorCostChanged,
       );
     } catch (_) {
-      if (ref.mounted) _startFailed(PrivateUsdCopy.convertStartFailed);
+      if (ref.mounted) startFailed(PrivateUsdCopy.convertStartFailed);
     }
-  }
-
-  PrivateUsdRoutePath? _backToReview() {
-    if (ref.mounted) {
-      state = state.copyWith(step: PrivateUsdConvertStep.review);
-      unawaited(findUnderWay());
-    }
-    return null;
-  }
-
-  void _startFailed(String message) {
-    state = state.copyWith(
-      step: PrivateUsdConvertStep.review,
-      startError: message,
-      quoteSpent: true,
-    );
-  }
-
-  void _onTick() {
-    if (!ref.mounted) return;
-    state = state.copyWith(now: _clock());
-    // A draft left to run out on the amount step is replaced, once; on the
-    // review the user decides. A failed amount is not asked again until it
-    // changes, and never in the background or locked.
-    final units = state.units;
-    if (state.step != PrivateUsdConvertStep.amount ||
-        state.draft == null ||
-        !state.isExpired ||
-        state.quoting ||
-        state.lookingUp ||
-        state.quoteError != null ||
-        units == null ||
-        units == state.stale ||
-        state.isShort ||
-        !ref.read(privateUsdEngineProvider).canRun) {
-      return;
-    }
-    _requestQuote(units);
-  }
-
-  void _cancelQuote() {
-    _generation++;
-    _pending?.cancel();
-    _pending = null;
   }
 
   void _requestQuote(
@@ -588,53 +467,30 @@ class PrivateUsdReverseConvertNotifier
     Duration debounce = Duration.zero,
     bool forReview = false,
   }) {
-    _cancelQuote();
-    final generation = _generation;
-    final account = _account;
+    final account = this.account;
     if (account == null) return;
-    state = state.copyWith(quoting: true, clearQuoteError: true);
-    _pending = Timer(debounce, () async {
-      if (!ref.mounted || generation != _generation) return;
-      final engine = ref.read(privateUsdEngineProvider);
-      // Preserve a request paused during the debounce. No page or quote is
-      // opened until the engine can run; editing or disposal cancels it.
-      if (!engine.canRun) {
-        _requestQuote(
-          units,
-          debounce: PrivateUsdConvertTiming.tick,
-          forReview: forReview,
-        );
-        return;
-      }
-      rust.ApiReverseRecord? record;
-      Object? failure;
-      try {
-        // The direction needs the page (it prices the quote): open it
-        // first, so a page that cannot start spends no swap index.
+    requestQuote<rust.ApiReverseRecord>(
+      (current) async {
+        // The page prices the quote: it opens first, so a page that cannot
+        // start spends no swap index.
         await ref.read(privateUsdReversePageProvider).fees(account);
-        if (!ref.mounted || generation != _generation) return;
-        final quote = await engine.reverseQuote(account, units: units.toInt());
-        record = await ref
+        if (!current()) return null;
+        final quote = await ref
+            .read(privateUsdEngineProvider)
+            .reverseQuote(account, units: units.toInt());
+        return ref
             .read(privateUsdReverseFundingProvider)
             .price(account, quote.costRequest);
-      } catch (error) {
-        failure = error;
-      }
-      if (!ref.mounted || generation != _generation) return;
-      if (record != null) {
-        _withDraft(record, forReview: forReview);
-      } else {
-        _quoteFailed(failure!, units);
-      }
-    });
+      },
+      debounce: debounce,
+      onQuote: (record) => _withDraft(record, forReview: forReview),
+      onFailure: (error) => _quoteFailed(error, units),
+    );
   }
 
   void _withDraft(rust.ApiReverseRecord record, {required bool forReview}) {
+    if (!takesQuote(forReview: forReview)) return;
     final onReview = state.step != PrivateUsdConvertStep.amount;
-    if (state.isConfirming || (onReview && !forReview)) {
-      state = state.copyWith(quoting: false);
-      return;
-    }
     final next = state.copyWith(
       draft: record,
       quoting: false,
@@ -655,18 +511,12 @@ class PrivateUsdReverseConvertNotifier
   }
 
   void _quoteFailed(Object error, BigInt units) {
-    if (error is rust.ApiPrivateUsdError &&
-        error.code == rust.ApiPrivateUsdErrorCode.busy) {
-      // A conversion is under way: it shows instead.
-      state = state.copyWith(quoting: false);
-      unawaited(findUnderWay());
-      return;
-    }
+    if (showsUnderWay(error)) return;
     final message = switch (error) {
       rust.ApiPrivateUsdError(:final code) => privateUsdReverseQuoteMessage(
         code,
       ),
-      PrivateUsdKeyLockedException() => null,
+      PrivateUsdPause() => null,
       _ => PrivateUsdCopy.convertErrorGeneric,
     };
     state = state.copyWith(

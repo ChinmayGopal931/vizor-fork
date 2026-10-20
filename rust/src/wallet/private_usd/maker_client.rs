@@ -1,20 +1,17 @@
-//! The maker's quote API (plan reference §5.2; zapp `of/SwapClients.kt`).
+//! The maker's quote API.
 //!
 //! Never retried here: a quote is single-use, and an accept that timed out
-//! may have opened a swap. The token loop around an accept (`401
-//! tokenRequired`, then a paid retry) belongs to the engine (M4, M5): this
-//! client sends the `Authorization` it is given and returns the refusal with
-//! its challenge.
+//! may have opened a swap.
 
 use serde::Serialize;
 
 use super::deployment::{CLIENT_TIMEOUT, QUICK_TIMEOUT};
 use super::models::{
-    is_fixed_hex, Address, Hex, MakerInfo, MakerSwapStatus, ReverseQuote, SwapAcceptance,
-    SwapAccepted, SwapQuote, Word,
+    is_fixed_hex, Address, Hex, MakerInfo, ReverseQuote, SwapAcceptance, SwapAccepted, SwapQuote,
+    Word,
 };
 use super::transport::{get_json, post_json, HttpTransport, Service, SwapHttpError};
-use crate::wallet::routed_http::RoutedPhase;
+use super::{ErrorCode, PrivateUsdError};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -87,10 +84,8 @@ impl<'a, T: HttpTransport> MakerClient<'a, T> {
         &self,
         quote_id: &str,
         acceptance: &SwapAcceptance,
-        authorization: Option<&str>,
     ) -> Result<SwapAccepted, SwapHttpError> {
-        self.accept_at("/v1/quote", quote_id, acceptance, authorization)
-            .await
+        self.accept_at("/v1/quote", quote_id, acceptance).await
     }
 
     /// `POST /v1/reverse/quote`: `units` of the user's private dollars,
@@ -123,9 +118,8 @@ impl<'a, T: HttpTransport> MakerClient<'a, T> {
         &self,
         quote_id: &str,
         acceptance: &SwapAcceptance,
-        authorization: Option<&str>,
     ) -> Result<SwapAccepted, SwapHttpError> {
-        self.accept_at("/v1/reverse/quote", quote_id, acceptance, authorization)
+        self.accept_at("/v1/reverse/quote", quote_id, acceptance)
             .await
     }
 
@@ -134,48 +128,24 @@ impl<'a, T: HttpTransport> MakerClient<'a, T> {
         prefix: &str,
         quote_id: &str,
         acceptance: &SwapAcceptance,
-        authorization: Option<&str>,
     ) -> Result<SwapAccepted, SwapHttpError> {
         // The id becomes a path segment: only a well-formed one goes out.
         if !is_fixed_hex(quote_id, 32) {
-            return Err(SwapHttpError::Unreachable {
-                service: Service::Maker,
-                phase: RoutedPhase::BeforeDispatch,
-                message: "malformed quote id".into(),
-            });
+            return Err(SwapHttpError::Invalid(PrivateUsdError::new(
+                ErrorCode::Mismatch,
+                "malformed quote id",
+            )));
         }
-        let headers: Vec<(&str, &str)> = authorization
-            .map(|authorization| ("authorization", authorization))
-            .into_iter()
-            .collect();
         post_json(
             self.transport,
             Service::Maker,
             self.url(&format!("{prefix}/{quote_id}/accept")),
             acceptance,
             CLIENT_TIMEOUT,
-            &headers,
+            &[],
             |_: &SwapAccepted| Ok(()),
         )
         .await
-    }
-
-    /// `GET /v1/swaps/{swapId}`, read only to collect a returned token.
-    pub(crate) async fn swap_status(
-        &self,
-        swap_id: &Word,
-    ) -> Result<MakerSwapStatus, SwapHttpError> {
-        let url = self.url(&format!("/v1/swaps/{}", swap_id.to_hex()));
-        get_json(self.transport, Service::Maker, url, |_| Ok(())).await
-    }
-
-    /// `GET /v1/reverse/swaps/{swapId}`: advisory only; read for the token.
-    pub(crate) async fn reverse_swap_status(
-        &self,
-        swap_id: &Word,
-    ) -> Result<MakerSwapStatus, SwapHttpError> {
-        let url = self.url(&format!("/v1/reverse/swaps/{}", swap_id.to_hex()));
-        get_json(self.transport, Service::Maker, url, |_| Ok(())).await
     }
 }
 
@@ -186,8 +156,9 @@ mod tests {
     use crate::wallet::private_usd::models::Redacted;
     use crate::wallet::private_usd::transport::{
         test_support::{Reply, TestServer},
-        RoutedTransport, SwapErrorCode,
+        SwapErrorCode,
     };
+    use crate::wallet::routed_http::RoutedHttp;
 
     fn hex(bytes: usize, value: u8) -> String {
         format!("0x{}", format!("{value:02x}").repeat(bytes))
@@ -202,9 +173,9 @@ mod tests {
         }
     }
 
-    /// Refusals carry the status, the code and what the service attached;
-    /// below 500 nothing was sent. A dropped connection, a 5xx or an answer
-    /// that does not read may have been.
+    /// Refusals carry the status, the code and what the service attached; a
+    /// dropped connection is no answer, and a success that does not read is
+    /// unreadable.
     #[tokio::test]
     async fn classifies_the_makers_answers() {
         let _policy = lock_route_policy();
@@ -234,33 +205,21 @@ mod tests {
             Reply::json(200, r#"{"swapId":"0x12"}"#),
             Reply::Hangup,
         ]);
-        let transport = RoutedTransport::new();
+        let transport = RoutedHttp::new();
         let maker = MakerClient::new(&transport, &format!("{}/maker/", server.url));
         let quote_id = hex(32, 0x22);
 
         let quote = maker.quote(1_000_000, [4; 20], [5; 32]).await.unwrap();
         assert_eq!(quote.amount.0, 1_000_000);
 
-        let token_required = maker
-            .accept(&quote_id, &acceptance(), None)
-            .await
-            .unwrap_err();
+        let token_required = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
         let SwapHttpError::Refused(refusal) = &token_required else {
             panic!("{token_required:?}");
         };
         assert_eq!(refusal.status, 401);
         assert_eq!(refusal.code, Some(SwapErrorCode::TokenRequired));
-        assert!(refusal
-            .challenge
-            .as_deref()
-            .unwrap()
-            .starts_with("PrivateToken"));
-        assert!(!token_required.may_have_sent());
 
-        let busy = maker
-            .accept(&quote_id, &acceptance(), Some("PrivateToken token=xyz"))
-            .await
-            .unwrap_err();
+        let busy = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
         let SwapHttpError::Refused(refusal) = &busy else {
             panic!("{busy:?}");
         };
@@ -269,49 +228,27 @@ mod tests {
             (503, Some(SwapErrorCode::Unavailable))
         );
         assert_eq!(refusal.retry_after_secs, Some(7));
-        assert!(busy.may_have_sent());
 
-        let unknown = maker
-            .accept(&quote_id, &acceptance(), None)
-            .await
-            .unwrap_err();
+        let unknown = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
         assert_eq!(unknown.code(), None);
         assert!(matches!(&unknown, SwapHttpError::Refused(refusal) if refusal.reason == "later"));
 
-        let not_json = maker
-            .accept(&quote_id, &acceptance(), None)
-            .await
-            .unwrap_err();
+        let not_json = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
         assert!(
             matches!(&not_json, SwapHttpError::Refused(refusal) if refusal.reason == "not json")
         );
-        assert!(!not_json.may_have_sent());
 
-        let unreadable = maker
-            .accept(&quote_id, &acceptance(), None)
-            .await
-            .unwrap_err();
+        let unreadable = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
         assert!(
             matches!(unreadable, SwapHttpError::Unreadable { .. }),
             "{unreadable:?}"
         );
-        assert!(unreadable.may_have_sent());
 
-        let hangup = maker
-            .accept(&quote_id, &acceptance(), None)
-            .await
-            .unwrap_err();
+        let hangup = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
         assert!(
-            matches!(
-                hangup,
-                SwapHttpError::Unreachable {
-                    phase: RoutedPhase::AfterDispatch,
-                    ..
-                }
-            ),
+            matches!(hangup, SwapHttpError::Unreachable { .. }),
             "{hangup:?}"
         );
-        assert!(hangup.may_have_sent());
 
         let received = server.received();
         assert_eq!(received[0].path, "/maker/v1/quote");
@@ -324,12 +261,8 @@ mod tests {
         );
         assert_eq!(received[1].header("content-type"), Some("application/json"));
         assert_eq!(received[1].header("authorization"), None);
-        assert_eq!(
-            received[2].header("authorization"),
-            Some("PrivateToken token=xyz")
-        );
 
-        // Nothing listens: refused before anything was sent.
+        // Nothing listens: no answer.
         let port = std::net::TcpListener::bind("127.0.0.1:0")
             .unwrap()
             .local_addr()
@@ -338,15 +271,8 @@ mod tests {
         let closed = MakerClient::new(&transport, &format!("http://127.0.0.1:{port}"));
         let unsent = closed.info().await.unwrap_err();
         assert!(
-            matches!(
-                unsent,
-                SwapHttpError::Unreachable {
-                    phase: RoutedPhase::BeforeDispatch,
-                    ..
-                }
-            ),
+            matches!(unsent, SwapHttpError::Unreachable { .. }),
             "{unsent:?}"
         );
-        assert!(!unsent.may_have_sent());
     }
 }

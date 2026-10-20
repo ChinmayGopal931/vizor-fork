@@ -796,22 +796,15 @@ Widget buildSettingsSupportVizorUseCase(BuildContext context) {
   );
 }
 
-/// The Settings card for the Home portfolio chart with market prices turned on:
-/// it names the pricing server, what a request carries, and who sees the IP
-/// address.
+/// The Settings card for the portfolio chart, market prices on.
 Widget buildMobileSettingsPortfolioChartUseCase(BuildContext context) =>
     _buildMobileSettingsPortfolioChartUseCase(
       PortfolioChartSettings.defaults.copyWith(marketPrices: true),
     );
 
-/// Market prices off, as a fresh install has them: the ZEC balance chart, which
-/// asks no server for anything, and what turning prices on would do.
+/// Market prices off, as a fresh install has them.
 Widget buildMobileSettingsPortfolioChartLocalUseCase(BuildContext context) =>
-    _buildMobileSettingsPortfolioChartUseCase(
-      PortfolioChartSettings.defaults.copyWith(
-        defaultRange: PortfolioChartRange.month,
-      ),
-    );
+    _buildMobileSettingsPortfolioChartUseCase(PortfolioChartSettings.defaults);
 
 /// The chart switched off.
 Widget buildMobileSettingsPortfolioChartHiddenUseCase(BuildContext context) =>

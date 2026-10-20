@@ -97,15 +97,16 @@ class MobileTorControl extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: AppSpacing.s),
-                    Expanded(
-                      child: Text(
-                        'Use Tor',
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.labelLarge.copyWith(
-                          color: colors.text.accent,
-                        ),
+                    // The label keeps its natural width so the status gets
+                    // the rest of the row: an even split broke "Connected"
+                    // mid-word on 360 dp phones.
+                    Text(
+                      'Use Tor',
+                      style: AppTypography.labelLarge.copyWith(
+                        color: colors.text.accent,
                       ),
                     ),
+                    const SizedBox(width: AppSpacing.xs),
                     Expanded(
                       child: Text(
                         presentation.statusLabel,

@@ -1607,8 +1607,8 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
   /// was warned about; null skips the post-drain recheck.
   ///
   /// [confirmedPrivateUsdUnfinishedCount] is the number of Private USD
-  /// conversions under way the user was warned about; more than that (or any
-  /// when null) refuses with [PrivateUsdUnfinishedConversionsException].
+  /// conversions under way the user was warned about; null skips the
+  /// post-drain recheck, as for Gift Cards.
   Future<void> removeAccount(
     String uuid, {
     int? confirmedUnsharedGiftCardCount,
@@ -1654,26 +1654,27 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
     }
   }
 
-  /// Refuses (plan §3.5, invariant 15) unless the user confirmed at least
-  /// as many Private USD conversions under way across [accountUuids] as
-  /// there are now: their funds sit in a joint account or escrow that only
-  /// this seed and swap index can recover. Read after the drain, so one that
-  /// started meanwhile is counted. A store that cannot be read never blocks:
-  /// the warning is a warning, and a user who must delete is never trapped.
+  /// Refuses when more Private USD conversions are under way across
+  /// [accountUuids] than the user confirmed: their funds sit in a joint
+  /// account or escrow that only this seed and swap index can recover. Read
+  /// after the drain, so one that started meanwhile is counted.
   Future<void> _throwIfPrivateUsdConversionsUnconfirmed(
     Iterable<String> accountUuids,
     int? confirmedCount,
   ) async {
+    if (confirmedCount == null) return;
     final int count;
     try {
       count = await ref
           .read(privateUsdLifecycleProvider)
           .unfinishedCount(accountUuids);
     } catch (e, st) {
-      log('private USD conversion count failed: $e\n$st');
-      return;
+      // Conversions may be under way; reconfirm without a count rather than
+      // proceed silently.
+      log('private USD conversion recheck failed: $e\n$st');
+      throw const PrivateUsdUnfinishedConversionsException();
     }
-    if (count > (confirmedCount ?? 0)) {
+    if (count > confirmedCount) {
       throw PrivateUsdUnfinishedConversionsException(count: count);
     }
   }
@@ -1945,7 +1946,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
   /// every account.
   ///
   /// [confirmedPrivateUsdUnfinishedCount] works as in [removeAccount],
-  /// summed over every account; only an unlocked wallet refuses.
+  /// summed over every account; only an unlocked wallet rechecks.
   Future<void> resetWallet({
     int? confirmedUnsharedGiftCardCount,
     int? confirmedPrivateUsdUnfinishedCount,
@@ -1986,9 +1987,10 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         for (final account in state.value?.accounts ?? const <AccountInfo>[])
           account.uuid,
       ], confirmedUnsharedGiftCardCount);
-      // Unlocked only, like the Gift Card refusal: a locked reset is the
-      // way back into a wallet whose passcode is lost, and conversions
-      // cannot finish while it is locked anyway, so it warns instead.
+      // Unlocked only, like the in-flight Gift Card claim refusal: a locked
+      // reset is the way back into a wallet whose passcode is lost, and
+      // conversions cannot finish while it is locked anyway, so it only
+      // warns.
       if (!ref.read(appSecurityProvider).requiresUnlock) {
         await _throwIfPrivateUsdConversionsUnconfirmed([
           for (final account in state.value?.accounts ?? const <AccountInfo>[])
@@ -2162,7 +2164,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
       }
       // Every account's Railgun wallet and scan cache in the page's storage,
       // the swap records and joint accounts, and the device-wide token
-      // stores (X4). The secure-storage wipe below takes the engine keys and
+      // stores. The secure-storage wipe below takes the engine keys and
       // balance caches.
       try {
         await ref.read(privateUsdLifecycleProvider).wipeRailgunPage();
@@ -2171,9 +2173,13 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
       }
       try {
         await deletePrivateUsdDirectories();
-        await deletePrivateUsdTokenStores();
       } catch (e, st) {
         recordError('private USD storage cleanup', e, st);
+      }
+      try {
+        await deletePrivateUsdTokenStores();
+      } catch (e, st) {
+        recordError('private USD token store cleanup', e, st);
       }
       try {
         // The wallet's own companions went with it. No wallet is current

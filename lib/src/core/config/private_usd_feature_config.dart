@@ -2,30 +2,37 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show HttpException, HttpHeaders;
 
-import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../main.dart' show log;
 import '../../providers/network_privacy_provider.dart';
+import '../layout/app_form_factor.dart';
 import '../layout/app_process_work_policy.dart';
 import '../network/network_http_client.dart';
 
-/// Private USD's build defines (plan reference §7.3), read once here.
+/// Private USD's build defines, read once here.
 ///
 /// The master switch until launch; release builds turn it on only after the
-/// M8 sign-off.
+/// owner's sign-off.
 const kVizorPrivateUsdEnabled = bool.fromEnvironment(
   'VIZOR_PRIVATE_USD_ENABLED',
 );
 
-/// The kill-switch JSON's URL (D16). Empty: no fetch, and the feature is
+/// Whether this build can have Private USD at all: the define, in a mobile
+/// build. Const, so every other build drops the feature's code.
+const kPrivateUsdBuildEnabled =
+    kVizorPrivateUsdEnabled && kAppFormFactor == AppFormFactor.mobile;
+
+/// The kill-switch JSON's URL. Empty: no fetch, and the feature is
 /// available.
 const kVizorPrivateUsdFlagUrl = String.fromEnvironment(
   'VIZOR_PRIVATE_USD_FLAG_URL',
 );
 
-/// Keyed Ethereum RPC URLs (E6). Secrets: never log them or store them.
+/// Keyed Ethereum RPC URLs. Secrets: never log them or store them.
 /// Empty means unset; publicnode serves alone then.
 const kVizorEthereumRpcUrlMainnet = String.fromEnvironment(
   'VIZOR_ETHEREUM_RPC_URL_MAINNET',
@@ -34,8 +41,15 @@ const kVizorEthereumRpcUrlSepolia = String.fromEnvironment(
   'VIZOR_ETHEREUM_RPC_URL_SEPOLIA',
 );
 
-/// An optional support link for stuck-funds copy (D17).
+/// An optional support link for stuck-funds copy.
 const kVizorSupportUrl = String.fromEnvironment('VIZOR_SUPPORT_URL');
+
+/// Logs [line] in debug builds. Private USD's lines carry runtime types and
+/// error codes only: an error's message can quote a keyed RPC URL or what
+/// the Railgun page saw.
+void privateUsdLog(String line) {
+  if (kDebugMode) log('privateUsd: $line');
+}
 
 /// The keyed RPC URL for a Railgun network (`mainnet` or `sepolia`), when the
 /// build has one whose host the page may reach; otherwise null. A URL on
@@ -54,8 +68,8 @@ String? privateUsdKeyedRpcUrl(
   }.trim();
   if (keyed.isEmpty) return null;
   final allowed = _privateUsdRpcUrlOn(keyed, allowedHosts);
-  if (allowed == null && kDebugMode) {
-    debugPrint('privateUsd: the keyed RPC URL is not on an allowed host');
+  if (allowed == null) {
+    privateUsdLog('the keyed RPC URL is not on an allowed host');
   }
   return allowed;
 }
@@ -75,10 +89,9 @@ String? _privateUsdRpcUrlOn(String url, List<String> hosts) {
   return trimmed;
 }
 
-/// The hosts a user's own Ethereum RPC URL may use, per Railgun network
-/// (Settings; owner, 2026-10-17): the RPC providers the page already
-/// reaches, so the page's filters (Kotlin, Swift, the Rust bridge and the
-/// CSP) stay as they are.
+/// The hosts a user's own Ethereum RPC URL (Settings) may use, per Railgun
+/// network: the RPC providers the page already reaches, so the page's
+/// filters (Kotlin, Swift, the Rust bridge and the CSP) stay as they are.
 const _kPrivateUsdCustomRpcHosts = <String, List<String>>{
   'mainnet': [
     'eth-mainnet.g.alchemy.com',
@@ -161,13 +174,20 @@ class HttpPrivateUsdAvailabilitySource implements PrivateUsdAvailabilitySource {
 
   @override
   Future<bool?> fetch() async {
-    final response = await _client.request(
-      'GET',
-      _endpoint,
-      headers: const {HttpHeaders.acceptHeader: 'application/json'},
-      timeout: timeout,
-    );
+    final NetworkHttpResponse response;
+    try {
+      response = await _client.request(
+        'GET',
+        _endpoint,
+        headers: const {HttpHeaders.acceptHeader: 'application/json'},
+        timeout: timeout,
+      );
+    } catch (e) {
+      privateUsdLog('kill switch fetch failed (${e.runtimeType})');
+      rethrow;
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      privateUsdLog('kill switch returned ${response.statusCode}');
       throw HttpException(
         'The kill switch returned ${response.statusCode}',
         uri: _endpoint,
@@ -237,7 +257,7 @@ const _kRetryDelays = <Duration>[
   Duration(seconds: 300),
 ];
 
-/// The kill switch (D16): `false` only after the owner's document said so.
+/// The kill switch: `false` only after the owner's document said so.
 /// `false` hides the entry points; it never stops a conversion under way.
 final privateUsdKillSwitchProvider =
     NotifierProvider<PrivateUsdKillSwitchNotifier, bool>(
@@ -309,7 +329,8 @@ class PrivateUsdKillSwitchNotifier extends Notifier<bool> {
   Future<void> _start() async {
     try {
       _lastKnown = await ref.read(privateUsdAvailabilityStoreProvider).read();
-    } catch (_) {
+    } catch (e) {
+      privateUsdLog('kill switch answer unreadable (${e.runtimeType})');
       _lastKnown = null;
     }
     if (_disposed) return;
@@ -322,8 +343,9 @@ class PrivateUsdKillSwitchNotifier extends Notifier<bool> {
     _fetchInFlight = true;
     try {
       fetched = await ref.read(privateUsdAvailabilitySourceProvider).fetch();
-    } catch (_) {
+    } catch (e) {
       // Unknown, not unavailable: keep the last known answer, ask again.
+      privateUsdLog('kill switch fetch unresolved (${e.runtimeType})');
       _retryPending = true;
       _scheduleRetry();
       return;
@@ -337,8 +359,9 @@ class PrivateUsdKillSwitchNotifier extends Notifier<bool> {
     _lastKnown = fetched;
     try {
       await ref.read(privateUsdAvailabilityStoreProvider).write(fetched);
-    } catch (_) {
+    } catch (e) {
       // The answer still applies for this run.
+      privateUsdLog('kill switch answer not cached (${e.runtimeType})');
     }
     if (_disposed) return;
     state = resolvePrivateUsdAvailability(fetched: fetched);

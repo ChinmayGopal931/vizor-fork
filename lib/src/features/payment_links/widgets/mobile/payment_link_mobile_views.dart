@@ -83,10 +83,9 @@ class PaymentLinkHowItWorksMobileSheet extends StatelessWidget {
         children: [
           Text(
             title,
-            // The sheet's title: Thin, as sheet titles are.
             style: AppTypography.bodyLarge.copyWith(
               color: context.colors.text.accent,
-              fontWeight: FontWeight.w100,
+              fontWeight: AppFontWeight.heading,
             ),
           ),
           const SizedBox(height: AppSpacing.xxs),

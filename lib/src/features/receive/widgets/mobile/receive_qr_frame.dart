@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/mobile/neon_motion.dart';
 
 /// Space between [ReceiveQrFrame]'s lit outline and the code's plate.
 const double kReceiveQrFrameGap = AppSpacing.xs;
@@ -75,18 +76,15 @@ class _ReceiveQrFramePainter extends CustomPainter {
       width: 1.2,
       intensity: 0.55 * light,
     );
-    final cuts = Path()
-      ..moveTo(rect.left, rect.top + _cut)
-      ..lineTo(rect.left + _cut, rect.top)
-      ..moveTo(rect.right - _cut, rect.top)
-      ..lineTo(rect.right, rect.top + _cut)
-      ..moveTo(rect.right, rect.bottom - _cut)
-      ..lineTo(rect.right - _cut, rect.bottom)
-      ..moveTo(rect.left + _cut, rect.bottom)
-      ..lineTo(rect.left, rect.bottom - _cut);
     Neon.strokeTube(
       canvas,
-      cuts,
+      Neon.chamferCuts(
+        rect,
+        topLeft: _cut,
+        topRight: _cut,
+        bottomRight: _cut,
+        bottomLeft: _cut,
+      ),
       glow: glow,
       core: core,
       width: 1.6,

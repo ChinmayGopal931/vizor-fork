@@ -11,21 +11,22 @@ import '../src/features/private_usd/models/private_usd_record_key.dart';
 import '../src/features/private_usd/models/private_usd_status_presentation.dart';
 import '../src/features/private_usd/models/railgun_models.dart';
 import '../src/features/private_usd/private_usd_copy.dart';
+import '../src/features/private_usd/providers/private_usd_balance_provider.dart';
 import '../src/features/private_usd/providers/private_usd_conversion_provider.dart';
 import '../src/features/private_usd/providers/private_usd_convert_provider.dart';
-import '../src/features/private_usd/screens/mobile/mobile_private_usd_conversion_screen.dart';
-import '../src/features/private_usd/screens/mobile/mobile_private_usd_convert_review_screen.dart';
-import '../src/features/private_usd/screens/mobile/mobile_private_usd_convert_screen.dart';
+import '../src/features/private_usd/providers/private_usd_unfinished_provider.dart';
 import '../src/features/private_usd/screens/mobile/mobile_private_usd_screen.dart';
 import '../src/features/private_usd/services/private_usd_balance_repository.dart';
 import '../src/features/private_usd/services/private_usd_engine.dart';
 import '../src/features/private_usd/services/private_usd_zec_quote_search.dart';
 import '../src/features/private_usd/widgets/mobile/private_usd_activity_rows.dart';
+import '../src/features/private_usd/widgets/mobile/private_usd_convert_views.dart';
+import '../src/features/private_usd/widgets/mobile/private_usd_progress_views.dart';
 import '../src/features/private_usd/widgets/mobile/private_usd_receive_sheet.dart';
 import '../src/rust/api/private_usd.dart';
 
-/// Deterministic Private USD fixtures (plan reference §9.7): fixed balances,
-/// addresses and times; no WebView, Rust, network or clock.
+/// Deterministic Private USD fixtures: fixed balances, addresses and times;
+/// no WebView, Rust, network or clock.
 
 /// Mainnet USDC, the token the home and screen previews hold.
 const previewPrivateUsdUsdc = PrivateUsdToken(
@@ -34,13 +35,36 @@ const previewPrivateUsdUsdc = PrivateUsdToken(
   decimals: 6,
 );
 
-/// A real-format `0zk` address (zapp's test vector for 64 bytes of 0x08).
+/// A real-format `0zk` address, for 64 bytes of 0x08.
 const previewPrivateUsdAddress =
     '0zk1qyrs4qyrd08p6uep0fc2y8njktgcpezts3rpaq6q0ln948ecjkw8prv7j6f'
     'e3z53llz8ursderja0juwv5pgnv8x5klmmwkv8q38h9n704h4d4qjyw7n5qk68nx';
 
+/// Another wallet's real-format `0zk` address, for sends.
+const previewPrivateUsdRecipient =
+    '0zk1qy860uut20m8gd6fnhzvr0zqeyhs0ya5247x7h2eyedxsazx43w5nrv7j6fe3z53l78'
+    'hn78kmslky2206lm75mclrv7dawd756m2suy7l4zud2m4yhg6kcsn7ed';
+
+/// An EIP-55 address (the EIP's own example): a deposit address, or where a
+/// withdrawal goes.
+const previewPrivateUsdEthereumAddress =
+    '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed';
+
+/// A send's Ethereum transaction.
+const previewPrivateUsdTxHash =
+    '0x4b2e6a8c0d1f3a5c7e9b1d3f5a7c9e0b2d4f6a8c1e3b5d7f9a0c2e4b6d8f1a3c';
+
 /// 2026-10-13 09:41 local.
 final previewPrivateUsdUpdatedAt = DateTime(2026, 10, 13, 9, 41);
+
+/// 2026-10-14 09:41 local: the conversion and send previews' "now".
+final previewPrivateUsdNow = DateTime(2026, 10, 14, 9, 41);
+
+/// [time] in Unix seconds, as Rust records it.
+int previewPrivateUsdUnix(DateTime time) => time.millisecondsSinceEpoch ~/ 1000;
+
+// The deployment's Zcash confirmations, as the previews count them.
+const _confirmations = 2;
 
 /// A balance with [available], [arriving], [blocked] and [processing]
 /// dollars of USDC.
@@ -73,16 +97,11 @@ PrivateUsdBalanceState previewPrivateUsdBalance({
 RailgunTokenAmount _held(BigInt amount) =>
     RailgunTokenAmount(token: previewPrivateUsdUsdc.address, amount: amount);
 
-/// Not used yet: nothing known and nothing loading, the home strip's "—".
+/// Not used yet: nothing known and nothing loading.
 const previewPrivateUsdUnknown = PrivateUsdBalanceState();
 
 /// A first sync under way, nothing shown yet.
 const previewPrivateUsdLoading = PrivateUsdBalanceState(isRefreshing: true);
-
-/// Another wallet's real-format `0zk` address, for sends.
-const previewPrivateUsdRecipient =
-    '0zk1qy860uut20m8gd6fnhzvr0zqeyhs0ya5247x7h2eyedxsazx43w5nrv7j6fe3z53l78'
-    'hn78kmslky2206lm75mclrv7dawd756m2suy7l4zud2m4yhg6kcsn7ed';
 
 /// A send of $[dollars] kept [ago] before [previewPrivateUsdNow]:
 /// confirmed with its transaction, or not in a block yet.
@@ -100,16 +119,52 @@ ApiSendRecord previewPrivateUsdSendRecord({
     amount: BigInt.from((dollars * 1e6).round()).toString(),
     fee: '500000',
     to: withdraw
-        ? '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
+        ? previewPrivateUsdEthereumAddress
         : previewPrivateUsdRecipient,
     withdraw: withdraw,
-    sentAt: sentAt.millisecondsSinceEpoch ~/ 1000,
+    sentAt: previewPrivateUsdUnix(sentAt),
     state: confirmed ? ApiSendState.confirmed : ApiSendState.unconfirmed,
-    txHash: confirmed
-        ? '0x4b2e6a8c0d1f3a5c7e9b1d3f5a7c9e0b2d4f6a8c1e3b5d7f9a0c2e4b6d8f1a3c'
-        : null,
-    postedAt: sentAt.millisecondsSinceEpoch ~/ 1000,
+    txHash: confirmed ? previewPrivateUsdTxHash : null,
+    postedAt: previewPrivateUsdUnix(sentAt),
   );
+}
+
+/// Holds the text controllers a form preview edits, one per [texts].
+class PrivateUsdPreviewControllers extends StatefulWidget {
+  const PrivateUsdPreviewControllers({
+    required this.texts,
+    required this.builder,
+    super.key,
+  });
+
+  final List<String> texts;
+  final Widget Function(
+    BuildContext context,
+    List<TextEditingController> controllers,
+  )
+  builder;
+
+  @override
+  State<PrivateUsdPreviewControllers> createState() =>
+      _PrivateUsdPreviewControllersState();
+}
+
+class _PrivateUsdPreviewControllersState
+    extends State<PrivateUsdPreviewControllers> {
+  late final _controllers = [
+    for (final text in widget.texts) TextEditingController(text: text),
+  ];
+
+  @override
+  void dispose() {
+    for (final controller in _controllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, _controllers);
 }
 
 Widget buildMobilePrivateUsdDefaultUseCase(BuildContext context) =>
@@ -161,8 +216,8 @@ Widget buildMobilePrivateUsdHiddenUseCase(BuildContext context) =>
       privacyModeEnabled: true,
     );
 
-/// A send not in a block yet: the spending note, Send and Withdraw
-/// disabled (M7).
+/// A send not in a block yet: the spending note, and Send, Withdraw and
+/// bridging held back.
 Widget buildMobilePrivateUsdPaymentPendingUseCase(BuildContext context) =>
     _PrivateUsdScreenPreview(
       state: previewPrivateUsdBalance(available: 1210.4, processing: 12.5),
@@ -202,11 +257,6 @@ class _PrivateUsdScreenPreview extends StatelessWidget {
           zecUsdPrice: 70,
           privacyModeEnabled: privacyModeEnabled,
           screening: const Duration(hours: 1),
-          tokenNames: {
-            previewPrivateUsdUsdc.address: PrivateUsdCopy.tokenName(
-              previewPrivateUsdUsdc.symbol,
-            ),
-          },
           activityRows: [
             for (final record in sends)
               buildPrivateUsdSendActivityRow(
@@ -219,9 +269,9 @@ class _PrivateUsdScreenPreview extends StatelessWidget {
               ?buildPrivateUsdActivityRow(
                 context: context,
                 record: record,
-                zcashConfirmations: 2,
+                zcashConfirmations: _confirmations,
                 privacyModeEnabled: privacyModeEnabled,
-                onOpenPayout: () {},
+                onOpenTransaction: () {},
               ),
           ],
           onBack: () {},
@@ -239,21 +289,18 @@ class _PrivateUsdScreenPreview extends StatelessWidget {
   }
 }
 
-/// A deposit address, EIP-55 (the EIP's own example).
-const previewPrivateUsdDepositAddress =
-    '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed';
-
-// As `showAppMobileSheet` presents it: the modal card at the bottom.
+// As `showAppMobileSheet` presents it: the modal card at the bottom, the
+// sheet scrolling when it is taller than the space above the status bar.
 Widget _receivePreview(PrivateUsdReceiveKind kind) => PrivateUsdPreviewFrame(
   child: Builder(
     builder: (context) => ColoredBox(
       color: context.colors.background.window,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Spacer(),
-          MobileModalCard(child: _receiveBody(kind)),
-        ],
+      child: SafeArea(
+        bottom: false,
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: MobileModalCard(child: _receiveBody(kind)),
+        ),
       ),
     ),
   ),
@@ -264,7 +311,7 @@ Widget _receiveBody(PrivateUsdReceiveKind kind) => PrivateUsdReceiveSheetBody(
   onKindChanged: (_) {},
   symbol: 'USDC',
   chain: 'Ethereum',
-  address: previewPrivateUsdDepositAddress,
+  address: previewPrivateUsdEthereumAddress,
   railgunAddress: previewPrivateUsdAddress,
   terms: const ApiDepositTerms(
     fee: '250000',
@@ -316,12 +363,7 @@ class PrivateUsdPreviewFrame extends StatelessWidget {
   }
 }
 
-// ── Forward conversion (M5, plan reference §9.7) ─────────────────────────
-
-/// 2026-10-14 09:41 local: the forward previews' "now".
-final previewPrivateUsdNow = DateTime(2026, 10, 14, 9, 41);
-
-int _unix(DateTime time) => time.millisecondsSinceEpoch ~/ 1000;
+// ── Forward conversion ───────────────────────────────────────────────────
 
 /// A quote for 0.5 ZEC in all ($16 asked, $15.50 arriving after a $0.46
 /// relayer fee) that is offered for [holds] more.
@@ -336,7 +378,7 @@ PrivateUsdZecQuote previewPrivateUsdQuote({
     requestedUnits: 16000000,
     quote: ApiForwardQuote(
       index: index,
-      expiresAt: _unix(expiresAt),
+      expiresAt: previewPrivateUsdUnix(expiresAt),
       amount: '16000000',
       networkCost: '40000',
       relayerFee: '460000',
@@ -344,7 +386,7 @@ PrivateUsdZecQuote previewPrivateUsdQuote({
       depositZat: BigInt.from(49990000),
       depositFeeZat: BigInt.from(10000),
       maxTotalZat: BigInt.from(50000000),
-      feeExpiresAt: _unix(expiresAt),
+      feeExpiresAt: previewPrivateUsdUnix(expiresAt),
     ),
   );
 }
@@ -388,20 +430,21 @@ ApiForwardRecord previewPrivateUsdRecord({
   bool deposited = true,
 }) {
   final acceptedAt = previewPrivateUsdNow.subtract(ago);
+  int at(Duration after) => previewPrivateUsdUnix(acceptedAt.add(after));
   return ApiForwardRecord(
     index: index,
     swapId:
         '0x7b2d41c09e5f8a3b6c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b',
     phase: phase,
-    acceptedAt: _unix(acceptedAt),
-    quoteExpiresAt: _unix(acceptedAt.add(const Duration(minutes: 5))),
+    acceptedAt: previewPrivateUsdUnix(acceptedAt),
+    quoteExpiresAt: at(const Duration(minutes: 5)),
     depositZat: BigInt.from(49990000),
     maxTotalZat: BigInt.from(50000000),
     amount: '16000000',
     receives: '15500000',
     relayerFee: '460000',
-    t0: _unix(acceptedAt.add(const Duration(minutes: 40))),
-    t1: _unix(acceptedAt.add(const Duration(hours: 2))),
+    t0: at(const Duration(minutes: 40)),
+    t1: at(const Duration(hours: 2)),
     depositTxid: deposited
         ? '9f1c3b5a7d2e4f60819a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f70'
         : null,
@@ -417,49 +460,29 @@ ApiForwardRecord previewPrivateUsdRecord({
     outcome: outcome,
     refundCause: refundCause,
     nothingSentCause: nothingSentCause,
-    endedAt: outcome == null
-        ? null
-        : _unix(acceptedAt.add(const Duration(minutes: 12))),
+    endedAt: outcome == null ? null : at(const Duration(minutes: 12)),
   );
 }
 
-Widget _convertPreview(PrivateUsdConvertState state) =>
-    PrivateUsdPreviewFrame(child: _ConvertPreview(state: state));
-
-class _ConvertPreview extends StatefulWidget {
-  const _ConvertPreview({required this.state});
-
-  final PrivateUsdConvertState state;
-
-  @override
-  State<_ConvertPreview> createState() => _ConvertPreviewState();
-}
-
-class _ConvertPreviewState extends State<_ConvertPreview> {
-  late final _controller = TextEditingController(text: widget.state.amountText);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => MobilePrivateUsdConvertView(
-    state: widget.state,
-    controller: _controller,
-    autofocus: false,
-    privateUsdAvailable: BigInt.from(1250400000),
-    onAmountChanged: (_) {},
-    onMax: () {},
-    onReview: () {},
-    onBack: () {},
-    // The direction toggle shows on the amount step, as in the app (M6).
-    onSwitchDirection: widget.state.step == PrivateUsdConvertStep.amount
-        ? () {}
-        : null,
-  );
-}
+Widget _convertPreview(PrivateUsdConvertState state) => PrivateUsdPreviewFrame(
+  child: PrivateUsdPreviewControllers(
+    texts: [state.amountText],
+    builder: (context, controllers) => MobilePrivateUsdConvertView(
+      state: state,
+      controller: controllers.single,
+      autofocus: false,
+      privateUsdAvailable: BigInt.from(1250400000),
+      onAmountChanged: (_) {},
+      onMax: () {},
+      onReview: () {},
+      onBack: () {},
+      // The direction switch is live on the amount step, as in the app.
+      onSwitchDirection: state.step == PrivateUsdConvertStep.amount
+          ? () {}
+          : null,
+    ),
+  ),
+);
 
 /// ZEC → USD with a quote: the ledger and its countdown.
 Widget buildMobilePrivateUsdConvertUseCase(BuildContext context) =>
@@ -467,7 +490,7 @@ Widget buildMobilePrivateUsdConvertUseCase(BuildContext context) =>
       previewPrivateUsdConvertState(quote: previewPrivateUsdQuote()),
     );
 
-/// "Getting quote…" while the typed amount is quoted.
+/// While the typed amount is quoted.
 Widget buildMobilePrivateUsdConvertQuotingUseCase(BuildContext context) =>
     _convertPreview(previewPrivateUsdConvertState(quoting: true));
 
@@ -480,7 +503,7 @@ Widget buildMobilePrivateUsdConvertInsufficientUseCase(BuildContext context) =>
       ),
     );
 
-/// The wallet still catching up: the line says so and "Max" waits.
+/// The wallet still catching up: the line says so and Max waits.
 Widget buildMobilePrivateUsdConvertSyncingUseCase(BuildContext context) =>
     _convertPreview(
       previewPrivateUsdConvertState(
@@ -490,17 +513,15 @@ Widget buildMobilePrivateUsdConvertSyncingUseCase(BuildContext context) =>
       ),
     );
 
-Widget _reviewPreview(PrivateUsdConvertState state, {bool torOff = false}) =>
-    PrivateUsdPreviewFrame(
-      child: MobilePrivateUsdConvertReviewView(
-        state: state,
-        privacyModeEnabled: false,
-        showsTorOffDisclosure: torOff,
-        onBack: () {},
-        onConfirm: () {},
-        onRefreshQuote: () {},
-      ),
-    );
+Widget _reviewPreview(PrivateUsdConvertState state) => PrivateUsdPreviewFrame(
+  child: MobilePrivateUsdConvertReviewView(
+    state: state,
+    privacyModeEnabled: false,
+    onBack: () {},
+    onConfirm: () {},
+    onRefreshQuote: () {},
+  ),
+);
 
 /// The forward review.
 Widget buildMobilePrivateUsdReviewUseCase(BuildContext context) =>
@@ -511,24 +532,13 @@ Widget buildMobilePrivateUsdReviewUseCase(BuildContext context) =>
       ),
     );
 
-/// The review once its quote ran out: "Quote expired", "Refresh quote".
+/// The review once its quote ran out.
 Widget buildMobilePrivateUsdReviewExpiredUseCase(BuildContext context) =>
     _reviewPreview(
       previewPrivateUsdConvertState(
         quote: previewPrivateUsdQuote(holds: Duration.zero),
         step: PrivateUsdConvertStep.review,
       ),
-    );
-
-/// The review with the Tor-off token disclosure (shown once tokens exist,
-/// M4).
-Widget buildMobilePrivateUsdReviewTorOffUseCase(BuildContext context) =>
-    _reviewPreview(
-      previewPrivateUsdConvertState(
-        quote: previewPrivateUsdQuote(),
-        step: PrivateUsdConvertStep.review,
-      ),
-      torOff: true,
     );
 
 Widget _progressPreview(
@@ -540,7 +550,7 @@ Widget _progressPreview(
     presentation: privateUsdProgressPresentation(
       status: status,
       now: previewPrivateUsdNow,
-      zcashConfirmations: 2,
+      zcashConfirmations: _confirmations,
       screening: const Duration(hours: 1),
       balance: balance,
       explorerTxPrefix: 'https://sepolia.etherscan.io/tx/',
@@ -555,7 +565,7 @@ Widget _progressPreview(
   ),
 );
 
-/// Forward, waiting for confirmations (1 of 2).
+/// Waiting for confirmations, 1 of 2.
 Widget buildMobilePrivateUsdProgressUseCase(BuildContext context) =>
     _progressPreview(
       PrivateUsdConversionStatus(
@@ -564,7 +574,7 @@ Widget buildMobilePrivateUsdProgressUseCase(BuildContext context) =>
       ),
     );
 
-/// An opening that has taken over 90 s: "Call it off".
+/// An opening that has taken over 90 s, so it can be called off.
 Widget buildMobilePrivateUsdProgressOpeningSlowUseCase(BuildContext context) =>
     _progressPreview(
       PrivateUsdConversionStatus(
@@ -653,7 +663,7 @@ Widget buildMobilePrivateUsdProgressNothingSentUseCase(BuildContext context) =>
       ),
     );
 
-/// The home banner's conversion: waiting for confirmations (1 of 2).
+/// The home banner's conversion: waiting for confirmations, 1 of 2.
 Map<PrivateUsdRecordKey, PrivateUsdConversionStatus>
 previewPrivateUsdConverting(String accountUuid) => {
   PrivateUsdRecordKey(
@@ -666,19 +676,56 @@ previewPrivateUsdConverting(String accountUuid) => {
   ),
 };
 
-/// The banner a conversion under way shows (for tests).
+/// A balance that only shows [fixed]. It never polls or opens the page.
+class FixedPrivateUsdBalanceNotifier extends PrivateUsdBalanceNotifier {
+  FixedPrivateUsdBalanceNotifier(super.accountUuid, this.fixed);
+
+  final PrivateUsdBalanceState fixed;
+
+  @override
+  PrivateUsdBalanceState build() => fixed;
+
+  @override
+  VoidCallback watch({required bool ifUsed}) => () {};
+
+  @override
+  void refresh({Duration maxAge = Duration.zero}) {}
+}
+
+/// Conversions that only show [fixed]. No engine runs.
+class FixedPrivateUsdConversionsNotifier extends PrivateUsdConversionsNotifier {
+  FixedPrivateUsdConversionsNotifier(this.fixed);
+
+  final Map<PrivateUsdRecordKey, PrivateUsdConversionStatus> fixed;
+
+  @override
+  Map<PrivateUsdRecordKey, PrivateUsdConversionStatus> build() => fixed;
+}
+
+/// Reverse conversions that only show [fixed]. No engine runs.
+class FixedPrivateUsdReverseConversionsNotifier
+    extends PrivateUsdReverseConversionsNotifier {
+  FixedPrivateUsdReverseConversionsNotifier(this.fixed);
+
+  final Map<PrivateUsdRecordKey, PrivateUsdReverseStatus> fixed;
+
+  @override
+  Map<PrivateUsdRecordKey, PrivateUsdReverseStatus> build() => fixed;
+}
+
+/// The banner a conversion under way shows.
 PrivateUsdBannerState previewPrivateUsdBanner() => PrivateUsdBannerState(
   path: const PrivateUsdRoutePath(
     direction: PrivateUsdDirection.forward,
     index: 7,
   ),
-  title: PrivateUsdCopy.bannerToUsd,
+  title: PrivateUsdCopy.convertingToUsd,
   detail: privateUsdForwardStageLabel(
     PrivateUsdConversionStatus(
       record: previewPrivateUsdRecord(depositConfirmations: 1),
       wait: ApiForwardWait.confirming,
     ),
-    zcashConfirmations: 2,
+    zcashConfirmations: _confirmations,
   ),
   attention: false,
 );
@@ -692,6 +739,6 @@ List<ActivityRowData> previewPrivateUsdActivityRows(
     ?buildPrivateUsdActivityRow(
       context: context,
       record: record,
-      zcashConfirmations: 2,
+      zcashConfirmations: _confirmations,
     ),
 ];

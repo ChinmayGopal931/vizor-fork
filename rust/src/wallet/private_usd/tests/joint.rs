@@ -1,6 +1,6 @@
-//! The M2 joint-account and deposit operations (plan M2 "Done when"), against
-//! real wallet DBs that scan synthetic compact blocks after NU6.3. A local
-//! fake lightwalletd answers the chain tip; nothing is broadcast.
+//! The joint-account and deposit operations, against real wallet DBs that
+//! scan synthetic compact blocks after NU6.3. A local fake lightwalletd
+//! answers the chain tip; nothing is broadcast.
 
 use std::num::NonZeroU32;
 
@@ -262,7 +262,7 @@ fn home_ua() -> String {
     .encode(&NETWORK.network_type())
 }
 
-/// Swap `index`'s joint account with the reference §5.5 maker share.
+/// Swap `index`'s joint account with the vectors' maker share.
 fn joint_account(index: u32) -> JointAccount {
     let maker = derive_maker_share(&[9; 32], u64::from(index)).unwrap();
     SwapKeyContext::for_tests(&[7; 64], PrivateUsdNetwork::Mainnet, 0)
@@ -389,11 +389,14 @@ fn a_swap_deposit_is_one_transaction_within_its_approved_total() {
         )
     };
 
-    let over = propose(&joint_ua, 500_000, 500_000).err().unwrap();
+    let over = propose(&joint_ua, 500_000, 500_000)
+        .err()
+        .unwrap()
+        .to_string();
     assert!(over.contains("more than the approved 500000"), "{over}");
     // A TEX recipient takes two transactions (ZIP 320).
     let tex = Address::Tex([2; 20]).to_zcash_address(&NETWORK).encode();
-    let split = propose(&tex, 500_000, FUNDS).err().unwrap();
+    let split = propose(&tex, 500_000, FUNDS).err().unwrap().to_string();
     assert!(split.contains("must be one transaction"), "{split}");
     assert_eq!(proposal_locks(&wallet.path), 0);
 

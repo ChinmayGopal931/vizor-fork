@@ -11,11 +11,10 @@ import 'private_usd_engine_provider.dart';
 import 'private_usd_unfinished_provider.dart';
 import 'railgun_engine_provider.dart';
 
-/// [accountUuid]'s spend status (reference §6.7, §9.4 S2): `checking` until
-/// its send log is read, then `sending` while a send runs or the log holds
-/// one not seen in a block, `converting` while a conversion is under way,
-/// `unreadable` when the log does not read, else `available`. Send and
-/// Withdraw need `available`.
+/// [accountUuid]'s spend status: `checking` until its send log is read, then
+/// `sending` while a send runs or the log holds one not seen in a block,
+/// `converting` while a conversion is under way, `unreadable` when the log
+/// does not read, else `available`. Send and Withdraw need `available`.
 final privateUsdSpendStatusProvider = NotifierProvider.autoDispose
     .family<PrivateUsdSpendStatusNotifier, PrivateUsdSpendStatus, String>(
       PrivateUsdSpendStatusNotifier.new,
@@ -77,10 +76,10 @@ class PrivateUsdSendRecordsNotifier extends Notifier<List<rust.ApiSendRecord>> {
 }
 
 /// [accountUuid]'s outgoing payment in flight, as the Private USD screen
-/// shows it (owner, 2026-10-17): the proof's progress while the page proves
-/// one (a send, a withdrawal or a conversion's escrow payment), how long a
-/// kept send has waited for a block, and "Updating your balance" from its
-/// block until the balance syncs. Null when none is in flight.
+/// shows it: the proof's progress while the page proves one (a send, a
+/// withdrawal or a conversion's escrow payment), how long a kept send has
+/// waited for a block, and that the balance is updating from its block until
+/// the balance syncs. Null when none is in flight.
 final privateUsdPendingPaymentProvider = Provider.autoDispose
     .family<PrivateUsdPendingPayment?, String>((ref, accountUuid) {
       final proofProgress = ref.watch(

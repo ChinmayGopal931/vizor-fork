@@ -5,9 +5,9 @@ import '../../theme/app_theme.dart';
 /// Content surface used by the mobile screens: it sections settings rows,
 /// activity groups, and similar list content.
 ///
-/// In the neon redesign it is a glass panel: dark, see-through, cut at two
-/// opposite corners, with a faint red edge whose cut corners are lit, so the
-/// backdrop's light reads through and the panel still has a shape.
+/// It is a glass panel: dark, see-through, cut at two opposite corners, with
+/// a faint red edge whose cut corners are lit, so the backdrop's light reads
+/// through and the panel still has a shape.
 class MobileSurfaceCard extends StatelessWidget {
   const MobileSurfaceCard({
     required this.child,
@@ -16,12 +16,14 @@ class MobileSurfaceCard extends StatelessWidget {
     super.key,
   });
 
-  /// Kept for callers written against the Figma surfaces; the neon panel's
-  /// corners are cut ([AppChamfer.large]) rather than rounded.
+  /// Corner radius measured from the Figma mobile surfaces (not
+  /// tokenized as a variable yet).
   static const defaultRadius = 20.0;
 
   final Widget child;
   final EdgeInsetsGeometry padding;
+
+  /// Ignored: the glass panel's corners are cut ([AppChamfer.large]).
   final double cornerRadius;
 
   @override
@@ -66,12 +68,13 @@ class NeonGlassPanelPainter extends CustomPainter {
           ..strokeWidth = 1
           ..color = glow.withValues(alpha: 0.22),
       );
-    final corners = Path()
-      ..moveTo(rect.left, rect.top + cut)
-      ..lineTo(rect.left + cut, rect.top)
-      ..moveTo(rect.right, rect.bottom - cut)
-      ..lineTo(rect.right - cut, rect.bottom);
-    Neon.strokeTube(canvas, corners, glow: glow, core: core, width: 1.4);
+    Neon.strokeTube(
+      canvas,
+      Neon.chamferCuts(rect, topLeft: cut, bottomRight: cut),
+      glow: glow,
+      core: core,
+      width: 1.4,
+    );
   }
 
   @override

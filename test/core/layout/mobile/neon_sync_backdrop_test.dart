@@ -7,8 +7,7 @@ import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 
 // The floor flows, and a climbing line's pulse runs, only while something
-// scans; idle, nothing moves and no frame is drawn (the owner's choice on
-// 2026-10-17, iOS progress VI-19).
+// scans; idle, nothing moves and no frame is drawn.
 void main() {
   const synced = NeonSyncLine(
     progress: 1,
@@ -96,25 +95,25 @@ void main() {
     expect(moving(tester), isTrue, reason: 'and flows again when one starts');
   });
 
-  NeonSyncBackdropView view(WidgetTester tester) =>
-      tester.widget<NeonSyncBackdropView>(find.byType(NeonSyncBackdropView));
+  NeonSyncLineLayer layer(WidgetTester tester) =>
+      tester.widget<NeonSyncLineLayer>(find.byType(NeonSyncLineLayer));
 
   testWidgets('a line behind the content keeps its head in front', (
     tester,
   ) async {
     // Synced (or failed), the line runs behind; its head, beside the
     // readout, is the front layer's, so nothing between the layers cuts it
-    // there (owner, 2026-10-17).
+    // there.
     await pumpLayer(tester, synced);
-    expect(view(tester).linePart, NeonSyncLinePart.belowHead);
+    expect(layer(tester).linePart, NeonSyncLinePart.belowHead);
     await pumpLayer(tester, synced, layer: NeonSyncLayer.front);
-    expect(view(tester).linePart, NeonSyncLinePart.head);
+    expect(layer(tester).linePart, NeonSyncLinePart.head);
 
     // Climbing, the whole line is over the content.
     await pumpLayer(tester, climbing);
-    expect(view(tester).linePart, NeonSyncLinePart.none);
+    expect(layer(tester).linePart, NeonSyncLinePart.none);
     await pumpLayer(tester, climbing, layer: NeonSyncLayer.front);
-    expect(view(tester).linePart, NeonSyncLinePart.whole);
+    expect(layer(tester).linePart, NeonSyncLinePart.whole);
   });
 
   testWidgets('the head drawn in front reaches past the readout', (
@@ -132,17 +131,17 @@ void main() {
       await pumpLayer(tester, line, layer: NeonSyncLayer.front);
       final readout = tester.getRect(
         find.descendant(
-          of: find.byType(NeonSyncBackdropView),
+          of: find.byType(NeonSyncLineLayer),
           matching: find.byType(RotatedBox),
         ),
       );
       final length = neonSyncReadoutLength(
-        tester.element(find.byType(NeonSyncBackdropView)),
+        tester.element(find.byType(NeonSyncLineLayer)),
         line.readout,
       );
       // The measure is the readout as drawn, reading bottom to top.
       expect(length, moreOrLessEquals(readout.height, epsilon: 0.5));
-      final size = tester.getSize(find.byType(NeonSyncBackdropView));
+      final size = tester.getSize(find.byType(NeonSyncLineLayer));
       final band = neonSyncHeadBand(
         size,
         progress: line.progress,

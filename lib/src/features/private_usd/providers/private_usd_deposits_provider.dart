@@ -9,10 +9,10 @@ import 'private_usd_available_provider.dart';
 import 'private_usd_engine_provider.dart';
 import 'private_usd_unfinished_provider.dart';
 
-/// Whether "Receive" (public USDC deposits, M9) shows for the active
-/// account: the build follows deposits, the network pins a Deposits
-/// contract, and Private USD is available to the account (the kill switch
-/// included, D16; a deposit already under way is followed regardless).
+/// Whether "Receive" (public USDC deposits) shows for the active account:
+/// the build follows deposits, the network pins a Deposits contract, and
+/// Private USD is available to the account (the kill switch included; a
+/// deposit already under way is followed regardless).
 final privateUsdDepositsAvailableProvider = Provider<bool>(
   (ref) =>
       ref.watch(privateUsdDepositsEnabledProvider) &&
@@ -71,7 +71,7 @@ final privateUsdDepositRescuesProvider = Provider.autoDispose
       return pass?.rescuable ?? const [];
     });
 
-/// The engine's deposit calls the screens make: a pass now, a rescue.
+/// The deposit pass the screens ask the engine for.
 @immutable
 class PrivateUsdDepositActions {
   const PrivateUsdDepositActions(this._engine);

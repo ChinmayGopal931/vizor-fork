@@ -8,9 +8,8 @@ import 'package:zcash_wallet/widgetbook/private_usd_send_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
 // The send form's scanner takes a 0zk address to send privately and a 0x one
-// to withdraw, as typed ones are taken (owner, 2026-10-19). An ethereum:
-// request gives up its recipient, never its token, and one for another chain
-// is refused.
+// to withdraw, as typed ones are taken. An ethereum: request gives up its
+// recipient, never its token, and one for another chain is refused.
 void main() {
   const mainnet = 1;
   const zeroAddress = '0x0000000000000000000000000000000000000000';
@@ -55,11 +54,11 @@ void main() {
 
     test('points a 0x address to Withdraw', () {
       expectRejected(
-        scan(previewPrivateUsdWithdrawAddress),
+        scan(previewPrivateUsdEthereumAddress),
         PrivateUsdCopy.scanUseWithdraw,
       );
       expectRejected(
-        scan('ethereum:$previewPrivateUsdWithdrawAddress@1'),
+        scan('ethereum:$previewPrivateUsdEthereumAddress@1'),
         PrivateUsdCopy.scanUseWithdraw,
       );
     });
@@ -78,14 +77,14 @@ void main() {
 
     test('takes a 0x address, plain or as an ethereum: request', () {
       for (final raw in [
-        previewPrivateUsdWithdrawAddress,
-        'ethereum:$previewPrivateUsdWithdrawAddress',
-        'ethereum:$previewPrivateUsdWithdrawAddress@1',
-        'ethereum:pay-$previewPrivateUsdWithdrawAddress@1',
+        previewPrivateUsdEthereumAddress,
+        'ethereum:$previewPrivateUsdEthereumAddress',
+        'ethereum:$previewPrivateUsdEthereumAddress@1',
+        'ethereum:pay-$previewPrivateUsdEthereumAddress@1',
       ]) {
         expectAccepted(
           scan(raw, mode: withdraw),
-          previewPrivateUsdWithdrawAddress,
+          previewPrivateUsdEthereumAddress,
         );
       }
     });
@@ -94,22 +93,22 @@ void main() {
       expectAccepted(
         scan(
           'ethereum:$token@1/transfer?address='
-          '$previewPrivateUsdWithdrawAddress&uint256=1000000',
+          '$previewPrivateUsdEthereumAddress&uint256=1000000',
           mode: withdraw,
         ),
-        previewPrivateUsdWithdrawAddress,
+        previewPrivateUsdEthereumAddress,
       );
     });
 
     test('refuses a request for another chain', () {
       expectRejected(
-        scan('ethereum:$previewPrivateUsdWithdrawAddress@137', mode: withdraw),
+        scan('ethereum:$previewPrivateUsdEthereumAddress@137', mode: withdraw),
         PrivateUsdCopy.scanOtherNetwork,
       );
       expectRejected(
         scan(
           'ethereum:$token@137/transfer?address='
-          '$previewPrivateUsdWithdrawAddress',
+          '$previewPrivateUsdEthereumAddress',
           mode: withdraw,
         ),
         PrivateUsdCopy.scanOtherNetwork,
@@ -117,11 +116,11 @@ void main() {
       // Testnet's deployment is on Sepolia.
       expectAccepted(
         scan(
-          'ethereum:$previewPrivateUsdWithdrawAddress@11155111',
+          'ethereum:$previewPrivateUsdEthereumAddress@11155111',
           mode: withdraw,
           chainId: 11155111,
         ),
-        previewPrivateUsdWithdrawAddress,
+        previewPrivateUsdEthereumAddress,
       );
     });
 
@@ -142,7 +141,7 @@ void main() {
         // One letter's case flipped: the EIP-55 checksum fails.
         expectRejected(
           scan(
-            previewPrivateUsdWithdrawAddress.replaceFirst('a', 'A'),
+            previewPrivateUsdEthereumAddress.replaceFirst('a', 'A'),
             mode: withdraw,
           ),
           PrivateUsdCopy.scanNot0x,

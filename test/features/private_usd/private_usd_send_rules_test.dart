@@ -4,6 +4,7 @@ import 'package:zcash_wallet/src/features/private_usd/models/private_usd_send.da
 import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_spend_guard.dart';
+import 'package:zcash_wallet/src/features/swap/models/swap_token_amount_formatting.dart';
 import 'package:zcash_wallet/src/rust/frb_generated.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_send_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
@@ -28,7 +29,7 @@ class _RailgunAddressRust implements RustLibApi {
 
 final _rust = _RailgunAddressRust();
 const _account = 'account-1';
-const _checksummed = previewPrivateUsdWithdrawAddress;
+const _checksummed = previewPrivateUsdEthereumAddress;
 const _zero = '0x0000000000000000000000000000000000000000';
 
 void main() {
@@ -114,7 +115,7 @@ void main() {
     expect(request?.amount, BigInt.from(1249900000));
     expect(request?.isWithdrawal, isTrue);
     expect(
-      privateUsdTokenText(form('').networkFee!.sendable(asset), 6),
+      swapBaseUnitsToDecimal('${form('').networkFee!.sendable(asset)}', 6),
       '1249.9',
     );
   });
@@ -135,22 +136,21 @@ void main() {
       return 'paid';
     }
 
-    final outcome = await guard.send(
-      _account,
-      pay,
-      busy: (status) => 'busy ${status.name}',
-      unreadable: () => 'unreadable',
+    Matcher busy(PrivateUsdSpendStatus status) => throwsA(
+      isA<PrivateUsdSpendBusyException>().having(
+        (e) => e.status,
+        'status',
+        status,
+      ),
     );
-    expect(outcome, 'busy sending');
+
+    await expectLater(
+      guard.send(_account, pay),
+      busy(PrivateUsdSpendStatus.sending),
+    );
     await expectLater(
       guard.startConversion(_account, pay),
-      throwsA(
-        isA<PrivateUsdSpendBusyException>().having(
-          (e) => e.status,
-          'status',
-          PrivateUsdSpendStatus.sending,
-        ),
-      ),
+      busy(PrivateUsdSpendStatus.sending),
     );
     expect(ran, isFalse, reason: 'a payment started over an unsettled send');
 
@@ -166,14 +166,9 @@ void main() {
       readLog: (_) async => const [],
       unfinishedCount: (_) async => 1,
     );
-    expect(
-      await converting.send(
-        _account,
-        pay,
-        busy: (status) => 'busy ${status.name}',
-        unreadable: () => 'unreadable',
-      ),
-      'busy converting',
+    await expectLater(
+      converting.send(_account, pay),
+      busy(PrivateUsdSpendStatus.converting),
     );
     expect(ran, isFalse);
     expect(await converting.startConversion(_account, pay), 'paid');
@@ -185,14 +180,9 @@ void main() {
     );
     await garbled.check(_account);
     expect(garbled.statusFor(_account), PrivateUsdSpendStatus.unreadable);
-    expect(
-      await garbled.send(
-        _account,
-        pay,
-        busy: (status) => 'busy ${status.name}',
-        unreadable: () => 'unreadable',
-      ),
-      'unreadable',
+    await expectLater(
+      garbled.send(_account, pay),
+      busy(PrivateUsdSpendStatus.unreadable),
     );
     garbled.dispose();
   });

@@ -13,44 +13,33 @@ import 'private_usd_unfinished_provider.dart';
 /// Where a user's own Ethereum RPC URL (Settings) is kept for a Railgun
 /// network: one secure-storage key per network, which a full reset's wipe
 /// takes with the rest.
-abstract interface class PrivateUsdCustomRpcStore {
-  Future<String?> read(String railgunNetwork);
-
-  Future<void> write(String railgunNetwork, String url);
-
-  Future<void> delete(String railgunNetwork);
-}
-
-class SecurePrivateUsdCustomRpcStore implements PrivateUsdCustomRpcStore {
-  const SecurePrivateUsdCustomRpcStore(this._storage);
+class PrivateUsdCustomRpcStore {
+  const PrivateUsdCustomRpcStore(this._storage);
 
   final AppSecureStore _storage;
 
-  static String storageKey(String railgunNetwork) =>
+  static String _storageKey(String railgunNetwork) =>
       'vizor_private_usd_ethereum_rpc_v1_$railgunNetwork';
 
-  @override
   Future<String?> read(String railgunNetwork) =>
-      _storage.readString(storageKey(railgunNetwork));
+      _storage.readString(_storageKey(railgunNetwork));
 
-  @override
   Future<void> write(String railgunNetwork, String url) =>
-      _storage.writeString(storageKey(railgunNetwork), url);
+      _storage.writeString(_storageKey(railgunNetwork), url);
 
-  @override
   Future<void> delete(String railgunNetwork) =>
-      _storage.delete(storageKey(railgunNetwork));
+      _storage.delete(_storageKey(railgunNetwork));
 }
 
 final privateUsdCustomRpcStoreProvider = Provider<PrivateUsdCustomRpcStore>(
-  (_) => SecurePrivateUsdCustomRpcStore(AppSecureStore.instance),
+  (_) => PrivateUsdCustomRpcStore(AppSecureStore.instance),
 );
 
 /// The user's own Ethereum RPC URL for a wallet network (`main`, `test`), or
 /// null for the default (the build's keyed URL, else publicnode). When set it
 /// replaces the default everywhere, alone: the page's `start` and Rust's
-/// Ethereum calls, with no fallback (owner, 2026-10-17). A secret, as it can
-/// hold a key: never log it or put it in a record.
+/// Ethereum calls, with no fallback. A secret, as it can hold a key: never
+/// log it or put it in a record.
 final privateUsdCustomRpcProvider =
     AsyncNotifierProvider.family<PrivateUsdCustomRpcNotifier, String?, String>(
       PrivateUsdCustomRpcNotifier.new,
@@ -139,7 +128,7 @@ Future<String?> privateUsdCustomRpcUrlOf(Ref ref, String network) async {
 /// hold a key.
 String privateUsdCustomRpcHost(String url) => Uri.parse(url).host;
 
-/// Checks a URL before Settings saves it; replaced in tests.
+/// Checks a URL before Settings saves it.
 final privateUsdRpcCheckerProvider = Provider<PrivateUsdRpcChecker>((ref) {
   final checker = PrivateUsdRpcChecker();
   ref.onDispose(checker.close);

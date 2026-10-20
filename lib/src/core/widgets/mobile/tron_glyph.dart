@@ -2,9 +2,8 @@ import 'package:flutter/widgets.dart';
 
 import '../../theme/app_theme.dart';
 
-/// The neon redesign's line glyphs: straight strokes and 45° cuts only, drawn
-/// on a 24-unit grid. Lit, they are tubes (glow and a white-hot core); unlit,
-/// thin grey lines.
+/// Line glyphs of straight strokes and 45° cuts only, drawn on a 24-unit
+/// grid. Lit, they are tubes (glow and a white-hot core); unlit, thin lines.
 enum TronGlyphKind {
   home,
   swap,
@@ -41,36 +40,23 @@ class TronGlyph extends StatelessWidget {
   final double lit;
   final double size;
 
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size.square(size),
-      painter: _TronGlyphPainter(
-        kind: kind,
-        color: color,
-        core: core ?? color,
-        lit: lit,
-      ),
-    );
+  /// The cut-corner plate that holds check, plus, cancel and help, in a
+  /// [size] square: 20 of the 24 units, two opposite corners cut by 4.
+  static Path platePath(double size) {
+    final u = size / 24;
+    return Path()..addPolygon([
+      Offset(6 * u, 2 * u),
+      Offset(22 * u, 2 * u),
+      Offset(22 * u, 18 * u),
+      Offset(18 * u, 22 * u),
+      Offset(2 * u, 22 * u),
+      Offset(2 * u, 6 * u),
+    ], true);
   }
-}
 
-class _TronGlyphPainter extends CustomPainter {
-  _TronGlyphPainter({
-    required this.kind,
-    required this.color,
-    required this.core,
-    required this.lit,
-  });
-
-  final TronGlyphKind kind;
-  final Color color;
-  final Color core;
-  final double lit;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final u = size.width / 24;
+  /// The strokes of [kind] in a [size] square, as the glyph draws them.
+  static Path pathFor(TronGlyphKind kind, double size) {
+    final u = size / 24;
     Offset p(double x, double y) => Offset(x * u, y * u);
     final path = Path();
     void poly(List<Offset> points, {bool close = false}) {
@@ -80,6 +66,8 @@ class _TronGlyphPainter extends CustomPainter {
       }
       if (close) path.close();
     }
+
+    void plate() => path.addPath(platePath(size), Offset.zero);
 
     switch (kind) {
       case TronGlyphKind.home:
@@ -125,15 +113,8 @@ class _TronGlyphPainter extends CustomPainter {
         ], close: true);
         poly([p(12, 8), p(16, 12), p(12, 16), p(8, 12)], close: true);
       case TronGlyphKind.check:
-        // A cut-corner plate holding an angular tick.
-        poly([
-          p(6, 2),
-          p(22, 2),
-          p(22, 18),
-          p(18, 22),
-          p(2, 22),
-          p(2, 6),
-        ], close: true);
+        // The plate holding an angular tick.
+        plate();
         poly([p(7, 12.5), p(10.5, 16), p(17, 8.5)]);
       case TronGlyphKind.receive:
         // A drop into a bracket.
@@ -141,14 +122,7 @@ class _TronGlyphPainter extends CustomPainter {
         poly([p(7, 10), p(12, 15), p(17, 10)]);
         poly([p(3, 15), p(3, 21), p(21, 21), p(21, 15)]);
       case TronGlyphKind.plus:
-        poly([
-          p(6, 2),
-          p(22, 2),
-          p(22, 18),
-          p(18, 22),
-          p(2, 22),
-          p(2, 6),
-        ], close: true);
+        plate();
         poly([p(12, 7), p(12, 17)]);
         poly([p(7, 12), p(17, 12)]);
       case TronGlyphKind.warning:
@@ -156,26 +130,12 @@ class _TronGlyphPainter extends CustomPainter {
         poly([p(12, 9), p(12, 14.5)]);
         poly([p(12, 17), p(12, 18)]);
       case TronGlyphKind.cancel:
-        poly([
-          p(6, 2),
-          p(22, 2),
-          p(22, 18),
-          p(18, 22),
-          p(2, 22),
-          p(2, 6),
-        ], close: true);
+        plate();
         poly([p(8, 8), p(16, 16)]);
         poly([p(16, 8), p(8, 16)]);
       case TronGlyphKind.help:
         // The plate holding a question mark of straight strokes.
-        poly([
-          p(6, 2),
-          p(22, 2),
-          p(22, 18),
-          p(18, 22),
-          p(2, 22),
-          p(2, 6),
-        ], close: true);
+        plate();
         poly([
           p(8.5, 9.5),
           p(8.5, 8),
@@ -201,7 +161,40 @@ class _TronGlyphPainter extends CustomPainter {
         poly([p(11.5, 7.5), p(18.5, 14.5)]);
         poly([p(18.5, 7.5), p(11.5, 14.5)]);
     }
+    return path;
+  }
 
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size.square(size),
+      painter: _TronGlyphPainter(
+        kind: kind,
+        color: color,
+        core: core ?? color,
+        lit: lit,
+      ),
+    );
+  }
+}
+
+class _TronGlyphPainter extends CustomPainter {
+  _TronGlyphPainter({
+    required this.kind,
+    required this.color,
+    required this.core,
+    required this.lit,
+  });
+
+  final TronGlyphKind kind;
+  final Color color;
+  final Color core;
+  final double lit;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final u = size.width / 24;
+    final path = TronGlyph.pathFor(kind, size.width);
     if (lit > 0) {
       Neon.strokeTube(
         canvas,
@@ -213,14 +206,11 @@ class _TronGlyphPainter extends CustomPainter {
       );
     }
     if (lit < 1) {
-      canvas.drawPath(
+      Neon.strokeUnlit(
+        canvas,
         path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.6 * u
-          ..strokeJoin = StrokeJoin.miter
-          ..strokeCap = StrokeCap.square
-          ..color = color.withValues(alpha: 1 - lit),
+        color: color.withValues(alpha: 1 - lit),
+        width: 1.6 * u,
       );
     }
   }

@@ -19,7 +19,8 @@ import '../../../../providers/account_provider.dart';
 import '../../../../providers/network_privacy_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../../../providers/zec_price_change_provider.dart';
-import '../../../../rust/api/private_usd.dart' show ApiReversePhase;
+import '../../../../rust/api/private_usd.dart'
+    show ApiDepositPass, ApiReversePhase;
 import '../../../activity/activity_feed_sections.dart'
     show compareActivityEntries;
 import '../../../activity/models/activity_row_data.dart';
@@ -27,6 +28,7 @@ import '../../../activity/widgets/activity_feed.dart' show ActivityFeedRowGroup;
 import '../../models/private_usd_arrival.dart';
 import '../../models/private_usd_balances.dart';
 import '../../models/private_usd_deposits.dart';
+import '../../models/private_usd_messages.dart';
 import '../../models/private_usd_pending_payment.dart';
 import '../../models/private_usd_record_key.dart';
 import '../../models/private_usd_screening_status.dart';
@@ -43,6 +45,7 @@ import '../../providers/private_usd_receive_address_provider.dart';
 import '../../providers/private_usd_spend_status_provider.dart';
 import '../../providers/railgun_engine_provider.dart';
 import '../../services/private_usd_balance_repository.dart';
+import '../../widgets/mobile/private_usd_flow_widgets.dart';
 import '../../widgets/mobile/private_usd_home_strip.dart';
 import '../../widgets/mobile/private_usd_activity_rows.dart';
 import '../../widgets/mobile/private_usd_banner.dart';
@@ -51,10 +54,10 @@ import '../../widgets/mobile/private_usd_info_sheets.dart';
 import '../../widgets/mobile/private_usd_pending_payment_line.dart';
 import '../../widgets/mobile/private_usd_sync_line.dart';
 
-/// `/private-usd` (plan reference §9.4 S2): the balance with its screening
-/// buckets, Send and Withdraw with the spending note, the conversion under
-/// way, the receive address, the activity, and "Convert". Railgun's sync is
-/// Home's sync line (iOS progress VI-19).
+/// `/private-usd`: the balance with its screening buckets, Send, Withdraw
+/// and Receive with the spending note, the deposits, the conversion under
+/// way, the activity, and the way into a new conversion. Railgun's sync is
+/// drawn as Home's sync line.
 class MobilePrivateUsdScreen extends ConsumerStatefulWidget {
   const MobilePrivateUsdScreen({super.key});
 
@@ -63,8 +66,8 @@ class MobilePrivateUsdScreen extends ConsumerStatefulWidget {
       _MobilePrivateUsdScreenState();
 }
 
-/// How often the screen asks for a deposit pass while it is open (plan M9's
-/// default cadence).
+/// How often the open screen asks for a deposit pass. A pass reads every
+/// deposit address on chain, and deposits show here only in passing.
 const _depositRefresh = Duration(seconds: 60);
 
 class _MobilePrivateUsdScreenState
@@ -75,7 +78,7 @@ class _MobilePrivateUsdScreenState
   void initState() {
     super.initState();
     // On open: a balance older than 30 s refreshes, and the deposits are
-    // read (with the vaults, for "Refunds").
+    // read, with the vaults a refund can come from.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(privateUsdDepositActionsProvider).refresh(checkVaults: true);
@@ -112,20 +115,12 @@ class _MobilePrivateUsdScreenState
     final underWay = ref.watch(privateUsdUnderWayProvider(uuid));
     void open(PrivateUsdRoutePath path) => context.push(path.location);
     void openRefunds() => context.push('/private-usd/refunds');
-    final records = ref.watch(privateUsdActivityRecordsProvider(uuid));
-    final reverseRecords = ref.watch(
-      privateUsdReverseActivityRecordsProvider(uuid),
-    );
-    final depositRecords = ref.watch(privateUsdDepositRecordsProvider(uuid));
+    final feed = ref.watch(privateUsdActivityProvider(uuid));
     final screening = Duration(seconds: deployment?.screeningSeconds ?? 0);
     final activity = [
-      for (final entry in privateUsdActivityEntries(
+      for (final entry in privateUsdFeedEntries(
         context: context,
-        records: records,
-        reverseRecords: reverseRecords,
-        depositRecords: depositRecords,
-        screening: screening,
-        zcashConfirmations: deployment?.zcashConfirmations ?? 2,
+        activity: feed,
         privacyModeEnabled: privacyModeEnabled,
         onOpenConversion: open,
         onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
@@ -134,10 +129,9 @@ class _MobilePrivateUsdScreenState
       )..sort(compareActivityEntries))
         entry.row,
     ];
-    // Deposits (M9): their state now, and a vault that can be rescued.
     final depositPass = ref.watch(privateUsdDepositPassProvider(uuid));
     final hasRefunds =
-        reverseRecords.any(
+        feed.reverseRecords.any(
           (record) => record.phase == ApiReversePhase.refunded,
         ) ||
         ref.watch(privateUsdDepositRescuesProvider(uuid)).isNotEmpty;
@@ -161,7 +155,6 @@ class _MobilePrivateUsdScreenState
         (balance.refreshFailed ||
             ref.watch(privateUsdEthereumUnreachableProvider(uuid)));
     return MobilePrivateUsdView(
-      rpcFailing: rpcFailing,
       onUseDefaultRpc: rpcFailing
           ? () => unawaited(_useDefaultRpc(network, uuid))
           : null,
@@ -173,18 +166,11 @@ class _MobilePrivateUsdScreenState
       screening: screening,
       arrivingSince: privateUsdArrivingSince(
         arriving: balance.balances?.arriving ?? BigInt.zero,
-        forward: records,
-        reverse: reverseRecords,
-        deposits: depositRecords,
+        forward: feed.records,
+        reverse: feed.reverseRecords,
+        deposits: feed.depositRecords,
       ),
-      depositLines: depositPass == null
-          ? const []
-          : privateUsdDepositLines(
-              depositPass,
-              now: DateTime.now(),
-              screening: screening,
-            ),
-      depositMinimum: BigInt.tryParse(depositPass?.terms?.minValue ?? ''),
+      depositPass: depositPass,
       // Public USDC where the network pins deposits, and the 0zk address
       // for another Railgun wallet: one sheet, as ZEC's Receive.
       onReceive: deposits || address.value != null
@@ -194,10 +180,6 @@ class _MobilePrivateUsdScreenState
               deposits: deposits,
             )
           : null,
-      tokenNames: {
-        for (final token in deployment?.usdTokens ?? const [])
-          token.address.toLowerCase(): PrivateUsdCopy.tokenName(token.symbol),
-      },
       banner: ref.watch(privateUsdConversionBannerProvider(uuid)),
       activityRows: activity,
       onRefunds: hasRefunds ? openRefunds : null,
@@ -233,8 +215,7 @@ class _MobilePrivateUsdScreenState
   }
 }
 
-/// The screen's content for a given balance, address and price. Widgetbook,
-/// capture scenarios and tests build it directly.
+/// The screen's content for a given balance, its deposits and the price.
 class MobilePrivateUsdView extends StatelessWidget {
   const MobilePrivateUsdView({
     required this.state,
@@ -247,7 +228,6 @@ class MobilePrivateUsdView extends StatelessWidget {
     this.arrivingSince,
     this.now = DateTime.now,
     this.networkPrivacy,
-    this.tokenNames = const {},
     this.banner,
     this.activityRows = const [],
     this.onOpenConversion,
@@ -259,11 +239,9 @@ class MobilePrivateUsdView extends StatelessWidget {
     this.spendNote,
     this.pendingPayment,
     this.onRefunds,
-    this.rpcFailing = false,
     this.onUseDefaultRpc,
     this.onReceive,
-    this.depositLines = const [],
-    this.depositMinimum,
+    this.depositPass,
     super.key,
   });
 
@@ -278,20 +256,15 @@ class MobilePrivateUsdView extends StatelessWidget {
   final double? zecUsdPrice;
   final bool privacyModeEnabled;
 
-  /// How long Railgun screens new funds, for the explanations and the
-  /// Arriving row's estimate.
+  /// How long Railgun screens new funds.
   final Duration screening;
 
   /// When the funds arriving now landed (`privateUsdArrivingSince`), for the
-  /// Arriving row's estimate; null when unknown, and the row reads as
-  /// before.
+  /// Arriving row's estimate; null when unknown, and the row has none.
   final DateTime? arrivingSince;
 
-  /// The clock that estimate reads.
+  /// The clock that estimate and the deposits read.
   final DateTime Function() now;
-
-  /// Token names by lowercase address, for the Assets list.
-  final Map<String, String> tokenNames;
   final VoidCallback onBack;
   final VoidCallback onRefresh;
 
@@ -300,13 +273,13 @@ class MobilePrivateUsdView extends StatelessWidget {
   final List<ActivityRowData> activityRows;
   final ValueChanged<PrivateUsdRoutePath>? onOpenConversion;
 
-  /// "Convert": the conversion under way, else a new one. Hidden when null.
+  /// Opens the conversion under way, else a new one; null hides it.
   final VoidCallback? onConvert;
 
-  /// Whether "Convert" is enabled (the spend guard, reference §9.4 S2).
+  /// Whether the spend guard lets a conversion start.
   final bool canConvert;
 
-  /// "Send" and "Withdraw" (M7); hidden when null.
+  /// Null hides both.
   final VoidCallback? onSend;
   final VoidCallback? onWithdraw;
 
@@ -320,21 +293,19 @@ class MobilePrivateUsdView extends StatelessWidget {
   /// Where an outgoing payment in flight stands, above the spending note.
   final PrivateUsdPendingPayment? pendingPayment;
 
-  /// "Refunds" beside the Activity heading, once a conversion was refunded.
+  /// Refunds beside the Activity heading, once a conversion was refunded.
   final VoidCallback? onRefunds;
 
-  /// A sync or a conversion step fails while the user's own Ethereum RPC is
-  /// set: the card says so in place of its error, with [onUseDefaultRpc].
-  final bool rpcFailing;
+  /// Set while a sync or a conversion step fails with the user's own
+  /// Ethereum RPC set: the card says so in place of its error, with the way
+  /// back to the default.
   final VoidCallback? onUseDefaultRpc;
 
-  /// "Receive" (M9): the Receive USDC sheet for public USDC. Hidden when
-  /// null (no deposits on this network, or Private USD unavailable).
+  /// Opens the Receive sheet; null hides it.
   final VoidCallback? onReceive;
 
-  /// The deposits' state now (M9), and the relayer's minimum.
-  final List<PrivateUsdDepositLine> depositLines;
-  final BigInt? depositMinimum;
+  /// The last deposit pass: its deposits' state, and the relayer's minimum.
+  final ApiDepositPass? depositPass;
 
   @override
   Widget build(BuildContext context) {
@@ -342,6 +313,10 @@ class MobilePrivateUsdView extends StatelessWidget {
     final balances = state.balances;
     final banner = this.banner;
     final onConvert = this.onConvert;
+    final depositPass = this.depositPass;
+    final depositLines = depositPass == null
+        ? const <PrivateUsdDepositLine>[]
+        : privateUsdDepositLines(depositPass, now: now(), screening: screening);
     final syncLine = privateUsdSyncLine(
       state,
       networkPrivacy: networkPrivacy,
@@ -371,7 +346,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                     MobileTopNav.back(
                       title: PrivateUsdCopy.title,
                       onBack: onBack,
-                      trailing: _InfoButton(
+                      trailing: PrivateUsdInfoButton(
                         onTap: () => showPrivateUsdInfoSheet(
                           context,
                           screening: screening,
@@ -403,7 +378,6 @@ class MobilePrivateUsdView extends StatelessWidget {
                               zecUsdPrice: zecUsdPrice,
                               privacyModeEnabled: privacyModeEnabled,
                               onRefresh: onRefresh,
-                              rpcFailing: rpcFailing,
                               onUseDefaultRpc: onUseDefaultRpc,
                             ),
                           ),
@@ -480,7 +454,9 @@ class MobilePrivateUsdView extends StatelessWidget {
                             NeonSyncOcclude(
                               child: _DepositsCard(
                                 lines: depositLines,
-                                minimum: depositMinimum,
+                                minimum: BigInt.tryParse(
+                                  depositPass?.terms?.minValue ?? '',
+                                ),
                                 screening: screening,
                                 privacyModeEnabled: privacyModeEnabled,
                                 onTap: onReceive,
@@ -523,7 +499,6 @@ class MobilePrivateUsdView extends StatelessWidget {
                               NeonSyncOcclude(
                                 child: _AssetsCard(
                                   balances: balances,
-                                  tokenNames: tokenNames,
                                   privacyModeEnabled: privacyModeEnabled,
                                 ),
                               ),
@@ -580,7 +555,7 @@ String _masked(String usd, bool privacyModeEnabled) => hideAmountIfPrivacyMode(
 );
 
 /// Send, Withdraw or Receive. The three share a row, about 100 dp each on a
-/// 360 dp phone, where the large button's side padding left "Withdraw" 17 px
+/// 360 dp phone, where the large button's side padding cut the longest label
 /// short: the padding is tight, and a label that still doesn't fit scales
 /// down instead of overflowing the button.
 class _ActionButton extends StatelessWidget {
@@ -617,7 +592,6 @@ class _TotalCard extends StatelessWidget {
     required this.zecUsdPrice,
     required this.privacyModeEnabled,
     required this.onRefresh,
-    required this.rpcFailing,
     required this.onUseDefaultRpc,
   });
 
@@ -625,7 +599,6 @@ class _TotalCard extends StatelessWidget {
   final double? zecUsdPrice;
   final bool privacyModeEnabled;
   final VoidCallback onRefresh;
-  final bool rpcFailing;
   final VoidCallback? onUseDefaultRpc;
 
   @override
@@ -642,9 +615,10 @@ class _TotalCard extends StatelessWidget {
             zecUsdPrice: zecUsdPrice,
           );
     final updatedAt = state.updatedAt;
-    // The sync's progress is the sync line's (VI-19): its percentage, and a
-    // refresh as the floor flowing. What stays here is what to expect of a
-    // first sync, and how old the balance is.
+    final onUseDefaultRpc = this.onUseDefaultRpc;
+    // The sync's progress is the sync line's: its percentage, and a refresh
+    // as the floor flowing. What stays here is what to expect of a first
+    // sync, and how old the balance is.
     final status = balances == null
         ? (state.isLoading ? PrivateUsdCopy.firstLoad : null)
         : updatedAt == null
@@ -705,7 +679,7 @@ class _TotalCard extends StatelessWidget {
               ),
             ),
           ],
-          if (rpcFailing) ...[
+          if (onUseDefaultRpc != null) ...[
             const SizedBox(height: AppSpacing.xs),
             // Read out: the sync line says only that the sync failed.
             Text(
@@ -715,16 +689,14 @@ class _TotalCard extends StatelessWidget {
                 color: colors.text.destructive,
               ),
             ),
-            if (onUseDefaultRpc case final onUseDefault?) ...[
-              const SizedBox(height: AppSpacing.xs),
-              AppButton(
-                key: const ValueKey('mobile_private_usd_rpc_default'),
-                variant: AppButtonVariant.secondary,
-                size: AppButtonSize.small,
-                onPressed: onUseDefault,
-                child: const Text(PrivateUsdCopy.rpcUseDefault),
-              ),
-            ],
+            const SizedBox(height: AppSpacing.xs),
+            AppButton(
+              key: const ValueKey('mobile_private_usd_rpc_default'),
+              variant: AppButtonVariant.secondary,
+              size: AppButtonSize.small,
+              onPressed: onUseDefaultRpc,
+              child: const Text(PrivateUsdCopy.rpcUseDefault),
+            ),
           ] else if (error != null) ...[
             const SizedBox(height: AppSpacing.xs),
             ExcludeSemantics(
@@ -925,8 +897,7 @@ class _BucketRow extends StatelessWidget {
   final String label;
   final String amount;
 
-  /// A live line under the label, smaller and in the accent colour (owner,
-  /// 2026-10-19): what the work behind this amount is doing now.
+  /// What the work behind this amount is doing now, under the label.
   final String? status;
   final String? info;
   final bool danger;
@@ -976,11 +947,10 @@ class _BucketRow extends StatelessWidget {
   }
 }
 
-/// The Arriving row (owner, 2026-10-17): "Arriving · 40%" while its funds
-/// are screened, from when they landed ([since]) over the [screening]
-/// period, then "Arriving · taking longer than usual"; plain "Arriving"
-/// when no landing time is known. The estimate moves every 10 s while the
-/// row shows.
+/// The Arriving row: while its funds are screened, the share of the
+/// [screening] time gone by since they landed ([since]), then that it takes
+/// longer than usual; no estimate when no landing time is known. The
+/// estimate moves every 10 s while the row shows.
 class _ArrivingRow extends StatefulWidget {
   const _ArrivingRow({
     required this.since,
@@ -1047,14 +1017,9 @@ class _ArrivingRowState extends State<_ArrivingRow> {
 }
 
 class _AssetsCard extends StatelessWidget {
-  const _AssetsCard({
-    required this.balances,
-    required this.tokenNames,
-    required this.privacyModeEnabled,
-  });
+  const _AssetsCard({required this.balances, required this.privacyModeEnabled});
 
   final PrivateUsdBalances balances;
-  final Map<String, String> tokenNames;
   final bool privacyModeEnabled;
 
   @override
@@ -1075,8 +1040,7 @@ class _AssetsCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    tokenNames[asset.token.address] ??
-                        PrivateUsdCopy.tokenName(asset.token.symbol),
+                    privateUsdTokenName(asset.token.symbol),
                     style: AppTypography.bodyMedium.copyWith(
                       color: colors.text.primary,
                     ),
@@ -1128,9 +1092,8 @@ class _EmptyCard extends StatelessWidget {
   }
 }
 
-/// The deposits' state now (M9): what each deposit address received, what
-/// is being made private, and what is being screened. Opens the Receive
-/// USDC sheet.
+/// The deposits' state now: what each deposit address received, what is
+/// being made private, and what is being screened. Opens the Receive sheet.
 class _DepositsCard extends StatelessWidget {
   const _DepositsCard({
     required this.lines,
@@ -1179,7 +1142,7 @@ class _DepositsCard extends StatelessWidget {
   }
 }
 
-/// Conversions (M5), then sends and withdrawals (M7), newest first.
+/// Conversions, deposits, sends and withdrawals, newest first.
 class _ActivitySection extends StatelessWidget {
   const _ActivitySection({required this.rows, this.onRefunds});
 
@@ -1199,9 +1162,9 @@ class _ActivitySection extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    PrivateUsdCopy.activityTitle,
-                    style: AppTypography.headlineSmall.copyWith(
-                      color: colors.text.accent,
+                    PrivateUsdCopy.activityTitle.toUpperCase(),
+                    style: kNeonHudCaptionStyle.copyWith(
+                      color: colors.neon.glow,
                     ),
                   ),
                 ),
@@ -1238,36 +1201,6 @@ class _ActivitySection extends StatelessWidget {
               ),
             ],
         ],
-      ),
-    );
-  }
-}
-
-class _InfoButton extends StatelessWidget {
-  const _InfoButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: PrivateUsdCopy.infoButton,
-      excludeSemantics: true,
-      child: GestureDetector(
-        key: const ValueKey('mobile_private_usd_info'),
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: SizedBox.square(
-          dimension: 44,
-          child: Center(
-            child: AppIcon(
-              AppIcons.help,
-              size: 20,
-              color: context.colors.text.primary,
-            ),
-          ),
-        ),
       ),
     );
   }

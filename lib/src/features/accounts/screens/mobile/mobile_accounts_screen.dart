@@ -435,9 +435,11 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
 
   /// [recheckFailed] reopens the sheet after a failed post-drain recheck: it
   /// shows the "couldn't check" warning and the next attempt skips the recheck.
+  /// [privateUsdRecheckFailed] does the same for Private USD conversions.
   Future<void> _showRemoveSheet(
     AccountInfo account, {
     bool recheckFailed = false,
+    bool privateUsdRecheckFailed = false,
   }) async {
     final accounts = ref.read(accountProvider).value?.accounts ?? const [];
     final isLastAccount = accounts.length == 1;
@@ -460,15 +462,17 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
     }
     // Private USD conversions under way: their funds can only be recovered
     // by this account (or, for the last one, this wallet). Warn, then allow.
-    var privateUsdUnfinishedCount = 0;
-    try {
-      privateUsdUnfinishedCount = await ref.read(
-        isLastAccount
-            ? privateUsdUnfinishedTotalProvider.future
-            : privateUsdUnfinishedCountProvider(account.uuid).future,
-      );
-    } catch (e, st) {
-      log('MobileAccounts: private USD conversion count failed: $e\n$st');
+    int? privateUsdUnfinishedCount;
+    if (!privateUsdRecheckFailed) {
+      try {
+        privateUsdUnfinishedCount = await ref.read(
+          isLastAccount
+              ? privateUsdUnfinishedTotalProvider.future
+              : privateUsdUnfinishedCountProvider(account.uuid).future,
+        );
+      } catch (e, st) {
+        log('MobileAccounts: private USD conversion count failed: $e\n$st');
+      }
     }
     if (!mounted) return;
     final confirmed = await showAppMobileSheet<bool>(
@@ -492,7 +496,7 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
         .value
         ?.activeAccountUuid;
     UnsharedGiftCardsChangedException? reconfirm;
-    var reconfirmPrivateUsd = false;
+    PrivateUsdUnfinishedConversionsException? reconfirmPrivateUsd;
     try {
       if (isLastAccount) {
         // runWithSyncPausedForWalletReset clears the cached DB path in its
@@ -538,9 +542,8 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
       log('MobileAccounts: remove needs reconfirmation: ${e.count}');
       reconfirm = e;
     } on PrivateUsdUnfinishedConversionsException catch (e) {
-      // More conversions under way than the user confirmed: ask again.
       log('MobileAccounts: remove needs conversion reconfirmation: ${e.count}');
-      reconfirmPrivateUsd = true;
+      reconfirmPrivateUsd = e;
     } catch (e, st) {
       log('MobileAccounts: remove failed: $e\n$st');
       if (mounted) {
@@ -558,10 +561,13 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
       // Show the confirmation again with the fresh count.
       ref.invalidate(paymentLinkUnsharedFundedCountProvider(account.uuid));
       await _showRemoveSheet(account, recheckFailed: reconfirm.count == null);
-    } else if (reconfirmPrivateUsd && mounted) {
+    } else if (reconfirmPrivateUsd != null && mounted) {
       ref.invalidate(privateUsdUnfinishedCountProvider(account.uuid));
       ref.invalidate(privateUsdUnfinishedTotalProvider);
-      await _showRemoveSheet(account);
+      await _showRemoveSheet(
+        account,
+        privateUsdRecheckFailed: reconfirmPrivateUsd.count == null,
+      );
     }
   }
 
@@ -774,8 +780,8 @@ class MobileAccountRemovalSheet extends StatelessWidget {
   final int? unsharedGiftCardCount;
 
   /// Private USD conversions under way: the account's, or for the last
-  /// account (a reset) the wallet's.
-  final int privateUsdUnfinishedCount;
+  /// account (a reset) the wallet's. Null when the check failed.
+  final int? privateUsdUnfinishedCount;
 
   static const _titleStyle = TextStyle(
     fontFamily: 'Gotham',
@@ -866,7 +872,7 @@ class MobileAccountRemovalSheet extends StatelessWidget {
                 style: _bodyStyle.copyWith(color: colors.text.warning),
               ),
             ],
-            if (privateUsdUnfinishedCount > 0) ...[
+            if (privateUsdUnfinishedCount case final count? when count > 0) ...[
               const SizedBox(height: AppSpacing.s),
               Text(
                 PrivateUsdCopy.deleteUnfinishedTitle,
@@ -876,12 +882,17 @@ class MobileAccountRemovalSheet extends StatelessWidget {
               const SizedBox(height: AppSpacing.xxs),
               Text(
                 isLastAccount
-                    ? PrivateUsdCopy.resetUnfinishedBody(
-                        privateUsdUnfinishedCount,
-                      )
-                    : PrivateUsdCopy.deleteUnfinishedBody(
-                        privateUsdUnfinishedCount,
-                      ),
+                    ? PrivateUsdCopy.resetUnfinishedBody(count)
+                    : PrivateUsdCopy.deleteUnfinishedBody(count),
+                key: const ValueKey('mobile_account_remove_private_usd'),
+                style: _bodyStyle.copyWith(color: colors.text.destructive),
+              ),
+            ] else if (privateUsdUnfinishedCount == null) ...[
+              const SizedBox(height: AppSpacing.s),
+              Text(
+                isLastAccount
+                    ? PrivateUsdCopy.resetUncheckedBody
+                    : PrivateUsdCopy.deleteUncheckedBody,
                 key: const ValueKey('mobile_account_remove_private_usd'),
                 style: _bodyStyle.copyWith(color: colors.text.destructive),
               ),
@@ -894,7 +905,7 @@ class MobileAccountRemovalSheet extends StatelessWidget {
               onPressed: () => Navigator.of(context).pop(true),
               leading: isLastAccount ? null : const AppIcon(AppIcons.trash),
               child: Text(
-                switch ((isLastAccount, privateUsdUnfinishedCount > 0)) {
+                switch ((isLastAccount, privateUsdUnfinishedCount != 0)) {
                   (true, true) => PrivateUsdCopy.resetAnyway,
                   (true, false) => 'Reset Veylor',
                   (false, true) => PrivateUsdCopy.deleteAnyway,

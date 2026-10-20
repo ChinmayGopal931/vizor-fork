@@ -167,7 +167,7 @@ Widget _typographyRow(BuildContext context, _TypographyRow row) {
                 row.name,
                 style: TextStyle(
                   color: colors.text.accent,
-                  fontFamily: 'Gotham',
+                  fontFamily: kGothamFamily,
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
                 ),
@@ -177,7 +177,7 @@ Widget _typographyRow(BuildContext context, _TypographyRow row) {
                 metric,
                 style: TextStyle(
                   color: colors.text.muted,
-                  fontFamily: 'Gotham',
+                  fontFamily: kGothamFamily,
                   fontSize: 10,
                   height: 1.4,
                 ),

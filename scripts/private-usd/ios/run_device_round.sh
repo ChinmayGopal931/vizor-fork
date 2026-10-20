@@ -1,43 +1,65 @@
 #!/usr/bin/env bash
-# The Private USD device round on iOS (docs/private-usd-ios-plan.md MI3.5, §10; the order of rounds is in
-# docs/private-usd-ios-device-checklist.md), against Zcash testnet and Ethereum Sepolia, on a booted simulator or
-# an iPhone with iOS 17 or later:
-#
-#   1. integration_test/private_usd_device_test.dart, the M3 round (the strip before first use, the first sync and
-#      the address, Tor on and off, the lock, the unlock), with the host checkpoints it calls
-#      (device_round_ios.py serve). The simulator shares this Mac's loopback, and its app is a process of this Mac:
-#      the driver samples its listeners, its sockets and WebKit's (lsof), its WebContent processes and memory.
-#      An iPhone reaches the driver over the local network, under a random token; there the test checks the page
-#      and its bridge from the app, and rvictl and tcpdump (sudo) capture the iPhone's traffic;
-#   2. on an iPhone, the capture verdict: while Tor was on, no connection to a Railgun host and no DNS query for
-#      one (device_round_ios.py capture-verdict, classified like check_sockets.py --onionoo).
-#
-# Usage: scripts/private-usd/ios/run_device_round.sh (--simulator UDID | --device UDID) [options]
-#   --out DIR            evidence directory (default: $TMPDIR/pusd-ios-round-<time>)
-#   --bundle-id ID       the installed app's bundle ID (default com.keplr.vizor). On a personal iPhone, build with
-#                        a side-by-side ID (iOS reference §8.7, never committed) and pass it here.
-#   --host-ip ADDR       (iPhone) the Mac's address on the iPhone's network (default: en0's)
-#   --keep-page-data     keep the Railgun page's data store (no true first sync)
-#   --no-tor-first-sync  skip the first sync through Tor
-#   --skip-test          only the capture verdict of an earlier --out (iPhone)
-#
-# The M5 to M8 rounds (--m5, --m6, --m7, --m8-route, --keyed-rpc on Android) come with MI4 to MI6 and MI8: they kill
-# the app between two `flutter test` runs, and whether `flutter test` keeps the app's data between runs on iOS is
-# for those milestones to settle.
-#
-# Safety: it never boots a simulator (boot one first) and never uninstalls (flutter test --no-uninstall). It
-# refuses an iPhone whose installed app is not a development build (plan XI11): a development build signed with
-# the App Store bundle ID would replace an App Store Veylor and inherit its wallet. It also refuses when it can't
-# tell. The round resets this build's testnet wallet only.
-#
-# Not automated here: the screen (set Auto-Lock to Never for an iPhone round and restore it after; iOS has no
-# `svc power stayon`), the release-build check (a release build runs only on an iPhone signed with the owner's
-# team, EI2: by hand, from the iOS device checklist), and memory on an iPhone (Xcode or xctrace).
-#
-# Unverified until the first device session (plan VI-1): the driver's simulator labels for WebKit, devicectl's
-# app field `builtByDeveloper`, tcpdump on rvi0, and the Local Network prompt an iPhone shows the first time the
-# test reaches the driver (accept it).
 set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/private-usd/ios/run_device_round.sh (--simulator UDID | --device UDID) [options]
+
+The Private USD device round on iOS, against Zcash testnet and Ethereum
+Sepolia, on a booted simulator or an iPhone with iOS 17 or later. The order
+of rounds is in docs/private-usd-ios-device-checklist.md.
+
+  1. integration_test/private_usd_device_test.dart's first round (the strip
+     before first use, the first sync and the address, Tor on and off, the
+     lock, the unlock), with the host checkpoints it calls
+     (device_round_ios.py serve). The simulator shares this Mac's loopback,
+     and its app is a process of this Mac: the driver samples its listeners,
+     its sockets and WebKit's (lsof), its WebContent processes and memory. An
+     iPhone reaches the driver over the local network, under a random token;
+     there the test checks the page and its bridge from the app, and rvictl
+     and tcpdump (sudo) capture the iPhone's traffic.
+  2. On an iPhone, the capture verdict: while Tor was on, no connection to a
+     Railgun host and no DNS query for one (device_round_ios.py
+     capture-verdict, classified like check_sockets.py --onionoo).
+
+Options:
+  --out DIR            evidence directory
+                       (default: $TMPDIR/pusd-ios-round-<time>)
+  --bundle-id ID       the installed app's bundle ID (default com.keplr.vizor).
+                       On a personal iPhone, build with a side-by-side bundle
+                       ID (never committed) and pass it here.
+  --host-ip ADDR       (iPhone) the Mac's address on the iPhone's network
+                       (default: en0's)
+  --keep-page-data     keep the Railgun page's data store (no true first sync)
+  --no-tor-first-sync  skip the first sync through Tor
+  --skip-test          only the capture verdict of an earlier --out (iPhone)
+  -h, --help           show this help
+
+Relative paths are taken from the directory the runner was started in.
+
+The Android runner's other rounds (--m5, --m6, --m7, --deposits, --m8-route,
+--keyed-rpc) are not here yet: they kill the app between two `flutter test`
+runs, and whether `flutter test` keeps the app's data between runs on iOS is
+not settled.
+
+Safety: it never boots a simulator (boot one first) and never uninstalls
+(flutter test --no-uninstall). It refuses an iPhone whose installed app is
+not a development build: a development build signed with the App Store bundle
+ID would replace an App Store Veylor and inherit its wallet. It also refuses
+when it can't tell. The round resets this build's testnet wallet only.
+
+Not automated here: the screen (set Auto-Lock to Never for an iPhone round
+and restore it after; iOS has no `svc power stayon`), the release-build check
+(a release build runs only on an iPhone signed with the owner's team: by
+hand, from the iOS device checklist), and memory on an iPhone (Xcode or
+xctrace).
+
+Unverified until the first device session: the driver's simulator labels for
+WebKit, devicectl's app field `builtByDeveloper`, tcpdump on rvi0, and the
+Local Network prompt an iPhone shows the first time the test reaches the
+driver (accept it).
+EOF
+}
 
 CALLER_DIR=$PWD
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
@@ -57,21 +79,23 @@ OUT="${TMPDIR:-/tmp}/pusd-ios-round-$(date +%Y%m%d-%H%M%S)"
 TARGET="" UDID="" HOST_IP="" RUN_TEST=1 KEEP_PAGE=0 TOR_FIRST_SYNC=true
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --simulator) TARGET=sim; UDID=$2; shift 2 ;;
-    --device) TARGET=device; UDID=$2; shift 2 ;;
-    --out) OUT=$2; [[ $OUT == /* ]] || OUT="$CALLER_DIR/$OUT"; shift 2 ;;
-    --bundle-id) BUNDLE_ID=$2; shift 2 ;;
-    --host-ip) HOST_IP=$2; shift 2 ;;
+    --simulator) TARGET=sim; UDID="${2:-}"; shift 2 ;;
+    --device) TARGET=device; UDID="${2:-}"; shift 2 ;;
+    --out) OUT="${2:-}"; shift 2 ;;
+    --bundle-id) BUNDLE_ID="${2:-}"; shift 2 ;;
+    --host-ip) HOST_IP="${2:-}"; shift 2 ;;
     --keep-page-data) KEEP_PAGE=1; shift ;;
     --no-tor-first-sync) TOR_FIRST_SYNC=false; shift ;;
     --skip-test) RUN_TEST=0; shift ;;
-    --m5|--m6|--m7|--m8-route|--keyed-rpc)
-      echo "$1: the iOS runner has the M3 round only so far (MI4 to MI6 and MI8 add the others)" >&2
+    --m5|--m6|--m7|--deposits|--m8-route|--keyed-rpc)
+      echo "$1: the iOS runner has only the first round so far" >&2
       exit 2 ;;
-    *) echo "unknown option: $1" >&2; exit 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 [[ -n $TARGET && -n $UDID ]] || { echo "pass --simulator UDID or --device UDID" >&2; exit 2; }
+[[ $OUT == /* ]] || OUT="$CALLER_DIR/$OUT"
 mkdir -p "$OUT"
 
 log() { echo "$(date +%H:%M:%S) [round] $*" | tee -a "$OUT/round.log"; }
@@ -128,7 +152,7 @@ else
   APP_STATE=${PIPESTATUS[0]}
   set -e
   if [[ $APP_STATE != 0 ]]; then
-    log "REFUSING: the installed $BUNDLE_ID may be a real wallet, or the runner can't tell (plan XI11). Nothing was changed."
+    log "REFUSING: the installed $BUNDLE_ID may be a real wallet, or the runner can't tell. Nothing was changed."
     exit 4
   fi
   HOST_IP=${HOST_IP:-$(ipconfig getifaddr en0 || true)}

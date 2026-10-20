@@ -2,19 +2,17 @@ package com.keplr.vizor.railgun
 
 import com.keplr.vizor.railgun.RailgunProtocol.Message
 import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertIs
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
-// Ported from zapp's railgun-lib `RailgunProtocolTest` (plan reference §8.7), over raw JSON text: Kotlin no longer
-// reads params, results or event data, so the scan-event and `RailgunAddress` cases moved to Dart and Rust. Robolectric
+// The envelope only: Kotlin never reads params, results or event data, which stay raw JSON text for Dart. Robolectric
 // provides `org.json`.
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
@@ -31,7 +29,9 @@ class RailgunProtocolTest {
     @Test
     fun paramsAreOneObjectSplicedAsSent() {
         listOf("[]", "1", "\"text\"", "{} {}", """{"a":1}, "b"""", "not json", "").forEach {
-            assertFailsWith<RailgunException.Protocol>(it) { RailgunProtocol.request(1, RailgunMethod.START, it) }
+            assertThrows(it, RailgunException.Protocol::class.java) {
+                RailgunProtocol.request(1, RailgunMethod.START, it)
+            }
         }
         // Not re-serialized, so a large number keeps every digit.
         val params = """{"amount":123456789012345678901234567890}"""
@@ -50,22 +50,22 @@ class RailgunProtocolTest {
 
     @Test
     fun failuresKeepTheirKind() {
-        assertIs<RailgunException.Protocol>(failure("""{"code":"BAD_REQUEST","message":"no wallet is open"}"""))
-        assertIs<RailgunException.Failed>(failure("""{"code":"FAILED","message":"the RPC timed out"}"""))
+        assertTrue(failure("""{"code":"BAD_REQUEST","message":"no wallet is open"}""") is RailgunException.Protocol)
+        assertTrue(failure("""{"code":"FAILED","message":"the RPC timed out"}""") is RailgunException.Failed)
         assertEquals("the RPC timed out", failure("""{"code":"FAILED","message":"the RPC timed out"}""").message)
     }
 
     @Test
     fun anUnknownCodeIsAFailure() {
-        assertIs<RailgunException.Failed>(failure("""{"code":"SOMETHING_NEW","message":"?"}"""))
+        assertTrue(failure("""{"code":"SOMETHING_NEW","message":"?"}""") is RailgunException.Failed)
     }
 
     @Test
     fun aReplyItCannotReadStillFailsItsCall() {
-        val message = assertIs<Message.Failure>(RailgunProtocol.decode("""{"id":5,"error":"a bare string"}"""))
+        val message = RailgunProtocol.decode("""{"id":5,"error":"a bare string"}""") as Message.Failure
 
-        assertEquals(5, message.id)
-        assertIs<RailgunException.Protocol>(message.error)
+        assertEquals(5L, message.id)
+        assertTrue(message.error is RailgunException.Protocol)
     }
 
     @Test
@@ -119,7 +119,7 @@ class RailgunProtocolTest {
         .filter { it.isNotEmpty() }
 
     private fun failure(error: String): RailgunException =
-        assertIs<Message.Failure>(RailgunProtocol.decode("""{"id":1,"error":$error}""")).error
+        (RailgunProtocol.decode("""{"id":1,"error":$error}""") as Message.Failure).error
 
     private companion object {
         const val PAGE = "../railgun-web/src/index.js"

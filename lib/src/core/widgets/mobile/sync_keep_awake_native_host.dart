@@ -64,7 +64,7 @@ class _SyncKeepAwakeNativeHostState
     if (kAppFormFactor == AppFormFactor.mobile) {
       // Keep observing while inactive; a short-circuit here drops the provider
       // subscription, and resume's one-time read cannot restore it. Private
-      // USD's progress screens share this one native flag (X8).
+      // USD's progress screens share this one native flag.
       final syncActive = ref.watch(syncKeepAwakeActiveProvider);
       final privateUsdActive = ref.watch(privateUsdKeepAwakeProvider);
       _requestNativeState(_isInForeground && (syncActive || privateUsdActive));

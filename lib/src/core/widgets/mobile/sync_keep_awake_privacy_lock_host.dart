@@ -21,7 +21,7 @@ import '../app_button.dart';
 import '../app_icon.dart';
 import '../biometric_icon.dart';
 import 'neon_done_sign.dart';
-import 'neon_horizon.dart';
+import 'neon_glyph_badge.dart';
 import 'neon_motion.dart';
 import 'neon_scramble_text.dart';
 import 'tron_glyph.dart';
@@ -469,21 +469,27 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
                   SizedBox(height: layout.logoToMainGap),
                   main,
                   SizedBox(height: layout.mainToButtonGap),
-                  NeonDelayedIgnition(
+                  NeonIgnition(
                     key: ValueKey(mode == SyncKeepAwakePrivacyLockMode.done),
                     delay: mode == SyncKeepAwakePrivacyLockMode.done
                         ? const Duration(milliseconds: 1500)
                         : Duration.zero,
-                    builder: (context, light) => Opacity(
-                      opacity: light,
-                      child: AppButton(
-                        key: const ValueKey(
-                          'sync_keep_awake_privacy_unlock_button',
+                    // Dark until it switches on, and not to be tapped then.
+                    builder: (context, light) => IgnorePointer(
+                      ignoring: light == 0,
+                      child: Opacity(
+                        opacity: light,
+                        child: AppButton(
+                          key: const ValueKey(
+                            'sync_keep_awake_privacy_unlock_button',
+                          ),
+                          onPressed: onUnlockPressed,
+                          leading: _SyncKeepAwakeUnlockIcon(
+                            biometric: biometric,
+                          ),
+                          minWidth: 165,
+                          child: const Text('Unlock Veylor'),
                         ),
-                        onPressed: onUnlockPressed,
-                        leading: _SyncKeepAwakeUnlockIcon(biometric: biometric),
-                        minWidth: 165,
-                        child: const Text('Unlock Veylor'),
                       ),
                     ),
                   ),
@@ -672,7 +678,6 @@ class _SyncKeepAwakePasscodeConfirmScreen extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              // The nav's own page title: spaced uppercase Thin.
               Consumer(
                 builder: (context, ref, _) => MobileTopNav.back(
                   title: _titleForMode(
@@ -766,9 +771,9 @@ class _SyncKeepAwakePasscodeConfirmScreen extends StatelessWidget {
   }
 }
 
-/// A title on the privacy screen, drawn as a neon page title. The string
-/// stays sentence case: it is upper-cased where drawn, and screen readers
-/// get it as written.
+/// A title on the privacy screen, drawn as a page title
+/// ([kNeonPageTitleStyle]). The string stays sentence case: it is upper-cased
+/// where drawn, and screen readers get it as written.
 class _SyncKeepAwakeTitle extends StatelessWidget {
   const _SyncKeepAwakeTitle(this.text);
 
@@ -838,12 +843,13 @@ class _SyncKeepAwakeStatusLockup extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (animate)
-                  NeonDelayedIgnition(
+                  NeonIgnition(
                     delay: const Duration(milliseconds: 1000),
                     builder: (context, light) => light == 0
                         ? Opacity(opacity: 0, child: _SyncKeepAwakeTitle(title))
                         : NeonScrambleText(
                             text: title.toUpperCase(),
+                            semanticsLabel: title,
                             style: kNeonPageTitleStyle.copyWith(
                               color: colors.text.accent,
                             ),
@@ -886,7 +892,7 @@ class _SyncKeepAwakeProgressLockup extends StatelessWidget {
 
   /// Neon numerals: Gotham Thin, whose hairline strokes read as tubes.
   static const _numeralStyle = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w100,
     fontSize: 56,
     height: 1,
@@ -895,7 +901,7 @@ class _SyncKeepAwakeProgressLockup extends StatelessWidget {
 
   /// The percent sign, set beside them as the sign's ticker is.
   static const _percentSignStyle = TextStyle(
-    fontFamily: 'Gotham',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w300,
     fontSize: 22,
     height: 1,
@@ -985,9 +991,9 @@ class _SyncKeepAwakeProgressLockup extends StatelessWidget {
   }
 }
 
-/// The progress ring in the neon look: the synced share is a lit tube that
-/// runs clockwise from the top to a bright head, and the rest is a scale of
-/// unlit ticks that the head burns along.
+/// The progress ring: the synced share is a lit tube that runs clockwise
+/// from the top to a bright head, and the rest is a scale of unlit ticks
+/// that the head burns along.
 class _SyncKeepAwakeRingPainter extends CustomPainter {
   const _SyncKeepAwakeRingPainter({
     required this.progress,
@@ -1051,20 +1057,21 @@ class _SyncKeepAwakeRingPainter extends CustomPainter {
     if (k <= 0) return;
     final head =
         center + Offset(math.cos(headAngle), math.sin(headAngle)) * radius;
-    final bead = Rect.fromCenter(center: Offset.zero, width: 7, height: 7);
     canvas
       ..save()
       ..translate(head.dx, head.dy)
-      ..rotate(headAngle)
-      ..drawRect(
-        bead.inflate(5),
-        Paint()
-          ..color = glow.withValues(alpha: 0.6 * k)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-      )
-      ..drawRect(bead, Paint()..color = glow.withValues(alpha: k))
-      ..drawRect(bead.deflate(2), Paint()..color = core.withValues(alpha: k))
-      ..restore();
+      ..rotate(headAngle);
+    Neon.bead(
+      canvas,
+      Offset.zero,
+      glow: glow,
+      core: core,
+      size: 7,
+      blur: 6,
+      rim: 2,
+      intensity: k,
+    );
+    canvas.restore();
   }
 
   @override

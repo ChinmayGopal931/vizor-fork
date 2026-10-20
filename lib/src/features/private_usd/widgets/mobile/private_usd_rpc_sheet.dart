@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart' show TextInputAction;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,18 +9,19 @@ import '../../../../core/config/private_usd_feature_config.dart';
 import '../../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
-import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/mobile_text_field.dart';
+import '../../models/private_usd_messages.dart';
 import '../../private_usd_copy.dart';
 import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_custom_rpc_provider.dart';
 import '../../services/private_usd_rpc_check.dart';
+import 'private_usd_paste_button.dart';
 
-/// Settings' Ethereum RPC sheet (owner, 2026-10-17): a URL of the user's own
-/// on one of the RPC providers the Railgun page already reaches, checked with
-/// `eth_chainId` before it is saved, or the default again. Pops the toast to
-/// show, or null when nothing changed. The field starts empty and the sheet
-/// shows only the saved URL's host: the URL can hold a key.
+/// Settings' Ethereum RPC sheet: a URL of the user's own on one of the RPC
+/// providers the Railgun page already reaches, checked with `eth_chainId`
+/// before it is saved, or the default again. Pops the toast to show, or null
+/// when nothing changed. The field starts empty and the sheet shows only the
+/// saved URL's host: the URL can hold a key.
 Future<String?> showPrivateUsdRpcSheet(BuildContext context) =>
     showAppMobileSheet<String>(
       context: context,
@@ -55,20 +56,10 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
     ).notifier,
   );
 
-  Future<void> _paste() async {
-    final text = (await Clipboard.getData(Clipboard.kTextPlain))?.text?.trim();
-    if (!mounted || text == null || text.isEmpty) return;
-    _controller.value = TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-    );
-    setState(() => _error = null);
-  }
-
   Future<void> _checkAndSave() async {
     final deployment = ref.read(privateUsdCurrentDeploymentProvider);
     if (deployment == null || _busy) return;
-    final chain = PrivateUsdCopy.rpcNetwork(deployment.railgunNetwork);
+    final chain = privateUsdRpcNetworkName(deployment.railgunNetwork);
     final url = privateUsdCustomRpcUrl(
       _controller.text,
       deployment.railgunNetwork,
@@ -134,7 +125,7 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
     final deployment = ref.watch(privateUsdCurrentDeploymentProvider);
     final network = ref.watch(appBootstrapProvider).network;
     final custom = ref.watch(privateUsdCustomRpcProvider(network)).value;
-    final chain = PrivateUsdCopy.rpcNetwork(
+    final chain = privateUsdRpcNetworkName(
       deployment?.railgunNetwork ?? 'mainnet',
     );
     final error = _error;
@@ -195,25 +186,11 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
                       if (_error != null) setState(() => _error = null);
                     },
                     onSubmitted: (_) => unawaited(_checkAndSave()),
-                    trailing: Semantics(
-                      button: true,
-                      label: PrivateUsdCopy.rpcPaste,
-                      excludeSemantics: true,
-                      child: GestureDetector(
-                        key: const ValueKey('private_usd_rpc_paste'),
-                        behavior: HitTestBehavior.opaque,
-                        onTap: _busy ? null : () => unawaited(_paste()),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.s,
-                          ),
-                          child: AppIcon(
-                            AppIcons.paste,
-                            size: 20,
-                            color: colors.text.primary,
-                          ),
-                        ),
-                      ),
+                    trailing: PrivateUsdPasteButton(
+                      key: const ValueKey('private_usd_rpc_paste'),
+                      controller: _controller,
+                      enabled: !_busy,
+                      onPasted: (_) => setState(() => _error = null),
                     ),
                   ),
                   if (error != null) ...[

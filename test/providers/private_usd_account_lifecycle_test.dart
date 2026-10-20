@@ -21,10 +21,9 @@ import 'package:zcash_wallet/src/rust/frb_generated.dart';
 
 import '../features/private_usd/support/fake_private_usd_backend.dart';
 
-// Account deletion and reset with Private USD conversions under way (plan
-// §3.5, invariant 15; reference §8.4): warn and allow, never block a
-// confirmed deletion; drain the engine first; remove the account's
-// conversions only after the Rust account delete.
+// Account deletion and reset with Private USD conversions under way: warn
+// and allow, never block a confirmed deletion; drain the engine first;
+// remove the account's conversions only after the Rust account delete.
 final _rust = _RemovalRustApiFake();
 
 void main() {
@@ -72,7 +71,9 @@ void main() {
     final container = await containerFor();
 
     await expectLater(
-      container.read(accountProvider.notifier).removeAccount('account-2'),
+      container
+          .read(accountProvider.notifier)
+          .removeAccount('account-2', confirmedPrivateUsdUnfinishedCount: 0),
       throwsA(
         isA<PrivateUsdUnfinishedConversionsException>().having(
           (e) => e.count,
@@ -141,7 +142,9 @@ void main() {
     conversions.unfinishedCounts['account-2'] = 0;
     final container = await containerFor();
 
-    await container.read(accountProvider.notifier).removeAccount('account-2');
+    await container
+        .read(accountProvider.notifier)
+        .removeAccount('account-2', confirmedPrivateUsdUnfinishedCount: 0);
 
     expect(_rust.deletedAccounts, ['account-2']);
     expect(conversions.deleted, ['account-2']);
@@ -152,7 +155,9 @@ void main() {
     final unlocked = await containerFor();
 
     await expectLater(
-      unlocked.read(accountProvider.notifier).resetWallet(),
+      unlocked
+          .read(accountProvider.notifier)
+          .resetWallet(confirmedPrivateUsdUnfinishedCount: 0),
       throwsA(
         isA<PrivateUsdUnfinishedConversionsException>().having(
           (e) => e.count,
@@ -169,26 +174,45 @@ void main() {
     _failPathProvider();
     final locked = await containerFor(unlocked: false);
     await expectLater(
-      locked.read(accountProvider.notifier).resetWallet(),
+      locked
+          .read(accountProvider.notifier)
+          .resetWallet(confirmedPrivateUsdUnfinishedCount: 0),
       throwsA(isNot(isA<PrivateUsdUnfinishedConversionsException>())),
     );
   });
 
-  test('a store that cannot be read never blocks a deletion', () async {
+  test('a store that cannot be read asks again without a count, and a '
+      'deletion confirmed without one goes ahead', () async {
     conversions.unfinishedCounts.remove('account-2');
     final failing = _LoggingBackend(events)..failCount = true;
     lifecycle = PrivateUsdLifecycle(conversions: failing);
     final container = await containerFor();
+    final accounts = container.read(accountProvider.notifier);
 
-    await container.read(accountProvider.notifier).removeAccount('account-2');
+    await expectLater(
+      accounts.removeAccount(
+        'account-2',
+        confirmedPrivateUsdUnfinishedCount: 0,
+      ),
+      throwsA(
+        isA<PrivateUsdUnfinishedConversionsException>().having(
+          (e) => e.count,
+          'count',
+          isNull,
+        ),
+      ),
+    );
+    expect(_rust.deletedAccounts, isEmpty);
+
+    await accounts.removeAccount('account-2');
 
     expect(_rust.deletedAccounts, ['account-2']);
   });
 
-  // iOS progress BI-3 and VI-17: the account's Railgun wallet leaves the
-  // page's storage too. Its mnemonic is derived before the Rust delete (Rust
-  // checks the seed against the account), and the page deletes the wallet
-  // after it, behind a bridge that reaches nothing. Best effort throughout.
+  // The account's Railgun wallet leaves the page's storage too. Its mnemonic
+  // is derived before the Rust delete (Rust checks the seed against the
+  // account), and the page deletes the wallet after it, behind a bridge that
+  // reaches nothing. Best effort throughout.
   group("the account's Railgun wallet", () {
     late _PageHost page;
     late _SeedAccounts accounts;
@@ -348,7 +372,7 @@ void main() {
   });
 }
 
-const _engineKey = '${kRailgunEncryptionKeyStoragePrefix}account-2';
+final _engineKey = AppSecureStore.railgunEncryptionKeyStorageKey('account-2');
 
 const _sepolia = ApiDeployment(
   network: 'testnet',

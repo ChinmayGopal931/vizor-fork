@@ -10,16 +10,15 @@ import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_refunds_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_reverse_convert_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_refunds_screen.dart';
-import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_reverse_conversion_screen.dart';
-import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_reverse_convert_view.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_reverse_funding.dart';
+import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_convert_views.dart';
+import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_progress_views.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
-// The reverse conversion's screens (plan reference §9.4 S4, S6, S7; §9.5),
-// built from the Widgetbook fixtures.
+// The reverse conversion's screens, built from the Widgetbook fixtures.
 void main() {
   setUp(() {
     final view = TestWidgetsFlutterBinding.ensureInitialized()
@@ -183,9 +182,8 @@ void main() {
     expect(find.text(PrivateUsdCopy.refundsView), findsOneWidget);
   });
 
-  // A finished bridge kept "Moving ZEC to your wallet" spinning beside an
-  // enabled "New bridge" (owner, 2026-10-19): the timeline capped its
-  // current step at the last row.
+  // The timeline once capped a finished bridge's current step at its last
+  // row, which kept spinning beside the button for a new one.
   testWidgets('a finished bridge keeps no step current and lights its sign', (
     tester,
   ) async {
@@ -231,7 +229,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.text(PrivateUsdCopy.bridgeEndedTitle.toUpperCase()),
+      find.text(PrivateUsdCopy.actionConvert.toUpperCase()),
       findsOneWidget,
     );
     expect(find.text(PrivateUsdCopy.bridgedYouPaid), findsOneWidget);
@@ -266,7 +264,7 @@ void main() {
       ),
     );
 
-    // Waiting for the tap (owner, 2026-10-17): nothing is being sent yet.
+    // Waiting for the tap: nothing is being sent yet.
     await show();
     expect(find.text(PrivateUsdCopy.reverseStepPay), findsOneWidget);
     expect(
@@ -283,7 +281,7 @@ void main() {
       proofProgress: 0.42,
     );
     expect(find.text(PrivateUsdCopy.reverseStepFund), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.reverseProving(42)), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.paymentProving(42)), findsOneWidget);
     expect(find.text(PrivateUsdCopy.reverseStepPay), findsNothing);
 
     await show(

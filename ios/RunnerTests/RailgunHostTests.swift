@@ -14,8 +14,8 @@ import XCTest
   @testable import Vizor
 #endif
 
-/// The Railgun host's boundary (plan MI2.6): the envelope, the methods table, the scheme handler, the content rules
-/// and exactly-once replies. The page itself runs in the device rounds.
+/// The Railgun host's boundary: the envelope, the methods table, the scheme handler, the content rules and
+/// exactly-once replies. The page itself runs in the device rounds.
 final class RailgunHostTests: XCTestCase {
   // MARK: The envelope
 
@@ -32,7 +32,7 @@ final class RailgunHostTests: XCTestCase {
   func testParamsAreOneObjectSplicedAsSent() throws {
     for params in ["[]", "1", #""text""#, "{} {}", #"{"a":1}, "b""#, "not json", ""] {
       XCTAssertThrowsError(try RailgunProtocol.request(id: 1, method: .start, paramsJSON: params), params) {
-        XCTAssertEqual(($0 as? RailgunError)?.code, "PROTOCOL", params)
+        XCTAssertEqual(($0 as? RailgunError)?.code, "protocol", params)
       }
     }
     // Not re-serialized, so a large number keeps every digit.
@@ -75,7 +75,7 @@ final class RailgunHostTests: XCTestCase {
       return XCTFail("an unreadable failure must still fail its call")
     }
     XCTAssertEqual(id, 5)
-    XCTAssertEqual(error.code, "PROTOCOL")
+    XCTAssertEqual(error.code, "protocol")
   }
 
   func testDecodesEventsAndDropsWhatItDoesNotUnderstand() {
@@ -213,7 +213,6 @@ final class RailgunHostTests: XCTestCase {
       "blob:veylor-railgun://app/0f1e",
       "data:application/wasm;base64,AGFzbQ==",
       "https://eth-sepolia.g.alchemy.com/v2/key",
-      RailgunEndpoints.poiNodeURL,
     ] + RailgunEndpoints.hosts.map({ "https://\($0)/any/path" }) {
       XCTAssertTrue(lets(url), url)
     }
@@ -244,7 +243,7 @@ final class RailgunHostTests: XCTestCase {
 
   // MARK: The bridge
 
-  /// Invariant 20: the page never loads without a bridge that accepts on its port.
+  /// The page never loads without a bridge that accepts on its port.
   func testTheBridgeProbeTellsAListenerFromAClosedPort() throws {
     let fd = socket(AF_INET, SOCK_STREAM, 0)
     XCTAssertGreaterThanOrEqual(fd, 0)
@@ -268,8 +267,8 @@ final class RailgunHostTests: XCTestCase {
 
   // MARK: Backups
 
-  /// Plan DI6 and invariant 25: the page's web data directory is made and marked before the store is first used,
-  /// and marking it again, once it exists, holds.
+  /// The page's web data directory is made and marked before the store is first used, and marking it again, once it
+  /// exists, holds.
   func testTheWebDataDirectoryIsOutOfBackupsBeforeFirstUse() throws {
     let library = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: library, withIntermediateDirectories: true)
@@ -378,11 +377,11 @@ final class RailgunHostTests: XCTestCase {
   func testTheHandlerAnswersEachCallOnce() async {
     let handler = RailgunHostHandler(debuggable: false)
     let calls: [(String, Any?, String?)] = [
-      ("load", ["proxyPort": 0, "debug": false], "BAD_ARGS"),
-      ("load", ["proxyPort": 65536, "debug": false], "BAD_ARGS"),
-      ("call", ["method": "openNewWallet", "paramsJson": "{}"], "BAD_ARGS"),
-      ("call", ["method": "refresh"], "BAD_ARGS"),
-      ("call", ["method": "refresh", "paramsJson": "{}"], "CLOSED"),
+      ("load", ["proxyPort": 0, "debug": false], "bad_args"),
+      ("load", ["proxyPort": 65536, "debug": false], "bad_args"),
+      ("call", ["method": "openNewWallet", "paramsJson": "{}"], "bad_args"),
+      ("call", ["method": "refresh"], "bad_args"),
+      ("call", ["method": "refresh", "paramsJson": "{}"], "closed"),
     ]
     for (method, arguments, code) in calls {
       let answers = Answers()

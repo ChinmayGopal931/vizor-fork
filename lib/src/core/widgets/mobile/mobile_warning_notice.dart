@@ -4,8 +4,7 @@ import '../../theme/app_theme.dart';
 import '../app_icon.dart';
 
 /// An inline warning line with an icon, in the destructive colour: a quote
-/// that drifted or expired, or why a step did not start. Lifted from the
-/// swap review so the Private USD screens share it.
+/// that drifted or expired, or why a step did not start.
 class MobileWarningNotice extends StatelessWidget {
   const MobileWarningNotice({required this.message, super.key});
 

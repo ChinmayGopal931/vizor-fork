@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_done_sign.dart';
-import 'package:zcash_wallet/src/core/widgets/mobile/neon_horizon.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/neon_glyph_badge.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_motion.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_bridged_hero.dart';

@@ -10,8 +10,7 @@ import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
 // The Receive sheet switches, as ZEC's Receive does its pools, between
-// public USDC (the default) and 0zkUSDC from another Railgun wallet (owner,
-// 2026-10-19). It replaced the screen's "Receive from a Railgun wallet" card.
+// public USDC (the default) and 0zkUSDC from another Railgun wallet.
 void main() {
   setUp(() {
     final view = TestWidgetsFlutterBinding.ensureInitialized()
@@ -62,7 +61,7 @@ void main() {
               onKindChanged: switchable ? switched.add : null,
               symbol: 'USDC',
               chain: 'Ethereum',
-              address: previewPrivateUsdDepositAddress,
+              address: previewPrivateUsdEthereumAddress,
               railgunAddress: previewPrivateUsdAddress,
               onClose: () {},
             ),
@@ -85,12 +84,12 @@ void main() {
       find.text(PrivateUsdCopy.depositOnly('USDC', 'Ethereum')),
       findsOneWidget,
     );
-    expect(find.text(previewPrivateUsdDepositAddress), findsOneWidget);
+    expect(find.text(previewPrivateUsdEthereumAddress), findsOneWidget);
     expect(find.text(previewPrivateUsdAddress), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('private_usd_deposit_copy')));
     await tester.pump();
-    expect(clipboard, [previewPrivateUsdDepositAddress]);
+    expect(clipboard, [previewPrivateUsdEthereumAddress]);
 
     await tester.tap(
       find.byKey(const ValueKey('private_usd_receive_shielded')),
@@ -106,7 +105,7 @@ void main() {
 
     expect(find.text(PrivateUsdCopy.receiveShieldedOnly), findsOneWidget);
     expect(find.text(previewPrivateUsdAddress), findsOneWidget);
-    expect(find.text(previewPrivateUsdDepositAddress), findsNothing);
+    expect(find.text(previewPrivateUsdEthereumAddress), findsNothing);
     expect(find.text(PrivateUsdCopy.receiveAddressNote), findsOneWidget);
 
     await tester.tap(

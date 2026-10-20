@@ -1,6 +1,4 @@
-//! Deposits: public USDC into the account's private balance (plan M9;
-//! zecSwap `docs/deposits.md`, whose reference wallet is
-//! `zecswap_client::Depositor`).
+//! Deposits: public USDC into the account's private balance.
 //!
 //! Each account has Ethereum deposit addresses of its own, derived from its
 //! seed (`SwapKeyContext::deposit_keys`). Once one holds at least the
@@ -11,15 +9,14 @@
 //! sends it and keeps the fee, can delay a deposit but never redirect it. The
 //! wallet never holds ETH.
 //!
-//! [`Deposits::pass`] advances a persisted state machine, as `sends` does,
-//! rather than zecSwap's loops: it scans the addresses, posts again what was
-//! kept, follows what the relayer named, and signs what is due, keeping
-//! every request in `swaps.db` before it is posted and posting only what was
-//! kept. A pass killed at any point leaves the store consistent: the next one
-//! posts the kept bytes again. Only the chain settles a deposit: a mined
-//! receipt in which the pinned contract's `DepositShielded` names the address
-//! and one of this wallet's notes. The relayer's word alone is believed for
-//! nothing.
+//! [`Deposits::pass`] advances a persisted state machine, as `sends` does: it
+//! scans the addresses, posts again what was kept, follows what the relayer
+//! named, and signs what is due, keeping every request in `swaps.db` before it
+//! is posted and posting only what was kept. A pass killed at any point leaves
+//! the store consistent: the next one posts the kept bytes again. Only the
+//! chain settles a deposit: a mined receipt in which the pinned contract's
+//! `DepositShielded` names the address and one of this wallet's notes. The
+//! relayer's word alone is believed for nothing.
 //!
 //! Never log a request, a record, an address or a note: they carry
 //! signatures and link the account. Logs carry codes and indices.
@@ -27,51 +24,53 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 use zecswap_core::{DepositsDomain, ReceiveAuthorization, RescueAuthorization, TokenDomain};
 use zecswap_railgun::{ShieldCiphertext, ShieldNote};
 
-use super::abi;
+use super::abi::{self, address_word, keccak, u128_word, WORD};
 use super::deployment::{
-    self, Deployment, DepositsPin, CLIENT_TIMEOUT, MAX_RELAYER_FEE, RAILGUN_FEE_BPS,
+    self, after_railgun_fee, require_within_fee_cap, Deployment, DepositsPin, BPS_MAX,
+    MAX_RELAYER_FEE,
 };
-use super::engine::{self, Clock, OpHandle, SystemClock};
+use super::engine::{self, AccountGuard, AccountLocks, Clock, OpHandle, SystemClock};
 use super::evm_rpc::{DepositChain, EvmRpc, ReceiptLog, TransactionStatus};
 use super::keys::SwapKeyContext;
-use super::models::{decode_strict, Address, Amount, Hex, RelayerTerms, Sent, Signature, SwapNote, Word};
-use super::relayer_client::{RelayerClient, MAX_RETRY_AFTER_SECONDS};
+use super::models::{
+    decode_strict, is_false, is_zero, Address, Amount, Hex, RelayerTerms, Signature, SwapNote, Word,
+};
+use super::relayer_client::{retry_after, RelayerClient};
 use super::store::{DepositRow, SwapStore};
-use super::terms::{address_word, keccak};
-use super::transport::{post_json, HttpTransport, RoutedTransport, Service, SwapHttpError};
-use super::{fail, ErrorCode, PrivateUsdError, Result, OPERATIONS};
+use super::swap;
+use super::transport::{HttpTransport, SwapHttpError};
+use super::{fail, lock, with_operations, ErrorCode, PrivateUsdError, Result};
+use crate::wallet::routed_http::RoutedHttp;
 
 /// Addresses read per Multicall3 call; a scan stops after a window of this
-/// many with none used (zecSwap `GAP`).
+/// many with none used.
 pub(crate) const GAP: u32 = 20;
 /// The most windows one scan reads: a node claiming every address is used
 /// never keeps a pass going.
 const MAX_WINDOWS: u32 = 50;
 /// How long an authorization is valid once signed, where the relayer takes
-/// that long (zecSwap `VALIDITY`).
+/// that long.
 const VALIDITY_SECONDS: u64 = 60 * 60;
-/// How far this clock and the relayer's may differ (zecSwap `CLOCK_SLACK`).
+/// How far this clock and the relayer's may differ.
 const CLOCK_SLACK_SECONDS: u64 = 60;
 /// A request still waiting to be posted is signed again once its
 /// `validBefore` is less than this away: the relayer takes none with under
 /// 15 minutes left to land.
 const RESIGN_BEFORE_SECONDS: u64 = 16 * 60;
 /// A `503` asking to wait this long or less is waited out in the pass and
-/// the same bytes posted again (zecSwap `BUSY_WAIT`)...
+/// the same bytes posted again...
 const BUSY_WAIT_SECONDS: u64 = 30;
-/// ...for at most this long in all (zecSwap `BUSY_PATIENCE`).
+/// ...for at most this long in all.
 const BUSY_PATIENCE_SECONDS: u64 = 90;
 /// The first wait between posts nothing answered, doubling to
-/// [`LONGEST_WAIT_SECONDS`] (zecSwap `BACKOFF`, `LONGEST_WAIT`).
+/// [`LONGEST_WAIT_SECONDS`].
 const BACKOFF_SECONDS: u64 = 15;
 const LONGEST_WAIT_SECONDS: u64 = 5 * 60;
 /// An address refused twice is not signed for again before this, unless its
@@ -82,15 +81,15 @@ const REFUSED_PAUSE_SECONDS: u64 = 60 * 60;
 /// reverted.
 const REVERTED_PAUSE_SECONDS: u64 = 60 * 60;
 /// A transaction the relayer named that has not mined within this is posted
-/// again, the same bytes (zecSwap `REPOST`): the relayer names it again while
-/// it can still land, and sends the deposit anew once it cannot. Mainnet's
-/// relayer sends through Flashbots Protect, which the node never sees before
-/// a transaction mines, and which drops one it could not land in 10 blocks.
+/// again, the same bytes: the relayer names it again while it can still land,
+/// and sends the deposit anew once it cannot. Mainnet's relayer sends through
+/// Flashbots Protect, which the node never sees before a transaction mines,
+/// and which drops one it could not land in 10 blocks.
 const REPOST_SECONDS: u64 = 60;
 /// The most a deposit request may be (the relayer's limit).
 const MAX_REQUEST_BODY: usize = 16 * 1024;
-/// The deposit fee cap's percentage part (D23): a deposit pays the relayer
-/// at most [`MAX_RELAYER_FEE`] and this part of its value.
+/// The deposit fee cap's percentage part: a deposit pays the relayer at most
+/// [`MAX_RELAYER_FEE`] and this part of its value.
 pub(crate) const CAP_FEE_BPS: u32 = 50;
 /// How soon a pass asks to run again while a deposit is posted and not
 /// mined.
@@ -104,23 +103,24 @@ const RESCUED_EVENT: &str = "Rescued(address,uint256,uint256,address,bytes32)";
 
 // ---- fees ----
 
-/// What a deposit of `value` pays (zecswap-api `deposit_fee`): `fee` and its
-/// `fee_bps` part of `value`, rounded up.
+/// What a deposit of `value` pays the relayer: `fee` and its `fee_bps` part
+/// of `value`, rounded up.
 pub(crate) fn deposit_fee(fee: u128, fee_bps: u32, value: u128) -> u128 {
-    fee.saturating_add(value.saturating_mul(fee_bps.into()).div_ceil(10_000))
+    fee.saturating_add(value.saturating_mul(fee_bps.into()).div_ceil(BPS_MAX))
 }
 
-/// The most this wallet lets the relayer keep of a deposit of `value`
-/// (D23): 2 USDC and 0.5% of it, so the cap grows with the deposit as the
-/// relayer's fee does.
+/// The most this wallet lets the relayer keep of a deposit of `value`: 2 USDC
+/// and 0.5% of it, so the cap grows with the deposit as the relayer's fee
+/// does.
 pub(crate) fn fee_cap(value: u128) -> u128 {
     deposit_fee(MAX_RELAYER_FEE, CAP_FEE_BPS, value)
 }
 
-/// The fee a deposit of `value` pays under `terms`, once it is within the
-/// cap and under the value; `RelayerFee` otherwise.
-pub(crate) fn capped_fee(terms: &DepositTerms, value: u128) -> Result<u128> {
-    let fee = deposit_fee(terms.fee, terms.fee_bps, value);
+/// The fee a deposit of `value` pays under the relayer's `fee` and
+/// `fee_bps`, once it is within the cap and under the value; `RelayerFee`
+/// otherwise.
+pub(crate) fn capped_fee(fee: u128, fee_bps: u32, value: u128) -> Result<u128> {
+    let fee = deposit_fee(fee, fee_bps, value);
     if fee > fee_cap(value) {
         return fail(
             ErrorCode::RelayerFee,
@@ -134,12 +134,6 @@ pub(crate) fn capped_fee(terms: &DepositTerms, value: u128) -> Result<u128> {
         );
     }
     Ok(fee)
-}
-
-/// What reaches the private balance from `shielded` (a deposit's value less
-/// the relayer's fee): Railgun keeps its shield fee, rounded down.
-pub(crate) fn after_railgun_fee(shielded: u128) -> u128 {
-    shielded - shielded.saturating_mul(RAILGUN_FEE_BPS) / 10_000
 }
 
 /// What reaches the private balance from a deposit of `value` paying `fee`.
@@ -180,17 +174,22 @@ struct WireDepositTerms {
 }
 
 /// `terms`' `deposits`, once they are the pin's: the pinned chain, Deposits
-/// contract, deposits account and token (zecSwap `Depositor::terms`, with the
-/// account pinned too: the nonce commits to it, so a tampered answer cannot
-/// take even the fee). Never followed otherwise: `Unavailable` where nothing
-/// is pinned or the relayer takes no deposits (or none this build can use),
-/// `WrongDeployment` for another deployment's.
+/// contract, deposits account and token (the nonce commits to the account,
+/// so a tampered answer cannot take even the fee). Never followed otherwise:
+/// `Unavailable` where nothing is pinned or the relayer takes no deposits (or
+/// none this build can use), `WrongDeployment` for another deployment's.
 pub(crate) fn pinned_terms(terms: &RelayerTerms, pins: &Deployment) -> Result<DepositTerms> {
     let Some(pin) = pins.deposits else {
-        return fail(ErrorCode::Unavailable, "no Deposits contract is pinned here");
+        return fail(
+            ErrorCode::Unavailable,
+            "no Deposits contract is pinned here",
+        );
     };
     if terms.chain_id != pins.chain_id {
-        return fail(ErrorCode::WrongDeployment, "the relayer serves another chain");
+        return fail(
+            ErrorCode::WrongDeployment,
+            "the relayer serves another chain",
+        );
     }
     let Some(deposits) = terms.deposits.as_ref().filter(|value| !value.is_null()) else {
         return fail(ErrorCode::Unavailable, "the relayer takes no deposits");
@@ -206,11 +205,14 @@ pub(crate) fn pinned_terms(terms: &RelayerTerms, pins: &Deployment) -> Result<De
     }
     let usable = wire.fee.is_swap_amount(false)
         && wire.min_value.is_swap_amount(true)
-        && wire.fee_bps <= 10_000
+        && u128::from(wire.fee_bps) <= BPS_MAX
         // An authorization signed under these must outlive its re-signing.
         && wire.max_validity > RESIGN_BEFORE_SECONDS + CLOCK_SLACK_SECONDS;
     if !usable {
-        return fail(ErrorCode::Unavailable, "the relayer's deposit terms are unusable");
+        return fail(
+            ErrorCode::Unavailable,
+            "the relayer's deposit terms are unusable",
+        );
     }
     Ok(DepositTerms {
         relayer: wire.relayer.0,
@@ -231,9 +233,8 @@ fn validity(terms: &DepositTerms) -> u64 {
 // ---- notes and addresses ----
 
 /// The note as `abi.encode(npk, ciphertext)` writes it: the five words a
-/// deposit's nonce commits to (zecSwap's `ShieldNote::words`, which the
-/// pinned `zecswap-railgun` rev does not have). Their keccak is the note's
-/// commitment, which signing checks.
+/// deposit's nonce commits to. Their keccak is the note's commitment, which
+/// signing checks.
 pub(crate) fn note_words(note: &ShieldNote) -> [[u8; 32]; 5] {
     let [first, second, third] = note.ciphertext.encrypted_bundle;
     [note.npk, first, second, third, note.ciphertext.shield_key]
@@ -404,14 +405,6 @@ pub(crate) struct Landing {
     pub at: u64,
 }
 
-fn is_false(value: &bool) -> bool {
-    !*value
-}
-
-fn is_zero(value: &u64) -> bool {
-    *value == 0
-}
-
 /// One signed deposit or rescue and where it stands. Kept before it is
 /// posted; one per signing, so a replaced request stays and its note is
 /// still recognized if it lands after all.
@@ -555,9 +548,7 @@ impl DepositRecord {
         } else {
             (self.backoff * 2).min(LONGEST_WAIT_SECONDS)
         };
-        let wait = self
-            .backoff
-            .max(after.unwrap_or(0).min(MAX_RETRY_AFTER_SECONDS));
+        let wait = self.backoff.max(after.unwrap_or(0));
         self.posted_at = Some(now);
         self.retry_at = Some(now.saturating_add(wait));
         self.waiting = waiting;
@@ -658,8 +649,8 @@ fn decode_row(row: &DepositRow) -> Result<DepositRecord> {
     Ok(record)
 }
 
-/// Keeps `records` in one transaction under `OPERATIONS`: a request and the
-/// one it replaces change together.
+/// Keeps `records` in one transaction: a request and the one it replaces
+/// change together.
 fn keep(store: &mut SwapStore, account: &str, records: &[&DepositRecord]) -> Result<()> {
     let rows = records
         .iter()
@@ -677,44 +668,28 @@ fn keep(store: &mut SwapStore, account: &str, records: &[&DepositRecord]) -> Res
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    let _guard = OPERATIONS.lock().unwrap_or_else(|error| error.into_inner());
-    store.put_deposits(account, &rows)
+    with_operations(|| store.put_deposits(account, &rows))
 }
 
 fn keep_scan(store: &mut SwapStore, account: &str, at: u64, scan: &DepositScan) -> Result<()> {
     let json = serde_json::to_string(scan)
         .map_err(|_| PrivateUsdError::new(ErrorCode::StoreUnreadable, "a scan does not encode"))?;
-    let _guard = OPERATIONS.lock().unwrap_or_else(|error| error.into_inner());
-    store.put_deposit_scan(account, at, &json)
+    with_operations(|| store.put_deposit_scan(account, at, &json))
 }
 
 // ---- per-account passes ----
 
-static DEPOSIT_LOCKS: LazyLock<Mutex<HashMap<String, Arc<AsyncMutex<()>>>>> =
-    LazyLock::new(Default::default);
-
-/// An account's deposit pass or rescue, released when dropped: two never run
-/// at once for one account, and an account deletion waits for neither.
-pub(crate) struct DepositGuard {
-    _guard: OwnedMutexGuard<()>,
-}
+/// An account's deposit passes and rescues: two never run at once for one
+/// account, and an account deletion waits for neither.
+static DEPOSIT_LOCKS: AccountLocks = AccountLocks::new();
 
 /// Takes `account`'s deposit lock, or `Busy` while a pass or rescue holds it.
-pub(crate) fn lock_account(account: &str) -> Result<DepositGuard> {
-    let mutex = DEPOSIT_LOCKS
-        .lock()
-        .unwrap_or_else(|error| error.into_inner())
-        .entry(account.to_owned())
-        .or_default()
-        .clone();
-    mutex
-        .try_lock_owned()
-        .map(|guard| DepositGuard { _guard: guard })
-        .map_err(|_| PrivateUsdError::new(ErrorCode::Busy, "a deposit pass of this account is running"))
+pub(crate) fn lock_account(account: &str) -> Result<AccountGuard> {
+    DEPOSIT_LOCKS.try_lock(account, "a deposit pass of this account is running")
 }
 
-/// Token domains read and checked this process, by chain and token
-/// (zecSwap's `OnceCell`): a token's `name()` and `version()` never change.
+/// Token domains read and checked this process, by chain and token: a
+/// token's `name()` and `version()` never change.
 static TOKEN_DOMAINS: LazyLock<Mutex<HashMap<(u64, [u8; 20]), (String, String)>>> =
     LazyLock::new(Default::default);
 
@@ -746,8 +721,9 @@ pub(crate) struct PassReport {
     pub used: Vec<AddressView>,
     pub records: Vec<DepositRecord>,
     /// The terms, or why they did not read: `Unavailable` and
-    /// `WrongDeployment` hide deposits; anything else only the fees.
-    pub terms: std::result::Result<DepositTerms, ErrorCode>,
+    /// `WrongDeployment` hide deposits; anything else only the fees. `None`
+    /// when the pass did not ask.
+    pub terms: Option<std::result::Result<DepositTerms, ErrorCode>>,
     pub rescuable: Vec<Rescuable>,
     /// Whether this pass read the addresses from the chain (else they are
     /// the last scan's).
@@ -758,6 +734,25 @@ pub(crate) struct PassReport {
     pub next_poll: Option<Duration>,
     /// The first step that failed, after the terms.
     pub problem: Option<ErrorCode>,
+}
+
+impl PassReport {
+    /// The pass of an account that never scanned or kept a deposit, when
+    /// nothing asked for one: address 0 to show, and nothing else.
+    pub(crate) fn unused(showing_address: [u8; 20]) -> Self {
+        Self {
+            showing: 0,
+            showing_address,
+            used: Vec::new(),
+            records: Vec::new(),
+            terms: None,
+            rescuable: Vec::new(),
+            scanned: false,
+            scanned_at: None,
+            next_poll: None,
+            problem: None,
+        }
+    }
 }
 
 /// What a pass knows while it advances one request.
@@ -779,8 +774,8 @@ impl PassContext<'_> {
     }
 }
 
-/// How a relayer answered a post (`docs/deposits.md`, Answers).
-enum Posted {
+/// How the relayer answered a post.
+enum Answer {
     /// `200`: these transactions send it.
     Sent(Vec<[u8; 32]>),
     /// `409`: the authorization is used, or another deposit of the address is
@@ -800,11 +795,10 @@ pub(crate) struct Deposits<'a, T: HttpTransport, C: DepositChain, K: Clock> {
     pin: DepositsPin,
     account: &'a str,
     keys: &'a SwapKeyContext,
-    transport: &'a T,
-    relayer_url: String,
+    relayer: RelayerClient<'a, T>,
     chain: &'a C,
     clock: &'a K,
-    cancel: Option<Arc<AtomicBool>>,
+    op: Option<&'a OpHandle>,
 }
 
 impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
@@ -816,41 +810,33 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
         transport: &'a T,
         chain: &'a C,
         clock: &'a K,
-        cancel: Option<Arc<AtomicBool>>,
+        op: Option<&'a OpHandle>,
     ) -> Result<Self> {
         let Some(pin) = pins.deposits else {
-            return fail(ErrorCode::Unavailable, "no Deposits contract is pinned here");
+            return fail(
+                ErrorCode::Unavailable,
+                "no Deposits contract is pinned here",
+            );
         };
         Ok(Self {
             pins,
             pin,
             account,
             keys,
-            transport,
-            relayer_url: pins.relayer_url.trim_end_matches('/').to_owned(),
+            relayer: RelayerClient::new(transport, pins.relayer_url),
             chain,
             clock,
-            cancel,
+            op,
         })
     }
 
     fn check_cancelled(&self) -> Result<()> {
-        if self
-            .cancel
-            .as_ref()
-            .is_some_and(|cancel| cancel.load(Ordering::Acquire))
-        {
-            return Err(engine::cancelled());
-        }
-        Ok(())
+        engine::check_cancelled(self.op)
     }
 
     /// The relayer's deposit terms, held to the pin.
     pub(crate) async fn terms(&self) -> Result<DepositTerms> {
-        let terms = RelayerClient::new(self.transport, &self.relayer_url)
-            .terms()
-            .await?;
-        pinned_terms(&terms, self.pins)
+        pinned_terms(&self.relayer.terms().await?, self.pins)
     }
 
     /// Deposit address `index`.
@@ -878,11 +864,7 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
     /// `"USD Coin"`, `"2"`, tUSD's `"ZecSwap Test USD"`, `"2"`.
     async fn token_domain(&self) -> Result<TokenDomain> {
         let key = (self.pins.chain_id, self.pin.token);
-        let cached = TOKEN_DOMAINS
-            .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .get(&key)
-            .cloned();
+        let cached = lock(&TOKEN_DOMAINS).get(&key).cloned();
         if let Some((name, version)) = cached {
             return Ok(TokenDomain {
                 name,
@@ -910,16 +892,13 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
                 "the token's domain separator is not its name and version's",
             );
         }
-        TOKEN_DOMAINS
-            .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .insert(key, (domain.name.clone(), domain.version.clone()));
+        lock(&TOKEN_DOMAINS).insert(key, (domain.name.clone(), domain.version.clone()));
         Ok(domain)
     }
 
     /// Every used address, scanned `GAP` at a time from index 0 until a
-    /// window holds none used (zecSwap `recover`): an old address that gets
-    /// USDC later is found and shielded to a note of its own.
+    /// window holds none used: an old address that gets USDC later is found
+    /// and shielded to a note of its own.
     async fn scan(&self) -> Result<DepositScan> {
         let mut used = Vec::new();
         for window in 0..MAX_WINDOWS {
@@ -991,13 +970,16 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
                 }
                 Err(error) if error.code == ErrorCode::Cancelled => return Err(error),
                 Err(error) => {
-                    log::warn!("Private USD: a deposit scan failed ({:?})", error.code);
+                    log::warn!("private usd: a deposit scan failed ({:?})", error.code);
                     note(error.code);
                     None
                 }
             },
             Err(error) => {
-                log::warn!("Private USD: the deposit chain did not read ({:?})", error.code);
+                log::warn!(
+                    "private usd: the deposit chain did not read ({:?})",
+                    error.code
+                );
                 note(error.code);
                 None
             }
@@ -1031,7 +1013,7 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
                     return Err(error);
                 }
                 log::warn!(
-                    "Private USD: deposit of address {index} wasn't advanced ({:?})",
+                    "private usd: deposit of address {index} wasn't advanced ({:?})",
                     error.code
                 );
                 note(error.code);
@@ -1044,22 +1026,19 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
             let kept = records(store, self.account)?;
             let now = self.clock.now();
             for address in &scan.used {
-                if address.balance.0 < terms.min_value
-                    || under_way.contains(&address.index)
-                    || kept
-                        .iter()
-                        .any(|record| record.index == address.index && !record.state.finished())
-                    || paused(&kept, address.index, address.balance.0, terms, now)
-                {
+                if under_way.contains(&address.index) || !due(&kept, address, terms, now) {
                     continue;
                 }
                 self.check_cancelled()?;
-                if let Err(error) = self.shield(store, address.index, address.balance.0, terms, &context).await {
+                if let Err(error) = self
+                    .shield(store, address.index, address.balance.0, terms, &context)
+                    .await
+                {
                     if error.code == ErrorCode::Cancelled {
                         return Err(error);
                     }
                     log::warn!(
-                        "Private USD: address {} wasn't signed for ({:?})",
+                        "private usd: address {} wasn't signed for ({:?})",
                         address.index,
                         error.code
                     );
@@ -1109,27 +1088,26 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
         let next_poll = next_poll(&records, now).or_else(|| {
             // An address that holds enough and could not be signed for is
             // tried again soon.
-            let due = match (&terms, unsigned) {
+            let retry = match (&terms, unsigned) {
                 (_, true) => true,
-                (Ok(terms), false) => view.used.iter().any(|address| {
-                    address.balance.0 >= terms.min_value
-                        && !paused(&records, address.index, address.balance.0, terms, now)
-                        && !records.iter().any(|record| {
-                            record.index == address.index && !record.state.finished()
-                        })
-                }),
+                (Ok(terms), false) => view
+                    .used
+                    .iter()
+                    .any(|address| due(&records, address, terms, now)),
                 // Terms that did not read for now (never ones that are
                 // unavailable or not the pin's): tried again soon.
-                (Err(_), false) => may_post && view.used.iter().any(|address| address.balance.0 > 0),
+                (Err(_), false) => {
+                    may_post && view.used.iter().any(|address| address.balance.0 > 0)
+                }
             };
-            (due && sign_new).then_some(SIGN_RETRY)
+            (retry && sign_new).then_some(SIGN_RETRY)
         });
         Ok(PassReport {
             showing: view.showing,
             showing_address: self.address(view.showing)?,
             used,
             records,
-            terms: terms.map_err(|error| error.code),
+            terms: Some(terms.map_err(|error| error.code)),
             rescuable,
             scanned,
             scanned_at,
@@ -1156,10 +1134,10 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
         Ok(())
     }
 
-    /// The shield `zecswap_client::Depositor::sign_shield` signs, as a record
-    /// to keep: the fee within the cap (D23), valid for an hour (or what the
-    /// relayer takes less a minute, and after `after_valid_before`), to a note
-    /// of the account's own Railgun wallet, under the token's own domain.
+    /// A signed shield of `value`, as a record to keep: the fee within the
+    /// cap, valid for an hour (or what the relayer takes less a minute, and
+    /// after `after_valid_before`), to a note of the account's own Railgun
+    /// wallet, under the token's own domain.
     async fn sign_shield(
         &self,
         index: u32,
@@ -1168,7 +1146,7 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
         after_refusal: bool,
         after_valid_before: u64,
     ) -> Result<DepositRecord> {
-        let fee = capped_fee(terms, value)?;
+        let fee = capped_fee(terms.fee, terms.fee_bps, value)?;
         let token = self.token_domain().await?;
         let keys = self.keys.deposit_keys(index)?;
         let from = keys.key.address();
@@ -1179,7 +1157,9 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
             .keys
             .railgun_keys()?
             .note(&keys.shield_entropy(valid_before))
-            .map_err(|error| PrivateUsdError::new(ErrorCode::Other, format!("deposit note: {error}")))?;
+            .map_err(|error| {
+                PrivateUsdError::new(ErrorCode::Other, format!("deposit note: {error}"))
+            })?;
         let words = note_words(&note);
         let parts: Vec<&[u8]> = words.iter().map(|word| &word[..]).collect();
         if keccak(&parts) != note.commitment() {
@@ -1247,7 +1227,10 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
                 if let (true, Some((balance, terms))) =
                     (context.may_post, context.signable(record.index))
                 {
-                    let after = record.shield.as_ref().map_or(0, |shield| shield.valid_before);
+                    let after = record
+                        .shield
+                        .as_ref()
+                        .map_or(0, |shield| shield.valid_before);
                     let fresh = self
                         .sign_shield(record.index, balance, terms, record.after_refusal, after)
                         .await?;
@@ -1271,9 +1254,9 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
         self.post_kept(store, record, context).await
     }
 
-    /// Posts `record`'s kept bytes and notes the answer before acting on it
-    /// (`docs/deposits.md`, Answers). A refused shield is signed again once
-    /// from fresh terms and a fresh balance; refused again, it is dropped.
+    /// Posts `record`'s kept bytes and notes the answer before acting on it.
+    /// A refused shield is signed again once from fresh terms and a fresh
+    /// balance; refused again, it is dropped.
     async fn post_kept(
         &self,
         store: &mut SwapStore,
@@ -1282,22 +1265,22 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
     ) -> Result<()> {
         loop {
             self.check_cancelled()?;
-            let posted = self.post(&record).await;
+            let answer = self.post(&record).await;
             let now = self.clock.now();
             // A request the relayer already named a transaction for stays
             // named: it is never signed again while that one may land, and
             // only the chain (or its expiry) ends it.
             let named_before = record.state == DepositState::Sent;
-            match posted {
-                Posted::Sent(transactions) => {
+            match answer {
+                Answer::Sent(transactions) => {
                     let named = record.named(transactions, false, now);
                     return keep(store, self.account, &[&named]);
                 }
-                Posted::Conflict(transactions) if !transactions.is_empty() => {
+                Answer::Conflict(transactions) if !transactions.is_empty() => {
                     let named = record.named(transactions, true, now);
                     return keep(store, self.account, &[&named]);
                 }
-                Posted::Conflict(_) => {
+                Answer::Conflict(_) => {
                     let posted = if named_before {
                         record.asked_again(now)
                     } else {
@@ -1306,16 +1289,16 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
                     keep(store, self.account, &[&posted])?;
                     return self.unnamed_conflict(store, posted).await;
                 }
-                Posted::Retry { .. } | Posted::Refused { .. } if named_before => {
+                Answer::Retry { .. } | Answer::Refused { .. } if named_before => {
                     return keep(store, self.account, &[&record.asked_again(now)]);
                 }
-                Posted::Retry { after, waiting } => {
+                Answer::Retry { after, waiting } => {
                     let posted = record.unanswered(after, waiting, now);
                     return keep(store, self.account, &[&posted]);
                 }
-                Posted::Refused { status } => {
+                Answer::Refused { status } => {
                     log::warn!(
-                        "Private USD: the relayer refused the deposit of address {} (HTTP {status})",
+                        "private usd: the relayer refused the deposit of address {} (HTTP {status})",
                         record.index
                     );
                     if record.kind == DepositKind::Shield && !record.after_refusal {
@@ -1332,7 +1315,7 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
                             Ok(None) => {}
                             Err(error) if error.code == ErrorCode::Cancelled => return Err(error),
                             Err(error) => log::warn!(
-                                "Private USD: address {} wasn't signed for again ({:?})",
+                                "private usd: address {} wasn't signed for again ({:?})",
                                 record.index,
                                 error.code
                             ),
@@ -1361,12 +1344,18 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
             .deposit_addresses(&self.pin, &[record.from()])
             .await?;
         let [address] = uses[..] else {
-            return fail(ErrorCode::ChainUnreadable, "a balance read answered another count");
+            return fail(
+                ErrorCode::ChainUnreadable,
+                "a balance read answered another count",
+            );
         };
         if address.balance < terms.min_value {
             return Ok(None);
         }
-        let after = record.shield.as_ref().map_or(0, |shield| shield.valid_before);
+        let after = record
+            .shield
+            .as_ref()
+            .map_or(0, |shield| shield.valid_before);
         self.sign_shield(record.index, address.balance, &terms, true, after)
             .await
             .map(Some)
@@ -1387,7 +1376,10 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
                     .await?
             }
             (DepositKind::Rescue, _) => {
-                let nonce = record.rescue.as_ref().map_or(u64::MAX, |rescue| rescue.nonce);
+                let nonce = record
+                    .rescue
+                    .as_ref()
+                    .map_or(u64::MAX, |rescue| rescue.nonce);
                 self.chain.deposit_rescue_nonce(&self.pin, &from).await? > nonce
             }
             _ => false,
@@ -1405,7 +1397,10 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
         if record.kind == DepositKind::Shield {
             let uses = self.chain.deposit_addresses(&self.pin, &[from]).await?;
             let [address] = uses[..] else {
-                return fail(ErrorCode::ChainUnreadable, "a balance read answered another count");
+                return fail(
+                    ErrorCode::ChainUnreadable,
+                    "a balance read answered another count",
+                );
             };
             if address.balance < record.value.0 {
                 return keep(
@@ -1439,7 +1434,7 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
                     Some(landing) => keep(store, self.account, &[&record.landed(landing, now)]),
                     None => {
                         log::warn!(
-                            "Private USD: a transaction named for the deposit of address {} is not its deposit",
+                            "private usd: a transaction named for the deposit of address {} is not its deposit",
                             record.index
                         );
                         let mut unbelieved = record.unanswered(None, false, now);
@@ -1451,7 +1446,7 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
             }
             TransactionStatus::Reverted => {
                 log::warn!(
-                    "Private USD: the deposit of address {} reverted",
+                    "private usd: the deposit of address {} reverted",
                     record.index
                 );
                 keep(
@@ -1464,7 +1459,11 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
                 if now > record.expires_at().saturating_add(CLOCK_SLACK_SECONDS) =>
             {
                 // Not on chain and past its validity: it can never land.
-                keep(store, self.account, &[&record.ended(DepositState::Expired, now)])
+                keep(
+                    store,
+                    self.account,
+                    &[&record.ended(DepositState::Expired, now)],
+                )
             }
             TransactionStatus::Unknown | TransactionStatus::Pending
                 if context.may_post
@@ -1513,18 +1512,18 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
                 && log.topics.len() == 2
                 && log.topics[0] == event
                 && log.topics[1] == from
-                && log.data.len() == 4 * 32;
+                && log.data.len() == 4 * WORD;
             if !ours_shape {
                 continue;
             }
-            let word = |i: usize| -> [u8; 32] { log.data[i * 32..(i + 1) * 32].try_into().expect("32 bytes") };
-            let note = word(3);
-            let believed = own.contains(&note)
-                || (record.conflict && self.railgun_shielded(&logs, &note)?);
+            let words = abi::words(&log.data, 4)?;
+            let note = words[3];
+            let believed =
+                own.contains(&note) || (record.conflict && self.railgun_shielded(&logs, &note)?);
             if !believed {
                 continue;
             }
-            let (Some(shielded), Some(fee)) = (amount(&word(0)), amount(&word(1))) else {
+            let (Ok(shielded), Ok(fee)) = (u128_word(&words[0]), u128_word(&words[1])) else {
                 continue;
             };
             return Ok(Some(Landing {
@@ -1558,59 +1557,46 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
     }
 
     /// Posts `record`'s request: the same bytes again, waiting out a `503`
-    /// that asks 30 s or less for up to 90 s in all (zecSwap `BUSY_WAIT`,
-    /// `BUSY_PATIENCE`).
-    async fn post(&self, record: &DepositRecord) -> Posted {
-        let (path, body) = match (&record.shield, &record.rescue) {
-            (Some(shield), _) => ("/v1/deposits/shield", serde_json::to_value(shield)),
-            (_, Some(rescue)) => ("/v1/deposits/rescue", serde_json::to_value(rescue)),
-            (None, None) => return Posted::Refused { status: 0 },
-        };
-        let Ok(body) = body else {
-            return Posted::Refused { status: 0 };
-        };
-        let url = format!("{}{path}", self.relayer_url);
+    /// that asks 30 s or less for up to 90 s in all.
+    async fn post(&self, record: &DepositRecord) -> Answer {
         let mut waited = 0u64;
         loop {
             if self.check_cancelled().is_err() {
-                return Posted::Retry {
+                return Answer::Retry {
                     after: None,
                     waiting: false,
                 };
             }
-            let answer = post_json(
-                self.transport,
-                Service::Relayer,
-                url.clone(),
-                &body,
-                CLIENT_TIMEOUT,
-                &[],
-                |_: &Sent| Ok(()),
-            )
-            .await;
+            let answer = match (&record.shield, &record.rescue) {
+                (Some(shield), _) => self.relayer.deposit_shield(shield).await,
+                (_, Some(rescue)) => self.relayer.deposit_rescue(rescue).await,
+                (None, None) => return Answer::Refused { status: 0 },
+            };
             let refusal = match answer {
                 Ok(sent) if !sent.transactions.is_empty() => {
-                    return Posted::Sent(sent.transactions.iter().map(|tx| tx.0).collect())
+                    return Answer::Sent(sent.transactions.iter().map(|tx| tx.0).collect())
                 }
                 // An empty list names nothing: no answer.
                 Ok(_) => {
-                    return Posted::Retry {
+                    return Answer::Retry {
                         after: None,
                         waiting: false,
                     }
                 }
                 Err(SwapHttpError::Refused(refusal)) => refusal,
+                // The request does not encode: nothing went, nor will.
+                Err(SwapHttpError::Invalid(_)) => return Answer::Refused { status: 0 },
                 Err(_) => {
-                    return Posted::Retry {
+                    return Answer::Retry {
                         after: None,
                         waiting: true,
                     }
                 }
             };
             match refusal.status {
-                409 => return Posted::Conflict(refusal.transactions),
+                409 => return Answer::Conflict(refusal.transactions),
                 400 | 415 | 422 => {
-                    return Posted::Refused {
+                    return Answer::Refused {
                         status: refusal.status,
                     }
                 }
@@ -1623,14 +1609,14 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
                             continue;
                         }
                     }
-                    return Posted::Retry {
-                        after: refusal.retry_after_secs,
+                    return Answer::Retry {
+                        after: retry_after(&refusal),
                         waiting: true,
                     };
                 }
                 _ => {
-                    return Posted::Retry {
-                        after: refusal.retry_after_secs,
+                    return Answer::Retry {
+                        after: retry_after(&refusal),
                         waiting: true,
                     }
                 }
@@ -1651,7 +1637,7 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
     /// Which used addresses' vaults hold more than a rescue's fee (the terms'
     /// `fee` alone, at most the cap).
     async fn rescuable(&self, scan: &DepositScan, terms: &DepositTerms) -> Result<Vec<Rescuable>> {
-        if terms.fee > MAX_RELAYER_FEE {
+        if require_within_fee_cap(terms.fee).is_err() {
             return Ok(Vec::new());
         }
         let deposited: Vec<u32> = scan
@@ -1669,7 +1655,10 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
             .collect::<Result<Vec<_>>>()?;
         let held = self.chain.vault_balances(&self.pin, &owners).await?;
         if held.len() != owners.len() {
-            return fail(ErrorCode::ChainUnreadable, "a vault read answered another count");
+            return fail(
+                ErrorCode::ChainUnreadable,
+                "a vault read answered another count",
+            );
         }
         Ok(deposited
             .into_iter()
@@ -1683,19 +1672,16 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
             .collect())
     }
 
-    /// Shields again what Railgun sent back to address `index`'s vault
-    /// (zecSwap `Depositor::sign_rescue`), the user's action behind a
-    /// confirmation (D18): signed with a fresh nonce and deadline, kept, then
-    /// posted. It pays the terms' `fee` alone, at most the cap (X6).
-    /// `Unavailable` when the vault holds no more than the fee; `Busy` while
-    /// a rescue of the address is under way.
+    /// Shields again what Railgun sent back to address `index`'s vault, the
+    /// user's action behind a confirmation: signed with a fresh nonce and
+    /// deadline, kept, then posted. It pays the terms' `fee` alone, at most
+    /// the cap. `Unavailable` when the vault holds no more than the fee;
+    /// `Busy` while a rescue of the address is under way.
     pub(crate) async fn rescue(&self, store: &mut SwapStore, index: u32) -> Result<DepositRecord> {
         self.require_chain().await?;
         let terms = self.terms().await?;
         let fee = terms.fee;
-        if fee > MAX_RELAYER_FEE {
-            return fail(ErrorCode::RelayerFee, "the relayer's rescue fee is above the cap");
-        }
+        require_within_fee_cap(fee)?;
         if records(store, self.account)?.iter().any(|record| {
             record.kind == DepositKind::Rescue && record.index == index && !record.state.finished()
         }) {
@@ -1705,17 +1691,25 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
         let from = keys.key.address();
         let vaults = self.chain.vault_balances(&self.pin, &[from]).await?;
         let [held] = vaults[..] else {
-            return fail(ErrorCode::ChainUnreadable, "a vault read answered another count");
+            return fail(
+                ErrorCode::ChainUnreadable,
+                "a vault read answered another count",
+            );
         };
         if held <= fee {
-            return fail(ErrorCode::Unavailable, "the vault holds nothing to rescue beyond the fee");
+            return fail(
+                ErrorCode::Unavailable,
+                "the vault holds nothing to rescue beyond the fee",
+            );
         }
         let nonce = self.chain.deposit_rescue_nonce(&self.pin, &from).await?;
         let note = self
             .keys
             .railgun_keys()?
             .note(&keys.rescue_entropy(nonce))
-            .map_err(|error| PrivateUsdError::new(ErrorCode::Other, format!("rescue note: {error}")))?;
+            .map_err(|error| {
+                PrivateUsdError::new(ErrorCode::Other, format!("rescue note: {error}"))
+            })?;
         let now = self.clock.now();
         let deadline = now + validity(&terms);
         let digest = self.domain().rescue(
@@ -1768,19 +1762,19 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
         records(store, self.account)?
             .into_iter()
             .find(|kept| kept.id == id)
-            .ok_or_else(|| PrivateUsdError::new(ErrorCode::StoreUnreadable, "the rescue is not kept"))
+            .ok_or_else(|| {
+                PrivateUsdError::new(ErrorCode::StoreUnreadable, "the rescue is not kept")
+            })
     }
 }
 
-/// An account's deposits over routed HTTP (one transport per call, so it
-/// follows the route policy and fails closed on Tor), the pinned contracts
-/// and the keyed or keyless RPC.
-pub(crate) type WalletDeposits<'a> =
-    Deposits<'a, RoutedTransport, EvmRpc<'a, RoutedTransport>, SystemClock>;
+/// An account's deposits over routed HTTP, the pinned contracts and the
+/// keyed or keyless RPC.
+pub(crate) type WalletDeposits<'a> = Deposits<'a, RoutedHttp, EvmRpc<'a, RoutedHttp>, SystemClock>;
 
-/// Runs `step` on the account's deposits and `swaps.db`. With `op`, its
-/// cancel flag stops requests and the pass. The caller holds the account's
-/// deposit lock.
+/// Runs `step` on the account's deposits and `swaps.db`; cancelling `op`
+/// stops its requests and the pass. The caller holds the account's deposit
+/// lock.
 pub(crate) async fn run<R>(
     store_dir: &Path,
     keys: &SwapKeyContext,
@@ -1789,12 +1783,11 @@ pub(crate) async fn run<R>(
     op: Option<&OpHandle>,
     step: impl AsyncFnOnce(&WalletDeposits<'_>, &mut SwapStore) -> Result<R>,
 ) -> Result<R> {
-    let cancel = op.map(OpHandle::cancel_flag).unwrap_or_default();
-    let transport = RoutedTransport::cancellable(cancel.clone());
+    let transport = swap::transport(op);
     let pins = deployment::deployment(keys.network());
-    let chain = EvmRpc::new(&transport, pins.rpc_url(eth_rpc_url), pins);
+    let chain = EvmRpc::new(&transport, pins, eth_rpc_url);
     let clock = SystemClock;
-    let deposits = Deposits::new(pins, account, keys, &transport, &chain, &clock, Some(cancel))?;
+    let deposits = Deposits::new(pins, account, keys, &transport, &chain, &clock, op)?;
     let mut store = SwapStore::open(store_dir)?;
     step(&deposits, &mut store).await
 }
@@ -1804,17 +1797,27 @@ fn check_body<B: Serialize>(request: &B) -> Result<()> {
     let body = serde_json::to_vec(request)
         .map_err(|_| PrivateUsdError::new(ErrorCode::Other, "the request does not encode"))?;
     if body.len() > MAX_REQUEST_BODY {
-        return fail(ErrorCode::Other, "the request is larger than the relayer takes");
+        return fail(
+            ErrorCode::Other,
+            "the request is larger than the relayer takes",
+        );
     }
     Ok(())
 }
 
-/// A word that fits `u128`.
-fn amount(word: &[u8; 32]) -> Option<u128> {
-    word[..16]
-        .iter()
-        .all(|byte| *byte == 0)
-        .then(|| u128::from_be_bytes(word[16..].try_into().expect("16 bytes")))
+/// Whether `address` is due a deposit: it holds at least the minimum, none
+/// of its requests is under way, and it is not paused.
+fn due(
+    records: &[DepositRecord],
+    address: &ScannedAddress,
+    terms: &DepositTerms,
+    now: u64,
+) -> bool {
+    address.balance.0 >= terms.min_value
+        && !records
+            .iter()
+            .any(|record| record.index == address.index && !record.state.finished())
+        && !paused(records, address.index, address.balance.0, terms, now)
 }
 
 /// Whether address `index` waits before it is signed for again: refused
@@ -1836,9 +1839,7 @@ fn paused(
     let since = now.saturating_sub(newest.ended_at.unwrap_or(0));
     match newest.state {
         DepositState::Refused => {
-            since < REFUSED_PAUSE_SECONDS
-                && newest.value.0 == balance
-                && newest.terms.same(terms)
+            since < REFUSED_PAUSE_SECONDS && newest.value.0 == balance && newest.terms.same(terms)
         }
         DepositState::Reverted => since < REVERTED_PAUSE_SECONDS,
         _ => false,
@@ -1868,17 +1869,16 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::wallet::private_usd::deployment::{self, hex_address};
     use crate::wallet::private_usd::PrivateUsdNetwork;
+    use crate::wallet::private_usd::{abi::hex0x, deployment};
 
     fn hex_bytes(text: &str) -> Vec<u8> {
         hex::decode(text.trim_start_matches("0x")).unwrap()
     }
 
-    /// The addresses ethers derives from known seeds and paths (zecSwap
-    /// `crates/zecswap-core/tests/deposit-vectors.json`): any wallet that
-    /// takes a derivation path finds them. Both networks, accounts above 0
-    /// and indices above 0, through the account's ZIP-32 index, as EIP-55
+    /// The addresses ethers derives from known seeds and paths: any wallet
+    /// that takes a derivation path finds them. Both networks, accounts above
+    /// 0 and indices above 0, through the account's ZIP-32 index, as EIP-55
     /// writes them.
     #[test]
     fn deposit_addresses_are_the_ones_other_wallets_derive() {
@@ -1886,16 +1886,76 @@ mod tests {
         let seed_b = "0x5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4";
         let seed_c = "0x4ad883f4bd38fb5f190bba027d1d1905397e1f22dd05c0fb0000471522789e05";
         let vectors = [
-            (seed_a, PrivateUsdNetwork::Mainnet, 0, 0, "0xA94C82a5Cd0a5104B6abd66cbB127c6B1a81250D"),
-            (seed_a, PrivateUsdNetwork::Mainnet, 0, 19, "0xc0DE0cf2c15baB02b4F47bE6F4f405AaD33EC816"),
-            (seed_a, PrivateUsdNetwork::Mainnet, 7, 3, "0x34c5711759A6691910b4C52811162DE0E8df0b41"),
-            (seed_a, PrivateUsdNetwork::Testnet, 0, 1, "0xAE45E0bfc615883482B75FcCa02277f5fc34571f"),
-            (seed_a, PrivateUsdNetwork::Testnet, 1, 0, "0xDC882eD150675aCc5895a301D0dE76E7Ee59d41F"),
-            (seed_b, PrivateUsdNetwork::Mainnet, 1, 0, "0x714D8792D3D58376d720aDf326835A8F37cADc10"),
-            (seed_b, PrivateUsdNetwork::Testnet, 0, 0, "0xe7132b3e464d4AAa4CD7361c82fed5Ae2B889d8A"),
-            (seed_b, PrivateUsdNetwork::Testnet, 7, 3, "0x032e44DC477cd0f4c277e7d3a32069eF7a8f87fe"),
-            (seed_c, PrivateUsdNetwork::Mainnet, 0, 1, "0x90c45459351cCe09CE90818B6C358370076255a0"),
-            (seed_c, PrivateUsdNetwork::Testnet, 0, 19, "0x66CF8f802376C8afCA2888805477EEf02244199d"),
+            (
+                seed_a,
+                PrivateUsdNetwork::Mainnet,
+                0,
+                0,
+                "0xA94C82a5Cd0a5104B6abd66cbB127c6B1a81250D",
+            ),
+            (
+                seed_a,
+                PrivateUsdNetwork::Mainnet,
+                0,
+                19,
+                "0xc0DE0cf2c15baB02b4F47bE6F4f405AaD33EC816",
+            ),
+            (
+                seed_a,
+                PrivateUsdNetwork::Mainnet,
+                7,
+                3,
+                "0x34c5711759A6691910b4C52811162DE0E8df0b41",
+            ),
+            (
+                seed_a,
+                PrivateUsdNetwork::Testnet,
+                0,
+                1,
+                "0xAE45E0bfc615883482B75FcCa02277f5fc34571f",
+            ),
+            (
+                seed_a,
+                PrivateUsdNetwork::Testnet,
+                1,
+                0,
+                "0xDC882eD150675aCc5895a301D0dE76E7Ee59d41F",
+            ),
+            (
+                seed_b,
+                PrivateUsdNetwork::Mainnet,
+                1,
+                0,
+                "0x714D8792D3D58376d720aDf326835A8F37cADc10",
+            ),
+            (
+                seed_b,
+                PrivateUsdNetwork::Testnet,
+                0,
+                0,
+                "0xe7132b3e464d4AAa4CD7361c82fed5Ae2B889d8A",
+            ),
+            (
+                seed_b,
+                PrivateUsdNetwork::Testnet,
+                7,
+                3,
+                "0x032e44DC477cd0f4c277e7d3a32069eF7a8f87fe",
+            ),
+            (
+                seed_c,
+                PrivateUsdNetwork::Mainnet,
+                0,
+                1,
+                "0x90c45459351cCe09CE90818B6C358370076255a0",
+            ),
+            (
+                seed_c,
+                PrivateUsdNetwork::Testnet,
+                0,
+                19,
+                "0x66CF8f802376C8afCA2888805477EEf02244199d",
+            ),
         ];
         for (seed, network, account, index, expected) in vectors {
             let keys = SwapKeyContext::for_tests(&hex_bytes(seed), network, account);
@@ -1904,9 +1964,9 @@ mod tests {
         }
     }
 
-    /// zecswap-api's cases for `deposit_fee`, and the cap (D23): over it
-    /// refused, a fee of the whole value or more refused, and the cap grows
-    /// with the deposit.
+    /// The relayer's cases for `deposit_fee`, and the cap: over it refused, a
+    /// fee of the whole value or more refused, and the cap grows with the
+    /// deposit.
     #[test]
     fn the_fee_cap_grows_with_the_deposit_and_refuses_above_it() {
         assert_eq!(deposit_fee(100_000, 10, 25_000_000), 125_000);
@@ -1916,51 +1976,41 @@ mod tests {
         assert_eq!(deposit_fee(100_000, 0, 25_000_000), 100_000);
         assert_eq!(deposit_fee(u128::MAX, 10, u128::MAX), u128::MAX);
 
-        let terms = |fee: u128, fee_bps: u32| DepositTerms {
-            relayer: [7; 20],
-            fee,
-            fee_bps,
-            fee_expires_at: None,
-            min_value: 2_000_000,
-            max_validity: 86_400,
-        };
         // The hosted terms: $0.10 and 0.1%.
-        assert_eq!(capped_fee(&terms(100_000, 10), 5_000_000).unwrap(), 105_000);
+        assert_eq!(capped_fee(100_000, 10, 5_000_000).unwrap(), 105_000);
         assert_eq!(arrives(5_000_000, 105_000), 4_882_763);
         // The cap is 2 USDC and 0.5% of the value, rounded up.
         assert_eq!(fee_cap(0), 2_000_000);
         assert_eq!(fee_cap(1_000_000_000), 7_000_000);
         assert_eq!(fee_cap(1), 2_000_001);
-        let at_cap = terms(2_000_000, 50);
-        assert_eq!(capped_fee(&at_cap, 1_000_000_000).unwrap(), 7_000_000);
-        let over = terms(2_000_001, 50);
+        assert_eq!(capped_fee(2_000_000, 50, 1_000_000_000).unwrap(), 7_000_000);
         assert_eq!(
-            capped_fee(&over, 1_000_000_000).unwrap_err().code,
+            capped_fee(2_000_001, 50, 1_000_000_000).unwrap_err().code,
             ErrorCode::RelayerFee
         );
-        let percent_over = terms(0, 51);
         assert_eq!(
-            capped_fee(&percent_over, 1_000_000_000_000).unwrap_err().code,
+            capped_fee(0, 51, 1_000_000_000_000).unwrap_err().code,
             ErrorCode::RelayerFee
         );
         // A fee that grows with the value stays under a cap that grows too:
         // 2 USDC and 0.6% is over it for a large deposit, not a small one.
-        let grows = terms(1_000_000, 60);
-        assert!(capped_fee(&grows, 10_000_000).is_ok());
+        assert!(capped_fee(1_000_000, 60, 10_000_000).is_ok());
         assert_eq!(
-            capped_fee(&grows, 1_000_000_000_000).unwrap_err().code,
+            capped_fee(1_000_000, 60, 1_000_000_000_000)
+                .unwrap_err()
+                .code,
             ErrorCode::RelayerFee
         );
         // Not under the value: nothing would be shielded.
         assert_eq!(
-            capped_fee(&terms(100_000, 0), 100_000).unwrap_err().code,
+            capped_fee(100_000, 0, 100_000).unwrap_err().code,
             ErrorCode::RelayerFee
         );
         assert_eq!(
-            capped_fee(&terms(100_000, 0), 99_999).unwrap_err().code,
+            capped_fee(100_000, 0, 99_999).unwrap_err().code,
             ErrorCode::RelayerFee
         );
-        assert!(capped_fee(&terms(100_000, 0), 100_001).is_ok());
+        assert!(capped_fee(100_000, 0, 100_001).is_ok());
     }
 
     /// The terms are the pin's or refused: another chain, Deposits contract,
@@ -1971,14 +2021,14 @@ mod tests {
         let pins = deployment::deployment(PrivateUsdNetwork::Testnet);
         let pin = pins.deposits.unwrap();
         let hosted = json!({
-            "relayer": hex_address(&pins.relayer),
+            "relayer": hex0x(&pins.relayer),
             "chainId": pins.chain_id,
-            "contract": hex_address(&pins.contract),
+            "contract": hex0x(&pins.contract),
             "fee": "100000",
             "deposits": {
-                "contract": hex_address(&pin.contract),
-                "relayer": hex_address(&pin.relayer),
-                "token": hex_address(&pin.token),
+                "contract": hex0x(&pin.contract),
+                "relayer": hex0x(&pin.relayer),
+                "token": hex0x(&pin.token),
                 "fee": "100000",
                 "feeBps": 10,
                 "feeExpiresAt": 1_792_371_546u64,
@@ -2003,14 +2053,14 @@ mod tests {
                 max_validity: 86_400,
             }
         );
-        let other = hex_address(&[0x77; 20]);
+        let other = hex0x(&[0x77; 20]);
         for (field, value) in [
             ("contract", other.clone()),
             ("relayer", other.clone()),
             ("token", other.clone()),
             // The top-level relayer, which payouts are signed for, is not
             // the deposits account.
-            ("relayer", hex_address(&pins.relayer)),
+            ("relayer", hex0x(&pins.relayer)),
             // The retired test token.
             ("token", "0x5764d0044bef5aa839e0ddafe2073421101b9ed8".into()),
         ] {
@@ -2031,8 +2081,8 @@ mod tests {
         let mut unreadable = hosted.clone();
         unreadable["deposits"]["minValue"] = json!(2_000_000);
         assert_eq!(read(&unreadable).unwrap_err().code, ErrorCode::Unavailable);
-        // Mainnet's live terms (2026-10-19) name its pin; testnet's,
-        // relabelled as mainnet's, do not.
+        // Mainnet's live terms name its pin; testnet's, relabelled as
+        // mainnet's, do not.
         let mainnet = deployment::deployment(PrivateUsdNetwork::Mainnet);
         let live = json!({
             "relayer": "0xcbcb5f57c79c88a0e4bb450289de2088958a017f",
@@ -2068,6 +2118,9 @@ mod tests {
                 max_validity: 86_400,
             }
         );
-        assert_eq!(on_mainnet(&chain).unwrap_err().code, ErrorCode::WrongDeployment);
+        assert_eq!(
+            on_mainnet(&chain).unwrap_err().code,
+            ErrorCode::WrongDeployment
+        );
     }
 }

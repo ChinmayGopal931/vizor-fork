@@ -93,7 +93,7 @@ void main() {
     expect(AppInputSizingDesktop.height, 46);
     expect(AppInputSizingDesktop.iconWrapWidth, 32);
     expect(AppInputSizingDesktop.iconSize, 20);
-    expect(AppInputSizingDesktop.radius, AppRadii.small);
+    expect(AppInputSizingDesktop.radius, AppRadiiDesktop.small);
 
     expect(AppWindowSizing.minWidth, 1080);
     expect(AppWindowSizing.minHeight, 720);
@@ -104,7 +104,7 @@ void main() {
   });
 
   test('mobile sizing tokens match 1 Sizing-3.zip', () {
-    // The neon redesign's near-square corners: even a pill is a 4px slab.
+    // Near-square corners: even a pill is a 4px slab.
     expect(AppRadiiMobile.xSmall, 2);
     expect(AppRadiiMobile.small, 2);
     expect(AppRadiiMobile.medium, 3);
@@ -122,9 +122,9 @@ void main() {
     expect(AppInputSizingMobile.height, 60);
     expect(AppInputSizingMobile.iconWrapWidth, 36);
     expect(AppInputSizingMobile.iconSize, 24);
-    // Figma `Input/Radii` aliases `Radii.SM` (16) on mobile; the Figma
-    // radii scale is shifted one tier against Dart's, so `SM` = `medium`.
-    expect(AppInputSizingMobile.radius, AppRadii.medium);
+    // Figma `Input/Radii` aliases `Radii.SM` on mobile; the Figma radii
+    // scale is shifted one tier against Dart's, so `SM` = `medium`.
+    expect(AppInputSizingMobile.radius, AppRadiiMobile.medium);
   });
 
   test('desktop font tokens preserve redesign serif typography', () {
@@ -188,9 +188,9 @@ void main() {
     // The current variable export updates mobile body/label/code metrics,
     // but actual mobile app frames still render display headlines with
     // Young Serif. Keep that intentional app-level screen behavior pinned.
-    // The neon redesign sets mobile lighter than Figma: Thin (100) for
-    // headlines and display, Light (300) for everything else. No mobile
-    // token is Book (400) or heavier.
+    // Mobile is lighter than Figma: Thin (100) for headlines and display,
+    // Light (300) for everything else. No mobile token is Book (400) or
+    // heavier.
     const mobileStyles = <String, TextStyle>{
       'displayLarge': AppTypographyMobile.displayLarge,
       'displayMedium': AppTypographyMobile.displayMedium,

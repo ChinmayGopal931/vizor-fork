@@ -3,15 +3,12 @@ import 'package:flutter/widgets.dart';
 import '../../../core/theme/app_theme.dart';
 import '../models/portfolio_chart_models.dart';
 
-/// The range chips, shared by the Home chart and its Settings.
-///
-/// Each chip is a [keyPrefix]`_<label>` key, for example
-/// `portfolio_chart_range_1w`.
+/// The chart's range chips, each keyed [keyPrefix]`_<label>`.
 class PortfolioChartRangeSelector extends StatelessWidget {
   const PortfolioChartRangeSelector({
     required this.selected,
     required this.onSelected,
-    this.keyPrefix = 'portfolio_chart_range',
+    required this.keyPrefix,
     super.key,
   });
 

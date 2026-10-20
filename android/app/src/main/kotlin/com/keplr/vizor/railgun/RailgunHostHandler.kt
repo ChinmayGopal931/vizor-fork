@@ -12,12 +12,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * Binds one Activity's Flutter engine to the process-wide Railgun page (the channel contract is in
- * `docs/private-usd-reference.md` §6.2). The host and its page outlive the Activity; only a finishing Activity
- * closes the page.
+ * Binds one Activity's Flutter engine to the process-wide Railgun page. The host and its page outlive the Activity;
+ * only a finishing Activity closes the page.
  *
- * Never log a call's `paramsJson`, its result or a failure's message: `start` carries keyed RPC URLs,
- * `openWallet` the wallet's mnemonic, and engine errors can quote either.
+ * Never log a call's `paramsJson`, its result or a failure's message: `start` carries keyed RPC URLs, `openWallet`
+ * and `deleteWallet` the wallet's mnemonic, and engine errors can quote either.
  */
 class RailgunHostHandler(
     context: Context,
@@ -33,14 +32,14 @@ class RailgunHostHandler(
     ) {
         when (call.method) {
             // Every Android build can host the page (minSdk 30); answered without loading the WebView package. A
-            // WebView without `PROXY_OVERRIDE` still fails `load` with UNAVAILABLE.
+            // WebView without `PROXY_OVERRIDE` still fails `load` with `unavailable`.
             "supported" -> result.success(true)
             "load" -> {
                 val port = (call.arg("proxyPort") as? Number)?.toInt()
                 if (port == null || port !in 1..65535) return result.error(BAD_ARGS, "proxyPort", null)
                 val debug = debuggable && call.arg("debug") == true
                 reply(result) {
-                    Pages.page = host.load(port, debug)
+                    host.load(port, debug)
                     null
                 }
             }
@@ -48,24 +47,19 @@ class RailgunHostHandler(
                 val method = (call.arg("method") as? String)?.let(RailgunMethod::fromWire)
                 val params = call.arg("paramsJson") as? String
                 if (method == null || params == null) return result.error(BAD_ARGS, "method or paramsJson", null)
-                reply(result) {
-                    val page = Pages.page?.takeIf { it.isOpen } ?: throw RailgunException.Disconnected("no page")
-                    page.call(method, params)
-                }
+                reply(result) { host.call(method, params) }
             }
             "close" ->
                 reply(result) {
                     host.close()
-                    Pages.page = null
                     null
                 }
             "wipe" ->
                 reply(result) {
                     host.wipe()
-                    Pages.page = null
                     null
                 }
-            "isOpen" -> result.success(Pages.page?.isOpen == true)
+            "isOpen" -> result.success(host.isOpen)
             else -> result.notImplemented()
         }
     }
@@ -87,17 +81,13 @@ class RailgunHostHandler(
     /** Detaches from the engine. The page stays up across recreation, and closes when the Activity finishes. */
     fun dispose(finishing: Boolean) {
         onCancel(null)
-        if (finishing) {
-            Pages.scope.launch {
-                host.close()
-                Pages.page = null
-            }
-        }
+        if (finishing) Pages.scope.launch { host.close() }
     }
 
     private fun MethodCall.arg(key: String): Any? = (arguments as? Map<*, *>)?.get(key)
 
-    // Exactly one answer per call, on the main thread: a second one crashes the engine, and none hangs Dart.
+    // Exactly one answer per call, on the main thread: a second one crashes the engine, and none hangs Dart. Any
+    // failure but a RailgunException gets a fixed message, as on iOS: its own could quote a URL.
     private fun reply(
         result: MethodChannel.Result,
         block: suspend () -> Any?,
@@ -114,38 +104,41 @@ class RailgunHostHandler(
                 }
             outcome.fold(
                 onSuccess = { result.success(it) },
-                onFailure = { e -> result.error((e as? RailgunException)?.code() ?: FAILED, e.message, null) },
+                onFailure = { e ->
+                    if (e is RailgunException) {
+                        result.error(e.code(), e.message, null)
+                    } else {
+                        result.error(FAILED, "the Railgun host failed", null)
+                    }
+                },
             )
         }
     }
 
     companion object {
-        const val CHANNEL = "com.zcash.wallet/railgun"
+        const val METHOD_CHANNEL = "com.zcash.wallet/railgun"
         const val EVENT_CHANNEL = "com.zcash.wallet/railgun/events"
 
-        private const val BAD_ARGS = "BAD_ARGS"
-        private const val CLOSED = "CLOSED"
-        private const val FAILED = "FAILED"
+        private const val BAD_ARGS = "bad_args"
+        private const val CLOSED = "closed"
+        private const val FAILED = "failed"
 
         private fun RailgunException.code() =
             when (this) {
                 is RailgunException.Disconnected -> CLOSED
-                is RailgunException.Timeout -> "TIMEOUT"
-                is RailgunException.Unavailable -> "UNAVAILABLE"
-                is RailgunException.Protocol -> "PROTOCOL"
+                is RailgunException.Timeout -> "timeout"
+                is RailgunException.Unavailable -> "unavailable"
+                is RailgunException.Protocol -> "protocol"
                 is RailgunException.Failed -> FAILED
             }
     }
 
-    /** The process-level host, built once with the application context, and its current page. */
+    /** The process-level host, built once with the application context. */
     private object Pages {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
         @Volatile
         private var shared: RailgunWebViewHost? = null
-
-        @Volatile
-        var page: RailgunPage? = null
 
         fun host(context: Context): RailgunWebViewHost =
             shared ?: synchronized(this) {

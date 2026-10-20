@@ -2,12 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app_bootstrap.dart';
-import '../../../core/config/pricing_engine_config.dart';
 import '../../../core/storage/app_secure_store.dart';
-import '../../../providers/zec_price_change_provider.dart';
 import '../models/portfolio_chart_models.dart';
 
-/// The Home portfolio chart's settings.
+/// The portfolio chart's settings.
 @immutable
 class PortfolioChartSettings {
   const PortfolioChartSettings({
@@ -16,9 +14,7 @@ class PortfolioChartSettings {
     required this.defaultRange,
   });
 
-  /// The shipped defaults: shown, the ZEC balance, one week. Market prices are
-  /// off until the user turns them on, because they are the one thing here that
-  /// contacts a server: a fresh install requests nothing for the chart.
+  /// The shipped defaults: shown, the ZEC balance, one week.
   static const defaults = PortfolioChartSettings(
     enabled: true,
     marketPrices: false,
@@ -28,8 +24,7 @@ class PortfolioChartSettings {
   /// Whether the chart is on Home at all.
   final bool enabled;
 
-  /// Whether to value the balance in USD, which asks the pricing server for
-  /// daily prices. Off, the chart shows the ZEC balance and makes no request.
+  /// Whether to value the balance at market prices instead of showing ZEC.
   final bool marketPrices;
 
   /// The range the chart opens on.
@@ -59,22 +54,6 @@ class PortfolioChartSettings {
   @override
   int get hashCode => Object.hash(enabled, marketPrices, defaultRange);
 }
-
-/// The pricing server the chart would ask, or `null` when this build has none
-/// it can use: the define is empty, not `https`, or not a plain origin.
-final portfolioPricingEngineBaseUriProvider = Provider<Uri?>(
-  (ref) => parsePricingEngineBaseUri(kVizorPricingEngineBaseUrl),
-);
-
-/// Whether this build can value the chart at market prices at all: where Home
-/// shows a price (its own gate, so the chart never reaches a price service on a
-/// build where the Home price would not) and with a usable pricing server.
-/// Where it is false the chart is the ZEC balance and Settings offers no price
-/// switch.
-final portfolioChartPricesAvailableProvider = Provider<bool>((ref) {
-  return ref.watch(zecMarketDataAvailableProvider) &&
-      ref.watch(portfolioPricingEngineBaseUriProvider) != null;
-});
 
 class PortfolioChartSettingsNotifier extends Notifier<PortfolioChartSettings> {
   static final _store = AppSecureStore.instance;
@@ -106,11 +85,6 @@ class PortfolioChartSettingsNotifier extends Notifier<PortfolioChartSettings> {
     );
     state = state.copyWith(marketPrices: marketPrices);
   }
-
-  Future<void> setDefaultRange(PortfolioChartRange range) async {
-    await _store.writePlain(kPortfolioChartRangeKey, range.label);
-    state = state.copyWith(defaultRange: range);
-  }
 }
 
 final portfolioChartSettingsProvider =
@@ -118,9 +92,8 @@ final portfolioChartSettingsProvider =
       PortfolioChartSettingsNotifier.new,
     );
 
-/// The range on show right now. It opens on the saved default and changes with
-/// the chips on Home for the rest of the session only; changing the default in
-/// Settings resets it.
+/// The range on show. It opens on the saved range and follows the chart's
+/// range chips for the rest of the session.
 class PortfolioChartRangeNotifier extends Notifier<PortfolioChartRange> {
   @override
   PortfolioChartRange build() {

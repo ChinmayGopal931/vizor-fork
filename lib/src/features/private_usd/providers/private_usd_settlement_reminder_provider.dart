@@ -15,7 +15,7 @@ import 'private_usd_unfinished_provider.dart';
 const kPrivateUsdSettlementWarning = Duration(minutes: 2);
 
 /// A buzz a USD → ZEC conversion is due: the user's turn, once "Authorize
-/// settlement" is first offered (owner, 2026-10-19), or its closing within
+/// settlement" is first offered, or its closing within
 /// [kPrivateUsdSettlementWarning] while still unauthorized.
 enum PrivateUsdSettlementBuzz { none, offered, closing }
 
@@ -43,10 +43,10 @@ PrivateUsdSettlementBuzz privateUsdSettlementBuzzDue(
 /// mid-conversion, and again when it comes within
 /// [kPrivateUsdSettlementWarning] of its cut-off (`readyDeadline − 120 s`)
 /// still unauthorized ([privateUsdSettlementBuzzDue]). For every account's
-/// conversions as the engine publishes them (D14). Only while Veylor is in
-/// the foreground and unlocked: there is no background work or notification
-/// (D9), so a closed app cannot buzz, and a step offered while the app was
-/// away buzzes on its return. `PrivateUsdEngineHost` keeps it alive.
+/// conversions as the engine publishes them. Only while the app is in the
+/// foreground and unlocked: there is no background work or notification, so
+/// a closed app cannot buzz, and a step offered while the app was away
+/// buzzes on its return. `PrivateUsdEngineHost` keeps it alive.
 final privateUsdSettlementReminderProvider = Provider<void>((ref) {
   final offered = <PrivateUsdRecordKey>{};
   final closing = <PrivateUsdRecordKey>{};

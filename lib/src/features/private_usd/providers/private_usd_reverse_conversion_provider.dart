@@ -3,15 +3,15 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/private_usd_feature_config.dart';
 import '../../../rust/api/private_usd.dart' as rust;
+import '../models/private_usd_messages.dart';
 import '../models/private_usd_record_key.dart';
 import '../models/private_usd_reverse_presentation.dart';
 import '../private_usd_copy.dart';
 import '../services/private_usd_engine.dart';
+import '../services/private_usd_pause.dart';
 import '../services/private_usd_reverse_funding.dart';
-import '../services/private_usd_swap_backend.dart';
-import '../services/railgun_engine.dart';
-import '../services/railgun_engine_key_store.dart';
 import 'private_usd_convert_provider.dart';
 import 'private_usd_engine_provider.dart';
 import 'private_usd_unfinished_provider.dart';
@@ -24,8 +24,7 @@ const kPrivateUsdReverseTick = Duration(seconds: 5);
 /// A user step the reverse progress is running.
 enum PrivateUsdReverseUserStep { pricing, readying, cancelling }
 
-/// One reverse conversion as its progress screen shows it (plan reference
-/// §9.4 S6, §9.5).
+/// One reverse conversion as its progress screen shows it.
 @immutable
 class PrivateUsdReverseConversionState {
   const PrivateUsdReverseConversionState({
@@ -49,7 +48,7 @@ class PrivateUsdReverseConversionState {
   /// The payment's funding, while it runs or after it paid nothing.
   final PrivateUsdFundingState? funding;
 
-  /// The page's proof (0..1) while it proves.
+  /// The page's proof (0..1) while it proves; null between proofs.
   final double? proofProgress;
   final PrivateUsdReverseUserStep? acting;
 
@@ -75,6 +74,7 @@ class PrivateUsdReverseConversionState {
     PrivateUsdFundingState? funding,
     bool clearFunding = false,
     double? proofProgress,
+    bool clearProofProgress = false,
     PrivateUsdReverseUserStep? acting,
     bool clearActing = false,
     String? error,
@@ -84,7 +84,9 @@ class PrivateUsdReverseConversionState {
     status: status ?? this.status,
     loaded: loaded ?? this.loaded,
     funding: clearFunding ? null : (funding ?? this.funding),
-    proofProgress: proofProgress ?? this.proofProgress,
+    proofProgress: clearProofProgress
+        ? null
+        : (proofProgress ?? this.proofProgress),
     acting: clearActing ? null : (acting ?? this.acting),
     error: clearError ? null : (error ?? this.error),
   );
@@ -92,7 +94,7 @@ class PrivateUsdReverseConversionState {
 
 /// One reverse conversion's progress, driven by the foreground engine loop
 /// (`reverse_advance`), with the user's steps: "Pay {debit}", "Authorize
-/// settlement" and the call-off (D18 sheets in the screen).
+/// settlement" and the call-off (each behind a sheet in the screen).
 final privateUsdReverseConversionProvider = NotifierProvider.autoDispose
     .family<
       PrivateUsdReverseConversionNotifier,
@@ -128,11 +130,14 @@ class PrivateUsdReverseConversionNotifier
     ) {
       state = state.copyWith(funding: next, clearFunding: next == null);
     });
+    // A new proof starts from none, so a second "Pay" never shows the last
+    // proof's share.
     ref.listen(
       railgunEngineStateProvider.select((engine) => engine.proof?.progress),
-      (_, next) {
-        if (next != null) state = state.copyWith(proofProgress: next);
-      },
+      (_, next) => state = state.copyWith(
+        proofProgress: next,
+        clearProofProgress: next == null,
+      ),
     );
     final tick = Timer.periodic(
       kPrivateUsdReverseTick,
@@ -154,8 +159,8 @@ class PrivateUsdReverseConversionNotifier
   Future<void> _load() async {
     try {
       await _engine.loadReverseRecords(key.accountUuid);
-    } catch (_) {
-      if (kDebugMode) debugPrint('privateUsd: reading conversions failed');
+    } catch (error) {
+      privateUsdLog('reading conversions failed (${error.runtimeType})');
     }
     if (!ref.mounted) return;
     state = state.copyWith(
@@ -168,8 +173,8 @@ class PrivateUsdReverseConversionNotifier
   /// "Try now": cuts the loop's nap short.
   void retryNow() => _engine.nudge();
 
-  /// "Pay {debit}": funds the conversion at its reviewed cost (R4–R6). Its
-  /// proof and outcome show through the funding's state.
+  /// "Pay {debit}": funds the conversion at its reviewed cost. Its proof and
+  /// outcome show through the funding's state.
   void pay() {
     final record = state.status?.record;
     if (record == null ||
@@ -208,7 +213,7 @@ class PrivateUsdReverseConversionNotifier
         error = privateUsdReverseStepMessage(failure.code);
       }
     } catch (failure) {
-      if (!_isPause(failure)) error = PrivateUsdCopy.reverseError;
+      if (failure is! PrivateUsdPause) error = PrivateUsdCopy.reverseError;
     }
     if (!ref.mounted) return;
     state = state.copyWith(
@@ -218,9 +223,9 @@ class PrivateUsdReverseConversionNotifier
     );
   }
 
-  /// "Cancel conversion" / "Request refund", once its sheet was confirmed
-  /// (D18). It runs while a payment's proof may still run (that proof is
-  /// then never submitted); a settled conversion can no longer be refunded.
+  /// "Cancel conversion" / "Request refund", once its sheet was confirmed. It
+  /// runs while a payment's proof may still run (that proof is then never
+  /// submitted); a settled conversion can no longer be refunded.
   Future<void> cancel() async {
     final record = state.status?.record;
     if (record == null || state.busy) return;
@@ -245,7 +250,9 @@ class PrivateUsdReverseConversionNotifier
         _ => PrivateUsdCopy.convertCallOffFailed,
       };
     } catch (failure) {
-      if (!_isPause(failure)) error = PrivateUsdCopy.convertCallOffFailed;
+      if (failure is! PrivateUsdPause) {
+        error = PrivateUsdCopy.convertCallOffFailed;
+      }
     }
     if (!ref.mounted) return;
     // A cancel Rust recorded stands, whatever the call said after.
@@ -289,7 +296,7 @@ class PrivateUsdReverseConversionNotifier
     } on rust.ApiPrivateUsdError catch (failure) {
       error = privateUsdReverseStepMessage(failure.code);
     } catch (failure) {
-      if (!_isPause(failure)) error = PrivateUsdCopy.reverseError;
+      if (failure is! PrivateUsdPause) error = PrivateUsdCopy.reverseError;
     }
     if (!ref.mounted) return;
     state = state.copyWith(
@@ -298,11 +305,4 @@ class PrivateUsdReverseConversionNotifier
       clearError: error == null,
     );
   }
-
-  static bool _isPause(Object failure) =>
-      failure is PrivateUsdEngineInterruptedException ||
-      failure is PrivateUsdEngineUnavailableException ||
-      failure is PrivateUsdKeyLockedException ||
-      failure is RailgunEngineInterruptedException ||
-      failure is RailgunEngineKeyLockedException;
 }

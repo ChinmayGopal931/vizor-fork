@@ -36,7 +36,6 @@ import 'src/core/theme/gotham_fonts.dart';
 import 'src/core/theme/legacy_material_theme.dart';
 import 'src/core/widgets/mobile/mobile_numeric_keyboard_toolbar.dart';
 import 'src/core/widgets/mobile/unlock_reveal_host.dart';
-import 'src/core/widgets/mobile/private_usd_engine_host.dart';
 import 'src/core/widgets/app_button.dart';
 import 'src/core/widgets/app_icon.dart';
 import 'src/core/widgets/app_toast.dart';
@@ -103,6 +102,7 @@ import 'src/features/payment_links/screens/desktop_payment_link_scan_screen.dart
 import 'src/features/private_usd/models/private_usd_record_key.dart';
 import 'src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'src/features/private_usd/providers/private_usd_unfinished_provider.dart';
+import 'src/features/private_usd/widgets/mobile/private_usd_engine_host.dart';
 import 'src/features/send/screens/payment_request_scan_screen.dart';
 import 'src/features/payment_links/screens/desktop_gift_password_screen.dart';
 import 'src/features/payment_links/screens/desktop_gift_customise_screen.dart';
@@ -571,7 +571,7 @@ final _routerProvider = Provider<_AppRouter>((ref) {
   ref.listen(privateUsdAvailableProvider, (_, _) {
     refresh.requestRefresh();
   });
-  // A conversion under way keeps its progress route reachable (D16).
+  // A conversion under way keeps its progress route reachable.
   ref.listen(privateUsdUnfinishedProvider, (_, _) {
     refresh.requestRefresh();
   });
@@ -705,7 +705,7 @@ String? appRedirect({
   final swapFeatureEnabled = ref.read(swapFeatureEnabledProvider);
   // Hardware accounts, accounts without a ZIP-32 index, networks without a
   // deployment and the kill switch all leave it unavailable, except the
-  // progress of a conversion still under way for the active account (D16).
+  // progress of a conversion still under way for the active account.
   final isPrivateUsd = _isRouteOrChild(state.matchedLocation, '/private-usd');
 
   log(

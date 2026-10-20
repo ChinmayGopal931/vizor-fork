@@ -4,16 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/private_usd_feature_config.dart';
 import '../../../core/storage/app_secure_store.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/private_usd_lifecycle_provider.dart';
 import '../models/private_usd_balances.dart';
+import '../models/private_usd_record_key.dart';
 import '../models/railgun_models.dart';
 import '../services/private_usd_balance_cache.dart';
 import '../services/private_usd_balance_repository.dart';
+import '../services/private_usd_pause.dart';
 import '../services/railgun_engine.dart';
-import '../services/railgun_engine_key_store.dart';
-import '../models/private_usd_record_key.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_keep_awake_provider.dart';
 import 'private_usd_unfinished_provider.dart';
@@ -27,9 +28,9 @@ final privateUsdBalanceClockProvider = Provider<DateTime Function()>(
   (_) => DateTime.now,
 );
 
-/// One account's private USD balance (plan reference §6.6): the cached one
-/// at once, then each sync's. Nothing refreshes until something watches it
-/// through [privateUsdBalanceKeepFreshProvider].
+/// One account's private USD balance: the cached one at once, then each
+/// sync's. Nothing refreshes until something watches it through
+/// [privateUsdBalanceKeepFreshProvider].
 final privateUsdBalanceProvider = NotifierProvider.autoDispose
     .family<PrivateUsdBalanceNotifier, PrivateUsdBalanceState, String>(
       PrivateUsdBalanceNotifier.new,
@@ -51,30 +52,16 @@ final privateUsdBalanceKeepFreshProvider = Provider.autoDispose
       // Watching starts polling, which can refresh at once and so change the
       // balance provider; Riverpod forbids that while this provider builds.
       // Register right after the build instead.
-      PrivateUsdBalanceWatch? watch;
+      VoidCallback? cancel;
       var disposed = false;
       scheduleMicrotask(() {
-        if (!disposed) watch = notifier.watch(ifUsed: key.ifUsed);
+        if (!disposed) cancel = notifier.watch(ifUsed: key.ifUsed);
       });
       ref.onDispose(() {
         disposed = true;
-        watch?.cancel();
+        cancel?.call();
       });
     });
-
-/// A watcher's hold on [PrivateUsdBalanceNotifier]'s polling.
-class PrivateUsdBalanceWatch {
-  PrivateUsdBalanceWatch._(this._cancel);
-
-  final void Function() _cancel;
-  var _cancelled = false;
-
-  void cancel() {
-    if (_cancelled) return;
-    _cancelled = true;
-    _cancel();
-  }
-}
 
 class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
   PrivateUsdBalanceNotifier(this.accountUuid);
@@ -94,7 +81,7 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
   Future<void>? _refreshing;
   RailgunSync? _shown;
 
-  // The first sync this notifier started, while it runs (VI-18).
+  // The first sync this notifier started, while it runs.
   PrivateUsdFirstSync? _runningFirstSync;
 
   @override
@@ -133,16 +120,19 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
     return const PrivateUsdBalanceState();
   }
 
-  /// Keeps the balance fresh until the returned watch is cancelled.
-  PrivateUsdBalanceWatch watch({required bool ifUsed}) {
+  /// Keeps the balance fresh until the returned callback runs.
+  VoidCallback watch({required bool ifUsed}) {
     _watchers++;
     if (!ifUsed) _strictWatchers++;
     _ensurePolling();
-    return PrivateUsdBalanceWatch._(() {
+    var cancelled = false;
+    return () {
+      if (cancelled) return;
+      cancelled = true;
       _watchers--;
       if (!ifUsed) _strictWatchers--;
       if (_watchers == 0) _stopPolling();
-    });
+    };
   }
 
   /// Refreshes unless the balance is younger than [maxAge]. An explicit
@@ -164,8 +154,8 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
 
   Future<void> _refreshNow() async {
     // With nothing shown yet, this may be the wallet's first sync, which
-    // keeps the screen on until it completes or fails (VI-18), even past
-    // this notifier: the page goes on syncing.
+    // keeps the screen on until it completes or fails, even past this
+    // notifier: the page goes on syncing.
     final firstSync = state.balances == null
         ? ref.read(privateUsdFirstSyncsProvider.notifier).begin(accountUuid)
         : null;
@@ -185,17 +175,11 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       try {
         _shownIfMounted(await sync);
       } catch (_) {}
-    } on RailgunEngineInterruptedException {
+    } on PrivateUsdPause {
       // A lock, switch or route change closed the page: not a failure.
       _settled();
-    } on RailgunEngineUnavailableException {
-      _settled();
-    } on RailgunEngineKeyLockedException {
-      _settled();
     } catch (error) {
-      if (kDebugMode) {
-        debugPrint('privateUsd: refresh failed (${error.runtimeType})');
-      }
+      privateUsdLog('refresh failed (${error.runtimeType})');
       _failed();
     } finally {
       firstSync?.end();
@@ -337,22 +321,4 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
     _pollTimer?.cancel();
     _pollTimer = null;
   }
-}
-
-/// A balance that only shows [fixed]: Widgetbook, capture scenarios and
-/// widget tests. It never polls or opens the page.
-class FixedPrivateUsdBalanceNotifier extends PrivateUsdBalanceNotifier {
-  FixedPrivateUsdBalanceNotifier(super.accountUuid, this.fixed);
-
-  final PrivateUsdBalanceState fixed;
-
-  @override
-  PrivateUsdBalanceState build() => fixed;
-
-  @override
-  PrivateUsdBalanceWatch watch({required bool ifUsed}) =>
-      PrivateUsdBalanceWatch._(() {});
-
-  @override
-  void refresh({Duration maxAge = Duration.zero}) {}
 }

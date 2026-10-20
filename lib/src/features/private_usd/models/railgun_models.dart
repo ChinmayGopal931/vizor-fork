@@ -1,11 +1,13 @@
 import 'dart:convert';
 
-/// The Railgun page's typed requests, results and events (plan reference
-/// §6.2). Kotlin forwards params, results and events as raw JSON text; these
-/// models are the only place they are read, so a Swift host can reuse them.
-///
-/// Token amounts travel as decimal strings and EVM addresses as `0x` hex;
-/// addresses are kept lowercase here so they compare by value.
+import 'package:flutter/foundation.dart';
+
+// The Railgun page's typed requests, results and events. The Kotlin and
+// Swift hosts forward params, results and events as raw JSON text; these
+// models are the only place they are read.
+//
+// Token amounts travel as decimal strings and EVM addresses as `0x` hex;
+// addresses are kept lowercase here so they compare by value.
 
 /// A page result or event this build cannot read. A page that answers a
 /// method with the wrong shape fails that call.
@@ -141,10 +143,7 @@ class RailgunBalances {
     if (other.byBucket.length != byBucket.length) return false;
     for (final entry in byBucket.entries) {
       final theirs = other.byBucket[entry.key];
-      if (theirs == null || theirs.length != entry.value.length) return false;
-      for (var i = 0; i < theirs.length; i++) {
-        if (theirs[i] != entry.value[i]) return false;
-      }
+      if (theirs == null || !listEquals(theirs, entry.value)) return false;
     }
     return true;
   }
@@ -377,7 +376,7 @@ class RailgunNullifiers {
   bool operator ==(Object other) =>
       other is RailgunNullifiers &&
       other.tree == tree &&
-      _listEquals(other.nullifiers, nullifiers);
+      listEquals(other.nullifiers, nullifiers);
 
   @override
   int get hashCode => Object.hash(tree, Object.hashAll(nullifiers));
@@ -807,12 +806,4 @@ RailgunNullifiers _nullifiers(Map<String, dynamic> spend) {
           throw const RailgunProtocolException('a nullifier is unreadable'),
     ]),
   );
-}
-
-bool _listEquals<T>(List<T> a, List<T> b) {
-  if (a.length != b.length) return false;
-  for (var i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
-  }
-  return true;
 }

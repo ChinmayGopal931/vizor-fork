@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show HttpHeaders;
 
-import 'package:flutter/foundation.dart';
-
+import '../../../core/config/private_usd_feature_config.dart';
 import '../../../core/network/network_http_client.dart';
 
 /// Why a user's own Ethereum RPC URL failed the check before saving.
@@ -80,9 +79,7 @@ class PrivateUsdRpcChecker {
           : PrivateUsdRpcCheckFailure.wrongChain;
     } catch (error) {
       // The type only: a message can quote the URL.
-      if (kDebugMode) {
-        debugPrint('privateUsd: the RPC check failed (${error.runtimeType})');
-      }
+      privateUsdLog('the RPC check failed (${error.runtimeType})');
       return PrivateUsdRpcCheckFailure.unreachable;
     } finally {
       timer.cancel();

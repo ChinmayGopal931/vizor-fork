@@ -1,16 +1,17 @@
 import Flutter
 import Foundation
+import Network
 
-/// Binds the Flutter engine to the process-wide Railgun page (the channel contract is the Android reference's §6.2,
-/// plus `supported`). The page host outlives the engine.
+/// Binds the Flutter engine to the process-wide Railgun page, over the same channel contract as Android's
+/// `RailgunHostHandler`. The page host outlives the engine.
 ///
 /// Never log a call's `paramsJson`, its result or a failure's message: `start` carries keyed RPC URLs, `openWallet`
 /// and `deleteWallet` a mnemonic, and engine errors can quote either.
 final class RailgunHostHandler: NSObject, FlutterStreamHandler {
-  static let channelName = "com.zcash.wallet/railgun"
-  static let eventsName = "com.zcash.wallet/railgun/events"
+  static let methodChannelName = "com.zcash.wallet/railgun"
+  static let eventChannelName = "com.zcash.wallet/railgun/events"
 
-  /// Whether this build may debug the page at all; `load`'s `debug` can only narrow it (plan XI12).
+  /// Whether this build may debug the page at all; `load`'s `debug` can only narrow it.
   static var isDebugBuild: Bool {
     #if DEBUG
       return true
@@ -32,7 +33,11 @@ final class RailgunHostHandler: NSObject, FlutterStreamHandler {
     case "supported":
       result(RailgunPageHost.isSupported)
     case "load":
-      guard let port = arguments?["proxyPort"] as? Int, (1...65535).contains(port) else {
+      guard
+        let number = arguments?["proxyPort"] as? Int,
+        (1...65535).contains(number),
+        let port = NWEndpoint.Port(rawValue: UInt16(number))
+      else {
         result(Self.badArgs("proxyPort"))
         return
       }
@@ -83,8 +88,9 @@ final class RailgunHostHandler: NSObject, FlutterStreamHandler {
     return nil
   }
 
-  /// Exactly one answer per call, on the main thread (plan invariant 23): a second one crashes the app, and none
-  /// hangs Dart. The task answers once, when its body ends; the page answers every waiting call when it closes.
+  /// Exactly one answer per call, on the main thread: a second one crashes the app, and none hangs Dart. The task
+  /// answers once, when its body ends; the page answers every waiting call when it closes. Any failure but a
+  /// `RailgunError` gets a fixed message: its own could quote a URL.
   private func reply(_ result: @escaping FlutterResult, _ body: @escaping @MainActor () async throws -> Any?) {
     Task { @MainActor in
       let answer: Any?
@@ -93,13 +99,13 @@ final class RailgunHostHandler: NSObject, FlutterStreamHandler {
       } catch let error as RailgunError {
         answer = error.flutterError
       } catch {
-        answer = FlutterError(code: "FAILED", message: "the Railgun host failed", details: nil)
+        answer = RailgunError.failed("the Railgun host failed").flutterError
       }
       result(answer)
     }
   }
 
   private static func badArgs(_ what: String) -> FlutterError {
-    FlutterError(code: "BAD_ARGS", message: what, details: nil)
+    FlutterError(code: "bad_args", message: what, details: nil)
   }
 }

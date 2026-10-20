@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
 
-/// One block's net effect on an account's balance, read from the wallet
-/// database. This is the only wallet data the portfolio chart uses, and it
-/// never leaves the device.
+import '../../../rust/api/sync.dart' as rust_sync;
+
+/// A transaction's net effect on an account's balance, at the block that
+/// mined it.
 @immutable
 class BalanceDelta {
   const BalanceDelta({
@@ -12,12 +13,39 @@ class BalanceDelta {
   });
 
   final int height;
-
-  /// The block's time.
   final DateTime time;
 
   /// Signed: negative for spends, including the fee.
   final int zatoshi;
+}
+
+/// The transactions that moved the balance, as deltas the chart can place in
+/// time. Unmined and expired transactions did not move it. A mined transaction
+/// with no block time cannot be placed, so there is no coherent history:
+/// `null`.
+List<BalanceDelta>? balanceDeltasFromTransactions(
+  Iterable<rust_sync.TransactionInfo> transactions,
+) {
+  final deltas = <BalanceDelta>[];
+  for (final transaction in transactions) {
+    if (transaction.expiredUnmined || transaction.minedHeight == BigInt.zero) {
+      continue;
+    }
+    final delta = transaction.accountBalanceDelta;
+    if (delta == 0) continue;
+    if (transaction.blockTime == BigInt.zero) return null;
+    deltas.add(
+      BalanceDelta(
+        height: transaction.minedHeight.toInt(),
+        time: DateTime.fromMillisecondsSinceEpoch(
+          transaction.blockTime.toInt() * 1000,
+          isUtc: true,
+        ),
+        zatoshi: delta,
+      ),
+    );
+  }
+  return deltas;
 }
 
 /// The balance from [time] until the next step.
@@ -55,7 +83,7 @@ class BalanceHistory {
   }
 }
 
-/// Folds per-block deltas into a balance history.
+/// Folds deltas into a balance history.
 ///
 /// Blocks are ordered by height, not by time, so a block whose time is a few
 /// seconds out of order cannot reorder the history; a time that would run

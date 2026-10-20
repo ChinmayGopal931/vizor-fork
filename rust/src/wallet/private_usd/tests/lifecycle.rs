@@ -1,8 +1,7 @@
-//! The Rust side of the account lifecycle guards (plan M5 "Done when",
-//! reference §8.4, §3.5 item 15), through the FRB calls Dart makes: the
-//! count the deletion and reset warnings show, the accounts the engine loop
-//! advances and drains, the refusal while a step runs, and the cleanup once
-//! the user confirmed.
+//! The Rust side of the account lifecycle guards, through the FRB calls Dart
+//! makes: the count the deletion and reset warnings show, the accounts the
+//! engine loop advances and drains, the refusal while a step runs, and the
+//! cleanup once the user confirmed.
 
 use std::sync::Arc;
 
@@ -12,8 +11,7 @@ use zecswap_core::NetworkType;
 
 use super::super::engine::{self, OpHandle};
 use super::super::evm_rpc::SwapStage;
-use super::super::forward::joint_db_path;
-use super::super::joint;
+use super::super::joint::{self, joint_db_path};
 use super::super::models::{Direction, ForwardOutcome};
 use super::super::store::JointAccountRow;
 use super::super::ErrorCode;

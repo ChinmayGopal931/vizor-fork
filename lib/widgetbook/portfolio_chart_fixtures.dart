@@ -1,4 +1,3 @@
-// ignore_for_file: depend_on_referenced_packages
 // Dev-only: Widgetbook and Figma comparison fixtures for the Home portfolio
 // chart. Nothing here is reachable from `lib/main.dart`.
 
@@ -96,10 +95,5 @@ class PreviewPortfolioChartSettingsNotifier
   @override
   Future<void> setMarketPrices(bool marketPrices) async {
     state = state.copyWith(marketPrices: marketPrices);
-  }
-
-  @override
-  Future<void> setDefaultRange(PortfolioChartRange range) async {
-    state = state.copyWith(defaultRange: range);
   }
 }

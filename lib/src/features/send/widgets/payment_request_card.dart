@@ -9,7 +9,7 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_icon_hover_button.dart';
 import '../../../core/widgets/full_address_viewer.dart';
-import '../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../../core/widgets/mobile/tron_glyph.dart';
 import '../../../core/widgets/pool_badge.dart';
 import '../../../core/widgets/review_wrap_card.dart';

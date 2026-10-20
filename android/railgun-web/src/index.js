@@ -1,6 +1,6 @@
 // Over the host's transport: {id, method, params} in; {id, result}, {id, error: {code, message}} and {event, data} out.
 // Android hands the page a MessagePort. WebKit has no way to hand a page a port, so Veylor's iOS host registers the
-// `railgunHost` script message handler instead, and delivers with `__railgunHostDeliver` (iOS plan XI5).
+// `railgunHost` script message handler instead, and delivers with `__railgunHostDeliver`.
 import { RailgunError, errorCode } from './errors.js';
 import { prepareReverse, reverseCost } from './reverse.js';
 import * as transact from './transact.js';

@@ -90,13 +90,13 @@ import UIKit
     )
     ledgerMobileDiscoveryChannel.setStreamHandler(ledgerMobileHandler)
 
-    // Private USD's hidden Railgun page (docs/private-usd-ios-plan.md). The page itself is a process singleton; this
-    // only binds the engine to it, before Dart's bootstrap asks whether it is supported.
+    // Private USD's hidden Railgun page. The page itself is a process singleton; this only binds the engine to it,
+    // before Dart's bootstrap asks whether it is supported.
     let railgunHostHandler = RailgunHostHandler()
     self.railgunHostHandler = railgunHostHandler
-    FlutterMethodChannel(name: RailgunHostHandler.channelName, binaryMessenger: messenger)
+    FlutterMethodChannel(name: RailgunHostHandler.methodChannelName, binaryMessenger: messenger)
       .setMethodCallHandler { call, result in railgunHostHandler.handle(call, result: result) }
-    FlutterEventChannel(name: RailgunHostHandler.eventsName, binaryMessenger: messenger)
+    FlutterEventChannel(name: RailgunHostHandler.eventChannelName, binaryMessenger: messenger)
       .setStreamHandler(railgunHostHandler)
 
     let keychainAccessibilityMigrationHandler =

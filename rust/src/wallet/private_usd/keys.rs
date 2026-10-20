@@ -1,11 +1,9 @@
-//! The swap keys of one software account (plan §3.3).
+//! The swap keys of one software account.
 //!
 //! `SwapKeyContext::open` reads the account's ZIP-32 index from the main
 //! wallet DB and refuses a seed whose fingerprint is not the account's, so no
 //! key is ever derived from the wrong seed. Each swap's keys then derive from
-//! the seed and the swap index: `zecswap_core::derive_user_keys(seed,
-//! network, account = ZIP-32 index, index)` (D8). Wiring mirrors zecSwap's
-//! `zecswap-jni/src/ops.rs`.
+//! the seed, the account's ZIP-32 index and the swap index.
 
 use std::fmt;
 
@@ -31,8 +29,8 @@ pub(crate) struct AccountDerivation {
 }
 
 /// The derivation of `account_uuid`, or `None` when Private USD cannot run
-/// for it: a hardware account (no seed on the phone, D6) or one without ZIP-32
-/// metadata (D8 needs the index).
+/// for it: a hardware account (no seed on the phone) or one without ZIP-32
+/// metadata.
 pub(crate) fn account_derivation(
     main_db: &str,
     network: WalletNetwork,
@@ -74,8 +72,8 @@ impl fmt::Debug for SwapKeyContext {
 
 impl SwapKeyContext {
     /// Parses the stored secret (a phrase or the `{version, mnemonic,
-    /// bip39Passphrase}` envelope) into the 64-byte seed, passphrase included
-    /// (D7), and requires its fingerprint to be the account's.
+    /// bip39Passphrase}` envelope) into the 64-byte seed, passphrase included,
+    /// and requires its fingerprint to be the account's.
     ///
     /// `Unavailable` on regtest, for a hardware account or one without
     /// derivation metadata; `Mismatch` for another seed.
@@ -124,6 +122,7 @@ impl SwapKeyContext {
         self.network
     }
 
+    #[cfg(test)]
     pub(crate) fn zip32_index(&self) -> u32 {
         self.zip32_index
     }
@@ -162,10 +161,10 @@ impl SwapKeyContext {
             })
     }
 
-    /// Accepts a quote for swap `index` (zecSwap's `ops.rs` `accept`): checks
-    /// the maker's proof of `E` in `context`, then proves our `Z` bound to
-    /// both shares and to the payout into this account's Railgun note.
-    /// `Mismatch` when the maker's proof does not verify.
+    /// Accepts a quote for swap `index`: checks the maker's proof of `E` in
+    /// `context`, then proves our `Z` bound to both shares and to the payout
+    /// into this account's Railgun note. `Mismatch` when the maker's proof
+    /// does not verify.
     pub(crate) fn acceptance(
         &self,
         index: u32,
@@ -228,12 +227,11 @@ impl SwapKeyContext {
         Ok(self.railgun_keys()?.address())
     }
 
-    /// Deposit address `index` of the account (M9): its Ethereum key at
+    /// Deposit address `index` of the account: its Ethereum key at
     /// `m/44'/60'/(1000 + zip32)'/0/index` on mainnet, coin type `1'` on
-    /// testnet, from the seed with its passphrase (D7) and the account's
-    /// ZIP-32 index (D8), and what the notes its deposits pay are built
-    /// from. The key signs only a deposit's EIP-3009 authorization and a
-    /// rescue: never delegate the address (EIP-7702) or use it otherwise.
+    /// testnet, and what the notes its deposits pay are built from. The key
+    /// signs only a deposit's EIP-3009 authorization and a rescue: never
+    /// delegate the address (EIP-7702) or use it otherwise.
     pub(crate) fn deposit_keys(&self, index: u32) -> Result<DepositKeys> {
         derive_deposit_keys(
             self.seed.expose_secret(),

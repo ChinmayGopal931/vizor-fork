@@ -25,8 +25,8 @@ class ProfilePictureOption {
   final String assetPath;
 }
 
-/// The neon portraits (Veylor redesign). Ids stay `pfp-NN` so stored
-/// accounts and contacts keep theirs.
+/// The neon portraits. Ids stay `pfp-NN` so stored accounts and contacts
+/// keep theirs.
 const _kProfilePictureSuffixes = ['01', '02', '03', '04', '05', '06', '07'];
 
 const _kProfilePictureLabelsBySuffix = {

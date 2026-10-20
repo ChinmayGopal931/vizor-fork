@@ -1,4 +1,5 @@
 import '../../../core/config/zcash_explorer.dart';
+import '../../../core/formatting/address_display.dart';
 import '../../../core/formatting/date_format.dart';
 import '../../../core/formatting/zec_amount.dart';
 import '../../../core/privacy/privacy_mask.dart';
@@ -10,6 +11,8 @@ import '../private_usd_copy.dart';
 import '../services/private_usd_balance_repository.dart';
 import '../services/private_usd_engine.dart';
 import 'private_usd_balances.dart';
+import 'private_usd_explorer.dart';
+import 'private_usd_messages.dart';
 
 /// What the forward progress screen offers once a conversion ended.
 enum PrivateUsdProgressAction { viewBalance, tryAgain }
@@ -23,10 +26,9 @@ const kPrivateUsdSlowOpening = Duration(seconds: 90);
 /// The balance is read this long after a payout before it can show it.
 const _payoutSettles = Duration(seconds: 30);
 
-/// Everything the forward progress screen shows for one conversion (plan
-/// reference §9.5): the step list (as vizor's swap status presentation, so
-/// the timeline UI stays single-sourced), and the note, problem, result and
-/// action around it.
+/// Everything the forward progress screen shows for one conversion: the step
+/// list (as the swap status presentation, so the timeline UI stays
+/// single-sourced), and the note, problem, result and action around it.
 class PrivateUsdProgressPresentation {
   const PrivateUsdProgressPresentation({
     required this.status,
@@ -61,12 +63,12 @@ class PrivateUsdProgressPresentation {
   /// "Call it off": an opening that has taken over 90 s, with no problem.
   final bool showsCallOff;
 
-  /// "Keep Vizor open until this finishes" (D9).
+  /// [PrivateUsdCopy.convertBackgroundNote] shows under the progress.
   final bool showsKeepOpen;
   final PrivateUsdProgressAction? action;
 
   /// A key-using step (deposit, claim, sweep) is still to come: the screen
-  /// stays awake while this progress shows (X8).
+  /// stays awake while this progress shows.
   final bool keyStepPending;
 
   /// The top bar's: "Bridging" while it runs (screening included),
@@ -105,31 +107,16 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
     required List<SwapStatusStepData> steps,
     required int progressIndex,
     required SwapStatusBadgeKind badgeKind,
-    bool showTabs = true,
-  }) => SwapActivityStatusPresentation(
-    title: PrivateUsdCopy.convertProgressTitle,
+  }) => privateUsdSwapStatus(
     payAsset: SwapAsset.zec,
     receiveAsset: SwapAsset.usdc,
-    payFiatText: '',
-    receiveFiatText: '',
     payAmountText: zecText,
     receiveAmountText: usdText,
-    // A finished bridge's amounts are no longer an estimate.
-    payLabel: badgeKind == SwapStatusBadgeKind.completed
-        ? PrivateUsdCopy.bridgedYouPaid
-        : PrivateUsdCopy.convertYouPay,
-    receiveLabel: badgeKind == SwapStatusBadgeKind.completed
-        ? PrivateUsdCopy.bridgedYouReceived
-        : PrivateUsdCopy.convertYouReceive,
-    badgeKind: badgeKind,
-    progressIndex: progressIndex,
     steps: steps,
+    progressIndex: progressIndex,
+    badgeKind: badgeKind,
     details: details,
-    progressTabLabel: PrivateUsdCopy.progressTab,
-    // Every row is one of the conversion's own (swap ID, its transactions,
-    // when it started): all of them show while it runs.
-    allDetailsInProgress: true,
-    showTabs: showTabs,
+    bridged: badgeKind == SwapStatusBadgeKind.completed,
   );
 
   PrivateUsdProgressPresentation ended({
@@ -144,7 +131,6 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
       steps: steps,
       progressIndex: progressIndex,
       badgeKind: badgeKind,
-      showTabs: steps.isNotEmpty,
     ),
     payAmountText: zecText,
     receiveAmountText: usdText,
@@ -154,7 +140,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
     action: action,
     title: badgeKind == SwapStatusBadgeKind.liveQuote
         ? PrivateUsdCopy.convertProgressTitle
-        : PrivateUsdCopy.bridgeEndedTitle,
+        : PrivateUsdCopy.actionConvert,
     bridged: badgeKind == SwapStatusBadgeKind.completed,
   );
 
@@ -352,15 +338,27 @@ String privateUsdForwardStageLabel(
 List<SwapStatusStepData> _forwardSteps({
   required int active,
   String? description,
-}) => [
-  for (final (index, title) in const [
+}) => privateUsdProgressSteps(
+  const [
     PrivateUsdCopy.convertStepOpen,
     PrivateUsdCopy.convertStepDeposit,
     PrivateUsdCopy.convertStepConfirm,
     PrivateUsdCopy.convertStepClaim,
     PrivateUsdCopy.convertStepArrive,
     PrivateUsdCopy.convertStepScreen,
-  ].indexed)
+  ],
+  active: active,
+  description: description,
+);
+
+/// [titles] as a conversion's timeline: those before [active] done,
+/// [active] running with [description], the rest still to come.
+List<SwapStatusStepData> privateUsdProgressSteps(
+  List<String> titles, {
+  required int active,
+  String? description,
+}) => [
+  for (final (index, title) in titles.indexed)
     SwapStatusStepData(
       title: title,
       state: index < active
@@ -371,6 +369,43 @@ List<SwapStatusStepData> _forwardSteps({
       description: index == active ? description : null,
     ),
 ];
+
+/// A conversion's timeline and details as the swap status screen draws
+/// them. Once it [bridged], its amounts are no longer an estimate.
+SwapActivityStatusPresentation privateUsdSwapStatus({
+  required SwapAsset payAsset,
+  required SwapAsset receiveAsset,
+  required String payAmountText,
+  required String receiveAmountText,
+  required List<SwapStatusStepData> steps,
+  required int progressIndex,
+  required SwapStatusBadgeKind badgeKind,
+  required List<SwapStatusDetailRowData> details,
+  required bool bridged,
+}) => SwapActivityStatusPresentation(
+  title: PrivateUsdCopy.convertProgressTitle,
+  payAsset: payAsset,
+  receiveAsset: receiveAsset,
+  payFiatText: '',
+  receiveFiatText: '',
+  payAmountText: payAmountText,
+  receiveAmountText: receiveAmountText,
+  payLabel: bridged
+      ? PrivateUsdCopy.bridgedYouPaid
+      : PrivateUsdCopy.convertYouPay,
+  receiveLabel: bridged
+      ? PrivateUsdCopy.bridgedYouReceived
+      : PrivateUsdCopy.convertYouReceive,
+  badgeKind: badgeKind,
+  progressIndex: progressIndex,
+  steps: steps,
+  details: details,
+  progressTabLabel: PrivateUsdCopy.progressTab,
+  // Every row is one of the conversion's own (swap ID, its transactions,
+  // when it started): all of them show while it runs.
+  allDetailsInProgress: true,
+  showTabs: steps.isNotEmpty,
+);
 
 String _confirmationsDetail(int? confirmations, int needed) {
   final count = (confirmations ?? 0).clamp(0, needed);
@@ -393,31 +428,29 @@ List<SwapStatusDetailRowData> _details(
   return [
     SwapStatusDetailRowData(
       label: PrivateUsdCopy.detailSwapId,
-      value: _short(record.swapId),
+      value: truncatedTxid(record.swapId),
       copyable: true,
       copyText: record.swapId,
     ),
     if (deposit != null)
       SwapStatusDetailRowData(
         label: PrivateUsdCopy.detailDeposit,
-        value: _short(privateUsdDisplayTxid(deposit)),
+        value: truncatedTxid(privateUsdDisplayTxid(deposit)),
         copyable: true,
         copyText: privateUsdDisplayTxid(deposit),
       ),
     if (payout != null)
       SwapStatusDetailRowData(
         label: PrivateUsdCopy.detailPayout,
-        value: _short(payout),
+        value: truncatedTxid(payout),
         copyable: true,
         copyText: payout,
-        linkUri: explorerTxPrefix == null
-            ? null
-            : Uri.tryParse('$explorerTxPrefix$payout'),
+        linkUri: privateUsdExplorerUri(explorerTxPrefix, payout),
       ),
     if (sweep != null)
       SwapStatusDetailRowData(
         label: PrivateUsdCopy.detailRefund,
-        value: _short(privateUsdDisplayTxid(sweep)),
+        value: truncatedTxid(privateUsdDisplayTxid(sweep)),
         copyable: true,
         copyText: privateUsdDisplayTxid(sweep),
       ),
@@ -434,7 +467,3 @@ List<SwapStatusDetailRowData> _details(
 /// (protocol) byte order, as history rows do.
 String privateUsdDisplayTxid(String internalTxid) =>
     zcashDisplayTxidHex(internalTxid, ZcashExplorerTxidOrder.protocol);
-
-String _short(String value) => value.length <= 16
-    ? value
-    : '${value.substring(0, 8)}…${value.substring(value.length - 6)}';

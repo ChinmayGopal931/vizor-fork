@@ -23,12 +23,18 @@ typedef AppButtonDecorationBuilder =
 
 const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
-/// How far a mobile button's corner cuts reach, by button height.
-double _mobileChamfer(double height) => height >= 44
+/// How far a mobile button's corner cuts reach, by its height: a full-size
+/// button takes [AppChamfer.medium], the medium sizes a cut between that and
+/// [AppChamfer.small], and the small size [AppChamfer.small].
+double _mobileChamfer(double height) => height >= _mobileFullSizeHeight
     ? AppChamfer.medium
-    : height >= 30
-    ? 6
+    : height >= _mobileMediumHeight
+    ? _mobileMediumCut
     : AppChamfer.small;
+
+const _mobileFullSizeHeight = 44.0;
+const _mobileMediumHeight = 30.0;
+const _mobileMediumCut = 6.0;
 
 class _Sizing {
   const _Sizing({
@@ -158,20 +164,17 @@ _VariantPalette _paletteFor(AppButtonVariant variant, AppColors c) {
         focusRingHover: c.button.primary.bgHover,
       );
     case AppButtonVariant.secondary:
+      // Mobile glass buttons carry a hairline edge; desktop has none.
+      final border = _mobile
+          ? c.border.subtleOpacity
+          : c.background.ground.withValues(alpha: 0);
       return _VariantPalette(
         bg: c.button.secondary.bg,
         bgHover: c.button.secondary.bgHover,
         bgPressed: c.button.secondary.bgPressed,
-        // Mobile glass buttons carry a hairline edge; desktop has none.
-        border: _mobile
-            ? c.border.subtleOpacity
-            : c.background.ground.withValues(alpha: 0),
-        borderHover: _mobile
-            ? c.border.subtleOpacity
-            : c.background.ground.withValues(alpha: 0),
-        borderPressed: _mobile
-            ? c.border.subtleOpacity
-            : c.background.ground.withValues(alpha: 0),
+        border: border,
+        borderHover: border,
+        borderPressed: border,
         borderWidth: _mobile ? 1 : 0,
         label: c.button.secondary.label,
         labelHover: c.button.secondary.label,
@@ -396,8 +399,8 @@ class _AppButtonState extends State<AppButton> {
     final borderWidth = _enabled ? palette.borderWidth : 0.0;
     final iconGap = widget.iconGap ?? sizing.gap;
     final contentPadding = widget.contentPadding ?? sizing.padding;
-    // Mobile (the neon redesign) cuts the corners at 45° instead of the
-    // desktop pill; composed rows that pass a radius keep their own shape.
+    // Mobile cuts the corners at 45° instead of the desktop pill; composed
+    // rows that pass a radius keep their own shape.
     final mobileCut = _mobileChamfer(height);
     final OutlinedBorder shape = widget.borderRadius != null
         ? RoundedRectangleBorder(borderRadius: widget.borderRadius!)

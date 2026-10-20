@@ -1,10 +1,8 @@
-//! Fakes for the swap engine's seams (plan §10), after zapp's
-//! `AtomicSwapDriverFixtures` and `ReverseSwapDriverFixtures` (`FakeChain`,
-//! `FakeKeys`, `FakeZcash`, `FakeStore`): one shared [`World`] behind a
+//! Fakes for the swap engine's seams: one shared [`World`] behind a
 //! [`ChainReader`], the maker and relayer as an [`HttpTransport`] routed by
-//! path, the wallet's Zcash side and the clocks. The keys are real (the §5.5
-//! vector seed), the maker's share and proof are real, and the store is a
-//! real `swaps.db` in a temp dir. Nothing here reaches a network.
+//! path, the wallet's Zcash side and the clocks. The keys are real, the
+//! maker's share and proof are real, and the store is a real `swaps.db` in a
+//! temp dir. Nothing here reaches a network.
 
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
@@ -20,8 +18,9 @@ use zecswap_core::{
     derive_maker_share, JointAccount, PublicShare, SecretShare, SpendKey, SwapContext, Terms,
 };
 
+use super::super::abi::keccak;
 use super::super::deployment::{self, Deployment};
-use super::super::engine::{Clock, MakerChecks, NoTokens, OpHandle};
+use super::super::engine::{Clock, MakerChecks, OpHandle};
 use super::super::evm_rpc::{
     ChainReader, ConfirmedSwap, Head, PaidOut, ReverseChainState, SwapStage, SwapState,
     TransactionStatus,
@@ -35,10 +34,10 @@ use super::super::models::{
 };
 use super::super::reverse::{self, ProvedFunding, Reverse, ReverseQuoted, ReverseZcash};
 use super::super::store::{self, SwapStore};
-use super::super::terms::{keccak, reverse_swap_id, swap_id};
+use super::super::terms::{reverse_swap_id, swap_id};
 use super::super::transport::HttpTransport;
 use super::super::{fail, ErrorCode, PrivateUsdNetwork, Result};
-use crate::wallet::routed_http::{RoutedError, RoutedPhase, RoutedRequest, RoutedResponse};
+use crate::wallet::routed_http::{RoutedError, RoutedRequest, RoutedResponse};
 
 pub(super) const NOW: u64 = 1_790_000_000;
 pub(super) const LOCK_SECONDS: u64 = 600;
@@ -49,8 +48,8 @@ pub(super) const DEPOSIT_FEE_ZAT: u64 = 10_000;
 pub(super) const ZCASH_HEIGHT: u64 = 4_200_000;
 pub(super) const NETWORK: PrivateUsdNetwork = PrivateUsdNetwork::Testnet;
 pub(super) const QUOTE_ID: [u8; 32] = [0x22; 32];
-// A reverse quote's deadlines (zapp's fixture spacing: funding, ready and
-// refund 1000, 3000 and 5000 s out), and the relayer's funding fee.
+// A reverse quote's deadlines (funding, ready and refund 1000, 3000 and
+// 5000 s out), and the relayer's funding fee.
 pub(super) const FUNDING: u64 = NOW + 1_000;
 pub(super) const READY: u64 = NOW + 3_000;
 pub(super) const REFUND: u64 = NOW + 5_000;
@@ -73,7 +72,7 @@ pub(super) fn maker_share() -> PublicShare {
     maker_secret().public()
 }
 
-/// A word with `value` in its last byte: zapp's `hash(n)`.
+/// A word with `value` in its last byte.
 pub(super) fn word(value: u8) -> [u8; 32] {
     let mut word = [0u8; 32];
     word[31] = value;
@@ -83,7 +82,7 @@ pub(super) fn word(value: u8) -> [u8; 32] {
 /// A transaction id named for what it is, so a test reads which one it means.
 pub(super) fn tx_id(name: &str) -> ZcashTxId {
     let mut hex = hex::encode(name);
-    hex.extend(std::iter::repeat('0').take(64 - hex.len()));
+    hex.extend(std::iter::repeat_n('0', 64 - hex.len()));
     ZcashTxId::parse(&hex).unwrap()
 }
 
@@ -545,8 +544,8 @@ impl ChainReader for FakeChain {
 
 // ---- the maker and the relayer ----
 
-/// The maker and the relayer, routed by path: what zecSwap's services would
-/// answer, and what their transactions would do to the contract.
+/// The maker and the relayer, routed by path: what the services would answer,
+/// and what their transactions would do to the contract.
 pub(super) struct FakeServices(pub World);
 
 fn answer(status: u16, body: Value) -> std::result::Result<RoutedResponse, RoutedError> {
@@ -614,7 +613,7 @@ impl HttpTransport for FakeServices {
         }
         if self.0.get().unreachable == Some(path.as_str()) {
             return Err(RoutedError {
-                phase: RoutedPhase::AfterDispatch,
+                route_blocked: false,
                 message: "no answer".into(),
             });
         }
@@ -906,8 +905,8 @@ impl ForwardZcash for FakeZcash {
         Ok(self.0.get().synced)
     }
 
-    async fn deposit_fee(&self, _address: &str, _zatoshi: u64) -> Option<u64> {
-        self.0.get().deposit_fee
+    async fn deposit_fee(&self, _address: &str, _zatoshi: u64) -> Result<Option<u64>> {
+        Ok(self.0.get().deposit_fee)
     }
 
     async fn propose_deposit(
@@ -1028,15 +1027,15 @@ impl ReverseZcash for FakeZcash {
         _joint: &JointAccount,
         _key: &SpendKey,
         _birthday: u64,
-        max_fee_zat: Option<u64>,
+        max_fee_zatoshi: Option<u64>,
     ) -> Result<Option<ReverseReceiveTransaction>> {
         let mut state = self.0.set();
-        state.receive_caps.push(max_fee_zat);
+        state.receive_caps.push(max_fee_zatoshi);
         if !state.spendable {
             return Ok(None);
         }
         let fee = state.sweep_pays;
-        if max_fee_zat.is_some_and(|cap| fee > cap) {
+        if max_fee_zatoshi.is_some_and(|cap| fee > cap) {
             return fail(ErrorCode::ZcashWallet, "the sweep's fee is over its limit");
         }
         let built = transaction(&format!("receive{}", state.receive_caps.len()));
@@ -1103,8 +1102,7 @@ impl Clock for FakeClock {
 
 // ---- the harness ----
 
-pub(super) type FakeForward<'a> =
-    Forward<'a, FakeChain, FakeServices, FakeZcash, FakeClock, NoTokens>;
+pub(super) type FakeForward<'a> = Forward<'a, FakeChain, FakeServices, FakeZcash, FakeClock>;
 
 /// One account's forward swaps over the fakes, with a `swaps.db` of its own
 /// or shared with another account of the same wallet.
@@ -1118,7 +1116,6 @@ pub(super) struct Harness {
     services: FakeServices,
     zcash: FakeZcash,
     clock: FakeClock,
-    tokens: NoTokens,
     makers: MakerChecks,
 }
 
@@ -1142,7 +1139,6 @@ impl Harness {
             services: FakeServices(world.clone()),
             zcash: FakeZcash(world.clone()),
             clock: FakeClock(world.clone()),
-            tokens: NoTokens,
             makers: MakerChecks::default(),
             world,
         }
@@ -1160,7 +1156,6 @@ impl Harness {
             &self.services,
             &self.zcash,
             &self.clock,
-            &self.tokens,
             &self.makers,
             op,
         )
@@ -1181,7 +1176,7 @@ impl Harness {
     /// A quote accepted, and the swap opened on chain.
     pub(super) async fn accepted(&self) -> ForwardRecord {
         let quoted = self.quote().await.unwrap();
-        let max_total = quoted.offer.max_total_zat().unwrap();
+        let max_total = quoted.offer.max_total_zatoshi().unwrap();
         self.forward()
             .accept(&mut self.store(), quoted.index, max_total)
             .await
@@ -1228,7 +1223,7 @@ impl Harness {
             .find(&self.account, Direction::Forward, index)
             .unwrap()
         {
-            Some(StoredRecord::Forward(record)) => record,
+            Some(StoredRecord::Forward(record)) => *record,
             other => panic!("no forward record {index}: {other:?}"),
         }
     }
@@ -1236,7 +1231,10 @@ impl Harness {
     /// Replaces the kept record, as an earlier run of the app left it.
     pub(super) fn keep(&self, record: &ForwardRecord) {
         self.store()
-            .update(&self.account, &StoredRecord::Forward(record.clone()))
+            .update(
+                &self.account,
+                &StoredRecord::Forward(Box::new(record.clone())),
+            )
             .unwrap();
     }
 
@@ -1256,8 +1254,7 @@ impl Harness {
 
 // ---- the reverse harness ----
 
-pub(super) type FakeReverse<'a> =
-    Reverse<'a, FakeChain, FakeServices, FakeZcash, FakeClock, NoTokens>;
+pub(super) type FakeReverse<'a> = Reverse<'a, FakeChain, FakeServices, FakeZcash, FakeClock>;
 
 impl Harness {
     pub(super) fn reverse(&self) -> FakeReverse<'_> {
@@ -1268,7 +1265,6 @@ impl Harness {
             &self.services,
             &self.zcash,
             &self.clock,
-            &self.tokens,
             &self.makers,
             None,
         )
@@ -1294,7 +1290,7 @@ impl Harness {
     }
 
     /// Quoted, priced, gone ahead with, accepted and its joint account
-    /// imported: waiting for the user's payment (zapp `prepared`).
+    /// imported: waiting for the user's payment.
     pub(super) async fn prepared(&self) -> ReverseRecord {
         let quoted = self.reverse_quote().await.unwrap();
         let (debit, railgun_fee) = self.page_cost(quoted.price.fee.0);
@@ -1381,7 +1377,7 @@ impl Harness {
             .find(&self.account, Direction::Reverse, index)
             .unwrap()
         {
-            Some(StoredRecord::Reverse(record)) => record,
+            Some(StoredRecord::Reverse(record)) => *record,
             other => panic!("no reverse record {index}: {other:?}"),
         }
     }

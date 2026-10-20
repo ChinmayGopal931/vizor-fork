@@ -1,13 +1,14 @@
 import Foundation
 import WebKit
 
-/// The page's allowlist as a `WKContentRuleList` (iOS reference §6.4): block everything, then let through the page's
-/// own scheme, `blob:`, `data:` and https to the hosts in `RailgunEndpoints`. WebKit has no per-request hook for
+/// The page's allowlist as a `WKContentRuleList`: block everything, then let through the page's own scheme, `blob:`,
+/// `data:` and https to the hosts in `RailgunEndpoints`. WebKit has no per-request hook for
 /// network loads, so this stands in for Android's request filter. The bridge's allowlist stays the authority; this
 /// and the page's CSP are defence in depth.
 enum RailgunContentRules {
-  /// Versioned: change it whenever the hosts change, so a stale compiled list is never reused.
-  static let identifier = "railgun-allowlist-v2"
+  /// Fixed: nothing looks a stored list up, and each process compiles the list again from `encoded()`, replacing the
+  /// one stored under this identifier.
+  static let identifier = "railgun-allowlist"
 
   /// The URL patterns let through, one rule each: WebKit's rule regexes have no alternation.
   static var allowedPatterns: [String] {

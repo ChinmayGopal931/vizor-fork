@@ -7,16 +7,14 @@ import '../src/features/private_usd/providers/private_usd_convert_provider.dart'
 import '../src/features/private_usd/providers/private_usd_refunds_provider.dart';
 import '../src/features/private_usd/providers/private_usd_reverse_convert_provider.dart';
 import '../src/features/private_usd/screens/mobile/mobile_private_usd_refunds_screen.dart';
-import '../src/features/private_usd/screens/mobile/mobile_private_usd_reverse_conversion_screen.dart';
-import '../src/features/private_usd/screens/mobile/mobile_private_usd_reverse_convert_view.dart';
 import '../src/features/private_usd/services/private_usd_engine.dart';
 import '../src/features/private_usd/services/private_usd_reverse_funding.dart';
+import '../src/features/private_usd/widgets/mobile/private_usd_convert_views.dart';
+import '../src/features/private_usd/widgets/mobile/private_usd_progress_views.dart';
 import '../src/rust/api/private_usd.dart';
 import 'private_usd_use_cases.dart';
 
-// ── Reverse conversion and refunds (M6, plan reference §9.7) ─────────────
-
-int _unix(DateTime time) => time.millisecondsSinceEpoch ~/ 1000;
+// ── Reverse conversion and refunds ───────────────────────────────────────
 
 const _ended = {
   ApiReversePhase.quoted,
@@ -61,16 +59,24 @@ ApiReverseRecord previewPrivateUsdReverseRecord({
     amount: '25000000',
     networkCost: '30000',
     depositZat: BigInt.from(80000000),
-    quoteExpiresAt: _unix(acceptedAt.add(const Duration(minutes: 3))),
-    fundingDeadline: _unix(acceptedAt.add(const Duration(minutes: 15))),
-    readyDeadline: _unix(previewPrivateUsdNow.add(readyIn)),
-    refundAfter: _unix(previewPrivateUsdNow.add(const Duration(hours: 6))),
+    quoteExpiresAt: previewPrivateUsdUnix(
+      acceptedAt.add(const Duration(minutes: 3)),
+    ),
+    fundingDeadline: previewPrivateUsdUnix(
+      acceptedAt.add(const Duration(minutes: 15)),
+    ),
+    readyDeadline: previewPrivateUsdUnix(previewPrivateUsdNow.add(readyIn)),
+    refundAfter: previewPrivateUsdUnix(
+      previewPrivateUsdNow.add(const Duration(hours: 6)),
+    ),
     cost: priced
         ? ApiReverseCost(
             debit: '25313282',
             railgunFee: '63282',
             broadcasterFee: '250000',
-            feeExpiresAt: _unix(acceptedAt.add(const Duration(minutes: 5))),
+            feeExpiresAt: previewPrivateUsdUnix(
+              acceptedAt.add(const Duration(minutes: 5)),
+            ),
           )
         : null,
     funded: paid,
@@ -97,8 +103,12 @@ ApiReverseRecord previewPrivateUsdReverseRecord({
         : null,
     receivedZat: received ? BigInt.from(79985000) : null,
     receiveConfirmations: receiveConfirmations,
-    acceptedAt: phase == ApiReversePhase.quoted ? null : _unix(acceptedAt),
-    updatedAt: _unix(previewPrivateUsdNow.subtract(const Duration(minutes: 1))),
+    acceptedAt: phase == ApiReversePhase.quoted
+        ? null
+        : previewPrivateUsdUnix(acceptedAt),
+    updatedAt: previewPrivateUsdUnix(
+      previewPrivateUsdNow.subtract(const Duration(minutes: 1)),
+    ),
   );
 }
 
@@ -116,44 +126,25 @@ PrivateUsdReverseConvertState previewPrivateUsdReverseConvertState({
   available: BigInt.from(1250400000),
 );
 
-class _ReverseConvertPreview extends StatefulWidget {
-  const _ReverseConvertPreview({required this.state});
-
-  final PrivateUsdReverseConvertState state;
-
-  @override
-  State<_ReverseConvertPreview> createState() => _ReverseConvertPreviewState();
-}
-
-class _ReverseConvertPreviewState extends State<_ReverseConvertPreview> {
-  late final _controller = TextEditingController(text: widget.state.amountText);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => MobilePrivateUsdReverseConvertView(
-    state: widget.state,
-    controller: _controller,
-    autofocus: false,
-    onAmountChanged: (_) {},
-    onMax: () {},
-    onReview: () {},
-    onBack: () {},
-    onSwitchDirection: () {},
+/// USD → ZEC with a priced quote: the ledger and its countdown.
+Widget buildMobilePrivateUsdConvertReverseUseCase(BuildContext context) {
+  final state = previewPrivateUsdReverseConvertState();
+  return PrivateUsdPreviewFrame(
+    child: PrivateUsdPreviewControllers(
+      texts: [state.amountText],
+      builder: (context, controllers) => MobilePrivateUsdReverseConvertView(
+        state: state,
+        controller: controllers.single,
+        autofocus: false,
+        onAmountChanged: (_) {},
+        onMax: () {},
+        onReview: () {},
+        onBack: () {},
+        onSwitchDirection: () {},
+      ),
+    ),
   );
 }
-
-/// USD → ZEC with a priced quote: the ledger and its countdown.
-Widget buildMobilePrivateUsdConvertReverseUseCase(BuildContext context) =>
-    PrivateUsdPreviewFrame(
-      child: _ReverseConvertPreview(
-        state: previewPrivateUsdReverseConvertState(),
-      ),
-    );
 
 /// The reverse review: the ledger, the keep-open note and its deadline.
 Widget buildMobilePrivateUsdReviewReverseUseCase(BuildContext context) =>
@@ -193,14 +184,14 @@ Widget _reverseProgress(
   ),
 );
 
-/// `awaitingFunding` after the fees changed: the new total, "Pay {debit}".
+/// `awaitingFunding` after the fees changed: the new total to pay.
 Widget buildMobilePrivateUsdReverseFundingUseCase(BuildContext context) =>
     _reverseProgress(
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.awaitingFunding),
       message: PrivateUsdCopy.reverseErrorCostChanged,
     );
 
-/// The payment proving in the page (vizor): its progress and keep-open note.
+/// The payment proving in the page: its progress and keep-open note.
 Widget buildMobilePrivateUsdReverseProvingUseCase(BuildContext context) =>
     _reverseProgress(
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.awaitingFunding),
@@ -210,7 +201,7 @@ Widget buildMobilePrivateUsdReverseProvingUseCase(BuildContext context) =>
       proofProgress: 0.42,
     );
 
-/// The deposit is confirmed: "Authorize settlement".
+/// The deposit is confirmed: settlement waits for the user.
 Widget buildMobilePrivateUsdReverseReadyUseCase(BuildContext context) =>
     _reverseProgress(
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.awaitingReady),
@@ -249,7 +240,7 @@ Widget buildMobilePrivateUsdReverseRefundWaitUseCase(BuildContext context) =>
       ),
     );
 
-/// Refunded: "View refunds".
+/// Refunded, with the way to the refunds.
 Widget buildMobilePrivateUsdReverseRefundedUseCase(BuildContext context) =>
     _reverseProgress(
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.refunded),
@@ -293,8 +284,8 @@ Widget buildMobilePrivateUsdRefundsUseCase(BuildContext context) => _refunds(
 Widget buildMobilePrivateUsdRefundsEmptyUseCase(BuildContext context) =>
     _refunds(const PrivateUsdRefundsState(loaded: true));
 
-/// The home banner's reverse conversion: waiting for "Authorize
-/// settlement", so it asks for attention.
+/// The home banner's reverse conversion: settlement waits for the user, so
+/// it asks for attention.
 Map<PrivateUsdRecordKey, PrivateUsdReverseStatus>
 previewPrivateUsdReverseAttention(String accountUuid) => {
   PrivateUsdRecordKey(

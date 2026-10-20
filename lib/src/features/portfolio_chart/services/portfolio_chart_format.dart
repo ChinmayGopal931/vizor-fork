@@ -3,6 +3,7 @@ import '../../../core/formatting/date_format.dart';
 import '../../../core/formatting/number_format.dart';
 import '../../../core/formatting/zec_amount.dart';
 import '../models/portfolio_chart_models.dart';
+import 'portfolio_price_history.dart';
 
 /// `$1,234.56`. Sign is the caller's.
 String formatPortfolioUsd(double value) {
@@ -13,7 +14,7 @@ String formatPortfolioUsd(double value) {
 
 /// `12.345 ZEC`, with the balance card's precision. Sign is the caller's.
 String formatPortfolioZec(double value) {
-  final zatoshi = BigInt.from((value.abs() * 100000000).round());
+  final zatoshi = BigInt.from((value.abs() * zatoshiPerZec.toDouble()).round());
   final amount = ZecAmount.fromZatoshi(zatoshi).compactBalance.amountText;
   return '$amount $kZcashDefaultCurrencyTicker';
 }
@@ -73,39 +74,11 @@ String formatPortfolioPointTime(
   PortfolioChartRange range,
   PortfolioChartMode mode,
 ) {
-  final utc = time.toUtc();
-  final isDailyPrice =
-      mode == PortfolioChartMode.usd &&
-      utc.hour == 0 &&
-      utc.minute == 0 &&
-      utc.second == 0 &&
-      utc.millisecond == 0 &&
-      utc.microsecond == 0;
-  if (isDailyPrice) {
+  if (mode == PortfolioChartMode.usd && isUtcMidnight(time)) {
+    final utc = time.toUtc();
     return '${monthAbbreviation(utc.month)} ${utc.day}, ${utc.year}';
   }
   return range == PortfolioChartRange.year || range == PortfolioChartRange.all
       ? formatMonthDayYear(time)
       : formatDayMonthTime(time);
-}
-
-/// The pricing server's host as Settings names it, in full: `host`, or
-/// `host:port` when the origin has a port of its own. Empty without a server.
-String portfolioPricingServerHost(Uri? baseUri) {
-  if (baseUri == null || baseUri.host.isEmpty) return '';
-  return baseUri.hasPort ? '${baseUri.host}:${baseUri.port}' : baseUri.host;
-}
-
-/// The longest host the Home card names in full; a longer one is shortened to
-/// its first label, which for `zapp-pricing-engine.majorworker.workers.dev` is
-/// the service's own name. Settings always names the host in full.
-const _fullHostLimit = 24;
-
-/// What the Home card calls the pricing server in "Prices from ...": the host
-/// when it is short enough to fit beside the card's title, otherwise its first
-/// label.
-String portfolioPriceSourceName(Uri? baseUri) {
-  final host = baseUri?.host ?? '';
-  if (host.isEmpty) return 'the pricing server';
-  return host.length <= _fullHostLimit ? host : host.split('.').first;
 }

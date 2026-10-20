@@ -27,7 +27,7 @@ export 'app_surface_colors.dart';
 export 'app_sync_colors.dart';
 export 'app_text_colors.dart';
 
-const _neon = kAppFormFactor == AppFormFactor.mobile;
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Aggregated semantic color palette for the app. Sourced from the Zcash
 /// design system Figma spec; organized into semantic categories that mirror
@@ -67,10 +67,11 @@ class AppColors {
   final AppMacosUtilityColors macosUtility;
   final AppNeonColors neon;
 
-  /// Figma faces on desktop, the neon redesign on mobile builds. Tests that
-  /// must pin one design regardless of lane read the named sets below.
-  static const dark = _neon ? neonDark : figmaDark;
-  static const light = _neon ? neonLight : figmaLight;
+  /// The Figma sets on desktop builds, the neon sets on mobile builds. Every
+  /// colour group selects the same way. Tests that must pin one design
+  /// regardless of lane read the named sets below.
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
 
   static const figmaDark = AppColors(
     background: AppBackgroundColors.figmaDark,

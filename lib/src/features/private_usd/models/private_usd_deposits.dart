@@ -2,8 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../rust/api/private_usd.dart' as rust;
 
-/// How a deposit address or a deposit shows (plan M9; zecSwap
-/// `docs/deposits.md`, "What to show").
+/// How a deposit address or a deposit shows.
 enum PrivateUsdDepositPhase {
   /// The address holds money not yet made private: "Received $X".
   received,

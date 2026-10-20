@@ -10,7 +10,7 @@ import '../../core/layout/app_form_factor.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_icon.dart';
-import '../../core/widgets/mobile/neon_horizon.dart';
+import '../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../providers/account_provider.dart';
 import '../payment_links/services/payment_link_received_store.dart';
 import '../../providers/device_owner_auth_provider.dart';

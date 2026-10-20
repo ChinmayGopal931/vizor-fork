@@ -1,6 +1,6 @@
 package com.keplr.vizor.railgun
 
-/** Everything this library throws, besides cancellation. */
+/** Everything the Railgun host throws, besides cancellation. */
 sealed class RailgunException(
     message: String,
     cause: Throwable? = null,

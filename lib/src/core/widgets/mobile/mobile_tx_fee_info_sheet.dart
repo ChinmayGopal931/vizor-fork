@@ -32,10 +32,9 @@ Future<void> showMobileTxFeeInfoSheet(
           children: [
             Text(
               title,
-              // The sheet's title: Thin, as sheet titles are.
               style: AppTypography.headlineSmall.copyWith(
                 color: colors.text.accent,
-                fontWeight: FontWeight.w100,
+                fontWeight: AppFontWeight.heading,
               ),
             ),
             const SizedBox(height: AppSpacing.xs),

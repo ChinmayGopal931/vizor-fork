@@ -301,10 +301,9 @@ class _ProfilePictureSheetState extends State<_ProfilePictureSheet> {
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     'Select profile picture',
-                    // The sheet's title: Thin, as sheet titles are.
                     style: AppTypography.bodyLarge.copyWith(
                       color: colors.text.accent,
-                      fontWeight: FontWeight.w100,
+                      fontWeight: AppFontWeight.heading,
                     ),
                   ),
                 ],

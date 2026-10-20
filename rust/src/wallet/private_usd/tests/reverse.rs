@@ -1,21 +1,20 @@
-//! The reverse conversion's fund-safety rules on fakes (plan M6 "Done when",
-//! §10): zapp's ★ cases from `ReverseSwapDriverTest`, `ReverseSwapRefundTest`,
-//! `ReverseSwapRevealTest` and `ReverseFundingTest` (reference §8.7), one test
-//! per rule, and the `openReverse` calldata byte for byte.
+//! The reverse conversion's fund-safety rules on fakes, one test per rule,
+//! and the `openReverse` calldata byte for byte.
 
 use std::sync::Arc;
 
 use tokio::sync::Notify;
 use zecswap_core::{Domain, PublicShare, RescueAuthorization, ReverseOpen};
 
+use super::super::abi::address_word;
 use super::super::engine;
 use super::super::evm_rpc::{SwapStage, TransactionStatus};
-use super::super::funding_calls::{self, OpenReverseArgs};
+use super::super::funding_calls;
 use super::super::joint::SwapTxStatus;
 use super::super::models::{
     Direction, Hex, ReverseFundingTransaction, ReversePhase, ReverseReceiveEstimate, StoredRecord,
 };
-use super::super::terms::{self, address_word};
+use super::super::terms;
 use super::super::ErrorCode;
 use super::fakes::*;
 use super::{bytes, text, vectors};
@@ -48,11 +47,10 @@ async fn called_off_with_escrow() -> Harness {
     h
 }
 
-/// §3.5 item 7. A funding whose answer was lost is never proved again: the
-/// kept bytes go again only while the node does not know them, before the
-/// funding deadline and while the user has not called the conversion off,
-/// and the hash a resend gets back is kept (zapp `ReverseFundingTest` 43 and
-/// 95, `ReverseSwapDriverTest` 183, `ReverseSwapRefundTest` 171).
+/// A funding whose answer was lost is never proved again: the kept bytes go
+/// again only while the node does not know them, before the funding deadline
+/// and while the user has not called the conversion off, and the hash a
+/// resend gets back is kept.
 #[tokio::test]
 async fn a_lost_funding_answer_is_sent_again_only_while_the_node_does_not_know_it() {
     let h = Harness::new();
@@ -120,9 +118,9 @@ async fn a_lost_funding_answer_is_sent_again_only_while_the_node_does_not_know_i
 }
 
 /// A funding's answer that comes back after the user called the conversion
-/// off keeps the cancel and the funding's hash (zapp `ReverseFundingTest`
-/// 24). The driver lock spans the post, so a cancel waits for it; and a
-/// cancel while the page proves means the proof is never sent.
+/// off keeps the cancel and the funding's hash. The driver lock spans the
+/// post, so a cancel waits for it; and a cancel while the page proves means
+/// the proof is never sent.
 #[tokio::test]
 async fn a_late_funding_answer_keeps_the_users_cancel() {
     let h = Harness::new();
@@ -147,7 +145,7 @@ async fn a_late_funding_answer_keeps_the_users_cancel() {
         record.cancel_requested = true;
         record.phase = ReversePhase::RefundWait;
         h.store()
-            .update(&h.account, &StoredRecord::Reverse(record))
+            .update(&h.account, &StoredRecord::Reverse(Box::new(record)))
             .unwrap();
         release.notify_one();
         busy
@@ -184,8 +182,7 @@ async fn a_late_funding_answer_keeps_the_users_cancel() {
 }
 
 /// `ready` is the user's second approval: the engine never signs it, a kept
-/// one is only sent again while it holds, and never signed again (zapp
-/// `ReverseSwapDriverTest` 200, 215 and 382).
+/// one is only sent again while it holds, and never signed again.
 #[tokio::test]
 async fn ready_is_signed_only_by_the_user_and_never_again_after_a_restart() {
     let h = Harness::new();
@@ -243,8 +240,7 @@ async fn ready_is_signed_only_by_the_user_and_never_again_after_a_restart() {
 
 /// The sweep home pays at most the fee the user reviewed with `ready`,
 /// however the estimate moved since; it is kept before it is first sent,
-/// sent again unchanged, and built anew only once proven expired (zapp
-/// `ReverseSwapRefundTest` 220, `ReverseSwapDriverTest` 47).
+/// sent again unchanged, and built anew only once proven expired.
 #[tokio::test]
 async fn the_sweep_home_pays_no_more_than_the_reviewed_fee() {
     let h = Harness::new();
@@ -316,9 +312,7 @@ async fn the_sweep_home_pays_no_more_than_the_reviewed_fee() {
 /// `z` is revealed only under our refund lock with more than the margin
 /// left, read from a fresh head again immediately before the reveal: never
 /// inside the margin, never when the lock lapses or the escrow settles while
-/// the reveal is prepared, never through a node minutes behind (zapp
-/// `ReverseSwapDriverTest` 338, `ReverseSwapRevealTest`,
-/// `ReverseSwapRefundTest` 202).
+/// the reveal is prepared, never through a node minutes behind.
 #[tokio::test]
 async fn the_refund_secret_is_revealed_only_under_a_fresh_lock_with_time_to_spare() {
     let h = called_off_with_escrow().await;
@@ -394,8 +388,7 @@ async fn the_refund_secret_is_revealed_only_under_a_fresh_lock_with_time_to_spar
 /// A refund is rescued only once it was paid out and its vault holds more
 /// than the relayer's fee; a rescue keeps the contract's nonce and its
 /// deadline exactly, is never sent again in the background, and leaves a
-/// newer conversion active (zapp `ReverseSwapRevealTest`,
-/// `ReverseSwapRefundTest` 99 and 305).
+/// newer conversion active.
 #[tokio::test]
 async fn a_refund_is_rescued_only_from_a_vault_holding_more_than_the_fee() {
     let h = Harness::new();
@@ -473,22 +466,22 @@ async fn a_refund_is_rescued_only_from_a_vault_holding_more_than_the_fee() {
 }
 
 /// The funding's calls byte for byte as ethers encodes them with the
-/// contract's ABI (zecSwap's funding vector, whose `OpenReverse` signature
-/// recovers under zecswap-core's digest), and the roles zapp checks on a real
-/// funding request (`ReverseSwapRefundTest` 283): exactly the escrow approved
-/// to the contract, the escrow opened for the right parties into our own
-/// refund note under our signature, and the relayer paid its fee.
+/// contract's ABI (a vector whose `OpenReverse` signature recovers under
+/// zecswap-core's digest), and the roles of a real funding request: exactly
+/// the escrow approved to the contract, the escrow opened for the right
+/// parties into our own refund note under our signature, and the relayer
+/// paid its fee.
 #[tokio::test]
 async fn open_reverse_calldata_matches_the_independent_encoding_and_zapps_roles() {
     let vector = &vectors()["reverseFunding"];
     let number = |name: &str| vector[name].as_u64().unwrap();
-    let open = OpenReverseArgs {
+    let open = ReverseOpen {
         maker: bytes(&vector["maker"]),
         user: bytes(&vector["user"]),
         token: bytes(&vector["token"]),
         amount: u128::from(number("amount")),
-        maker_share: bytes(&vector["makerShare"]),
-        user_share: bytes(&vector["userShare"]),
+        maker_share: PublicShare::from_affine_bytes(&bytes(&vector["makerShare"])).unwrap(),
+        user_share: PublicShare::from_affine_bytes(&bytes(&vector["userShare"])).unwrap(),
         t0: number("t0"),
         t1: number("t1"),
         refund_note: bytes(&vector["refundNote"]),
@@ -510,28 +503,15 @@ async fn open_reverse_calldata_matches_the_independent_encoding_and_zapps_roles(
     for (call, name) in calls.iter().zip(["approve", "openReverse", "transfer"]) {
         assert_eq!(hex0x(&call.data), text(&vector[name]), "{name}");
     }
-    let maker_key = PublicShare::from_affine_bytes(&open.maker_share).unwrap();
-    let user_key = PublicShare::from_affine_bytes(&open.user_share).unwrap();
     assert_eq!(
-        hex0x(&terms::reverse_swap_id(&open.user, &maker_key)),
+        hex0x(&terms::reverse_swap_id(&open.user, &open.maker_share)),
         text(&vector["swapId"])
     );
     let domain = Domain {
         chain_id: number("chainId"),
         contract,
     };
-    let digest = domain.open_reverse(&ReverseOpen {
-        maker: open.maker,
-        user: open.user,
-        token: open.token,
-        amount: open.amount,
-        maker_share: maker_key,
-        user_share: user_key,
-        t0: open.t0,
-        t1: open.t1,
-        refund_note: open.refund_note,
-        deadline: open.deadline,
-    });
+    let digest = domain.open_reverse(&open);
     assert_eq!(zecswap_core::signer(&digest, &signature), Some(open.user));
 
     let h = Harness::new();

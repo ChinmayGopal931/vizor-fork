@@ -1,15 +1,13 @@
-import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show PathMetric;
 
 import 'package:flutter/widgets.dart';
 
 import '../../theme/app_theme.dart';
-import 'veylor_wordmark.dart';
 
-/// The neon look's motion: one line of light that switches screens on and
+/// The mobile look's motion: one line of light that switches screens on and
 /// off as a CRT does, and runs along paths as a light cycle, drawing what it
-/// lights. Plan and rules: `docs/neon-motion-plan.md`.
+/// lights.
 abstract final class NeonMotion {
   static const intro = Duration(milliseconds: 1550);
   static const reveal = Duration(milliseconds: 760);
@@ -26,11 +24,37 @@ abstract final class NeonMotion {
   static const wordmarkSize = Size(200, 44);
 
   /// How far [t] is between [from] and [to], clamped to 0..1.
-  static double span(double t, double from, double to) =>
+  static double span(double t, num from, num to) =>
       ((t - from) / (to - from)).clamp(0.0, 1.0);
 
   static bool reduced(BuildContext context) =>
       MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+}
+
+/// A one-shot animation that plays when its widget first appears.
+///
+/// [onAppear] runs once, on the first [didChangeDependencies], where reduced
+/// motion can first be read; under reduced motion [onAppearReduced] runs
+/// instead. Nothing replays it later, so turning reduced motion off never
+/// sets off a sign that is already lit.
+mixin NeonAppearMotion<T extends StatefulWidget> on State<T> {
+  var _appeared = false;
+
+  void onAppear();
+
+  void onAppearReduced() {}
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_appeared) return;
+    _appeared = true;
+    if (NeonMotion.reduced(context)) {
+      onAppearReduced();
+    } else {
+      onAppear();
+    }
+  }
 }
 
 /// A path a light cycle can run along: its lengths are measured once.
@@ -85,31 +109,9 @@ class NeonTrail {
     );
     final tip = head.getTangentForOffset(headAt);
     if (tip != null) {
-      paintNeonBead(canvas, tip.position, glow: glow, core: core);
+      Neon.bead(canvas, tip.position, glow: glow, core: core);
     }
   }
-}
-
-/// A light cycle's head, or a CRT's dot: a small white-hot square in a halo.
-void paintNeonBead(
-  Canvas canvas,
-  Offset at, {
-  required Color glow,
-  required Color core,
-  double size = 5,
-  double intensity = 1,
-}) {
-  final k = intensity.clamp(0.0, 1.0);
-  if (k <= 0) return;
-  final bead = Rect.fromCenter(center: at, width: size, height: size);
-  canvas
-    ..drawRect(
-      bead.inflate(size),
-      Paint()
-        ..color = glow.withValues(alpha: 0.6 * k)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, size),
-    )
-    ..drawRect(bead, Paint()..color = core.withValues(alpha: k));
 }
 
 /// A CRT's horizontal scanline from [left] to [right] at [y]; a dot when
@@ -125,7 +127,7 @@ void paintNeonScanline(
   double intensity = 1,
 }) {
   if (right - left < 1) {
-    paintNeonBead(
+    Neon.bead(
       canvas,
       Offset((left + right) / 2, y),
       glow: glow,
@@ -146,222 +148,74 @@ void paintNeonScanline(
   );
 }
 
-/// The lit VEYLOR wordmark that, the first time it is shown in a process,
-/// switches on: a dot, a CRT scanline across the screen, a light cycle that
-/// traces the letters, then the sign's flicker. Later it is simply lit.
-class VeylorWordmarkIntro extends StatefulWidget {
-  const VeylorWordmarkIntro({this.size = NeonMotion.wordmarkSize, super.key});
-
-  final Size size;
-
-  static var _played = false;
-
-  @override
-  State<VeylorWordmarkIntro> createState() => _VeylorWordmarkIntroState();
-}
-
-class _VeylorWordmarkIntroState extends State<VeylorWordmarkIntro>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: NeonMotion.intro,
-    value: 1,
-  );
-  late final AppLifecycleListener _lifecycle;
-  var _started = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Never resume halfway after a trip to the background.
-    _lifecycle = AppLifecycleListener(onHide: () => _controller.value = 1);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_started) return;
-    _started = true;
-    if (VeylorWordmarkIntro._played || NeonMotion.reduced(context)) return;
-    VeylorWordmarkIntro._played = true;
-    _controller.value = 0;
-    // Startup frames must not eat the opening.
-    unawaited(
-      WidgetsBinding.instance.waitUntilFirstFrameRasterized.then((_) {
-        if (mounted && _controller.value == 0) _controller.forward();
-      }),
-    );
-  }
-
-  @override
-  void dispose() {
-    _lifecycle.dispose();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final neon = context.colors.neon;
-    return ExcludeSemantics(
-      child: CustomPaint(
-        size: widget.size,
-        painter: _WordmarkIntroPainter(
-          animation: _controller,
-          glow: neon.glow,
-          core: neon.core,
-          screenWidth: MediaQuery.sizeOf(context).width,
-        ),
-      ),
-    );
-  }
-}
-
-class _WordmarkIntroPainter extends CustomPainter {
-  _WordmarkIntroPainter({
-    required this.animation,
-    required this.glow,
-    required this.core,
-    required this.screenWidth,
-  }) : super(repaint: animation);
-
-  final Animation<double> animation;
-  final Color glow;
-  final Color core;
-  final double screenWidth;
-
-  static const _lit = 0.75;
-  Size? _trailSize;
-  NeonTrail? _trail;
-  ({Path path, double width})? _art;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (_trailSize != size) {
-      _trailSize = size;
-      _art = VeylorWordmarkPainter.geometry(size);
-      _trail = _art == null ? null : NeonTrail(_art!.path);
-    }
-    final art = _art;
-    if (art == null) return;
-    final t = animation.value;
-    if (t >= 1) {
-      Neon.strokeTube(
-        canvas,
-        art.path,
-        glow: glow,
-        core: core,
-        width: art.width,
-        intensity: _lit,
-      );
-      return;
-    }
-
-    final ms = t * NeonMotion.intro.inMilliseconds;
-    final center = size.center(Offset.zero);
-    if (ms < 560) {
-      final grow = Curves.easeOutCubic.transform(NeonMotion.span(ms, 120, 380));
-      final shrink = Curves.easeInCubic.transform(
-        NeonMotion.span(ms, 380, 560),
-      );
-      final half = screenWidth / 2 * grow * (1 - shrink);
-      paintNeonScanline(
-        canvas,
-        center.dy,
-        center.dx - half,
-        center.dx + half,
-        glow: glow,
-        core: core,
-        intensity: ms < 120 ? NeonMotion.span(ms, 0, 120) : 1 - 0.6 * shrink,
-      );
-    }
-    if (ms < 1250) {
-      _trail!.paint(
-        canvas,
-        Curves.easeInOutCubic.transform(NeonMotion.span(ms, 450, 1250)),
-        glow: glow,
-        core: core,
-        width: art.width,
-      );
-      return;
-    }
-    Neon.strokeTube(
-      canvas,
-      art.path,
-      glow: glow,
-      core: core,
-      width: art.width,
-      intensity: _lit * NeonIgnition.lightAt(NeonMotion.span(ms, 1250, 1550)),
-    );
-  }
-
-  @override
-  bool shouldRepaint(_WordmarkIntroPainter oldDelegate) =>
-      oldDelegate.animation != animation ||
-      oldDelegate.glow != glow ||
-      oldDelegate.core != core ||
-      oldDelegate.screenWidth != screenWidth;
-}
-
-/// Dark for [delay], then switches on with the sign's flicker; [builder]
-/// gets the light level, 0..1. Under reduced motion it is lit at once.
-class NeonDelayedIgnition extends StatefulWidget {
-  const NeonDelayedIgnition({
-    required this.delay,
+/// Switches a neon sign on once, when it first appears: dark for [delay],
+/// then a couple of stutters, then steady. [builder] gets the light level,
+/// 0..1. Under reduced motion, or when not [enabled], the light is simply on.
+class NeonIgnition extends StatefulWidget {
+  const NeonIgnition({
     required this.builder,
+    this.delay = Duration.zero,
+    this.enabled = true,
     super.key,
   });
 
-  final Duration delay;
   final Widget Function(BuildContext context, double light) builder;
+  final Duration delay;
+  final bool enabled;
+
+  /// The switch-on itself, after [delay].
+  static const duration = Duration(milliseconds: 900);
+
+  /// The light level at [t] (0..1) of [duration]: stutter, catch, stutter,
+  /// then full light.
+  static double lightAt(double t) {
+    if (t < 0.10) return 0.15;
+    if (t < 0.16) return 0.85;
+    if (t < 0.24) return 0.25;
+    if (t < 0.34) return 1;
+    if (t < 0.40) return 0.55;
+    return Curves.easeOut.transform(((t - 0.40) / 0.60).clamp(0.0, 1.0)) * 0.3 +
+        0.7;
+  }
 
   @override
-  State<NeonDelayedIgnition> createState() => _NeonDelayedIgnitionState();
+  State<NeonIgnition> createState() => _NeonIgnitionState();
 }
 
-class _NeonDelayedIgnitionState extends State<NeonDelayedIgnition>
-    with SingleTickerProviderStateMixin {
+class _NeonIgnitionState extends State<NeonIgnition>
+    with SingleTickerProviderStateMixin, NeonAppearMotion<NeonIgnition> {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: widget.delay + NeonIgnition.duration,
     value: 1,
   );
-  var _started = false;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_started) return;
-    _started = true;
-    if (!NeonMotion.reduced(context)) _controller.forward(from: 0);
+  void onAppear() {
+    if (widget.enabled) _controller.forward(from: 0);
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  double get _light {
+    if (_controller.isCompleted) return 1;
+    final ms = _controller.value * _controller.duration!.inMilliseconds;
+    final delay = widget.delay.inMilliseconds;
+    if (ms < delay) return 0;
+    return NeonIgnition.lightAt(
+      NeonMotion.span(ms, delay, delay + NeonIgnition.duration.inMilliseconds),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _controller,
-      builder: (context, _) {
-        if (_controller.isCompleted) return widget.builder(context, 1);
-        final ms = _controller.value * _controller.duration!.inMilliseconds;
-        final delay = widget.delay.inMilliseconds;
-        if (ms < delay) return widget.builder(context, 0);
-        return widget.builder(
-          context,
-          NeonIgnition.lightAt(
-            NeonMotion.span(
-              ms,
-              delay.toDouble(),
-              (delay + NeonIgnition.duration.inMilliseconds).toDouble(),
-            ),
-          ),
-        );
-      },
+      builder: (context, _) => widget.builder(context, _light),
     );
   }
 }

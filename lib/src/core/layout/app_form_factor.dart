@@ -5,9 +5,9 @@ import 'package:flutter/foundation.dart';
 /// Which design-token set this binary was compiled with.
 ///
 /// The Figma variable collections `Sizing` and `Fonts` each carry a
-/// Desktop / Mobile mode; [kAppFormFactor] selects between them. Color
-/// tokens are form-factor invariant (they vary by Dark / Light theme
-/// only), so the form factor never affects `AppColors`.
+/// Desktop / Mobile mode; [kAppFormFactor] selects between them. It also
+/// selects the colour sets: the Figma ones on desktop, the neon ones on
+/// mobile (see `AppColors.dark`).
 ///
 /// The form factor is a **build-time** constant driven by
 /// `--dart-define=VIZOR_FORM_FACTOR=desktop|mobile` (default: desktop).

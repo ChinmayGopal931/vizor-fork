@@ -3,8 +3,7 @@ import 'dart:math' as math;
 import '../models/private_usd_balances.dart';
 import '../models/railgun_models.dart';
 
-/// How often a watched balance is looked at, and how stale it may get
-/// (plan reference §6.6; zapp `PrivateUsdBalanceRepository`).
+/// How often a watched balance is looked at, and how stale it may get.
 abstract final class PrivateUsdBalanceTiming {
   /// The polling tick, and the freshness wanted while funds arrive.
   static const arrivingPoll = Duration(seconds: 30);
@@ -100,8 +99,8 @@ class PrivateUsdBalanceState {
   );
 }
 
-/// Something is in screening, so the balance is worth looking at often.
-/// A forward payout landing (M5) will count too.
+/// Something is in screening (a payout or a deposit that just landed), so
+/// the balance is worth looking at often.
 bool isPrivateUsdArriving(PrivateUsdBalanceState state) =>
     (state.balances?.arriving ?? BigInt.zero) > BigInt.zero;
 
@@ -133,12 +132,11 @@ class PrivateUsdBalanceRetries {
 }
 
 /// A first sync's progress, in percent of the time one takes: Railgun's
-/// notes, then the transaction ids its screening needs (zapp
-/// `FirstSyncProgress`). The engine reports the notes at milestones that can
-/// be minutes apart, so between two the number creeps toward the next one's,
-/// slower the nearer it gets, without passing it. The ids come in batches
-/// whose progress each starts over, so every batch covers part of what is
-/// left and the number never goes back.
+/// notes, then the transaction ids its screening needs. The engine reports
+/// the notes at milestones that can be minutes apart, so between two the
+/// number creeps toward the next one's, slower the nearer it gets, without
+/// passing it. The ids come in batches whose progress each starts over, so
+/// every batch covers part of what is left and the number never goes back.
 class PrivateUsdFirstSyncProgress {
   PrivateUsdFirstSyncProgress({Duration Function()? elapsed})
     : _elapsed = elapsed ?? _stopwatch();

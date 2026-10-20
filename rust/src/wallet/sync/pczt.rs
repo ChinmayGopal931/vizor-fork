@@ -472,10 +472,9 @@ fn prepare_ironwood_commitments() {
 fn orchard_circuit_version_for_consensus_branch(
     consensus_branch_id: u32,
 ) -> orchard::circuit::OrchardCircuitVersion {
-    // The branch's Orchard protocol revision picks the circuit, so every
-    // upgrade that keeps revision V3 after NU6.3 (testnet NU7) proves as
-    // NU6.3 does. Matching NU6.3 alone proved testnet NU7 PCZTs with the
-    // post-NU6.2 circuit, and extraction rejected them as `InvalidProof`.
+    // The branch's Orchard protocol revision picks the circuit: an upgrade
+    // that keeps revision V3 (testnet NU7) proves as NU6.3 does, or
+    // extraction rejects its proofs as `InvalidProof`.
     let revision = zcash_protocol::consensus::BranchId::try_from(consensus_branch_id)
         .ok()
         .and_then(|branch| branch.orchard_protocol_revision());
@@ -609,8 +608,8 @@ pub async fn create_pczt_from_proposal(
             .proposal
             .clone()
             .with_proposed_version(stored.proposed_tx_version);
-        // A Private USD joint sweep discards its OVK (D12); every other
-        // purpose that reaches here keeps the sender's.
+        // A Private USD joint sweep discards its OVK; every other purpose
+        // that reaches here keeps the sender's.
         let pczt = zcb_create_pczt::<_, _, Infallible, _, Infallible, _>(
             &mut db,
             &network,

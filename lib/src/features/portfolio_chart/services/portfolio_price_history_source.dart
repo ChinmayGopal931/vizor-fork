@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -12,8 +13,7 @@ abstract interface class PortfolioPriceHistorySource {
   Future<PriceSeries?> fetch(PriceWindow window);
 }
 
-/// A source for a build with no usable pricing server: it has no prices and
-/// asks nobody.
+/// The source for a build without a usable pricing server.
 class UnavailablePortfolioPriceHistorySource
     implements PortfolioPriceHistorySource {
   const UnavailablePortfolioPriceHistorySource();
@@ -22,18 +22,13 @@ class UnavailablePortfolioPriceHistorySource
   Future<PriceSeries?> fetch(PriceWindow window) async => null;
 }
 
-/// The pricing engine, through the same route-aware client as the Home price:
-/// Tor when Tor is on, a direct connection otherwise, and never a fallback from
-/// one to the other. Only `https` is spoken. What a request carries is fixed by
-/// [pricingEnginePricesUri].
-///
-/// The answer is untrusted. A page is rejected unless it is a 2xx of at most
-/// [maxPageBytes] that [parsePricingEnginePage] accepts; a series that does not
-/// end on the first page follows the server's cursor for at most
+/// The pricing engine, over `https` through the route-aware client the Home
+/// price uses. A series follows the server's cursor for at most
 /// [kPricingEngineMaxPages] pages, and one that would need more is refused
-/// rather than drawn short. [NetworkHttpClient] buffers a body before handing
-/// it over, so the size cap refuses an oversized answer; it does not stop its
-/// download.
+/// rather than drawn short.
+///
+/// [NetworkHttpClient] buffers a body before handing it over, so
+/// [maxPageBytes] refuses an oversized answer but does not stop its download.
 class PricingEnginePortfolioPriceHistorySource
     implements PortfolioPriceHistorySource {
   PricingEnginePortfolioPriceHistorySource({
@@ -57,16 +52,25 @@ class PricingEnginePortfolioPriceHistorySource
   @override
   Future<PriceSeries?> fetch(PriceWindow window) async {
     if (_baseUri.scheme != 'https') return null;
+    // Cuts off the request in flight at the deadline: under Tor the client
+    // retries a timed-out GET, so the per-request timeout alone can overrun it.
+    final expired = Completer<void>();
+    final expiry = Timer(deadline, expired.complete);
     try {
-      return await _fetchPages(window);
+      return await _fetchPages(window, expired.future);
     } catch (e) {
       // The type only: a message can carry the URL.
       log('portfolioChart: price history fetch failed: ${e.runtimeType}');
       return null;
+    } finally {
+      expiry.cancel();
     }
   }
 
-  Future<PriceSeries?> _fetchPages(PriceWindow window) async {
+  Future<PriceSeries?> _fetchPages(
+    PriceWindow window,
+    Future<void> expired,
+  ) async {
     final clock = Stopwatch()..start();
     final pages = <PricingEnginePage>[];
     var from = window.from;
@@ -81,6 +85,7 @@ class PricingEnginePortfolioPriceHistorySource
         pricingEnginePricesUri(_baseUri, from: from, to: window.to),
         headers: const {HttpHeaders.acceptHeader: 'application/json'},
         timeout: remaining < timeout ? remaining : timeout,
+        cancelSignal: expired,
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
         log('portfolioChart: price history returned ${response.statusCode}');
@@ -134,21 +139,17 @@ class PortfolioPriceHistory {
   static const staleAfter = Duration(days: 1);
 }
 
-/// Caches price history per range, so rebuilding the chart does not refetch it.
+/// Caches price history per range, in memory, so rebuilding the chart does not
+/// refetch it.
 ///
-/// A range's series is for one window of whole UTC days, which moves at UTC
-/// midnight; a cached series is served for as long as it is for today's window
-/// and the server had every day of it. A window the server had not caught up
-/// with is asked again after [recheckAfter]. A fetch is shared between callers
-/// that ask while it is in flight. When a refresh fails the previous series is
-/// served, and the range is left alone for [failureCooldown] so a flaky route
-/// is not hammered. The cache lives in memory only: nothing about the wallet is
-/// in it, and a restart costs one request per range viewed.
+/// A cached series is served while it is for today's window (which moves at
+/// UTC midnight) and the server had every day of it; a window the server had
+/// not caught up with is asked again after [recheckAfter]. A failed refresh
+/// serves the previous series and leaves the range alone for
+/// [failureCooldown], so a flaky route is not hammered.
 ///
-/// [PortfolioChartRange.all] begins where the server's own history does, which
-/// only an answer can say. Until one has, the shortest range is asked for
-/// first: the request every device sends anyway, so nothing extra leaves the
-/// device but the second, equally fixed, request.
+/// [PortfolioChartRange.all] begins where the server's history does, which
+/// only an answer can say, so until one has the week is asked for first.
 class PortfolioPriceHistoryRepository {
   PortfolioPriceHistoryRepository({
     required PortfolioPriceHistorySource source,
@@ -173,7 +174,6 @@ class PortfolioPriceHistoryRepository {
   /// What is cached for [range], however old. Asks nobody.
   PortfolioPriceHistory? cached(PortfolioChartRange range) => _cache[range];
 
-  /// The prices for [range], or `null` when there are none.
   Future<PortfolioPriceHistory?> load(PortfolioChartRange range) {
     final now = _now().toUtc();
     final cached = _cache[range];

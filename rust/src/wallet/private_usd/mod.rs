@@ -1,21 +1,16 @@
-//! Private USD: shielded ZEC to and from Railgun USDC by atomic swap
-//! (`docs/private-usd-android-plan.md`).
+//! Private USD: shielded ZEC to and from Railgun USDC by atomic swap.
 //!
 //! Rust owns every key, every swap rule and all swap networking. Keys are
-//! re-derived from the seed for each use and never stored; swap records live
-//! in `swaps.db` (`store`). Engine HTTP goes through `crate::wallet::routed_http`
-//! only, so it follows the route policy and fails closed on Tor.
+//! derived from the seed again for each use and never stored; swap records
+//! live in `swaps.db` (`store`). Engine HTTP goes through
+//! `crate::wallet::routed_http` only, so it follows the route policy and fails
+//! closed on Tor.
 //!
 //! Never log the mnemonic, the seed, a secret share, a relayer ticket, token
 //! state or a keyed RPC URL.
 
-// M1 and M2 build blocks the engine drives; the forward (M5), reverse (M6) and
-// send (M7) halves use their share, and a few wait for M4's tokens. Remove
-// this once the engine uses them all.
-#![allow(dead_code)]
-
 use std::fmt;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use zecswap_core::NetworkType;
 
@@ -38,18 +33,30 @@ pub(crate) mod relayer_client;
 pub(crate) mod reverse;
 pub(crate) mod sends;
 pub(crate) mod store;
+pub(crate) mod swap;
 pub(crate) mod terms;
 pub(crate) mod transport;
 
 #[cfg(test)]
 mod tests;
 
-/// One `swaps.db` or `joint.db` writer at a time. Never held across network
-/// I/O.
-pub(crate) static OPERATIONS: Mutex<()> = Mutex::new(());
+static OPERATIONS: Mutex<()> = Mutex::new(());
 
-/// The networks with a swap deployment. Regtest has none (D2), so the feature
-/// is hidden there.
+/// Runs `write` as the only writer of `swaps.db` and `joint.db`. It must not
+/// do network I/O.
+pub(crate) fn with_operations<T>(write: impl FnOnce() -> T) -> T {
+    let _guard = lock(&OPERATIONS);
+    write()
+}
+
+/// Locks `mutex`, past a holder that panicked: every state guarded here stays
+/// consistent between statements.
+pub(crate) fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// The networks with a swap deployment. Regtest has none, so the feature is
+/// hidden there.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum PrivateUsdNetwork {
     Mainnet,
@@ -92,7 +99,7 @@ impl PrivateUsdNetwork {
 
 /// Why a step failed. The first group maps one to one onto the FRB codes
 /// (`api::private_usd::ApiPrivateUsdErrorCode`); the rest are internal reasons
-/// that `api()` folds into them.
+/// that `api::private_usd::api_code` folds into them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ErrorCode {
     RelayerUnreachable,
@@ -105,12 +112,8 @@ pub(crate) enum ErrorCode {
     DepositUnpayable,
     ZcashRejected,
     Mismatch,
-    TokensUnreachable,
     TokensRefused,
-    TokensDeviceRefused,
-    NoTokensToday,
     TokensNeeded,
-    Keystore,
     ChainLagging,
     QuoteExpired,
     MakerUnavailable,

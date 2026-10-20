@@ -5,33 +5,35 @@ proof, served at `https://railgun-artifacts.pepeman931.workers.dev` from the own
 `railgun-artifacts`, static assets). The Private USD page downloads from `https://ipfs-lb.com`, the SDK's own
 gateway, and falls back to this mirror when that fails (an HTTP or network error, or nothing from it for 10 s).
 
-**Why.** The SDK hard-codes `ipfs-lb.com` as its only gateway, with no setting and no fallback. On 2026-10-17 it
-went down (Cloudflare 502 for everything), and a fresh install could not make its first proof. Railway and zapp
-depend on the same gateway; Kohaku runs its own mirror. The owner chose a mirror the same day, as the fallback
-behind ipfs-lb.com.
+**Why.** The SDK hard-codes `ipfs-lb.com` as its only gateway, with no setting and no fallback. While that
+gateway is down, a fresh install cannot make its first proof.
 
 **Trust.** Availability only. The files are content-addressed, served at their IPFS paths
 (`/ipfs/<hash>/...`), and the SDK checks every zkey and wasm against the hashes it ships
-(`artifact-v2-hashes.json`, copied here) after decompressing it. It does not check the vkey; a wrong vkey can
-only make a proof fail locally.
+(`artifact-v2-hashes.json`) after decompressing it. It does not check the vkey; a wrong vkey can only make a
+proof fail locally.
 
-**POI circuits.** Wallet 11.2.0 (2026-09-30) replaced the POI circuits; the POI nodes verify only proofs from the
-new ones and answer the earlier ones' `Invalid proof`. Their directory (`QmZ2MyM6…`) resolves on no public gateway,
-only its files do, so `fetch-verify.mjs` gets each by its own CID (`POI_FILE_CIDS`) and saves it at the path the SDK
+**POI circuits.** Wallet 11.2.0 replaced the POI circuits; the POI nodes verify only proofs from the new ones
+and answer the earlier ones' `Invalid proof`. Their directory (`QmZ2MyM6…`) resolves on no public gateway, only
+its files do, so `fetch-verify.mjs` gets each by its own CID (`POI_FILE_CIDS`) and saves it at the path the SDK
 asks for. Their vkeys are in `poi-v2/`, exported with snarkjs from the zkeys once those matched 11.2.0's hashes,
-and equal to the ones railgun-rust embeds (2026-10-19). The earlier POI directory (`QmZrP9…`, hashes in
+and equal to the ones railgun-rust embeds. The earlier POI directory (`QmZrP9…`, hashes in
 `poi-nov-2-23-hashes.json`) stays for builds before 11.2.0.
 
 ## Rebuild or refresh
 
-Run from this directory. `files/` and `oversize/` are gitignored (about 1.1 GB).
+Run from this directory, after `npm ci --ignore-scripts` in `android/railgun-web`: the hashes are the ones the
+SDK the page bundles ships. `files/` and `oversize/` are gitignored (about 1.1 GB).
 
-1. Download and verify every file. Any IPFS gateway that serves the content works; Pinata did on 2026-10-17,
-   and Filebase on 2026-10-19, when Pinata answered quick requests with a bot check. A rerun skips files that
-   already verify.
+```bash
+HASHES=../../../android/railgun-web/node_modules/@railgun-community/wallet/dist/services/artifacts/json/artifact-v2-hashes.json
+```
+
+1. Download and verify every file. Any IPFS gateway that serves the content works, Filebase among them;
+   Pinata can answer quick requests with a bot check. A rerun skips files that already verify.
 
    ```bash
-   node fetch-verify.mjs artifact-v2-hashes.json files https://ipfs.filebase.io
+   node fetch-verify.mjs "$HASHES" files https://ipfs.filebase.io
    cp _headers files/_headers
    ```
 
@@ -55,7 +57,7 @@ Run from this directory. `files/` and `oversize/` are gitignored (about 1.1 GB).
    every hash, and every POI vkey against `poi-v2/`:
 
    ```bash
-   node fetch-verify.mjs artifact-v2-hashes.json /tmp/railgun-mirror-check https://railgun-artifacts.pepeman931.workers.dev --paths
+   node fetch-verify.mjs "$HASHES" /tmp/railgun-mirror-check https://railgun-artifacts.pepeman931.workers.dev --paths
    ```
 
 The Worker sends every request through `worker/worker.js` first: GET and HEAD go to the assets (`_headers` adds

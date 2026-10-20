@@ -1,6 +1,4 @@
-//! The Railgun send log and its settlement (plan §3.4 `railgun_sends`,
-//! reference §6.7; zapp `up/PrivateUsdSendLog.kt` and the settlement of
-//! `up/PrivateUsdSender.kt`).
+//! The Railgun send log and its settlement.
 //!
 //! Dart prices and proves a send or withdrawal on the Railgun page. Rust
 //! keeps the proof before anything goes out ([`keep`]), posts only what it
@@ -15,28 +13,26 @@
 //!
 //! Never log a record or a request: they hold the proof.
 
-use std::collections::HashMap;
 use std::fmt;
-use std::sync::{Arc, LazyLock, Mutex};
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex as AsyncMutex;
 
-use super::deployment::{Deployment, MAX_RELAYER_FEE};
-use super::engine::Clock;
+use super::abi::hex0x;
+use super::deployment::{require_within_fee_cap, Deployment};
+use super::engine::{AccountLocks, Clock};
 use super::evm_rpc::{SendChain, TransactionStatus};
 use super::models::{decode_strict, Address, Amount, Hex, RailgunTransactRequest, Word};
 use super::relayer_client::{RailgunBroadcast, RelayerClient};
 use super::store::{SendRow, SendState, SwapStore};
 use super::transport::HttpTransport;
-use super::{fail, railgun_keys, ErrorCode, PrivateUsdError, Result, OPERATIONS};
+use super::{fail, railgun_keys, with_operations, ErrorCode, PrivateUsdError, Result};
 
-/// A send still out is asked about again after this (zapp `ASK_AGAIN_AFTER`).
+/// A send still out is asked about again after this.
 const ASK_AGAIN_AFTER_SECONDS: u64 = 3 * 60;
 /// A send whose notes the relayer called spent, while the chain shows none
-/// of them spent, is posted again after this (zapp `SPENT_RECHECK_AFTER`).
+/// of them spent, is posted again after this.
 const SPENT_RECHECK_AFTER_SECONDS: u64 = 15 * 60;
-/// The most the relayer takes in one post (reference §6.7).
+/// The most the relayer takes in one post.
 const MAX_TRANSACT_BODY: usize = 132 * 1024;
 /// A send id is the UUID Dart made when the send began.
 const MAX_SEND_ID_CHARS: usize = 64;
@@ -48,8 +44,7 @@ pub(crate) struct RailgunSpend {
     pub nullifiers: Vec<Word>,
 }
 
-/// A kept proof, and when the relayer last answered about it (zapp
-/// `PrivateUsdRelay`).
+/// A kept proof, and when the relayer last answered about it.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Relay {
@@ -70,8 +65,8 @@ pub(crate) struct Relay {
     pub retry_at: Option<u64>,
 }
 
-/// One send or withdrawal (zapp `PrivateUsdSendRecord`): `relay` while it is
-/// unconfirmed, none once it landed.
+/// One send or withdrawal: `relay` while it is unconfirmed, none once it
+/// landed.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SendRecord {
@@ -202,13 +197,13 @@ struct PageSpend {
     nullifiers: Vec<String>,
 }
 
-/// Keeps `send` before it goes out (zapp `PrivateUsdSendLog.prove`): a send
-/// this fails for must not go. The proof must be this deployment's (its
-/// chain, Railgun's proxy, no value, nullifiers in every spend) and pay the
-/// relayer no more than the cap (`RelayerFee`). `Busy` while another payment
-/// of the account is unsettled or a conversion is under way: one outgoing
-/// payment at a time, across restarts. The same send kept again is the
-/// send already kept; another proof under its id is `Mismatch`, never kept.
+/// Keeps `send` before it goes out: a send this fails for must not go. The
+/// proof must be this deployment's (its chain, Railgun's proxy, no value,
+/// nullifiers in every spend) and pay the relayer no more than the cap
+/// (`RelayerFee`). `Busy` while another payment of the account is unsettled
+/// or a conversion is under way: one outgoing payment at a time, across
+/// restarts. The same send kept again is the send already kept; another
+/// proof under its id is `Mismatch`, never kept.
 pub(crate) fn keep(
     store: &mut SwapStore,
     pins: &Deployment,
@@ -217,23 +212,24 @@ pub(crate) fn keep(
     now: u64,
 ) -> Result<SendRecord> {
     let record = proved_record(pins, send, now)?;
-    let _guard = OPERATIONS.lock().unwrap_or_else(|error| error.into_inner());
-    let kept = records(store, account)?;
-    if let Some(earlier) = kept.iter().find(|earlier| earlier.id == record.id) {
-        return if earlier.same_send(&record) {
-            Ok(earlier.clone())
-        } else {
-            fail(ErrorCode::Mismatch, "another send is kept under this id")
-        };
-    }
-    if kept.iter().any(|earlier| !earlier.confirmed()) {
-        return fail(ErrorCode::Busy, "an earlier payment is not settled yet");
-    }
-    if store.unfinished_count(account)? > 0 {
-        return fail(ErrorCode::Busy, "a conversion is under way");
-    }
-    write(store, account, &record)?;
-    Ok(record)
+    with_operations(|| {
+        let kept = records(store, account)?;
+        if let Some(earlier) = kept.iter().find(|earlier| earlier.id == record.id) {
+            return if earlier.same_send(&record) {
+                Ok(earlier.clone())
+            } else {
+                fail(ErrorCode::Mismatch, "another send is kept under this id")
+            };
+        }
+        if kept.iter().any(|earlier| !earlier.confirmed()) {
+            return fail(ErrorCode::Busy, "an earlier payment is not settled yet");
+        }
+        if store.unfinished_count(account)? > 0 {
+            return fail(ErrorCode::Busy, "a conversion is under way");
+        }
+        write(store, account, &record)?;
+        Ok(record)
+    })
 }
 
 /// The account's sends, newest first. One that does not read makes the
@@ -243,30 +239,20 @@ pub(crate) fn records(store: &SwapStore, account: &str) -> Result<Vec<SendRecord
 }
 
 /// Per-account passes: a post and a settlement never run at once for one
-/// account. Never held by `OPERATIONS`' holders.
-static SEND_LOCKS: LazyLock<Mutex<HashMap<String, Arc<AsyncMutex<()>>>>> =
-    LazyLock::new(Default::default);
+/// account.
+static SEND_LOCKS: AccountLocks = AccountLocks::new();
 
-fn send_lock(account: &str) -> Arc<AsyncMutex<()>> {
-    SEND_LOCKS
-        .lock()
-        .unwrap_or_else(|error| error.into_inner())
-        .entry(account.to_owned())
-        .or_default()
-        .clone()
-}
-
-/// How many of a proof's nullifiers are spent (zapp `PrivateUsdNullifiers`).
-/// One transact spends all of its nullifiers or none of them.
+/// How many of a proof's nullifiers are spent. One transact spends all of
+/// its nullifiers or none of them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Nullifiers {
-    NoneSpent,
-    SomeSpent,
+    Unspent,
+    PartlySpent,
     AllSpent,
 }
 
 /// The relayer side of an account's sends: posting kept requests and
-/// settling them (zapp `PrivateUsdSendSettlement`).
+/// settling them.
 pub(crate) struct Sends<'a, T: HttpTransport, K: Clock> {
     relayer: RelayerClient<'a, T>,
     clock: &'a K,
@@ -290,7 +276,7 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
         store: &mut SwapStore,
         send_id: &str,
     ) -> Result<RailgunBroadcast> {
-        let lock = send_lock(self.account);
+        let lock = SEND_LOCKS.of(self.account);
         let _pass = lock.lock().await;
         let Some(send) = find(store, self.account, send_id)? else {
             return fail(ErrorCode::Other, "no such send");
@@ -306,16 +292,16 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
         Ok(self.post(store, send_id, &relay.request).await)
     }
 
-    /// Settles the account's unconfirmed sends, oldest first (zapp
-    /// `settleAll`): each is confirmed, dropped, or asked about again. A pass
-    /// asked for while one runs has nothing left to do. One send's failure
-    /// leaves it for the next pass. Returns the sends after the pass.
+    /// Settles the account's unconfirmed sends, oldest first: each is
+    /// confirmed, dropped, or asked about again. A pass asked for while one
+    /// runs has nothing left to do. One send's failure leaves it for the next
+    /// pass. Returns the sends after the pass.
     pub(crate) async fn settle_all<C: SendChain>(
         &self,
         store: &mut SwapStore,
         chain: &C,
     ) -> Result<Vec<SendRecord>> {
-        let lock = send_lock(self.account);
+        let lock = SEND_LOCKS.of(self.account);
         if let Ok(_pass) = lock.try_lock() {
             let mut unconfirmed: Vec<SendRecord> = records(store, self.account)?
                 .into_iter()
@@ -325,7 +311,7 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
             for send in unconfirmed {
                 if let Err(error) = self.settle(store, chain, &send).await {
                     log::warn!(
-                        "Private USD: send {} wasn't settled ({:?})",
+                        "private usd: send {} wasn't settled ({:?})",
                         send.id,
                         error.code
                     );
@@ -335,9 +321,8 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
         records(store, self.account)
     }
 
-    /// zapp `settle`'s `when`: an answer that its notes are spent settles from
-    /// the chain; a named transaction from its receipt; anything else is
-    /// posted again.
+    /// An answer that its notes are spent settles from the chain; a named
+    /// transaction from its receipt; anything else is posted again.
     async fn settle<C: SendChain>(
         &self,
         store: &mut SwapStore,
@@ -424,8 +409,8 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
         }
         match spent_nullifiers(chain, &relay.spends).await? {
             Nullifiers::AllSpent => change(store, self.account, id, |send| send.landed(None)),
-            Nullifiers::SomeSpent => remove(store, self.account, id),
-            Nullifiers::NoneSpent => {
+            Nullifiers::PartlySpent => remove(store, self.account, id),
+            Nullifiers::Unspent => {
                 if since >= SPENT_RECHECK_AFTER_SECONDS {
                     self.post_again(store, id, relay).await;
                 }
@@ -434,8 +419,8 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
         }
     }
 
-    /// Posts `request` and notes what the answer says before it is acted on
-    /// (zapp `post`). Once a send is kept the log is a record, not a gate:
+    /// Posts `request` and notes what the answer says before it is acted on.
+    /// Once a send is kept the log is a record, not a gate:
     /// a note that fails is logged, and the answer stands. A refusal forgets
     /// the send, since nothing from it went or ever will.
     async fn post(
@@ -454,7 +439,7 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
                 })
             }
             RailgunBroadcast::Refused { status } => {
-                log::warn!("Private USD: the relayer refused send {id} (HTTP {status})");
+                log::warn!("private usd: the relayer refused send {id} (HTTP {status})");
                 remove(store, self.account, id)
             }
             RailgunBroadcast::Spent(transactions) => {
@@ -464,14 +449,14 @@ impl<'a, T: HttpTransport, K: Clock> Sends<'a, T, K> {
                 })
             }
             RailgunBroadcast::Retry { retry_after_secs } => {
-                log::warn!("Private USD: the relayer's answer for send {id} is unknown");
+                log::warn!("private usd: the relayer's answer for send {id} is unknown");
                 let retry_at = retry_after_secs.map(|seconds| now.saturating_add(seconds));
                 change(store, self.account, id, |send| send.posted(now, retry_at))
             }
         };
         if let Err(error) = noted {
             log::warn!(
-                "Private USD: the send log wasn't updated ({:?})",
+                "private usd: the send log wasn't updated ({:?})",
                 error.code
             );
         }
@@ -491,16 +476,16 @@ async fn spent_nullifiers<C: SendChain>(chain: &C, spends: &[RailgunSpend]) -> R
         }
     }
     Ok(if spent == 0 {
-        Nullifiers::NoneSpent
+        Nullifiers::Unspent
     } else if spent == total {
         Nullifiers::AllSpent
     } else {
-        Nullifiers::SomeSpent
+        Nullifiers::PartlySpent
     })
 }
 
-/// `send` as a record, once it is this deployment's (the page's own checks
-/// on a proof, `RailgunWallet.prove`, again).
+/// `send` as a record, once it is this deployment's: the page's own checks on
+/// a proof, again.
 fn proved_record(pins: &Deployment, send: &ProvedSend<'_>, now: u64) -> Result<SendRecord> {
     let mismatch = |message: &str| PrivateUsdError::new(ErrorCode::Mismatch, message);
     let id_reads = !send.id.is_empty()
@@ -522,9 +507,7 @@ fn proved_record(pins: &Deployment, send: &ProvedSend<'_>, now: u64) -> Result<S
     if !send.amount.is_swap_amount(true) {
         return Err(mismatch("the amount is out of range"));
     }
-    if send.fee.0 > MAX_RELAYER_FEE {
-        return fail(ErrorCode::RelayerFee, "the relayer's fee is above the cap");
-    }
+    require_within_fee_cap(send.fee.0)?;
     if !is_destination(send.to) {
         return Err(mismatch("the destination is not a 0zk or 0x address"));
     }
@@ -595,7 +578,7 @@ fn is_destination(to: &str) -> bool {
 /// `0x` and at least a selector of hex, lowercased.
 fn calldata(text: &str) -> Option<String> {
     let bytes = hex::decode(text.strip_prefix("0x")?).ok()?;
-    (bytes.len() >= 4).then(|| format!("0x{}", hex::encode(bytes)))
+    (bytes.len() >= 4).then(|| hex0x(&bytes))
 }
 
 /// 32 bytes of hex, `0x` optional.
@@ -615,28 +598,28 @@ fn find(store: &SwapStore, account: &str, id: &str) -> Result<Option<SendRecord>
         .find(|send| send.id == id))
 }
 
-/// Changes `id`, if it is still kept (zapp `update`): one read and one write
-/// under `OPERATIONS`, so a deleted account's send never comes back.
+/// Changes `id`, if it is still kept: one read and one write by the only
+/// writer, so a deleted account's send never comes back.
 fn change(
     store: &mut SwapStore,
     account: &str,
     id: &str,
     transform: impl FnOnce(SendRecord) -> SendRecord,
 ) -> Result<()> {
-    let _guard = OPERATIONS.lock().unwrap_or_else(|error| error.into_inner());
-    let Some(send) = find(store, account, id)? else {
-        return Ok(());
-    };
-    write(store, account, &transform(send))
+    with_operations(|| {
+        let Some(send) = find(store, account, id)? else {
+            return Ok(());
+        };
+        write(store, account, &transform(send))
+    })
 }
 
 /// Forgets `id`, which moved nothing.
 fn remove(store: &mut SwapStore, account: &str, id: &str) -> Result<()> {
-    let _guard = OPERATIONS.lock().unwrap_or_else(|error| error.into_inner());
-    store.remove_send(account, id)
+    with_operations(|| store.remove_send(account, id))
 }
 
-/// One row, one SQLite transaction. The caller holds `OPERATIONS`.
+/// One row, one SQLite transaction, inside `with_operations`.
 fn write(store: &mut SwapStore, account: &str, record: &SendRecord) -> Result<()> {
     let record_json = serde_json::to_string(record).map_err(|error| {
         PrivateUsdError::new(

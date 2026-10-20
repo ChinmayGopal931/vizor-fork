@@ -34,7 +34,7 @@ const ALLOW_ZERO_CONFIRMATION_SHIELDING: bool = true;
 // invalidate the claim.
 const PAYMENT_LINK_CLAIM_CONFIRMATIONS: u32 = 2;
 // A Private USD joint sweep spends every note of a swap's joint account,
-// trusted or not, at the same depth as zecSwap's own wallet.
+// trusted or not, once it has this many confirmations.
 const JOINT_SWEEP_CONFIRMATIONS: u32 = 2;
 
 fn confirmations_policy() -> ConfirmationsPolicy {

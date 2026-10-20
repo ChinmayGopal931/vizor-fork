@@ -603,7 +603,7 @@ class WidgetbookApp extends StatelessWidget {
                       builder: buildMobileHomePrivateUsdHiddenUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Private USD converting',
+                      name: 'Private USD bridging',
                       builder: buildMobileHomePrivateUsdConvertingUseCase,
                     ),
                     WidgetbookUseCase(
@@ -627,7 +627,7 @@ class WidgetbookApp extends StatelessWidget {
               name: 'Private USD',
               children: [
                 WidgetbookComponent(
-                  name: 'Mobile',
+                  name: 'Screen',
                   useCases: [
                     WidgetbookUseCase(
                       name: 'Default',
@@ -657,122 +657,153 @@ class WidgetbookApp extends StatelessWidget {
                       name: 'Payment pending',
                       builder: buildMobilePrivateUsdPaymentPendingUseCase,
                     ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Receive',
+                  useCases: [
                     WidgetbookUseCase(
-                      name: 'Convert',
-                      builder: buildMobilePrivateUsdConvertUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Convert getting a quote',
-                      builder: buildMobilePrivateUsdConvertQuotingUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Convert not enough ZEC',
-                      builder: buildMobilePrivateUsdConvertInsufficientUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Convert while syncing',
-                      builder: buildMobilePrivateUsdConvertSyncingUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Review',
-                      builder: buildMobilePrivateUsdReviewUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Review expired',
-                      builder: buildMobilePrivateUsdReviewExpiredUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Review with Tor off',
-                      builder: buildMobilePrivateUsdReviewTorOffUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Progress',
-                      builder: buildMobilePrivateUsdProgressUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Progress opening slowly',
-                      builder: buildMobilePrivateUsdProgressOpeningSlowUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Progress problem',
-                      builder: buildMobilePrivateUsdProgressProblemUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Progress paid',
-                      builder: buildMobilePrivateUsdProgressPaidUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Progress bridged',
-                      builder: buildMobilePrivateUsdProgressBridgedUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Receive USDC',
+                      name: 'USDC',
                       builder: buildMobilePrivateUsdReceiveUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Receive 0zkUSDC',
+                      name: '0zkUSDC',
                       builder: buildMobilePrivateUsdReceiveShieldedUseCase,
                     ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Bridge',
+                  useCases: [
                     WidgetbookUseCase(
-                      name: 'Progress refunding',
+                      name: 'To 0zkUSDC',
+                      builder: buildMobilePrivateUsdConvertUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Getting a quote',
+                      builder: buildMobilePrivateUsdConvertQuotingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Not enough ZEC',
+                      builder: buildMobilePrivateUsdConvertInsufficientUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'While syncing',
+                      builder: buildMobilePrivateUsdConvertSyncingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'To ZEC',
+                      builder: buildMobilePrivateUsdConvertReverseUseCase,
+                    ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Bridge review',
+                  useCases: [
+                    WidgetbookUseCase(
+                      name: 'To 0zkUSDC',
+                      builder: buildMobilePrivateUsdReviewUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Quote expired',
+                      builder: buildMobilePrivateUsdReviewExpiredUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'To ZEC',
+                      builder: buildMobilePrivateUsdReviewReverseUseCase,
+                    ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Bridge progress to 0zkUSDC',
+                  useCases: [
+                    WidgetbookUseCase(
+                      name: 'Confirming',
+                      builder: buildMobilePrivateUsdProgressUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Opening slowly',
+                      builder: buildMobilePrivateUsdProgressOpeningSlowUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Problem',
+                      builder: buildMobilePrivateUsdProgressProblemUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Paid',
+                      builder: buildMobilePrivateUsdProgressPaidUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Bridged',
+                      builder: buildMobilePrivateUsdProgressBridgedUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Refunding',
                       builder: buildMobilePrivateUsdProgressRefundingUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Progress refunded',
+                      name: 'Refunded',
                       builder: buildMobilePrivateUsdProgressRefundedUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Progress nothing sent',
+                      name: 'Nothing sent',
                       builder: buildMobilePrivateUsdProgressNothingSentUseCase,
                     ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Bridge progress to ZEC',
+                  useCases: [
                     WidgetbookUseCase(
-                      name: 'Convert to ZEC',
-                      builder: buildMobilePrivateUsdConvertReverseUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Review to ZEC',
-                      builder: buildMobilePrivateUsdReviewReverseUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Reverse funding, fees changed',
+                      name: 'Fees changed',
                       builder: buildMobilePrivateUsdReverseFundingUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Reverse proving the payment',
+                      name: 'Proving the payment',
                       builder: buildMobilePrivateUsdReverseProvingUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Reverse authorize settlement',
+                      name: 'Authorize settlement',
                       builder: buildMobilePrivateUsdReverseReadyUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Reverse settling',
+                      name: 'Settling',
                       builder: buildMobilePrivateUsdReverseSettlingUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Reverse receiving',
+                      name: 'Receiving',
                       builder: buildMobilePrivateUsdReverseReceivingUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Reverse complete',
+                      name: 'Complete',
                       builder: buildMobilePrivateUsdReverseCompleteUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Reverse refund wait',
+                      name: 'Refund wait',
                       builder: buildMobilePrivateUsdReverseRefundWaitUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Reverse refunded',
+                      name: 'Refunded',
                       builder: buildMobilePrivateUsdReverseRefundedUseCase,
                     ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Refunds',
+                  useCases: [
                     WidgetbookUseCase(
-                      name: 'Refunds',
+                      name: 'Default',
                       builder: buildMobilePrivateUsdRefundsUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Refunds empty',
+                      name: 'Empty',
                       builder: buildMobilePrivateUsdRefundsEmptyUseCase,
                     ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Send',
+                  useCases: [
                     WidgetbookUseCase(
                       name: 'Send',
                       builder: buildMobilePrivateUsdSendUseCase,
@@ -789,24 +820,34 @@ class WidgetbookApp extends StatelessWidget {
                       name: 'Send leaves the network fee',
                       builder: buildMobilePrivateUsdSendLeaveFeeUseCase,
                     ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Send review',
+                  useCases: [
                     WidgetbookUseCase(
-                      name: 'Send review',
+                      name: 'Send',
                       builder: buildMobilePrivateUsdSendReviewUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Withdraw review',
+                      name: 'Withdraw',
                       builder: buildMobilePrivateUsdWithdrawReviewUseCase,
                     ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Send status',
+                  useCases: [
                     WidgetbookUseCase(
-                      name: 'Send proving',
+                      name: 'Proving',
                       builder: buildMobilePrivateUsdSendProvingUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Send done',
+                      name: 'Done',
                       builder: buildMobilePrivateUsdSendDoneUseCase,
                     ),
                     WidgetbookUseCase(
-                      name: 'Send unconfirmed',
+                      name: 'Unconfirmed',
                       builder: buildMobilePrivateUsdSendUnconfirmedUseCase,
                     ),
                   ],

@@ -12,8 +12,8 @@ const _mobile = kAppFormFactor == AppFormFactor.mobile;
 /// adapts automatically to any element height. Keep [full] available for
 /// the few places where a literal radius is more convenient.
 ///
-/// Mobile builds resolve to [AppRadiiMobile], the sharp scale of Veylor's
-/// neon redesign; desktop keeps the Figma scale in [AppRadiiDesktop].
+/// Mobile builds resolve to the near-square [AppRadiiMobile]; desktop keeps
+/// the Figma scale in [AppRadiiDesktop].
 abstract final class AppRadii {
   static const double xSmall = _mobile
       ? AppRadiiMobile.xSmall
@@ -45,8 +45,8 @@ abstract final class AppRadiiDesktop {
   static const double full = 999;
 }
 
-/// The neon redesign's radii (mobile): flat planes and near-square corners.
-/// Even a "pill" is a slab with a 4px edge.
+/// The mobile radii: flat planes and near-square corners. Even a "pill" is a
+/// slab with a 4px edge.
 abstract final class AppRadiiMobile {
   static const double xSmall = 2;
   static const double small = 2;
@@ -56,9 +56,9 @@ abstract final class AppRadiiMobile {
   static const double full = 4;
 }
 
-/// 45° corner cuts for the neon redesign's signature surfaces (buttons, the
-/// tab bar, the balance sign, avatars), drawn with `BeveledRectangleBorder`.
-/// A value is how far the cut reaches along each edge.
+/// 45° corner cuts for the mobile surfaces (buttons, panels, badges,
+/// avatars), drawn with `BeveledRectangleBorder`. A value is how far the cut
+/// reaches along each edge.
 abstract final class AppChamfer {
   static const double small = 4;
   static const double medium = 8;

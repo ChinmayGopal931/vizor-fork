@@ -6,7 +6,9 @@ import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/private_usd_lifecycle_provider.dart';
 import '../../../rust/api/private_usd.dart' as rust;
+import '../../swap/models/swap_token_amount_formatting.dart';
 import '../models/private_usd_balances.dart';
+import '../models/private_usd_messages.dart';
 import '../models/private_usd_send.dart';
 import '../private_usd_copy.dart';
 import '../services/private_usd_sender.dart';
@@ -22,13 +24,13 @@ final privateUsdSendPageProvider = Provider<PrivateUsdSendPage>(
   (ref) => RailgunSendPage(ref.watch(railgunEngineProvider)),
 );
 
-/// The sender (plan M7), kept alive with the engine: a send outlives the
-/// screen that started it, and settlement runs for the app's lifetime
-/// (`PrivateUsdEngineHost` builds it). Settlement passes run (M7 part 1
-/// note) after every Railgun sync any use made (reference §6.6 "Shared
-/// syncs"), on unlock and on an account switch while the log holds a send
-/// not seen in a block, and during a send's landing wait. Account deletions
-/// and resets drain it through [privateUsdLifecycleProvider].
+/// The sender, kept alive with the engine: a send outlives the screen that
+/// started it, and settlement runs for the app's lifetime
+/// (`PrivateUsdEngineHost` builds it). Settlement passes run after every
+/// Railgun sync any use made, on unlock and on an account switch while the
+/// log holds a send not seen in a block, and during a send's landing wait.
+/// Account deletions and resets drain it through
+/// [privateUsdLifecycleProvider].
 final privateUsdSenderProvider = Provider<PrivateUsdSender>((ref) {
   final deployment = ref.watch(privateUsdCurrentDeploymentProvider);
   final guard = ref.watch(privateUsdSpendGuardProvider);
@@ -37,9 +39,7 @@ final privateUsdSenderProvider = Provider<PrivateUsdSender>((ref) {
     page: ref.watch(privateUsdSendPageProvider),
     backend: ref.watch(privateUsdSendBackendProvider),
     guard: guard,
-    maxRelayerFee:
-        BigInt.tryParse(deployment?.maxRelayerFee ?? '') ??
-        BigInt.from(2000000),
+    maxRelayerFee: privateUsdRelayerFeeCap(deployment),
   );
   final lifecycle = ref.watch(privateUsdLifecycleProvider);
   lifecycle.register(
@@ -89,16 +89,15 @@ final privateUsdSenderProvider = Provider<PrivateUsdSender>((ref) {
   return sender;
 });
 
-/// One send or withdrawal's form, review and outcome (reference §9.4 S8),
-/// per mode, while its screens show.
+/// One send or withdrawal's form, review and outcome, per mode, while its
+/// screens show.
 final privateUsdSendProvider = NotifierProvider.autoDispose
     .family<PrivateUsdSendNotifier, PrivateUsdSendForm, PrivateUsdSendMode>(
       PrivateUsdSendNotifier.new,
     );
 
-/// zapp `PrivateUsdSendVM`'s actions: edit, review (prices the send), send,
-/// back. Anything signed never returns to review, where it could be paid
-/// again.
+/// The send's actions: edit, review (prices the send), send, back. Anything
+/// signed never returns to review, where it could be paid again.
 class PrivateUsdSendNotifier extends Notifier<PrivateUsdSendForm> {
   PrivateUsdSendNotifier(this.mode);
 
@@ -177,7 +176,7 @@ class PrivateUsdSendNotifier extends Notifier<PrivateUsdSendForm> {
     final asset = state.asset(_balances());
     if (asset == null) return null;
     final units = state.networkFee?.sendable(asset) ?? asset.available;
-    final text = privateUsdTokenText(units, asset.token.decimals);
+    final text = swapBaseUnitsToDecimal('$units', asset.token.decimals);
     _edit((f) => f.copyWith(token: asset.token, amountText: text));
     return text;
   }

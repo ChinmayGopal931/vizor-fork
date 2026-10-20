@@ -137,6 +137,9 @@ void main() {
       expect(find.text('SYNC COMPLETE'), findsOneWidget);
       expect(find.text('Veylor is checking'), findsNothing);
       expect(find.textContaining('%'), findsNothing);
+      // The unlock button switches on after the done sign, and takes no tap
+      // while it is still dark.
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Unlock Veylor'));
       await tester.pumpAndSettle();
       expect(find.text('SYNCED'), findsOneWidget);

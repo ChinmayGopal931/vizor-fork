@@ -23,16 +23,21 @@ final privateUsdCurrentDeploymentProvider =
       return ref.watch(privateUsdDeploymentProvider(network));
     });
 
+/// The most a relayer may charge for one payment, as [deployment] pins it.
+/// Null without a deployment or a readable cap: then no fee is within it.
+BigInt? privateUsdRelayerFeeCap(rust_private_usd.ApiDeployment? deployment) =>
+    BigInt.tryParse(deployment?.maxRelayerFee ?? '');
+
 /// Asks the platform's Railgun host whether the page runs here; replaced in
 /// tests.
 final railgunHostSupportQueryProvider = Provider<Future<bool?> Function()>(
   (_) => queryRailgunHostSupported,
 );
 
-/// Whether this platform's Railgun host can run the page (iOS plan XI9): the
-/// bootstrap's answer, so it is known from the first frame. When the iOS
-/// handler had not answered yet, it counts as no until it is asked again after
-/// the first frame.
+/// Whether this platform's Railgun host can run the page: the bootstrap's
+/// answer, so it is known from the first frame. When the iOS handler had not
+/// answered yet, it counts as no until it is asked again after the first
+/// frame.
 final railgunHostSupportedProvider =
     NotifierProvider<RailgunHostSupportedNotifier, bool>(
       RailgunHostSupportedNotifier.new,
@@ -53,13 +58,11 @@ class RailgunHostSupportedNotifier extends Notifier<bool> {
   }
 }
 
-/// Whether the active account sees Private USD (plan reference §8.3). The
-/// banner and conversion progress of a swap under way do not follow it (D16).
+/// Whether the active account sees Private USD. The banner and conversion
+/// progress of a swap under way do not follow it.
 final privateUsdAvailableProvider = Provider<bool>((ref) {
   // Const, so desktop builds and builds without the define drop the rest.
-  if (!kVizorPrivateUsdEnabled || kAppFormFactor != AppFormFactor.mobile) {
-    return false;
-  }
+  if (!kPrivateUsdBuildEnabled) return false;
   return privateUsdAvailableFor(
     enabled: true,
     formFactor: kAppFormFactor,
@@ -75,10 +78,10 @@ final privateUsdAvailableProvider = Provider<bool>((ref) {
   );
 });
 
-/// The availability rule on its own: the build define, a mobile build on a
-/// platform that hosts the page, a deployment for the network, the kill
-/// switch not off, and a software account with a ZIP-32 index (hardware
-/// accounts have no seed on the phone; D6, D8).
+/// The availability rule on its own: where the swap engine runs
+/// ([privateUsdEngineEnabledFor]), with the kill switch not off and a
+/// software account with a ZIP-32 index (hardware accounts have no seed on
+/// the phone).
 bool privateUsdAvailableFor({
   required bool enabled,
   required AppFormFactor formFactor,
@@ -87,22 +90,40 @@ bool privateUsdAvailableFor({
   required bool hasDeployment,
   required bool killSwitchAvailable,
   required AccountInfo? activeAccount,
-}) {
-  return enabled &&
-      formFactor == AppFormFactor.mobile &&
-      privateUsdPlatformHostsPage(
-        platform: platform,
-        hostSupported: hostSupported,
-      ) &&
-      hasDeployment &&
-      killSwitchAvailable &&
-      activeAccount != null &&
-      !activeAccount.isHardware &&
-      activeAccount.zip32AccountIndex != null;
-}
+}) =>
+    privateUsdEngineEnabledFor(
+      enabled: enabled,
+      formFactor: formFactor,
+      platform: platform,
+      hostSupported: hostSupported,
+      hasDeployment: hasDeployment,
+    ) &&
+    killSwitchAvailable &&
+    activeAccount != null &&
+    !activeAccount.isHardware &&
+    activeAccount.zip32AccountIndex != null;
 
-/// Whether [platform] runs the Railgun page (iOS plan XI9): every Android
-/// build, and iOS where its host says so (iOS 17 and later, plan DI2).
+/// Whether this build runs the swap engine at all: the define, a mobile build
+/// on a platform that hosts the page, and a deployment for the network. It
+/// does not follow the active account or the kill switch: conversions under
+/// way keep being driven for every account.
+bool privateUsdEngineEnabledFor({
+  required bool enabled,
+  required AppFormFactor formFactor,
+  required TargetPlatform platform,
+  required bool hostSupported,
+  required bool hasDeployment,
+}) =>
+    enabled &&
+    formFactor == AppFormFactor.mobile &&
+    privateUsdPlatformHostsPage(
+      platform: platform,
+      hostSupported: hostSupported,
+    ) &&
+    hasDeployment;
+
+/// Whether [platform] runs the Railgun page: every Android build, and iOS
+/// where its host says so (iOS 17 and later).
 bool privateUsdPlatformHostsPage({
   required TargetPlatform platform,
   required bool hostSupported,

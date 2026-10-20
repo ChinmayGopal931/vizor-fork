@@ -4,7 +4,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/config/private_usd_feature_config.dart';
 import '../models/railgun_models.dart';
+import 'private_usd_pause.dart';
 import 'railgun_host_channel.dart';
 
 /// What opening one account's Railgun wallet needs: the page's `start`, the
@@ -30,12 +32,11 @@ class RailgunWalletOpening {
   String toString() => 'RailgunWalletOpening(${start.network})';
 }
 
-/// What deleting one account's Railgun wallet from the page's storage takes
-/// (iOS progress BI-3, VI-17): its Railgun network and mnemonic, the params of
-/// the page's `deleteWallet`. Rust derives the mnemonic only while the
-/// account exists, so this is made before the Rust account delete and used
-/// after it. The mnemonic is dropped at its first use or [discard]; never log
-/// it.
+/// What deleting one account's Railgun wallet from the page's storage takes:
+/// its Railgun network and mnemonic, the params of the page's
+/// `deleteWallet`. Rust derives the mnemonic only while the account exists,
+/// so this is made before the Rust account delete and used after it. The
+/// mnemonic is dropped at its first use or [discard]; never log it.
 class RailgunWalletDeletion {
   RailgunWalletDeletion({
     required this.accountUuid,
@@ -84,7 +85,7 @@ abstract interface class RailgunWalletSource {
 /// The engine closed the page under a running use: a lock, an account
 /// switch, a route change, the idle close or a wallet change. Nothing
 /// failed; the next use reopens the page.
-class RailgunEngineInterruptedException implements Exception {
+class RailgunEngineInterruptedException implements PrivateUsdPause {
   const RailgunEngineInterruptedException();
 
   @override
@@ -92,7 +93,7 @@ class RailgunEngineInterruptedException implements Exception {
 }
 
 /// Uses are refused while an account deletion or a reset drains the engine.
-class RailgunEngineUnavailableException implements Exception {
+class RailgunEngineUnavailableException implements PrivateUsdPause {
   const RailgunEngineUnavailableException();
 
   @override
@@ -100,7 +101,7 @@ class RailgunEngineUnavailableException implements Exception {
 }
 
 /// The page opened a wallet whose address is not the one Rust derives for the
-/// account (plan §3.5, invariant 19). The page is closed; nothing is used.
+/// account. The page is closed; nothing is used.
 class RailgunAddressMismatchException implements Exception {
   const RailgunAddressMismatchException();
 
@@ -189,7 +190,7 @@ class RailgunEngineState {
 }
 
 /// The Railgun page, one use at a time, for whichever account a use asks
-/// for (plan reference §6.3, §8.4). It lives outside the widget tree.
+/// for. It lives outside the widget tree.
 ///
 /// - Opening is: bridge start, page `load` on its port, `start`,
 ///   `openWallet`, then the address check against Rust.
@@ -339,10 +340,10 @@ class RailgunEngine {
   }
 
   /// Deletes [deletion]'s wallet from the page's storage, for an account
-  /// deletion once the Rust account delete went through (iOS progress BI-3,
-  /// VI-17): a fresh page behind a bridge that refuses every connection (the
-  /// page reaches nothing, so it never waits for Tor), the page's
-  /// `deleteWallet`, then the page and the bridge close.
+  /// deletion once the Rust account delete went through: a fresh page behind
+  /// a bridge that refuses every connection (the page reaches nothing, so it
+  /// never waits for Tor), the page's `deleteWallet`, then the page and the
+  /// bridge close.
   ///
   /// - It is one use: whatever page is open closes first (one per process),
   ///   and it never runs beside another use. It runs while the engine is
@@ -363,7 +364,7 @@ class RailgunEngine {
           .run(() => _deleteWallet(deletion, startOfflineBridge))
           .timeout(timeout);
     } on TimeoutException {
-      _debugLog('deleting a wallet timed out');
+      privateUsdLog('deleting a Railgun wallet timed out');
       // Ends a page still loading or deleting; a deletion still waiting for
       // its turn finds its mnemonic gone.
       deletion.discard();
@@ -425,7 +426,7 @@ class RailgunEngine {
     try {
       await _lock.run(() async {}).timeout(timeout);
     } on TimeoutException {
-      _debugLog('drain timed out');
+      privateUsdLog('the Railgun engine did not drain in time');
     }
   }
 
@@ -433,12 +434,10 @@ class RailgunEngine {
     if (_pauseDepth > 0) _pauseDepth--;
   }
 
-  /// iOS may reclaim a suspended app's listening socket (iOS plan XI14, UI16).
-  /// Back from the background with a page open, a bridge that no longer
-  /// accepts connections leaves the page without its route, so the page closes
-  /// and stops the bridge, and the next use reopens it on a new one
-  /// (invariant 21). Whether WebKit would take a new port on a live page is
-  /// MI0.6's question; until then the page is reloaded rather than repointed.
+  /// iOS may reclaim a suspended app's listening socket. Back from the
+  /// background with a page open, a bridge that no longer accepts
+  /// connections leaves the page without its route, so the page closes and
+  /// stops the bridge, and the next use reopens it on a new one.
   Future<void> replaceDeadBridge() async {
     final port = _bridgePort;
     if (_disposed || _session == null || port == null) return;
@@ -450,7 +449,7 @@ class RailgunEngine {
       accepts = false;
     }
     if (accepts || epoch != _epoch || _disposed) return;
-    _debugLog('the bridge stopped accepting in the background');
+    privateUsdLog('the Railgun bridge stopped accepting in the background');
     await close();
   }
 
@@ -578,7 +577,7 @@ class RailgunEngine {
     try {
       await _host.close();
     } catch (e) {
-      _debugLog('closing the page failed: ${_describe(e)}');
+      privateUsdLog('closing the Railgun page failed: ${_describe(e)}');
     }
     await _stopBridgeQuietly();
   }
@@ -588,7 +587,7 @@ class RailgunEngine {
     try {
       await _stopBridge();
     } catch (e) {
-      _debugLog('stopping the bridge failed: ${e.runtimeType}');
+      privateUsdLog('stopping the Railgun bridge failed: ${e.runtimeType}');
     }
   }
 
@@ -638,7 +637,7 @@ class RailgunEngine {
         failure: code,
       ),
     );
-    if (code != null) _debugLog('a page call failed: ${code.name}');
+    if (code != null) privateUsdLog('a Railgun page call failed: ${code.name}');
   }
 
   void _publish(RailgunEngineState next) {
@@ -658,10 +657,6 @@ class RailgunEngine {
     RailgunHostException(:final code) => code.name,
     _ => '${error.runtimeType}',
   };
-
-  void _debugLog(String line) {
-    if (kDebugMode) debugPrint('RailgunEngine: $line');
-  }
 }
 
 /// One page's open wallet. Every call fails with
@@ -706,7 +701,7 @@ class RailgunSession {
       _engine.state.value.copyWith(phase: RailgunEnginePhase.ready),
     );
     if (refreshed.screening == RailgunScreening.failed) {
-      _engine._debugLog('screening failed');
+      privateUsdLog('Railgun screening failed');
     }
     return refreshed;
   }

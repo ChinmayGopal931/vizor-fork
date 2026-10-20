@@ -6,9 +6,12 @@ import '../../../providers/private_usd_lifecycle_provider.dart';
 import '../models/private_usd_record_key.dart';
 import '../services/private_usd_engine.dart';
 
-/// Every conversion the swap engine has seen, by key, as it last published
-/// them. Empty until an engine runs (desktop and builds without Private USD
-/// never start one).
+// What the swap engine last published, for the widget tree and the router:
+// empty until an engine runs (desktop and builds without Private USD never
+// start one). Then the conversions under way as Rust's store counts them,
+// for the deletion and reset warnings.
+
+/// Every forward conversion the swap engine has seen, by key.
 final privateUsdConversionsProvider =
     NotifierProvider<
       PrivateUsdConversionsNotifier,
@@ -20,13 +23,11 @@ class PrivateUsdConversionsNotifier
   @override
   Map<PrivateUsdRecordKey, PrivateUsdConversionStatus> build() => const {};
 
-  /// The engine's latest snapshot.
   void publish(Map<PrivateUsdRecordKey, PrivateUsdConversionStatus> next) =>
       state = next;
 }
 
-/// Every reverse conversion the swap engine has seen (M6), drafts too, by
-/// key, as it last published them.
+/// Every reverse conversion the swap engine has seen, drafts too, by key.
 final privateUsdReverseConversionsProvider =
     NotifierProvider<
       PrivateUsdReverseConversionsNotifier,
@@ -38,14 +39,13 @@ class PrivateUsdReverseConversionsNotifier
   @override
   Map<PrivateUsdRecordKey, PrivateUsdReverseStatus> build() => const {};
 
-  /// The engine's latest snapshot.
   void publish(Map<PrivateUsdRecordKey, PrivateUsdReverseStatus> next) =>
       state = next;
 }
 
-/// The active account's deposits (M9) as the swap engine last published
-/// them: the last pass, or why it failed. Null until a pass ran, after a
-/// lock, and for an account that cannot have deposits.
+/// The active account's deposits: the last pass, or why it failed. Null
+/// until a pass ran, after a lock, and for an account that cannot have
+/// deposits.
 final privateUsdDepositsProvider =
     NotifierProvider<PrivateUsdDepositsNotifier, PrivateUsdDepositsStatus?>(
       PrivateUsdDepositsNotifier.new,
@@ -55,14 +55,12 @@ class PrivateUsdDepositsNotifier extends Notifier<PrivateUsdDepositsStatus?> {
   @override
   PrivateUsdDepositsStatus? build() => null;
 
-  /// The engine's latest snapshot.
   void publish(PrivateUsdDepositsStatus? next) => state = next;
 }
 
 /// The conversions under way in either direction, for every account: the
 /// router's synchronous guard keeps a conversion's progress route reachable
-/// while its record is here, even when Private USD is otherwise unavailable (D16). It changes
-/// only when a conversion starts or ends, so the router refreshes rarely.
+/// while its record is here, even when Private USD is otherwise unavailable.
 final privateUsdUnfinishedProvider =
     NotifierProvider<PrivateUsdUnfinishedNotifier, Set<PrivateUsdRecordKey>>(
       PrivateUsdUnfinishedNotifier.new,
@@ -72,11 +70,10 @@ class PrivateUsdUnfinishedNotifier extends Notifier<Set<PrivateUsdRecordKey>> {
   @override
   Set<PrivateUsdRecordKey> build() => const {};
 
-  void publish(Set<PrivateUsdRecordKey> next) {
-    if (setEquals(next, state)) return;
-    state = Set.unmodifiable(next);
-  }
+  void publish(Set<PrivateUsdRecordKey> next) => state = Set.unmodifiable(next);
 
+  // Only a conversion starting or ending notifies, so the router refreshes
+  // rarely.
   @override
   bool updateShouldNotify(
     Set<PrivateUsdRecordKey> previous,
@@ -85,7 +82,7 @@ class PrivateUsdUnfinishedNotifier extends Notifier<Set<PrivateUsdRecordKey>> {
 }
 
 /// The conversion under way for [accountUuid], if any: only one runs at a
-/// time per account (plan §3.5, invariant 16).
+/// time per account.
 PrivateUsdRecordKey? privateUsdUnderWayFor(
   Set<PrivateUsdRecordKey> unfinished,
   String? accountUuid,
@@ -97,8 +94,8 @@ PrivateUsdRecordKey? privateUsdUnderWayFor(
   return null;
 }
 
-/// [accountUuid]'s conversions under way, for the account deletion warning
-/// (plan §3.5, invariant 15). 0 for a build or a wallet without any.
+/// [accountUuid]'s conversions under way, for the account deletion warning.
+/// 0 for a build or a wallet without any.
 final privateUsdUnfinishedCountProvider = FutureProvider.autoDispose
     .family<int, String>(
       (ref, accountUuid) =>
@@ -111,36 +108,10 @@ final privateUsdUnfinishedTotalProvider = FutureProvider.autoDispose<int>((
 ) {
   final accounts = ref.watch(
     accountProvider.select(
-      (state) => [
-        for (final account in state.value?.accounts ?? const <AccountInfo>[])
-          account.uuid,
-      ].join(','),
+      (state) => state.value?.accounts ?? const <AccountInfo>[],
     ),
   );
-  return ref
-      .read(privateUsdLifecycleProvider)
-      .unfinishedCount(accounts.isEmpty ? const [] : accounts.split(','));
+  return ref.read(privateUsdLifecycleProvider).unfinishedCount([
+    for (final account in accounts) account.uuid,
+  ]);
 });
-
-/// Conversions that only show [fixed]: Widgetbook, capture scenarios and
-/// widget tests. No engine runs.
-class FixedPrivateUsdConversionsNotifier extends PrivateUsdConversionsNotifier {
-  FixedPrivateUsdConversionsNotifier(this.fixed);
-
-  final Map<PrivateUsdRecordKey, PrivateUsdConversionStatus> fixed;
-
-  @override
-  Map<PrivateUsdRecordKey, PrivateUsdConversionStatus> build() => fixed;
-}
-
-/// Reverse conversions that only show [fixed]: Widgetbook, capture scenarios
-/// and widget tests. No engine runs.
-class FixedPrivateUsdReverseConversionsNotifier
-    extends PrivateUsdReverseConversionsNotifier {
-  FixedPrivateUsdReverseConversionsNotifier(this.fixed);
-
-  final Map<PrivateUsdRecordKey, PrivateUsdReverseStatus> fixed;
-
-  @override
-  Map<PrivateUsdRecordKey, PrivateUsdReverseStatus> build() => fixed;
-}

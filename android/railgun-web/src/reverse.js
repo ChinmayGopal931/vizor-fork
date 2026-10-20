@@ -32,6 +32,8 @@ export const prepareReverse = (params, emit) =>
     if (transactions.length !== 3 || transactions.some(({ to }, i) => i !== 1 && getAddress(to) !== getAddress(token))) {
       throw badRequest('expected approval, escrow open and relayer fee');
     }
+    const evmGasType = getEVMGasTypeForTransaction(network, true);
+    if (evmGasType !== EVMGasType.Type2) throw badRequest('unsupported funding gas type');
     // Public-wallet mode binds requireSuccess=true. The relayer estimates real-proof gas and signs the envelope.
     await generateCrossContractCallsProof(
       TXID_VERSION, network, walletId, encryptionKey, unshield, [], shield, [], transactions,
@@ -39,13 +41,7 @@ export const prepareReverse = (params, emit) =>
     );
     const { transaction } = await populateProvedCrossContractCalls(
       TXID_VERSION, network, walletId, unshield, [], shield, [], transactions,
-      undefined, true, undefined, {
-        evmGasType: getEVMGasTypeForTransaction(network, true),
-        gasEstimate: 0n,
-        maxFeePerGas: 0n,
-        maxPriorityFeePerGas: 0n,
-      },
+      undefined, true, undefined, { evmGasType, gasEstimate: 0n, maxFeePerGas: 0n, maxPriorityFeePerGas: 0n },
     );
-    if (getEVMGasTypeForTransaction(network, true) !== EVMGasType.Type2) throw badRequest('unsupported funding gas type');
     return { ...unsignedFunding(transaction, relayAdapt), cost };
   });

@@ -1,13 +1,13 @@
 //! `swaps.db`: the swap-index counter, swap records, active pointers, the
-//! joint-account index, the Railgun send log (plan §3.4), and since schema 2
-//! the deposits and each account's last deposit scan (M9).
+//! joint-account index, the Railgun send log, and since schema 2 the deposits
+//! and each account's last deposit scan.
 //!
 //! A plain SQLite file in app-private storage, opened per call (WAL,
 //! `synchronous = FULL`, a busy timeout), migrated by `PRAGMA user_version`.
 //! Every write is one transaction, so a crash cannot tear a record or move
 //! the counter back. Records decode strictly: an unreadable one is an error,
-//! never a reset. Hold `private_usd::OPERATIONS` around writes, never across
-//! network I/O. Never log a record: it may hold a ticket.
+//! never a reset. Writes go through `private_usd::with_operations`, never
+//! across network I/O. Never log a record: it may hold a ticket.
 
 use std::fmt;
 use std::path::Path;
@@ -19,9 +19,9 @@ use super::models::{Direction, StoredRecord};
 use super::{fail, ErrorCode, PrivateUsdError, Result};
 
 const FILE_NAME: &str = "swaps.db";
-/// 1: swaps, the send log and the joint accounts (M1 to M7). 2: deposits
-/// (M9). A build that knows only 1 refuses a store at 2 as newer than
-/// itself, never resetting it.
+/// 1: swaps, the send log and the joint accounts. 2: deposits. A build that
+/// knows only 1 refuses a store at 2 as newer than itself, never resetting
+/// it.
 const SCHEMA_VERSION: i32 = 2;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// Finished records kept per direction. Reverse `REFUNDED` ones are kept
@@ -32,7 +32,8 @@ const MAX_CONFIRMED_SENDS: u32 = 100;
 /// Finished deposits kept per account; one still under way is never
 /// trimmed.
 const MAX_FINISHED_DEPOSITS: u32 = 100;
-/// The index space zapp counts in (a Kotlin `Int`).
+/// Swap indices stay below `i32::MAX`: another wallet of the same seed shares
+/// the index space and counts it in a signed 32-bit integer.
 const MAX_INDEX: i64 = i32::MAX as i64;
 
 const SCHEMA: &str = "
@@ -59,7 +60,7 @@ CREATE TABLE railgun_sends(
   PRIMARY KEY(account_uuid, send_id));
 ";
 
-/// Schema 2 (M9): each kept deposit or rescue request and its state, and
+/// Schema 2: each kept deposit or rescue request and its state, and
 /// each account's last scan of its deposit addresses.
 const SCHEMA_V2: &str = "
 CREATE TABLE deposits(
@@ -122,7 +123,7 @@ impl fmt::Debug for SendRow {
     }
 }
 
-/// One kept deposit or rescue request (M9). `finished` once it landed or can
+/// One kept deposit or rescue request. `finished` once it landed or can
 /// never land; one under way is never trimmed.
 #[derive(Clone, PartialEq, Eq)]
 pub(crate) struct DepositRow {
@@ -164,13 +165,13 @@ fn now() -> u64 {
 
 #[cfg(test)]
 thread_local! {
-    /// Fails the next `save` on this thread just before it commits, as a
-    /// crash there would.
+    /// Fails the next record or deposit write on this thread just before it
+    /// commits, as a crash there would.
     static CRASH_BEFORE_COMMIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-/// Fails the next record write on this thread just before it commits, as a
-/// crash there would.
+/// Fails the next record or deposit write on this thread just before it
+/// commits, as a crash there would.
 #[cfg(test)]
 pub(crate) fn crash_before_next_commit() {
     CRASH_BEFORE_COMMIT.with(|crash| crash.set(true));
@@ -758,8 +759,7 @@ impl SwapStore {
             })
             .map_err(sql)?;
         rows.map(|row| {
-            let (deposit_id, index, state, finished, created_at, record_json) =
-                row.map_err(sql)?;
+            let (deposit_id, index, state, finished, created_at, record_json) = row.map_err(sql)?;
             Ok(DepositRow {
                 deposit_id,
                 address_index: u32::try_from(index)
@@ -844,8 +844,8 @@ mod tests {
         format!("{}.{}", hex(32, 0x5c), "3f".repeat(32))
     }
 
-    /// zapp's `SwapRecordStorageTest` forward fixtures: accepted, depositing,
-    /// deposited, paid, refunded, ended unsent, and with a ticket.
+    /// Forward record fixtures: accepted, depositing, deposited, paid,
+    /// refunded, ended unsent, and with a ticket.
     fn forward_states() -> Vec<String> {
         let head = format!(
             r#"{{"index":7,"quote":{{"quoteId":"{}","maker":"{MAKER}","makerShare":"{}","makerProof":"{}","chainId":11155111,"contract":"{CONTRACT}","token":"{TOKEN}","amount":"1000000","depositZat":202021,"expiresAt":1790000300}},"swapId":"{}","zcashHeight":4200000,"acceptedAt":1790000000,"receives":"977550","relayerFee":"20000""#,
@@ -880,7 +880,7 @@ mod tests {
         ]
     }
 
-    /// zapp's reverse fixtures: previewed, accepted, sending (with a ticket),
+    /// Reverse record fixtures: previewed, accepted, sending (with a ticket),
     /// settling, refunded by a mainnet build, and refunded.
     fn reverse_states() -> Vec<String> {
         let swap_id = hex(32, 0x5c);
@@ -948,7 +948,7 @@ mod tests {
 
     fn forward(json: &str) -> ForwardRecord {
         match StoredRecord::decode(Direction::Forward, json).unwrap() {
-            StoredRecord::Forward(record) => record,
+            StoredRecord::Forward(record) => *record,
             other => panic!("{other:?}"),
         }
     }
@@ -977,32 +977,31 @@ mod tests {
 
         let mut store = SwapStore::open(dir.path()).unwrap();
         assert!(store
-            .save(ACCOUNT, &StoredRecord::Forward(accepted.clone()))
+            .save(ACCOUNT, &StoredRecord::Forward(Box::new(accepted.clone())))
             .unwrap());
         assert!(!store
-            .save(ACCOUNT, &StoredRecord::Forward(accepted.clone()))
+            .save(ACCOUNT, &StoredRecord::Forward(Box::new(accepted.clone())))
             .unwrap());
         CRASH_BEFORE_COMMIT.with(|crash| crash.set(true));
         assert!(store
-            .save(ACCOUNT, &StoredRecord::Forward(depositing))
+            .save(ACCOUNT, &StoredRecord::Forward(Box::new(depositing)))
             .is_err());
         drop(store);
 
         let store = SwapStore::open(dir.path()).unwrap();
         assert_eq!(
             store.active(ACCOUNT, Direction::Forward).unwrap(),
-            Some(StoredRecord::Forward(accepted.clone()))
+            Some(StoredRecord::Forward(Box::new(accepted.clone())))
         );
         assert_eq!(
             store.history(ACCOUNT, Direction::Forward).unwrap(),
-            vec![StoredRecord::Forward(accepted)]
+            vec![StoredRecord::Forward(Box::new(accepted))]
         );
         assert_eq!(store.unfinished_count(ACCOUNT).unwrap(), 1);
     }
 
-    /// Records read only as this build writes them, and every zapp shape
-    /// reads and writes back unchanged; anything else is an error, never a
-    /// reset.
+    /// Records read only as this build writes them, and every fixture reads
+    /// and writes back unchanged; anything else is an error, never a reset.
     #[test]
     fn records_decode_strictly() {
         let forward_cases = forward_states()
@@ -1039,7 +1038,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut store = SwapStore::open(dir.path()).unwrap();
         store
-            .save(ACCOUNT, &StoredRecord::Forward(forward(&forward_json())))
+            .save(
+                ACCOUNT,
+                &StoredRecord::Forward(Box::new(forward(&forward_json()))),
+            )
             .unwrap();
         let next = store.take_index(ACCOUNT).unwrap();
         store
@@ -1053,9 +1055,9 @@ mod tests {
         assert_eq!(store.take_index(ACCOUNT).unwrap(), next + 1);
     }
 
-    /// A store schema 1 wrote (M1 to M7) opens at schema 2 (M9): the
-    /// deposits tables join, and every record, the counter, the active
-    /// pointer and the send log stay as they were.
+    /// A store schema 1 wrote opens at schema 2: the deposits tables join,
+    /// and every record, the counter, the active pointer and the send log
+    /// stay as they were.
     #[test]
     fn a_version_1_store_migrates_to_2_keeping_its_records() {
         let dir = tempfile::tempdir().unwrap();
@@ -1097,7 +1099,7 @@ mod tests {
         assert_eq!(SCHEMA_VERSION, 2);
         assert_eq!(
             store.active(ACCOUNT, Direction::Forward).unwrap(),
-            Some(StoredRecord::Forward(forward(&json)))
+            Some(StoredRecord::Forward(Box::new(forward(&json))))
         );
         assert_eq!(store.unfinished_count(ACCOUNT).unwrap(), 1);
         assert_eq!(store.take_index(ACCOUNT).unwrap(), 9);
@@ -1127,7 +1129,7 @@ mod tests {
         assert_eq!(store.deposits(ACCOUNT).unwrap().len(), 1);
         assert_eq!(
             store.active(ACCOUNT, Direction::Forward).unwrap(),
-            Some(StoredRecord::Forward(forward(&json)))
+            Some(StoredRecord::Forward(Box::new(forward(&json))))
         );
     }
 
@@ -1144,7 +1146,10 @@ mod tests {
         assert_eq!(store.take_index(ACCOUNT).unwrap(), 2);
         // A record kept under a higher index than the counter moves it past.
         store
-            .save(ACCOUNT, &StoredRecord::Forward(forward(&forward_json())))
+            .save(
+                ACCOUNT,
+                &StoredRecord::Forward(Box::new(forward(&forward_json()))),
+            )
             .unwrap();
         assert_eq!(store.take_index(ACCOUNT).unwrap(), 8);
         drop(store);

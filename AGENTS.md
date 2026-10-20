@@ -175,9 +175,12 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   are cut-corner plates with a red edge.
 - **Light.** `lib/src/core/theme/neon.dart`: `Neon.textGlow`,
   `Neon.boxGlow`, `Neon.strokeTube` (halo, glow and core: every lit line
-  uses it), `NeonIgnition` (a sign's switch-on flicker, off under reduced
-  motion), `kNeonHudCaptionStyle` and `kNeonPageTitleStyle` (the page
-  title).
+  uses it), the shared painter recipes (`Neon.bead`, `Neon.perspectiveGrid`,
+  `Neon.chamferCuts`, `Neon.strokeUnlit`), `kNeonHudCaptionStyle` and
+  `kNeonPageTitleStyle` (the page title). Motion lives in
+  `lib/src/core/widgets/mobile/neon_motion.dart`: `NeonIgnition` (a sign's
+  switch-on flicker, with an optional delay, off under reduced motion) and
+  the `NeonAppearMotion` mixin for one-shot entrances.
 - **Type.** Gotham everywhere, lighter on mobile, and nothing on mobile is
   Book (400) or heavier. Headings are Thin (100): screen, step, page and
   sheet titles, a state's statement (Home's "We're importing your
@@ -188,8 +191,9 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   (`bodyMediumStrong` and the code styles included), so mobile code leaves
   the token's weight alone. Widgets both form factors draw use
   `AppFontWeight` for a one-off emphasis weight (desktop keeps the Figma
-  weight, mobile resolves it to Light); the legacy Material theme goes
-  through it too, so unstyled mobile text is Light. There are no exceptions.
+  weight, mobile resolves it to Light; `AppFontWeight.heading` is the Thin
+  heading weight); the legacy Material theme goes through it too, so
+  unstyled mobile text is Light. There are no exceptions.
   Page titles (`MobileTopNav.back`) are spaced uppercase Thin; section heads
   (Settings groups, Activity dates, Home's recent activity) are uppercase
   red HUD captions. These uppercase captions are a deliberate exception to
@@ -288,9 +292,9 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   the page title.
 - **Chart card.** The chart is drawn as a neon trail on a Tron grid; a
   scrub reads the line under the finger (interpolated value and time), not
-  the nearest data point. The card no longer names the price server; the
-  Settings card still does. Settings no longer offers a default range:
-  the saved one (a week unless changed before) still opens the chart.
+  the nearest data point. Neither the card nor Settings names the price
+  server. Settings offers no default range: the saved one (a week unless
+  changed before) still opens the chart.
 - **iOS.** The sync and transaction Live Activities
   (`ios/SyncWidget/SyncWidgetLiveActivity.swift`) are black and neon red
   with thin type and a thin red progress line; nothing starts them yet
@@ -908,13 +912,14 @@ the chart no longer reads that define.
   keys and values.
 - **When it may leave the device.** `portfolioPriceRequestsAllowedProvider` is
   the one gate in front of the price source: "Use market prices" is on, the
-  chart is shown on Home, this build shows market prices at all
-  (`zecMarketDataAvailableProvider`, the Home price's own gate) and has a
-  usable server, the wallet is unlocked, privacy mode is off, and the app is
-  in the foreground (`appInForegroundProvider`). While any of these does not
-  hold nothing is requested; only an already cached series is drawn. An empty,
-  non-https or invalid `VIZOR_PRICING_ENGINE_BASE_URL` has the same effect for
-  good: no price switch in Settings and no request.
+  chart is shown on Home, market prices are shown at all
+  (`zecMarketDataAvailableProvider`, the Home price's own gate, which follows
+  the active account through Private USD) and there is a usable server, the
+  wallet is unlocked, privacy mode is off, and the app is in the foreground
+  (`appInForegroundProvider`). While any of these does not hold nothing is
+  requested; only an already cached series is drawn. An empty, non-https or
+  invalid `VIZOR_PRICING_ENGINE_BASE_URL` has the same effect for good: no
+  price switch in Settings and no request.
 - **The answer is untrusted data.** `parsePricingEnginePage` and
   `assemblePriceSeries` accept a series only when it is the documented
   document for the same asset, currency, resolution and dates; its

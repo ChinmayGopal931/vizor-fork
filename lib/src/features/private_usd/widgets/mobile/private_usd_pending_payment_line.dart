@@ -2,15 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
+import '../../../../core/formatting/countdown_format.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../models/private_usd_pending_payment.dart';
 import '../../private_usd_copy.dart';
-import '../../screens/mobile/mobile_private_usd_convert_screen.dart'
-    show formatMinutesSeconds;
 
-/// An outgoing payment in flight on the Private USD screen (owner,
-/// 2026-10-17): "Proving your payment · n%", "Waiting for a block · m:ss",
-/// whose clock ticks each second, or "Updating your balance".
+/// Where an outgoing payment in flight stands, on the Private USD screen:
+/// its proof's progress, the wait for a block, whose clock ticks each
+/// second, or the balance updating.
 class PrivateUsdPendingPaymentLine extends StatefulWidget {
   const PrivateUsdPendingPaymentLine({
     required this.payment,

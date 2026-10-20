@@ -2237,8 +2237,7 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
   ),
   FigmaCompareScenario(
     id: 'mobile-private-usd-default',
-    description:
-        'Private USD screen with buckets, activity and the receive address',
+    description: 'Private USD screen with its buckets, actions and activity',
     builder: buildMobilePrivateUsdDefaultUseCase,
     desktop: false,
     mobile: true,
@@ -2318,13 +2317,6 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     id: 'mobile-private-usd-review-expired',
     description: 'Private USD review once its quote expired',
     builder: buildMobilePrivateUsdReviewExpiredUseCase,
-    desktop: false,
-    mobile: true,
-  ),
-  FigmaCompareScenario(
-    id: 'mobile-private-usd-review-tor-off',
-    description: 'Private USD review with the Tor-off token disclosure',
-    builder: buildMobilePrivateUsdReviewTorOffUseCase,
     desktop: false,
     mobile: true,
   ),

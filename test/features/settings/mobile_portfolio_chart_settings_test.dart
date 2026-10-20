@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/config/pricing_engine_config.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
-import 'package:zcash_wallet/src/features/portfolio_chart/models/portfolio_chart_models.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/providers/portfolio_chart_settings_provider.dart';
 import 'package:zcash_wallet/src/features/settings/widgets/mobile/mobile_portfolio_chart_settings_card.dart';
 import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
@@ -30,18 +29,11 @@ class _FakeSettingsNotifier extends PortfolioChartSettingsNotifier {
     changes.add('marketPrices=$marketPrices');
     state = state.copyWith(marketPrices: marketPrices);
   }
-
-  @override
-  Future<void> setDefaultRange(PortfolioChartRange range) async {
-    changes.add('range=${range.label}');
-    state = state.copyWith(defaultRange: range);
-  }
 }
 
 Widget _app(
   _FakeSettingsNotifier notifier, {
   bool pricesAvailable = true,
-  Uri? pricingServer,
   bool hasPricingServer = true,
 }) {
   return ProviderScope(
@@ -50,8 +42,7 @@ Widget _app(
       zecMarketDataAvailableProvider.overrideWithValue(pricesAvailable),
       portfolioPricingEngineBaseUriProvider.overrideWithValue(
         hasPricingServer
-            ? pricingServer ??
-                  parsePricingEngineBaseUri(kVizorPricingEngineBaseUrl)
+            ? parsePricingEngineBaseUri(kVizorPricingEngineBaseUrl)
             : null,
       ),
     ],
@@ -80,8 +71,6 @@ void main() {
 
     // Shown by default.
     expect(_isOn(tester, 'toggle'), isTrue);
-    // The range is picked on the chart itself; the card has no range row.
-    expect(find.text('Default range'), findsNothing);
 
     await tester.tap(
       find.byKey(const ValueKey('mobile_settings_portfolio_chart_row')),
@@ -90,7 +79,6 @@ void main() {
 
     expect(notifier.changes, ['enabled=false']);
     expect(_isOn(tester, 'toggle'), isFalse);
-    expect(find.text('Default range'), findsNothing);
 
     // The price switch keeps its saved value but cannot be changed while the
     // chart is hidden.
@@ -112,7 +100,7 @@ void main() {
     final notifier = _FakeSettingsNotifier();
     await tester.pumpWidget(_app(notifier));
 
-    // Opt-in: off by default, with the offer and its cost stated up front.
+    // Opt-in: off by default.
     expect(_isOn(tester, 'prices_toggle'), isFalse);
 
     await tester.tap(
@@ -129,16 +117,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(notifier.changes, ['marketPrices=true', 'marketPrices=false']);
     expect(_isOn(tester, 'prices_toggle'), isFalse);
-
-    // No range chips: the card never changes the default range.
-    expect(
-      find.byKey(const ValueKey('mobile_settings_portfolio_chart_range_1y')),
-      findsNothing,
-    );
-    expect(
-      notifier.changes.where((change) => change.startsWith('range=')),
-      isEmpty,
-    );
   });
 
   testWidgets('a build without market prices offers no price switch', (

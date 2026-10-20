@@ -41,24 +41,24 @@ PrivateUsdSwapContext privateUsdSwapContextOf(Ref ref) {
   );
 }
 
-/// The swap engine's calls for this wallet; replaced by a fake in tests.
+/// The swap engine's calls for this wallet.
 final privateUsdSwapBackendProvider = Provider<PrivateUsdSwapBackend>(
   (ref) => RustPrivateUsdSwapBackend(() => privateUsdSwapContextOf(ref)),
 );
 
-/// The Rust send calls for this wallet (M7); replaced by a fake in tests.
+/// The Rust send calls for this wallet; replaced by a fake in tests.
 final privateUsdSendBackendProvider = Provider<PrivateUsdSendBackend>(
   (ref) => RustPrivateUsdSendBackend(() => privateUsdSwapContextOf(ref)),
 );
 
-/// The Rust deposit calls for this wallet (M9); replaced by a fake in tests.
+/// The Rust deposit calls for this wallet.
 final privateUsdDepositBackendProvider = Provider<PrivateUsdDepositBackend>(
-  (ref) => RustPrivateUsdDepositBackend(() => privateUsdSwapContextOf(ref)),
+  (ref) => PrivateUsdDepositBackend(() => privateUsdSwapContextOf(ref)),
 );
 
 /// Whether this build follows deposits at all: the swap engine runs and the
 /// network pins a Deposits contract (testnet and mainnet both do). It does
-/// not follow the kill switch, which only stops new deposits (D16).
+/// not follow the kill switch, which only stops new deposits.
 final privateUsdDepositsEnabledProvider = Provider<bool>(
   (ref) =>
       ref.watch(privateUsdEngineEnabledProvider) &&
@@ -66,7 +66,7 @@ final privateUsdDepositsEnabledProvider = Provider<bool>(
 );
 
 /// The account deposits run for: the active one, when it can have them (a
-/// software account with a ZIP-32 index, D6, D8).
+/// software account with a ZIP-32 index).
 String? privateUsdDepositAccountOf(Ref ref) {
   final account = ref.read(accountProvider).value?.activeAccount;
   if (account == null ||
@@ -77,30 +77,10 @@ String? privateUsdDepositAccountOf(Ref ref) {
   return account.uuid;
 }
 
-/// Whether this build runs the swap engine at all: the define, a mobile build
-/// on a platform that hosts the page, and a deployment for the network. It
-/// does not follow the active account or the kill switch: conversions under
-/// way keep being driven for every account (D14, D16).
-bool privateUsdEngineEnabledFor({
-  required bool enabled,
-  required AppFormFactor formFactor,
-  required TargetPlatform platform,
-  required bool hostSupported,
-  required bool hasDeployment,
-}) =>
-    enabled &&
-    formFactor == AppFormFactor.mobile &&
-    privateUsdPlatformHostsPage(
-      platform: platform,
-      hostSupported: hostSupported,
-    ) &&
-    hasDeployment;
-
+/// [privateUsdEngineEnabledFor] for this build.
 final privateUsdEngineEnabledProvider = Provider<bool>((ref) {
   // Const, so desktop builds and builds without the define drop the rest.
-  if (!kVizorPrivateUsdEnabled || kAppFormFactor != AppFormFactor.mobile) {
-    return false;
-  }
+  if (!kPrivateUsdBuildEnabled) return false;
   return privateUsdEngineEnabledFor(
     enabled: true,
     formFactor: kAppFormFactor,
@@ -111,20 +91,22 @@ final privateUsdEngineEnabledProvider = Provider<bool>((ref) {
   );
 });
 
-/// The foreground swap loop (plan reference §5.10), kept alive outside the
-/// widget tree once `PrivateUsdEngineHost` builds it. Gift Card's shape: a
-/// lock or the background pauses it, unlock and the foreground resume it,
-/// and account deletions and resets drain it through
-/// [privateUsdLifecycleProvider]. Its snapshot goes to
-/// [privateUsdConversionsProvider] and [privateUsdUnfinishedProvider].
+/// The foreground swap loop, kept alive outside the widget tree once
+/// `PrivateUsdEngineHost` builds it. Gift Card's shape: a lock or the
+/// background pauses it, unlock and the foreground resume it, and account
+/// deletions and resets drain it through [privateUsdLifecycleProvider]. Its
+/// snapshot goes to [privateUsdConversionsProvider] and
+/// [privateUsdUnfinishedProvider].
 final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
   final lifecycle = ref.watch(privateUsdLifecycleProvider);
   final state = WidgetsBinding.instance.lifecycleState;
+  // Stricter than `appInForegroundProvider`: an app that starts inactive
+  // runs no key-using step until it is resumed.
   var foreground = state == null || state == AppLifecycleState.resumed;
   final depositsEnabled = ref.read(privateUsdDepositsEnabledProvider);
   final engine = PrivateUsdEngine(
     backend: ref.watch(privateUsdSwapBackendProvider),
-    // Any account's seed while unlocked (D14); null while locked.
+    // Any account's seed while unlocked; null while locked.
     readMnemonic: (accountUuid) => ref
         .read(accountProvider.notifier)
         .getMnemonicBytesForAccount(accountUuid),
@@ -138,8 +120,8 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
       return accounts == null ||
           accounts.any((account) => account.uuid == accountUuid);
     },
-    // Deposits (M9): the active account's only. The kill switch stops new
-    // ones, never one under way (D16).
+    // Deposits: the active account's only. The kill switch stops new ones,
+    // never one under way.
     depositBackend: depositsEnabled
         ? ref.watch(privateUsdDepositBackendProvider)
         : null,
@@ -160,19 +142,20 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
     });
   }
 
-  void publishDeposits() =>
-      ref.read(privateUsdDepositsProvider.notifier).publish(engine.deposits.value);
+  void publishDeposits() => ref
+      .read(privateUsdDepositsProvider.notifier)
+      .publish(engine.deposits.value);
 
   engine.conversions.addListener(publish);
   engine.reverseConversions.addListener(publish);
   engine.deposits.addListener(publishDeposits);
   // The deposits follow the active account.
-  ref.listen(
-    accountProvider.select((s) => s.value?.activeAccountUuid),
-    (previous, next) {
-      if (previous != null && previous != next) engine.depositAccountChanged();
-    },
-  );
+  ref.listen(accountProvider.select((s) => s.value?.activeAccountUuid), (
+    previous,
+    next,
+  ) {
+    if (previous != null && previous != next) engine.depositAccountChanged();
+  });
   lifecycle.register(
     owner: engine,
     quiesceAndDrain: engine.quiesceAndDrain,
@@ -241,7 +224,7 @@ final privateUsdUnderWayProvider =
     );
 
 /// One outgoing Railgun payment at a time per account, sends and
-/// conversions alike, across restarts (the send log, M7).
+/// conversions alike, across restarts (the send log).
 final privateUsdSpendGuardProvider = Provider<PrivateUsdSpendGuard>((ref) {
   final guard = PrivateUsdSpendGuard(
     readLog: (accountUuid) =>
@@ -258,8 +241,8 @@ final privateUsdReversePageProvider = Provider<PrivateUsdReversePage>(
   (ref) => RailgunReversePage(ref.watch(railgunEngineProvider)),
 );
 
-/// The reverse funding (§5.11 R4–R6), kept alive with the engine: a proof
-/// outlives the screen that started it.
+/// The reverse funding, kept alive with the engine: a proof outlives the
+/// screen that started it.
 final privateUsdReverseFundingProvider = Provider<PrivateUsdReverseFunding>((
   ref,
 ) {

@@ -1,8 +1,7 @@
-//! The forward conversion's fund-safety rules on fakes (plan M5 "Done when",
-//! §10): zapp's ★ cases from `AtomicSwapDriverTest`, `AtomicSwapClaimTest`
-//! and `AtomicSwapSettlementTest` (reference §8.7), and vizor's own: the
-//! deposit's crash points and sync gate, the 2 USDC cap, the token gate
-//! without a tokens client, and one driver step per account.
+//! The forward conversion's fund-safety rules on fakes: the driver, claim
+//! and settlement rules, the deposit's crash points and sync gate, the 2 USDC
+//! cap, the token gate without a tokens client, and one driver step per
+//! account.
 
 use std::sync::Arc;
 
@@ -13,7 +12,7 @@ use super::super::evm_rpc::SwapStage;
 use super::super::forward::{AcceptOutcome, ForwardStep, ForwardWait};
 use super::super::joint::SwapTxStatus;
 use super::super::models::{
-    Amount, DepositState, Direction, ForwardOutcome, Hex, NothingSentCause, RefundCause,
+    Amount, DepositProgress, Direction, ForwardOutcome, Hex, NothingSentCause, RefundCause,
 };
 use super::super::terms::swap_id;
 use super::super::{ErrorCode, Result};
@@ -159,7 +158,7 @@ async fn an_offer_says_what_arrives_after_the_relayer_and_railgun_take_their_fee
     assert_eq!(quoted.offer.relayer_fee, Amount(20_000));
     assert_eq!(quoted.offer.receives, Amount(977_550));
     assert_eq!(
-        quoted.offer.max_total_zat(),
+        quoted.offer.max_total_zatoshi(),
         Some(DEPOSIT_ZAT + DEPOSIT_FEE_ZAT)
     );
     // The maker quotes for the swap's own key and note.
@@ -177,7 +176,7 @@ async fn an_offer_says_what_arrives_after_the_relayer_and_railgun_take_their_fee
 }
 
 /// Claiming reveals `z`, so another swap on the same index would be the
-/// maker's to take (§3.5 item 1).
+/// maker's to take.
 #[tokio::test]
 async fn swap_indices_are_never_reused() {
     let h = Harness::new();
@@ -190,7 +189,7 @@ async fn swap_indices_are_never_reused() {
     assert_eq!(h.world.get().quote_requests.len(), 2);
 
     // A reinstall loses the counter; the chain still shows indices 0 and 1
-    // in use (the same seed in zapp, say), and they are skipped.
+    // in use (the same seed in another wallet, say), and they are skipped.
     let reinstalled = Harness::new();
     for index in [0, 1] {
         let share = reinstalled.keys.user_share(index).unwrap();
@@ -298,8 +297,8 @@ async fn an_accept_refusal_ends_only_when_nothing_can_have_opened() {
     assert_eq!(h.record().outcome, None);
 }
 
-/// No tokens client yet (M4): a maker asking for a token gets
-/// `TokensNeeded`, never a retry, and the conversion can be dropped.
+/// Without a tokens client, a maker asking for a token gets `TokensNeeded`,
+/// never a retry, and the conversion can be dropped.
 #[tokio::test]
 async fn a_maker_asking_for_a_token_turns_the_accept_away_without_a_retry() {
     let h = Harness::new();
@@ -391,7 +390,7 @@ async fn a_deposit_the_wallet_cannot_pay_leaves_nothing_attempted() {
     h.world.set().unpayable = true;
 
     assert_eq!(code(h.advance().await), ErrorCode::DepositUnpayable);
-    assert_eq!(h.record().deposit_state(), DepositState::NotStarted);
+    assert_eq!(h.record().deposit_progress(), DepositProgress::NotStarted);
 
     h.world.set().unpayable = false;
     {
@@ -465,8 +464,8 @@ async fn an_expired_deposit_is_paid_again_only_while_payable() {
     assert_eq!(h.deposits(), 1);
 }
 
-/// vizor's deposit split (§8.1.2): propose, keep `Started`, create, keep the
-/// bytes. A crash at either save never leads to a second deposit.
+/// The deposit's split: propose, keep `Started`, create, keep the bytes. A
+/// crash at either save never leads to a second deposit.
 #[tokio::test]
 async fn a_crash_around_the_deposit_never_pays_it_twice() {
     // Before `Started` commits: the proposal is released, nothing created.
@@ -476,7 +475,7 @@ async fn a_crash_around_the_deposit_never_pays_it_twice() {
     assert_eq!(code(h.advance().await), ErrorCode::StoreUnreadable);
     assert_eq!(h.world.get().discarded, 1);
     assert_eq!(h.deposits(), 0);
-    assert_eq!(h.record().deposit_state(), DepositState::NotStarted);
+    assert_eq!(h.record().deposit_progress(), DepositProgress::NotStarted);
     h.world.set().crash = None;
     assert_eq!(h.advance().await.unwrap(), h.confirming());
     assert_eq!(h.deposits(), 1);
@@ -487,7 +486,7 @@ async fn a_crash_around_the_deposit_never_pays_it_twice() {
     h.accepted().await;
     h.world.set().crash = Some(Crash::AfterCreate);
     assert_eq!(code(h.advance().await), ErrorCode::StoreUnreadable);
-    assert_eq!(h.record().deposit_state(), DepositState::Started);
+    assert_eq!(h.record().deposit_progress(), DepositProgress::Started);
     assert!(h.submitted().is_empty());
     h.world.set().crash = None;
     assert_eq!(h.advance().await.unwrap(), h.confirming());
@@ -511,7 +510,7 @@ async fn no_deposit_is_built_until_the_wallet_has_scanned_to_the_tip() {
         waiting(ForwardWait::ZcashSyncing)
     );
     assert_eq!(h.deposits(), 0);
-    assert_eq!(h.record().deposit_state(), DepositState::NotStarted);
+    assert_eq!(h.record().deposit_progress(), DepositProgress::NotStarted);
 
     h.world.set().synced = true;
     assert_eq!(h.advance().await.unwrap(), h.confirming());
@@ -951,7 +950,7 @@ async fn a_refused_payout_is_signed_again_only_at_a_higher_fee() {
     assert_eq!(h.record().outcome, None);
 }
 
-/// D11: no payout is signed for more than 2 USDC, nor for a fee that leaves
+/// No payout is signed for more than 2 USDC, nor for a fee that leaves
 /// nothing.
 #[tokio::test]
 async fn a_payout_is_never_signed_above_the_cap() {
