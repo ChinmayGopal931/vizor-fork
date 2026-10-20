@@ -8,6 +8,7 @@ import '../../../core/storage/app_secure_store.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/private_usd_lifecycle_provider.dart';
 import '../models/private_usd_balances.dart';
+import '../models/railgun_models.dart';
 import '../services/private_usd_balance_cache.dart';
 import '../services/private_usd_balance_repository.dart';
 import '../services/railgun_engine.dart';
@@ -258,6 +259,7 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       updatedAt: sync.at,
       address: sync.address,
       refreshFailed: false,
+      screeningFailed: sync.screening == RailgunScreening.failed,
       clearFirstSyncPercent: true,
     );
     _runningFirstSync?.end();

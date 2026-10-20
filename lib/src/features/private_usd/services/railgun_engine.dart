@@ -111,18 +111,21 @@ class RailgunAddressMismatchException implements Exception {
 
 enum RailgunEnginePhase { idle, starting, syncing, proving, ready, failed }
 
-/// Balances as one sync of [accountUuid]'s wallet at [address] found them.
+/// Balances as one sync of [accountUuid]'s wallet at [address] found them,
+/// with how its screening last went.
 class RailgunSync {
   const RailgunSync({
     required this.accountUuid,
     required this.address,
     required this.balances,
+    required this.screening,
     required this.at,
   });
 
   final String accountUuid;
   final String address;
   final RailgunBalances balances;
+  final RailgunScreening screening;
   final DateTime at;
 }
 
@@ -137,6 +140,7 @@ class RailgunEngineState {
     this.utxoScan,
     this.txidScan,
     this.proof,
+    this.screening,
     this.lastSync,
     this.failure,
   });
@@ -151,6 +155,10 @@ class RailgunEngineState {
   final RailgunScanEvent? txidScan;
   final RailgunProofEvent? proof;
 
+  /// What the open page's screening work is doing, as it last said; null
+  /// before it says anything, and once the page closes.
+  final RailgunScreeningEvent? screening;
+
   /// The last sync any use made: balances, conversions or sends.
   final RailgunSync? lastSync;
 
@@ -162,6 +170,7 @@ class RailgunEngineState {
     RailgunScanEvent? utxoScan,
     RailgunScanEvent? txidScan,
     RailgunProofEvent? proof,
+    RailgunScreeningEvent? screening,
     RailgunSync? lastSync,
     bool clearScans = false,
     bool clearProof = false,
@@ -173,6 +182,7 @@ class RailgunEngineState {
     utxoScan: clearScans ? null : (utxoScan ?? this.utxoScan),
     txidScan: clearScans ? null : (txidScan ?? this.txidScan),
     proof: clearProof ? null : (proof ?? this.proof),
+    screening: screening ?? this.screening,
     lastSync: lastSync ?? this.lastSync,
     failure: failure,
   );
@@ -303,11 +313,12 @@ class RailgunEngine {
   /// Syncs [accountUuid]'s wallet to the chain's tip and reads its balances.
   Future<RailgunSync> sync(String accountUuid) =>
       withSession(accountUuid, (session) async {
-        final balances = await session.refresh();
+        final refreshed = await session.refresh();
         final sync = RailgunSync(
           accountUuid: accountUuid,
           address: session.address,
-          balances: balances,
+          balances: refreshed.balances,
+          screening: refreshed.screening,
           at: _now(),
         );
         _publish(state.value.copyWith(lastSync: sync));
@@ -607,6 +618,8 @@ class RailgunEngine {
         );
       case final RailgunProofEvent proof:
         _publish(state.value.copyWith(proof: proof));
+      case final RailgunScreeningEvent screening:
+        _publish(state.value.copyWith(screening: screening));
       // Page lines can quote anything the engine saw: never printed here.
       case RailgunLogEvent() || null:
         break;
@@ -677,21 +690,25 @@ class RailgunSession {
   List<String> get secrets => _secrets;
 
   /// Syncs to the chain's tip, asks the screening nodes about new notes, and
-  /// returns the balances. A first sync reads all of Railgun's history.
-  Future<RailgunBalances> refresh() async {
+  /// returns the balances with how the screening last went. A first sync
+  /// reads all of Railgun's history.
+  Future<RailgunRefresh> refresh() async {
     _engine._publish(
       _engine.state.value.copyWith(
         phase: RailgunEnginePhase.syncing,
         clearScans: true,
       ),
     );
-    final balances = RailgunBalances.parse(
+    final refreshed = RailgunRefresh.parse(
       _engine._decode(await _engine._call(this, 'refresh', '{}')),
     );
     _engine._publish(
       _engine.state.value.copyWith(phase: RailgunEnginePhase.ready),
     );
-    return balances;
+    if (refreshed.screening == RailgunScreening.failed) {
+      _engine._debugLog('screening failed');
+    }
+    return refreshed;
   }
 
   /// What [broadcaster] charges to send [transfer]; nothing is proved.

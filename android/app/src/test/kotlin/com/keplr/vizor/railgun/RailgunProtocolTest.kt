@@ -74,6 +74,7 @@ class RailgunProtocolTest {
         listOf(
             "scan" to """{"event":"scan","data":{"tree":"txid","status":"Updated","progress":0.4}}""",
             "proof" to """{"event":"proof","data":{"progress":0.25,"status":"proving"}}""",
+            "screening" to """{"event":"screening","data":{"txids":null,"download":{"progress":0.5},"proving":null}}""",
             "log" to """{"event":"log","data":"scanning"}""",
         ).forEach { (name, raw) -> assertEquals(Message.Event(name, raw), RailgunProtocol.decode(raw)) }
     }

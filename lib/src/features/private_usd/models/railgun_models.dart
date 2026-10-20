@@ -63,7 +63,50 @@ class RailgunTokenAmount {
   String toString() => 'RailgunTokenAmount($token, $amount)';
 }
 
-/// What `refresh` answers: every token in every bucket the SDK lists.
+/// How the wallet's screening went the last time the engine tried: asking
+/// the screening nodes about its notes, and sending them the proofs its own
+/// sends need. A send's change stays `MissingInternalPOI` until a node takes
+/// those proofs.
+enum RailgunScreening {
+  ok('ok'),
+
+  /// The check or a proof failed: a node unreachable, or one refusing what
+  /// it was sent. The engine tries again after every scan.
+  failed('failed');
+
+  const RailgunScreening(this.wireName);
+
+  final String wireName;
+
+  static RailgunScreening? fromWire(Object? name) {
+    for (final screening in values) {
+      if (screening.wireName == name) return screening;
+    }
+    return null;
+  }
+}
+
+/// What `refresh` answers: the balances, and how the screening last went.
+class RailgunRefresh {
+  const RailgunRefresh({required this.balances, required this.screening});
+
+  final RailgunBalances balances;
+  final RailgunScreening screening;
+
+  static RailgunRefresh parse(Object? json) {
+    final map = _object(json, 'refresh');
+    final screening = RailgunScreening.fromWire(map['screening']);
+    if (screening == null) {
+      throw const RailgunProtocolException('screening is unreadable');
+    }
+    return RailgunRefresh(
+      balances: RailgunBalances.parse(map['balances']),
+      screening: screening,
+    );
+  }
+}
+
+/// Every token in every bucket the SDK lists.
 class RailgunBalances {
   const RailgunBalances(this.byBucket);
 
@@ -580,6 +623,9 @@ sealed class RailgunEvent {
           progress: progress.toDouble(),
           status: status is String ? status : '',
         );
+      case 'screening':
+        if (data is! Map<String, dynamic>) return null;
+        return RailgunScreeningEvent.decode(data);
       case 'log':
         return data is String ? RailgunLogEvent(data) : null;
       default:
@@ -626,6 +672,93 @@ class RailgunProofEvent extends RailgunEvent {
 
   @override
   int get hashCode => Object.hash(progress, status);
+}
+
+/// What the page's screening work is doing now, each step null while idle:
+/// catching up on Railgun's transaction ids ([txids], their share done),
+/// downloading proving files ([downloading], with [download] their share
+/// when known), and proving POIs ([proving]). The page sends the whole state
+/// on every change, so the latest one is all that is running.
+class RailgunScreeningEvent extends RailgunEvent {
+  const RailgunScreeningEvent({
+    this.txids,
+    this.downloading = false,
+    this.download,
+    this.proving,
+  });
+
+  final double? txids;
+  final bool downloading;
+  final double? download;
+  final RailgunPoiProving? proving;
+
+  /// Nothing running.
+  bool get isIdle => txids == null && !downloading && proving == null;
+
+  /// A step it cannot read is left out rather than failing the rest.
+  static RailgunScreeningEvent decode(Map<String, dynamic> data) {
+    double? share(Object? step) {
+      final progress = step is Map<String, dynamic> ? step['progress'] : null;
+      return progress is num
+          ? progress.toDouble().clamp(0.0, 1.0).toDouble()
+          : null;
+    }
+
+    final download = data['download'];
+    final proving = data['proving'];
+    RailgunPoiProving? proof;
+    if (proving is Map<String, dynamic>) {
+      final index = proving['index'];
+      final count = proving['count'];
+      if (index is int && count is int && index >= 1 && count >= index) {
+        proof = RailgunPoiProving(
+          index: index,
+          count: count,
+          progress: share(proving) ?? 0,
+        );
+      }
+    }
+    return RailgunScreeningEvent(
+      txids: share(data['txids']),
+      downloading: download is Map<String, dynamic>,
+      download: share(download),
+      proving: proof,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is RailgunScreeningEvent &&
+      other.txids == txids &&
+      other.downloading == downloading &&
+      other.download == download &&
+      other.proving == proving;
+
+  @override
+  int get hashCode => Object.hash(txids, downloading, download, proving);
+}
+
+/// POI proof [index] (from 1) of [count], [progress] 0 to 1.
+class RailgunPoiProving {
+  const RailgunPoiProving({
+    required this.index,
+    required this.count,
+    required this.progress,
+  });
+
+  final int index;
+  final int count;
+  final double progress;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RailgunPoiProving &&
+      other.index == index &&
+      other.count == count &&
+      other.progress == progress;
+
+  @override
+  int get hashCode => Object.hash(index, count, progress);
 }
 
 /// An engine or console line, sent only from a page loaded with `debug`. It

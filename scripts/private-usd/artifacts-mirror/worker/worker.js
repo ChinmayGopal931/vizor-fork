@@ -15,6 +15,7 @@ const CORS = {
 // Path -> number of parts.
 const SPLIT = {
   '/ipfs/QmZrP9zaZw2LwErT2yA6VpMWm65UdToQiKj4DtStVsUJHr/POI_13x13/zkey.br': 2,
+  '/ipfs/QmZ2MyM6TKxffkv6stuo2hFwmUfs3q4xgMYN164Sje8new/circuits/13x13/zkey.br': 2,
 };
 
 export default {

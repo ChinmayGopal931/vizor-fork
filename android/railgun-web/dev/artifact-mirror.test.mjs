@@ -8,7 +8,13 @@ import vm from 'node:vm';
 import { brotliCompressSync } from 'node:zlib';
 import { ArtifactName } from '@railgun-community/shared-models';
 import { throughMirror } from '../artifact-mirror-plugin.mjs';
-import { ARTIFACT_MIRROR, GATEWAY_STALL_MS, IPFS_GATEWAY, artifactGet } from '../src/artifact-mirror.js';
+import {
+  ARTIFACT_MIRROR,
+  GATEWAY_STALL_MS,
+  IPFS_GATEWAY,
+  artifactGet,
+  setArtifactProgressListener,
+} from '../src/artifact-mirror.js';
 
 const require = createRequire(import.meta.url);
 // The SDK's artifact modules, which its package doesn't export.
@@ -61,10 +67,11 @@ function memoryStore() {
 }
 
 test('the SDK asks the gateway for the 279 files the mirror holds', () => {
-  // The mirror copies these two of the gateway's directories (scripts/private-usd/artifacts-mirror/).
+  // The mirror copies these two of the gateway's directories (scripts/private-usd/artifacts-mirror/): the circuits,
+  // and the POI circuits since wallet 11.2.0 (the earlier POI directory stays there for older builds).
   const directories = [
     'QmUsmnK4PFc7zDp2cmC4wBZxYLjNyRgWfs5GNcJJ2uLcpU',
-    'QmZrP9zaZw2LwErT2yA6VpMWm65UdToQiKj4DtStVsUJHr',
+    'QmZ2MyM6TKxffkv6stuo2hFwmUfs3q4xgMYN164Sje8new',
   ];
   const hashes = require(path.join(ARTIFACTS, 'json/artifact-v2-hashes.json'));
   const files = [ArtifactName.ZKEY, ArtifactName.WASM, ArtifactName.VKEY];
@@ -85,7 +92,10 @@ test('when the gateway fails, the mirror is asked for the same path, the same wa
     const axios = axiosReplying((url) => (fromMirror(url) ? { data: 'mirror' } : failure));
     assert.equal((await artifactGet(axios, VKEY, TEXT)).data, 'mirror');
     assert.deepEqual(axios.asked, [VKEY, mirrored(VKEY)]);
-    assert.equal(axios.configs[1], TEXT);
+    // The same request, only heard as it goes.
+    const { onDownloadProgress, ...config } = axios.configs[1];
+    assert.deepEqual(config, TEXT);
+    assert.equal(typeof onDownloadProgress, 'function');
   }
 });
 
@@ -107,6 +117,29 @@ test('the mirror is asked once nothing has come from the gateway for 10 s', asyn
   t.mock.timers.tick(1);
   assert.equal((await answer).data, 'mirror');
   assert.deepEqual(axios.asked, [VKEY, mirrored(VKEY)]);
+});
+
+test('a download reports its bytes under its gateway URL, from the mirror too, then its end', async () => {
+  const heard = [];
+  setArtifactProgressListener((url, loaded, total) => heard.push([url, loaded, total]));
+  try {
+    const axios = axiosReplying((url, config) => {
+      if (!fromMirror(url)) {
+        config.onDownloadProgress({ loaded: 5, total: 50 });
+        return httpError(502);
+      }
+      config.onDownloadProgress({ loaded: 50, total: 50 });
+      return { data: 'mirror' };
+    });
+    assert.equal((await artifactGet(axios, VKEY, TEXT)).data, 'mirror');
+    assert.deepEqual(heard, [
+      [VKEY, 5, 50],
+      [VKEY, 50, 50],
+      [VKEY, undefined, undefined],
+    ]);
+  } finally {
+    setArtifactProgressListener(undefined);
+  }
 });
 
 test("when both fail, the mirror's failure is the one reported", async () => {

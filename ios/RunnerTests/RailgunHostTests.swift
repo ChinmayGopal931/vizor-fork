@@ -83,6 +83,7 @@ final class RailgunHostTests: XCTestCase {
     for (name, raw) in [
       ("scan", #"{"event":"scan","data":{"tree":"txid","status":"Updated","progress":0.4}}"#),
       ("proof", #"{"event":"proof","data":{"progress":0.25,"status":"proving"}}"#),
+      ("screening", #"{"event":"screening","data":{"txids":null,"download":{"progress":0.5},"proving":null}}"#),
       ("log", #"{"event":"log","data":"scanning"}"#),
     ] {
       XCTAssertEqual(RailgunProtocol.decode(raw), .event(name: name, rawJSON: raw))

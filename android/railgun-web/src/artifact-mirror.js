@@ -13,6 +13,16 @@ export const ARTIFACT_MIRROR = 'https://railgun-artifacts.pepeman931.workers.dev
  */
 export const GATEWAY_STALL_MS = 10_000;
 
+let progressListener;
+
+/**
+ * Hears every artifact download as it goes: `(url, loaded, total)` while bytes arrive (`total` undefined when the answer
+ * gives no length), then `(url)` once it is done, whichever way. A mirror download reports under its gateway URL.
+ */
+export function setArtifactProgressListener(listener) {
+  progressListener = listener;
+}
+
 /**
  * `axios.get(url, config)` for an artifact `url` on the gateway. When the gateway's request fails (an HTTP error, a
  * network error, or nothing from it for GATEWAY_STALL_MS), the mirror is asked for the same path, the same way.
@@ -21,15 +31,21 @@ export async function artifactGet(axios, url, config) {
   if (typeof url !== 'string' || !url.startsWith(`${IPFS_GATEWAY}/ipfs/`)) {
     throw new Error(`not an artifact on the gateway: ${url}`);
   }
+  const report = (event) => progressListener?.(url, event?.loaded ?? 0, event?.total || undefined);
   try {
-    return await getUnlessStalled(axios, url, config);
+    return await getUnlessStalled(axios, url, config, report);
   } catch {
-    return axios.get(`${ARTIFACT_MIRROR}${url.slice(IPFS_GATEWAY.length)}`, config);
+    return await axios.get(`${ARTIFACT_MIRROR}${url.slice(IPFS_GATEWAY.length)}`, {
+      ...config,
+      onDownloadProgress: report,
+    });
+  } finally {
+    progressListener?.(url);
   }
 }
 
 // A gateway that keeps sending, however slowly, is left to finish: only the SDK's own time limit applies to it.
-async function getUnlessStalled(axios, url, config) {
+async function getUnlessStalled(axios, url, config, report) {
   const abandon = new AbortController();
   let timer;
   const wait = () => {
@@ -38,7 +54,14 @@ async function getUnlessStalled(axios, url, config) {
   };
   wait();
   try {
-    return await axios.get(url, { ...config, signal: abandon.signal, onDownloadProgress: wait });
+    return await axios.get(url, {
+      ...config,
+      signal: abandon.signal,
+      onDownloadProgress: (event) => {
+        wait();
+        report(event);
+      },
+    });
   } finally {
     clearTimeout(timer);
   }

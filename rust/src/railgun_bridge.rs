@@ -28,12 +28,18 @@
 
 use std::{future::Future, io, sync::OnceLock, time::Duration};
 
+use http::Uri;
+use hyper_util::{
+    client::legacy::connect::{dns::GaiResolver, HttpConnector},
+    rt::TokioIo,
+};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::{TcpListener, TcpStream},
     sync::{oneshot, Mutex},
     task::{JoinHandle, JoinSet},
 };
+use tower_service::Service;
 use zcash_client_backend::tor::Client as TorClient;
 
 use crate::network_privacy::{self, DirectRouteLease};
@@ -42,6 +48,11 @@ use crate::wallet::private_usd::deployment::RAILGUN_PAGE_HOSTS;
 const HTTPS_PORT: u16 = 443;
 /// A client that has not finished its handshake by then is dropped.
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
+/// How long a direct connection waits on the first address family before trying
+/// the other alongside it (RFC 6555), as hyper-util does by default.
+const HAPPY_EYEBALLS_TIMEOUT: Duration = Duration::from_millis(300);
+/// All of an upstream's addresses together get this long.
+const DIRECT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 const SOCKS_VERSION: u8 = 0x05;
 const METHOD_NO_AUTH: u8 = 0x00;
@@ -335,7 +346,11 @@ async fn connect_upstream(
             // The lease is taken before connecting, so a Tor enable that lands
             // mid-connect aborts the attempt too.
             let route = DirectRouteLease::new();
-            let mut connecting = Box::pin(TcpStream::connect((host.as_str(), port)));
+            let mut connecting = Box::pin(connect_direct(
+                direct_connector(GaiResolver::new()),
+                &host,
+                port,
+            ));
             let stream =
                 std::future::poll_fn(|cx| route.poll(cx, |cx| connecting.as_mut().poll(cx)))
                     .await
@@ -344,6 +359,39 @@ async fn connect_upstream(
         }
         _ => Err(Reply::NotAllowed),
     }
+}
+
+/// The connector of every other direct path (`DirectRouteConnector`): both
+/// address families, the second joining after [`HAPPY_EYEBALLS_TIMEOUT`]. A
+/// plain connect tries a host's addresses one by one, IPv6 first on a phone with
+/// an IPv6 address, and on a network that hands out IPv6 it cannot carry each
+/// attempt hung there until Chromium gave up on the request: the page reached no
+/// host with an IPv6 address (a phone on one home Wi-Fi, 2026-10-19).
+fn direct_connector<R>(resolver: R) -> HttpConnector<R> {
+    let mut connector = HttpConnector::new_with_resolver(resolver);
+    connector.enforce_http(false);
+    connector.set_nodelay(true);
+    connector.set_happy_eyeballs_timeout(Some(HAPPY_EYEBALLS_TIMEOUT));
+    connector.set_connect_timeout(Some(DIRECT_CONNECT_TIMEOUT));
+    connector
+}
+
+async fn connect_direct<C>(mut connector: C, host: &str, port: u16) -> io::Result<TcpStream>
+where
+    C: Service<Uri, Response = TokioIo<TcpStream>>,
+    C::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+{
+    let uri = Uri::builder()
+        .scheme("http")
+        .authority(format!("{host}:{port}"))
+        .path_and_query("/")
+        .build()
+        .map_err(io::Error::other)?;
+    std::future::poll_fn(|cx| connector.poll_ready(cx))
+        .await
+        .map_err(io::Error::other)?;
+    let stream = connector.call(uri).await.map_err(io::Error::other)?;
+    Ok(stream.into_inner())
 }
 
 #[cfg(test)]
@@ -506,6 +554,53 @@ mod tests {
         network_privacy::begin_tor_enable();
         let error = tunnel.read_exact(&mut echoed).await.unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::ConnectionAborted);
+    }
+
+    /// A resolver that answers every name with `self.0`, in that order.
+    #[derive(Clone)]
+    struct Fixed(Vec<std::net::SocketAddr>);
+
+    impl Service<hyper_util::client::legacy::connect::dns::Name> for Fixed {
+        type Response = std::vec::IntoIter<std::net::SocketAddr>;
+        type Error = io::Error;
+        type Future = std::future::Ready<io::Result<Self::Response>>;
+
+        fn poll_ready(
+            &mut self,
+            _: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<io::Result<()>> {
+            std::task::Poll::Ready(Ok(()))
+        }
+
+        fn call(&mut self, _: hyper_util::client::legacy::connect::dns::Name) -> Self::Future {
+            std::future::ready(Ok(self.0.clone().into_iter()))
+        }
+    }
+
+    #[tokio::test]
+    async fn a_direct_connection_falls_back_to_ipv4_when_ipv6_goes_nowhere() {
+        let upstream = echo_server().await;
+        // The IPv6 documentation range is routed nowhere: an address the
+        // network hands out but cannot carry, listed first as a phone lists it.
+        let nowhere = std::net::SocketAddr::new(
+            std::net::Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1).into(),
+            upstream.port(),
+        );
+        let started = std::time::Instant::now();
+        let connector = direct_connector(Fixed(vec![nowhere, upstream]));
+        let mut stream = tokio::time::timeout(
+            Duration::from_secs(5),
+            connect_direct(connector, HOST, upstream.port()),
+        )
+        .await
+        .expect("connected before Chromium would give up")
+        .unwrap();
+        assert!(started.elapsed() < Duration::from_secs(3));
+
+        stream.write_all(b"ping").await.unwrap();
+        let mut echoed = [0u8; 4];
+        stream.read_exact(&mut echoed).await.unwrap();
+        assert_eq!(&echoed, b"ping");
     }
 
     /// Bootstraps the real Tor network into a temporary directory, then tunnels

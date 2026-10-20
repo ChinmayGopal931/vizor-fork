@@ -46,6 +46,49 @@ void main() {
     }
   });
 
+  test('a refresh carries its balances and how the screening went', () {
+    final failed = RailgunRefresh.parse(
+      jsonDecode(
+        '{"balances":{"MissingInternalPOI":[{"token":"$_token",'
+        '"amount":"29119207"}]},"screening":"failed"}',
+      ),
+    );
+
+    expect(failed.screening, RailgunScreening.failed);
+    expect(
+      failed.balances,
+      RailgunBalances({
+        RailgunBalanceBucket.missingInternalPoi: [
+          RailgunTokenAmount(token: _token, amount: BigInt.from(29119207)),
+        ],
+      }),
+    );
+    expect(
+      RailgunRefresh.parse(
+        jsonDecode('{"balances":{},"screening":"ok"}'),
+      ).screening,
+      RailgunScreening.ok,
+    );
+  });
+
+  test('a refresh without a screening it knows, or without balances, fails',
+      () {
+    for (final body in [
+      '{"balances":{}}',
+      '{"balances":{},"screening":"maybe"}',
+      '{"balances":{},"screening":false}',
+      '{"screening":"ok"}',
+      // The answer before screening was added: its buckets at the top.
+      '{"Spendable":[{"token":"$_token","amount":"1"}]}',
+    ]) {
+      expect(
+        () => RailgunRefresh.parse(jsonDecode(body)),
+        throwsA(isA<RailgunProtocolException>()),
+        reason: body,
+      );
+    }
+  });
+
   test('a transaction that is not a transact call for the broadcaster is '
       'refused', () {
     for (final reply in [
@@ -165,6 +208,40 @@ void main() {
     ]) {
       expect(RailgunEvent.decode(raw), isNull, reason: raw);
     }
+  });
+
+  test('decodes the screening state, each step null while idle', () {
+    expect(
+      RailgunEvent.decode(
+        '{"event":"screening","data":{"txids":{"progress":0.42},'
+        '"download":{"progress":null},'
+        '"proving":{"index":2,"count":3,"progress":0.7}}}',
+      ),
+      const RailgunScreeningEvent(
+        txids: 0.42,
+        downloading: true,
+        proving: RailgunPoiProving(index: 2, count: 3, progress: 0.7),
+      ),
+    );
+    final idle = RailgunEvent.decode(
+      '{"event":"screening","data":{"txids":null,"download":null,'
+      '"proving":null}}',
+    );
+    expect(idle, const RailgunScreeningEvent());
+    expect((idle! as RailgunScreeningEvent).isIdle, isTrue);
+  });
+
+  test('a screening step it cannot read is left out, not the rest', () {
+    expect(
+      RailgunEvent.decode(
+        '{"event":"screening","data":{"txids":{"progress":7},'
+        '"download":{"progress":0.5},'
+        '"proving":{"index":4,"count":3,"progress":0.1}}}',
+      ),
+      // A share is kept to 0-1; proof 4 of 3 is no proof.
+      const RailgunScreeningEvent(txids: 1, downloading: true, download: 0.5),
+    );
+    expect(RailgunEvent.decode('{"event":"screening","data":7}'), isNull);
   });
 
   test('openWallet params never print the mnemonic', () {

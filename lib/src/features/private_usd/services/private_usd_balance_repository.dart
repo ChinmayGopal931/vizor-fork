@@ -32,6 +32,7 @@ class PrivateUsdBalanceState {
     this.address,
     this.isRefreshing = false,
     this.refreshFailed = false,
+    this.screeningFailed = false,
     this.firstSyncPercent,
   });
 
@@ -43,6 +44,11 @@ class PrivateUsdBalanceState {
   final String? address;
   final bool isRefreshing;
   final bool refreshFailed;
+
+  /// The last sync found the screening failing ([RailgunScreening.failed]),
+  /// so what is processing is waiting on the screening nodes, not on a send.
+  /// Never cached: a cached balance shows without it.
+  final bool screeningFailed;
 
   /// How far the wallet's first sync has come, while nothing shows yet.
   final int? firstSyncPercent;
@@ -56,6 +62,7 @@ class PrivateUsdBalanceState {
     String? address,
     bool? isRefreshing,
     bool? refreshFailed,
+    bool? screeningFailed,
     int? firstSyncPercent,
     bool clearFirstSyncPercent = false,
   }) => PrivateUsdBalanceState(
@@ -64,6 +71,7 @@ class PrivateUsdBalanceState {
     address: address ?? this.address,
     isRefreshing: isRefreshing ?? this.isRefreshing,
     refreshFailed: refreshFailed ?? this.refreshFailed,
+    screeningFailed: screeningFailed ?? this.screeningFailed,
     firstSyncPercent: clearFirstSyncPercent
         ? null
         : (firstSyncPercent ?? this.firstSyncPercent),
@@ -77,6 +85,7 @@ class PrivateUsdBalanceState {
       other.address == address &&
       other.isRefreshing == isRefreshing &&
       other.refreshFailed == refreshFailed &&
+      other.screeningFailed == screeningFailed &&
       other.firstSyncPercent == firstSyncPercent;
 
   @override
@@ -86,6 +95,7 @@ class PrivateUsdBalanceState {
     address,
     isRefreshing,
     refreshFailed,
+    screeningFailed,
     firstSyncPercent,
   );
 }

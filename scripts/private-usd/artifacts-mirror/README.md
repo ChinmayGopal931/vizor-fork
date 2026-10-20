@@ -15,34 +15,47 @@ behind ipfs-lb.com.
 (`artifact-v2-hashes.json`, copied here) after decompressing it. It does not check the vkey; a wrong vkey can
 only make a proof fail locally.
 
+**POI circuits.** Wallet 11.2.0 (2026-09-30) replaced the POI circuits; the POI nodes verify only proofs from the
+new ones and answer the earlier ones' `Invalid proof`. Their directory (`QmZ2MyM6…`) resolves on no public gateway,
+only its files do, so `fetch-verify.mjs` gets each by its own CID (`POI_FILE_CIDS`) and saves it at the path the SDK
+asks for. Their vkeys are in `poi-v2/`, exported with snarkjs from the zkeys once those matched 11.2.0's hashes,
+and equal to the ones railgun-rust embeds (2026-10-19). The earlier POI directory (`QmZrP9…`, hashes in
+`poi-nov-2-23-hashes.json`) stays for builds before 11.2.0.
+
 ## Rebuild or refresh
 
-Run from this directory. `files/` and `oversize/` are gitignored (about 1.06 GB).
+Run from this directory. `files/` and `oversize/` are gitignored (about 1.1 GB).
 
-1. Download and verify every file. Any IPFS gateway that serves the content works; Pinata did on 2026-10-17.
-   A rerun skips files that already verify.
+1. Download and verify every file. Any IPFS gateway that serves the content works; Pinata did on 2026-10-17,
+   and Filebase on 2026-10-19, when Pinata answered quick requests with a bot check. A rerun skips files that
+   already verify.
 
    ```bash
-   node fetch-verify.mjs artifact-v2-hashes.json files https://gateway.pinata.cloud
+   node fetch-verify.mjs artifact-v2-hashes.json files https://ipfs.filebase.io
    cp _headers files/_headers
    ```
 
 2. Split any file over the 25 MiB static-asset limit into `.partN` files and list it in `worker/worker.js`
-   (`SPLIT`). Today that is only the POI 13x13 zkey:
+   (`SPLIT`). Today that is the two POI 13x13 zkeys:
 
    ```bash
    P=files/ipfs/QmZrP9zaZw2LwErT2yA6VpMWm65UdToQiKj4DtStVsUJHr/POI_13x13
    mkdir -p oversize && mv $P/zkey.br oversize/POI_13x13-zkey.br
    split -b 20971520 -a 1 oversize/POI_13x13-zkey.br $P/zkey.br.part
    mv $P/zkey.br.parta $P/zkey.br.part0 && mv $P/zkey.br.partb $P/zkey.br.part1
+   P=files/ipfs/QmZ2MyM6TKxffkv6stuo2hFwmUfs3q4xgMYN164Sje8new/circuits/13x13
+   mv $P/zkey.br oversize/POI_13x13-v2-zkey.br
+   split -b 20971520 -a 1 oversize/POI_13x13-v2-zkey.br $P/zkey.br.part
+   mv $P/zkey.br.parta $P/zkey.br.part0 && mv $P/zkey.br.partb $P/zkey.br.part1
    ```
 
 3. Deploy (wrangler logged in to the owner's account): `cd worker && wrangler deploy`.
 
-4. Check the live mirror end to end; this downloads everything again and verifies every hash:
+4. Check the live mirror end to end at the paths the SDK asks for; this downloads everything again and verifies
+   every hash, and every POI vkey against `poi-v2/`:
 
    ```bash
-   node fetch-verify.mjs artifact-v2-hashes.json /tmp/railgun-mirror-check https://railgun-artifacts.pepeman931.workers.dev
+   node fetch-verify.mjs artifact-v2-hashes.json /tmp/railgun-mirror-check https://railgun-artifacts.pepeman931.workers.dev --paths
    ```
 
 The Worker sends every request through `worker/worker.js` first: GET and HEAD go to the assets (`_headers` adds

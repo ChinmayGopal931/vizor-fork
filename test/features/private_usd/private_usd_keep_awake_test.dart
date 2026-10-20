@@ -69,7 +69,7 @@ void main() {
     await startRefresh(container);
     expect(keepAwake(container), isTrue);
 
-    page.refreshing!.complete(_balancesJson);
+    page.refreshing!.complete(_refreshJson);
     await pumpEventQueue();
     expect(
       container.read(privateUsdBalanceProvider(_account)).balances,
@@ -118,7 +118,7 @@ void main() {
       isTrue,
     );
     expect(keepAwake(container), isFalse);
-    page.refreshing!.complete(_balancesJson);
+    page.refreshing!.complete(_refreshJson);
   });
 
   test("a conversion's progress still keeps the screen on", () {
@@ -141,6 +141,7 @@ const _account = 'account';
 const _balancesJson =
     '{"Spendable":[{"token":"0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c",'
     '"amount":"5"}]}';
+const _refreshJson = '{"balances":$_balancesJson,"screening":"ok"}';
 
 class _Security extends AppSecurityNotifier {
   @override
