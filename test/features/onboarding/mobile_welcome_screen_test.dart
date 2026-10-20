@@ -548,10 +548,8 @@ void main() {
     tester.view.physicalSize = const Size(951, 669);
     await tester.pumpAndSettle();
     expect(find.byKey(_widePane), findsOneWidget);
-    expect(
-      tester.getRect(find.byKey(_horizon)).right,
-      lessThanOrEqualTo(951 - 120),
-    );
+    // The art is decorative and runs on under the inset; the controls do not.
+    expect(tester.getRect(find.byKey(_horizon)).right, 951);
     expect(
       tester
           .getRect(
@@ -560,6 +558,44 @@ void main() {
           .right,
       lessThanOrEqualTo(951 - 120),
     );
+    for (final key in [
+      'mobile_welcome_get_started',
+      'mobile_welcome_import',
+      'mobile_welcome_redeem_card',
+    ]) {
+      expect(
+        tester.getRect(find.byKey(ValueKey(key))).right,
+        lessThanOrEqualTo(951 - 120),
+      );
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the wide horizon is clipped beside the pane on true black', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(852, 393);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(
+      _app(padding: const EdgeInsets.only(left: 59, right: 59, bottom: 21)),
+    );
+    await tester.pumpAndSettle();
+    final pane = tester.getRect(find.byKey(_widePane));
+    final horizon = find.byKey(_horizon);
+    // The floor's lines fan out past its box; none may run under the pane.
+    final clip = find
+        .ancestor(of: horizon, matching: find.byType(ClipRect))
+        .first;
+    expect(tester.getRect(clip), tester.getRect(horizon));
+    expect(tester.getRect(horizon).left, pane.right);
+    expect(tester.getRect(horizon).right, 852);
+    final scaffold = tester.widget<Scaffold>(
+      find.descendant(
+        of: find.byType(MobileWelcomeScreen),
+        matching: find.byType(Scaffold),
+      ),
+    );
+    expect(scaffold.backgroundColor, const Color(0xff000000));
     expect(tester.takeException(), isNull);
   });
 

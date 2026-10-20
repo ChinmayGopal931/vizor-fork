@@ -94,7 +94,7 @@ class _MobileWelcomeScreenState extends ConsumerState<MobileWelcomeScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: const Color(0xff0f0f0f),
+        backgroundColor: const Color(0xff000000),
         body: LayoutBuilder(
           builder: (context, constraints) {
             final insets = MediaQuery.paddingOf(context);
@@ -109,9 +109,10 @@ class _MobileWelcomeScreenState extends ConsumerState<MobileWelcomeScreen> {
             final artHeight = (constraints.maxWidth + 1) * 700 / 394;
             final fadeEnd = math.min(1.0, artHeight / constraints.maxHeight);
             // A wide window sets the horizon beside the pane, centred in the
-            // space to its right.
+            // space to its right. It is decorative, so it runs on under the
+            // right inset.
             final horizonWidth = landscape
-                ? constraints.maxWidth - insets.right - paneRight
+                ? constraints.maxWidth - paneRight
                 : constraints.maxWidth;
             final horizonHeight =
                 constraints.maxHeight * (landscape ? 0.6 : 0.42);
@@ -125,14 +126,18 @@ class _MobileWelcomeScreenState extends ConsumerState<MobileWelcomeScreen> {
                   left: landscape ? paneRight : 0,
                   width: horizonWidth,
                   height: horizonHeight,
-                  child: NeonIgnition(
-                    enabled: widget.animateBackground,
-                    builder: (context, light) => Opacity(
-                      opacity: light,
-                      child: NeonHorizon(
-                        key: const ValueKey('mobile_welcome_horizon'),
-                        width: horizonWidth,
-                        height: horizonHeight,
+                  // The floor's lines fan out past its box; keep them out of
+                  // the pane.
+                  child: ClipRect(
+                    child: NeonIgnition(
+                      enabled: widget.animateBackground,
+                      builder: (context, light) => Opacity(
+                        opacity: light,
+                        child: NeonHorizon(
+                          key: const ValueKey('mobile_welcome_horizon'),
+                          width: horizonWidth,
+                          height: horizonHeight,
+                        ),
                       ),
                     ),
                   ),
@@ -150,10 +155,10 @@ class _MobileWelcomeScreenState extends ConsumerState<MobileWelcomeScreen> {
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
                             colors: [
-                              Color(0xff0f0f0f),
-                              Color(0xff0f0f0f),
-                              Color(0x990f0f0f),
-                              Color(0x000f0f0f),
+                              Color(0xff000000),
+                              Color(0xff000000),
+                              Color(0x99000000),
+                              Color(0x00000000),
                             ],
                             stops: [0, 0.35, 0.7, 1],
                           ),
