@@ -925,12 +925,24 @@ void main() {
         tester.widget<FadeTransition>(fade).opacity.value,
         closeTo(0.5, 0.01),
       );
+      // The route's fade is the scene's only one; the buttons' focus rings
+      // fade on their own.
+      final buttonFades = find
+          .descendant(
+            of: find.byType(AppButton),
+            matching: find.byType(FadeTransition),
+          )
+          .evaluate()
+          .toSet();
       expect(
-        find.descendant(
-          of: find.byType(MobileShieldScene),
-          matching: find.byType(FadeTransition),
-        ),
-        findsNothing,
+        find
+            .descendant(
+              of: find.byType(MobileShieldScene),
+              matching: find.byType(FadeTransition),
+            )
+            .evaluate()
+            .where((element) => !buttonFades.contains(element)),
+        isEmpty,
       );
       await tester.pump(const Duration(milliseconds: 120));
       final scene = tester.widget<MobileShieldScene>(
@@ -988,7 +1000,7 @@ void main() {
           route.reverseTransitionDuration,
           const Duration(milliseconds: 180),
         );
-        expect(find.text('Transparent Balance'), findsOneWidget);
+        expect(find.text('Transparent balance'), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       });

@@ -5,12 +5,13 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/physics.dart';
 import 'package:flutter/widgets.dart';
 
-import 'shield_icon.dart';
+import '../../../../../core/theme/app_theme.dart';
+import '../../../../../core/widgets/app_icon.dart';
 import 'shield_haptics.dart';
-import 'shield_metal.dart';
 import 'shield_motion.dart';
 
-/// "Drag to shield": a glass track with a metal pin (Figma 8810:78585/78587).
+/// "Drag to shield": a cut-corner glass slab and a lit pin. The slab's edge
+/// is a tube that lights from its left end as far as the pin.
 ///
 /// The pin tracks the finger 1:1 from wherever it was grabbed, rubber-bands
 /// past both ends, and on release either springs home with the finger's
@@ -218,44 +219,47 @@ class _SlideToShieldState extends State<SlideToShield>
         onPointerMove: _move,
         onPointerUp: _up,
         onPointerCancel: _up,
-        child: AnimatedBuilder(
-          animation: Listenable.merge([
-            _pos,
-            _press,
-            _flash,
-            _squash,
-            _shimmer,
-          ]),
-          builder: (context, _) {
-            final x = _x.clamp(-_knob.width, widget.width);
-            final p = (x / _maxX).clamp(0.0, 1.0);
-            final flash = _flashCurve(_flash.value);
-            return SizedBox.fromSize(
-              size: Size(widget.width, SlideToShield.height),
-              child: _Track(
-                progress: p,
-                flash: flash,
-                knobX: x,
-                label: _Label(
+        // The sheen repaints every frame; keep the lit sign beside it still.
+        child: RepaintBoundary(
+          child: AnimatedBuilder(
+            animation: Listenable.merge([
+              _pos,
+              _press,
+              _flash,
+              _squash,
+              _shimmer,
+            ]),
+            builder: (context, _) {
+              final x = _x.clamp(-_knob.width, widget.width);
+              final p = (x / _maxX).clamp(0.0, 1.0);
+              final flash = _flashCurve(_flash.value);
+              return SizedBox.fromSize(
+                size: Size(widget.width, SlideToShield.height),
+                child: _Track(
                   progress: p,
-                  shimmer: reduce ? null : _shimmer.value,
-                ),
-                knob: Positioned(
-                  left: x,
-                  top: 0,
-                  child: Transform(
-                    alignment: Alignment.centerRight,
-                    transform: Matrix4.diagonal3Values(
-                      (1 - 0.04 * _press.value) * (1 + 0.07 * _squash.value),
-                      (1 - 0.04 * _press.value) * (1 - 0.07 * _squash.value),
-                      1,
+                  flash: flash,
+                  knobX: x,
+                  label: _Label(
+                    progress: p,
+                    shimmer: reduce ? null : _shimmer.value,
+                  ),
+                  knob: Positioned(
+                    left: x,
+                    top: 0,
+                    child: Transform(
+                      alignment: Alignment.centerRight,
+                      transform: Matrix4.diagonal3Values(
+                        (1 - 0.04 * _press.value) * (1 + 0.07 * _squash.value),
+                        (1 - 0.04 * _press.value) * (1 - 0.07 * _squash.value),
+                        1,
+                      ),
+                      child: _Knob(press: _press.value),
                     ),
-                    child: const _MetalKnob(),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -270,7 +274,16 @@ class _SlideToShieldState extends State<SlideToShield>
   }
 }
 
-const _white = Color(0xFFFFFFFF);
+/// How far the slab's and the pin's corner cuts reach: a full-size button's.
+const _cut = AppChamfer.medium;
+
+Path _outline(Rect rect) => Neon.chamferedRect(
+  rect,
+  topLeft: _cut,
+  topRight: _cut,
+  bottomRight: _cut,
+  bottomLeft: _cut,
+);
 
 class _Track extends StatelessWidget {
   const _Track({
@@ -289,47 +302,42 @@ class _Track extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = progress;
-    final radius = BorderRadius.circular(99);
-    // Crimson glass with light concentrated around the silver pin.
-    final tint = 0.10 * flash;
+    final colors = context.colors;
+    final neon = colors.neon;
     return Stack(
       clipBehavior: Clip.none,
       children: [
         // Outer haze, fading in with the drag.
         Positioned.fill(
           child: IgnorePointer(
-            child: CustomPaint(painter: _OuterGlowPainter(p, knobX)),
+            child: CustomPaint(
+              painter: _OuterGlowPainter(progress, knobX, neon.glow),
+            ),
           ),
         ),
-        ClipRRect(
-          borderRadius: radius,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned.fill(
-                child: BackdropFilter(
-                  filter: ui.ImageFilter.blur(sigmaX: 27.5, sigmaY: 27.5),
-                  child: CustomPaint(
-                    painter: _TrackPainter(knobX, p, tint),
-                    child: const SizedBox.expand(),
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: radius,
-                    border: Border.all(
-                      color: const Color(0x33774B5D),
-                      width: 0.75,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned.fill(child: label),
-              knob,
-            ],
+        Positioned.fill(
+          child: CustomPaint(
+            painter: _TrackPainter(
+              knobX: knobX,
+              progress: progress,
+              flash: flash,
+              fill: colors.background.window.withValues(alpha: 0.62),
+              glow: neon.glow,
+              core: neon.core,
+            ),
+          ),
+        ),
+        // The slab's outline clips the pin as it rubber-bands past either end.
+        Positioned.fill(
+          child: ClipPath(
+            clipper: ShapeBorderClipper(shape: Neon.chamferBorder(cut: _cut)),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(child: label),
+                knob,
+              ],
+            ),
           ),
         ),
       ],
@@ -337,24 +345,23 @@ class _Track extends StatelessWidget {
   }
 }
 
-/// Track drop shadow drawn only outside the glass (Figma's "show shadow
-/// behind node" is off), so the translucent fill stays clean.
+/// Haze drawn only outside the slab, so the glass stays clean.
 class _OuterGlowPainter extends CustomPainter {
-  _OuterGlowPainter(this.progress, this.knobX);
+  _OuterGlowPainter(this.progress, this.knobX, this.glow);
 
   final double progress;
   final double knobX;
+  final Color glow;
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(99));
     canvas.save();
     canvas.clipPath(
       Path()
         ..fillType = PathFillType.evenOdd
         ..addRect(rect.inflate(400))
-        ..addRRect(rrect),
+        ..addPath(_outline(rect), Offset.zero),
     );
     canvas.drawOval(
       Rect.fromCenter(
@@ -363,9 +370,7 @@ class _OuterGlowPainter extends CustomPainter {
         height: 52,
       ),
       Paint()
-        ..color = const Color(
-          0xFFAA2455,
-        ).withValues(alpha: 0.18 + 0.22 * progress)
+        ..color = glow.withValues(alpha: 0.14 + 0.2 * progress)
         ..maskFilter = const MaskFilter.blur(ui.BlurStyle.normal, 24),
     );
     canvas.restore();
@@ -373,36 +378,88 @@ class _OuterGlowPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_OuterGlowPainter old) =>
-      old.progress != progress || old.knobX != knobX;
+      old.progress != progress || old.knobX != knobX || old.glow != glow;
 }
 
+/// The glass slab: a dark fill inside the cut outline, light pooled around
+/// the pin, and the outline as a tube that is lit from the left end up to
+/// the pin and unlit ahead of it. Locked in, the whole tube lights.
 class _TrackPainter extends CustomPainter {
-  const _TrackPainter(this.knobX, this.progress, this.flash);
+  const _TrackPainter({
+    required this.knobX,
+    required this.progress,
+    required this.flash,
+    required this.fill,
+    required this.glow,
+    required this.core,
+  });
 
   final double knobX;
   final double progress;
   final double flash;
+  final Color fill;
+  final Color glow;
+  final Color core;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    canvas.drawRect(rect, Paint()..color = const Color(0xB3302028));
+    final rect = (Offset.zero & size).deflate(0.5);
+    final outline = _outline(rect);
+    final pin = knobX + 30;
+    canvas.drawPath(outline, Paint()..color = fill);
+    canvas.save();
+    canvas.clipPath(outline);
     canvas.drawRect(
       rect,
       Paint()
-        ..shader = ui.Gradient.radial(Offset(knobX + 30, size.height / 2), 100, [
-          const Color(0xFFAA2455).withValues(alpha: 0.36 + 0.32 * progress),
-          const Color(0x00AA2455),
+        ..shader = ui.Gradient.radial(Offset(pin, size.height / 2), 100, [
+          glow.withValues(alpha: 0.16 + 0.16 * progress),
+          glow.withValues(alpha: 0),
         ]),
     );
     if (flash > 0) {
-      canvas.drawRect(rect, Paint()..color = _white.withValues(alpha: flash));
+      canvas.drawRect(
+        rect,
+        Paint()..color = glow.withValues(alpha: 0.3 * flash),
+      );
     }
+    canvas.restore();
+    Neon.strokeUnlit(
+      canvas,
+      outline,
+      color: glow.withValues(alpha: 0.22),
+      width: 1,
+    );
+    Neon.strokeTube(
+      canvas,
+      progress >= 1 ? outline : _litEdge(rect, pin),
+      glow: glow,
+      core: core,
+      width: 1.4,
+      intensity: 0.5 + 0.5 * progress + flash,
+    );
+  }
+
+  /// The outline's left end, and its top and bottom edges as far as [x].
+  static Path _litEdge(Rect r, double x) {
+    final end = x.clamp(r.left + _cut, r.right - _cut);
+    return Path()
+      ..moveTo(end, r.top)
+      ..lineTo(r.left + _cut, r.top)
+      ..lineTo(r.left, r.top + _cut)
+      ..lineTo(r.left, r.bottom - _cut)
+      ..lineTo(r.left + _cut, r.bottom)
+      ..lineTo(end, r.bottom);
   }
 
   @override
   bool shouldRepaint(_TrackPainter old) =>
-      old.knobX != knobX || old.progress != progress || old.flash != flash;
+      old.knobX != knobX ||
+      old.progress != progress ||
+      old.flash != flash ||
+      old.fill != fill ||
+      old.glow != glow ||
+      old.core != core;
 }
 
 class _Label extends StatelessWidget {
@@ -419,7 +476,9 @@ class _Label extends StatelessWidget {
     final opacity = (1 - progress / 0.5).clamp(0.0, 1.0);
     Widget text = Text(
       'Drag to shield',
-      style: VText.labelL.copyWith(color: _white),
+      style: AppTypography.bodyMedium.copyWith(
+        color: context.colors.text.primary,
+      ),
     );
     final phase = shimmer;
     if (phase != null && progress == 0) {
@@ -456,41 +515,41 @@ class _Label extends StatelessWidget {
   }
 }
 
-/// Metal pin (Figma 8810:78587), in the shared [Metal] finish. Static: it
-/// only moves, squashes and dims with the press.
-class _MetalKnob extends StatelessWidget {
-  const _MetalKnob();
+/// The pin: a cut-corner plate lit red, as a passcode key lights under the
+/// finger, holding the shield. It only moves, squashes and brightens with a
+/// press.
+class _Knob extends StatelessWidget {
+  const _Knob({required this.press});
+
+  final double press;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: _SlideToShieldState._knob.width,
-      height: _SlideToShieldState._knob.height,
-      child: const CustomPaint(
-        painter: _MetalPainter(),
+    final colors = context.colors;
+    final glow = colors.neon.glow;
+    return SizedBox.fromSize(
+      size: _SlideToShieldState._knob,
+      child: DecoratedBox(
+        decoration: ShapeDecoration(
+          // Opaque, so the lit edge ends out of sight beneath it.
+          color: Color.alphaBlend(
+            glow.withValues(alpha: 0.18 + 0.1 * press),
+            colors.background.window,
+          ),
+          shape: Neon.chamferBorder(
+            cut: _cut,
+            side: BorderSide(color: glow),
+          ),
+          shadows: Neon.boxGlow(glow, intensity: 0.7 + 0.3 * press),
+        ),
         child: Center(
-          child: Padding(
-            padding: EdgeInsets.only(left: 1, top: 1),
-            child: ShieldIcon(
-              'knob_shield_fill',
-              box: Size.square(27),
-              width: 21.4133,
-              height: 24.7507,
-            ),
+          child: AppIcon(
+            AppIcons.shieldKeyhole,
+            size: 24,
+            color: colors.neon.core,
           ),
         ),
       ),
     );
   }
-}
-
-class _MetalPainter extends CustomPainter {
-  const _MetalPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) =>
-      Metal.pill(canvas, Offset.zero & size);
-
-  @override
-  bool shouldRepaint(_MetalPainter old) => false;
 }

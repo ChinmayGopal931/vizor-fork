@@ -26,7 +26,7 @@ void main() {
         defaultPixelRatio: 1,
         overrideConfiguration: FigmaCompareConfiguration(
           scenarioId: 'mobile-shield-home-flow',
-          themeMode: ThemeMode.light,
+          themeMode: ThemeMode.dark,
           logicalSize: shot.size,
           pixelRatio: 1,
           outputPath: output.isEmpty ? '' : '$output/${shot.name}.png',
@@ -49,7 +49,7 @@ void main() {
             );
             await tester.pump(const Duration(milliseconds: 17));
           }
-          expect(find.text('Transparent Balance'), findsOneWidget);
+          expect(find.text('Transparent balance'), findsOneWidget);
           if (shot.seconds == 0) return;
           final slider = find.byType(SlideToShield);
           final gesture = await tester.startGesture(

@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../core/widgets/app_button.dart';
-import '../../../../../core/widgets/app_icon.dart';
 
 /// Keeps the signing controls in the same slots while their content changes.
 /// Only the transaction owner supplies actions and their enabled state.
@@ -73,18 +72,11 @@ class KeystoneShieldFooter extends StatelessWidget {
             1.0,
             availableWidth - cancelWidth - labelInsets - 3,
           );
-          const iconSize = 20.0;
           final contentHeight = math.max(
-            iconSize,
+            measure('Cancel', cancelLabelWidth).height,
             math.max(
-              measure('Cancel', cancelLabelWidth).height,
-              math.max(
-                measure('Show QR', actionLabelWidth).height,
-                measure(
-                  'Next step',
-                  actionLabelWidth - iconSize - AppSpacing.xxs,
-                ).height,
-              ),
+              measure('Show QR', actionLabelWidth).height,
+              measure('Next step', actionLabelWidth).height,
             ),
           );
           final height = math.max(
@@ -102,10 +94,7 @@ class KeystoneShieldFooter extends StatelessWidget {
                   height: height,
                   variant: AppButtonVariant.ghost,
                   onPressed: onCancel,
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(color: Color(0xFFFFFFFF)),
-                  ),
+                  child: const Text('Cancel'),
                 ),
               ),
               const SizedBox(width: AppSpacing.s),
@@ -125,10 +114,7 @@ class KeystoneShieldFooter extends StatelessWidget {
                     duration: Duration(milliseconds: reduced ? 120 : 160),
                     builder: (context, color, child) => DefaultTextStyle.merge(
                       style: TextStyle(color: color),
-                      child: IconTheme.merge(
-                        data: IconThemeData(color: color),
-                        child: child!,
-                      ),
+                      child: child!,
                     ),
                     child: SizedBox(
                       width: double.infinity,
@@ -147,24 +133,10 @@ class KeystoneShieldFooter extends StatelessWidget {
                             ?current,
                           ],
                         ),
-                        child: Row(
+                        child: Text(
+                          showQr ? 'Next step' : 'Show QR',
                           key: ValueKey(showQr),
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                showQr ? 'Next step' : 'Show QR',
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            if (showQr) ...[
-                              const SizedBox(width: AppSpacing.xxs),
-                              const SizedBox.square(
-                                dimension: iconSize,
-                                child: AppIcon(AppIcons.chevronForward),
-                              ),
-                            ],
-                          ],
+                          textAlign: TextAlign.center,
                         ),
                       ),
                     ),

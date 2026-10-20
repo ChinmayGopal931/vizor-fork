@@ -1,55 +1,25 @@
 import 'package:flutter/widgets.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
-/// A Figma icon component: a fixed [box] with the exported SVG placed at the
-/// component's inset. When [left]/[top] are omitted the SVG is centered.
+import '../../../../../core/widgets/app_icon.dart';
+import '../../../../../core/widgets/mobile/neon_done_sign.dart';
+import '../../../../../core/widgets/mobile/neon_glyph_badge.dart';
+import '../../../../../core/widgets/mobile/tron_glyph.dart';
+
+/// The mark over the amount: the transparent balance on a lit plate, then
+/// the done sign switching on once the balance is shielded. The particles
+/// still condense into the shield's silhouette at its centre and hand over
+/// to the sign.
 class ShieldIcon extends StatelessWidget {
-  const ShieldIcon(
-    this.name, {
-    super.key,
-    required this.box,
-    required this.width,
-    required this.height,
-    this.left,
-    this.top,
-    this.tint,
-  });
+  const ShieldIcon.transparent({required this.size, super.key})
+    : shielded = false;
 
-  final String name;
-  final Size box;
-  final double width;
-  final double height;
-  final double? left;
-  final double? top;
+  const ShieldIcon.shielded({required this.size, super.key}) : shielded = true;
 
-  /// Recolors a monochrome icon (used where the export lost the instance's
-  /// color override).
-  final Color? tint;
+  final double size;
+  final bool shielded;
 
   @override
-  Widget build(BuildContext context) {
-    final svg = SvgPicture.asset(
-      'assets/icons/shielding_$name.svg',
-      width: width,
-      height: height,
-      colorFilter: tint == null
-          ? null
-          : ColorFilter.mode(tint!, BlendMode.srcIn),
-    );
-    return SizedBox.fromSize(
-      size: box,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            left: left ?? (box.width - width) / 2,
-            top: top ?? (box.height - height) / 2,
-            width: width,
-            height: height,
-            child: svg,
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => shielded
+      ? NeonDoneSign(glyph: TronGlyphKind.check, size: size)
+      : NeonGlyphBadge(iconName: AppIcons.transparentBalance, size: size);
 }

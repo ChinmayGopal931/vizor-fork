@@ -32,12 +32,11 @@ class KeystoneShieldScannerSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     final message = decoding
         ? 'Reading signature…'
         : hint ?? 'Scanning… $progress%';
-    final style = AppTypography.bodyMedium.copyWith(
-      color: const Color(0xFFFFFFFF),
-    );
+    final style = AppTypography.bodyMedium.copyWith(color: colors.text.primary);
     double measure(String text) {
       final painter = TextPainter(
         text: TextSpan(text: text, style: style),
@@ -67,8 +66,11 @@ class KeystoneShieldScannerSurface extends StatelessWidget {
         children: [
           SizedBox.square(
             dimension: viewSize,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadii.large),
+            // A cut that clears the viewfinder's rounded brackets.
+            child: ClipPath(
+              clipper: ShapeBorderClipper(
+                shape: Neon.chamferBorder(cut: AppChamfer.medium),
+              ),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -109,9 +111,9 @@ class KeystoneShieldScannerSurface extends StatelessWidget {
               child: Opacity(
                 opacity: morph.scannerGlyphOpacity,
                 alwaysIncludeSemantics: true,
-                child: const Icon(
+                child: Icon(
                   Icons.flashlight_on_outlined,
-                  color: Color(0xFFFFFFFF),
+                  color: colors.button.ghost.label,
                   semanticLabel: 'Toggle flashlight',
                 ),
               ),

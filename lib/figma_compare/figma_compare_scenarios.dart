@@ -181,7 +181,7 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
   ),
   FigmaCompareScenario(
     id: 'mobile-shield-reference-review',
-    description: 'Original video: Transparent Balance',
+    description: 'Original video: Transparent balance',
     builder: buildMobileShieldReferenceReview,
     desktop: false,
     mobile: true,

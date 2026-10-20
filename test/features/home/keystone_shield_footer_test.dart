@@ -161,13 +161,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       for (final width in [360.0, 375.0, 390.0, 393.0, 402.0, 430.0]) {
-        // Gotham sets wider than Geist: at 360 and 1.15 "Next step" takes
-        // the wrapping fallback.
-        for (final scale in [
-          1.0,
-          if (width >= 375) 1.15,
-          if (width >= 390) 1.3,
-        ]) {
+        for (final scale in [1.0, 1.15, if (width >= 390) 1.3]) {
           tester.view.physicalSize = Size(width, 850);
           final qr = ValueNotifier(true);
           var nextCalls = 0, showCalls = 0, cancelCalls = 0;

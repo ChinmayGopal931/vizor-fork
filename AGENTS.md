@@ -212,6 +212,18 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   corner as a portrait only: a tap decrypts the name beside it for a few
   seconds, a second tap (or a long press) opens the account switcher, and
   screen readers get the name and the switcher directly.
+- **Shielding.** Home's Shield button opens upstream's immersive flow
+  (`/home/shield`, `/home/keystone-shield`, `/home/ledger-shield`) over a
+  frozen Home, in the neon look:
+  - Black over Home's Tron floor, which flows only while the wallet works
+    or the shield assembles.
+  - The amount in the balance sign's light, and red particles that turn
+    white-hot as they land.
+  - A cut-corner glass slider whose `Neon.strokeTube` edge lights up to the
+    pin.
+  - Success as a `NeonDoneSign`. Complete is the primary slab and Cancel a
+    ghost button.
+  - The Keystone QR stays black on white with its quiet zone.
 - **Sync line.** `NeonSyncBackdrop` replaces the top bar's sync label on
   Home. A Tron floor lies behind the content and flows only while
   something scans (idle, nothing moves and no frame is drawn), and a red

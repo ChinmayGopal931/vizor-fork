@@ -106,7 +106,7 @@ class _KeystoneShieldMotionPreviewState
       amount: '14.12',
       resultAmount: '14.1199',
       title: _stage == _Stage.review
-          ? 'Transparent Balance'
+          ? 'Transparent balance'
           : _stage == _Stage.succeeded
           ? 'Shielded successfully'
           : scanner

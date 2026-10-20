@@ -4,9 +4,6 @@ import '../../../../../core/theme/app_theme.dart';
 
 abstract final class VText {
   static const display = AppTypography.displayLarge;
-  static final labelL = AppTypography.bodyMedium.copyWith(
-    color: const Color(0xFFFFFFFF),
-  );
 }
 
 /// Motion vocabulary. Curves are the strong variants, never the built-ins.

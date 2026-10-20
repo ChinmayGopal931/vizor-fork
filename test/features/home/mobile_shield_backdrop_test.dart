@@ -78,7 +78,7 @@ void main() {
         home: MobileShieldScene(
           phase: MobileShieldPhase.review,
           amount: '14.12',
-          title: 'Transparent Balance',
+          title: 'Transparent balance',
           backdrop: backdrop,
         ),
       ),
