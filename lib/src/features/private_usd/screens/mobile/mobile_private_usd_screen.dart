@@ -1,13 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart' show Scaffold;
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app_bootstrap.dart';
-import '../../../../core/feedback/app_haptics.dart';
 import '../../../../core/formatting/date_format.dart';
 import '../../../../core/layout/mobile/mobile_top_nav.dart';
 import '../../../../core/layout/mobile/neon_sync_backdrop.dart';
@@ -28,21 +26,27 @@ import '../../../activity/models/activity_row_data.dart';
 import '../../../activity/widgets/activity_feed.dart' show ActivityFeedRowGroup;
 import '../../models/private_usd_arrival.dart';
 import '../../models/private_usd_balances.dart';
+import '../../models/private_usd_deposits.dart';
 import '../../models/private_usd_pending_payment.dart';
 import '../../models/private_usd_record_key.dart';
+import '../../models/private_usd_screening_status.dart';
+import '../../models/railgun_models.dart' show RailgunScreeningEvent;
 import '../../private_usd_copy.dart';
 import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_balance_provider.dart';
 import '../../providers/private_usd_activity_provider.dart';
 import '../../providers/private_usd_conversion_provider.dart';
 import '../../providers/private_usd_custom_rpc_provider.dart';
+import '../../providers/private_usd_deposits_provider.dart';
 import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_receive_address_provider.dart';
 import '../../providers/private_usd_spend_status_provider.dart';
+import '../../providers/railgun_engine_provider.dart';
 import '../../services/private_usd_balance_repository.dart';
 import '../../widgets/mobile/private_usd_home_strip.dart';
 import '../../widgets/mobile/private_usd_activity_rows.dart';
 import '../../widgets/mobile/private_usd_banner.dart';
+import '../../widgets/mobile/private_usd_receive_sheet.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
 import '../../widgets/mobile/private_usd_pending_payment_line.dart';
 import '../../widgets/mobile/private_usd_sync_line.dart';
@@ -59,20 +63,37 @@ class MobilePrivateUsdScreen extends ConsumerStatefulWidget {
       _MobilePrivateUsdScreenState();
 }
 
+/// How often the screen asks for a deposit pass while it is open (plan M9's
+/// default cadence).
+const _depositRefresh = Duration(seconds: 60);
+
 class _MobilePrivateUsdScreenState
     extends ConsumerState<MobilePrivateUsdScreen> {
+  Timer? _depositTimer;
+
   @override
   void initState() {
     super.initState();
-    // On open: a balance older than 30 s refreshes.
+    // On open: a balance older than 30 s refreshes, and the deposits are
+    // read (with the vaults, for "Refunds").
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      ref.read(privateUsdDepositActionsProvider).refresh(checkVaults: true);
       final uuid = ref.read(accountProvider).value?.activeAccountUuid;
       if (uuid == null) return;
       ref
           .read(privateUsdBalanceProvider(uuid).notifier)
           .refresh(maxAge: PrivateUsdBalanceTiming.arrivingPoll);
     });
+    _depositTimer = Timer.periodic(_depositRefresh, (_) {
+      if (mounted) ref.read(privateUsdDepositActionsProvider).refresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    _depositTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -86,6 +107,7 @@ class _MobilePrivateUsdScreenState
     );
     final deployment = ref.watch(privateUsdCurrentDeploymentProvider);
     final address = ref.watch(privateUsdReceiveAddressProvider(uuid));
+    final deposits = ref.watch(privateUsdDepositsAvailableProvider);
     final privacyModeEnabled = ref.watch(privacyModeProvider);
     final underWay = ref.watch(privateUsdUnderWayProvider(uuid));
     void open(PrivateUsdRoutePath path) => context.push(path.location);
@@ -94,11 +116,15 @@ class _MobilePrivateUsdScreenState
     final reverseRecords = ref.watch(
       privateUsdReverseActivityRecordsProvider(uuid),
     );
+    final depositRecords = ref.watch(privateUsdDepositRecordsProvider(uuid));
+    final screening = Duration(seconds: deployment?.screeningSeconds ?? 0);
     final activity = [
       for (final entry in privateUsdActivityEntries(
         context: context,
         records: records,
         reverseRecords: reverseRecords,
+        depositRecords: depositRecords,
+        screening: screening,
         zcashConfirmations: deployment?.zcashConfirmations ?? 2,
         privacyModeEnabled: privacyModeEnabled,
         onOpenConversion: open,
@@ -108,10 +134,20 @@ class _MobilePrivateUsdScreenState
       )..sort(compareActivityEntries))
         entry.row,
     ];
-    final hasRefunds = reverseRecords.any(
-      (record) => record.phase == ApiReversePhase.refunded,
-    );
+    // Deposits (M9): their state now, and a vault that can be rescued.
+    final depositPass = ref.watch(privateUsdDepositPassProvider(uuid));
+    final hasRefunds =
+        reverseRecords.any(
+          (record) => record.phase == ApiReversePhase.refunded,
+        ) ||
+        ref.watch(privateUsdDepositRescuesProvider(uuid)).isNotEmpty;
     final balance = ref.watch(privateUsdBalanceProvider(uuid));
+    // What the page's screening work is doing, from this account's page only.
+    final screeningActivity = ref.watch(
+      railgunEngineStateProvider.select(
+        (engine) => engine.accountUuid == uuid ? engine.screening : null,
+      ),
+    );
     final sends = ref.watch(privateUsdEngineEnabledProvider);
     final spending = ref.watch(privateUsdSpendStatusProvider(uuid));
     final hasDollars =
@@ -130,16 +166,34 @@ class _MobilePrivateUsdScreenState
           ? () => unawaited(_useDefaultRpc(network, uuid))
           : null,
       state: balance,
+      screeningActivity: screeningActivity,
       networkPrivacy: ref.watch(networkPrivacyProvider),
       zecUsdPrice: ref.watch(zecHomeUsdUnitPriceProvider),
       privacyModeEnabled: privacyModeEnabled,
-      receiveAddress: address.value,
-      screening: Duration(seconds: deployment?.screeningSeconds ?? 0),
+      screening: screening,
       arrivingSince: privateUsdArrivingSince(
         arriving: balance.balances?.arriving ?? BigInt.zero,
         forward: records,
         reverse: reverseRecords,
+        deposits: depositRecords,
       ),
+      depositLines: depositPass == null
+          ? const []
+          : privateUsdDepositLines(
+              depositPass,
+              now: DateTime.now(),
+              screening: screening,
+            ),
+      depositMinimum: BigInt.tryParse(depositPass?.terms?.minValue ?? ''),
+      // Public USDC where the network pins deposits, and the 0zk address
+      // for another Railgun wallet: one sheet, as ZEC's Receive.
+      onReceive: deposits || address.value != null
+          ? () => showPrivateUsdReceiveSheet(
+              context,
+              accountUuid: uuid,
+              deposits: deposits,
+            )
+          : null,
       tokenNames: {
         for (final token in deployment?.usdTokens ?? const [])
           token.address.toLowerCase(): PrivateUsdCopy.tokenName(token.symbol),
@@ -186,10 +240,10 @@ class MobilePrivateUsdView extends StatelessWidget {
     required this.state,
     required this.zecUsdPrice,
     required this.privacyModeEnabled,
-    required this.receiveAddress,
     required this.screening,
     required this.onBack,
     required this.onRefresh,
+    this.screeningActivity,
     this.arrivingSince,
     this.now = DateTime.now,
     this.networkPrivacy,
@@ -207,18 +261,22 @@ class MobilePrivateUsdView extends StatelessWidget {
     this.onRefunds,
     this.rpcFailing = false,
     this.onUseDefaultRpc,
+    this.onReceive,
+    this.depositLines = const [],
+    this.depositMinimum,
     super.key,
   });
 
   final PrivateUsdBalanceState state;
 
+  /// What the page's screening work is doing now, for the Processing row's
+  /// live line and the sync line; null while the page says nothing.
+  final RailgunScreeningEvent? screeningActivity;
+
   /// Whether the page waits for Tor or Tor failed, for the sync line.
   final NetworkPrivacyState? networkPrivacy;
   final double? zecUsdPrice;
   final bool privacyModeEnabled;
-
-  /// Null until Rust has derived it.
-  final String? receiveAddress;
 
   /// How long Railgun screens new funds, for the explanations and the
   /// Arriving row's estimate.
@@ -270,13 +328,25 @@ class MobilePrivateUsdView extends StatelessWidget {
   final bool rpcFailing;
   final VoidCallback? onUseDefaultRpc;
 
+  /// "Receive" (M9): the Receive USDC sheet for public USDC. Hidden when
+  /// null (no deposits on this network, or Private USD unavailable).
+  final VoidCallback? onReceive;
+
+  /// The deposits' state now (M9), and the relayer's minimum.
+  final List<PrivateUsdDepositLine> depositLines;
+  final BigInt? depositMinimum;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final balances = state.balances;
     final banner = this.banner;
     final onConvert = this.onConvert;
-    final syncLine = privateUsdSyncLine(state, networkPrivacy: networkPrivacy);
+    final syncLine = privateUsdSyncLine(
+      state,
+      networkPrivacy: networkPrivacy,
+      txidCatchUp: screeningActivity?.txids,
+    );
     return Scaffold(
       backgroundColor: colors.background.window,
       body: AppToastHost(
@@ -337,38 +407,48 @@ class MobilePrivateUsdView extends StatelessWidget {
                               onUseDefaultRpc: onUseDefaultRpc,
                             ),
                           ),
-                          if (onSend != null && onWithdraw != null) ...[
+                          if ((onSend != null && onWithdraw != null) ||
+                              onReceive != null) ...[
                             const SizedBox(height: AppSpacing.s),
                             NeonSyncOcclude(
                               child: Row(
                                 children: [
-                                  Expanded(
-                                    child: AppButton(
-                                      key: const ValueKey(
-                                        'mobile_private_usd_send',
-                                      ),
-                                      variant: AppButtonVariant.secondary,
-                                      expand: true,
-                                      onPressed: canSend ? onSend : null,
-                                      child: const Text(
-                                        PrivateUsdCopy.actionSend,
+                                  if (onSend != null && onWithdraw != null) ...[
+                                    Expanded(
+                                      child: _ActionButton(
+                                        buttonKey: const ValueKey(
+                                          'mobile_private_usd_send',
+                                        ),
+                                        label: PrivateUsdCopy.actionSend,
+                                        onPressed: canSend ? onSend : null,
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.s),
-                                  Expanded(
-                                    child: AppButton(
-                                      key: const ValueKey(
-                                        'mobile_private_usd_withdraw',
-                                      ),
-                                      variant: AppButtonVariant.secondary,
-                                      expand: true,
-                                      onPressed: canSend ? onWithdraw : null,
-                                      child: const Text(
-                                        PrivateUsdCopy.actionWithdraw,
+                                    const SizedBox(width: AppSpacing.s),
+                                    Expanded(
+                                      child: _ActionButton(
+                                        buttonKey: const ValueKey(
+                                          'mobile_private_usd_withdraw',
+                                        ),
+                                        label: PrivateUsdCopy.actionWithdraw,
+                                        onPressed: canSend ? onWithdraw : null,
                                       ),
                                     ),
-                                  ),
+                                  ],
+                                  // Incoming, so the spend guard never
+                                  // holds it.
+                                  if (onReceive case final onReceive?) ...[
+                                    if (onSend != null && onWithdraw != null)
+                                      const SizedBox(width: AppSpacing.s),
+                                    Expanded(
+                                      child: _ActionButton(
+                                        buttonKey: const ValueKey(
+                                          'mobile_private_usd_receive_usdc',
+                                        ),
+                                        label: PrivateUsdCopy.actionReceive,
+                                        onPressed: onReceive,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -395,6 +475,18 @@ class MobilePrivateUsdView extends StatelessWidget {
                               ),
                             ),
                           ],
+                          if (depositLines.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.s),
+                            NeonSyncOcclude(
+                              child: _DepositsCard(
+                                lines: depositLines,
+                                minimum: depositMinimum,
+                                screening: screening,
+                                privacyModeEnabled: privacyModeEnabled,
+                                onTap: onReceive,
+                              ),
+                            ),
+                          ],
                           if (banner != null) ...[
                             const SizedBox(height: AppSpacing.s),
                             NeonSyncOcclude(
@@ -417,6 +509,11 @@ class MobilePrivateUsdView extends StatelessWidget {
                                 balances: balances,
                                 privacyModeEnabled: privacyModeEnabled,
                                 screening: screening,
+                                processingStalled: state.screeningFailed,
+                                processingStatus: privateUsdScreeningStatus(
+                                  activity: screeningActivity,
+                                  balances: balances,
+                                ),
                                 arrivingSince: arrivingSince,
                                 now: now,
                               ),
@@ -431,12 +528,6 @@ class MobilePrivateUsdView extends StatelessWidget {
                                 ),
                               ),
                             ],
-                          ],
-                          if (receiveAddress case final address?) ...[
-                            const SizedBox(height: AppSpacing.s),
-                            NeonSyncOcclude(
-                              child: _ReceiveAddressCard(address: address),
-                            ),
                           ],
                           const SizedBox(height: AppSpacing.md),
                           _ActivitySection(
@@ -487,6 +578,38 @@ String _masked(String usd, bool privacyModeEnabled) => hideAmountIfPrivacyMode(
   privacyModeEnabled: privacyModeEnabled,
   denomination: '',
 );
+
+/// Send, Withdraw or Receive. The three share a row, about 100 dp each on a
+/// 360 dp phone, where the large button's side padding left "Withdraw" 17 px
+/// short: the padding is tight, and a label that still doesn't fit scales
+/// down instead of overflowing the button.
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.buttonKey,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final Key buttonKey;
+  final String label;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppButton(
+      key: buttonKey,
+      variant: AppButtonVariant.secondary,
+      expand: true,
+      constrainContent: true,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xxs,
+        vertical: AppSpacing.xs,
+      ),
+      onPressed: onPressed,
+      child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1)),
+    );
+  }
+}
 
 class _TotalCard extends StatelessWidget {
   const _TotalCard({
@@ -706,6 +829,8 @@ class _BucketsCard extends StatelessWidget {
     required this.balances,
     required this.privacyModeEnabled,
     required this.screening,
+    required this.processingStalled,
+    required this.processingStatus,
     required this.arrivingSince,
     required this.now,
   });
@@ -713,6 +838,13 @@ class _BucketsCard extends StatelessWidget {
   final PrivateUsdBalances balances;
   final bool privacyModeEnabled;
   final Duration screening;
+
+  /// What is processing waits on screening that keeps failing, not on a
+  /// send ([PrivateUsdBalanceState.screeningFailed]).
+  final bool processingStalled;
+
+  /// The Processing row's live line (`privateUsdScreeningStatus`), if any.
+  final String? processingStatus;
   final DateTime? arrivingSince;
   final DateTime Function() now;
 
@@ -730,12 +862,17 @@ class _BucketsCard extends StatelessWidget {
       if (balances.processing > BigInt.zero)
         _BucketRow(
           key: const ValueKey('mobile_private_usd_row_processing'),
-          label: PrivateUsdCopy.rowProcessing,
+          label: processingStalled
+              ? PrivateUsdCopy.rowProcessingStalled
+              : PrivateUsdCopy.rowProcessing,
           amount: _masked(
             formatPrivateUsd(balances.processing),
             privacyModeEnabled,
           ),
-          info: PrivateUsdCopy.rowProcessingInfo,
+          status: processingStatus,
+          info: processingStalled
+              ? PrivateUsdCopy.rowProcessingStalledInfo
+              : PrivateUsdCopy.rowProcessingInfo,
         ),
       if (balances.arriving > BigInt.zero)
         _ArrivingRow(
@@ -779,6 +916,7 @@ class _BucketRow extends StatelessWidget {
   const _BucketRow({
     required this.label,
     required this.amount,
+    this.status,
     this.info,
     this.danger = false,
     super.key,
@@ -786,6 +924,10 @@ class _BucketRow extends StatelessWidget {
 
   final String label;
   final String amount;
+
+  /// A live line under the label, smaller and in the accent colour (owner,
+  /// 2026-10-19): what the work behind this amount is doing now.
+  final String? status;
   final String? info;
   final bool danger;
 
@@ -810,6 +952,16 @@ class _BucketRow extends StatelessWidget {
             ),
           ],
         ),
+        if (status != null) ...[
+          const SizedBox(height: AppSpacing.xxs),
+          Text(
+            status!,
+            key: const ValueKey('mobile_private_usd_row_status'),
+            style: AppTypography.bodyExtraSmall.copyWith(
+              color: colors.text.brandCrimson,
+            ),
+          ),
+        ],
         if (info != null) ...[
           const SizedBox(height: AppSpacing.xxs),
           Text(
@@ -976,75 +1128,52 @@ class _EmptyCard extends StatelessWidget {
   }
 }
 
-class _ReceiveAddressCard extends StatelessWidget {
-  const _ReceiveAddressCard({required this.address});
+/// The deposits' state now (M9): what each deposit address received, what
+/// is being made private, and what is being screened. Opens the Receive
+/// USDC sheet.
+class _DepositsCard extends StatelessWidget {
+  const _DepositsCard({
+    required this.lines,
+    required this.minimum,
+    required this.screening,
+    required this.privacyModeEnabled,
+    required this.onTap,
+  });
 
-  final String address;
-
-  Future<void> _copy(BuildContext context) async {
-    // A receive address is not sensitive: the plain clipboard.
-    await Clipboard.setData(ClipboardData(text: address));
-    unawaited(AppHaptics.copy());
-    if (context.mounted) showAppToast(context, PrivateUsdCopy.addressCopied);
-  }
+  final List<PrivateUsdDepositLine> lines;
+  final BigInt? minimum;
+  final Duration screening;
+  final bool privacyModeEnabled;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return MobileSurfaceCard(
-      key: const ValueKey('mobile_private_usd_receive'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  PrivateUsdCopy.receiveAddress,
-                  style: AppTypography.labelLarge.copyWith(
-                    color: colors.text.accent,
-                  ),
-                ),
-              ),
-              Semantics(
-                button: true,
-                label: PrivateUsdCopy.copyAddress,
-                excludeSemantics: true,
-                child: GestureDetector(
-                  key: const ValueKey('mobile_private_usd_copy_address'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _copy(context),
-                  child: SizedBox.square(
-                    dimension: 44,
-                    child: Center(
-                      child: AppIcon(
-                        AppIcons.copy,
-                        size: 20,
-                        color: colors.text.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.s),
-            decoration: BoxDecoration(
-              color: colors.background.window,
-              borderRadius: BorderRadius.circular(AppRadii.medium),
-            ),
-            child: Text(
-              address,
-              key: const ValueKey('mobile_private_usd_address'),
-              style: AppTypography.codeSmall.copyWith(
+    return GestureDetector(
+      key: const ValueKey('mobile_private_usd_deposits'),
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: MobileSurfaceCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              PrivateUsdCopy.depositsTitle,
+              style: AppTypography.labelLarge.copyWith(
                 color: colors.text.accent,
               ),
             ),
-          ),
-        ],
+            for (final line in lines) ...[
+              const SizedBox(height: AppSpacing.xs),
+              PrivateUsdDepositLineText(
+                line: line,
+                minimum: minimum,
+                screening: screening,
+                privacyModeEnabled: privacyModeEnabled,
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

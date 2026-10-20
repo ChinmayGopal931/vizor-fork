@@ -18,7 +18,6 @@ import '../src/core/widgets/mobile/mobile_surface_card.dart';
 
 const _mobileTabItems = [
   AppMobileTabItem(iconName: AppIcons.home, label: 'Home'),
-  AppMobileTabItem(iconName: AppIcons.swapArrows, label: 'Swap'),
   AppMobileTabItem(iconName: AppIcons.history, label: 'Activity'),
   AppMobileTabItem(iconName: AppIcons.cog, label: 'Settings'),
 ];
@@ -110,7 +109,7 @@ class _ShellPreviewState extends State<_ShellPreview> {
 
   @override
   Widget build(BuildContext context) {
-    final labels = ['Home', 'Swap', 'Activity', 'Settings'];
+    final labels = ['Home', 'Activity', 'Settings'];
     return AppMobileShell(
       body: Column(
         children: [

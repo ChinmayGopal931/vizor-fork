@@ -1495,7 +1495,7 @@ fn accept_refusal(refusal: &Refusal) -> Option<NothingSentCause> {
         Some(SwapErrorCode::UnknownSwap | SwapErrorCode::Internal) => None,
         // A relayer's answer, which no maker gives, or a code this build
         // does not know: read by status.
-        Some(SwapErrorCode::AlreadySpent) | None => match refusal.status {
+        Some(SwapErrorCode::AlreadySpent | SwapErrorCode::Conflict) | None => match refusal.status {
             400 => Some(NothingSentCause::MakerRefused),
             404 => Some(NothingSentCause::QuoteExpired),
             503 => Some(NothingSentCause::MakerUnavailable),

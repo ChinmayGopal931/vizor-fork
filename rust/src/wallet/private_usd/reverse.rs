@@ -1937,7 +1937,7 @@ fn last_word(refusal: &Refusal) -> Option<NothingSentCause> {
         | SwapErrorCode::UnknownSwap
         | SwapErrorCode::NotFound
         | SwapErrorCode::MethodNotAllowed => Some(NothingSentCause::MakerRefused),
-        SwapErrorCode::Internal | SwapErrorCode::AlreadySpent => None,
+        SwapErrorCode::Internal | SwapErrorCode::AlreadySpent | SwapErrorCode::Conflict => None,
     }
 }
 

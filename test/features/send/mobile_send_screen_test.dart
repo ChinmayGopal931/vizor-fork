@@ -2503,7 +2503,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('SELECT RECIPIENT'), findsOneWidget);
-    expect(find.text('Scan a QR Code'), findsOneWidget);
+    expect(find.text('Scan a QR code'), findsOneWidget);
     // The unfocused empty state carries no Continue button.
     expect(find.byKey(const ValueKey('mobile_send_continue')), findsNothing);
     expect(find.text('Paste'), findsNothing);
@@ -2619,7 +2619,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Scan a QR Code'));
+    await tester.tap(find.text('Scan a QR code'));
     await tester.pumpAndSettle();
 
     expect(scannerOpenCount, 1);
@@ -2653,7 +2653,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Scan a QR Code'));
+    await tester.tap(find.text('Scan a QR code'));
     await tester.pumpAndSettle();
 
     final editable = tester.widget<EditableText>(
@@ -2680,7 +2680,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Scan a QR Code'));
+    await tester.tap(find.text('Scan a QR code'));
     await tester.pumpAndSettle();
 
     for (final downgrade in SendScanDowngrade.values) {
@@ -2712,7 +2712,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Scan a QR Code'));
+      await tester.tap(find.text('Scan a QR code'));
       await tester.pumpAndSettle();
 
       // The request is answered on the card, over the send screen.

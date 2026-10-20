@@ -94,6 +94,15 @@ Widget _app({
   ),
 );
 
+/// Swap opens from Home's Swap button, pushed over the tabs.
+Future<void> _openSwap(WidgetTester tester) async {
+  final swap = find.byKey(const ValueKey('mobile_home_swap'));
+  await tester.ensureVisible(swap);
+  await tester.pumpAndSettle();
+  await tester.tap(swap);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('slippage buttons stay above the keyboard on a compact route', (
     tester,
@@ -105,8 +114,7 @@ void main() {
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
+    await _openSwap(tester);
     await tester.tap(find.byKey(const ValueKey('swap_settings_button')));
     await tester.pumpAndSettle();
     tester.view.viewInsets = const FakeViewPadding(bottom: 216);
@@ -140,8 +148,7 @@ void main() {
   ) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
+    await _openSwap(tester);
     for (var mode = 0; mode < 2; mode++) {
       if (mode == 1) {
         await tester.tap(
@@ -344,8 +351,7 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
+    await _openSwap(tester);
 
     expect(find.byType(MobileSwapScreen), findsOneWidget);
     expect(find.text('Add recipient address'), findsOneWidget);
@@ -359,12 +365,11 @@ void main() {
   });
 
   testWidgets('swap modal rides the root navigator and covers the whole '
-      'screen, tab bar included', (tester) async {
+      'screen', (tester) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
+    await _openSwap(tester);
     expect(find.byType(MobileSwapScreen), findsOneWidget);
 
     await tester.tap(find.text('Add recipient address'));
@@ -372,8 +377,8 @@ void main() {
     expect(find.byType(MobileSwapAddressEditModal), findsOneWidget);
 
     // The dialog barrier spans the full screen — including the status
-    // bar strip at the very top and the floating tab bar at the bottom
-    // (neither was covered by the old inline overlay).
+    // bar strip at the very top and the bottom edge (neither was covered
+    // by the old inline overlay).
     final screen = tester.getRect(find.byType(MaterialApp));
     final barrier = tester.getRect(find.byType(ModalBarrier).last);
     expect(barrier, screen);
@@ -385,10 +390,9 @@ void main() {
     expect(find.byType(MobileSwapAddressEditModal), findsNothing);
     expect(find.byType(MobileSwapScreen), findsOneWidget);
 
-    // The bottom strip — where the floating tab bar sits — is under the
-    // barrier too. The modal card is bottom-anchored with a gap beneath
-    // it, so a tap in that gap hits the barrier and dismisses the modal
-    // instead of reaching the tab bar to switch branches.
+    // The bottom strip is under the barrier too. The modal card is
+    // bottom-anchored with a gap beneath it, so a tap in that gap hits the
+    // barrier and dismisses the modal.
     await tester.tap(find.text('Add recipient address'));
     await tester.pumpAndSettle();
     expect(find.byType(MobileSwapAddressEditModal), findsOneWidget);
@@ -419,8 +423,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
+    await _openSwap(tester);
 
     await tester.tap(find.text('Add recipient address'));
     await tester.pumpAndSettle();
@@ -457,8 +460,7 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
+    await _openSwap(tester);
 
     await tester.tap(find.text('Add recipient address'));
     await tester.pumpAndSettle();
@@ -470,16 +472,15 @@ void main() {
     expect(find.byType(MobileSwapScreen), findsOneWidget);
   });
 
-  testWidgets('swap tab has no back or close button while editing amounts', (
+  testWidgets('swap keeps one back button and no close while editing amounts', (
     tester,
   ) async {
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
+    await _openSwap(tester);
 
-    expect(find.bySemanticsLabel('Back'), findsNothing);
+    expect(find.bySemanticsLabel('Back'), findsOneWidget);
     expect(find.bySemanticsLabel('Close'), findsNothing);
     final field = find.descendant(
       of: find.byKey(const ValueKey('swap_amount_field')),
@@ -491,7 +492,7 @@ void main() {
 
     expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
     expect(tester.widget<TextField>(field).controller!.text, '0.25');
-    expect(find.bySemanticsLabel('Back'), findsNothing);
+    expect(find.bySemanticsLabel('Back'), findsOneWidget);
     expect(find.bySemanticsLabel('Close'), findsNothing);
 
     // The existing native keyboard action can still dismiss the input.
@@ -499,7 +500,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<TextField>(field).focusNode!.hasFocus, isFalse);
     expect(tester.widget<TextField>(field).controller!.text, '0.25');
-    expect(find.bySemanticsLabel('Back'), findsNothing);
+    expect(find.bySemanticsLabel('Back'), findsOneWidget);
     expect(find.bySemanticsLabel('Close'), findsNothing);
   });
 
@@ -508,8 +509,7 @@ void main() {
   ) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
+    await _openSwap(tester);
 
     // The "You pay" / "You receive" labels stay pinned — they are no longer
     // hidden on input — and the focused amount field keeps the SAME
@@ -543,8 +543,7 @@ void main() {
   ) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
+    await _openSwap(tester);
 
     final field = find.byKey(const ValueKey('swap_receive_amount_field'));
     final textField = find.descendant(
@@ -571,8 +570,7 @@ void main() {
       final swapProvider = _MobileDelayedQuoteSwapProvider();
       await tester.pumpWidget(_app(swapProvider: swapProvider));
       await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsLabel('Swap').last);
-      await tester.pumpAndSettle();
+      await _openSwap(tester);
 
       await tester.enterText(
         find.byKey(const ValueKey('swap_amount_field')),
@@ -645,8 +643,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
+    await _openSwap(tester);
 
     expect(
       find.text('USDC on Base is not currently supported.'),
@@ -659,8 +656,7 @@ void main() {
   ) async {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
+    await _openSwap(tester);
 
     await tester.tap(find.text('Add recipient address'));
     await tester.pumpAndSettle();
@@ -690,8 +686,7 @@ void main() {
 
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
+    await _openSwap(tester);
 
     await tester.tap(find.text('Add recipient address'));
     await tester.pumpAndSettle();

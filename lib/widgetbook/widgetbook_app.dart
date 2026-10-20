@@ -702,6 +702,18 @@ class WidgetbookApp extends StatelessWidget {
                       builder: buildMobilePrivateUsdProgressPaidUseCase,
                     ),
                     WidgetbookUseCase(
+                      name: 'Progress bridged',
+                      builder: buildMobilePrivateUsdProgressBridgedUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Receive USDC',
+                      builder: buildMobilePrivateUsdReceiveUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Receive 0zkUSDC',
+                      builder: buildMobilePrivateUsdReceiveShieldedUseCase,
+                    ),
+                    WidgetbookUseCase(
                       name: 'Progress refunding',
                       builder: buildMobilePrivateUsdProgressRefundingUseCase,
                     ),

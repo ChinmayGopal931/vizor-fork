@@ -74,6 +74,7 @@ class _SendFormPreviewState extends State<_SendFormPreview> {
     onRecipientChanged: (_) {},
     onUseAll: () {},
     onPaste: () {},
+    onScan: () {},
     onReview: () {},
     onBack: () {},
     isRailgunAddress: previewPrivateUsdIsRailgunAddress,

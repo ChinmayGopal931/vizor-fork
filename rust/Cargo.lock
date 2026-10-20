@@ -9486,11 +9486,13 @@ dependencies = [
 name = "zecswap-core"
 version = "0.1.0"
 dependencies = [
+ "bip32",
  "blake2b_simd",
  "ff 0.14.0",
  "group 0.14.0",
  "k256",
  "rand 0.10.3",
+ "secp256k1",
  "sha3",
  "zakura-address",
  "zakura-orchard",

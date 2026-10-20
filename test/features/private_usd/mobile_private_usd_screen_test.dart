@@ -2,10 +2,10 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_pending_payment.dart';
+import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_screen.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
@@ -36,9 +36,9 @@ void main() {
   Future<void> pumpScreen(
     WidgetTester tester,
     PrivateUsdBalanceState state, {
-    String? address = previewPrivateUsdAddress,
     PrivateUsdPendingPayment? pendingPayment,
     String? spendNote,
+    RailgunScreeningEvent? screeningActivity,
   }) async {
     refreshes = 0;
     await tester.pumpWidget(
@@ -47,9 +47,9 @@ void main() {
           data: AppThemeData.dark,
           child: MobilePrivateUsdView(
             state: state,
+            screeningActivity: screeningActivity,
             zecUsdPrice: 50,
             privacyModeEnabled: false,
-            receiveAddress: address,
             screening: const Duration(hours: 1),
             onBack: () {},
             onRefresh: () => refreshes++,
@@ -62,9 +62,7 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('a balance shows its buckets, receive address and activity', (
-    tester,
-  ) async {
+  testWidgets('a balance shows its buckets and activity', (tester) async {
     await pumpScreen(
       tester,
       previewPrivateUsdBalance(available: 100, arriving: 20, processing: 5),
@@ -79,14 +77,77 @@ void main() {
     expect(find.text(PrivateUsdCopy.rowArriving), findsOneWidget);
     expect(find.text(PrivateUsdCopy.rowArrivingInfo(_hour)), findsOneWidget);
     expect(find.text(PrivateUsdCopy.rowBlocked), findsNothing);
-    expect(find.text(PrivateUsdCopy.receiveAddress), findsOneWidget);
-    expect(find.text(previewPrivateUsdAddress), findsOneWidget);
+    // The 0zk address moved into the Receive sheet (owner, 2026-10-19).
+    expect(
+      find.byKey(const ValueKey('mobile_private_usd_receive')),
+      findsNothing,
+    );
+    expect(find.text(previewPrivateUsdAddress), findsNothing);
     expect(find.text(PrivateUsdCopy.activityEmpty), findsOneWidget);
     expect(find.text(PrivateUsdCopy.emptyTitle), findsNothing);
     // Convert shows only with its action (the screen always gives one);
     // Send and Withdraw arrive with M7.
     expect(find.text(PrivateUsdCopy.actionConvert), findsNothing);
     expect(find.text(PrivateUsdCopy.actionSend), findsNothing);
+  });
+
+  testWidgets('processing says so when the screening keeps failing', (
+    tester,
+  ) async {
+    await pumpScreen(
+      tester,
+      previewPrivateUsdBalance(available: 8.8, processing: 29.11),
+    );
+    expect(find.text(PrivateUsdCopy.rowProcessing), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.rowProcessingInfo), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.rowProcessingStalled), findsNothing);
+
+    await pumpScreen(
+      tester,
+      previewPrivateUsdBalance(
+        available: 8.8,
+        processing: 29.11,
+      ).copyWith(screeningFailed: true),
+    );
+    expect(find.text(PrivateUsdCopy.rowProcessingStalled), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.rowProcessingStalledInfo), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.rowProcessing), findsNothing);
+    expect(find.text(PrivateUsdCopy.rowProcessingInfo), findsNothing);
+    expect(find.text(r'$29.11'), findsOneWidget);
+
+    // Nothing processing, nothing to say.
+    await pumpScreen(
+      tester,
+      previewPrivateUsdBalance(available: 8.8).copyWith(screeningFailed: true),
+    );
+    expect(find.text(PrivateUsdCopy.rowProcessingStalled), findsNothing);
+  });
+
+  testWidgets('processing says what the screening work is doing, smaller '
+      'and in another colour than its label (owner, 2026-10-19)', (
+    tester,
+  ) async {
+    const statusKey = ValueKey('mobile_private_usd_row_status');
+    await pumpScreen(
+      tester,
+      previewPrivateUsdBalance(available: 8.8, processing: 29.11),
+      screeningActivity: const RailgunScreeningEvent(
+        proving: RailgunPoiProving(index: 1, count: 3, progress: 0.4),
+      ),
+    );
+    final status = tester.widget<Text>(find.byKey(statusKey));
+    expect(status.data, PrivateUsdCopy.screeningProving(1, 3, 40));
+    final label = tester.widget<Text>(find.text(PrivateUsdCopy.rowProcessing));
+    expect(status.style!.fontSize!, lessThan(label.style!.fontSize!));
+    expect(status.style!.color, isNot(label.style!.color));
+
+    // Nothing running and nothing a node has taken: no line.
+    await pumpScreen(
+      tester,
+      previewPrivateUsdBalance(available: 8.8, processing: 29.11),
+      screeningActivity: const RailgunScreeningEvent(),
+    );
+    expect(find.byKey(statusKey), findsNothing);
   });
 
   testWidgets('a payment in flight shows its stage, with observed numbers '
@@ -159,14 +220,12 @@ void main() {
     await pumpScreen(
       tester,
       const PrivateUsdBalanceState(isRefreshing: true, firstSyncPercent: 42),
-      address: null,
     );
 
     expect(find.text(PrivateUsdCopy.firstLoad), findsOneWidget);
     expect(find.text(PrivateUsdCopy.firstLoadProgress(42)), findsNothing);
     expect(find.text('RAILGUN SYNC 42%'), findsOneWidget);
     expect(find.text(PrivateUsdCopy.unknown), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.receiveAddress), findsNothing);
   });
 
   testWidgets('a failed refresh keeps the last balance and says so', (
@@ -195,37 +254,11 @@ void main() {
     expect(find.text(PrivateUsdCopy.rowBlockedInfo), findsOneWidget);
   });
 
-  testWidgets('refresh asks again; copy puts the address on the clipboard', (
-    tester,
-  ) async {
-    final clipboard = <String>[];
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'Clipboard.setData') {
-          clipboard.add((call.arguments as Map)['text'] as String);
-        }
-        return null;
-      },
-    );
-    addTearDown(
-      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        null,
-      ),
-    );
+  testWidgets('refresh asks again', (tester) async {
     await pumpScreen(tester, previewPrivateUsdBalance(available: 1));
 
     await tester.tap(find.byKey(const ValueKey('mobile_private_usd_refresh')));
     expect(refreshes, 1);
-
-    await tester.tap(
-      find.byKey(const ValueKey('mobile_private_usd_copy_address')),
-    );
-    await tester.pump();
-    expect(clipboard, [previewPrivateUsdAddress]);
-    expect(find.text(PrivateUsdCopy.addressCopied), findsOneWidget);
-    await tester.pumpAndSettle(const Duration(seconds: 5));
   });
 
   testWidgets('the info sheet explains the feature', (tester) async {

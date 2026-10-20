@@ -131,7 +131,7 @@ void main() {
       return presentation;
     }
 
-    // Unpaid: "Pay {debit}" and "Cancel conversion".
+    // Unpaid: "Pay {debit}" and "Cancel bridge".
     await progress(
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.awaitingFunding),
     );
@@ -167,7 +167,7 @@ void main() {
       isNull,
     );
 
-    // Settled: no call-off; ended: "New conversion".
+    // Settled: no call-off; ended: "New bridge".
     await progress(
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.receiving),
     );
@@ -181,6 +181,62 @@ void main() {
     expect(find.text(PrivateUsdCopy.reverseResultRefunded), findsOneWidget);
     expect(find.text(PrivateUsdCopy.reverseNew), findsOneWidget);
     expect(find.text(PrivateUsdCopy.refundsView), findsOneWidget);
+  });
+
+  // A finished bridge kept "Moving ZEC to your wallet" spinning beside an
+  // enabled "New bridge" (owner, 2026-10-19): the timeline capped its
+  // current step at the last row.
+  testWidgets('a finished bridge keeps no step current and lights its sign', (
+    tester,
+  ) async {
+    Future<void> show(ApiReversePhase phase, {bool celebrate = false}) => pump(
+      tester,
+      MobilePrivateUsdReverseConversionView(
+        presentation: privateUsdReverseProgressPresentation(
+          status: PrivateUsdReverseStatus(
+            record: previewPrivateUsdReverseRecord(phase: phase),
+          ),
+          now: previewPrivateUsdNow,
+        ),
+        celebrate: celebrate,
+        onBack: () {},
+        onInfo: () {},
+        onRetry: () {},
+      ),
+    );
+
+    await show(ApiReversePhase.receiving);
+    expect(
+      find.byKey(const ValueKey('swap_status_active_step_loader')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(PrivateUsdCopy.convertProgressTitle.toUpperCase()),
+      findsOneWidget,
+    );
+
+    await show(ApiReversePhase.complete);
+    await tester.pump(const Duration(seconds: 1));
+    expect(
+      find.byKey(const ValueKey('swap_status_active_step_loader')),
+      findsNothing,
+    );
+    expect(find.text(PrivateUsdCopy.reverseSweeping), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('mobile_private_usd_bridged')),
+      findsOneWidget,
+    );
+    expect(
+      find.text(PrivateUsdCopy.bridgedTitle.toUpperCase()),
+      findsOneWidget,
+    );
+    expect(
+      find.text(PrivateUsdCopy.bridgeEndedTitle.toUpperCase()),
+      findsOneWidget,
+    );
+    expect(find.text(PrivateUsdCopy.bridgedYouPaid), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.bridgedYouReceived), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.reverseNew), findsOneWidget);
   });
 
   testWidgets('the Pay step reads as the user\'s to take until Pay is tapped, '

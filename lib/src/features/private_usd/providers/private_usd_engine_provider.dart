@@ -11,6 +11,7 @@ import '../../../providers/app_security_provider.dart';
 import '../../../providers/private_usd_lifecycle_provider.dart';
 import '../../../providers/rpc_endpoint_failover_provider.dart';
 import '../models/private_usd_record_key.dart';
+import '../services/private_usd_deposit_backend.dart';
 import '../services/private_usd_engine.dart';
 import '../services/private_usd_reverse_funding.dart';
 import '../services/private_usd_sender.dart';
@@ -49,6 +50,32 @@ final privateUsdSwapBackendProvider = Provider<PrivateUsdSwapBackend>(
 final privateUsdSendBackendProvider = Provider<PrivateUsdSendBackend>(
   (ref) => RustPrivateUsdSendBackend(() => privateUsdSwapContextOf(ref)),
 );
+
+/// The Rust deposit calls for this wallet (M9); replaced by a fake in tests.
+final privateUsdDepositBackendProvider = Provider<PrivateUsdDepositBackend>(
+  (ref) => RustPrivateUsdDepositBackend(() => privateUsdSwapContextOf(ref)),
+);
+
+/// Whether this build follows deposits at all: the swap engine runs and the
+/// network pins a Deposits contract (testnet and mainnet both do). It does
+/// not follow the kill switch, which only stops new deposits (D16).
+final privateUsdDepositsEnabledProvider = Provider<bool>(
+  (ref) =>
+      ref.watch(privateUsdEngineEnabledProvider) &&
+      ref.watch(privateUsdCurrentDeploymentProvider)?.deposits != null,
+);
+
+/// The account deposits run for: the active one, when it can have them (a
+/// software account with a ZIP-32 index, D6, D8).
+String? privateUsdDepositAccountOf(Ref ref) {
+  final account = ref.read(accountProvider).value?.activeAccount;
+  if (account == null ||
+      account.isHardware ||
+      account.zip32AccountIndex == null) {
+    return null;
+  }
+  return account.uuid;
+}
 
 /// Whether this build runs the swap engine at all: the define, a mobile build
 /// on a platform that hosts the page, and a deployment for the network. It
@@ -94,6 +121,7 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
   final lifecycle = ref.watch(privateUsdLifecycleProvider);
   final state = WidgetsBinding.instance.lifecycleState;
   var foreground = state == null || state == AppLifecycleState.resumed;
+  final depositsEnabled = ref.read(privateUsdDepositsEnabledProvider);
   final engine = PrivateUsdEngine(
     backend: ref.watch(privateUsdSwapBackendProvider),
     // Any account's seed while unlocked (D14); null while locked.
@@ -110,6 +138,13 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
       return accounts == null ||
           accounts.any((account) => account.uuid == accountUuid);
     },
+    // Deposits (M9): the active account's only. The kill switch stops new
+    // ones, never one under way (D16).
+    depositBackend: depositsEnabled
+        ? ref.watch(privateUsdDepositBackendProvider)
+        : null,
+    depositAccount: () => privateUsdDepositAccountOf(ref),
+    depositsSignNew: () => ref.read(privateUsdAvailableProvider),
   );
 
   void publish() {
@@ -125,8 +160,19 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
     });
   }
 
+  void publishDeposits() =>
+      ref.read(privateUsdDepositsProvider.notifier).publish(engine.deposits.value);
+
   engine.conversions.addListener(publish);
   engine.reverseConversions.addListener(publish);
+  engine.deposits.addListener(publishDeposits);
+  // The deposits follow the active account.
+  ref.listen(
+    accountProvider.select((s) => s.value?.activeAccountUuid),
+    (previous, next) {
+      if (previous != null && previous != next) engine.depositAccountChanged();
+    },
+  );
   lifecycle.register(
     owner: engine,
     quiesceAndDrain: engine.quiesceAndDrain,
@@ -177,6 +223,7 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
     lifecycle.unregister(engine);
     engine.conversions.removeListener(publish);
     engine.reverseConversions.removeListener(publish);
+    engine.deposits.removeListener(publishDeposits);
     unawaited(engine.dispose());
   });
   // After the provider is built: starting may publish.

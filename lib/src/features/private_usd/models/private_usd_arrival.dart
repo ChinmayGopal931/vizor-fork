@@ -18,10 +18,15 @@ import '../private_usd_copy.dart';
 /// null. A paid conversion keeps what it paid (`receives`, in the 6-decimal
 /// swap token's base units, so micro-dollars); a refund's record does not,
 /// so a refund is taken as it comes.
+///
+/// A deposit (M9) that landed counts as a payout does: it landed when the
+/// pass saw its mined event (`endedAt`), and brought what the contract
+/// shielded less Railgun's fee (`arrives`).
 DateTime? privateUsdArrivingSince({
   required BigInt arriving,
   Iterable<rust.ApiForwardRecord> forward = const [],
   Iterable<rust.ApiReverseRecord> reverse = const [],
+  Iterable<rust.ApiDepositRecord> deposits = const [],
 }) {
   if (arriving <= BigInt.zero) return null;
   int? landedAt;
@@ -41,6 +46,16 @@ DateTime? privateUsdArrivingSince({
     if (landedAt == null || record.updatedAt > landedAt) {
       landedAt = record.updatedAt;
       amount = null;
+    }
+  }
+  for (final record in deposits) {
+    final endedAt = record.endedAt;
+    if (record.state != rust.ApiDepositState.landed || endedAt == null) {
+      continue;
+    }
+    if (landedAt == null || endedAt > landedAt) {
+      landedAt = endedAt;
+      amount = BigInt.tryParse(record.arrives);
     }
   }
   if (landedAt == null || (amount != null && arriving < amount)) return null;

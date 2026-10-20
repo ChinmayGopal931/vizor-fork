@@ -42,7 +42,7 @@ internal object RailgunProtocol {
     /** Engine and console lines; forwarded only from a page loaded with `debug`. */
     const val LOG = "log"
 
-    private val EVENTS = setOf(LOG, "scan", "proof")
+    private val EVENTS = setOf(LOG, "scan", "proof", "screening")
 
     sealed interface Message {
         data object Ready : Message

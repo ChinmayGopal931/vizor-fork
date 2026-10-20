@@ -17,6 +17,7 @@ use crate::wallet::keys;
 use crate::wallet::network::WalletNetwork;
 use crate::wallet::private_usd::{
     deployment::{self, hex_address},
+    deposits,
     engine::{self, Activity, Clock, OpHandle, SystemClock},
     evm_rpc::EvmRpc,
     forward::{self, AcceptOutcome, AdvanceReport, ForwardWait, Quoted},
@@ -69,6 +70,10 @@ pub enum ApiPrivateUsdErrorCode {
     Other,
     /// The call was cancelled (`private_usd_cancel`): never a failure.
     Cancelled,
+    /// A record, a service or the node belongs to another deployment than
+    /// this build pins: a conversion pinned to the retired testnet token, or
+    /// deposit terms that are not the pin's. Never followed.
+    WrongDeployment,
 }
 
 /// A Private USD failure. Its Dart `toString()` is the message.
@@ -126,8 +131,7 @@ fn api_code(code: ErrorCode) -> ApiPrivateUsdErrorCode {
         ErrorCode::RouteBlocked => Api::RouteBlocked,
         ErrorCode::Other => Api::Other,
         ErrorCode::Cancelled => Api::Cancelled,
-        // zapp holds a wrong deployment as the relayer being unreachable.
-        ErrorCode::WrongDeployment => Api::RelayerUnreachable,
+        ErrorCode::WrongDeployment => Api::WrongDeployment,
         ErrorCode::ChainUnreadable => Api::EthereumUnreachable,
         ErrorCode::IndicesInUse => Api::Other,
         ErrorCode::AmountUnquotable => Api::AmountRefused,
@@ -172,6 +176,21 @@ pub struct ApiDeployment {
     /// The tokens the private USD balance counts as dollars, the swap token
     /// first. Each has `token_decimals`.
     pub usd_tokens: Vec<ApiUsdToken>,
+    /// Where public USDC is shielded into the private balance (M9); `None`
+    /// where no Deposits contract is pinned, which hides deposits.
+    pub deposits: Option<ApiDepositsPin>,
+}
+
+/// A network's pinned Deposits deployment (M9).
+pub struct ApiDepositsPin {
+    /// The Deposits contract, `0x` lowercase.
+    pub contract: String,
+    /// The token deposits take (the swap token), `0x` lowercase.
+    pub token: String,
+    /// `USDC`, or `tUSD` on testnet.
+    pub token_symbol: String,
+    /// The network a sender picks: `Ethereum`, or `Sepolia` on testnet.
+    pub chain_name: String,
 }
 
 /// A token the private USD balance counts as dollars.
@@ -217,6 +236,21 @@ pub fn private_usd_deployment(network: String) -> Option<ApiDeployment> {
                 symbol: token.symbol.to_owned(),
             })
             .collect(),
+        deposits: pins.deposits.map(|pin| ApiDepositsPin {
+            contract: hex_address(&pin.contract),
+            token: hex_address(&pin.token),
+            token_symbol: pins
+                .usd_tokens
+                .iter()
+                .find(|token| token.address == pin.token)
+                .map_or("USDC", |token| token.symbol)
+                .to_owned(),
+            chain_name: match network {
+                PrivateUsdNetwork::Mainnet => "Ethereum",
+                PrivateUsdNetwork::Testnet => "Sepolia",
+            }
+            .to_owned(),
+        }),
     })
 }
 
@@ -1517,6 +1551,404 @@ fn api_transact(answer: &RailgunBroadcast) -> ApiTransactResult {
         kind,
         transactions,
         retry_after_secs,
+    }
+}
+
+// ---- deposits (M9) ----
+
+/// The relayer's deposit terms, held to the pin, for the Receive USDC sheet
+/// (amounts in token base units).
+pub struct ApiDepositTerms {
+    /// The relayer's fee before its percentage; a rescue pays it alone.
+    pub fee: String,
+    /// The relayer's percentage of a deposit, in basis points.
+    pub fee_bps: u32,
+    /// Until when an authorization signed with `fee` is taken (Unix
+    /// seconds), where gas prices the fee.
+    pub fee_expires_at: Option<i64>,
+    /// The least a deposit moves.
+    pub min_value: String,
+    /// Railgun's shield fee, in basis points.
+    pub railgun_fee_bps: u32,
+}
+
+/// What a deposit of an amount costs and brings.
+pub struct ApiDepositQuote {
+    /// The relayer's fee.
+    pub fee: String,
+    /// What reaches the private balance after both fees.
+    pub arrives: String,
+}
+
+/// The deposit address to show and its index.
+pub struct ApiDepositAddress {
+    pub index: u32,
+    /// EIP-55, as exchanges' withdrawal forms take it.
+    pub address: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApiDepositKind {
+    /// An address's balance shielded on its authorization.
+    Shield,
+    /// What Railgun sent back to an address's vault, shielded again.
+    Rescue,
+}
+
+/// Where a deposit stands (`docs/deposits.md`, "What to show").
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApiDepositState {
+    /// Kept, not yet answered with a transaction: "Received $X" (or, with
+    /// `waiting`, "Waiting for the network").
+    Signed,
+    /// Posted, until it mines: "Making it private…".
+    Sent,
+    /// Mined and believed: "Private, available in …".
+    Landed,
+    /// Refused: the address shows as received but not shielding.
+    Refused,
+    /// Its transaction reverted: nothing moved; signed again after an hour.
+    Reverted,
+    /// Signed again in its place: not shown.
+    Replaced,
+    /// Its validity ran out first: not shown.
+    Expired,
+}
+
+/// One kept deposit or rescue, for the screen and the activity rows.
+pub struct ApiDepositRecord {
+    pub id: String,
+    pub kind: ApiDepositKind,
+    /// The deposit address's index, and the address (EIP-55).
+    pub index: u32,
+    pub address: String,
+    pub state: ApiDepositState,
+    /// What it moves (a rescue: its vault's balance when signed).
+    pub value: String,
+    /// The relayer's fee.
+    pub fee: String,
+    /// What reaches the private balance: the contract's own figure once it
+    /// landed, else what the request should bring.
+    pub arrives: String,
+    /// Unix seconds when it was signed, and when it ended.
+    pub created_at: i64,
+    pub ended_at: Option<i64>,
+    /// The transaction that landed it, or the last the relayer named.
+    pub tx_hash: Option<String>,
+    /// The relayer asked to wait over 30 s, or could not be reached.
+    pub waiting: bool,
+}
+
+/// A used deposit address: it holds tokens or has deposited.
+pub struct ApiDepositAddressUse {
+    pub index: u32,
+    pub address: String,
+    pub balance: String,
+    pub deposited: bool,
+}
+
+/// A vault holding more than a rescue's fee: "Recover" is offered.
+pub struct ApiDepositRescuable {
+    pub index: u32,
+    pub address: String,
+    pub held: String,
+    pub fee: String,
+}
+
+/// One deposit pass: the address to show, the used ones, the account's
+/// deposits, the terms and when to pass again.
+pub struct ApiDepositPass {
+    pub index: u32,
+    pub address: String,
+    pub used: Vec<ApiDepositAddressUse>,
+    pub records: Vec<ApiDepositRecord>,
+    /// The terms, or why they did not read: `Unavailable` or
+    /// `WrongDeployment` means deposits are unavailable (show no address);
+    /// anything else only that the fees could not load.
+    pub terms: Option<ApiDepositTerms>,
+    pub terms_error: Option<ApiPrivateUsdErrorCode>,
+    pub rescuable: Vec<ApiDepositRescuable>,
+    /// Whether this pass read the addresses from the chain, and when they
+    /// were last read.
+    pub scanned: bool,
+    pub scanned_at: Option<i64>,
+    /// When to pass again; none while nothing is posted or due.
+    pub next_poll_ms: Option<u32>,
+    /// The first step that failed (a scan, a signing, a post).
+    pub problem: Option<ApiPrivateUsdErrorCode>,
+}
+
+/// The relayer's deposit terms (`GET /v1/terms`' `deposits`), held to the
+/// pin. `Unavailable` where nothing is pinned or the relayer takes none,
+/// `WrongDeployment` for another deployment's: say deposits are
+/// unavailable. Anything else (Tor starting, the relayer down): show the
+/// address and say the fees could not load.
+pub fn private_usd_deposit_terms(network: String) -> Result<ApiDepositTerms, ApiPrivateUsdError> {
+    catch(|| {
+        let network = swap_network(&network)?;
+        let pins = deployment::deployment(network);
+        let transport = RoutedTransport::new();
+        let relayer = RelayerClient::new(&transport, pins.relayer_url);
+        let terms = block_on(async {
+            let terms = relayer.terms().await?;
+            deposits::pinned_terms(&terms, pins)
+        })?;
+        Ok(api_deposit_terms(&terms))
+    })
+}
+
+/// What a deposit of `value` costs and brings under the relayer's `fee`
+/// and `fee_bps`; `None` when its fee is above the cap (D23) or not under
+/// the value, so nothing would be signed.
+#[frb(sync)]
+pub fn private_usd_deposit_quote(fee: String, fee_bps: u32, value: String) -> Option<ApiDepositQuote> {
+    let (fee, value) = (fee.parse::<u128>().ok()?, value.parse::<u128>().ok()?);
+    let terms = deposits::DepositTerms {
+        relayer: [0; 20],
+        fee,
+        fee_bps,
+        fee_expires_at: None,
+        min_value: 0,
+        max_validity: 0,
+    };
+    let fee = deposits::capped_fee(&terms, value).ok()?;
+    Some(ApiDepositQuote {
+        fee: fee.to_string(),
+        arrives: deposits::arrives(value, fee).to_string(),
+    })
+}
+
+/// The deposit address to show now, from the last scan kept (index 0 before
+/// any): no network, so it shows while Tor starts. Checks the seed against
+/// the account first.
+pub fn private_usd_deposit_address(
+    db_path: String,
+    network: String,
+    account_uuid: String,
+    store_dir: String,
+    mnemonic_bytes: Vec<u8>,
+) -> Result<ApiDepositAddress, ApiPrivateUsdError> {
+    let secret = Zeroizing::new(mnemonic_bytes);
+    catch(panic::AssertUnwindSafe(|| {
+        let keys = open_context(&db_path, &network, &account_uuid, &secret)?;
+        if deployment::deployment(keys.network()).deposits.is_none() {
+            return Err(PrivateUsdError::new(
+                ErrorCode::Unavailable,
+                "no Deposits contract is pinned here",
+            )
+            .into());
+        }
+        let index = match SwapStore::open_existing(Path::new(&store_dir))? {
+            Some(store) => deposits::last_scan(&store, &account_uuid)?
+                .map_or(0, |(_, scan)| scan.showing),
+            None => 0,
+        };
+        let address = keys.deposit_keys(index)?.key.address();
+        Ok(ApiDepositAddress {
+            index,
+            address: deposits::eip55(&address),
+        })
+    }))
+}
+
+/// One deposit pass for the account (the active one): scans its deposit
+/// addresses (Multicall3, twenty a call, until a window holds none used),
+/// posts again what was kept, follows what the relayer named, and with
+/// `sign_new` signs, keeps and posts a deposit for each address holding at
+/// least the minimum. A deposit already under way is followed and posted
+/// whatever `sign_new` says (the kill switch never stops one). With
+/// `check_vaults` it also reads which vaults can be rescued. With
+/// `only_if_used` (the passes nothing asked for: unlock, the foreground, an
+/// account switch) an account that never scanned or kept a deposit gets the
+/// address to show and nothing else: no network, and no store created.
+/// `Busy` while another pass or a rescue of the account runs; stops with
+/// `Cancelled` once `private_usd_cancel(op_id)` is called. Run it only while
+/// unlocked and in the foreground.
+pub fn private_usd_deposit_pass(
+    db_path: String,
+    network: String,
+    account_uuid: String,
+    store_dir: String,
+    mnemonic_bytes: Vec<u8>,
+    eth_rpc_url: String,
+    op_id: u32,
+    sign_new: bool,
+    check_vaults: bool,
+    only_if_used: bool,
+) -> Result<ApiDepositPass, ApiPrivateUsdError> {
+    let secret = Zeroizing::new(mnemonic_bytes);
+    catch(panic::AssertUnwindSafe(|| {
+        let op = OpHandle::begin(op_id)?;
+        let keys = open_context(&db_path, &network, &account_uuid, &secret)?;
+        let _guard = deposits::lock_account(&account_uuid)?;
+        if op.cancelled() {
+            return Err(engine::cancelled().into());
+        }
+        if only_if_used {
+            let used = match SwapStore::open_existing(Path::new(&store_dir))? {
+                Some(store) => {
+                    deposits::last_scan(&store, &account_uuid)?.is_some()
+                        || !store.deposits(&account_uuid)?.is_empty()
+                }
+                None => false,
+            };
+            if !used {
+                let address = keys.deposit_keys(0)?.key.address();
+                return Ok(ApiDepositPass {
+                    index: 0,
+                    address: deposits::eip55(&address),
+                    used: Vec::new(),
+                    records: Vec::new(),
+                    terms: None,
+                    terms_error: None,
+                    rescuable: Vec::new(),
+                    scanned: false,
+                    scanned_at: None,
+                    next_poll_ms: None,
+                    problem: None,
+                });
+            }
+        }
+        let report = block_on(deposits::run(
+            Path::new(&store_dir),
+            &keys,
+            &account_uuid,
+            &eth_rpc_url,
+            Some(&op),
+            async |deposits, store| deposits.pass(store, sign_new, check_vaults).await,
+        ))?;
+        Ok(api_deposit_pass(&report))
+    }))
+}
+
+/// The account's deposits and rescues, newest first; empty when none was
+/// ever kept. No network and no key.
+pub fn private_usd_deposit_records(
+    account_uuid: String,
+    store_dir: String,
+) -> Result<Vec<ApiDepositRecord>, ApiPrivateUsdError> {
+    catch(|| {
+        let Some(store) = SwapStore::open_existing(Path::new(&store_dir))? else {
+            return Ok(Vec::new());
+        };
+        Ok(deposits::records(&store, &account_uuid)?
+            .iter()
+            .map(api_deposit_record)
+            .collect())
+    })
+}
+
+/// "Recover" a deposit whose note Railgun's screening refused and sent back
+/// to the address's vault (the user's action, behind a confirmation, D18):
+/// signs a rescue with the vault's next nonce, keeps it and posts it. It
+/// pays the relayer's `fee` alone, at most 2 USDC (X6). `Unavailable` when
+/// the vault holds no more than the fee, `Busy` while a rescue of the
+/// address or a pass runs.
+pub fn private_usd_deposit_rescue(
+    db_path: String,
+    network: String,
+    account_uuid: String,
+    store_dir: String,
+    mnemonic_bytes: Vec<u8>,
+    eth_rpc_url: String,
+    index: u32,
+) -> Result<ApiDepositRecord, ApiPrivateUsdError> {
+    let secret = Zeroizing::new(mnemonic_bytes);
+    catch(panic::AssertUnwindSafe(|| {
+        let keys = open_context(&db_path, &network, &account_uuid, &secret)?;
+        let _guard = deposits::lock_account(&account_uuid)?;
+        let record = block_on(deposits::run(
+            Path::new(&store_dir),
+            &keys,
+            &account_uuid,
+            &eth_rpc_url,
+            None,
+            async |deposits, store| deposits.rescue(store, index).await,
+        ))?;
+        Ok(api_deposit_record(&record))
+    }))
+}
+
+fn api_deposit_terms(terms: &deposits::DepositTerms) -> ApiDepositTerms {
+    ApiDepositTerms {
+        fee: terms.fee.to_string(),
+        fee_bps: terms.fee_bps,
+        fee_expires_at: terms.fee_expires_at.map(seconds),
+        min_value: terms.min_value.to_string(),
+        railgun_fee_bps: deployment::RAILGUN_FEE_BPS as u32,
+    }
+}
+
+fn api_deposit_record(record: &deposits::DepositRecord) -> ApiDepositRecord {
+    ApiDepositRecord {
+        id: record.id.clone(),
+        kind: match record.kind {
+            deposits::DepositKind::Shield => ApiDepositKind::Shield,
+            deposits::DepositKind::Rescue => ApiDepositKind::Rescue,
+        },
+        index: record.index,
+        address: deposits::eip55(&record.from()),
+        state: match record.state {
+            deposits::DepositState::Signed => ApiDepositState::Signed,
+            deposits::DepositState::Sent => ApiDepositState::Sent,
+            deposits::DepositState::Landed => ApiDepositState::Landed,
+            deposits::DepositState::Refused => ApiDepositState::Refused,
+            deposits::DepositState::Reverted => ApiDepositState::Reverted,
+            deposits::DepositState::Replaced => ApiDepositState::Replaced,
+            deposits::DepositState::Expired => ApiDepositState::Expired,
+        },
+        value: record.value.0.to_string(),
+        fee: record.fee().to_string(),
+        arrives: record.arrives().to_string(),
+        created_at: seconds(record.created_at),
+        ended_at: record.ended_at.map(seconds),
+        tx_hash: record
+            .landing
+            .and_then(|landing| landing.tx)
+            .or_else(|| record.transactions.last().copied())
+            .map(|tx| tx.to_hex()),
+        waiting: record.waiting,
+    }
+}
+
+fn api_deposit_pass(report: &deposits::PassReport) -> ApiDepositPass {
+    ApiDepositPass {
+        index: report.showing,
+        address: deposits::eip55(&report.showing_address),
+        used: report
+            .used
+            .iter()
+            .map(|address| ApiDepositAddressUse {
+                index: address.index,
+                address: deposits::eip55(&address.address),
+                balance: address.balance.to_string(),
+                deposited: address.deposited,
+            })
+            .collect(),
+        records: report.records.iter().map(api_deposit_record).collect(),
+        terms: report.terms.as_ref().ok().map(api_deposit_terms),
+        terms_error: report.terms.as_ref().err().map(|code| api_code(*code)),
+        rescuable: report
+            .rescuable
+            .iter()
+            .map(|rescuable| ApiDepositRescuable {
+                index: rescuable.index,
+                address: report
+                    .used
+                    .iter()
+                    .find(|address| address.index == rescuable.index)
+                    .map(|address| deposits::eip55(&address.address))
+                    .unwrap_or_default(),
+                held: rescuable.held.to_string(),
+                fee: rescuable.fee.to_string(),
+            })
+            .collect(),
+        scanned: report.scanned,
+        scanned_at: report.scanned_at.map(seconds),
+        next_poll_ms: report
+            .next_poll
+            .map(|nap| u32::try_from(nap.as_millis()).unwrap_or(u32::MAX)),
+        problem: report.problem.map(api_code),
     }
 }
 

@@ -21,6 +21,7 @@ void main() {
       sync.balances.byBucket[RailgunBalanceBucket.spendable]!.single.amount,
       BigInt.from(5),
     );
+    expect(sync.screening, RailgunScreening.ok);
     // The first build closes what an earlier Flutter engine left behind.
     expect(log, [
       'close',
@@ -31,6 +32,49 @@ void main() {
       'call openWallet',
       'call refresh',
     ]);
+    await engine.dispose();
+  });
+
+  test("the page's screening state lands in the engine's, and a closed page "
+      'forgets it', () async {
+    final log = <String>[];
+    final host = _FakeHost(log, pageAddress: _address);
+    final engine = _engineWith(host, log);
+    await engine.sync('account');
+
+    host.pageEvents.add(
+      '{"event":"screening","data":{"txids":null,"download":null,'
+      '"proving":{"index":1,"count":2,"progress":0.5}}}',
+    );
+    await pumpEventQueue();
+    expect(
+      engine.state.value.screening,
+      const RailgunScreeningEvent(
+        proving: RailgunPoiProving(index: 1, count: 2, progress: 0.5),
+      ),
+    );
+
+    await engine.close();
+    expect(engine.state.value.screening, isNull);
+    await engine.dispose();
+  });
+
+  test("a sync carries the page's failed screening", () async {
+    final log = <String>[];
+    final refresh = Completer<String>();
+    final engine = _engine(log, pageAddress: _address, refresh: refresh);
+
+    final sync = engine.sync('account');
+    await _until(() => log.contains('call refresh'));
+    refresh.complete(
+      '{"balances":{"MissingInternalPOI":[{"token":'
+      '"0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c","amount":"5"}]},'
+      '"screening":"failed"}',
+    );
+
+    final synced = await sync;
+    expect(synced.screening, RailgunScreening.failed);
+    expect(engine.state.value.lastSync?.screening, RailgunScreening.failed);
     await engine.dispose();
   });
 
@@ -445,8 +489,9 @@ class _FakeHost implements RailgunHost {
       'start' => '{"fees":{"unshield":25,"shield":25}}',
       'openWallet' => jsonEncode({'address': pageAddress}),
       'refresh' =>
-        '{"Spendable":[{"token":"0x5764d0044bef5aa839e0ddafe2073421101b9ed8",'
-            '"amount":"5"}]}',
+        '{"balances":{"Spendable":[{"token":'
+            '"0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c","amount":"5"}]},'
+            '"screening":"ok"}',
       'deleteWallet' => 'null',
       _ => throw RailgunHostException(RailgunHostErrorCode.badArgs),
     };
@@ -468,6 +513,9 @@ class _FakeHost implements RailgunHost {
   @override
   Future<bool> isOpen() async => _open;
 
+  /// What the page sends unasked, as the host forwards it.
+  final pageEvents = StreamController<String>.broadcast();
+
   @override
-  Stream<String> get events => const Stream.empty();
+  Stream<String> get events => pageEvents.stream;
 }

@@ -108,6 +108,7 @@ A pointer such as "§5.5" means that file. Open a reference section only when a 
 | D20 | Makers do not require Privacy Pass tokens today. | M5–M7 device testing does not wait on the issuer allowlist (E3) or a locked-bootloader phone (E9). M4 is still built and unit-tested, because a maker can turn tokens on at any time and the client must already handle `401 tokenRequired`. |
 | D21 | zecSwap is licensed `MIT OR Apache-2.0`. | The usual dual license in the Rust and Zcash ecosystem, and compatible with veylor's Apache-2.0 (E1). |
 | D22 | Routed HTTP is shared, not duplicated. `rust/src/wallet/routed_http.rs` is built for Private USD (M1 task 10), then the Enhance PIR transport and voting's `VizorRoute` move onto it (M1 task 10b, separate PR). Send settlement stays in Rust. | One routed executor to audit for Tor fail-closed behaviour. Settlement in Rust keeps iOS cheap. |
+| D23 | Deposit fee cap (owner, 2026-10-18): a deposit is signed only if `fee ≤ 2_000_000 + ⌈value × 50 / 10000⌉` (`MAX_RELAYER_FEE` plus 50 bps) and `fee < value`. A deposit rescue pays the terms' `fee` alone, capped at `MAX_RELAYER_FEE` (X6). Deposits shield automatically while the app is unlocked and in the foreground (M9). | Extends D11: a deposit's fee has a percentage, so its cap grows with the deposit. Mainnet's gas-priced fee (a first deposit burns about 0.9M gas) may need a higher fixed part before mainnet deposits launch. |
 
 The owner also confirmed (2026-10-13) that joint accounts live in a **separate database**, not as hidden accounts in `zcash_wallet.db` as zapp does. Hidden accounts would leak into account lists, sync status, voting, PIR recovery and the Ironwood migration.
 
@@ -136,7 +137,7 @@ The implementer cannot produce these. Check the row a milestone waits on before 
 
 | # | What | Blocks | Until it arrives | Status |
 |---|---|---|---|---|
-| E1 | **zecSwap Zakura build plus license (D3).** A branch or a second manifest for `zecswap-core` (the 17-line diff is in §12) at a pinned rev, licensed `MIT OR Apache-2.0` (D21): `LICENSE-MIT` and `LICENSE-APACHE` at the root, and `license` in every crate's `Cargo.toml`. A Zakura manifest cannot share a workspace with `zecswap-tokens` (M0). | Merging anything that imports the zecSwap crates | Develop against the local `[patch]` (How to work); do not merge | open |
+| E1 | **zecSwap Zakura build plus license (D3).** A branch or a second manifest for `zecswap-core` (the 17-line diff is in §12) at a pinned rev, licensed `MIT OR Apache-2.0` (D21): `LICENSE-MIT` and `LICENSE-APACHE` at the root, and `license` in every crate's `Cargo.toml`. A Zakura manifest cannot share a workspace with `zecswap-tokens` (M0). Since M9 it must also carry `feature/deposits`' `zecswap-core` and `zecswap-railgun` (today a local patch on the stand-in, `~/dev/zapp/zecSwap-zakura-deposits.patch`); Veylor then pins a pushed rev and carries no patch, changing only `rust/Cargo.toml`. | Merging anything that imports the zecSwap crates | Develop against the local `[patch]` (How to work); do not merge | open |
 | E2 | **zapp relicensed to Apache-2.0 (D3):** `railgun-lib` (Kotlin and JS glue), `evm-lib/.../hd/Bip85.kt`, `common/privateusd`, `offramp-lib`, the UI copy and the ported tests. Headers still say `AGPL-3.0-only`. | Merging anything ported from zapp (M3 onward) | Write it locally; do not merge | **not needed** (owner, 2026-10-14: no relicensing; sign off at the end, then commit and push) |
 | E3 | **Issuer allowlist (D1).** `com.keplr.vizor` (D19) and the SHA-256 digests of the upload and Play signing keys in the mainnet and testnet issuer configs (`zs/deployments/mainnet-beta.json` `issuer.android`); optionally the debug digest on testnet; turn the mainnet issuer on. | M4 device acceptance; release once a maker requires tokens | M4 merges on unit tests; M5–M7 do not wait (D20) | open |
 | E4 | **wallet-libraries fork with `connect_stream` (D13):** `391d0b02` plus the §6.8 patch. | The M3 bridge (merge) | The local copy (How to work). M0 proved the patch on device. | open |
@@ -1017,6 +1018,39 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
 - **Build release with all the defines:** `fvm flutter build apk --release --dart-define=VIZOR_FORM_FACTOR=mobile --dart-define=VIZOR_PRIVATE_USD_ENABLED=true --dart-define-from-file=<rpc json>`.
 - **Issuer acceptance is per signing digest** (E3): a differently signed APK gets `TokensDeviceRefused`.
 - **The beta limits are enforced by the server.** Test with more than 50 USDC; never hard-code the limit.
+
+### M9. Deposits: public USDC into private USD
+
+**Goal.** Each software account gets Ethereum deposit addresses of its own, derived from its seed, that take public USDC (tUSD on Sepolia) from an exchange or any wallet. Once an address holds at least the relayer's `minValue`, the wallet signs one EIP-3009 `receiveWithAuthorization` of its whole balance to zecSwap's Deposits contract; the relayer sends it and keeps a fee, and the contract shields the rest into the account's own `0zk` balance, to a note the wallet built. The wallet never holds ETH, and the relayer can delay a deposit but never redirect it: the authorization's nonce commits to the note, the fee and the relayer. The fixed `0zk` receive address stays, as the way to receive from another Railgun wallet.
+
+**Needs.** The testnet Deposits deployment (live since 2026-10-18 23:42 UTC); testnet funds from the owner for the device check. Mainnet had no Deposits contract then, so it had no pin and the feature was hidden there; its contract went live on 2026-10-19 and is pinned since (progress M9.7).
+
+**Inputs.**
+- zecSwap `feature/deposits` (`~/dev/zapp/zecSwap-deposits` at `9185466`, read-only): `docs/deposits.md` (the wallet–relayer contract; it wins over this plan), `crates/zecswap-client/src/{deposits.rs,api.rs}` (the reference wallet), `crates/zecswap-api/src/relayer.rs`, `crates/zecswap-chain/src/evm/deposits.rs`, `crates/zecswap-core/src/{deposit.rs,auth.rs}`, `deployments/sepolia-deposits.json`.
+- This repo: `rust/src/wallet/private_usd/{sends.rs,relayer_client.rs,transport.rs,evm_rpc.rs,store.rs,keys.rs,deployment.rs,models.rs}`, `rust/src/api/private_usd.rs`, the Private USD screen, copy, activity rows, engine and engine host.
+
+**Tasks.**
+
+1. Bring the deposit code in: `git apply ~/dev/zapp/zecSwap-zakura-deposits.patch` to the local E1 stand-in (D23's decision 3; temporary until zecSwap or a published `zecswap-core` carries it, E1). `Cargo.lock` changes by `bip32` and `secp256k1` under `zecswap-core` only. `zecswap-railgun` stays on git, so the note's five words (`npk`, the three `encrypted_bundle` words, `shield_key`) are built here.
+2. Pins (`deployment.rs`): the testnet swap token moves to the deposits' tUSD (`0x64c4…727c`, for swaps too); a deposits pin per network (`None` on mainnet) with the Deposits contract, the relayer's deposits account, the token and Multicall3; `/v1/terms`' `deposits` checked against it.
+3. Rust (`deposits.rs`): deposit keys (`m/44'/60'|1'/(1000 + zip32)'/0/index`), watching (Multicall3 `aggregate3`, 20 addresses a call, until 20 in a row are unused), signing (the fee cap D23, the token's own EIP-712 domain, the nonce over the five words, the fee and the relayer), keeping before posting, the Answers table of `docs/deposits.md`, belief only from the pinned contract's `DepositShielded` in a mined receipt, rescue, the `deposits` table (`swaps.db` schema 2), FRB.
+4. Dart and UI: deposits in the foreground engine (active account only; cancelled on lock and background; drained before deletion and reset), the "Receive USDC" sheet (EIP-55 address as a QR in `ReceiveQrFrame`, copy, the token and network, the minimum and both fees), the relabelled `0zk` card, the deposit states on the screen and in the activity rows, landed deposits in the Arriving estimate, deposit rescue on the Refunds screen.
+5. Checks: the unit tests below; `fvm flutter analyze`; the testnet APK builds. A deposits step in the device round (`run_device_round.sh --deposits`).
+6. Device check on testnet, with the owner's funds: a withdrawal of at least 3 tUSD to the shown address shields on its own; the shown address moves to index 1; a second deposit there shields to a note of its own; a restore of the same seed finds both used addresses and shows index 2.
+
+**As built (progress D-115 to D-127).** Rust: `deposits.rs` (the pass, the records, rescue), `abi.rs` (Multicall3 `aggregate3`, `string`, Railgun's `Shield`), `evm_rpc.rs`'s `DepositChain`, `store.rs` schema 2, six FRB calls. Dart: `private_usd_deposit_backend.dart`, the engine's deposit lane, `private_usd_deposits_provider.dart`, `private_usd_deposits.dart` (what to show), the Receive USDC sheet, the screen's card and button, activity rows, Arriving and Refunds. The device round's `--deposits [--deposits-usd 3] [--deposits-twice]` withdraws private tUSD to the account's own shown address and waits for it to shield back and the shown index to move.
+
+**Done when.** Unit tests pass: the deposit addresses against zecSwap's `deposit-vectors.json`; the fee cap with `deposit_fee`'s cases; terms that do not match the pin, refused; the store's 1 → 2 migration keeping existing records (owner, 2026-10-18: these four, end-to-end for the rest). The device check (task 6) passes.
+
+**Traps.**
+
+- **Pin the deposits account, not the top-level relayer.** The terms' `deposits.relayer` is its own account; the nonce commits to it.
+- **Never hardcode the token's domain.** Read `name()` and `version()`, and check the separator against `DOMAIN_SEPARATOR()`.
+- **Keep before post, and post only what was kept.** A pass killed at any point must leave the store consistent; a kept request is posted again as the same bytes, re-signed only while no transaction was named for it, once `validBefore` is under 16 minutes away or the fee's `feeExpiresAt` passed.
+- **A refusal pauses the address.** Signed again once from fresh terms; refused again, it is dropped, and the address is not signed for until its balance or the terms change, or an hour passes.
+- **A reverted deposit holds the address for an hour** (the relayer's `503`); sign again after.
+- **The deposit key signs only the two digests**: never delegate a deposit address (EIP-7702) or use one for anything else.
+- **Old-tUSD records.** A reverse record pinned to the old testnet token fails as `WrongDeployment`, never silently.
 
 ## 10. Test strategy
 

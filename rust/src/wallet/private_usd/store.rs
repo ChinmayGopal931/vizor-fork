@@ -1,5 +1,6 @@
 //! `swaps.db`: the swap-index counter, swap records, active pointers, the
-//! joint-account index and the Railgun send log (plan §3.4).
+//! joint-account index, the Railgun send log (plan §3.4), and since schema 2
+//! the deposits and each account's last deposit scan (M9).
 //!
 //! A plain SQLite file in app-private storage, opened per call (WAL,
 //! `synchronous = FULL`, a busy timeout), migrated by `PRAGMA user_version`.
@@ -18,13 +19,19 @@ use super::models::{Direction, StoredRecord};
 use super::{fail, ErrorCode, PrivateUsdError, Result};
 
 const FILE_NAME: &str = "swaps.db";
-const SCHEMA_VERSION: i32 = 1;
+/// 1: swaps, the send log and the joint accounts (M1 to M7). 2: deposits
+/// (M9). A build that knows only 1 refuses a store at 2 as newer than
+/// itself, never resetting it.
+const SCHEMA_VERSION: i32 = 2;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// Finished records kept per direction. Reverse `REFUNDED` ones are kept
 /// beyond it: a rescue may still be possible.
 const MAX_HISTORY: u32 = 100;
 /// Confirmed sends kept per account; unconfirmed ones are never trimmed.
 const MAX_CONFIRMED_SENDS: u32 = 100;
+/// Finished deposits kept per account; one still under way is never
+/// trimmed.
+const MAX_FINISHED_DEPOSITS: u32 = 100;
 /// The index space zapp counts in (a Kotlin `Int`).
 const MAX_INDEX: i64 = i32::MAX as i64;
 
@@ -50,6 +57,24 @@ CREATE TABLE railgun_sends(
   account_uuid TEXT NOT NULL, send_id TEXT NOT NULL, created_at INTEGER NOT NULL,
   state TEXT NOT NULL, record_json TEXT NOT NULL,
   PRIMARY KEY(account_uuid, send_id));
+";
+
+/// Schema 2 (M9): each kept deposit or rescue request and its state, and
+/// each account's last scan of its deposit addresses.
+const SCHEMA_V2: &str = "
+CREATE TABLE deposits(
+  account_uuid  TEXT NOT NULL,
+  deposit_id    TEXT NOT NULL,
+  address_index INTEGER NOT NULL,
+  state         TEXT NOT NULL,
+  finished      INTEGER NOT NULL,
+  created_at    INTEGER NOT NULL,
+  record_json   TEXT NOT NULL,
+  PRIMARY KEY(account_uuid, deposit_id));
+CREATE TABLE deposit_scans(
+  account_uuid TEXT PRIMARY KEY,
+  scanned_at   INTEGER NOT NULL,
+  scan_json    TEXT NOT NULL);
 ";
 
 /// A joint account a swap imported into `joint.db`.
@@ -92,6 +117,27 @@ impl fmt::Debug for SendRow {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SendRow")
             .field("send_id", &self.send_id)
+            .field("state", &self.state)
+            .finish_non_exhaustive()
+    }
+}
+
+/// One kept deposit or rescue request (M9). `finished` once it landed or can
+/// never land; one under way is never trimmed.
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) struct DepositRow {
+    pub deposit_id: String,
+    pub address_index: u32,
+    pub state: String,
+    pub finished: bool,
+    pub created_at: u64,
+    pub record_json: String,
+}
+
+impl fmt::Debug for DepositRow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DepositRow")
+            .field("deposit_id", &self.deposit_id)
             .field("state", &self.state)
             .finish_non_exhaustive()
     }
@@ -168,6 +214,14 @@ impl SwapStore {
         match version {
             0 => {
                 tx.execute_batch(SCHEMA).map_err(sql)?;
+                tx.execute_batch(SCHEMA_V2).map_err(sql)?;
+                tx.pragma_update(None, "user_version", SCHEMA_VERSION)
+                    .map_err(sql)?;
+            }
+            // 1 → 2: the deposits tables join; every row already kept stays
+            // as it was.
+            1 => {
+                tx.execute_batch(SCHEMA_V2).map_err(sql)?;
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
@@ -470,6 +524,8 @@ impl SwapStore {
             "active",
             "joint_accounts",
             "railgun_sends",
+            "deposits",
+            "deposit_scans",
         ] {
             tx.execute(
                 &format!("DELETE FROM {table} WHERE account_uuid = ?1"),
@@ -633,6 +689,127 @@ impl SwapStore {
             )
             .map_err(sql)?;
         Ok(())
+    }
+
+    /// Keeps or replaces `rows` in one transaction, so a request and the one
+    /// it replaces change together, then trims the finished deposits beyond
+    /// the newest `MAX_FINISHED_DEPOSITS`.
+    pub(crate) fn put_deposits(&mut self, account: &str, rows: &[DepositRow]) -> Result<()> {
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(sql)?;
+        for row in rows {
+            tx.execute(
+                "INSERT INTO deposits(account_uuid, deposit_id, address_index, state, finished,
+                                      created_at, record_json)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                 ON CONFLICT(account_uuid, deposit_id) DO UPDATE SET
+                   address_index = excluded.address_index, state = excluded.state,
+                   finished = excluded.finished, created_at = excluded.created_at,
+                   record_json = excluded.record_json",
+                params![
+                    account,
+                    row.deposit_id,
+                    row.address_index,
+                    row.state,
+                    row.finished,
+                    row.created_at as i64,
+                    row.record_json,
+                ],
+            )
+            .map_err(sql)?;
+        }
+        tx.execute(
+            "DELETE FROM deposits
+             WHERE account_uuid = ?1 AND finished = 1 AND deposit_id NOT IN (
+               SELECT deposit_id FROM deposits WHERE account_uuid = ?1 AND finished = 1
+               ORDER BY created_at DESC, deposit_id DESC LIMIT ?2)",
+            params![account, MAX_FINISHED_DEPOSITS],
+        )
+        .map_err(sql)?;
+        #[cfg(test)]
+        if CRASH_BEFORE_COMMIT.with(|crash| crash.replace(false)) {
+            return fail(ErrorCode::StoreUnreadable, "crashed before commit");
+        }
+        tx.commit().map_err(sql)
+    }
+
+    /// The account's kept deposits, newest first.
+    pub(crate) fn deposits(&self, account: &str) -> Result<Vec<DepositRow>> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT deposit_id, address_index, state, finished, created_at, record_json
+                 FROM deposits WHERE account_uuid = ?1
+                 ORDER BY created_at DESC, deposit_id DESC",
+            )
+            .map_err(sql)?;
+        let rows = statement
+            .query_map([account], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, bool>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, String>(5)?,
+                ))
+            })
+            .map_err(sql)?;
+        rows.map(|row| {
+            let (deposit_id, index, state, finished, created_at, record_json) =
+                row.map_err(sql)?;
+            Ok(DepositRow {
+                deposit_id,
+                address_index: u32::try_from(index)
+                    .map_err(|_| unreadable("a deposit's address index is out of range"))?,
+                state,
+                finished,
+                created_at: u64::try_from(created_at)
+                    .map_err(|_| unreadable("negative deposit time"))?,
+                record_json,
+            })
+        })
+        .collect()
+    }
+
+    /// Keeps the account's last deposit scan, replacing the one before.
+    pub(crate) fn put_deposit_scan(
+        &mut self,
+        account: &str,
+        scanned_at: u64,
+        scan_json: &str,
+    ) -> Result<()> {
+        self.conn
+            .execute(
+                "INSERT INTO deposit_scans(account_uuid, scanned_at, scan_json) VALUES (?1, ?2, ?3)
+                 ON CONFLICT(account_uuid) DO UPDATE SET
+                   scanned_at = excluded.scanned_at, scan_json = excluded.scan_json",
+                params![account, scanned_at as i64, scan_json],
+            )
+            .map_err(sql)?;
+        Ok(())
+    }
+
+    /// The account's last deposit scan and when it was taken.
+    pub(crate) fn deposit_scan(&self, account: &str) -> Result<Option<(u64, String)>> {
+        let row: Option<(i64, String)> = self
+            .conn
+            .query_row(
+                "SELECT scanned_at, scan_json FROM deposit_scans WHERE account_uuid = ?1",
+                [account],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(sql)?;
+        row.map(|(at, json)| {
+            Ok((
+                u64::try_from(at).map_err(|_| unreadable("negative scan time"))?,
+                json,
+            ))
+        })
+        .transpose()
     }
 }
 
@@ -874,6 +1051,84 @@ mod tests {
         assert!(store.history(ACCOUNT, Direction::Forward).is_err());
         // The unreadable record is kept, and the counter goes on.
         assert_eq!(store.take_index(ACCOUNT).unwrap(), next + 1);
+    }
+
+    /// A store schema 1 wrote (M1 to M7) opens at schema 2 (M9): the
+    /// deposits tables join, and every record, the counter, the active
+    /// pointer and the send log stay as they were.
+    #[test]
+    fn a_version_1_store_migrates_to_2_keeping_its_records() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = Connection::open(dir.path().join(FILE_NAME)).unwrap();
+        conn.execute_batch(SCHEMA).unwrap();
+        conn.pragma_update(None, "user_version", 1).unwrap();
+        let json = forward_json();
+        conn.execute(
+            "INSERT INTO swaps(account_uuid, direction, swap_index, deployment, swap_id, phase,
+                               finished, record_json, updated_at)
+             VALUES (?1, 'forward', 7, 'testnet', ?2, 'OPENING', 0, ?3, 1790000000)",
+            params![ACCOUNT, hex(32, 0x5c), json],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO active(account_uuid, direction, swap_index) VALUES (?1, 'forward', 7)",
+            [ACCOUNT],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO swap_counter(account_uuid, next_index) VALUES (?1, 9)",
+            [ACCOUNT],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO railgun_sends(account_uuid, send_id, created_at, state, record_json)
+             VALUES (?1, 'send-1', 1790000100, 'confirmed', '{}')",
+            [ACCOUNT],
+        )
+        .unwrap();
+        drop(conn);
+
+        let mut store = SwapStore::open(dir.path()).unwrap();
+        let version: i32 = store
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, SCHEMA_VERSION);
+        assert_eq!(SCHEMA_VERSION, 2);
+        assert_eq!(
+            store.active(ACCOUNT, Direction::Forward).unwrap(),
+            Some(StoredRecord::Forward(forward(&json)))
+        );
+        assert_eq!(store.unfinished_count(ACCOUNT).unwrap(), 1);
+        assert_eq!(store.take_index(ACCOUNT).unwrap(), 9);
+        let sends = store.sends(ACCOUNT).unwrap();
+        assert_eq!(sends.len(), 1);
+        assert_eq!(sends[0].send_id, "send-1");
+        // The deposits tables are there, empty.
+        assert!(store.deposits(ACCOUNT).unwrap().is_empty());
+        assert_eq!(store.deposit_scan(ACCOUNT).unwrap(), None);
+        store
+            .put_deposits(
+                ACCOUNT,
+                &[DepositRow {
+                    deposit_id: "shield-0-1790003600".into(),
+                    address_index: 0,
+                    state: "signed".into(),
+                    finished: false,
+                    created_at: 1_790_000_000,
+                    record_json: "{}".into(),
+                }],
+            )
+            .unwrap();
+        drop(store);
+
+        // Opened again, nothing migrates twice and nothing is lost.
+        let store = SwapStore::open(dir.path()).unwrap();
+        assert_eq!(store.deposits(ACCOUNT).unwrap().len(), 1);
+        assert_eq!(
+            store.active(ACCOUNT, Direction::Forward).unwrap(),
+            Some(StoredRecord::Forward(forward(&json)))
+        );
     }
 
     #[test]

@@ -14,17 +14,13 @@ import 'api/sync.dart';
 import 'api/voting.dart';
 import 'api/voting_session.dart';
 import 'api/wallet.dart';
-
 import 'dart:async';
 import 'dart:convert';
-
 import 'frb_generated.dart';
 import 'frb_generated.io.dart'
     if (dart.library.js_interop) 'frb_generated.web.dart';
 import 'network_privacy.dart';
-
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
-
 import 'third_party/zcash_voting/config.dart';
 import 'third_party/zcash_voting/delegate.dart';
 import 'third_party/zcash_voting/share_policy.dart';
@@ -87,7 +83,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -2049639101;
+  int get rustContentHash => -2052408378;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -1184,6 +1180,52 @@ abstract class RustLibApi extends BaseApi {
   });
 
   ApiDeployment? crateApiPrivateUsdPrivateUsdDeployment({
+    required String network,
+  });
+
+  Future<ApiDepositAddress> crateApiPrivateUsdPrivateUsdDepositAddress({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+  });
+
+  Future<ApiDepositPass> crateApiPrivateUsdPrivateUsdDepositPass({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String ethRpcUrl,
+    required int opId,
+    required bool signNew,
+    required bool checkVaults,
+    required bool onlyIfUsed,
+  });
+
+  ApiDepositQuote? crateApiPrivateUsdPrivateUsdDepositQuote({
+    required String fee,
+    required int feeBps,
+    required String value,
+  });
+
+  Future<List<ApiDepositRecord>> crateApiPrivateUsdPrivateUsdDepositRecords({
+    required String accountUuid,
+    required String storeDir,
+  });
+
+  Future<ApiDepositRecord> crateApiPrivateUsdPrivateUsdDepositRescue({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String ethRpcUrl,
+    required int index,
+  });
+
+  Future<ApiDepositTerms> crateApiPrivateUsdPrivateUsdDepositTerms({
     required String network,
   });
 
@@ -9202,6 +9244,291 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<ApiDepositAddress> crateApiPrivateUsdPrivateUsdDepositAddress({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 184,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_deposit_address,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDepositAddressConstMeta,
+        argValues: [dbPath, network, accountUuid, storeDir, mnemonicBytes],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDepositAddressConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_deposit_address",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+        ],
+      );
+
+  @override
+  Future<ApiDepositPass> crateApiPrivateUsdPrivateUsdDepositPass({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String ethRpcUrl,
+    required int opId,
+    required bool signNew,
+    required bool checkVaults,
+    required bool onlyIfUsed,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(opId, serializer);
+          sse_encode_bool(signNew, serializer);
+          sse_encode_bool(checkVaults, serializer);
+          sse_encode_bool(onlyIfUsed, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 185,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_deposit_pass,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDepositPassConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          ethRpcUrl,
+          opId,
+          signNew,
+          checkVaults,
+          onlyIfUsed,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDepositPassConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_deposit_pass",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "ethRpcUrl",
+          "opId",
+          "signNew",
+          "checkVaults",
+          "onlyIfUsed",
+        ],
+      );
+
+  @override
+  ApiDepositQuote? crateApiPrivateUsdPrivateUsdDepositQuote({
+    required String fee,
+    required int feeBps,
+    required String value,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(fee, serializer);
+          sse_encode_u_32(feeBps, serializer);
+          sse_encode_String(value, serializer);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 186,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_box_autoadd_api_deposit_quote,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDepositQuoteConstMeta,
+        argValues: [fee, feeBps, value],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDepositQuoteConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_deposit_quote",
+        argNames: ["fee", "feeBps", "value"],
+      );
+
+  @override
+  Future<List<ApiDepositRecord>> crateApiPrivateUsdPrivateUsdDepositRecords({
+    required String accountUuid,
+    required String storeDir,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 187,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_api_deposit_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDepositRecordsConstMeta,
+        argValues: [accountUuid, storeDir],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDepositRecordsConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_deposit_records",
+        argNames: ["accountUuid", "storeDir"],
+      );
+
+  @override
+  Future<ApiDepositRecord> crateApiPrivateUsdPrivateUsdDepositRescue({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String ethRpcUrl,
+    required int index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 188,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_deposit_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDepositRescueConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          ethRpcUrl,
+          index,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDepositRescueConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_deposit_rescue",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "ethRpcUrl",
+          "index",
+        ],
+      );
+
+  @override
+  Future<ApiDepositTerms> crateApiPrivateUsdPrivateUsdDepositTerms({
+    required String network,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(network, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 189,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_deposit_terms,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDepositTermsConstMeta,
+        argValues: [network],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDepositTermsConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_deposit_terms",
+        argNames: ["network"],
+      );
+
+  @override
   Future<ApiForwardRecord> crateApiPrivateUsdPrivateUsdForwardAbandon({
     required String network,
     required String accountUuid,
@@ -9221,7 +9548,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 184,
+            funcId: 190,
             port: port_,
           );
         },
@@ -9270,7 +9597,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 185,
+            funcId: 191,
             port: port_,
           );
         },
@@ -9339,7 +9666,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 186,
+            funcId: 192,
             port: port_,
           );
         },
@@ -9406,7 +9733,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 187,
+            funcId: 193,
             port: port_,
           );
         },
@@ -9463,7 +9790,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 188,
+            funcId: 194,
             port: port_,
           );
         },
@@ -9496,7 +9823,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 189,
+            funcId: 195,
           )!;
         },
         codec: SseCodec(
@@ -9535,7 +9862,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 190,
+            funcId: 196,
             port: port_,
           );
         },
@@ -9574,7 +9901,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 191,
+            funcId: 197,
             port: port_,
           );
         },
@@ -9607,7 +9934,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 192,
+            funcId: 198,
             port: port_,
           );
         },
@@ -9646,7 +9973,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 193,
+            funcId: 199,
             port: port_,
           );
         },
@@ -9693,7 +10020,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 194,
+            funcId: 200,
             port: port_,
           );
         },
@@ -9760,7 +10087,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 195,
+            funcId: 201,
             port: port_,
           );
         },
@@ -9827,7 +10154,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 196,
+            funcId: 202,
             port: port_,
           );
         },
@@ -9887,7 +10214,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 197,
+            funcId: 203,
             port: port_,
           );
         },
@@ -9934,7 +10261,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 198,
+            funcId: 204,
             port: port_,
           );
         },
@@ -9991,7 +10318,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 199,
+            funcId: 205,
             port: port_,
           );
         },
@@ -10038,7 +10365,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 200,
+            funcId: 206,
             port: port_,
           );
         },
@@ -10098,7 +10425,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 201,
+            funcId: 207,
             port: port_,
           );
         },
@@ -10145,7 +10472,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 202,
+            funcId: 208,
             port: port_,
           );
         },
@@ -10198,7 +10525,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 203,
+            funcId: 209,
             port: port_,
           );
         },
@@ -10243,7 +10570,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 204,
+            funcId: 210,
             port: port_,
           );
         },
@@ -10302,7 +10629,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 205,
+            funcId: 211,
             port: port_,
           );
         },
@@ -10360,7 +10687,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 206,
+            funcId: 212,
             port: port_,
           );
         },
@@ -10418,7 +10745,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 207,
+            funcId: 213,
             port: port_,
           );
         },
@@ -10457,7 +10784,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 208,
+            funcId: 214,
             port: port_,
           );
         },
@@ -10496,7 +10823,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 209,
+            funcId: 215,
             port: port_,
           );
         },
@@ -10531,7 +10858,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 210,
+            funcId: 216,
             port: port_,
           );
         },
@@ -10574,7 +10901,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 211,
+            funcId: 217,
             port: port_,
           );
         },
@@ -10631,7 +10958,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 212,
+            funcId: 218,
             port: port_,
           );
         },
@@ -10690,7 +11017,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 213,
+            funcId: 219,
             port: port_,
           );
         },
@@ -10735,7 +11062,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 214,
+            funcId: 220,
           )!;
         },
         codec: SseCodec(
@@ -10781,7 +11108,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 215,
+            funcId: 221,
             port: port_,
           );
         },
@@ -10829,7 +11156,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 216,
+            funcId: 222,
             port: port_,
           );
         },
@@ -10866,7 +11193,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 217,
+            funcId: 223,
             port: port_,
           );
         },
@@ -10924,7 +11251,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 218,
+            funcId: 224,
             port: port_,
           );
         },
@@ -10984,7 +11311,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 219,
+            funcId: 225,
             port: port_,
           );
         },
@@ -11018,7 +11345,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 220,
+            funcId: 226,
             port: port_,
           );
         },
@@ -11059,7 +11386,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 221,
+            funcId: 227,
             port: port_,
           );
         },
@@ -11103,7 +11430,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 222,
+            funcId: 228,
             port: port_,
           );
         },
@@ -11133,7 +11460,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 223,
+            funcId: 229,
           )!;
         },
         codec: SseCodec(
@@ -11166,7 +11493,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 224,
+            funcId: 230,
             port: port_,
           );
         },
@@ -11203,7 +11530,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 225,
+            funcId: 231,
             port: port_,
           );
         },
@@ -11238,7 +11565,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 226,
+            funcId: 232,
             port: port_,
           );
         },
@@ -11273,7 +11600,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 227,
+            funcId: 233,
             port: port_,
           );
         },
@@ -11315,7 +11642,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 228,
+            funcId: 234,
             port: port_,
           );
         },
@@ -11350,7 +11677,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 229,
+            funcId: 235,
             port: port_,
           );
         },
@@ -11391,7 +11718,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 230,
+            funcId: 236,
             port: port_,
           );
         },
@@ -11440,7 +11767,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 231,
+            funcId: 237,
             port: port_,
           );
         },
@@ -11469,7 +11796,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 232,
+            funcId: 238,
             port: port_,
           );
         },
@@ -11508,7 +11835,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 233,
+            funcId: 239,
             port: port_,
           );
         },
@@ -11557,7 +11884,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 234,
+              funcId: 240,
               port: port_,
             );
           },
@@ -11616,7 +11943,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 235,
+            funcId: 241,
             port: port_,
           );
         },
@@ -11659,7 +11986,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 236,
+            funcId: 242,
           )!;
         },
         codec: SseCodec(
@@ -11713,7 +12040,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 237,
+            funcId: 243,
             port: port_,
           );
         },
@@ -11769,7 +12096,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 238,
+            funcId: 244,
           )!;
         },
         codec: SseCodec(
@@ -11799,7 +12126,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 239,
+            funcId: 245,
           )!;
         },
         codec: SseCodec(
@@ -11829,7 +12156,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 240,
+            funcId: 246,
           )!;
         },
         codec: SseCodec(
@@ -11859,7 +12186,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 241,
+            funcId: 247,
           )!;
         },
         codec: SseCodec(
@@ -11889,7 +12216,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 242,
+            funcId: 248,
           )!;
         },
         codec: SseCodec(
@@ -11924,7 +12251,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 243,
+            funcId: 249,
             port: port_,
           );
         },
@@ -11960,7 +12287,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 244,
+              funcId: 250,
               port: port_,
             );
           },
@@ -11995,7 +12322,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 245,
+            funcId: 251,
             port: port_,
           );
         },
@@ -12026,7 +12353,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 246,
+            funcId: 252,
             port: port_,
           );
         },
@@ -12068,7 +12395,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 247,
+            funcId: 253,
             port: port_,
           );
         },
@@ -12122,7 +12449,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 248,
+            funcId: 254,
             port: port_,
           );
         },
@@ -12160,7 +12487,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 249,
+            funcId: 255,
             port: port_,
           );
         },
@@ -12202,7 +12529,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 250,
+              funcId: 256,
               port: port_,
             );
           },
@@ -12243,7 +12570,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 251,
+              funcId: 257,
               port: port_,
             );
           },
@@ -12275,7 +12602,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 252,
+            funcId: 258,
             port: port_,
           );
         },
@@ -12305,7 +12632,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 253,
+            funcId: 259,
             port: port_,
           );
         },
@@ -12332,7 +12659,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 254,
+            funcId: 260,
             port: port_,
           );
         },
@@ -12359,7 +12686,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 255,
+            funcId: 261,
           )!;
         },
         codec: SseCodec(
@@ -12385,7 +12712,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 256,
+            funcId: 262,
             port: port_,
           );
         },
@@ -12412,7 +12739,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 257,
+            funcId: 263,
             port: port_,
           );
         },
@@ -12459,7 +12786,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 258,
+            funcId: 264,
             port: port_,
           );
         },
@@ -12532,7 +12859,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 259,
+            funcId: 265,
             port: port_,
           );
         },
@@ -12594,7 +12921,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 260,
+            funcId: 266,
             port: port_,
           );
         },
@@ -12629,7 +12956,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 261,
+            funcId: 267,
             port: port_,
           );
         },
@@ -12666,7 +12993,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 262,
+            funcId: 268,
             port: port_,
           );
         },
@@ -12705,7 +13032,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 263,
+            funcId: 269,
             port: port_,
           );
         },
@@ -12734,7 +13061,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 264,
+            funcId: 270,
           )!;
         },
         codec: SseCodec(
@@ -12761,7 +13088,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 265,
+            funcId: 271,
           )!;
         },
         codec: SseCodec(
@@ -12797,7 +13124,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 266,
+            funcId: 272,
             port: port_,
           );
         },
@@ -12836,7 +13163,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 267,
+            funcId: 273,
             port: port_,
           );
         },
@@ -12877,7 +13204,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 268,
+            funcId: 274,
             port: port_,
           );
         },
@@ -12927,7 +13254,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 269,
+            funcId: 275,
             port: port_,
           );
         },
@@ -12977,7 +13304,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 270,
+            funcId: 276,
             port: port_,
           );
         },
@@ -13011,7 +13338,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 271,
+            funcId: 277,
             port: port_,
           );
         },
@@ -13048,7 +13375,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 272,
+            funcId: 278,
             port: port_,
           );
         },
@@ -13079,7 +13406,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 273,
+            funcId: 279,
           )!;
         },
         codec: SseCodec(
@@ -13108,7 +13435,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 274,
+            funcId: 280,
             port: port_,
           );
         },
@@ -13136,7 +13463,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 275,
+            funcId: 281,
           )!;
         },
         codec: SseCodec(
@@ -13162,7 +13489,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 276,
+            funcId: 282,
           )!;
         },
         codec: SseCodec(
@@ -13208,7 +13535,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 277,
+            funcId: 283,
             port: port_,
           );
         },
@@ -13256,7 +13583,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 278,
+            funcId: 284,
           )!;
         },
         codec: SseCodec(
@@ -13290,7 +13617,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 279,
+            funcId: 285,
             port: port_,
           );
         },
@@ -13327,7 +13654,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 280,
+            funcId: 286,
             port: port_,
           );
         },
@@ -13593,8 +13920,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiDeployment dco_decode_api_deployment(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 18)
-      throw Exception('unexpected arr length: expect 18 but see ${arr.length}');
+    if (arr.length != 19)
+      throw Exception('unexpected arr length: expect 19 but see ${arr.length}');
     return ApiDeployment(
       network: dco_decode_String(arr[0]),
       railgunNetwork: dco_decode_String(arr[1]),
@@ -13614,6 +13941,143 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       screeningSeconds: dco_decode_u_32(arr[15]),
       maxRelayerFee: dco_decode_String(arr[16]),
       usdTokens: dco_decode_list_api_usd_token(arr[17]),
+      deposits: dco_decode_opt_box_autoadd_api_deposits_pin(arr[18]),
+    );
+  }
+
+  @protected
+  ApiDepositAddress dco_decode_api_deposit_address(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return ApiDepositAddress(
+      index: dco_decode_u_32(arr[0]),
+      address: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  ApiDepositAddressUse dco_decode_api_deposit_address_use(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return ApiDepositAddressUse(
+      index: dco_decode_u_32(arr[0]),
+      address: dco_decode_String(arr[1]),
+      balance: dco_decode_String(arr[2]),
+      deposited: dco_decode_bool(arr[3]),
+    );
+  }
+
+  @protected
+  ApiDepositKind dco_decode_api_deposit_kind(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiDepositKind.values[raw as int];
+  }
+
+  @protected
+  ApiDepositPass dco_decode_api_deposit_pass(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 11)
+      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    return ApiDepositPass(
+      index: dco_decode_u_32(arr[0]),
+      address: dco_decode_String(arr[1]),
+      used: dco_decode_list_api_deposit_address_use(arr[2]),
+      records: dco_decode_list_api_deposit_record(arr[3]),
+      terms: dco_decode_opt_box_autoadd_api_deposit_terms(arr[4]),
+      termsError: dco_decode_opt_box_autoadd_api_private_usd_error_code(arr[5]),
+      rescuable: dco_decode_list_api_deposit_rescuable(arr[6]),
+      scanned: dco_decode_bool(arr[7]),
+      scannedAt: dco_decode_opt_box_autoadd_i_64(arr[8]),
+      nextPollMs: dco_decode_opt_box_autoadd_u_32(arr[9]),
+      problem: dco_decode_opt_box_autoadd_api_private_usd_error_code(arr[10]),
+    );
+  }
+
+  @protected
+  ApiDepositQuote dco_decode_api_deposit_quote(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return ApiDepositQuote(
+      fee: dco_decode_String(arr[0]),
+      arrives: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  ApiDepositRecord dco_decode_api_deposit_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 12)
+      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    return ApiDepositRecord(
+      id: dco_decode_String(arr[0]),
+      kind: dco_decode_api_deposit_kind(arr[1]),
+      index: dco_decode_u_32(arr[2]),
+      address: dco_decode_String(arr[3]),
+      state: dco_decode_api_deposit_state(arr[4]),
+      value: dco_decode_String(arr[5]),
+      fee: dco_decode_String(arr[6]),
+      arrives: dco_decode_String(arr[7]),
+      createdAt: dco_decode_i_64(arr[8]),
+      endedAt: dco_decode_opt_box_autoadd_i_64(arr[9]),
+      txHash: dco_decode_opt_String(arr[10]),
+      waiting: dco_decode_bool(arr[11]),
+    );
+  }
+
+  @protected
+  ApiDepositRescuable dco_decode_api_deposit_rescuable(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return ApiDepositRescuable(
+      index: dco_decode_u_32(arr[0]),
+      address: dco_decode_String(arr[1]),
+      held: dco_decode_String(arr[2]),
+      fee: dco_decode_String(arr[3]),
+    );
+  }
+
+  @protected
+  ApiDepositState dco_decode_api_deposit_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiDepositState.values[raw as int];
+  }
+
+  @protected
+  ApiDepositTerms dco_decode_api_deposit_terms(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return ApiDepositTerms(
+      fee: dco_decode_String(arr[0]),
+      feeBps: dco_decode_u_32(arr[1]),
+      feeExpiresAt: dco_decode_opt_box_autoadd_i_64(arr[2]),
+      minValue: dco_decode_String(arr[3]),
+      railgunFeeBps: dco_decode_u_32(arr[4]),
+    );
+  }
+
+  @protected
+  ApiDepositsPin dco_decode_api_deposits_pin(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return ApiDepositsPin(
+      contract: dco_decode_String(arr[0]),
+      token: dco_decode_String(arr[1]),
+      tokenSymbol: dco_decode_String(arr[2]),
+      chainName: dco_decode_String(arr[3]),
     );
   }
 
@@ -14411,6 +14875,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiDeployment dco_decode_box_autoadd_api_deployment(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_api_deployment(raw);
+  }
+
+  @protected
+  ApiDepositQuote dco_decode_box_autoadd_api_deposit_quote(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_deposit_quote(raw);
+  }
+
+  @protected
+  ApiDepositTerms dco_decode_box_autoadd_api_deposit_terms(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_deposit_terms(raw);
+  }
+
+  @protected
+  ApiDepositsPin dco_decode_box_autoadd_api_deposits_pin(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_deposits_pin(raw);
   }
 
   @protected
@@ -15481,6 +15963,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<ApiDepositAddressUse> dco_decode_list_api_deposit_address_use(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_api_deposit_address_use)
+        .toList();
+  }
+
+  @protected
+  List<ApiDepositRecord> dco_decode_list_api_deposit_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_api_deposit_record).toList();
+  }
+
+  @protected
+  List<ApiDepositRescuable> dco_decode_list_api_deposit_rescuable(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_api_deposit_rescuable)
+        .toList();
+  }
+
+  @protected
   List<ApiDynamicConfigAttempt> dco_decode_list_api_dynamic_config_attempt(
     dynamic raw,
   ) {
@@ -16301,6 +16807,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiDeployment? dco_decode_opt_box_autoadd_api_deployment(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_api_deployment(raw);
+  }
+
+  @protected
+  ApiDepositQuote? dco_decode_opt_box_autoadd_api_deposit_quote(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_api_deposit_quote(raw);
+  }
+
+  @protected
+  ApiDepositTerms? dco_decode_opt_box_autoadd_api_deposit_terms(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_api_deposit_terms(raw);
+  }
+
+  @protected
+  ApiDepositsPin? dco_decode_opt_box_autoadd_api_deposits_pin(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_api_deposits_pin(raw);
   }
 
   @protected
@@ -18197,6 +18721,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_screeningSeconds = sse_decode_u_32(deserializer);
     var var_maxRelayerFee = sse_decode_String(deserializer);
     var var_usdTokens = sse_decode_list_api_usd_token(deserializer);
+    var var_deposits = sse_decode_opt_box_autoadd_api_deposits_pin(
+      deserializer,
+    );
     return ApiDeployment(
       network: var_network,
       railgunNetwork: var_railgunNetwork,
@@ -18216,6 +18743,169 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       screeningSeconds: var_screeningSeconds,
       maxRelayerFee: var_maxRelayerFee,
       usdTokens: var_usdTokens,
+      deposits: var_deposits,
+    );
+  }
+
+  @protected
+  ApiDepositAddress sse_decode_api_deposit_address(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_index = sse_decode_u_32(deserializer);
+    var var_address = sse_decode_String(deserializer);
+    return ApiDepositAddress(index: var_index, address: var_address);
+  }
+
+  @protected
+  ApiDepositAddressUse sse_decode_api_deposit_address_use(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_index = sse_decode_u_32(deserializer);
+    var var_address = sse_decode_String(deserializer);
+    var var_balance = sse_decode_String(deserializer);
+    var var_deposited = sse_decode_bool(deserializer);
+    return ApiDepositAddressUse(
+      index: var_index,
+      address: var_address,
+      balance: var_balance,
+      deposited: var_deposited,
+    );
+  }
+
+  @protected
+  ApiDepositKind sse_decode_api_deposit_kind(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiDepositKind.values[inner];
+  }
+
+  @protected
+  ApiDepositPass sse_decode_api_deposit_pass(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_index = sse_decode_u_32(deserializer);
+    var var_address = sse_decode_String(deserializer);
+    var var_used = sse_decode_list_api_deposit_address_use(deserializer);
+    var var_records = sse_decode_list_api_deposit_record(deserializer);
+    var var_terms = sse_decode_opt_box_autoadd_api_deposit_terms(deserializer);
+    var var_termsError = sse_decode_opt_box_autoadd_api_private_usd_error_code(
+      deserializer,
+    );
+    var var_rescuable = sse_decode_list_api_deposit_rescuable(deserializer);
+    var var_scanned = sse_decode_bool(deserializer);
+    var var_scannedAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_nextPollMs = sse_decode_opt_box_autoadd_u_32(deserializer);
+    var var_problem = sse_decode_opt_box_autoadd_api_private_usd_error_code(
+      deserializer,
+    );
+    return ApiDepositPass(
+      index: var_index,
+      address: var_address,
+      used: var_used,
+      records: var_records,
+      terms: var_terms,
+      termsError: var_termsError,
+      rescuable: var_rescuable,
+      scanned: var_scanned,
+      scannedAt: var_scannedAt,
+      nextPollMs: var_nextPollMs,
+      problem: var_problem,
+    );
+  }
+
+  @protected
+  ApiDepositQuote sse_decode_api_deposit_quote(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_fee = sse_decode_String(deserializer);
+    var var_arrives = sse_decode_String(deserializer);
+    return ApiDepositQuote(fee: var_fee, arrives: var_arrives);
+  }
+
+  @protected
+  ApiDepositRecord sse_decode_api_deposit_record(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_kind = sse_decode_api_deposit_kind(deserializer);
+    var var_index = sse_decode_u_32(deserializer);
+    var var_address = sse_decode_String(deserializer);
+    var var_state = sse_decode_api_deposit_state(deserializer);
+    var var_value = sse_decode_String(deserializer);
+    var var_fee = sse_decode_String(deserializer);
+    var var_arrives = sse_decode_String(deserializer);
+    var var_createdAt = sse_decode_i_64(deserializer);
+    var var_endedAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_txHash = sse_decode_opt_String(deserializer);
+    var var_waiting = sse_decode_bool(deserializer);
+    return ApiDepositRecord(
+      id: var_id,
+      kind: var_kind,
+      index: var_index,
+      address: var_address,
+      state: var_state,
+      value: var_value,
+      fee: var_fee,
+      arrives: var_arrives,
+      createdAt: var_createdAt,
+      endedAt: var_endedAt,
+      txHash: var_txHash,
+      waiting: var_waiting,
+    );
+  }
+
+  @protected
+  ApiDepositRescuable sse_decode_api_deposit_rescuable(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_index = sse_decode_u_32(deserializer);
+    var var_address = sse_decode_String(deserializer);
+    var var_held = sse_decode_String(deserializer);
+    var var_fee = sse_decode_String(deserializer);
+    return ApiDepositRescuable(
+      index: var_index,
+      address: var_address,
+      held: var_held,
+      fee: var_fee,
+    );
+  }
+
+  @protected
+  ApiDepositState sse_decode_api_deposit_state(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiDepositState.values[inner];
+  }
+
+  @protected
+  ApiDepositTerms sse_decode_api_deposit_terms(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_fee = sse_decode_String(deserializer);
+    var var_feeBps = sse_decode_u_32(deserializer);
+    var var_feeExpiresAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_minValue = sse_decode_String(deserializer);
+    var var_railgunFeeBps = sse_decode_u_32(deserializer);
+    return ApiDepositTerms(
+      fee: var_fee,
+      feeBps: var_feeBps,
+      feeExpiresAt: var_feeExpiresAt,
+      minValue: var_minValue,
+      railgunFeeBps: var_railgunFeeBps,
+    );
+  }
+
+  @protected
+  ApiDepositsPin sse_decode_api_deposits_pin(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_contract = sse_decode_String(deserializer);
+    var var_token = sse_decode_String(deserializer);
+    var var_tokenSymbol = sse_decode_String(deserializer);
+    var var_chainName = sse_decode_String(deserializer);
+    return ApiDepositsPin(
+      contract: var_contract,
+      token: var_token,
+      tokenSymbol: var_tokenSymbol,
+      chainName: var_chainName,
     );
   }
 
@@ -19239,6 +19929,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_api_deployment(deserializer));
+  }
+
+  @protected
+  ApiDepositQuote sse_decode_box_autoadd_api_deposit_quote(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_deposit_quote(deserializer));
+  }
+
+  @protected
+  ApiDepositTerms sse_decode_box_autoadd_api_deposit_terms(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_deposit_terms(deserializer));
+  }
+
+  @protected
+  ApiDepositsPin sse_decode_box_autoadd_api_deposits_pin(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_deposits_pin(deserializer));
   }
 
   @protected
@@ -20495,6 +21209,48 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <ApiBallotIntent>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_api_ballot_intent(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ApiDepositAddressUse> sse_decode_list_api_deposit_address_use(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ApiDepositAddressUse>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_api_deposit_address_use(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ApiDepositRecord> sse_decode_list_api_deposit_record(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ApiDepositRecord>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_api_deposit_record(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ApiDepositRescuable> sse_decode_list_api_deposit_rescuable(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ApiDepositRescuable>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_api_deposit_rescuable(deserializer));
     }
     return ans_;
   }
@@ -21797,6 +22553,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_api_deployment(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ApiDepositQuote? sse_decode_opt_box_autoadd_api_deposit_quote(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_deposit_quote(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ApiDepositTerms? sse_decode_opt_box_autoadd_api_deposit_terms(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_deposit_terms(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ApiDepositsPin? sse_decode_opt_box_autoadd_api_deposits_pin(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_deposits_pin(deserializer));
     } else {
       return null;
     }
@@ -24304,6 +25099,139 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_32(self.screeningSeconds, serializer);
     sse_encode_String(self.maxRelayerFee, serializer);
     sse_encode_list_api_usd_token(self.usdTokens, serializer);
+    sse_encode_opt_box_autoadd_api_deposits_pin(self.deposits, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_address(
+    ApiDepositAddress self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_String(self.address, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_address_use(
+    ApiDepositAddressUse self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_String(self.address, serializer);
+    sse_encode_String(self.balance, serializer);
+    sse_encode_bool(self.deposited, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_kind(
+    ApiDepositKind self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_pass(
+    ApiDepositPass self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_String(self.address, serializer);
+    sse_encode_list_api_deposit_address_use(self.used, serializer);
+    sse_encode_list_api_deposit_record(self.records, serializer);
+    sse_encode_opt_box_autoadd_api_deposit_terms(self.terms, serializer);
+    sse_encode_opt_box_autoadd_api_private_usd_error_code(
+      self.termsError,
+      serializer,
+    );
+    sse_encode_list_api_deposit_rescuable(self.rescuable, serializer);
+    sse_encode_bool(self.scanned, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.scannedAt, serializer);
+    sse_encode_opt_box_autoadd_u_32(self.nextPollMs, serializer);
+    sse_encode_opt_box_autoadd_api_private_usd_error_code(
+      self.problem,
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_api_deposit_quote(
+    ApiDepositQuote self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.fee, serializer);
+    sse_encode_String(self.arrives, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_record(
+    ApiDepositRecord self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_api_deposit_kind(self.kind, serializer);
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_String(self.address, serializer);
+    sse_encode_api_deposit_state(self.state, serializer);
+    sse_encode_String(self.value, serializer);
+    sse_encode_String(self.fee, serializer);
+    sse_encode_String(self.arrives, serializer);
+    sse_encode_i_64(self.createdAt, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.endedAt, serializer);
+    sse_encode_opt_String(self.txHash, serializer);
+    sse_encode_bool(self.waiting, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_rescuable(
+    ApiDepositRescuable self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_String(self.address, serializer);
+    sse_encode_String(self.held, serializer);
+    sse_encode_String(self.fee, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_state(
+    ApiDepositState self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_terms(
+    ApiDepositTerms self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.fee, serializer);
+    sse_encode_u_32(self.feeBps, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.feeExpiresAt, serializer);
+    sse_encode_String(self.minValue, serializer);
+    sse_encode_u_32(self.railgunFeeBps, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposits_pin(
+    ApiDepositsPin self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.contract, serializer);
+    sse_encode_String(self.token, serializer);
+    sse_encode_String(self.tokenSymbol, serializer);
+    sse_encode_String(self.chainName, serializer);
   }
 
   @protected
@@ -25065,6 +25993,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_api_deployment(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_deposit_quote(
+    ApiDepositQuote self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_deposit_quote(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_deposit_terms(
+    ApiDepositTerms self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_deposit_terms(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_deposits_pin(
+    ApiDepositsPin self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_deposits_pin(self, serializer);
   }
 
   @protected
@@ -26168,6 +27123,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_api_deposit_address_use(
+    List<ApiDepositAddressUse> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_api_deposit_address_use(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_api_deposit_record(
+    List<ApiDepositRecord> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_api_deposit_record(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_api_deposit_rescuable(
+    List<ApiDepositRescuable> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_api_deposit_rescuable(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_api_dynamic_config_attempt(
     List<ApiDynamicConfigAttempt> self,
     SseSerializer serializer,
@@ -27246,6 +28237,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_api_deployment(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_deposit_quote(
+    ApiDepositQuote? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_deposit_quote(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_deposit_terms(
+    ApiDepositTerms? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_deposit_terms(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_deposits_pin(
+    ApiDepositsPin? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_deposits_pin(self, serializer);
     }
   }
 

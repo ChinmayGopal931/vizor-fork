@@ -64,16 +64,18 @@ pub(crate) fn lock_account(account: &str) -> Result<DriverGuard> {
 }
 
 /// Removes everything Private USD keeps for `account` (reference §8.4): its
-/// joint accounts in `joint.db` first, then its rows in `swaps.db`, so a
-/// failure leaves the rows to retry with. `Busy` while one of its driver
-/// steps runs: a step that saved after the delete would bring a record back.
-/// The caller warned the user and drained the engine first (§3.5 item 15).
+/// joint accounts in `joint.db` first, then its rows in `swaps.db` (its
+/// deposits included), so a failure leaves the rows to retry with. `Busy`
+/// while one of its driver steps or deposit passes runs: a step that saved
+/// after the delete would bring a record back. The caller warned the user
+/// and drained the engine first (§3.5 item 15).
 pub(crate) fn delete_account(
     store_dir: &Path,
     network: WalletNetwork,
     account: &str,
 ) -> Result<()> {
     let _driver = lock_account(account)?;
+    let _deposits = super::deposits::lock_account(account)?;
     remove_account_offers(account);
     remove_account_fundings(account);
     let Some(mut store) = SwapStore::open_existing(store_dir)? else {

@@ -481,6 +481,7 @@ class MobilePrivateUsdReverseReviewView extends StatelessWidget {
                             ).activity.toString(),
                           ),
                           asset: SwapAsset.zec,
+                          bottomText: PrivateUsdCopy.shieldedZec,
                         ),
                       ),
                       PrivateUsdReverseLedger(

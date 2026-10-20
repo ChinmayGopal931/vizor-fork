@@ -46,7 +46,7 @@ enum RailgunProtocol {
   /// Engine lines; forwarded only from a page loaded with `debug`.
   static let log = "log"
 
-  private static let events: Set<String> = [log, "scan", "proof"]
+  private static let events: Set<String> = [log, "scan", "proof", "screening"]
 
   /// `paramsJSON` must be exactly one JSON object, so it can't add keys to the envelope around it. It is spliced,
   /// not re-serialized, so large numbers keep every digit.

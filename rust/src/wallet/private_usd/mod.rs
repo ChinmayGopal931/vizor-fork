@@ -21,7 +21,9 @@ use zecswap_core::NetworkType;
 
 use crate::wallet::network::WalletNetwork;
 
+pub(crate) mod abi;
 pub(crate) mod deployment;
+pub(crate) mod deposits;
 pub(crate) mod engine;
 pub(crate) mod evm_rpc;
 pub(crate) mod forward;

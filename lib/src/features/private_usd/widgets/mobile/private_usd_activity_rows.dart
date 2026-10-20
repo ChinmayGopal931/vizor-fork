@@ -12,6 +12,7 @@ import '../../../activity/activity_feed_sections.dart';
 import '../../../activity/activity_row_mapper.dart';
 import '../../../activity/models/activity_row_data.dart';
 import '../../models/private_usd_balances.dart';
+import '../../models/private_usd_deposits.dart';
 import '../../models/private_usd_record_key.dart';
 import '../../models/private_usd_send.dart';
 import '../../models/private_usd_reverse_presentation.dart';
@@ -264,6 +265,89 @@ ActivityRowData buildPrivateUsdSendActivityRow({
 DateTime privateUsdSendActivityTime(ApiSendRecord record) =>
     DateTime.fromMillisecondsSinceEpoch(record.sentAt * 1000);
 
+/// A deposit's activity row (M9), or null for one that moved nothing (it
+/// was signed again in its place, ran out, was refused or reverted: the
+/// money is still at the deposit address, which the screen shows).
+///
+/// - Kept, not yet answered: "Deposit", "Received $X" or "Waiting for the
+///   network…", `+$arrives` (neutral).
+/// - Posted: "Deposit", "Making it private…".
+/// - Landed: "Deposit" ("Recovered deposit" for a rescue), "Private,
+///   available in …" while Railgun screens it, then "Now private";
+///   `+$arrives` (positive); opens its transaction on Etherscan.
+ActivityRowData? buildPrivateUsdDepositActivityRow({
+  required BuildContext context,
+  required ApiDepositRecord record,
+  required Duration screening,
+  DateTime Function() now = DateTime.now,
+  bool privacyModeEnabled = false,
+  bool dateOnlyTimestamp = false,
+  VoidCallback? onOpenTransaction,
+}) {
+  final colors = context.colors;
+  final arrives = hideAmountIfPrivacyMode(
+    formatPrivateUsd(BigInt.tryParse(record.arrives) ?? BigInt.zero),
+    privacyModeEnabled: privacyModeEnabled,
+    denomination: '',
+  );
+  final value = hideAmountIfPrivacyMode(
+    formatPrivateUsd(BigInt.tryParse(record.value) ?? BigInt.zero),
+    privacyModeEnabled: privacyModeEnabled,
+    denomination: '',
+  );
+  final landedAt = privateUsdDepositLandedAt(record);
+  final String subtitle;
+  switch (record.state) {
+    case ApiDepositState.signed:
+      subtitle = record.waiting
+          ? PrivateUsdCopy.depositWaiting
+          : PrivateUsdCopy.depositReceived(value);
+    case ApiDepositState.sent:
+      subtitle = PrivateUsdCopy.depositMakingPrivate;
+    case ApiDepositState.landed:
+      subtitle =
+          landedAt != null && now().difference(landedAt) < screening
+          ? PrivateUsdCopy.depositPrivate(PrivateUsdCopy.about(screening))
+          : PrivateUsdCopy.activityDepositPrivate;
+    case ApiDepositState.refused ||
+        ApiDepositState.reverted ||
+        ApiDepositState.replaced ||
+        ApiDepositState.expired:
+      return null;
+  }
+  final landed = record.state == ApiDepositState.landed;
+  return ActivityRowData(
+    stableId: 'private-usd:deposit:${record.id}',
+    title: record.kind == ApiDepositKind.rescue
+        ? PrivateUsdCopy.activityDepositRescue
+        : PrivateUsdCopy.activityDeposit,
+    leadingIconName: _glyph,
+    leading: _logo,
+    leadingBackgroundColor: colors.background.neutralSubtleOpacity,
+    leadingIconColor: colors.icon.regular,
+    subtitle: subtitle,
+    amountText: activityAmountTextForFormFactor(
+      PrivateUsdCopy.activityIn(arrives),
+    ),
+    amountColor: landed
+        ? colors.text.positiveStrong
+        : outgoingAmountColor(colors),
+    statusText: '',
+    statusIconName: landed ? null : AppIcons.loader,
+    statusColor: landed ? null : colors.text.secondary,
+    timestampText: formatActivityTimestamp(
+      privateUsdDepositActivityTime(record),
+      dateOnly: dateOnlyTimestamp,
+    ),
+    onTap: landed ? onOpenTransaction : null,
+  );
+}
+
+/// When a deposit's row sorts: when it landed, else when it was signed.
+DateTime privateUsdDepositActivityTime(ApiDepositRecord record) =>
+    privateUsdDepositLandedAt(record) ??
+    DateTime.fromMillisecondsSinceEpoch(record.createdAt * 1000);
+
 /// [records] (and [reverseRecords], [sendRecords]) as activity entries for
 /// the home and Activity feeds and `/private-usd`.
 List<ActivityEntry> privateUsdActivityEntries({
@@ -275,9 +359,25 @@ List<ActivityEntry> privateUsdActivityEntries({
   required ValueChanged<String> onOpenPayout,
   List<ApiReverseRecord> reverseRecords = const [],
   List<ApiSendRecord> sendRecords = const [],
+  List<ApiDepositRecord> depositRecords = const [],
+  Duration screening = Duration.zero,
   VoidCallback? onOpenRefunds,
   bool dateOnlyTimestamp = false,
 }) => [
+  for (final record in depositRecords)
+    if (buildPrivateUsdDepositActivityRow(
+          context: context,
+          record: record,
+          screening: screening,
+          privacyModeEnabled: privacyModeEnabled,
+          dateOnlyTimestamp: dateOnlyTimestamp,
+          onOpenTransaction: switch (record.txHash) {
+            final tx? => () => onOpenPayout(tx),
+            null => null,
+          },
+        )
+        case final row?)
+      ActivityEntry(timestamp: privateUsdDepositActivityTime(record), row: row),
   for (final record in sendRecords)
     ActivityEntry(
       timestamp: privateUsdSendActivityTime(record),

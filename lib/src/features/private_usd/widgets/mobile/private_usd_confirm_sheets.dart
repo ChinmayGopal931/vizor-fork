@@ -52,6 +52,26 @@ Future<bool> confirmPrivateUsdRefundRecovery(
   return confirmed ?? false;
 }
 
+/// Asks before a deposit Railgun's screening sent back is recovered (M9,
+/// D18): the relayer's [fee] comes out of it. True once confirmed.
+Future<bool> confirmPrivateUsdDepositRescue(
+  BuildContext context, {
+  required String fee,
+}) async {
+  final confirmed = await showAppMobileSheet<bool>(
+    context: context,
+    builder: (sheetContext) => PrivateUsdConfirmSheetBody(
+      sheetKey: const ValueKey('private_usd_deposit_rescue_sheet'),
+      title: PrivateUsdCopy.refundsDepositConfirmTitle,
+      body: PrivateUsdCopy.refundsDepositConfirmBody(fee),
+      confirmLabel: PrivateUsdCopy.refundsDepositRecover,
+      onConfirm: () => Navigator.of(sheetContext).pop(true),
+      onDismiss: () => Navigator.of(sheetContext).pop(false),
+    ),
+  );
+  return confirmed ?? false;
+}
+
 /// A confirmation sheet: a title, what follows, the action and "Not now".
 class PrivateUsdConfirmSheetBody extends StatelessWidget {
   const PrivateUsdConfirmSheetBody({

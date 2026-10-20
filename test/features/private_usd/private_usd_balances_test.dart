@@ -119,7 +119,7 @@ void main() {
   });
 }
 
-const _testUsd = '0x5764d0044bef5aa839e0ddafe2073421101b9ed8';
+const _testUsd = '0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c';
 const _usdc = '0x1c7d4b196cb0c7b01d743fbc6116a902379c7238';
 const _weth = '0xfff9976782d46cc05630d1f6ebab18b2324d6b14';
 const _tokens = [

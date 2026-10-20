@@ -20,6 +20,7 @@ import '../../theme/app_theme.dart';
 import '../app_button.dart';
 import '../app_icon.dart';
 import '../biometric_icon.dart';
+import 'neon_done_sign.dart';
 import 'neon_horizon.dart';
 import 'neon_motion.dart';
 import 'neon_scramble_text.dart';
@@ -821,7 +822,7 @@ class _SyncKeepAwakeStatusLockup extends StatelessWidget {
             right: 0,
             child: Center(
               child: animate
-                  ? _SyncDoneSign(key: glyphKey, glyph: glyph, size: _badgeSize)
+                  ? NeonDoneSign(key: glyphKey, glyph: glyph, size: _badgeSize)
                   : NeonGlyphBadge(
                       key: glyphKey,
                       glyph: glyph,
@@ -1156,176 +1157,4 @@ class _CrtLinePainter extends CustomPainter {
       oldDelegate.fade != fade ||
       oldDelegate.glow != glow ||
       oldDelegate.core != core;
-}
-
-/// The done badge switching on: a scanline across the screen pulls into
-/// the badge, a light cycle traces its cut plate and then its glyph, and
-/// the badge flickers on in its place.
-class _SyncDoneSign extends StatefulWidget {
-  const _SyncDoneSign({required this.glyph, required this.size, super.key});
-
-  final TronGlyphKind glyph;
-  final double size;
-
-  @override
-  State<_SyncDoneSign> createState() => _SyncDoneSignState();
-}
-
-class _SyncDoneSignState extends State<_SyncDoneSign>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: NeonMotion.syncDone,
-    value: 1,
-  );
-  var _started = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_started) return;
-    _started = true;
-    if (!NeonMotion.reduced(context)) _controller.forward(from: 0);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final neon = context.colors.neon;
-    final badge = NeonGlyphBadge(glyph: widget.glyph, size: widget.size);
-    return SizedBox.square(
-      dimension: widget.size,
-      child: AnimatedBuilder(
-        animation: _controller,
-        child: badge,
-        builder: (context, badge) {
-          if (_controller.isCompleted) return badge!;
-          final ms = _controller.value * NeonMotion.syncDone.inMilliseconds;
-          final light = ms < 1350
-              ? 0.0
-              : NeonIgnition.lightAt(NeonMotion.span(ms, 1350, 1800));
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              if (light > 0) Opacity(opacity: light, child: badge),
-              ExcludeSemantics(
-                child: CustomPaint(
-                  size: Size.square(widget.size),
-                  painter: _SyncDoneTrailPainter(
-                    ms: ms,
-                    glow: neon.glow,
-                    core: neon.core,
-                    screenWidth: MediaQuery.sizeOf(context).width,
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _SyncDoneTrailPainter extends CustomPainter {
-  _SyncDoneTrailPainter({
-    required this.ms,
-    required this.glow,
-    required this.core,
-    required this.screenWidth,
-  });
-
-  final double ms;
-  final Color glow;
-  final Color core;
-  final double screenWidth;
-
-  static NeonTrail? _plate;
-  static NeonTrail? _glyph;
-  static double? _cachedFor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final s = size.width;
-    if (_cachedFor != s) {
-      _cachedFor = s;
-      // The badge's cut plate, and the check glyph's own plate and tick on
-      // the glyph's 24-unit grid, as `NeonGlyphBadge` and `TronGlyph` draw
-      // them.
-      _plate = NeonTrail(
-        Neon.chamferedRect(
-          (Offset.zero & size).deflate(0.5),
-          topLeft: s * 0.2,
-          topRight: s * 0.2,
-          bottomRight: s * 0.2,
-          bottomLeft: s * 0.2,
-        ),
-      );
-      final inner = s * 0.46;
-      final offset = (s - inner) / 2;
-      Offset p(double x, double y) =>
-          Offset(offset + x / 24 * inner, offset + y / 24 * inner);
-      _glyph = NeonTrail(
-        Path()
-          ..addPolygon([
-            p(6, 2),
-            p(22, 2),
-            p(22, 18),
-            p(18, 22),
-            p(2, 22),
-            p(2, 6),
-          ], true)
-          ..addPolygon([p(7, 12.5), p(10.5, 16), p(17, 8.5)], false),
-      );
-    }
-
-    final center = size.center(Offset.zero);
-    if (ms < 460) {
-      final grow = Curves.easeOutCubic.transform(NeonMotion.span(ms, 0, 260));
-      final shrink = Curves.easeInCubic.transform(
-        NeonMotion.span(ms, 260, 420),
-      );
-      final full = screenWidth / 2;
-      final half = (full * grow) - (full - s / 2) * shrink;
-      paintNeonScanline(
-        canvas,
-        center.dy,
-        center.dx - math.max(0, half),
-        center.dx + math.max(0, half),
-        glow: glow,
-        core: core,
-        intensity: 1 - NeonMotion.span(ms, 380, 460),
-      );
-    }
-    final fade = 1 - NeonMotion.span(ms, 1350, 1600);
-    _plate!.paint(
-      canvas,
-      Curves.easeInOutCubic.transform(NeonMotion.span(ms, 380, 1000)),
-      glow: glow,
-      core: core,
-      width: 1.2,
-      intensity: 0.55 * fade,
-    );
-    _glyph!.paint(
-      canvas,
-      Curves.easeInOutCubic.transform(NeonMotion.span(ms, 950, 1350)),
-      glow: glow,
-      core: core,
-      width: 1.4,
-      intensity: 0.7 * fade,
-      headLength: 10,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_SyncDoneTrailPainter oldDelegate) =>
-      oldDelegate.ms != ms ||
-      oldDelegate.glow != glow ||
-      oldDelegate.core != core ||
-      oldDelegate.screenWidth != screenWidth;
 }

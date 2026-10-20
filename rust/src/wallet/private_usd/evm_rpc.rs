@@ -22,7 +22,10 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use zecswap_core::Terms;
 
-use super::deployment::{hex_address, Deployment, MAX_LOGS_BODY, MAX_SERVICE_BODY, QUICK_TIMEOUT};
+use super::abi::{self, Call3};
+use super::deployment::{
+    hex_address, Deployment, DepositsPin, MAX_LOGS_BODY, MAX_SERVICE_BODY, QUICK_TIMEOUT,
+};
 use super::terms::{address_word, keccak};
 use super::transport::HttpTransport;
 use super::{fail, ErrorCode, PrivateUsdError, Result};
@@ -49,6 +52,20 @@ pub(crate) const PAID_OUT_EVENT: &str = "PaidOut(bytes32,address,uint256)";
 pub(crate) const NULLIFIERS: &str = "nullifiers(uint256,bytes32)";
 /// A relayed send counts as landed once its receipt has this many blocks.
 pub(crate) const SEND_CONFIRMATIONS: u32 = 1;
+/// The Deposits contract (M9; zecSwap `IDeposits`). Unlike the swap
+/// contract's `bytes32` versions, these take an address.
+pub(crate) const DEPOSITED: &str = "deposited(address)";
+pub(crate) const DEPOSITS_VAULT_OF: &str = "vaultOf(address)";
+pub(crate) const DEPOSITS_RESCUE_NONCES: &str = "rescueNonces(address)";
+pub(crate) const DEPOSITS_TOKEN: &str = "TOKEN()";
+/// The token's own EIP-712 domain (EIP-3009).
+pub(crate) const TOKEN_NAME: &str = "name()";
+pub(crate) const TOKEN_VERSION: &str = "version()";
+pub(crate) const TOKEN_DOMAIN_SEPARATOR: &str = "DOMAIN_SEPARATOR()";
+pub(crate) const AUTHORIZATION_STATE: &str = "authorizationState(address,bytes32)";
+/// A deposit, or a rescue, counts as landed once its receipt has this many
+/// blocks, as a relayed send does.
+pub(crate) const DEPOSIT_CONFIRMATIONS: u32 = SEND_CONFIRMATIONS;
 
 /// The first four bytes of `keccak256(signature)`.
 pub(crate) fn selector(signature: &str) -> [u8; 4] {
@@ -158,6 +175,64 @@ pub(crate) trait SendChain {
     async fn send_status(&self, transaction: &[u8; 32]) -> Result<TransactionStatus>;
     /// `nullifiers(tree, nullifier)` on Railgun's proxy at `latest`.
     async fn nullifier_spent(&self, tree: u32, nullifier: &[u8; 32]) -> Result<bool>;
+}
+
+/// A deposit address as a scan reads it: what it holds of the token, and
+/// whether it has deposited (its vault is there).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct AddressUse {
+    pub balance: u128,
+    pub deposited: bool,
+}
+
+impl AddressUse {
+    /// Given out: it holds tokens or has deposited (zecSwap `Used::used`).
+    pub(crate) fn used(&self) -> bool {
+        self.balance > 0 || self.deposited
+    }
+}
+
+/// One log of a mined transaction's receipt.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ReceiptLog {
+    pub address: [u8; 20],
+    pub topics: Vec<[u8; 32]>,
+    pub data: Vec<u8>,
+}
+
+/// What deposits read from Ethereum (plan M9; zecSwap
+/// `crates/zecswap-chain/src/evm/deposits.rs`). Implemented over JSON-RPC by
+/// [`EvmRpc`], one request per call; deposit tests fake it.
+pub(crate) trait DepositChain {
+    /// The node's chain id (named apart from `ChainReader::chain_id`, which
+    /// `EvmRpc` also has).
+    async fn node_chain_id(&self) -> Result<u64>;
+    /// Each owner's token balance and whether it has deposited, in one
+    /// Multicall3 `aggregate3` at `latest`.
+    async fn deposit_addresses(&self, pin: &DepositsPin, owners: &[[u8; 20]])
+        -> Result<Vec<AddressUse>>;
+    /// The Deposits contract's `TOKEN()`.
+    async fn deposits_token(&self, pin: &DepositsPin) -> Result<[u8; 20]>;
+    /// The token's own `name()`, `version()` and `DOMAIN_SEPARATOR()`.
+    async fn token_domain(&self, token: &[u8; 20]) -> Result<(String, String, [u8; 32])>;
+    /// What each owner's vault (`vaultOf`) holds of the token: Railgun sends
+    /// a note its screening refused back there.
+    async fn vault_balances(&self, pin: &DepositsPin, owners: &[[u8; 20]]) -> Result<Vec<u128>>;
+    /// The nonce `from`'s next rescue signs (`rescueNonces(from)`).
+    async fn deposit_rescue_nonce(&self, pin: &DepositsPin, from: &[u8; 20]) -> Result<u64>;
+    /// Whether `from` used authorization `nonce` on the token: an EIP-3009
+    /// nonce of a deposit is used only by its landing (the wallet never
+    /// cancels one).
+    async fn authorization_used(
+        &self,
+        token: &[u8; 20],
+        from: &[u8; 20],
+        nonce: &[u8; 32],
+    ) -> Result<bool>;
+    /// A deposit's transaction, with [`DEPOSIT_CONFIRMATIONS`].
+    async fn deposit_status(&self, transaction: &[u8; 32]) -> Result<TransactionStatus>;
+    /// The logs of `transaction`'s receipt; `None` while it is not mined.
+    async fn receipt_logs(&self, transaction: &[u8; 32]) -> Result<Option<Vec<ReceiptLog>>>;
 }
 
 enum RpcError {
@@ -541,6 +616,198 @@ impl<T: HttpTransport> SendChain for EvmRpc<'_, T> {
             .await?;
         Ok(words(&data, 1)?[0].iter().any(|byte| *byte != 0))
     }
+}
+
+impl<T: HttpTransport> EvmRpc<'_, T> {
+    /// Each call's return data, from one `aggregate3` on Multicall3 at
+    /// `latest`; any call failing fails the read.
+    async fn aggregate(&self, multicall: &[u8; 20], calls: &[Call3]) -> Result<Vec<Vec<u8>>> {
+        let data = abi::encode_aggregate3(selector(abi::AGGREGATE3), calls);
+        let answer = self.eth_call(multicall, data, "latest").await?;
+        abi::decode_aggregate3(&answer, calls.len())
+    }
+
+    /// `signature()` on `to` at `latest`.
+    async fn bare_call(&self, to: &[u8; 20], signature: &str) -> Result<Vec<u8>> {
+        Ok(self.eth_call(to, call_data(signature, &[]), "latest").await?)
+    }
+}
+
+impl<T: HttpTransport> DepositChain for EvmRpc<'_, T> {
+    async fn node_chain_id(&self) -> Result<u64> {
+        ChainReader::chain_id(self).await
+    }
+
+    async fn deposit_addresses(
+        &self,
+        pin: &DepositsPin,
+        owners: &[[u8; 20]],
+    ) -> Result<Vec<AddressUse>> {
+        let calls: Vec<Call3> = owners
+            .iter()
+            .flat_map(|owner| {
+                let word = address_word(owner);
+                [
+                    Call3 {
+                        target: pin.token,
+                        data: call_data(BALANCE_OF, &[&word]),
+                    },
+                    Call3 {
+                        target: pin.contract,
+                        data: call_data(DEPOSITED, &[&word]),
+                    },
+                ]
+            })
+            .collect();
+        let answers = self.aggregate(&pin.multicall, &calls).await?;
+        answers
+            .chunks_exact(2)
+            .map(|pair| {
+                Ok(AddressUse {
+                    balance: u128_word(&exact_word(&pair[0])?)?,
+                    deposited: bool_word(&exact_word(&pair[1])?)?,
+                })
+            })
+            .collect()
+    }
+
+    async fn deposits_token(&self, pin: &DepositsPin) -> Result<[u8; 20]> {
+        address_of_word(&exact_word(&self.bare_call(&pin.contract, DEPOSITS_TOKEN).await?)?)
+    }
+
+    async fn token_domain(&self, token: &[u8; 20]) -> Result<(String, String, [u8; 32])> {
+        let name = abi::decode_string(&self.bare_call(token, TOKEN_NAME).await?)?;
+        let version = abi::decode_string(&self.bare_call(token, TOKEN_VERSION).await?)?;
+        let separator = exact_word(&self.bare_call(token, TOKEN_DOMAIN_SEPARATOR).await?)?;
+        Ok((name, version, separator))
+    }
+
+    async fn vault_balances(&self, pin: &DepositsPin, owners: &[[u8; 20]]) -> Result<Vec<u128>> {
+        if owners.is_empty() {
+            return Ok(Vec::new());
+        }
+        let vault_calls: Vec<Call3> = owners
+            .iter()
+            .map(|owner| Call3 {
+                target: pin.contract,
+                data: call_data(DEPOSITS_VAULT_OF, &[&address_word(owner)]),
+            })
+            .collect();
+        let vaults = self
+            .aggregate(&pin.multicall, &vault_calls)
+            .await?
+            .iter()
+            .map(|answer| address_of_word(&exact_word(answer)?))
+            .collect::<Result<Vec<_>>>()?;
+        let balance_calls: Vec<Call3> = vaults
+            .iter()
+            .map(|vault| Call3 {
+                target: pin.token,
+                data: call_data(BALANCE_OF, &[&address_word(vault)]),
+            })
+            .collect();
+        self.aggregate(&pin.multicall, &balance_calls)
+            .await?
+            .iter()
+            .map(|answer| u128_word(&exact_word(answer)?))
+            .collect()
+    }
+
+    async fn deposit_rescue_nonce(&self, pin: &DepositsPin, from: &[u8; 20]) -> Result<u64> {
+        let data = self
+            .eth_call(
+                &pin.contract,
+                call_data(DEPOSITS_RESCUE_NONCES, &[&address_word(from)]),
+                "latest",
+            )
+            .await?;
+        u64_word(&exact_word(&data)?)
+    }
+
+    async fn authorization_used(
+        &self,
+        token: &[u8; 20],
+        from: &[u8; 20],
+        nonce: &[u8; 32],
+    ) -> Result<bool> {
+        let data = self
+            .eth_call(
+                token,
+                call_data(AUTHORIZATION_STATE, &[&address_word(from), nonce]),
+                "latest",
+            )
+            .await?;
+        bool_word(&exact_word(&data)?)
+    }
+
+    async fn deposit_status(&self, transaction: &[u8; 32]) -> Result<TransactionStatus> {
+        self.transaction_status(transaction, DEPOSIT_CONFIRMATIONS)
+            .await
+    }
+
+    async fn receipt_logs(&self, transaction: &[u8; 32]) -> Result<Option<Vec<ReceiptLog>>> {
+        let Some(receipt) = self
+            .lookup(transaction, "eth_getTransactionReceipt")
+            .await?
+        else {
+            return Ok(None);
+        };
+        let logs: Vec<LogEntry> =
+            serde_json::from_value(receipt["logs"].clone()).map_err(|_| {
+                PrivateUsdError::new(ErrorCode::ChainUnreadable, "unreadable receipt logs")
+            })?;
+        let mut read = Vec::with_capacity(logs.len());
+        for log in logs {
+            if log.removed {
+                continue;
+            }
+            let address = super::models::Address::parse(&log.address.to_ascii_lowercase())
+                .ok_or_else(|| {
+                    PrivateUsdError::new(ErrorCode::ChainUnreadable, "unreadable log address")
+                })?;
+            let topics = log
+                .topics
+                .iter()
+                .map(|topic| super::models::Word::parse(&topic.to_ascii_lowercase()).map(|t| t.0))
+                .collect::<Option<Vec<_>>>()
+                .ok_or_else(|| {
+                    PrivateUsdError::new(ErrorCode::ChainUnreadable, "unreadable log topic")
+                })?;
+            read.push(ReceiptLog {
+                address: address.0,
+                topics,
+                data: hex_bytes(&Value::String(log.data))?,
+            });
+        }
+        Ok(Some(read))
+    }
+}
+
+/// Exactly one word: a static answer of another length is not this ABI's.
+fn exact_word(data: &[u8]) -> Result<[u8; 32]> {
+    if data.len() != WORD {
+        return fail(
+            ErrorCode::ChainUnreadable,
+            format!("expected one word, the node answered {} bytes", data.len()),
+        );
+    }
+    Ok(data.try_into().expect("32 bytes"))
+}
+
+/// An ABI `bool`: zero or one, nothing else.
+fn bool_word(word: &[u8; 32]) -> Result<bool> {
+    if word[..WORD - 1].iter().any(|byte| *byte != 0) || word[WORD - 1] > 1 {
+        return fail(ErrorCode::ChainUnreadable, "a bool that is neither 0 nor 1");
+    }
+    Ok(word[WORD - 1] == 1)
+}
+
+/// An ABI `address`: twelve zero bytes, then the address.
+fn address_of_word(word: &[u8; 32]) -> Result<[u8; 20]> {
+    if word[..12].iter().any(|byte| *byte != 0) {
+        return fail(ErrorCode::ChainUnreadable, "an address word with high bytes");
+    }
+    Ok(word[12..].try_into().expect("20 bytes"))
 }
 
 impl SwapState {

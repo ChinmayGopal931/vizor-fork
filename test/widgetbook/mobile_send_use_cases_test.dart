@@ -22,7 +22,7 @@ void main() {
     expect(find.text('SELECT RECIPIENT'), findsOneWidget);
     expect(find.text('Zcash Address'), findsOneWidget);
     expect(find.text('Paste'), findsNothing);
-    expect(find.text('Scan a QR Code'), findsOneWidget);
+    expect(find.text('Scan a QR code'), findsOneWidget);
     expect(find.text('Continue'), findsNothing);
     expect(
       find.byKey(const ValueKey('mobile_send_recipient_focus_scrim')),
@@ -68,7 +68,7 @@ void main() {
       AppAssetSizeMobile.padding,
     );
     expect(
-      tester.getTopLeft(find.text('Scan a QR Code')).dx -
+      tester.getTopLeft(find.text('Scan a QR code')).dx -
           tester.getTopRight(scanIconFrameFinder).dx,
       AppSpacing.s,
     );

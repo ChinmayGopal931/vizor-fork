@@ -209,7 +209,7 @@ mod tests {
     async fn classifies_the_makers_answers() {
         let _policy = lock_route_policy();
         let quote = format!(
-            r#"{{"quoteId":"{}","maker":"0x2bac02b5032e9092493814c705f156b49e288922","makerShare":"{}","makerProof":"{}","chainId":11155111,"contract":"0xd75efc6a157cc0a95f66962da86ddf35d9f2617c","token":"0x5764d0044bef5aa839e0ddafe2073421101b9ed8","amount":"1000000","depositZat":202021,"expiresAt":1790000300,"later":true}}"#,
+            r#"{{"quoteId":"{}","maker":"0x2bac02b5032e9092493814c705f156b49e288922","makerShare":"{}","makerProof":"{}","chainId":11155111,"contract":"0xd75efc6a157cc0a95f66962da86ddf35d9f2617c","token":"0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c","amount":"1000000","depositZat":202021,"expiresAt":1790000300,"later":true}}"#,
             hex(32, 0x22),
             hex(64, 0x0a),
             hex(64, 0x06)

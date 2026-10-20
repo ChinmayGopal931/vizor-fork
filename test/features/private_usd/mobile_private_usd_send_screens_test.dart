@@ -106,6 +106,56 @@ void main() {
     expect(enabled(tester, 'mobile_private_usd_send_review'), isFalse);
   });
 
+  // As ZEC Send's recipient picker (owner, 2026-10-19): the Receive sheet
+  // shows both kinds of address as a code.
+  testWidgets('Send and Withdraw scan their recipient; not while busy', (
+    tester,
+  ) async {
+    var scans = 0;
+    Future<void> show(PrivateUsdSendForm form) async {
+      final amount = TextEditingController();
+      final recipient = TextEditingController();
+      addTearDown(amount.dispose);
+      addTearDown(recipient.dispose);
+      await pump(
+        tester,
+        (_) => MobilePrivateUsdSendView(
+          form: form,
+          balances: previewPrivateUsdBalance(available: 100).balances,
+          status: PrivateUsdSpendStatus.available,
+          amountController: amount,
+          recipientController: recipient,
+          onAmountChanged: (_) {},
+          onRecipientChanged: (_) {},
+          onUseAll: () {},
+          onScan: () => scans++,
+          onReview: () {},
+          onBack: () {},
+          isRailgunAddress: previewPrivateUsdIsRailgunAddress,
+          autofocus: false,
+        ),
+      );
+    }
+
+    final scan = find.byKey(const ValueKey('mobile_private_usd_send_scan'));
+    for (final mode in PrivateUsdSendMode.values) {
+      await show(PrivateUsdSendForm(mode: mode, token: previewPrivateUsdUsdc));
+      expect(scan, findsOneWidget);
+      await tester.tap(scan);
+      expect(scans, mode.index + 1, reason: mode.name);
+    }
+
+    await show(
+      PrivateUsdSendForm(
+        mode: PrivateUsdSendMode.private,
+        token: previewPrivateUsdUsdc,
+        isBusy: true,
+      ),
+    );
+    await tester.tap(scan);
+    expect(scans, PrivateUsdSendMode.values.length);
+  });
+
   testWidgets('review, proof, outcome, and Send and Withdraw held back by a '
       'pending payment', (tester) async {
     await pump(tester, buildMobilePrivateUsdWithdrawReviewUseCase);

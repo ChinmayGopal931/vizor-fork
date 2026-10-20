@@ -179,17 +179,18 @@ Future<void> _openPage(int port) async {
 Future<void> _timedRefresh() async {
   final began = _clock.elapsed;
   try {
-    final balances = RailgunBalances.parse(
+    final refreshed = RailgunRefresh.parse(
       jsonDecode(await _host.call('refresh', '{}')),
     );
     final held = [
-      for (final entry in balances.byBucket.entries)
+      for (final entry in refreshed.balances.byBucket.entries)
         if (entry.value.any((a) => a.amount > BigInt.zero))
           '${entry.key.wireName}×${entry.value.length}',
     ];
     _log(
       'refresh done in ${_since(began)}: '
-      '${held.isEmpty ? 'nothing held' : held.join(', ')}',
+      '${held.isEmpty ? 'nothing held' : held.join(', ')}, '
+      'screening ${refreshed.screening.wireName}',
     );
   } on RailgunHostException catch (e) {
     _log('refresh failed after ${_since(began)}: ${_describe(e)}');
@@ -257,6 +258,11 @@ void _onEvent(String raw) {
       }
     case final RailgunProofEvent proof:
       _log('proof ${proof.status} ${proof.progress}');
+    case final RailgunScreeningEvent screening:
+      _log(
+        'screening txids ${screening.txids} downloading '
+        '${screening.downloading} proving ${screening.proving?.index}',
+      );
     case final RailgunLogEvent line:
       debugPrint(
         '[spike][page] ${redactRailgunMessage(line.message, secrets: _secrets)}',

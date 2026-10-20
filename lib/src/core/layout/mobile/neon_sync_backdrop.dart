@@ -174,19 +174,34 @@ class NeonSyncScrolled extends StatefulWidget {
 class _NeonSyncScrolledState extends State<NeonSyncScrolled> {
   bool _scrolled = false;
 
+  void _update(int depth, ScrollMetrics metrics) {
+    if (depth != 0 || metrics.axis != Axis.vertical) return;
+    final scrolled = metrics.extentBefore > 4;
+    if (scrolled != _scrolled) setState(() => _scrolled = scrolled);
+  }
+
   bool _onScroll(ScrollNotification notification) {
-    if (notification.depth == 0 && notification.metrics.axis == Axis.vertical) {
-      final scrolled = notification.metrics.extentBefore > 4;
-      if (scrolled != _scrolled) setState(() => _scrolled = scrolled);
-    }
+    _update(notification.depth, notification.metrics);
+    return false;
+  }
+
+  // A list whose content shrinks under a scrolled position is clamped back
+  // without a scroll notification (a finished bridge's banner going away
+  // left the Private USD page at its top with its readout hidden); only its
+  // metrics notification tells.
+  bool _onMetrics(ScrollMetricsNotification notification) {
+    _update(notification.depth, notification.metrics);
     return false;
   }
 
   @override
   Widget build(BuildContext context) =>
-      NotificationListener<ScrollNotification>(
-        onNotification: _onScroll,
-        child: widget.builder(context, _scrolled),
+      NotificationListener<ScrollMetricsNotification>(
+        onNotification: _onMetrics,
+        child: NotificationListener<ScrollNotification>(
+          onNotification: _onScroll,
+          child: widget.builder(context, _scrolled),
+        ),
       );
 }
 

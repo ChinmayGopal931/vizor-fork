@@ -102,6 +102,9 @@ pub(crate) enum SwapErrorCode {
     AlreadySpent,
     /// Spend a token from the issuer the `WWW-Authenticate` challenge names.
     TokenRequired,
+    /// A deposit's authorization is used, or another deposit of the same
+    /// address is on its way (`409`, M9).
+    Conflict,
 }
 
 impl SwapErrorCode {
@@ -119,6 +122,7 @@ impl SwapErrorCode {
             "methodNotAllowed" => Self::MethodNotAllowed,
             "alreadySpent" => Self::AlreadySpent,
             "tokenRequired" => Self::TokenRequired,
+            "conflict" => Self::Conflict,
             _ => return None,
         })
     }

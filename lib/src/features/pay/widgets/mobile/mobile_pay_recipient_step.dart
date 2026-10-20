@@ -8,6 +8,7 @@ import '../../../../core/widgets/app_profile_picture.dart';
 import '../../../../core/widgets/mobile_text_field.dart';
 import '../../../address_book/models/address_book_contact.dart';
 import '../../../address_book/models/address_book_label_lookup.dart';
+import '../../../address_scan/widgets/mobile_scan_address_row.dart';
 import '../../../swap/models/swap_address_formatting.dart';
 import '../../../swap/models/swap_models.dart';
 import '../../models/pay_recent_recipients.dart';
@@ -140,7 +141,7 @@ class _MobilePayRecipientStepState extends State<MobilePayRecipientStep> {
                     children: [
                       _buildRecipientField(context),
                       const SizedBox(height: AppSpacing.md),
-                      _buildQrRow(context),
+                      _qrRow,
                       if (visibleRecents.isNotEmpty) ...[
                         const SizedBox(height: AppSpacing.md),
                         _FlatRecipientSection(
@@ -260,7 +261,7 @@ class _MobilePayRecipientStepState extends State<MobilePayRecipientStep> {
         children: [
           _buildRecipientField(context),
           const SizedBox(height: AppSpacing.md),
-          _buildQrRow(context),
+          _qrRow,
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) => SingleChildScrollView(
@@ -385,63 +386,10 @@ class _MobilePayRecipientStepState extends State<MobilePayRecipientStep> {
     );
   }
 
-  Widget _buildQrRow(BuildContext context) {
-    final colors = context.colors;
-    return Semantics(
-      button: true,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: widget.busy ? null : widget.onOpenScanner,
-        child: SizedBox(
-          key: const ValueKey('mobile_pay_recipient_qr_row'),
-          height: _recipientRowHeight,
-          child: Row(
-            children: [
-              Container(
-                width: AppAssetSize.size,
-                height: AppAssetSize.size,
-                decoration: BoxDecoration(
-                  color: colors.background.neutralSubtleOpacity,
-                  borderRadius: BorderRadius.circular(AppRadii.full),
-                ),
-                child: Center(
-                  child: AppIcon(
-                    AppIcons.qr,
-                    size: AppAssetSize.icon,
-                    color: colors.icon.accent,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.s),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Scan a QR code',
-                      style: AppTypography.labelLarge.copyWith(
-                        color: colors.text.accent,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xxs),
-                    Text(
-                      'Scan an address using camera',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.labelLarge.copyWith(
-                        color: colors.text.secondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Widget get _qrRow => MobileScanAddressRow(
+    key: const ValueKey('mobile_pay_recipient_qr_row'),
+    onTap: widget.busy ? null : widget.onOpenScanner,
+  );
 
   List<PayRecentRecipient> _recentsForAddress(
     String address,

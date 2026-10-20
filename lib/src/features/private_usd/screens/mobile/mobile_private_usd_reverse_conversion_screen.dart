@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/feedback/app_haptics.dart';
 import '../../../../core/layout/mobile/mobile_top_nav.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
@@ -23,6 +24,7 @@ import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_keep_awake_provider.dart';
 import '../../providers/private_usd_reverse_conversion_provider.dart';
+import '../../widgets/mobile/private_usd_bridged_hero.dart';
 import '../../widgets/mobile/private_usd_confirm_sheets.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
 import '../../widgets/mobile/private_usd_logo.dart';
@@ -51,6 +53,12 @@ class _MobilePrivateUsdReverseConversionScreenState
   PrivateUsdProgressVisibleNotifier? _visibility;
   var _tab = SwapStatusTab.progress;
   var _detailsExpanded = false;
+
+  /// Whether the last presentation shown was bridged; null before one.
+  bool? _wasBridged;
+
+  /// The bridge finished in view (not opened finished): its sign plays.
+  var _celebrate = false;
 
   @override
   void initState() {
@@ -135,6 +143,10 @@ class _MobilePrivateUsdReverseConversionScreenState
             privacyModeEnabled: ref.watch(privacyModeProvider),
             explorerTxPrefix: deployment?.explorerTxPrefix,
           );
+    if (presentation != null) {
+      if (presentation.bridged && _wasBridged == false) _celebrate = true;
+      _wasBridged = presentation.bridged;
+    }
     final notifier = ref.read(
       privateUsdReverseConversionProvider(key).notifier,
     );
@@ -148,6 +160,8 @@ class _MobilePrivateUsdReverseConversionScreenState
         presentation: presentation,
         message: state.message,
         acting: state.acting,
+        celebrate: _celebrate,
+        onBridgedImpact: () => unawaited(AppHaptics.sendSuccess()),
         activeTab: _tab,
         detailsExpanded: _detailsExpanded,
         onTabChanged: (tab) => setState(() => _tab = tab),
@@ -187,6 +201,8 @@ class MobilePrivateUsdReverseConversionView extends StatelessWidget {
     this.onViewRefunds,
     this.message,
     this.acting,
+    this.celebrate = false,
+    this.onBridgedImpact,
     this.activeTab = SwapStatusTab.progress,
     this.detailsExpanded = false,
     this.onTabChanged,
@@ -200,6 +216,12 @@ class MobilePrivateUsdReverseConversionView extends StatelessWidget {
   /// Why the last step did not go through.
   final String? message;
   final PrivateUsdReverseUserStep? acting;
+
+  /// Plays the "Bridged" sign: the bridge finished while it showed.
+  final bool celebrate;
+
+  /// As the sign lights, for the success haptic.
+  final VoidCallback? onBridgedImpact;
   final SwapStatusTab activeTab;
   final bool detailsExpanded;
   final ValueChanged<SwapStatusTab>? onTabChanged;
@@ -226,7 +248,7 @@ class MobilePrivateUsdReverseConversionView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             MobileTopNav.back(
-              title: PrivateUsdCopy.convertProgressTitle,
+              title: presentation?.title ?? PrivateUsdCopy.convertProgressTitle,
               onBack: onBack,
               trailing: PrivateUsdInfoButton(onTap: onInfo),
             ),
@@ -286,7 +308,13 @@ class MobilePrivateUsdReverseConversionView extends StatelessWidget {
     final message = this.message;
     final cancelling = acting == PrivateUsdReverseUserStep.cancelling;
     return [
-      if (resultTitle != null) ...[
+      if (presentation.bridged)
+        PrivateUsdBridgedHero(
+          body: presentation.resultBody ?? '',
+          celebrate: celebrate,
+          onImpact: onBridgedImpact,
+        )
+      else if (resultTitle != null) ...[
         const SizedBox(height: AppSpacing.s),
         MobileSurfaceCard(
           key: const ValueKey('mobile_private_usd_progress_result'),
@@ -368,7 +396,9 @@ class MobilePrivateUsdReverseConversionView extends StatelessWidget {
           amountText: presentation.receiveAmountText,
           asset: status.receiveAsset,
           icon: privateUsdHeaderIcon(status.receiveAsset),
+          bottomText: PrivateUsdCopy.shieldedZec,
         ),
+        headerToBodyGap: AppSpacing.xs,
         activeTab: activeTab,
         detailsExpanded: detailsExpanded,
         onTabChanged: onTabChanged ?? (_) {},

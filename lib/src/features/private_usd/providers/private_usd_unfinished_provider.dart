@@ -43,6 +43,22 @@ class PrivateUsdReverseConversionsNotifier
       state = next;
 }
 
+/// The active account's deposits (M9) as the swap engine last published
+/// them: the last pass, or why it failed. Null until a pass ran, after a
+/// lock, and for an account that cannot have deposits.
+final privateUsdDepositsProvider =
+    NotifierProvider<PrivateUsdDepositsNotifier, PrivateUsdDepositsStatus?>(
+      PrivateUsdDepositsNotifier.new,
+    );
+
+class PrivateUsdDepositsNotifier extends Notifier<PrivateUsdDepositsStatus?> {
+  @override
+  PrivateUsdDepositsStatus? build() => null;
+
+  /// The engine's latest snapshot.
+  void publish(PrivateUsdDepositsStatus? next) => state = next;
+}
+
 /// The conversions under way in either direction, for every account: the
 /// router's synchronous guard keeps a conversion's progress route reachable
 /// while its record is here, even when Private USD is otherwise unavailable (D16). It changes

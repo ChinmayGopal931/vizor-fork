@@ -365,6 +365,37 @@ void main() {
       expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsNothing);
     });
 
+    testWidgets('paid and screened: the "Bridged" sign', (tester) async {
+      await pumpProgress(
+        tester,
+        PrivateUsdConversionStatus(
+          record: previewPrivateUsdRecord(
+            phase: ApiForwardPhase.paid,
+            outcome: ApiForwardOutcome.paid,
+            ago: const Duration(minutes: 20),
+          ),
+        ),
+        // Read after the payout settled, nothing left arriving.
+        balance: previewPrivateUsdBalance(
+          available: 115.5,
+        ).copyWith(updatedAt: previewPrivateUsdNow),
+      );
+
+      expect(
+        find.byKey(const ValueKey('mobile_private_usd_bridged')),
+        findsOneWidget,
+      );
+      expect(
+        find.text(PrivateUsdCopy.convertResultScreenedBody(r'$15.50')),
+        findsOneWidget,
+      );
+      expect(find.text(PrivateUsdCopy.convertResultPaidTitle), findsNothing);
+      expect(
+        find.text(PrivateUsdCopy.bridgeEndedTitle.toUpperCase()),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('refunded and nothing sent end with "Try again"', (
       tester,
     ) async {
@@ -465,7 +496,6 @@ void main() {
           state: previewPrivateUsdBalance(),
           zecUsdPrice: 50,
           privacyModeEnabled: false,
-          receiveAddress: previewPrivateUsdAddress,
           screening: const Duration(hours: 1),
           banner: previewPrivateUsdBanner(),
           activityRows: previewPrivateUsdActivityRows(context, [
@@ -490,8 +520,22 @@ void main() {
 
     // A zero balance with a conversion under way is not "empty".
     expect(find.text(PrivateUsdCopy.emptyTitle), findsNothing);
-    expect(find.text(PrivateUsdCopy.bannerToUsd), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.activityConverting), findsOneWidget);
+    // The banner and the bridge's own row read alike ("Bridging to
+    // 0zkUSDC"), so each is found where it stands.
+    expect(
+      find.descendant(
+        of: find.byType(PrivateUsdConversionBannerView),
+        matching: find.text(PrivateUsdCopy.bannerToUsd),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('mobile_private_usd_activity_row_0')),
+        matching: find.text(PrivateUsdCopy.activityConverting),
+      ),
+      findsOneWidget,
+    );
     expect(find.text(PrivateUsdCopy.activityConverted), findsOneWidget);
     // Nothing sent moved no money: no row.
     expect(

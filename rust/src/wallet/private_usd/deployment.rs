@@ -108,6 +108,28 @@ pub(crate) struct Deployment {
     /// first and never stored.
     pub keyless_rpc_url: &'static str,
     pub poi_node_url: &'static str,
+    /// Where public USDC is shielded into the private balance (M9); `None`
+    /// where no Deposits contract is pinned, and deposits are hidden.
+    pub deposits: Option<DepositsPin>,
+}
+
+/// What a wallet pins of a Deposits deployment, never what a relayer says
+/// (zecSwap `docs/deposits.md`, "Pin the deployment"). The relayer's terms
+/// must name the same contract, account and token on the pinned chain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DepositsPin {
+    /// The Deposits contract: every authorization's `to`.
+    pub contract: [u8; 20],
+    /// Its deployment block, informational.
+    pub contract_block: u64,
+    /// The account the relayer sends deposits from. A deposit's nonce
+    /// commits to it, so a tampered answer cannot take even the fee. It is
+    /// not the top-level `relayer`, which payouts are signed for.
+    pub relayer: [u8; 20],
+    /// The token deposits are in: the deployment's swap token.
+    pub token: [u8; 20],
+    /// Multicall3, which reads twenty deposit addresses in one call.
+    pub multicall: [u8; 20],
 }
 
 /// A token the private USD balance counts as dollars.
@@ -120,8 +142,16 @@ pub(crate) struct UsdToken {
 }
 
 const MAINNET_USDC: [u8; 20] = address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
-/// The testnet maker's swap token; it stands in for USDC.
-const SEPOLIA_TEST_USD: [u8; 20] = address("0x5764D0044bef5AA839E0dDafE2073421101B9Ed8");
+/// The testnet maker's swap token; it stands in for USDC. `ZecSwap Test
+/// USD`, version `2`, 6 decimals, with EIP-3009 for deposits (Sepolia block
+/// 11,944,315). The hosted maker and relayer moved to it at 23:42 UTC on
+/// 2026-10-18, for swaps too: the retired one
+/// (`0x5764D0044bef5AA839E0dDafE2073421101B9Ed8`) no longer swaps, and its
+/// balances no longer count.
+const SEPOLIA_TEST_USD: [u8; 20] = address("0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c");
+/// Multicall3, at its canonical address on every chain (it has code on
+/// Sepolia, checked 2026-10-18, and on mainnet, 2026-10-19).
+const MULTICALL3: [u8; 20] = address("0xcA11bde05977b3631167028862bE2a173976CA11");
 /// Circle's test USDC, the one Railgun accepts on Sepolia.
 const SEPOLIA_USDC: [u8; 20] = address("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238");
 
@@ -155,6 +185,16 @@ const MAINNET: Deployment = Deployment {
     railscan_tx_prefix: "https://railscan.io/ethereum/tx/",
     keyless_rpc_url: "https://ethereum-rpc.publicnode.com",
     poi_node_url: POI_NODE_URL,
+    // zecSwap `deployments/mainnet-deposits.json` (branch
+    // `feature/deposits`), live since 03:48 UTC on 2026-10-19. Its relayer
+    // sends deposits through Flashbots Protect, one at a time.
+    deposits: Some(DepositsPin {
+        contract: address("0xebc7508e20bd4467491ee7e7589d5c7d4c5e8cb6"),
+        contract_block: 26_224_004,
+        relayer: address("0x6ae40b34c32d3feaa0eef53d7e4724160b7a2135"),
+        token: MAINNET_USDC,
+        multicall: MULTICALL3,
+    }),
 };
 
 const TESTNET: Deployment = Deployment {
@@ -193,6 +233,15 @@ const TESTNET: Deployment = Deployment {
     railscan_tx_prefix: "https://railscan.io/sepolia/tx/",
     keyless_rpc_url: "https://ethereum-sepolia-rpc.publicnode.com",
     poi_node_url: POI_NODE_URL,
+    // zecSwap `deployments/sepolia-deposits.json`, live since 23:42 UTC on
+    // 2026-10-18.
+    deposits: Some(DepositsPin {
+        contract: address("0x58324e9a866c9690aca08169d3c67630e84c9019"),
+        contract_block: 11_944_316,
+        relayer: address("0xedc4c88a3f6ae8130a2c18babbabd8100cc1a446"),
+        token: SEPOLIA_TEST_USD,
+        multicall: MULTICALL3,
+    }),
 };
 
 pub(crate) fn deployment(network: PrivateUsdNetwork) -> &'static Deployment {

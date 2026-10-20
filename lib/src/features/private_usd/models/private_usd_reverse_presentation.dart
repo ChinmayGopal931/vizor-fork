@@ -105,6 +105,8 @@ class PrivateUsdReverseProgressPresentation {
     this.showsKeepOpen = false,
     this.provingNote,
     this.keyStepPending = false,
+    this.title = PrivateUsdCopy.convertProgressTitle,
+    this.bridged = false,
   });
 
   final SwapActivityStatusPresentation status;
@@ -139,6 +141,12 @@ class PrivateUsdReverseProgressPresentation {
 
   /// A key-using step is still to come: the screen stays awake (X8).
   final bool keyStepPending;
+
+  /// The top bar's: "Bridging" while it runs, "Bridge" once it ended.
+  final String title;
+
+  /// It finished: the "Bridged" sign in place of the result card.
+  final bool bridged;
 }
 
 /// The reverse progress for [status] at [now]. [funding] is the funding's
@@ -168,6 +176,7 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     required List<SwapStatusStepData> steps,
     required int progressIndex,
     required SwapStatusBadgeKind badgeKind,
+    bool bridged = false,
   }) => SwapActivityStatusPresentation(
     title: PrivateUsdCopy.convertProgressTitle,
     payAsset: SwapAsset.usdc,
@@ -176,8 +185,12 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     receiveFiatText: '',
     payAmountText: usdText,
     receiveAmountText: zecText,
-    payLabel: PrivateUsdCopy.convertYouPay,
-    receiveLabel: PrivateUsdCopy.convertYouReceive,
+    payLabel: bridged
+        ? PrivateUsdCopy.bridgedYouPaid
+        : PrivateUsdCopy.convertYouPay,
+    receiveLabel: bridged
+        ? PrivateUsdCopy.bridgedYouReceived
+        : PrivateUsdCopy.convertYouReceive,
     badgeKind: badgeKind,
     progressIndex: progressIndex,
     steps: steps,
@@ -197,11 +210,13 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     int progressIndex = 0,
     String? amounts,
     bool viewRefunds = false,
+    bool bridged = false,
   }) => PrivateUsdReverseProgressPresentation(
     status: presentation(
       steps: steps,
       progressIndex: progressIndex,
       badgeKind: badgeKind,
+      bridged: bridged,
     ),
     payAmountText: usdText,
     receiveAmountText: zecText,
@@ -212,6 +227,8 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     actionLabel: PrivateUsdCopy.reverseNew,
     actionEnabled: true,
     showsViewRefunds: viewRefunds,
+    title: PrivateUsdCopy.bridgeEndedTitle,
+    bridged: bridged,
   );
 
   switch (record.phase) {
@@ -223,6 +240,7 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
         steps: _reverseSteps(active: 6),
         progressIndex: 6,
         amounts: PrivateUsdCopy.reverseProgressAmounts(usdText, zecText),
+        bridged: true,
       );
     case ApiReversePhase.refunded:
       return ended(

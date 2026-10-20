@@ -401,6 +401,11 @@ pub(crate) struct RelayerTerms {
     pub reverse_funding: Option<ReverseFundingTerms>,
     pub railgun_sends: Option<RailgunSendsTerms>,
     pub fee_expires_at: Option<u64>,
+    /// Absent when the relayer takes no deposits (M9). Kept unparsed here,
+    /// so a deposits part this build cannot read never fails the terms the
+    /// swaps and sends need; `deposits::pinned_terms` reads and checks it.
+    #[serde(default)]
+    pub deposits: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

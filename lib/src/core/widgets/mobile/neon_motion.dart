@@ -17,6 +17,9 @@ abstract final class NeonMotion {
   static const crtOff = Duration(milliseconds: 380);
   static const syncDone = Duration(milliseconds: 1800);
 
+  /// `NeonDoneSign` with its shockwave: the done sign, then two rings.
+  static const bridged = Duration(milliseconds: 2600);
+
   /// Where the unlock backdrop and the reveal curtain put the wordmark, so
   /// the handoff between them is seamless.
   static const wordmarkAlignment = Alignment(0, -0.45);

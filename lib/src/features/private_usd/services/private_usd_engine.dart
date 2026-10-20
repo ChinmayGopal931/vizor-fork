@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../rust/api/private_usd.dart' as rust;
 import '../models/private_usd_record_key.dart';
+import 'private_usd_deposit_backend.dart';
 import 'private_usd_swap_backend.dart';
 
 /// The foreground loop's timing (plan reference §5.10, zapp `SwapLoop`).
@@ -172,6 +173,38 @@ class PrivateUsdReverseStatus {
   );
 }
 
+/// What the engine knows about the active account's deposits (M9): the last
+/// pass, or why it failed.
+@immutable
+class PrivateUsdDepositsStatus {
+  const PrivateUsdDepositsStatus({
+    required this.accountUuid,
+    this.pass,
+    this.error,
+    this.checkedAt,
+  });
+
+  final String accountUuid;
+
+  /// The last pass that returned: the address shown, the used ones, the
+  /// deposits, the terms.
+  final rust.ApiDepositPass? pass;
+
+  /// Why the last pass failed, if it did.
+  final rust.ApiPrivateUsdErrorCode? error;
+  final DateTime? checkedAt;
+
+  /// The account's deposits, newest first.
+  List<rust.ApiDepositRecord> get records => pass?.records ?? const [];
+
+  /// A deposit posted or waiting to be posted.
+  bool get inFlight => records.any(
+    (record) =>
+        record.state == rust.ApiDepositState.signed ||
+        record.state == rust.ApiDepositState.sent,
+  );
+}
+
 /// The engine's moment when a long step outside its queue began (the page's
 /// funding proof, up to 10 minutes): a call bound to it never starts once
 /// the engine paused, drained or moved on since.
@@ -203,11 +236,17 @@ class PrivateUsdEngine {
     required bool Function() allowed,
     bool Function(String accountUuid)? isKnownAccount,
     DateTime Function()? now,
+    PrivateUsdDepositBackend? depositBackend,
+    String? Function()? depositAccount,
+    bool Function()? depositsSignNew,
   }) : _backend = backend,
        _readMnemonic = readMnemonic,
        _allowed = allowed,
        _isKnownAccount = isKnownAccount ?? _anyAccount,
-       _now = now ?? DateTime.now;
+       _now = now ?? DateTime.now,
+       _depositBackend = depositBackend,
+       _depositAccount = depositAccount,
+       _depositsSignNew = depositsSignNew;
 
   static bool _anyAccount(String _) => true;
 
@@ -222,6 +261,17 @@ class PrivateUsdEngine {
   /// so advancing it would only fail every pass.
   final bool Function(String accountUuid) _isKnownAccount;
   final DateTime Function() _now;
+
+  /// Deposits (M9): the calls, the account they run for (the active one,
+  /// when it can have deposits; null otherwise), and whether a pass may sign
+  /// a new deposit (the kill switch: off, it still follows and posts the
+  /// ones under way).
+  final PrivateUsdDepositBackend? _depositBackend;
+  final String? Function()? _depositAccount;
+  final bool Function()? _depositsSignNew;
+
+  /// The active account's deposits as the last pass left them.
+  final deposits = ValueNotifier<PrivateUsdDepositsStatus?>(null);
 
   /// Every conversion the engine has seen, by key.
   final conversions =
@@ -255,6 +305,16 @@ class PrivateUsdEngine {
   Timer? _napTimer;
   Completer<void>? _napWaker;
 
+  // Deposits: a pass is due (asked for, or its time came), with the vault
+  // check; the pass running now on its own lane; when the next is due.
+  bool _depositDue = false;
+  bool _depositCheckVaults = false;
+  // Asked for by a screen or the sheet (else unlock, the foreground or an
+  // account switch, which read only an account that used deposits).
+  bool _depositAsked = false;
+  Future<void>? _depositRun;
+  DateTime? _depositNextAt;
+
   // Op ids are unique per process, so a cancel Rust remembers for an old id
   // can never stop a newer call.
   static int _lastOpId = 0;
@@ -280,7 +340,12 @@ class PrivateUsdEngine {
   /// background) until their next advance returns.
   void start({bool resuming = false}) {
     if (_disposed) return;
-    if (resuming) _markResuming();
+    if (resuming) {
+      _markResuming();
+      // Unlock, the foreground, a restart: the deposits are read again.
+      _depositDue = true;
+      _depositCheckVaults = true;
+    }
     _wanted = true;
     _nudged = true;
     _kick();
@@ -324,18 +389,22 @@ class PrivateUsdEngine {
     }
   }
 
-  /// One pass over every conversion under way; the nap before the next, or
-  /// null when nothing is under way.
+  /// One pass over every conversion under way, with the active account's
+  /// deposits beside it; the nap before the next, or null when nothing is
+  /// under way.
   Future<Duration?> _pass(int epoch) async {
+    // Deposits run on a lane of their own, never awaited here: a deposit
+    // pass (up to 90 s while the relayer is busy) never holds a conversion
+    // step back. Its end wakes the loop.
+    Duration? nap = _deposits(epoch);
     final List<String> accounts;
     try {
       accounts = await _backend.accountsWithUnfinished();
     } catch (error) {
       _debugLog('listing conversions failed (${error.runtimeType})');
-      return PrivateUsdEngineTiming.restart;
+      return _shorter(nap, PrivateUsdEngineTiming.restart);
     }
     if (epoch != _epoch) return null;
-    Duration? nap;
     for (final account in accounts) {
       if (!_isKnownAccount(account)) continue;
       final List<rust.ApiForwardRecord> records;
@@ -618,6 +687,10 @@ class PrivateUsdEngine {
   static rust.ApiPrivateUsdErrorCode _problemOf(
     rust.ApiPrivateUsdErrorCode code,
   ) => switch (code) {
+    // zapp holds a service serving another deployment as the relayer being
+    // unreachable.
+    rust.ApiPrivateUsdErrorCode.wrongDeployment =>
+      rust.ApiPrivateUsdErrorCode.relayerUnreachable,
     rust.ApiPrivateUsdErrorCode.mismatch ||
     rust.ApiPrivateUsdErrorCode.zcashWallet ||
     rust.ApiPrivateUsdErrorCode.storeUnreadable ||
@@ -675,26 +748,30 @@ class PrivateUsdEngine {
     bool dropLateResult = true,
   }) => _queue(accountUuid, _epoch, step, dropLateResult: dropLateResult);
 
+  /// [lane] keeps a queue apart from the account's conversions (deposits);
+  /// the seed read is still [accountUuid]'s.
   Future<T> _queue<T>(
     String accountUuid,
     int epoch,
     Future<T> Function(int opId, PrivateUsdSecretReader secret) step, {
     bool dropLateResult = true,
+    String? lane,
   }) {
     if (_disposed || _quiesceDepth > 0) {
       return Future<T>.error(const PrivateUsdEngineUnavailableException());
     }
-    final previous = _tails[accountUuid] ?? Future<void>.value();
+    final key = lane ?? accountUuid;
+    final previous = _tails[key] ?? Future<void>.value();
     final result = previous.then(
       (_) => _step(accountUuid, epoch, step, dropLateResult: dropLateResult),
     );
     final tail = result.then<void>((_) {}, onError: (Object _) {});
-    _tails[accountUuid] = tail;
+    _tails[key] = tail;
     _running.add(tail);
     unawaited(
       tail.whenComplete(() {
         _running.remove(tail);
-        if (identical(_tails[accountUuid], tail)) _tails.remove(accountUuid);
+        if (identical(_tails[key], tail)) _tails.remove(key);
       }),
     );
     return result;
@@ -1094,6 +1171,188 @@ class PrivateUsdEngine {
     _publishReverse();
   }
 
+  // ── Deposits (M9) ──────────────────────────────────────────────────
+
+  static String _depositLane(String accountUuid) => '$accountUuid#deposits';
+
+  /// Asks for a deposit pass now (Private USD or the Receive USDC sheet
+  /// opened, their timers, an account switch); [checkVaults] also reads
+  /// which vaults can be rescued. Runs only while the engine may.
+  void requestDeposits({bool checkVaults = false}) {
+    if (_disposed || _depositBackend == null) return;
+    _depositDue = true;
+    _depositAsked = true;
+    if (checkVaults) _depositCheckVaults = true;
+    start();
+  }
+
+  /// The active account changed: its deposits are read afresh (if it used
+  /// them), and the last account's status goes.
+  void depositAccountChanged() {
+    if (_disposed || _depositBackend == null) return;
+    _depositNextAt = null;
+    _publishDeposits(null);
+    _depositDue = true;
+    _depositCheckVaults = true;
+    start();
+  }
+
+  /// Starts a deposit pass when one is due; the nap until the next is due,
+  /// or null (none due, or one running: its end wakes the loop).
+  Duration? _deposits(int epoch) {
+    final backend = _depositBackend;
+    final account = _depositAccount?.call();
+    if (backend == null || account == null || _depositRun != null) {
+      return null;
+    }
+    final now = _now();
+    final next = _depositNextAt;
+    if (_depositDue || (next != null && !now.isBefore(next))) {
+      _startDepositPass(account, backend, epoch);
+      return null;
+    }
+    return next?.difference(now);
+  }
+
+  void _startDepositPass(
+    String accountUuid,
+    PrivateUsdDepositBackend backend,
+    int epoch,
+  ) {
+    _depositDue = false;
+    _depositNextAt = null;
+    final checkVaults = _depositCheckVaults;
+    _depositCheckVaults = false;
+    // A pass its schedule set off follows deposits under way, so the
+    // account used them; one nothing asked for reads only such an account.
+    final onlyIfUsed = !_depositAsked && !(deposits.value?.inFlight ?? false);
+    _depositAsked = false;
+    final run = _depositPass(
+      accountUuid,
+      backend,
+      epoch,
+      checkVaults,
+      onlyIfUsed,
+    );
+    _depositRun = run;
+    _running.add(run);
+    unawaited(
+      run.whenComplete(() {
+        _running.remove(run);
+        if (identical(_depositRun, run)) _depositRun = null;
+        // The loop picks the pass's next time up.
+        if (!_disposed && epoch == _epoch) start();
+      }),
+    );
+  }
+
+  Future<void> _depositPass(
+    String accountUuid,
+    PrivateUsdDepositBackend backend,
+    int epoch,
+    bool checkVaults,
+    bool onlyIfUsed,
+  ) async {
+    try {
+      final pass = await _queue(
+        accountUuid,
+        epoch,
+        (opId, secret) => backend.pass(
+          accountUuid,
+          secret,
+          opId: opId,
+          signNew: _depositsSignNew?.call() ?? false,
+          checkVaults: checkVaults,
+          onlyIfUsed: onlyIfUsed,
+        ),
+        lane: _depositLane(accountUuid),
+      );
+      if (epoch != _epoch) return;
+      final now = _now();
+      _publishDeposits(
+        PrivateUsdDepositsStatus(
+          accountUuid: accountUuid,
+          pass: pass,
+          checkedAt: now,
+        ),
+      );
+      final ms = pass.nextPollMs;
+      if (ms != null) {
+        final asked = Duration(milliseconds: ms);
+        _depositNextAt = now.add(
+          asked < PrivateUsdEngineTiming.minNap
+              ? PrivateUsdEngineTiming.minNap
+              : asked,
+        );
+      }
+    } on rust.ApiPrivateUsdError catch (error) {
+      switch (error.code) {
+        // A pause stopped it: the next start reads the deposits again.
+        case rust.ApiPrivateUsdErrorCode.cancelled:
+          _depositDue = true;
+          _depositAsked = _depositAsked || !onlyIfUsed;
+        // Another pass or a rescue held the account.
+        case rust.ApiPrivateUsdErrorCode.busy:
+          _depositNextAt = _now().add(PrivateUsdEngineTiming.retry);
+        default:
+          _debugLog('a deposit pass failed (${error.code.name})');
+          final previous = deposits.value;
+          _publishDeposits(
+            PrivateUsdDepositsStatus(
+              accountUuid: accountUuid,
+              pass: previous?.accountUuid == accountUuid ? previous?.pass : null,
+              error: error.code,
+              checkedAt: _now(),
+            ),
+          );
+          // Something under way is followed again; else the next ask does.
+          if (deposits.value?.inFlight ?? false) {
+            _depositNextAt = _now().add(PrivateUsdEngineTiming.restart);
+          }
+      }
+    } on PrivateUsdEngineInterruptedException {
+      _depositDue = true;
+      _depositAsked = _depositAsked || !onlyIfUsed;
+    } on PrivateUsdEngineUnavailableException {
+      _depositDue = true;
+      _depositAsked = _depositAsked || !onlyIfUsed;
+    } on PrivateUsdKeyLockedException {
+      _depositDue = true;
+      _depositAsked = _depositAsked || !onlyIfUsed;
+    } catch (error) {
+      _debugLog('a deposit pass failed (${error.runtimeType})');
+      if (deposits.value?.inFlight ?? false) {
+        _depositNextAt = _now().add(PrivateUsdEngineTiming.restart);
+      }
+    }
+  }
+
+  /// "Recover" for deposit address [index]: the user's action only, never
+  /// the loop's. The deposits are read again after.
+  Future<rust.ApiDepositRecord> rescueDeposit(
+    String accountUuid, {
+    required int index,
+  }) async {
+    final backend = _depositBackend;
+    if (backend == null) throw const PrivateUsdEngineUnavailableException();
+    try {
+      return await _queue(
+        accountUuid,
+        _epoch,
+        (_, secret) => backend.rescue(accountUuid, secret, index: index),
+        dropLateResult: false,
+        lane: _depositLane(accountUuid),
+      );
+    } finally {
+      requestDeposits(checkVaults: true);
+    }
+  }
+
+  void _publishDeposits(PrivateUsdDepositsStatus? status) {
+    if (_disposed) return;
+    deposits.value = status;
+  }
+
   // ── Pausing and draining ───────────────────────────────────────────
 
   /// Stops starting steps and cancels the running one (lock, background).
@@ -1103,6 +1362,8 @@ class PrivateUsdEngine {
   Future<void> pause(PrivateUsdPauseReason reason) async {
     _interrupt();
     if (reason != PrivateUsdPauseReason.lock) return;
+    // The deposit addresses are the account's: not kept past a lock.
+    _publishDeposits(null);
     try {
       _backend.clearSessions();
     } catch (error) {
@@ -1132,6 +1393,7 @@ class PrivateUsdEngine {
   void forgetAccount(String accountUuid) {
     _statuses.removeWhere((key, _) => key.accountUuid == accountUuid);
     _reverse.removeWhere((key, _) => key.accountUuid == accountUuid);
+    if (deposits.value?.accountUuid == accountUuid) _publishDeposits(null);
     _publish();
   }
 
@@ -1139,6 +1401,8 @@ class PrivateUsdEngine {
   void forgetAll() {
     _statuses.clear();
     _reverse.clear();
+    _depositNextAt = null;
+    _publishDeposits(null);
     _publish();
   }
 
@@ -1148,6 +1412,7 @@ class PrivateUsdEngine {
     _interrupt();
     conversions.dispose();
     reverseConversions.dispose();
+    deposits.dispose();
   }
 
   void _interrupt() {

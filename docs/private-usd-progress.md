@@ -7,6 +7,17 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **Deposits (M9, 2026-10-18): public USDC into private USD.** Each
+  software account has Ethereum deposit addresses of its own; once one holds
+  the relayer's minimum, the app signs, keeps and posts an EIP-3009
+  authorization on its own while unlocked and in the foreground, and only
+  the chain settles it. On testnet, and on mainnet since 2026-10-19 (M9.7).
+  The testnet swap token moved to the deposits' tUSD for swaps too. Built
+  and checked on the host (four unit tests, live read-only checks against
+  Sepolia, `fvm flutter analyze`); the device round has a `--deposits`
+  step. The first testnet deposit landed on the phone (M9.6); the mainnet
+  check with the owner's funds is next (M9.7).
+
 - **Owner decisions of 2026-10-17 (shared Dart, so Android changes too;
   details in `docs/private-usd-ios-progress.md`).**
   - **Account deletion deletes the Railgun wallet (BI-3, option (a);
@@ -367,7 +378,14 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 - **Owner items:** E1's zecSwap Zakura build must carry the
   `zakura-protocol =2.2.0` pin (bumped locally, uncommitted, in
   `~/dev/zapp/zecSwap-zakura/crates/zecswap-core/Cargo.toml` lines 21 and
-  31); upstream veylor has the same testnet NU7 gap; N1 (tokens, M4), E6, E7,
+  31) and, since M9 (2026-10-18), the deposit code
+  (`~/dev/zapp/zecSwap-zakura-deposits.patch`, applied there uncommitted:
+  `feature/deposits`' `zecswap-core` and `zecswap-railgun/src` with `bip32
+  =0.6.0-pre.1` on `secp256k1 0.29`). The patch is temporary: the owner
+  will move upstream zecSwap, or a published `zecswap-core`, onto the
+  Zakura crates, and Veylor then pins a pushed rev with no patch. Every
+  deposit import goes through `zecswap_core` and `zecswap_railgun`, so that
+  switch changes only `rust/Cargo.toml`; upstream veylor has the same testnet NU7 gap; N1 (tokens, M4), E6, E7,
   E4, and sign-off for M8.7. E2 (relicensing) is dropped: the owner said
   none is needed (2026-10-14); sign off at the end, then commit and push.
 
@@ -1538,7 +1556,391 @@ M8 status (2026-10-14): the non-device parts are done.
     pre-existing `app_review_payment_handoff_test.dart` failures (the "Edit"
     and "Review" cases, 5 each).
 
+## M9. Deposits (public USDC into private USD)
+
+- [x] M9.1 Bring the deposit code in: `git apply
+  ~/dev/zapp/zecSwap-zakura-deposits.patch` to the E1 stand-in
+  (`~/dev/zapp/zecSwap-zakura`) applied cleanly (2026-10-18); `cargo test`
+  in `rust/` passed (1,518 library tests, 12 ignored, and the integration
+  suites), and `Cargo.lock` gained two lines only, `bip32` and `secp256k1`
+  under `zecswap-core`, with no new package. The note's five words are
+  built in `deposits.rs` (M9.3)
+- [x] M9.2 Pins: the testnet swap token moved to the deposits' tUSD
+  (`0x64c4…727c`, for swaps too); `Deployment.deposits` (testnet: the
+  Deposits contract, the relayer's deposits account, the token, Multicall3;
+  mainnet: none), exposed as `ApiDeployment.deposits`; `/v1/terms`'
+  `deposits` held to it (D-115, D-116); old-token cases decided (D-117)
+- [x] M9.3 Rust `deposits.rs` (with `abi.rs` and `evm_rpc`'s
+  `DepositChain`): deposit keys, the scan, signing within the cap, keep
+  before post, the Answers table, belief from the chain, rescue, the
+  `deposits` and `deposit_scans` tables (`swaps.db` schema 2), six FRB calls
+  and the bindings (D-118 to D-123)
+- [x] M9.4 Dart and UI: deposits on the engine's own lane (active account,
+  foreground and unlocked, drained with the rest), the Receive USDC sheet,
+  "Receive" beside Send and Withdraw, the deposits card, the relabelled
+  `0zk` card and `infoReceive`, deposit activity rows on the screen, the
+  Activity tab and Home, landed deposits in Arriving, deposit rescue on
+  Refunds (D-124 to D-126)
+- [x] M9.5 Checks (2026-10-18): the four unit tests pass, and the Private
+  USD module's Rust tests (80 passed, 2 ignored); the four Dart tests with
+  the moved token (36 passed) and the Railgun page's fee test pass;
+  `fvm flutter analyze` is clean; live read-only checks against Sepolia
+  passed (D-121). The testnet APK builds at `8f3a382ee` (`fvm flutter build
+  apk --debug --target-platform android-arm64` with
+  `VIZOR_FORM_FACTOR=mobile`, `VIZOR_PRIVATE_USD_ENABLED=true`,
+  `ZCASH_DEFAULT_NETWORK=test`; 222.6 MB, `com.keplr.vizor`); nothing was
+  installed. The device round's `--deposits` step is written, not run
+  (D-127). The whole suites were left to the owner
+- [ ] M9.6 Testnet on the phone, with the owner's funds (task 5 of the
+  brief): two deposits shielded, the shown index moving, and recovery
+  - **First deposit (2026-10-19, 02:31 UTC).** It ran on the OnePlus 15's
+    side-by-side build at `03e33fe88`. The owner withdrew 200 tUSD to index 0
+    (`0x4efA32956C01382B1859F96Dc472eD64a5614C9C`) in
+    `0xc3ee3047079aa1521b3d3267df33b8cb96fbacca4bd3dce726b84867cd988c7e`
+    (block 11,945,227).
+    - The app shielded it on its own in the next block, 12 s later:
+      `0xc56236050119c1f11cd3eabcc26cc0cf343ffbd908c1d2be00d49d9dd818b616`
+      (block 11,945,228), through the pinned deposits account.
+    - The relayer's fee was 0.30 (0.10 + 0.1%) and 199.70 was shielded,
+      about 199.20 after Railgun's 0.25%. The address now holds 0.
+    - The event's `value` is the amount shielded, after the relayer's fee,
+      as `deposits.rs` reads it.
+    - The three buttons (Send, Withdraw and Receive) overflowed on the
+      phone's 360 dp width; fixed in `5250d4c8f`.
+- [ ] M9.7 Mainnet (2026-10-19): the pin, then a deposit on the phone with
+  the owner's funds
+  - **The pin.** zecSwap's mainnet Deposits went live at 03:48 UTC on
+    2026-10-19 (`deployments/mainnet-deposits.json` on `feature/deposits`,
+    `52aba50`). `deployment.rs` pins the contract `0xebc7…8cb6` (block
+    26,224,004), the deposits account `0x6ae4…2135`, USDC and Multicall3.
+  - **Checked live, read-only** (publicnode and the hosted terms):
+    - The contract's `TOKEN()` is USDC, `RAILGUN()` the pinned proxy and
+      `SANCTIONS()` `0x40C5…C8fb`. Its deployment receipt is at the pinned
+      block.
+    - The record's first deposit (1 USDC,
+      `0xabdd88dbc52fe8ff15d6dff55cd913b67da8af79ed542399478b61b52832649e`)
+      was sent by the deposits account. Its `DepositShielded` names that
+      account, with value 893,786 after a 106,214 fee.
+    - USDC reads `"USD Coin"`, `"2"`, with a matching `DOMAIN_SEPARATOR()`,
+      and Multicall3 has code.
+    - The relayer's terms name the pinned three: a fee of 0.103843 plus
+      0.1%, far under the D23 cap, and a minimum of 1 USDC.
+  - **The pin test** now takes mainnet's live terms and refuses testnet's
+    relabelled as mainnet's (D-127's third test).
+  - **Flashbots** changed when a named deposit is posted again (D-129).
+- [ ] M9 gate
+
 ## Deviations
+
+- **D-115 (M9.2): the deposits account is pinned too.** zecSwap's
+  reference wallet checks the terms' Deposits contract and token only; the
+  brief also pins the relayer's deposits account
+  (`0xedc4…a446`, not the top-level relayer), so a tampered answer cannot
+  take even the fee: `deposits::pinned_terms` refuses another chain,
+  contract, account or token (`WrongDeployment`) and a relayer without
+  deposits or with unusable terms (`Unavailable`; a `maxValidity` under 17
+  minutes counts as unusable, since a request would go stale on arrival).
+  Checked live on 2026-10-18: the hosted terms name exactly the pinned
+  three, the Deposits contract's `TOKEN()` is the new tUSD, the token reads
+  `"ZecSwap Test USD"`, `"2"` with a matching `DOMAIN_SEPARATOR()`, and
+  Multicall3 has code on Sepolia.
+- **D-116 (M9.2): `RelayerTerms.deposits` is kept unparsed.** It is a
+  `serde_json::Value` that `pinned_terms` reads, so a deposits part this
+  build cannot read never fails the terms the swaps and sends need (the
+  brief's point that old builds ignore it holds for new ones too).
+- **D-117 (M9.2): old-tUSD cases.** The pin moved in `deployment.rs`,
+  `maker_client.rs`'s test, the four Dart tests, `broadcaster-fee.test.mjs`
+  and the reference's table. `store.rs`'s fixtures keep the old token: they
+  are zapp's historical records, on the retired contract `0xbd9a…e225`, and
+  never reach `require_served`. A reverse record pinned to the old token
+  fails `require_served` with `WrongDeployment`, which now reaches Dart as
+  its own code (`ApiPrivateUsdErrorCode.wrongDeployment`): the Refunds
+  screen says such a refund is from an earlier test deployment and cannot
+  be recovered in this version, instead of "Couldn't check this refund"
+  every 15 s. Every other Dart mapping treats the new code as
+  `relayerUnreachable`, as before.
+- **D-118 (M9.3): the scan follows zecSwap's `recover`.** Windows of 20
+  from index 0, each one Multicall3 `aggregate3` reading the token's
+  `balanceOf` and the contract's `deposited` for its 20 addresses, until a
+  window holds none used (so 20 in a row unused), at most 50 windows. The
+  shown index is the lowest whose `deposited` is false. Each account's last
+  scan is kept (`deposit_scans`), so the sheet shows an address with no
+  network (while Tor starts, say).
+- **D-119 (M9.3): the pass as a persisted state machine.** States `signed`
+  (kept, nothing named yet), `sent` (named), and the ends `landed`,
+  `refused`, `reverted`, `replaced`, `expired`. One record per signing,
+  keyed `shield-<index>-<validBefore>`, so a replaced request's note is
+  still recognized if it lands after all; a replacement and the request it
+  replaces are written in one transaction. A request the relayer named a
+  transaction for is never signed again: a re-post of it (its transaction
+  not mined in a minute, D-129) keeps it named whatever the answer,
+  and only the chain or its expiry ends it. An address with a request under
+  way at a pass's start is not signed for again in that pass (its scanned
+  balance may be the one that request just moved). A refused re-signing
+  drops the request; the address then waits out the hour.
+- **D-120 (M9.3): a `409` naming nothing.** The reference gives up; here the
+  chain decides. The shield's EIP-3009 nonce used on the token
+  (`authorizationState`) means it landed (only the Deposits contract can
+  use it, for this note, fee and relayer; the wallet never cancels one), so
+  it is recorded landed with no transaction; a balance under its value
+  means another deposit took its funds (`replaced`); otherwise it waits and
+  is posted again. A rescue whose nonce the vault moved past landed too.
+- **D-121 (M9.3): belief.** A `200`'s transaction is believed only with the
+  pinned contract's `DepositShielded` (a rescue's `Rescued`) naming the
+  address and this request's note; a `409`'s, with any of the address's
+  kept notes or, as the reference checks, a note in the same receipt's
+  Railgun `Shield` that the account's Railgun keys open. Not believed, the
+  request is posted again later. Checked live on 2026-10-18 against the
+  CLI's deposit (`0xd7667941…`): the decoders read its `DepositShielded`
+  (value 4,895,000, fee 105,000: the event's `value` is what was shielded,
+  after the relayer's fee) and Railgun's `Shield`, whose note's commitment,
+  and the keccak of its five words, are the event's note; and this build's
+  nonce and commitment for a test note equal the contract's own
+  `depositNonce` and `noteCommitment`. These checks ran as a temporary
+  read-only test, removed afterwards (D-127).
+- **D-122 (M9.3): the FRB calls.** `private_usd_deposit_terms`,
+  `private_usd_deposit_quote` (sync: the fee and what arrives, or none above
+  the cap), `private_usd_deposit_address` (the last scan's, no network),
+  `private_usd_deposit_pass`, `private_usd_deposit_records` and
+  `private_usd_deposit_rescue`. A pass with `only_if_used` (one nothing
+  asked for: unlock, the foreground, an account switch) returns just the
+  address for an account that never scanned or kept a deposit, with no
+  network and no store created, so a wallet that never looked at deposits
+  sends nothing on each resume. Deposits take a lock of their own per
+  account (`deposits::lock_account`), never the conversions' driver lock,
+  and account deletion takes both.
+- **D-123 (M9.3): schema 2.** `swaps.db` gains `deposits` and
+  `deposit_scans`; a store at 1 migrates in place, keeping every row; a
+  build that knows only 1 refuses a store at 2 as newer than itself, never
+  resetting it. `delete_account` removes both tables' rows.
+- **D-124 (M9.4): the cadence as built.** As the brief's defaults: a pass on
+  opening Private USD and the Receive USDC sheet, on unlock, the foreground
+  and an account switch (those three only for an account that used
+  deposits, D-122), every 60 s while Private USD is open and every 15 s
+  while the sheet is, and while a deposit is posted every 10 s (the pass's
+  `next_poll`); 60 s while an address holds enough but could not be signed
+  for. Never while locked or in the background. Deposits run on a lane of
+  the engine's own, so a deposit pass (up to 90 s while the relayer is
+  busy) never holds a conversion step back; the vaults are read on opening
+  Private USD and Refunds.
+- **D-125 (M9.4): the button and the sheet.** "Receive" sits beside Send and
+  Withdraw (three across; the sheet's title says "Receive USDC", "Receive
+  tUSD" on testnet). It shows only where the network pins deposits and
+  Private USD is available (the kill switch included); a deposit under way
+  is followed regardless (D16). The QR is the EIP-55 address in
+  `ReceiveQrFrame`, drawn as the Receive screen's codes (`ReceiveQrSurface`,
+  transparent type, so a short address keeps a version the badge cannot
+  spoil). EIP-55 is computed in Rust (`deposits::eip55`), which every
+  address crossing to Dart goes through.
+- **D-126 (M9.4): rescue on Refunds.** A deposit Railgun's screening sent
+  back to its vault shows on the Refunds screen with "Recover deposit"
+  behind a confirmation sheet (D18); the Refunds button shows for it too.
+  Getting a refused note back to the vault (Railgun's unshield to origin)
+  is not in the Railgun page, so today a vault holds funds only if that was
+  done from another Railgun wallet.
+- **D-127 (owner, 2026-10-18): four unit tests, end to end for the rest.**
+  The owner cut §5's unit list to the deposit addresses (ten of zecSwap's
+  vectors, both networks, accounts and indices above 0, compared as EIP-55
+  strings), the fee cap with `deposit_fee`'s cases, terms that are not the
+  pin's, and the store's 1 → 2 migration. The rest is the device round's
+  `--deposits` step (written, not run: it needs the phone and testnet
+  tUSD) and the testnet check with the owner's funds. No new widget tests
+  or capture scenarios (owner's rules); Widgetbook use cases were optional
+  and are not added.
+- **D-128 (owner, 2026-10-19): a buzz before "Authorize settlement"
+  closes.** The owner asked for the phone to vibrate, then gradually stop,
+  as a USD → ZEC conversion nears its settlement deadline.
+  - **When.** It buzzes once per conversion, two minutes before
+    `readyDeadline − 120 s`, while the button is still offered.
+  - **Pattern.** It holds 0.8 s at full strength, then fades over 1.6 s:
+    an Android waveform with alarm usage (a motor without amplitude control
+    fades by shortening its pulses), iOS Core Haptics, or Dart taps
+    elsewhere.
+  - **Permission.** Android needs `VIBRATE`, an install-time permission
+    with no prompt; iOS needs none.
+  - **D9 holds.** It works only in the foreground and unlocked, with no
+    notification or background work, so a closed app cannot buzz.
+  - **On the phone.** The owner confirmed it on the OnePlus 15
+    (`b6f0b3e62`, 2026-10-19).
+- **D-129 (M9.7): a named deposit is posted again after a minute.**
+  zecSwap changed this after the brief's `9185466` (`0889bae`, `094c1fe`).
+  - **Why.** Mainnet's relayer sends deposits through Flashbots Protect
+    (`blockRange=10`, one at a time). The node never sees such a
+    transaction before it mines, and Flashbots drops one it could not land.
+    The relayer takes it as dropped 5 blocks later and sends the deposit
+    anew when it is posted again.
+  - **What the doc says.** `docs/deposits.md` now says to post the same
+    bytes again when a named transaction has not mined within a minute
+    (`REPOST`).
+  - **The change.** `follow` posted again only for a transaction unknown to
+    the node, after 3 minutes. It now posts again for an unknown or pending
+    one after 60 s (`REPOST_SECONDS`). A named request is still never
+    signed again (D-119).
+  - **Nothing else.** The new `503` for a send the private RPC refused
+    (`Retry-After` 30) is handled as any other `503`.
+- **D-130 (owner, 2026-10-19): txids keep their progress, and Processing
+  says when the screening fails.** On the OnePlus 15, $29.11 of change from
+  two Oct 13 withdrawals stayed Processing for six days.
+  - **Txids.** The engine kept its txid tree one batch at a time, 10,000 by
+    default, which is exactly one subgraph answer and over ten minutes on
+    the phone. A page closed (lock) or frozen (background) before an answer
+    ended kept none of it, so the wallet sat at 130,000 txids (Aug 30) and
+    could not link its sends to prove them. The page now sets the batch to
+    1,000 (`TXID_SYNC_BATCH_SIZE`), the engine's own knob for clients
+    "that may be killed mid-scan". The engine reads on only while an answer
+    is one batch long, so `refresh` syncs again with the SDK's
+    `syncRailgunTransactionsV2` (`catchUpTxids` in `src/txid-catch-up.js`,
+    at most 50 passes, waiting out a sync the engine started itself) until
+    one adds nothing. Txid `Complete`s wait for the catch-up's end
+    (`txidCompleteHold`), so the first-sync percentage does not jump to
+    99 % between passes.
+  - **Screening.** `generatePOIsForWallet` only starts the engine's
+    screening (`refreshPOIsForAllTXIDVersions` does not await it), so a
+    proof's failure never reached the page's catch. It arrives as a POI
+    proof event, which the page now follows
+    (`setOnWalletPOIProofProgressCallback`). `refresh` answers
+    `{balances, screening: "ok" | "failed"}` (`RailgunRefresh`; zapp's page
+    answered the bucket map alone, reference §6.4). A failed one marks the
+    balance (`screeningFailed`, never cached), and the Processing row reads
+    "Processing · screening delayed" with its own explanation instead of
+    "A send is being confirmed".
+  - **The node.** Once the txids caught up, the wallet's proofs for its
+    three sends were valid (checked with snarkjs against the POI_3x3 vkey,
+    public inputs built as the node builds them), yet `ppoi.fdi.network`
+    answered every one `Invalid proof` while `ipfs-lb.com` returned 502.
+    That is outside the app; the new row is what the user sees meanwhile.
+  - **Tests.** The bundle's Node tests 25 passed, 8 of them new
+    (`dev/txid-catch-up.test.mjs`); `check.mjs` passed on Sepolia; the Dart
+    Private USD tests 100 passed (7 mobile-tagged skipped) and the mobile
+    lane 53 passed, with new cases for `RailgunRefresh.parse`, a sync's
+    screening, the balance's flag and the row; `fvm flutter analyze` clean.
+    `railgun.js` is 1,190 bytes larger (9,770,719), and the build still
+    reproduces byte for byte. Not yet run on a phone.
+  - **Mainnet.** A throwaway wallet's first sync on the built page saved its
+    txids 1,000 at a time; closed at 26,000 and reopened, it still held
+    26,000 (it fell back to the last 10,000 before). One refresh then caught
+    up to the POI node's validated index (143,189 txids) in 530 s over 13
+    syncs, with one txid Complete, at its end.
+- **D-131 (owner, 2026-10-19): wallet 11.2.0, for the POI circuits the nodes
+  now verify.** `ppoi.fdi.network`'s `Invalid proof` (D-130) was ours: wallet
+  11.2.0 (2026-09-30) replaced the POI circuits, and proofs from either set
+  do not verify against the other's keys. The three proofs the phone sent
+  verify against the old POI_3x3 vkey and fail against the new one, exported
+  from the new zkey once it matched 11.2.0's hash (and equal to the vkey
+  railgun-rust embeds). Railgun's wallet issue #145 (open) reports the same
+  `Invalid proof`, and a proof from 11.2.0's circuits, fetched by their own
+  CIDs, accepted on 2026-10-17.
+  - **The bump.** `@railgun-community/wallet` 11.1.0 → 11.2.0; the engine
+    (9.8.0) and shared models (8.2.0) stay. Besides the POI circuits it
+    reads txids one page per call and adds Base's indexer, which Ethereum
+    never asks; no page host changes. The new circuits live under their own
+    local path, so a phone never reuses the old ones it cached.
+  - **Sends need them too.** Every send and withdrawal proves POIs before
+    the broadcaster gets it (`sendWithPublicWallet` false), so with
+    `ipfs-lb.com` still down the mirror had to hold the new circuits before
+    any build with 11.2.0 ships. Their directory resolves on no public
+    gateway, only their files: `fetch-verify.mjs` now gets each by its own
+    CID, keeps the vkeys in `poi-v2/`, and keeps the old POI files for
+    earlier builds; the new 13x13 zkey (28 MB) is split like the old one.
+  - **Nothing to resubmit.** The engine proves missing POIs again after
+    every scan, now with the new circuits.
+  - **Done.** The mirror was rebuilt from itself (285 files, every hash
+    checked; the new POI files placed first) and deployed with the owner's
+    go-ahead (version `05c1c940`, 7 new files, 280 unchanged); a fresh
+    download of all 285 from the live mirror at the SDK's paths verified,
+    the joined 13x13 zkey and both vkeys included. The bundle's Node tests
+    25 passed and `check.mjs` passed on the 11.2.0 bundle; `railgun.js` is
+    9,775,560 bytes and names only the new POI directory.
+  - **On the phone.** Installed on the OnePlus 15 the same night: the page
+    fetched the new POI_3x3 files from the mirror (ipfs-lb.com still
+    failing), and `ppoi.fdi.network` took all three proofs (HTTP 200, no
+    error). Two minutes later the three notes read `Valid` and $30.43 of
+    change was spendable.
+- **D-132 (owner, 2026-10-19): the bridge tries IPv6 and IPv4 together, and
+  the Processing row says what screening is doing.**
+  - **Bridge.** On the owner's home Wi-Fi the phone has IPv6 addresses and a
+    route but no IPv6 traffic gets through. The bridge's direct connect tried
+    a host's addresses one by one, IPv6 first, so every dual-stack host
+    (`ppoi.fdi.network`, `rail-squid.squids.live`, publicnode, the mirror)
+    hung in `SYN_SENT` until Chromium gave up (`ERR_TIMED_OUT`), while Infura
+    (IPv4 only) worked. That is the earlier "couldn't update the balance". It
+    now connects with hyper-util's `HttpConnector`, like
+    `DirectRouteConnector`: the second family joins after 300 ms, 10 s for all
+    of a host's addresses. On that Wi-Fi the page then held
+    `51.159.166.34:443` (the POI node over IPv4) and refreshed. A Rust test
+    resolves to an unreachable IPv6 address before a working IPv4 one.
+  - **Live line.** The page publishes a `screening` event, the whole state on
+    every change (`src/screening-activity.js`): a long txid catch-up's share
+    (only 1,000 or more behind, against the POI node's validated index),
+    downloads of the proving files (`setArtifactProgressListener` in
+    `artifact-mirror.js`, bytes summed across files) and POI proofs (from the
+    proof callback). Kotlin and Swift forward the new event; Dart keeps it in
+    `RailgunEngineState.screening`. Under Processing, in a smaller size and
+    the accent colour (owner), the row reads what runs, proof first:
+    "Building screening proof 1 of 3 · 40%", "Downloading proving files ·
+    25%", "Syncing Railgun's transaction list · 42%", or, with nothing
+    running, "Waiting for Railgun's screening service" while a node holds
+    proofs (`ProofSubmitted`, now `PrivateUsdBalances.submitted`).
+  - **Sync line.** A long txid catch-up climbs as `RAILGUN SYNC n%` instead
+    of reading synced (owner: it read synced for six days with the list
+    13,000 behind).
+- **D-133 (owner, 2026-10-19): a buzz when "Authorize settlement" is
+  offered.** D-128 buzzed only two minutes before the step closes; the owner
+  expected one when the step comes up, mid-conversion, to call them back to
+  it. The reminder now buzzes when the step is first offered, and again two
+  minutes before it closes if still unauthorized; one buzz when the offer
+  comes inside those two minutes (`privateUsdSettlementBuzzDue`, four unit
+  tests). D9 holds: foreground and unlocked only, so a step offered while the
+  app was away buzzes on its return.
+
+- **D-134 (owner, 2026-10-19): "bridge" in place of "convert", a "Bridged"
+  sign, Receive's switch, and the sync line's fixes.** UI only; no swap,
+  key or funds logic changed.
+  - Every user-facing string says bridge, bridging or bridged (title
+    "Bridging", tab "Bridge progress", button "Bridge", "New bridge",
+    activity "Bridged to ZEC" and "Bridged to 0zkUSDC"; the forward banner
+    reads "Bridging to 0zkUSDC"). Identifiers, keys and routes keep
+    `convert`.
+  - A finished bridge kept its last step ("Moving ZEC to your shielded
+    wallet") spinning beside an enabled "New conversion": the timeline
+    capped its current step at the last row. `SwapAnimatedProgressRoute`
+    now lets the index sit one past the last step, so nothing stays current
+    (swaps never pass it). The step reads "Moving ZEC to your wallet", which
+    no longer ellipsizes.
+  - A bridge that finishes in view lights a "Bridged" sign: the sync
+    screen's done badge (now the shared `NeonDoneSign`) with a shockwave of
+    two lit rings, the send screen's ripple as neon, and the send success
+    haptic as the badge lights. Opened later, the sign is simply lit. The
+    top bar reads "Bridge" once a bridge ended, and its amounts "You paid"
+    and "You received".
+  - The gap under the header closed: the bridge screens set it to 8 px
+    (`MobileSwapStatusContent.headerToBodyGap`, swaps keep theirs) and name
+    the ZEC side "Shielded ZEC", as the dollar side is "Private USD".
+  - Railgun's sync line stands at Home's 85%. Right after a bridge it ran
+    full height with no `RAILGUN SYNCED` and gaps: the finished bridge's
+    banner going away shrank a scrolled page, the list was clamped back to
+    its top without a scroll notification, and `NeonSyncScrolled` kept it
+    "scrolled" (readout faded, the line behind the blocks). It now follows
+    metrics notifications too; a widget test fails on the old listener.
+  - The "Receive from a Railgun wallet" card is gone. Receive opens one
+    sheet with ZEC Receive's switch (`NeonSwitchTabs`, now shared): USDC at
+    the deposit address by default, 0zkUSDC at the 0zk address. Without a
+    Deposits pin the sheet shows the 0zk address alone. The M3 device round
+    reads the address from the sheet.
+
+- **D-135 (owner, 2026-10-19): Send and Withdraw scan their recipient.** Now
+  that Receive shows both kinds of address as a code, the send form has ZEC
+  Send's "Scan a QR code" row under the address field. The row is one
+  widget for all three pickers (`MobileScanAddressRow`: ZEC Send, Pay and
+  Private USD), and the scanner is ZEC Send's card (`MobileAddressScanCard`,
+  `showPrivateUsdScanSheet`). `privateUsdScanOutcome` takes what typing takes
+  (`privateUsdSendDestination`): a 0zk address on Send (an all-capitals one
+  lowercased, as bech32 QR codes often carry it), a 0x one on Withdraw. An
+  `ethereum:` request gives up its recipient (a token transfer's `address`,
+  never the token) and is refused when it names another chain than the
+  deployment's; the other kind of address is refused by name, pointing to
+  the action that takes it. ZEC Send's row now reads "Scan a QR code", in
+  sentence case like Pay's.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
@@ -3054,8 +3456,12 @@ M8 status (2026-10-14): the non-device parts are done.
   `ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh --m5`.
 - **B-6. E1, E2 and E4 are not delivered.** Local stand-ins:
   `~/dev/zapp/zecSwap-zakura` (detached worktree at `d69e3fb` with the §12
-  diff; zecSwap has no LICENSE yet) and `~/dev/wallet-libraries-e4` (`391d0b0`
-  plus the §6.8 `connect_stream` patch). Nothing built on them, and nothing
+  diff, and since M9 (2026-10-18) the deposits patch
+  `~/dev/zapp/zecSwap-zakura-deposits.patch` applied on top, uncommitted;
+  zecSwap has no LICENSE yet) and `~/dev/wallet-libraries-e4` (`391d0b0`
+  plus the §6.8 `connect_stream` patch). The deposits patch goes away when
+  E1 lands: upstream zecSwap or a published `zecswap-core` on the Zakura
+  crates, pinned by a pushed rev, with only `rust/Cargo.toml` changing. Nothing built on them, and nothing
   ported from zapp, may be pushed or merged; the M0.3 spike lives on the local
   branch `spike/private-usd-m0`. Since M3 this branch depends on both through
   `rust/Cargo.toml` paths (D-18), and carries zapp's Railgun bundle, JS source

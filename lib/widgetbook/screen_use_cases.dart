@@ -782,7 +782,7 @@ class _MobileSettingsMainPreview extends StatelessWidget {
       body: const MobileSettingsScreen(),
       tabBar: AppMobileTabBar(
         items: _mobileHomeTabItems,
-        currentIndex: 3,
+        currentIndex: 2,
         onSelect: (_) {},
       ),
     );
@@ -921,7 +921,7 @@ class _MobileSettingsFooterPreviewState
       ),
       tabBar: AppMobileTabBar(
         items: _mobileHomeTabItems,
-        currentIndex: 3,
+        currentIndex: 2,
         onSelect: (_) {},
       ),
     );
@@ -982,7 +982,7 @@ class _MobileSettingsExplorerPreviewState
       ),
       tabBar: AppMobileTabBar(
         items: _mobileHomeTabItems,
-        currentIndex: 3,
+        currentIndex: 2,
         onSelect: (_) {},
       ),
     );
@@ -5431,7 +5431,6 @@ final _homeKeystoneState = AccountState(
 
 const _mobileHomeTabItems = [
   AppMobileTabItem(iconName: AppIcons.home, label: 'Home'),
-  AppMobileTabItem(iconName: AppIcons.swapArrows, label: 'Swap'),
   AppMobileTabItem(iconName: AppIcons.history, label: 'Activity'),
   AppMobileTabItem(iconName: AppIcons.cog, label: 'Settings'),
 ];

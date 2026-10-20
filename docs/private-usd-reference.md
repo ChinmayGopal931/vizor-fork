@@ -1010,9 +1010,10 @@ Source: `ui/common/atomicswap/AtomicSwapMainnet.kt:18-79` and `AtomicSwapTestnet
 | Issuer URL / name | `…mainnet…/issuer` / `zecswap-mainnet-issuer` | `…testnet…/issuer` / `zecswap-testnet-issuer` |
 | Ethereum chain id | 1 | 11155111 (Sepolia) |
 | ZecSwap contract | `0x4708D7d36992b7e33Ad97a1ab0A31c3ac6C4fe6D` (block 26178667, `LOCK_DURATION` 1800 s) | `0xD75Efc6a157CC0A95f66962DA86DDf35d9F2617c` (block 11860526, `LOCK_DURATION` 600 s) |
-| Swap token | USDC `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` (`of/SwapDeployment.kt:60`) | test USD `0x5764D0044bef5AA839E0dDafE2073421101B9Ed8`; Circle test USDC is `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` (`PrivateUsdTokens.kt:36-42`) |
+| Swap token | USDC `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` (`of/SwapDeployment.kt:60`) | test USD `0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c` (`ZecSwap Test USD`, version `2`, 6 decimals, EIP-3009; Sepolia block 11,944,315; the hosted maker and relayer moved to it at 23:42 UTC on 2026-10-18, for swaps too; the retired one, `0x5764D0044bef5AA839E0dDafE2073421101B9Ed8`, no longer swaps); Circle test USDC is `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` (`PrivateUsdTokens.kt:36-42`) |
 | Maker address (only maker accepted) | `0x4370eEaa6bEcf1dAeF21Deeb0379Eb7f6CaEf7eF` | `0x2bac02b5032e9092493814c705f156b49e288922` |
 | Relayer address (payouts signed for) | `0xcBcb5f57C79C88a0E4BB450289dE2088958A017F` | `0xd9633572041886fa7584a2e12f36c8c7f1126412` |
+| Deposits (M9) | Deposits contract `0xebc7508e20bd4467491ee7e7589d5c7d4c5e8cb6` (block 26,224,004, live since 03:48 UTC on 2026-10-19); the relayer's deposits account `0x6ae40b34c32d3feaa0eef53d7e4724160b7a2135` (not the payouts relayer), sending through Flashbots Protect one at a time; token: USDC above; Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` (`deployments/mainnet-deposits.json` on zecSwap's `feature/deposits`) | Deposits contract `0x58324e9a866c9690aca08169d3c67630e84c9019` (block 11,944,316); the relayer's deposits account `0xedc4c88a3f6ae8130a2c18babbabd8100cc1a446` (not the payouts relayer); token: the test USD above; Multicall3 `0xcA11bde05977b3631167028862bE2a173976CA11` (`deployments/sepolia-deposits.json`) |
 | Relayer 0zk (send fee note, pinned) | `0zk1qy860uut20m8gd6fnhzvr0zqeyhs0ya5247x7h2eyedxsazx43w5nrv7j6fe3z53l78hn78kmslky2206lm75mclrv7dawd756m2suy7l4zud2m4yhg6kcsn7ed` | `0zk1qy25r4x4qjhtlfe0k9z22jy9psfm83j4k4fgvqs3pmv4he4ytefm8rv7j6fe3z53lltumh8amd66g2axaej92dmjk6mvnuveqtmmwccdm593pft827p4xpwljug` |
 | Railgun proxy / Relay Adapt | `0xFA7093CDD9EE6932B4eb2c9e1cde7CE00B1FA4b9` / `0xAc9f360Ae85469B27aEDdEaFC579Ef2d052aD405` | `0xeCFCf3b4eC647c4Ca6D49108b311b7a7C9543fea` / `0x7e3d929EbD5bDC84d02Bd3205c777578f33A214D` (`of/SwapDeployment.kt:40-57`) |
 | Issuer `tokenKey` (base64url SPKI, RSA-PSS SHA-384) | full value below (`AtomicSwapMainnet.kt:29-34` = `mainnet-beta.json` `issuer.tokenKey`) | full value below (`AtomicSwapTestnet.kt:30-35` = `sepolia-tokens.json` `tokens.issuerTokenKey`) |
@@ -1758,7 +1759,7 @@ Read from zapp at `60bcf0b30` and veylor at `4a859bee0`. **No Figma exists for t
 
 ### 9.2 Routes, screens, providers and reuse
 
-**Module.** Build a new feature, `lib/src/features/private_usd/`, with `models/`, `providers/`, `services/`, `screens/mobile/` and `widgets/mobile/`. Do not extend `SwapNotifier`: veylor's swap UI is tied to NEAR models. `MobileSwapComposerTicket` and `MobilePayAmountStep` take a `SwapState`, and `MobileSwapReviewContent` takes a `SwapQuote`. Reuse only the presentational pieces. Keep Private USD out of the Swap tab, which disappears whenever NEAR is disabled.
+**Module.** Build a new feature, `lib/src/features/private_usd/`, with `models/`, `providers/`, `services/`, `screens/mobile/` and `widgets/mobile/`. Do not extend `SwapNotifier`: veylor's swap UI is tied to NEAR models. `MobileSwapComposerTicket` and `MobilePayAmountStep` take a `SwapState`, and `MobileSwapReviewContent` takes a `SwapQuote`. Reuse only the presentational pieces. Keep Private USD out of the Swap screen, whose Home button (a tab until 2026-10-19) disappears whenever NEAR is disabled.
 
 **Routes.** All routes are mobile-tree `CupertinoPage`s over the shell, next to `/pay` in `lib/src/core/navigation/mobile_routes.dart` (`/pay` at `:339`). Route arguments go through `state.extra`, with a `redirect` back when the extra has the wrong type (`:289-297`). Titles are sentence case.
 
@@ -1967,7 +1968,7 @@ Rules are zapp's unless marked **veylor**. Data references point to §6.6 (balan
 - **Empty state:** shown when the total is 0 and nothing is converting: "No private dollars yet" with a short body (`:114`).
 - **Assets:** listed only when more than one dollar token is held (Sepolia only, `:205-225`).
 - **Send / Withdraw** (`:116-123`, `PrivateUsdView.kt:301-334`): enabled when a sender exists, the spend guard is `AVAILABLE`, and some dollar token has `available > 0`.
-- **Receive address:** the 0zk address with a copy button, labelled "Your receive address". It is not sensitive.
+- **Receive address:** the 0zk address with a copy button, labelled "Receive from a Railgun wallet" since M9 (it was "Your receive address"): the way private USD comes in from another Railgun wallet, with no fee. It is not sensitive. Public USDC comes in through the deposit address of the Receive USDC sheet (M9).
 - **Spending note** (`pu/PrivateUsdSpendingText.kt`), from the spend guard (§6.7):
 
   | Status | Note |
@@ -2268,14 +2269,14 @@ Flags:
 | `private_usd_load_failed` | Couldn't load the balance. Try again in a moment. | |
 | `private_usd_empty_title` | No private dollars yet | |
 | `private_usd_empty_body` | Convert ZEC into dollars nobody else can see: not your balance, and not who you pay. | |
-| `private_usd_receive_address` | Your receive address | |
+| `private_usd_receive_address` | Receive from a Railgun wallet (M9; was "Your receive address") | |
 | `private_usd_copy_address` | Copy your private USD address | |
 | `private_usd_checking_payments` | Checking pending payments… | |
 | `private_usd_payment_pending` | A previous payment is still pending. You can send or convert again once it's confirmed. | |
 | `private_usd_conversion_pending` | A conversion is in progress. Sending will be available when it finishes. | |
 | `private_usd_info_title` | About private USD | |
 | `private_usd_info_step_convert` | Convert: exchange ZEC and private USD. | S (em dash → colon, all five) |
-| `private_usd_info_receive` | Receive: share your receive address on this screen. Anyone with a Railgun wallet can send you private USD there. | B |
+| `private_usd_info_receive` | Receive: public USDC from an exchange or any wallet goes to your deposit address (Receive), and Veylor makes it private for a small fee. Private USD from another Railgun wallet goes to your Railgun address on this screen, with no fee. (M9) | B |
 | `private_usd_info_send` | Send: transfer private USD to another Railgun address. The recipient receives it privately. | |
 | `private_usd_info_withdraw` | Withdraw: move private USD to a public Ethereum address. The destination and amount are visible on Ethereum. | |
 | `private_usd_info_refunds` | Refunds: recover a refund that couldn't enter your private balance. | |
