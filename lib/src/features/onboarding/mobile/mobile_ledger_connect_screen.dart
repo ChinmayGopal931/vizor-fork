@@ -373,12 +373,8 @@ class _MobileLedgerConnectScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
+              MobileSurfaceCard(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: colors.background.ground,
-                  borderRadius: BorderRadius.circular(AppRadii.large),
-                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -452,7 +448,6 @@ class _MobileLedgerConnectScreenState
                             horizontal: AppSpacing.s,
                             vertical: AppSpacing.sm,
                           ),
-                          borderRadius: BorderRadius.circular(AppRadii.large),
                           onPressed: _sessionOpen
                               ? null
                               : _toggleAdvancedOptions,

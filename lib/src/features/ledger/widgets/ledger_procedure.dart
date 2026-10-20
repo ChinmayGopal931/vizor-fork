@@ -1,8 +1,12 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../../core/layout/app_form_factor.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import 'mobile/neon_ledger_step_marker.dart';
+
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 class LedgerStep {
   const LedgerStep(
@@ -120,7 +124,18 @@ class _LedgerProcedureState extends State<LedgerProcedure> {
                         width: markerSize,
                         height: lineHeight,
                         child: Center(
-                          child: index < widget.currentStep
+                          child: _mobile
+                              ? NeonLedgerStepMarker(
+                                  ordinal: index + 1,
+                                  progress: index < widget.currentStep
+                                      ? LedgerStepProgress.done
+                                      : index == widget.currentStep
+                                      ? LedgerStepProgress.current
+                                      : LedgerStepProgress.ahead,
+                                  size: markerSize,
+                                  style: style,
+                                )
+                              : index < widget.currentStep
                               ? AppIcon(
                                   AppIcons.check,
                                   size: 20,
@@ -163,10 +178,21 @@ class _LedgerProcedureState extends State<LedgerProcedure> {
                               Flexible(
                                 child: Text(
                                   widget.steps[index].label,
+                                  // On mobile the current step is lit, as the
+                                  // swap timeline's.
                                   style: style.copyWith(
                                     color: index == widget.currentStep
-                                        ? colors.text.accent
+                                        ? _mobile
+                                              ? colors.neon.core
+                                              : colors.text.accent
                                         : colors.text.secondary,
+                                    shadows:
+                                        _mobile && index == widget.currentStep
+                                        ? Neon.textGlow(
+                                            colors.neon.glow,
+                                            intensity: 0.3,
+                                          )
+                                        : null,
                                   ),
                                 ),
                               ),
@@ -181,7 +207,9 @@ class _LedgerProcedureState extends State<LedgerProcedure> {
                                     AppIcons.loader,
                                     animated: true,
                                     size: 20,
-                                    color: colors.icon.regular,
+                                    color: _mobile
+                                        ? colors.neon.glow
+                                        : colors.icon.regular,
                                   ),
                                 ),
                               ],

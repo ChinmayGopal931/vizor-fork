@@ -323,9 +323,6 @@ class _LedgerDeviceRow extends StatelessWidget {
         onPressed: enabled ? onTap : null,
         variant: AppButtonVariant.secondary,
         height: 52,
-        borderRadius: BorderRadius.circular(AppRadii.medium),
-        enabledBackgroundColor: colors.background.neutralSubtleOpacity,
-        enabledBorderColor: const Color(0x00000000),
         expand: true,
         growWithContent: true,
         constrainContent: true,
@@ -373,9 +370,9 @@ class _StatusMessage extends StatelessWidget {
     return Container(
       constraints: const BoxConstraints(minHeight: 76),
       padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
+      decoration: ShapeDecoration(
         color: colors.background.neutralSubtleOpacity,
-        borderRadius: BorderRadius.circular(AppRadii.medium),
+        shape: Neon.wedgeBorder(cut: AppChamfer.medium),
       ),
       child: Row(
         children: [

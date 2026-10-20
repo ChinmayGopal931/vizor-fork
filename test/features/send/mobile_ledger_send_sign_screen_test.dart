@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:zcash_wallet/src/features/ledger/services/ledger_device_request.dart';
 import 'package:zcash_wallet/src/features/ledger/services/ledger_device_selection.dart';
 import 'package:zcash_wallet/src/features/ledger/widgets/ledger_procedure.dart';
+import 'package:zcash_wallet/src/features/ledger/widgets/mobile/neon_ledger_step_marker.dart';
 import 'package:flutter/services.dart';
 import 'package:zcash_wallet/src/features/ledger/services/ledger_failure_guidance.dart';
 import 'package:zcash_wallet/src/features/ledger/services/ledger_mobile_ble_service.dart';
@@ -648,7 +649,11 @@ void main() {
         1,
       );
       expect(
-        find.byWidgetPredicate((w) => w is AppIcon && w.name == AppIcons.check),
+        find.byWidgetPredicate(
+          (w) =>
+              w is NeonLedgerStepMarker &&
+              w.progress == LedgerStepProgress.done,
+        ),
         findsOneWidget,
       );
       expect(
