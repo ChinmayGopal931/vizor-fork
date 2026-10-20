@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
+import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
+import 'package:zcash_wallet/src/providers/sync_failure.dart';
+import 'package:zcash_wallet/src/providers/sync_provider.dart';
 
 // The floor flows, and a climbing line's pulse runs, only while something
 // scans; idle, nothing moves and no frame is drawn.
@@ -203,5 +206,103 @@ void main() {
     rows.value = 2;
     await tester.pumpAndSettle();
     expect(scrolled, isFalse);
+  });
+
+  // Home's line and the wide window's sidebar read the same wallet state, so
+  // they must never disagree.
+  group('the wallet line', () {
+    const off = NetworkPrivacyState.off();
+
+    test(
+      'a scan climbs with its display progress and reads its percentage',
+      () {
+        final line = NeonSyncLine.wallet(
+          SyncState(isSyncing: true, percentage: 0.4),
+          whole: 42,
+          networkPrivacy: off,
+          climbProgress: () => 0.42,
+        );
+        expect(line.readout, NeonSyncReadout.progress(42));
+        expect(line.progress, 0.42);
+        expect(line.climbing, isTrue);
+        expect(line.failed, isFalse);
+      },
+    );
+
+    test('a synced wallet is full and never reads the climb', () {
+      final line = NeonSyncLine.wallet(
+        SyncState(percentage: 1),
+        whole: 100,
+        networkPrivacy: off,
+        climbProgress: () => fail('read while synced'),
+      );
+      expect(line.readout, NeonSyncReadout.synced);
+      expect(line.progress, 1);
+      expect(line.climbing, isFalse);
+    });
+
+    test('a scan a few blocks behind the tip reads as synced', () {
+      final line = NeonSyncLine.wallet(
+        SyncState(
+          isSyncing: true,
+          percentage: 0.99,
+          scannedHeight: 1000,
+          chainTipHeight: 1010,
+          lastSyncCompletedAt: DateTime(2026),
+        ),
+        whole: 99,
+        networkPrivacy: off,
+        climbProgress: () => fail('read while catching up'),
+      );
+      expect(line.readout, NeonSyncReadout.synced);
+      expect(line.semanticsLabel, 'Veylor is synced');
+      expect(line.progress, 1);
+      expect(line.climbing, isFalse);
+    });
+
+    test('a failed sync holds where it stopped', () {
+      final line = NeonSyncLine.wallet(
+        SyncState(
+          percentage: 0.3,
+          failure: const SyncFailure(
+            kind: SyncFailureKind.network,
+            rawMessage: 'offline',
+            userMessage: 'Network error',
+          ),
+        ),
+        whole: 30,
+        networkPrivacy: off,
+        climbProgress: () => fail('read after a failure'),
+      );
+      expect(line.readout, NeonSyncReadout.failed);
+      expect(line.progress, 0.3);
+      expect(line.failed, isTrue);
+      expect(line.climbing, isFalse);
+    });
+
+    test('Tor reads first: waiting on it, then offline', () {
+      final waiting = NeonSyncLine.wallet(
+        SyncState(isSyncing: true),
+        whole: 1,
+        networkPrivacy: const NetworkPrivacyState(
+          torEnabled: true,
+          status: NetworkPrivacyConnectionStatus.connecting,
+        ),
+        climbProgress: () => 0.01,
+      );
+      expect(waiting.readout, NeonSyncReadout.torWaiting);
+      expect(waiting.climbing, isTrue);
+      final offline = NeonSyncLine.wallet(
+        SyncState(percentage: 0.5),
+        whole: 50,
+        networkPrivacy: const NetworkPrivacyState(
+          torEnabled: true,
+          status: NetworkPrivacyConnectionStatus.failed,
+        ),
+        climbProgress: () => fail('read while Tor is offline'),
+      );
+      expect(offline.readout, NeonSyncReadout.torOffline);
+      expect(offline.failed, isTrue);
+    });
   });
 }

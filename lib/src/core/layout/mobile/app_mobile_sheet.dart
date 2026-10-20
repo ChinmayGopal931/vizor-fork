@@ -278,10 +278,9 @@ class MobileModalCard extends StatelessWidget {
                       minWidth: 44,
                       height: 44,
                       contentPadding: EdgeInsets.zero,
-                      enabledBackgroundColor: colors.background.base,
                       onPressed: backEnabled ? onBack : null,
                       child: const ExcludeSemantics(
-                        child: AppIcon(AppIcons.arrowBack, size: 20),
+                        child: AppIcon(AppIcons.chevronBackward, size: 24),
                       ),
                     ),
                   ),

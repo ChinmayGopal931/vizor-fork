@@ -22,7 +22,7 @@ import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_tab_bar.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_top_nav_account.dart';
 import 'package:zcash_wallet/src/services/native_mobile_navigation_geometry.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_wallet_sidebar.dart';
-import 'package:zcash_wallet/src/core/layout/mobile/mobile_sync_status.dart';
+import 'package:zcash_wallet/src/core/layout/mobile/neon_sidebar.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_page_viewport.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_window_policy.dart';
 import 'package:zcash_wallet/src/core/widgets/app_toast.dart';
@@ -453,10 +453,10 @@ void main() {
       expect(tester.getRect(sidebar).bottom, 653);
       final sync = find.descendant(
         of: sidebar,
-        matching: find.byType(MobileSyncStatus),
+        matching: find.byType(NeonSidebarSyncReadout),
       );
-      // No native corner mock here: the 24pt fallback plus 16pt glow gap.
-      expect(tester.getRect(sync).bottom, 653 - AppRadii.large - AppSpacing.sm);
+      // The readout keeps above the native safe area's bottom, 635.
+      expect(tester.getRect(sync).bottom, 635);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },
@@ -687,13 +687,24 @@ void main() {
                     ? theme.colors.navPanel.activeIcon
                     : unselectedPaint.label,
               );
-              expect(
-                paints[item + 1].fill,
-                selected
-                    ? theme.colors.navPanel.activeBg
-                    : unselectedPaint.fill,
-              );
+              // The active row is lit, not filled.
+              expect(paints[item + 1].fill, unselectedPaint.fill);
             }
+            expect(
+              [
+                for (final glyph in tester.widgetList<NeonSidebarGlyph>(
+                  find.descendant(
+                    of: sidebar,
+                    matching: find.byType(NeonSidebarGlyph),
+                  ),
+                ))
+                  glyph.selected,
+              ],
+              [
+                for (final path in ['/home', '/activity', '/settings'])
+                  path == current,
+              ],
+            );
             expect(find.byType(MobileAccountsSheet), findsNothing);
           }
           await tester.pumpAndSettle();

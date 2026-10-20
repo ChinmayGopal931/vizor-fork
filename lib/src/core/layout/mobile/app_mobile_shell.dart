@@ -32,6 +32,8 @@ class AppMobileShell extends StatelessWidget {
     final navigation = MobileNavigationScope.maybeOf(context);
     final mode = navigation?.mode ?? MobileNavigationMode.bottomTabs;
     final rail = navigation?.railRect;
+    final railOnLeft =
+        rail != null && rail.center.dx < MediaQuery.sizeOf(context).width / 2;
     return Scaffold(
       backgroundColor: context.colors.background.window,
       extendBody: true,
@@ -45,30 +47,50 @@ class AppMobileShell extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             body,
-            if (mode == MobileNavigationMode.systemSideTabs && rail != null)
+            if (mode == MobileNavigationMode.systemSideTabs &&
+                rail != null) ...[
+              // As under the bottom bar, content fades into black around the
+              // side rail, toward the screen edge and the bottom it stands
+              // at. Above the rail that edge stays clear.
+              Positioned(
+                top: rail.top - AppSpacing.md,
+                bottom: 0,
+                left: railOnLeft ? 0 : rail.left - AppSpacing.md,
+                width: railOnLeft ? rail.right + AppSpacing.md : null,
+                right: railOnLeft ? null : 0,
+                child: IgnorePointer(
+                  child: ShaderMask(
+                    blendMode: BlendMode.dstIn,
+                    shaderCallback: _fadeToward(
+                      context,
+                      Alignment.bottomCenter,
+                    ).createShader,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: _fadeToward(
+                          context,
+                          railOnLeft
+                              ? Alignment.centerLeft
+                              : Alignment.centerRight,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               Positioned.fromRect(
                 rect: rail,
                 child: SingleChildScrollView(child: tabBar),
               ),
+            ],
           ],
         ),
       ),
-      // No bar behind the tab glyphs: content fades into black under them
-      // so they stay legible over anything scrolled beneath.
       bottomNavigationBar: mode != MobileNavigationMode.bottomTabs
           ? null
           : DecoratedBox(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    context.colors.background.window.withValues(alpha: 0),
-                    context.colors.background.window.withValues(alpha: 0.97),
-                    context.colors.background.window,
-                  ],
-                  stops: const [0, 0.16, 1],
-                ),
+                gradient: _fadeToward(context, Alignment.bottomCenter),
               ),
               child: MobileBottomSafeArea(
                 bottomPadding: bottomGap,
@@ -83,6 +105,22 @@ class AppMobileShell extends StatelessWidget {
                 ),
               ),
             ),
+    );
+  }
+
+  /// No bar behind the tab glyphs: content fades into black toward the
+  /// [edge] the bar stands on, so they stay legible over anything beneath.
+  static LinearGradient _fadeToward(BuildContext context, Alignment edge) {
+    final window = context.colors.background.window;
+    return LinearGradient(
+      begin: -edge,
+      end: edge,
+      colors: [
+        window.withValues(alpha: 0),
+        window.withValues(alpha: 0.97),
+        window,
+      ],
+      stops: const [0, 0.16, 1],
     );
   }
 }

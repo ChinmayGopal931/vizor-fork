@@ -8,6 +8,7 @@ import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_sheet.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_tab_bar.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_top_nav.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
+import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_scramble_text.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/tron_glyph.dart';
@@ -426,6 +427,53 @@ void main() {
       );
       expect(rim.foregroundPainter, isNotNull);
     }
+  });
+
+  testWidgets('MobileModalCard floats Back as a cut-corner glass chevron', (
+    tester,
+  ) async {
+    var backs = 0;
+    await tester.pumpWidget(
+      _harness(
+        SizedBox(
+          width: 393,
+          height: 852,
+          child: MobileModalCard(
+            onBack: () => backs++,
+            child: const SizedBox(height: 200),
+          ),
+        ),
+      ),
+    );
+
+    final back = find.byKey(const ValueKey('mobile_modal_back_button'));
+    final button = tester.widget<AppButton>(back);
+    expect(button.variant, AppButtonVariant.secondary);
+    // Glass, not the card's opaque surface.
+    expect(button.enabledBackgroundColor, isNull);
+    final plate =
+        tester
+                .widget<AnimatedContainer>(
+                  find.descendant(
+                    of: back,
+                    matching: find.byType(AnimatedContainer),
+                  ),
+                )
+                .decoration
+            as ShapeDecoration;
+    expect(plate.shape, isA<BeveledRectangleBorder>());
+    expect(plate.color, AppThemeData.dark.colors.button.secondary.bg);
+    expect(
+      tester
+          .widget<AppIcon>(
+            find.descendant(of: back, matching: find.byType(AppIcon)),
+          )
+          .name,
+      AppIcons.chevronBackward,
+    );
+    expect(tester.getSize(back), const Size(44, 44));
+    await tester.tap(back);
+    expect(backs, 1);
   });
 }
 

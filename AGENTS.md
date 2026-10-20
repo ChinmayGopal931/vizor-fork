@@ -250,6 +250,27 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   (owner, 2026-10-19). Swap opens over them from a full-width button on
   Home, under Send and Receive, which split their row in half. Home has
   no Pay button.
+- **Wide window.** A landscape window with at least 568 pt of safe width,
+  a foldable or a tablet shows the wallet in a 440 pt pane beside a
+  sidebar (`MobileWalletSidebar`, upstream's adaptive frame).
+  - The panel is neon glass (`MobileSidebarSurface`, painted by
+    `NeonGlassPanelPainter`) with its top-left and bottom-right corners cut
+    and lit. It follows no display curve.
+  - Its destinations are the tab bar's three: Home, Activity and Settings,
+    never Swap. Swap, the chart and Private USD open in the pane, with
+    Home kept lit. They use the tab bar's glyphs (`NeonSidebarGlyph`)
+    beside Light labels. The active row is lit rather than filled: its
+    glyph and red label glow over a pool of light that crossfades to a
+    newly selected row.
+  - The panel's foot keeps a sync readout for the pages without a sync
+    line (`NeonSidebarSyncReadout`): a short rising line beside a red HUD
+    caption. `NeonSyncLine.wallet` builds both it and Home's line, so the
+    two always read the same.
+  - The stateful Private USD flows keep the sidebar veiled (Back only)
+    until their exits are designed against the invariants.
+  - The vertical tab rail, shown when iOS reports a system side edge,
+    stands in the bottom bar's fade.
+  - A nested sheet's floating Back is a cut-corner glass button.
 - **Art.** The medieval illustrations are gone from mobile: empty states use
   `NeonHorizon` (a striped 80s sun over a grid floor), hero and status
   spots `NeonGlyphBadge`, and painted backgrounds are dropped. The account

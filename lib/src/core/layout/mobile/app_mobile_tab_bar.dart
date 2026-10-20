@@ -19,6 +19,15 @@ class AppMobileTabItem {
 
   /// Accessibility label; the bar itself is icon-only.
   final String label;
+
+  /// The line glyph drawn for the app's tabs; any other icon keeps the icon
+  /// set.
+  TronGlyphKind? get glyph => switch (iconName) {
+    AppIcons.home => TronGlyphKind.home,
+    AppIcons.history => TronGlyphKind.activity,
+    AppIcons.cog => TronGlyphKind.settings,
+    _ => null,
+  };
 }
 
 /// The mobile tab bar: only the glyphs, Tron line icons ([TronGlyph])
@@ -218,7 +227,7 @@ class _TabBarItemState extends State<_TabBarItem>
                       colors.navPanel.activeIcon,
                       lit,
                     )!;
-                    final glyph = _tronGlyphFor(widget.item.iconName);
+                    final glyph = widget.item.glyph;
                     if (glyph == null) {
                       return AppIcon(
                         widget.item.iconName,
@@ -243,12 +252,3 @@ class _TabBarItemState extends State<_TabBarItem>
     );
   }
 }
-
-/// The tab bar draws its own line glyphs for the app's tabs; any other icon
-/// keeps the icon set.
-TronGlyphKind? _tronGlyphFor(String iconName) => switch (iconName) {
-  AppIcons.home => TronGlyphKind.home,
-  AppIcons.history => TronGlyphKind.activity,
-  AppIcons.cog => TronGlyphKind.settings,
-  _ => null,
-};

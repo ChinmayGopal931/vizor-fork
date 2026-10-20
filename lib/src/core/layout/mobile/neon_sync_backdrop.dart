@@ -75,6 +75,65 @@ class NeonSyncLine {
     this.readoutStyle = kNeonSyncReadoutStyle,
   }) : scanning = scanning ?? climbing;
 
+  /// The wallet's line: Home draws it, and the wide window's sidebar reads
+  /// it out. [whole] is the scan's whole percentage. [climbProgress] is read
+  /// only while the line climbs, so a caller may watch a per-frame progress
+  /// there and nowhere else.
+  factory NeonSyncLine.wallet(
+    SyncState sync, {
+    required int whole,
+    required NetworkPrivacyState networkPrivacy,
+    required double Function() climbProgress,
+  }) {
+    final status = SyncStatusLabel.from(
+      sync,
+      displayWholePercentage: whole,
+      networkPrivacy: networkPrivacy,
+    );
+    // The Tor states as [SyncStatusLabel.from] decides them: a failed Tor
+    // route wins over everything, and only then can the sync wait on Tor.
+    final torFailed =
+        networkPrivacy.torRouteRetained &&
+        networkPrivacy.status == NetworkPrivacyConnectionStatus.failed;
+    final waitingOnTor = !torFailed && syncIsWaitingOnTor(networkPrivacy, sync);
+    // A wallet a few blocks behind is catching up, not syncing: its line
+    // stays full and behind the content instead of dropping and climbing
+    // again on every new block.
+    final gap = sync.chainTipHeight - sync.scannedHeight;
+    final catchingUp =
+        status.kind == SyncStatusKind.syncing &&
+        !waitingOnTor &&
+        sync.lastSyncCompletedAt != null &&
+        sync.chainTipHeight > 0 &&
+        gap <= _catchUpBlocks;
+    final syncing = status.kind == SyncStatusKind.syncing && !catchingUp;
+    final progress = switch (status.kind) {
+      _ when catchingUp => 1.0,
+      SyncStatusKind.synced => 1.0,
+      SyncStatusKind.syncing => climbProgress().clamp(0.03, 0.99),
+      SyncStatusKind.failed => sync.percentage.clamp(0.03, 0.99),
+    };
+    final readout = switch (status.kind) {
+      _ when catchingUp => NeonSyncReadout.synced,
+      SyncStatusKind.synced => NeonSyncReadout.synced,
+      SyncStatusKind.failed =>
+        torFailed ? NeonSyncReadout.torOffline : NeonSyncReadout.failed,
+      SyncStatusKind.syncing =>
+        waitingOnTor
+            ? NeonSyncReadout.torWaiting
+            : NeonSyncReadout.progress(whole, checking: sync.isChecking),
+    };
+    return NeonSyncLine(
+      progress: progress.toDouble(),
+      readout: readout,
+      semanticsLabel: catchingUp
+          ? _syncedSemanticsLabel
+          : status.semanticsLabel,
+      climbing: syncing,
+      failed: status.kind == SyncStatusKind.failed,
+    );
+  }
+
   /// How far the line has climbed, 0..1.
   final double progress;
 
@@ -241,59 +300,14 @@ class NeonSyncBackdrop extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sync = ref.watch(syncProvider).value ?? SyncState();
-    final whole = ref.watch(syncDisplayWholePercentageProvider);
-    final networkPrivacy = ref.watch(networkPrivacyProvider);
-    final status = SyncStatusLabel.from(
-      sync,
-      displayWholePercentage: whole,
-      networkPrivacy: networkPrivacy,
-    );
-    // The Tor states as [SyncStatusLabel.from] decides them: a failed Tor
-    // route wins over everything, and only then can the sync wait on Tor.
-    final torFailed =
-        networkPrivacy.torRouteRetained &&
-        networkPrivacy.status == NetworkPrivacyConnectionStatus.failed;
-    final waitingOnTor = !torFailed && syncIsWaitingOnTor(networkPrivacy, sync);
-    // A wallet a few blocks behind is catching up, not syncing: its line
-    // stays full and behind the content instead of dropping and climbing
-    // again on every new block.
-    final gap = sync.chainTipHeight - sync.scannedHeight;
-    final catchingUp =
-        status.kind == SyncStatusKind.syncing &&
-        !waitingOnTor &&
-        sync.lastSyncCompletedAt != null &&
-        sync.chainTipHeight > 0 &&
-        gap <= _catchUpBlocks;
-    final syncing = status.kind == SyncStatusKind.syncing && !catchingUp;
-    final progress = switch (status.kind) {
-      _ when catchingUp => 1.0,
-      SyncStatusKind.synced => 1.0,
-      SyncStatusKind.syncing =>
-        ref.watch(syncDisplayPercentageProvider).clamp(0.03, 0.99),
-      SyncStatusKind.failed => sync.percentage.clamp(0.03, 0.99),
-    };
-    final readout = switch (status.kind) {
-      _ when catchingUp => NeonSyncReadout.synced,
-      SyncStatusKind.synced => NeonSyncReadout.synced,
-      SyncStatusKind.failed =>
-        torFailed ? NeonSyncReadout.torOffline : NeonSyncReadout.failed,
-      SyncStatusKind.syncing =>
-        waitingOnTor
-            ? NeonSyncReadout.torWaiting
-            : NeonSyncReadout.progress(whole, checking: sync.isChecking),
-    };
     return NeonSyncLineLayer(
       layer: layer,
       scrolled: scrolled,
-      line: NeonSyncLine(
-        progress: progress.toDouble(),
-        readout: readout,
-        semanticsLabel: catchingUp
-            ? _syncedSemanticsLabel
-            : status.semanticsLabel,
-        climbing: syncing,
-        failed: status.kind == SyncStatusKind.failed,
+      line: NeonSyncLine.wallet(
+        ref.watch(syncProvider).value ?? SyncState(),
+        whole: ref.watch(syncDisplayWholePercentageProvider),
+        networkPrivacy: ref.watch(networkPrivacyProvider),
+        climbProgress: () => ref.watch(syncDisplayPercentageProvider),
       ),
     );
   }
