@@ -243,7 +243,6 @@ where
     /// What the page's `reverseCost` prices swap `index`'s funding at now.
     pub(crate) async fn price(&self, store: &SwapStore, index: u32) -> Result<FundingPrice> {
         let record: ReverseRecord = load(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         let sponsored = self.sponsored().await?;
         Ok(FundingPrice {
             index,
@@ -267,7 +266,6 @@ where
         railgun_fee: Amount,
     ) -> Result<ReverseRecord> {
         let record: ReverseRecord = load(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         let priceable = record.phase == ReversePhase::Quoted
             || (record.phase == ReversePhase::AwaitingFunding
                 && record.funding.is_none()
@@ -306,7 +304,6 @@ where
         index: u32,
     ) -> Result<ReverseRecord> {
         let record = active(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         if record.phase != ReversePhase::Quoted {
             return Ok(record);
         }
@@ -316,7 +313,7 @@ where
                 "price the conversion's funding before going ahead",
             );
         }
-        swap::require_none_under_way(store, self.account, self.pins)?;
+        swap::require_none_under_way(store, self.account)?;
         let now = self.state(&record).await?.head.timestamp;
         require_quote_holds(&record.quote, now)?;
         let mut going = record;
@@ -422,7 +419,6 @@ where
     /// holds more than a rescue's relayer fee. A chain read only.
     pub(crate) async fn can_rescue(&self, store: &SwapStore, index: u32) -> Result<bool> {
         let record: ReverseRecord = load(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         Ok(record.phase == ReversePhase::Refunded && self.rescue_fee(&record).await?.is_some())
     }
 
@@ -542,7 +538,6 @@ where
     /// deployment's and its id its quote's. An escrow must be the one this
     /// conversion funded, at its confirmation depth.
     async fn state(&self, record: &ReverseRecord) -> Result<ReverseChainState> {
-        require_served(self.pins, record)?;
         let maker_share = terms::quote_maker_share(&record.quote.terms)?;
         if record.swap_id.0 != terms::reverse_swap_id(&record.quote.user.0, &maker_share) {
             return fail(ErrorCode::Mismatch, "the conversion's id isn't its quote's");
@@ -679,7 +674,7 @@ where
             );
         }
         self.pins.swap_contract()?;
-        swap::require_none_under_way(store, self.account, self.pins)?;
+        swap::require_none_under_way(store, self.account)?;
         swap::check_maker(&self.maker, self.pins, self.makers, true).await?;
         let requested = Amount(u128::from(units));
         let relayer = pinned_relayer_terms(&self.view.relayer, self.pins).await?;
@@ -723,7 +718,6 @@ where
             ready: None,
             cancel_requested: false,
             refund_posted: false,
-            refund_lock: None,
             payout: None,
             rescue: None,
             receive: None,
@@ -735,7 +729,7 @@ where
         };
         let now = self.view.state(&record).await?.head.timestamp;
         require_time_to_go_ahead(&record.quote, now)?;
-        swap::require_none_under_way(store, self.account, self.pins)?;
+        swap::require_none_under_way(store, self.account)?;
         save(store, self.account, &record)?;
         Ok(ReverseQuoted {
             price: FundingPrice {
@@ -775,7 +769,6 @@ where
     ) -> Result<FundingRequest> {
         let session = engine::session();
         let record = active(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         require_going_ahead(&record)?;
         if record.funding.is_some() {
             return Ok(FundingRequest {
@@ -894,7 +887,6 @@ where
         if !snapshot.under_way() {
             return Ok(snapshot);
         }
-        require_served(self.pins, &snapshot)?;
         engine::check_cancelled(self.op)?;
         let estimate = if AWAITING_DEPOSIT.contains(&snapshot.phase) {
             Some(self.look_at_deposit(&snapshot).await?)
@@ -926,7 +918,6 @@ where
         index: u32,
     ) -> Result<ReverseRecord> {
         let snapshot = active(store, self.account, index)?;
-        require_served(self.pins, &snapshot)?;
         require_going_ahead(&snapshot)?;
         if snapshot.ready.is_some() {
             self.advance(store, index).await?;
@@ -974,7 +965,6 @@ where
     /// the flag was kept leaves it kept.
     pub(crate) async fn cancel(&self, store: &mut SwapStore, index: u32) -> Result<ReverseRecord> {
         let record = active(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         require_refund_possible(&record)?;
         if record.finished() {
             return Ok(record);
@@ -1002,7 +992,6 @@ where
     /// than the fee.
     pub(crate) async fn rescue(&self, store: &mut SwapStore, index: u32) -> Result<ReverseRecord> {
         let record: ReverseRecord = load(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         if record.phase != ReversePhase::Refunded {
             return fail(ErrorCode::Other, "only a refunded conversion is rescued");
         }
@@ -1053,7 +1042,6 @@ where
         record: &ReverseRecord,
         resuming: bool,
     ) -> Result<ReverseAccept> {
-        require_served(self.pins, record)?;
         if record.account.is_some() {
             return Ok(ReverseAccept::Accepted);
         }
@@ -1585,20 +1573,6 @@ where
 }
 
 // ---- rules ----
-
-/// The record is pinned to this build's deployment: the same chain,
-/// windows contract, token, Railgun proxy, maker, relayer and Zcash network.
-/// A conversion never moves to another, and one of the lock contract's is
-/// never followed.
-fn require_served(pins: &Deployment, record: &ReverseRecord) -> Result<()> {
-    if !swap::serves_reverse(pins, &record.deployment) {
-        return fail(
-            ErrorCode::WrongDeployment,
-            "the conversion belongs to another deployment",
-        );
-    }
-    Ok(())
-}
 
 /// A reverse quote this deployment's maker gave for `user`, refunding into
 /// our own `note`.

@@ -195,14 +195,6 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
     case null:
       break;
   }
-  // Never driven: nothing runs, and nothing is asked of the user.
-  if (status.otherDeployment) {
-    return ended(
-      badgeKind: SwapStatusBadgeKind.failed,
-      title: PrivateUsdCopy.otherDeploymentTitle,
-      body: PrivateUsdCopy.otherDeploymentBody,
-    );
-  }
 
   final problem = status.problem;
   final syncing = status.wait == ApiForwardWait.zcashSyncing;

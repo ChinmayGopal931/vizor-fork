@@ -18,12 +18,4 @@ void main() {
       );
     }
   });
-
-  test('a step on a bridge of another deployment says it is from an '
-      'earlier test deployment', () {
-    expect(
-      privateUsdReverseStepMessage(ApiPrivateUsdErrorCode.wrongDeployment),
-      PrivateUsdCopy.otherDeploymentBody,
-    );
-  });
 }

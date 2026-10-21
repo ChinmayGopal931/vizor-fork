@@ -346,7 +346,6 @@ async fn a_maker_asking_for_a_token_turns_the_accept_away_without_a_retry() {
     // Nothing opened: it can be abandoned.
     let abandoned = super::super::forward::abandon(
         &mut h.store(),
-        pins(),
         h.chain(),
         &FakeClock(h.world.clone()),
         &h.account,
@@ -1268,53 +1267,6 @@ async fn services_naming_other_windows_are_refused() {
     assert!(h.quote().await.is_ok());
 }
 
-/// A conversion of the lock contract is never driven by the windows' rules,
-/// nor ended: refused before anything is read or sent. It holds up no new
-/// one.
-#[tokio::test]
-async fn a_conversion_of_the_lock_contract_is_never_driven() {
-    let h = Harness::new();
-    h.deposited().await;
-    let mut record = h.record();
-    record.quote.contract = Hex(hex_literal("d75efc6a157cc0a95f66962da86ddf35d9f2617c"));
-    h.keep(&record);
-    let asked = h.paths().len();
-    let reads = h.world.get().confirmed_reads;
-
-    assert_eq!(code(h.advance().await), ErrorCode::WrongDeployment);
-    let abandoned = super::super::forward::abandon(
-        &mut h.store(),
-        pins(),
-        h.chain(),
-        &FakeClock(h.world.clone()),
-        &h.account,
-        0,
-    )
-    .await;
-    assert_eq!(code(abandoned), ErrorCode::WrongDeployment);
-    assert_eq!(h.paths().len(), asked);
-    assert_eq!(h.world.get().confirmed_reads, reads);
-    assert_eq!(h.record(), record);
-
-    assert_eq!(h.quote().await.unwrap().index, 1);
-}
-
-/// A conversion under way holds up a private payment; one of the lock
-/// contract, which this build never drives, does not.
-#[tokio::test]
-async fn only_a_conversion_this_build_drives_holds_up_a_payment() {
-    let h = Harness::new();
-    h.deposited().await;
-    let proof = super::sends::page_proof(&[[1; 32]]);
-    let held = super::sends::keep(&mut h.store(), &h.account, "send-1", &proof).unwrap_err();
-    assert_eq!(held.code, ErrorCode::Busy);
-
-    let mut record = h.record();
-    record.quote.contract = Hex(hex_literal("d75efc6a157cc0a95f66962da86ddf35d9f2617c"));
-    h.keep(&record);
-    super::sends::keep(&mut h.store(), &h.account, "send-1", &proof).unwrap();
-}
-
 /// Mainnet pins no windows contract: no bridge is quoted there, and nothing
 /// is asked of its maker or relayer.
 #[tokio::test]
@@ -1323,10 +1275,6 @@ async fn mainnet_takes_no_bridge() {
     assert_eq!(code(h.quote().await), ErrorCode::Unavailable);
     assert_eq!(code(h.reverse_quote().await), ErrorCode::Unavailable);
     assert!(h.paths().is_empty());
-}
-
-fn hex_literal(hex: &str) -> [u8; 20] {
-    hex::decode(hex).unwrap().try_into().unwrap()
 }
 
 // ---- one driver step per account ----

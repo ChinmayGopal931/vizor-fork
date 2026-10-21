@@ -136,7 +136,6 @@ String privateUsdReverseStepMessage(
   // as good as unreachable.
   ApiPrivateUsdErrorCode.ethereumUnreachable ||
   ApiPrivateUsdErrorCode.chainLagging => PrivateUsdCopy.convertErrorEthereum,
-  ApiPrivateUsdErrorCode.wrongDeployment => PrivateUsdCopy.otherDeploymentBody,
   ApiPrivateUsdErrorCode.relayerFee => PrivateUsdCopy.convertErrorFeeCap,
   ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.convertProblemRoute,
   ApiPrivateUsdErrorCode.storeUnreadable => PrivateUsdCopy.convertErrorStore,

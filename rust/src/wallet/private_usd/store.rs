@@ -21,9 +21,8 @@ use super::{fail, ErrorCode, PrivateUsdError, Result};
 
 const FILE_NAME: &str = "swaps.db";
 /// 1: swaps, the send log and the joint accounts. 2: deposits. 3: records of
-/// the windows contract, which a build of the lock contract's would drive by
-/// the wrong rules: it refuses the store as newer. A build refuses a store
-/// newer than itself, never resetting it.
+/// the windows contract. A build refuses a store newer than itself, never
+/// resetting it.
 const SCHEMA_VERSION: i32 = 3;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// Finished records kept per direction. Reverse `REFUNDED` ones are kept
@@ -221,9 +220,7 @@ impl SwapStore {
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
-            // 1 → 2: the deposits tables join. 2 → 3 changes no table: the
-            // lock contract's records stay as they were, read and never
-            // driven.
+            // 1 → 2: the deposits tables join. 2 → 3 changes no table.
             1 | 2 => {
                 if version == 1 {
                     tx.execute_batch(SCHEMA_V2).map_err(sql)?;
@@ -488,36 +485,6 @@ impl SwapStore {
             .optional()
             .map_err(sql)?;
         Ok(updated.map(|seconds| u64::try_from(seconds).unwrap_or_default()))
-    }
-
-    /// The account's conversions under way, read: forward unfinished,
-    /// reverse unfinished and past its quote.
-    pub(crate) fn unfinished(&self, account: &str) -> Result<Vec<StoredRecord>> {
-        let mut statement = self
-            .conn
-            .prepare(
-                "SELECT direction, swap_index, record_json FROM swaps
-                 WHERE account_uuid = ?1 AND finished = 0
-                   AND NOT (direction = 'reverse' AND phase = 'QUOTED')
-                 ORDER BY direction, swap_index",
-            )
-            .map_err(sql)?;
-        let rows = statement
-            .query_map([account], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, i64>(1)?,
-                    row.get::<_, String>(2)?,
-                ))
-            })
-            .map_err(sql)?;
-        rows.map(|row| {
-            let (direction, index, json) = row.map_err(sql)?;
-            let direction = Direction::parse(&direction)
-                .ok_or_else(|| unreadable("unknown record direction"))?;
-            decode(direction, index, &json)
-        })
-        .collect()
     }
 
     /// Conversions under way: forward unfinished, reverse unfinished and past
@@ -954,7 +921,7 @@ mod tests {
         );
         let account = "0a0b".repeat(8);
         let refunded = format!(
-            r#"{head},"account":"{account}","phase":"REFUNDED","cost":{cost},"funding":{funding},"cancelRequested":true,"refundLock":{authorization},"payout":{payout},"acceptedAt":1790000100}}"#
+            r#"{head},"account":"{account}","phase":"REFUNDED","cost":{cost},"funding":{funding},"cancelRequested":true,"refundPosted":true,"payout":{payout},"acceptedAt":1790000100}}"#
         );
         let refunded_on_mainnet = refunded
             .replace(TESTNET, MAINNET)
@@ -1166,39 +1133,6 @@ mod tests {
             store.active(ACCOUNT, Direction::Forward).unwrap(),
             Some(StoredRecord::Forward(Box::new(forward(&json))))
         );
-    }
-
-    /// A store schema 2 wrote, with the lock contract's records, opens at
-    /// schema 3 with every record as it was: still read strictly, refund
-    /// locks included, and never dropped.
-    #[test]
-    fn a_version_2_store_keeps_the_lock_contracts_records() {
-        let dir = tempfile::tempdir().unwrap();
-        let conn = Connection::open(dir.path().join(FILE_NAME)).unwrap();
-        conn.execute_batch(SCHEMA).unwrap();
-        conn.execute_batch(SCHEMA_V2).unwrap();
-        conn.pragma_update(None, "user_version", 2).unwrap();
-        let refunded = reverse_states().pop().unwrap();
-        assert!(refunded.contains(r#""refundLock""#));
-        conn.execute(
-            "INSERT INTO swaps(account_uuid, direction, swap_index, deployment, swap_id, phase,
-                               finished, record_json, updated_at)
-             VALUES (?1, 'reverse', 4, 'testnet', ?2, 'REFUNDED', 1, ?3, 1790000000)",
-            params![ACCOUNT, hex(32, 0x5c), refunded],
-        )
-        .unwrap();
-        drop(conn);
-
-        let store = SwapStore::open(dir.path()).unwrap();
-        let version: i32 = store
-            .conn
-            .query_row("PRAGMA user_version", [], |row| row.get(0))
-            .unwrap();
-        assert_eq!(version, 3);
-        let kept = store.history(ACCOUNT, Direction::Reverse).unwrap();
-        assert_eq!(kept.len(), 1);
-        assert_eq!(kept[0].to_json().unwrap(), refunded);
-        assert!(store.unfinished(ACCOUNT).unwrap().is_empty());
     }
 
     #[test]

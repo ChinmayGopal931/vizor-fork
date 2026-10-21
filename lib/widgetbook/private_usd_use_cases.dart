@@ -237,20 +237,6 @@ Widget buildMobilePrivateUsdBridgeOffUseCase(BuildContext context) =>
       bridgeAvailable: false,
     );
 
-/// An unfinished bridge of another deployment: its row says so, and it
-/// holds up nothing.
-Widget buildMobilePrivateUsdOtherDeploymentUseCase(BuildContext context) =>
-    _PrivateUsdScreenPreview(
-      state: previewPrivateUsdBalance(available: 1250.4),
-      records: [
-        previewPrivateUsdRecord(
-          phase: ApiForwardPhase.claiming,
-          otherDeployment: true,
-          ago: const Duration(days: 1),
-        ),
-      ],
-    );
-
 class _PrivateUsdScreenPreview extends StatelessWidget {
   const _PrivateUsdScreenPreview({
     required this.state,
@@ -444,8 +430,7 @@ PrivateUsdConvertState previewPrivateUsdConvertState({
 
 /// A forward record of 0.5 ZEC for $15.50, accepted [ago] before
 /// [previewPrivateUsdNow], on the testnet windows contract (`t1` two hours
-/// on, its late window an hour), or with [otherDeployment] on another
-/// deployment's, which has no late claim time and is never driven.
+/// on, its late window an hour).
 ApiForwardRecord previewPrivateUsdRecord({
   int index = 7,
   ApiForwardPhase phase = ApiForwardPhase.confirming,
@@ -455,7 +440,6 @@ ApiForwardRecord previewPrivateUsdRecord({
   Duration ago = const Duration(minutes: 3),
   int? depositConfirmations,
   bool deposited = true,
-  bool otherDeployment = false,
 }) {
   final acceptedAt = previewPrivateUsdNow.subtract(ago);
   int at(Duration after) => previewPrivateUsdUnix(acceptedAt.add(after));
@@ -473,8 +457,7 @@ ApiForwardRecord previewPrivateUsdRecord({
     relayerFee: '460000',
     t0: at(const Duration(minutes: 40)),
     t1: at(const Duration(hours: 2)),
-    lateClaimAt: otherDeployment ? null : at(const Duration(hours: 3)),
-    otherDeployment: otherDeployment,
+    lateClaimAt: at(const Duration(hours: 3)),
     depositTxid: deposited
         ? '9f1c3b5a7d2e4f60819a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f70'
         : null,
@@ -683,20 +666,6 @@ PrivateUsdConversionStatus previewPrivateUsdUnwinding() =>
 
 Widget buildMobilePrivateUsdProgressUnwindingUseCase(BuildContext context) =>
     _progressPreview(previewPrivateUsdUnwinding());
-
-/// A bridge of another deployment (the lock contract's): never driven.
-Widget buildMobilePrivateUsdProgressOtherDeploymentUseCase(
-  BuildContext context,
-) => _progressPreview(
-  PrivateUsdConversionStatus(
-    record: previewPrivateUsdRecord(
-      phase: ApiForwardPhase.claiming,
-      depositConfirmations: 2,
-      otherDeployment: true,
-      ago: const Duration(days: 1),
-    ),
-  ),
-);
 
 /// The ZEC came back.
 Widget buildMobilePrivateUsdProgressRefundedUseCase(BuildContext context) =>

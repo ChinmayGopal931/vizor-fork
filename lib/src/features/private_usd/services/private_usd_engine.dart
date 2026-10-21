@@ -91,14 +91,6 @@ abstract class PrivateUsdStepStatus<R, S extends PrivateUsdStepStatus<R, S>> {
 
   bool get isUnderWay;
 
-  /// The record belongs to another deployment than this build pins, such as
-  /// the lock contract's: Rust never drives it, so it is never advanced, and
-  /// nothing waits or fails.
-  bool get otherDeployment;
-
-  /// Under way and this deployment's: advanced, and shown as running.
-  bool get isDriven => isUnderWay && !otherDeployment;
-
   S copyWith({
     R? record,
     rust.ApiActivity? activity,
@@ -136,9 +128,6 @@ class PrivateUsdConversionStatus
 
   @override
   bool get isUnderWay => record.outcome == null;
-
-  @override
-  bool get otherDeployment => record.otherDeployment;
 
   @override
   PrivateUsdConversionStatus copyWith({
@@ -192,9 +181,6 @@ class PrivateUsdReverseStatus
 
   @override
   bool get isUnderWay => privateUsdReverseUnderWay(record.phase);
-
-  @override
-  bool get otherDeployment => record.otherDeployment;
 
   /// Waiting on the user's payment or settlement approval (an advance's
   /// `needs_you`): the banner asks for attention.
@@ -293,10 +279,10 @@ class _Book<R, S extends PrivateUsdStepStatus<R, S>> {
 
   void publish() => snapshot.value = Map.unmodifiable(statuses);
 
-  /// Marks the conversions it drives as being picked up again; whether any
+  /// Marks the conversions under way as being picked up again; whether any
   /// changed.
   bool markResuming() => _updateAll(
-    (status) => status.isDriven && !status.resuming
+    (status) => status.isUnderWay && !status.resuming
         ? status.copyWith(resuming: true)
         : null,
   );
@@ -323,8 +309,7 @@ class _Book<R, S extends PrivateUsdStepStatus<R, S>> {
 
 /// The foreground swap loop: it advances every account's conversions under
 /// way while the app is open, in the foreground and unlocked, and not while
-/// a deletion or reset drains it. A conversion of another deployment is
-/// shown, never advanced.
+/// a deletion or reset drains it.
 ///
 /// - Every call that touches a record (quote, accept, advance, abandon) runs
 ///   on one serial queue per account, so Rust's per-account driver lock
@@ -522,10 +507,8 @@ class PrivateUsdEngine {
         continue;
       }
       if (epoch != _epoch) return null;
-      // A record of another deployment is never advanced: Rust never drives
-      // it, and its seed is never read for it.
       for (final record in records) {
-        if (record.outcome != null || record.otherDeployment) continue;
+        if (record.outcome != null) continue;
         final next = await _advanceForward(account, record, epoch);
         if (epoch != _epoch) return null;
         if (next != null) nap = _shorter(nap, next);
@@ -542,10 +525,7 @@ class PrivateUsdEngine {
       }
       if (epoch != _epoch) return null;
       for (final record in reverse) {
-        if (!privateUsdReverseUnderWay(record.phase) ||
-            record.otherDeployment) {
-          continue;
-        }
+        if (!privateUsdReverseUnderWay(record.phase)) continue;
         final next = await _advanceReverse(account, record, epoch);
         if (epoch != _epoch) return null;
         if (next != null) nap = _shorter(nap, next);
@@ -930,7 +910,7 @@ class PrivateUsdEngine {
     final previous = book.statuses[key];
     final S next;
     if (previous == null) {
-      next = fresh.copyWith(resuming: _resumeLoaded && fresh.isDriven);
+      next = fresh.copyWith(resuming: _resumeLoaded && fresh.isUnderWay);
     } else if (!fresh.isUnderWay) {
       // A draft or an ended conversion: nothing waits or fails.
       next = fresh.copyWith(checkedAt: previous.checkedAt);

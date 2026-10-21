@@ -25,8 +25,7 @@ const _ended = {
 
 /// A reverse record of a $25.00 escrow (debit $25.31 with its fees) for
 /// about 0.79985 ZEC, accepted [ago] before [previewPrivateUsdNow]. Its
-/// flags follow its phase as Rust's would; with [otherDeployment] it is of
-/// another deployment, never driven.
+/// flags follow its phase as Rust's would.
 ApiReverseRecord previewPrivateUsdReverseRecord({
   int index = 9,
   ApiReversePhase phase = ApiReversePhase.receivingZec,
@@ -36,7 +35,6 @@ ApiReverseRecord previewPrivateUsdReverseRecord({
   int receiveConfirmations = 0,
   Duration ago = const Duration(minutes: 12),
   Duration readyIn = const Duration(minutes: 38),
-  bool otherDeployment = false,
 }) {
   final acceptedAt = previewPrivateUsdNow.subtract(ago);
   final underWay = !_ended.contains(phase);
@@ -111,7 +109,6 @@ ApiReverseRecord previewPrivateUsdReverseRecord({
     updatedAt: previewPrivateUsdUnix(
       previewPrivateUsdNow.subtract(const Duration(minutes: 1)),
     ),
-    otherDeployment: otherDeployment,
   );
 }
 
@@ -248,19 +245,6 @@ Widget buildMobilePrivateUsdReverseRefundedUseCase(BuildContext context) =>
     _reverseProgress(
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.refunded),
     );
-
-/// A bridge of another deployment (the lock contract's), stopped waiting
-/// for settlement: never driven, and nothing asked of the user.
-Widget buildMobilePrivateUsdReverseOtherDeploymentUseCase(
-  BuildContext context,
-) => _reverseProgress(
-  previewPrivateUsdReverseRecord(
-    phase: ApiReversePhase.awaitingReady,
-    ago: const Duration(days: 1),
-    readyIn: const Duration(hours: -23),
-    otherDeployment: true,
-  ),
-);
 
 Widget _refunds(PrivateUsdRefundsState state) => PrivateUsdPreviewFrame(
   child: MobilePrivateUsdRefundsView(

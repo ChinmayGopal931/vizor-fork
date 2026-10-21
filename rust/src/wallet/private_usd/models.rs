@@ -948,10 +948,6 @@ pub(crate) struct ReverseRecord {
     /// is signed or sent after it.
     #[serde(default, skip_serializing_if = "is_false")]
     pub refund_posted: bool,
-    /// The lock contract's refund lock, in a record from before the windows
-    /// contract: still read, never written.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub refund_lock: Option<SwapAuthorization>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payout: Option<SwapPayout>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -350,7 +350,7 @@ Each one exists because breaking it loses funds or privacy. Most are enforced in
 13. **Fail closed on Tor.** All engine HTTP goes through `routed_http`, with no clearnet fallback. Railgun page traffic goes only through the bridge (D4), or the page does not run while Tor is on. Never persist or log the keyed RPC URL, the relayer ticket or token secrets.
 14. **Foreground and unlocked only (D9).** No step starts while `requiresUnlock` or in the background. Background cancels the Rust step and stops polling, but leaves the Railgun page open: closing it would restart a first sync from zero (§6.3), and the 10-minute idle timer or the lock closes it. Lock cancels the Rust step, closes the page and drops Dart-held secrets.
 15. **Guard account deletion and reset.** While an account has an unfinished conversion, show a warning before deleting it or resetting, with the number of unfinished conversions (copy `delete_unfinished_*`, `reset_unfinished_body`, §9.6). Delete only after the user explicitly confirms (owner decision, 2026-10-13: warn and allow, never block, so a user who must reset is never trapped). Drain `privateUsdLifecycle` before deleting. Clean up only after the Rust delete succeeds. *Why:* the funds sit in a joint account or escrow that only that seed and index can recover.
-16. **One conversion at a time per account**, in either direction (zapp `acceptanceLock`). **One outgoing Railgun payment at a time per wallet**, conversions included, across restarts (the spend guard, §6.7). A conversion of another deployment, such as the lock contract's, is never driven and holds up neither.
+16. **One conversion at a time per account**, in either direction (zapp `acceptanceLock`). **One outgoing Railgun payment at a time per wallet**, conversions included, across restarts (the spend guard, §6.7).
 17. **The chain is the only evidence.** The maker's status API never is.
 18. **Never quote per keystroke** (X10).
 19. **Check seed and address.** Derive keys only after the seed-fingerprint check (§3.3). Refuse a Railgun session whose address differs from Rust's.
@@ -843,7 +843,7 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
 **Done when.**
 - The fund-safety unit tests pass on fakes (the ★ cases in §8.7):
   - a deposit is never paid twice (`withFound`; created but unbroadcast is found, never rebuilt)
-  - an expired deposit is rebuilt only when payable and with no refund lock
+  - an expired deposit is rebuilt only when payable
   - the claim refuses to reveal inside the 300 s margin
   - a payout is re-signed only on a fee rise, and never above 2 USDC
   - a concurrent advance and accept on one account gives `Busy` and leaves the record intact
@@ -919,7 +919,7 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
   - a late funding response after cancel keeps the cancel
   - `ready` is never re-signed after a restart
   - the receive sweep is capped at the reviewed fee
-  - a reveal is refused when the refund lock is about to lapse
+  - a reveal is refused inside the 300 s margin before its window closes
   - rescue eligibility and nonce
   - `openReverse` calldata matches zapp's fixture
 - Device E2E:
@@ -1052,7 +1052,6 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
 - **A refusal pauses the address.** Signed again once from fresh terms; refused again, it is dropped, and the address is not signed for until its balance or the terms change, or an hour passes.
 - **A reverted deposit holds the address for an hour** (the relayer's `503`); sign again after.
 - **The deposit key signs only the two digests**: never delegate a deposit address (EIP-7702) or use one for anything else.
-- **Old-tUSD records.** A reverse record pinned to the old testnet token fails as `WrongDeployment`, never silently.
 
 ## 10. Test strategy
 

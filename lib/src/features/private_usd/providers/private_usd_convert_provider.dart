@@ -750,9 +750,8 @@ class PrivateUsdConvertNotifier
 
 /// [accountUuid]'s conversion under way in either direction, read from the
 /// records (opening a convert screen, or after the app died mid-accept):
-/// one at a time per account, so it shows instead of a new one. One of
-/// another deployment holds up no new conversion. Reading them also
-/// publishes the account's reverse drafts.
+/// one at a time per account, so it shows instead of a new one. Reading
+/// them also publishes the account's reverse drafts.
 Future<PrivateUsdRoutePath?> privateUsdFindUnderWay(
   PrivateUsdEngine engine,
   String accountUuid,
@@ -760,7 +759,7 @@ Future<PrivateUsdRoutePath?> privateUsdFindUnderWay(
   try {
     final forward = await engine.loadRecords(accountUuid);
     for (final record in forward) {
-      if (record.outcome == null && !record.otherDeployment) {
+      if (record.outcome == null) {
         return PrivateUsdRoutePath(
           direction: PrivateUsdDirection.forward,
           index: record.index,
@@ -769,7 +768,7 @@ Future<PrivateUsdRoutePath?> privateUsdFindUnderWay(
     }
     final reverse = await engine.loadReverseRecords(accountUuid);
     for (final record in reverse) {
-      if (privateUsdReverseUnderWay(record.phase) && !record.otherDeployment) {
+      if (privateUsdReverseUnderWay(record.phase)) {
         return PrivateUsdRoutePath(
           direction: PrivateUsdDirection.reverse,
           index: record.index,

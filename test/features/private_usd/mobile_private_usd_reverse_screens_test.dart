@@ -296,43 +296,6 @@ void main() {
     );
   });
 
-  testWidgets('a bridge of another deployment says it can\'t continue: no '
-      'approval, no call-off and no new bridge', (tester) async {
-    await pump(
-      tester,
-      MobilePrivateUsdReverseConversionView(
-        presentation: privateUsdReverseProgressPresentation(
-          status: PrivateUsdReverseStatus(
-            record: previewPrivateUsdReverseRecord(
-              phase: ApiReversePhase.awaitingReady,
-              otherDeployment: true,
-            ),
-          ),
-          now: previewPrivateUsdNow,
-        ),
-        onBack: () {},
-        onInfo: () {},
-        onRetry: () {},
-        onAction: () {},
-        onCallOff: () {},
-      ),
-    );
-
-    expect(find.text(PrivateUsdCopy.otherDeploymentTitle), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.otherDeploymentBody), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.reverseReady), findsNothing);
-    expect(find.text(PrivateUsdCopy.reverseReadyExplanation), findsNothing);
-    expect(
-      find.byKey(const ValueKey('mobile_private_usd_progress_action')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(const ValueKey('mobile_private_usd_progress_call_off')),
-      findsNothing,
-    );
-    expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsNothing);
-  });
-
   testWidgets('with bridging off, an ended bridge offers no new one', (
     tester,
   ) async {

@@ -12608,7 +12608,6 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
         let mut var_t0 = <Option<i64>>::sse_decode(deserializer);
         let mut var_t1 = <Option<i64>>::sse_decode(deserializer);
         let mut var_lateClaimAt = <Option<i64>>::sse_decode(deserializer);
-        let mut var_otherDeployment = <bool>::sse_decode(deserializer);
         let mut var_depositTxid = <Option<String>>::sse_decode(deserializer);
         let mut var_depositConfirmations = <Option<u32>>::sse_decode(deserializer);
         let mut var_sweepTxid = <Option<String>>::sse_decode(deserializer);
@@ -12634,7 +12633,6 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
             t0: var_t0,
             t1: var_t1,
             late_claim_at: var_lateClaimAt,
-            other_deployment: var_otherDeployment,
             deposit_txid: var_depositTxid,
             deposit_confirmations: var_depositConfirmations,
             sweep_txid: var_sweepTxid,
@@ -13065,7 +13063,6 @@ impl SseDecode for crate::api::private_usd::ApiReverseRecord {
         let mut var_receiveConfirmations = <u32>::sse_decode(deserializer);
         let mut var_acceptedAt = <Option<i64>>::sse_decode(deserializer);
         let mut var_updatedAt = <i64>::sse_decode(deserializer);
-        let mut var_otherDeployment = <bool>::sse_decode(deserializer);
         return crate::api::private_usd::ApiReverseRecord {
             index: var_index,
             swap_id: var_swapId,
@@ -13091,7 +13088,6 @@ impl SseDecode for crate::api::private_usd::ApiReverseRecord {
             receive_confirmations: var_receiveConfirmations,
             accepted_at: var_acceptedAt,
             updated_at: var_updatedAt,
-            other_deployment: var_otherDeployment,
         };
     }
 }
@@ -19202,7 +19198,6 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiForwardRecord
             self.t0.into_into_dart().into_dart(),
             self.t1.into_into_dart().into_dart(),
             self.late_claim_at.into_into_dart().into_dart(),
-            self.other_deployment.into_into_dart().into_dart(),
             self.deposit_txid.into_into_dart().into_dart(),
             self.deposit_confirmations.into_into_dart().into_dart(),
             self.sweep_txid.into_into_dart().into_dart(),
@@ -19800,7 +19795,6 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiReverseRecord
             self.receive_confirmations.into_into_dart().into_dart(),
             self.accepted_at.into_into_dart().into_dart(),
             self.updated_at.into_into_dart().into_dart(),
-            self.other_deployment.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -24683,7 +24677,6 @@ impl SseEncode for crate::api::private_usd::ApiForwardRecord {
         <Option<i64>>::sse_encode(self.t0, serializer);
         <Option<i64>>::sse_encode(self.t1, serializer);
         <Option<i64>>::sse_encode(self.late_claim_at, serializer);
-        <bool>::sse_encode(self.other_deployment, serializer);
         <Option<String>>::sse_encode(self.deposit_txid, serializer);
         <Option<u32>>::sse_encode(self.deposit_confirmations, serializer);
         <Option<String>>::sse_encode(self.sweep_txid, serializer);
@@ -25034,7 +25027,6 @@ impl SseEncode for crate::api::private_usd::ApiReverseRecord {
         <u32>::sse_encode(self.receive_confirmations, serializer);
         <Option<i64>>::sse_encode(self.accepted_at, serializer);
         <i64>::sse_encode(self.updated_at, serializer);
-        <bool>::sse_encode(self.other_deployment, serializer);
     }
 }
 

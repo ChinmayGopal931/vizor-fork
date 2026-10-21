@@ -3,10 +3,8 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_record_key.dart';
-import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_convert_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
-import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 
 import 'support/fake_private_usd_backend.dart';
 
@@ -266,84 +264,6 @@ void main() {
     engine.resumeAfterMutation();
     await tester.pump();
     expect(backend.advances, 2);
-  });
-
-  // A lock contract's record stays unfinished in Rust's store, which never
-  // drives it: it is shown as such, and never nags.
-  engineTest('a conversion of another deployment is never advanced, never '
-      'shows a problem and is never picked up again', (tester) async {
-    const reverseKey = PrivateUsdRecordKey(
-      accountUuid: account,
-      direction: PrivateUsdDirection.reverse,
-      index: 9,
-    );
-    backend = FakePrivateUsdBackend(
-      records: {
-        account: [forwardRecord(otherDeployment: true)],
-      },
-    );
-    backend.reverse[account] = [
-      previewPrivateUsdReverseRecord(
-        index: 9,
-        phase: ApiReversePhase.awaitingReady,
-        otherDeployment: true,
-      ),
-    ];
-    final engine = engineFor(tester);
-
-    engine.start();
-    await tester.pump();
-    await tester.pump(persisted + retry);
-    engine.start(resuming: true);
-    await tester.pump();
-    await tester.pump(const Duration(minutes: 5));
-
-    expect(backend.advances, 0);
-    expect(backend.reverseAdvances, 0);
-    expect(seeds, isEmpty, reason: 'a seed was read for a record never driven');
-    final forward = engine.conversions.value[key]!;
-    final reverse = engine.reverseConversions.value[reverseKey]!;
-    for (final status in <PrivateUsdStepStatus<Object?, Object?>>[
-      forward,
-      reverse,
-    ]) {
-      expect(status.otherDeployment, isTrue);
-      expect(status.isUnderWay, isTrue);
-      expect(status.isDriven, isFalse);
-      expect(status.problem, isNull);
-      expect(status.failingSince, isNull);
-      expect(status.resuming, isFalse);
-    }
-  });
-
-  engineTest('a conversion of another deployment holds up no new one', (
-    tester,
-  ) async {
-    backend = FakePrivateUsdBackend(
-      records: {
-        account: [forwardRecord(otherDeployment: true)],
-      },
-    );
-    backend.reverse[account] = [
-      previewPrivateUsdReverseRecord(
-        index: 9,
-        phase: ApiReversePhase.awaitingReady,
-        otherDeployment: true,
-      ),
-    ];
-    final engine = engineFor(tester);
-
-    expect(await privateUsdFindUnderWay(engine, account), isNull);
-
-    backend.reverse[account]!.add(
-      previewPrivateUsdReverseRecord(
-        index: 10,
-        phase: ApiReversePhase.awaitingReady,
-      ),
-    );
-    final underWay = await privateUsdFindUnderWay(engine, account);
-    expect(underWay?.direction, PrivateUsdDirection.reverse);
-    expect(underWay?.index, 10);
   });
 
   engineTest('every account with a conversion under way is advanced (D14)', (

@@ -685,10 +685,6 @@ class WidgetbookApp extends StatelessWidget {
                       name: 'Bridging off',
                       builder: buildMobilePrivateUsdBridgeOffUseCase,
                     ),
-                    WidgetbookUseCase(
-                      name: 'Earlier test deployment',
-                      builder: buildMobilePrivateUsdOtherDeploymentUseCase,
-                    ),
                   ],
                 ),
                 WidgetbookComponent(
@@ -785,11 +781,6 @@ class WidgetbookApp extends StatelessWidget {
                       name: 'Nothing sent',
                       builder: buildMobilePrivateUsdProgressNothingSentUseCase,
                     ),
-                    WidgetbookUseCase(
-                      name: 'Earlier test deployment',
-                      builder:
-                          buildMobilePrivateUsdProgressOtherDeploymentUseCase,
-                    ),
                   ],
                 ),
                 WidgetbookComponent(
@@ -826,11 +817,6 @@ class WidgetbookApp extends StatelessWidget {
                     WidgetbookUseCase(
                       name: 'Refunded',
                       builder: buildMobilePrivateUsdReverseRefundedUseCase,
-                    ),
-                    WidgetbookUseCase(
-                      name: 'Earlier test deployment',
-                      builder:
-                          buildMobilePrivateUsdReverseOtherDeploymentUseCase,
                     ),
                   ],
                 ),

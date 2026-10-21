@@ -66,10 +66,9 @@ pub enum ApiPrivateUsdErrorCode {
     Other,
     /// The call was cancelled (`private_usd_cancel`): never a failure.
     Cancelled,
-    /// A record, a service or the node belongs to another deployment than
-    /// this build pins: a conversion of the lock contract or of the retired
-    /// testnet token, a contract that is not the pinned windows contract, or
-    /// deposit terms that are not the pin's. Never followed.
+    /// A service or the node belongs to another deployment than this build
+    /// pins: a contract that is not the pinned windows contract, or terms
+    /// that are not the pin's. Never followed.
     WrongDeployment,
 }
 
@@ -515,12 +514,8 @@ pub struct ApiForwardRecord {
     pub t0: Option<i64>,
     pub t1: Option<i64>,
     /// `t1` and the contract's late window: from here a swap the maker never
-    /// refunded is claimed after all. `None` before the maker answered, and
-    /// for a conversion of another deployment.
+    /// refunded is claimed after all. `None` before the maker answered.
     pub late_claim_at: Option<i64>,
-    /// A conversion of another deployment, such as the lock contract's: read,
-    /// never driven, and holding up nothing.
-    pub other_deployment: bool,
     /// Internal byte order hex, as wallet history rows carry it; show it with
     /// `zcashDisplayTxidHex`.
     pub deposit_txid: Option<String>,
@@ -668,8 +663,7 @@ pub fn private_usd_forward_advance(
 /// Drops swap `index` before it reached the chain: an unanswered accept ends
 /// `MakerUnavailable` (a turn-away at the token gate included), an answered
 /// one `NeverOpened`. `TooLate` once a deposit started or the chain shows
-/// the swap; `WrongDeployment` for a conversion of another deployment, such
-/// as the lock contract's, which is never ended or driven. No key is needed.
+/// the swap. No key is needed.
 pub fn private_usd_forward_abandon(
     network: String,
     account_uuid: String,
@@ -792,9 +786,6 @@ pub struct ApiReverseRecord {
     pub accepted_at: Option<i64>,
     /// When the record last changed (device clock).
     pub updated_at: i64,
-    /// A conversion of another deployment, such as the lock contract's: read,
-    /// never driven, and holding up nothing.
-    pub other_deployment: bool,
 }
 
 /// What the Railgun page's `reverseCost` takes: `{amount, railgun:
@@ -2025,9 +2016,6 @@ fn api_reverse_record(
         .ok()
         .flatten()
         .unwrap_or_default();
-    // Another deployment's conversion is never driven: it waits on no one.
-    let other_deployment = deployment::for_chain_id(record.deployment.chain_id)
-        .is_none_or(|pins| !swap::serves_reverse(pins, &record.deployment));
     ApiReverseRecord {
         index: record.index,
         swap_id: record.swap_id.to_hex(),
@@ -2053,8 +2041,8 @@ fn api_reverse_record(
             .map(|transaction| transaction.to_hex()),
         cancel_requested: record.cancel_requested,
         settled: record.is_settled(),
-        cancellable: !other_deployment && record.cancellable(),
-        awaiting_user: !other_deployment && record.awaiting_user(),
+        cancellable: record.cancellable(),
+        awaiting_user: record.awaiting_user(),
         receive_estimate_zat: record
             .receive_estimate
             .as_ref()
@@ -2071,7 +2059,6 @@ fn api_reverse_record(
         receive_confirmations: u32::try_from(record.receive_confirmations).unwrap_or(u32::MAX),
         accepted_at: record.accepted_at.map(seconds),
         updated_at: seconds(updated_at),
-        other_deployment,
     }
 }
 
@@ -2214,8 +2201,6 @@ fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> Api
         t0: record.t0.map(seconds),
         t1: record.t1.map(seconds),
         late_claim_at: late_claim_at(record),
-        other_deployment: deployment::for_chain_id(record.quote.chain_id)
-            .is_none_or(|pins| !swap::serves(pins, &record.quote)),
         deposit_txid: record
             .deposit
             .as_ref()
@@ -2234,12 +2219,9 @@ fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> Api
 }
 
 /// When a forward swap the maker never refunded is claimed after all, `t1`
-/// and the late window of the contract its quote names; `None` before `t1`
-/// is known, and for a conversion of another deployment.
+/// and the contract's late window; `None` before `t1` is known.
 fn late_claim_at(record: &ForwardRecord) -> Option<i64> {
-    let swaps = deployment::for_chain_id(record.quote.chain_id)?
-        .swaps
-        .filter(|swaps| swaps.address == record.quote.contract.0)?;
+    let swaps = deployment::for_chain_id(record.quote.chain_id)?.swaps?;
     Some(seconds(record.t1?.saturating_add(swaps.late_window)))
 }
 

@@ -5,8 +5,7 @@ import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engin
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_swap_backend.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 
-/// A forward record under way at [index] (or ended with [outcome]), with
-/// [otherDeployment] of a deployment this build never drives.
+/// A forward record under way at [index] (or ended with [outcome]).
 ApiForwardRecord forwardRecord({
   int index = 7,
   ApiForwardPhase phase = ApiForwardPhase.confirming,
@@ -22,7 +21,6 @@ ApiForwardRecord forwardRecord({
   String relayerFee = '460000',
   int? t0,
   int? t1,
-  bool otherDeployment = false,
   String? depositTxid,
   int? depositConfirmations,
   String? sweepTxid,
@@ -41,7 +39,6 @@ ApiForwardRecord forwardRecord({
   relayerFee: relayerFee,
   t0: t0,
   t1: t1,
-  otherDeployment: otherDeployment,
   depositTxid: depositTxid,
   depositConfirmations: depositConfirmations,
   sweepTxid: sweepTxid,
@@ -224,7 +221,6 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
   ApiReverseRecord Function(int index, PrivateUsdFundingProof proof)?
   onSubmitFunding;
   int fundingRequests = 0;
-  int reverseAdvances = 0;
   final submitted = <PrivateUsdFundingProof>[];
 
   @override
@@ -296,10 +292,7 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
     PrivateUsdSecretReader secret, {
     required int opId,
     required int index,
-  }) {
-    reverseAdvances++;
-    throw UnimplementedError();
-  }
+  }) => throw UnimplementedError();
 
   @override
   Future<ApiReverseRecord> reverseAuthorizeReady(

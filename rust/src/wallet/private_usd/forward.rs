@@ -281,7 +281,7 @@ where
     pub(crate) async fn quote(&self, store: &mut SwapStore, units: u32) -> Result<Quoted> {
         let session = engine::session();
         self.pins.swap_contract()?;
-        swap::require_none_under_way(store, self.account, self.pins)?;
+        swap::require_none_under_way(store, self.account)?;
         swap::check_maker(&self.maker, self.pins, self.makers, false).await?;
         let index = indices::take_index(
             store,
@@ -344,7 +344,7 @@ where
         if let Some(record) = find(store, self.account, index)? {
             return self.accept_again(store, record).await;
         }
-        swap::require_none_under_way(store, self.account, self.pins)?;
+        swap::require_none_under_way(store, self.account)?;
         let now = self.clock.now();
         let offer =
             engine::offer(self.account, index, self.keys.network(), now).ok_or_else(|| {
@@ -409,7 +409,6 @@ where
             Some(_) => return Ok(AcceptOutcome::Accepted),
             None => {}
         }
-        require_served(self.pins, &record)?;
         // Answered: under way; the engine follows it.
         if record.t0.is_some() {
             return Ok(AcceptOutcome::Accepted);
@@ -528,7 +527,6 @@ where
         if let Some(outcome) = &record.outcome {
             return Ok(ForwardStep::Finished(outcome.clone()));
         }
-        require_served(self.pins, &record)?;
         engine::check_cancelled(self.op)?;
         match self.terms(&record)? {
             None => self.not_on_chain(store, &record, false).await,
@@ -1232,7 +1230,6 @@ where
 /// chain shows the swap: it goes on.
 pub(crate) async fn abandon<C: ChainReader, K: Clock>(
     store: &mut SwapStore,
-    pins: &Deployment,
     chain: &C,
     clock: &K,
     account: &str,
@@ -1242,7 +1239,6 @@ pub(crate) async fn abandon<C: ChainReader, K: Clock>(
     if record.finished() {
         return Ok(record);
     }
-    require_served(pins, &record)?;
     if record.deposit_progress() != DepositProgress::NotStarted
         || chain.swap(&record.swap_id.0).await?.is_some()
     {
@@ -1304,19 +1300,6 @@ fn unpayable(pins: &Deployment, terms: &Terms, chain_now: u64) -> Result<Option<
             None
         },
     )
-}
-
-/// The record is pinned to this build's deployment: its quote names the
-/// pinned chain, windows contract, token and maker. One of another, such as
-/// the lock contract's, is never followed.
-fn require_served(pins: &Deployment, record: &ForwardRecord) -> Result<()> {
-    if !serves(pins, &record.quote) {
-        return fail(
-            ErrorCode::WrongDeployment,
-            "the conversion belongs to another deployment",
-        );
-    }
-    Ok(())
 }
 
 /// Waiting on the windows, with the deadlines they run on.
@@ -1422,9 +1405,8 @@ pub(crate) async fn abandon_with(
     account: &str,
     index: u32,
 ) -> Result<ForwardRecord> {
-    let pins = deployment::deployment(network);
     let transport = RoutedHttp::new();
-    let chain = EvmRpc::new(&transport, pins, eth_rpc_url);
+    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url);
     let mut store = SwapStore::open(store_dir)?;
-    abandon(&mut store, pins, &chain, &SystemClock, account, index).await
+    abandon(&mut store, &chain, &SystemClock, account, index).await
 }

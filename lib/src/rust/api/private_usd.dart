@@ -197,8 +197,7 @@ Future<ApiForwardAdvance> privateUsdForwardAdvance({
 /// Drops swap `index` before it reached the chain: an unanswered accept ends
 /// `MakerUnavailable` (a turn-away at the token gate included), an answered
 /// one `NeverOpened`. `TooLate` once a deposit started or the chain shows
-/// the swap; `WrongDeployment` for a conversion of another deployment, such
-/// as the lock contract's, which is never ended or driven. No key is needed.
+/// the swap. No key is needed.
 Future<ApiForwardRecord> privateUsdForwardAbandon({
   required String network,
   required String accountUuid,
@@ -1373,13 +1372,8 @@ class ApiForwardRecord {
   final PlatformInt64? t1;
 
   /// `t1` and the contract's late window: from here a swap the maker never
-  /// refunded is claimed after all. `None` before the maker answered, and
-  /// for a conversion of another deployment.
+  /// refunded is claimed after all. `None` before the maker answered.
   final PlatformInt64? lateClaimAt;
-
-  /// A conversion of another deployment, such as the lock contract's: read,
-  /// never driven, and holding up nothing.
-  final bool otherDeployment;
 
   /// Internal byte order hex, as wallet history rows carry it; show it with
   /// `zcashDisplayTxidHex`.
@@ -1413,7 +1407,6 @@ class ApiForwardRecord {
     this.t0,
     this.t1,
     this.lateClaimAt,
-    required this.otherDeployment,
     this.depositTxid,
     this.depositConfirmations,
     this.sweepTxid,
@@ -1439,7 +1432,6 @@ class ApiForwardRecord {
       t0.hashCode ^
       t1.hashCode ^
       lateClaimAt.hashCode ^
-      otherDeployment.hashCode ^
       depositTxid.hashCode ^
       depositConfirmations.hashCode ^
       sweepTxid.hashCode ^
@@ -1467,7 +1459,6 @@ class ApiForwardRecord {
           t0 == other.t0 &&
           t1 == other.t1 &&
           lateClaimAt == other.lateClaimAt &&
-          otherDeployment == other.otherDeployment &&
           depositTxid == other.depositTxid &&
           depositConfirmations == other.depositConfirmations &&
           sweepTxid == other.sweepTxid &&
@@ -1617,10 +1608,9 @@ enum ApiPrivateUsdErrorCode {
   /// The call was cancelled (`private_usd_cancel`): never a failure.
   cancelled,
 
-  /// A record, a service or the node belongs to another deployment than
-  /// this build pins: a conversion of the lock contract or of the retired
-  /// testnet token, a contract that is not the pinned windows contract, or
-  /// deposit terms that are not the pin's. Never followed.
+  /// A service or the node belongs to another deployment than this build
+  /// pins: a contract that is not the pinned windows contract, or terms
+  /// that are not the pin's. Never followed.
   wrongDeployment,
 }
 
@@ -1969,10 +1959,6 @@ class ApiReverseRecord {
   /// When the record last changed (device clock).
   final PlatformInt64 updatedAt;
 
-  /// A conversion of another deployment, such as the lock contract's: read,
-  /// never driven, and holding up nothing.
-  final bool otherDeployment;
-
   const ApiReverseRecord({
     required this.index,
     required this.swapId,
@@ -1998,7 +1984,6 @@ class ApiReverseRecord {
     required this.receiveConfirmations,
     this.acceptedAt,
     required this.updatedAt,
-    required this.otherDeployment,
   });
 
   @override
@@ -2026,8 +2011,7 @@ class ApiReverseRecord {
       receivedZat.hashCode ^
       receiveConfirmations.hashCode ^
       acceptedAt.hashCode ^
-      updatedAt.hashCode ^
-      otherDeployment.hashCode;
+      updatedAt.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -2057,8 +2041,7 @@ class ApiReverseRecord {
           receivedZat == other.receivedZat &&
           receiveConfirmations == other.receiveConfirmations &&
           acceptedAt == other.acceptedAt &&
-          updatedAt == other.updatedAt &&
-          otherDeployment == other.otherDeployment;
+          updatedAt == other.updatedAt;
 }
 
 /// One send or withdrawal of the log.

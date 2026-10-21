@@ -10,9 +10,9 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 - **The windows contract (2026-10-20, D-137).** Testnet swaps settle on
   zecSwap's windows contract, with no claim or refund locks. Mainnet
   bridging is off until zecSwap deploys one there, so the app hides Bridge;
-  the balance, deposits, sends and withdrawals work. A bridge left on the
-  lock contract shows as from an earlier test deployment, is never driven,
-  and holds up nothing. Not yet run on the A35.
+  the balance, deposits, sends and withdrawals work. The app keeps no code
+  for the lock contract's bridges (D-139): a phone that holds some has its
+  Private USD store cleared first. Not yet run on the A35.
 
 - **Sepolia's Railgun list (2026-10-20, D-138).** Railgun's Sepolia
   indexer breaks its hash chain at transaction 4188, which held relayed
@@ -2002,23 +2002,23 @@ M8 status (2026-10-14): the non-device parts are done.
   - **The ready depth.** Before `t0` a claim goes only on a ready 12 blocks
     deep: the oracle's rule. Veylor reads the swap at `head − 12`, one block
     stricter than zecSwap's reference code (`head − 11`).
-  - **Old records.** Lock-era records are kept and read, but never driven
-    (`WrongDeployment`, `swaps.db` schema 3); the retired contracts' used
-    indices are still skipped. Each API record carries `otherDeployment`,
-    which Rust sets for a record this build never drives (`swap::serves`
-    or `serves_reverse` against the pins of the record's chain). The
-    engine never advances one or reads a seed for it, and Rust reports it
-    waiting on no one (`awaitingUser` and `cancellable` false). Its progress
-    reads
-    "This bridge is from an earlier test deployment. It can't continue in
-    this version.", with no problem card, banner, keep-awake or settlement
-    buzz, and a refunded one is marked on Refunds without a check.
-  - **They hold up nothing:** not a new bridge, not Send or Withdraw.
-    `sends::keep` refuses only beside a conversion this build drives
-    (`swap::require_none_under_way`, as the quote does).
-    `private_usd_unfinished_count` still counts every unfinished record,
-    on purpose: it only feeds the account-deletion warning, and the
-    deletion removes those records with the account.
+  - **Old records (removed by D-139).** Lock-era records are kept and read,
+    but never driven (`WrongDeployment`, `swaps.db` schema 3); the retired
+    contracts' used indices are still skipped. Each API record carries
+    `otherDeployment`, which Rust sets for a record this build never drives
+    (`swap::serves` or `serves_reverse` against the pins of the record's
+    chain). The engine never advances one or reads a seed for it, and Rust
+    reports it waiting on no one (`awaitingUser` and `cancellable` false).
+    Its progress reads "This bridge is from an earlier test deployment. It
+    can't continue in this version.", with no problem card, banner,
+    keep-awake or settlement buzz, and a refunded one is marked on Refunds
+    without a check.
+  - **They hold up nothing (removed by D-139):** not a new bridge, not Send
+    or Withdraw. `sends::keep` refuses only beside a conversion this build
+    drives (`swap::require_none_under_way`, as the quote does).
+    `private_usd_unfinished_count` still counts every unfinished record, on
+    purpose: it only feeds the account-deletion warning, and the deletion
+    removes those records with the account.
   - **The maker's `/v1/info` and the relayer's terms** may name
     `contractKind`, `minWindow` and `lateWindow`; each must match the pins,
     else `WrongDeployment`. All three are optional because mainnet's
@@ -2058,6 +2058,32 @@ M8 status (2026-10-14): the non-device parts are done.
     moves to the paid plan.
   - **Drop it** once the header reads `intact`: the worker, its host in the
     allowlists and the CSP, and the plugin.
+
+- **D-139 (owner, 2026-10-21): no code for the lock contract's bridges.**
+  The owner tests alone and starts every bridge on the windows contract:
+  "remove all the old stuff, we want to be moving to the new stuff only".
+  - **Removed.** The per-record deployment checks (`require_served` in
+    both directions, with `serves_record` and `serves_reverse`), so one
+    unfinished conversion is `Busy` again for a new one and for
+    `sends::keep`, by `unfinished_count`; the API records'
+    `otherDeployment`; the lock contract's `refundLock` field (records are
+    read strictly, so a store holding a lock-era refund no longer opens);
+    and in Dart, the "Can't continue" progress, the quiet activity row,
+    Refunds' "from an earlier test deployment", and the engine's and
+    providers' skips, with their copy, Widgetbook use cases, Figma
+    scenarios and tests.
+  - **Kept.** The contract identity check (`MIN_WINDOW()` and
+    `LATE_WINDOW()` as pinned, `LOCK_DURATION()` reverting) and the
+    four-word `getSwap`, which zecSwap's port spec requires of the windows
+    contract; the maker's and relayer's windows; and skipping an index a
+    retired lock contract shows in use, which stops a store that lost its
+    counter from reusing a share the old contract's maker has seen.
+  - **Phones.** A phone that holds lock-era bridges has its Private USD
+    store (`swaps.db` and `joint.db`) cleared before it runs this build.
+    The ZEC wallet and the Railgun wallet stay. The A35 held some.
+  - Unit tests: Rust's Private USD tests (91 passed; the three removed
+    covered old records); in Dart, the Private USD tests in both lanes
+    (135 and 187 passed) and every mobile Figma scenario (330).
   - Not yet seen clearing a stuck send on a phone.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not

@@ -26,7 +26,6 @@ class PrivateUsdRefundRow {
     required this.record,
     this.recoverable,
     this.checkFailed = false,
-    this.otherDeployment = false,
     this.error,
   });
 
@@ -36,10 +35,6 @@ class PrivateUsdRefundRow {
   /// checked.
   final bool? recoverable;
   final bool checkFailed;
-
-  /// Pinned to another deployment than this build's (the lock contract, or
-  /// the retired testnet token): never recovered here.
-  final bool otherDeployment;
 
   /// Why its last recovery did not go through.
   final String? error;
@@ -54,7 +49,6 @@ class PrivateUsdRefundRow {
     record: record ?? this.record,
     recoverable: recoverable ?? this.recoverable,
     checkFailed: checkFailed ?? this.checkFailed,
-    otherDeployment: otherDeployment,
     error: clearError ? null : (error ?? this.error),
   );
 }
@@ -135,10 +129,7 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
         for (final record in _refunded(
           ref.read(privateUsdReverseConversionsProvider),
         ))
-          PrivateUsdRefundRow(
-            record: record,
-            otherDeployment: record.otherDeployment,
-          ),
+          PrivateUsdRefundRow(record: record),
       ],
     );
   }
@@ -175,10 +166,7 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
       rows: [
         for (final record in records)
           known[record.index]?.copyWith(record: record) ??
-              PrivateUsdRefundRow(
-                record: record,
-                otherDeployment: record.otherDeployment,
-              ),
+              PrivateUsdRefundRow(record: record),
       ],
     );
   }
@@ -235,26 +223,16 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
     if (!_engine.canRun) return;
     final pass = ++_pass;
     state = state.copyWith(refreshing: true);
-    // A record of another deployment is said so without asking Rust.
-    final pending = [
-      for (final row in state.rows)
-        if (!row.record.otherDeployment) row.record.index,
-    ];
+    final pending = [for (final row in state.rows) row.record.index];
     Future<void> worker() async {
       while (pending.isNotEmpty) {
         final index = pending.removeAt(0);
         bool? recoverable;
         var failed = false;
-        var otherDeployment = false;
         try {
           recoverable = await _engine
               .reverseCanRescue(accountUuid, index: index)
               .timeout(PrivateUsdRefundsTiming.timeout);
-        } on rust.ApiPrivateUsdError catch (error) {
-          // Refused as another deployment's: said so, never recovered.
-          otherDeployment =
-              error.code == rust.ApiPrivateUsdErrorCode.wrongDeployment;
-          failed = !otherDeployment;
         } catch (_) {
           failed = true;
         }
@@ -265,11 +243,8 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
               row.record.index == index
                   ? PrivateUsdRefundRow(
                       record: row.record,
-                      recoverable: failed || otherDeployment
-                          ? null
-                          : recoverable,
+                      recoverable: failed ? null : recoverable,
                       checkFailed: failed,
-                      otherDeployment: otherDeployment,
                       error: row.error,
                     )
                   : row,

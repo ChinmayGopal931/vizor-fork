@@ -58,10 +58,9 @@ class PrivateUsdDepositsNotifier extends Notifier<PrivateUsdDepositsStatus?> {
   void publish(PrivateUsdDepositsStatus? next) => state = next;
 }
 
-/// The conversions the engine drives in either direction (under way and
-/// this deployment's), for every account: the router's synchronous guard
-/// keeps a conversion's progress route reachable while its record is here,
-/// even when Private USD is otherwise unavailable.
+/// The conversions under way in either direction, for every account: the
+/// router's synchronous guard keeps a conversion's progress route reachable
+/// while its record is here, even when Private USD is otherwise unavailable.
 final privateUsdUnfinishedProvider =
     NotifierProvider<PrivateUsdUnfinishedNotifier, Set<PrivateUsdRecordKey>>(
       PrivateUsdUnfinishedNotifier.new,

@@ -136,9 +136,9 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
     ref.read(privateUsdReverseConversionsProvider.notifier).publish(reverse);
     ref.read(privateUsdUnfinishedProvider.notifier).publish({
       for (final entry in snapshot.entries)
-        if (entry.value.isDriven) entry.key,
+        if (entry.value.isUnderWay) entry.key,
       for (final entry in reverse.entries)
-        if (entry.value.isDriven) entry.key,
+        if (entry.value.isUnderWay) entry.key,
     });
   }
 

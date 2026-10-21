@@ -5,14 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/formatting/date_format.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
-import 'package:zcash_wallet/src/features/activity/models/activity_row_data.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_status_presentation.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_convert_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_screen.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
-import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_activity_rows.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_banner.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_scramble_text.dart';
@@ -479,29 +477,6 @@ void main() {
       );
     });
 
-    testWidgets('a bridge of another deployment says it can\'t continue, and '
-        'asks nothing of the user', (tester) async {
-      await pumpProgress(
-        tester,
-        PrivateUsdConversionStatus(
-          record: previewPrivateUsdRecord(
-            phase: ApiForwardPhase.claiming,
-            otherDeployment: true,
-          ),
-        ),
-      );
-
-      expect(find.text(PrivateUsdCopy.otherDeploymentTitle), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.otherDeploymentBody), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertProblemTitle), findsNothing);
-      expect(find.text(PrivateUsdCopy.convertStepClaim), findsNothing);
-      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsNothing);
-      expect(
-        find.byKey(const ValueKey('mobile_private_usd_progress_action')),
-        findsNothing,
-      );
-    });
-
     testWidgets('with bridging off, an ended bridge offers no new one', (
       tester,
     ) async {
@@ -523,32 +498,6 @@ void main() {
         findsNothing,
       );
     });
-  });
-
-  testWidgets('an unfinished bridge of another deployment is a quiet row', (
-    tester,
-  ) async {
-    late ActivityRowData row;
-    await pump(
-      tester,
-      Builder(
-        builder: (context) {
-          row = buildPrivateUsdActivityRow(
-            context: context,
-            record: previewPrivateUsdRecord(
-              phase: ApiForwardPhase.claiming,
-              otherDeployment: true,
-            ),
-            zcashConfirmations: 2,
-          )!;
-          return const SizedBox.shrink();
-        },
-      ),
-    );
-
-    expect(row.title, PrivateUsdCopy.convertingToUsd);
-    expect(row.subtitle, PrivateUsdCopy.activityOtherDeployment);
-    expect(row.statusIconName, isNull, reason: 'nothing runs');
   });
 
   testWidgets('the banner names the conversion, its stage, and keep-open', (

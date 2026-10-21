@@ -17,8 +17,8 @@ use super::joint::{SwapTxStatus, WalletZcash};
 use super::keys::SwapKeyContext;
 use super::maker_client::MakerClient;
 use super::models::{
-    Amount, Direction, ForwardRecord, RecordDeployment, RelayerTerms, ReverseRecord, StoredRecord,
-    SwapAcceptance, SwapQuote, SwapZcashNetwork,
+    Amount, Direction, ForwardRecord, RelayerTerms, ReverseRecord, StoredRecord, SwapAcceptance,
+    SwapQuote, SwapZcashNetwork,
 };
 use super::relayer_client::RelayerClient;
 use super::store::SwapStore;
@@ -263,27 +263,6 @@ pub(crate) fn serves(pins: &Deployment, quote: &SwapQuote) -> bool {
         && quote.maker.0 == pins.maker
 }
 
-/// A reverse record pinned to this build's deployment: the same chain,
-/// windows contract, token, Railgun proxy, maker, relayer and Zcash network.
-pub(crate) fn serves_reverse(pins: &Deployment, pinned: &RecordDeployment) -> bool {
-    pinned.chain_id == pins.chain_id
-        && pins.settles_on(&pinned.contract.0)
-        && pinned.token.0 == pins.token
-        && pinned.railgun_proxy.0 == pins.railgun_proxy
-        && pinned.maker.0 == pins.maker
-        && pinned.relayer.0 == pins.relayer
-        && pinned.zcash_network == SwapZcashNetwork::from(pins.network)
-}
-
-/// A record this build drives: one pinned to another deployment, such as
-/// the lock contract's, is never followed.
-pub(crate) fn serves_record(pins: &Deployment, record: &StoredRecord) -> bool {
-    match record {
-        StoredRecord::Forward(record) => serves(pins, &record.quote),
-        StoredRecord::Reverse(record) => serves_reverse(pins, &record.deployment),
-    }
-}
-
 /// A quote's error: the maker turning the amount down is `AmountRefused`.
 pub(crate) fn quote_error(error: SwapHttpError) -> PrivateUsdError {
     match error.code() {
@@ -520,19 +499,10 @@ pub(crate) fn update<R: SwapRecord>(
     Ok(())
 }
 
-/// One conversion at a time per account, in either direction. A reverse
-/// draft is not under way, nor is a conversion of another deployment, which
-/// this build never drives.
-pub(crate) fn require_none_under_way(
-    store: &SwapStore,
-    account: &str,
-    pins: &Deployment,
-) -> Result<()> {
-    let under_way = store
-        .unfinished(account)?
-        .iter()
-        .any(|record| serves_record(pins, record));
-    if under_way {
+/// One conversion at a time per account, in either direction; a reverse
+/// draft is not under way.
+pub(crate) fn require_none_under_way(store: &SwapStore, account: &str) -> Result<()> {
+    if store.unfinished_count(account)? > 0 {
         return fail(ErrorCode::Busy, "a conversion is already under way");
     }
     Ok(())

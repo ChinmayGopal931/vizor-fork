@@ -146,7 +146,7 @@ fn bodies<F>(transport: &ScriptedTransport<F>) -> Vec<String> {
 
 /// The page's `transfer` result spending `nullifiers`: its proxy in mixed
 /// case, its calldata in capitals, with the fields the relayer never sees.
-pub(super) fn page_proof(nullifiers: &[[u8; 32]]) -> Value {
+fn page_proof(nullifiers: &[[u8; 32]]) -> Value {
     let nullifiers: Vec<String> = nullifiers.iter().map(|n| hex0x(n)).collect();
     json!({
         "chainId": pins().chain_id,
@@ -179,12 +179,7 @@ fn proved<'a>(id: &'a str, proof: &'a str) -> ProvedSend<'a> {
     }
 }
 
-pub(super) fn keep(
-    store: &mut SwapStore,
-    account: &str,
-    id: &str,
-    proof: &Value,
-) -> Result<SendRecord> {
+fn keep(store: &mut SwapStore, account: &str, id: &str, proof: &Value) -> Result<SendRecord> {
     let proof = proof.to_string();
     sends::keep(store, pins(), account, &proved(id, &proof), NOW)
 }

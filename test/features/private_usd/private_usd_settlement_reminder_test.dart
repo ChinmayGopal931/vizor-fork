@@ -54,8 +54,8 @@ void main() {
     expect(due(short, now), PrivateUsdSettlementBuzz.closing);
   });
 
-  test('nothing buzzes before the step, once it has closed, when cancelled, '
-      'or for a bridge of another deployment', () {
+  test('nothing buzzes before the step, once it has closed, or when '
+      'cancelled', () {
     for (final record in [
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.awaitingFunding),
       previewPrivateUsdReverseRecord(
@@ -65,10 +65,6 @@ void main() {
       previewPrivateUsdReverseRecord(
         phase: ApiReversePhase.awaitingReady,
         cancelRequested: true,
-      ),
-      previewPrivateUsdReverseRecord(
-        phase: ApiReversePhase.awaitingReady,
-        otherDeployment: true,
       ),
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.settling),
     ]) {

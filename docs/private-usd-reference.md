@@ -340,7 +340,6 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
 10. **`REFUNDED`**: §5.8.
 11. **Token return.** On every advance after the deposit started, `GET /v1/swaps/{id}` collects the token if one is awaited (§5.9). Until M4, none is awaited and nothing is read (progress D-33).
 12. **Abandon** (user action, `:126-131`): allowed only while the deposit is `NotStarted` and `swap(id)` is empty → `NothingSent(NEVER_OPENED)`. As built, an unanswered record (no `t0`, such as one turned away at the token gate) ends `NothingSent(MAKER_UNAVAILABLE)` instead (progress D-33); otherwise `TooLate`. A record of another deployment is `WrongDeployment`: never ended or driven.
-13. **Another deployment's record** (the lock contract's, or the retired testnet token's): `require_served` refuses it before any step, so every advance fails at once. It is kept and read (`swaps.db` schema 3), and its indices stay spent. Its API record says so (`other_deployment`, from `swap::serves` or `serves_reverse` against the pins of its chain), and it holds up nothing: no new conversion, and no send or withdrawal (`sends::keep` refuses only beside a conversion this build drives, through `require_none_under_way`). The app shows it as from an earlier test deployment and never advances it (progress D-137).
 
 The invariants for this machine are §3.5 items 1–8 and 16.
 
@@ -353,7 +352,7 @@ The invariants for this machine are §3.5 items 1–8 and 16.
 - `index`, the whole `deployment` (pinned with the record), `quote` (`ReverseQuote`), `swapId`, `userShare`, `acceptance` (the wire `SwapAcceptance`, re-sent on retry) and `birthday`
 - `account?` (the joint account's UUID), `phase`, `cost?` (`{debit, railgunFee, broadcasterFee, feeExpiresAt?}`)
 - `funding?` (`{txId?, cost, request: {swapId, chainId, to, data, value:"0"}}`), `ready?` and `cancelRequested`
-- `refundPosted` (kept before a refund goes), `refundLock?` (a lock-era record's, read only), `payout?`, `rescue?`, `receive?` (`{txId, raw, expiryHeight, receivedZat, feeZat}`), `receiveEstimate?` (`{availableZat, feeZat}`) and `receiveConfirmations`
+- `refundPosted` (kept before a refund goes), `payout?`, `rescue?`, `receive?` (`{txId, raw, expiryHeight, receivedZat, feeZat}`), `receiveEstimate?` (`{availableZat, feeZat}`) and `receiveConfirmations`
 - `acceptedAt?`, `makerAccepted` and `ticket?`
 
 **Phases:** `QUOTED → ACCEPTING → AWAITING_FUNDING → SENDING_USDC → CONFIRMING_ESCROW → RECEIVING_ZEC → AWAITING_READY → SETTLING → RECEIVING → COMPLETE`. The refund branch is `REFUND_WAIT → REFUNDING → REFUND_PAYOUT → REFUNDED`. `CANCELLED` ends a conversion with nothing paid. `FINISHED = {COMPLETE, REFUNDED, CANCELLED}`.
@@ -421,7 +420,6 @@ The invariants for this machine are §3.5 items 1–8 and 16.
 - **Posts follow their save** under the per-account driver lock, which spans the post: a cancel waits for a funding's post rather than interleaving with it. The funding's answer is merged into the record as it is then.
 - **The token gate** (step 3): the user's accept returns `TokensNeeded` and leaves the record unanswered; the loop resuming an interrupted accept ends it `CANCELLED` (no tokens client before M4).
 - **The sweep home** pays at most the reviewed `receiveEstimate.feeZat`; `estimate` is the joint account's confirmed receipts and `5000 × max(2, notes + 1)`.
-- **A record's deployment** must match the pins in chain, windows contract, token, Railgun proxy, maker, relayer and Zcash network. A lock-era record is read, never driven (`WrongDeployment`), and holds up nothing: no new conversion, send or withdrawal.
 
 ### 5.8 Refunds, offline behaviour and user-visible states
 
@@ -586,7 +584,6 @@ pub(crate) fn delete_account(store_dir, network, account) -> Result<()>;   // dr
 - After a forward record ends: `private_usd_tokens_issuance_*` prefetch (M4 service).
 - As built (M5, progress D-51): the loop idles with no timer while nothing is under way, and accept, a progress screen opening, unlock and the foreground start it. It naps the shortest `next_poll_ms` of a pass (at least 1 s), 15 s after a failed step or `Busy`, 30 s when listing failed. Only advances and accept drop a result that lands after a pause; a quote or a call-off that finished in Rust is still shown. The lifecycle and lock listeners live in `privateUsdEngineProvider`; `PrivateUsdEngineHost` only keeps it alive.
 - As built (M6, progress D-81): each pass reads both directions per account and advances reverse records under way only (never a `quoted` draft); reverse records live in a second snapshot (`privateUsdReverseConversionsProvider`), and the unfinished set is the union. The funding runs outside the queue, bound to the engine's epoch (`PrivateUsdEngineTicket`), and its submit is asked again right before the FRB call; a cancel `drop`s it. The loop never sends a rescue.
-- As built (progress D-137): a record of another deployment (its `otherDeployment`, set by Rust) is never advanced and reads no seed. Its status says so: no problem, no resuming, no banner, keep-awake, settlement buzz or repricing, and the unfinished set (`isDriven`) leaves it out. It holds up no new conversion (`privateUsdFindUnderWay`) and no send, as in Rust; the Refunds screen marks a refunded one without a check.
 
 ### 5.11 End-to-end walk (who does what; crash, kill and lock at each step)
 
@@ -1017,7 +1014,7 @@ Source: `ui/common/atomicswap/AtomicSwapMainnet.kt:18-79` and `AtomicSwapTestnet
 | Issuer URL / name | `…mainnet…/issuer` / `zecswap-mainnet-issuer` | `…testnet…/issuer` / `zecswap-testnet-issuer` |
 | Ethereum chain id | 1 | 11155111 (Sepolia) |
 | ZecSwap windows contract (bridging) | none: zecSwap's mainnet still settles on its lock contract, so bridging is off (`ApiDeployment.bridgeAvailable` false; quotes and conversions are `Unavailable`) until a windows contract is deployed there | `0x459b0a69e0f736666b66a3ffe0fc17c11f05980d` (block 11958709, `MIN_WINDOW` 1800 s, `LATE_WINDOW` 3600 s) |
-| Retired lock contracts (their used indices are skipped; their records are read, never driven) | `0x4708D7d36992b7e33Ad97a1ab0A31c3ac6C4fe6D` (block 26178667, `LOCK_DURATION` 1800 s) | `0xD75Efc6a157CC0A95f66962DA86DDf35d9F2617c` (block 11860526, `LOCK_DURATION` 600 s) |
+| Retired lock contracts (their used indices are skipped) | `0x4708D7d36992b7e33Ad97a1ab0A31c3ac6C4fe6D` (block 26178667, `LOCK_DURATION` 1800 s) | `0xD75Efc6a157CC0A95f66962DA86DDf35d9F2617c` (block 11860526, `LOCK_DURATION` 600 s) |
 | The maker's deadlines (its policy, not pinned) | — | `t0` 45 min after the open, `t1` an hour after `t0`; an unpaid swap is called off 5 min before `t0` |
 | Swap token | USDC `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` (`of/SwapDeployment.kt:60`) | test USD `0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c` (`ZecSwap Test USD`, version `2`, 6 decimals, EIP-3009; Sepolia block 11,944,315; the hosted maker and relayer moved to it at 23:42 UTC on 2026-10-18, for swaps too; the retired one, `0x5764D0044bef5AA839E0dDafE2073421101B9Ed8`, no longer swaps); Circle test USDC is `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` (`PrivateUsdTokens.kt:36-42`) |
 | Maker address (only maker accepted) | `0x4370eEaa6bEcf1dAeF21Deeb0379Eb7f6CaEf7eF` | `0x2bac02b5032e9092493814c705f156b49e288922` |
@@ -1301,7 +1298,6 @@ pub enum ApiActivity { Depositing, Claiming, PayingOut, Sweeping, Funding, Ready
 /// The step `op_id` is in right now (zapp's `onActivity`); Dart polls it every 500 ms while an advance is in flight.
 #[frb(sync)] pub fn private_usd_activity(op_id: u32) -> Option<ApiActivity>;
 /// Unfinished = forward `end == None`, or reverse phase ∉ {QUOTED} ∪ FINISHED. QUOTED drafts do not count.
-/// Another deployment's records count too: the count only warns before a deletion, which removes them.
 /// Neither this nor the next call creates swaps.db (0 / empty for a wallet that never converted).
 pub fn private_usd_unfinished_count(store_dir: String, account_uuid: String) -> Result<u32, ApiPrivateUsdError>;
 /// Every account with an unfinished record (D14 loop input).
@@ -1337,8 +1333,7 @@ pub struct ApiForwardRecord {          // flat view of zapp's record (§5.6); th
     pub index: u32, pub swap_id: String, pub phase: ApiForwardPhase, pub accepted_at: i64, pub quote_expires_at: i64,
     pub deposit_zat: u64, pub max_total_zat: Option<u64>, pub amount: String, pub receives: String, pub relayer_fee: String,
     pub t0: Option<i64>, pub t1: Option<i64>,
-    pub late_claim_at: Option<i64>,    // t1 + LATE_WINDOW: the claim goes for good if the maker never refunded; None before the maker answered, and for another deployment's record
-    pub other_deployment: bool,        // pinned to another deployment (the lock contract's): read, never driven, holding up nothing
+    pub late_claim_at: Option<i64>,    // t1 + LATE_WINDOW: the claim goes for good if the maker never refunded; None before the maker answered
     pub deposit_txid: Option<String>,  // internal byte order hex, = TransactionInfo.txidHex (M5 pitfalls); records keep zapp's display hex
     pub deposit_confirmations: Option<u32>,   // as built: only while under way with a deposit kept (0 until mined)
     pub sweep_txid: Option<String>, pub payout_tx: Option<String>,
@@ -1371,7 +1366,6 @@ pub struct ApiReverseRecord {
     pub receive_estimate_zat: Option<u64>, pub receive_fee_zat: Option<u64>,   // the reviewed sweep: after its fee, and the fee (its cap)
     pub receive_txid: Option<String>, pub received_zat: Option<u64>, pub receive_confirmations: u32,   // receive_txid: internal byte order
     pub accepted_at: Option<i64>, pub updated_at: i64,
-    pub other_deployment: bool,        // as forward
 }
 pub struct ApiReverseAdvance { pub record: ApiReverseRecord, pub next_poll_ms: u32, pub problem: Option<ApiPrivateUsdErrorCode>, pub needs_you: bool }
 pub struct ApiReverseCostRequest { pub index: u32, pub amount: String, pub railgun_proxy: String, pub fee: String, pub fee_expires_at: Option<i64> }
@@ -2180,7 +2174,6 @@ The **review** phase (same screen):
 | Any problem after 1 min of failures (§5.8) | the current step | problem card "Taking longer than usual" + message | "Try now" |
 | `end = Refunded(cause)` | no steps | result "Your ZEC came back" + body by cause | "Try again" (none while bridging is off) |
 | `end = NothingSent(cause)` | no steps | result "Nothing was sent" + body by cause | "Try again" (none while bridging is off) |
-| A record of another deployment, unfinished (never driven) | no steps | result "Can't continue" / "This bridge is from an earlier test deployment. It can't continue in this version." | none; no banner, keep-awake or keep-open note |
 
 **Reverse** (§5.7; `pu/reverse/PrivateUsdReverseProgress.kt:114-191`, phase labels `common/atomicswap/ReverseSwapStage.kt:14-31`). The list is `Prepare → Fund → Deposit → Approve → Settle → Receive`. Refund phases show one step labelled with the phase.
 
@@ -2201,7 +2194,6 @@ The **review** phase (same screen):
 | `REFUND_PAYOUT` | "Returning your private USD to Railgun" | same | none | none | none |
 | `REFUNDED` | none | "Conversion called off" · "your dollars came back" | result "Refund sent" / "Private refund paid. Railgun screening may delay availability." | "New conversion"; "View refunds" → rescue if eligible | none |
 | `CANCELLED` | none | no row | result "Conversion cancelled" / "Conversion cancelled; no escrow payment remains" | "New conversion" | none |
-| A record of another deployment, under way (never driven) | none | "From an earlier test deployment" | result "Can't continue" / "This bridge is from an earlier test deployment. It can't continue in this version." | none | none |
 
 The cancel-requested note: "Refund requested…" before `ready`, or "…after {refundAfter}…" after it. While bridging is off, an ended conversion offers no "New conversion".
 
@@ -2322,7 +2314,6 @@ Flags:
 | `private_usd_activity_to` | to {address} |
 | `private_usd_activity_in` / `_out` | +{$} / −{$} |
 | `private_usd_activity_sending` / `_unconfirmed` | sending… / not in a block yet |
-| N `activity_other_deployment` | From an earlier test deployment (an unfinished record of another deployment, with no spinner) |
 | `private_usd_activity_open_conversion` / `_open_transaction` | Open conversion / View transaction |
 | `refunds_view` | View refunds |
 
@@ -2470,7 +2461,6 @@ Flags:
 | `convert_result_maker_cancelled` | The market maker called the swap off before your ZEC was sent. Your ZEC never left your wallet. | |
 | `convert_result_view_balance` | View private USD | |
 | `convert_result_try_again` | Try again | |
-| N `other_deployment_title` / `_body` | Can't continue / This bridge is from an earlier test deployment. It can't continue in this version. (either direction) | N |
 
 **Reverse: progress, results and actions**
 
@@ -2618,7 +2608,6 @@ As built in M5 (D-56): the forward rows, `mobile-home-private-usd-converting` (t
 | `mobile-private-usd-blocked` | "Screening refused" row |
 | `mobile-private-usd-payment-pending` | spending note, Send/Withdraw disabled |
 | `mobile-private-usd-bridge-off` | no Bridge, the empty card points to Receive (mainnet for now) |
-| `mobile-private-usd-other-deployment` | a quiet row for an earlier deployment's bridge; Send, Withdraw and Bridge stay open |
 | `mobile-private-usd-tor-unavailable` | fallback notice |
 | `mobile-private-usd-convert` | ZEC→USD amount with a quote ledger and countdown |
 | `mobile-private-usd-convert-quoting` | "Getting quote…" |
@@ -2635,7 +2624,6 @@ As built in M5 (D-56): the forward rows, `mobile-home-private-usd-converting` (t
 | `mobile-private-usd-progress-paid` | arriving/screening |
 | `mobile-private-usd-progress-refunding` | refund step |
 | `mobile-private-usd-progress-unwinding` | the maker's refund, then the ZEC home; the late claim time |
-| `mobile-private-usd-progress-other-deployment` | "Can't continue" |
 | `mobile-private-usd-progress-refunded` | result |
 | `mobile-private-usd-progress-nothing-sent` | result |
 | `mobile-private-usd-reverse-funding` | `AWAITING_FUNDING` with cost changed |
@@ -2645,7 +2633,6 @@ As built in M5 (D-56): the forward rows, `mobile-home-private-usd-converting` (t
 | `mobile-private-usd-reverse-complete` | result |
 | `mobile-private-usd-reverse-refund-wait` | cancel requested |
 | `mobile-private-usd-reverse-refunded` | "View refunds" |
-| `mobile-private-usd-reverse-other-deployment` | "Can't continue", nothing to approve |
 | `mobile-private-usd-refunds` | rows: checking, recoverable, none, check failed |
 | `mobile-private-usd-refunds-empty` | empty |
 | `mobile-private-usd-send` | form, valid |

@@ -187,7 +187,6 @@ abstract final class PrivateUsdCopy {
   static String activityIn(String usd) => '+$usd';
   static String activityOut(String usd) => '−$usd';
   static const activityUnconfirmed = 'not in a block yet';
-  static const activityOtherDeployment = 'From an earlier test deployment';
   static const refundsView = 'View refunds';
 
   // ── Convert (both directions): amount and quote ─────────────────────
@@ -465,13 +464,6 @@ abstract final class PrivateUsdCopy {
   static const convertResultViewBalance = 'View private USD';
   static const convertResultTryAgain = 'Try again';
 
-  // A conversion of another deployment (the lock contract's, or the retired
-  // testnet token's), in either direction: never driven.
-  static const otherDeploymentTitle = "Can't continue";
-  static const otherDeploymentBody =
-      "This bridge is from an earlier test deployment. It can't continue in "
-      'this version.';
-
   // ── Reverse: amount, review and info ──────────────────────────────────
 
   static const convertSwapDirection = 'Swap bridge direction';
@@ -625,9 +617,6 @@ abstract final class PrivateUsdCopy {
   /// cap.
   static String refundsRecoverConfirmBody(String cap) =>
       "The relayer's fee, at most $cap, comes out of the refund.";
-  static const refundsOtherDeployment =
-      "This refund is from an earlier test deployment. It can't be "
-      'recovered in this version.';
 
   static const refundsDepositTitle = 'Deposit sent back by screening';
   static String refundsDepositBody(String usd) =>
