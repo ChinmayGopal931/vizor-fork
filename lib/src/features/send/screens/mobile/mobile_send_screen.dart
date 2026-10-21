@@ -2600,111 +2600,108 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
     return Column(
       children: [
         Expanded(
-          child: Padding(
+          // Scrolls where a keyboard leaves less than its height.
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.sm,
               AppSpacing.sm,
               AppSpacing.sm,
               0,
             ),
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: SizedBox(
-                key: const ValueKey('mobile_send_amount_top_content'),
-                height: _kMobileSendAmountTopContentHeight,
-                width: double.infinity,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildAmountField(
-                      context,
-                      showError: showError,
-                      spendableText: spendableText,
-                      zecUsdUnitPrice: zecUsdUnitPrice,
-                      amountStyle: amountStyle,
-                      amountUnitStyle: amountUnitStyle,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    SizedBox(
-                      key: const ValueKey('mobile_send_amount_recipient_block'),
-                      height: _kMobileSendAmountRecipientBlockHeight,
-                      width: double.infinity,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            height: _kMobileSendAmountRecipientLabelHeight,
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                'Sending to',
-                                style: AppTypography.labelLarge.copyWith(
-                                  color: colors.text.secondary,
+            child: SizedBox(
+              key: const ValueKey('mobile_send_amount_top_content'),
+              height: _kMobileSendAmountTopContentHeight,
+              width: double.infinity,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildAmountField(
+                    context,
+                    showError: showError,
+                    spendableText: spendableText,
+                    zecUsdUnitPrice: zecUsdUnitPrice,
+                    amountStyle: amountStyle,
+                    amountUnitStyle: amountUnitStyle,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  SizedBox(
+                    key: const ValueKey('mobile_send_amount_recipient_block'),
+                    height: _kMobileSendAmountRecipientBlockHeight,
+                    width: double.infinity,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          height: _kMobileSendAmountRecipientLabelHeight,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Sending to',
+                              style: AppTypography.labelLarge.copyWith(
+                                color: colors.text.secondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xxs),
+                        SizedBox(
+                          key: const ValueKey(
+                            'mobile_send_amount_recipient_row',
+                          ),
+                          height: _kMobileSendAmountRecipientRowHeight,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.s,
+                            ),
+                            child: Row(
+                              children: [
+                                AppProfilePicture(
+                                  key: const ValueKey(
+                                    'mobile_send_amount_recipient_picture',
+                                  ),
+                                  profilePictureId: recipientPictureId ?? '',
+                                  size: AppProfilePictureSize.navLarge,
                                 ),
-                              ),
+                                const SizedBox(width: AppSpacing.s),
+                                Expanded(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: recipientLabel == null
+                                        ? [
+                                            _RecipientLineText(
+                                              _truncateAddress(
+                                                _addressController.text,
+                                              ),
+                                              color: colors.text.accent,
+                                            ),
+                                          ]
+                                        : [
+                                            _RecipientLineText(
+                                              recipientLabel,
+                                              color: colors.text.accent,
+                                            ),
+                                            const SizedBox(
+                                              height: AppSpacing.xxs,
+                                            ),
+                                            _RecipientLineText(
+                                              _truncateAddress(
+                                                _addressController.text,
+                                              ),
+                                              color: colors.text.secondary,
+                                            ),
+                                          ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: AppSpacing.xxs),
-                          SizedBox(
-                            key: const ValueKey(
-                              'mobile_send_amount_recipient_row',
-                            ),
-                            height: _kMobileSendAmountRecipientRowHeight,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: AppSpacing.s,
-                              ),
-                              child: Row(
-                                children: [
-                                  AppProfilePicture(
-                                    key: const ValueKey(
-                                      'mobile_send_amount_recipient_picture',
-                                    ),
-                                    profilePictureId: recipientPictureId ?? '',
-                                    size: AppProfilePictureSize.navLarge,
-                                  ),
-                                  const SizedBox(width: AppSpacing.s),
-                                  Expanded(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: recipientLabel == null
-                                          ? [
-                                              _RecipientLineText(
-                                                _truncateAddress(
-                                                  _addressController.text,
-                                                ),
-                                                color: colors.text.accent,
-                                              ),
-                                            ]
-                                          : [
-                                              _RecipientLineText(
-                                                recipientLabel,
-                                                color: colors.text.accent,
-                                              ),
-                                              const SizedBox(
-                                                height: AppSpacing.xxs,
-                                              ),
-                                              _RecipientLineText(
-                                                _truncateAddress(
-                                                  _addressController.text,
-                                                ),
-                                                color: colors.text.secondary,
-                                              ),
-                                            ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

@@ -223,6 +223,29 @@ void main() {
     );
   });
 
+  testWidgets('mobile send amount scrolls rather than overflows above a tall '
+      'keyboard', (tester) async {
+    // A 360 x 785 Android phone with a button navigation bar, under a
+    // keyboard with a suggestion strip.
+    tester.view.padding = const FakeViewPadding(top: 34);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 309);
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewInsets);
+    await _pumpMobileSendUseCase(
+      tester,
+      buildMobileSendAmountEmptyUseCase,
+      size: const Size(360, 785),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.getSize(
+        find.byKey(const ValueKey('mobile_send_amount_top_content')),
+      ),
+      const Size(328, 285),
+    );
+  });
+
   testWidgets('mobile send amount empty cursor matches typed native cursor', (
     tester,
   ) async {
@@ -538,15 +561,13 @@ Matcher _closeRect(Rect expected) {
 Future<void> _pumpMobileSendUseCase(
   WidgetTester tester,
   WidgetBuilder builder, {
+  Size size = const Size(393, 852),
   double devicePixelRatio = 1,
   TargetPlatform? platform,
   TextScaler? textScaler,
   Duration settleDuration = const Duration(milliseconds: 600),
 }) async {
-  tester.view.physicalSize = Size(
-    393 * devicePixelRatio,
-    852 * devicePixelRatio,
-  );
+  tester.view.physicalSize = size * devicePixelRatio;
   tester.view.devicePixelRatio = devicePixelRatio;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
