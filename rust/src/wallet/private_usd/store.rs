@@ -1,6 +1,7 @@
 //! `swaps.db`: the swap-index counter, swap records, active pointers, the
 //! joint-account index, the Railgun send log, and since schema 2 the deposits
-//! and each account's last deposit scan.
+//! and each account's last deposit scan. Since schema 3 records follow the
+//! windows contract.
 //!
 //! A plain SQLite file in app-private storage, opened per call (WAL,
 //! `synchronous = FULL`, a busy timeout), migrated by `PRAGMA user_version`.
@@ -19,10 +20,10 @@ use super::models::{Direction, StoredRecord};
 use super::{fail, ErrorCode, PrivateUsdError, Result};
 
 const FILE_NAME: &str = "swaps.db";
-/// 1: swaps, the send log and the joint accounts. 2: deposits. A build that
-/// knows only 1 refuses a store at 2 as newer than itself, never resetting
-/// it.
-const SCHEMA_VERSION: i32 = 2;
+/// 1: swaps, the send log and the joint accounts. 2: deposits. 3: records of
+/// the windows contract. A build refuses a store newer than itself, never
+/// resetting it.
+const SCHEMA_VERSION: i32 = 3;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// Finished records kept per direction. Reverse `REFUNDED` ones are kept
 /// beyond it: a rescue may still be possible.
@@ -219,10 +220,11 @@ impl SwapStore {
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
-            // 1 → 2: the deposits tables join; every row already kept stays
-            // as it was.
-            1 => {
-                tx.execute_batch(SCHEMA_V2).map_err(sql)?;
+            // 1 → 2: the deposits tables join. 2 → 3 changes no table.
+            1 | 2 => {
+                if version == 1 {
+                    tx.execute_batch(SCHEMA_V2).map_err(sql)?;
+                }
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
@@ -919,7 +921,7 @@ mod tests {
         );
         let account = "0a0b".repeat(8);
         let refunded = format!(
-            r#"{head},"account":"{account}","phase":"REFUNDED","cost":{cost},"funding":{funding},"cancelRequested":true,"refundLock":{authorization},"payout":{payout},"acceptedAt":1790000100}}"#
+            r#"{head},"account":"{account}","phase":"REFUNDED","cost":{cost},"funding":{funding},"cancelRequested":true,"refundPosted":true,"payout":{payout},"acceptedAt":1790000100}}"#
         );
         let refunded_on_mainnet = refunded
             .replace(TESTNET, MAINNET)
@@ -1055,11 +1057,11 @@ mod tests {
         assert_eq!(store.take_index(ACCOUNT).unwrap(), next + 1);
     }
 
-    /// A store schema 1 wrote opens at schema 2: the deposits tables join,
+    /// A store schema 1 wrote opens at schema 3: the deposits tables join,
     /// and every record, the counter, the active pointer and the send log
     /// stay as they were.
     #[test]
-    fn a_version_1_store_migrates_to_2_keeping_its_records() {
+    fn a_version_1_store_migrates_keeping_its_records() {
         let dir = tempfile::tempdir().unwrap();
         let conn = Connection::open(dir.path().join(FILE_NAME)).unwrap();
         conn.execute_batch(SCHEMA).unwrap();
@@ -1096,7 +1098,7 @@ mod tests {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
         assert_eq!(version, SCHEMA_VERSION);
-        assert_eq!(SCHEMA_VERSION, 2);
+        assert_eq!(SCHEMA_VERSION, 3);
         assert_eq!(
             store.active(ACCOUNT, Direction::Forward).unwrap(),
             Some(StoredRecord::Forward(Box::new(forward(&json))))

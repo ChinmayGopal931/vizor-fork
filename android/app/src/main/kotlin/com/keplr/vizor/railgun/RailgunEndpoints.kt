@@ -7,8 +7,9 @@ package com.keplr.vizor.railgun
  * literals below, so keep them literal.
  */
 internal object RailgunEndpoints {
-    // Ethereum RPC (keyless publicnode, then the keyed providers), the screening node, the SDK's own quick sync,
-    // and where the proving artifacts come from: the SDK's own gateway, then our mirror when the gateway fails.
+    // Ethereum RPC (keyless publicnode, then the keyed providers), the screening node, the SDK's own quick sync and,
+    // on Sepolia, our copy of its transaction list with the hash chain repaired, and where the proving artifacts come
+    // from: the SDK's own gateway, then our mirror when the gateway fails.
     val hosts =
         setOf(
             "ethereum-rpc.publicnode.com",
@@ -19,6 +20,7 @@ internal object RailgunEndpoints {
             "sepolia.infura.io",
             "ppoi.fdi.network",
             "rail-squid.squids.live",
+            "railgun-sepolia-list.pepeman931.workers.dev",
             "ipfs-lb.com",
             "railgun-artifacts.pepeman931.workers.dev",
         )

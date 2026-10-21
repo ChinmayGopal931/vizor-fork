@@ -55,7 +55,6 @@ String? privateUsdErrorMessage(ApiPrivateUsdErrorCode code) => switch (code) {
   ApiPrivateUsdErrorCode.storeUnreadable => PrivateUsdCopy.convertErrorStore,
   ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.routeBlocked,
   ApiPrivateUsdErrorCode.railgunClosed ||
-  ApiPrivateUsdErrorCode.claimTurn ||
   ApiPrivateUsdErrorCode.zcashRejected ||
   ApiPrivateUsdErrorCode.mismatch ||
   ApiPrivateUsdErrorCode.fundingCostChanged ||
@@ -77,7 +76,6 @@ String privateUsdProblemMessage(ApiPrivateUsdErrorCode code) => switch (code) {
   ApiPrivateUsdErrorCode.ethereumUnreachable ||
   ApiPrivateUsdErrorCode.chainLagging => PrivateUsdCopy.convertProblemEthereum,
   ApiPrivateUsdErrorCode.railgunClosed => PrivateUsdCopy.convertProblemRailgun,
-  ApiPrivateUsdErrorCode.claimTurn => PrivateUsdCopy.convertProblemTurn,
   ApiPrivateUsdErrorCode.zcashWallet => PrivateUsdCopy.convertProblemWallet,
   ApiPrivateUsdErrorCode.depositUnpayable =>
     PrivateUsdCopy.convertProblemUnpayable,
@@ -123,22 +121,26 @@ String? privateUsdReverseQuoteMessage(ApiPrivateUsdErrorCode code) =>
 
 /// What to say when a reverse step the user took (pay, authorize settlement,
 /// cancel) did not go through.
-String privateUsdReverseStepMessage(ApiPrivateUsdErrorCode code) =>
-    switch (code) {
-      ApiPrivateUsdErrorCode.depositUnconfirmed =>
-        PrivateUsdCopy.reverseErrorUnconfirmed,
-      ApiPrivateUsdErrorCode.tooLate ||
-      ApiPrivateUsdErrorCode.quoteExpired => PrivateUsdCopy.reverseErrorTooLate,
-      ApiPrivateUsdErrorCode.fundingCostChanged =>
-        PrivateUsdCopy.reverseErrorCostChanged,
-      ApiPrivateUsdErrorCode.unavailable =>
-        PrivateUsdCopy.reverseErrorFundingUnavailable,
-      ApiPrivateUsdErrorCode.relayerFee => PrivateUsdCopy.convertErrorFeeCap,
-      ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.convertProblemRoute,
-      ApiPrivateUsdErrorCode.storeUnreadable =>
-        PrivateUsdCopy.convertErrorStore,
-      _ => PrivateUsdCopy.reverseError,
-    };
+String privateUsdReverseStepMessage(
+  ApiPrivateUsdErrorCode code,
+) => switch (code) {
+  ApiPrivateUsdErrorCode.depositUnconfirmed =>
+    PrivateUsdCopy.reverseErrorUnconfirmed,
+  ApiPrivateUsdErrorCode.tooLate ||
+  ApiPrivateUsdErrorCode.quoteExpired => PrivateUsdCopy.reverseErrorTooLate,
+  ApiPrivateUsdErrorCode.fundingCostChanged =>
+    PrivateUsdCopy.reverseErrorCostChanged,
+  ApiPrivateUsdErrorCode.unavailable =>
+    PrivateUsdCopy.reverseErrorFundingUnavailable,
+  // Settlement is signed only on a fresh head: a node minutes behind is
+  // as good as unreachable.
+  ApiPrivateUsdErrorCode.ethereumUnreachable ||
+  ApiPrivateUsdErrorCode.chainLagging => PrivateUsdCopy.convertErrorEthereum,
+  ApiPrivateUsdErrorCode.relayerFee => PrivateUsdCopy.convertErrorFeeCap,
+  ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.convertProblemRoute,
+  ApiPrivateUsdErrorCode.storeUnreadable => PrivateUsdCopy.convertErrorStore,
+  _ => PrivateUsdCopy.reverseError,
+};
 
 /// The problem card's message for a reverse conversion whose steps have
 /// failed for a minute.

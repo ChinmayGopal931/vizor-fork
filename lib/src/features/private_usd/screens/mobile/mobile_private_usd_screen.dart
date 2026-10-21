@@ -126,6 +126,9 @@ class _MobilePrivateUsdScreenState
         onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
         onOpenRefunds: openRefunds,
         sendRecords: ref.watch(privateUsdSendRecordsProvider(uuid)),
+        receipts: ref.watch(
+          privateUsdBalanceProvider(uuid).select((state) => state.received),
+        ),
       )..sort(compareActivityEntries))
         entry.row,
     ];
@@ -143,6 +146,7 @@ class _MobilePrivateUsdScreenState
       ),
     );
     final sends = ref.watch(privateUsdEngineEnabledProvider);
+    final bridge = ref.watch(privateUsdBridgeAvailableProvider);
     final spending = ref.watch(privateUsdSpendStatusProvider(uuid));
     final hasDollars =
         balance.balances?.assets.any((a) => a.available > BigInt.zero) ?? false;
@@ -192,6 +196,7 @@ class _MobilePrivateUsdScreenState
           ? context.push('/private-usd/convert')
           : open(underWay.path),
       canConvert: underWay != null || spending.canStartConversion,
+      bridgeAvailable: bridge,
       onSend: sends ? () => context.push('/private-usd/send') : null,
       onWithdraw: sends ? () => context.push('/private-usd/withdraw') : null,
       canSend: spending.canSend && hasDollars,
@@ -233,6 +238,7 @@ class MobilePrivateUsdView extends StatelessWidget {
     this.onOpenConversion,
     this.onConvert,
     this.canConvert = true,
+    this.bridgeAvailable = true,
     this.onSend,
     this.onWithdraw,
     this.canSend = false,
@@ -279,6 +285,10 @@ class MobilePrivateUsdView extends StatelessWidget {
   /// Whether the spend guard lets a conversion start.
   final bool canConvert;
 
+  /// Whether the network pins a windows contract. Off, Bridge is hidden
+  /// and nothing on the screen points to it.
+  final bool bridgeAvailable;
+
   /// Null hides both.
   final VoidCallback? onSend;
   final VoidCallback? onWithdraw;
@@ -312,7 +322,7 @@ class MobilePrivateUsdView extends StatelessWidget {
     final colors = context.colors;
     final balances = state.balances;
     final banner = this.banner;
-    final onConvert = this.onConvert;
+    final onConvert = bridgeAvailable ? this.onConvert : null;
     final depositPass = this.depositPass;
     final depositLines = depositPass == null
         ? const <PrivateUsdDepositLine>[]
@@ -350,6 +360,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                         onTap: () => showPrivateUsdInfoSheet(
                           context,
                           screening: screening,
+                          bridgeAvailable: bridgeAvailable,
                         ),
                       ),
                     ),
@@ -477,7 +488,11 @@ class MobilePrivateUsdView extends StatelessWidget {
                               balances.total == BigInt.zero &&
                               banner == null) ...[
                             const SizedBox(height: AppSpacing.s),
-                            const NeonSyncOcclude(child: _EmptyCard()),
+                            NeonSyncOcclude(
+                              child: _EmptyCard(
+                                bridgeAvailable: bridgeAvailable,
+                              ),
+                            ),
                           ] else if (balances != null) ...[
                             const SizedBox(height: AppSpacing.s),
                             NeonSyncOcclude(
@@ -1065,7 +1080,10 @@ class _AssetsCard extends StatelessWidget {
 }
 
 class _EmptyCard extends StatelessWidget {
-  const _EmptyCard();
+  const _EmptyCard({required this.bridgeAvailable});
+
+  /// Off, Receive is the way in.
+  final bool bridgeAvailable;
 
   @override
   Widget build(BuildContext context) {
@@ -1081,7 +1099,9 @@ class _EmptyCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            PrivateUsdCopy.emptyBody,
+            bridgeAvailable
+                ? PrivateUsdCopy.emptyBody
+                : PrivateUsdCopy.emptyBodyReceive,
             style: AppTypography.bodySmall.copyWith(
               color: colors.text.secondary,
             ),

@@ -245,6 +245,7 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       refreshFailed: false,
       screeningFailed: sync.screening == RailgunScreening.failed,
       clearFirstSyncPercent: true,
+      received: _receipts(sync),
     );
     _runningFirstSync?.end();
     unawaited(
@@ -257,6 +258,25 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
             balances: sync.balances,
           ),
     );
+  }
+
+  // The dollar tokens' receipts. One the engine has no block time for keeps
+  // the time of the sync that first listed it, so it sorts where it came in.
+  List<RailgunReceipt>? _receipts(RailgunSync sync) {
+    final received = sync.received;
+    if (received == null) return null;
+    final tokens = {for (final token in _tokens()) token.address};
+    final firstSeen = {
+      for (final receipt in state.received)
+        (receipt.txid, receipt.token, receipt.amount): receipt.at,
+    };
+    return List.unmodifiable([
+      for (final receipt in received)
+        if (tokens.contains(receipt.token))
+          receipt.orDated(
+            firstSeen[(receipt.txid, receipt.token, receipt.amount)] ?? sync.at,
+          ),
+    ]);
   }
 
   void _onEngine(RailgunEngineState engine) {

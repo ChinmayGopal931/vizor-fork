@@ -7,6 +7,19 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **The windows contract (2026-10-20, D-137).** Testnet swaps settle on
+  zecSwap's windows contract, with no claim or refund locks. Mainnet
+  bridging is off until zecSwap deploys one there, so the app hides Bridge;
+  the balance, deposits, sends and withdrawals work. The app keeps no code
+  for the lock contract's bridges (D-139): a phone that holds some has its
+  Private USD store cleared first. Not yet run on the A35.
+
+- **Sepolia's Railgun list (2026-10-20, D-138).** Railgun's Sepolia
+  indexer breaks its hash chain at transaction 4188, which held relayed
+  sends' change in Processing. The page reads it through our worker
+  `railgun-sepolia-list`, which repairs the chain and logs nothing. Checked
+  live against the screening node; not yet seen on a phone.
+
 - **Zakura Common v3 (2026-10-20, D-136).** The branch builds on upstream
   `main` at `75d3fae57` and the published Common 3.0.0 crates. Both
   stand-ins moved (B-6). Not yet run on the A35.
@@ -1963,6 +1976,151 @@ M8 status (2026-10-14): the non-device parts are done.
   - rc9's migrations (one-time IVKs) run on `zcash_wallet.db` and
     `joint.db` and cannot be undone: an older build cannot open them, so
     never install one while a conversion is under way.
+- **D-137 (owner, 2026-10-20): swaps on zecSwap's windows contract;
+  bridging off on mainnet.** zecSwap's testnet contract has no claim or
+  refund locks: at every moment one side at most may reveal, by the clock
+  and the swap's stage (zecSwap #17, its `PORT-SPEC.md`; plan §3.5 items
+  3, 5 to 8 and 16, reference §5.4).
+  - **Pins.** Sepolia pins `0x459b…980d` (`MIN_WINDOW` 1800 s,
+    `LATE_WINDOW` 3600 s). No swap read is trusted until the contract
+    answers both as pinned and reverts `LOCK_DURATION()`, and `getSwap` must
+    be four words.
+  - **Mainnet bridging stays off** until zecSwap deploys a windows contract
+    there: mainnet pins none, so quotes and conversions are `Unavailable`
+    (`ApiDeployment.bridgeAvailable` false). The app hides Bridge, its
+    screens redirect to `/private-usd`, and an ended conversion offers no
+    new one. The balance, deposits, sends and withdrawals are unchanged.
+  - **Reveals.** Each is decided on one consistent read (the newest block's
+    number, time and hash, then `getSwap` at that hash) and again just
+    before the post, with `claim_posted` or `refund_posted` kept first. A
+    forward claim goes on a ready before `t0`, or from `t0`, until
+    `t1 − 300 s`; between it and `t1 + LATE_WINDOW` the swap unwinds
+    through the maker's refund, and then the claim goes for good. A reverse
+    `ready` is signed only while its deadline falls before `t0` and no
+    refund was posted (`ChainLagging` on a head over 3 minutes behind); an
+    open escrow is refunded once no `ready` of ours can land.
+  - **The ready depth.** Before `t0` a claim goes only on a ready 12 blocks
+    deep: the oracle's rule. Veylor reads the swap at `head − 12`, one block
+    stricter than zecSwap's reference code (`head − 11`).
+  - **Old records (removed by D-139).** Lock-era records are kept and read,
+    but never driven (`WrongDeployment`, `swaps.db` schema 3); the retired
+    contracts' used indices are still skipped. Each API record carries
+    `otherDeployment`, which Rust sets for a record this build never drives
+    (`swap::serves` or `serves_reverse` against the pins of the record's
+    chain). The engine never advances one or reads a seed for it, and Rust
+    reports it waiting on no one (`awaitingUser` and `cancellable` false).
+    Its progress reads "This bridge is from an earlier test deployment. It
+    can't continue in this version.", with no problem card, banner,
+    keep-awake or settlement buzz, and a refunded one is marked on Refunds
+    without a check.
+  - **They hold up nothing (removed by D-139):** not a new bridge, not Send
+    or Withdraw. `sends::keep` refuses only beside a conversion this build
+    drives (`swap::require_none_under_way`, as the quote does).
+    `private_usd_unfinished_count` still counts every unfinished record, on
+    purpose: it only feeds the account-deletion warning, and the deletion
+    removes those records with the account.
+  - **The maker's `/v1/info` and the relayer's terms** may name
+    `contractKind`, `minWindow` and `lateWindow`; each must match the pins,
+    else `WrongDeployment`. All three are optional because mainnet's
+    lock-contract services name none; the testnet maker and relayer serve
+    all three (`windows`, 1800, 3600). An accept's `lateWindow` is optional
+    the same way.
+  - Unit tests: the oracle's 44 app vectors replay in Rust (`cargo test
+    --lib`: 1570 passed, the 21 failures upstream's); in Dart, the
+    Private USD and provider tests (956 passed) and the mobile lane's
+    Private USD, Widgetbook and Home tests (352 passed), with every mobile
+    Figma scenario rendering. Not yet run on the A35.
+
+- **D-138 (owner, 2026-10-20): Sepolia's Railgun list, read through a
+  worker that repairs it.** Relayed sends' outputs on Sepolia stayed in
+  Processing (`MissingExternalPOI`). Railgun's Sepolia indexer breaks its
+  verification-hash chain at transaction 4188 (block 11816741), so the
+  SDK's transaction-ID sync stops there and the wallet cannot prove a send
+  made after it.
+  - **Not the pre-send proofs.** Submitting the SDK's pre-send screening
+    proofs would have shown the screening node each note's `npk`, and with
+    it the amounts. The owner ruled it out: privacy is not traded for a
+    testnet convenience, and Sepolia and mainnet run the same code.
+  - **The worker.** `railgun-sepolia-list` (`scripts/private-usd/sepolia-list/`,
+    on the owner's Cloudflare account) relays every query to the indexer
+    unchanged and recomputes only the hashes from 4188 on. It keeps no logs
+    and stores nothing; its `X-Verification-Hashes` header says what it
+    did. The page's build points only Sepolia's queries at it
+    (`android/railgun-web/sepolia-list-plugin.mjs`), and its host is in the
+    Kotlin, Swift and Rust allowlists and the page's CSP. Mainnet's chain is
+    whole (143,458 transactions) and is read directly.
+  - **Checked live.** `verify.mjs` reads the live list through the SDK's
+    own client: the engine accepts every hash from 0, and the
+    transaction-ID root it builds at 4566 is the one the screening node
+    validated (`261c2820…e1ec5d`).
+  - **Cost.** A keccak per transaction since the break, about 19 more a
+    day. Past the free plan's 10 ms per request (error 1102), the worker
+    moves to the paid plan.
+  - **Drop it** once the header reads `intact`: the worker, its host in the
+    allowlists and the CSP, and the plugin.
+
+- **D-139 (owner, 2026-10-21): no code for the lock contract's bridges.**
+  The owner tests alone and starts every bridge on the windows contract:
+  "remove all the old stuff, we want to be moving to the new stuff only".
+  - **Removed.** The per-record deployment checks (`require_served` in
+    both directions, with `serves_record` and `serves_reverse`), so one
+    unfinished conversion is `Busy` again for a new one and for
+    `sends::keep`, by `unfinished_count`; the API records'
+    `otherDeployment`; the lock contract's `refundLock` field (records are
+    read strictly, so a store holding a lock-era refund no longer opens);
+    and in Dart, the "Can't continue" progress, the quiet activity row,
+    Refunds' "from an earlier test deployment", and the engine's and
+    providers' skips, with their copy, Widgetbook use cases, Figma
+    scenarios and tests.
+  - **Kept.** The contract identity check (`MIN_WINDOW()` and
+    `LATE_WINDOW()` as pinned, `LOCK_DURATION()` reverting) and the
+    four-word `getSwap`, which zecSwap's port spec requires of the windows
+    contract; the maker's and relayer's windows; and skipping an index a
+    retired lock contract shows in use, which stops a store that lost its
+    counter from reusing a share the old contract's maker has seen.
+  - **Phones.** A phone that holds lock-era bridges has its Private USD
+    store (`swaps.db` and `joint.db`) cleared before it runs this build.
+    The ZEC wallet and the Railgun wallet stay. The A35 held some.
+  - Unit tests: Rust's Private USD tests (91 passed; the three removed
+    covered old records); in Dart, the Private USD tests in both lanes
+    (135 and 187 passed) and every mobile Figma scenario (330).
+
+- **D-140 (owner, 2026-10-21): private sends received show in Activity.**
+  A private send from another wallet raised the receiver's balance but left
+  no row: Activity listed only what the phone did itself.
+  - **From the page's own history.** `refresh` also returns the wallet's
+    received private sends (`received.js`), read with the SDK's
+    `getWalletTransactionHistory`, which builds them from the notes the
+    scan already decrypted. Nothing new is requested, so nothing leaves
+    the phone. Shields (deposits, a bridge's payout) and change are left
+    out, so nothing shows twice. A history the page cannot read is `null`
+    and the balances stand.
+  - **The row.** "Received privately", `+$amount`, on the Private USD
+    screen as "Sent privately" is. Until the sender's screening clears it
+    reads "available once screened" with a spinner; then it shows the
+    sender ("from 0zk1…") where the sender showed it, else "sender
+    hidden". Veylor's own sends never show the sender. It opens the
+    transaction.
+  - **Kept in memory only**, with the balance: the deployment's dollar
+    tokens only, and a sync that cannot read the history keeps the last
+    list. A receipt with no block time takes the time of the sync that
+    first listed it.
+  - The page bundle was rebuilt with bun 1.3.2, which reproduces the
+    committed bundle from unchanged sources byte for byte (node is no
+    longer installed here).
+  - Unit tests: the page's `received.test.mjs` (3); in Dart, the parsing,
+    the balance provider and the row, with both lanes' Private USD tests
+    (138 and 400 passed, every mobile Figma scenario included).
+
+- **D-141 (owner, 2026-10-21): Private USD counts in the total shielded.**
+  The chart page's holdings list Private USD with the shielded pools,
+  captioned "Shielded on Ethereum" (the Home strip with a caption in place
+  of its ZEC worth). The total under them adds its headline amount (what
+  the row reads, `spendable`) to the shielded ZEC: in dollars at Home's
+  price, or "X ZEC + $Y" without one, and as before while Private USD is
+  unknown or unavailable. The transparent ZEC moved under the total, as it
+  is not part of it. Home's balance sign is unchanged (ZEC).
+  - Not yet seen clearing a stuck send on a phone.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

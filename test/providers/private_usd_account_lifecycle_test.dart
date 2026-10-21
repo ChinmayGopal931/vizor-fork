@@ -393,6 +393,7 @@ const _sepolia = ApiDeployment(
   screeningSeconds: 3600,
   maxRelayerFee: '2000000',
   usdTokens: [],
+  bridgeAvailable: true,
 );
 
 /// The account notifier as built, with each account's seed readable.

@@ -153,7 +153,8 @@ class PrivateUsdReverseProgressPresentation {
 
 /// The reverse progress for [status] at [now]. [funding] is the funding's
 /// state and [proofProgress] the page's proof (0..1) while it proves;
-/// [busy] disables the actions while one of them runs.
+/// [busy] disables the actions while one of them runs. With
+/// [bridgeAvailable] off, an ended conversion offers no new one.
 PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
   required PrivateUsdReverseStatus status,
   required DateTime now,
@@ -162,6 +163,7 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
   bool busy = false,
   bool privacyModeEnabled = false,
   String? explorerTxPrefix,
+  bool bridgeAvailable = true,
 }) {
   final record = status.record;
   final debit = privateUsdReverseDebit(record);
@@ -212,9 +214,9 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     amountsText: amounts,
     resultTitle: title,
     resultBody: body,
-    action: PrivateUsdReverseAction.newConversion,
-    actionLabel: PrivateUsdCopy.reverseNew,
-    actionEnabled: true,
+    action: bridgeAvailable ? PrivateUsdReverseAction.newConversion : null,
+    actionLabel: bridgeAvailable ? PrivateUsdCopy.reverseNew : null,
+    actionEnabled: bridgeAvailable,
     showsViewRefunds: viewRefunds,
     title: PrivateUsdCopy.actionConvert,
     bridged: bridged,

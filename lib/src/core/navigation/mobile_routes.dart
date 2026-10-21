@@ -378,7 +378,8 @@ List<RouteBase> _walletRoutes() {
     ),
     // Private USD. The shared redirect sends these routes home while Private
     // USD is unavailable, except a conversion's progress while that
-    // conversion is unfinished.
+    // conversion is unfinished, and the bridge's to `/private-usd` while
+    // bridging is off.
     GoRoute(
       path: '/private-usd',
       pageBuilder: (context, state) => _mobilePage(

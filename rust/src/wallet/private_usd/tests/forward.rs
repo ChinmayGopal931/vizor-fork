@@ -1,7 +1,7 @@
-//! The forward conversion's fund-safety rules on fakes: the driver, claim
-//! and settlement rules, the deposit's crash points and sync gate, the 2 USDC
-//! cap, the token gate without a tokens client, and one driver step per
-//! account.
+//! The forward conversion's fund-safety rules on fakes: the driver, the
+//! claim's windows and settlement, the deposit's crash points and sync gate,
+//! the 2 USDC cap, the token gate without a tokens client, records of
+//! another contract, and one driver step per account.
 
 use std::sync::Arc;
 
@@ -107,30 +107,29 @@ async fn the_happy_path_claims_into_railgun() {
             "/v1/terms",
             &accept_path(),
             "/v1/terms",
-            "/v1/lock-claim",
             "/v1/claim",
         ]
     );
-    // The claim reveals z, and each relayer request carries the swap's
-    // ticket.
+    // The claim reveals z with the swap's ticket, on a ready read at the
+    // block 12 below the head.
     let z = h.keys.user_keys(0).unwrap().share.to_be_bytes();
     let state = h.world.get();
     assert_eq!(
         state.bodies["/v1/claim"]["secret"],
         format!("0x{}", hex::encode(z))
     );
-    for path in ["/v1/lock-claim", "/v1/claim"] {
-        let ticket = state.headers[path]
-            .iter()
-            .find(|(name, _)| name.eq_ignore_ascii_case("zecswap-ticket"))
-            .map(|(_, value)| value.clone());
-        assert_eq!(
-            ticket,
-            record.ticket.as_ref().map(|ticket| ticket.0.clone())
-        );
-    }
+    let ticket = state.headers["/v1/claim"]
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("zecswap-ticket"))
+        .map(|(_, value)| value.clone());
+    assert_eq!(
+        ticket,
+        record.ticket.as_ref().map(|ticket| ticket.0.clone())
+    );
+    assert_eq!(state.depth_reads, vec![state.head_number - 12; 2]);
     drop(state);
     let ended = h.record();
+    assert!(ended.claim_posted, "kept as posted before it went");
     assert_eq!(ended.outcome, Some(ForwardOutcome::Paid));
     assert_eq!(ended.finished_at, Some(NOW));
     assert_eq!(
@@ -142,6 +141,7 @@ async fn the_happy_path_claims_into_railgun() {
     let payout = ended.payout.unwrap();
     let digest = pins()
         .domain()
+        .unwrap()
         .payout(&record.swap_id.0, &pins().relayer, payout.fee.0);
     assert_eq!(
         zecswap_core::signer(&digest, &payout.signature.0),
@@ -200,19 +200,33 @@ async fn swap_indices_are_never_reused() {
             .push(swap_id(&pins().maker, &share));
     }
     assert_eq!(reinstalled.quote().await.unwrap().index, 2);
-    let state = reinstalled.world.get();
-    assert_eq!(
-        state.quote_requests.len(),
-        1,
-        "the maker never hears of a used index"
-    );
-    assert_eq!(
-        state.quote_requests[0]["payout"],
-        format!(
-            "0x{}",
-            hex::encode(reinstalled.keys.auth_address(2).unwrap())
-        )
-    );
+    {
+        let state = reinstalled.world.get();
+        assert_eq!(
+            state.quote_requests.len(),
+            1,
+            "the maker never hears of a used index"
+        );
+        assert_eq!(
+            state.quote_requests[0]["payout"],
+            format!(
+                "0x{}",
+                hex::encode(reinstalled.keys.auth_address(2).unwrap())
+            )
+        );
+    }
+
+    // Indices the retired lock contract shows in use are skipped as well.
+    let reinstalled = Harness::new();
+    for index in [0, 1] {
+        let share = reinstalled.keys.user_share(index).unwrap();
+        reinstalled
+            .world
+            .set()
+            .used_before
+            .push(swap_id(&pins().maker, &share));
+    }
+    assert_eq!(reinstalled.quote().await.unwrap().index, 2);
 }
 
 #[tokio::test]
@@ -446,22 +460,30 @@ async fn an_expired_deposit_is_paid_again_only_while_payable() {
         nothing_sent(NothingSentCause::DepositWindowMissed)
     );
     assert_eq!(h.deposits(), 2);
+}
 
-    // Nor once the maker holds a refund lock: it is calling the swap off.
-    let h = Harness::new();
-    h.deposited().await;
-    {
-        let mut state = h.world.set();
-        state
-            .statuses
-            .insert(tx_id("deposit1"), SwapTxStatus::Expired);
-        state.refund_lock_until = NOW + LOCK_SECONDS;
+/// `t1` must leave the claim from `t0` the contract's least window, and no
+/// more than two hours: the deposit waits on it until the maker refunds.
+#[tokio::test]
+async fn nothing_is_deposited_into_a_swap_whose_t1_is_too_close_or_too_far() {
+    for (t1_after, payable) in [
+        (30 * 60 - 1, false),
+        (30 * 60, true),
+        (2 * 60 * 60, true),
+        (2 * 60 * 60 + 1, false),
+    ] {
+        let h = Harness::new();
+        h.world.set().t1_after = t1_after;
+        h.accepted().await;
+        let step = h.advance().await.unwrap();
+        if payable {
+            assert_eq!(step, h.confirming(), "{t1_after}");
+            assert_eq!(h.deposits(), 1);
+        } else {
+            assert_eq!(step, nothing_sent(NothingSentCause::Mismatch), "{t1_after}");
+            assert_eq!(h.deposits(), 0);
+        }
     }
-    assert_eq!(
-        h.advance().await.unwrap(),
-        nothing_sent(NothingSentCause::MakerCancelled)
-    );
-    assert_eq!(h.deposits(), 1);
 }
 
 /// The deposit's split: propose, keep `Started`, create, keep the bytes. A
@@ -678,22 +700,41 @@ async fn a_sweep_waits_until_the_refunded_deposit_is_spendable() {
     assert_eq!(h.record().sweep, None);
 }
 
+/// A refund mined before t0 is the maker calling the swap off, one from t1
+/// waited out the claim; without its event, the chain's time decides.
 #[tokio::test]
-async fn a_refund_locked_after_t0_is_a_swap_nobody_claimed_in_time() {
-    let h = Harness::new();
-    h.mined_deposit().await;
-    h.refund();
-    {
-        let mut state = h.world.set();
-        state.refund_lock_until = state.t0 + 300 + 10 + LOCK_SECONDS;
+async fn a_refund_from_t1_is_a_swap_nobody_claimed_in_time() {
+    for (refunded_at, chain_now, cause) in [
+        (
+            Some(NOW + 60),
+            NOW + 2 * 60 * 60,
+            RefundCause::MakerCancelled,
+        ),
+        (
+            Some(NOW + 35 * 60 + 60 * 60),
+            NOW + 2 * 60 * 60,
+            RefundCause::NotClaimedInTime,
+        ),
+        (None, NOW + 2 * 60 * 60, RefundCause::NotClaimedInTime),
+        (None, NOW + 60, RefundCause::MakerCancelled),
+    ] {
+        let h = Harness::new();
+        h.mined_deposit().await;
+        h.refund();
+        h.advance().await.unwrap();
+        {
+            let mut state = h.world.set();
+            state.statuses.insert(tx_id("sweep1"), mined(2));
+            state.refunded_at = refunded_at;
+            state.chain_now = chain_now;
+            state.clock = chain_now;
+        }
+        assert_eq!(
+            h.advance().await.unwrap(),
+            refunded("sweep1", cause),
+            "{refunded_at:?}"
+        );
     }
-    h.advance().await.unwrap();
-    h.world.set().statuses.insert(tx_id("sweep1"), mined(2));
-
-    assert_eq!(
-        h.advance().await.unwrap(),
-        refunded("sweep1", RefundCause::NotClaimedInTime)
-    );
 }
 
 #[tokio::test]
@@ -721,7 +762,23 @@ async fn a_swap_left_under_the_same_id_by_an_earlier_use_of_the_index_is_never_p
     assert_eq!(h.record().payout_tx, None);
 }
 
-// ---- the reveal margin (AtomicSwapClaimTest, AtomicSwapSettlementTest) ----
+// ---- the claim's windows ----
+
+fn unwinding(h: &Harness) -> ForwardStep {
+    let state = h.world.get();
+    ForwardStep::Waiting {
+        wait: ForwardWait::Unwinding,
+        t0: Some(state.t0),
+        t1: Some(state.t1()),
+    }
+}
+
+/// Both clocks move to `at`.
+fn at(h: &Harness, at: u64) {
+    let mut state = h.world.set();
+    state.chain_now = at;
+    state.clock = at;
+}
 
 #[tokio::test]
 async fn the_share_stays_secret_when_railgun_is_not_taking_payouts() {
@@ -748,17 +805,110 @@ async fn the_share_stays_secret_when_railgun_is_not_taking_payouts() {
     assert_eq!(h.posted("/v1/payout"), 0);
 }
 
+/// Before t0 a ready counts once it is 12 blocks deep: one a reorg drops
+/// would leave the claim reverted with `z` public. From t0 an open swap is
+/// claimed without one.
 #[tokio::test]
-async fn the_share_stays_secret_under_a_lock_about_to_lapse() {
+async fn a_ready_is_claimed_on_before_t0_only_once_it_is_twelve_blocks_deep() {
     let h = Harness::new();
     h.deposited().await;
+    let head = h.world.get().head_number;
     {
         let mut state = h.world.set();
         state.stage = SwapStage::Ready;
-        state.claim_lock_until = NOW + 60;
+        state.ready_block = Some(head - 11);
     }
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    assert_eq!(h.posted("/v1/claim"), 0);
+    assert_eq!(h.record().payout, None, "nothing signed while it waits");
 
-    assert_eq!(code(h.advance().await), ErrorCode::ClaimTurn);
+    h.world.set().ready_block = Some(head - 12);
+    assert_eq!(h.advance().await.unwrap(), paid());
+    assert_eq!(h.posted("/v1/claim"), 1);
+
+    // The same shallow ready from t0: no depth needed.
+    let h = Harness::new();
+    h.deposited().await;
+    let t0 = h.world.get().t0;
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.ready_block = Some(state.head_number);
+    }
+    at(&h, t0);
+    assert_eq!(h.advance().await.unwrap(), paid());
+}
+
+/// Under the margin before t1 nothing is revealed, by the later of the
+/// chain's and the device's clocks; between t1 and t1 + LATE the swap is the
+/// maker's to refund; from t1 + LATE it is claimed after all.
+#[tokio::test]
+async fn the_claim_waits_out_the_margin_and_the_late_window_then_goes_for_good() {
+    // Just inside the margin, it goes.
+    let h = Harness::new();
+    h.deposited().await;
+    h.world.set().stage = SwapStage::Ready;
+    let t1 = h.world.get().t1();
+    at(&h, t1 - 301);
+    assert_eq!(h.advance().await.unwrap(), paid());
+
+    let h = Harness::new();
+    h.deposited().await;
+    h.world.set().stage = SwapStage::Ready;
+    let ahead = Harness::new();
+    ahead.deposited().await;
+    ahead.world.set().stage = SwapStage::Ready;
+    {
+        // The chain at the margin's edge, the device a second past it.
+        let mut state = ahead.world.set();
+        state.chain_now = t1 - 400;
+        state.clock = t1 - 300;
+    }
+    assert_eq!(ahead.advance().await.unwrap(), unwinding(&ahead));
+    assert_eq!(ahead.posted("/v1/claim"), 0);
+
+    at(&h, t1 - 300);
+    assert_eq!(h.advance().await.unwrap(), unwinding(&h));
+    for now in [t1, t1 + late_window() - 1] {
+        at(&h, now);
+        assert_eq!(h.advance().await.unwrap(), unwinding(&h), "{now}");
+    }
+    assert_eq!(h.posted("/v1/claim"), 0);
+    assert!(!h.record().claim_posted);
+    assert_eq!(h.record().payout, None);
+
+    at(&h, t1 + late_window());
+    assert_eq!(h.advance().await.unwrap(), paid());
+    assert_eq!(h.posted("/v1/claim"), 1);
+
+    // An open swap too: the late claim is the user's whether or not the
+    // maker readied it.
+    let h = Harness::new();
+    h.deposited().await;
+    let t1 = h.world.get().t1();
+    at(&h, t1 + 10);
+    assert_eq!(h.advance().await.unwrap(), unwinding(&h));
+    at(&h, t1 + late_window());
+    assert_eq!(h.advance().await.unwrap(), paid());
+}
+
+/// Once the maker refunds in the late window, the deposit comes home.
+#[tokio::test]
+async fn an_unwound_swap_brings_the_deposit_home_after_the_makers_refund() {
+    let h = Harness::new();
+    h.mined_deposit().await;
+    let t1 = h.world.get().t1();
+    at(&h, t1 + 60);
+    assert_eq!(h.advance().await.unwrap(), unwinding(&h));
+
+    h.refund();
+    h.world.set().refunded_at = Some(t1 + 120);
+    assert_eq!(h.advance().await.unwrap(), waiting(ForwardWait::Refunding));
+    h.world.set().statuses.insert(tx_id("sweep1"), mined(2));
+    assert_eq!(
+        h.advance().await.unwrap(),
+        refunded("sweep1", RefundCause::NotClaimedInTime)
+    );
     assert_eq!(h.posted("/v1/claim"), 0);
 }
 
@@ -769,14 +919,13 @@ async fn the_share_stays_secret_through_a_node_minutes_behind() {
     {
         let mut state = h.world.set();
         state.stage = SwapStage::Ready;
-        state.claim_lock_until = NOW + LOCK_SECONDS;
         state.clock = NOW + 4 * 60;
     }
 
     assert_eq!(code(h.advance().await), ErrorCode::ChainLagging);
-    assert_eq!(h.posted("/v1/claim") + h.posted("/v1/lock-claim"), 0);
+    assert_eq!(h.posted("/v1/claim"), 0);
 
-    // A device clock a minute off still claims.
+    // A device clock a minute and a half off still claims.
     let h = Harness::new();
     h.deposited().await;
     {
@@ -787,45 +936,43 @@ async fn the_share_stays_secret_through_a_node_minutes_behind() {
     assert_eq!(h.advance().await.unwrap(), paid());
 }
 
+/// The window is read again, in one read, immediately before the claim is
+/// posted: a window that shut, terms that changed, Railgun closing or a head
+/// that fell behind meanwhile reveal nothing.
 #[tokio::test]
-async fn a_delayed_lock_response_never_reveals_inside_the_margin_or_after_expiry() {
-    for remaining in [60i64, 0, -1] {
-        let h = Harness::new();
-        h.deposited().await;
-        {
-            let mut state = h.world.set();
-            state.stage = SwapStage::Ready;
-            state.after_lock = Some(Box::new(move |state: &mut State| {
-                state.chain_now = (state.claim_lock_until as i64 - remaining) as u64;
-                state.clock = state.chain_now;
-            }));
-        }
-
-        assert_eq!(code(h.advance().await), ErrorCode::ClaimTurn, "{remaining}");
-        assert_eq!(h.posted("/v1/claim"), 0);
-        assert_eq!(h.record().outcome, None);
-    }
-}
-
-#[tokio::test]
-async fn the_lock_and_terms_are_read_again_immediately_before_the_reveal() {
-    // The step reads the swap (1), the lock request waits for its lock (2),
-    // and the reveal reads it once more (3).
+async fn the_window_and_terms_are_read_again_immediately_before_the_reveal() {
     type Change = fn(&mut State);
-    let changes: [(Change, ErrorCode); 3] = [
-        // A lock removed before the reveal.
-        (|state| state.claim_lock_until = 0, ErrorCode::ClaimTurn),
-        // A payout commitment changed before the reveal.
+    let changes: [(Change, std::result::Result<ForwardWait, ErrorCode>); 5] = [
+        // The margin before t1 ran out.
+        (
+            |state| {
+                state.chain_now = state.t1() - 300;
+                state.clock = state.chain_now;
+            },
+            Ok(ForwardWait::Unwinding),
+        ),
+        // The maker refunded: the swap is shut.
+        (
+            |state| {
+                state.stage = SwapStage::Refunded;
+                state.secret = maker_secret().to_be_bytes();
+            },
+            Ok(ForwardWait::Confirming),
+        ),
+        // A payout commitment changed.
         (
             |state| {
                 state.tamper = Some(Box::new(|words: &mut [[u8; 32]; 11]| {
                     words[10] = [6; 32];
                 }))
             },
-            ErrorCode::Mismatch,
+            Err(ErrorCode::Mismatch),
         ),
-        // A head that fell behind while waiting.
-        (|state| state.clock += 4 * 60, ErrorCode::ChainLagging),
+        (
+            |state| state.railgun_accepts = false,
+            Err(ErrorCode::RailgunClosed),
+        ),
+        (|state| state.clock += 4 * 60, Err(ErrorCode::ChainLagging)),
     ];
     for (change, expected) in changes {
         let h = Harness::new();
@@ -833,17 +980,24 @@ async fn the_lock_and_terms_are_read_again_immediately_before_the_reveal() {
         {
             let mut state = h.world.set();
             state.stage = SwapStage::Ready;
-            state.confirmed_reads = 0;
-            state.on_confirmed_read = Some(Box::new(move |state: &mut State, read| {
-                if read == 3 {
+            state.reads = 0;
+            state.on_read = Some(Box::new(move |state: &mut State, read| {
+                if read == 2 {
                     change(state);
                 }
             }));
         }
 
-        assert_eq!(code(h.advance().await), expected);
-        assert_eq!(h.posted("/v1/lock-claim"), 1);
+        let step = h.advance().await;
+        match expected {
+            Ok(wait) => match step.unwrap() {
+                ForwardStep::Waiting { wait: got, .. } => assert_eq!(got, wait),
+                other => panic!("{other:?}"),
+            },
+            Err(error) => assert_eq!(code(step), error),
+        }
         assert_eq!(h.posted("/v1/claim"), 0, "{expected:?}");
+        assert!(!h.record().claim_posted);
     }
 }
 
@@ -862,17 +1016,27 @@ async fn an_unconfirmed_open_is_neither_funded_nor_abandoned_after_the_quote_exp
     assert_eq!(h.record().outcome, None);
 }
 
+/// A relayer that holds a claim back (`503`, its own send may still land)
+/// gets the same claim again on the next step; nothing is signed anew.
 #[tokio::test]
-async fn an_unconfirmed_claim_lock_never_releases_the_secret() {
+async fn a_held_back_claim_is_posted_again_unchanged() {
     let h = Harness::new();
     h.deposited().await;
-    h.world.set().stage = SwapStage::Ready;
-    let before_lock = h.world.snapshot();
-    h.world.set().confirmed = Some(Box::new(move |_| before_lock.clone()));
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.claim_refusal = Some((503, "unavailable"));
+    }
+    assert_eq!(code(h.advance().await), ErrorCode::RelayerRefused);
+    let held = h.record();
+    assert!(held.claim_posted);
+    let first = h.world.get().bodies["/v1/claim"].clone();
 
-    assert_eq!(code(h.advance().await), ErrorCode::ChainLagging);
-    assert_eq!(h.posted("/v1/lock-claim"), 1);
-    assert_eq!(h.posted("/v1/claim"), 0);
+    h.world.set().claim_refusal = None;
+    assert_eq!(h.advance().await.unwrap(), paid());
+    assert_eq!(h.posted("/v1/claim"), 2);
+    assert_eq!(h.world.get().bodies["/v1/claim"], first);
+    assert_eq!(h.record().payout, held.payout);
 }
 
 // ---- the payout and its fee (AtomicSwapClaimTest, AtomicSwapSettlementTest) ----
@@ -976,7 +1140,7 @@ async fn a_payout_is_never_signed_above_the_cap() {
         state.stage = SwapStage::Ready;
     }
     assert_eq!(code(h.advance().await), ErrorCode::RelayerFee);
-    assert_eq!(h.posted("/v1/lock-claim") + h.posted("/v1/claim"), 0);
+    assert_eq!(h.posted("/v1/claim"), 0);
     assert_eq!(h.record().payout, None);
     // At the cap, it is paid.
     h.world.set().relayer_fee = CAP;
@@ -991,10 +1155,10 @@ async fn a_payout_is_never_signed_above_the_cap() {
         let mut state = h.world.set();
         state.stage = SwapStage::Ready;
         state.least_fee = CAP + 1;
-        state.confirmed_reads = 0;
+        state.reads = 0;
         // The relayer raises its fee as it turns the claim down.
-        state.on_confirmed_read = Some(Box::new(|state: &mut State, read| {
-            if read == 3 {
+        state.on_read = Some(Box::new(|state: &mut State, read| {
+            if read == 2 {
                 state.relayer_fee = CAP + 1;
             }
         }));
@@ -1051,6 +1215,66 @@ async fn an_orphaned_payout_is_retried_until_it_has_its_confirmations() {
     assert_eq!(h.advance().await.unwrap(), paid());
     assert_eq!(h.posted("/v1/payout"), 2);
     assert_eq!(h.record().deposit, record.deposit);
+}
+
+// ---- the deployment ----
+
+/// A maker or relayer that names other windows, or another kind of
+/// contract, serves another deployment: nothing is paid into its swaps.
+#[tokio::test]
+async fn services_naming_other_windows_are_refused() {
+    let h = Harness::new();
+    h.world.set().accepted_late_window = Some(24 * 60 * 60);
+    assert_eq!(
+        h.accept(h.quote().await.unwrap().index).await.unwrap(),
+        AcceptOutcome::NothingSent(NothingSentCause::Mismatch)
+    );
+    assert_eq!(
+        h.advance().await.unwrap(),
+        nothing_sent(NothingSentCause::Mismatch)
+    );
+    assert_eq!(h.deposits(), 0);
+
+    for windows in [
+        serde_json::json!({ "minWindow": 3_600 }),
+        serde_json::json!({ "lateWindow": 24 * 60 * 60 }),
+        serde_json::json!({ "contractKind": "locks" }),
+    ] {
+        let h = Harness::new();
+        h.world.set().terms_windows = Some(windows.clone());
+        assert_eq!(
+            code(h.quote().await),
+            ErrorCode::WrongDeployment,
+            "terms {windows}"
+        );
+        let h = Harness::new();
+        h.world.set().info_windows = Some(windows.clone());
+        assert_eq!(
+            code(h.quote().await),
+            ErrorCode::WrongDeployment,
+            "info {windows}"
+        );
+        assert_eq!(h.posted("/v1/quote"), 0, "info {windows}");
+    }
+    let pinned = serde_json::json!({
+        "minWindow": 30 * 60,
+        "lateWindow": late_window(),
+        "contractKind": "windows",
+    });
+    let h = Harness::new();
+    h.world.set().terms_windows = Some(pinned.clone());
+    h.world.set().info_windows = Some(pinned);
+    assert!(h.quote().await.is_ok());
+}
+
+/// Mainnet pins no windows contract: no bridge is quoted there, and nothing
+/// is asked of its maker or relayer.
+#[tokio::test]
+async fn mainnet_takes_no_bridge() {
+    let h = Harness::on(super::super::PrivateUsdNetwork::Mainnet);
+    assert_eq!(code(h.quote().await), ErrorCode::Unavailable);
+    assert_eq!(code(h.reverse_quote().await), ErrorCode::Unavailable);
+    assert!(h.paths().is_empty());
 }
 
 // ---- one driver step per account ----

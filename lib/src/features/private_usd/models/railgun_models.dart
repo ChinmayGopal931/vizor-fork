@@ -88,12 +88,20 @@ enum RailgunScreening {
   }
 }
 
-/// What `refresh` answers: the balances, and how the screening last went.
+/// What `refresh` answers: the balances, the private sends received, and
+/// how the screening last went.
 class RailgunRefresh {
-  const RailgunRefresh({required this.balances, required this.screening});
+  const RailgunRefresh({
+    required this.balances,
+    required this.screening,
+    this.received,
+  });
 
   final RailgunBalances balances;
   final RailgunScreening screening;
+
+  /// Null when the page could not read its history.
+  final List<RailgunReceipt>? received;
 
   static RailgunRefresh parse(Object? json) {
     final map = _object(json, 'refresh');
@@ -104,8 +112,99 @@ class RailgunRefresh {
     return RailgunRefresh(
       balances: RailgunBalances.parse(map['balances']),
       screening: screening,
+      received: RailgunReceipt.parseAll(map['received']),
     );
   }
+}
+
+/// A private send the wallet received, from the notes its sync decrypted.
+@immutable
+class RailgunReceipt {
+  const RailgunReceipt({
+    required this.txid,
+    required this.token,
+    required this.amount,
+    this.bucket,
+    this.at,
+    this.sender,
+  });
+
+  /// The Ethereum transaction that carried it, `0x` hex.
+  final String txid;
+
+  /// `0x`, lowercase.
+  final String token;
+  final BigInt amount;
+
+  /// Where it stands with the screening; null for a bucket this build does
+  /// not know.
+  final RailgunBalanceBucket? bucket;
+
+  /// When its block was made, where the engine knows.
+  final DateTime? at;
+
+  /// The sender's `0zk` address, only where the sender showed it.
+  final String? sender;
+
+  /// This receipt, dated [fallback] where the engine had no time for it.
+  RailgunReceipt orDated(DateTime fallback) => at != null
+      ? this
+      : RailgunReceipt(
+          txid: txid,
+          token: token,
+          amount: amount,
+          bucket: bucket,
+          at: fallback,
+          sender: sender,
+        );
+
+  /// Screened and spendable, or spent since.
+  bool get settled =>
+      bucket == RailgunBalanceBucket.spendable ||
+      bucket == RailgunBalanceBucket.spent;
+
+  /// Null where the page had no history to give. A receipt it cannot read is
+  /// left out: the history never fails the balances.
+  static List<RailgunReceipt>? parseAll(Object? json) {
+    if (json is! List) return null;
+    return List.unmodifiable([for (final item in json) ?_receipt(item)]);
+  }
+
+  static RailgunReceipt? _receipt(Object? item) {
+    if (item is! Map<String, dynamic>) return null;
+    final txid = item['txid'];
+    final timestamp = item['timestamp'];
+    final bucket = item['bucket'];
+    final sender = item['sender'];
+    try {
+      if (txid is! String || !_txidPattern.hasMatch(txid)) return null;
+      return RailgunReceipt(
+        txid: txid.toLowerCase(),
+        token: _evmAddress(item['token'], 'token'),
+        amount: _decimal(item['amount'], 'amount'),
+        bucket: bucket is String ? RailgunBalanceBucket.fromWire(bucket) : null,
+        at: timestamp is int && timestamp > 0
+            ? DateTime.fromMillisecondsSinceEpoch(timestamp * 1000)
+            : null,
+        sender: sender is String && sender.startsWith('0zk1') ? sender : null,
+      );
+    } on RailgunProtocolException {
+      return null;
+    }
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is RailgunReceipt &&
+      other.txid == txid &&
+      other.token == token &&
+      other.amount == amount &&
+      other.bucket == bucket &&
+      other.at == at &&
+      other.sender == sender;
+
+  @override
+  int get hashCode => Object.hash(txid, token, amount, bucket, at, sender);
 }
 
 /// Every token in every bucket the SDK lists.
@@ -774,6 +873,7 @@ Map<String, dynamic> _object(Object? json, String what) {
 }
 
 final _evmAddressPattern = RegExp(r'^0x[0-9a-fA-F]{40}$');
+final _txidPattern = RegExp(r'^0x[0-9a-fA-F]{64}$');
 final _decimalPattern = RegExp(r'^[0-9]+$');
 
 String _evmAddress(Object? value, String what) {

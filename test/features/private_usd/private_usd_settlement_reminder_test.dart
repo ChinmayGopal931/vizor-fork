@@ -28,14 +28,12 @@ void main() {
     readyIn: const Duration(minutes: 30),
   );
 
-  test("the user's turn buzzes as soon as Authorize settlement is offered",
-      () {
+  test("the user's turn buzzes as soon as Authorize settlement is offered", () {
     expect(due(ready, now), PrivateUsdSettlementBuzz.offered);
     expect(due(ready, now, offerBuzzed: true), PrivateUsdSettlementBuzz.none);
   });
 
-  test('it buzzes again two minutes before it closes, still unauthorized',
-      () {
+  test('it buzzes again two minutes before it closes, still unauthorized', () {
     // It closes 28 minutes on; 1 m 30 s left.
     final late = now.add(const Duration(minutes: 26, seconds: 30));
     expect(

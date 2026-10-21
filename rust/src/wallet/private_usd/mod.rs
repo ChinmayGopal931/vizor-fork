@@ -107,7 +107,6 @@ pub(crate) enum ErrorCode {
     RelayerFee,
     EthereumUnreachable,
     RailgunClosed,
-    ClaimTurn,
     ZcashWallet,
     DepositUnpayable,
     ZcashRejected,

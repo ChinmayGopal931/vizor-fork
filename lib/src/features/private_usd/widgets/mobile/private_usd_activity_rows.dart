@@ -19,6 +19,7 @@ import '../../models/private_usd_record_key.dart';
 import '../../models/private_usd_send.dart';
 import '../../models/private_usd_reverse_presentation.dart';
 import '../../models/private_usd_status_presentation.dart';
+import '../../models/railgun_models.dart';
 import '../../private_usd_copy.dart';
 import '../../providers/private_usd_activity_provider.dart';
 import '../../providers/private_usd_available_provider.dart';
@@ -257,6 +258,57 @@ ActivityRowData buildPrivateUsdSendActivityRow({
 DateTime privateUsdSendActivityTime(ApiSendRecord record) =>
     DateTime.fromMillisecondsSinceEpoch(record.sentAt * 1000);
 
+/// A private send this wallet received: in once screened (spendable, or spent
+/// since), from its sender's truncated address where the sender showed it;
+/// it opens its transaction.
+ActivityRowData buildPrivateUsdReceivedActivityRow({
+  required BuildContext context,
+  required RailgunReceipt receipt,
+  bool privacyModeEnabled = false,
+  bool dateOnlyTimestamp = false,
+  VoidCallback? onOpenTransaction,
+}) {
+  final colors = context.colors;
+  final settled = receipt.settled;
+  final sender = receipt.sender;
+  final usd = hideAmountIfPrivacyMode(
+    formatPrivateUsdExact(receipt.amount, PrivateUsdBalances.decimals),
+    privacyModeEnabled: privacyModeEnabled,
+    denomination: '',
+  );
+  return ActivityRowData(
+    stableId:
+        'private-usd:received:${receipt.txid}:${receipt.token}:'
+        '${receipt.amount}',
+    title: PrivateUsdCopy.activityReceived,
+    leadingIconName: _glyph,
+    leading: _logo,
+    leadingBackgroundColor: colors.background.neutralSubtleOpacity,
+    leadingIconColor: colors.icon.regular,
+    subtitle: !settled
+        ? PrivateUsdCopy.activityReceivedScreening
+        : sender == null
+        ? PrivateUsdCopy.activitySenderHidden
+        : PrivateUsdCopy.activityFrom(truncatedAddress(sender)),
+    amountText: activityAmountTextForFormFactor(PrivateUsdCopy.activityIn(usd)),
+    amountColor: settled
+        ? colors.text.positiveStrong
+        : outgoingAmountColor(colors),
+    statusText: '',
+    statusIconName: settled ? null : AppIcons.loader,
+    statusColor: settled ? null : colors.text.secondary,
+    timestampText: formatActivityTimestamp(
+      privateUsdReceivedActivityTime(receipt),
+      dateOnly: dateOnlyTimestamp,
+    ),
+    onTap: onOpenTransaction,
+  );
+}
+
+/// When a received send's row sorts: when its block was made.
+DateTime privateUsdReceivedActivityTime(RailgunReceipt receipt) =>
+    receipt.at ?? DateTime.fromMillisecondsSinceEpoch(0);
+
 /// A deposit's activity row, or null for one that moved nothing (it was
 /// signed again in its place, ran out, was refused or reverted: the money is
 /// still at the deposit address, which the screen shows). Once landed it
@@ -333,9 +385,9 @@ DateTime privateUsdDepositActivityTime(ApiDepositRecord record) =>
     privateUsdDepositLandedAt(record) ??
     DateTime.fromMillisecondsSinceEpoch(record.createdAt * 1000);
 
-/// [activity] (and on `/private-usd`, [sendRecords]) as feed entries.
-/// [onOpenPayout] opens any row's transaction, not only a payout: a
-/// deposit's, a send's or a funding's too.
+/// [activity] (and on `/private-usd`, [sendRecords] and [receipts]) as feed
+/// entries. [onOpenPayout] opens any row's transaction, not only a payout: a
+/// deposit's, a send's, a received send's or a funding's too.
 List<ActivityEntry> privateUsdFeedEntries({
   required BuildContext context,
   required PrivateUsdActivity activity,
@@ -344,6 +396,7 @@ List<ActivityEntry> privateUsdFeedEntries({
   required ValueChanged<String> onOpenPayout,
   VoidCallback? onOpenRefunds,
   List<ApiSendRecord> sendRecords = const [],
+  List<RailgunReceipt> receipts = const [],
   bool dateOnlyTimestamp = false,
 }) {
   VoidCallback? openTransaction(String? tx) =>
@@ -374,6 +427,17 @@ List<ActivityEntry> privateUsdFeedEntries({
           privacyModeEnabled: privacyModeEnabled,
           dateOnlyTimestamp: dateOnlyTimestamp,
           onOpenTransaction: openTransaction(record.txHash),
+        ),
+      ),
+    for (final receipt in receipts)
+      ActivityEntry(
+        timestamp: privateUsdReceivedActivityTime(receipt),
+        row: buildPrivateUsdReceivedActivityRow(
+          context: context,
+          receipt: receipt,
+          privacyModeEnabled: privacyModeEnabled,
+          dateOnlyTimestamp: dateOnlyTimestamp,
+          onOpenTransaction: openTransaction(receipt.txid),
         ),
       ),
     for (final record in activity.reverseRecords)

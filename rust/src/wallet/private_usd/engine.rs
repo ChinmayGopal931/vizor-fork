@@ -273,7 +273,7 @@ pub(crate) enum Activity {
     Funding,
     /// Sending the saved `ready` again.
     Readying,
-    /// Locking, revealing or paying out a reverse refund.
+    /// Revealing or paying out a reverse refund.
     Refunding,
 }
 
@@ -432,9 +432,7 @@ pub(crate) fn problem(code: ErrorCode) -> ErrorCode {
     use ErrorCode::*;
     match code {
         RelayerUnreachable | RelayerRefused | RelayerFee | EthereumUnreachable | RailgunClosed
-        | ClaimTurn | ZcashWallet | DepositUnpayable | ZcashRejected | Mismatch | RouteBlocked => {
-            code
-        }
+        | ZcashWallet | DepositUnpayable | ZcashRejected | Mismatch | RouteBlocked => code,
         ChainLagging | ChainUnreadable => EthereumUnreachable,
         // A service serving another deployment reads as the relayer being
         // unreachable.

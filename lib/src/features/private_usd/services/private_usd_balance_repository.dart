@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
+
 import '../models/private_usd_balances.dart';
 import '../models/railgun_models.dart';
 
@@ -33,6 +35,7 @@ class PrivateUsdBalanceState {
     this.refreshFailed = false,
     this.screeningFailed = false,
     this.firstSyncPercent,
+    this.received = const [],
   });
 
   /// Null until a sync or the cache has something to show.
@@ -52,6 +55,10 @@ class PrivateUsdBalanceState {
   /// How far the wallet's first sync has come, while nothing shows yet.
   final int? firstSyncPercent;
 
+  /// The private sends the wallet received, as the last sync that could read
+  /// them found them. Never cached.
+  final List<RailgunReceipt> received;
+
   /// No balance yet, and one is on its way.
   bool get isLoading => balances == null && (!refreshFailed || isRefreshing);
 
@@ -64,6 +71,7 @@ class PrivateUsdBalanceState {
     bool? screeningFailed,
     int? firstSyncPercent,
     bool clearFirstSyncPercent = false,
+    List<RailgunReceipt>? received,
   }) => PrivateUsdBalanceState(
     balances: balances ?? this.balances,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -74,6 +82,7 @@ class PrivateUsdBalanceState {
     firstSyncPercent: clearFirstSyncPercent
         ? null
         : (firstSyncPercent ?? this.firstSyncPercent),
+    received: received ?? this.received,
   );
 
   @override
@@ -85,7 +94,8 @@ class PrivateUsdBalanceState {
       other.isRefreshing == isRefreshing &&
       other.refreshFailed == refreshFailed &&
       other.screeningFailed == screeningFailed &&
-      other.firstSyncPercent == firstSyncPercent;
+      other.firstSyncPercent == firstSyncPercent &&
+      listEquals(other.received, received);
 
   @override
   int get hashCode => Object.hash(
@@ -96,6 +106,7 @@ class PrivateUsdBalanceState {
     refreshFailed,
     screeningFailed,
     firstSyncPercent,
+    Object.hashAll(received),
   );
 }
 

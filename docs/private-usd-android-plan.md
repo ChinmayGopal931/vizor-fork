@@ -196,9 +196,9 @@ Dart owns UI and orchestration only. Rust owns every key, every swap rule and al
    └─► swaps.db: index counter, records, joint-account index, Railgun send log
 ```
 
-**Forward, ZEC → USD**, in one paragraph (§5.6). Take the index, quote, and accept with the user's share. Read the escrow `Open` on Ethereum and derive the joint UA from the on-chain shares. Pay ZEC from the main account to the joint UA. When the escrow is `Ready` (or `Open` after `t0`), take a claim lock and reveal `z` through the relayer. USDC is shielded into the user's Railgun wallet as the pre-agreed payout note. If the maker refunds, it reveals `e`, and the wallet sweeps the joint ZEC home with `±(e+z)`.
+**Forward, ZEC → USD**, in one paragraph (§5.6). Take the index, quote, and accept with the user's share. Read the escrow `Open` on Ethereum and derive the joint UA from the on-chain shares. Pay ZEC from the main account to the joint UA. When the escrow is `Ready` (12 blocks deep before `t0`), or from `t0`, reveal `z` through the relayer while the claim window has more than 300 s left before `t1`. USDC is shielded into the user's Railgun wallet as the pre-agreed payout note. If the maker refunds (calling an unpaid swap off before `t0`, or from `t1` once the claim window closed), it reveals `e`, and the wallet sweeps the joint ZEC home with `±(e+z)`; a swap the maker never refunds is claimed after all from `t1 + LATE_WINDOW`. The windows are the contract's (reference §5.4).
 
-**Reverse, USD → ZEC** (§5.7). Quote, accept, then import the joint account. The Railgun page proves a Relay Adapt transaction that funds the escrow (the first approval). The maker deposits ZEC to the joint UA. Once the deposit has 2 confirmations, the user signs `Ready` (the second approval). The maker claims the USDC by revealing `e`, and the wallet sweeps the ZEC home with `±(e+z)`.
+**Reverse, USD → ZEC** (§5.7). Quote, accept, then import the joint account. The Railgun page proves a Relay Adapt transaction that funds the escrow (the first approval). The maker deposits ZEC to the joint UA. Once the deposit has 2 confirmations, the user signs `Ready` (the second approval), whose deadline must fall before `t0`. The maker claims the USDC by revealing `e`, and the wallet sweeps the ZEC home with `±(e+z)`.
 
 **Send and withdraw** (§6.7). The page proves a Railgun `transfer` (to `0zk`) or `unshield` (to `0x`) that pays the relayer's fee note. The proved bytes are persisted in the Rust send log (§3.4) before Rust posts them to the relayer.
 
@@ -337,12 +337,12 @@ Each one exists because breaking it loses funds or privacy. Most are enforced in
 
 1. **Never reuse a swap index.** Commit `next_index + 1` before any quote leaves the device, and skip indices in use on chain (§3.3). *Why:* claiming reveals `z`, so any other swap that shares that `z` becomes spendable by its maker.
 2. **Save the record before accept.** Treat an accept timeout, transport failure or `5xx` as "maybe opened". *Why:* the maker may have opened an escrow that only this record can follow.
-3. **Never pay a deposit twice.** Save `deposit = Started` before creating the transaction. Save the bytes (`Kept`) before the first broadcast. Rebuild only after the old transaction is **proven** expired (the wallet has fully scanned past its expiry height), and never once the maker holds a refund lock. On resume with `Started` and no bytes, search the main DB for a sent transaction to the joint UA (`findDeposit`) before building anything. The deposit must be exactly one transaction, with a total ≤ the approved `maxTotalZat`. *Why:* a second deposit is unrecoverable once the first lands.
+3. **Never pay a deposit twice.** Save `deposit = Started` before creating the transaction. Save the bytes (`Kept`) before the first broadcast. Rebuild only after the old transaction is **proven** expired (the wallet has fully scanned past its expiry height), and never once the swap is no longer `Open`. On resume with `Started` and no bytes, search the main DB for a sent transaction to the joint UA (`findDeposit`) before building anything. The deposit must be exactly one transaction, with a total ≤ the approved `maxTotalZat`, and only on terms whose `t1 − t0` is within `max(MIN_WINDOW, 600 s)` to 2 h. *Why:* a second deposit is unrecoverable once the first lands.
 4. **Derive the deposit address from the on-chain shares** in the confirmed `getSwap` terms, never from the API alone. *Why:* a malicious API could otherwise substitute an address it controls.
-5. **Reveal `z` only under a fresh lock.** That means a held, confirmed claim lock (forward) or refund lock (reverse) with **more than 300 s** left, re-read from a fresh confirmed head immediately before sending. Never reveal on a relayer answer or an old observation. *Why:* a reveal that lands after the lock lapses lets the maker take both sides.
-6. **Only a confirmed read authorizes anything.** Only `confirmedSwap` (block `head − confirmations + 1`) authorizes a deposit, a reveal or completion. Refuse lock reasoning when the head's timestamp trails the device clock by more than 180 s (`freshHead`). *Why:* a lagging node can show stale stages.
-7. **Never prove a second reverse funding because a response was lost.** Resend the same bytes only while the node does not know the hash, `now < fundingDeadline`, and the user has not cancelled. `ready` is never re-signed after a restart, only resent. *Why:* a second funding pays twice.
-8. **Save every signed payout, refund payout, refund lock and ready before sending it.** (A forward claim lock is not saved: losing one reveals nothing, D-36.) A refused payout is re-signed only when the relayer's fee rose; otherwise a payout is re-signed only when the fee to pay changed, the offer's within its window or else the relayer's now (reference §5.6 step 8). Every relayer fee must be `< amount` and **≤ 2 USDC** (D11, X6).
+5. **Reveal `z` only in its window.** Decide each reveal on one consistent read (the swap at the newest block's hash, with that block's number and time), and decide it again on a fresh read immediately before sending. A window opens by the block's time and closes by the later of it and the device clock, with a 300 s margin. Forward: claim on a `Ready` swap 12 blocks deep before `t0`, or from `t0`, while more than 300 s are left before `t1`; from `t1` the swap is the maker's to refund for `LATE_WINDOW`, then the claim goes for good. Reverse: refund an `Open` escrow once the chain is past every `ready` deadline signed (or at `t0`), a `Ready` one from `t1`. Never reveal on a relayer answer or an old observation, and never `eth_call` or `eth_estimateGas` anything carrying a share. *Why:* a reveal that lands outside its window reverts with the share public, and the other side takes both legs.
+6. **Only a confirmed read authorizes a deposit or completion** (`confirmedSwap`, block `head − confirmations + 1`). Refuse a reveal decision when the head's timestamp trails the device clock by more than 180 s (`freshHead`), and trust no swap read until the contract answers `MIN_WINDOW()` and `LATE_WINDOW()` as pinned and reverts `LOCK_DURATION()`. *Why:* a lagging node can show stale stages, and a lock contract's records decode under the windows contract's ABI.
+7. **Never prove a second reverse funding because a response was lost.** Resend the same bytes only while the node does not know the hash, `now < fundingDeadline`, and the user has not cancelled. `ready` is signed only while its deadline (the head plus 120 s) falls before `t0` and no refund was posted; it is never re-signed after a restart, only resent. *Why:* a second funding pays twice, and a `ready` landing after a refund was sent reverts the refund with `z` public.
+8. **Save every signed payout, refund payout and ready before sending it, and a claim or refund as posted before it goes** (`claim_posted`, `refund_posted`). A refused payout is re-signed only when the relayer's fee rose; otherwise a payout is re-signed only when the fee to pay changed, the offer's within its window or else the relayer's now (reference §5.6 step 8). Every relayer fee must be `< amount` and **≤ 2 USDC** (D11, X6).
 9. **Broadcast before store** for every externally signed PCZT: the joint sweeps reuse `store_and_broadcast_pczts_with_compact_signatures_for_proposal` (`rust/src/wallet/sync/pczt.rs:1645`). *Why:* AGENTS.md hardware invariant 1. A rejected broadcast must not leave notes marked spent.
 10. **`PROPOSAL_STORE` is consume-on-entry.** Discard on every non-consuming exit, for the deposit and sweep proposals alike (AGENTS.md hardware invariant 4).
 11. **Discard OVK on joint sweeps (D12). Sender OVK on the deposit**, so the user's own OVK still recovers it.
@@ -452,8 +452,10 @@ pub(crate) trait ChainReader {   // errors are PrivateUsdError (D-7)
     async fn head(&self) -> Result<Head /*{number, timestamp}*/>;
     async fn swap(&self, id: &[u8; 32]) -> Result<Option<SwapState>>;                           // latest
     async fn confirmed_swap(&self, id: &[u8; 32], terms: &Terms) -> Result<ConfirmedSwap /*{head, swap}*/>;
-    async fn lock_duration(&self) -> Result<u64>;
+    async fn read_swap(&self, id: &[u8; 32], terms: &Terms) -> Result<SwapRead>;                // the newest block's number, time and hash, getSwap at that hash: a reveal's one consistent read
+    async fn swap_at(&self, id: &[u8; 32], terms: &Terms, number: u64) -> Result<Option<SwapState>>; // the ready's depth before t0
     async fn maker_key_used(&self, key: &[u8; 32]) -> Result<bool>;
+    async fn used_before(&self, id: &[u8; 32], key: &[u8; 32]) -> Result<bool>;                 // on a retired lock contract (index skipping)
     async fn reverse_state(&self, id: &[u8; 32], terms: &Terms) -> Result<ReverseChainState>;   // refund note, funding block, getSwap at one confirmed block
     async fn vault_balance(&self, id: &[u8; 32]) -> Result<u128>;
     async fn rescue_nonce(&self, id: &[u8; 32]) -> Result<u64>;
@@ -841,7 +843,7 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
 **Done when.**
 - The fund-safety unit tests pass on fakes (the ★ cases in §8.7):
   - a deposit is never paid twice (`withFound`; created but unbroadcast is found, never rebuilt)
-  - an expired deposit is rebuilt only when payable and with no refund lock
+  - an expired deposit is rebuilt only when payable
   - the claim refuses to reveal inside the 300 s margin
   - a payout is re-signed only on a fee rise, and never above 2 USDC
   - a concurrent advance and accept on one account gives `Busy` and leaves the record intact
@@ -866,7 +868,7 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
 - **The deposit runs beside the main sync.** Both take `with_wallet_db_write_lock` per call or batch, so multi-second waits are normal.
   - Don't use `runWithAuthoritativeSpendable`, which breaks D14.
   - Rust compares the scanned height with the **live** lightwalletd tip and returns `wait = ZcashSyncing` until it catches up.
-- **A created deposit is always broadcast:** the main sync's `resubmit_pending_transactions` rebroadcasts it. Never replace one; reconcile by txid only. A deposit that lands after a refund lock is swept through `DEPOSIT_UNSETTLED`.
+- **A created deposit is always broadcast:** the main sync's `resubmit_pending_transactions` rebroadcasts it. Never replace one; reconcile by txid only. A deposit that lands after the maker called the swap off is swept through `DEPOSIT_UNSETTLED`.
 - **`PROPOSAL_STORE` within one advance.** Hold the deposit proposal in an RAII guard that discards it unless create consumed it. Use `send_flow_id = "private-usd-deposit:{account}:{index}"`. A refusal during app exit is retryable.
 - **The deposit fee preview** builds the `propose_swap_deposit` proposal without storing or locking it, and requires one step and no Sapling parameters (D-35). `None` makes the quote unpayable.
 - **Txid order.** Return internal-order hex for matching history rows; display it with `zcashDisplayTxidHex`. zapp's JSON stores display hex.
@@ -917,7 +919,7 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
   - a late funding response after cancel keeps the cancel
   - `ready` is never re-signed after a restart
   - the receive sweep is capped at the reviewed fee
-  - a reveal is refused when the refund lock is about to lapse
+  - a reveal is refused inside the 300 s margin before its window closes
   - rescue eligibility and nonce
   - `openReverse` calldata matches zapp's fixture
 - Device E2E:
@@ -979,7 +981,7 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
   - a send arrives at a second account's `0zk` address
   - a withdrawal reaches a `0x` address
   - killed between proving and the post, it resends the same bytes and never re-proves
-  - on Sepolia, outputs stay "Processing" (`MissingExternalPOI`)
+  - on Sepolia, outputs leave "Processing" once the wallet has proved the send (through the repaired list, progress D-138)
 
 **Traps.**
 
@@ -1050,7 +1052,6 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
 - **A refusal pauses the address.** Signed again once from fresh terms; refused again, it is dropped, and the address is not signed for until its balance or the terms change, or an hour passes.
 - **A reverted deposit holds the address for an hour** (the relayer's `503`); sign again after.
 - **The deposit key signs only the two digests**: never delegate a deposit address (EIP-7702) or use one for anything else.
-- **Old-tUSD records.** A reverse record pinned to the old testnet token fails as `WrongDeployment`, never silently.
 
 ## 10. Test strategy
 
@@ -1125,13 +1126,13 @@ Skip unit tests for UI glue, provider wiring and copy; the device rounds cover t
 
 **Accepted risks.**
 
-- **A created deposit always goes out.** The main sync rebroadcasts every unmined, unexpired outgoing transaction (`resubmit_pending_transactions`), so the engine cannot withhold a deposit it has already created, even after the maker takes a refund lock. Such a deposit is swept home through `DEPOSIT_UNSETTLED` (§5.8), less fees. Excluding joint-UA deposits from resubmission is possible but not planned.
+- **A created deposit always goes out.** The main sync rebroadcasts every unmined, unexpired outgoing transaction (`resubmit_pending_transactions`), so the engine cannot withhold a deposit it has already created, even after the maker calls the swap off. Such a deposit is swept home through `DEPOSIT_UNSETTLED` (§5.8), less fees. Excluding joint-UA deposits from resubmission is possible but not planned.
 
 - **The GPL-3.0 bundle inside an Apache-2.0 app.** The owner decided to ship it as a separately licensed asset (D3, X12). The swap path never needs the bundle; only the balance, reverse funding and sends do. A native prover (`Railgun-Community/mopro`) is the alternative if legal review objects. That would be new work.
 - **The exact birthday reveals swap timing** to lightwalletd (invariant 12).
 - **The no-auth loopback proxy** is reachable by other local apps while the page is open (§6.8).
 - **Foreground-only conversions fail more often** than zapp's (D9). The copy says to keep Veylor open, and X8 keeps the screen awake.
 - **The same seed in zapp and veylor** on ZIP-32 index 0 shares the Railgun wallet and the swap index space. Chain-checked index skipping prevents reuse (§3.3).
-- **The Sepolia screening indexer is broken,** so relayed-send outputs stay `MissingExternalPOI` (Processing) on testnet.
+- **The Sepolia screening indexer is broken.** Our worker `railgun-sepolia-list` repairs its transaction list (progress D-138), so on testnet the wallet's proofs of its own sends depend on that worker until Railgun mends the indexer.
 - **The first Railgun sync is slow.** On mainnet the notes phase alone took ~40 minutes on a Galaxy A35 over Wi-Fi (~60 % of the sync). It needs the foreground and the screen on (U21). In M0 a restarted sync finished faster (68.5 s against about 100 s on Sepolia), so some progress persists.
 - **AGENTS.md described an Android preparation worker and `rust/src/android_jni.rs` that this repo no longer has** (removed in `459a8565b`). M8 corrected AGENTS.md (progress D-106). Do not build on them.

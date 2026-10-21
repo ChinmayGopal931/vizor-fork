@@ -274,7 +274,7 @@ pub(crate) struct SwapAcceptance {
     pub token_request: Option<Redacted<String>>,
 }
 
-/// A lock or `ready` the swap's own key signed, for a relayer to send.
+/// A `ready` the swap's own key signed, for a relayer to send.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SwapAuthorization {
@@ -354,6 +354,11 @@ pub(crate) struct MakerInfo {
     pub reverse_enabled: bool,
     /// The key accepts' tokens come back under, base64url SPKI.
     pub token_return_key: Option<String>,
+    /// The contract's `MIN_WINDOW`, `LATE_WINDOW` and kind, where the maker
+    /// names them.
+    pub min_window: Option<u64>,
+    pub late_window: Option<u64>,
+    pub contract_kind: Option<String>,
 }
 
 /// The swap a maker opened for an accepted quote, with the deadlines it
@@ -365,6 +370,8 @@ pub(crate) struct SwapAccepted {
     pub t0: u64,
     pub t1: u64,
     pub ticket: Option<Ticket>,
+    /// The contract's `LATE_WINDOW`, where the maker names it.
+    pub late_window: Option<u64>,
 }
 
 impl SwapAccepted {
@@ -385,6 +392,11 @@ pub(crate) struct RelayerTerms {
     pub relayer: Address,
     pub chain_id: u64,
     pub contract: Address,
+    /// The contract's `MIN_WINDOW`, `LATE_WINDOW` and kind, where the relayer
+    /// names them.
+    pub min_window: Option<u64>,
+    pub late_window: Option<u64>,
+    pub contract_kind: Option<String>,
     pub fee: Amount,
     pub reverse_funding: Option<ReverseFundingTerms>,
     pub railgun_sends: Option<RailgunSendsTerms>,
@@ -581,6 +593,9 @@ pub(crate) struct ForwardRecord {
     pub sweep: Option<ZcashTransaction>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payout: Option<SwapPayout>,
+    /// A claim was posted, `z` with it: kept before it goes.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub claim_posted: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub t0: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -731,15 +746,16 @@ pub(crate) struct RecordDeployment {
 }
 
 impl RecordDeployment {
-    /// `network`'s pins, as a new reverse record keeps them.
-    pub(crate) fn pinned(network: PrivateUsdNetwork) -> Self {
+    /// `network`'s pins, as a new reverse record keeps them; `Unavailable`
+    /// where bridging is off.
+    pub(crate) fn pinned(network: PrivateUsdNetwork) -> super::Result<Self> {
         let pins = deployment::deployment(network);
-        Self {
+        Ok(Self {
             maker_url: pins.maker_url.into(),
             relayer_url: pins.relayer_url.into(),
             rpc_url: pins.keyless_rpc_url.into(),
             chain_id: pins.chain_id,
-            contract: Hex(pins.contract),
+            contract: Hex(pins.swap_contract()?.address),
             token: Hex(pins.token),
             railgun_proxy: Hex(pins.railgun_proxy),
             maker: Hex(pins.maker),
@@ -753,7 +769,7 @@ impl RecordDeployment {
                 token_key: pins.issuer_token_key.into(),
                 return_key: pins.maker_token_return_key.into(),
             }),
-        }
+        })
     }
 }
 
@@ -921,12 +937,17 @@ pub(crate) struct ReverseRecord {
     pub cost: Option<ReverseFundingCost>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub funding: Option<ReverseFundingTransaction>,
+    /// The one `ready` the user signs, kept before it is handed out. It is
+    /// never signed again, so its deadline is every ready deadline the
+    /// conversion has: a refund waits for the chain to pass it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ready: Option<SwapAuthorization>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub cancel_requested: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub refund_lock: Option<SwapAuthorization>,
+    /// A refund was posted, `z` with it: kept before it goes, and no `ready`
+    /// is signed or sent after it.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub refund_posted: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payout: Option<SwapPayout>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -950,6 +971,11 @@ pub(crate) struct ReverseRecord {
 impl ReverseRecord {
     pub(crate) fn finished(&self) -> bool {
         self.phase.is_finished()
+    }
+
+    /// The deadline of every `ready` the user signed.
+    pub(crate) fn ready_deadlines(&self) -> Vec<u64> {
+        self.ready.iter().map(|ready| ready.deadline).collect()
     }
 
     /// A quote only previewed: never written to history.

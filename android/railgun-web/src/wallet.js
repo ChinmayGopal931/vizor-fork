@@ -14,6 +14,7 @@ import {
   getLatestRailgunTxidData,
   getProver,
   getSerializedERC20Balances,
+  getWalletTransactionHistory,
   hasEngine,
   loadProvider,
   loadWalletByID,
@@ -32,6 +33,7 @@ import { groth16 } from 'snarkjs';
 import { setArtifactProgressListener } from './artifact-mirror.js';
 import { artifactStore } from './artifacts.js';
 import { badRequest } from './errors.js';
+import { receivedSends } from './received.js';
 import { screeningActivity } from './screening-activity.js';
 import { catchUpTxids, txidCompleteHold } from './txid-catch-up.js';
 import { walletNamespaces } from './wallet-namespaces.js';
@@ -199,7 +201,8 @@ export async function deleteWallet({ network: name, mnemonic }) {
 
 /**
  * Scans to the chain's tip, catches up on txids, then has the screening nodes check the notes. Returns the balances,
- * and `screening`: `failed` when that check, or the proofs the engine last sent for this wallet's sends, failed.
+ * the private sends received (`received`), and `screening`: `failed` when that check, or the proofs the engine last
+ * sent for this wallet's sends, failed.
  */
 export async function refresh(_params, emit) {
   const { walletId } = session();
@@ -233,7 +236,11 @@ export async function refresh(_params, emit) {
     // The balances stand; their screening statuses catch up on a later sync.
     emit('log', `screening not refreshed: ${error?.message ?? error}`);
   }
-  return { balances: await balances(), screening: checkFailed || proofsFailed ? 'failed' : 'ok' };
+  return {
+    balances: await balances(),
+    received: await received(emit),
+    screening: checkFailed || proofsFailed ? 'failed' : 'ok',
+  };
 }
 
 const latestTxidIndex = async () => (await getLatestRailgunTxidData(TXID_VERSION, network)).txidIndex;
@@ -290,6 +297,19 @@ async function scanNotesNow(walletId) {
     await new Promise((resolve) => setTimeout(resolve, NOTES_SCAN_RETRY_MS));
   }
   throw new Error('no notes scan started for a minute: one may be stuck');
+}
+
+/**
+ * The private sends this wallet received (`receivedSends`), from the notes its scans already decrypted: nothing is
+ * fetched. `null` when the history can't be read: the balances stand without it.
+ */
+async function received(emit) {
+  try {
+    return receivedSends(await getWalletTransactionHistory(chain(), session().walletId, undefined));
+  } catch (error) {
+    emit('log', `received sends not read: ${error?.message ?? error}`);
+    return null;
+  }
 }
 
 /** Balances by screening status: `Spendable`, `ShieldPending`, `ShieldBlocked`, … */

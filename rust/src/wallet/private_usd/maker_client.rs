@@ -180,13 +180,20 @@ mod tests {
     async fn classifies_the_makers_answers() {
         let _policy = lock_route_policy();
         let quote = format!(
-            r#"{{"quoteId":"{}","maker":"0x2bac02b5032e9092493814c705f156b49e288922","makerShare":"{}","makerProof":"{}","chainId":11155111,"contract":"0xd75efc6a157cc0a95f66962da86ddf35d9f2617c","token":"0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c","amount":"1000000","depositZat":202021,"expiresAt":1790000300,"later":true}}"#,
+            r#"{{"quoteId":"{}","maker":"0x2bac02b5032e9092493814c705f156b49e288922","makerShare":"{}","makerProof":"{}","chainId":11155111,"contract":"0x459b0a69e0f736666b66a3ffe0fc17c11f05980d","token":"0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c","amount":"1000000","depositZat":202021,"expiresAt":1790000300,"later":true}}"#,
             hex(32, 0x22),
             hex(64, 0x0a),
             hex(64, 0x06)
         );
+        let accepted = format!(
+            r#"{{"swapId":"{}","t0":1790002700,"t1":1790006300,"ticket":"{}.{}","lateWindow":3600}}"#,
+            hex(32, 0x5c),
+            hex(32, 0x5c),
+            "3f".repeat(32)
+        );
         let server = TestServer::start(vec![
             Reply::json(200, &quote),
+            Reply::json(200, &accepted),
             Reply::Http {
                 status: 401,
                 headers: vec![(
@@ -211,6 +218,13 @@ mod tests {
 
         let quote = maker.quote(1_000_000, [4; 20], [5; 32]).await.unwrap();
         assert_eq!(quote.amount.0, 1_000_000);
+
+        // An accept names the deadlines, the ticket and the contract's late
+        // window.
+        let opened = maker.accept(&quote_id, &acceptance()).await.unwrap();
+        assert_eq!((opened.t0, opened.t1), (1_790_002_700, 1_790_006_300));
+        assert_eq!(opened.late_window, Some(3_600));
+        assert!(opened.ticket_for(&Hex([0x5c; 32])).is_some());
 
         let token_required = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
         let SwapHttpError::Refused(refusal) = &token_required else {

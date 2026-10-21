@@ -1,14 +1,18 @@
-//! What forward and reverse swaps share: the lock and reveal rules, the
-//! payout fee rules, the maker's and the relayer's checks against the pins,
-//! the records in `swaps.db`, and the seams of one driver call. Each
-//! direction keeps its own state machine.
+//! What forward and reverse swaps share: the windows that decide when a
+//! share may be revealed, the payout fee rules, the maker's and the
+//! relayer's checks against the pins, the records in `swaps.db`, and the
+//! seams of one driver call. Each direction keeps its own state machine.
 
 use std::path::Path;
 
 use zecswap_core::{JointAccount, SecretShare, SpendKey, SwapContext};
 
-use super::deployment::{self, Deployment, REVEAL_MARGIN_SECONDS, SIGNATURE_TTL_SECONDS};
+use super::deployment::{
+    self, Deployment, SwapContract, READY_DEPTH_BLOCKS, REVEAL_MARGIN_SECONDS,
+    SIGNATURE_TTL_SECONDS,
+};
 use super::engine::{self, MakerChecks, OpHandle};
+use super::evm_rpc::SwapStage;
 use super::joint::{SwapTxStatus, WalletZcash};
 use super::keys::SwapKeyContext;
 use super::maker_client::MakerClient;
@@ -25,11 +29,13 @@ use crate::wallet::routed_http::RoutedHttp;
 
 /// The maker API version this build speaks.
 const MAKER_API_VERSION: u32 = 1;
-/// Lock reasoning is refused on a head this much older than the device's
-/// clock: a lapsed lock would look held.
+/// A reveal is refused on a head this much older than the device's clock:
+/// a node minutes behind shows windows that have moved on.
 const MAX_HEAD_LAG_SECONDS: u64 = 3 * 60;
+/// The only contract kind a relayer's terms may name.
+const WINDOWS_CONTRACT_KIND: &str = "windows";
 
-// ---- locks and reveals ----
+// ---- the windows ----
 
 /// `head`, the latest block's time, unless it trails this device's clock by
 /// minutes.
@@ -44,42 +50,118 @@ pub(crate) fn fresh_head(head: u64, device_now: u64) -> Result<u64> {
     Ok(head)
 }
 
-/// Whether a lock held until `lock_until` leaves more than the reveal margin:
-/// a share revealed under it lands before the other side's turn. The margin
-/// counts from the later of the fresh `head` and this device's clock, since
-/// the head may trail real time by up to `MAX_HEAD_LAG_SECONDS`.
-pub(crate) fn reveal_margin_holds(lock_until: u64, head: u64, device_now: u64) -> bool {
-    let from = head.max(device_now);
-    lock_until > from && lock_until - from > REVEAL_MARGIN_SECONDS
+/// A swap as one consistent read shows it: its stage as of the newest block,
+/// that block's time and number, and the device's clock.
+///
+/// A window has opened once the block's time is at or past its start: a
+/// block at or past it exists, so every later one is past it too, where the
+/// device's clock may run ahead. How much of a window is left counts from
+/// the later of the two clocks: either can only make a reveal go earlier,
+/// and the margin covers a device clock behind.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct WindowView {
+    /// `None`: no swap at that block.
+    pub stage: Option<SwapStage>,
+    pub head: u64,
+    pub head_number: u64,
+    pub device_now: u64,
+    pub t0: u64,
+    pub t1: u64,
+    /// The contract's `LATE_WINDOW`.
+    pub late_window: u64,
 }
 
-/// Whether the contract gives us a lock at `now`: none is held, nor is it
-/// the other side's turn after ours lapsed (`ZecSwap.sol`'s `_locked` and
-/// `_turnAfterLapse`).
-pub(crate) fn may_take_lock(own: u64, other: u64, now: u64, lock_duration: u64) -> bool {
-    let held = now < own || now < other;
-    let their_turn = own > other && (now < own || now - own < lock_duration);
-    lock_duration > 0 && !held && !their_turn
+impl WindowView {
+    fn live(&self) -> bool {
+        matches!(self.stage, Some(SwapStage::Open | SwapStage::Ready))
+    }
+
+    fn end_clock(&self) -> u64 {
+        self.head.max(self.device_now)
+    }
 }
 
-/// The deadline of a lock signed at `now`, or `None` while the contract would
-/// not give us the lock.
-pub(crate) fn lock_deadline(
-    own: u64,
-    other: u64,
-    now: u64,
-    lock_duration: u64,
-) -> Result<Option<u64>> {
-    if !may_take_lock(own, other, now, lock_duration) {
-        return Ok(None);
+/// What a forward swap's windows let the user's claim do now.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ClaimWindow {
+    /// Reveal `z`: the window leaves the margin, or the late window is over
+    /// and the claim is the user's for good.
+    Open,
+    /// Not before `t0` on a swap not ready, nor on a ready that is not
+    /// `READY_DEPTH_BLOCKS` deep.
+    NotYet,
+    /// The swap unwinds: from `t1` the maker refunds for its late window,
+    /// and under the margin before `t1` a claim could land after it. From
+    /// `t1 + LATE` the claim opens again.
+    Unwinding,
+    /// Railgun is not taking the payout, which would sit in the contract.
+    RailgunClosed,
+    /// Claimed, refunded, or no swap.
+    Shut,
+}
+
+/// The user's claim of a forward swap on `view`, the swap ready at block
+/// `ready_block` where known.
+pub(crate) fn claim_window(
+    view: &WindowView,
+    ready_block: Option<u64>,
+    railgun_accepts: bool,
+) -> ClaimWindow {
+    if !view.live() {
+        return ClaimWindow::Shut;
     }
-    if SIGNATURE_TTL_SECONDS >= lock_duration {
-        return fail(
-            ErrorCode::WrongDeployment,
-            "the contract's locks are too short to sign for",
-        );
+    if !railgun_accepts {
+        return ClaimWindow::RailgunClosed;
     }
-    Ok(Some(now + SIGNATURE_TTL_SECONDS))
+    if view.head >= view.t1 {
+        return if view.head >= view.t1.saturating_add(view.late_window) {
+            ClaimWindow::Open
+        } else {
+            ClaimWindow::Unwinding
+        };
+    }
+    if view.head < view.t0 {
+        let deep = view.stage == Some(SwapStage::Ready)
+            && ready_block.is_some_and(|block| {
+                block <= view.head_number && view.head_number - block >= READY_DEPTH_BLOCKS
+            });
+        if !deep {
+            return ClaimWindow::NotYet;
+        }
+    }
+    if view.end_clock().saturating_add(REVEAL_MARGIN_SECONDS) >= view.t1 {
+        return ClaimWindow::Unwinding;
+    }
+    ClaimWindow::Open
+}
+
+/// Whether the user may sign a reverse escrow's `ready` on `view`: open, no
+/// refund of ours ever posted, the maker's ZEC confirmed in full, and the
+/// signature's deadline, `SIGNATURE_TTL_SECONDS` from the block's time,
+/// before `t0`, from when no ready lands.
+pub(crate) fn may_sign_ready(
+    view: &WindowView,
+    refund_posted: bool,
+    deposit_confirmed: bool,
+) -> bool {
+    view.stage == Some(SwapStage::Open)
+        && !refund_posted
+        && deposit_confirmed
+        && view.head.saturating_add(SIGNATURE_TTL_SECONDS) < view.t0
+}
+
+/// Whether the user may reveal `z` to refund a reverse escrow on `view`: a
+/// ready one from `t1`, for good; an open one once no ready it signed can
+/// land, the chain being past each one's deadline or at `t0`. A ready
+/// landing first would revert the refund with `z` public.
+pub(crate) fn may_refund(view: &WindowView, ready_deadlines: &[u64]) -> bool {
+    match view.stage {
+        Some(SwapStage::Ready) => view.head >= view.t1,
+        Some(SwapStage::Open) => !ready_deadlines
+            .iter()
+            .any(|deadline| view.head <= *deadline && view.head < view.t0),
+        _ => false,
+    }
 }
 
 /// The key that spends swap `index`'s joint account, `±(e+z)`, from the
@@ -173,10 +255,10 @@ impl From<PostError> for PrivateUsdError {
 
 // ---- the maker and the relayer ----
 
-/// The quote names the pinned chain, contract, token and maker.
+/// The quote names the pinned chain, windows contract, token and maker.
 pub(crate) fn serves(pins: &Deployment, quote: &SwapQuote) -> bool {
     quote.chain_id == pins.chain_id
-        && quote.contract.0 == pins.contract
+        && pins.settles_on(&quote.contract.0)
         && quote.token.0 == pins.token
         && quote.maker.0 == pins.maker
 }
@@ -191,9 +273,23 @@ pub(crate) fn quote_error(error: SwapHttpError) -> PrivateUsdError {
     }
 }
 
-/// The maker's `/v1/info` against the pins, once per session and direction.
-/// A reverse conversion also needs the maker to take them
-/// (`reverseEnabled`), else `Unavailable`.
+/// Whether the windows and contract kind a service names, where it names
+/// them, are the pinned contract's.
+fn names_pinned_windows(
+    contract: &SwapContract,
+    min_window: Option<u64>,
+    late_window: Option<u64>,
+    contract_kind: Option<&str>,
+) -> bool {
+    min_window.is_none_or(|window| window == contract.min_window)
+        && late_window.is_none_or(|window| window == contract.late_window)
+        && contract_kind.is_none_or(|kind| kind == WINDOWS_CONTRACT_KIND)
+}
+
+/// The maker's `/v1/info` against the pins, once per session and direction,
+/// windows and contract kind included where it names them. A reverse
+/// conversion also needs the maker to take them (`reverseEnabled`), else
+/// `Unavailable`.
 pub(crate) async fn check_maker<T: HttpTransport>(
     maker: &MakerClient<'_, T>,
     pins: &Deployment,
@@ -204,13 +300,20 @@ pub(crate) async fn check_maker<T: HttpTransport>(
     if makers.checked(network, reverse) {
         return Ok(());
     }
+    let contract = pins.swap_contract()?;
     let info = maker.info().await?;
     let serves = info.api_version == MAKER_API_VERSION
         && info.maker.0 == pins.maker
         && info.chain_id == pins.chain_id
-        && info.contract.0 == pins.contract
+        && info.contract.0 == contract.address
         && info.token.0 == pins.token
-        && info.zcash_network == SwapZcashNetwork::from(network);
+        && info.zcash_network == SwapZcashNetwork::from(network)
+        && names_pinned_windows(
+            contract,
+            info.min_window,
+            info.late_window,
+            info.contract_kind.as_deref(),
+        );
     if !serves {
         return fail(
             ErrorCode::WrongDeployment,
@@ -240,16 +343,25 @@ pub(crate) async fn check_maker<T: HttpTransport>(
 }
 
 /// `GET /v1/terms`, once they are the pinned relayer's on the pinned chain
-/// and contract, and not the maker's.
+/// and windows contract, and not the maker's. Windows the terms name must be
+/// the pinned ones, which the chain answers, and a contract kind they name
+/// must be the windows'.
 pub(crate) async fn pinned_relayer_terms<T: HttpTransport>(
     relayer: &RelayerClient<'_, T>,
     pins: &Deployment,
 ) -> Result<RelayerTerms> {
+    let contract = pins.swap_contract()?;
     let terms = relayer.terms().await?;
     let serves = terms.chain_id == pins.chain_id
-        && terms.contract.0 == pins.contract
+        && terms.contract.0 == contract.address
         && terms.relayer.0 == pins.relayer
-        && terms.relayer.0 != pins.maker;
+        && terms.relayer.0 != pins.maker
+        && names_pinned_windows(
+            contract,
+            terms.min_window,
+            terms.late_window,
+            terms.contract_kind.as_deref(),
+        );
     if !serves {
         return fail(ErrorCode::WrongDeployment, "another deployment's relayer");
     }
@@ -269,7 +381,7 @@ pub(crate) fn acceptance(
     };
     let context = SwapContext {
         chain_id: quote.chain_id,
-        contract: pins.contract,
+        contract: pins.swap_contract()?.address,
         quote_id,
     };
     keys.acceptance(index, context, &terms::quote_maker_share(quote)?, &proof)

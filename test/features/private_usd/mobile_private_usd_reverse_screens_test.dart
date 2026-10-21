@@ -296,6 +296,33 @@ void main() {
     );
   });
 
+  testWidgets('with bridging off, an ended bridge offers no new one', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      MobilePrivateUsdReverseConversionView(
+        presentation: privateUsdReverseProgressPresentation(
+          status: PrivateUsdReverseStatus(
+            record: previewPrivateUsdReverseRecord(
+              phase: ApiReversePhase.refunded,
+            ),
+          ),
+          now: previewPrivateUsdNow,
+          bridgeAvailable: false,
+        ),
+        onBack: () {},
+        onInfo: () {},
+        onRetry: () {},
+        onViewRefunds: () {},
+      ),
+    );
+
+    expect(find.text(PrivateUsdCopy.reverseResultRefunded), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.refundsView), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.reverseNew), findsNothing);
+  });
+
   testWidgets('refunds: each row says where its recovery stands, and only a '
       'recoverable one offers it', (tester) async {
     PrivateUsdRefundRow row(

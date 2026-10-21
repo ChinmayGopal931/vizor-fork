@@ -32,12 +32,13 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
 - The USDC is shielded into the user's own Railgun `0zk` wallet as a pre-agreed note (the "payout note").
 - The user has no Ethereum account and no gas. A relayer sends every Ethereum transaction on the user's EIP-712 signatures, made with the per-swap auth key.
 - `Terms` is 11 words: `maker, token, amount (u128), makerKey (x, y), userKey (x, y), user, t0 (u64), t1 (u64), payoutNote (bytes32)`. The contract stores only the terms hash, and every call passes the terms.
-- `getSwap` returns `termsHash, stage (0 None / 1 Open / 2 Ready / 3 Claimed / 4 Refunded), paidOut, claimLockUntil, refundLockUntil, secret`. When the maker refunds a forward swap, or claims a reverse one, it reveals `e` in `secret`.
+- `getSwap` returns `termsHash, stage (0 None / 1 Open / 2 Ready / 3 Claimed / 4 Refunded), paidOut, secret`. When the maker refunds a forward swap, or claims a reverse one, it reveals `e` in `secret`.
+- **Windows, not locks.** Veylor settles on zecSwap's windows contract: at every moment one side at most may reveal its share, by the clock (`t0`, `t1` and the contract's `LATE_WINDOW`) and the swap's stage (§5.4). A reveal mined outside its window reverts with the share public. The lock contract zapp follows (claim and refund locks, `LOCK_DURATION`, six-word swap records) is retired here, and the steps below that once took a lock now judge a window (zecSwap's `docs/local/windows/audit3/PORT-SPEC.md`).
 - A `WrongStage` right after a deadline usually means a lagging node, so retry it.
 
 **Directions.**
 
-- **Forward (ZEC → USD):** the maker locks USDC, the user deposits ZEC, and the user claims the USDC by revealing `z`.
+- **Forward (ZEC → USD):** the maker escrows USDC, the user deposits ZEC, and the user claims the USDC by revealing `z`.
 - **Reverse (USD → ZEC):** the roles are swapped on chain. The user funds the escrow with USDC, and the maker deposits ZEC. After the user's `Ready` signature, the maker claims the USDC by revealing `e`, and the user sweeps the ZEC home with `±(e+z)`. The escrow id is `reverseSwapId = keccak256(abi.encode(userAuthAddress, makerShare, true))`, never a forward id.
 
 **Spam tokens.** Every accept needs one Privacy Pass token (RFC 9577 challenge, RFC 9578 blind RSA): one token per swap, and three walk-aways per device per day. The issuer signs only devices whose Android Keystore attestation verifies (§5.9).
@@ -76,15 +77,15 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
 
 | Call | Body | 200 answer |
 |---|---|---|
-| `GET /v1/info` | — | `{apiVersion:1, maker, chainId, contract, token, zcashNetwork:"mainnet"\|"testnet", reverseEnabled, tokenReturnKey?}` |
+| `GET /v1/info` | — | `{apiVersion:1, maker, chainId, contract, token, zcashNetwork:"mainnet"\|"testnet", reverseEnabled, tokenReturnKey?, contractKind?, minWindow?, lateWindow?}`. Windows the info names must be the pinned ones, and a kind must be `windows` (`WrongDeployment`); all three are optional because mainnet's lock-contract services name none. |
 | `POST /v1/quote` | `{units, payout: authAddress, payoutNote}` | `{quoteId, maker, makerShare, makerProof, chainId, contract, token, amount, depositZat, expiresAt, networkCost?}` |
-| `POST /v1/quote/{quoteId}/accept` | `{userShare, userProof, viewingKeys, tokenRequest?}`, plus `Authorization: PrivateToken token=…` on a paid retry | `{swapId, t0, t1, ticket}` |
+| `POST /v1/quote/{quoteId}/accept` | `{userShare, userProof, viewingKeys, tokenRequest?}`, plus `Authorization: PrivateToken token=…` on a paid retry | `{swapId, t0, t1, ticket, lateWindow?}`; a `lateWindow` other than the pinned one is another contract's (`NothingSent(MISMATCH)`, nothing paid) |
 | `GET /v1/swaps/{swapId}` | — | `{swapId, tokenReturn?}` (read only to collect the token) |
 | `POST /v1/reverse/quote` | `{units, user: authAddress, refundNote}` | `{terms: <Quote>, user, refundNote, fundingDeadline, readyDeadline, refundAfter}` |
-| `POST /v1/reverse/quote/{quoteId}/accept` | as forward | `{swapId, t0, t1, ticket}` |
+| `POST /v1/reverse/quote/{quoteId}/accept` | as forward | `{swapId, t0, t1, ticket, lateWindow?}`; another `lateWindow` cancels the conversion, nothing paid |
 | `GET /v1/reverse/swaps/{swapId}` | — | `{swapId, phase, depositTxid?, readyDeadline, refundAfter, tokenReturn?}` (advisory only) |
 
-- **`/v1/info` checks** (`of/SwapChecks.kt:9-28`): it must equal the pin in `apiVersion`, `maker`, `chainId`, `contract`, `token` and `zcashNetwork`. Reverse also needs `reverseEnabled`. A `tokenReturnKey` that differs from the pinned return key is refused (`TOKENS_REFUSED`). Check once per driver.
+- **`/v1/info` checks** (`of/SwapChecks.kt:9-28`): it must equal the pin in `apiVersion`, `maker`, `chainId`, `contract`, `token` and `zcashNetwork`, and a `contractKind`, `minWindow` or `lateWindow` it names must be the pinned contract's, as in the relayer's terms (§5.3; else `WrongDeployment`). Reverse also needs `reverseEnabled`. A `tokenReturnKey` that differs from the pinned return key is refused (`TOKENS_REFUSED`). Check once per driver.
 - **Quote well-formedness** (`of/SwapWire.kt:247-253`, `of/ReverseSwapModels.kt:228-234`):
   - `quoteId` is 32 bytes and `makerProof` 64 bytes
   - `amount` is in 1..2^120
@@ -98,43 +99,45 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
 
 | Path | Body |
 |---|---|
-| `GET /v1/terms` | answer: `{relayer, chainId, contract, fee, feeExpiresAt?, reverseFunding?, railgunSends?}`. `reverseFunding` is `{relayAdapt, token, maker, maxGasLimit, maxGasPriceWei, maxCalldataBytes, fee}`. |
-| `/v1/lock-claim` | `{swapId, terms, deadline, signature}` |
+| `GET /v1/terms` | answer: `{relayer, chainId, contract, minWindow?, lateWindow?, contractKind?, fee, feeExpiresAt?, reverseFunding?, railgunSends?}`. `reverseFunding` is `{relayAdapt, token, maker, maxGasLimit, maxGasPriceWei, maxCalldataBytes, fee}`. Windows the terms name must be the pinned ones, and a kind must be `windows` (`WrongDeployment`); all three are optional because mainnet's lock-contract services name none. |
 | `/v1/claim` | `{swapId, terms, secret: z (32 B big-endian), payout: <Payout>}` → 2 transactions (claim, then payout) |
 | `/v1/payout` | `{swapId, terms, note: {npk, encryptedBundle:[3×bytes32], shieldKey}, fee, signature}` |
 | `/v1/reverse/fund` | `{swapId, chainId, to: relayAdapt, data, value:"0"}` → 0 or 1 transaction. An empty list means a matching escrow already exists. |
-| `/v1/reverse/ready`, `/v1/reverse/lock-refund` | `{swapId, terms, deadline, signature}` |
+| `/v1/reverse/ready` | `{swapId, terms, deadline, signature}` |
 | `/v1/reverse/refund` | `{swapId, terms, secret: z, payout}` |
 | `/v1/reverse/refund-payout` | `<Payout>` |
 | `/v1/reverse/rescue` | `{swapId, terms, note, fee, nonce, deadline, signature}` |
+
+- **The windows contract's relayer** has no `/v1/lock-claim` or `/v1/reverse/lock-refund`. A `400 rejected` is final and sent nothing (a claim between `t1` and `t1 + LATE_WINDOW`, or under the margin before `t1`; a `ready` after the relayer sent a refund). A `503` with `Retry-After` asks for the same post again: the relayer holds a claim on a ready not yet 12 blocks deep before `t0`, and a reverse refund while a `ready` it sent may still land.
 
 ### 5.4 Contract reads (Ethereum JSON-RPC, `of/AtomicSwapChain.kt`)
 
 - **RPC.** Use the keyed URL if set, else publicnode (`ui/common/privateusd/PrivateUsdTokens.kt:59-65`). zapp does not fall back from the keyed URL to publicnode here.
 - **Every confirmed read** first checks `eth_chainId == deployment.chainId` (`:198-202`). It reads `eth_getBlockByNumber("latest")` for `{number, timestamp}`. Calls then use the block tag `head − confirmations + 1`, with the escrow confirmations (mainnet 3, testnet 2; `:204-209`).
-- **`getSwap(bytes32)`** (selector `0x3da0e66e`, `zl/android.md` §6). The answer must be exactly 6 words (192 bytes), or `WRONG_DEPLOYMENT` (`:144-149`):
+- **`getSwap(bytes32)`** (selector `0x3da0e66e`, `zl/android.md` §6). On the windows contract the answer must be exactly 4 words (128 bytes), or `WRONG_DEPLOYMENT` (the lock contract's six-word records, which also carried `claimLockUntil` and `refundLockUntil`, are refused):
   - `termsHash`
   - `stage` (0 None → no swap; 1 Open, 2 Ready, 3 Claimed, 4 Refunded)
   - `paidOut`
-  - `claimLockUntil`
-  - `refundLockUntil`
   - `secret`
 
   A `termsHash` that differs from `keccak256(abi.encode(terms))` is `MISMATCH` (`of/AtomicSwapModels.kt:51-54`). The terms are 11 words: `maker, token, amount, makerKey.x, makerKey.y, userKey.x, userKey.y, user, t0, t1, payoutNote` (`of/SwapTerms.kt:34-44`).
-- **`swap(id)` versus `confirmedSwap(id)`.** `swap(id)` reads `latest`, unconfirmed. It is used only for index skipping and "did it ever open". `confirmedSwap(id, terms)` reads the confirmed block and is the only read that authorizes a deposit, a reveal or completion (`of/AtomicSwapSeams.kt:122-134`).
+- **Contract identity.** Before any swap read is trusted, the pinned contract must answer `MIN_WINDOW()` and `LATE_WINDOW()` with the pinned windows and revert `LOCK_DURATION()`, which only the lock contract answers (`WRONG_DEPLOYMENT`). Checked once.
+- **`swap(id)`, `confirmedSwap(id)` and `read_swap(id)`.** `swap(id)` reads `latest`, unconfirmed. It is used only for index skipping and "did it ever open". `confirmedSwap(id, terms)` reads the confirmed block and is the only read that authorizes a deposit or completion (`of/AtomicSwapSeams.kt:122-134`). A reveal is decided on `read_swap(id, terms)`, one consistent read: the newest block's number, time and hash, then `getSwap` pinned to that hash (read again while the node does not know it; never `latest` twice, as load-balanced nodes answer a block apart). `swap_at(id, terms, n)` reads block `n`, for a ready's depth.
 - **Other reads:**
-  - `LOCK_DURATION()`: read once, since it is immutable.
+  - `MIN_WINDOW()` and `LATE_WINDOW()`: read once, since they are immutable.
   - `makerKeyUsed(bytes32)`, called with `keccak(abi.encode(authAddress, share))`.
   - `reverseFunding(bytes32)` → `(refundNote bytes32, fundingBlock uint)`.
   - `vaultOf(bytes32)`, then ERC20 `balanceOf(vault)`.
   - `rescueNonces(bytes32)`.
   - On the Railgun proxy, `tokenBlocklist(address)`: `0` means it accepts, and **any revert means paused, so closed** (`:44-51`).
-- **Selectors** (Keccak-256, computed 2026-10-13; `getSwap`, `LOCK_DURATION` and `hashTerms` match `zl/android.md` §6). Each argument is one 32-byte word; addresses are left-padded.
+- **Selectors** (Keccak-256, computed 2026-10-13, the windows' on 2026-10-20; `getSwap`, `LOCK_DURATION` and `hashTerms` match `zl/android.md` §6). Each argument is one 32-byte word; addresses are left-padded.
 
   | Call | Selector | Answer |
   |---|---|---|
-  | `getSwap(bytes32)` | `0x3da0e66e` | 6 words |
-  | `LOCK_DURATION()` | `0x485d3834` | uint256 |
+  | `getSwap(bytes32)` | `0x3da0e66e` | 4 words |
+  | `MIN_WINDOW()` | `0x52b65c4b` | uint256 |
+  | `LATE_WINDOW()` | `0x4d9fef3e` | uint256 |
+  | `LOCK_DURATION()` | `0x485d3834` | must revert: only the lock contract answers it |
   | `makerKeyUsed(bytes32)` | `0xdc1c5a08` | bool word |
   | `reverseFunding(bytes32)` | `0x4aee90e2` | `(bytes32 refundNote, uint64 block)`; `refundNote == 0` means none |
   | `vaultOf(bytes32)` | `0x0177928f` | address word |
@@ -148,13 +151,16 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
   - Walk backwards from the confirmed head in 5,000-block windows, to `head − (now − acceptedAt)/12 − 5000`.
   - Skip `removed` logs and check the address and topics.
 - **`caughtUp`.** Poll `confirmedSwap` every 2 s, 30 times (`zc/` uses 60 s), until a predicate holds; otherwise `CHAIN_LAGGING` (`of/AtomicSwapDriver.kt:494-504, 517-518`).
-- **`freshHead`.** Refuse to reason about locks when the head's timestamp trails the device clock by more than 180 s (`:507-519`).
-- **Lock turns** (`mayTakeLock`, `of/SwapChecks.kt:56-66`, mirroring `ZecSwap.sol` `_locked`/`_turnAfterLapse`). A lock is available iff no lock is held and it is not the other side's turn. It is their turn when `own > other` and `now − own < LOCK_DURATION`.
-- **Contract rules** that matter (`zs/contracts/src/ZecSwap.sol`):
-  - Forward `lockClaim` is allowed when `Ready`, or when `Open` and `now ≥ t0` (`:549-553`).
-  - `lockRefund` is allowed when `Open` at any time, or when `Ready` and `now ≥ t1` (`:466-469`).
-  - A reverse escrow is **never** claimable from `Open`, and `ready` must land before its `t0` (`:353, 552`).
-  - A signed lock's `deadline` must satisfy `now ≤ deadline < now + LOCK_DURATION` (`:374-375`).
+- **`freshHead`.** Refuse a reveal decision, or a `ready` signature, when the head's timestamp trails the device clock by more than 180 s (`CHAIN_LAGGING`).
+- **The windows contract's rules** (zecSwap's `docs/local/windows/prototype/src/ZecSwap.sol`). At every moment one side at most may reveal:
+  - Forward: the maker may refund (call the swap off) an `Open` swap until `t0`, unless it made it ready; the user may claim once it is `Ready`, or from `t0`, until `t1`; from `t1` only the maker may refund, for `LATE_WINDOW`; from `t1 + LATE_WINDOW` the user may claim again.
+  - Reverse: the maker may claim a `Ready` escrow until `t1`; the user may refund an `Open` escrow, and a `Ready` one from `t1`. `ready` lands only before `t0`.
+  - `openReverse` refuses an escrow that leaves less than `MIN_WINDOW` before `t0`, or between `t0` and `t1`.
+- **When Veylor reveals** (`swap::claim_window`, `swap::may_sign_ready`, `swap::may_refund`; held to the vectors of zecSwap's port oracle, `rust/src/wallet/private_usd/tests/windows_vectors.json`). Each is judged on one consistent read of a fresh head, and again immediately before the post. A window has opened once the block's time is at or past its start; how much is left counts from the later of the block's time and the device clock (either can only make a reveal go earlier, and the margin covers a device clock behind).
+  - Forward claim: on a `Ready` swap 12 blocks deep before `t0` (`swap_at(head − 12)` still `Ready`; the relayer answers `503` meanwhile), or from `t0` on an `Open` or `Ready` one, while `max(head, device) + 300 s < t1`. Under that margin, and from `t1` until `t1 + LATE_WINDOW`, the swap unwinds (`UNWINDING`): its ZEC comes back after the maker's refund. From `t1 + LATE_WINDOW` the claim goes for good.
+  - Reverse `ready`: only on an `Open` escrow with the maker's deposit confirmed, no refund of ours ever posted, and its deadline (`head + 120 s`) before `t0`.
+  - Reverse refund: a `Ready` escrow from `t1`; an `Open` one once the chain is past every `ready` deadline signed, or at `t0`.
+  - Never `eth_call` or `eth_estimateGas` a claim or refund: the simulation would show the node the share. Reveals go through the relayer, which on mainnet sends them through Flashbots Protect.
 
 ### 5.5 EIP-712 (`zcore/auth.rs`)
 
@@ -164,20 +170,20 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
 
 | Type | Used by |
 |---|---|
-| `LockClaim(bytes32 id,uint64 deadline)` | forward `/v1/lock-claim` |
 | `Payout(bytes32 id,address relayer,uint128 fee)` | forward `/v1/claim` and `/v1/payout` |
 | `OpenReverse(address maker,address user,address token,uint128 amount,bytes32 makerKey,bytes32 userKey,uint64 t0,uint64 t1,bytes32 refundNote,uint64 deadline)`, where `makerKey`/`userKey` are `keccak` of the 64-byte shares | reverse funding (`openReverse` calldata) |
 | `Ready(bytes32 id,uint64 deadline)` | `/v1/reverse/ready` |
-| `LockRefund(bytes32 id,uint64 deadline)` | `/v1/reverse/lock-refund` |
 | `RefundPayout(bytes32 id,address relayer,uint128 fee)` | `/v1/reverse/refund` and `/v1/reverse/refund-payout` |
 | `Rescue(bytes32 id,bytes32 note,address relayer,uint128 fee,uint64 nonce,uint64 deadline)` | `/v1/reverse/rescue` |
 
-- **Deadline.** Every lock or ready deadline is `chainHead.timestamp + 120` (`SIGNATURE_TTL_SECONDS`), which must stay below `LOCK_DURATION`.
+The lock contract's `LockClaim` and `LockRefund` are gone with it.
+
+- **Deadline.** Every `ready` or rescue deadline is `chainHead.timestamp + 120` (`SIGNATURE_TTL_SECONDS`); a `ready`'s must fall before `t0`.
 - **Ids are not in `zecswap-core`.** `swap_id` and `reverse_swap_id` live in `zecswap-chain` (`zs/crates/zecswap-chain/src/evm.rs:293-308`), which veylor does not depend on (D3). Write them in `terms.rs` with `sha3::Keccak256`:
   - `swap_id(maker, Z) = keccak(pad32(maker) ‖ Z.to_affine_bytes())` (96 bytes)
   - `reverse_swap_id(user, E) = keccak(pad32(user) ‖ E.to_affine_bytes() ‖ word(1))` (128 bytes)
   - the `makerKeyUsed` key = `swap_id(authAddress, Z)`, the same 96-byte preimage with the auth address as owner (`of/AtomicSwapChain.kt:59-63`, `SwapId.of(owner, share)`)
-- **Signing.** `UserSwapKeys.auth.sign(&digest) -> [u8; 65]` (`r‖s‖v`, low `s`, `v ∈ {27,28}`). The digests are `zecswap_core::Domain { chain_id, contract }.{lock_claim, payout, open_reverse, ready, lock_refund, refund_payout, rescue}` (`zcore/auth.rs:47-135`).
+- **Signing.** `UserSwapKeys.auth.sign(&digest) -> [u8; 65]` (`r‖s‖v`, low `s`, `v ∈ {27,28}`). The digests are `zecswap_core::Domain { chain_id, contract }.{payout, open_reverse, ready, refund_payout, rescue}` (`zcore/auth.rs`), with the windows contract as `contract`.
 
 **Known-answer vectors.** Output of `cargo run -p zecswap-client --example vectors` at `zs` `d69e3fb` (run 2026-10-13). Pin them in `rust/src/wallet/private_usd/tests/vectors.json`; do not regenerate. Inputs: `seed` = 64 × `0x07`, `NetworkType::Test`, account 0, index 0; maker share = `derive_maker_share(root = 32 × 0x09, nonce 0)`; maker `0x09eD1F966745Be18C711C346242c0974DAd7c3e5`; domain chain `11155111`, contract `0x1111…1111` (20 × `0x11`); relayer `0x2222…2222`; token `0x3333…3333`; payee `0x4444…4444`; `deadline` 1790000000; `fee` 20000.
 
@@ -227,6 +233,7 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
 ```
 
 - The signatures are deterministic (RFC 6979), so compare them byte for byte. Share proofs are randomized: test a round trip (`SwapContext::prove_user` then `verify_user`), not a value.
+- The `LockClaim` and `LockRefund` lines are the lock contract's, kept as zecSwap printed them; nothing signs either type now.
 - zapp pins the same values in `of/../commonTest/.../ZecSwapVectors.kt` (64 lines).
 
 ### 5.6 Forward (ZEC → USD) state machine
@@ -286,16 +293,17 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
 
    | Condition | Cause |
    |---|---|
-   | `refundLockUntil ≠ 0` | `MAKER_CANCELLED` |
-   | `t1 ≤ t0` or `t0 > now + 2 h` | `MISMATCH` |
+   | `t1 − t0` outside `max(MIN_WINDOW, 600 s)` to 2 h, or `t0 > now + 2 h` | `MISMATCH` |
    | `t0 < now + minSecondsToT0` (15 min mainnet, 9 min testnet; default 25 min) | `DEPOSIT_WINDOW_MISSED` |
+
+   A maker that calls the swap off refunds it (`Refunded`, §5.8): zapp's `refundLockUntil ≠ 0 → MAKER_CANCELLED` has no windows counterpart. The `t1 − t0` bound leaves a silent maker's swap a claim from `t0` of at least twice the margin, and caps how long a deposit waits for the maker's refund.
 
    - **`withFound`.** If the deposit is `Started` with no tx, search the wallet's sent, non-expired transactions for a recipient equal to the deposit address. A hit becomes `Kept`.
    - **`keepSending`** (`of/ZcashTransactions.kt:53-74`):
      1. A kept tx that is `Expired` is dropped.
      2. If there is none and the deposit is payable: `prepareDeposit` proposes `depositZat` to the address and requires exactly 1 transaction and a total ≤ `maxTotalZat` (`DEPOSIT_UNPAYABLE`).
      3. **Save `Started`**, then create (sign and store, no broadcast), then **save `Kept(tx)`**.
-     4. If not `Mined`, broadcast the kept bytes. This happens only while `refundLockUntil == 0`.
+     4. If not `Mined`, broadcast the kept bytes. This happens only while the swap is `Open`.
    - **veylor (as built, progress D-35).** Building a new deposit first waits for the main wallet's scan to reach the live lightwalletd tip (`wait = ZcashSyncing`); status reads and resends do not. A deposit that would spend Sapling notes is refused (`DEPOSIT_UNPAYABLE`): Rust cannot fetch the Sapling parameters. Send flow `private-usd-deposit:{account}:{index}`.
    - **Status** (`ua/SwapZcashTransactions.kt:98-138`):
 
@@ -312,16 +320,13 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
    - `chain.now ≥ t0` → claim (the maker went quiet).
    - Otherwise `Waiting(CONFIRMING, t0, t1)`.
 6. **`READY`** → claim. **`CLAIMED`** and not `paidOut` → payout. Then `finishPaid`.
-7. **Claim** (`AtomicSwapClaim.claim`, `:330-345`):
-   1. Build or reuse the payout (step 8).
-   2. Require Railgun open (`RAILGUN_CLOSED`).
-   3. Hold the claim lock:
-      - Skip it if `claimLockUntil − freshNow > 300 s`.
-      - Else, if `mayTakeLock` fails → `CLAIM_LOCK_LAPSING` (retry once the turn is ours).
-      - Else sign `LockClaim(id, now+120)`, `POST /v1/lock-claim`, and `caughtUp(claimLockUntil > now)`.
+7. **Claim** (zapp's `AtomicSwapClaim.claim`, `:330-345`, with the lock replaced by the claim's window, §5.4):
+   1. The window on one consistent read (`claim_window`): before `t0` and not `Ready` 12 blocks deep → `Waiting(CONFIRMING)`; under the margin before `t1`, or from `t1` until `t1 + LATE_WINDOW` → `Waiting(UNWINDING)`; otherwise open.
+   2. Build or reuse the payout (step 8).
+   3. Require Railgun open (`RAILGUN_CLOSED`), asked only once the window is open.
    4. Derive `z`.
-   5. Immediately before sending, re-read `confirmedSwap` with a fresh head, and require `stage ∈ {Open, Ready}` and `claimLockUntil − now > 300 s` (`REVEAL_MARGIN`/`CLAIM_MARGIN`).
-   6. `POST /v1/claim {secret: z, payout}`.
+   5. Immediately before sending, judge the window again on a fresh consistent read, and keep `claim_posted` on the record.
+   6. `POST /v1/claim {secret: z, payout}`. A `503` (the relayer's own depth wait) posts the same claim again later.
    7. `caughtUp(stage == Claimed)`. If not `paidOut`: `POST /v1/payout` and `caughtUp(Claimed && paidOut)`.
 
    **Never send `z` on a relayer answer or an old observation.**
@@ -334,7 +339,7 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
 9. **`finishPaid`** (`:227-239`): require a confirmed `PaidOut` event (`CHAIN_LAGGING` until one appears). Check the event's relayer and fee against the pin. `end = Paid`, with `payoutTx` and `receives` recomputed from the event's fee.
 10. **`REFUNDED`**: §5.8.
 11. **Token return.** On every advance after the deposit started, `GET /v1/swaps/{id}` collects the token if one is awaited (§5.9). Until M4, none is awaited and nothing is read (progress D-33).
-12. **Abandon** (user action, `:126-131`): allowed only while the deposit is `NotStarted` and `swap(id)` is empty → `NothingSent(NEVER_OPENED)`. As built, an unanswered record (no `t0`, such as one turned away at the token gate) ends `NothingSent(MAKER_UNAVAILABLE)` instead (progress D-33); otherwise `TooLate`.
+12. **Abandon** (user action, `:126-131`): allowed only while the deposit is `NotStarted` and `swap(id)` is empty → `NothingSent(NEVER_OPENED)`. As built, an unanswered record (no `t0`, such as one turned away at the token gate) ends `NothingSent(MAKER_UNAVAILABLE)` instead (progress D-33); otherwise `TooLate`. A record of another deployment is `WrongDeployment`: never ended or driven.
 
 The invariants for this machine are §3.5 items 1–8 and 16.
 
@@ -347,7 +352,7 @@ The invariants for this machine are §3.5 items 1–8 and 16.
 - `index`, the whole `deployment` (pinned with the record), `quote` (`ReverseQuote`), `swapId`, `userShare`, `acceptance` (the wire `SwapAcceptance`, re-sent on retry) and `birthday`
 - `account?` (the joint account's UUID), `phase`, `cost?` (`{debit, railgunFee, broadcasterFee, feeExpiresAt?}`)
 - `funding?` (`{txId?, cost, request: {swapId, chainId, to, data, value:"0"}}`), `ready?` and `cancelRequested`
-- `refundLock?`, `payout?`, `rescue?`, `receive?` (`{txId, raw, expiryHeight, receivedZat, feeZat}`), `receiveEstimate?` (`{availableZat, feeZat}`) and `receiveConfirmations`
+- `refundPosted` (kept before a refund goes), `payout?`, `rescue?`, `receive?` (`{txId, raw, expiryHeight, receivedZat, feeZat}`), `receiveEstimate?` (`{availableZat, feeZat}`) and `receiveConfirmations`
 - `acceptedAt?`, `makerAccepted` and `ticket?`
 
 **Phases:** `QUOTED → ACCEPTING → AWAITING_FUNDING → SENDING_USDC → CONFIRMING_ESCROW → RECEIVING_ZEC → AWAITING_READY → SETTLING → RECEIVING → COMPLETE`. The refund branch is `REFUND_WAIT → REFUNDING → REFUND_PAYOUT → REFUNDED`. `CANCELLED` ends a conversion with nothing paid. `FINISHED = {COMPLETE, REFUNDED, CANCELLED}`.
@@ -361,7 +366,7 @@ The invariants for this machine are §3.5 items 1–8 and 16.
    4. `index = take()`.
    5. `POST /v1/reverse/quote {units, user: authAddress, refundNote: commitment(index)}`.
    6. Verify: the deployment, `user` and `refundNote` are ours and the note is non-zero; `terms.amount == requested`; and the maker proof, by building the acceptance now.
-   7. Require `readyDeadline > chainNow + 25 min` and `refundAfter ≤ chainNow + 24 h` (`:228-236`).
+   7. Require `readyDeadline > chainNow + 25 min` and `refundAfter ≤ chainNow + 24 h` (`:228-236`), and that the quote leaves the contract's `MIN_WINDOW` from `fundingDeadline` to `readyDeadline` and from `readyDeadline` to `refundAfter`, or `openReverse` would revert the funding.
    8. `birthday = Zcash tip`; `cost = funding.cost(amount)`, using the page's `reverseCost` (§6).
    9. Save as `QUOTED`. A quoted draft is never written to history.
 2. **Go ahead** (first foreground authorization, `:94-103`): under the lock, require the quote to hold (`now < expiresAt` and `now < fundingDeadline`). Then save `ACCEPTING` with `acceptedAt`.
@@ -394,16 +399,16 @@ The invariants for this machine are §3.5 items 1–8 and 16.
    | `CLAIMED` | the maker revealed `e`. Save `RECEIVING` and **sweep home**. |
    | refund due (§5.8) | the refund path |
    | `READY` | `SETTLING` |
-   | `ready` saved | resend it while `now ≤ ready.deadline` and `refundLockUntil == 0`, never re-signed. Lapsed → `REFUND_WAIT`. |
+   | `ready` saved | resend it while `now ≤ ready.deadline` and no refund was posted, never re-signed. Lapsed → `REFUND_WAIT`. |
    | otherwise | look at the deposit (below) |
 6. **Deposit detection** (`ReverseSwapReceiving`, `:498-531`). Sync the joint account to the tip. `estimate` sums **received**, not-sent transactions with ≥ `zcashConfirmations` (2), and sets `fee = 5000 × max(2, notes + 1)` (`ua/JointAccounts.kt:92-107`).
    - If `available < depositZat`, there is no estimate yet. `available ≥ depositZat` but `available ≤ fee` → `MISMATCH`.
-   - The phase is `SETTLING` if the escrow is not `Open`. It is `REFUND_WAIT` if there is a refund lock or `now + 120 ≥ readyDeadline`. Otherwise it is `AWAITING_READY` with an estimate, or `RECEIVING_ZEC` without one.
+   - The phase is `SETTLING` if the escrow is not `Open`. It is `REFUND_WAIT` if a refund was posted or `now + 120 ≥ readyDeadline`. Otherwise it is `AWAITING_READY` with an estimate, or `RECEIVING_ZEC` without one.
    - **The maker's status API is never evidence.**
 7. **Ready** (second foreground authorization; `:147-157`, `ReverseSwapApprovals.authorizeReady`, `:291-310`):
-   1. Require the whole deposit spendable (`DEPOSIT_UNCONFIRMED`), the escrow `Open` with no refund lock, and `now + 120 < readyDeadline`.
-   2. Sign `Ready(id, now+120)`.
-   3. **Save** `ready`, `SETTLING` and `receiveEstimate` (the reviewed sweep fee), then `POST /v1/reverse/ready`.
+   1. Require the whole deposit spendable (`DEPOSIT_UNCONFIRMED`), and, on one consistent read of a fresh head (`CHAIN_LAGGING` on a head minutes behind), the escrow `Open`, no refund ever posted, and `head + 120 < readyDeadline` (`may_sign_ready`; `TOO_LATE` otherwise).
+   2. Sign `Ready(id, head+120)`.
+   3. **Save** `ready` (its deadline is the one a refund waits out), `SETTLING` and `receiveEstimate` (the reviewed sweep fee), then `POST /v1/reverse/ready`. The relayer refuses a `ready` after it sent a refund for the escrow (`400`).
    4. A restart never signs `ready`.
 8. **Sweep home** (`receive`, `:534-558`): `keepSending` with `prepareReceive`. The sweep is signed with `e + z` and capped at the reviewed `receiveEstimate.feeZat`. It is kept before it is first sent. `confirmations ≥ zcashConfirmations` → `COMPLETE`, then forget the joint account.
 9. **Cancel** (user, `:159-182`): allowed until the escrow is claimed or a receive is built (`isSettled`). It saves `cancelRequested`. The phase becomes `REFUND_WAIT` unless a refund is already under way, and an advance follows at once. With no escrow it ends `CANCELLED`. With an escrow it starts a refund.
@@ -415,7 +420,6 @@ The invariants for this machine are §3.5 items 1–8 and 16.
 - **Posts follow their save** under the per-account driver lock, which spans the post: a cancel waits for a funding's post rather than interleaving with it. The funding's answer is merged into the record as it is then.
 - **The token gate** (step 3): the user's accept returns `TokensNeeded` and leaves the record unanswered; the loop resuming an interrupted accept ends it `CANCELLED` (no tokens client before M4).
 - **The sweep home** pays at most the reviewed `receiveEstimate.feeZat`; `estimate` is the joint account's confirmed receipts and `5000 × max(2, notes + 1)`.
-- **A record's deployment** must match the pins in chain, contract, token, Railgun proxy, maker, relayer and Zcash network.
 
 ### 5.8 Refunds, offline behaviour and user-visible states
 
@@ -432,14 +436,14 @@ The invariants for this machine are §3.5 items 1–8 and 16.
    4. Else build: `SweepIntent(homeUA, balance − feeLimit, feeLimit)`, with `feeLimit = min(320,000, balance − 1)` and at least 10,000.
    5. Propose the whole balance with no change. The fee starts at 10,000 and grows to the proposal's fee until it is stable at one transaction, up to 64 tries (`ua/JointAccounts.kt:154-208`).
 3. Keep the sweep and send it until it has `zcashConfirmations`.
-4. End `Refunded(sweepTxId, cause)` and delete the joint account. The cause is `MAKER_CANCELLED` if `refundLockUntil − LOCK_DURATION < t0`, else `NOT_CLAIMED_IN_TIME`.
+4. End `Refunded(sweepTxId, cause)` and delete the joint account. The cause is `MAKER_CANCELLED` if the refund mined before `t1` (the maker called the swap off), else `NOT_CLAIMED_IN_TIME` (the refund from `t1`, after the swap unwound).
 
-**Reverse refund** (`of/ReverseSwapRefunds.kt`). It is due when cancelled, when the escrow is `Refunded`, when it is `Ready` with `now ≥ refundAfter`, or when it is `Open` with `now ≥ readyDeadline`.
+**Reverse refund** (`of/ReverseSwapRefunds.kt`, with the lock replaced by the windows, §5.4). It is due when cancelled, when the escrow is `Refunded`, when it is `Ready` with `now ≥ refundAfter`, or when it is `Open` with `now ≥ readyDeadline`.
 
 1. `Refunded` and `paidOut` → `REFUNDED`. `Refunded` without a payout → sign or reuse `RefundPayout(id, relayer, feeNow)`, save it, then `POST /v1/reverse/refund-payout` (`REFUND_PAYOUT`). The fee must be ≤ 2 USDC (D11).
 2. `Ready` and `now < t1` → `REFUND_WAIT`.
-3. If the refund lock has lapsed and `mayTakeLock`: sign `LockRefund(id, now+120)`, or reuse the saved one while its deadline is ≥ now. Save it, then `POST /v1/reverse/lock-refund` (`REFUNDING`).
-4. Under a lock: re-read fresh. Require `refundLockUntil − freshHead > 300 s`. Save the payout first. Re-read again immediately before sending. Then `POST /v1/reverse/refund {secret: z, payout}`.
+3. On one consistent read (`may_refund`): a `Ready` escrow from `t1`, an `Open` one once the chain is past every `ready` deadline signed (or at `t0`); else `REFUND_WAIT`. After a cancel with a signed `ready` that may still land, that is a wait of up to 2 minutes.
+4. Save the payout first. Judge again on a fresh read immediately before sending, keep `refund_posted` (no `ready` is signed or sent after it), then `POST /v1/reverse/refund {secret: z, payout}`. A `503` (a `ready` the relayer sent may still land) posts the same refund again later.
 5. Revealing `z` lets the maker take back its ZEC with `e + z`. The USDC goes to the refund note, less the relayer fee.
 6. **Rescue** (user action on a `REFUNDED` record): only if `paidOut` and the vault balance exceeds the relayer fee. Read `rescueNonces(id)`, require the fee ≤ 2 USDC (X6), sign `Rescue(id, note, relayer, fee, nonce, now+120)`, then `POST /v1/reverse/rescue`. The record stays finished, and `REFUNDED` records are kept beyond the 100-record history limit (`ua/ReverseSwapStoreImpl.kt:61-69`).
 
@@ -448,19 +452,19 @@ The invariants for this machine are §3.5 items 1–8 and 16.
 | Direction and state | Outcome |
 |---|---|
 | Forward, before the deposit | Past `t0 − minSecondsToT0` the deposit is never paid: `NothingSent(DEPOSIT_WINDOW_MISSED)`. |
-| Forward, deposit paid, swap `Ready`, user absent past `t1` | The maker may lock a refund and reveal `e`. The user sweeps the ZEC home whenever they next open and unlock Veylor (`Refunded(NOT_CLAIMED_IN_TIME)`, less Zcash fees). The USDC is lost only as an opportunity. |
-| Forward, `Open` after `t0` | Both sides may take locks. The first lock wins. |
-| Reverse, unready escrow | Never claimable by time (`ZecSwap.sol:552`). The USDC stays locked until the phone returns and refunds. |
-| Reverse, `Ready` | The maker claims. A user who returns late still sweeps with the revealed `e`. |
+| Forward, deposit paid, user absent past `t1 − 300 s` | The swap unwinds: from `t1` the maker may refund, revealing `e`, for `LATE_WINDOW`. The user sweeps the ZEC home whenever they next open and unlock Veylor (`Refunded(NOT_CLAIMED_IN_TIME)`, less Zcash fees). The USDC is lost only as an opportunity. A maker that never refunds leaves the claim to the user from `t1 + LATE_WINDOW`, for good. |
+| Forward, `Open` from `t0` | The user may claim; the maker can no longer call the swap off. |
+| Reverse, unready escrow | Never the maker's to claim. The USDC stays escrowed until the phone returns and refunds. |
+| Reverse, `Ready` | The maker claims until `t1`. A user who returns late still sweeps with the revealed `e`. If the maker never claims, the user refunds from `t1`. |
 
-The real hazard is a reveal that does not land before the lock lapses. That is why the 300 s margin and the fresh re-reads exist.
+The real hazard is a reveal that lands outside its window: it reverts with the share public, and the other side takes both legs. That is why the 300 s margin, the 12-block ready depth, the one consistent read and the fresh read immediately before the post exist.
 
 **User-visible states.**
 
-- **Forward stages** (`ua/AtomicSwapStage.kt`): `OPENING`, `DEPOSITING`, `CONFIRMING`, `CLAIMING`, `REFUNDING`.
+- **Forward stages** (`ua/AtomicSwapStage.kt`): `OPENING`, `DEPOSITING`, `CONFIRMING`, `CLAIMING`, `REFUNDING`. Veylor adds the `UNWINDING` wait (§5.4).
 - **Forward outcomes:** `Paid`, `Refunded(cause)`, `NothingSent(cause)`.
 - **Reverse:** one label per phase (`ua/ReverseSwapStage.kt`). The user's approvals are `FUNDING` in `AWAITING_FUNDING` and `SETTLEMENT` in `AWAITING_READY`. Cancel is shown while `!cancelRequested && !isSettled` and not in `REFUNDING`/`REFUND_PAYOUT`.
-- **Problems** (`ua/SwapLoop.kt:61-95`): `RELAYER_UNREACHABLE`, `RELAYER_REFUSED`, `RELAYER_FEE`, `ETHEREUM_UNREACHABLE`, `RAILGUN_CLOSED`, `CLAIM_TURN`, `ZCASH_WALLET`, `DEPOSIT_UNPAYABLE`, `ZCASH_REJECTED`, `MISMATCH`, `TOKENS_UNREACHABLE`, `UNEXPECTED`.
+- **Problems** (`ua/SwapLoop.kt:61-95`): `RELAYER_UNREACHABLE`, `RELAYER_REFUSED`, `RELAYER_FEE`, `ETHEREUM_UNREACHABLE`, `RAILGUN_CLOSED`, `ZCASH_WALLET`, `DEPOSIT_UNPAYABLE`, `ZCASH_REJECTED`, `MISMATCH`, `TOKENS_UNREACHABLE`, `UNEXPECTED`. zapp's `CLAIM_TURN` went with the locks.
   - A problem is shown only after 1 min of consecutive failures.
   - `ZcashWait.{SYNCING, CONFIRMATIONS}` is never a problem.
   - The block → hold mapping is at `ua/SwapLoop.kt:424-486`.
@@ -535,14 +539,14 @@ D9 drops zapp's `AtomicSwapWorker`, its scheduler, its wake alarms and its notif
 
 - The loop runs while any software account has a record under way, and only while unlocked and in the foreground (D9, D14). It calls `forward_advance`/`reverse_advance`, then naps. A `nudge` (`retryNow`: "Try now", accept, fund, ready, cancel or rescue) cuts the nap short.
 - A failed step is retried every 15 s. A crashed loop restarts after 30 s.
-- **Forward naps:** `OPENING` 5 s; `CONFIRMING` 20 s; `DEPOSIT_UNSETTLED` and `REFUNDING` 30 s (`ua/AtomicSwapRepository.kt:269-276`). **Reverse naps:** 15 s (`ua/ReverseSwapRepository.kt:184-186`).
+- **Forward naps:** `OPENING` 5 s; `CONFIRMING` 20 s; `DEPOSIT_UNSETTLED`, `REFUNDING` and veylor's `UNWINDING` 30 s (`ua/AtomicSwapRepository.kt:269-276`). **Reverse naps:** 15 s (`ua/ReverseSwapRepository.kt:184-186`).
 - A problem (§5.8) shows only after 1 minute of consecutive failures. `ZcashWait.{SYNCING, CONFIRMATIONS}` is never a problem. The mapping from a failed step to a held problem is at `ua/SwapLoop.kt:424-486`.
 - **Starts:** app foreground and unlock; the progress screen opening; and in a `finally` after accept, fund, ready, cancel and rescue (`ua/AtomicSwapRepository.kt:137-144`, `ua/ReverseSwapRepository.kt:122-129`).
 - **On a finished forward swap:** prefetch tokens.
 - **Zcash status reads:** zapp runs `syncToTip` for up to 1 minute per read, because nothing else syncs in its background (`ua/SwapZcashTransactions.kt:103-104`). In veylor, the main DB is kept current by `syncProvider`. Before a deposit decision, check that the main wallet's scan has reached the tip, else return `ZcashWait.SYNCING`. Sync `joint.db` with `sync_joint_db` on each advance that needs it.
 - **What must happen while the app is open**, for a conversion to *succeed* rather than only stay safe:
   - the forward deposit, before `t0 − minSecondsToT0`
-  - the forward claim, before the maker refunds a `Ready` swap at `t1`
+  - the forward claim, before `t1 − 300 s`; after it the swap unwinds through the maker's refund (or the claim waits for `t1 + LATE_WINDOW`)
   - the reverse `ready`, before `readyDeadline − 120 s`
   - every refund and sweep
 
@@ -597,7 +601,7 @@ pub(crate) fn delete_account(store_dir, network, account) -> Result<()>;   // dr
 | F5 | Advance: confirmed `getSwap`; verify terms; derive the joint UA from the on-chain shares. | Rust `forward.rs` | read-only | cancelled between reads |
 | F6 | Deposit: main wallet scanned to the live tip? else `ZcashSyncing`. Save `Started` → propose (RAII discard) → create (stored in the main DB) → save `Kept{txid, raw, expiry}` → broadcast. | Rust (`propose_swap_deposit`, `create_stored_proposal_transactions`, `broadcast_raw`) | after `Started` and before `Kept`: resume runs `findDeposit` (the stored tx, which the main sync is also rebroadcasting); never a second deposit | cancel is honoured only before `Started` or after `Kept` |
 | F7 | `Waiting(CONFIRMING)` until the maker marks `Ready` (or `t0` passes). Naps 20 s. | Rust + engine | nothing at risk | paused; absent past `t1` → the maker may refund → F-R1 |
-| F8 | Claim: lock-claim, fresh re-read, reveal `z`, payout. Payout signed and saved before sending. | Rust | resume re-reads the chain; a saved payout is reused; `z` is never re-sent without a fresh lock | cancel between steps; a lapsed lock means a new lock on resume |
+| F8 | Claim: the window on one consistent read, payout signed and saved, the window again on a fresh read, `claim_posted` kept, reveal `z`, payout. Too late before `t1`: `UNWINDING` until the maker's refund (F-R1), or a claim from `t1 + LATE_WINDOW`. | Rust | resume re-reads the chain; a saved payout is reused; `z` goes again only inside its window | cancel between steps |
 | F9 | `finishPaid` on a confirmed `PaidOut` → `end = Paid`. Engine prefetches tokens; the balance polls at 30 s (arriving). | Rust; `privateUsdBalanceProvider` | idempotent | — |
 
 **Forward refund.**
@@ -620,7 +624,7 @@ pub(crate) fn delete_account(store_dir, network, account) -> Result<()>;   // dr
 | R5 | Page `prepareReverse` (≤ 10 min; `proof` events; keep-awake). | `RailgunEngine` | proof lost; nothing paid; "Pay {debit}" proves again | lock closes the page → `closed`; background → the result is dropped unless still foreground, unlocked and same epoch |
 | R6 | `…_submit_funding`: cost changed → saved, `FundingCostChanged`, AWAITING_FUNDING ("Pay {debit}"); else save `funding` + SENDING_USDC, then POST. | Rust | after the save: resume resends the same bytes only while the node does not know the hash and `now < fundingDeadline` | as F3 |
 | R7 | Advance (15 s naps): escrow confirmed → RECEIVING_ZEC; the maker deposits ZEC; `sync_joint_db`; 2 confirmations → AWAITING_READY (banner "needs attention"). | engine → Rust | read-only | paused |
-| R8 | "Authorize settlement" → `…_authorize_ready`: sign, save `ready`, SETTLING, then POST. | progress screen → Rust | resume resends the saved `ready` until its deadline; never re-signs | — |
+| R8 | "Authorize settlement" → `…_authorize_ready`: on a fresh head, with its deadline before `t0` and no refund posted, sign, save `ready`, SETTLING, then POST. | progress screen → Rust | resume resends the saved `ready` until its deadline, never after a refund was posted; never re-signs | — |
 | R9 | The maker claims (reveals `e`) → RECEIVING: sweep home capped at the reviewed fee, kept before first send → COMPLETE, delete the joint account. | Rust | as F-R3 | as F6 |
 
 **Reverse cancel, refund and rescue.**
@@ -628,7 +632,7 @@ pub(crate) fn delete_account(store_dir, network, account) -> Result<()>;   // dr
 | # | Step | Component | Crash/kill | Lock |
 |---|---|---|---|---|
 | RC1 | Cancel (confirmation sheet) → `…_cancel`: saves `cancelRequested`, REFUND_WAIT; no escrow → CANCELLED. A funding proof in flight is dropped at R6. | progress screen → Rust | the flag is saved first | — |
-| RC2 | Refund due → lock-refund (signed, saved, POSTed) → fresh re-read (> 300 s) → payout saved → reveal `z` → REFUND_PAYOUT → REFUNDED. | Rust | each signature saved before sending; resume re-reads the chain | cancel between steps |
+| RC2 | Refund due → its window on one consistent read (a `ready` that may still land waits it out) → payout saved → the window again on a fresh read → `refund_posted` kept → reveal `z` → REFUND_PAYOUT → REFUNDED. | Rust | each signature saved before sending; resume re-reads the chain | cancel between steps |
 | RC3 | Refunds screen: `…_can_rescue` per REFUNDED row every 15 s; "Recover refund" (sheet) → `…_rescue`. | refunds provider → Rust | rescue is idempotent by `rescueNonces` | the screen's poller stops; nothing at risk |
 
 ## 6. Railgun host reference
@@ -715,7 +719,7 @@ JSON strings go over one `WebMessagePort`. The page side is `rl/web/src/index.js
 |---|---|---|---|---|
 | `start` | 2 min | `{network: "mainnet"\|"sepolia", rpcUrls: [String], poiNodeUrls: [String], debug: Bool}` | `{fees: {unshield: Int bps}}` (the JS also returns `shield`) | `wallet.js:53-88` |
 | `openWallet` | 1 min | `{encryptionKey: hex32, mnemonic: String}` | `{address: "0zk…"}` | `wallet.js:91, 96-112` |
-| `refresh` | **2 h** | `{}` | `{ "<bucket>": [{token: 0xAddr, amount: dec}] }` | `wallet.js:115-161` |
+| `refresh` | **2 h** | `{}` | `{balances: {"<bucket>": [{token: 0xAddr, amount: dec}]}, received: [{txid, timestamp, token, amount: dec, bucket, sender}] \| null, screening: "ok" \| "failed"}` | `wallet.js` `refresh`, `received.js` |
 | `broadcasterFee` | 2 min | `{to: 0zk\|0x, token, amount, broadcaster: B}` | `{fee: dec}` | `transact.js:38-56` |
 | `transfer` | 10 min | `{to: 0zk, token, amount, fee, broadcaster: B}` | `{chainId, to, data, value:"0", spends:[{tree, nullifiers:[hex]}], proofMs}` | `transact.js:59-76` |
 | `unshield` | 10 min | `{to: 0x, token, amount, fee, broadcaster: B}` | same as `transfer` | `transact.js:79-95` |
@@ -796,6 +800,7 @@ A call whose coroutine is cancelled is answered `closed`, so every call gets exa
   1. `refreshBalances` for the notes scan, retried until a scan actually starts: 20 attempts × 3 s, and `Incomplete` throws (`:136-150`)
   2. `refreshReceivePOIsForWallet` and `generatePOIsForWallet`, best effort (`:118-124`)
   3. `getTokenBalancesByBucket` (`:153-161`)
+  4. As built: `getWalletTransactionHistory` for the private sends the wallet received (`received.js`: `TransferReceiveERC20s` only, so no shield, deposit, payout or change). The SDK builds it from the notes the scan already decrypted, so it sends no request. `sender` is set only where the sender showed its 0zk address, and `timestamp` is null where the engine has no block time. A history it cannot read gives `null`, and the balances stand.
 - **Serialized spends.** `broadcasterFee`, `transfer`, `unshield` and `prepareReverse` run one at a time (`transact.js:24-31`).
 - **First sync.** The first sync reads all of Railgun's history (using the `rail-squid.squids.live` quick sync). Its notes phase alone took about 40 minutes on a Galaxy A35 over Wi-Fi, about 60 % of the sync, before the txid batches; the milestone table is at `ui/common/privateusd/PrivateUsdBalanceRepository.kt:436-448, 480-483`. Nothing is kept until it completes, and a timeout restarts it (`RailgunProtocol.kt:39-42`).
 - **The engine wrapper** (`ui/common/repository/RailgunEngine.kt`):
@@ -934,7 +939,7 @@ Dollar amounts are `amount / 10^decimals` with decimals 6, taken from the table 
 - **Persistence.** zapp persists the proved bytes before posting, in `PrivateUsdSendLog` (`private_usd_sends_v2`, max 100). It reconciles them on every balance sync (`PrivateUsdSender.kt:269-437`; veylor runs this in Rust, `private_usd_send_settle_all`, §8.2).
 - **One outgoing payment at a time.** `PrivateUsdSpendGuard` allows one outgoing payment per wallet, conversions included, across restarts (`PrivateUsdSpendGuard.kt:32-96`).
 - **Fees.** Railgun's unshield fee is 25 bps (`RailgunFees`, from the engine; `of/AtomicSwapDriver.kt:297` `RAILGUN_FEE`).
-- **Screening caveat.** On Sepolia, relayed-send outputs stay `MissingExternalPOI` because of an indexer break (`railgun-sends.md` "Screening").
+- **Screening caveat.** On Sepolia, Railgun's indexer breaks its verification-hash chain at transaction 4188, which held relayed-send outputs in `MissingExternalPOI` (`railgun-sends.md` "Screening"). The page reads Sepolia's list through our worker `railgun-sepolia-list`, which repairs the chain, so the wallet proves its own sends again (progress D-138).
 - **Fee cap (D11).** Refuse a `broadcasterFee` result above 2 USDC (in the fee token's base units) with `send_error_fee_cap`, before proving.
 - **veylor storage.** The send log is the `railgun_sends` table in `swaps.db` (§3.4). Persist the proved bytes before posting. Reconcile them on every balance sync. As built (M7 part 1, progress D-90 to D-94): `rust/src/wallet/private_usd/sends.rs` keeps the page's proof (`keep`), posts only kept bytes (`Sends::transact`) and settles from the chain (`Sends::settle_all`); `relayer_client.rs` maps the answers (a `Retry-After` above an hour waits an hour) and pins the terms; `evm_rpc.rs` reads `nullifiers(uint256,bytes32)` through the `SendChain` seam. The Dart half (M7 part 2, progress D-96 to D-98): `services/private_usd_sender.dart` prices, proves, keeps (only while the tap's engine epoch holds) and posts once; `privateUsdSenderProvider` settles on every Railgun sync, on unlock and on an account switch; `services/private_usd_spend_guard.dart` reads the send log across restarts.
 
@@ -1009,7 +1014,9 @@ Source: `ui/common/atomicswap/AtomicSwapMainnet.kt:18-79` and `AtomicSwapTestnet
 | Relayer URL | `…mainnet…/relayer` | `…testnet…/relayer` |
 | Issuer URL / name | `…mainnet…/issuer` / `zecswap-mainnet-issuer` | `…testnet…/issuer` / `zecswap-testnet-issuer` |
 | Ethereum chain id | 1 | 11155111 (Sepolia) |
-| ZecSwap contract | `0x4708D7d36992b7e33Ad97a1ab0A31c3ac6C4fe6D` (block 26178667, `LOCK_DURATION` 1800 s) | `0xD75Efc6a157CC0A95f66962DA86DDf35d9F2617c` (block 11860526, `LOCK_DURATION` 600 s) |
+| ZecSwap windows contract (bridging) | none: zecSwap's mainnet still settles on its lock contract, so bridging is off (`ApiDeployment.bridgeAvailable` false; quotes and conversions are `Unavailable`) until a windows contract is deployed there | `0x459b0a69e0f736666b66a3ffe0fc17c11f05980d` (block 11958709, `MIN_WINDOW` 1800 s, `LATE_WINDOW` 3600 s) |
+| Retired lock contracts (their used indices are skipped) | `0x4708D7d36992b7e33Ad97a1ab0A31c3ac6C4fe6D` (block 26178667, `LOCK_DURATION` 1800 s) | `0xD75Efc6a157CC0A95f66962DA86DDf35d9F2617c` (block 11860526, `LOCK_DURATION` 600 s) |
+| The maker's deadlines (its policy, not pinned) | — | `t0` 45 min after the open, `t1` an hour after `t0`; an unpaid swap is called off 5 min before `t0` |
 | Swap token | USDC `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` (`of/SwapDeployment.kt:60`) | test USD `0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c` (`ZecSwap Test USD`, version `2`, 6 decimals, EIP-3009; Sepolia block 11,944,315; the hosted maker and relayer moved to it at 23:42 UTC on 2026-10-18, for swaps too; the retired one, `0x5764D0044bef5AA839E0dDafE2073421101B9Ed8`, no longer swaps); Circle test USDC is `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` (`PrivateUsdTokens.kt:36-42`) |
 | Maker address (only maker accepted) | `0x4370eEaa6bEcf1dAeF21Deeb0379Eb7f6CaEf7eF` | `0x2bac02b5032e9092493814c705f156b49e288922` |
 | Relayer address (payouts signed for) | `0xcBcb5f57C79C88a0E4BB450289dE2088958A017F` | `0xd9633572041886fa7584a2e12f36c8c7f1126412` |
@@ -1019,7 +1026,7 @@ Source: `ui/common/atomicswap/AtomicSwapMainnet.kt:18-79` and `AtomicSwapTestnet
 | Issuer `tokenKey` (base64url SPKI, RSA-PSS SHA-384) | full value below (`AtomicSwapMainnet.kt:29-34` = `mainnet-beta.json` `issuer.tokenKey`) | full value below (`AtomicSwapTestnet.kt:30-35` = `sepolia-tokens.json` `tokens.issuerTokenKey`) |
 | Maker `tokenReturnKey` | full value below (`AtomicSwapMainnet.kt:35-40` = `issuer.returnKey`) | full value below (`AtomicSwapTestnet.kt:36-41` = `tokens.makerReturnKey`) |
 | Zcash confirmations (maker counts a deposit) | 2 | 2 |
-| Escrow / lock / payout confirmations (Ethereum) | 3 (the default, `of/SwapDeployment.kt:79`) | 2 |
+| Open / escrow / payout confirmations (Ethereum) | 3 (the default, `of/SwapDeployment.kt:79`) | 2 |
 | Min `t0` (`ZcashDepositTerms.minSecondsToT0`) | 15 min | 9 min |
 | Default min `t0` / max `t0` | 25 min (`of/SwapTypes.kt:30`) / 2 h (`of/AtomicSwapDeposits.kt:126`) | same |
 | Screening time shown | 1 h | 1 min |
@@ -1051,8 +1058,11 @@ MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQME
 
 ### 7.2 Driver constants (both networks)
 
-- `SIGNATURE_TTL_SECONDS` = 120 (`of/SwapTypes.kt:33`)
-- `REVEAL_MARGIN_SECONDS`, the `CLAIM_MARGIN`, = 300 (`:36`, and `zs/crates/zecswap-client/src/user.rs:24`)
+- `SIGNATURE_TTL_SECONDS` = 120 (`of/SwapTypes.kt:33`): a `ready` or rescue holds this long
+- `REVEAL_MARGIN_SECONDS`, the `CLAIM_MARGIN`, = 300 (`:36`, and `zs/crates/zecswap-client/src/user.rs:24`): a claim goes only while `max(head, device) + 300 s < t1`
+- `READY_DEPTH_BLOCKS` = 12: before `t0` a claim goes on a ready only this deep, the port oracle's rule. Veylor reads the swap at `head − 12`, one block stricter than zecSwap's reference client (`head − 11`)
+- `MAX_T0_TO_T1_SECONDS` = 2 h: the most a forward swap's `t1` may follow its `t0`; the least is `max(MIN_WINDOW, 600 s)`
+- `MAX_HEAD_LAG_SECONDS` = 180 (`freshHead`)
 - `ACCEPT_MARGIN_SECONDS` = 15 (`of/AtomicSwapDriver.kt:294`)
 - `RAILGUN_FEE` = 25 bps (`:297`)
 - quick HTTP timeout 20 s (`of/SwapClients.kt:438`); relayer ticket header `ZecSwap-Ticket` (`:436`)
@@ -1082,6 +1092,8 @@ Every knob is a Dart define, read once with `String.fromEnvironment`/`bool.fromE
 - Dart passes the URL to Rust on each engine call that reads the chain, and to the page's `start.rpcUrls` (keyed first, then publicnode). Rust's engine uses the keyed URL if it is set, else publicnode. Like zapp (`PrivateUsdTokens.kt:59-65`), it does not fall back from a keyed URL to publicnode.
 - **Never put the URL in a swap record or a log.** Changing the key must not strand a reverse swap.
 - A define sits in plain text in the release binary, like zapp's `BuildConfig`. It is "secret" only from the repo. Use a dedicated, rate-capped key. **Unverified:** whether Alchemy origin allowlisting helps. WebView requests carry `Origin: https://railgun.appassets.androidplatform.net`; Rust requests carry none.
+
+**Bridging off (mainnet).** No define: the pins decide. `private_usd_deployment` returns `bridgeAvailable: false` where no windows contract is pinned (mainnet for now). The app then hides Bridge and the ways to a new bridge, and sends `/private-usd/convert…` to `/private-usd`; Rust refuses quotes and conversions (`Unavailable`). The balance, deposits, sends and withdrawals are unaffected, and a conversion's progress stays reachable.
 
 **Kill-switch semantics (D16).**
 
@@ -1173,7 +1185,7 @@ Each row is a step zapp performs, and the veylor seam that performs it. "New" me
   - **"async" in the table below means a Dart `Future`**, not necessarily a Rust `async fn`. Follow the file you are next to: most of `api/sync.rs` is plain `pub fn` that FRB runs on a worker thread and that builds its own runtime (`:429`); `api/network_privacy.rs` uses `pub async fn` on FRB's tokio runtime. Use plain `pub fn` + `catch` + an inner runtime for the private USD calls, and `pub async fn` only for the bridge start/stop (it spawns a long-lived tokio task).
   - **No data-carrying enums** (no `freezed` in `pubspec.yaml` dependencies; FRB would emit `@freezed` sealed classes). A result such as `Accepted | TokensNeeded | NothingSent(cause)` is a struct `{ kind: ApiAcceptKind, cause: Option<ApiNothingSentCause>, … }` with fieldless enums.
   - **Integer widths.** `u64` becomes Dart `BigInt` (`lib/src/rust/api/sync.dart:202`); `u32`/`i32` become `int`. Use `u32` for indices, counts and `next_poll_ms`, `i64` for unix seconds, and decimal `String` for token amounts. `Option<T>` → `T?`.
-- **Errors.** Copy `ApiWalletError` (`api/sync.rs:63-122`): `pub struct ApiPrivateUsdError { code: ApiPrivateUsdErrorCode, message: String }`, with `#[frb(dart_code = "@override String toString() => message;")]`. The codes mirror §5.8's problems plus the pre-send errors: `RelayerUnreachable`, `RelayerRefused`, `RelayerFee`, `EthereumUnreachable`, `RailgunClosed`, `ClaimTurn`, `ZcashWallet`, `DepositUnpayable`, `ZcashRejected`, `Mismatch`, `TokensUnreachable`, `TokensRefused`, `TokensDeviceRefused`, `NoTokensToday`, `TokensNeeded`, `Keystore`, `ChainLagging`, `QuoteExpired`, `MakerUnavailable`, `MakerBusy`, `AmountRefused`, `FundingCostChanged`, `DepositUnconfirmed`, `TooLate`, `Busy`, `StoreUnreadable`, `Unavailable`, `RouteBlocked` and `Other`, plus `Cancelled` since M5 (a call stopped by `private_usd_cancel`; never a failure, progress D-32). Dart never branches on message text; `privateUsdErrorMessage(code)` maps them to copy (§9.6). Wrap panics with the `catch` helper (`api/secret.rs:7-21`).
+- **Errors.** Copy `ApiWalletError` (`api/sync.rs:63-122`): `pub struct ApiPrivateUsdError { code: ApiPrivateUsdErrorCode, message: String }`, with `#[frb(dart_code = "@override String toString() => message;")]`. The codes mirror §5.8's problems plus the pre-send errors: `RelayerUnreachable`, `RelayerRefused`, `RelayerFee`, `EthereumUnreachable`, `RailgunClosed`, `ZcashWallet`, `DepositUnpayable`, `ZcashRejected`, `Mismatch`, `TokensUnreachable`, `TokensRefused`, `TokensDeviceRefused`, `NoTokensToday`, `TokensNeeded`, `Keystore`, `ChainLagging`, `QuoteExpired`, `MakerUnavailable`, `MakerBusy`, `AmountRefused`, `FundingCostChanged`, `DepositUnconfirmed`, `TooLate`, `Busy`, `StoreUnreadable`, `Unavailable`, `RouteBlocked` and `Other`, plus `Cancelled` since M5 (a call stopped by `private_usd_cancel`; never a failure, progress D-32) and `WrongDeployment` (a record, service or node of another deployment, the lock contract's included; never followed). The lock contract's `ClaimTurn` is gone (progress D-137). Dart never branches on message text; `privateUsdErrorMessage(code)` maps them to copy (§9.6). Wrap panics with the `catch` helper (`api/secret.rs:7-21`).
 - **Concurrency.** A module-level `OPERATIONS: Mutex<()>` per DB, like `wallet::gift_card_tracking::OPERATIONS` (defined at `rust/src/wallet/gift_card_tracking.rs:8`, taken at `api/gift_card_tracking.rs:14-16`), plus an id-keyed cancel registry like `cancel_payment_link_claim_sync` (`api/sync.rs:545`; registry shape at `:19-20, 414-449`). From M5 also a per-account async driver lock held across network I/O (§5.10 "veylor engine"); `OPERATIONS` never is.
 - **Streams.** The swap engine needs none: Dart drives `forward_advance(...) -> ApiForwardAdvance { record, wait?, next_poll_ms, problem? }` from a foreground loop, and polls the sync `private_usd_activity(op_id)` for the in-flight step label. Use `StreamSink<T>` (`crate::frb_generated::StreamSink`; examples at `api/sync.rs:305-346` and `api/ledger.rs:512-545`) only if joint-sync progress is shown. Railgun `scan` and `proof` events come from the Kotlin `EventChannel`, not FRB.
 - **Dart conventions.** Riverpod 3 (`flutter_riverpod: ^3.3.1`).
@@ -1314,7 +1326,7 @@ pub struct ApiAcceptResult { pub kind: ApiAcceptKind, pub cause: Option<ApiNothi
 /// means "maybe opened": Dart must then open the progress route, not the error.
 pub fn private_usd_forward_accept(ctx, secret, lwd, rpc, index: u32, max_total_zat: u64) -> Result<ApiAcceptResult, ApiPrivateUsdError>;
 
-pub enum ApiForwardWait { Opening, Confirming, DepositUnsettled, Refunding, ZcashSyncing }
+pub enum ApiForwardWait { Opening, Confirming, DepositUnsettled, Refunding, ZcashSyncing, Unwinding }   // Unwinding: too late to claim before t1; the maker's refund brings the ZEC back
 pub enum ApiForwardOutcome { Paid, Refunded, NothingSent }
 pub enum ApiRefundCause { MakerCancelled, NotClaimedInTime }
 pub enum ApiForwardPhase { Opening, Depositing, Confirming, Claiming, Refunding, Paid, Refunded, NothingSent }   // as built: the store's phase
@@ -1322,6 +1334,7 @@ pub struct ApiForwardRecord {          // flat view of zapp's record (§5.6); th
     pub index: u32, pub swap_id: String, pub phase: ApiForwardPhase, pub accepted_at: i64, pub quote_expires_at: i64,
     pub deposit_zat: u64, pub max_total_zat: Option<u64>, pub amount: String, pub receives: String, pub relayer_fee: String,
     pub t0: Option<i64>, pub t1: Option<i64>,
+    pub late_claim_at: Option<i64>,    // t1 + LATE_WINDOW: the claim goes for good if the maker never refunded; None before the maker answered
     pub deposit_txid: Option<String>,  // internal byte order hex, = TransactionInfo.txidHex (M5 pitfalls); records keep zapp's display hex
     pub deposit_confirmations: Option<u32>,   // as built: only while under way with a deposit kept (0 until mined)
     pub sweep_txid: Option<String>, pub payout_tx: Option<String>,
@@ -1576,7 +1589,7 @@ pub fn private_usd_send_settle_all(store_dir: String, network: String, eth_rpc_u
 - **Write `rust/src/wallet/private_usd/evm_rpc.rs`** (about 250 lines) over `routed_request`, with JSON-RPC 2.0 `{jsonrpc, id, method, params}` and one request per call (no batching, since publicnode limits it):
   - `eth_chainId` → must equal the pin (§5.4)
   - `eth_getBlockByNumber("latest", false)` → `{number, timestamp}`
-  - `eth_call({to, data}, blockTag)`, for `getSwap(bytes32)` `0x3da0e66e`, `LOCK_DURATION()`, `makerKeyUsed(bytes32)`, `reverseFunding(bytes32)`, `vaultOf(bytes32)`, ERC-20 `balanceOf`, `rescueNonces(bytes32)`, and the proxy `tokenBlocklist(address)` (revert = closed)
+  - `eth_call({to, data}, blockTag)`, for `getSwap(bytes32)` `0x3da0e66e` (at a block number, or pinned to the newest block's hash for a reveal), `MIN_WINDOW()`, `LATE_WINDOW()`, `LOCK_DURATION()` (which must revert), `makerKeyUsed(bytes32)`, `reverseFunding(bytes32)`, `vaultOf(bytes32)`, ERC-20 `balanceOf`, `rescueNonces(bytes32)`, and the proxy `tokenBlocklist(address)` (revert = closed)
   - `eth_getLogs({address, topics:[PaidOut sig, id], fromBlock, toBlock})` in 5,000-block windows
   - `eth_getTransactionReceipt(hash)` for the reverse funding `REVERTED` check
 - **ABI.** Fixed 32-byte words; there are no dynamic types in these calls. Encode by hand and decode by slicing (`getSwap` must be exactly 192 bytes). Use `zecswap-core`'s terms hashing and `sha3::Keccak256`.
@@ -1993,6 +2006,7 @@ Rules are zapp's unless marked **veylor**. Data references point to §6.6 (balan
   | Send or withdraw, confirmed | "Sent privately" or "Withdrew" | date · "to 0zk1qy86…l4zu" (8 + 4 characters) | `−$amount` | tx on Etherscan |
   | Send not in a block yet | same | date · "not in a block yet" | same | tx if known |
   | Send still proving | same | date · "sending…" | same | none |
+  | Private send received (as built) | "Received privately" | date · "from 0zk1qy86…l4zu" where the sender showed it, else "sender hidden"; "available once screened" until spendable | `+$amount`, positive once screened | tx on Etherscan |
 
   The empty state reads "Your conversions, sends and withdrawals will show here." A "Refunds" button sits beside the "Activity" heading (`PrivateUsdView.kt:193-214`).
 - **Primary button:** "Convert". It opens the conversion under way if there is one, else the convert screen. It is enabled when a conversion exists or `canStartConversion` (§6.7: `AVAILABLE` or `CONVERTING`).
@@ -2151,7 +2165,8 @@ The **review** phase (same screen):
 | Deposit `Started`/`Kept`, being built or sent (activity `DEPOSITING`) | "Sending your ZEC" · "A few seconds" | none | none (**veylor: keep the app open**; the deposit needs the seed) |
 | `Waiting(CONFIRMING)` | "Waiting for confirmations" · "n of 2 · about x min" (75 s per block) | `confirmations ≥ 2`, no payout yet, `t0 > now`: "The market maker hasn't confirmed your deposit yet. If it still hasn't by {t0}, Veylor claims your dollars itself." | none (**veylor: stay open past `t0`**) |
 | `ZcashWait.SYNCING` (any step) | detail "Waiting for your Zcash wallet to sync" | none | none |
-| Claim, lock or payout under way (any other activity) | "Claiming your dollars" · "About a minute" | none | none |
+| Claim or payout under way (any other activity) | "Claiming your dollars" · "About a minute" | none | none |
+| `Waiting(UNWINDING)`, no claim running | two steps: "Waiting for the market maker's refund", then "Bringing your ZEC back" | "The swap couldn't be completed in time, so it unwinds: your ZEC comes back after the market maker's refund. If the market maker hasn't refunded by {lateClaimAt}, Veylor claims your dollars instead." | none (**veylor: keep open**; the sweep or the late claim needs the seed) |
 | `end = Paid`, balance not yet synced 30 s after it | all four complete; "Arriving in your private balance" · "About a minute" | none | "View private USD" |
 | `Paid`, arrived but still `arriving` | "Screening" · "about 1 h" (mainnet; 1 min testnet) | none | "View private USD" |
 | `Paid`, screened | all complete | none | "View private USD" |
@@ -2159,8 +2174,8 @@ The **review** phase (same screen):
 | `Waiting(DEPOSIT_UNSETTLED)` | the confirmations step | "The market maker called the swap off while your ZEC payment was still unconfirmed. If it goes through, Veylor brings your ZEC back." | none |
 | Resuming after a restart | the current step | "Picking up where it left off." | none |
 | Any problem after 1 min of failures (§5.8) | the current step | problem card "Taking longer than usual" + message | "Try now" |
-| `end = Refunded(cause)` | no steps | result "Your ZEC came back" + body by cause | "Try again" |
-| `end = NothingSent(cause)` | no steps | result "Nothing was sent" + body by cause | "Try again" |
+| `end = Refunded(cause)` | no steps | result "Your ZEC came back" + body by cause | "Try again" (none while bridging is off) |
+| `end = NothingSent(cause)` | no steps | result "Nothing was sent" + body by cause | "Try again" (none while bridging is off) |
 
 **Reverse** (§5.7; `pu/reverse/PrivateUsdReverseProgress.kt:114-191`, phase labels `common/atomicswap/ReverseSwapStage.kt:14-31`). The list is `Prepare → Fund → Deposit → Approve → Settle → Receive`. Refund phases show one step labelled with the phase.
 
@@ -2182,7 +2197,7 @@ The **review** phase (same screen):
 | `REFUNDED` | none | "Conversion called off" · "your dollars came back" | result "Refund sent" / "Private refund paid. Railgun screening may delay availability." | "New conversion"; "View refunds" → rescue if eligible | none |
 | `CANCELLED` | none | no row | result "Conversion cancelled" / "Conversion cancelled; no escrow payment remains" | "New conversion" | none |
 
-The cancel-requested note: "Refund requested…" before `ready`, or "…after {refundAfter}…" after it.
+The cancel-requested note: "Refund requested…" before `ready`, or "…after {refundAfter}…" after it. While bridging is off, an ended conversion offers no "New conversion".
 
 **What needs the user.** In zapp, only the funding payment (`AWAITING_FUNDING`), the settlement approval (`AWAITING_READY`), cancel and rescue. In veylor, **every key-using step also needs the app open and unlocked** (D9): the forward deposit, claim and sweep, and the reverse fund, ready, refund and sweep. So the progress screens and the banner must say so (§9.6 `F` rows). Keep the screen awake while a progress screen is visible and a key step is pending (X8), by OR-ing `privateUsdKeepAwakeProvider` into the watch in `SyncKeepAwakeNativeHost.build` (`lib/src/core/widgets/mobile/sync_keep_awake_native_host.dart:62-70`), never by calling `NativeScreenAwakeBridge` directly (M5 pitfalls; the opt-in sync keep-awake is `syncKeepAwakeActiveProvider`, `lib/src/providers/sync_keep_awake_provider.dart:168`). As built (iOS progress VI-18): it also holds through a Railgun first sync while the wallet is unlocked (`privateUsdFirstSyncKeepAwakeProvider`; the balance notifier registers each first sync in `privateUsdFirstSyncsProvider`).
 
@@ -2269,6 +2284,7 @@ Flags:
 | `private_usd_load_failed` | Couldn't load the balance. Try again in a moment. | |
 | `private_usd_empty_title` | No private dollars yet | |
 | `private_usd_empty_body` | Convert ZEC into dollars nobody else can see: not your balance, and not who you pay. | |
+| N `empty_body_receive` | Receive dollars nobody else can see: not your balance, and not who you pay. (bridging off) | N |
 | `private_usd_receive_address` | Receive from a Railgun wallet (M9; was "Your receive address") | |
 | `private_usd_copy_address` | Copy your private USD address | |
 | `private_usd_checking_payments` | Checking pending payments… | |
@@ -2298,6 +2314,9 @@ Flags:
 | `private_usd_activity_sent` / `_withdrew` | Sent privately / Withdrew |
 | `private_usd_activity_detail` | {a} · {b} |
 | `private_usd_activity_to` | to {address} |
+| N `private_usd_activity_received` | Received privately (a private send another wallet made to this one; on `/private-usd` only, as sends) |
+| N `private_usd_activity_from` / `_sender_hidden` | from {address} / sender hidden |
+| N `private_usd_activity_received_screening` | available once screened |
 | `private_usd_activity_in` / `_out` | +{$} / −{$} |
 | `private_usd_activity_sending` / `_unconfirmed` | sending… / not in a block yet |
 | `private_usd_activity_open_conversion` / `_open_transaction` | Open conversion / View transaction |
@@ -2399,9 +2418,11 @@ Flags:
 | `convert_unsettled` | The market maker called the swap off while your ZEC payment was still unconfirmed. If it goes through, Veylor brings your ZEC back. | B |
 | `convert_resuming` | Picking up where it left off. | |
 | `convert_refunding` | The swap was called off. Veylor is bringing your ZEC back to your wallet. | B |
+| `convert_step_unwind` | Waiting for the market maker's refund | N |
+| `convert_unwinding` / `_until` | The swap couldn't be completed in time, so it unwinds: your ZEC comes back after the market maker's refund. / {that} If the market maker hasn't refunded by {time}, Veylor claims your dollars instead. | N |
 | `convert_background_note` | Keep Veylor open until this finishes. If you leave, it pauses and picks up when you're back. | B, F |
 | `convert_progress_info_title` | What's happening | |
-| `convert_progress_info_open` | The market maker opens the swap on Ethereum and locks the dollars in it. | |
+| `convert_progress_info_open` | The market maker opens the swap on Ethereum and puts the dollars in it. | B |
 | `convert_progress_info_deposit` | Veylor sends your ZEC to the deposit address you and the market maker share. | B |
 | `convert_progress_info_confirm` | The market maker waits for {n} Zcash confirmation(s). (plural) | |
 | `convert_progress_info_claim` | Veylor claims the dollars into your private balance. A relayer pays the Ethereum fees. | B |
@@ -2418,7 +2439,6 @@ Flags:
 | `convert_problem_relayer_fee` | The relayer's fee is more than this conversion pays out, or above the 2 USDC limit, so Veylor waits for it to come down. | B, N |
 | `convert_problem_ethereum` | Veylor can't reach Ethereum right now. It keeps trying while it's open. | B, F |
 | `convert_problem_railgun` | Railgun isn't accepting deposits right now, so Veylor holds off claiming. If it doesn't reopen in time, the swap is called off and your ZEC comes back. | B |
-| `convert_problem_turn` | The market maker holds the claim for a few minutes. Veylor claims as soon as it's your turn. | B |
 | `convert_problem_wallet` | Veylor couldn't complete this step with your Zcash wallet. It will keep trying while open and unlocked. | B |
 | `convert_problem_unpayable` | Your wallet can't pay the deposit right now, for example because the network fee went up. Veylor keeps trying. If it still can't pay in time, the swap ends and nothing is sent. | B |
 | `convert_problem_tokens` | Veylor can't get this conversion's token right now. It keeps trying while it's open. | B, T, F |
@@ -2572,6 +2592,8 @@ As built in M7 (D-101): the nine send rows below and `mobile-private-usd-payment
 
 As built in M6 (D-87): the twelve reverse and refunds rows below plus `mobile-private-usd-reverse-proving` (the payment's proof at 42 %), in `lib/widgetbook/private_usd_reverse_use_cases.dart`; `mobile-home-private-usd-attention` passes `privateUsdReverseConversions` to `_buildMobileHomeUseCase`. The forward convert fixture shows the direction toggle.
 
+As built for the windows contract (D-137): `mobile-private-usd-{bridge-off,other-deployment}`, `mobile-private-usd-progress-{unwinding,other-deployment}` and `mobile-private-usd-reverse-other-deployment`. The preview forward record carries a late claim time an hour after `t1`.
+
 As built in M5 (D-56): the forward rows, `mobile-home-private-usd-converting` (through `_buildMobileHomeUseCase`'s `privateUsdConversions`), `mobile-private-usd-convert{,-quoting,-insufficient,-syncing}`, `mobile-private-usd-review{,-expired,-tor-off}` and `mobile-private-usd-progress{,-opening-slow,-problem,-paid,-refunding,-refunded,-nothing-sent}`; `mobile-private-usd-default` now has a converted and a called-off row and the Convert button. `mobile-home-private-usd-attention` is a reverse banner and arrives with M6.
 
 | Scenario id | State |
@@ -2590,6 +2612,7 @@ As built in M5 (D-56): the forward rows, `mobile-home-private-usd-converting` (t
 | `mobile-private-usd-refresh-failed` | last known balance plus error |
 | `mobile-private-usd-blocked` | "Screening refused" row |
 | `mobile-private-usd-payment-pending` | spending note, Send/Withdraw disabled |
+| `mobile-private-usd-bridge-off` | no Bridge, the empty card points to Receive (mainnet for now) |
 | `mobile-private-usd-tor-unavailable` | fallback notice |
 | `mobile-private-usd-convert` | ZEC→USD amount with a quote ledger and countdown |
 | `mobile-private-usd-convert-quoting` | "Getting quote…" |
@@ -2605,6 +2628,7 @@ As built in M5 (D-56): the forward rows, `mobile-home-private-usd-converting` (t
 | `mobile-private-usd-progress-problem` | problem card |
 | `mobile-private-usd-progress-paid` | arriving/screening |
 | `mobile-private-usd-progress-refunding` | refund step |
+| `mobile-private-usd-progress-unwinding` | the maker's refund, then the ZEC home; the late claim time |
 | `mobile-private-usd-progress-refunded` | result |
 | `mobile-private-usd-progress-nothing-sent` | result |
 | `mobile-private-usd-reverse-funding` | `AWAITING_FUNDING` with cost changed |

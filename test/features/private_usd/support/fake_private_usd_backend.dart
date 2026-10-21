@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_swap_backend.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 
@@ -105,8 +106,14 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
 
   @override
   Future<List<String>> accountsWithUnfinished() async => [
-    for (final entry in records.entries)
-      if (entry.value.any((record) => record.outcome == null)) entry.key,
+    for (final account in {...records.keys, ...reverse.keys})
+      if ((records[account] ?? const []).any(
+            (record) => record.outcome == null,
+          ) ||
+          (reverse[account] ?? const []).any(
+            (record) => privateUsdReverseUnderWay(record.phase),
+          ))
+        account,
   ];
 
   @override

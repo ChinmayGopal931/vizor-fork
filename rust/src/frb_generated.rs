@@ -12276,6 +12276,7 @@ impl SseDecode for crate::api::private_usd::ApiDeployment {
             <Vec<crate::api::private_usd::ApiUsdToken>>::sse_decode(deserializer);
         let mut var_deposits =
             <Option<crate::api::private_usd::ApiDepositsPin>>::sse_decode(deserializer);
+        let mut var_bridgeAvailable = <bool>::sse_decode(deserializer);
         return crate::api::private_usd::ApiDeployment {
             network: var_network,
             railgun_network: var_railgunNetwork,
@@ -12296,6 +12297,7 @@ impl SseDecode for crate::api::private_usd::ApiDeployment {
             max_relayer_fee: var_maxRelayerFee,
             usd_tokens: var_usdTokens,
             deposits: var_deposits,
+            bridge_available: var_bridgeAvailable,
         };
     }
 }
@@ -12605,6 +12607,7 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
         let mut var_relayerFee = <String>::sse_decode(deserializer);
         let mut var_t0 = <Option<i64>>::sse_decode(deserializer);
         let mut var_t1 = <Option<i64>>::sse_decode(deserializer);
+        let mut var_lateClaimAt = <Option<i64>>::sse_decode(deserializer);
         let mut var_depositTxid = <Option<String>>::sse_decode(deserializer);
         let mut var_depositConfirmations = <Option<u32>>::sse_decode(deserializer);
         let mut var_sweepTxid = <Option<String>>::sse_decode(deserializer);
@@ -12629,6 +12632,7 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
             relayer_fee: var_relayerFee,
             t0: var_t0,
             t1: var_t1,
+            late_claim_at: var_lateClaimAt,
             deposit_txid: var_depositTxid,
             deposit_confirmations: var_depositConfirmations,
             sweep_txid: var_sweepTxid,
@@ -12651,6 +12655,7 @@ impl SseDecode for crate::api::private_usd::ApiForwardWait {
             2 => crate::api::private_usd::ApiForwardWait::DepositUnsettled,
             3 => crate::api::private_usd::ApiForwardWait::Refunding,
             4 => crate::api::private_usd::ApiForwardWait::ZcashSyncing,
+            5 => crate::api::private_usd::ApiForwardWait::Unwinding,
             _ => unreachable!("Invalid variant for ApiForwardWait: {}", inner),
         };
     }
@@ -12831,28 +12836,27 @@ impl SseDecode for crate::api::private_usd::ApiPrivateUsdErrorCode {
             2 => crate::api::private_usd::ApiPrivateUsdErrorCode::RelayerFee,
             3 => crate::api::private_usd::ApiPrivateUsdErrorCode::EthereumUnreachable,
             4 => crate::api::private_usd::ApiPrivateUsdErrorCode::RailgunClosed,
-            5 => crate::api::private_usd::ApiPrivateUsdErrorCode::ClaimTurn,
-            6 => crate::api::private_usd::ApiPrivateUsdErrorCode::ZcashWallet,
-            7 => crate::api::private_usd::ApiPrivateUsdErrorCode::DepositUnpayable,
-            8 => crate::api::private_usd::ApiPrivateUsdErrorCode::ZcashRejected,
-            9 => crate::api::private_usd::ApiPrivateUsdErrorCode::Mismatch,
-            10 => crate::api::private_usd::ApiPrivateUsdErrorCode::TokensRefused,
-            11 => crate::api::private_usd::ApiPrivateUsdErrorCode::TokensNeeded,
-            12 => crate::api::private_usd::ApiPrivateUsdErrorCode::ChainLagging,
-            13 => crate::api::private_usd::ApiPrivateUsdErrorCode::QuoteExpired,
-            14 => crate::api::private_usd::ApiPrivateUsdErrorCode::MakerUnavailable,
-            15 => crate::api::private_usd::ApiPrivateUsdErrorCode::MakerBusy,
-            16 => crate::api::private_usd::ApiPrivateUsdErrorCode::AmountRefused,
-            17 => crate::api::private_usd::ApiPrivateUsdErrorCode::FundingCostChanged,
-            18 => crate::api::private_usd::ApiPrivateUsdErrorCode::DepositUnconfirmed,
-            19 => crate::api::private_usd::ApiPrivateUsdErrorCode::TooLate,
-            20 => crate::api::private_usd::ApiPrivateUsdErrorCode::Busy,
-            21 => crate::api::private_usd::ApiPrivateUsdErrorCode::StoreUnreadable,
-            22 => crate::api::private_usd::ApiPrivateUsdErrorCode::Unavailable,
-            23 => crate::api::private_usd::ApiPrivateUsdErrorCode::RouteBlocked,
-            24 => crate::api::private_usd::ApiPrivateUsdErrorCode::Other,
-            25 => crate::api::private_usd::ApiPrivateUsdErrorCode::Cancelled,
-            26 => crate::api::private_usd::ApiPrivateUsdErrorCode::WrongDeployment,
+            5 => crate::api::private_usd::ApiPrivateUsdErrorCode::ZcashWallet,
+            6 => crate::api::private_usd::ApiPrivateUsdErrorCode::DepositUnpayable,
+            7 => crate::api::private_usd::ApiPrivateUsdErrorCode::ZcashRejected,
+            8 => crate::api::private_usd::ApiPrivateUsdErrorCode::Mismatch,
+            9 => crate::api::private_usd::ApiPrivateUsdErrorCode::TokensRefused,
+            10 => crate::api::private_usd::ApiPrivateUsdErrorCode::TokensNeeded,
+            11 => crate::api::private_usd::ApiPrivateUsdErrorCode::ChainLagging,
+            12 => crate::api::private_usd::ApiPrivateUsdErrorCode::QuoteExpired,
+            13 => crate::api::private_usd::ApiPrivateUsdErrorCode::MakerUnavailable,
+            14 => crate::api::private_usd::ApiPrivateUsdErrorCode::MakerBusy,
+            15 => crate::api::private_usd::ApiPrivateUsdErrorCode::AmountRefused,
+            16 => crate::api::private_usd::ApiPrivateUsdErrorCode::FundingCostChanged,
+            17 => crate::api::private_usd::ApiPrivateUsdErrorCode::DepositUnconfirmed,
+            18 => crate::api::private_usd::ApiPrivateUsdErrorCode::TooLate,
+            19 => crate::api::private_usd::ApiPrivateUsdErrorCode::Busy,
+            20 => crate::api::private_usd::ApiPrivateUsdErrorCode::StoreUnreadable,
+            21 => crate::api::private_usd::ApiPrivateUsdErrorCode::Unavailable,
+            22 => crate::api::private_usd::ApiPrivateUsdErrorCode::RouteBlocked,
+            23 => crate::api::private_usd::ApiPrivateUsdErrorCode::Other,
+            24 => crate::api::private_usd::ApiPrivateUsdErrorCode::Cancelled,
+            25 => crate::api::private_usd::ApiPrivateUsdErrorCode::WrongDeployment,
             _ => unreachable!("Invalid variant for ApiPrivateUsdErrorCode: {}", inner),
         };
     }
@@ -18774,6 +18778,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiDeployment {
             self.max_relayer_fee.into_into_dart().into_dart(),
             self.usd_tokens.into_into_dart().into_dart(),
             self.deposits.into_into_dart().into_dart(),
+            self.bridge_available.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -19192,6 +19197,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiForwardRecord
             self.relayer_fee.into_into_dart().into_dart(),
             self.t0.into_into_dart().into_dart(),
             self.t1.into_into_dart().into_dart(),
+            self.late_claim_at.into_into_dart().into_dart(),
             self.deposit_txid.into_into_dart().into_dart(),
             self.deposit_confirmations.into_into_dart().into_dart(),
             self.sweep_txid.into_into_dart().into_dart(),
@@ -19224,6 +19230,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiForwardWait {
             Self::DepositUnsettled => 2.into_dart(),
             Self::Refunding => 3.into_dart(),
             Self::ZcashSyncing => 4.into_dart(),
+            Self::Unwinding => 5.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -19482,28 +19489,27 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiPrivateUsdErr
             Self::RelayerFee => 2.into_dart(),
             Self::EthereumUnreachable => 3.into_dart(),
             Self::RailgunClosed => 4.into_dart(),
-            Self::ClaimTurn => 5.into_dart(),
-            Self::ZcashWallet => 6.into_dart(),
-            Self::DepositUnpayable => 7.into_dart(),
-            Self::ZcashRejected => 8.into_dart(),
-            Self::Mismatch => 9.into_dart(),
-            Self::TokensRefused => 10.into_dart(),
-            Self::TokensNeeded => 11.into_dart(),
-            Self::ChainLagging => 12.into_dart(),
-            Self::QuoteExpired => 13.into_dart(),
-            Self::MakerUnavailable => 14.into_dart(),
-            Self::MakerBusy => 15.into_dart(),
-            Self::AmountRefused => 16.into_dart(),
-            Self::FundingCostChanged => 17.into_dart(),
-            Self::DepositUnconfirmed => 18.into_dart(),
-            Self::TooLate => 19.into_dart(),
-            Self::Busy => 20.into_dart(),
-            Self::StoreUnreadable => 21.into_dart(),
-            Self::Unavailable => 22.into_dart(),
-            Self::RouteBlocked => 23.into_dart(),
-            Self::Other => 24.into_dart(),
-            Self::Cancelled => 25.into_dart(),
-            Self::WrongDeployment => 26.into_dart(),
+            Self::ZcashWallet => 5.into_dart(),
+            Self::DepositUnpayable => 6.into_dart(),
+            Self::ZcashRejected => 7.into_dart(),
+            Self::Mismatch => 8.into_dart(),
+            Self::TokensRefused => 9.into_dart(),
+            Self::TokensNeeded => 10.into_dart(),
+            Self::ChainLagging => 11.into_dart(),
+            Self::QuoteExpired => 12.into_dart(),
+            Self::MakerUnavailable => 13.into_dart(),
+            Self::MakerBusy => 14.into_dart(),
+            Self::AmountRefused => 15.into_dart(),
+            Self::FundingCostChanged => 16.into_dart(),
+            Self::DepositUnconfirmed => 17.into_dart(),
+            Self::TooLate => 18.into_dart(),
+            Self::Busy => 19.into_dart(),
+            Self::StoreUnreadable => 20.into_dart(),
+            Self::Unavailable => 21.into_dart(),
+            Self::RouteBlocked => 22.into_dart(),
+            Self::Other => 23.into_dart(),
+            Self::Cancelled => 24.into_dart(),
+            Self::WrongDeployment => 25.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -24431,6 +24437,7 @@ impl SseEncode for crate::api::private_usd::ApiDeployment {
         <String>::sse_encode(self.max_relayer_fee, serializer);
         <Vec<crate::api::private_usd::ApiUsdToken>>::sse_encode(self.usd_tokens, serializer);
         <Option<crate::api::private_usd::ApiDepositsPin>>::sse_encode(self.deposits, serializer);
+        <bool>::sse_encode(self.bridge_available, serializer);
     }
 }
 
@@ -24669,6 +24676,7 @@ impl SseEncode for crate::api::private_usd::ApiForwardRecord {
         <String>::sse_encode(self.relayer_fee, serializer);
         <Option<i64>>::sse_encode(self.t0, serializer);
         <Option<i64>>::sse_encode(self.t1, serializer);
+        <Option<i64>>::sse_encode(self.late_claim_at, serializer);
         <Option<String>>::sse_encode(self.deposit_txid, serializer);
         <Option<u32>>::sse_encode(self.deposit_confirmations, serializer);
         <Option<String>>::sse_encode(self.sweep_txid, serializer);
@@ -24696,6 +24704,7 @@ impl SseEncode for crate::api::private_usd::ApiForwardWait {
                 crate::api::private_usd::ApiForwardWait::DepositUnsettled => 2,
                 crate::api::private_usd::ApiForwardWait::Refunding => 3,
                 crate::api::private_usd::ApiForwardWait::ZcashSyncing => 4,
+                crate::api::private_usd::ApiForwardWait::Unwinding => 5,
                 _ => {
                     unimplemented!("");
                 }
@@ -24830,28 +24839,27 @@ impl SseEncode for crate::api::private_usd::ApiPrivateUsdErrorCode {
                 crate::api::private_usd::ApiPrivateUsdErrorCode::RelayerFee => 2,
                 crate::api::private_usd::ApiPrivateUsdErrorCode::EthereumUnreachable => 3,
                 crate::api::private_usd::ApiPrivateUsdErrorCode::RailgunClosed => 4,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::ClaimTurn => 5,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::ZcashWallet => 6,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::DepositUnpayable => 7,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::ZcashRejected => 8,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::Mismatch => 9,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::TokensRefused => 10,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::TokensNeeded => 11,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::ChainLagging => 12,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::QuoteExpired => 13,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::MakerUnavailable => 14,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::MakerBusy => 15,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::AmountRefused => 16,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::FundingCostChanged => 17,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::DepositUnconfirmed => 18,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::TooLate => 19,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::Busy => 20,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::StoreUnreadable => 21,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::Unavailable => 22,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::RouteBlocked => 23,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::Other => 24,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::Cancelled => 25,
-                crate::api::private_usd::ApiPrivateUsdErrorCode::WrongDeployment => 26,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::ZcashWallet => 5,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::DepositUnpayable => 6,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::ZcashRejected => 7,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::Mismatch => 8,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::TokensRefused => 9,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::TokensNeeded => 10,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::ChainLagging => 11,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::QuoteExpired => 12,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::MakerUnavailable => 13,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::MakerBusy => 14,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::AmountRefused => 15,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::FundingCostChanged => 16,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::DepositUnconfirmed => 17,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::TooLate => 18,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::Busy => 19,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::StoreUnreadable => 20,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::Unavailable => 21,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::RouteBlocked => 22,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::Other => 23,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::Cancelled => 24,
+                crate::api::private_usd::ApiPrivateUsdErrorCode::WrongDeployment => 25,
                 _ => {
                     unimplemented!("");
                 }

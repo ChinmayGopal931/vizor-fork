@@ -2023,7 +2023,7 @@ mod tests {
         let hosted = json!({
             "relayer": hex0x(&pins.relayer),
             "chainId": pins.chain_id,
-            "contract": hex0x(&pins.contract),
+            "contract": hex0x(&pins.swap_contract().unwrap().address),
             "fee": "100000",
             "deposits": {
                 "contract": hex0x(&pin.contract),

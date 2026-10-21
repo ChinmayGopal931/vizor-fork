@@ -681,6 +681,10 @@ class WidgetbookApp extends StatelessWidget {
                       name: 'Payment pending',
                       builder: buildMobilePrivateUsdPaymentPendingUseCase,
                     ),
+                    WidgetbookUseCase(
+                      name: 'Bridging off',
+                      builder: buildMobilePrivateUsdBridgeOffUseCase,
+                    ),
                   ],
                 ),
                 WidgetbookComponent(
@@ -764,6 +768,10 @@ class WidgetbookApp extends StatelessWidget {
                     WidgetbookUseCase(
                       name: 'Refunding',
                       builder: buildMobilePrivateUsdProgressRefundingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Unwinding',
+                      builder: buildMobilePrivateUsdProgressUnwindingUseCase,
                     ),
                     WidgetbookUseCase(
                       name: 'Refunded',

@@ -7,6 +7,7 @@ import '../../../core/config/private_usd_feature_config.dart';
 import '../../../core/layout/app_form_factor.dart';
 import '../../../providers/account_provider.dart';
 import '../../../rust/api/private_usd.dart' as rust_private_usd;
+import '../models/private_usd_record_key.dart';
 import '../services/railgun_host_channel.dart';
 
 /// The pinned deployment for a wallet network (`main`, `test`); null where
@@ -27,6 +28,42 @@ final privateUsdCurrentDeploymentProvider =
 /// Null without a deployment or a readable cap: then no fee is within it.
 BigInt? privateUsdRelayerFeeCap(rust_private_usd.ApiDeployment? deployment) =>
     BigInt.tryParse(deployment?.maxRelayerFee ?? '');
+
+/// Whether this build's network pins a windows contract, so bridging runs.
+/// Off (mainnet until one is deployed there), Bridge is hidden and its
+/// screens redirect; the balance, deposits, sends and withdrawals work
+/// either way.
+final privateUsdBridgeAvailableProvider = Provider<bool>((ref) {
+  // Const, so desktop builds and builds without the define drop the rest.
+  if (!kPrivateUsdBuildEnabled) return false;
+  return ref.watch(privateUsdCurrentDeploymentProvider)?.bridgeAvailable ??
+      false;
+});
+
+/// Where the router sends a Private USD [location], or null to let it show:
+/// home while Private USD is unavailable, except a conversion's progress
+/// while [underWay] holds it, and the Private USD screen from the bridge's
+/// screens while bridging is off. Any other location is left alone, and
+/// nothing is read for it.
+String? privateUsdRedirect(
+  String location, {
+  required bool Function() available,
+  required bool Function() bridgeAvailable,
+  required bool Function(PrivateUsdRoutePath conversion) underWay,
+}) {
+  if (!_isRouteOrChild(location, '/private-usd')) return null;
+  if (!available()) {
+    final conversion = PrivateUsdRoutePath.tryParseLocation(location);
+    return conversion != null && underWay(conversion) ? null : '/home';
+  }
+  if (_isRouteOrChild(location, '/private-usd/convert') && !bridgeAvailable()) {
+    return '/private-usd';
+  }
+  return null;
+}
+
+bool _isRouteOrChild(String location, String routePath) =>
+    location == routePath || location.startsWith('$routePath/');
 
 /// Asks the platform's Railgun host whether the page runs here; replaced in
 /// tests.

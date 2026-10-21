@@ -2596,6 +2596,15 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     mobile: true,
   ),
   FigmaCompareScenario(
+    id: 'mobile-private-usd-progress-unwinding',
+    description:
+        "Private USD progress unwinding: waiting for the maker's refund, "
+        'with the late claim time',
+    builder: buildMobilePrivateUsdProgressUnwindingUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
     id: 'mobile-private-usd-progress-refunded',
     description: 'Private USD progress after the ZEC came back',
     builder: buildMobilePrivateUsdProgressRefundedUseCase,
@@ -2711,6 +2720,14 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     description:
         'Private USD with a send not in a block yet: spending note, Send and Withdraw disabled',
     builder: buildMobilePrivateUsdPaymentPendingUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-bridge-off',
+    description:
+        'Private USD on a network without a windows contract: no Bridge',
+    builder: buildMobilePrivateUsdBridgeOffUseCase,
     desktop: false,
     mobile: true,
   ),

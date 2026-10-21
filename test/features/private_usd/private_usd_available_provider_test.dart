@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
 import 'package:zcash_wallet/src/core/layout/app_form_factor.dart';
+import 'package:zcash_wallet/src/features/private_usd/models/private_usd_record_key.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_engine_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/railgun_host_channel.dart';
@@ -297,6 +298,73 @@ void main() {
     });
   });
 
+  // Mainnet pins no windows contract yet (`ApiDeployment.bridgeAvailable`):
+  // the bridge's screens are left, and the rest of Private USD stays.
+  test('with bridging off, the bridge\'s screens send to Private USD', () {
+    String? redirect(
+      String location, {
+      bool available = true,
+      bool bridgeAvailable = false,
+      Set<PrivateUsdRoutePath> underWay = const {},
+    }) => privateUsdRedirect(
+      location,
+      available: () => available,
+      bridgeAvailable: () => bridgeAvailable,
+      underWay: underWay.contains,
+    );
+
+    for (final location in [
+      '/private-usd/convert',
+      '/private-usd/convert/review',
+    ]) {
+      expect(redirect(location), '/private-usd', reason: location);
+      expect(redirect(location, bridgeAvailable: true), isNull);
+    }
+    for (final location in [
+      '/private-usd',
+      '/private-usd/send',
+      '/private-usd/withdraw',
+      '/private-usd/refunds',
+      '/private-usd/conversion/forward/3',
+    ]) {
+      expect(redirect(location), isNull, reason: location);
+    }
+
+    // Unavailable, everything goes home but a conversion's progress while
+    // it is under way.
+    const underWay = PrivateUsdRoutePath(
+      direction: PrivateUsdDirection.forward,
+      index: 3,
+    );
+    expect(redirect('/private-usd', available: false), '/home');
+    expect(redirect('/private-usd/convert', available: false), '/home');
+    expect(
+      redirect('/private-usd/conversion/forward/3', available: false),
+      '/home',
+    );
+    expect(
+      redirect(
+        '/private-usd/conversion/forward/3',
+        available: false,
+        underWay: {underWay},
+      ),
+      isNull,
+    );
+  });
+
+  test('a location outside Private USD reads nothing', () {
+    String? redirect(String location) => privateUsdRedirect(
+      location,
+      available: () => fail('read availability for $location'),
+      bridgeAvailable: () => fail('read the bridge for $location'),
+      underWay: (_) => fail('read the conversions for $location'),
+    );
+
+    for (final location in ['/home', '/swap', '/private-usdx', '/settings']) {
+      expect(redirect(location), isNull, reason: location);
+    }
+  });
+
   // No test lane builds with VIZOR_PRIVATE_USD_ENABLED, so the host is inert
   // in both, as in desktop builds: it builds no engine and reads nothing.
   testWidgets('without the define the engine host builds no engine', (
@@ -319,5 +387,7 @@ void main() {
     expect(find.text('home'), findsOneWidget);
     expect(container.read(privateUsdEngineEnabledProvider), isFalse);
     expect(container.exists(privateUsdEngineProvider), isFalse);
+    // Nor does bridging read a deployment.
+    expect(container.read(privateUsdBridgeAvailableProvider), isFalse);
   });
 }

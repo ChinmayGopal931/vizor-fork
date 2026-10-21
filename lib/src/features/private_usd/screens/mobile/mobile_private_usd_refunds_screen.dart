@@ -281,8 +281,6 @@ class _RefundCard extends StatelessWidget {
     );
     final status = recovering
         ? PrivateUsdCopy.refundsRecovering
-        : row.otherDeployment
-        ? PrivateUsdCopy.refundsOtherDeployment
         : row.checkFailed
         ? PrivateUsdCopy.refundsCheckFailed
         : row.recoverable == null

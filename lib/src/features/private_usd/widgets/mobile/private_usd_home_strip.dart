@@ -44,12 +44,16 @@ class PrivateUsdHomeStrip extends ConsumerWidget {
     required this.accountUuid,
     required this.privacyModeEnabled,
     required this.onTap,
+    this.caption,
     super.key,
   });
 
   final String accountUuid;
   final bool privacyModeEnabled;
   final VoidCallback onTap;
+
+  /// See [PrivateUsdHomeStripView.caption].
+  final String? caption;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -64,6 +68,7 @@ class PrivateUsdHomeStrip extends ConsumerWidget {
       zecUsdPrice: ref.watch(zecHomeUsdUnitPriceProvider),
       privacyModeEnabled: privacyModeEnabled,
       onTap: onTap,
+      caption: caption,
     );
   }
 }
@@ -74,6 +79,7 @@ class PrivateUsdHomeStripView extends StatelessWidget {
     required this.zecUsdPrice,
     required this.privacyModeEnabled,
     required this.onTap,
+    this.caption,
     super.key,
   });
 
@@ -81,6 +87,10 @@ class PrivateUsdHomeStripView extends StatelessWidget {
   final double? zecUsdPrice;
   final bool privacyModeEnabled;
   final VoidCallback onTap;
+
+  /// Said under the name in place of the ZEC worth, as the holdings panel
+  /// places Private USD among the shielded pools.
+  final String? caption;
 
   @override
   Widget build(BuildContext context) {
@@ -90,12 +100,13 @@ class PrivateUsdHomeStripView extends StatelessWidget {
     final amount = balances == null
         ? (state.isRefreshing ? PrivateUsdCopy.loading : PrivateUsdCopy.unknown)
         : _masked(formatPrivateUsd(balances.spendable));
-    final zec = balances == null || privacyModeEnabled
+    final zec = caption != null || balances == null || privacyModeEnabled
         ? null
         : privateUsdZecEquivalentText(
             balances.spendable,
             zecUsdPrice: zecUsdPrice,
           );
+    final under = caption ?? zec;
     // The one detail that needs saying, refused funds first.
     final String? detail;
     final String? detailSpoken;
@@ -173,12 +184,14 @@ class PrivateUsdHomeStripView extends StatelessWidget {
                               color: colors.text.primary,
                             ),
                           ),
-                          if (zec != null) ...[
+                          if (under != null) ...[
                             const SizedBox(height: AppSpacing.xxs),
                             Text(
-                              zec,
-                              key: const ValueKey(
-                                'mobile_home_private_usd_zec_equivalent',
+                              under,
+                              key: ValueKey(
+                                caption != null
+                                    ? 'mobile_home_private_usd_caption'
+                                    : 'mobile_home_private_usd_zec_equivalent',
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,

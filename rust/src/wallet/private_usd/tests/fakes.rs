@@ -22,7 +22,7 @@ use super::super::abi::keccak;
 use super::super::deployment::{self, Deployment};
 use super::super::engine::{Clock, MakerChecks, OpHandle};
 use super::super::evm_rpc::{
-    ChainReader, ConfirmedSwap, Head, PaidOut, ReverseChainState, SwapStage, SwapState,
+    ChainReader, ConfirmedSwap, Head, PaidOut, ReverseChainState, SwapRead, SwapStage, SwapState,
     TransactionStatus,
 };
 use super::super::forward::{Forward, ForwardStep, ForwardWait, ForwardZcash, Quoted};
@@ -40,7 +40,6 @@ use super::super::{fail, ErrorCode, PrivateUsdNetwork, Result};
 use crate::wallet::routed_http::{RoutedError, RoutedRequest, RoutedResponse};
 
 pub(super) const NOW: u64 = 1_790_000_000;
-pub(super) const LOCK_SECONDS: u64 = 600;
 pub(super) const DEPOSIT_ZAT: u64 = 202_021;
 pub(super) const AMOUNT: u128 = 1_000_000;
 pub(super) const RELAYER_FEE: u128 = 20_000;
@@ -61,6 +60,16 @@ const UNSHIELD_BPS: u128 = 25;
 
 pub(super) fn pins() -> &'static Deployment {
     deployment::deployment(NETWORK)
+}
+
+/// The pinned windows contract.
+pub(super) fn contract() -> [u8; 20] {
+    pins().swap_contract().unwrap().address
+}
+
+/// The contract's `LATE_WINDOW`.
+pub(super) fn late_window() -> u64 {
+    pins().swap_contract().unwrap().late_window
 }
 
 /// The maker's secret share `e`, which a refund reveals.
@@ -135,8 +144,12 @@ pub(super) struct State {
     pub swap_id: Option<[u8; 32]>,
     pub stage: SwapStage,
     pub t0: u64,
-    pub claim_lock_until: u64,
-    pub refund_lock_until: u64,
+    /// How long after `t0` the maker sets `t1`.
+    pub t1_after: u64,
+    /// The block a ready swap went ready in; `None`: long before the head.
+    pub ready_block: Option<u64>,
+    /// When the refund mined, as its event shows; `None`: no event found.
+    pub refunded_at: Option<u64>,
     pub paid_out: bool,
     pub secret: [u8; 32],
     pub railgun_accepts: bool,
@@ -147,14 +160,22 @@ pub(super) struct State {
     /// Runs before each confirmed read, with its number (1, 2, …).
     pub on_confirmed_read: Option<Box<dyn FnMut(&mut State, u32)>>,
     pub confirmed_reads: u32,
+    /// Runs before each consistent read a reveal is decided on, with its
+    /// number (1, 2, …).
+    pub on_read: Option<Box<dyn FnMut(&mut State, u32)>>,
+    pub reads: u32,
+    /// The blocks the swap was read at below the head.
+    pub depth_reads: Vec<u64>,
     pub payout_visible: bool,
     pub payout_hash: [u8; 32],
     pub payout_fee: u128,
     /// Swap ids an earlier use of their index left on chain.
     pub used_ids: Vec<[u8; 32]>,
+    /// Swap ids an earlier use of their index left on a retired contract.
+    pub used_before: Vec<[u8; 32]>,
 
-    // A reverse escrow, open once funded, with the stage, locks, payout and
-    // secret above.
+    // A reverse escrow, open once funded, with the stage, payout and secret
+    // above.
     pub escrow_terms: Option<Terms>,
     pub escrow_id: Option<[u8; 32]>,
     pub escrow_note: [u8; 32],
@@ -179,6 +200,10 @@ pub(super) struct State {
     /// A reverse quote's funding, ready and refund deadlines.
     pub reverse_deadlines: (u64, u64, u64),
     pub reverse_accepts: u32,
+    /// The late window an accept names; `None` names none.
+    pub accepted_late_window: Option<u64>,
+    /// What `/v1/info` adds: the contract's windows and kind.
+    pub info_windows: Option<Value>,
 
     // The relayer.
     pub relayer: [u8; 20],
@@ -188,9 +213,12 @@ pub(super) struct State {
     pub least_fee: u128,
     pub claim_pays_out: bool,
     pub fee_after_claim: Option<u128>,
-    pub after_lock: Option<Hook>,
-    /// Holds the answer to the lock request until notified.
-    pub hold_lock: Option<Arc<Notify>>,
+    /// A status and code every claim is refused with, sending nothing.
+    pub claim_refusal: Option<(u16, &'static str)>,
+    /// What `/v1/terms` adds: the contract's windows and kind.
+    pub terms_windows: Option<Value>,
+    /// Holds the answer to `/v1/terms` until notified.
+    pub hold_terms: Option<Arc<Notify>>,
     /// A relayer path that never answers.
     pub unreachable: Option<&'static str>,
     /// The fee the relayer funds reverse escrows for; `None`: no sponsorship.
@@ -260,8 +288,9 @@ impl State {
             swap_id: None,
             stage: SwapStage::Open,
             t0: NOW + 35 * 60,
-            claim_lock_until: 0,
-            refund_lock_until: 0,
+            t1_after: 60 * 60,
+            ready_block: None,
+            refunded_at: None,
             paid_out: false,
             secret: [0; 32],
             railgun_accepts: true,
@@ -269,10 +298,14 @@ impl State {
             confirmed: None,
             on_confirmed_read: None,
             confirmed_reads: 0,
+            on_read: None,
+            reads: 0,
+            depth_reads: Vec::new(),
             payout_visible: true,
             payout_hash: word(0),
             payout_fee: RELAYER_FEE,
             used_ids: Vec::new(),
+            used_before: Vec::new(),
             escrow_terms: None,
             escrow_id: None,
             escrow_note: [0; 32],
@@ -290,14 +323,17 @@ impl State {
             hold_accept: None,
             reverse_deadlines: (FUNDING, READY, REFUND),
             reverse_accepts: 0,
+            accepted_late_window: Some(late_window()),
+            info_windows: None,
             relayer: pins.relayer,
             relayer_fee: RELAYER_FEE,
             fee_expires_at: None,
             least_fee: 0,
             claim_pays_out: true,
             fee_after_claim: None,
-            after_lock: None,
-            hold_lock: None,
+            claim_refusal: None,
+            terms_windows: None,
+            hold_terms: None,
             unreachable: None,
             funding_fee: Some(FUNDING_FEE),
             fund_hash: Some(word(8)),
@@ -331,7 +367,18 @@ impl State {
     }
 
     pub(super) fn t1(&self) -> u64 {
-        self.t0 + 300
+        self.t0 + self.t1_after
+    }
+
+    /// The newest block, its hash named for its number.
+    pub(super) fn head(&self) -> Head {
+        let mut hash = [0u8; 32];
+        hash[24..].copy_from_slice(&self.head_number.to_be_bytes());
+        Head {
+            number: self.head_number,
+            timestamp: self.chain_now,
+            hash,
+        }
     }
 
     /// Time passes, on the device and on the chain alike.
@@ -351,8 +398,6 @@ impl State {
             terms_hash: words_hash(&terms_words(terms)),
             stage: self.stage,
             paid_out: self.paid_out,
-            claim_lock_until: self.claim_lock_until,
-            refund_lock_until: self.refund_lock_until,
             secret: self.secret,
         })
     }
@@ -365,8 +410,6 @@ impl State {
                 terms_hash: [0xee; 32],
                 stage: SwapStage::Open,
                 paid_out: false,
-                claim_lock_until: 0,
-                refund_lock_until: 0,
                 secret: [0; 32],
             });
         }
@@ -382,11 +425,23 @@ impl State {
             terms_hash: words_hash(&words),
             stage: self.stage,
             paid_out: self.paid_out,
-            claim_lock_until: self.claim_lock_until,
-            refund_lock_until: self.refund_lock_until,
             secret: self.secret,
         })
     }
+}
+
+/// `swap`, unless its terms hash to other than `terms`.
+fn verified(swap: Option<SwapState>, terms: &Terms) -> Result<Option<SwapState>> {
+    if swap
+        .as_ref()
+        .is_some_and(|swap| swap.terms_hash != terms.hash())
+    {
+        return fail(
+            ErrorCode::Mismatch,
+            "the swap on chain opened with other terms",
+        );
+    }
+    Ok(swap)
 }
 
 /// The state every fake shares; single-threaded, as the engine's tests run.
@@ -424,11 +479,7 @@ impl ChainReader for FakeChain {
     }
 
     async fn head(&self) -> Result<Head> {
-        let state = self.0.get();
-        Ok(Head {
-            number: state.head_number,
-            timestamp: state.chain_now,
-        })
+        Ok(self.0.get().head())
     }
 
     async fn swap(&self, id: &[u8; 32]) -> Result<Option<SwapState>> {
@@ -451,29 +502,58 @@ impl ChainReader for FakeChain {
             Some(confirmed) => confirmed(&state),
             None => state.swap_at_tip(id),
         };
-        if let Some(swap) = &swap {
-            if swap.terms_hash != terms.hash() {
-                return fail(
-                    ErrorCode::Mismatch,
-                    "the swap on chain opened with other terms",
-                );
-            }
-        }
         Ok(ConfirmedSwap {
-            head: Head {
-                number: state.head_number,
-                timestamp: state.chain_now,
-            },
-            swap,
+            head: state.head(),
+            swap: verified(swap, terms)?,
         })
     }
 
-    async fn lock_duration(&self) -> Result<u64> {
-        Ok(LOCK_SECONDS)
+    /// The swap, or the reverse escrow, at the head, with the head.
+    async fn read_swap(&self, id: &[u8; 32], terms: &Terms) -> Result<SwapRead> {
+        let read = {
+            let mut state = self.0.set();
+            state.reads += 1;
+            state.reads
+        };
+        let hook = self.0.set().on_read.take();
+        if let Some(mut hook) = hook {
+            hook(&mut self.0.set(), read);
+            self.0.set().on_read = Some(hook);
+        }
+        let state = self.0.get();
+        let swap = state.swap_at_tip(id).or_else(|| state.escrow_at(id));
+        Ok(SwapRead {
+            head: state.head(),
+            swap: verified(swap, terms)?,
+        })
+    }
+
+    /// A ready swap was still open before the block it went ready in.
+    async fn swap_at(
+        &self,
+        id: &[u8; 32],
+        terms: &Terms,
+        number: u64,
+    ) -> Result<Option<SwapState>> {
+        self.0.set().depth_reads.push(number);
+        let state = self.0.get();
+        let swap = state.swap_at_tip(id).map(|mut swap| {
+            if swap.stage == SwapStage::Ready
+                && state.ready_block.is_some_and(|block| number < block)
+            {
+                swap.stage = SwapStage::Open;
+            }
+            swap
+        });
+        verified(swap, terms)
     }
 
     async fn maker_key_used(&self, _key: &[u8; 32]) -> Result<bool> {
         Ok(false)
+    }
+
+    async fn used_before(&self, id: &[u8; 32], _key: &[u8; 32]) -> Result<bool> {
+        Ok(self.0.get().used_before.contains(id))
     }
 
     async fn reverse_state(&self, id: &[u8; 32], terms: &Terms) -> Result<ReverseChainState> {
@@ -500,14 +580,10 @@ impl ChainReader for FakeChain {
         }
         let open = swap.is_some();
         Ok(ReverseChainState {
-            head: Head {
-                number: state.head_number,
-                timestamp: state.chain_now,
-            },
+            head: state.head(),
             swap,
             refund_note: if open { state.escrow_note } else { [0; 32] },
             funding_block: if open { state.funding_block } else { 0 },
-            lock_duration: LOCK_SECONDS,
         })
     }
 
@@ -531,6 +607,10 @@ impl ChainReader for FakeChain {
             relayer: pins().relayer,
             fee: state.payout_fee,
         }))
+    }
+
+    async fn confirmed_refund_time(&self, _id: &[u8; 32], _since: u64) -> Result<Option<u64>> {
+        Ok(self.0.get().refunded_at)
     }
 
     async fn transaction_status(
@@ -601,10 +681,10 @@ impl HttpTransport for FakeServices {
         }
         let hold = if path.ends_with("/accept") {
             self.0.get().hold_accept.clone()
-        } else if path == "/v1/lock-claim" {
-            self.0.get().hold_lock.clone()
         } else if path == "/v1/reverse/fund" {
             self.0.get().hold_fund.clone()
+        } else if path == "/v1/terms" {
+            self.0.get().hold_terms.clone()
         } else {
             None
         };
@@ -634,22 +714,27 @@ impl FakeServices {
     ) -> std::result::Result<RoutedResponse, RoutedError> {
         let pins = pins();
         match (method, path) {
-            (&Method::GET, "/v1/info") => answer(
-                200,
-                json!({
+            (&Method::GET, "/v1/info") => {
+                let mut info = json!({
                     "apiVersion": 1,
                     "maker": hex0x(&pins.maker),
                     "chainId": pins.chain_id,
-                    "contract": hex0x(&pins.contract),
+                    "contract": hex0x(&contract()),
                     "token": hex0x(&pins.token),
                     "zcashNetwork": "testnet",
                     "reverseEnabled": true,
-                }),
-            ),
+                });
+                if let Some(Value::Object(windows)) = &self.0.get().info_windows {
+                    for (name, value) in windows {
+                        info[name] = value.clone();
+                    }
+                }
+                answer(200, info)
+            }
             (&Method::POST, "/v1/quote") => {
                 let context = SwapContext {
                     chain_id: pins.chain_id,
-                    contract: pins.contract,
+                    contract: contract(),
                     quote_id: QUOTE_ID,
                 };
                 let proof = context.prove_maker(&maker_secret(), UnwrapErr(SysRng));
@@ -663,7 +748,7 @@ impl FakeServices {
                         "makerShare": hex0x(&maker_share().to_affine_bytes()),
                         "makerProof": hex0x(&proof.to_bytes()),
                         "chainId": pins.chain_id,
-                        "contract": hex0x(&pins.contract),
+                        "contract": hex0x(&contract()),
                         "token": hex0x(&pins.token),
                         "amount": state.amount.to_string(),
                         "depositZat": DEPOSIT_ZAT,
@@ -674,7 +759,7 @@ impl FakeServices {
             (&Method::POST, "/v1/reverse/quote") => {
                 let context = SwapContext {
                     chain_id: pins.chain_id,
-                    contract: pins.contract,
+                    contract: contract(),
                     quote_id: QUOTE_ID,
                 };
                 let proof = context.prove_maker(&maker_secret(), UnwrapErr(SysRng));
@@ -690,7 +775,7 @@ impl FakeServices {
                             "makerShare": hex0x(&maker_share().to_affine_bytes()),
                             "makerProof": hex0x(&proof.to_bytes()),
                             "chainId": pins.chain_id,
-                            "contract": hex0x(&pins.contract),
+                            "contract": hex0x(&contract()),
                             "token": hex0x(&pins.token),
                             "amount": body["units"].as_u64().unwrap().to_string(),
                             "depositZat": REVERSE_DEPOSIT_ZAT,
@@ -711,15 +796,16 @@ impl FakeServices {
                 let request = state.quote_requests.last().unwrap().clone();
                 let id = reverse_swap_id(&bytes(&request["user"]), &maker_share());
                 let (_, ready, refund) = state.reverse_deadlines;
-                answer(
-                    200,
-                    json!({
-                        "swapId": hex0x(&id),
-                        "t0": ready,
-                        "t1": refund,
-                        "ticket": format!("{}.{}", hex0x(&id), "3f".repeat(32)),
-                    }),
-                )
+                let mut accepted = json!({
+                    "swapId": hex0x(&id),
+                    "t0": ready,
+                    "t1": refund,
+                    "ticket": format!("{}.{}", hex0x(&id), "3f".repeat(32)),
+                });
+                if let Some(window) = state.accepted_late_window {
+                    accepted["lateWindow"] = json!(window);
+                }
+                answer(200, accepted)
             }
             (&Method::POST, path) if path.ends_with("/accept") => {
                 let mut state = self.0.set();
@@ -769,15 +855,16 @@ impl FakeServices {
                 );
                 state.swap_id = Some(id);
                 state.opened = true;
-                answer(
-                    200,
-                    json!({
-                        "swapId": hex0x(&id),
-                        "t0": t0,
-                        "t1": t1,
-                        "ticket": format!("{}.{}", hex0x(&id), "3f".repeat(32)),
-                    }),
-                )
+                let mut accepted = json!({
+                    "swapId": hex0x(&id),
+                    "t0": t0,
+                    "t1": t1,
+                    "ticket": format!("{}.{}", hex0x(&id), "3f".repeat(32)),
+                });
+                if let Some(window) = state.accepted_late_window {
+                    accepted["lateWindow"] = json!(window);
+                }
+                answer(200, accepted)
             }
             _ => answer(404, json!({ "code": "notFound", "error": "no such path" })),
         }
@@ -806,11 +893,16 @@ impl FakeServices {
                 let mut terms = json!({
                     "relayer": hex0x(&state.relayer),
                     "chainId": pins.chain_id,
-                    "contract": hex0x(&pins.contract),
+                    "contract": hex0x(&contract()),
                     "fee": state.relayer_fee.to_string(),
                 });
                 if let Some(expires_at) = state.fee_expires_at {
                     terms["feeExpiresAt"] = json!(expires_at);
+                }
+                if let Some(Value::Object(windows)) = &state.terms_windows {
+                    for (name, value) in windows {
+                        terms[name] = value.clone();
+                    }
                 }
                 if let Some(fee) = state.funding_fee {
                     terms["reverseFunding"] = json!({
@@ -833,26 +925,17 @@ impl FakeServices {
             (
                 &Method::POST,
                 "/v1/reverse/ready"
-                | "/v1/reverse/lock-refund"
                 | "/v1/reverse/refund"
                 | "/v1/reverse/refund-payout"
                 | "/v1/reverse/rescue",
             ) => answer(200, json!({ "transactions": [] })),
-            (&Method::POST, "/v1/lock-claim") => {
-                {
-                    let mut state = self.0.set();
-                    state.claim_lock_until = state.chain_now + LOCK_SECONDS;
-                }
-                let hook = self.0.set().after_lock.take();
-                if let Some(mut hook) = hook {
-                    hook(&mut self.0.set());
-                }
-                answer(200, json!({ "transactions": [hex0x(&word(0))] }))
-            }
             (&Method::POST, "/v1/claim") => {
                 let fee: u128 = body["payout"]["fee"].as_str().unwrap().parse().unwrap();
                 let mut state = self.0.set();
                 state.posted_fees.push(fee);
+                if let Some((status, code)) = state.claim_refusal {
+                    return answer(status, json!({ "code": code, "error": "not now" }));
+                }
                 if fee < state.least_fee {
                     return rejected();
                 }
@@ -1127,6 +1210,13 @@ impl Harness {
     /// Another account of the same wallet, with a seed of its own.
     pub(super) fn beside(other: &Harness) -> Self {
         Self::with(other.dir.clone(), &[8; 64])
+    }
+
+    /// An account on `network`'s deployment, over the same fakes.
+    pub(super) fn on(network: PrivateUsdNetwork) -> Self {
+        let mut harness = Self::new();
+        harness.keys = SwapKeyContext::for_tests(&[7; 64], network, 0);
+        harness
     }
 
     fn with(dir: Rc<tempfile::TempDir>, seed: &[u8]) -> Self {

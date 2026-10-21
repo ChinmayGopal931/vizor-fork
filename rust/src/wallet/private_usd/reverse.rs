@@ -16,9 +16,14 @@
 //!   A proof made before a lock, or for a record that changed, is never
 //!   submitted.
 //! - `ready` is signed only when the user authorizes it, never after a
-//!   restart; a kept one is only sent again while it holds.
-//! - `z` is revealed only under a refund lock with more than the margin left,
-//!   read from a fresh head immediately before sending.
+//!   restart, and only before `t0` with its deadline kept before it is handed
+//!   out; a kept one is only sent again while it holds, and never once a
+//!   refund was posted.
+//! - `z` is revealed to refund an open escrow only once no `ready` of ours
+//!   can land (the chain past its deadline, or at `t0`), and a ready one only
+//!   from `t1`. It is judged on one consistent read of a fresh head, again
+//!   immediately before sending, and the refund is kept as posted before it
+//!   goes.
 //!
 //! The driver runs over seams: [`ChainReader`], [`HttpTransport`],
 //! [`ReverseZcash`] (the wallet's side, `WalletZcash`) and [`Clock`]. The
@@ -47,14 +52,13 @@ use super::models::{
     Amount, Direction, Hex, JointAccountId, NothingSentCause, RecordDeployment, RelayerTerms,
     ReverseFundingCost, ReverseFundingRequest, ReverseFundingTerms, ReverseFundingTransaction,
     ReversePhase, ReverseQuote, ReverseReceiveEstimate, ReverseReceiveTransaction, ReverseRecord,
-    StoredRecord, SwapAuthorization, SwapNote, SwapPayout, SwapRescue, SwapZcashNetwork,
-    ZcashTransaction,
+    StoredRecord, SwapAuthorization, SwapNote, SwapPayout, SwapRescue, ZcashTransaction,
 };
 use super::relayer_client::RelayerClient;
 use super::store::SwapStore;
 use super::swap::{
-    self, find, load, lock_deadline, pinned_relayer_terms, quote_error, require_payout_fee,
-    reveal_margin_holds, save, serves, update, PostError, SwapCall,
+    self, find, load, pinned_relayer_terms, quote_error, require_payout_fee, save, serves, update,
+    PostError, SwapCall, WindowView,
 };
 use super::transport::{HttpTransport, Refusal, SwapErrorCode, SwapHttpError};
 use super::{fail, indices, terms, ErrorCode, PrivateUsdError, PrivateUsdNetwork, Result};
@@ -239,7 +243,6 @@ where
     /// What the page's `reverseCost` prices swap `index`'s funding at now.
     pub(crate) async fn price(&self, store: &SwapStore, index: u32) -> Result<FundingPrice> {
         let record: ReverseRecord = load(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         let sponsored = self.sponsored().await?;
         Ok(FundingPrice {
             index,
@@ -263,7 +266,6 @@ where
         railgun_fee: Amount,
     ) -> Result<ReverseRecord> {
         let record: ReverseRecord = load(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         let priceable = record.phase == ReversePhase::Quoted
             || (record.phase == ReversePhase::AwaitingFunding
                 && record.funding.is_none()
@@ -302,7 +304,6 @@ where
         index: u32,
     ) -> Result<ReverseRecord> {
         let record = active(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         if record.phase != ReversePhase::Quoted {
             return Ok(record);
         }
@@ -418,7 +419,6 @@ where
     /// holds more than a rescue's relayer fee. A chain read only.
     pub(crate) async fn can_rescue(&self, store: &SwapStore, index: u32) -> Result<bool> {
         let record: ReverseRecord = load(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         Ok(record.phase == ReversePhase::Refunded && self.rescue_fee(&record).await?.is_some())
     }
 
@@ -538,7 +538,6 @@ where
     /// deployment's and its id its quote's. An escrow must be the one this
     /// conversion funded, at its confirmation depth.
     async fn state(&self, record: &ReverseRecord) -> Result<ReverseChainState> {
-        require_served(self.pins, record)?;
         let maker_share = terms::quote_maker_share(&record.quote.terms)?;
         if record.swap_id.0 != terms::reverse_swap_id(&record.quote.user.0, &maker_share) {
             return fail(ErrorCode::Mismatch, "the conversion's id isn't its quote's");
@@ -674,6 +673,7 @@ where
                 "a conversion to ZEC names a whole number of cents",
             );
         }
+        self.pins.swap_contract()?;
         swap::require_none_under_way(store, self.account)?;
         swap::check_maker(&self.maker, self.pins, self.makers, true).await?;
         let requested = Amount(u128::from(units));
@@ -705,7 +705,7 @@ where
         let maker_share = terms::quote_maker_share(&quote.terms)?;
         let record = ReverseRecord {
             index,
-            deployment: RecordDeployment::pinned(self.pins.network),
+            deployment: RecordDeployment::pinned(self.pins.network)?,
             swap_id: Hex(terms::reverse_swap_id(&user, &maker_share)),
             user_share: acceptance.user_share,
             acceptance,
@@ -717,7 +717,7 @@ where
             funding: None,
             ready: None,
             cancel_requested: false,
-            refund_lock: None,
+            refund_posted: false,
             payout: None,
             rescue: None,
             receive: None,
@@ -769,7 +769,6 @@ where
     ) -> Result<FundingRequest> {
         let session = engine::session();
         let record = active(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         require_going_ahead(&record)?;
         if record.funding.is_some() {
             return Ok(FundingRequest {
@@ -816,7 +815,7 @@ where
         };
         deployment::require_within_fee_cap(fee.0)?;
         let open = reverse_open(&record)?;
-        let digest = self.pins.domain().open_reverse(&open);
+        let digest = self.pins.domain()?.open_reverse(&open);
         let signature = self.keys.user_keys(index)?.auth.sign(&digest);
         let calls = funding_calls::encode(
             record.quote.terms.contract.0,
@@ -888,7 +887,6 @@ where
         if !snapshot.under_way() {
             return Ok(snapshot);
         }
-        require_served(self.pins, &snapshot)?;
         engine::check_cancelled(self.op)?;
         let estimate = if AWAITING_DEPOSIT.contains(&snapshot.phase) {
             Some(self.look_at_deposit(&snapshot).await?)
@@ -909,16 +907,17 @@ where
     }
 
     /// The user's second approval: once the maker's whole deposit has its
-    /// confirmations and the escrow is open with time left, signs `ready`
-    /// and keeps it with the sweep's reviewed fee before posting it. A kept
-    /// one is only sent again; a restart never signs one.
+    /// confirmations and the escrow is open with its signature's deadline
+    /// before `t0` (judged on one consistent read of a fresh head), and no
+    /// refund was posted, signs `ready` and keeps it, its deadline and the
+    /// sweep's reviewed fee before posting it. A kept one is only sent again;
+    /// a restart never signs one.
     pub(crate) async fn authorize_ready(
         &self,
         store: &mut SwapStore,
         index: u32,
     ) -> Result<ReverseRecord> {
         let snapshot = active(store, self.account, index)?;
-        require_served(self.pins, &snapshot)?;
         require_going_ahead(&snapshot)?;
         if snapshot.ready.is_some() {
             self.advance(store, index).await?;
@@ -932,17 +931,15 @@ where
         })?;
         let record = active(store, self.account, index)?;
         require_going_ahead(&record)?;
-        let observed = self.state(&record).await?;
-        let Some(escrow) = observed.swap else {
+        if self.state(&record).await?.swap.is_none() {
             return fail(ErrorCode::DepositUnconfirmed, "the escrow isn't confirmed");
-        };
-        let now = observed.head.timestamp;
-        let open = escrow.stage == SwapStage::Open && escrow.refund_lock_until == 0;
-        if !open || now.saturating_add(SIGNATURE_TTL_SECONDS) >= record.quote.ready_deadline {
+        }
+        let view = self.windows(&record).await?;
+        if !swap::may_sign_ready(&view, record.refund_posted, true) {
             return fail(ErrorCode::TooLate, "too late to authorize settlement");
         }
-        let deadline = now + SIGNATURE_TTL_SECONDS;
-        let digest = self.pins.domain().ready(&record.swap_id.0, deadline);
+        let deadline = view.head + SIGNATURE_TTL_SECONDS;
+        let digest = self.pins.domain()?.ready(&record.swap_id.0, deadline);
         let ready = SwapAuthorization {
             swap_id: record.swap_id,
             deadline,
@@ -968,7 +965,6 @@ where
     /// the flag was kept leaves it kept.
     pub(crate) async fn cancel(&self, store: &mut SwapStore, index: u32) -> Result<ReverseRecord> {
         let record = active(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         require_refund_possible(&record)?;
         if record.finished() {
             return Ok(record);
@@ -996,7 +992,6 @@ where
     /// than the fee.
     pub(crate) async fn rescue(&self, store: &mut SwapStore, index: u32) -> Result<ReverseRecord> {
         let record: ReverseRecord = load(store, self.account, index)?;
-        require_served(self.pins, &record)?;
         if record.phase != ReversePhase::Refunded {
             return fail(ErrorCode::Other, "only a refunded conversion is rescued");
         }
@@ -1008,7 +1003,7 @@ where
         let now = swap::fresh_head(self.state(&record).await?.head.timestamp, self.clock.now())?;
         let deadline = now + SIGNATURE_TTL_SECONDS;
         let note = self.keys.note(index)?;
-        let digest = self.pins.domain().rescue(
+        let digest = self.pins.domain()?.rescue(
             &record.swap_id.0,
             &note.commitment(),
             &self.pins.relayer,
@@ -1047,7 +1042,6 @@ where
         record: &ReverseRecord,
         resuming: bool,
     ) -> Result<ReverseAccept> {
-        require_served(self.pins, record)?;
         if record.account.is_some() {
             return Ok(ReverseAccept::Accepted);
         }
@@ -1113,11 +1107,16 @@ where
             // No answer, or one that does not read: maybe accepted.
             Err(error) => return Err(error.into()),
         };
-        // The maker takes the same keys again, on the quote's deadlines.
+        // The maker takes the same keys again, on the quote's deadlines and
+        // the contract's late window.
         let quote = &record.quote;
+        let late_window = self.pins.swap_contract()?.late_window;
         let opened = accepted.swap_id == record.swap_id
             && accepted.t0 == quote.ready_deadline
-            && accepted.t1 == quote.refund_after;
+            && accepted.t1 == quote.refund_after
+            && accepted
+                .late_window
+                .is_none_or(|window| window == late_window);
         if !opened {
             self.finish(store, record.clone(), ReversePhase::Cancelled)
                 .await?;
@@ -1160,8 +1159,8 @@ where
             return update(store, self.account, &settling);
         }
         if let Some(ready) = record.ready.clone() {
-            // A `ready` the user signed is sent again while it holds, and
-            // never signed again after.
+            // A `ready` the user signed is sent again while it holds, never
+            // once a refund was posted, and never signed again after.
             let lapsed = observed.head.timestamp > ready.deadline;
             let mut current = record.clone();
             current.phase = if lapsed {
@@ -1170,7 +1169,7 @@ where
                 ReversePhase::Settling
             };
             update(store, self.account, &current)?;
-            if !lapsed && escrow.refund_lock_until == 0 {
+            if !lapsed && !record.refund_posted {
                 engine::check_cancelled(self.op)?;
                 engine::set_activity(self.op, Activity::Readying);
                 self.view
@@ -1286,7 +1285,7 @@ where
         let now = observed.head.timestamp;
         let phase = if escrow.stage != SwapStage::Open {
             ReversePhase::Settling
-        } else if escrow.refund_lock_until != 0
+        } else if record.refund_posted
             || now.saturating_add(SIGNATURE_TTL_SECONDS) >= record.quote.ready_deadline
         {
             ReversePhase::RefundWait
@@ -1379,8 +1378,8 @@ where
         Ok(())
     }
 
-    /// Getting the dollars back: paid out once refunded, else the refund
-    /// lock, else the reveal under it.
+    /// Getting the dollars back: paid out once refunded, else the reveal once
+    /// the windows let it land.
     async fn refund(
         &self,
         store: &mut SwapStore,
@@ -1407,72 +1406,19 @@ where
             return Ok(());
         }
         if escrow.stage == SwapStage::Ready && now < record.quote.refund_after {
-            let mut waiting = record.clone();
-            waiting.phase = ReversePhase::RefundWait;
-            return update(store, self.account, &waiting);
-        }
-        if escrow.refund_lock_until <= now {
-            return self.lock_refund(store, record, escrow, observed).await;
+            return self.wait_to_refund(store, record.index);
         }
         self.reveal(store, record).await
     }
 
-    /// Takes the refund lock when the turn is ours: a kept authorization is
-    /// sent again while its deadline holds, else one signed now; kept before
-    /// it is sent. A claim lock held, or the maker's turn after a refund lock
-    /// of ours lapsed, keeps the refund waiting.
-    async fn lock_refund(
-        &self,
-        store: &mut SwapStore,
-        record: &ReverseRecord,
-        escrow: &SwapState,
-        observed: &ReverseChainState,
-    ) -> Result<()> {
-        let now = observed.head.timestamp;
-        let Some(deadline) = lock_deadline(
-            escrow.refund_lock_until,
-            escrow.claim_lock_until,
-            now,
-            observed.lock_duration,
-        )?
-        else {
-            return Ok(());
-        };
-        let authorization = match &record.refund_lock {
-            Some(saved) if saved.deadline >= now => saved.clone(),
-            _ => {
-                let digest = self.pins.domain().lock_refund(&record.swap_id.0, deadline);
-                SwapAuthorization {
-                    swap_id: record.swap_id,
-                    deadline,
-                    signature: Hex(self.keys.user_keys(record.index)?.auth.sign(&digest)),
-                }
-            }
-        };
-        let mut locking = record.clone();
-        locking.refund_lock = Some(authorization.clone());
-        locking.phase = ReversePhase::Refunding;
-        update(store, self.account, &locking)?;
-        engine::check_cancelled(self.op)?;
-        self.view
-            .relayer
-            .lock_refund(
-                &authorization,
-                &reverse_terms(record)?,
-                record.ticket.as_ref(),
-            )
-            .await?;
-        Ok(())
-    }
-
-    /// Reveals `z` under our refund lock, never on a relayer's answer, an old
-    /// observation or a lagging head: the lock must hold for more than the
-    /// margin on a fresh read, and again on one taken immediately before the
-    /// reveal.
+    /// Reveals `z` once the windows let the refund land, never on a relayer's
+    /// answer, an old observation or a lagging head: judged on one consistent
+    /// read, and again on one taken immediately before the reveal. While a
+    /// `ready` of ours may still land, it waits. The refund is kept as posted
+    /// before it goes, and no `ready` is signed or sent after it.
     async fn reveal(&self, store: &mut SwapStore, record: &ReverseRecord) -> Result<()> {
-        let fresh = self.state(record).await?;
-        if !fresh_refund_lock(&fresh, self.clock.now())? {
-            return Ok(());
+        if !self.refund_lands(store, record.index).await? {
+            return self.wait_to_refund(store, record.index);
         }
         // Signed when it goes out, and kept first.
         let payout = self
@@ -1480,10 +1426,12 @@ where
             .await?;
         engine::check_cancelled(self.op)?;
         let secret = Zeroizing::new(self.keys.user_keys(record.index)?.share.to_be_bytes());
-        let current = self.state(record).await?;
-        if !fresh_refund_lock(&current, self.clock.now())? {
-            return Ok(());
+        if !self.refund_lands(store, record.index).await? {
+            return self.wait_to_refund(store, record.index);
         }
+        let mut posting: ReverseRecord = load(store, self.account, record.index)?;
+        posting.refund_posted = true;
+        update(store, self.account, &posting)?;
         self.view
             .relayer
             .refund(
@@ -1494,6 +1442,39 @@ where
             )
             .await?;
         Ok(())
+    }
+
+    /// Whether swap `index`'s refund lands now, past every `ready` its record
+    /// signed.
+    async fn refund_lands(&self, store: &SwapStore, index: u32) -> Result<bool> {
+        let record: ReverseRecord = load(store, self.account, index)?;
+        let view = self.windows(&record).await?;
+        Ok(swap::may_refund(&view, &record.ready_deadlines()))
+    }
+
+    fn wait_to_refund(&self, store: &mut SwapStore, index: u32) -> Result<()> {
+        let mut waiting: ReverseRecord = load(store, self.account, index)?;
+        waiting.phase = ReversePhase::RefundWait;
+        update(store, self.account, &waiting)
+    }
+
+    /// `record`'s escrow on one consistent read of a fresh head, as its
+    /// windows judge it.
+    async fn windows(&self, record: &ReverseRecord) -> Result<WindowView> {
+        let read = self
+            .chain
+            .read_swap(&record.swap_id.0, &reverse_terms(record)?)
+            .await?;
+        let device_now = self.clock.now();
+        Ok(WindowView {
+            stage: read.swap.as_ref().map(|swap| swap.stage),
+            head: swap::fresh_head(read.head.timestamp, device_now)?,
+            head_number: read.head.number,
+            device_now,
+            t0: record.quote.ready_deadline,
+            t1: record.quote.refund_after,
+            late_window: self.pins.swap_contract()?.late_window,
+        })
     }
 
     /// The refund's payout at the relayer's fee now: the kept one while its
@@ -1513,7 +1494,7 @@ where
             _ => {
                 let digest =
                     self.pins
-                        .domain()
+                        .domain()?
                         .refund_payout(&record.swap_id.0, &self.pins.relayer, fee.0);
                 SwapPayout {
                     swap_id: record.swap_id,
@@ -1593,27 +1574,6 @@ where
 
 // ---- rules ----
 
-/// The record is pinned to this build's deployment: the same chain,
-/// contract, token, Railgun proxy, maker, relayer and Zcash network. A
-/// conversion never moves to another.
-fn require_served(pins: &Deployment, record: &ReverseRecord) -> Result<()> {
-    let pinned = &record.deployment;
-    let serves = pinned.chain_id == pins.chain_id
-        && pinned.contract.0 == pins.contract
-        && pinned.token.0 == pins.token
-        && pinned.railgun_proxy.0 == pins.railgun_proxy
-        && pinned.maker.0 == pins.maker
-        && pinned.relayer.0 == pins.relayer
-        && pinned.zcash_network == SwapZcashNetwork::from(pins.network);
-    if !serves {
-        return fail(
-            ErrorCode::WrongDeployment,
-            "the conversion belongs to another deployment",
-        );
-    }
-    Ok(())
-}
-
 /// A reverse quote this deployment's maker gave for `user`, refunding into
 /// our own `note`.
 fn verify_quote(
@@ -1633,6 +1593,18 @@ fn verify_quote(
     }
     if quote.user.0 != *user || quote.refund_note.0 != *note || *note == [0; 32] {
         return fail(ErrorCode::Mismatch, "the quote refunds someone else");
+    }
+    // An escrow funded at its deadline must still leave the contract's least
+    // window before `t0`, and `t1` that window after `t0`, or `openReverse`
+    // refuses it.
+    let min_window = pins.swap_contract()?.min_window;
+    if quote.ready_deadline - quote.funding_deadline < min_window
+        || quote.refund_after - quote.ready_deadline < min_window
+    {
+        return fail(
+            ErrorCode::Mismatch,
+            "the quote's deadlines leave less than the contract's window",
+        );
     }
     Ok(())
 }
@@ -1745,24 +1717,6 @@ fn refund_due(record: &ReverseRecord, observed: &ReverseChainState, escrow: &Swa
             SwapStage::Open => now >= record.quote.ready_deadline,
             SwapStage::Claimed => false,
         }
-}
-
-/// An escrow still open or ready, under our refund lock with more than the
-/// margin left on a fresh head.
-fn fresh_refund_lock(state: &ReverseChainState, device_now: u64) -> Result<bool> {
-    let Some(escrow) = state
-        .swap
-        .as_ref()
-        .filter(|swap| matches!(swap.stage, SwapStage::Open | SwapStage::Ready))
-    else {
-        return Ok(false);
-    };
-    let head = swap::fresh_head(state.head.timestamp, device_now)?;
-    Ok(reveal_margin_holds(
-        escrow.refund_lock_until,
-        head,
-        device_now,
-    ))
 }
 
 /// The relayer fee a priced or proved funding of `record` pays: the page

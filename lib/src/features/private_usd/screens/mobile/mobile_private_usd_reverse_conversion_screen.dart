@@ -61,10 +61,16 @@ class _MobilePrivateUsdReverseConversionScreenState
     final key = widget.path.keyFor(account);
     final state = ref.watch(privateUsdReverseConversionProvider(key));
     final status = state.status;
+    final bridge = ref.watch(privateUsdBridgeAvailableProvider);
     if (status == null && state.loaded) {
-      // No such conversion for this account: start a new one instead.
+      // No such conversion for this account: start a new one instead, where
+      // bridging runs.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) context.pushReplacement('/private-usd/convert?to=zec');
+        if (mounted) {
+          context.pushReplacement(
+            bridge ? '/private-usd/convert?to=zec' : '/private-usd',
+          );
+        }
       });
     }
     final deployment = ref.watch(privateUsdCurrentDeploymentProvider);
@@ -78,6 +84,7 @@ class _MobilePrivateUsdReverseConversionScreenState
             busy: state.busy,
             privacyModeEnabled: ref.watch(privacyModeProvider),
             explorerTxPrefix: deployment?.explorerTxPrefix,
+            bridgeAvailable: bridge,
           );
     if (presentation != null) noteBridged(presentation.bridged);
     final notifier = ref.read(
