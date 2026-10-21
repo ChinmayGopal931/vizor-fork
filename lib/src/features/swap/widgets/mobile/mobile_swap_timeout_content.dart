@@ -3,26 +3,26 @@ import 'package:flutter/widgets.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
+import '../../../../core/widgets/mobile/neon_glyph_badge.dart';
+import '../../../../core/widgets/mobile/tron_glyph.dart';
 
 /// Mobile deposit-timeout state — Figma `Swap failed` (4755:89127):
-/// the fallen-knight illustration, the "Time's up" tag, the serif
-/// headline, and the restart action. The host's top nav carries the
-/// "Swap failed" title, so it doesn't repeat here.
+/// a neon warning badge, the "Time's up" tag, the headline, and the restart
+/// action. The host's top nav carries the "Swap failed" title, so it doesn't
+/// repeat here.
 class MobileSwapTimeoutContent extends StatelessWidget {
   const MobileSwapTimeoutContent({required this.onRestart, super.key});
 
-  static const _illustration =
-      'assets/illustrations/swap_failed_illustration.webp';
   static const _contentWidth = 340.0;
   static const _messageWidth = 300.0;
   static const _headlineWidth = 217.0;
-  static const _illustrationHeight = 220.0;
+  static const _badgeSize = 96.0;
   static const _buttonHeight = 36.0;
   static const _buttonMinWidth = 96.0;
 
   static const _headlineStyle = TextStyle(
-    fontFamily: 'Young Serif',
-    fontWeight: FontWeight.w400,
+    fontFamily: 'Gotham',
+    fontWeight: FontWeight.w100,
     fontSize: 24,
     height: 28 / 24,
     letterSpacing: 0,
@@ -42,12 +42,10 @@ class MobileSwapTimeoutContent extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Image.asset(
-              _illustration,
-              key: const ValueKey('mobile_swap_timeout_illustration'),
-              width: _contentWidth,
-              height: _illustrationHeight,
-              fit: BoxFit.contain,
+            const NeonGlyphBadge(
+              key: ValueKey('mobile_swap_timeout_illustration'),
+              glyph: TronGlyphKind.warning,
+              size: _badgeSize,
             ),
             const SizedBox(height: AppSpacing.base),
             SizedBox(

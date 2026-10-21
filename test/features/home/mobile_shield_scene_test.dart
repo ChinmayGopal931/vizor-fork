@@ -71,7 +71,7 @@ void main() {
       MobileShieldScene(
         phase: phase,
         amount: '14.12',
-        title: 'Transparent Balance',
+        title: 'Transparent balance',
         canLeave: phase == MobileShieldPhase.review,
         onClose: () => closes++,
       ),
@@ -188,7 +188,7 @@ void main() {
         phase: MobileShieldPhase.review,
         amount: '14.12',
         resultAmount: result,
-        title: 'Transparent Balance',
+        title: 'Transparent balance',
       ),
     );
     await tester.pumpWidget(scene('14.12'));
@@ -221,7 +221,7 @@ void main() {
           MobileShieldScene(
             phase: MobileShieldPhase.review,
             amount: '14.12',
-            title: 'Transparent Balance',
+            title: 'Transparent balance',
             onClose: () => closes++,
           ),
           textScale: 2,
@@ -330,7 +330,7 @@ void main() {
         MobileShieldScene(
           phase: MobileShieldPhase.review,
           amount: '14.12',
-          title: 'Transparent Balance',
+          title: 'Transparent balance',
           onClose: () => closes++,
         ),
       ),
@@ -365,7 +365,7 @@ void main() {
           const MobileShieldScene(
             phase: MobileShieldPhase.review,
             amount: '14.12',
-            title: 'Transparent Balance',
+            title: 'Transparent balance',
           ),
         ),
       );

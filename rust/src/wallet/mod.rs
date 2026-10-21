@@ -12,6 +12,8 @@ pub mod keys;
 pub mod keystone;
 pub mod ledger;
 pub mod network;
+pub(crate) mod private_usd;
+pub(crate) mod routed_http;
 pub mod secret_payload;
 pub mod secret_store;
 pub mod sync;
@@ -31,6 +33,9 @@ const ALLOW_ZERO_CONFIRMATION_SHIELDING: bool = true;
 // confirmations anchor one block below the tip, so a one-block reorg cannot
 // invalidate the claim.
 const PAYMENT_LINK_CLAIM_CONFIRMATIONS: u32 = 2;
+// A Private USD joint sweep spends every note of a swap's joint account,
+// trusted or not, once it has this many confirmations.
+const JOINT_SWEEP_CONFIRMATIONS: u32 = 2;
 
 fn confirmations_policy() -> ConfirmationsPolicy {
     ConfirmationsPolicy::new(
@@ -46,6 +51,13 @@ fn payment_link_claim_confirmations_policy() -> ConfirmationsPolicy {
         NonZeroU32::new(PAYMENT_LINK_CLAIM_CONFIRMATIONS).expect("claim confirmations are nonzero");
     ConfirmationsPolicy::new(confirmations, confirmations, false)
         .expect("claim confirmations are symmetric")
+}
+
+fn joint_sweep_confirmations_policy() -> ConfirmationsPolicy {
+    let confirmations =
+        NonZeroU32::new(JOINT_SWEEP_CONFIRMATIONS).expect("sweep confirmations are nonzero");
+    ConfirmationsPolicy::new(confirmations, confirmations, false)
+        .expect("sweep confirmations are symmetric")
 }
 
 #[cfg(test)]

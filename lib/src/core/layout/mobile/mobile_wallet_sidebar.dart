@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart' show Material, MaterialType;
 import 'package:flutter/widgets.dart';
-import '../../formatting/sync_status_label.dart';
 import '../../navigation/mobile_destinations.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_button.dart';
-import '../../widgets/app_icon.dart';
-import 'mobile_sync_status.dart';
 import 'mobile_sidebar_surface.dart';
+import 'neon_sidebar.dart';
+import 'neon_sync_backdrop.dart';
 
 /// A mobile component, intentionally independent of the desktop sidebar.
 /// Data is injected so window/typography/accessibility states can be captured
@@ -15,7 +14,7 @@ class MobileWalletSidebar extends StatelessWidget {
   const MobileWalletSidebar({
     required this.accountName,
     required this.avatar,
-    required this.status,
+    required this.sync,
     required this.currentPath,
     required this.swapEnabled,
     required this.onSelect,
@@ -25,7 +24,9 @@ class MobileWalletSidebar extends StatelessWidget {
   });
   final String accountName;
   final Widget avatar;
-  final SyncStatusLabel status;
+
+  /// The wallet's sync line, read out at the foot of the panel.
+  final NeonSyncLine sync;
   final String currentPath;
   final bool swapEnabled;
   final ValueChanged<String>? onSelect;
@@ -36,6 +37,13 @@ class MobileWalletSidebar extends StatelessWidget {
   /// still represent actual route restrictions. A full lock uses a panel veil;
   /// a profile-only restriction retains the individual disabled style.
   final bool inputBlocked;
+
+  static const _rowInset = 12.0;
+  static const _rowPadding = 12.0;
+
+  /// Where the destinations' glyphs stand: past the row's inset, its padding
+  /// and the button's label slot. The sync readout's line stands under them.
+  static const _glyphInset = _rowInset + _rowPadding + AppSpacing.xxs;
 
   @override
   Widget build(BuildContext context) {
@@ -87,9 +95,11 @@ class MobileWalletSidebar extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           for (final destination in items) ...[
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: _rowInset),
               child: Semantics(
                 selected: _selected(destination.path),
+                // The active row is lit, not filled: its glyph and label glow
+                // over a pool of light, as the tab bar's active tab does.
                 child: AppButton(
                   variant: AppButtonVariant.ghost,
                   height: 52,
@@ -97,18 +107,17 @@ class MobileWalletSidebar extends StatelessWidget {
                   expand: true,
                   constrainContent: true,
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
+                    horizontal: _rowPadding,
                     vertical: 12,
                   ),
                   disabledBackgroundColor: fullyDisabled
-                      ? (_selected(destination.path)
-                            ? colors.navPanel.activeBg
-                            : colors.background.ground.withValues(alpha: 0))
+                      ? colors.background.ground.withValues(alpha: 0)
                       : null,
-                  enabledBackgroundColor: _selected(destination.path)
-                      ? colors.navPanel.activeBg
-                      : null,
+                  pressedBackgroundColor: colors.navPanel.activeBg,
                   enabledLabelColor: _selected(destination.path)
+                      ? colors.navPanel.activeIcon
+                      : null,
+                  pressedLabelColor: _selected(destination.path)
                       ? colors.navPanel.activeIcon
                       : null,
                   onPressed: onSelect == null
@@ -116,12 +125,9 @@ class MobileWalletSidebar extends StatelessWidget {
                       : () => onSelect!(destination.path),
                   child: Row(
                     children: [
-                      AppIcon(
-                        destination.item.iconName,
-                        size: 24,
-                        color: _selected(destination.path)
-                            ? colors.navPanel.activeIcon
-                            : colors.icon.muted,
+                      NeonSidebarGlyph(
+                        item: destination.item,
+                        selected: _selected(destination.path),
                       ),
                       const SizedBox(width: AppSpacing.s),
                       Expanded(
@@ -132,6 +138,14 @@ class MobileWalletSidebar extends StatelessWidget {
                                 ? (_selected(destination.path)
                                       ? colors.navPanel.activeIcon
                                       : colors.button.ghost.label)
+                                : null,
+                            shadows:
+                                _selected(destination.path) &&
+                                    (onSelect != null || fullyDisabled)
+                                ? Neon.textGlow(
+                                    colors.navPanel.activeIcon,
+                                    intensity: 0.3,
+                                  )
                                 : null,
                           ),
                         ),
@@ -148,83 +162,73 @@ class MobileWalletSidebar extends StatelessWidget {
         ],
       ),
     );
-    final panel = MobileSidebarSurface.builder(
-      builder: (context, corners) {
-        final bottomClearance = MediaQuery.paddingOf(
-          context,
-        ).bottom.clamp(corners.bottomLeft.y + AppSpacing.sm, double.infinity);
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            // Both regions share one scroll layout. Their contiguous veils
-            // cover the entire panel, while the single sync widget paints last
-            // (including its glow). No duplicate footer or deferred measurement.
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          fit: StackFit.passthrough,
-                          children: [
-                            Semantics(
-                              enabled: fullyDisabled ? false : null,
-                              child: controls,
-                            ),
-                            if (fullyDisabled)
-                              Positioned.fill(
-                                child: _SidebarVeil(
-                                  key: const ValueKey(
-                                    'mobile_sidebar_controls_veil',
-                                  ),
-                                  color: veilColor,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      Stack(
+    final panel = MobileSidebarSurface(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bottomClearance = MediaQuery.paddingOf(
+            context,
+          ).bottom.clamp(AppSpacing.sm, double.infinity);
+          // Both regions share one scroll layout. Their contiguous veils
+          // cover the entire panel, while the single sync widget paints last
+          // (including its glow). No duplicate footer or deferred measurement.
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: Stack(
                         clipBehavior: Clip.none,
+                        fit: StackFit.passthrough,
                         children: [
+                          Semantics(
+                            enabled: fullyDisabled ? false : null,
+                            child: controls,
+                          ),
                           if (fullyDisabled)
                             Positioned.fill(
                               child: _SidebarVeil(
                                 key: const ValueKey(
-                                  'mobile_sidebar_footer_veil',
+                                  'mobile_sidebar_controls_veil',
                                 ),
                                 color: veilColor,
                               ),
                             ),
-                          Padding(
-                            key: const ValueKey(
-                              'mobile_sidebar_sync_foreground',
-                            ),
-                            // Keep the bar and its glow above the same native
-                            // bottom corner used to paint and clip the panel.
-                            padding: EdgeInsets.only(
-                              right: 16,
-                              bottom: bottomClearance,
-                            ),
-                            child: MobileSyncStatus.fromStatus(
-                              context: context,
-                              status: status,
-                              leading: true,
-                              wrapLabel: true,
-                            ),
-                          ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        if (fullyDisabled)
+                          Positioned.fill(
+                            child: _SidebarVeil(
+                              key: const ValueKey('mobile_sidebar_footer_veil'),
+                              color: veilColor,
+                            ),
+                          ),
+                        Padding(
+                          key: const ValueKey('mobile_sidebar_sync_foreground'),
+                          // The readout's line stands under the glyphs, above
+                          // the panel's foot and the window's safe area.
+                          padding: EdgeInsetsDirectional.only(
+                            start: _glyphInset,
+                            end: AppSpacing.sm,
+                            bottom: bottomClearance,
+                          ),
+                          child: NeonSidebarSyncReadout(line: sync),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            );
-          },
-        );
-      },
+            ),
+          );
+        },
+      ),
     );
     // Establish text defaults independently of surrounding route Material widgets.
     // Establish a complete mobile text style instead of inheriting the
@@ -252,6 +256,9 @@ class MobileWalletSidebar extends StatelessWidget {
           (currentPath == '/accounts' ||
               currentPath.startsWith('/send') ||
               currentPath.startsWith('/receive') ||
+              currentPath.startsWith('/swap') ||
+              currentPath.startsWith('/private-usd') ||
+              currentPath == '/portfolio-chart' ||
               currentPath.startsWith('/migration')));
 }
 

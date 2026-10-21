@@ -346,8 +346,7 @@ class _MobileEndpointScreenState extends ConsumerState<MobileEndpointScreen> {
       ),
       children: [
         // Dark hero card with the host:port field — Figma `Custom
-        // endpoint` card (4083:457541): 200 high with the faded
-        // castle-library line art along the bottom edge.
+        // endpoint` card (4083:457541): 200 high.
         Container(
           key: const ValueKey('mobile_endpoint_custom_card'),
           height: 200,
@@ -355,11 +354,6 @@ class _MobileEndpointScreenState extends ConsumerState<MobileEndpointScreen> {
             color: colors.background.homeCard,
             borderRadius: BorderRadius.circular(AppRadii.large),
             border: Border.all(color: colors.border.subtleOpacity, width: 1.5),
-            image: const DecorationImage(
-              image: AssetImage('assets/illustrations/endpoint_custom_bg.webp'),
-              fit: BoxFit.cover,
-              alignment: Alignment.bottomCenter,
-            ),
           ),
           child: Stack(
             children: [
@@ -396,11 +390,9 @@ class _MobileEndpointScreenState extends ConsumerState<MobileEndpointScreen> {
                           backgroundColor: colors.background.ground,
                           restingBorderColor: colors.border.subtle,
                           textStyle: AppTypography.labelMedium.copyWith(
-                            fontWeight: FontWeight.w400,
                             color: colors.text.accent,
                           ),
                           hintStyle: AppTypography.labelMedium.copyWith(
-                            fontWeight: FontWeight.w400,
                             color: colors.text.muted,
                           ),
                           onChanged: (_) => setState(() => _submitError = null),
@@ -575,15 +567,11 @@ class _MobileCurrentEndpointText extends StatelessWidget {
     return Text.rich(
       TextSpan(
         text: 'Current: ',
-        style: AppTypography.labelMedium.copyWith(
-          fontWeight: FontWeight.w500,
-          color: colors.text.primary,
-        ),
+        style: AppTypography.labelMedium.copyWith(color: colors.text.primary),
         children: [
           TextSpan(
             text: current.hostPort,
             style: AppTypography.labelMedium.copyWith(
-              fontWeight: FontWeight.w400,
               color: colors.text.accent,
             ),
           ),
@@ -591,7 +579,6 @@ class _MobileCurrentEndpointText extends StatelessWidget {
             TextSpan(
               text: ' $suffix',
               style: AppTypography.labelMedium.copyWith(
-                fontWeight: FontWeight.w500,
                 color: colors.text.primary,
               ),
             ),
@@ -621,11 +608,9 @@ class _PresetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final titleStyle = AppTypography.labelMedium.copyWith(
-      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
       color: colors.text.accent,
     );
     final detailStyle = AppTypography.labelMedium.copyWith(
-      fontWeight: FontWeight.w400,
       color: selected ? colors.text.accent : colors.text.secondary,
     );
     return Semantics(

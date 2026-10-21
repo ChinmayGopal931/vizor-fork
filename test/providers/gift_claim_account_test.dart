@@ -23,7 +23,9 @@ import 'package:zcash_wallet/src/rust/frb_generated.dart';
 const _passcode = '13579086';
 const _mnemonic = 'gift wallet mnemonic fixture';
 const _name = 'My gift wallet';
-const _profile = 'pfp-11';
+// A current portrait: the retired knight ids (pfp-08 to pfp-15) are saved as
+// the portrait they map onto.
+const _profile = 'pfp-04';
 String _pendingDraft() => jsonEncode({
   'mnemonic': _mnemonic,
   'network': incomingLink.network,

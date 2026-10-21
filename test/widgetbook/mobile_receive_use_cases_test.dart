@@ -23,8 +23,8 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(MobileReceiveScreen), findsOneWidget);
-    expect(find.text('Receive ZEC'), findsOneWidget);
-    expect(find.text('Account Name'), findsOneWidget);
+    expect(find.text('RECEIVE ZEC'), findsOneWidget);
+    expect(find.text('ACCOUNT NAME'), findsOneWidget);
     expect(find.text('Share shielded address'), findsOneWidget);
     expect(find.text('Copy shielded address'), findsOneWidget);
     // Share shares its row with the square request button: 300 - 8 - 50.
@@ -92,7 +92,7 @@ void main() {
     );
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Shielded address'), findsOneWidget);
+    expect(find.text('SHIELDED ADDRESS'), findsOneWidget);
     expect(find.text('Strong privacy by default.'), findsOneWidget);
     expect(find.text('Close'), findsOneWidget);
     _expectFloatingInfoSheet(tester);
@@ -137,7 +137,7 @@ void main() {
     );
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Transparent address'), findsOneWidget);
+    expect(find.text('TRANSPARENT ADDRESS'), findsOneWidget);
     expect(find.text('Publicly visible'), findsOneWidget);
     expect(find.text('Close'), findsOneWidget);
     expect(
@@ -162,7 +162,11 @@ void _expectFloatingInfoSheet(WidgetTester tester) {
   // and the actual app font must fit every explainer without truncation.
   final text = find.descendant(of: sheet, matching: find.byType(Text));
   for (final paragraph in tester.renderObjectList<RenderParagraph>(text)) {
-    expect(paragraph.didExceedMaxLines, isFalse);
+    expect(
+      paragraph.didExceedMaxLines,
+      isFalse,
+      reason: 'truncated: ${paragraph.text.toPlainText()}',
+    );
   }
 }
 

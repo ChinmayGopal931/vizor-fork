@@ -23,8 +23,8 @@ enum VerifyAddressModalAddressKind { shielded, transparent, external }
 /// The address verification modal opened from "Show full address" on the
 /// send review screen (and later the received receipt).
 ///
-/// Renders the full address as a continuous Geist Mono string that wraps
-/// naturally, with Copy as the primary action.
+/// Renders the full address as a continuous string in the code style that
+/// wraps naturally, with Copy as the primary action.
 ///
 /// Static only — no provider wiring. The caller hosts this card inside an
 /// `AppPaneModalOverlay` and supplies the callbacks.

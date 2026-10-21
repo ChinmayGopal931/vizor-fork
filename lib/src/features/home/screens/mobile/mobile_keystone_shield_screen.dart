@@ -2,7 +2,6 @@ import '../../../../core/navigation/mobile_sidebar_exit.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart' show Colors;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -576,7 +575,7 @@ class _MobileKeystoneShieldScreenState
           amount: formatZecAmount(_amount),
           resultAmount: formatZecAmount(_shieldedAmount ?? _amount),
           title: !_started
-              ? 'Transparent Balance'
+              ? 'Transparent balance'
               : _done
               ? 'Shielded successfully'
               : scanning
@@ -683,10 +682,7 @@ class _MobileKeystoneShieldScreenState
                       growWithContent: true,
                       variant: AppButtonVariant.ghost,
                       onPressed: _finishWarningOrFailure,
-                      child: const Text(
-                        'Back to wallet',
-                        style: TextStyle(color: Colors.white),
-                      ),
+                      child: const Text('Back to wallet'),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.s),

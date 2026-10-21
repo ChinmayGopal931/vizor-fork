@@ -59,7 +59,7 @@ class LedgerDeviceAppPrompt extends StatelessWidget {
                   ledgerZcashAppOpenInstruction(networkName),
                   style: AppTypography.bodyMedium.copyWith(
                     color: colors.text.accent,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeight.semiBold,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xxs),

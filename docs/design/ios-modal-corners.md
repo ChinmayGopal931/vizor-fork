@@ -74,7 +74,7 @@ highlight share one shape.
 
 ## Validation (2026-09-23)
 
-Vizor PR688 E2E, iPhone 17 Pro, iOS 26.5, 402 × 874 logical points, scale 3:
+Veylor PR688 E2E, iPhone 17 Pro, iOS 26.5, 402 × 874 logical points, scale 3:
 
 | State | Top radius | Bottom left/right | Card frame (x, y, w, h) |
 | --- | --- | --- | --- |
@@ -118,7 +118,7 @@ after this test correction.
 
 ## Reproduce native captures
 
-Use a dedicated simulator: the preview replaces its installed Vizor executable.
+Use a dedicated simulator: the preview replaces its installed Veylor executable.
 Enable the software keyboard in Simulator. Build and install the preview, then
 run the capture script with that simulator's UDID:
 

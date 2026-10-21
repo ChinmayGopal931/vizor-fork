@@ -1,0 +1,7 @@
+{
+  "name": "web3",
+  "version": "0.0.0-unused",
+  "description": "Stands in for web3, which @railgun-community/circomlibjs lists but only its tests use; the real one brings request, tar and express into the tree",
+  "main": "index.js",
+  "license": "AGPL-3.0-only"
+}

@@ -229,9 +229,9 @@ class _LedgerConnectScreenState extends ConsumerState<LedgerConnectScreen> {
       return 'Connect and unlock your Ledger. $appInstruction';
     }
     if (lower.contains('already') || lower.contains('duplicate')) {
-      return 'This Ledger account is already in Vizor.';
+      return 'This Ledger account is already in Veylor.';
     }
-    return 'Vizor could not read this Ledger account. $appInstruction Then try again.';
+    return 'Veylor could not read this Ledger account. $appInstruction Then try again.';
   }
 
   Widget _transportChoice(LedgerConnectionTransport transport) {
@@ -485,7 +485,7 @@ class _LedgerConnectScreenState extends ConsumerState<LedgerConnectScreen> {
                       Text(
                         'Connect Ledger',
                         style: AppTypography.displayLarge.copyWith(
-                          fontFamily: 'Young Serif',
+                          fontFamily: kGothamFamily,
                           fontWeight: FontWeight.w400,
                           color: context.colors.text.accent,
                         ),
@@ -571,7 +571,7 @@ class _LedgerConnectScreenState extends ConsumerState<LedgerConnectScreen> {
                         ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
-                        'See your balance and activity in Vizor.\nApprove transactions on Ledger.',
+                        'See your balance and activity in Veylor.\nApprove transactions on Ledger.',
                         style: AppTypography.bodySmall.copyWith(
                           color: context.colors.text.secondary,
                         ),

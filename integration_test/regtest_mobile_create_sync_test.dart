@@ -32,7 +32,7 @@ void main() {
 
       await pumpUntil(
         tester,
-        () => tester.any(find.text('Vizor is synced')),
+        () => tester.any(find.text('Veylor is synced')),
         description: 'sync to complete',
         timeout: const Duration(minutes: 2),
       );

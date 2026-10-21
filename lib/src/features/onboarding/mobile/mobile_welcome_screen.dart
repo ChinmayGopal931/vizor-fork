@@ -16,13 +16,14 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/layout/mobile/mobile_window_policy.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/mobile/neon_horizon.dart';
+import '../../../core/widgets/mobile/neon_motion.dart';
 import '../shared/onboarding_welcome_art.dart' show VizorWordmark;
-import 'mobile_welcome_backdrop.dart';
 import '../shared/welcome_accent_button.dart';
 import '../shared/welcome_button_tokens.dart';
 import '../shared/welcome_gift_card_button.dart';
 
-/// Figma `Welcome` (8635:103040): native video with create and import entry paths.
+/// Figma `Welcome` (8635:103040) with create and import entry paths.
 class MobileWelcomeScreen extends ConsumerStatefulWidget {
   const MobileWelcomeScreen({
     this.showBackButton = false,
@@ -32,6 +33,9 @@ class MobileWelcomeScreen extends ConsumerStatefulWidget {
 
   /// `/add-account` returns home and offers the same Gift Card setup choices.
   final bool showBackButton;
+
+  /// Whether the horizon flickers on like a neon sign when the screen
+  /// appears. Previews and captures pass false for a steady frame.
   final bool animateBackground;
 
   @override
@@ -90,7 +94,7 @@ class _MobileWelcomeScreenState extends ConsumerState<MobileWelcomeScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: const Color(0xff0f0f0f),
+        backgroundColor: const Color(0xff000000),
         body: LayoutBuilder(
           builder: (context, constraints) {
             final insets = MediaQuery.paddingOf(context);
@@ -99,27 +103,43 @@ class _MobileWelcomeScreenState extends ConsumerState<MobileWelcomeScreen> {
             // Keep 240-point mobile buttons and 16-point side padding even in
             // a short, wide window below the former 740-point breakpoint.
             final paneWidth = (safeWidth * 0.4).clamp(272.0, 420.0);
-            final artWidth = math.max(
-              constraints.maxHeight * 16 / 9,
-              safeWidth - paneWidth,
-            );
             final paneRight = insets.left + paneWidth;
-            final artCenter =
-                (paneRight + constraints.maxWidth - insets.right) / 2;
-            final videoHeight = (constraints.maxWidth + 1) * 700 / 394;
-            final fadeEnd = math.min(1.0, videoHeight / constraints.maxHeight);
+            // The Figma's 394×700 video slot (393×852 reference) sets where
+            // the art fades into the page.
+            final artHeight = (constraints.maxWidth + 1) * 700 / 394;
+            final fadeEnd = math.min(1.0, artHeight / constraints.maxHeight);
+            // A wide window sets the horizon beside the pane, centred in the
+            // space to its right. It is decorative, so it runs on under the
+            // right inset.
+            final horizonWidth = landscape
+                ? constraints.maxWidth - paneRight
+                : constraints.maxWidth;
+            final horizonHeight =
+                constraints.maxHeight * (landscape ? 0.6 : 0.42);
             return Stack(
               fit: StackFit.expand,
               children: [
-                // 394×700 video slot at x=-1 in the 393×852 reference.
                 Positioned(
-                  top: 0,
-                  left: landscape ? artCenter - artWidth / 2 : -1,
-                  width: landscape ? artWidth : constraints.maxWidth + 1,
-                  height: landscape ? constraints.maxHeight : videoHeight,
-                  child: MobileWelcomeBackdrop(
-                    animate: widget.animateBackground,
-                    landscape: landscape,
+                  top: landscape
+                      ? (constraints.maxHeight - horizonHeight) / 2
+                      : insets.top,
+                  left: landscape ? paneRight : 0,
+                  width: horizonWidth,
+                  height: horizonHeight,
+                  // The floor's lines fan out past its box; keep them out of
+                  // the pane.
+                  child: ClipRect(
+                    child: NeonIgnition(
+                      enabled: widget.animateBackground,
+                      builder: (context, light) => Opacity(
+                        opacity: light,
+                        child: NeonHorizon(
+                          key: const ValueKey('mobile_welcome_horizon'),
+                          width: horizonWidth,
+                          height: horizonHeight,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 if (landscape)
@@ -135,10 +155,10 @@ class _MobileWelcomeScreenState extends ConsumerState<MobileWelcomeScreen> {
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
                             colors: [
-                              Color(0xff0f0f0f),
-                              Color(0xff0f0f0f),
-                              Color(0x990f0f0f),
-                              Color(0x000f0f0f),
+                              Color(0xff000000),
+                              Color(0xff000000),
+                              Color(0x99000000),
+                              Color(0x00000000),
                             ],
                             stops: [0, 0.35, 0.7, 1],
                           ),
@@ -169,6 +189,7 @@ class _MobileWelcomeScreenState extends ConsumerState<MobileWelcomeScreen> {
                   ),
                 if (landscape)
                   Positioned(
+                    key: const ValueKey('mobile_welcome_wide_pane'),
                     left: insets.left,
                     top: insets.top,
                     bottom: insets.bottom,
@@ -264,7 +285,7 @@ class _MobileWelcomeScreenState extends ConsumerState<MobileWelcomeScreen> {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const VizorWordmark(width: 106, height: 40, color: Color(0xffffffff)),
+        const VizorWordmark(width: 106, height: 40),
         const SizedBox(height: AppSpacing.md),
         Text(
           'Shielded\nby default',

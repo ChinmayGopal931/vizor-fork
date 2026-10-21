@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 
 import '../../theme/app_theme.dart';
+import '../../feedback/app_haptics.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/mobile/neon_scramble_text.dart';
 import 'mobile_sync_status.dart';
 
 /// Height of [MobileTopNav] — Figma `Mobile Top Nav` (node 4237:92733).
@@ -14,18 +18,18 @@ const double kMobileTopNavHeight = 72;
 ///   Used by the tab roots.
 /// - [MobileTopNav.steps] — back button + centered progress track. Used
 ///   by multi-step flows (onboarding, send wizard).
-/// - [MobileTopNav.back] — back button + centered serif title. Used by
+/// - [MobileTopNav.back] — back button + centered title. Used by
 ///   pushed detail screens; with a null [onBack] the button is omitted
 ///   and only the centered title remains (tab roots like Activity).
 ///
 /// Metrics come from Figma node 4237:92733 (393×72; not tokenized as
 /// variables yet, so they live here as constants). The Back-variant
-/// title uses [AppTypography.headlineLarge], which on mobile resolves to
-/// Young Serif 32 px (Headline L) — the size the shared Mobile Top Nav
-/// component's Back variant uses across the mobile screen frames.
+/// title is a page title ([kNeonPageTitleStyle]) unless the screen passes
+/// its own [titleStyle].
 class MobileTopNav extends StatelessWidget {
   const MobileTopNav.account({
     required this.accountName,
+    this.height = kMobileTopNavHeight,
     this.balanceLabel,
     this.syncLabel,
     this.syncLabelColor,
@@ -39,7 +43,6 @@ class MobileTopNav extends StatelessWidget {
        title = '',
        titleStyle = null,
        titleMaxLines = 1,
-       height = kMobileTopNavHeight,
        progress = 0,
        progressOffset = Offset.zero,
        progressTrackColor = null,
@@ -133,7 +136,7 @@ class MobileTopNav extends StatelessWidget {
   final Color? progressTrackColor;
   final bool showBackButton;
 
-  /// Back variant: centered serif title.
+  /// Back variant: centered title.
   final String title;
   final TextStyle? titleStyle;
   final int titleMaxLines;
@@ -157,6 +160,7 @@ class MobileTopNav extends StatelessWidget {
   static const _backButtonSize = 44.0;
   static const _progressTrackWidth = 196.0;
   static const _progressTrackHeight = 6.0;
+  static const _syncStatusMaxShare = 0.65;
 
   @override
   Widget build(BuildContext context) {
@@ -172,66 +176,41 @@ class MobileTopNav extends StatelessWidget {
 
   Widget _buildAccount(BuildContext context) {
     final colors = context.colors;
-    final account = GestureDetector(
-      key: const ValueKey('mobile_top_nav_account'),
-      behavior: HitTestBehavior.opaque,
-      onTap: onAccountTap,
-      child: Row(
-        mainAxisSize: MainAxisSize.max,
-        children: [
-          avatar ?? _AvatarPlaceholder(size: _avatarSize),
-          const SizedBox(width: AppSpacing.s),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  accountName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.labelLarge.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: colors.text.accent,
-                  ),
-                ),
-                if (balanceLabel != null) ...[
-                  const SizedBox(height: AppSpacing.xxs),
-                  Text(
-                    balanceLabel!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.labelLarge.copyWith(
-                      fontWeight: FontWeight.w400,
-                      color: colors.text.secondary,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
+    final account = _AccountBadge(
+      accountName: accountName,
+      balanceLabel: balanceLabel,
+      avatar: avatar ?? _AvatarPlaceholder(size: _avatarSize),
+      onAccountTap: onAccountTap,
     );
 
-    return Row(
-      children: [
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: Align(alignment: Alignment.centerLeft, child: account),
-        ),
-        if (syncLabel != null)
-          MobileSyncStatus(
-            label: syncLabel!,
-            baseColor: syncLabelColor ?? colors.sync.text,
-            highlightColor:
-                syncHighlightColor ?? syncLabelColor ?? colors.sync.text,
-            indicatorColor: syncIndicatorColor ?? colors.sync.glow,
-            animated: syncAnimated,
-          )
-        else
+    return LayoutBuilder(
+      builder: (context, constraints) => Row(
+        children: [
           const SizedBox(width: AppSpacing.sm),
-      ],
+          Expanded(
+            child: Align(alignment: Alignment.centerLeft, child: account),
+          ),
+          if (syncLabel != null)
+            // The status never takes more than this share of the bar, so the
+            // account avatar keeps its room at large text sizes and with a
+            // long label; past it the label ends in an ellipsis.
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: constraints.maxWidth * _syncStatusMaxShare,
+              ),
+              child: MobileSyncStatus(
+                label: syncLabel!,
+                baseColor: syncLabelColor ?? colors.sync.text,
+                highlightColor:
+                    syncHighlightColor ?? syncLabelColor ?? colors.sync.text,
+                indicatorColor: syncIndicatorColor ?? colors.sync.glow,
+                animated: syncAnimated,
+              ),
+            )
+          else
+            const SizedBox(width: AppSpacing.sm),
+        ],
+      ),
     );
   }
 
@@ -289,12 +268,14 @@ class MobileTopNav extends StatelessWidget {
             padding: const EdgeInsets.symmetric(
               horizontal: _backButtonSize + AppSpacing.s,
             ),
+            // A page title is drawn uppercase; a screen's own style keeps
+            // its case.
             child: Text(
-              title,
+              titleStyle == null ? title.toUpperCase() : title,
               maxLines: titleMaxLines,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: (titleStyle ?? AppTypography.headlineLarge).copyWith(
+              style: (titleStyle ?? kNeonPageTitleStyle).copyWith(
                 color: foregroundColor ?? colors.text.accent,
               ),
             ),
@@ -368,6 +349,137 @@ class _AvatarPlaceholder extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.colors.background.overlay,
         shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+/// The account in the top bar: only its portrait until tapped. A tap
+/// decrypts the name in beside it, which folds away again after a moment;
+/// tapping while the name shows (or a long press) opens the account switcher.
+/// Screen readers get the name and the switcher directly.
+class _AccountBadge extends StatefulWidget {
+  const _AccountBadge({
+    required this.accountName,
+    required this.avatar,
+    required this.onAccountTap,
+    this.balanceLabel,
+  });
+
+  final String accountName;
+  final String? balanceLabel;
+  final Widget avatar;
+  final VoidCallback? onAccountTap;
+
+  @override
+  State<_AccountBadge> createState() => _AccountBadgeState();
+}
+
+class _AccountBadgeState extends State<_AccountBadge> {
+  static const _showFor = Duration(milliseconds: 3500);
+
+  var _revealed = false;
+  Timer? _hide;
+
+  @override
+  void dispose() {
+    _hide?.cancel();
+    super.dispose();
+  }
+
+  void _setRevealed(bool revealed) {
+    _hide?.cancel();
+    if (revealed) _hide = Timer(_showFor, () => _setRevealed(false));
+    if (mounted && revealed != _revealed) {
+      setState(() => _revealed = revealed);
+    }
+  }
+
+  void _onTap() {
+    if (_revealed) {
+      _setRevealed(false);
+      widget.onAccountTap?.call();
+      return;
+    }
+    unawaited(AppHaptics.auxiliaryKey());
+    _setRevealed(true);
+  }
+
+  void _onLongPress() {
+    _setRevealed(false);
+    widget.onAccountTap?.call();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final nameStyle = AppTypography.labelLarge.copyWith(
+      fontSize: 17,
+      letterSpacing: 0.6,
+      color: colors.text.accent,
+    );
+    return Semantics(
+      key: const ValueKey('mobile_top_nav_account_semantics'),
+      button: true,
+      label: widget.accountName,
+      onTap: widget.onAccountTap,
+      excludeSemantics: true,
+      child: GestureDetector(
+        key: const ValueKey('mobile_top_nav_account'),
+        behavior: HitTestBehavior.opaque,
+        onTap: _onTap,
+        onLongPress: _onLongPress,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            widget.avatar,
+            Flexible(
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.centerLeft,
+                child: _revealed
+                    ? Padding(
+                        padding: const EdgeInsets.only(left: AppSpacing.s),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            NeonScrambleText(
+                              key: const ValueKey(
+                                'mobile_top_nav_account_name',
+                              ),
+                              text: widget.accountName,
+                              decryptOnAppear: true,
+                              overflow: TextOverflow.ellipsis,
+                              style: nameStyle,
+                              cipherStyle: nameStyle.copyWith(
+                                color: colors.neon.glow,
+                                shadows: Neon.textGlow(
+                                  colors.neon.glow,
+                                  intensity: 0.5,
+                                ),
+                              ),
+                            ),
+                            if (widget.balanceLabel case final label?) ...[
+                              const SizedBox(height: AppSpacing.xxs),
+                              Text(
+                                label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.labelLarge.copyWith(
+                                  color: colors.text.secondary,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      )
+                    : const SizedBox(height: 1),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

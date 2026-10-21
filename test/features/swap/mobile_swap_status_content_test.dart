@@ -6,6 +6,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/mobile_surface_card.dart';
+import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_presentation.dart';
+import 'package:zcash_wallet/src/features/private_usd/models/private_usd_status_presentation.dart';
+import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
+import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/swap/domain/swap_asset.dart';
 import 'package:zcash_wallet/src/features/swap/models/swap_activity_status_mapper.dart';
 import 'package:zcash_wallet/src/features/swap/models/swap_detail_tooltips.dart';
@@ -22,6 +27,11 @@ import 'package:zcash_wallet/src/features/swap/widgets/mobile/mobile_swap_review
 import 'package:zcash_wallet/src/features/swap/widgets/mobile/mobile_swap_status_content.dart';
 import 'package:zcash_wallet/src/features/swap/widgets/swap_activity_panel.dart'
     show mobileSwapStatusHeaderLabels, mobileSwapStatusRecipientFullAddress;
+
+import 'package:zcash_wallet/src/rust/api/private_usd.dart'
+    show ApiForwardWait, ApiReversePhase;
+import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
+import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
 import '../../figma_compare/figma_compare_font_loader.dart';
 
@@ -563,13 +573,11 @@ void main() {
     final detailsRect = tester.getRect(
       find.byKey(const ValueKey('mobile_swap_transaction_details')),
     );
-    final card = tester.widget<Container>(
-      find
-          .descendant(
-            of: find.byKey(const ValueKey('mobile_swap_status_card')),
-            matching: find.byType(Container),
-          )
-          .first,
+    final card = tester.widget<MobileSurfaceCard>(
+      find.descendant(
+        of: find.byKey(const ValueKey('mobile_swap_status_card')),
+        matching: find.byType(MobileSurfaceCard),
+      ),
     );
     expect(
       card.padding,
@@ -583,6 +591,76 @@ void main() {
     expect(labelRect.left, moreOrLessEquals(detailsRect.left));
     expect(valueRect.left, greaterThan(labelRect.right));
     expect(valueRect.right, greaterThan(detailsRect.right - 120));
+  });
+
+  testWidgets('a Private USD conversion lists all its rows while it runs, '
+      'both ways; a swap still keeps its compact rows', (tester) async {
+    Future<void> details(SwapActivityStatusPresentation presentation) =>
+        tester.pumpWidget(
+          _harness(
+            SingleChildScrollView(
+              child: MobileSwapStatusContent(
+                presentation: presentation,
+                payHeaderRow: _payRow(),
+                receiveHeaderRow: _receiveRow(),
+                activeTab: SwapStatusTab.details,
+                detailsExpanded: true,
+                onTabChanged: (_) {},
+                onToggleDetails: () {},
+              ),
+            ),
+          ),
+        );
+
+    final forward = privateUsdProgressPresentation(
+      status: PrivateUsdConversionStatus(
+        record: previewPrivateUsdRecord(depositConfirmations: 1),
+        wait: ApiForwardWait.confirming,
+      ),
+      now: previewPrivateUsdNow,
+      zcashConfirmations: 2,
+      screening: const Duration(hours: 1),
+    ).status;
+    expect(forward.showTabs, isTrue);
+    await details(forward);
+    for (final label in [
+      PrivateUsdCopy.detailSwapId,
+      PrivateUsdCopy.detailDeposit,
+      PrivateUsdCopy.detailStarted,
+    ]) {
+      expect(find.text(label), findsOneWidget, reason: label);
+    }
+
+    final reverse = privateUsdReverseProgressPresentation(
+      status: PrivateUsdReverseStatus(
+        record: previewPrivateUsdReverseRecord(
+          phase: ApiReversePhase.receiving,
+        ),
+      ),
+      now: previewPrivateUsdNow,
+    ).status;
+    expect(reverse.showTabs, isTrue);
+    await details(reverse);
+    for (final label in [
+      PrivateUsdCopy.detailSwapId,
+      PrivateUsdCopy.detailFunding,
+      PrivateUsdCopy.detailZecReceived,
+      PrivateUsdCopy.detailStarted,
+    ]) {
+      expect(find.text(label), findsOneWidget, reason: label);
+    }
+
+    // The same rows in a swap's details stay out while it runs.
+    await tester.pumpWidget(
+      _harness(
+        SingleChildScrollView(
+          child: _content(showTabs: true, details: forward.details),
+        ),
+      ),
+    );
+    expect(find.text(PrivateUsdCopy.detailSwapId), findsNothing);
+    expect(find.text(PrivateUsdCopy.detailDeposit), findsNothing);
+    expect(find.text(PrivateUsdCopy.detailStarted), findsNothing);
   });
 
   testWidgets('completed details hide recipient and deposit address rows', (

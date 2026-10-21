@@ -39,7 +39,7 @@ class FigmaCompareApp extends StatelessWidget {
     );
 
     return MaterialApp(
-      title: 'Vizor Figma comparison',
+      title: 'Veylor Figma comparison',
       debugShowCheckedModeBanner: false,
       theme: buildLegacyLightTheme(),
       darkTheme: buildLegacyDarkTheme(),

@@ -4,6 +4,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_tooltip.dart';
+import '../../../../core/widgets/mobile/mobile_warning_notice.dart';
 import '../../../address_book/models/address_book_contact.dart';
 import '../../../address_book/widgets/contact_name_inline.dart';
 import '../../domain/swap_address_plan.dart';
@@ -105,28 +106,28 @@ class MobileSwapReviewContent extends StatelessWidget {
         _ReviewCard(quote: quote),
         if (amountWarning != null) ...[
           const SizedBox(height: AppSpacing.s),
-          _MobileReviewNotice(
+          MobileWarningNotice(
             key: const ValueKey('mobile_swap_review_amount_warning'),
             message: amountWarning!,
           ),
         ],
         if (expired) ...[
           const SizedBox(height: AppSpacing.s),
-          const _MobileReviewNotice(
+          const MobileWarningNotice(
             message: 'Quote expired. Review again for an updated rate.',
           ),
         ],
         if (startError != null) ...[
           const SizedBox(height: AppSpacing.s),
-          _MobileReviewNotice(message: startError!),
+          MobileWarningNotice(message: startError!),
         ],
         if (startBlockedReason != null) ...[
           const SizedBox(height: AppSpacing.s),
-          _MobileReviewNotice(message: startBlockedReason!),
+          MobileWarningNotice(message: startBlockedReason!),
         ],
         if (inactiveMessage != null) ...[
           const SizedBox(height: AppSpacing.s),
-          _MobileReviewNotice(
+          MobileWarningNotice(
             key: const ValueKey('mobile_swap_review_inactive_notice'),
             message: inactiveMessage!,
           ),
@@ -249,40 +250,6 @@ class _ReviewRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// Plum notice line under the card (quote drift, expiry, errors).
-class _MobileReviewNotice extends StatelessWidget {
-  const _MobileReviewNotice({required this.message, super.key});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: AppIcon(
-            AppIcons.warning,
-            size: AppIconSize.medium,
-            color: colors.text.destructive,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.xs),
-        Expanded(
-          child: Text(
-            message,
-            style: AppTypography.bodySmall.copyWith(
-              color: colors.text.destructive,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

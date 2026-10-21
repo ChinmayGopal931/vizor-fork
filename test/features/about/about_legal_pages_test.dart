@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zcash_wallet/app.dart';
@@ -14,6 +13,7 @@ import 'package:zcash_wallet/src/core/widgets/app_back_link.dart';
 import 'package:zcash_wallet/src/features/about/screens/about_screen.dart';
 import 'package:zcash_wallet/src/providers/account_models.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 
@@ -261,13 +261,7 @@ void main() {
 }
 
 Future<void> _loadAppFonts() async {
-  final youngSerif = FontLoader('Young Serif')
-    ..addFont(rootBundle.load('assets/fonts/YoungSerif-Regular.ttf'));
-  final geist = FontLoader('Geist')
-    ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-    ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'));
-
-  await Future.wait([youngSerif.load(), geist.load()]);
+  await loadGothamFonts();
 }
 
 Future<void> _setDesktopViewport(WidgetTester tester) async {

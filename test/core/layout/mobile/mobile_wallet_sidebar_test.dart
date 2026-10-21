@@ -6,20 +6,33 @@ import 'dart:ui' show SemanticsAction;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zcash_wallet/src/core/formatting/sync_status_label.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_shell.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_tab_bar.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_navigation_scope.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_wallet_sidebar.dart';
+import 'package:zcash_wallet/src/core/layout/mobile/neon_sidebar.dart';
+import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_sidebar_surface.dart';
-import 'package:zcash_wallet/src/core/layout/mobile/mobile_sync_status.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/tron_glyph.dart';
 
-const status = SyncStatusLabel(
-  kind: SyncStatusKind.syncing,
-  label: '4% Syncing...',
-  semanticsLabel: '4% Syncing',
+final status = NeonSyncLine(
+  progress: 0.04,
+  readout: NeonSyncReadout.progress(4),
+  semanticsLabel: 'Syncing 4 percent',
+  climbing: true,
+);
+const failed = NeonSyncLine(
+  progress: 0.04,
+  readout: NeonSyncReadout.failed,
+  semanticsLabel: 'Syncing failed. Network error',
+  failed: true,
+);
+const synced = NeonSyncLine(
+  progress: 1,
+  readout: NeonSyncReadout.synced,
+  semanticsLabel: 'Veylor is synced',
 );
 Widget harness(Widget child, {double scale = 1, AppThemeData? theme}) =>
     MaterialApp(
@@ -46,15 +59,13 @@ Widget harness(Widget child, {double scale = 1, AppThemeData? theme}) =>
 void main() {
   for (final dark in [false, true]) {
     for (final enabled in [false, true]) {
-      for (final kind in SyncStatusKind.values) {
+      for (final line in [status, synced, failed]) {
         testWidgets('sidebar resets inherited text decoration '
-            '(dark=$dark, enabled=$enabled, sync=$kind)', (tester) async {
+            '(dark=$dark, enabled=$enabled, sync=${line.readout})', (
+          tester,
+        ) async {
           final theme = dark ? AppThemeData.dark : AppThemeData.light;
-          final label = switch (kind) {
-            SyncStatusKind.syncing => '4% Syncing...',
-            SyncStatusKind.synced => 'Vizor is synced',
-            SyncStatusKind.failed => 'Syncing failed',
-          };
+          final label = line.readout.toUpperCase();
           await tester.pumpWidget(
             harness(
               SizedBox(
@@ -63,11 +74,7 @@ void main() {
                 child: MobileWalletSidebar(
                   accountName: 'Account probe',
                   avatar: const SizedBox(width: 40, height: 40),
-                  status: SyncStatusLabel(
-                    kind: kind,
-                    label: label,
-                    semanticsLabel: label,
-                  ),
+                  sync: line,
                   currentPath: '/home',
                   swapEnabled: true,
                   onSelect: enabled ? (_) {} : null,
@@ -91,26 +98,23 @@ void main() {
           for (final text in [
             'Account probe',
             'Home',
-            'Swap',
             'Activity',
             'Settings',
             label,
           ]) {
             final style = effectiveStyle(text);
             expect(style.decoration, TextDecoration.none, reason: text);
+            // The readout is a HUD caption; the rest is the Light body.
             final typography = text == label
-                ? AppTypography.labelMedium
+                ? kNeonHudCaptionStyle
                 : AppTypography.bodyMediumStrong;
             expect(style.fontFamily, typography.fontFamily, reason: text);
             expect(style.fontSize, typography.fontSize, reason: text);
             expect(style.fontWeight, typography.fontWeight, reason: text);
+            expect(style.letterSpacing, typography.letterSpacing, reason: text);
           }
-          final syncColor = switch (kind) {
-            SyncStatusKind.syncing => theme.colors.sync.textSyncing,
-            SyncStatusKind.synced => theme.colors.sync.text,
-            SyncStatusKind.failed => theme.colors.sync.textError,
-          };
-          expect(effectiveStyle(label).color, syncColor);
+          // Red light whatever the state, as Home's readout is.
+          expect(effectiveStyle(label).color, theme.colors.neon.glow);
           if (enabled) {
             expect(
               effectiveStyle('Home').color,
@@ -135,7 +139,7 @@ void main() {
             bool navigation = true,
             bool account = true,
             bool pending = false,
-            SyncStatusLabel sync = status,
+            NeonSyncLine? sync,
           }) => harness(
             SizedBox(
               width: 256,
@@ -143,7 +147,7 @@ void main() {
               child: MobileWalletSidebar(
                 accountName: 'Account probe',
                 avatar: const SizedBox.square(dimension: 40),
-                status: sync,
+                sync: sync ?? status,
                 currentPath: '/home',
                 swapEnabled: true,
                 onSelect: navigation ? visits.add : null,
@@ -164,11 +168,8 @@ void main() {
               .toList();
           await tester.pumpWidget(subject());
           final restingFills = fills();
-          final syncState = tester.state(find.byType(MobileSyncStatus));
-          final syncRect = tester.getRect(find.byType(MobileSyncStatus));
-          final syncColors = tester.widget<MobileSyncStatus>(
-            find.byType(MobileSyncStatus),
-          );
+          final syncState = tester.state(find.byType(NeonSidebarSyncReadout));
+          final syncRect = tester.getRect(find.byType(NeonSidebarSyncReadout));
           final focus = Focus.of(tester.element(find.text('Settings')));
           focus.requestFocus();
           await tester.pump();
@@ -183,7 +184,6 @@ void main() {
           for (final label in [
             'Account probe',
             'Home',
-            'Swap',
             'Activity',
             'Settings',
           ]) {
@@ -195,14 +195,19 @@ void main() {
               isFalse,
             );
           }
-          expect(tester.state(find.byType(MobileSyncStatus)), same(syncState));
-          expect(tester.getRect(find.byType(MobileSyncStatus)), syncRect);
-          final sync = tester.widget<MobileSyncStatus>(
-            find.byType(MobileSyncStatus),
+          expect(
+            tester.state(find.byType(NeonSidebarSyncReadout)),
+            same(syncState),
           );
-          expect(sync.baseColor, syncColors.baseColor);
-          expect(sync.indicatorColor, syncColors.indicatorColor);
-          expect(sync.animated, syncColors.animated);
+          expect(tester.getRect(find.byType(NeonSidebarSyncReadout)), syncRect);
+          expect(
+            tester
+                .widget<NeonSidebarSyncReadout>(
+                  find.byType(NeonSidebarSyncReadout),
+                )
+                .line,
+            same(status),
+          );
           final panel = tester.getRect(find.byType(MobileSidebarSurface));
           final top = tester.getRect(
             find.byKey(const ValueKey('mobile_sidebar_controls_veil')),
@@ -234,24 +239,20 @@ void main() {
             Clip.none,
           ); // Preserve the upper glow.
           await tester.pumpWidget(
-            subject(
-              navigation: false,
-              account: false,
-              sync: const SyncStatusLabel(
-                kind: SyncStatusKind.failed,
-                label: 'Syncing failed',
-                semanticsLabel: 'Syncing failed',
-              ),
-            ),
+            subject(navigation: false, account: false, sync: failed),
           );
-          expect(find.text('Syncing failed'), findsOneWidget);
+          expect(find.text('SYNC FAILED'), findsOneWidget);
           expect(
             tester
-                .widget<MobileSyncStatus>(find.byType(MobileSyncStatus))
-                .liveRegion,
+                .getSemantics(find.bySemanticsLabel(failed.semanticsLabel))
+                .flagsCollection
+                .isLiveRegion,
             isTrue,
           );
-          expect(tester.state(find.byType(MobileSyncStatus)), same(syncState));
+          expect(
+            tester.state(find.byType(NeonSidebarSyncReadout)),
+            same(syncState),
+          );
           await tester.pumpWidget(subject(account: false));
           expect(
             find.byKey(const ValueKey('mobile_sidebar_controls_veil')),
@@ -287,7 +288,7 @@ void main() {
             child: MobileWalletSidebar(
               accountName: 'Account probe',
               avatar: const SizedBox.square(dimension: 40),
-              status: status,
+              sync: status,
               currentPath: '/home',
               swapEnabled: true,
               onSelect: null,
@@ -297,9 +298,9 @@ void main() {
           scale: 2,
         ),
       );
-      await tester.ensureVisible(find.text('4% Syncing...'));
+      await tester.ensureVisible(find.text('SYNC 4%'));
       await tester.pump();
-      final sync = tester.getRect(find.byType(MobileSyncStatus));
+      final sync = tester.getRect(find.byType(NeonSidebarSyncReadout));
       final panel = tester.getRect(find.byType(MobileSidebarSurface));
       expect(sync.bottom, lessThanOrEqualTo(panel.bottom));
       expect(sync.top, greaterThanOrEqualTo(panel.top));
@@ -320,7 +321,7 @@ void main() {
           child: MobileWalletSidebar(
             accountName: 'Account probe',
             avatar: const SizedBox(width: 40, height: 40),
-            status: status,
+            sync: status,
             currentPath: '/home',
             swapEnabled: true,
             inputBlocked: blocked,
@@ -341,13 +342,7 @@ void main() {
                 .style!
                 .color;
         await tester.pumpWidget(harness(sidebar(blocked: false)));
-        final labels = [
-          'Account probe',
-          'Home',
-          'Swap',
-          'Activity',
-          'Settings',
-        ];
+        final labels = ['Account probe', 'Home', 'Activity', 'Settings'];
         final colors = [for (final label in labels) textColor(label)];
         final settingsNode = Focus.of(tester.element(find.text('Settings')));
         settingsNode.requestFocus();
@@ -413,7 +408,7 @@ void main() {
         child: MobileWalletSidebar(
           accountName: 'Windborne Trailguard',
           avatar: const SizedBox(width: 40, height: 40),
-          status: status,
+          sync: status,
           currentPath: '/activity',
           swapEnabled: false,
           onAccountTap: enabled ? () {} : null,
@@ -422,7 +417,7 @@ void main() {
       );
       await tester.pumpWidget(harness(sidebar()));
       expect(find.text('Swap'), findsNothing);
-      expect(find.text('4% Syncing...'), findsOneWidget);
+      expect(find.text('SYNC 4%'), findsOneWidget);
       await tester.tap(find.text('Settings'));
       expect(visits, ['/settings']);
       await tester.pumpWidget(harness(sidebar(enabled: false)));
@@ -431,6 +426,55 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('Home stays lit on the pages it opens', (tester) async {
+    for (final (path, lit) in [
+      ('/home', true),
+      ('/swap', true),
+      ('/swap/review', true),
+      ('/private-usd', true),
+      ('/private-usd/convert', true),
+      ('/portfolio-chart', true),
+      ('/activity', false),
+    ]) {
+      await tester.pumpWidget(
+        harness(
+          SizedBox(
+            key: ValueKey(path),
+            width: 200,
+            height: 600,
+            child: MobileWalletSidebar(
+              accountName: 'Account probe',
+              avatar: const SizedBox.square(dimension: 40),
+              sync: status,
+              currentPath: path,
+              swapEnabled: true,
+              onSelect: (_) {},
+              onAccountTap: () {},
+            ),
+          ),
+        ),
+      );
+      final home =
+          (tester
+                      .widget<RichText>(
+                        find.descendant(
+                          of: find.text('Home'),
+                          matching: find.byType(RichText),
+                        ),
+                      )
+                      .text
+                  as TextSpan)
+              .style!
+              .color;
+      expect(
+        home == AppThemeData.light.colors.navPanel.activeIcon,
+        lit,
+        reason: path,
+      );
+    }
+    expect(find.text('Swap'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
     'short sidebar scrolls all controls at large accessibility text size',
     (tester) async {
@@ -442,7 +486,7 @@ void main() {
             child: MobileWalletSidebar(
               accountName: 'A long account name that should wrap',
               avatar: const SizedBox(width: 40, height: 40),
-              status: status,
+              sync: status,
               currentPath: '/home',
               swapEnabled: true,
               onAccountTap: () {},
@@ -453,7 +497,7 @@ void main() {
         ),
       );
       expect(tester.takeException(), isNull);
-      await tester.ensureVisible(find.text('4% Syncing...'));
+      await tester.ensureVisible(find.text('SYNC 4%'));
       await tester.pump();
       expect(tester.takeException(), isNull);
     },
@@ -462,6 +506,7 @@ void main() {
     'side tabs retain upright icons and every destination scrolls into view',
     (tester) async {
       final selected = <int>[];
+      var bodyTaps = 0;
       await tester.pumpWidget(
         harness(
           SizedBox(
@@ -472,7 +517,11 @@ void main() {
               navigation: MobileBranchNavigation(),
               railRect: const Rect.fromLTWH(416, 200, 64, 100),
               child: AppMobileShell(
-                body: const SizedBox.expand(),
+                body: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => bodyTaps++,
+                  child: const SizedBox.expand(),
+                ),
                 tabBar: AppMobileTabBar(
                   axis: Axis.vertical,
                   items: const [
@@ -488,6 +537,43 @@ void main() {
         ),
       );
       expect(tester.takeException(), isNull);
+      // Content fades into the window colour toward the rail's screen edge,
+      // without taking touches from it.
+      final shell = tester.getRect(find.byType(AppMobileShell));
+      final fade = find.descendant(
+        of: find.byType(AppMobileShell),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is DecoratedBox &&
+              widget.decoration is BoxDecoration &&
+              (widget.decoration as BoxDecoration).gradient is LinearGradient,
+        ),
+      );
+      final gradient =
+          (tester.widget<DecoratedBox>(fade).decoration as BoxDecoration)
+                  .gradient!
+              as LinearGradient;
+      expect(gradient.begin, Alignment.centerLeft);
+      expect(gradient.end, Alignment.centerRight);
+      expect(gradient.colors.first.a, 0);
+      expect(gradient.colors.last, AppThemeData.light.colors.background.window);
+      // Only beside the rail: toward its screen edge and the bottom.
+      expect(
+        tester.getRect(fade),
+        Rect.fromLTRB(
+          shell.left + 416 - AppSpacing.md,
+          shell.top + 200 - AppSpacing.md,
+          shell.right,
+          shell.bottom,
+        ),
+      );
+      final mask = tester.widget<ShaderMask>(
+        find.ancestor(of: fade, matching: find.byType(ShaderMask)),
+      );
+      expect(mask.blendMode, BlendMode.dstIn);
+      await tester.tapAt(tester.getRect(fade).topLeft + const Offset(10, 40));
+      expect(bodyTaps, 1);
+      expect(selected, isEmpty);
       await tester.ensureVisible(find.bySemanticsLabel('Settings'));
       await tester.pump();
       await tester.tap(find.bySemanticsLabel('Settings'));
@@ -495,4 +581,138 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  Widget neonSidebar(String path) => harness(
+    SizedBox(
+      width: 256,
+      height: 600,
+      child: MobileWalletSidebar(
+        accountName: 'Account probe',
+        avatar: const SizedBox.square(dimension: 40),
+        sync: status,
+        currentPath: path,
+        swapEnabled: true,
+        onSelect: (_) {},
+        onAccountTap: () {},
+      ),
+    ),
+    theme: AppThemeData.dark,
+  );
+
+  testWidgets(
+    'destinations are Tron glyphs, the active one lit in a pool of its light',
+    (tester) async {
+      final colors = AppThemeData.dark.colors;
+      List<TronGlyph> glyphs() => tester
+          .widgetList<TronGlyph>(
+            find.descendant(
+              of: find.byType(MobileWalletSidebar),
+              matching: find.byType(TronGlyph),
+            ),
+          )
+          .toList();
+      double pool(int index) =>
+          ((tester
+                              .widget<DecoratedBox>(
+                                find.descendant(
+                                  of: find.byType(NeonSidebarGlyph).at(index),
+                                  matching: find.byType(DecoratedBox),
+                                ),
+                              )
+                              .decoration
+                          as BoxDecoration)
+                      .gradient!
+                  as RadialGradient)
+              .colors
+              .first
+              .a;
+
+      await tester.pumpWidget(neonSidebar('/activity'));
+      expect(glyphs().map((glyph) => glyph.kind), [
+        TronGlyphKind.home,
+        TronGlyphKind.activity,
+        TronGlyphKind.settings,
+      ]);
+      expect(
+        find.descendant(
+          of: find.byType(MobileWalletSidebar),
+          matching: find.byType(AppIcon),
+        ),
+        findsNothing,
+      );
+      expect([for (final glyph in glyphs()) glyph.lit], [0, 1, 0]);
+      expect(glyphs()[1].color, colors.navPanel.activeIcon);
+      expect(glyphs()[1].core, colors.neon.core);
+      expect(glyphs()[0].color, colors.icon.muted);
+      expect(pool(1), greaterThan(0));
+      expect(pool(0), 0);
+      expect(pool(2), 0);
+
+      // A page no destination owns leaves every glyph dark.
+      await tester.pumpWidget(neonSidebar('/about'));
+      expect([for (final glyph in glyphs()) glyph.lit], [0, 0, 0]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'the sync readout stands in the glyph column, its caption with the labels',
+    (tester) async {
+      await tester.pumpWidget(neonSidebar('/home'));
+      final glyph = tester.getRect(find.byType(NeonSidebarGlyph).first);
+      final line = tester.getRect(
+        find
+            .descendant(
+              of: find.byType(NeonSidebarSyncReadout),
+              matching: find.byType(CustomPaint),
+            )
+            .first,
+      );
+      expect(line.center.dx, glyph.center.dx);
+      expect(
+        tester.getRect(find.text('SYNC 4%')).left,
+        tester.getRect(find.text('Home')).left,
+      );
+      expect(find.bySemanticsLabel(status.semanticsLabel), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('the sync readout breathes only while its line climbs', (
+    tester,
+  ) async {
+    Future<void> pump(NeonSyncLine line, {bool reduced = false}) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppTheme(
+            data: AppThemeData.dark,
+            child: Builder(
+              builder: (context) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(disableAnimations: reduced),
+                child: Center(
+                  child: SizedBox(
+                    width: 200,
+                    child: NeonSidebarSyncReadout(line: line),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+
+    await pump(status);
+    expect(tester.binding.hasScheduledFrame, isTrue);
+    await pump(synced);
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    await pump(failed);
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    await pump(status, reduced: true);
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    expect(tester.takeException(), isNull);
+  });
 }

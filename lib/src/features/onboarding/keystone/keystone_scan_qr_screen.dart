@@ -172,7 +172,7 @@ class _TitleBlock extends StatelessWidget {
           child: Text(
             'Scan QR Code',
             style: AppTypography.displayLarge.copyWith(
-              fontFamily: 'Young Serif',
+              fontFamily: 'Gotham',
               fontWeight: FontWeight.w400,
               color: colors.text.accent,
             ),

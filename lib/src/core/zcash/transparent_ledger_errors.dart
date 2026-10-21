@@ -1,6 +1,6 @@
 /// User copy for a wallet whose transparent funds this build cannot use.
 const transparentLedgerNeedsNewerBuildMessage =
-    'This wallet needs a newer version of Vizor to use its transparent funds.';
+    'This wallet needs a newer version of Veylor to use its transparent funds.';
 
 /// Whether [raw] is the wallet library's refusal to operate on transparent
 /// funds under a stricter or newer policy than this build supports.

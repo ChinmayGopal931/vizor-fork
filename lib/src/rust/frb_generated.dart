@@ -7,23 +7,20 @@ import 'api/gift_card_tracking.dart';
 import 'api/keystone.dart';
 import 'api/ledger.dart';
 import 'api/network_privacy.dart';
+import 'api/private_usd.dart';
 import 'api/secret.dart';
 import 'api/simple.dart';
 import 'api/sync.dart';
 import 'api/voting.dart';
 import 'api/voting_session.dart';
 import 'api/wallet.dart';
-
 import 'dart:async';
 import 'dart:convert';
-
 import 'frb_generated.dart';
 import 'frb_generated.io.dart'
     if (dart.library.js_interop) 'frb_generated.web.dart';
 import 'network_privacy.dart';
-
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
-
 import 'third_party/zcash_voting/config.dart';
 import 'third_party/zcash_voting/delegate.dart';
 import 'third_party/zcash_voting/share_policy.dart';
@@ -86,7 +83,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => 42048655;
+  int get rustContentHash => -2052408378;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -1161,6 +1158,308 @@ abstract class RustLibApi extends BaseApi {
     required String txidHex,
   });
 
+  Future<bool> crateApiPrivateUsdPrivateUsdAccountEligible({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+  });
+
+  Future<List<String>> crateApiPrivateUsdPrivateUsdAccountsWithUnfinished({
+    required String storeDir,
+  });
+
+  ApiActivity? crateApiPrivateUsdPrivateUsdActivity({required int opId});
+
+  void crateApiPrivateUsdPrivateUsdCancel({required int opId});
+
+  void crateApiPrivateUsdPrivateUsdClearSessions();
+
+  Future<void> crateApiPrivateUsdPrivateUsdDeleteAccount({
+    required String storeDir,
+    required String network,
+    required String accountUuid,
+  });
+
+  ApiDeployment? crateApiPrivateUsdPrivateUsdDeployment({
+    required String network,
+  });
+
+  Future<ApiDepositAddress> crateApiPrivateUsdPrivateUsdDepositAddress({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+  });
+
+  Future<ApiDepositPass> crateApiPrivateUsdPrivateUsdDepositPass({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String ethRpcUrl,
+    required int opId,
+    required bool signNew,
+    required bool checkVaults,
+    required bool onlyIfUsed,
+  });
+
+  ApiDepositQuote? crateApiPrivateUsdPrivateUsdDepositQuote({
+    required String fee,
+    required int feeBps,
+    required String value,
+  });
+
+  Future<List<ApiDepositRecord>> crateApiPrivateUsdPrivateUsdDepositRecords({
+    required String accountUuid,
+    required String storeDir,
+  });
+
+  Future<ApiDepositRecord> crateApiPrivateUsdPrivateUsdDepositRescue({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String ethRpcUrl,
+    required int index,
+  });
+
+  Future<ApiDepositTerms> crateApiPrivateUsdPrivateUsdDepositTerms({
+    required String network,
+  });
+
+  Future<ApiForwardRecord> crateApiPrivateUsdPrivateUsdForwardAbandon({
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required String ethRpcUrl,
+    required int index,
+  });
+
+  Future<ApiAcceptResult> crateApiPrivateUsdPrivateUsdForwardAccept({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int index,
+    required BigInt maxTotalZat,
+  });
+
+  Future<ApiForwardAdvance> crateApiPrivateUsdPrivateUsdForwardAdvance({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int opId,
+    required int index,
+  });
+
+  Future<ApiForwardQuote> crateApiPrivateUsdPrivateUsdForwardQuote({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int units,
+  });
+
+  Future<List<ApiForwardRecord>> crateApiPrivateUsdPrivateUsdForwardRecords({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+  });
+
+  bool crateApiPrivateUsdPrivateUsdIsValidRailgunAddress({
+    required String address,
+  });
+
+  Future<String> crateApiPrivateUsdPrivateUsdRailgunAddress({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required List<int> mnemonicBytes,
+  });
+
+  Future<String> crateApiPrivateUsdPrivateUsdRailgunMnemonic({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required List<int> mnemonicBytes,
+  });
+
+  Future<ApiRailgunSendsTerms> crateApiPrivateUsdPrivateUsdRailgunSendsTerms({
+    required String network,
+  });
+
+  Future<ApiTransactResult> crateApiPrivateUsdPrivateUsdRelayerTransact({
+    required String storeDir,
+    required String network,
+    required String accountUuid,
+    required String sendId,
+  });
+
+  Future<ApiAcceptResult> crateApiPrivateUsdPrivateUsdReverseAccept({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int index,
+  });
+
+  Future<ApiReverseAdvance> crateApiPrivateUsdPrivateUsdReverseAdvance({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int opId,
+    required int index,
+  });
+
+  Future<ApiReverseRecord> crateApiPrivateUsdPrivateUsdReverseAuthorizeReady({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int index,
+  });
+
+  Future<bool> crateApiPrivateUsdPrivateUsdReverseCanRescue({
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required String ethRpcUrl,
+    required int index,
+  });
+
+  Future<ApiReverseRecord> crateApiPrivateUsdPrivateUsdReverseCancel({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int index,
+  });
+
+  Future<ApiReverseCostRequest> crateApiPrivateUsdPrivateUsdReverseCostRequest({
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required int index,
+  });
+
+  Future<ApiFundingRequest> crateApiPrivateUsdPrivateUsdReverseFundingRequest({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String ethRpcUrl,
+    required int index,
+    required String railgunAddress,
+  });
+
+  Future<ApiReverseRecord> crateApiPrivateUsdPrivateUsdReverseGoAhead({
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required String ethRpcUrl,
+    required int index,
+  });
+
+  Future<ApiReverseQuote> crateApiPrivateUsdPrivateUsdReverseQuote({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int units,
+  });
+
+  Future<List<ApiReverseRecord>> crateApiPrivateUsdPrivateUsdReverseRecords({
+    required String accountUuid,
+    required String storeDir,
+  });
+
+  Future<ApiReverseRecord> crateApiPrivateUsdPrivateUsdReverseRescue({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String ethRpcUrl,
+    required int index,
+  });
+
+  Future<ApiReverseRecord> crateApiPrivateUsdPrivateUsdReverseSetCost({
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required int index,
+    required String debit,
+    required String railgunFee,
+  });
+
+  Future<ApiReverseRecord> crateApiPrivateUsdPrivateUsdReverseSubmitFunding({
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required String ethRpcUrl,
+    required int index,
+    required String to,
+    required String data,
+    required String value,
+    required String debit,
+    required String railgunFee,
+  });
+
+  Future<List<ApiSendRecord>> crateApiPrivateUsdPrivateUsdSendLogList({
+    required String storeDir,
+    required String accountUuid,
+  });
+
+  Future<ApiSendRecord> crateApiPrivateUsdPrivateUsdSendLogPut({
+    required String storeDir,
+    required String network,
+    required String accountUuid,
+    required ApiProvedSend send,
+  });
+
+  Future<List<ApiSendRecord>> crateApiPrivateUsdPrivateUsdSendSettleAll({
+    required String storeDir,
+    required String network,
+    required String ethRpcUrl,
+    required String accountUuid,
+  });
+
+  Future<int> crateApiPrivateUsdPrivateUsdUnfinishedCount({
+    required String storeDir,
+    required String accountUuid,
+  });
+
   Future<ProposalResult> crateApiSyncProposePaymentLinkBatch({
     required String dbPath,
     required String network,
@@ -1401,9 +1700,15 @@ abstract class RustLibApi extends BaseApi {
     required String lightwalletdUrl,
   });
 
+  Future<int> crateApiNetworkPrivacyStartOfflineRailgunBridge();
+
+  Future<int> crateApiNetworkPrivacyStartRailgunBridge();
+
   Future<String> crateApiNetworkPrivacyStartTorUpdateRelay();
 
   void crateApiSyncStopMempoolObserver();
+
+  Future<void> crateApiNetworkPrivacyStopRailgunBridge();
 
   Future<void> crateApiNetworkPrivacyStopTorUpdateRelay();
 
@@ -8722,6 +9027,1868 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<bool> crateApiPrivateUsdPrivateUsdAccountEligible({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 177,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdAccountEligibleConstMeta,
+        argValues: [dbPath, network, accountUuid],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdAccountEligibleConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_account_eligible",
+        argNames: ["dbPath", "network", "accountUuid"],
+      );
+
+  @override
+  Future<List<String>> crateApiPrivateUsdPrivateUsdAccountsWithUnfinished({
+    required String storeDir,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(storeDir, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 178,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_String,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdAccountsWithUnfinishedConstMeta,
+        argValues: [storeDir],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiPrivateUsdPrivateUsdAccountsWithUnfinishedConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_accounts_with_unfinished",
+        argNames: ["storeDir"],
+      );
+
+  @override
+  ApiActivity? crateApiPrivateUsdPrivateUsdActivity({required int opId}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_32(opId, serializer);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 179,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_box_autoadd_api_activity,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdActivityConstMeta,
+        argValues: [opId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdActivityConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_activity",
+        argNames: ["opId"],
+      );
+
+  @override
+  void crateApiPrivateUsdPrivateUsdCancel({required int opId}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_u_32(opId, serializer);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 180,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdCancelConstMeta,
+        argValues: [opId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdCancelConstMeta =>
+      const TaskConstMeta(debugName: "private_usd_cancel", argNames: ["opId"]);
+
+  @override
+  void crateApiPrivateUsdPrivateUsdClearSessions() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 181,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdClearSessionsConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdClearSessionsConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_clear_sessions",
+        argNames: [],
+      );
+
+  @override
+  Future<void> crateApiPrivateUsdPrivateUsdDeleteAccount({
+    required String storeDir,
+    required String network,
+    required String accountUuid,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 182,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDeleteAccountConstMeta,
+        argValues: [storeDir, network, accountUuid],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDeleteAccountConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_delete_account",
+        argNames: ["storeDir", "network", "accountUuid"],
+      );
+
+  @override
+  ApiDeployment? crateApiPrivateUsdPrivateUsdDeployment({
+    required String network,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(network, serializer);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 183,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_box_autoadd_api_deployment,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDeploymentConstMeta,
+        argValues: [network],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDeploymentConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_deployment",
+        argNames: ["network"],
+      );
+
+  @override
+  Future<ApiDepositAddress> crateApiPrivateUsdPrivateUsdDepositAddress({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 184,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_deposit_address,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDepositAddressConstMeta,
+        argValues: [dbPath, network, accountUuid, storeDir, mnemonicBytes],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDepositAddressConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_deposit_address",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+        ],
+      );
+
+  @override
+  Future<ApiDepositPass> crateApiPrivateUsdPrivateUsdDepositPass({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String ethRpcUrl,
+    required int opId,
+    required bool signNew,
+    required bool checkVaults,
+    required bool onlyIfUsed,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(opId, serializer);
+          sse_encode_bool(signNew, serializer);
+          sse_encode_bool(checkVaults, serializer);
+          sse_encode_bool(onlyIfUsed, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 185,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_deposit_pass,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDepositPassConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          ethRpcUrl,
+          opId,
+          signNew,
+          checkVaults,
+          onlyIfUsed,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDepositPassConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_deposit_pass",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "ethRpcUrl",
+          "opId",
+          "signNew",
+          "checkVaults",
+          "onlyIfUsed",
+        ],
+      );
+
+  @override
+  ApiDepositQuote? crateApiPrivateUsdPrivateUsdDepositQuote({
+    required String fee,
+    required int feeBps,
+    required String value,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(fee, serializer);
+          sse_encode_u_32(feeBps, serializer);
+          sse_encode_String(value, serializer);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 186,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_box_autoadd_api_deposit_quote,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDepositQuoteConstMeta,
+        argValues: [fee, feeBps, value],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDepositQuoteConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_deposit_quote",
+        argNames: ["fee", "feeBps", "value"],
+      );
+
+  @override
+  Future<List<ApiDepositRecord>> crateApiPrivateUsdPrivateUsdDepositRecords({
+    required String accountUuid,
+    required String storeDir,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 187,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_api_deposit_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDepositRecordsConstMeta,
+        argValues: [accountUuid, storeDir],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDepositRecordsConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_deposit_records",
+        argNames: ["accountUuid", "storeDir"],
+      );
+
+  @override
+  Future<ApiDepositRecord> crateApiPrivateUsdPrivateUsdDepositRescue({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String ethRpcUrl,
+    required int index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 188,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_deposit_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDepositRescueConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          ethRpcUrl,
+          index,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDepositRescueConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_deposit_rescue",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "ethRpcUrl",
+          "index",
+        ],
+      );
+
+  @override
+  Future<ApiDepositTerms> crateApiPrivateUsdPrivateUsdDepositTerms({
+    required String network,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(network, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 189,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_deposit_terms,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdDepositTermsConstMeta,
+        argValues: [network],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdDepositTermsConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_deposit_terms",
+        argNames: ["network"],
+      );
+
+  @override
+  Future<ApiForwardRecord> crateApiPrivateUsdPrivateUsdForwardAbandon({
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required String ethRpcUrl,
+    required int index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 190,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_forward_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdForwardAbandonConstMeta,
+        argValues: [network, accountUuid, storeDir, ethRpcUrl, index],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdForwardAbandonConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_forward_abandon",
+        argNames: ["network", "accountUuid", "storeDir", "ethRpcUrl", "index"],
+      );
+
+  @override
+  Future<ApiAcceptResult> crateApiPrivateUsdPrivateUsdForwardAccept({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int index,
+    required BigInt maxTotalZat,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(lightwalletdUrl, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(index, serializer);
+          sse_encode_u_64(maxTotalZat, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 191,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_accept_result,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdForwardAcceptConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          lightwalletdUrl,
+          ethRpcUrl,
+          index,
+          maxTotalZat,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdForwardAcceptConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_forward_accept",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "lightwalletdUrl",
+          "ethRpcUrl",
+          "index",
+          "maxTotalZat",
+        ],
+      );
+
+  @override
+  Future<ApiForwardAdvance> crateApiPrivateUsdPrivateUsdForwardAdvance({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int opId,
+    required int index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(lightwalletdUrl, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(opId, serializer);
+          sse_encode_u_32(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 192,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_forward_advance,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdForwardAdvanceConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          lightwalletdUrl,
+          ethRpcUrl,
+          opId,
+          index,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdForwardAdvanceConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_forward_advance",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "lightwalletdUrl",
+          "ethRpcUrl",
+          "opId",
+          "index",
+        ],
+      );
+
+  @override
+  Future<ApiForwardQuote> crateApiPrivateUsdPrivateUsdForwardQuote({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int units,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(lightwalletdUrl, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(units, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 193,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_forward_quote,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdForwardQuoteConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          lightwalletdUrl,
+          ethRpcUrl,
+          units,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdForwardQuoteConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_forward_quote",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "lightwalletdUrl",
+          "ethRpcUrl",
+          "units",
+        ],
+      );
+
+  @override
+  Future<List<ApiForwardRecord>> crateApiPrivateUsdPrivateUsdForwardRecords({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 194,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_api_forward_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdForwardRecordsConstMeta,
+        argValues: [dbPath, network, accountUuid, storeDir],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdForwardRecordsConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_forward_records",
+        argNames: ["dbPath", "network", "accountUuid", "storeDir"],
+      );
+
+  @override
+  bool crateApiPrivateUsdPrivateUsdIsValidRailgunAddress({
+    required String address,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(address, serializer);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 195,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdIsValidRailgunAddressConstMeta,
+        argValues: [address],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiPrivateUsdPrivateUsdIsValidRailgunAddressConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_is_valid_railgun_address",
+        argNames: ["address"],
+      );
+
+  @override
+  Future<String> crateApiPrivateUsdPrivateUsdRailgunAddress({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required List<int> mnemonicBytes,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 196,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdRailgunAddressConstMeta,
+        argValues: [dbPath, network, accountUuid, mnemonicBytes],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdRailgunAddressConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_railgun_address",
+        argNames: ["dbPath", "network", "accountUuid", "mnemonicBytes"],
+      );
+
+  @override
+  Future<String> crateApiPrivateUsdPrivateUsdRailgunMnemonic({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required List<int> mnemonicBytes,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 197,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdRailgunMnemonicConstMeta,
+        argValues: [dbPath, network, accountUuid, mnemonicBytes],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdRailgunMnemonicConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_railgun_mnemonic",
+        argNames: ["dbPath", "network", "accountUuid", "mnemonicBytes"],
+      );
+
+  @override
+  Future<ApiRailgunSendsTerms> crateApiPrivateUsdPrivateUsdRailgunSendsTerms({
+    required String network,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(network, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 198,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_railgun_sends_terms,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdRailgunSendsTermsConstMeta,
+        argValues: [network],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdRailgunSendsTermsConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_railgun_sends_terms",
+        argNames: ["network"],
+      );
+
+  @override
+  Future<ApiTransactResult> crateApiPrivateUsdPrivateUsdRelayerTransact({
+    required String storeDir,
+    required String network,
+    required String accountUuid,
+    required String sendId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(sendId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 199,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_transact_result,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdRelayerTransactConstMeta,
+        argValues: [storeDir, network, accountUuid, sendId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdRelayerTransactConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_relayer_transact",
+        argNames: ["storeDir", "network", "accountUuid", "sendId"],
+      );
+
+  @override
+  Future<ApiAcceptResult> crateApiPrivateUsdPrivateUsdReverseAccept({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(lightwalletdUrl, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 200,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_accept_result,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdReverseAcceptConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          lightwalletdUrl,
+          ethRpcUrl,
+          index,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdReverseAcceptConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_reverse_accept",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "lightwalletdUrl",
+          "ethRpcUrl",
+          "index",
+        ],
+      );
+
+  @override
+  Future<ApiReverseAdvance> crateApiPrivateUsdPrivateUsdReverseAdvance({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int opId,
+    required int index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(lightwalletdUrl, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(opId, serializer);
+          sse_encode_u_32(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 201,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_reverse_advance,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdReverseAdvanceConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          lightwalletdUrl,
+          ethRpcUrl,
+          opId,
+          index,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdReverseAdvanceConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_reverse_advance",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "lightwalletdUrl",
+          "ethRpcUrl",
+          "opId",
+          "index",
+        ],
+      );
+
+  @override
+  Future<ApiReverseRecord> crateApiPrivateUsdPrivateUsdReverseAuthorizeReady({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(lightwalletdUrl, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 202,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_reverse_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdReverseAuthorizeReadyConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          lightwalletdUrl,
+          ethRpcUrl,
+          index,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiPrivateUsdPrivateUsdReverseAuthorizeReadyConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_reverse_authorize_ready",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "lightwalletdUrl",
+          "ethRpcUrl",
+          "index",
+        ],
+      );
+
+  @override
+  Future<bool> crateApiPrivateUsdPrivateUsdReverseCanRescue({
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required String ethRpcUrl,
+    required int index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 203,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdReverseCanRescueConstMeta,
+        argValues: [network, accountUuid, storeDir, ethRpcUrl, index],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdReverseCanRescueConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_reverse_can_rescue",
+        argNames: ["network", "accountUuid", "storeDir", "ethRpcUrl", "index"],
+      );
+
+  @override
+  Future<ApiReverseRecord> crateApiPrivateUsdPrivateUsdReverseCancel({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(lightwalletdUrl, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 204,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_reverse_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdReverseCancelConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          lightwalletdUrl,
+          ethRpcUrl,
+          index,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdReverseCancelConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_reverse_cancel",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "lightwalletdUrl",
+          "ethRpcUrl",
+          "index",
+        ],
+      );
+
+  @override
+  Future<ApiReverseCostRequest> crateApiPrivateUsdPrivateUsdReverseCostRequest({
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required int index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_u_32(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 205,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_reverse_cost_request,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdReverseCostRequestConstMeta,
+        argValues: [network, accountUuid, storeDir, index],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdReverseCostRequestConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_reverse_cost_request",
+        argNames: ["network", "accountUuid", "storeDir", "index"],
+      );
+
+  @override
+  Future<ApiFundingRequest> crateApiPrivateUsdPrivateUsdReverseFundingRequest({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String ethRpcUrl,
+    required int index,
+    required String railgunAddress,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(index, serializer);
+          sse_encode_String(railgunAddress, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 206,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_funding_request,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdReverseFundingRequestConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          ethRpcUrl,
+          index,
+          railgunAddress,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiPrivateUsdPrivateUsdReverseFundingRequestConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_reverse_funding_request",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "ethRpcUrl",
+          "index",
+          "railgunAddress",
+        ],
+      );
+
+  @override
+  Future<ApiReverseRecord> crateApiPrivateUsdPrivateUsdReverseGoAhead({
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required String ethRpcUrl,
+    required int index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 207,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_reverse_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdReverseGoAheadConstMeta,
+        argValues: [network, accountUuid, storeDir, ethRpcUrl, index],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdReverseGoAheadConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_reverse_go_ahead",
+        argNames: ["network", "accountUuid", "storeDir", "ethRpcUrl", "index"],
+      );
+
+  @override
+  Future<ApiReverseQuote> crateApiPrivateUsdPrivateUsdReverseQuote({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String lightwalletdUrl,
+    required String ethRpcUrl,
+    required int units,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(lightwalletdUrl, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(units, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 208,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_reverse_quote,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdReverseQuoteConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          lightwalletdUrl,
+          ethRpcUrl,
+          units,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdReverseQuoteConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_reverse_quote",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "lightwalletdUrl",
+          "ethRpcUrl",
+          "units",
+        ],
+      );
+
+  @override
+  Future<List<ApiReverseRecord>> crateApiPrivateUsdPrivateUsdReverseRecords({
+    required String accountUuid,
+    required String storeDir,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 209,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_api_reverse_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdReverseRecordsConstMeta,
+        argValues: [accountUuid, storeDir],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdReverseRecordsConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_reverse_records",
+        argNames: ["accountUuid", "storeDir"],
+      );
+
+  @override
+  Future<ApiReverseRecord> crateApiPrivateUsdPrivateUsdReverseRescue({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required List<int> mnemonicBytes,
+    required String ethRpcUrl,
+    required int index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dbPath, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 210,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_reverse_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdReverseRescueConstMeta,
+        argValues: [
+          dbPath,
+          network,
+          accountUuid,
+          storeDir,
+          mnemonicBytes,
+          ethRpcUrl,
+          index,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdReverseRescueConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_reverse_rescue",
+        argNames: [
+          "dbPath",
+          "network",
+          "accountUuid",
+          "storeDir",
+          "mnemonicBytes",
+          "ethRpcUrl",
+          "index",
+        ],
+      );
+
+  @override
+  Future<ApiReverseRecord> crateApiPrivateUsdPrivateUsdReverseSetCost({
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required int index,
+    required String debit,
+    required String railgunFee,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_u_32(index, serializer);
+          sse_encode_String(debit, serializer);
+          sse_encode_String(railgunFee, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 211,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_reverse_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdReverseSetCostConstMeta,
+        argValues: [network, accountUuid, storeDir, index, debit, railgunFee],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdReverseSetCostConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_reverse_set_cost",
+        argNames: [
+          "network",
+          "accountUuid",
+          "storeDir",
+          "index",
+          "debit",
+          "railgunFee",
+        ],
+      );
+
+  @override
+  Future<ApiReverseRecord> crateApiPrivateUsdPrivateUsdReverseSubmitFunding({
+    required String network,
+    required String accountUuid,
+    required String storeDir,
+    required String ethRpcUrl,
+    required int index,
+    required String to,
+    required String data,
+    required String value,
+    required String debit,
+    required String railgunFee,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_u_32(index, serializer);
+          sse_encode_String(to, serializer);
+          sse_encode_String(data, serializer);
+          sse_encode_String(value, serializer);
+          sse_encode_String(debit, serializer);
+          sse_encode_String(railgunFee, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 212,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_reverse_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdReverseSubmitFundingConstMeta,
+        argValues: [
+          network,
+          accountUuid,
+          storeDir,
+          ethRpcUrl,
+          index,
+          to,
+          data,
+          value,
+          debit,
+          railgunFee,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiPrivateUsdPrivateUsdReverseSubmitFundingConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_reverse_submit_funding",
+        argNames: [
+          "network",
+          "accountUuid",
+          "storeDir",
+          "ethRpcUrl",
+          "index",
+          "to",
+          "data",
+          "value",
+          "debit",
+          "railgunFee",
+        ],
+      );
+
+  @override
+  Future<List<ApiSendRecord>> crateApiPrivateUsdPrivateUsdSendLogList({
+    required String storeDir,
+    required String accountUuid,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_String(accountUuid, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 213,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_api_send_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdSendLogListConstMeta,
+        argValues: [storeDir, accountUuid],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdSendLogListConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_send_log_list",
+        argNames: ["storeDir", "accountUuid"],
+      );
+
+  @override
+  Future<ApiSendRecord> crateApiPrivateUsdPrivateUsdSendLogPut({
+    required String storeDir,
+    required String network,
+    required String accountUuid,
+    required ApiProvedSend send,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(accountUuid, serializer);
+          sse_encode_box_autoadd_api_proved_send(send, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 214,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_send_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdSendLogPutConstMeta,
+        argValues: [storeDir, network, accountUuid, send],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdSendLogPutConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_send_log_put",
+        argNames: ["storeDir", "network", "accountUuid", "send"],
+      );
+
+  @override
+  Future<List<ApiSendRecord>> crateApiPrivateUsdPrivateUsdSendSettleAll({
+    required String storeDir,
+    required String network,
+    required String ethRpcUrl,
+    required String accountUuid,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_String(network, serializer);
+          sse_encode_String(ethRpcUrl, serializer);
+          sse_encode_String(accountUuid, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 215,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_api_send_record,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdSendSettleAllConstMeta,
+        argValues: [storeDir, network, ethRpcUrl, accountUuid],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdSendSettleAllConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_send_settle_all",
+        argNames: ["storeDir", "network", "ethRpcUrl", "accountUuid"],
+      );
+
+  @override
+  Future<int> crateApiPrivateUsdPrivateUsdUnfinishedCount({
+    required String storeDir,
+    required String accountUuid,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(storeDir, serializer);
+          sse_encode_String(accountUuid, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 216,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_u_32,
+          decodeErrorData: sse_decode_api_private_usd_error,
+        ),
+        constMeta: kCrateApiPrivateUsdPrivateUsdUnfinishedCountConstMeta,
+        argValues: [storeDir, accountUuid],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiPrivateUsdPrivateUsdUnfinishedCountConstMeta =>
+      const TaskConstMeta(
+        debugName: "private_usd_unfinished_count",
+        argNames: ["storeDir", "accountUuid"],
+      );
+
+  @override
   Future<ProposalResult> crateApiSyncProposePaymentLinkBatch({
     required String dbPath,
     required String network,
@@ -8743,7 +10910,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 177,
+            funcId: 217,
             port: port_,
           );
         },
@@ -8800,7 +10967,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 178,
+            funcId: 218,
             port: port_,
           );
         },
@@ -8859,7 +11026,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 179,
+            funcId: 219,
             port: port_,
           );
         },
@@ -8904,7 +11071,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 180,
+            funcId: 220,
           )!;
         },
         codec: SseCodec(
@@ -8950,7 +11117,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 181,
+            funcId: 221,
             port: port_,
           );
         },
@@ -8998,7 +11165,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 182,
+            funcId: 222,
             port: port_,
           );
         },
@@ -9035,7 +11202,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 183,
+            funcId: 223,
             port: port_,
           );
         },
@@ -9093,7 +11260,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 184,
+            funcId: 224,
             port: port_,
           );
         },
@@ -9153,7 +11320,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 185,
+            funcId: 225,
             port: port_,
           );
         },
@@ -9187,7 +11354,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 186,
+            funcId: 226,
             port: port_,
           );
         },
@@ -9228,7 +11395,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 187,
+            funcId: 227,
             port: port_,
           );
         },
@@ -9272,7 +11439,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 188,
+            funcId: 228,
             port: port_,
           );
         },
@@ -9302,7 +11469,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 189,
+            funcId: 229,
           )!;
         },
         codec: SseCodec(
@@ -9335,7 +11502,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 190,
+            funcId: 230,
             port: port_,
           );
         },
@@ -9372,7 +11539,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 191,
+            funcId: 231,
             port: port_,
           );
         },
@@ -9407,7 +11574,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 192,
+            funcId: 232,
             port: port_,
           );
         },
@@ -9442,7 +11609,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 193,
+            funcId: 233,
             port: port_,
           );
         },
@@ -9484,7 +11651,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 194,
+            funcId: 234,
             port: port_,
           );
         },
@@ -9519,7 +11686,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 195,
+            funcId: 235,
             port: port_,
           );
         },
@@ -9560,7 +11727,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 196,
+            funcId: 236,
             port: port_,
           );
         },
@@ -9609,7 +11776,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 197,
+            funcId: 237,
             port: port_,
           );
         },
@@ -9638,7 +11805,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 198,
+            funcId: 238,
             port: port_,
           );
         },
@@ -9677,7 +11844,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 199,
+            funcId: 239,
             port: port_,
           );
         },
@@ -9726,7 +11893,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 200,
+              funcId: 240,
               port: port_,
             );
           },
@@ -9785,7 +11952,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 201,
+            funcId: 241,
             port: port_,
           );
         },
@@ -9828,7 +11995,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 202,
+            funcId: 242,
           )!;
         },
         codec: SseCodec(
@@ -9882,7 +12049,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 203,
+            funcId: 243,
             port: port_,
           );
         },
@@ -9938,7 +12105,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 204,
+            funcId: 244,
           )!;
         },
         codec: SseCodec(
@@ -9968,7 +12135,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 205,
+            funcId: 245,
           )!;
         },
         codec: SseCodec(
@@ -9998,7 +12165,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 206,
+            funcId: 246,
           )!;
         },
         codec: SseCodec(
@@ -10028,7 +12195,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 207,
+            funcId: 247,
           )!;
         },
         codec: SseCodec(
@@ -10058,7 +12225,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 208,
+            funcId: 248,
           )!;
         },
         codec: SseCodec(
@@ -10093,7 +12260,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 209,
+            funcId: 249,
             port: port_,
           );
         },
@@ -10129,7 +12296,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 210,
+              funcId: 250,
               port: port_,
             );
           },
@@ -10164,7 +12331,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 211,
+            funcId: 251,
             port: port_,
           );
         },
@@ -10195,7 +12362,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 212,
+            funcId: 252,
             port: port_,
           );
         },
@@ -10237,7 +12404,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 213,
+            funcId: 253,
             port: port_,
           );
         },
@@ -10291,7 +12458,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 214,
+            funcId: 254,
             port: port_,
           );
         },
@@ -10329,7 +12496,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 215,
+            funcId: 255,
             port: port_,
           );
         },
@@ -10371,7 +12538,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 216,
+              funcId: 256,
               port: port_,
             );
           },
@@ -10412,7 +12579,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 217,
+              funcId: 257,
               port: port_,
             );
           },
@@ -10436,6 +12603,63 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<int> crateApiNetworkPrivacyStartOfflineRailgunBridge() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 258,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_u_16,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiNetworkPrivacyStartOfflineRailgunBridgeConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiNetworkPrivacyStartOfflineRailgunBridgeConstMeta =>
+      const TaskConstMeta(
+        debugName: "start_offline_railgun_bridge",
+        argNames: [],
+      );
+
+  @override
+  Future<int> crateApiNetworkPrivacyStartRailgunBridge() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 259,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_u_16,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiNetworkPrivacyStartRailgunBridgeConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiNetworkPrivacyStartRailgunBridgeConstMeta =>
+      const TaskConstMeta(debugName: "start_railgun_bridge", argNames: []);
+
+  @override
   Future<String> crateApiNetworkPrivacyStartTorUpdateRelay() {
     return handler.executeNormal(
       NormalTask(
@@ -10444,7 +12668,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 218,
+            funcId: 260,
             port: port_,
           );
         },
@@ -10471,7 +12695,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 219,
+            funcId: 261,
           )!;
         },
         codec: SseCodec(
@@ -10489,6 +12713,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "stop_mempool_observer", argNames: []);
 
   @override
+  Future<void> crateApiNetworkPrivacyStopRailgunBridge() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 262,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiNetworkPrivacyStopRailgunBridgeConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiNetworkPrivacyStopRailgunBridgeConstMeta =>
+      const TaskConstMeta(debugName: "stop_railgun_bridge", argNames: []);
+
+  @override
   Future<void> crateApiNetworkPrivacyStopTorUpdateRelay() {
     return handler.executeNormal(
       NormalTask(
@@ -10497,7 +12748,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 220,
+            funcId: 263,
             port: port_,
           );
         },
@@ -10544,7 +12795,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 221,
+            funcId: 264,
             port: port_,
           );
         },
@@ -10617,7 +12868,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 222,
+            funcId: 265,
             port: port_,
           );
         },
@@ -10679,7 +12930,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 223,
+            funcId: 266,
             port: port_,
           );
         },
@@ -10714,7 +12965,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 224,
+            funcId: 267,
             port: port_,
           );
         },
@@ -10751,7 +13002,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 225,
+            funcId: 268,
             port: port_,
           );
         },
@@ -10790,7 +13041,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 226,
+            funcId: 269,
             port: port_,
           );
         },
@@ -10819,7 +13070,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 227,
+            funcId: 270,
           )!;
         },
         codec: SseCodec(
@@ -10846,7 +13097,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 228,
+            funcId: 271,
           )!;
         },
         codec: SseCodec(
@@ -10882,7 +13133,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 229,
+            funcId: 272,
             port: port_,
           );
         },
@@ -10921,7 +13172,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 230,
+            funcId: 273,
             port: port_,
           );
         },
@@ -10962,7 +13213,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 231,
+            funcId: 274,
             port: port_,
           );
         },
@@ -11012,7 +13263,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 232,
+            funcId: 275,
             port: port_,
           );
         },
@@ -11062,7 +13313,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 233,
+            funcId: 276,
             port: port_,
           );
         },
@@ -11096,7 +13347,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 234,
+            funcId: 277,
             port: port_,
           );
         },
@@ -11133,7 +13384,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 235,
+            funcId: 278,
             port: port_,
           );
         },
@@ -11164,7 +13415,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 236,
+            funcId: 279,
           )!;
         },
         codec: SseCodec(
@@ -11193,7 +13444,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 237,
+            funcId: 280,
             port: port_,
           );
         },
@@ -11221,7 +13472,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 238,
+            funcId: 281,
           )!;
         },
         codec: SseCodec(
@@ -11247,7 +13498,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 239,
+            funcId: 282,
           )!;
         },
         codec: SseCodec(
@@ -11293,7 +13544,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 240,
+            funcId: 283,
             port: port_,
           );
         },
@@ -11341,7 +13592,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 241,
+            funcId: 284,
           )!;
         },
         codec: SseCodec(
@@ -11375,7 +13626,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 242,
+            funcId: 285,
             port: port_,
           );
         },
@@ -11412,7 +13663,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 243,
+            funcId: 286,
             port: port_,
           );
         },
@@ -11587,6 +13838,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiAcceptKind dco_decode_api_accept_kind(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiAcceptKind.values[raw as int];
+  }
+
+  @protected
+  ApiAcceptResult dco_decode_api_accept_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return ApiAcceptResult(
+      kind: dco_decode_api_accept_kind(arr[0]),
+      cause: dco_decode_opt_box_autoadd_api_nothing_sent_cause(arr[1]),
+      index: dco_decode_u_32(arr[2]),
+    );
+  }
+
+  @protected
+  ApiActivity dco_decode_api_activity(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiActivity.values[raw as int];
+  }
+
+  @protected
   ApiAppliedTransparentPolicy dco_decode_api_applied_transparent_policy(
     dynamic raw,
   ) {
@@ -11650,6 +13926,171 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiDeployment dco_decode_api_deployment(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 19)
+      throw Exception('unexpected arr length: expect 19 but see ${arr.length}');
+    return ApiDeployment(
+      network: dco_decode_String(arr[0]),
+      railgunNetwork: dco_decode_String(arr[1]),
+      chainId: dco_decode_i_64(arr[2]),
+      token: dco_decode_String(arr[3]),
+      tokenDecimals: dco_decode_u_32(arr[4]),
+      keylessRpcUrl: dco_decode_String(arr[5]),
+      poiNodeUrl: dco_decode_String(arr[6]),
+      railgunProxy: dco_decode_String(arr[7]),
+      relayAdapt: dco_decode_String(arr[8]),
+      relayerRailgunAddress: dco_decode_String(arr[9]),
+      allowedHosts: dco_decode_list_String(arr[10]),
+      explorerTxPrefix: dco_decode_String(arr[11]),
+      railscanTxPrefix: dco_decode_String(arr[12]),
+      zcashConfirmations: dco_decode_u_32(arr[13]),
+      escrowConfirmations: dco_decode_u_32(arr[14]),
+      screeningSeconds: dco_decode_u_32(arr[15]),
+      maxRelayerFee: dco_decode_String(arr[16]),
+      usdTokens: dco_decode_list_api_usd_token(arr[17]),
+      deposits: dco_decode_opt_box_autoadd_api_deposits_pin(arr[18]),
+    );
+  }
+
+  @protected
+  ApiDepositAddress dco_decode_api_deposit_address(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return ApiDepositAddress(
+      index: dco_decode_u_32(arr[0]),
+      address: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  ApiDepositAddressUse dco_decode_api_deposit_address_use(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return ApiDepositAddressUse(
+      index: dco_decode_u_32(arr[0]),
+      address: dco_decode_String(arr[1]),
+      balance: dco_decode_String(arr[2]),
+      deposited: dco_decode_bool(arr[3]),
+    );
+  }
+
+  @protected
+  ApiDepositKind dco_decode_api_deposit_kind(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiDepositKind.values[raw as int];
+  }
+
+  @protected
+  ApiDepositPass dco_decode_api_deposit_pass(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 11)
+      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    return ApiDepositPass(
+      index: dco_decode_u_32(arr[0]),
+      address: dco_decode_String(arr[1]),
+      used: dco_decode_list_api_deposit_address_use(arr[2]),
+      records: dco_decode_list_api_deposit_record(arr[3]),
+      terms: dco_decode_opt_box_autoadd_api_deposit_terms(arr[4]),
+      termsError: dco_decode_opt_box_autoadd_api_private_usd_error_code(arr[5]),
+      rescuable: dco_decode_list_api_deposit_rescuable(arr[6]),
+      scanned: dco_decode_bool(arr[7]),
+      scannedAt: dco_decode_opt_box_autoadd_i_64(arr[8]),
+      nextPollMs: dco_decode_opt_box_autoadd_u_32(arr[9]),
+      problem: dco_decode_opt_box_autoadd_api_private_usd_error_code(arr[10]),
+    );
+  }
+
+  @protected
+  ApiDepositQuote dco_decode_api_deposit_quote(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return ApiDepositQuote(
+      fee: dco_decode_String(arr[0]),
+      arrives: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  ApiDepositRecord dco_decode_api_deposit_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 12)
+      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    return ApiDepositRecord(
+      id: dco_decode_String(arr[0]),
+      kind: dco_decode_api_deposit_kind(arr[1]),
+      index: dco_decode_u_32(arr[2]),
+      address: dco_decode_String(arr[3]),
+      state: dco_decode_api_deposit_state(arr[4]),
+      value: dco_decode_String(arr[5]),
+      fee: dco_decode_String(arr[6]),
+      arrives: dco_decode_String(arr[7]),
+      createdAt: dco_decode_i_64(arr[8]),
+      endedAt: dco_decode_opt_box_autoadd_i_64(arr[9]),
+      txHash: dco_decode_opt_String(arr[10]),
+      waiting: dco_decode_bool(arr[11]),
+    );
+  }
+
+  @protected
+  ApiDepositRescuable dco_decode_api_deposit_rescuable(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return ApiDepositRescuable(
+      index: dco_decode_u_32(arr[0]),
+      address: dco_decode_String(arr[1]),
+      held: dco_decode_String(arr[2]),
+      fee: dco_decode_String(arr[3]),
+    );
+  }
+
+  @protected
+  ApiDepositState dco_decode_api_deposit_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiDepositState.values[raw as int];
+  }
+
+  @protected
+  ApiDepositTerms dco_decode_api_deposit_terms(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return ApiDepositTerms(
+      fee: dco_decode_String(arr[0]),
+      feeBps: dco_decode_u_32(arr[1]),
+      feeExpiresAt: dco_decode_opt_box_autoadd_i_64(arr[2]),
+      minValue: dco_decode_String(arr[3]),
+      railgunFeeBps: dco_decode_u_32(arr[4]),
+    );
+  }
+
+  @protected
+  ApiDepositsPin dco_decode_api_deposits_pin(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return ApiDepositsPin(
+      contract: dco_decode_String(arr[0]),
+      token: dco_decode_String(arr[1]),
+      tokenSymbol: dco_decode_String(arr[2]),
+      chainName: dco_decode_String(arr[3]),
+    );
+  }
+
+  @protected
   ApiDynamicConfigAttempt dco_decode_api_dynamic_config_attempt(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -11673,6 +14114,108 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return ApiDynamicConfigMirrorFailure(
       url: dco_decode_String(arr[0]),
       reason: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  ApiForwardAdvance dco_decode_api_forward_advance(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return ApiForwardAdvance(
+      record: dco_decode_api_forward_record(arr[0]),
+      wait: dco_decode_opt_box_autoadd_api_forward_wait(arr[1]),
+      nextPollMs: dco_decode_u_32(arr[2]),
+      problem: dco_decode_opt_box_autoadd_api_private_usd_error_code(arr[3]),
+    );
+  }
+
+  @protected
+  ApiForwardOutcome dco_decode_api_forward_outcome(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiForwardOutcome.values[raw as int];
+  }
+
+  @protected
+  ApiForwardPhase dco_decode_api_forward_phase(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiForwardPhase.values[raw as int];
+  }
+
+  @protected
+  ApiForwardQuote dco_decode_api_forward_quote(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    return ApiForwardQuote(
+      index: dco_decode_u_32(arr[0]),
+      expiresAt: dco_decode_i_64(arr[1]),
+      amount: dco_decode_String(arr[2]),
+      networkCost: dco_decode_opt_String(arr[3]),
+      relayerFee: dco_decode_String(arr[4]),
+      receives: dco_decode_String(arr[5]),
+      depositZat: dco_decode_u_64(arr[6]),
+      depositFeeZat: dco_decode_opt_box_autoadd_u_64(arr[7]),
+      maxTotalZat: dco_decode_opt_box_autoadd_u_64(arr[8]),
+      feeExpiresAt: dco_decode_opt_box_autoadd_i_64(arr[9]),
+    );
+  }
+
+  @protected
+  ApiForwardRecord dco_decode_api_forward_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 20)
+      throw Exception('unexpected arr length: expect 20 but see ${arr.length}');
+    return ApiForwardRecord(
+      index: dco_decode_u_32(arr[0]),
+      swapId: dco_decode_String(arr[1]),
+      phase: dco_decode_api_forward_phase(arr[2]),
+      acceptedAt: dco_decode_i_64(arr[3]),
+      quoteExpiresAt: dco_decode_i_64(arr[4]),
+      depositZat: dco_decode_u_64(arr[5]),
+      maxTotalZat: dco_decode_opt_box_autoadd_u_64(arr[6]),
+      amount: dco_decode_String(arr[7]),
+      receives: dco_decode_String(arr[8]),
+      relayerFee: dco_decode_String(arr[9]),
+      t0: dco_decode_opt_box_autoadd_i_64(arr[10]),
+      t1: dco_decode_opt_box_autoadd_i_64(arr[11]),
+      depositTxid: dco_decode_opt_String(arr[12]),
+      depositConfirmations: dco_decode_opt_box_autoadd_u_32(arr[13]),
+      sweepTxid: dco_decode_opt_String(arr[14]),
+      payoutTx: dco_decode_opt_String(arr[15]),
+      outcome: dco_decode_opt_box_autoadd_api_forward_outcome(arr[16]),
+      refundCause: dco_decode_opt_box_autoadd_api_refund_cause(arr[17]),
+      nothingSentCause: dco_decode_opt_box_autoadd_api_nothing_sent_cause(
+        arr[18],
+      ),
+      endedAt: dco_decode_opt_box_autoadd_i_64(arr[19]),
+    );
+  }
+
+  @protected
+  ApiForwardWait dco_decode_api_forward_wait(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiForwardWait.values[raw as int];
+  }
+
+  @protected
+  ApiFundingRequest dco_decode_api_funding_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return ApiFundingRequest(
+      amount: dco_decode_String(arr[0]),
+      railgunProxy: dco_decode_String(arr[1]),
+      token: dco_decode_String(arr[2]),
+      callsTo: dco_decode_list_String(arr[3]),
+      callsData: dco_decode_list_String(arr[4]),
+      relayAdapt: dco_decode_String(arr[5]),
+      fee: dco_decode_String(arr[6]),
+      alreadyFunded: dco_decode_bool(arr[7]),
     );
   }
 
@@ -11739,6 +14282,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiNothingSentCause dco_decode_api_nothing_sent_cause(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiNothingSentCause.values[raw as int];
+  }
+
+  @protected
   ApiPendingShareRound dco_decode_api_pending_share_round(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -11781,6 +14330,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiPrivateUsdError dco_decode_api_private_usd_error(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return ApiPrivateUsdError(
+      code: dco_decode_api_private_usd_error_code(arr[0]),
+      message: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  ApiPrivateUsdErrorCode dco_decode_api_private_usd_error_code(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiPrivateUsdErrorCode.values[raw as int];
+  }
+
+  @protected
   ApiProposalIdRange dco_decode_api_proposal_id_range(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -11801,6 +14368,143 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return ApiProposalRosterEntry(
       proposalId: dco_decode_u_32(arr[0]),
       numOptions: dco_decode_u_32(arr[1]),
+    );
+  }
+
+  @protected
+  ApiProvedSend dco_decode_api_proved_send(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return ApiProvedSend(
+      sendId: dco_decode_String(arr[0]),
+      token: dco_decode_String(arr[1]),
+      amount: dco_decode_String(arr[2]),
+      fee: dco_decode_String(arr[3]),
+      to: dco_decode_String(arr[4]),
+      proofJson: dco_decode_String(arr[5]),
+    );
+  }
+
+  @protected
+  ApiRailgunSendsTerms dco_decode_api_railgun_sends_terms(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    return ApiRailgunSendsTerms(
+      chainId: dco_decode_i_64(arr[0]),
+      railgunAddress: dco_decode_String(arr[1]),
+      railgunProxy: dco_decode_String(arr[2]),
+      token: dco_decode_String(arr[3]),
+      feeFloor: dco_decode_String(arr[4]),
+      feePerUnitGas: dco_decode_opt_String(arr[5]),
+      feeExpiresAt: dco_decode_opt_box_autoadd_i_64(arr[6]),
+      maxGasLimit: dco_decode_String(arr[7]),
+      maxGasPriceWei: dco_decode_String(arr[8]),
+      maxCalldataBytes: dco_decode_u_32(arr[9]),
+    );
+  }
+
+  @protected
+  ApiRefundCause dco_decode_api_refund_cause(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiRefundCause.values[raw as int];
+  }
+
+  @protected
+  ApiReverseAdvance dco_decode_api_reverse_advance(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return ApiReverseAdvance(
+      record: dco_decode_api_reverse_record(arr[0]),
+      nextPollMs: dco_decode_u_32(arr[1]),
+      problem: dco_decode_opt_box_autoadd_api_private_usd_error_code(arr[2]),
+      needsYou: dco_decode_bool(arr[3]),
+    );
+  }
+
+  @protected
+  ApiReverseCost dco_decode_api_reverse_cost(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return ApiReverseCost(
+      debit: dco_decode_String(arr[0]),
+      railgunFee: dco_decode_String(arr[1]),
+      broadcasterFee: dco_decode_String(arr[2]),
+      feeExpiresAt: dco_decode_opt_box_autoadd_i_64(arr[3]),
+    );
+  }
+
+  @protected
+  ApiReverseCostRequest dco_decode_api_reverse_cost_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return ApiReverseCostRequest(
+      index: dco_decode_u_32(arr[0]),
+      amount: dco_decode_String(arr[1]),
+      railgunProxy: dco_decode_String(arr[2]),
+      fee: dco_decode_String(arr[3]),
+      feeExpiresAt: dco_decode_opt_box_autoadd_i_64(arr[4]),
+    );
+  }
+
+  @protected
+  ApiReversePhase dco_decode_api_reverse_phase(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiReversePhase.values[raw as int];
+  }
+
+  @protected
+  ApiReverseQuote dco_decode_api_reverse_quote(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return ApiReverseQuote(
+      record: dco_decode_api_reverse_record(arr[0]),
+      costRequest: dco_decode_api_reverse_cost_request(arr[1]),
+    );
+  }
+
+  @protected
+  ApiReverseRecord dco_decode_api_reverse_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 24)
+      throw Exception('unexpected arr length: expect 24 but see ${arr.length}');
+    return ApiReverseRecord(
+      index: dco_decode_u_32(arr[0]),
+      swapId: dco_decode_String(arr[1]),
+      phase: dco_decode_api_reverse_phase(arr[2]),
+      amount: dco_decode_String(arr[3]),
+      networkCost: dco_decode_opt_String(arr[4]),
+      depositZat: dco_decode_u_64(arr[5]),
+      quoteExpiresAt: dco_decode_i_64(arr[6]),
+      fundingDeadline: dco_decode_i_64(arr[7]),
+      readyDeadline: dco_decode_i_64(arr[8]),
+      refundAfter: dco_decode_i_64(arr[9]),
+      cost: dco_decode_opt_box_autoadd_api_reverse_cost(arr[10]),
+      funded: dco_decode_bool(arr[11]),
+      fundingTx: dco_decode_opt_String(arr[12]),
+      cancelRequested: dco_decode_bool(arr[13]),
+      settled: dco_decode_bool(arr[14]),
+      cancellable: dco_decode_bool(arr[15]),
+      awaitingUser: dco_decode_bool(arr[16]),
+      receiveEstimateZat: dco_decode_opt_box_autoadd_u_64(arr[17]),
+      receiveFeeZat: dco_decode_opt_box_autoadd_u_64(arr[18]),
+      receiveTxid: dco_decode_opt_String(arr[19]),
+      receivedZat: dco_decode_opt_box_autoadd_u_64(arr[20]),
+      receiveConfirmations: dco_decode_u_32(arr[21]),
+      acceptedAt: dco_decode_opt_box_autoadd_i_64(arr[22]),
+      updatedAt: dco_decode_i_64(arr[23]),
     );
   }
 
@@ -11879,6 +14583,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiRoundStepEventKind dco_decode_api_round_step_event_kind(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return ApiRoundStepEventKind.values[raw as int];
+  }
+
+  @protected
+  ApiSendRecord dco_decode_api_send_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 12)
+      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    return ApiSendRecord(
+      sendId: dco_decode_String(arr[0]),
+      token: dco_decode_String(arr[1]),
+      amount: dco_decode_String(arr[2]),
+      fee: dco_decode_String(arr[3]),
+      to: dco_decode_String(arr[4]),
+      withdraw: dco_decode_bool(arr[5]),
+      sentAt: dco_decode_i_64(arr[6]),
+      state: dco_decode_api_send_state(arr[7]),
+      txHash: dco_decode_opt_String(arr[8]),
+      postedAt: dco_decode_opt_box_autoadd_i_64(arr[9]),
+      spentAt: dco_decode_opt_box_autoadd_i_64(arr[10]),
+      retryAt: dco_decode_opt_box_autoadd_i_64(arr[11]),
+    );
+  }
+
+  @protected
+  ApiSendState dco_decode_api_send_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiSendState.values[raw as int];
   }
 
   @protected
@@ -11989,9 +14721,40 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiTransactKind dco_decode_api_transact_kind(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ApiTransactKind.values[raw as int];
+  }
+
+  @protected
+  ApiTransactResult dco_decode_api_transact_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return ApiTransactResult(
+      kind: dco_decode_api_transact_kind(arr[0]),
+      transactions: dco_decode_list_String(arr[1]),
+      retryAfterSecs: dco_decode_opt_box_autoadd_u_32(arr[2]),
+    );
+  }
+
+  @protected
   ApiTransparentLedgerMode dco_decode_api_transparent_ledger_mode(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return ApiTransparentLedgerMode.values[raw as int];
+  }
+
+  @protected
+  ApiUsdToken dco_decode_api_usd_token(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return ApiUsdToken(
+      address: dco_decode_String(arr[0]),
+      symbol: dco_decode_String(arr[1]),
+    );
   }
 
   @protected
@@ -12097,6 +14860,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiActivity dco_decode_box_autoadd_api_activity(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_activity(raw);
+  }
+
+  @protected
   ApiAppliedTransparentPolicy
   dco_decode_box_autoadd_api_applied_transparent_policy(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -12109,6 +14878,76 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_api_delegation_signer_input(raw);
+  }
+
+  @protected
+  ApiDeployment dco_decode_box_autoadd_api_deployment(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_deployment(raw);
+  }
+
+  @protected
+  ApiDepositQuote dco_decode_box_autoadd_api_deposit_quote(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_deposit_quote(raw);
+  }
+
+  @protected
+  ApiDepositTerms dco_decode_box_autoadd_api_deposit_terms(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_deposit_terms(raw);
+  }
+
+  @protected
+  ApiDepositsPin dco_decode_box_autoadd_api_deposits_pin(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_deposits_pin(raw);
+  }
+
+  @protected
+  ApiForwardOutcome dco_decode_box_autoadd_api_forward_outcome(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_forward_outcome(raw);
+  }
+
+  @protected
+  ApiForwardWait dco_decode_box_autoadd_api_forward_wait(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_forward_wait(raw);
+  }
+
+  @protected
+  ApiNothingSentCause dco_decode_box_autoadd_api_nothing_sent_cause(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_nothing_sent_cause(raw);
+  }
+
+  @protected
+  ApiPrivateUsdErrorCode dco_decode_box_autoadd_api_private_usd_error_code(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_private_usd_error_code(raw);
+  }
+
+  @protected
+  ApiProvedSend dco_decode_box_autoadd_api_proved_send(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_proved_send(raw);
+  }
+
+  @protected
+  ApiRefundCause dco_decode_box_autoadd_api_refund_cause(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_refund_cause(raw);
+  }
+
+  @protected
+  ApiReverseCost dco_decode_box_autoadd_api_reverse_cost(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_api_reverse_cost(raw);
   }
 
   @protected
@@ -12225,6 +15064,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int dco_decode_box_autoadd_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
+  }
+
+  @protected
+  PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_i_64(raw);
   }
 
   @protected
@@ -13129,6 +15974,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<ApiDepositAddressUse> dco_decode_list_api_deposit_address_use(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_api_deposit_address_use)
+        .toList();
+  }
+
+  @protected
+  List<ApiDepositRecord> dco_decode_list_api_deposit_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_api_deposit_record).toList();
+  }
+
+  @protected
+  List<ApiDepositRescuable> dco_decode_list_api_deposit_rescuable(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_api_deposit_rescuable)
+        .toList();
+  }
+
+  @protected
   List<ApiDynamicConfigAttempt> dco_decode_list_api_dynamic_config_attempt(
     dynamic raw,
   ) {
@@ -13145,6 +16014,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return (raw as List<dynamic>)
         .map(dco_decode_api_dynamic_config_mirror_failure)
         .toList();
+  }
+
+  @protected
+  List<ApiForwardRecord> dco_decode_list_api_forward_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_api_forward_record).toList();
   }
 
   @protected
@@ -13178,12 +16053,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<ApiReverseRecord> dco_decode_list_api_reverse_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_api_reverse_record).toList();
+  }
+
+  @protected
+  List<ApiSendRecord> dco_decode_list_api_send_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_api_send_record).toList();
+  }
+
+  @protected
   List<ApiSnapshotBundlePirResult>
   dco_decode_list_api_snapshot_bundle_pir_result(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>)
         .map(dco_decode_api_snapshot_bundle_pir_result)
         .toList();
+  }
+
+  @protected
+  List<ApiUsdToken> dco_decode_list_api_usd_token(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_api_usd_token).toList();
   }
 
   @protected
@@ -13898,6 +16791,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiActivity? dco_decode_opt_box_autoadd_api_activity(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_api_activity(raw);
+  }
+
+  @protected
   ApiAppliedTransparentPolicy?
   dco_decode_opt_box_autoadd_api_applied_transparent_policy(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -13913,6 +16812,76 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return raw == null
         ? null
         : dco_decode_box_autoadd_api_delegation_signer_input(raw);
+  }
+
+  @protected
+  ApiDeployment? dco_decode_opt_box_autoadd_api_deployment(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_api_deployment(raw);
+  }
+
+  @protected
+  ApiDepositQuote? dco_decode_opt_box_autoadd_api_deposit_quote(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_api_deposit_quote(raw);
+  }
+
+  @protected
+  ApiDepositTerms? dco_decode_opt_box_autoadd_api_deposit_terms(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_api_deposit_terms(raw);
+  }
+
+  @protected
+  ApiDepositsPin? dco_decode_opt_box_autoadd_api_deposits_pin(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_api_deposits_pin(raw);
+  }
+
+  @protected
+  ApiForwardOutcome? dco_decode_opt_box_autoadd_api_forward_outcome(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_api_forward_outcome(raw);
+  }
+
+  @protected
+  ApiForwardWait? dco_decode_opt_box_autoadd_api_forward_wait(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_api_forward_wait(raw);
+  }
+
+  @protected
+  ApiNothingSentCause? dco_decode_opt_box_autoadd_api_nothing_sent_cause(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null
+        ? null
+        : dco_decode_box_autoadd_api_nothing_sent_cause(raw);
+  }
+
+  @protected
+  ApiPrivateUsdErrorCode? dco_decode_opt_box_autoadd_api_private_usd_error_code(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null
+        ? null
+        : dco_decode_box_autoadd_api_private_usd_error_code(raw);
+  }
+
+  @protected
+  ApiRefundCause? dco_decode_opt_box_autoadd_api_refund_cause(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_api_refund_cause(raw);
+  }
+
+  @protected
+  ApiReverseCost? dco_decode_opt_box_autoadd_api_reverse_cost(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_api_reverse_cost(raw);
   }
 
   @protected
@@ -14034,6 +17003,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int? dco_decode_opt_box_autoadd_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_i_32(raw);
+  }
+
+  @protected
+  PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_i_64(raw);
   }
 
   @protected
@@ -15642,6 +18617,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiAcceptKind sse_decode_api_accept_kind(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiAcceptKind.values[inner];
+  }
+
+  @protected
+  ApiAcceptResult sse_decode_api_accept_result(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_kind = sse_decode_api_accept_kind(deserializer);
+    var var_cause = sse_decode_opt_box_autoadd_api_nothing_sent_cause(
+      deserializer,
+    );
+    var var_index = sse_decode_u_32(deserializer);
+    return ApiAcceptResult(kind: var_kind, cause: var_cause, index: var_index);
+  }
+
+  @protected
+  ApiActivity sse_decode_api_activity(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiActivity.values[inner];
+  }
+
+  @protected
   ApiAppliedTransparentPolicy sse_decode_api_applied_transparent_policy(
     SseDeserializer deserializer,
   ) {
@@ -15713,6 +18713,215 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiDeployment sse_decode_api_deployment(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_network = sse_decode_String(deserializer);
+    var var_railgunNetwork = sse_decode_String(deserializer);
+    var var_chainId = sse_decode_i_64(deserializer);
+    var var_token = sse_decode_String(deserializer);
+    var var_tokenDecimals = sse_decode_u_32(deserializer);
+    var var_keylessRpcUrl = sse_decode_String(deserializer);
+    var var_poiNodeUrl = sse_decode_String(deserializer);
+    var var_railgunProxy = sse_decode_String(deserializer);
+    var var_relayAdapt = sse_decode_String(deserializer);
+    var var_relayerRailgunAddress = sse_decode_String(deserializer);
+    var var_allowedHosts = sse_decode_list_String(deserializer);
+    var var_explorerTxPrefix = sse_decode_String(deserializer);
+    var var_railscanTxPrefix = sse_decode_String(deserializer);
+    var var_zcashConfirmations = sse_decode_u_32(deserializer);
+    var var_escrowConfirmations = sse_decode_u_32(deserializer);
+    var var_screeningSeconds = sse_decode_u_32(deserializer);
+    var var_maxRelayerFee = sse_decode_String(deserializer);
+    var var_usdTokens = sse_decode_list_api_usd_token(deserializer);
+    var var_deposits = sse_decode_opt_box_autoadd_api_deposits_pin(
+      deserializer,
+    );
+    return ApiDeployment(
+      network: var_network,
+      railgunNetwork: var_railgunNetwork,
+      chainId: var_chainId,
+      token: var_token,
+      tokenDecimals: var_tokenDecimals,
+      keylessRpcUrl: var_keylessRpcUrl,
+      poiNodeUrl: var_poiNodeUrl,
+      railgunProxy: var_railgunProxy,
+      relayAdapt: var_relayAdapt,
+      relayerRailgunAddress: var_relayerRailgunAddress,
+      allowedHosts: var_allowedHosts,
+      explorerTxPrefix: var_explorerTxPrefix,
+      railscanTxPrefix: var_railscanTxPrefix,
+      zcashConfirmations: var_zcashConfirmations,
+      escrowConfirmations: var_escrowConfirmations,
+      screeningSeconds: var_screeningSeconds,
+      maxRelayerFee: var_maxRelayerFee,
+      usdTokens: var_usdTokens,
+      deposits: var_deposits,
+    );
+  }
+
+  @protected
+  ApiDepositAddress sse_decode_api_deposit_address(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_index = sse_decode_u_32(deserializer);
+    var var_address = sse_decode_String(deserializer);
+    return ApiDepositAddress(index: var_index, address: var_address);
+  }
+
+  @protected
+  ApiDepositAddressUse sse_decode_api_deposit_address_use(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_index = sse_decode_u_32(deserializer);
+    var var_address = sse_decode_String(deserializer);
+    var var_balance = sse_decode_String(deserializer);
+    var var_deposited = sse_decode_bool(deserializer);
+    return ApiDepositAddressUse(
+      index: var_index,
+      address: var_address,
+      balance: var_balance,
+      deposited: var_deposited,
+    );
+  }
+
+  @protected
+  ApiDepositKind sse_decode_api_deposit_kind(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiDepositKind.values[inner];
+  }
+
+  @protected
+  ApiDepositPass sse_decode_api_deposit_pass(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_index = sse_decode_u_32(deserializer);
+    var var_address = sse_decode_String(deserializer);
+    var var_used = sse_decode_list_api_deposit_address_use(deserializer);
+    var var_records = sse_decode_list_api_deposit_record(deserializer);
+    var var_terms = sse_decode_opt_box_autoadd_api_deposit_terms(deserializer);
+    var var_termsError = sse_decode_opt_box_autoadd_api_private_usd_error_code(
+      deserializer,
+    );
+    var var_rescuable = sse_decode_list_api_deposit_rescuable(deserializer);
+    var var_scanned = sse_decode_bool(deserializer);
+    var var_scannedAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_nextPollMs = sse_decode_opt_box_autoadd_u_32(deserializer);
+    var var_problem = sse_decode_opt_box_autoadd_api_private_usd_error_code(
+      deserializer,
+    );
+    return ApiDepositPass(
+      index: var_index,
+      address: var_address,
+      used: var_used,
+      records: var_records,
+      terms: var_terms,
+      termsError: var_termsError,
+      rescuable: var_rescuable,
+      scanned: var_scanned,
+      scannedAt: var_scannedAt,
+      nextPollMs: var_nextPollMs,
+      problem: var_problem,
+    );
+  }
+
+  @protected
+  ApiDepositQuote sse_decode_api_deposit_quote(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_fee = sse_decode_String(deserializer);
+    var var_arrives = sse_decode_String(deserializer);
+    return ApiDepositQuote(fee: var_fee, arrives: var_arrives);
+  }
+
+  @protected
+  ApiDepositRecord sse_decode_api_deposit_record(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_kind = sse_decode_api_deposit_kind(deserializer);
+    var var_index = sse_decode_u_32(deserializer);
+    var var_address = sse_decode_String(deserializer);
+    var var_state = sse_decode_api_deposit_state(deserializer);
+    var var_value = sse_decode_String(deserializer);
+    var var_fee = sse_decode_String(deserializer);
+    var var_arrives = sse_decode_String(deserializer);
+    var var_createdAt = sse_decode_i_64(deserializer);
+    var var_endedAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_txHash = sse_decode_opt_String(deserializer);
+    var var_waiting = sse_decode_bool(deserializer);
+    return ApiDepositRecord(
+      id: var_id,
+      kind: var_kind,
+      index: var_index,
+      address: var_address,
+      state: var_state,
+      value: var_value,
+      fee: var_fee,
+      arrives: var_arrives,
+      createdAt: var_createdAt,
+      endedAt: var_endedAt,
+      txHash: var_txHash,
+      waiting: var_waiting,
+    );
+  }
+
+  @protected
+  ApiDepositRescuable sse_decode_api_deposit_rescuable(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_index = sse_decode_u_32(deserializer);
+    var var_address = sse_decode_String(deserializer);
+    var var_held = sse_decode_String(deserializer);
+    var var_fee = sse_decode_String(deserializer);
+    return ApiDepositRescuable(
+      index: var_index,
+      address: var_address,
+      held: var_held,
+      fee: var_fee,
+    );
+  }
+
+  @protected
+  ApiDepositState sse_decode_api_deposit_state(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiDepositState.values[inner];
+  }
+
+  @protected
+  ApiDepositTerms sse_decode_api_deposit_terms(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_fee = sse_decode_String(deserializer);
+    var var_feeBps = sse_decode_u_32(deserializer);
+    var var_feeExpiresAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_minValue = sse_decode_String(deserializer);
+    var var_railgunFeeBps = sse_decode_u_32(deserializer);
+    return ApiDepositTerms(
+      fee: var_fee,
+      feeBps: var_feeBps,
+      feeExpiresAt: var_feeExpiresAt,
+      minValue: var_minValue,
+      railgunFeeBps: var_railgunFeeBps,
+    );
+  }
+
+  @protected
+  ApiDepositsPin sse_decode_api_deposits_pin(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_contract = sse_decode_String(deserializer);
+    var var_token = sse_decode_String(deserializer);
+    var var_tokenSymbol = sse_decode_String(deserializer);
+    var var_chainName = sse_decode_String(deserializer);
+    return ApiDepositsPin(
+      contract: var_contract,
+      token: var_token,
+      tokenSymbol: var_tokenSymbol,
+      chainName: var_chainName,
+    );
+  }
+
+  @protected
   ApiDynamicConfigAttempt sse_decode_api_dynamic_config_attempt(
     SseDeserializer deserializer,
   ) {
@@ -15735,6 +18944,154 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_url = sse_decode_String(deserializer);
     var var_reason = sse_decode_String(deserializer);
     return ApiDynamicConfigMirrorFailure(url: var_url, reason: var_reason);
+  }
+
+  @protected
+  ApiForwardAdvance sse_decode_api_forward_advance(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_record = sse_decode_api_forward_record(deserializer);
+    var var_wait = sse_decode_opt_box_autoadd_api_forward_wait(deserializer);
+    var var_nextPollMs = sse_decode_u_32(deserializer);
+    var var_problem = sse_decode_opt_box_autoadd_api_private_usd_error_code(
+      deserializer,
+    );
+    return ApiForwardAdvance(
+      record: var_record,
+      wait: var_wait,
+      nextPollMs: var_nextPollMs,
+      problem: var_problem,
+    );
+  }
+
+  @protected
+  ApiForwardOutcome sse_decode_api_forward_outcome(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiForwardOutcome.values[inner];
+  }
+
+  @protected
+  ApiForwardPhase sse_decode_api_forward_phase(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiForwardPhase.values[inner];
+  }
+
+  @protected
+  ApiForwardQuote sse_decode_api_forward_quote(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_index = sse_decode_u_32(deserializer);
+    var var_expiresAt = sse_decode_i_64(deserializer);
+    var var_amount = sse_decode_String(deserializer);
+    var var_networkCost = sse_decode_opt_String(deserializer);
+    var var_relayerFee = sse_decode_String(deserializer);
+    var var_receives = sse_decode_String(deserializer);
+    var var_depositZat = sse_decode_u_64(deserializer);
+    var var_depositFeeZat = sse_decode_opt_box_autoadd_u_64(deserializer);
+    var var_maxTotalZat = sse_decode_opt_box_autoadd_u_64(deserializer);
+    var var_feeExpiresAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    return ApiForwardQuote(
+      index: var_index,
+      expiresAt: var_expiresAt,
+      amount: var_amount,
+      networkCost: var_networkCost,
+      relayerFee: var_relayerFee,
+      receives: var_receives,
+      depositZat: var_depositZat,
+      depositFeeZat: var_depositFeeZat,
+      maxTotalZat: var_maxTotalZat,
+      feeExpiresAt: var_feeExpiresAt,
+    );
+  }
+
+  @protected
+  ApiForwardRecord sse_decode_api_forward_record(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_index = sse_decode_u_32(deserializer);
+    var var_swapId = sse_decode_String(deserializer);
+    var var_phase = sse_decode_api_forward_phase(deserializer);
+    var var_acceptedAt = sse_decode_i_64(deserializer);
+    var var_quoteExpiresAt = sse_decode_i_64(deserializer);
+    var var_depositZat = sse_decode_u_64(deserializer);
+    var var_maxTotalZat = sse_decode_opt_box_autoadd_u_64(deserializer);
+    var var_amount = sse_decode_String(deserializer);
+    var var_receives = sse_decode_String(deserializer);
+    var var_relayerFee = sse_decode_String(deserializer);
+    var var_t0 = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_t1 = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_depositTxid = sse_decode_opt_String(deserializer);
+    var var_depositConfirmations = sse_decode_opt_box_autoadd_u_32(
+      deserializer,
+    );
+    var var_sweepTxid = sse_decode_opt_String(deserializer);
+    var var_payoutTx = sse_decode_opt_String(deserializer);
+    var var_outcome = sse_decode_opt_box_autoadd_api_forward_outcome(
+      deserializer,
+    );
+    var var_refundCause = sse_decode_opt_box_autoadd_api_refund_cause(
+      deserializer,
+    );
+    var var_nothingSentCause =
+        sse_decode_opt_box_autoadd_api_nothing_sent_cause(deserializer);
+    var var_endedAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    return ApiForwardRecord(
+      index: var_index,
+      swapId: var_swapId,
+      phase: var_phase,
+      acceptedAt: var_acceptedAt,
+      quoteExpiresAt: var_quoteExpiresAt,
+      depositZat: var_depositZat,
+      maxTotalZat: var_maxTotalZat,
+      amount: var_amount,
+      receives: var_receives,
+      relayerFee: var_relayerFee,
+      t0: var_t0,
+      t1: var_t1,
+      depositTxid: var_depositTxid,
+      depositConfirmations: var_depositConfirmations,
+      sweepTxid: var_sweepTxid,
+      payoutTx: var_payoutTx,
+      outcome: var_outcome,
+      refundCause: var_refundCause,
+      nothingSentCause: var_nothingSentCause,
+      endedAt: var_endedAt,
+    );
+  }
+
+  @protected
+  ApiForwardWait sse_decode_api_forward_wait(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiForwardWait.values[inner];
+  }
+
+  @protected
+  ApiFundingRequest sse_decode_api_funding_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_amount = sse_decode_String(deserializer);
+    var var_railgunProxy = sse_decode_String(deserializer);
+    var var_token = sse_decode_String(deserializer);
+    var var_callsTo = sse_decode_list_String(deserializer);
+    var var_callsData = sse_decode_list_String(deserializer);
+    var var_relayAdapt = sse_decode_String(deserializer);
+    var var_fee = sse_decode_String(deserializer);
+    var var_alreadyFunded = sse_decode_bool(deserializer);
+    return ApiFundingRequest(
+      amount: var_amount,
+      railgunProxy: var_railgunProxy,
+      token: var_token,
+      callsTo: var_callsTo,
+      callsData: var_callsData,
+      relayAdapt: var_relayAdapt,
+      fee: var_fee,
+      alreadyFunded: var_alreadyFunded,
+    );
   }
 
   @protected
@@ -15807,6 +19164,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiNothingSentCause sse_decode_api_nothing_sent_cause(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiNothingSentCause.values[inner];
+  }
+
+  @protected
   ApiPendingShareRound sse_decode_api_pending_share_round(
     SseDeserializer deserializer,
   ) {
@@ -15856,6 +19222,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiPrivateUsdError sse_decode_api_private_usd_error(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_code = sse_decode_api_private_usd_error_code(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    return ApiPrivateUsdError(code: var_code, message: var_message);
+  }
+
+  @protected
+  ApiPrivateUsdErrorCode sse_decode_api_private_usd_error_code(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiPrivateUsdErrorCode.values[inner];
+  }
+
+  @protected
   ApiProposalIdRange sse_decode_api_proposal_id_range(
     SseDeserializer deserializer,
   ) {
@@ -15875,6 +19260,184 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return ApiProposalRosterEntry(
       proposalId: var_proposalId,
       numOptions: var_numOptions,
+    );
+  }
+
+  @protected
+  ApiProvedSend sse_decode_api_proved_send(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_sendId = sse_decode_String(deserializer);
+    var var_token = sse_decode_String(deserializer);
+    var var_amount = sse_decode_String(deserializer);
+    var var_fee = sse_decode_String(deserializer);
+    var var_to = sse_decode_String(deserializer);
+    var var_proofJson = sse_decode_String(deserializer);
+    return ApiProvedSend(
+      sendId: var_sendId,
+      token: var_token,
+      amount: var_amount,
+      fee: var_fee,
+      to: var_to,
+      proofJson: var_proofJson,
+    );
+  }
+
+  @protected
+  ApiRailgunSendsTerms sse_decode_api_railgun_sends_terms(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_chainId = sse_decode_i_64(deserializer);
+    var var_railgunAddress = sse_decode_String(deserializer);
+    var var_railgunProxy = sse_decode_String(deserializer);
+    var var_token = sse_decode_String(deserializer);
+    var var_feeFloor = sse_decode_String(deserializer);
+    var var_feePerUnitGas = sse_decode_opt_String(deserializer);
+    var var_feeExpiresAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_maxGasLimit = sse_decode_String(deserializer);
+    var var_maxGasPriceWei = sse_decode_String(deserializer);
+    var var_maxCalldataBytes = sse_decode_u_32(deserializer);
+    return ApiRailgunSendsTerms(
+      chainId: var_chainId,
+      railgunAddress: var_railgunAddress,
+      railgunProxy: var_railgunProxy,
+      token: var_token,
+      feeFloor: var_feeFloor,
+      feePerUnitGas: var_feePerUnitGas,
+      feeExpiresAt: var_feeExpiresAt,
+      maxGasLimit: var_maxGasLimit,
+      maxGasPriceWei: var_maxGasPriceWei,
+      maxCalldataBytes: var_maxCalldataBytes,
+    );
+  }
+
+  @protected
+  ApiRefundCause sse_decode_api_refund_cause(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiRefundCause.values[inner];
+  }
+
+  @protected
+  ApiReverseAdvance sse_decode_api_reverse_advance(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_record = sse_decode_api_reverse_record(deserializer);
+    var var_nextPollMs = sse_decode_u_32(deserializer);
+    var var_problem = sse_decode_opt_box_autoadd_api_private_usd_error_code(
+      deserializer,
+    );
+    var var_needsYou = sse_decode_bool(deserializer);
+    return ApiReverseAdvance(
+      record: var_record,
+      nextPollMs: var_nextPollMs,
+      problem: var_problem,
+      needsYou: var_needsYou,
+    );
+  }
+
+  @protected
+  ApiReverseCost sse_decode_api_reverse_cost(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_debit = sse_decode_String(deserializer);
+    var var_railgunFee = sse_decode_String(deserializer);
+    var var_broadcasterFee = sse_decode_String(deserializer);
+    var var_feeExpiresAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    return ApiReverseCost(
+      debit: var_debit,
+      railgunFee: var_railgunFee,
+      broadcasterFee: var_broadcasterFee,
+      feeExpiresAt: var_feeExpiresAt,
+    );
+  }
+
+  @protected
+  ApiReverseCostRequest sse_decode_api_reverse_cost_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_index = sse_decode_u_32(deserializer);
+    var var_amount = sse_decode_String(deserializer);
+    var var_railgunProxy = sse_decode_String(deserializer);
+    var var_fee = sse_decode_String(deserializer);
+    var var_feeExpiresAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    return ApiReverseCostRequest(
+      index: var_index,
+      amount: var_amount,
+      railgunProxy: var_railgunProxy,
+      fee: var_fee,
+      feeExpiresAt: var_feeExpiresAt,
+    );
+  }
+
+  @protected
+  ApiReversePhase sse_decode_api_reverse_phase(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiReversePhase.values[inner];
+  }
+
+  @protected
+  ApiReverseQuote sse_decode_api_reverse_quote(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_record = sse_decode_api_reverse_record(deserializer);
+    var var_costRequest = sse_decode_api_reverse_cost_request(deserializer);
+    return ApiReverseQuote(record: var_record, costRequest: var_costRequest);
+  }
+
+  @protected
+  ApiReverseRecord sse_decode_api_reverse_record(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_index = sse_decode_u_32(deserializer);
+    var var_swapId = sse_decode_String(deserializer);
+    var var_phase = sse_decode_api_reverse_phase(deserializer);
+    var var_amount = sse_decode_String(deserializer);
+    var var_networkCost = sse_decode_opt_String(deserializer);
+    var var_depositZat = sse_decode_u_64(deserializer);
+    var var_quoteExpiresAt = sse_decode_i_64(deserializer);
+    var var_fundingDeadline = sse_decode_i_64(deserializer);
+    var var_readyDeadline = sse_decode_i_64(deserializer);
+    var var_refundAfter = sse_decode_i_64(deserializer);
+    var var_cost = sse_decode_opt_box_autoadd_api_reverse_cost(deserializer);
+    var var_funded = sse_decode_bool(deserializer);
+    var var_fundingTx = sse_decode_opt_String(deserializer);
+    var var_cancelRequested = sse_decode_bool(deserializer);
+    var var_settled = sse_decode_bool(deserializer);
+    var var_cancellable = sse_decode_bool(deserializer);
+    var var_awaitingUser = sse_decode_bool(deserializer);
+    var var_receiveEstimateZat = sse_decode_opt_box_autoadd_u_64(deserializer);
+    var var_receiveFeeZat = sse_decode_opt_box_autoadd_u_64(deserializer);
+    var var_receiveTxid = sse_decode_opt_String(deserializer);
+    var var_receivedZat = sse_decode_opt_box_autoadd_u_64(deserializer);
+    var var_receiveConfirmations = sse_decode_u_32(deserializer);
+    var var_acceptedAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_updatedAt = sse_decode_i_64(deserializer);
+    return ApiReverseRecord(
+      index: var_index,
+      swapId: var_swapId,
+      phase: var_phase,
+      amount: var_amount,
+      networkCost: var_networkCost,
+      depositZat: var_depositZat,
+      quoteExpiresAt: var_quoteExpiresAt,
+      fundingDeadline: var_fundingDeadline,
+      readyDeadline: var_readyDeadline,
+      refundAfter: var_refundAfter,
+      cost: var_cost,
+      funded: var_funded,
+      fundingTx: var_fundingTx,
+      cancelRequested: var_cancelRequested,
+      settled: var_settled,
+      cancellable: var_cancellable,
+      awaitingUser: var_awaitingUser,
+      receiveEstimateZat: var_receiveEstimateZat,
+      receiveFeeZat: var_receiveFeeZat,
+      receiveTxid: var_receiveTxid,
+      receivedZat: var_receivedZat,
+      receiveConfirmations: var_receiveConfirmations,
+      acceptedAt: var_acceptedAt,
+      updatedAt: var_updatedAt,
     );
   }
 
@@ -15999,6 +19562,44 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return ApiRoundStepEventKind.values[inner];
+  }
+
+  @protected
+  ApiSendRecord sse_decode_api_send_record(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_sendId = sse_decode_String(deserializer);
+    var var_token = sse_decode_String(deserializer);
+    var var_amount = sse_decode_String(deserializer);
+    var var_fee = sse_decode_String(deserializer);
+    var var_to = sse_decode_String(deserializer);
+    var var_withdraw = sse_decode_bool(deserializer);
+    var var_sentAt = sse_decode_i_64(deserializer);
+    var var_state = sse_decode_api_send_state(deserializer);
+    var var_txHash = sse_decode_opt_String(deserializer);
+    var var_postedAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_spentAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_retryAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    return ApiSendRecord(
+      sendId: var_sendId,
+      token: var_token,
+      amount: var_amount,
+      fee: var_fee,
+      to: var_to,
+      withdraw: var_withdraw,
+      sentAt: var_sentAt,
+      state: var_state,
+      txHash: var_txHash,
+      postedAt: var_postedAt,
+      spentAt: var_spentAt,
+      retryAt: var_retryAt,
+    );
+  }
+
+  @protected
+  ApiSendState sse_decode_api_send_state(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiSendState.values[inner];
   }
 
   @protected
@@ -16150,12 +19751,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiTransactKind sse_decode_api_transact_kind(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ApiTransactKind.values[inner];
+  }
+
+  @protected
+  ApiTransactResult sse_decode_api_transact_result(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_kind = sse_decode_api_transact_kind(deserializer);
+    var var_transactions = sse_decode_list_String(deserializer);
+    var var_retryAfterSecs = sse_decode_opt_box_autoadd_u_32(deserializer);
+    return ApiTransactResult(
+      kind: var_kind,
+      transactions: var_transactions,
+      retryAfterSecs: var_retryAfterSecs,
+    );
+  }
+
+  @protected
   ApiTransparentLedgerMode sse_decode_api_transparent_ledger_mode(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return ApiTransparentLedgerMode.values[inner];
+  }
+
+  @protected
+  ApiUsdToken sse_decode_api_usd_token(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_address = sse_decode_String(deserializer);
+    var var_symbol = sse_decode_String(deserializer);
+    return ApiUsdToken(address: var_address, symbol: var_symbol);
   }
 
   @protected
@@ -16280,6 +19911,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiActivity sse_decode_box_autoadd_api_activity(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_activity(deserializer));
+  }
+
+  @protected
   ApiAppliedTransparentPolicy
   sse_decode_box_autoadd_api_applied_transparent_policy(
     SseDeserializer deserializer,
@@ -16294,6 +19933,94 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_api_delegation_signer_input(deserializer));
+  }
+
+  @protected
+  ApiDeployment sse_decode_box_autoadd_api_deployment(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_deployment(deserializer));
+  }
+
+  @protected
+  ApiDepositQuote sse_decode_box_autoadd_api_deposit_quote(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_deposit_quote(deserializer));
+  }
+
+  @protected
+  ApiDepositTerms sse_decode_box_autoadd_api_deposit_terms(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_deposit_terms(deserializer));
+  }
+
+  @protected
+  ApiDepositsPin sse_decode_box_autoadd_api_deposits_pin(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_deposits_pin(deserializer));
+  }
+
+  @protected
+  ApiForwardOutcome sse_decode_box_autoadd_api_forward_outcome(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_forward_outcome(deserializer));
+  }
+
+  @protected
+  ApiForwardWait sse_decode_box_autoadd_api_forward_wait(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_forward_wait(deserializer));
+  }
+
+  @protected
+  ApiNothingSentCause sse_decode_box_autoadd_api_nothing_sent_cause(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_nothing_sent_cause(deserializer));
+  }
+
+  @protected
+  ApiPrivateUsdErrorCode sse_decode_box_autoadd_api_private_usd_error_code(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_private_usd_error_code(deserializer));
+  }
+
+  @protected
+  ApiProvedSend sse_decode_box_autoadd_api_proved_send(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_proved_send(deserializer));
+  }
+
+  @protected
+  ApiRefundCause sse_decode_box_autoadd_api_refund_cause(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_refund_cause(deserializer));
+  }
+
+  @protected
+  ApiReverseCost sse_decode_box_autoadd_api_reverse_cost(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_api_reverse_cost(deserializer));
   }
 
   @protected
@@ -16420,6 +20147,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int sse_decode_box_autoadd_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_i_32(deserializer));
+  }
+
+  @protected
+  PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_i_64(deserializer));
   }
 
   @protected
@@ -17497,6 +21230,48 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<ApiDepositAddressUse> sse_decode_list_api_deposit_address_use(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ApiDepositAddressUse>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_api_deposit_address_use(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ApiDepositRecord> sse_decode_list_api_deposit_record(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ApiDepositRecord>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_api_deposit_record(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ApiDepositRescuable> sse_decode_list_api_deposit_rescuable(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ApiDepositRescuable>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_api_deposit_rescuable(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<ApiDynamicConfigAttempt> sse_decode_list_api_dynamic_config_attempt(
     SseDeserializer deserializer,
   ) {
@@ -17521,6 +21296,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <ApiDynamicConfigMirrorFailure>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_api_dynamic_config_mirror_failure(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ApiForwardRecord> sse_decode_list_api_forward_record(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ApiForwardRecord>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_api_forward_record(deserializer));
     }
     return ans_;
   }
@@ -17568,6 +21357,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<ApiReverseRecord> sse_decode_list_api_reverse_record(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ApiReverseRecord>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_api_reverse_record(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ApiSendRecord> sse_decode_list_api_send_record(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ApiSendRecord>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_api_send_record(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<ApiSnapshotBundlePirResult>
   sse_decode_list_api_snapshot_bundle_pir_result(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -17576,6 +21393,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <ApiSnapshotBundlePirResult>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_api_snapshot_bundle_pir_result(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ApiUsdToken> sse_decode_list_api_usd_token(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ApiUsdToken>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_api_usd_token(deserializer));
     }
     return ans_;
   }
@@ -18688,6 +22519,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiActivity? sse_decode_opt_box_autoadd_api_activity(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_activity(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   ApiAppliedTransparentPolicy?
   sse_decode_opt_box_autoadd_api_applied_transparent_policy(
     SseDeserializer deserializer,
@@ -18712,6 +22556,136 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_api_delegation_signer_input(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ApiDeployment? sse_decode_opt_box_autoadd_api_deployment(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_deployment(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ApiDepositQuote? sse_decode_opt_box_autoadd_api_deposit_quote(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_deposit_quote(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ApiDepositTerms? sse_decode_opt_box_autoadd_api_deposit_terms(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_deposit_terms(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ApiDepositsPin? sse_decode_opt_box_autoadd_api_deposits_pin(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_deposits_pin(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ApiForwardOutcome? sse_decode_opt_box_autoadd_api_forward_outcome(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_forward_outcome(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ApiForwardWait? sse_decode_opt_box_autoadd_api_forward_wait(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_forward_wait(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ApiNothingSentCause? sse_decode_opt_box_autoadd_api_nothing_sent_cause(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_nothing_sent_cause(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ApiPrivateUsdErrorCode? sse_decode_opt_box_autoadd_api_private_usd_error_code(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_private_usd_error_code(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ApiRefundCause? sse_decode_opt_box_autoadd_api_refund_cause(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_refund_cause(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ApiReverseCost? sse_decode_opt_box_autoadd_api_reverse_cost(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_api_reverse_cost(deserializer));
     } else {
       return null;
     }
@@ -18903,6 +22877,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_i_32(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_i_64(deserializer));
     } else {
       return null;
     }
@@ -21030,6 +25015,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_api_accept_kind(
+    ApiAcceptKind self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_accept_result(
+    ApiAcceptResult self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_accept_kind(self.kind, serializer);
+    sse_encode_opt_box_autoadd_api_nothing_sent_cause(self.cause, serializer);
+    sse_encode_u_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_activity(ApiActivity self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_api_applied_transparent_policy(
     ApiAppliedTransparentPolicy self,
     SseSerializer serializer,
@@ -21086,6 +25097,162 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_api_deployment(ApiDeployment self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.network, serializer);
+    sse_encode_String(self.railgunNetwork, serializer);
+    sse_encode_i_64(self.chainId, serializer);
+    sse_encode_String(self.token, serializer);
+    sse_encode_u_32(self.tokenDecimals, serializer);
+    sse_encode_String(self.keylessRpcUrl, serializer);
+    sse_encode_String(self.poiNodeUrl, serializer);
+    sse_encode_String(self.railgunProxy, serializer);
+    sse_encode_String(self.relayAdapt, serializer);
+    sse_encode_String(self.relayerRailgunAddress, serializer);
+    sse_encode_list_String(self.allowedHosts, serializer);
+    sse_encode_String(self.explorerTxPrefix, serializer);
+    sse_encode_String(self.railscanTxPrefix, serializer);
+    sse_encode_u_32(self.zcashConfirmations, serializer);
+    sse_encode_u_32(self.escrowConfirmations, serializer);
+    sse_encode_u_32(self.screeningSeconds, serializer);
+    sse_encode_String(self.maxRelayerFee, serializer);
+    sse_encode_list_api_usd_token(self.usdTokens, serializer);
+    sse_encode_opt_box_autoadd_api_deposits_pin(self.deposits, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_address(
+    ApiDepositAddress self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_String(self.address, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_address_use(
+    ApiDepositAddressUse self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_String(self.address, serializer);
+    sse_encode_String(self.balance, serializer);
+    sse_encode_bool(self.deposited, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_kind(
+    ApiDepositKind self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_pass(
+    ApiDepositPass self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_String(self.address, serializer);
+    sse_encode_list_api_deposit_address_use(self.used, serializer);
+    sse_encode_list_api_deposit_record(self.records, serializer);
+    sse_encode_opt_box_autoadd_api_deposit_terms(self.terms, serializer);
+    sse_encode_opt_box_autoadd_api_private_usd_error_code(
+      self.termsError,
+      serializer,
+    );
+    sse_encode_list_api_deposit_rescuable(self.rescuable, serializer);
+    sse_encode_bool(self.scanned, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.scannedAt, serializer);
+    sse_encode_opt_box_autoadd_u_32(self.nextPollMs, serializer);
+    sse_encode_opt_box_autoadd_api_private_usd_error_code(
+      self.problem,
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_api_deposit_quote(
+    ApiDepositQuote self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.fee, serializer);
+    sse_encode_String(self.arrives, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_record(
+    ApiDepositRecord self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_api_deposit_kind(self.kind, serializer);
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_String(self.address, serializer);
+    sse_encode_api_deposit_state(self.state, serializer);
+    sse_encode_String(self.value, serializer);
+    sse_encode_String(self.fee, serializer);
+    sse_encode_String(self.arrives, serializer);
+    sse_encode_i_64(self.createdAt, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.endedAt, serializer);
+    sse_encode_opt_String(self.txHash, serializer);
+    sse_encode_bool(self.waiting, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_rescuable(
+    ApiDepositRescuable self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_String(self.address, serializer);
+    sse_encode_String(self.held, serializer);
+    sse_encode_String(self.fee, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_state(
+    ApiDepositState self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposit_terms(
+    ApiDepositTerms self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.fee, serializer);
+    sse_encode_u_32(self.feeBps, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.feeExpiresAt, serializer);
+    sse_encode_String(self.minValue, serializer);
+    sse_encode_u_32(self.railgunFeeBps, serializer);
+  }
+
+  @protected
+  void sse_encode_api_deposits_pin(
+    ApiDepositsPin self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.contract, serializer);
+    sse_encode_String(self.token, serializer);
+    sse_encode_String(self.tokenSymbol, serializer);
+    sse_encode_String(self.chainName, serializer);
+  }
+
+  @protected
   void sse_encode_api_dynamic_config_attempt(
     ApiDynamicConfigAttempt self,
     SseSerializer serializer,
@@ -21104,6 +25271,113 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.url, serializer);
     sse_encode_String(self.reason, serializer);
+  }
+
+  @protected
+  void sse_encode_api_forward_advance(
+    ApiForwardAdvance self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_forward_record(self.record, serializer);
+    sse_encode_opt_box_autoadd_api_forward_wait(self.wait, serializer);
+    sse_encode_u_32(self.nextPollMs, serializer);
+    sse_encode_opt_box_autoadd_api_private_usd_error_code(
+      self.problem,
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_api_forward_outcome(
+    ApiForwardOutcome self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_forward_phase(
+    ApiForwardPhase self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_forward_quote(
+    ApiForwardQuote self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_i_64(self.expiresAt, serializer);
+    sse_encode_String(self.amount, serializer);
+    sse_encode_opt_String(self.networkCost, serializer);
+    sse_encode_String(self.relayerFee, serializer);
+    sse_encode_String(self.receives, serializer);
+    sse_encode_u_64(self.depositZat, serializer);
+    sse_encode_opt_box_autoadd_u_64(self.depositFeeZat, serializer);
+    sse_encode_opt_box_autoadd_u_64(self.maxTotalZat, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.feeExpiresAt, serializer);
+  }
+
+  @protected
+  void sse_encode_api_forward_record(
+    ApiForwardRecord self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_String(self.swapId, serializer);
+    sse_encode_api_forward_phase(self.phase, serializer);
+    sse_encode_i_64(self.acceptedAt, serializer);
+    sse_encode_i_64(self.quoteExpiresAt, serializer);
+    sse_encode_u_64(self.depositZat, serializer);
+    sse_encode_opt_box_autoadd_u_64(self.maxTotalZat, serializer);
+    sse_encode_String(self.amount, serializer);
+    sse_encode_String(self.receives, serializer);
+    sse_encode_String(self.relayerFee, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.t0, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.t1, serializer);
+    sse_encode_opt_String(self.depositTxid, serializer);
+    sse_encode_opt_box_autoadd_u_32(self.depositConfirmations, serializer);
+    sse_encode_opt_String(self.sweepTxid, serializer);
+    sse_encode_opt_String(self.payoutTx, serializer);
+    sse_encode_opt_box_autoadd_api_forward_outcome(self.outcome, serializer);
+    sse_encode_opt_box_autoadd_api_refund_cause(self.refundCause, serializer);
+    sse_encode_opt_box_autoadd_api_nothing_sent_cause(
+      self.nothingSentCause,
+      serializer,
+    );
+    sse_encode_opt_box_autoadd_i_64(self.endedAt, serializer);
+  }
+
+  @protected
+  void sse_encode_api_forward_wait(
+    ApiForwardWait self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_funding_request(
+    ApiFundingRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.amount, serializer);
+    sse_encode_String(self.railgunProxy, serializer);
+    sse_encode_String(self.token, serializer);
+    sse_encode_list_String(self.callsTo, serializer);
+    sse_encode_list_String(self.callsData, serializer);
+    sse_encode_String(self.relayAdapt, serializer);
+    sse_encode_String(self.fee, serializer);
+    sse_encode_bool(self.alreadyFunded, serializer);
   }
 
   @protected
@@ -21156,6 +25430,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_api_nothing_sent_cause(
+    ApiNothingSentCause self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_api_pending_share_round(
     ApiPendingShareRound self,
     SseSerializer serializer,
@@ -21193,6 +25476,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_api_private_usd_error(
+    ApiPrivateUsdError self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_private_usd_error_code(self.code, serializer);
+    sse_encode_String(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_api_private_usd_error_code(
+    ApiPrivateUsdErrorCode self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
   void sse_encode_api_proposal_id_range(
     ApiProposalIdRange self,
     SseSerializer serializer,
@@ -21210,6 +25512,138 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_u_32(self.proposalId, serializer);
     sse_encode_u_32(self.numOptions, serializer);
+  }
+
+  @protected
+  void sse_encode_api_proved_send(
+    ApiProvedSend self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.sendId, serializer);
+    sse_encode_String(self.token, serializer);
+    sse_encode_String(self.amount, serializer);
+    sse_encode_String(self.fee, serializer);
+    sse_encode_String(self.to, serializer);
+    sse_encode_String(self.proofJson, serializer);
+  }
+
+  @protected
+  void sse_encode_api_railgun_sends_terms(
+    ApiRailgunSendsTerms self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_64(self.chainId, serializer);
+    sse_encode_String(self.railgunAddress, serializer);
+    sse_encode_String(self.railgunProxy, serializer);
+    sse_encode_String(self.token, serializer);
+    sse_encode_String(self.feeFloor, serializer);
+    sse_encode_opt_String(self.feePerUnitGas, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.feeExpiresAt, serializer);
+    sse_encode_String(self.maxGasLimit, serializer);
+    sse_encode_String(self.maxGasPriceWei, serializer);
+    sse_encode_u_32(self.maxCalldataBytes, serializer);
+  }
+
+  @protected
+  void sse_encode_api_refund_cause(
+    ApiRefundCause self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_reverse_advance(
+    ApiReverseAdvance self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_reverse_record(self.record, serializer);
+    sse_encode_u_32(self.nextPollMs, serializer);
+    sse_encode_opt_box_autoadd_api_private_usd_error_code(
+      self.problem,
+      serializer,
+    );
+    sse_encode_bool(self.needsYou, serializer);
+  }
+
+  @protected
+  void sse_encode_api_reverse_cost(
+    ApiReverseCost self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.debit, serializer);
+    sse_encode_String(self.railgunFee, serializer);
+    sse_encode_String(self.broadcasterFee, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.feeExpiresAt, serializer);
+  }
+
+  @protected
+  void sse_encode_api_reverse_cost_request(
+    ApiReverseCostRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_String(self.amount, serializer);
+    sse_encode_String(self.railgunProxy, serializer);
+    sse_encode_String(self.fee, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.feeExpiresAt, serializer);
+  }
+
+  @protected
+  void sse_encode_api_reverse_phase(
+    ApiReversePhase self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_reverse_quote(
+    ApiReverseQuote self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_reverse_record(self.record, serializer);
+    sse_encode_api_reverse_cost_request(self.costRequest, serializer);
+  }
+
+  @protected
+  void sse_encode_api_reverse_record(
+    ApiReverseRecord self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_32(self.index, serializer);
+    sse_encode_String(self.swapId, serializer);
+    sse_encode_api_reverse_phase(self.phase, serializer);
+    sse_encode_String(self.amount, serializer);
+    sse_encode_opt_String(self.networkCost, serializer);
+    sse_encode_u_64(self.depositZat, serializer);
+    sse_encode_i_64(self.quoteExpiresAt, serializer);
+    sse_encode_i_64(self.fundingDeadline, serializer);
+    sse_encode_i_64(self.readyDeadline, serializer);
+    sse_encode_i_64(self.refundAfter, serializer);
+    sse_encode_opt_box_autoadd_api_reverse_cost(self.cost, serializer);
+    sse_encode_bool(self.funded, serializer);
+    sse_encode_opt_String(self.fundingTx, serializer);
+    sse_encode_bool(self.cancelRequested, serializer);
+    sse_encode_bool(self.settled, serializer);
+    sse_encode_bool(self.cancellable, serializer);
+    sse_encode_bool(self.awaitingUser, serializer);
+    sse_encode_opt_box_autoadd_u_64(self.receiveEstimateZat, serializer);
+    sse_encode_opt_box_autoadd_u_64(self.receiveFeeZat, serializer);
+    sse_encode_opt_String(self.receiveTxid, serializer);
+    sse_encode_opt_box_autoadd_u_64(self.receivedZat, serializer);
+    sse_encode_u_32(self.receiveConfirmations, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.acceptedAt, serializer);
+    sse_encode_i_64(self.updatedAt, serializer);
   }
 
   @protected
@@ -21281,6 +25715,32 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     ApiRoundStepEventKind self,
     SseSerializer serializer,
   ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_send_record(
+    ApiSendRecord self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.sendId, serializer);
+    sse_encode_String(self.token, serializer);
+    sse_encode_String(self.amount, serializer);
+    sse_encode_String(self.fee, serializer);
+    sse_encode_String(self.to, serializer);
+    sse_encode_bool(self.withdraw, serializer);
+    sse_encode_i_64(self.sentAt, serializer);
+    sse_encode_api_send_state(self.state, serializer);
+    sse_encode_opt_String(self.txHash, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.postedAt, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.spentAt, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.retryAt, serializer);
+  }
+
+  @protected
+  void sse_encode_api_send_state(ApiSendState self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
   }
@@ -21389,12 +25849,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_api_transact_kind(
+    ApiTransactKind self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_transact_result(
+    ApiTransactResult self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_transact_kind(self.kind, serializer);
+    sse_encode_list_String(self.transactions, serializer);
+    sse_encode_opt_box_autoadd_u_32(self.retryAfterSecs, serializer);
+  }
+
+  @protected
   void sse_encode_api_transparent_ledger_mode(
     ApiTransparentLedgerMode self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_api_usd_token(ApiUsdToken self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.address, serializer);
+    sse_encode_String(self.symbol, serializer);
   }
 
   @protected
@@ -21491,6 +25978,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_api_activity(
+    ApiActivity self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_activity(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_api_applied_transparent_policy(
     ApiAppliedTransparentPolicy self,
     SseSerializer serializer,
@@ -21506,6 +26002,105 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_api_delegation_signer_input(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_deployment(
+    ApiDeployment self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_deployment(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_deposit_quote(
+    ApiDepositQuote self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_deposit_quote(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_deposit_terms(
+    ApiDepositTerms self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_deposit_terms(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_deposits_pin(
+    ApiDepositsPin self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_deposits_pin(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_forward_outcome(
+    ApiForwardOutcome self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_forward_outcome(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_forward_wait(
+    ApiForwardWait self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_forward_wait(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_nothing_sent_cause(
+    ApiNothingSentCause self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_nothing_sent_cause(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_private_usd_error_code(
+    ApiPrivateUsdErrorCode self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_private_usd_error_code(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_proved_send(
+    ApiProvedSend self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_proved_send(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_refund_cause(
+    ApiRefundCause self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_refund_cause(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_api_reverse_cost(
+    ApiReverseCost self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_api_reverse_cost(self, serializer);
   }
 
   @protected
@@ -21641,6 +26236,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_box_autoadd_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_i_64(
+    PlatformInt64 self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_64(self, serializer);
   }
 
   @protected
@@ -22539,6 +27143,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_api_deposit_address_use(
+    List<ApiDepositAddressUse> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_api_deposit_address_use(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_api_deposit_record(
+    List<ApiDepositRecord> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_api_deposit_record(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_api_deposit_rescuable(
+    List<ApiDepositRescuable> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_api_deposit_rescuable(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_api_dynamic_config_attempt(
     List<ApiDynamicConfigAttempt> self,
     SseSerializer serializer,
@@ -22559,6 +27199,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_api_dynamic_config_mirror_failure(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_api_forward_record(
+    List<ApiForwardRecord> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_api_forward_record(item, serializer);
     }
   }
 
@@ -22599,6 +27251,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_api_reverse_record(
+    List<ApiReverseRecord> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_api_reverse_record(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_api_send_record(
+    List<ApiSendRecord> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_api_send_record(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_api_snapshot_bundle_pir_result(
     List<ApiSnapshotBundlePirResult> self,
     SseSerializer serializer,
@@ -22607,6 +27283,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_api_snapshot_bundle_pir_result(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_api_usd_token(
+    List<ApiUsdToken> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_api_usd_token(item, serializer);
     }
   }
 
@@ -23521,6 +28209,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_api_activity(
+    ApiActivity? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_activity(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_api_applied_transparent_policy(
     ApiAppliedTransparentPolicy? self,
     SseSerializer serializer,
@@ -23543,6 +28244,136 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_api_delegation_signer_input(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_deployment(
+    ApiDeployment? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_deployment(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_deposit_quote(
+    ApiDepositQuote? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_deposit_quote(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_deposit_terms(
+    ApiDepositTerms? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_deposit_terms(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_deposits_pin(
+    ApiDepositsPin? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_deposits_pin(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_forward_outcome(
+    ApiForwardOutcome? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_forward_outcome(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_forward_wait(
+    ApiForwardWait? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_forward_wait(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_nothing_sent_cause(
+    ApiNothingSentCause? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_nothing_sent_cause(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_private_usd_error_code(
+    ApiPrivateUsdErrorCode? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_private_usd_error_code(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_refund_cause(
+    ApiRefundCause? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_refund_cause(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_reverse_cost(
+    ApiReverseCost? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_api_reverse_cost(self, serializer);
     }
   }
 
@@ -23719,6 +28550,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_i_32(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_i_64(
+    PlatformInt64? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_i_64(self, serializer);
     }
   }
 

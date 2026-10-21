@@ -15,7 +15,7 @@ class _MigrationCanLeaveMessage extends StatelessWidget {
       children: [
         Text(primary ?? 'You can leave this screen.', style: style),
         const SizedBox(height: AppSpacing.xs),
-        Text(secondary ?? 'But keep Vizor open & running.', style: style),
+        Text(secondary ?? 'But keep Veylor open & running.', style: style),
       ],
     );
   }

@@ -89,8 +89,8 @@ class SyncStatusLabel {
 
     return const SyncStatusLabel(
       kind: SyncStatusKind.synced,
-      label: 'Vizor is synced',
-      semanticsLabel: 'Vizor is synced',
+      label: 'Veylor is synced',
+      semanticsLabel: 'Veylor is synced',
     );
   }
 }

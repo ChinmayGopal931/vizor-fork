@@ -58,7 +58,6 @@ class _MobileMigrationPreparing extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: AppTypography.headlineLarge.copyWith(
                       color: colors.text.accent,
-                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -81,7 +80,6 @@ class _MobileMigrationPreparing extends StatelessWidget {
                           TextSpan(
                             style: AppTypography.bodyLarge.copyWith(
                               color: colors.text.accent,
-                              fontWeight: FontWeight.w600,
                             ),
                             children: [
                               const TextSpan(text: 'Migration '),
@@ -230,7 +228,6 @@ class _MobileMigrationMigratingState
           textAlign: TextAlign.center,
           style: AppTypography.headlineLarge.copyWith(
             color: colors.text.accent,
-            fontWeight: FontWeight.w500,
           ),
         ),
         SizedBox(height: compact ? AppSpacing.md : 44),
@@ -241,7 +238,6 @@ class _MobileMigrationMigratingState
                 TextSpan(
                   style: AppTypography.bodyLarge.copyWith(
                     color: colors.text.accent,
-                    fontWeight: FontWeight.w600,
                   ),
                   children: [
                     const TextSpan(text: 'Migration '),
@@ -286,14 +282,14 @@ class _MobileMigrationMigratingState
               : coordinatorError != null
               ? "Couldn't continue migration. Try again."
               : needsAttention
-              ? 'Keep Vizor open & unlocked.'
+              ? 'Keep Veylor open & unlocked.'
               : waitingForSafeBlock
               ? 'Waiting for a safe block to continue.'
               : null,
           secondary: needsCredentialRecovery
               ? "Two saved transactions couldn't be reopened."
               : coordinatorError != null || needsAttention
-              ? 'Vizor will retry automatically.'
+              ? 'Veylor will retry automatically.'
               : waitingForSafeBlock
               ? 'You can leave this screen.'
               : null,
@@ -400,12 +396,11 @@ class _MobileMigrationRecoveryDialog extends StatelessWidget {
                   'Rebuild migration?',
                   style: AppTypography.bodyLarge.copyWith(
                     color: colors.text.accent,
-                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'Vizor will first check that the pending transactions were '
+                  'Veylor will first check that the pending transactions were '
                   'not sent. It will then rebuild the migration for only your '
                   'remaining balance. Any confirmed transfers will stay '
                   'unchanged.',

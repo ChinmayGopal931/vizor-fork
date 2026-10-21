@@ -6,9 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../main.dart' show log;
+import '../../core/layout/app_form_factor.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
 import '../../core/widgets/app_icon.dart';
+import '../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../providers/account_provider.dart';
 import '../payment_links/services/payment_link_received_store.dart';
 import '../../providers/device_owner_auth_provider.dart';
@@ -228,7 +230,9 @@ class _LostPasswordContent extends StatelessWidget {
   final VoidCallback onReset;
 
   static const double cardWidth = 396;
-  static const double cardHeight = 520;
+  // Figma: 520. Gotham's wider copy needs 41 px more content height, so the
+  // card is 568 px (still well inside the 720 px minimum window).
+  static const double cardHeight = 568;
   static const double _buttonGroupWidth = 348;
   static const double _destructiveButtonWidth = 232;
 
@@ -251,12 +255,16 @@ class _LostPasswordContent extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         // Figma: this screen's badge sits on a 30% gray shield, unlike the
-        // crimson welcome/unlock badge.
-        Image.asset(
-          'assets/illustrations/lost_password_badge.webp',
-          width: 50,
-          height: 50,
-        ),
+        // crimson welcome/unlock badge. The neon (mobile) look has no
+        // illustrated badges: a lit lock takes the same slot.
+        if (kAppFormFactor == AppFormFactor.mobile)
+          const NeonGlyphBadge(iconName: AppIcons.lock, size: 50)
+        else
+          Image.asset(
+            'assets/illustrations/lost_password_badge.webp',
+            width: 50,
+            height: 50,
+          ),
         const SizedBox(height: AppSpacing.base),
         Column(
           mainAxisSize: MainAxisSize.min,

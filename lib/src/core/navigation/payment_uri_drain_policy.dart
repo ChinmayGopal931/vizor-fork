@@ -45,7 +45,7 @@ const kPaymentUriParkTtl = Duration(minutes: 10);
 /// the one thing that is always true: the link is gone, and re-opening it once
 /// the wallet is up recovers it.
 const kPaymentUriUnavailableMessage =
-    "Vizor couldn't open this payment link. "
+    "Veylor couldn't open this payment link. "
     'Open it again once your wallet has loaded.';
 
 /// Shown when a second `zcash:` link arrives before the first one has been
@@ -86,7 +86,7 @@ const kPaymentUriMigrationSendGateMessage =
 /// not implement yet: more than one recipient, a binary memo, a custom asset.
 /// Nothing about the link is wrong, so it does not tell the sender off.
 const kPaymentUriUnsupportedMessage =
-    "This payment link uses a feature Vizor doesn't support yet.";
+    "This payment link uses a feature Veylor doesn't support yet.";
 
 /// Shown when a `zcash:` link cannot be parsed at all — bad encoding, a
 /// malformed amount, a missing address, a link too long to read.

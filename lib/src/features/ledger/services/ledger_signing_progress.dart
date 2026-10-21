@@ -82,14 +82,14 @@ extension LedgerSigningStageCopy on LedgerSigningStage {
 
   String messageForDevice(String? deviceModel) => switch (this) {
     LedgerSigningStage.preparing =>
-      'Please wait while Vizor prepares your transaction.',
+      'Please wait while Veylor prepares your transaction.',
     LedgerSigningStage.sending =>
       ledgerHasShortSigningWait(deviceModel)
           ? 'Your Ledger is preparing to sign. It may seem unresponsive for about 10 seconds. Keep your Ledger connected.'
           : 'Your Ledger is preparing to sign. It may seem unresponsive for about 30 seconds. Keep your Ledger connected.',
     LedgerSigningStage.reviewing =>
       'Review and approve when prompted on your Ledger.',
-    LedgerSigningStage.finishing => 'Keep Vizor open.',
+    LedgerSigningStage.finishing => 'Keep Veylor open.',
   };
   String get status => switch (this) {
     LedgerSigningStage.sending => 'Preparing to sign',

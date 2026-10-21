@@ -1,6 +1,9 @@
 import 'package:flutter/painting.dart';
 
+import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
+
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Button colors grouped by variant.
 ///
@@ -21,20 +24,39 @@ class AppButtonColors {
   final AppDisabledButtonColors disabled;
   final AppDestructiveButtonColors destructive;
 
-  static const dark = AppButtonColors(
-    primary: AppPrimaryButtonColors.dark,
-    secondary: AppSecondaryButtonColors.dark,
-    ghost: AppGhostButtonColors.dark,
-    disabled: AppDisabledButtonColors.dark,
-    destructive: AppDestructiveButtonColors.dark,
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
+
+  static const figmaDark = AppButtonColors(
+    primary: AppPrimaryButtonColors.figmaDark,
+    secondary: AppSecondaryButtonColors.figmaDark,
+    ghost: AppGhostButtonColors.figmaDark,
+    disabled: AppDisabledButtonColors.figmaDark,
+    destructive: AppDestructiveButtonColors.figmaDark,
   );
 
-  static const light = AppButtonColors(
-    primary: AppPrimaryButtonColors.light,
-    secondary: AppSecondaryButtonColors.light,
-    ghost: AppGhostButtonColors.light,
-    disabled: AppDisabledButtonColors.light,
-    destructive: AppDestructiveButtonColors.light,
+  static const figmaLight = AppButtonColors(
+    primary: AppPrimaryButtonColors.figmaLight,
+    secondary: AppSecondaryButtonColors.figmaLight,
+    ghost: AppGhostButtonColors.figmaLight,
+    disabled: AppDisabledButtonColors.figmaLight,
+    destructive: AppDestructiveButtonColors.figmaLight,
+  );
+
+  static const neonDark = AppButtonColors(
+    primary: AppPrimaryButtonColors.neonDark,
+    secondary: AppSecondaryButtonColors.neonDark,
+    ghost: AppGhostButtonColors.neonDark,
+    disabled: AppDisabledButtonColors.neonDark,
+    destructive: AppDestructiveButtonColors.neonDark,
+  );
+
+  static const neonLight = AppButtonColors(
+    primary: AppPrimaryButtonColors.neonLight,
+    secondary: AppSecondaryButtonColors.neonLight,
+    ghost: AppGhostButtonColors.neonLight,
+    disabled: AppDisabledButtonColors.neonLight,
+    destructive: AppDestructiveButtonColors.neonLight,
   );
 }
 
@@ -59,7 +81,10 @@ class AppPrimaryButtonColors {
   final Color label;
   final Color labelHover;
 
-  static const dark = AppPrimaryButtonColors(
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
+
+  static const figmaDark = AppPrimaryButtonColors(
     bg: Primitives.p800Dark,
     bgHover: CrimsonPrimitives.p300Dark,
     bgPressed: CrimsonPrimitives.p300Dark,
@@ -70,7 +95,7 @@ class AppPrimaryButtonColors {
     labelHover: Primitives.p800Dark,
   );
 
-  static const light = AppPrimaryButtonColors(
+  static const figmaLight = AppPrimaryButtonColors(
     bg: Primitives.p800Light,
     bgHover: CrimsonPrimitives.p400Light,
     bgPressed: CrimsonPrimitives.p400Light,
@@ -79,6 +104,30 @@ class AppPrimaryButtonColors {
     borderPressed: Primitives.p900Alpha5Light,
     label: Primitives.p100Light,
     labelHover: Primitives.p100Light,
+  );
+
+  /// A lit red slab with a black label; the hairline edge reads as the
+  /// tube's highlight.
+  static const neonDark = AppPrimaryButtonColors(
+    bg: NeonPrimitives.red,
+    bgHover: NeonPrimitives.redHot,
+    bgPressed: NeonPrimitives.redPressed,
+    border: NeonPrimitives.white14,
+    borderHover: NeonPrimitives.white14,
+    borderPressed: NeonPrimitives.white14,
+    label: NeonPrimitives.n0Dark,
+    labelHover: NeonPrimitives.n0Dark,
+  );
+
+  static const neonLight = AppPrimaryButtonColors(
+    bg: NeonPrimitives.redOnLight,
+    bgHover: NeonPrimitives.red,
+    bgPressed: NeonPrimitives.redOnLightPressed,
+    border: NeonPrimitives.ink10,
+    borderHover: NeonPrimitives.ink5,
+    borderPressed: NeonPrimitives.ink5,
+    label: NeonPrimitives.white,
+    labelHover: NeonPrimitives.white,
   );
 }
 
@@ -95,18 +144,36 @@ class AppSecondaryButtonColors {
   final Color bgPressed;
   final Color label;
 
-  static const dark = AppSecondaryButtonColors(
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
+
+  static const figmaDark = AppSecondaryButtonColors(
     bg: Primitives.p150Dark,
     bgHover: Primitives.p200Dark,
     bgPressed: Primitives.p200Dark,
     label: Primitives.p800Dark,
   );
 
-  static const light = AppSecondaryButtonColors(
+  static const figmaLight = AppSecondaryButtonColors(
     bg: Primitives.p0Light,
     bgHover: Primitives.p100Light,
     bgPressed: Primitives.p100Light,
     label: Primitives.p900Light,
+  );
+
+  /// Glass: the backdrop's light shows through.
+  static const neonDark = AppSecondaryButtonColors(
+    bg: NeonPrimitives.white6,
+    bgHover: NeonPrimitives.white14,
+    bgPressed: NeonPrimitives.white14,
+    label: NeonPrimitives.n800Dark,
+  );
+
+  static const neonLight = AppSecondaryButtonColors(
+    bg: NeonPrimitives.n0Light,
+    bgHover: NeonPrimitives.n100Light,
+    bgPressed: NeonPrimitives.n100Light,
+    label: NeonPrimitives.n800Light,
   );
 }
 
@@ -125,7 +192,10 @@ class AppGhostButtonColors {
   final Color border;
   final Color label;
 
-  static const dark = AppGhostButtonColors(
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
+
+  static const figmaDark = AppGhostButtonColors(
     bg: Primitives.p0Dark,
     // p100Dark equals the raised/modal surface (#232828), which made the
     // hover fill invisible on modal panels — one step up stays visible on
@@ -135,11 +205,25 @@ class AppGhostButtonColors {
     label: Primitives.p700Dark,
   );
 
-  static const light = AppGhostButtonColors(
+  static const figmaLight = AppGhostButtonColors(
     bg: Primitives.p0Light,
     bgHover: Primitives.p100Light,
     border: Primitives.p300Light,
     label: Primitives.p800Light,
+  );
+
+  static const neonDark = AppGhostButtonColors(
+    bg: NeonPrimitives.n0Dark,
+    bgHover: NeonPrimitives.n150Dark,
+    border: NeonPrimitives.n300Dark,
+    label: NeonPrimitives.n700Dark,
+  );
+
+  static const neonLight = AppGhostButtonColors(
+    bg: NeonPrimitives.n0Light,
+    bgHover: NeonPrimitives.n100Light,
+    border: NeonPrimitives.n300Light,
+    label: NeonPrimitives.n700Light,
   );
 }
 
@@ -149,14 +233,27 @@ class AppDisabledButtonColors {
   final Color bg;
   final Color label;
 
-  static const dark = AppDisabledButtonColors(
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
+
+  static const figmaDark = AppDisabledButtonColors(
     bg: Primitives.p300Alpha20Dark,
     label: Primitives.p500Alpha50Dark,
   );
 
-  static const light = AppDisabledButtonColors(
+  static const figmaLight = AppDisabledButtonColors(
     bg: Primitives.p300Alpha20Light,
     label: Primitives.p500Alpha50Light,
+  );
+
+  static const neonDark = AppDisabledButtonColors(
+    bg: NeonPrimitives.n300Alpha40Dark,
+    label: NeonPrimitives.n500Alpha60Dark,
+  );
+
+  static const neonLight = AppDisabledButtonColors(
+    bg: NeonPrimitives.n300Alpha20Light,
+    label: NeonPrimitives.n500Alpha50Light,
   );
 }
 
@@ -179,7 +276,10 @@ class AppDestructiveButtonColors {
   final Color borderPressed;
   final Color label;
 
-  static const dark = AppDestructiveButtonColors(
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
+
+  static const figmaDark = AppDestructiveButtonColors(
     bg: PlumPrimitives.p200Dark,
     bgHover: PlumPrimitives.p150Dark,
     bgPressed: PlumPrimitives.p150Dark,
@@ -189,7 +289,7 @@ class AppDestructiveButtonColors {
     label: PlumPrimitives.p800Dark,
   );
 
-  static const light = AppDestructiveButtonColors(
+  static const figmaLight = AppDestructiveButtonColors(
     bg: PlumPrimitives.p500Light,
     bgHover: PlumPrimitives.p600Light,
     bgPressed: PlumPrimitives.p600Light,
@@ -197,5 +297,27 @@ class AppDestructiveButtonColors {
     borderHover: Primitives.p900Alpha5Light,
     borderPressed: Primitives.p900Alpha5Light,
     label: PlumPrimitives.p50Light,
+  );
+
+  /// Outlined red on a dark red ground, so it never reads as the solid
+  /// primary slab.
+  static const neonDark = AppDestructiveButtonColors(
+    bg: NeonPrimitives.redSubtle,
+    bgHover: NeonPrimitives.redDeep,
+    bgPressed: NeonPrimitives.redDeep,
+    border: NeonPrimitives.red,
+    borderHover: NeonPrimitives.redHot,
+    borderPressed: NeonPrimitives.redHot,
+    label: NeonPrimitives.redCore,
+  );
+
+  static const neonLight = AppDestructiveButtonColors(
+    bg: NeonPrimitives.redSubtleOnLight,
+    bgHover: NeonPrimitives.redOnLight18,
+    bgPressed: NeonPrimitives.redOnLight18,
+    border: NeonPrimitives.redOnLight,
+    borderHover: NeonPrimitives.redOnLightPressed,
+    borderPressed: NeonPrimitives.redOnLightPressed,
+    label: NeonPrimitives.redOnLightPressed,
   );
 }

@@ -84,7 +84,6 @@ class _MobileMigrationOptionCard extends StatelessWidget {
                                   title,
                                   style: AppTypography.bodyLarge.copyWith(
                                     color: colors.text.accent,
-                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 if (recommended) ...[
@@ -112,7 +111,6 @@ class _MobileMigrationOptionCard extends StatelessWidget {
                                           style: AppTypography.labelLarge
                                               .copyWith(
                                                 color: const Color(0xFFD3FFE4),
-                                                fontWeight: FontWeight.w600,
                                               ),
                                         ),
                                       ),

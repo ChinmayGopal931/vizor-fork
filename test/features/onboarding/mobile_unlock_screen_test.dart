@@ -308,7 +308,10 @@ class _ResetBlockedAccountNotifier extends AccountNotifier {
   Future<void> restoreAfterUnlock() async {}
 
   @override
-  Future<void> resetWallet({int? confirmedUnsharedGiftCardCount}) async {
+  Future<void> resetWallet({
+    int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
+  }) async {
     resets += 1;
     throw const WalletResetInFlightGiftCardClaimsException(count: 1);
   }
@@ -380,7 +383,7 @@ void main() {
     expect(find.text('Forgot Passcode?'), findsOneWidget);
     expect(find.text(kForgotPasscodeUnbackedAccountWarning), findsOneWidget);
     expect(tester.takeException(), isNull);
-    expect(find.text('Continue to reset Vizor'), findsOneWidget);
+    expect(find.text('Continue to reset Veylor'), findsOneWidget);
 
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -408,7 +411,7 @@ void main() {
       find.text(kWalletResetInFlightGiftCardWarningMessage),
       findsOneWidget,
     );
-    expect(find.text('Continue to reset Vizor'), findsOneWidget);
+    expect(find.text('Continue to reset Veylor'), findsOneWidget);
   });
 
   testWidgets('a refused reset reads as a Gift Card wait, not a failure', (
@@ -464,13 +467,13 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel('Passcode help'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Continue to reset Vizor'));
+    await tester.tap(find.text('Continue to reset Veylor'));
     await tester.pumpAndSettle();
 
     // The second sheet arms after a deliberate countdown.
     await tester.pump(kForgotPasscodeLastWarningArmDelay);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Reset Vizor'));
+    await tester.tap(find.text('Reset Veylor'));
     await tester.pumpAndSettle();
 
     expect(accountNotifier.resets, 1);
@@ -892,6 +895,31 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    testWidgets('the opt-in box lights its check without a fill', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app(biometric: FakeBiometricUnlock(avail: faceAvailability)),
+      );
+      await tester.pumpAndSettle();
+      final option = find.byType(PasscodeBiometricOptIn);
+      expect(tester.getSize(option).height, greaterThanOrEqualTo(44));
+      final box = find.descendant(
+        of: option,
+        matching: find.byType(CustomPaint),
+      );
+      expect(tester.getSize(box), const Size.square(22));
+      // The plate's edge: a lit tube (halo, glow, core) and its unlit line.
+      expect(box, paintsExactlyCountTimes(#drawPath, 4));
+
+      await tester.tap(option);
+      await tester.pumpAndSettle();
+      // The check glyph lit over the plate, and nothing filled.
+      expect(box, paintsExactlyCountTimes(#drawPath, 7));
+      expect(box, paintsExactlyCountTimes(#drawRect, 0));
+      expect(box, paintsExactlyCountTimes(#drawRRect, 0));
+    });
   });
 
   group('haptics', () {
@@ -1062,10 +1090,6 @@ void main() {
       await tester.pump();
 
       expect(find.byType(MobileBiometricSignInView), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('mobile_biometric_sign_in_background')),
-        findsOneWidget,
-      );
       expect(
         find.byKey(const ValueKey('mobile_biometric_sign_in_badge')),
         findsOneWidget,

@@ -17,12 +17,14 @@ void main() {
   ) async {
     await _pumpActivityFeed(tester, rows: [_row(title: 'Sent')]);
 
+    // The neon avatar is a cut-corner plate, not a circle.
     final avatar = tester.getSize(
       find.byWidgetPredicate(
         (widget) =>
             widget is DecoratedBox &&
-            widget.decoration is BoxDecoration &&
-            (widget.decoration as BoxDecoration).shape == BoxShape.circle,
+            widget.decoration is ShapeDecoration &&
+            (widget.decoration as ShapeDecoration).shape
+                is BeveledRectangleBorder,
       ),
     );
     expect(avatar.width, AppAssetSizeMobile.size);
@@ -73,14 +75,22 @@ void main() {
     );
   });
 
-  testWidgets('mobile sub-line text uses the 16px label token', (tester) async {
+  testWidgets('mobile sub-line text uses the row label (16px label - 1)', (
+    tester,
+  ) async {
     await _pumpActivityFeed(
       tester,
       rows: [_row(title: 'Sent', subtitle: 'Shielded')],
     );
 
+    // Gotham is 8% wider than Geist, so mobile rows set the 16px label one
+    // point smaller to keep titles such as "Redeemed a gift card" whole. See
+    // `_activityRowLabelStyle`.
     final subtitle = tester.widget<Text>(find.text('Shielded'));
-    expect(subtitle.style?.fontSize, AppTypographyMobile.labelLarge.fontSize);
+    expect(
+      subtitle.style?.fontSize,
+      AppTypographyMobile.labelLarge.fontSize! - 1,
+    );
   });
 
   testWidgets('mobile activity card surface has no drop shadow', (

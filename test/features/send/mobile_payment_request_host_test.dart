@@ -682,8 +682,8 @@ void main() {
       await tester.tap(find.text('Enter amount'));
       await tester.pumpAndSettle();
       expect(harness.location, '/send');
-      expect(find.text('Enter Amount'), findsOneWidget);
-      expect(find.text('Select Recipient'), findsNothing);
+      expect(find.text('ENTER AMOUNT'), findsOneWidget);
+      expect(find.text('SELECT RECIPIENT'), findsNothing);
       expect(
         tester
             .widget<MobileSendScreen>(find.byType(MobileSendScreen))
@@ -723,8 +723,8 @@ void main() {
       rustApi.validAddress = false;
       await tester.tap(find.text('Enter amount'));
       await tester.pumpAndSettle();
-      expect(find.text('Select Recipient'), findsOneWidget);
-      expect(find.text('Enter Amount'), findsNothing);
+      expect(find.text('SELECT RECIPIENT'), findsOneWidget);
+      expect(find.text('ENTER AMOUNT'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -733,8 +733,8 @@ void main() {
     final harness = await _pumpHost(tester, realComposer: true);
     harness.router.go('/send', extra: _address);
     await tester.pumpAndSettle();
-    expect(find.text('Select Recipient'), findsOneWidget);
-    expect(find.text('Enter Amount'), findsNothing);
+    expect(find.text('SELECT RECIPIENT'), findsOneWidget);
+    expect(find.text('ENTER AMOUNT'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

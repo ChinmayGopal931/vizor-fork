@@ -9,10 +9,10 @@
              icons, matching the running app's themed bars (Dart side:
              androidSystemBarsStyleFor in app_theme_host.dart). Dark-mode
              values live in values-night/styles.xml. -->
-        <item name="android:statusBarColor">#F7F7F7</item>
+        <item name="android:statusBarColor">#EAEAE6</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:enforceStatusBarContrast">false</item>
-        <item name="android:navigationBarColor">#F7F7F7</item>
+        <item name="android:navigationBarColor">#EAEAE6</item>
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:enforceNavigationBarContrast">false</item>
     </style>
@@ -24,10 +24,10 @@
          This Theme is only used starting with V2 of Flutter's Android embedding. -->
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
-        <item name="android:statusBarColor">#F7F7F7</item>
+        <item name="android:statusBarColor">#EAEAE6</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:enforceStatusBarContrast">false</item>
-        <item name="android:navigationBarColor">#F7F7F7</item>
+        <item name="android:navigationBarColor">#EAEAE6</item>
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:enforceNavigationBarContrast">false</item>
     </style>

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart' show log;
 import 'core/profile_pictures.dart';
 import 'core/config/app_version_config.dart';
+import 'core/config/private_usd_feature_config.dart';
 import 'core/config/rpc_endpoint_config.dart';
 import 'core/config/swap_remote_enable_config.dart';
 import 'core/config/zcash_explorer.dart';
@@ -16,6 +17,7 @@ import 'core/storage/app_secure_store.dart';
 import 'core/storage/enhance_pir_preference_store.dart';
 import 'core/storage/wallet_paths.dart';
 import 'core/storage/secure_storage_diagnostics.dart';
+import 'features/private_usd/services/railgun_host_channel.dart';
 import 'providers/account_models.dart';
 import 'rust/api/sync.dart' as rust_sync;
 import 'rust/api/wallet.dart' as rust_wallet;
@@ -63,7 +65,11 @@ class AppBootstrapState {
     this.biometricUnlockEnabled = false,
     this.syncKeepAwakeEnabled = false,
     this.syncKeepAwakePromptSeen = false,
+    this.portfolioChartEnabled = true,
+    this.portfolioChartMarketPrices = false,
+    this.portfolioChartRange,
     this.enhancePirEnabled = false,
+    this.railgunHostSupported = false,
     this.failureKind,
     this.failureMessage,
   });
@@ -80,10 +86,21 @@ class AppBootstrapState {
   final bool syncKeepAwakeEnabled;
   final bool syncKeepAwakePromptSeen;
 
+  /// Home portfolio chart preferences; a null range is the default.
+  final bool portfolioChartEnabled;
+  final bool portfolioChartMarketPrices;
+  final String? portfolioChartRange;
+
   /// The saved private queries setting, or `null` when it could not be read.
   /// An unreadable setting is private for this launch, but unconfirmed: see
   /// [readEnhancePirEnabledPreference].
   final bool? enhancePirEnabled;
+
+  /// Whether this platform's Railgun host can run Private USD's page: Android
+  /// always, iOS from iOS 17, nothing else. `null` when the iOS handler did
+  /// not answer yet; it is asked again after the first frame. Only builds
+  /// with Private USD ask; the rest keep `false`.
+  final bool? railgunHostSupported;
 
   /// Whether biometric unlock was enabled at startup, read synchronously from
   /// secure storage. The unlock screen uses this to paint the biometric
@@ -287,7 +304,12 @@ Future<AppBootstrapState> loadAppBootstrap({
       key: kSyncKeepAwakePromptSeenKey,
       label: 'sync keep-awake prompt seen flag',
     );
+    final portfolioChart = await readPortfolioChartPreferences(storage);
     final enhancePirEnabled = await readEnhancePirEnabledPreference(storage);
+    // Known before the first frame, so the router's synchronous guards see it.
+    final railgunHostSupported = kPrivateUsdBuildEnabled
+        ? await queryRailgunHostSupported()
+        : false;
     var isPasswordConfigured = await storage.isPasswordConfigured();
     var isUnlocked = storage.hasSessionPassword;
     final dbPath = await _getDbPath();
@@ -480,7 +502,11 @@ Future<AppBootstrapState> loadAppBootstrap({
       biometricUnlockEnabled: biometricUnlockEnabled,
       syncKeepAwakeEnabled: syncKeepAwakeEnabled,
       syncKeepAwakePromptSeen: syncKeepAwakePromptSeen,
+      portfolioChartEnabled: portfolioChart.enabled,
+      portfolioChartMarketPrices: portfolioChart.marketPrices,
+      portfolioChartRange: portfolioChart.range,
       enhancePirEnabled: enhancePirEnabled,
+      railgunHostSupported: railgunHostSupported,
       isPasswordConfigured: isPasswordConfigured,
       isUnlocked: isUnlocked,
       passwordRotationRecoveryFailed: passwordRotationRecoveryFailed,
@@ -493,7 +519,7 @@ Future<AppBootstrapState> loadAppBootstrap({
     return AppBootstrapState.blocked(
       failureKind: AppBootstrapFailureKind.secureStorageUnavailable,
       failureMessage:
-          'Vizor needs access to secure storage before it can open your wallet.',
+          'Veylor needs access to secure storage before it can open your wallet.',
     );
   } catch (e) {
     log('bootstrap: failed, blocking startup: $e');
@@ -502,7 +528,7 @@ Future<AppBootstrapState> loadAppBootstrap({
     );
     return AppBootstrapState.blocked(
       failureKind: AppBootstrapFailureKind.startupFailure,
-      failureMessage: 'Vizor could not load its startup state.',
+      failureMessage: 'Veylor could not load its startup state.',
     );
   }
 }
@@ -677,6 +703,71 @@ Future<bool> _readPlainBool(
   } catch (e) {
     log('bootstrap: failed to read $label: $e');
     return false;
+  }
+}
+
+/// The Home portfolio chart's saved preferences. A saved choice is kept as it
+/// was written. An absent or unreadable value keeps the default: the chart is
+/// shown, market prices are off (so an unreadable keychain never turns a server
+/// on), and the range is unset.
+@visibleForTesting
+Future<({bool enabled, bool marketPrices, String? range})>
+readPortfolioChartPreferences(AppSecureStore storage) async {
+  return (
+    enabled: await _readPlainBoolOr(
+      storage,
+      key: kPortfolioChartEnabledKey,
+      defaultValue: true,
+      label: 'portfolio chart visibility',
+    ),
+    marketPrices: await _readPlainBoolOr(
+      storage,
+      key: kPortfolioChartMarketPricesKey,
+      defaultValue: false,
+      label: 'portfolio chart market prices flag',
+    ),
+    range: await _readPlainString(
+      storage,
+      key: kPortfolioChartRangeKey,
+      label: 'portfolio chart range',
+    ),
+  );
+}
+
+/// Like [_readPlainBool], for a switch with its own default: an absent or
+/// unreadable value keeps [defaultValue] rather than reading as off.
+Future<bool> _readPlainBoolOr(
+  AppSecureStore storage, {
+  required String key,
+  required bool defaultValue,
+  required String label,
+}) async {
+  try {
+    return switch (await storage.readPlain(key)) {
+      'true' => true,
+      'false' => false,
+      _ => defaultValue,
+    };
+  } on SecureStorageUnavailableException {
+    rethrow;
+  } catch (e) {
+    log('bootstrap: failed to read $label: $e');
+    return defaultValue;
+  }
+}
+
+Future<String?> _readPlainString(
+  AppSecureStore storage, {
+  required String key,
+  required String label,
+}) async {
+  try {
+    return await storage.readPlain(key);
+  } on SecureStorageUnavailableException {
+    rethrow;
+  } catch (e) {
+    log('bootstrap: failed to read $label: $e');
+    return null;
   }
 }
 

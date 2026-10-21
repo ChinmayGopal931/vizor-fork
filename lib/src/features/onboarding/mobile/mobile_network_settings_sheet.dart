@@ -315,7 +315,6 @@ class MobileNetworkSettingsContent extends StatelessWidget {
                   Text(
                     'Custom endpoint',
                     style: AppTypography.bodyLarge.copyWith(
-                      fontWeight: FontWeight.w600,
                       color: colors.text.accent,
                     ),
                   ),

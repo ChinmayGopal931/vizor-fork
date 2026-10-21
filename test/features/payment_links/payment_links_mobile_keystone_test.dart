@@ -5,7 +5,6 @@ import 'dart:async';
 
 import 'package:zcash_wallet/src/features/ledger/services/ledger_signing_progress.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/app.dart';
@@ -31,15 +30,12 @@ import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
 import 'package:zcash_wallet/src/features/ledger/services/ledger_signing_service.dart';
 import 'package:zcash_wallet/src/features/payment_links/services/payment_link_ledger_funding_service.dart';
 import 'package:zcash_wallet/src/features/payment_links/widgets/payment_link_ledger_signing_overlay.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 import '../../support/ledger_gift_card_support.dart';
 
 void main() {
   setUpAll(() async {
-    final loader = FontLoader('Geist')
-      ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-SemiBold.ttf'));
-    await loader.load();
+    await loadGothamFonts();
   });
 
   testWidgets(
@@ -55,7 +51,7 @@ void main() {
       await _walkToApproveAndCreate(tester, settle: false);
       expect(find.byType(PaymentLinkLedgerSigningOverlay), findsOneWidget);
       expect(find.byType(MobileKeystonePcztSigningFlow), findsNothing);
-      expect(find.text('Confirm on your Ledger'), findsOneWidget);
+      expect(find.text('Sign transaction'), findsOneWidget);
       ledger.storage.writeGate = Completer<void>();
       signing.complete([3]);
       for (var i = 0; i < 5; i++) {
@@ -177,32 +173,28 @@ void main() {
     expect(cta.onPressed, isNotNull);
     expect(find.text('Approve & create'), findsOneWidget);
   });
-  testWidgets(
-    'iOS swipe cancels only signing and releases its PCZT',
-    (tester) async {
-      final hardwareSigning = _FakePaymentLinkHardwareSigningService();
-      await _pumpMobilePaymentLinks(tester, hardwareSigning: hardwareSigning);
-      await _walkToApproveAndCreate(tester);
-      final route =
-          ModalRoute.of(
-                tester.element(find.byType(MobileKeystonePcztSigningFlow)),
-              )!
-              as PageRoute;
-      expect(route.popGestureEnabled, isTrue);
-      await tester.dragFrom(const Offset(1, 150), const Offset(1000, 0));
-      await tester.pumpAndSettle();
-      expect(find.byType(MobileKeystonePcztSigningFlow), findsNothing);
-      expect(hardwareSigning.discardedDrafts, [BigInt.one]);
-      expect(find.text('Approve & create'), findsOneWidget);
-      final cta = tester.widget<AppButton>(
-        find.byKey(
-          const ValueKey('payment_link_mobile_review_continue_button'),
-        ),
-      );
-      expect(cta.onPressed, isNotNull);
-    },
-    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
-  );
+  testWidgets('iOS swipe cancels only signing and releases its PCZT', (
+    tester,
+  ) async {
+    final hardwareSigning = _FakePaymentLinkHardwareSigningService();
+    await _pumpMobilePaymentLinks(tester, hardwareSigning: hardwareSigning);
+    await _walkToApproveAndCreate(tester);
+    final route =
+        ModalRoute.of(
+              tester.element(find.byType(MobileKeystonePcztSigningFlow)),
+            )!
+            as PageRoute;
+    expect(route.popGestureEnabled, isTrue);
+    await tester.dragFrom(const Offset(1, 150), const Offset(1000, 0));
+    await tester.pumpAndSettle();
+    expect(find.byType(MobileKeystonePcztSigningFlow), findsNothing);
+    expect(hardwareSigning.discardedDrafts, [BigInt.one]);
+    expect(find.text('Approve & create'), findsOneWidget);
+    final cta = tester.widget<AppButton>(
+      find.byKey(const ValueKey('payment_link_mobile_review_continue_button')),
+    );
+    expect(cta.onPressed, isNotNull);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 }
 
 Future<void> _walkToApproveAndCreate(
@@ -262,8 +254,9 @@ Future<void> _pumpMobilePaymentLinks(
   LedgerGiftHarness? ledger,
   LedgerPcztSigner? signer,
 }) async {
-  await tester.binding.setSurfaceSize(const Size(393, 852));
-  addTearDown(() => tester.binding.setSurfaceSize(null));
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = const Size(393, 852);
+  addTearDown(tester.view.reset);
 
   await tester.pumpWidget(
     ProviderScope(

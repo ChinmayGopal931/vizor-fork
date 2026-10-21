@@ -475,7 +475,6 @@ class _AccountProfileCard extends StatelessWidget {
                               'Account name',
                               style: AppTypography.labelLarge.copyWith(
                                 color: cardTextColor.withValues(alpha: 0.5),
-                                fontWeight: FontWeight.w400,
                               ),
                             ),
                           ),

@@ -108,6 +108,31 @@ pub async fn stop_tor_update_relay() {
     crate::tor_update_relay::stop().await;
 }
 
+/// Starts the loopback SOCKS5 bridge the Private USD Railgun page is proxied
+/// through, or returns the running bridge's port; a running offline bridge is
+/// stopped first. Fails closed while Tor is on but not usable, after waiting
+/// out a bootstrap.
+///
+/// On every route change, close the page, then [`stop_railgun_bridge`], then
+/// start a new bridge and load the page on its port.
+pub async fn start_railgun_bridge() -> Result<u16, String> {
+    crate::railgun_bridge::start().await
+}
+
+/// Starts a Railgun bridge that refuses every connection, for a page that must
+/// reach nothing (one loaded only to delete an account's Railgun wallet), or
+/// returns the running one's port; a running routed bridge is stopped first.
+/// It never waits for Tor.
+pub async fn start_offline_railgun_bridge() -> Result<u16, String> {
+    crate::railgun_bridge::start_offline().await
+}
+
+/// Stops the Railgun bridge, whichever kind runs, and closes the page's
+/// tunnels. Idempotent.
+pub async fn stop_railgun_bridge() {
+    crate::railgun_bridge::stop().await;
+}
+
 pub struct ImportBirthdayMetadata {
     pub sapling_activation_height: u64,
     pub sapling_activation_time: u32,

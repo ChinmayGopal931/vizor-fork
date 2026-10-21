@@ -22,16 +22,16 @@ Form factor controls presentation; active transport controls connection instruct
 
 | Phase | Title | Status | Body |
 | --- | --- | --- | --- |
-| preparing | Preparing for Ledger | Preparing transaction | Vizor is preparing the transaction for secure device review. |
+| preparing | Preparing for Ledger | Preparing transaction | Veylor is preparing the transaction for secure device review. |
 | awaitingDevice | Review on your Ledger | Waiting for approval | Review every transaction detail on the device, then approve or reject it. |
-| saving | Saving signed transaction | Securing transaction | Keep Vizor open while the signed transaction is saved securely. |
-| broadcasting | Sending transaction | Broadcasting to the network | Keep Vizor open while the transaction is sent. |
+| saving | Saving signed transaction | Securing transaction | Keep Veylor open while the signed transaction is saved securely. |
+| broadcasting | Sending transaction | Broadcasting to the network | Keep Veylor open while the transaction is sent. |
 | failed | Caller-specific | Caller-specific, often Action needed | Caller-specific failure/recovery instructions. |
 
 During awaitingDevice, readiness can override the card:
 
-- `Checking your Ledger` / `Checking device`: `Vizor is checking whether the Zcash app is ready.`
-- `Confirm opening Zcash` / `Opening Zcash`: `Confirm the request on your Ledger. Vizor will reconnect automatically.`
+- `Checking your Ledger` / `Checking device`: `Veylor is checking whether the Zcash app is ready.`
+- `Confirm opening Zcash` / `Opening Zcash`: `Confirm the request on your Ledger. Veylor will reconnect automatically.`
 - idle/ready/failed readiness otherwise keeps the generic approval text.
 - A failed card may use `Ledger needs attention` / `Action needed` and the readiness error.
 
@@ -44,13 +44,13 @@ mobile does not offer this connection picker.
 
 TEX and consecutive shielding display transaction/round counts. Awaiting text is
 `Review Transaction N of M on your Ledger`, `Waiting for approval · N of M`,
-and `Approve this transaction on the device. Vizor will request the next transaction separately.`
+and `Approve this transaction on the device. Veylor will request the next transaction separately.`
 Shielding additionally explains separate network fees per approval.
 Normal send hands off after saving to the send-status flow rather than showing
 the shared card's broadcasting phase.
 
 Voting shows `Approve voting delegation`, `Bundle N of M`, and defaults to
-`Waiting for Ledger approval` / `Approve bundle N on the device. Vizor will continue automatically.`
+`Waiting for Ledger approval` / `Approve bundle N on the device. Veylor will continue automatically.`
 Readiness overrides are checking/opening/attention. Its enclosing status screen
 can still say `Approve on your Ledger` while the panel is checking the device.
 Keep the existing disclosure that the device may not display the voting memo verbatim.
@@ -79,13 +79,13 @@ internal work into a few stages. Do not expose a checklist of internal operation
 
 | Stage | Suggested title | Short body | Work included |
 | --- | --- | --- | --- |
-| Prepare | Preparing transaction | Please wait while Vizor prepares your transaction. | PCZT/proofs, validation, connection readiness, cooldown and command planning. |
+| Prepare | Preparing transaction | Please wait while Veylor prepares your transaction. | PCZT/proofs, validation, connection readiness, cooldown and command planning. |
 | Transfer | Processing with Ledger | Keep your Ledger connected. This may take a while. | Transaction command transfer and device processing interleaved with that transfer. |
 | Review | Check your Ledger | Review and approve when prompted on your Ledger. | Processing around the review-triggering command and user review/approval. |
-| Finish | Finishing transaction | Keep Vizor open. | Signature retrieval/validation, checkpoint, and any remaining proof work; network submission if this surface owns it. |
+| Finish | Finishing transaction | Keep Veylor open. | Signature retrieval/validation, checkpoint, and any remaining proof work; network submission if this surface owns it. |
 
 The first two stages mean wait, review means check the device, and finish means
-Vizor is completing the approved request. Desktop/mobile use the same four-stage
+Veylor is completing the approved request. Desktop/mobile use the same four-stage
 model. No new screen per stage and no mandatory four-step checklist; update the
 existing title/status area without repeating the same information three times.
 

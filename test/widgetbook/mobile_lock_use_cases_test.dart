@@ -1,11 +1,9 @@
 @Tags(['mobile'])
 library;
 
-import 'dart:ui' as ui;
 import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_sheet.dart';
 
 import 'package:flutter/material.dart' show Icons, MaterialApp;
-import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,10 +14,10 @@ import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/forgot_passcode_sheet.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_unlock_screen.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/passcode_widgets.dart';
-import 'package:zcash_wallet/src/features/onboarding/shared/onboarding_auth_shell.dart';
 import 'package:zcash_wallet/src/features/payment_links/services/payment_link_received_store.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/widgetbook/screen_use_cases.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   setUpAll(_loadAppFonts);
@@ -192,12 +190,15 @@ void main() {
     expect(faceIdTitle.style?.fontSize, AppTypography.displayLarge.fontSize);
     expect(find.bySemanticsLabel('Back'), findsNothing);
     expect(find.text('Enable Face ID'), findsOneWidget);
-    expect(
-      find.byWidgetPredicate(
-        (widget) => widget is AppIcon && widget.name == AppIcons.faceId,
-      ),
-      findsOneWidget,
+    final faceIdIcon = find.byWidgetPredicate(
+      (widget) => widget is AppIcon && widget.name == AppIcons.faceId,
     );
+    for (final key in ['mobile_biometrics_enable', 'mobile_biometrics_hero']) {
+      expect(
+        find.descendant(of: find.byKey(ValueKey(key)), matching: faceIdIcon),
+        findsOneWidget,
+      );
+    }
 
     await _pumpMobileLockUseCase(tester, buildMobileFingerprintOptInUseCase);
     expect(tester.takeException(), isNull);
@@ -206,17 +207,17 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Enable fingerprint'), findsOneWidget);
-    expect(find.byIcon(Icons.fingerprint), findsOneWidget);
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Image &&
-            widget.image is AssetImage &&
-            (widget.image as AssetImage).assetName ==
-                'assets/illustrations/biometrics_fingerprint_knight.webp',
-      ),
-      findsOneWidget,
-    );
+    // The neon hero badge replaces the knight: Material's fingerprint on the
+    // button and on the badge (Apple's Touch ID art stays iOS-only).
+    for (final key in ['mobile_biometrics_enable', 'mobile_biometrics_hero']) {
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey(key)),
+          matching: find.byIcon(Icons.fingerprint),
+        ),
+        findsOneWidget,
+      );
+    }
   });
 
   testWidgets('mobile lock use cases render the Face ID sign-in backdrop', (
@@ -228,22 +229,14 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     expect(find.byType(MobileBiometricSignInView), findsOneWidget);
+    // The neon look has no illustrated backdrop: a lit lock on the window.
     expect(
-      find.byKey(const ValueKey('mobile_biometric_sign_in_background')),
-      findsOneWidget,
+      find.descendant(
+        of: find.byType(MobileBiometricSignInView),
+        matching: find.byType(Image),
+      ),
+      findsNothing,
     );
-    final backgroundImage = tester.widget<Image>(
-      find.byKey(const ValueKey('mobile_biometric_sign_in_background')),
-    );
-    expect(
-      (backgroundImage.image as AssetImage).assetName,
-      mobileBiometricSignInBackgroundAsset,
-    );
-    final backgroundSize = tester.getSize(
-      find.byKey(const ValueKey('mobile_biometric_sign_in_background')),
-    );
-    expect(backgroundSize.width, closeTo(392, 0.1));
-    expect(backgroundSize.height, closeTo(720, 0.1));
     expect(
       find.byKey(const ValueKey('mobile_biometric_sign_in_badge')),
       findsOneWidget,
@@ -288,21 +281,6 @@ void main() {
     expect(tester.getSize(find.byType(PasscodeNumpad)).width, 288);
   });
 
-  testWidgets('keeps desktop and mobile auth backgrounds separate', (
-    tester,
-  ) async {
-    await tester.runAsync(() async {
-      expect(
-        await _imageSize(onboardingAuthBackgroundAsset),
-        const Size(1344, 720),
-      );
-      expect(
-        await _imageSize(mobileBiometricSignInBackgroundAsset),
-        const Size(392, 720),
-      );
-    });
-  });
-
   testWidgets('forgot-passcode sheet warns about an in-flight Gift Card', (
     tester,
   ) async {
@@ -331,7 +309,7 @@ void main() {
     await _pumpMobileLockUseCase(tester, buildMobileForgotPasscodeSheetUseCase);
     expect(tester.takeException(), isNull);
     expect(find.text('Forgot Passcode?'), findsOneWidget);
-    expect(find.text('Continue to reset Vizor'), findsOneWidget);
+    expect(find.text('Continue to reset Veylor'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
     final forgotBody = tester.widget<Text>(
       find.textContaining("If you can't remember your passcode"),
@@ -467,26 +445,9 @@ void main() {
     expect(resetButton().onPressed, isNull);
 
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text('Reset Vizor'), findsOneWidget);
+    expect(find.text('Reset Veylor'), findsOneWidget);
     expect(resetButton().onPressed, isNotNull);
   });
-}
-
-Future<Size> _imageSize(String assetPath) async {
-  final data = await rootBundle.load(assetPath);
-  final buffer = await ui.ImmutableBuffer.fromUint8List(
-    data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
-  );
-  try {
-    final descriptor = await ui.ImageDescriptor.encoded(buffer);
-    try {
-      return Size(descriptor.width.toDouble(), descriptor.height.toDouble());
-    } finally {
-      descriptor.dispose();
-    }
-  } finally {
-    buffer.dispose();
-  }
 }
 
 Future<void> _pumpMobileLockUseCase(
@@ -522,11 +483,5 @@ Future<void> _pumpMobileLockUseCase(
 }
 
 Future<void> _loadAppFonts() async {
-  final geist = FontLoader('Geist')
-    ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-    ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'));
-  final youngSerif = FontLoader('Young Serif')
-    ..addFont(rootBundle.load('assets/fonts/YoungSerif-Regular.ttf'));
-
-  await Future.wait([geist.load(), youngSerif.load()]);
+  await loadGothamFonts();
 }

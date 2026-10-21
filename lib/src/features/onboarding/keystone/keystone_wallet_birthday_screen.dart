@@ -395,7 +395,7 @@ class _KeystoneWalletBirthdayScreenState
                             child: Text(
                               'Around when did you create your wallet?',
                               style: AppTypography.displayLarge.copyWith(
-                                fontFamily: 'Young Serif',
+                                fontFamily: 'Gotham',
                                 fontWeight: FontWeight.w400,
                                 color: context.colors.text.accent,
                               ),

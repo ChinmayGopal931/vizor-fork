@@ -28,6 +28,9 @@ abstract final class AppHaptics {
   /// Completing the last unanswered ballot item — one light confirmation tap.
   static Future<void> votingAnswersComplete() => HapticFeedback.lightImpact();
 
+  /// The unlock reveal parting to show the app — a light tap.
+  static Future<void> unlockReveal() => HapticFeedback.lightImpact();
+
   /// Send success confirmation — native custom haptic where available:
   /// 30ms pulse, then 40ms full-intensity pulse after a 60ms delay.
   static Future<void> sendSuccess() async {
@@ -72,6 +75,30 @@ abstract final class AppHaptics {
     await HapticFeedback.heavyImpact();
     await Future<void>.delayed(const Duration(milliseconds: 90));
     await HapticFeedback.heavyImpact();
+  }
+
+  /// "Authorize settlement" is about to close (Private USD, USD → ZEC): a
+  /// buzz that holds, then fades out. Native where available (an Android
+  /// waveform under the VIBRATE permission, iOS Core Haptics); otherwise a
+  /// run of taps, heavy to light, approximates the fade.
+  static Future<void> settlementDeadline() async {
+    try {
+      final handled = await _channel.invokeMethod<bool>('settlementDeadline');
+      if (handled == true) return;
+    } on PlatformException {
+      // Fall through to the approximation.
+    } on MissingPluginException {
+      // Desktop/web hosts have no haptics channel.
+    }
+    await HapticFeedback.heavyImpact();
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    await HapticFeedback.heavyImpact();
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+    await HapticFeedback.mediumImpact();
+    await Future<void>.delayed(const Duration(milliseconds: 260));
+    await HapticFeedback.lightImpact();
+    await Future<void>.delayed(const Duration(milliseconds: 360));
+    await HapticFeedback.selectionClick();
   }
 
   static bool get _shouldFallbackCustomSendHaptics =>

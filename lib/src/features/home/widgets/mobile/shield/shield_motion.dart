@@ -3,13 +3,7 @@ import 'package:flutter/animation.dart';
 import '../../../../../core/theme/app_theme.dart';
 
 abstract final class VText {
-  static const geist = 'Geist';
-  static final display = AppTypography.displayLarge.copyWith(
-    fontFamily: 'Shielding Serif',
-  );
-  static final labelL = AppTypography.bodyMedium.copyWith(
-    color: const Color(0xFFFFFFFF),
-  );
+  static const display = AppTypography.displayLarge;
 }
 
 /// Motion vocabulary. Curves are the strong variants, never the built-ins.

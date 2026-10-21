@@ -7,6 +7,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../core/widgets/app_button.dart';
+import '../../../../../core/widgets/mobile/neon_motion.dart';
 import 'balance_art.dart';
 import 'keystone_shield_morph.dart';
 import 'mobile_shield_backdrop.dart';
@@ -90,6 +91,21 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
   final _hardware = ShieldHardwareMotion();
   Widget? _hardwareChild;
 
+  /// Seconds the floor has flowed; it stands still between flows.
+  double _floorTime = 0;
+
+  /// The scene draws dark whatever the app's theme.
+  static const _theme = AppThemeData.dark;
+  static AppColors get _colors => _theme.colors;
+
+  /// A state's statement: Thin, as the screen titles are.
+  static final _statement = AppTypography.bodyLarge.copyWith(
+    fontWeight: AppFontWeight.heading,
+  );
+
+  /// One step of the floor's rows, as on Home while it syncs.
+  static const _floorPeriod = 2.25;
+
   bool get _review => widget.phase == MobileShieldPhase.review;
   double? get _a => _assemblyAt == null ? null : _clock.value - _assemblyAt!;
   String get _result => widget.resultAmount ?? widget.amount;
@@ -167,15 +183,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
 
   double _fitFont(String text) {
     final painter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: VText.display.copyWith(
-          fontSize: 84,
-          fontWeight: FontWeight.w700,
-          height: 1,
-          letterSpacing: -3.36,
-        ),
-      ),
+      text: TextSpan(text: text, style: BalanceArt.digits(84)),
       textDirection: TextDirection.ltr,
     )..layout();
     final size = math.min(84.0, 84 * 345 / math.max(1, painter.width));
@@ -275,12 +283,24 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
     );
   }
 
-  BalanceArt _balance(String amount, bool shielded) => BalanceArt(
-    amount,
-    look: shielded ? BalanceLook.shielded : BalanceLook.transparent,
-    unitTop: BalanceArt.unitOffset,
-    fontSize: shielded ? _afterFontSize : _beforeFontSize,
-  );
+  BalanceArt _balance(String amount, bool shielded, {double light = 1}) =>
+      BalanceArt(
+        amount,
+        look: shielded ? BalanceLook.shielded : BalanceLook.transparent,
+        unitTop: BalanceArt.unitOffset,
+        fontSize: shielded ? _afterFontSize : _beforeFontSize,
+        glow: _colors.neon.signGlow,
+        core: _colors.neon.signCore,
+        light: light,
+      );
+
+  /// The floor flows while the wallet works and the shield forms, and stands
+  /// still once it lands or while a step waits on the owner.
+  bool _floorFlows(double? a) => switch (widget.phase) {
+    MobileShieldPhase.working => true,
+    MobileShieldPhase.succeeded => a == null || a < ShieldTimeline.land,
+    _ => false,
+  };
 
   void _tick(Duration elapsed) {
     // Ticker.start resets its elapsed time; retain scene time across resume.
@@ -300,6 +320,8 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
         geometry: _geometry(_art!, _layout!),
         atlas: _art!.atlas,
         reduceMotion: _reduce,
+        glow: _colors.neon.glow,
+        core: _colors.neon.core,
       );
     }
     if (widget.phase == MobileShieldPhase.succeeded &&
@@ -311,6 +333,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
       _assemblyAt = t;
     }
     final a = _assemblyAt == null ? null : t - _assemblyAt!;
+    if (!_reduce && _floorFlows(a)) _floorTime += math.max(0.0, step);
     _field?.hapticsEnabled =
         widget.phase == MobileShieldPhase.working ||
         widget.phase == MobileShieldPhase.succeeded;
@@ -353,7 +376,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
   double _headingHeight(double width) {
     double measure(String text) {
       final painter = TextPainter(
-        text: TextSpan(text: text, style: AppTypography.bodyMedium),
+        text: TextSpan(text: text, style: _statement),
         textDirection: Directionality.of(context),
         textScaler: MediaQuery.textScalerOf(context),
       )..layout(maxWidth: math.max(1, width - 48));
@@ -363,7 +386,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
     }
 
     return math.max(
-      measure('Transparent Balance'),
+      measure('Transparent balance'),
       measure('Shielded successfully'),
     );
   }
@@ -383,7 +406,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
       systemNavigationBarDividerColor: Color(0xFF000000),
     ),
     child: AppTheme(
-      data: AppThemeData.dark,
+      data: _theme,
       child: PopScope(
         canPop: widget.onClose == null && widget.canLeave,
         onPopInvokedWithResult: (didPop, _) {
@@ -397,7 +420,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
               Positioned.fill(
                 child: IgnorePointer(
                   child: ColoredBox(
-                    color: const Color(0xFF000000),
+                    color: _colors.background.window,
                     child: _backdropImage == null
                         ? null
                         : ImageFiltered(
@@ -414,16 +437,21 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
                   ),
                 ),
               ),
-              AnimatedBuilder(
-                animation: _clock,
-                builder: (_, _) => CustomPaint(
-                  painter: ShieldScrimPainter(
-                    _a == null
-                        ? 0
-                        : ShieldTimeline.backgroundShift.eased(
-                            _a!,
-                            VMotion.ease,
-                          ),
+              RepaintBoundary(
+                child: AnimatedBuilder(
+                  animation: _clock,
+                  builder: (_, _) => CustomPaint(
+                    painter: ShieldScrimPainter(
+                      shift: _a == null
+                          ? 0
+                          : ShieldTimeline.backgroundShift.eased(
+                              _a!,
+                              VMotion.ease,
+                            ),
+                      flow: _floorTime / _floorPeriod % 1,
+                      scrim: _colors.background.window.withValues(alpha: 0.94),
+                      glow: _colors.neon.glow,
+                    ),
                   ),
                 ),
               ),
@@ -559,9 +587,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
                           ? 'Shielding your balance…'
                           : widget.title,
                       textAlign: TextAlign.center,
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: const Color(0xB3FFFFFF),
-                      ),
+                      style: _statement.copyWith(color: _colors.text.primary),
                     ),
                   ),
                 ),
@@ -580,20 +606,17 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
                 child: SizedBox(
                   width: 176.5,
                   height: 50,
+                  // The slab fades in as it will look once it can be
+                  // pressed, then casts its glow.
                   child: AppButton(
                     key: const ValueKey('mobile_shield_complete'),
                     onPressed: _ready ? widget.onComplete : null,
                     expand: true,
                     constrainContent: true,
-                    variant: AppButtonVariant.secondary,
-                    disabledBackgroundColor: const Color(0xFFFFFFFF),
-                    enabledBackgroundColor: const Color(0xFFFFFFFF),
-                    enabledLabelColor: const Color(0xFF141818),
+                    disabledBackgroundColor: _colors.button.primary.bg,
                     child: Text(
                       'Complete',
-                      style: AppTypography.bodyMedium.copyWith(
-                        color: const Color(0xFF141818),
-                      ),
+                      style: TextStyle(color: _colors.button.primary.label),
                     ),
                   ),
                 ),
@@ -605,7 +628,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
           Positioned(
             left: 24,
             right: 24,
-            top: layout.cancelCenter - 24,
+            top: layout.cancelCenter - AppButtonSizing.largeHeight / 2,
             child: Opacity(
               opacity: 1 - sliderOut,
               child: ExcludeSemantics(
@@ -621,23 +644,17 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
     );
   }
 
+  // The label keeps its colour while the button fades out after commit.
   Widget _cancel() => Semantics(
     button: true,
     label: 'Cancel',
-    child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: widget.canLeave ? widget.onClose : null,
-      child: SizedBox(
-        width: 100,
-        height: 48,
-        child: Center(
-          child: Text(
-            'Cancel',
-            style: AppTypography.bodyMedium.copyWith(
-              color: const Color(0x99FFFFFF),
-            ),
-          ),
-        ),
+    child: AppButton(
+      variant: AppButtonVariant.ghost,
+      onPressed: widget.canLeave ? widget.onClose : null,
+      disabledBackgroundColor: _colors.background.window.withValues(alpha: 0),
+      child: Text(
+        'Cancel',
+        style: TextStyle(color: _colors.button.ghost.label),
       ),
     ),
   );
@@ -762,9 +779,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
                             ? _keystoneFocusTitle ?? 'Shielding your balance…'
                             : widget.title,
                         textAlign: TextAlign.center,
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: const Color(0xFFFFFFFF),
-                        ),
+                        style: _statement.copyWith(color: _colors.text.accent),
                       ),
                       if (widget.body != null)
                         Padding(
@@ -773,7 +788,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
                             widget.body!,
                             textAlign: TextAlign.center,
                             style: AppTypography.bodySmall.copyWith(
-                              color: const Color(0xCCFFFFFF),
+                              color: _colors.text.secondary,
                             ),
                           ),
                         ),
@@ -816,63 +831,63 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
   Widget _visual(_ShieldLayout layout, bool auxiliary) {
     final a = _a;
     final t = _clock.value;
-    final before = _balance(widget.amount, false);
-    final after = _balance(_result, true);
     final header = _review ? 1.0 : 1 - ShieldTimeline.headerOut.eased(t);
-    Widget icon(String asset, double opacity) => Positioned(
+    // Keyed by role, so a sign keeps its state as layers come and go.
+    Widget icon(double opacity, {required bool result}) => Positioned(
+      key: ValueKey(result ? 'shielded_icon' : 'transparent_icon'),
       left: layout.iconCenter.dx - 20 * layout.artScale,
       top: layout.iconCenter.dy - 20 * layout.artScale,
       child: Opacity(
         opacity: opacity,
-        child: ShieldIcon(
-          asset,
-          box: Size.square(40 * layout.artScale),
-          width:
-              (asset == 'overlay_transparent' ? 36.6667 : 32) * layout.artScale,
-          height: 37 * layout.artScale,
-        ),
+        child: result
+            ? ShieldIcon.shielded(size: 40 * layout.artScale)
+            : ShieldIcon.transparent(size: 40 * layout.artScale),
       ),
     );
-    Widget title(String text, double opacity) => Positioned(
-      left: 24,
-      right: 24,
-      top: layout.titleTop,
-      child: SizedBox(
-        height: layout.headingHeight,
-        child: Center(
-          child: Opacity(
-            opacity: opacity,
-            child: Text(
-              text,
-              key: const ValueKey('mobile_shield_heading'),
-              textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium.copyWith(
-                color: const Color(0xFFFFFFFF),
+    Widget title(String text, double opacity, {required bool result}) =>
+        Positioned(
+          key: ValueKey(result ? 'shielded_title' : 'transparent_title'),
+          left: 24,
+          right: 24,
+          top: layout.titleTop,
+          child: SizedBox(
+            height: layout.headingHeight,
+            child: Center(
+              child: Opacity(
+                opacity: opacity,
+                child: Text(
+                  text,
+                  key: const ValueKey('mobile_shield_heading'),
+                  textAlign: TextAlign.center,
+                  style: _statement.copyWith(color: _colors.text.accent),
+                ),
               ),
             ),
           ),
-        ),
-      ),
-    );
-    Widget balance(BalanceArt art, {required bool result}) {
+        );
+    Widget balance({required bool result}) {
+      final amount = result ? _result : widget.amount;
+      final art = _balance(amount, result);
       final textIn = result
           ? ShieldTimeline.textIn.eased(a!, VMotion.ease)
           : 1.0;
-      final paint = CustomPaint(
-        key: ValueKey(
-          result ? 'mobile_shield_result_amount' : 'mobile_shield_amount',
-        ),
-        size: art.size,
-        painter: _BalancePainter(art),
-      );
+      // The sign goes dark as it crumbles.
+      final lit = result || _review ? 1.0 : 1 - ShieldTimeline.dissolve(t);
       final dy = result || _review || _reduce
           ? 0.0
           : ShieldTimeline.fallDy(t) * layout.artScale;
-      return Positioned(
-        left: layout.centerX - art.size.width * layout.artScale / 2,
-        top: layout.amountTop + dy,
-        child: Semantics(
-          label: '${result ? _result : widget.amount} ZEC',
+      Widget sign(double light) {
+        final paint = CustomPaint(
+          key: ValueKey(
+            result ? 'mobile_shield_result_amount' : 'mobile_shield_amount',
+          ),
+          size: art.size,
+          painter: _BalancePainter(
+            light == 1 ? art : _balance(amount, result, light: light),
+          ),
+        );
+        return Semantics(
+          label: '$amount ZEC',
           child: ExcludeSemantics(
             child: Transform.scale(
               alignment: Alignment.topLeft,
@@ -905,7 +920,18 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
               ),
             ),
           ),
-        ),
+        );
+      }
+
+      return Positioned(
+        key: ValueKey(result ? 'shielded_amount' : 'transparent_amount'),
+        left: layout.centerX - art.size.width * layout.artScale / 2,
+        top: layout.amountTop + dy,
+        // The transparent balance switches on as Home's sign does; the
+        // shielded one resolves from particles that are already lit.
+        child: result
+            ? sign(1)
+            : NeonIgnition(builder: (_, light) => sign(light * lit)),
       );
     }
 
@@ -928,6 +954,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
                           (a == null
                               ? 0.0
                               : ShieldTimeline.glowTextOut.eased(a))),
+                  _colors.neon.glow,
                 ),
               ),
             ),
@@ -951,14 +978,22 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
               ),
             ),
           if (!auxiliary && (_review || t < ShieldTimeline.fall.end)) ...[
-            icon('overlay_transparent', header * 0.6),
-            title(_review ? widget.title : 'Transparent Balance', header),
-            balance(before, result: false),
+            icon(header * 0.6, result: false),
+            title(
+              _review ? widget.title : 'Transparent balance',
+              header,
+              result: false,
+            ),
+            balance(result: false),
           ],
           if (!auxiliary && a != null && a >= ShieldTimeline.textIn.start) ...[
-            icon('success_shield_fill', ShieldTimeline.iconIn.eased(a)),
-            title(widget.title, ShieldTimeline.successLabelIn.eased(a)),
-            if (widget.showResultAmount) balance(after, result: true),
+            icon(ShieldTimeline.iconIn.eased(a), result: true),
+            title(
+              widget.title,
+              ShieldTimeline.successLabelIn.eased(a),
+              result: true,
+            ),
+            if (widget.showResultAmount) balance(result: true),
           ],
         ],
       ),
@@ -1002,15 +1037,17 @@ class _BalancePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) => art.paint(canvas);
   @override
-  bool shouldRepaint(_BalancePainter old) => true;
+  bool shouldRepaint(_BalancePainter old) => !art.paintsLike(old.art);
 }
 
+/// The balance's blurred ghost behind the cloud, lit in the tube's colour.
 class _CloudGlow extends CustomPainter {
-  const _CloudGlow(this.art, this.center, this.scale, this.opacity);
+  const _CloudGlow(this.art, this.center, this.scale, this.opacity, this.glow);
   final ShieldParticleArt art;
   final Offset center;
   final double scale;
   final double opacity;
+  final Color glow;
   @override
   void paint(Canvas canvas, Size size) {
     final baked = art.glowText;
@@ -1025,7 +1062,11 @@ class _CloudGlow extends CustomPainter {
         baked.image.height.toDouble(),
       ),
       (origin + baked.rect.topLeft * scale) & (baked.rect.size * scale),
-      Paint()..color = Color.fromRGBO(255, 255, 255, opacity * 0.7),
+      Paint()
+        ..colorFilter = ColorFilter.mode(
+          glow.withValues(alpha: opacity * 0.5),
+          BlendMode.srcIn,
+        ),
     );
   }
 
@@ -1034,7 +1075,8 @@ class _CloudGlow extends CustomPainter {
       old.art != art ||
       old.center != center ||
       old.scale != scale ||
-      old.opacity != opacity;
+      old.opacity != opacity ||
+      old.glow != glow;
 }
 
 /// Fade particles out behind readable hardware content without carving a

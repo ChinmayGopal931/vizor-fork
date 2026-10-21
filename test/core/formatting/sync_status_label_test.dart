@@ -67,7 +67,7 @@ void main() {
       SyncState(percentage: 1.0, isSyncing: false),
     );
     expect(status.kind, SyncStatusKind.synced);
-    expect(status.label, 'Vizor is synced');
+    expect(status.label, 'Veylor is synced');
   });
 
   test('syncing state carries whole-percent progress capped below 100', () {
@@ -160,7 +160,7 @@ void main() {
       ),
     );
     expect(status.kind, SyncStatusKind.synced);
-    expect(status.label, 'Vizor is synced');
+    expect(status.label, 'Veylor is synced');
   });
 
   test('an enable that never reached the runtime is not a Tor failure', () {
@@ -187,7 +187,7 @@ void main() {
       ),
     );
     expect(status.kind, SyncStatusKind.synced);
-    expect(status.label, 'Vizor is synced');
+    expect(status.label, 'Veylor is synced');
   });
 
   test('a disable that failed to quiesce is not a Tor connection failure', () {

@@ -116,7 +116,7 @@ class _IronwoodMigrationPrepareScreenState
     if (inputs.hasSyncFailure) {
       _go(
         '/home',
-        toast: 'Sync could not finish. Try again once Vizor is synced.',
+        toast: 'Sync could not finish. Try again once Veylor is synced.',
       );
       return const _IronwoodMigrationLoadingShell(
         step: IronwoodMigrationFlowStep.prepare,

@@ -1,7 +1,9 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/layout/app_form_factor.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/mobile/veylor_wordmark.dart';
 
 class OnboardingWelcomeBackdrop extends StatelessWidget {
   const OnboardingWelcomeBackdrop({
@@ -44,6 +46,21 @@ class VizorWordmark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    // The neon redesign (mobile) has its own Veylor wordmark: lit, or plain
+    // lines in [color] where a caller sets one. Desktop keeps the artwork.
+    if (kAppFormFactor == AppFormFactor.mobile) {
+      return SizedBox(
+        width: width,
+        height: height,
+        child: CustomPaint(
+          painter: VeylorWordmarkPainter(
+            glow: color ?? colors.neon.glow,
+            core: colors.neon.core,
+            lit: color == null,
+          ),
+        ),
+      );
+    }
     return SizedBox(
       width: width,
       height: height,

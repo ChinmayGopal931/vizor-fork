@@ -66,6 +66,28 @@ Future<String> startTorUpdateRelay() =>
 Future<void> stopTorUpdateRelay() =>
     RustLib.instance.api.crateApiNetworkPrivacyStopTorUpdateRelay();
 
+/// Starts the loopback SOCKS5 bridge the Private USD Railgun page is proxied
+/// through, or returns the running bridge's port; a running offline bridge is
+/// stopped first. Fails closed while Tor is on but not usable, after waiting
+/// out a bootstrap.
+///
+/// On every route change, close the page, then [`stop_railgun_bridge`], then
+/// start a new bridge and load the page on its port.
+Future<int> startRailgunBridge() =>
+    RustLib.instance.api.crateApiNetworkPrivacyStartRailgunBridge();
+
+/// Starts a Railgun bridge that refuses every connection, for a page that must
+/// reach nothing (one loaded only to delete an account's Railgun wallet), or
+/// returns the running one's port; a running routed bridge is stopped first.
+/// It never waits for Tor.
+Future<int> startOfflineRailgunBridge() =>
+    RustLib.instance.api.crateApiNetworkPrivacyStartOfflineRailgunBridge();
+
+/// Stops the Railgun bridge, whichever kind runs, and closes the page's
+/// tunnels. Idempotent.
+Future<void> stopRailgunBridge() =>
+    RustLib.instance.api.crateApiNetworkPrivacyStopRailgunBridge();
+
 /// Makes a GET request on a fresh Tor circuit. Dart calls this only after its
 /// process-wide route check has selected Tor; direct requests stay in Dart so
 /// existing test injection and platform behaviour remain unchanged.

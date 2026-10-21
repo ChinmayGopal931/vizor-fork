@@ -4,16 +4,24 @@
   second device would carry that choice with it, so a transferred install picks
   fresh guards at the cost of one bootstrap.
 
+  The WebView's data directory holds the Railgun page's IndexedDB: the
+  encrypted Private USD wallet and its scan cache. It is useless without the
+  secure-storage key, which does not transfer, so the new device starts the
+  Railgun sync afresh instead.
+
   `allowBackup="false"` already covers cloud backup, but from target SDK 31
   device-to-device transfer is governed here instead and defaults to including
   app data. `domain="file"` is getFilesDir(), which is what
-  getApplicationSupportDirectory() resolves to on Android.
+  getApplicationSupportDirectory() resolves to on Android; `domain="root"` is
+  the app's data directory, where the WebView keeps `app_webview`.
 -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="tor" />
+        <exclude domain="root" path="app_webview" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="tor" />
+        <exclude domain="root" path="app_webview" />
     </device-transfer>
 </data-extraction-rules>

@@ -657,8 +657,8 @@ class MobileGiftCardEntryView extends StatelessWidget {
               children: [
                 Text(
                   addingAccount
-                      ? 'Create account by redeeming Vizor Gift Card'
-                      : 'Create wallet by redeeming Vizor Gift Card',
+                      ? 'Create account by redeeming Veylor Gift Card'
+                      : 'Create wallet by redeeming Veylor Gift Card',
                   key: const ValueKey('gift_walletless_entry_title'),
                   textAlign: TextAlign.center,
                   style: AppTypography.displayLarge.copyWith(
@@ -702,7 +702,7 @@ class MobileGiftCardEntryView extends StatelessWidget {
                   child: Text(
                     addingAccount
                         ? 'Create a new account to receive the card’s balance.'
-                        : 'Create a new Vizor wallet to receive the card’s balance.',
+                        : 'Create a new Veylor wallet to receive the card’s balance.',
                     key: const ValueKey('gift_walletless_entry_explanation'),
                     textAlign: TextAlign.center,
                     style: AppTypography.bodyMediumStrong.copyWith(

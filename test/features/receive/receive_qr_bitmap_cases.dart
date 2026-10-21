@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/layout/app_form_factor.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/receive_address_widgets.dart';
 
@@ -84,29 +85,33 @@ void registerReceiveQrBitmapTests() {
       expect(find.byType(RawImage), findsNothing);
     });
 
-    testWidgets('switching pools ignores the previous delayed badge', (
-      tester,
-    ) async {
-      final shield = badges.install(_shieldAsset);
-      final transparent = badges.install(_transparentAsset);
-      await tester.pumpWidget(_surface());
-      PaintingBinding.instance.imageCache
-        ..clear()
-        ..clearLiveImages();
-      // The transparent asset is reinstalled after clearing the cache.
-      badges.reinstall(_transparentAsset, transparent);
-      await tester.pumpWidget(_surface(type: ReceiveAddressType.transparent));
+    // Mobile badges both pools with the same helmet, so only desktop
+    // switches badges with the pool.
+    if (!_mobile) {
+      testWidgets('switching pools ignores the previous delayed badge', (
+        tester,
+      ) async {
+        final shield = badges.install(_shieldAsset);
+        final transparent = badges.install(_transparentAsset);
+        await tester.pumpWidget(_surface());
+        PaintingBinding.instance.imageCache
+          ..clear()
+          ..clearLiveImages();
+        // The transparent asset is reinstalled after clearing the cache.
+        badges.reinstall(_transparentAsset, transparent);
+        await tester.pumpWidget(_surface(type: ReceiveAddressType.transparent));
 
-      expect(shield.hasListeners, isFalse);
-      shield.emit(const Color(0xFFCC0000));
-      await tester.pump();
-      expect(find.byType(RawImage), findsNothing);
+        expect(shield.hasListeners, isFalse);
+        shield.emit(const Color(0xFFCC0000));
+        await tester.pump();
+        expect(find.byType(RawImage), findsNothing);
 
-      transparent.emit(const Color(0xFF000000));
-      await _finishBitmap(tester);
-      expect(find.byType(RawImage), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
+        transparent.emit(const Color(0xFF000000));
+        await _finishBitmap(tester);
+        expect(find.byType(RawImage), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
 
     testWidgets('a badge decode error reaches the QR error state', (
       tester,
@@ -168,8 +173,15 @@ void registerReceiveQrBitmapTests() {
   });
 }
 
-const _shieldAsset = 'assets/icons/receive_qr_shield_crimson.png';
-const _transparentAsset = 'assets/icons/receive_qr_transparent_dark.png';
+// The neon redesign (mobile) badges every code with Veylor's helmet.
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
+const _veylorAsset = 'assets/icons/receive_qr_veylor.webp';
+const _shieldAsset = _mobile
+    ? _veylorAsset
+    : 'assets/icons/receive_qr_shield_crimson.png';
+const _transparentAsset = _mobile
+    ? _veylorAsset
+    : 'assets/icons/receive_qr_transparent_dark.png';
 
 Widget _surface({ReceiveAddressType type = ReceiveAddressType.shielded}) =>
     Directionality(

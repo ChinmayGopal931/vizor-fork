@@ -31,6 +31,9 @@ import 'payment_link_mobile_use_cases.dart';
 import 'payment_link_amount_currency_use_cases.dart';
 import 'payment_link_claim_outcome_use_cases.dart';
 import 'payment_link_use_cases.dart';
+import 'private_usd_reverse_use_cases.dart';
+import 'private_usd_send_use_cases.dart';
+import 'private_usd_use_cases.dart';
 import 'receive_use_cases.dart';
 import 'received_receipt_use_cases.dart';
 import 'review_components_use_cases.dart';
@@ -548,6 +551,38 @@ class WidgetbookApp extends StatelessWidget {
                       builder: buildMobileHomeGiftCardsUseCase,
                     ),
                     WidgetbookUseCase(
+                      name: 'Portfolio chart',
+                      builder: buildMobileHomePortfolioChartUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Portfolio chart falling',
+                      builder: buildMobileHomePortfolioChartFallingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Portfolio chart all time',
+                      builder: buildMobileHomePortfolioChartAllUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Portfolio chart ZEC balance',
+                      builder: buildMobileHomePortfolioChartZecUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Portfolio chart prices unavailable',
+                      builder: buildMobileHomePortfolioChartUnavailableUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Portfolio chart loading',
+                      builder: buildMobileHomePortfolioChartLoadingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Portfolio chart not enough history',
+                      builder: buildMobileHomePortfolioChartEmptyUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Portfolio chart hidden balances',
+                      builder: buildMobileHomePortfolioChartPrivateUseCase,
+                    ),
+                    WidgetbookUseCase(
                       name: 'No activity',
                       builder: buildMobileHomeNoActivityUseCase,
                     ),
@@ -567,6 +602,38 @@ class WidgetbookApp extends StatelessWidget {
                       name: 'Accounts modal',
                       builder: buildMobileHomeAccountsModalUseCase,
                     ),
+                    WidgetbookUseCase(
+                      name: 'Private USD',
+                      builder: buildMobileHomePrivateUsdUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Private USD not used yet',
+                      builder: buildMobileHomePrivateUsdUnknownUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Private USD loading',
+                      builder: buildMobileHomePrivateUsdLoadingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Private USD arriving',
+                      builder: buildMobileHomePrivateUsdArrivingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Private USD screening refused',
+                      builder: buildMobileHomePrivateUsdBlockedUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Private USD hidden balances',
+                      builder: buildMobileHomePrivateUsdHiddenUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Private USD bridging',
+                      builder: buildMobileHomePrivateUsdConvertingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Private USD needs attention',
+                      builder: buildMobileHomePrivateUsdAttentionUseCase,
+                    ),
                   ],
                 ),
                 WidgetbookComponent(
@@ -575,6 +642,237 @@ class WidgetbookApp extends StatelessWidget {
                     WidgetbookUseCase(
                       name: 'Gift Cards',
                       builder: buildDesktopHomeGiftCardsUseCase,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            WidgetbookFolder(
+              name: 'Private USD',
+              children: [
+                WidgetbookComponent(
+                  name: 'Screen',
+                  useCases: [
+                    WidgetbookUseCase(
+                      name: 'Default',
+                      builder: buildMobilePrivateUsdDefaultUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Empty',
+                      builder: buildMobilePrivateUsdEmptyUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'First load',
+                      builder: buildMobilePrivateUsdFirstLoadUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Refresh failed',
+                      builder: buildMobilePrivateUsdRefreshFailedUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Screening refused',
+                      builder: buildMobilePrivateUsdBlockedUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Hidden balances',
+                      builder: buildMobilePrivateUsdHiddenUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Payment pending',
+                      builder: buildMobilePrivateUsdPaymentPendingUseCase,
+                    ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Receive',
+                  useCases: [
+                    WidgetbookUseCase(
+                      name: 'USDC',
+                      builder: buildMobilePrivateUsdReceiveUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: '0zkUSDC',
+                      builder: buildMobilePrivateUsdReceiveShieldedUseCase,
+                    ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Bridge',
+                  useCases: [
+                    WidgetbookUseCase(
+                      name: 'To 0zkUSDC',
+                      builder: buildMobilePrivateUsdConvertUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Getting a quote',
+                      builder: buildMobilePrivateUsdConvertQuotingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Not enough ZEC',
+                      builder: buildMobilePrivateUsdConvertInsufficientUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'While syncing',
+                      builder: buildMobilePrivateUsdConvertSyncingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'To ZEC',
+                      builder: buildMobilePrivateUsdConvertReverseUseCase,
+                    ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Bridge review',
+                  useCases: [
+                    WidgetbookUseCase(
+                      name: 'To 0zkUSDC',
+                      builder: buildMobilePrivateUsdReviewUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Quote expired',
+                      builder: buildMobilePrivateUsdReviewExpiredUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'To ZEC',
+                      builder: buildMobilePrivateUsdReviewReverseUseCase,
+                    ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Bridge progress to 0zkUSDC',
+                  useCases: [
+                    WidgetbookUseCase(
+                      name: 'Confirming',
+                      builder: buildMobilePrivateUsdProgressUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Opening slowly',
+                      builder: buildMobilePrivateUsdProgressOpeningSlowUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Problem',
+                      builder: buildMobilePrivateUsdProgressProblemUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Paid',
+                      builder: buildMobilePrivateUsdProgressPaidUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Bridged',
+                      builder: buildMobilePrivateUsdProgressBridgedUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Refunding',
+                      builder: buildMobilePrivateUsdProgressRefundingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Refunded',
+                      builder: buildMobilePrivateUsdProgressRefundedUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Nothing sent',
+                      builder: buildMobilePrivateUsdProgressNothingSentUseCase,
+                    ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Bridge progress to ZEC',
+                  useCases: [
+                    WidgetbookUseCase(
+                      name: 'Fees changed',
+                      builder: buildMobilePrivateUsdReverseFundingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Proving the payment',
+                      builder: buildMobilePrivateUsdReverseProvingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Authorize settlement',
+                      builder: buildMobilePrivateUsdReverseReadyUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Settling',
+                      builder: buildMobilePrivateUsdReverseSettlingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Receiving',
+                      builder: buildMobilePrivateUsdReverseReceivingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Complete',
+                      builder: buildMobilePrivateUsdReverseCompleteUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Refund wait',
+                      builder: buildMobilePrivateUsdReverseRefundWaitUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Refunded',
+                      builder: buildMobilePrivateUsdReverseRefundedUseCase,
+                    ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Refunds',
+                  useCases: [
+                    WidgetbookUseCase(
+                      name: 'Default',
+                      builder: buildMobilePrivateUsdRefundsUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Empty',
+                      builder: buildMobilePrivateUsdRefundsEmptyUseCase,
+                    ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Send',
+                  useCases: [
+                    WidgetbookUseCase(
+                      name: 'Send',
+                      builder: buildMobilePrivateUsdSendUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Send invalid 0zk',
+                      builder: buildMobilePrivateUsdSendInvalidUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Withdraw to the zero address',
+                      builder: buildMobilePrivateUsdWithdrawZeroUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Send leaves the network fee',
+                      builder: buildMobilePrivateUsdSendLeaveFeeUseCase,
+                    ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Send review',
+                  useCases: [
+                    WidgetbookUseCase(
+                      name: 'Send',
+                      builder: buildMobilePrivateUsdSendReviewUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Withdraw',
+                      builder: buildMobilePrivateUsdWithdrawReviewUseCase,
+                    ),
+                  ],
+                ),
+                WidgetbookComponent(
+                  name: 'Send status',
+                  useCases: [
+                    WidgetbookUseCase(
+                      name: 'Proving',
+                      builder: buildMobilePrivateUsdSendProvingUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Done',
+                      builder: buildMobilePrivateUsdSendDoneUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Unconfirmed',
+                      builder: buildMobilePrivateUsdSendUnconfirmedUseCase,
                     ),
                   ],
                 ),
@@ -921,6 +1219,18 @@ class WidgetbookApp extends StatelessWidget {
                     WidgetbookUseCase(
                       name: 'Mobile settings explorer row',
                       builder: buildMobileSettingsExplorerUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Mobile portfolio chart settings',
+                      builder: buildMobileSettingsPortfolioChartUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Mobile portfolio chart settings prices off',
+                      builder: buildMobileSettingsPortfolioChartLocalUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Mobile portfolio chart settings hidden',
+                      builder: buildMobileSettingsPortfolioChartHiddenUseCase,
                     ),
                     WidgetbookUseCase(
                       name: 'Secret passphrase gate',

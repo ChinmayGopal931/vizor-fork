@@ -18,6 +18,7 @@ import '../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/mobile/neon_horizon.dart';
 import '../models/vizor_payment_link.dart';
 import '../services/payment_link_service.dart';
 import '../widgets/mobile/payment_link_mobile_views.dart';
@@ -237,11 +238,7 @@ class PaymentLinksMobileBody extends StatelessWidget {
       return _buildCardsList(context);
     }
     return PaymentLinksHomeMobileView(
-      illustration: Image.asset(
-        'assets/illustrations/payment_links/payment_link_empty_card.webp',
-        fit: BoxFit.contain,
-        semanticLabel: 'Gift box',
-      ),
+      illustration: const Center(child: NeonHorizon()),
       onBack: () => _leavePaymentLinks(context),
       onShowHelp: () => _showHelpSheet(context),
       onCreate: onStartCreate,

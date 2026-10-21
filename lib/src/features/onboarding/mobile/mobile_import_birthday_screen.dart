@@ -571,7 +571,6 @@ class _MobileImportBirthdayScreenState
                     _statusMessage!,
                     textAlign: TextAlign.center,
                     style: AppTypography.labelLarge.copyWith(
-                      fontWeight: FontWeight.w600,
                       color: colors.text.accent,
                     ),
                   ),

@@ -1,0 +1,166 @@
+{
+  "source": "Plan §3.3 and reference §5.4-§5.5 (zecSwap d69e3fb `cargo run -p zecswap-client --example vectors`, run 2026-10-13); engine addresses from zecswap-railgun tests/engine-vectors.json (engine 9.8.0). Pinned, never regenerated.",
+  "bip85": {
+    "xprv": "xprv9s21ZrQH143K2LBWUUQRFXhucrQqBpKdRRxNVq2zBqsx8HVqFk2uYo8kmbaLLHRdqtQpUm98uKfu3vca1LqdGhUtyoFnCNkfmXRyPXLjbKb",
+    "index": 0,
+    "entropy": "ae131e2312cdc61331542efe0d1077bac5ea803adf24b313a4f0e48e9c51f37f",
+    "mnemonic": "puppy ocean match cereal symbol another shed magic wrap hammer bulb intact gadget divorce twin tonight reason outdoor destroy simple truth cigar social volcano"
+  },
+  "railgun": [
+    {
+      "name": "zapp: abandon x23 + art, no passphrase, ZIP-32 index 0",
+      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
+      "passphrase": "",
+      "zip32Index": 0,
+      "entropy": "f7c5bc4d749b67810f8866b13c5d4fa8e48ee80e58bc58a80f9df11843646ce4",
+      "railgunMnemonic": "water combine battle truck reopen scene dilemma art raise title fault fade employ inject defense bleak flavor document trash timber loud rate receive math",
+      "railgunSeed": "a06f3b95b9ae6a46eded63da4807a1dbb4450d547f72ce309ae49f95fe0a07f9ad445c52a12d9057b66e86035ce002b2b8ff2deedefbd555f07e9ce94c76d952",
+      "address": "0zk1qy4jkxxr9zsw46luz7hvp2j6rtqmjws6ttnrrr6uf485mg9xwpwu0rv7j6fe3z53llrc73lffkv84nudklsglyryy0703mu97e8sgn6sk8anxxypf8jjz382jz9"
+    },
+    {
+      "name": "vizor (D7, D8): abandon x23 + art, passphrase \"vizor\", ZIP-32 index 1",
+      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
+      "passphrase": "vizor",
+      "zip32Index": 1,
+      "entropy": "723d0672c95ccdd3d85c10388379d7e46ff863d2be0143db88e52c4db9ffcf0e",
+      "railgunMnemonic": "impulse trial original naive smoke try gesture link decade bridge invest silver zebra cradle enough scan duck sword deer flat swear zoo destroy space",
+      "railgunSeed": "7d401812003ef389f2fa19ce6c6cae5371b46ec3b9200e3785b9d0a1aafcc046dc39f4a5c312681660a5041f815da650315be3e9374548fc33b8de89e7133f31",
+      "address": "0zk1qy9fp87z33daqyvxaqveyjgrpx243jupm2sprzzply0qtp948rafnrv7j6fe3z53la94m9hv6a8k9t6g6lslxsmyua7rcaclem6j2ekcjxpvg5w0v68dzd7477k"
+    }
+  ],
+  "engine": [
+    {
+      "seed": "0x5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+      "index": 0,
+      "address": "0zk1qy4v02p5zkq0zfpaxhz79j5tslrv8c44d80d8jr2fuecrtxlp8lemrv7j6fe3z53ll0jm7u592n0hr8elesd0xzv6y9jpdvsyln80m95jcxhvnmagfqg5p6e9mp"
+    },
+    {
+      "seed": "0x5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+      "index": 1,
+      "address": "0zk1qyshnlgrjhycpzkj7zum9tdx6xump9p40y6ky2gq4qwsuflj7c5j4rv7j6fe3z53lu4vzeqppnnkaqfsv0w4rjlpgmvcc8zyjgmwx6gnamztknd94ah52jp72g9"
+    },
+    {
+      "seed": "0x243c1266228fc9ff370d567ba4f805dfacc516375aecf4657cf870a4b551020d92d9b45a8181154f531c1358f742f42078a1620fca6251b1c4ec5fa6e1cf5c3a",
+      "index": 0,
+      "address": "0zk1qyz7z2y3ur9zjg5cp4zkpfr336cxrz6jk6x390uqvf08u2k7a9kperv7j6fe3z53luclgyrqf6neekjc8gxg9qpwu23cdujgkcp9t70vvvlhnndpk4zs6qmc3mx"
+    },
+    {
+      "seed": "0x243c1266228fc9ff370d567ba4f805dfacc516375aecf4657cf870a4b551020d92d9b45a8181154f531c1358f742f42078a1620fca6251b1c4ec5fa6e1cf5c3a",
+      "index": 1,
+      "address": "0zk1qyyk2cg7fgc97laxkksllcjzl8xqvs7hgmeycw2e0qpwgqxs7nf04rv7j6fe3z53l7m7nc2kuahcltavtpnzukpxmpa08a323qz49dslgpxmk5ewn20xysjtwkh"
+    }
+  ],
+  "swap": {
+    "inputs": {
+      "seed": "64 bytes of 0x07, NetworkType::Test, account 0, index 0",
+      "makerRoot": "32 bytes of 0x09, nonce 0",
+      "maker": "0x09eD1F966745Be18C711C346242c0974DAd7c3e5",
+      "chainId": 11155111,
+      "contract": "0x1111111111111111111111111111111111111111",
+      "relayer": "0x2222222222222222222222222222222222222222",
+      "token": "0x3333333333333333333333333333333333333333",
+      "payee": "0x4444444444444444444444444444444444444444",
+      "deadline": 1790000000,
+      "fee": 20000
+    },
+    "userShare": "0x0b42629d5b3f787aba7ccde87574c13f6db6b8fccb7c5cfeb3f4e4081c756461311662156525fcaa692aeef5d2362c2a9ab2083cd6d968c618aec72617aa925a",
+    "userSecret": "0x01bfb1d4b12d5365d9bc7aa9e7e7f641bdb7cce5c647b29c7077f344111ba6ac",
+    "viewingKeys": "0x97afa7272114ce3634144ee0883379f1a01695bbb56f64f99181ddf44369d125c3e134a0b68e43ce055281af3bf7e30850857d77995986765a72dde442b8802f",
+    "authAddress": "0x757de38c2d9880e44ab59827d1622403fbf88ff5",
+    "swapId": "0x297f1ca9d44ff7136dbddb0720ecadc040229e22c03ad0f9e4c648212bfc7b66",
+    "makerShare": "0x187d300ebb59a5c9e7c9e61debd0b535a8a5cbbad4a5c46ac2a0597a06c13ee4329a369cf900745cdca87863f3f00de64d16e088bb1f5da341a2977547f9080a",
+    "jointUaTest": "utest1exuj2qh9gcll0zjygvk7c48e5ra40wwtvdgd2u0ygwn2g3kanp47utpgh25m4pqwcjqsqy55zyr7qncw0ct0gpeccytje6tgeyaheah7",
+    "jointUfvkTest": "uviewtest130mkztp6gdvnvn0k3y3h820wjn9unqj2lzkt400lgw4velrg6dsy8m4lp3jn22hyupdk4e5z4dch99rrxcme7s2cm8r7805t64r7d7tma2xg0pn93vpu4luedpcrrj4k9jz6kx374g0738x70vu8l0ueh6nzu33aned77x7rwqyd3cxqndnpvyg4ffr8c",
+    "jointUaMain": "u1fqg38q80j2cmvmxlgy49v6fygqdnj88tsmgrxzga6lawz0yz8rsew26sc5er5lf3d0sn79gyyan0kleskq5qkw8ufpk3j2sc3geywz6m",
+    "notes": [
+      {
+        "railgunSeed": "64 bytes of 0x07",
+        "byte": 7,
+        "address": "0zk1qyt5x0c632363rrmd8psxws6n9tscm8gps277gzc0w3s5cg4mdpe9rv7j6fe3z53luahk4ksjwagt68fl2vguye054rxjyqzvhs9usq4rwrk09al6n0677pdrgn",
+        "npk": "0x11eb0b931cc092fe6876f395a4f8d29cf5c97c43903605253386e008ab4881e3",
+        "bundle": [
+          "0xe9f4508256863b2559259a39333a65685dfd7a7c86fa101e959517e06aa798c6",
+          "0x63835c785858b4cf0519698cc24ee8d84fb3f943d073895b3e2521517419ee97",
+          "0x82981c9149e1977d0ca708cd313450306e87b35a41dc832ec419686055b02e9a"
+        ],
+        "shieldKey": "0x02356776cb176876b31960b8ccbf0c0850a76e9a2ef49caa6631bca732d064b2",
+        "payoutNote": "0x14d061e0bf2b24d75b75adb91c04cc6b82be6b407b5901dbdb86bbbabe7a9acd"
+      },
+      {
+        "railgunSeed": "64 bytes of 0x08",
+        "byte": 8,
+        "address": "0zk1qyrs4qyrd08p6uep0fc2y8njktgcpezts3rpaq6q0ln948ecjkw8prv7j6fe3z53llz8ursderja0juwv5pgnv8x5klmmwkv8q38h9n704h4d4qjyw7n5qk68nx",
+        "npk": "0x1f80223263733ae7cb3047ae61b64ee8179674dbbd708cac8a7a8b15a222ba35",
+        "bundle": [
+          "0xe9f4508256863b2559259a39333a65684a26d33e9ac0081841cc96ed3d26c2b2",
+          "0xc47d927ba9163144d7c83e28031820134fb3f943d073895b3e2521517419ee97",
+          "0x7d9d444c12bec55e6b3892ca92fd50c9ba2d7d0783f95545a2f15923f8474c0f"
+        ],
+        "shieldKey": "0x02356776cb176876b31960b8ccbf0c0850a76e9a2ef49caa6631bca732d064b2",
+        "payoutNote": "0x5af6901ba7cb01f49785a29c4a2e57e31af3e53382ce3dd2e35678897515ffc1"
+      }
+    ],
+    "lockClaimDigest": "0xa24b846b1046f910dfb19e121beece3b85f942a20729f60f3b46847d4e2c0b93",
+    "lockClaimSignature": "0xc2a0a598fc3027f949c2a3f3fadb3e988a74effa69e09efc86d3db0e89904dfc69a81a0cc62da15628ed8084bb31d05723dfc2da4308dfbeb0ef4e134b7497551b",
+    "payoutDigest": "0xd824c10786687b122733cee8301283897ef90ad1fd4024e99a6d641ed0fe53c1",
+    "payoutSignature": "0x883118048774977816784fb0f34f256a8344caaf134201e0acd9f0b5c1f8e6a3685df4aa58f4d1725f49fbaa106cc594ef0ffe4b8569550860a00ce5291bae5b1c",
+    "reverseSwapId": "0x0a5ff70eda9eff985515f84e23bcff13da416fa9ed0500e251e248c8f5ff5436",
+    "reverseOpen": {
+      "amount": 50000000,
+      "t0": 1790003600,
+      "t1": 1790007200
+    },
+    "openReverseSignature": "0x10a82e61f8b598a82b826c7135c139df3dd9967323eb9d932a39bdbc79161fbf4cf02891f0cf6490c2b28ece250698c272688873eabef70caa633ae3307f144a1c",
+    "readySignature": "0xaa8ef1a956aaba632406f534bd2d746f4146d6be7bb38c6734afb37e223003b35928dc3f2bc76b884fb7d29eff5a95934a5c920ddd077198f6ba32bd2d70821f1c",
+    "lockRefundSignature": "0xd4dedeb359b5db83dee3ed53375a43e5debb2972e4ed38e25db90c2e7953b1a63f442f88f83424a5834b953c503ddcbcd305deb7dd7bd9614c0558e4e23bfa081c",
+    "refundPayoutSignature": "0xc3f9c0eeddff6919aa2f5a3d39ddc388d49e110eccf8b83ba3a75249f4358a4b259ff1882196c7cd5166c5ece50166a0af668a0cb2538a8445ef0983629a92241c",
+    "openReverseToRailgunSeedSignature": "0x546a50d199fc62080dd679e061f87b0eca23231ab5efeefce3f83a2e6479726f4434cc9c3dbf3cc286cc63dcb0062444b1f8f2f0d937ad1b5d11b4d0fd39d3041c",
+    "rescueSignature": "0x78eec500e909c43573c99fe613e6eb6910df95497ce24614e1203694d222c7595bbb8ef704271ca6fd8f037a03deefc9aa8e4a1a6a779de03b52e93fcff7c35a1b",
+    "termsHashes": {
+      "amount": 150000000,
+      "t0": 1790003600,
+      "t1": 1790007200,
+      "paysAccount": "0x909f60119225ae64356011c63945694ed0dc6aaaa8cd6002a897df9ab76efc66",
+      "paysRailgun": "0xb7ca9333e9e443218d19c3b8aa345fa67a671ac24060877de1498efb01c99a29",
+      "reverse": "0xa295e46f6db15997af4a950b5e6deed6ae5d3161b6571b2f445a34bc6570cead"
+    }
+  },
+  "selectors": {
+    "getSwap(bytes32)": "0x3da0e66e",
+    "LOCK_DURATION()": "0x485d3834",
+    "makerKeyUsed(bytes32)": "0xdc1c5a08",
+    "reverseFunding(bytes32)": "0x4aee90e2",
+    "vaultOf(bytes32)": "0x0177928f",
+    "rescueNonces(bytes32)": "0xeb106361",
+    "tokenBlocklist(address)": "0x815b534f",
+    "balanceOf(address)": "0x70a08231",
+    "hashTerms((address,address,uint128,uint256[2],uint256[2],address,uint64,uint64,bytes32))": "0x2f25f5c9",
+    "PaidOut(bytes32,address,uint256)": "0xf4292e0ae547c949263a88899ebcdac1a5493bef4f206b7592b5a7de68f4c0de",
+    "openReverse((address,address,address,uint128,uint256[2],uint256[2],uint64,uint64,bytes32,uint64),bytes)": "0x4c72b9a0",
+    "approve(address,uint256)": "0x095ea7b3",
+    "transfer(address,uint256)": "0xa9059cbb",
+    "nullifiers(uint256,bytes32)": "0xf19ea903"
+  },
+  "reverseFunding": {
+    "source": "zecSwap d69e3fb crates/zecswap-chain/src/evm/funding/sdk-vector.json, encoded by ethers v6 with the ZecSwap ABI (crates/zecswap-railgun/engine/funding-vector.cjs): the three calls of one reverse funding, cut from its Relay Adapt calldata. The shares are SpendAuthG multiples 1 and 2 (contracts/test/vectors/spend_auth_g.json); the signature is the key 0x07..07's OpenReverse. Pinned, never regenerated.",
+    "chainId": 11155111,
+    "contract": "0x1111111111111111111111111111111111111111",
+    "relayer": "0x2222222222222222222222222222222222222222",
+    "token": "0x3333333333333333333333333333333333333333",
+    "maker": "0x4444444444444444444444444444444444444444",
+    "user": "0x4a62316623ad457f02cdc5d997ded67a383ec569",
+    "amount": 1000000,
+    "makerShare": "0x375523b328f1d6063b8d187c3e5f445f0c7f0ce37b70a10c8d1a7284b875c9631ad0357fdf1a66db7b10bcfcfed624fbdfc914fec005bdd84ce33e817b0c3bc9",
+    "userShare": "0x08ea0058bac9576a7ff747ca15c86a57419c3bd75edd966d7d61b57fe449ab05287d6ab142b8db91f47ee858fcd30f9013cf25beca0d881f960556f3efbc9e99",
+    "t0": 2000003600,
+    "t1": 2000007200,
+    "refundNote": "0x6666666666666666666666666666666666666666666666666666666666666666",
+    "deadline": 2000000000,
+    "fee": 250000,
+    "signature": "0xf8aeea503379e144b76325a4b793fc530e47e51de81c9fe396f71b10b5bf88ea1c4939c5ac4634fdeff097b60f9bf811df3481f2db50eeef69a2974753ad50731c",
+    "swapId": "0x6a7644a884469d30e615d4034412eade61c2df1a248d3f45d127ba2a20a3a0c6",
+    "approve": "0x095ea7b3000000000000000000000000111111111111111111111111111111111111111100000000000000000000000000000000000000000000000000000000000f4240",
+    "openReverse": "0x4c72b9a000000000000000000000000044444444444444444444444444444444444444440000000000000000000000004a62316623ad457f02cdc5d997ded67a383ec569000000000000000000000000333333333333333333333333333333333333333300000000000000000000000000000000000000000000000000000000000f4240375523b328f1d6063b8d187c3e5f445f0c7f0ce37b70a10c8d1a7284b875c9631ad0357fdf1a66db7b10bcfcfed624fbdfc914fec005bdd84ce33e817b0c3bc908ea0058bac9576a7ff747ca15c86a57419c3bd75edd966d7d61b57fe449ab05287d6ab142b8db91f47ee858fcd30f9013cf25beca0d881f960556f3efbc9e99000000000000000000000000000000000000000000000000000000007735a210000000000000000000000000000000000000000000000000000000007735b0206666666666666666666666666666666666666666666666666666666666666666000000000000000000000000000000000000000000000000000000007735940000000000000000000000000000000000000000000000000000000000000001a00000000000000000000000000000000000000000000000000000000000000041f8aeea503379e144b76325a4b793fc530e47e51de81c9fe396f71b10b5bf88ea1c4939c5ac4634fdeff097b60f9bf811df3481f2db50eeef69a2974753ad50731c00000000000000000000000000000000000000000000000000000000000000",
+    "transfer": "0xa9059cbb0000000000000000000000002222222222222222222222222222222222222222000000000000000000000000000000000000000000000000000000000003d090"
+  }
+}

@@ -168,7 +168,6 @@ class _MobileVotingMemoPagerState extends State<_MobileVotingMemoPager> {
                       'Bundle ${memo.bundleIndex + 1} of ${memo.bundleCount}',
                       style: AppTypography.bodySmall.copyWith(
                         color: colors.text.secondary,
-                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 2),

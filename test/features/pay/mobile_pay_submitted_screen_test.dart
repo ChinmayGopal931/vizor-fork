@@ -168,16 +168,7 @@ void main() {
     expect(find.byKey(const ValueKey('pay_submitted_status')), findsOneWidget);
     expect(find.text('Done'), findsOneWidget);
     expect(find.text('Go to activity'), findsOneWidget);
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Image &&
-            widget.image is AssetImage &&
-            (widget.image as AssetImage).assetName ==
-                'assets/illustrations/mobile_send_status_background.webp',
-      ),
-      findsOneWidget,
-    );
+    expect(find.byType(MobileTransactionProgressScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

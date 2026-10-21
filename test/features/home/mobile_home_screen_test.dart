@@ -26,6 +26,9 @@ import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/config/swap_feature_config.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
+import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/neon_horizon.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/neon_scramble_text.dart';
 import 'package:zcash_wallet/src/features/home/screens/mobile/mobile_home_screen.dart';
 import 'package:zcash_wallet/src/features/activity/gift_card_activity_index.dart';
 import 'package:zcash_wallet/src/features/activity/widgets/activity_feed.dart';
@@ -666,6 +669,23 @@ SwapIntentRecord _externalToZecActivityRecord({
   );
 }
 
+/// The neon horizon painted on Home's empty-activity (rest) canvas.
+Finder _restHorizon() => find.descendant(
+  of: find.byKey(const ValueKey('mobile_home_rest_canvas')),
+  matching: find.byWidgetPredicate(
+    (widget) => widget is CustomPaint && widget.painter is NeonHorizonPainter,
+  ),
+);
+
+/// The balance sign's amount: a scramble text holding the number, with the
+/// ticker trailing it.
+String _shieldedBalanceText(WidgetTester tester) {
+  final amount = tester.widget<NeonScrambleText>(
+    find.byKey(const ValueKey('mobile_home_shielded_balance')),
+  );
+  return '${amount.text}${amount.trailing?.toPlainText() ?? ''}';
+}
+
 class _DeferredVotingStore implements VotingHomeCacheStore {
   final readGate = Completer<String?>();
   int reads = 0;
@@ -1211,23 +1231,25 @@ void main() {
     expect(find.textContaining("importing"), findsOneWidget);
     expect(find.text('Send'), findsNothing);
 
-    final background = tester.widget<Image>(
+    // The illustrated importing background is gone: the neon backdrop's two
+    // layers sit behind and over the content instead.
+    expect(
       find.byKey(const ValueKey('mobile_home_importing_background')),
+      findsNothing,
     );
-    expect(background.width, isNull);
-    expect(background.height, isNull);
-    expect(background.fit, BoxFit.cover);
-    expect(background.alignment, Alignment.topCenter);
+    expect(
+      tester
+          .widgetList<NeonSyncBackdrop>(find.byType(NeonSyncBackdrop))
+          .map((backdrop) => backdrop.layer),
+      [NeonSyncLayer.back, NeonSyncLayer.front],
+    );
 
     final canvasRect = tester.getRect(
       find.byKey(const ValueKey('mobile_home_rest_canvas')),
     );
-    final imageRect = tester.getRect(
-      find.byKey(const ValueKey('mobile_home_rest_image')),
-    );
 
-    expect(canvasRect.size, const Size(340, 220));
-    expect(imageRect.size, const Size(246, 192));
+    expect(canvasRect.size, const Size(340, 150));
+    expect(tester.getRect(_restHorizon()), canvasRect);
     expect(canvasRect.bottom, moreOrLessEquals(744));
 
     for (final size in const [
@@ -1239,15 +1261,18 @@ void main() {
     ]) {
       await tester.binding.setSurfaceSize(size);
       await tester.pump();
-      expect(
-        tester.getSize(
-          find.byKey(const ValueKey('mobile_home_importing_background')),
-        ),
-        size,
-      );
-      for (final key in ['mobile_home_rest_canvas', 'mobile_home_rest_image']) {
+      for (final layer in [
+        find.byType(NeonSyncBackdrop).first,
+        find.byType(NeonSyncBackdrop).last,
+      ]) {
+        expect(tester.getSize(layer), size);
+      }
+      for (final art in [
+        find.byKey(const ValueKey('mobile_home_rest_canvas')),
+        _restHorizon(),
+      ]) {
         expect(
-          tester.getCenter(find.byKey(ValueKey(key))).dx,
+          tester.getCenter(art).dx,
           moreOrLessEquals(size.width / 2, epsilon: 0.1),
         );
       }
@@ -1339,7 +1364,7 @@ void main() {
             find.text('No activity, yet...'),
             find.text('How about running your\nfirst ZEC tx?'),
             find.byKey(const ValueKey('mobile_home_rest_canvas')),
-            find.byKey(const ValueKey('mobile_home_rest_image')),
+            _restHorizon(),
           ]) {
             expect(
               tester.getCenter(finder).dx,
@@ -1364,12 +1389,13 @@ void main() {
     final canvasRect = tester.getRect(
       find.byKey(const ValueKey('mobile_home_rest_canvas')),
     );
-    final imageRect = tester.getRect(
-      find.byKey(const ValueKey('mobile_home_rest_image')),
-    );
+    final horizonRect = tester.getRect(_restHorizon());
 
-    expect(imageRect.left, greaterThanOrEqualTo(canvasRect.left));
-    expect(imageRect.right, lessThanOrEqualTo(canvasRect.right));
+    // The horizon narrows with the canvas and stays on screen.
+    expect(horizonRect.left, greaterThanOrEqualTo(canvasRect.left));
+    expect(horizonRect.right, lessThanOrEqualTo(canvasRect.right));
+    expect(canvasRect.left, greaterThanOrEqualTo(0));
+    expect(canvasRect.right, lessThanOrEqualTo(320));
   });
 
   testWidgets('includes Ironwood funds in the mobile shielded balance', (
@@ -1423,11 +1449,18 @@ void main() {
       40,
     );
     expect(find.text(r'$1,200.12'), findsOneWidget);
+    // The neon look drops the banner's faded tree art and its mask.
     expect(
       find.byKey(
         const ValueKey('mobile_home_ironwood_migration_banner_background'),
       ),
-      findsOneWidget,
+      findsNothing,
+    );
+    expect(
+      find.byKey(
+        const ValueKey('mobile_home_ironwood_migration_banner_image_mask'),
+      ),
+      findsNothing,
     );
     final migrationPill = find.byKey(
       const ValueKey('mobile_home_ironwood_migration_required_pill'),
@@ -1445,28 +1478,6 @@ void main() {
           tester.getTopRight(migrationPillIcon).dx,
       8,
     );
-    expect(
-      tester
-          .widget<Image>(
-            find.byKey(
-              const ValueKey(
-                'mobile_home_ironwood_migration_banner_background',
-              ),
-            ),
-          )
-          .fit,
-      BoxFit.fill,
-    );
-    final imageMask = tester.widget<ShaderMask>(
-      find.byKey(
-        const ValueKey('mobile_home_ironwood_migration_banner_image_mask'),
-      ),
-    );
-    expect(imageMask.blendMode, BlendMode.dstIn);
-    final maskShader = imageMask.shaderCallback(
-      const Rect.fromLTWH(0, 0, 361, 52),
-    );
-    expect(maskShader, isA<Shader>());
     final blinkRipple = find.byKey(
       const ValueKey('mobile_home_ironwood_migration_blink_ripple'),
     );
@@ -1642,7 +1653,7 @@ void main() {
           .onPressed,
       isNotNull,
     );
-    expect(find.byKey(const ValueKey('mobile_home_pay')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mobile_home_swap')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('mobile_home_send')));
     await tester.pumpAndSettle();
@@ -1712,15 +1723,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(
-      tester
-          .widget<Text>(
-            find.byKey(const ValueKey('mobile_home_shielded_balance')),
-          )
-          .textSpan
-          ?.toPlainText(),
-      '4 ZEC',
-    );
+    expect(_shieldedBalanceText(tester), '4 ZEC');
     expect(find.text('2 ZEC still migrating'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('mobile_home_ironwood_migration_loader')),
@@ -1732,7 +1735,7 @@ void main() {
           .onPressed,
       isNotNull,
     );
-    expect(find.byKey(const ValueKey('mobile_home_pay')), findsOneWidget);
+    expect(find.byKey(const ValueKey('mobile_home_swap')), findsOneWidget);
   });
 
   testWidgets('includes locked Orchard holdings in the migrating amount', (
@@ -1834,15 +1837,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(
-        tester
-            .widget<Text>(
-              find.byKey(const ValueKey('mobile_home_shielded_balance')),
-            )
-            .textSpan
-            ?.toPlainText(),
-        '7 ZEC',
-      );
+      expect(_shieldedBalanceText(tester), '7 ZEC');
       expect(find.text('Receive your first ZEC'), findsNothing);
       expect(find.text('Preparing migration'), findsOneWidget);
       expect(find.text('2 ZEC still migrating'), findsNothing);
@@ -1852,7 +1847,6 @@ void main() {
             .onPressed,
         isNull,
       );
-      expect(find.byKey(const ValueKey('mobile_home_pay')), findsNothing);
     },
   );
 
@@ -2569,15 +2563,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(
-      tester
-          .widget<Text>(
-            find.byKey(const ValueKey('mobile_home_shielded_balance')),
-          )
-          .textSpan
-          ?.toPlainText(),
-      '0.44291 ZEC',
-    );
+    expect(_shieldedBalanceText(tester), '0.44291 ZEC');
     expect(find.textContaining('0.44291641', findRichText: true), findsNothing);
     expect(find.text('Transparent: 0.12345 ZEC'), findsOneWidget);
   });
@@ -2718,17 +2704,15 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(
-      find.text('29.04 ZEC', findRichText: true, skipOffstage: false),
-      findsOneWidget,
-    );
+    expect(_shieldedBalanceText(tester), '29.04 ZEC');
     await tester.pumpAndSettle();
+    expect(find.text('29.04 ZEC', findRichText: true), findsOneWidget);
 
     syncNotifier.setSyncState(
       _syncedState(orchardBalance: BigInt.from(3004000000)),
     );
     await tester.pump();
-    expect(find.text('30.04 ZEC', findRichText: true), findsOneWidget);
+    expect(_shieldedBalanceText(tester), '30.04 ZEC');
   });
 
   testWidgets('animates transparent balance tray away before removal', (
@@ -2767,7 +2751,7 @@ void main() {
     expect(stripFinder, findsNothing);
   });
 
-  testWidgets('matches the Figma balance card controls and action labels', (
+  testWidgets('lays out the neon balance sign, its controls and actions', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -2791,38 +2775,30 @@ void main() {
     final receiveRect = tester.getRect(
       find.byKey(const ValueKey('mobile_home_receive')),
     );
-    final payRect = tester.getRect(
-      find.byKey(const ValueKey('mobile_home_pay')),
-    );
-    final payIcon = tester.widget<AppIcon>(
-      find.descendant(
-        of: find.byKey(const ValueKey('mobile_home_pay')),
-        matching: find.byType(AppIcon),
-      ),
+    final swapRect = tester.getRect(
+      find.byKey(const ValueKey('mobile_home_swap')),
     );
     final sendLabelStyle = _effectiveTextStyle(tester, find.text('Send'));
     final receiveLabelStyle = _effectiveTextStyle(tester, find.text('Receive'));
-    final shieldedLabel = tester.widget<Text>(find.text('Shielded balance'));
-    final fiatLabel = tester.widget<Text>(
+    final fiatRect = tester.getRect(
       find.byKey(const ValueKey('mobile_home_balance_fiat_text')),
     );
-    final balanceText = tester.widget<Text>(
-      find.byKey(const ValueKey('mobile_home_shielded_balance')),
+    final amountFinder = find.byKey(
+      const ValueKey('mobile_home_shielded_balance'),
     );
-    final balanceSpan = balanceText.textSpan! as TextSpan;
-    final amountSpan = balanceSpan.children![0] as TextSpan;
-    final tickerSpan = balanceSpan.children![1] as TextSpan;
+    final amountRect = tester.getRect(amountFinder);
+    final amount = tester.widget<NeonScrambleText>(amountFinder);
+    final ticker = amount.trailing! as TextSpan;
+    final neon = AppThemeData.dark.colors.neon;
 
     expect(privacyButtonRect.size, const Size(32, 32));
     expect(privacyIcon.size, 16);
-    expect(payIcon.name, AppIcons.paid);
-    expect(payIcon.size, 20);
-    expect(find.bySemanticsLabel('Pay'), findsOneWidget);
-    expect(payRect.top, moreOrLessEquals(sendRect.top, epsilon: 0.1));
-    expect(payRect.bottom, moreOrLessEquals(sendRect.bottom, epsilon: 0.1));
-    expect(payRect.size, const Size(50, 50));
     expect(receiveRect.left, greaterThan(sendRect.right));
-    expect(payRect.left, greaterThan(receiveRect.right));
+    expect(receiveRect.width, moreOrLessEquals(sendRect.width, epsilon: 0.1));
+    expect(swapRect.top, greaterThan(sendRect.bottom));
+    expect(swapRect.left, moreOrLessEquals(sendRect.left, epsilon: 0.1));
+    expect(swapRect.right, moreOrLessEquals(receiveRect.right, epsilon: 0.1));
+    expect(swapRect.height, sendRect.height);
     expect(find.text('NEW'), findsNothing);
     expect(find.bySemanticsLabel('New: Pay in USDC'), findsNothing);
     expect(sendRect.height, AppButtonSizing.largeHeight);
@@ -2840,13 +2816,19 @@ void main() {
       receiveLabelStyle.letterSpacing,
       AppTypography.labelLarge.letterSpacing,
     );
-    expect(shieldedLabel.style?.fontSize, 14);
-    expect(shieldedLabel.style?.height, 16 / 14);
-    expect(fiatLabel.style?.fontSize, 14);
-    expect(amountSpan.style?.fontSize, 45);
-    expect(amountSpan.style?.height, 48 / 45);
-    expect(tickerSpan.style?.fontSize, 32);
-    expect(tickerSpan.style?.height, 33 / 32);
+    // A frameless sign: no "Shielded balance" header, the fiat line above
+    // the digits, and the privacy eye to their right.
+    expect(find.text('Shielded balance'), findsNothing);
+    expect(fiatRect.bottom, lessThanOrEqualTo(amountRect.top));
+    expect(privacyButtonRect.left, greaterThanOrEqualTo(amountRect.right));
+    // Thin lit digits, with the ticker trailing them in the sign's glow.
+    expect(amount.text, '143.12');
+    expect(amount.style.fontWeight, AppTypography.displayLarge.fontWeight);
+    expect(amount.style.color, neon.signCore);
+    expect(amount.style.shadows, isNotEmpty);
+    expect(ticker.text, ' ZEC');
+    expect(ticker.style?.color, neon.signGlow);
+    expect(ticker.style!.fontSize, lessThan(amount.style.fontSize!));
   });
 
   testWidgets('zero balance offers the first-receive action', (tester) async {
@@ -2861,20 +2843,7 @@ void main() {
     expect(find.text('receive route'), findsOneWidget);
   });
 
-  testWidgets('pay action opens exact-output pay route', (tester) async {
-    await tester.pumpWidget(
-      _app(_syncedState(orchardBalance: BigInt.from(14312000000))),
-    );
-    await tester.pump();
-    await tester.pump();
-
-    await tester.tap(find.byKey(const ValueKey('mobile_home_pay')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('pay route zecToExternal exactOutput'), findsOneWidget);
-  });
-
-  testWidgets('hides the pay entry when swap is disabled', (tester) async {
+  testWidgets('hides the swap entry when swap is disabled', (tester) async {
     await tester.pumpWidget(
       _app(
         _syncedState(orchardBalance: BigInt.from(14312000000)),
@@ -2884,13 +2853,13 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.byKey(const ValueKey('mobile_home_pay')), findsNothing);
+    expect(find.byKey(const ValueKey('mobile_home_swap')), findsNothing);
     // Send/Receive remain.
     expect(find.byKey(const ValueKey('mobile_home_send')), findsOneWidget);
     expect(find.byKey(const ValueKey('mobile_home_receive')), findsOneWidget);
   });
 
-  testWidgets('uses the mobile Rest illustration canvas for empty activity', (
+  testWidgets('paints the neon horizon on the empty-activity canvas', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 1000));
@@ -2904,14 +2873,15 @@ void main() {
     final canvasRect = tester.getRect(
       find.byKey(const ValueKey('mobile_home_rest_canvas')),
     );
-    final imageRect = tester.getRect(
-      find.byKey(const ValueKey('mobile_home_rest_image')),
-    );
+    final horizon = tester.widget<CustomPaint>(_restHorizon());
+    final painter = horizon.painter! as NeonHorizonPainter;
 
-    expect(canvasRect.size, const Size(340, 220));
-    expect(imageRect.size, const Size(246, 192));
-    expect(imageRect.left - canvasRect.left, 47);
-    expect(imageRect.top - canvasRect.top, 28);
+    // The knight is gone; the canvas is the neon horizon, edge to edge.
+    expect(find.byKey(const ValueKey('mobile_home_rest_image')), findsNothing);
+    expect(canvasRect.size, const Size(340, 150));
+    expect(tester.getRect(_restHorizon()), canvasRect);
+    expect(painter.glow, AppThemeData.dark.colors.neon.glow);
+    expect(painter.core, AppThemeData.dark.colors.neon.core);
   });
 
   testWidgets('privacy eye masks the balance', (tester) async {
@@ -2947,6 +2917,8 @@ void main() {
 
     await tester.tap(find.bySemanticsLabel('Hide balance'));
     await tester.pump();
+    // Hiding re-encrypts the digits into the mask.
+    await tester.pump(const Duration(seconds: 1));
 
     expect(
       find.textContaining(fixedPrivacyMask(), findRichText: true),
@@ -3269,10 +3241,11 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(find.byType(MobileTransactionStatusScreen), findsOneWidget);
+    // The receipt's title is drawn uppercase in its top bar.
     expect(
       find.descendant(
         of: find.byType(MobileTransactionStatusScreen),
-        matching: find.text('Received'),
+        matching: find.text('RECEIVED'),
       ),
       findsOneWidget,
     );
@@ -3349,14 +3322,15 @@ void main() {
     final sendRect = tester.getRect(
       find.byKey(const ValueKey('mobile_home_send')),
     );
-    final payRect = tester.getRect(
-      find.byKey(const ValueKey('mobile_home_pay')),
+    final receiveRect = tester.getRect(
+      find.byKey(const ValueKey('mobile_home_receive')),
     );
     final rowRect = tester.getRect(
       find.byKey(const ValueKey('mobile_home_activity_row_0')),
     );
-    final headerFinder = find.text('Recent activity');
-    final seeAllFinder = find.text('See all');
+    // The section head and its link are HUD captions, drawn uppercase.
+    final headerFinder = find.text('RECENT ACTIVITY');
+    final seeAllFinder = find.text('SEE ALL');
     final headerRect = tester.getRect(headerFinder);
     final seeAllRect = tester.getRect(
       find.ancestor(
@@ -3375,17 +3349,15 @@ void main() {
     );
     expect(
       rowRect.right,
-      moreOrLessEquals(payRect.right - AppSpacing.xs, epsilon: 0.1),
+      moreOrLessEquals(receiveRect.right - AppSpacing.xs, epsilon: 0.1),
     );
     expect(headerRect.left, rowRect.left);
     expect(seeAllRect.height, 24);
-    expect(headerText.style?.fontSize, AppTypography.labelLarge.fontSize);
-    expect(headerText.style?.fontWeight, FontWeight.w600);
-    expect(seeAllText.style?.fontSize, AppTypography.labelLarge.fontSize);
-    expect(
-      seeAllText.style?.color,
-      AppThemeData.dark.colors.button.ghost.label,
-    );
+    expect(headerText.style?.fontSize, kNeonHudCaptionStyle.fontSize);
+    expect(headerText.style?.fontWeight, kNeonHudCaptionStyle.fontWeight);
+    expect(headerText.style?.color, AppThemeData.dark.colors.neon.glow);
+    expect(seeAllText.style?.fontSize, kNeonHudCaptionStyle.fontSize);
+    expect(seeAllText.style?.color, AppThemeData.dark.colors.text.secondary);
   });
 
   testWidgets('display progress ticks do not rebuild mobile Home content', (

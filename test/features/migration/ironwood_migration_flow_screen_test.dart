@@ -28,25 +28,11 @@ import 'package:zcash_wallet/src/features/ledger/services/ledger_signing_service
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/rust/api/sync.dart' as rust_sync;
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   setUpAll(() async {
-    const fonts = <String, List<String>>{
-      'Geist': [
-        'assets/fonts/Geist-Regular.ttf',
-        'assets/fonts/Geist-Medium.ttf',
-        'assets/fonts/Geist-SemiBold.ttf',
-        'assets/fonts/Geist-Bold.ttf',
-      ],
-      'Young Serif': ['assets/fonts/YoungSerif-Regular.ttf'],
-    };
-    for (final entry in fonts.entries) {
-      final loader = FontLoader(entry.key);
-      for (final asset in entry.value) {
-        loader.addFont(rootBundle.load(asset));
-      }
-      await loader.load();
-    }
+    await loadGothamFonts();
   });
 
   setUp(() {
@@ -301,7 +287,7 @@ void main() {
     expect(find.text('Migrations can take a long time'), findsOneWidget);
     expect(find.text('You can spend as funds arrive'), findsOneWidget);
     expect(find.text('Use VPN for an extra privacy'), findsOneWidget);
-    expect(find.text('Keep Vizor running'), findsOneWidget);
+    expect(find.text('Keep Veylor running'), findsOneWidget);
     expect(find.textContaining('VPN/network privacy layer'), findsOneWidget);
     expect(
       find.textContaining('send the next migration transaction'),
@@ -856,7 +842,7 @@ void main() {
           tester.widget<DecoratedBox>(iconTile).decoration as BoxDecoration;
       expect(tileDecoration.color, const Color(0xFFB90A4A));
       expect(tileDecoration.borderRadius, BorderRadius.circular(12));
-      expect(find.text('Keep Vizor running'), findsOneWidget);
+      expect(find.text('Keep Veylor running'), findsOneWidget);
       expect(
         find.text(
           'Preparation continues while the app is minimized, then migration '
@@ -1285,7 +1271,7 @@ void main() {
     expect(ironwoodMigrationKeystoneProofFailed(failed), isTrue);
     expect(
       ironwoodMigrationKeystoneProofWaitingMessage(pending),
-      'Signature captured. Vizor is still preparing local proofs (1/3). '
+      'Signature captured. Veylor is still preparing local proofs (1/3). '
       'Keep this screen open.',
     );
     expect(
@@ -1604,7 +1590,7 @@ void main() {
     );
     expect(
       find.text(
-        'You can close Vizor anytime. Migration will pause, and you can '
+        'You can close Veylor anytime. Migration will pause, and you can '
         'restart it when you return.',
       ),
       findsOneWidget,

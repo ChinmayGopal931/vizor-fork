@@ -369,7 +369,6 @@ class _MobileResultsHeader extends StatelessWidget {
                           expanded ? 'Hide description' : 'Show description',
                           style: AppTypography.labelLarge.copyWith(
                             color: colors.text.accent,
-                            fontWeight: FontWeight.w400,
                             letterSpacing: -0.04,
                           ),
                         ),
@@ -414,7 +413,7 @@ class _ResultsHeader extends StatelessWidget {
     );
     final titleStyle = AppTypography.headlineMedium.copyWith(
       color: colors.text.accent,
-      fontFamily: 'Geist',
+      fontFamily: 'Gotham',
       fontWeight: FontWeight.w600,
       fontSize: 20,
       height: 30 / 20,
@@ -628,10 +627,7 @@ class _MobileResultCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
           Text(
             proposal.title,
-            style: AppTypography.bodyLarge.copyWith(
-              color: colors.text.accent,
-              fontWeight: FontWeight.w600,
-            ),
+            style: AppTypography.bodyLarge.copyWith(color: colors.text.accent),
           ),
           if (proposal.description.trim().isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xxs),
@@ -675,7 +671,6 @@ class _MobileResultCard extends StatelessWidget {
                       'Total',
                       style: AppTypography.labelLarge.copyWith(
                         color: colors.text.accent,
-                        fontWeight: FontWeight.w500,
                         letterSpacing: -0.04,
                       ),
                     ),
@@ -683,7 +678,6 @@ class _MobileResultCard extends StatelessWidget {
                       _formatMobileTallyZec(total),
                       style: AppTypography.labelLarge.copyWith(
                         color: colors.text.primary,
-                        fontWeight: FontWeight.w400,
                         letterSpacing: -0.04,
                       ),
                     ),
@@ -720,7 +714,6 @@ class _MobileTallyRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final labelStyle = AppTypography.labelLarge.copyWith(
-      fontWeight: FontWeight.w400,
       letterSpacing: -0.04,
       color: colors.text.secondary,
     );

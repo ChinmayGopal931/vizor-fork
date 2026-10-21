@@ -44,10 +44,10 @@ Completed accounts do not repeat history discovery on subsequent syncs. Existing
 UTXO refreshes cover registered candidates; librustzcash grows the address gap
 when it observes use. Ledger UTXO queries do not assume transparent funds were
 received after the shielded birthday. This does not guarantee discovery if an
-external wallet uses and fully spends an entire candidate window while Vizor is
+external wallet uses and fully spends an entire candidate window while Veylor is
 offline, then moves beyond it. Explicit extended recovery is outside this change.
 
-Each Shield action selects at most 10 inputs, matching Vizor's current conservative
+Each Shield action selects at most 10 inputs, matching Veylor's current conservative
 Ledger serializer limit. Larger balances are shielded with subsequent actions;
 the normal signed-operation checkpoint/retry pipeline remains responsible for
 broadcast recovery. Inputs retain the selected account, scope and address index.

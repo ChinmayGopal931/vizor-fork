@@ -1,6 +1,6 @@
-# Contributing to Vizor
+# Contributing to Veylor
 
-Thank you for helping improve Vizor. Vizor is a self-custody Zcash wallet, so
+Thank you for helping improve Veylor. Veylor is a self-custody Zcash wallet, so
 changes that affect keys, wallet state, synchronization, balances, transaction
 construction, or privacy need especially careful review and testing.
 
@@ -18,7 +18,7 @@ the repository's [Apache License 2.0](LICENSE).
   or pull requests.
 
 Use GitHub issues for questions and ordinary bug reports when issue creation is
-available to you. A useful bug report includes the Vizor version or commit,
+available to you. A useful bug report includes the Veylor version or commit,
 operating system and architecture, expected and actual behavior, reproducible
 steps, and relevant sanitized logs. For device-specific bugs, also include the
 device or simulator and OS version.
@@ -36,7 +36,7 @@ wallet or its activity.
 
 ## Repository overview
 
-Vizor combines a Flutter application with a Rust wallet core and native
+Veylor combines a Flutter application with a Rust wallet core and native
 platform integrations.
 
 | Path | Responsibility |
@@ -155,7 +155,7 @@ fvm flutter run --dart-define=VIZOR_FORM_FACTOR=mobile
 
 For iOS wallet creation/import testing, `./clear-app.sh` removes the app,
 Keychain entries, and saved state from the booted simulator. This is destructive
-to that simulator's Vizor data; use it only with disposable test wallets.
+to that simulator's Veylor data; use it only with disposable test wallets.
 
 ## Making changes
 
@@ -213,7 +213,7 @@ binary.
 - A test that asserts mobile-only UI must begin with `@Tags(['mobile'])` and run
   in the mobile test lane. Untagged tests must be form-factor agnostic.
 - User-facing copy uses sentence case by default. Preserve canonical names and
-  acronyms such as Vizor, Zcash, ZEC, USDC, USDT, NEAR, and Keystone. Sidebar
+  acronyms such as Veylor, Zcash, ZEC, USDC, USDT, NEAR, and Keystone. Sidebar
   entries and screen titles may use title case.
 - Reuse the shared password policy. Desktop passwords accept only printable
   ASCII characters, and mobile uses an exact six-digit passcode through the
@@ -350,6 +350,6 @@ mobile-only or internal changes.
 
 ## License
 
-Vizor is licensed under the [Apache License 2.0](LICENSE). Submit only work that
+Veylor is licensed under the [Apache License 2.0](LICENSE). Submit only work that
 you have the right to contribute, and preserve third-party notices and license
 terms for copied or derived material.

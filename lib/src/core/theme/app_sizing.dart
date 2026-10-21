@@ -7,9 +7,10 @@
 /// touch-target metrics with no call-site changes. Reference a mode set
 /// directly only in tooling that must show both modes in one binary.
 ///
-/// The `Spacing`, `Radii`, `Units`, and `Window` token groups are
-/// identical across both Figma modes, so `AppSpacing`, `AppRadii`, and
-/// [AppWindowSizing] stay single-mode constants.
+/// The `Spacing`, `Units`, and `Window` token groups are identical across
+/// both Figma modes, so `AppSpacing` and [AppWindowSizing] stay single-mode
+/// constants. `AppRadii` selects per mode like these: mobile builds use
+/// their own near-square corners.
 library;
 
 import '../layout/app_form_factor.dart';
@@ -52,7 +53,7 @@ abstract final class AppInputSizingDesktop {
   static const double iconSize = 20;
 
   /// Figma `Input/Radii` aliases `Radii.S` (12) on desktop.
-  static const double radius = AppRadii.small;
+  static const double radius = AppRadiiDesktop.small;
 }
 
 /// Input sizing — Mobile mode.
@@ -61,11 +62,10 @@ abstract final class AppInputSizingMobile {
   static const double iconWrapWidth = 36;
   static const double iconSize = 24;
 
-  /// Figma `Input/Radii` aliases `Radii.SM` (16) on mobile. Note the
-  /// Figma radii scale gained an `SM` step, shifting its names one tier
-  /// against Dart's: Figma `SM`/`M`/`L` = Dart `medium`/`large`/`xLarge`
-  /// (values unchanged).
-  static const double radius = AppRadii.medium;
+  /// Figma `Input/Radii` aliases `Radii.SM` on mobile. Note the Figma
+  /// radii scale gained an `SM` step, shifting its names one tier against
+  /// Dart's: Figma `SM`/`M`/`L` = Dart `medium`/`large`/`xLarge`.
+  static const double radius = AppRadiiMobile.medium;
 }
 
 const _mobile = kAppFormFactor == AppFormFactor.mobile;

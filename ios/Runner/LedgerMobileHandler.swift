@@ -1021,7 +1021,7 @@ final class LedgerMobileHandler: NSObject, FlutterStreamHandler {
       case .appSwitchTimedOut:
         return flutterError(
           code: "unavailable",
-          message: "Vizor could not resume after opening the Zcash app. Try again."
+          message: "Veylor could not resume after opening the Zcash app. Try again."
         )
       case .invalidArguments, .invalidHex, .invalidAppInfo, .status:
         return flutterError(

@@ -90,7 +90,7 @@ class _LedgerShieldMotionPreviewState extends State<LedgerShieldMotionPreview> {
           ? MobileShieldPhase.hardware
           : MobileShieldPhase.working,
       title: _stage == _Stage.review
-          ? 'Transparent Balance'
+          ? 'Transparent balance'
           : done
           ? 'Shielded successfully'
           : hardware

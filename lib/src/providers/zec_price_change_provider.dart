@@ -9,6 +9,7 @@ import '../../main.dart' show log;
 import '../core/config/swap_feature_config.dart';
 import '../core/formatting/zec_amount.dart';
 import '../core/network/network_http_client.dart';
+import '../features/private_usd/providers/private_usd_available_provider.dart';
 import '../features/swap/models/swap_fiat_value_formatting.dart';
 
 const kVizorCoinGeckoPriceBaseUrlEnvKey = 'VIZOR_COINGECKO_PRICE_BASE_URL';
@@ -228,10 +229,20 @@ class ZecHomeMarketDataState {
   }
 }
 
+/// Whether ZEC market prices are shown at all: with swap on (mainnet), or
+/// while the active account has Private USD, which shows an indicative ZEC
+/// equivalent (also on testnet). The Home price and every other market-price
+/// display, such as the portfolio chart, share this one gate, so none of them
+/// reaches a price service where the Home price would not.
+final zecMarketDataAvailableProvider = Provider<bool>((ref) {
+  return ref.watch(swapFeatureEnabledProvider) ||
+      ref.watch(privateUsdAvailableProvider);
+});
+
 /// Latest usable non-swap ZEC market data. A persisted value less than one
 /// hour old is exposed while the first network refresh is in flight; transient
 /// failures retain it only until that TTL expires. Null while market-price UI
-/// is disabled on non-mainnet builds.
+/// is disabled ([zecMarketDataAvailableProvider]).
 final zecHomeMarketDataStateProvider =
     NotifierProvider.autoDispose<
       ZecHomeMarketDataNotifier,
@@ -248,7 +259,7 @@ class ZecHomeMarketDataNotifier extends Notifier<ZecHomeMarketDataState> {
     _refreshTimer?.cancel();
     _expiryTimer?.cancel();
     final epoch = ++_epoch;
-    if (!ref.watch(swapFeatureEnabledProvider)) {
+    if (!ref.watch(zecMarketDataAvailableProvider)) {
       return const ZecHomeMarketDataState();
     }
     final source = ref.watch(zecMarketDataSourceProvider);

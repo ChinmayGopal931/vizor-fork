@@ -8,6 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../payment_links/providers/payment_link_cards_provider.dart';
+import '../../../private_usd/private_usd_copy.dart';
+import '../../../private_usd/providers/private_usd_custom_rpc_provider.dart';
+import '../../../private_usd/widgets/mobile/private_usd_rpc_sheet.dart';
+import '../../../../app_bootstrap.dart';
 import '../../../../core/config/app_version_config.dart';
 import '../../../../core/config/zcash_explorer.dart';
 import '../../../../core/layout/mobile/app_mobile_sheet.dart';
@@ -34,6 +38,7 @@ import '../../../accounts/widgets/mobile/account_edit_sheets.dart';
 import '../../../onboarding/shared/onboarding_welcome_art.dart'
     show VizorWordmark;
 import '../../widgets/mobile/mobile_network_privacy_card.dart';
+import '../../widgets/mobile/mobile_portfolio_chart_settings_card.dart';
 import '../../widgets/settings_new_badge.dart';
 
 /// Mobile settings tab — Figma `SETTINGS` root frame (4494:65997).
@@ -65,6 +70,7 @@ class MobileSettingsScreen extends ConsumerWidget {
     final settingsChevronColor = context.colors.icon.accent;
     final seedPhraseEnabled = account != null && !account.isHardware;
     final viewingKeyEnabled = account != null;
+    final showEthereumRpc = ref.watch(privateUsdRpcSettingVisibleProvider);
 
     return SafeArea(
       bottom: false,
@@ -232,6 +238,8 @@ class MobileSettingsScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
+                const MobilePortfolioChartSettingsCard(),
+                const SizedBox(height: AppSpacing.md),
                 _SettingsGroup(
                   title: 'System',
                   rows: [
@@ -261,19 +269,26 @@ class MobileSettingsScreen extends ConsumerWidget {
                       showChevron: true,
                       onTap: () => context.push('/settings/explorer'),
                     ),
-                    MobileListRow(
-                      key: const ValueKey('mobile_settings_theme_row'),
-                      leading: _RowIcon(AppIcons.theme),
-                      label: 'Theme',
-                      value: _themeLabel(themeMode),
-                      minRowHeight: _settingsRowHeight,
-                      textStyle: settingsRowStyle,
-                      valueTextStyle: settingsRowStyle,
-                      valueColor: settingsValueColor,
-                      chevronColor: settingsChevronColor,
-                      showChevron: true,
-                      onTap: () => _showThemeSheet(context, ref, themeMode),
-                    ),
+                    if (showEthereumRpc)
+                      _EthereumRpcRow(
+                        textStyle: settingsRowStyle,
+                        valueColor: settingsValueColor,
+                        chevronColor: settingsChevronColor,
+                      ),
+                    if (!kThemeLockedToDark)
+                      MobileListRow(
+                        key: const ValueKey('mobile_settings_theme_row'),
+                        leading: _RowIcon(AppIcons.theme),
+                        label: 'Theme',
+                        value: _themeLabel(themeMode),
+                        minRowHeight: _settingsRowHeight,
+                        textStyle: settingsRowStyle,
+                        valueTextStyle: settingsRowStyle,
+                        valueColor: settingsValueColor,
+                        chevronColor: settingsChevronColor,
+                        showChevron: true,
+                        onTap: () => _showThemeSheet(context, ref, themeMode),
+                      ),
                     // No Figma frame for this row yet — listed in
                     // design_suggestion. Hidden on devices without
                     // biometric hardware.
@@ -368,16 +383,8 @@ class MobileSettingsScreen extends ConsumerWidget {
     ThemeMode.dark => 'Dark',
   };
 
-  static String _profilePictureDisplayLabel(String id) {
-    final option = resolveProfilePictureOption(id);
-    return switch (option.id) {
-      'pfp-01' => 'Knight',
-      'pfp-02' => 'Viking',
-      'pfp-03' => 'Samurai',
-      'pfp-11' => 'Wizard',
-      _ => option.label,
-    };
-  }
+  static String _profilePictureDisplayLabel(String id) =>
+      resolveProfilePictureOption(id).label;
 
   Future<void> _toggleBiometric(BuildContext context, WidgetRef ref) async {
     final notifier = ref.read(biometricUnlockProvider.notifier);
@@ -462,22 +469,22 @@ class _DisableBiometricSheet extends StatelessWidget {
   final BiometricKind kind;
 
   static const _titleStyle = TextStyle(
-    fontFamily: 'Geist',
-    fontWeight: FontWeight.w600,
+    fontFamily: 'Gotham',
+    fontWeight: FontWeight.w100,
     fontSize: 16,
     height: 24 / 16,
     letterSpacing: -0.24,
   );
   static const _bodyStyle = TextStyle(
-    fontFamily: 'Geist',
-    fontWeight: FontWeight.w400,
+    fontFamily: 'Gotham',
+    fontWeight: FontWeight.w300,
     fontSize: 14,
     height: 21 / 14,
     letterSpacing: -0.21,
   );
   static const _buttonLabelStyle = TextStyle(
-    fontFamily: 'Geist',
-    fontWeight: FontWeight.w500,
+    fontFamily: 'Gotham',
+    fontWeight: FontWeight.w300,
     fontSize: 14,
     height: 16 / 14,
     letterSpacing: -0.06,
@@ -496,7 +503,7 @@ class _DisableBiometricSheet extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'You will use your passcode to unlock Vizor. You can turn '
+            'You will use your passcode to unlock Veylor. You can turn '
             '${kind.inlineUnlockFeatureLabel} back on in settings anytime.',
             style: _bodyStyle.copyWith(color: colors.text.accent),
           ),
@@ -534,7 +541,7 @@ class _SettingsVersionFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Vizor, version $kVizorReleaseVersion',
+      label: 'Veylor, version $kVizorReleaseVersion',
       excludeSemantics: true,
       child: Center(
         child: Row(
@@ -586,16 +593,32 @@ class _SettingsGroup extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // HUD section head: a red caption with a rule running off it.
           Padding(
             padding: const EdgeInsets.only(
               left: AppSpacing.xxs,
               bottom: AppSpacing.xs,
             ),
-            child: Text(
-              title,
-              style: AppTypography.labelLarge.copyWith(
-                color: context.colors.text.secondary,
-              ),
+            child: Row(
+              children: [
+                Text(
+                  title.toUpperCase(),
+                  style: kNeonHudCaptionStyle.copyWith(
+                    color: context.colors.neon.glow,
+                    shadows: Neon.textGlow(
+                      context.colors.neon.glow,
+                      intensity: 0.35,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Container(
+                    height: 1,
+                    color: context.colors.neon.glow.withValues(alpha: 0.25),
+                  ),
+                ),
+              ],
             ),
           ),
           ...rows,
@@ -742,6 +765,46 @@ class _SyncKeepAwakeToggle extends StatelessWidget {
 
 const _settingsRowHeight = 44.0;
 
+/// Private USD's Ethereum RPC: "Default", or the host of the user's own URL;
+/// never the whole URL, which can hold a key.
+class _EthereumRpcRow extends ConsumerWidget {
+  const _EthereumRpcRow({
+    required this.textStyle,
+    required this.valueColor,
+    required this.chevronColor,
+  });
+
+  final TextStyle textStyle;
+  final Color valueColor;
+  final Color chevronColor;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final network = ref.watch(appBootstrapProvider).network;
+    final custom = ref.watch(privateUsdCustomRpcProvider(network)).value;
+    return MobileListRow(
+      key: const ValueKey('mobile_settings_ethereum_rpc_row'),
+      leading: const _RowIcon(AppIcons.link),
+      label: PrivateUsdCopy.rpcTitle,
+      value: custom == null
+          ? PrivateUsdCopy.rpcDefault
+          : privateUsdCustomRpcHost(custom),
+      minRowHeight: _settingsRowHeight,
+      textStyle: textStyle,
+      valueTextStyle: textStyle,
+      valueColor: valueColor,
+      chevronColor: chevronColor,
+      showChevron: true,
+      onTap: () => unawaited(_open(context)),
+    );
+  }
+
+  Future<void> _open(BuildContext context) async {
+    final done = await showPrivateUsdRpcSheet(context);
+    if (done != null && context.mounted) showAppToast(context, done);
+  }
+}
+
 class _RowIcon extends StatelessWidget {
   const _RowIcon(this.iconName);
 
@@ -749,9 +812,20 @@ class _RowIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Muted per the Figma settings rows — the leading glyphs are
-    // decorative, not max-contrast.
-    return AppIcon(iconName, size: 20, color: context.colors.icon.muted);
+    final neon = context.colors.neon;
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: ShapeDecoration(
+        color: neon.glow.withValues(alpha: 0.08),
+        shape: Neon.chamferBorder(
+          cut: AppChamfer.small + 2,
+          side: BorderSide(color: neon.glow.withValues(alpha: 0.45)),
+        ),
+      ),
+      alignment: Alignment.center,
+      child: AppIcon(iconName, size: 17, color: neon.core),
+    );
   }
 }
 

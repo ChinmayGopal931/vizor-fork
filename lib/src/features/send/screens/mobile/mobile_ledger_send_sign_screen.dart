@@ -283,8 +283,8 @@ class _MobileLedgerSendSignScreenState
             title: 'Could not finish transaction',
             statusLabel: 'Action needed',
             message: _signingComplete
-                ? 'Keep Vizor open and try again. No new Ledger approval needed.'
-                : 'Vizor could not prepare the transaction. Try again.',
+                ? 'Keep Veylor open and try again. No new Ledger approval needed.'
+                : 'Veylor could not prepare the transaction. Try again.',
             showDeviceAppPrompt: false,
             actionLabel: 'Try again',
           );
@@ -539,8 +539,8 @@ class _MobileLedgerSendSignScreenState
               : 'Could not save signed transaction',
           statusLabel: terminal ? 'Recovery required' : 'Action needed',
           message: terminal
-              ? 'Vizor could not verify the saved transaction. Do not sign or send it again.'
-              : 'Keep Vizor open and retry saving. No new Ledger approval needed.',
+              ? 'Veylor could not verify the saved transaction. Do not sign or send it again.'
+              : 'Keep Veylor open and retry saving. No new Ledger approval needed.',
           showDeviceAppPrompt: false,
           actionLabel: terminal ? null : 'Retry saving',
         );

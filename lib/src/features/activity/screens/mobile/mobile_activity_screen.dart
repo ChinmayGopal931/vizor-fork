@@ -28,6 +28,8 @@ import '../../swap_activity_row_items_provider.dart';
 import '../../swap_activity_row_mapper.dart';
 import '../../widgets/activity_feed.dart';
 import 'mobile_transaction_status_screen.dart';
+import '../../../private_usd/providers/private_usd_activity_provider.dart';
+import '../../../private_usd/widgets/mobile/private_usd_activity_rows.dart';
 
 /// Loads the full transaction history for one account; injectable so
 /// widget tests can avoid the Rust FFI.
@@ -282,10 +284,14 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen> {
             transactions: transactions,
           );
     final swapReceiveTxByIntent = absorption.receiveTxByIntent;
+    final privateUsd = accountUuid == null
+        ? PrivateUsdActivity.empty
+        : ref.watch(privateUsdActivityProvider(accountUuid));
 
     final entries = <ActivityEntry>[
       for (final tx in giftCardActivityIndex.withPendingClaims(transactions))
-        if (!absorption.absorbs(tx))
+        if (!absorption.absorbs(tx) &&
+            !privateUsd.txids.contains(tx.txidHex.toLowerCase()))
           _transactionEntry(
             context,
             tx,
@@ -316,6 +322,14 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen> {
             },
           ),
         ),
+      ...privateUsdFeedEntries(
+        context: context,
+        activity: privateUsd,
+        privacyModeEnabled: privacyModeEnabled,
+        onOpenConversion: (path) => context.push(path.location),
+        onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
+        onOpenRefunds: () => context.push('/private-usd/refunds'),
+      ),
     ];
     final sections = buildActivityFeedSections(entries);
 

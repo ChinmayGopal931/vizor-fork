@@ -11,7 +11,7 @@ Widget buildMobileShieldReview(BuildContext context) => const MobileShieldScene(
   phase: MobileShieldPhase.review,
   amount: '0.9912331',
   resultAmount: '0.9911331',
-  title: 'Transparent Balance',
+  title: 'Transparent balance',
   onCommit: _noop,
   onClose: _noop,
 );
@@ -75,7 +75,7 @@ Widget buildMobileShieldReferenceReview(BuildContext context) =>
         phase: MobileShieldPhase.review,
         amount: '14.12',
         resultAmount: '14.12',
-        title: 'Transparent Balance',
+        title: 'Transparent balance',
         onCommit: _noop,
         onClose: _noop,
       ),

@@ -36,9 +36,6 @@ class MobileOnboardingIntroScreen extends StatelessWidget {
       showProgress: showProgress,
       onBack: onBack ?? () => Navigator.of(context).maybePop(),
       title: 'The Shielded World',
-      titleStyle: AppTypography.displayLarge.copyWith(
-        fontWeight: FontWeight.w500,
-      ),
       topNavHeight: 74,
       topNavProgressOffset: const Offset(-4.5, 0),
       topNavProgressTrackColor: colors.background.inverse.withValues(
@@ -178,7 +175,7 @@ class MobileAddressTypesScreen extends StatelessWidget {
             body:
                 'Address starts with u1 (or zs for legacy).\nOnly you can '
                 'see your account balance and transaction history.',
-            boldRuns: const ['u1', 'zs'],
+            accentRuns: const ['u1', 'zs'],
           ),
           _InfoSection(
             iconName: AppIcons.transparentBalance,
@@ -338,7 +335,7 @@ class _InfoSection {
     required this.title,
     required this.body,
     this.trailing,
-    this.boldRuns = const [],
+    this.accentRuns = const [],
   });
 
   final String iconName;
@@ -347,13 +344,14 @@ class _InfoSection {
   final String body;
   final Widget? trailing;
 
-  /// Substrings of [body] rendered bold, e.g. the `u1` / `zs` address
-  /// prefixes the Figma frame emphasizes. First occurrence only.
-  final List<String> boldRuns;
+  /// Substrings of [body] drawn in the [accent] colour, e.g. the `u1` / `zs`
+  /// address prefixes the Figma frame sets in bold. Veylor's type has no bold,
+  /// so the emphasis is the brighter colour. First occurrence only.
+  final List<String> accentRuns;
 
-  TextSpan bodySpan(TextStyle base) {
+  TextSpan bodySpan(TextStyle base, {required Color accent}) {
     var spans = <TextSpan>[TextSpan(text: body)];
-    for (final run in boldRuns) {
+    for (final run in accentRuns) {
       final next = <TextSpan>[];
       var applied = false;
       for (final span in spans) {
@@ -368,7 +366,7 @@ class _InfoSection {
         next.add(
           TextSpan(
             text: run,
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            style: TextStyle(color: accent),
           ),
         );
         if (i + run.length < text.length) {
@@ -437,7 +435,6 @@ class _EducationSections extends StatelessWidget {
                           sections[i].title,
                           style: AppTypography.bodyLarge.copyWith(
                             color: colors.text.accent,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -450,6 +447,7 @@ class _EducationSections extends StatelessWidget {
                       AppTypography.bodyMedium.copyWith(
                         color: colors.text.primary,
                       ),
+                      accent: colors.text.accent,
                     ),
                   ),
                 ],

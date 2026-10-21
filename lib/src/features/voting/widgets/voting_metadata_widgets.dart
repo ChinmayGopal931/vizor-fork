@@ -360,10 +360,7 @@ class _MobileVotingProposalCard extends StatelessWidget {
           ],
           Text(
             proposal.title,
-            style: AppTypography.bodyLarge.copyWith(
-              color: colors.text.accent,
-              fontWeight: FontWeight.w600,
-            ),
+            style: AppTypography.bodyLarge.copyWith(color: colors.text.accent),
           ),
           if (proposal.description.trim().isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xxs),
@@ -446,7 +443,6 @@ class MobileVotingProposalMetadataRow extends StatelessWidget {
                         color: index < zipBadges.length
                             ? context.colors.text.primary
                             : context.colors.text.secondary,
-                        fontWeight: FontWeight.w400,
                         letterSpacing: -0.04,
                       ),
                     ),

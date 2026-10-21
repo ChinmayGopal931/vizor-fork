@@ -13,7 +13,7 @@ Future<void> showMobileTxFeeInfoSheet(
   String title = 'Tx fee',
   String description =
       'The network fee is set by the Zcash protocol (ZIP 317) '
-      'based on the transaction size. Vizor adds no extra fee.',
+      'based on the transaction size. Veylor adds no extra fee.',
 }) {
   return showAppMobileSheet<void>(
     context: context,
@@ -34,6 +34,7 @@ Future<void> showMobileTxFeeInfoSheet(
               title,
               style: AppTypography.headlineSmall.copyWith(
                 color: colors.text.accent,
+                fontWeight: AppFontWeight.heading,
               ),
             ),
             const SizedBox(height: AppSpacing.xs),

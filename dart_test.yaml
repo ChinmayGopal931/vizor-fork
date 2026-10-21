@@ -16,3 +16,8 @@ tags:
   # out of `flutter test integration_test/` and are run by hand.
   live-tor:
     skip: "live Tor probe only: fvm flutter test --tags live-tor --run-skipped <path> -d <device>"
+  # The Private USD device round: a physical Android phone, testnet and
+  # Sepolia, host checkpoints over adb reverse. It resets the build's testnet
+  # wallet, so only its runner starts it.
+  private-usd-device:
+    skip: "Private USD device round only: scripts/private-usd/run_device_round.sh"

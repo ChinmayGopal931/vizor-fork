@@ -505,7 +505,6 @@ class _MobileViewingKeyRevealView extends StatelessWidget {
                       child: Text(
                         'Full Viewing Key',
                         style: AppTypography.bodyMediumStrong.copyWith(
-                          fontWeight: FontWeight.w600,
                           color: colors.text.accent,
                         ),
                       ),

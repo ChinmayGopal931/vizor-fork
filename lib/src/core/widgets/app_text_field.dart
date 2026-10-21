@@ -326,9 +326,15 @@ class _AppTextFieldState extends State<AppTextField> {
       AppTextFieldTone.brandCrimson => colors.icon.brandCrimson,
     };
     final gap = _multiline ? AppSpacing.xs : AppSpacing.xxs;
+    // Name the leading distribution so the editable and the painters below
+    // share one strut. Left unset, the widgets inherit the theme's (even
+    // under Material 3) while a bare TextPainter uses proportional, whose
+    // forced lines leave out the font's line gap and come out shorter.
     final textStrutStyle = StrutStyle.fromTextStyle(
       valueStyle,
       forceStrutHeight: true,
+      leadingDistribution:
+          valueStyle.leadingDistribution ?? TextLeadingDistribution.even,
     );
     final textDirection = Directionality.of(context);
     var shellHeight = _multiline ? 148.0 : AppInputSizing.height;

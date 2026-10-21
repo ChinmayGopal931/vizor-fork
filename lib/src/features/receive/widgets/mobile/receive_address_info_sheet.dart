@@ -9,6 +9,13 @@ import '../receive_address_widgets.dart';
 const _closeButtonHeight = AppButtonSizing.largeHeight;
 const _modalCloseIconSize = 20.0;
 
+/// Keeps the head clear of the close button pinned top-right (32 px, 16 px
+/// from the edge) with a gap to spare.
+const _headEndInset = 48.0;
+
+/// Leaves the caption's rule a short run beside a long caption.
+const _headCaptionMaxWidth = 220.0;
+
 /// Opens the address-type explainer sheet — Figma `Shielded Address` /
 /// `Transparent Address` modals (4562:97619 / 4562:100793).
 Future<void> showReceiveAddressInfoSheet(
@@ -29,9 +36,13 @@ class ReceiveAddressInfoSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final glow = colors.neon.glow;
     final items = receiveAddressInfoItems(type, touchUi: true);
     final isShielded = type == ReceiveAddressType.shielded;
-    final itemMaxLines = isShielded ? const [3, 3, 3] : const [2, 4, 5, 4];
+    // Figma sizes these for Geist (3/3/3 and 2/4/5/4 lines). Gotham is 9%
+    // wider, so each explainer may need one more line; the sheet grows to
+    // fit instead of ellipsizing the copy.
+    final itemMaxLines = isShielded ? const [4, 4, 4] : const [3, 5, 6, 5];
 
     return Stack(
       children: [
@@ -46,33 +57,52 @@ class ReceiveAddressInfoSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 184,
-                  height: 51,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        receiveAddressInfoTitle(type),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.bodyLarge.copyWith(
-                          color: colors.text.accent,
-                          fontWeight: FontWeight.w600,
+              // HUD head: the address type as a red caption with a rule
+              // running off it, and what it promises as the Thin heading.
+              Padding(
+                padding: const EdgeInsets.only(right: _headEndInset),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: _headCaptionMaxWidth,
+                          ),
+                          child: Text(
+                            receiveAddressInfoTitle(type).toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: kNeonHudCaptionStyle.copyWith(
+                              color: glow,
+                              shadows: Neon.textGlow(glow, intensity: 0.35),
+                            ),
+                          ),
                         ),
-                      ),
-                      Text(
-                        receiveAddressInfoSubtitle(type),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.bodyMedium.copyWith(
-                          color: colors.text.secondary,
+                        const SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: SizedBox(
+                            height: 1,
+                            child: ColoredBox(
+                              color: glow.withValues(alpha: 0.25),
+                            ),
+                          ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      receiveAddressInfoSubtitle(type),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.bodyLarge.copyWith(
+                        color: colors.text.accent,
+                        fontWeight: AppFontWeight.heading,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -166,7 +196,7 @@ class _ReceiveAddressInfoSheetItem extends StatelessWidget {
           height: 25,
           child: Align(
             alignment: Alignment.centerLeft,
-            child: AppIcon(iconName, size: 20, color: colors.icon.accent),
+            child: AppIcon(iconName, size: 20, color: colors.neon.glow),
           ),
         ),
         const SizedBox(width: AppSpacing.s),

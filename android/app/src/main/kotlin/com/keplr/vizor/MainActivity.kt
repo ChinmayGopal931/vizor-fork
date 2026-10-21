@@ -1,9 +1,14 @@
 package com.keplr.vizor
 
 import android.content.Intent
+import android.media.AudioAttributes
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.VibrationAttributes
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import android.view.WindowManager
@@ -12,6 +17,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.security.MessageDigest
 import io.flutter.plugin.common.EventChannel
+import com.keplr.vizor.railgun.RailgunHostHandler
 
 // FlutterFragmentActivity: BiometricPrompt requires a FragmentActivity host.
 class MainActivity : FlutterFragmentActivity() {
@@ -93,6 +99,7 @@ class MainActivity : FlutterFragmentActivity() {
         )
     }
     private lateinit var ledgerMobileHandler: LedgerMobileHandler
+    private lateinit var railgunHostHandler: RailgunHostHandler
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -109,6 +116,8 @@ class MainActivity : FlutterFragmentActivity() {
                 "error" -> result.success(performErrorHaptic())
                 "sendSuccess" -> result.success(performSendSuccessHaptic())
                 "sendFailure" -> result.success(performSendFailureHaptic())
+                "settlementDeadline" ->
+                    result.success(performSettlementDeadlineHaptic())
                 else -> result.notImplemented()
             }
         }
@@ -159,6 +168,18 @@ class MainActivity : FlutterFragmentActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             LedgerMobileHandler.EVENT_CHANNEL
         ).setStreamHandler(ledgerMobileHandler)
+        // Private USD: the Railgun page. The host is process-wide; this only binds the channels.
+        railgunHostHandler = RailgunHostHandler(this, BuildConfig.DEBUG)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            RailgunHostHandler.METHOD_CHANNEL
+        ).setMethodCallHandler { call, result ->
+            railgunHostHandler.handle(call, result)
+        }
+        EventChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            RailgunHostHandler.EVENT_CHANNEL
+        ).setStreamHandler(railgunHostHandler)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             CAMERA_PERMISSION_CHANNEL
@@ -270,6 +291,53 @@ class MainActivity : FlutterFragmentActivity() {
         return window.decorView.performHapticFeedback(feedbackConstant)
     }
 
+    /** Private USD's "Authorize settlement" is about to close: 0.8 s at full
+     *  strength, then 1.6 s fading out. A motor without amplitude control
+     *  fades by shortening its pulses. Alarm usage, so the phone's touch
+     *  haptics setting does not mute a deadline. Needs VIBRATE. */
+    private fun performSettlementDeadlineHaptic(): Boolean {
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            getSystemService(VibratorManager::class.java)?.defaultVibrator
+        } else {
+            getSystemService(Vibrator::class.java)
+        }
+        if (vibrator == null || !vibrator.hasVibrator()) {
+            return false
+        }
+        val effect = if (vibrator.hasAmplitudeControl()) {
+            val fadeSteps = 16
+            VibrationEffect.createWaveform(
+                LongArray(fadeSteps + 1) { if (it == 0) 800L else 100L },
+                IntArray(fadeSteps + 1) { 255 * (fadeSteps + 1 - it) / (fadeSteps + 1) },
+                -1
+            )
+        } else {
+            VibrationEffect.createWaveform(
+                longArrayOf(0, 700, 120, 220, 160, 140, 200, 80, 240, 40),
+                -1
+            )
+        }
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                vibrator.vibrate(
+                    effect,
+                    VibrationAttributes.createForUsage(VibrationAttributes.USAGE_ALARM)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(
+                    effect,
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .build()
+                )
+            }
+            true
+        } catch (_: SecurityException) {
+            false
+        }
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (
             ::deviceOwnerAuthHandler.isInitialized &&
@@ -328,6 +396,8 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun onDestroy() {
         if (::ledgerMobileHandler.isInitialized) ledgerMobileHandler.close()
+        // The page survives recreation; only a finishing Activity closes it.
+        if (::railgunHostHandler.isInitialized) railgunHostHandler.dispose(isFinishing)
         super.onDestroy()
     }
 

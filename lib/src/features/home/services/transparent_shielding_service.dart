@@ -242,7 +242,7 @@ String shieldPcztBroadcastStatusMessage(
   }
   if (result.status == 'broadcasted_storage_failed') {
     return result.message ??
-        'The shield transaction reached the network, but Vizor could not store it locally. Do not try again until sync or an explorer confirms the latest status.';
+        'The shield transaction reached the network, but Veylor could not store it locally. Do not try again until sync or an explorer confirms the latest status.';
   }
   return result.message ??
       'The shield transaction status is uncertain. Check activity before trying again.';

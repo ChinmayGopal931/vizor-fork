@@ -108,7 +108,7 @@ void main() {
       const Size(124, 32),
     );
     final shieldedTabLabel = tester.widget<Text>(find.text('Shielded'));
-    expect(shieldedTabLabel.style?.fontFamily, 'Geist');
+    expect(shieldedTabLabel.style?.fontFamily, 'Gotham');
     expect(shieldedTabLabel.style?.fontWeight, FontWeight.w400);
     expect(shieldedTabLabel.style?.fontSize, 13);
     expect(shieldedTabLabel.style?.height, 14 / 13);
@@ -132,7 +132,7 @@ void main() {
     );
     final shieldedSpan = shieldedRichText.text as TextSpan;
     expect(shieldedRichText.overflow, TextOverflow.clip);
-    expect(shieldedSpan.style?.fontFamily, 'Geist');
+    expect(shieldedSpan.style?.fontFamily, 'Gotham');
     expect(shieldedSpan.style?.fontWeight, FontWeight.w500);
     expect(shieldedSpan.style?.fontSize, 14);
     expect(shieldedSpan.style?.height, 16 / 14);
@@ -602,7 +602,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.textContaining('Vizor will guide you to shield the balance'),
+      find.textContaining('Veylor will guide you to shield the balance'),
       findsOneWidget,
     );
     expect(_findAppIcon(AppIcons.renew), findsOneWidget);
@@ -1154,7 +1154,7 @@ void main() {
       },
     );
 
-    expect(suggested, ['vizor-request-0.5.png']);
+    expect(suggested, ['veylor-request-0.5.png']);
     final saved = File(target);
     expect(saved.existsSync(), isTrue);
     expect(saved.readAsBytesSync().take(4), [

@@ -29,7 +29,7 @@ const _displayRows = <_TypographyRow>[
   _TypographyRow(
     name: 'displayMedium',
     style: AppTypography.displayMedium,
-    sample: 'Welcome to Vizor',
+    sample: 'Welcome to Veylor',
   ),
   _TypographyRow(
     name: 'displaySmall',
@@ -167,7 +167,7 @@ Widget _typographyRow(BuildContext context, _TypographyRow row) {
                 row.name,
                 style: TextStyle(
                   color: colors.text.accent,
-                  fontFamily: 'Geist',
+                  fontFamily: kGothamFamily,
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
                 ),
@@ -177,7 +177,7 @@ Widget _typographyRow(BuildContext context, _TypographyRow row) {
                 metric,
                 style: TextStyle(
                   color: colors.text.muted,
-                  fontFamily: 'Geist',
+                  fontFamily: kGothamFamily,
                   fontSize: 10,
                   height: 1.4,
                 ),

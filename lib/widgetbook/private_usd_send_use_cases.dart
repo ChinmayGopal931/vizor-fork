@@ -1,0 +1,208 @@
+import 'package:flutter/widgets.dart';
+
+import '../src/features/private_usd/models/private_usd_balances.dart';
+import '../src/features/private_usd/models/private_usd_send.dart';
+import '../src/features/private_usd/models/railgun_models.dart';
+import '../src/features/private_usd/screens/mobile/mobile_private_usd_send_review_screen.dart';
+import '../src/features/private_usd/screens/mobile/mobile_private_usd_send_screen.dart';
+import '../src/features/private_usd/screens/mobile/mobile_private_usd_send_status_screen.dart';
+import '../src/features/private_usd/services/private_usd_spend_guard.dart';
+import 'private_usd_use_cases.dart';
+
+// ── Send and withdraw ────────────────────────────────────────────────────
+
+/// Previews have no Rust: a full-length `0zk1` address reads as valid.
+bool previewPrivateUsdIsRailgunAddress(String address) =>
+    address.startsWith('0zk1') &&
+    address.length == previewPrivateUsdRecipient.length;
+
+final _balances = previewPrivateUsdBalance(available: 1250.4).balances;
+
+/// The relayer's floor, $0.50, is what a send leaves until it is priced.
+final _networkFee = PrivateUsdNetworkFee(
+  token: previewPrivateUsdUsdc,
+  minimum: BigInt.from(500000),
+);
+
+PrivateUsdSendForm _form(
+  PrivateUsdSendMode mode, {
+  String amountText = '',
+  String recipient = '',
+}) => PrivateUsdSendForm(
+  mode: mode,
+  token: previewPrivateUsdUsdc,
+  amountText: amountText,
+  recipient: recipient,
+  networkFee: _networkFee,
+);
+
+Widget _send(PrivateUsdSendForm form) => PrivateUsdPreviewFrame(
+  child: PrivateUsdPreviewControllers(
+    texts: [form.amountText, form.recipient],
+    builder: (context, controllers) => MobilePrivateUsdSendView(
+      form: form,
+      balances: _balances,
+      status: PrivateUsdSpendStatus.available,
+      amountController: controllers.first,
+      recipientController: controllers.last,
+      onAmountChanged: (_) {},
+      onRecipientChanged: (_) {},
+      onUseAll: () {},
+      onScan: () {},
+      onReview: () {},
+      onBack: () {},
+      isRailgunAddress: previewPrivateUsdIsRailgunAddress,
+      autofocus: false,
+    ),
+  ),
+);
+
+/// $25 to another Railgun address, ready to review.
+Widget buildMobilePrivateUsdSendUseCase(BuildContext context) => _send(
+  _form(
+    PrivateUsdSendMode.private,
+    amountText: '25',
+    recipient: previewPrivateUsdRecipient,
+  ),
+);
+
+/// Not a `0zk` address.
+Widget buildMobilePrivateUsdSendInvalidUseCase(BuildContext context) => _send(
+  _form(
+    PrivateUsdSendMode.private,
+    amountText: '25',
+    recipient: previewPrivateUsdRecipient.substring(0, 40),
+  ),
+);
+
+/// A withdrawal to the zero address.
+Widget buildMobilePrivateUsdWithdrawZeroUseCase(BuildContext context) => _send(
+  _form(
+    PrivateUsdSendMode.withdraw,
+    amountText: '100',
+    recipient: '0x0000000000000000000000000000000000000000',
+  ),
+);
+
+/// All of it: the relayer's fee needs $0.50 of it.
+Widget buildMobilePrivateUsdSendLeaveFeeUseCase(BuildContext context) => _send(
+  _form(
+    PrivateUsdSendMode.private,
+    amountText: '1250.4',
+    recipient: previewPrivateUsdRecipient,
+  ),
+);
+
+final _privateRequest = PrivateUsdSendRequest(
+  token: previewPrivateUsdUsdc,
+  amount: BigInt.from(25000000),
+  to: const RailgunPrivateDestination(previewPrivateUsdRecipient),
+);
+
+final _privateCost = PrivateUsdSendCost(
+  railgunFee: BigInt.zero,
+  feeBasisPoints: 0,
+  networkFee: BigInt.from(500000),
+  networkFeeToken: previewPrivateUsdUsdc.address,
+);
+
+final _withdrawRequest = PrivateUsdSendRequest(
+  token: previewPrivateUsdUsdc,
+  amount: BigInt.from(100000000),
+  to: const RailgunPublicDestination(previewPrivateUsdEthereumAddress),
+);
+
+final _withdrawCost = PrivateUsdSendCost(
+  railgunFee: BigInt.from(250000),
+  feeBasisPoints: 25,
+  networkFee: BigInt.from(612340),
+  networkFeeToken: previewPrivateUsdUsdc.address,
+  networkFeeExpiresAt: 1792000000,
+);
+
+PrivateUsdSendForm _reviewed(
+  PrivateUsdSendMode mode, {
+  PrivateUsdSendPhase phase = PrivateUsdSendPhase.review,
+  PrivateUsdSendStep? step,
+  PrivateUsdSendOutcome? outcome,
+}) {
+  final private = mode == PrivateUsdSendMode.private;
+  final request = private ? _privateRequest : _withdrawRequest;
+  final cost = private ? _privateCost : _withdrawCost;
+  return PrivateUsdSendForm(
+    mode: mode,
+    phase: phase,
+    step: step,
+    token: previewPrivateUsdUsdc,
+    amountText: private ? '25' : '100',
+    recipient: request.to.text,
+    cost: cost,
+    reviewed: request,
+    isBusy: phase == PrivateUsdSendPhase.sending,
+    outcome: outcome,
+    networkFee: _networkFee.copyWith(quoted: cost.networkFee),
+  );
+}
+
+Widget _review(PrivateUsdSendForm form) => PrivateUsdPreviewFrame(
+  child: MobilePrivateUsdSendReviewView(
+    form: form,
+    balances: _balances,
+    status: PrivateUsdSpendStatus.available,
+    canConfirm: true,
+    onBack: () {},
+    onConfirm: () {},
+  ),
+);
+
+/// A private send's review.
+Widget buildMobilePrivateUsdSendReviewUseCase(BuildContext context) =>
+    _review(_reviewed(PrivateUsdSendMode.private));
+
+/// A withdrawal's review: Railgun's fee and the public notice.
+Widget buildMobilePrivateUsdWithdrawReviewUseCase(BuildContext context) =>
+    _review(_reviewed(PrivateUsdSendMode.withdraw));
+
+Widget _status(PrivateUsdSendForm form, {int? proofPercent}) =>
+    PrivateUsdPreviewFrame(
+      child: MobilePrivateUsdSendStatusView(
+        form: form,
+        proofPercent: proofPercent,
+        onDone: () {},
+        onViewTransaction: form.phase == PrivateUsdSendPhase.done
+            ? () {}
+            : null,
+      ),
+    );
+
+/// The page proves the send: 42 %.
+Widget buildMobilePrivateUsdSendProvingUseCase(BuildContext context) => _status(
+  _reviewed(
+    PrivateUsdSendMode.private,
+    phase: PrivateUsdSendPhase.sending,
+    step: PrivateUsdSendStep.proving,
+  ),
+  proofPercent: 42,
+);
+
+/// In a block, with its transaction.
+Widget buildMobilePrivateUsdSendDoneUseCase(BuildContext context) => _status(
+  _reviewed(
+    PrivateUsdSendMode.private,
+    phase: PrivateUsdSendPhase.done,
+    outcome: const PrivateUsdSendSent(previewPrivateUsdTxHash),
+  ),
+);
+
+/// Handed to the relayer, not in a block yet.
+Widget buildMobilePrivateUsdSendUnconfirmedUseCase(BuildContext context) =>
+    _status(
+      _reviewed(
+        PrivateUsdSendMode.withdraw,
+        phase: PrivateUsdSendPhase.done,
+        outcome: const PrivateUsdSendUnconfirmed(previewPrivateUsdTxHash),
+      ),
+    );
+
+/// The fixtures' balance as a [PrivateUsdBalances], for tests.
+PrivateUsdBalances get previewPrivateUsdSendBalances => _balances!;

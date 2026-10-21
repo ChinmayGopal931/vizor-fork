@@ -1,6 +1,9 @@
 import 'package:flutter/painting.dart';
 
+import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
+
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Interaction-state colors from the Figma `Semantic/State` group.
 ///
@@ -42,7 +45,10 @@ class AppStateColors {
   final Color focusRingBrand;
   final Color focusRingDestructive;
 
-  static const dark = AppStateColors(
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
+
+  static const figmaDark = AppStateColors(
     hover: Primitives.p100Dark,
     hoverOpacity: Primitives.p0Alpha15Dark,
     pressed: Primitives.p150Dark,
@@ -55,7 +61,7 @@ class AppStateColors {
     focusRingDestructive: PlumPrimitives.p200Dark,
   );
 
-  static const light = AppStateColors(
+  static const figmaLight = AppStateColors(
     hover: Primitives.p50Light,
     hoverOpacity: Primitives.p900Alpha5Light,
     pressed: Primitives.p150Light,
@@ -66,5 +72,31 @@ class AppStateColors {
     focusGap: Primitives.p0Light,
     focusRingBrand: CrimsonPrimitives.p300Light,
     focusRingDestructive: PlumPrimitives.p400Light,
+  );
+
+  static const neonDark = AppStateColors(
+    hover: NeonPrimitives.n100Dark,
+    hoverOpacity: NeonPrimitives.black15,
+    pressed: NeonPrimitives.n150Dark,
+    focus: NeonPrimitives.n200Dark,
+    selected: NeonPrimitives.n150Dark,
+    selectedOpacity: NeonPrimitives.black30,
+    focusRing: NeonPrimitives.n800Dark,
+    focusGap: NeonPrimitives.n0Dark,
+    focusRingBrand: NeonPrimitives.red,
+    focusRingDestructive: NeonPrimitives.redDeep,
+  );
+
+  static const neonLight = AppStateColors(
+    hover: NeonPrimitives.n50Light,
+    hoverOpacity: NeonPrimitives.ink5,
+    pressed: NeonPrimitives.n150Light,
+    focus: NeonPrimitives.n200Light,
+    selected: NeonPrimitives.n150Light,
+    selectedOpacity: NeonPrimitives.ink5,
+    focusRing: NeonPrimitives.n800Light,
+    focusGap: NeonPrimitives.n0Light,
+    focusRingBrand: NeonPrimitives.redOnLight,
+    focusRingDestructive: NeonPrimitives.redOnLight,
   );
 }

@@ -14,7 +14,11 @@ import '../../../core/feedback/app_haptics.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/biometric_icon.dart';
+import '../../../core/widgets/mobile/neon_motion.dart';
+import '../../../core/widgets/mobile/unlock_reveal_host.dart';
+import '../../../core/widgets/mobile/veylor_wordmark_intro.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../payment_links/providers/payment_link_intake_provider.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
@@ -29,21 +33,12 @@ import 'forgot_passcode_sheet.dart';
 import 'mobile_passcode_screen.dart' show kMobilePasscodeLength;
 import 'passcode_widgets.dart';
 
-const mobileBiometricSignInBackgroundAsset =
-    'assets/illustrations/mobile_onboarding_auth_background.webp';
-
-/// Backdrop assets shared by [MobileBiometricSignInView] and the unlock
-/// screen's precache, so the warmed [ImageCache] entries match the providers
-/// painted behind the Face ID sheet (same key -> cache hit, no blank frame).
-const _authBackgroundImage = AssetImage(mobileBiometricSignInBackgroundAsset);
-const _welcomeBadgeImage = AssetImage(
-  'assets/illustrations/welcome_badge_mobile.webp',
-);
 const _biometricBackdropMaxWait = Duration(milliseconds: 350);
 
 /// Mobile unlock — Figma `Sign In Passcode` (4885:23041): "Welcome Back",
-/// crimson-filling dots, round numpad keys, a bottom biometric retry action,
-/// and the numpad's help action opening the Forgot Passcode reset sheet.
+/// crimson-filling dots, cut-corner numpad keys, a bottom biometric retry
+/// action, and the numpad's help action opening the Forgot Passcode reset
+/// sheet.
 class MobileUnlockScreen extends ConsumerStatefulWidget {
   const MobileUnlockScreen({this.autoPromptBiometric = true, super.key});
 
@@ -66,33 +61,7 @@ class _MobileUnlockScreenState extends ConsumerState<MobileUnlockScreen> {
   // branded backdrop stays up across submit instead of flipping back to the
   // numpad while the Face ID sheet dismisses.
   var _biometricUnlocking = false;
-  var _didPrecacheBackdrop = false;
   String? _error;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_didPrecacheBackdrop) return;
-    _didPrecacheBackdrop = true;
-    // Warm the backdrop assets opportunistically. The auto-prompt waits for
-    // the backdrop shell frame, but image decode must not delay Face ID.
-    unawaited(_precacheBiometricBackdrop());
-  }
-
-  Future<void> _precacheBiometricBackdrop() async {
-    await Future.wait<void>([
-      precacheImage(
-        _authBackgroundImage,
-        context,
-        onError: (_, _) {},
-      ).catchError((_) {}),
-      precacheImage(
-        _welcomeBadgeImage,
-        context,
-        onError: (_, _) {},
-      ).catchError((_) {}),
-    ]);
-  }
 
   /// iOS presents no new frame until the app is active again, so a prompt
   /// raised while returning from the background covers the pre-background
@@ -263,6 +232,7 @@ class _MobileUnlockScreenState extends ConsumerState<MobileUnlockScreen> {
         final claimed = claimParkedPaymentUriAfterUnlock(ref);
         final hasPendingPaymentLink =
             ref.read(paymentLinkIntakeProvider).pendingLink != null;
+        ref.read(unlockRevealProvider.notifier).request();
         context.go(hasPendingPaymentLink ? '/payment-links' : '/home');
         final pendingPrefill = claimed.prefill;
         final notice = claimed.notice;
@@ -492,7 +462,7 @@ class _MobileUnlockScreenState extends ConsumerState<MobileUnlockScreen> {
                                       Text(
                                         _submitting
                                             ? 'Opening your wallet...'
-                                            : 'Enter your passcode to open Vizor',
+                                            : 'Enter your passcode to open Veylor',
                                         textAlign: TextAlign.center,
                                         style: AppTypography.bodyMediumStrong
                                             .copyWith(
@@ -563,41 +533,22 @@ class _MobileUnlockScreenState extends ConsumerState<MobileUnlockScreen> {
 class MobileBiometricSignInView extends StatelessWidget {
   const MobileBiometricSignInView({super.key});
 
-  static const _figmaFrameWidth = 393.0;
-  static const _backgroundWidth = 392.0;
-  static const _backgroundHeight = 720.0;
-
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     return ColoredBox(
-      color: colors.background.window,
-      child: Stack(
-        fit: StackFit.expand,
+      color: context.colors.background.window,
+      child: const Stack(
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final scale = constraints.maxWidth / _figmaFrameWidth;
-              return Align(
-                alignment: Alignment.topRight,
-                child: SizedBox(
-                  width: _backgroundWidth * scale,
-                  height: _backgroundHeight * scale,
-                  child: Image(
-                    image: _authBackgroundImage,
-                    key: const ValueKey('mobile_biometric_sign_in_background'),
-                    fit: BoxFit.fill,
-                  ),
-                ),
-              );
-            },
+          // The unlock reveal's curtain starts from this same spot.
+          Align(
+            alignment: NeonMotion.wordmarkAlignment,
+            child: VeylorWordmarkIntro(),
           ),
           Center(
-            child: Image(
-              image: _welcomeBadgeImage,
-              key: const ValueKey('mobile_biometric_sign_in_badge'),
-              width: 130,
-              height: 130,
+            child: NeonGlyphBadge(
+              key: ValueKey('mobile_biometric_sign_in_badge'),
+              iconName: AppIcons.lock,
+              size: 130,
             ),
           ),
         ],

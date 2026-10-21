@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/layout/app_form_factor.dart';
 import '../core/layout/app_process_work_policy.dart';
 import '../core/network/network_http_client.dart';
+import '../core/storage/device_backup.dart';
 import '../core/storage/wallet_paths.dart';
 import '../rust/api/network_privacy.dart' as rust_network_privacy;
 import '../rust/network_privacy.dart' as rust_types;
@@ -109,7 +110,7 @@ class RustNetworkPrivacyRuntime implements NetworkPrivacyRuntime {
   const RustNetworkPrivacyRuntime({
     this.configureRuntime = rust_network_privacy.configureNetworkPrivacy,
     this.resolveTorDirectory = getTorDataDirectoryPath,
-    this.excludeTorDirectoryFromBackup = _excludeFromDeviceBackup,
+    this.excludeTorDirectoryFromBackup = excludeFromDeviceBackup,
   });
 
   final Future<rust_types.NetworkPrivacyStatus> Function({
@@ -176,27 +177,12 @@ class RustNetworkPrivacyRuntime implements NetworkPrivacyRuntime {
   }
 }
 
-const _deviceBackupChannel = MethodChannel('com.zcash.wallet/network_privacy');
-
-Future<void> _excludeFromDeviceBackup(String directory) async {
-  // Android has no runtime equivalent. `android:allowBackup="false"` keeps app
-  // files out of cloud backup, and device-to-device transfer is governed by
-  // `data_extraction_rules.xml`, whose paths are fixed at build time. A
-  // companion directory is named after the generated wallet database, so it
-  // cannot be listed there; it transfers with that database, which already
-  // records the same transparent activity.
-  if (!Platform.isIOS) return;
-  try {
-    await _deviceBackupChannel.invokeMethod<void>('excludeFromBackup', {
-      'path': directory,
-    });
-  } on MissingPluginException {
-    // Test hosts and older builds have no native side to ask.
-  }
-}
-
 /// Keeps the private transparent recovery companions of the wallet at
 /// [dbPath] out of device backups in every build.
+///
+/// On Android a companion directory cannot be listed in the backup rules (it
+/// is named after the generated wallet database); it transfers with that
+/// database, which already records the same transparent activity.
 ///
 /// Companions record which of the wallet's transparent addresses had activity,
 /// and Rust rebuilds them, so a restore needs none. The iOS side creates the
@@ -206,7 +192,7 @@ Future<void> _excludeFromDeviceBackup(String directory) async {
 /// directory, and a reset names a new one.
 Future<void> excludeTransparentRecoveryCompanionsFromBackup(
   String dbPath, {
-  Future<void> Function(String directory) exclude = _excludeFromDeviceBackup,
+  Future<void> Function(String directory) exclude = excludeFromDeviceBackup,
 }) async {
   await exclude(transparentRecoveryCompanionDirectory(dbPath));
 }

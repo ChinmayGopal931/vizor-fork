@@ -24,6 +24,7 @@ import '../../../../core/widgets/mobile/mobile_list_row.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/biometric_unlock_provider.dart';
+import '../../../../providers/private_usd_lifecycle_provider.dart';
 import '../../../../providers/receive_address_provider.dart';
 import '../../../../providers/sync_provider.dart';
 import '../../../../providers/wallet_mutation_guard.dart';
@@ -32,6 +33,8 @@ import '../../../migration/providers/ironwood_migration_coordinator_provider.dar
 import '../../../payment_links/services/payment_link_received_store.dart';
 import '../../../payment_links/services/payment_link_recovery_reconciler.dart';
 import '../../../payment_links/services/payment_link_recovery_store.dart';
+import '../../../private_usd/private_usd_copy.dart';
+import '../../../private_usd/providers/private_usd_unfinished_provider.dart';
 import '../../widgets/mobile/account_edit_sheets.dart';
 
 /// Mobile account management — Figma `Accounts` / `Accounts Edits` /
@@ -228,7 +231,6 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.labelLarge.copyWith(
                       color: itemTextColor,
-                      fontWeight: FontWeight.w400,
                     ),
                   ),
                 ),
@@ -438,9 +440,11 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
 
   /// [recheckFailed] reopens the sheet after a failed post-drain recheck: it
   /// shows the "couldn't check" warning and the next attempt skips the recheck.
+  /// [privateUsdRecheckFailed] does the same for Private USD conversions.
   Future<void> _showRemoveSheet(
     AccountInfo account, {
     bool recheckFailed = false,
+    bool privateUsdRecheckFailed = false,
   }) async {
     final accounts = ref.read(accountProvider).value?.accounts ?? const [];
     final isLastAccount = accounts.length == 1;
@@ -461,6 +465,20 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
         log('MobileAccounts: unshared gift card count failed: $e\n$st');
       }
     }
+    // Private USD conversions under way: their funds can only be recovered
+    // by this account (or, for the last one, this wallet). Warn, then allow.
+    int? privateUsdUnfinishedCount;
+    if (!privateUsdRecheckFailed) {
+      try {
+        privateUsdUnfinishedCount = await ref.read(
+          isLastAccount
+              ? privateUsdUnfinishedTotalProvider.future
+              : privateUsdUnfinishedCountProvider(account.uuid).future,
+        );
+      } catch (e, st) {
+        log('MobileAccounts: private USD conversion count failed: $e\n$st');
+      }
+    }
     if (!mounted) return;
     final confirmed = await showAppMobileSheet<bool>(
       context: context,
@@ -469,6 +487,7 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
         isLastAccount: isLastAccount,
         hasActiveMigration: hasActiveMigration,
         unsharedGiftCardCount: unsharedGiftCardCount,
+        privateUsdUnfinishedCount: privateUsdUnfinishedCount,
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -482,6 +501,7 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
         .value
         ?.activeAccountUuid;
     UnsharedGiftCardsChangedException? reconfirm;
+    PrivateUsdUnfinishedConversionsException? reconfirmPrivateUsd;
     try {
       if (isLastAccount) {
         // runWithSyncPausedForWalletReset clears the cached DB path in its
@@ -491,6 +511,7 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
         await runWithSyncPausedForWalletReset(ref, () async {
           await accountNotifier.resetWallet(
             confirmedUnsharedGiftCardCount: unsharedGiftCardCount,
+            confirmedPrivateUsdUnfinishedCount: privateUsdUnfinishedCount,
           );
           try {
             await ref.read(biometricUnlockProvider.notifier).disable();
@@ -508,6 +529,7 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
           () => accountNotifier.removeAccount(
             account.uuid,
             confirmedUnsharedGiftCardCount: unsharedGiftCardCount,
+            confirmedPrivateUsdUnfinishedCount: privateUsdUnfinishedCount,
           ),
           quiesceVotingWork: true,
         );
@@ -524,13 +546,16 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
     } on UnsharedGiftCardsChangedException catch (e) {
       log('MobileAccounts: remove needs reconfirmation: ${e.count}');
       reconfirm = e;
+    } on PrivateUsdUnfinishedConversionsException catch (e) {
+      log('MobileAccounts: remove needs conversion reconfirmation: ${e.count}');
+      reconfirmPrivateUsd = e;
     } catch (e, st) {
       log('MobileAccounts: remove failed: $e\n$st');
       if (mounted) {
         showAppToast(context, switch (e) {
           PaymentLinkInFlightClaimsException() => e.toString(),
           WalletResetInFlightGiftCardClaimsException() => e.toString(),
-          _ when isLastAccount => "Couldn't reset Vizor",
+          _ when isLastAccount => "Couldn't reset Veylor",
           _ => "Couldn't remove the account",
         }, iconName: AppIcons.cross);
       }
@@ -541,6 +566,13 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
       // Show the confirmation again with the fresh count.
       ref.invalidate(paymentLinkUnsharedFundedCountProvider(account.uuid));
       await _showRemoveSheet(account, recheckFailed: reconfirm.count == null);
+    } else if (reconfirmPrivateUsd != null && mounted) {
+      ref.invalidate(privateUsdUnfinishedCountProvider(account.uuid));
+      ref.invalidate(privateUsdUnfinishedTotalProvider);
+      await _showRemoveSheet(
+        account,
+        privateUsdRecheckFailed: reconfirmPrivateUsd.count == null,
+      );
     }
   }
 
@@ -748,6 +780,7 @@ class MobileAccountRemovalSheet extends StatelessWidget {
     required this.isLastAccount,
     required this.hasActiveMigration,
     required this.unsharedGiftCardCount,
+    this.privateUsdUnfinishedCount = 0,
     super.key,
   });
 
@@ -758,23 +791,27 @@ class MobileAccountRemovalSheet extends StatelessWidget {
   /// Null when the unshared gift card check failed.
   final int? unsharedGiftCardCount;
 
+  /// Private USD conversions under way: the account's, or for the last
+  /// account (a reset) the wallet's. Null when the check failed.
+  final int? privateUsdUnfinishedCount;
+
   static const _titleStyle = TextStyle(
-    fontFamily: 'Geist',
-    fontWeight: FontWeight.w600,
+    fontFamily: 'Gotham',
+    fontWeight: FontWeight.w100,
     fontSize: 16,
     height: 24 / 16,
     letterSpacing: -0.24,
   );
   static const _bodyStyle = TextStyle(
-    fontFamily: 'Geist',
-    fontWeight: FontWeight.w400,
+    fontFamily: 'Gotham',
+    fontWeight: FontWeight.w300,
     fontSize: 14,
     height: 21 / 14,
     letterSpacing: -0.21,
   );
   static const _buttonLabelStyle = TextStyle(
-    fontFamily: 'Geist',
-    fontWeight: FontWeight.w500,
+    fontFamily: 'Gotham',
+    fontWeight: FontWeight.w300,
     fontSize: 14,
     height: 16 / 14,
     letterSpacing: -0.06,
@@ -783,22 +820,22 @@ class MobileAccountRemovalSheet extends StatelessWidget {
   String get _description {
     if (hasActiveMigration) {
       if (isLastAccount) {
-        return 'Resetting Vizor stops migrations on this device and deletes '
+        return 'Resetting Veylor stops migrations on this device and deletes '
             'every account and all local wallet data. Transactions already '
             'submitted to the Zcash network may still complete. After '
             're-importing, let each account fully sync before starting '
             'migration again.';
       }
-      return "This account's migration will no longer continue in Vizor. "
+      return "This account's migration will no longer continue in Veylor. "
           'Transactions already submitted to the Zcash network may still '
           'complete. After re-importing, let the account fully sync before '
           'starting migration again.';
     }
     if (isLastAccount) {
-      return 'Resetting Vizor deletes every account and all local wallet data. '
+      return 'Resetting Veylor deletes every account and all local wallet data. '
           'Make sure you can re-import your accounts before continuing.';
     }
-    return 'Removing this account deletes its local data from Vizor. Make '
+    return 'Removing this account deletes its local data from Veylor. Make '
         'sure you can re-import it before continuing.';
   }
 
@@ -847,6 +884,31 @@ class MobileAccountRemovalSheet extends StatelessWidget {
                 style: _bodyStyle.copyWith(color: colors.text.warning),
               ),
             ],
+            if (privateUsdUnfinishedCount case final count? when count > 0) ...[
+              const SizedBox(height: AppSpacing.s),
+              Text(
+                PrivateUsdCopy.deleteUnfinishedTitle,
+                key: const ValueKey('mobile_account_remove_private_usd_title'),
+                style: _bodyStyle.copyWith(color: colors.text.destructive),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                isLastAccount
+                    ? PrivateUsdCopy.resetUnfinishedBody(count)
+                    : PrivateUsdCopy.deleteUnfinishedBody(count),
+                key: const ValueKey('mobile_account_remove_private_usd'),
+                style: _bodyStyle.copyWith(color: colors.text.destructive),
+              ),
+            ] else if (privateUsdUnfinishedCount == null) ...[
+              const SizedBox(height: AppSpacing.s),
+              Text(
+                isLastAccount
+                    ? PrivateUsdCopy.resetUncheckedBody
+                    : PrivateUsdCopy.deleteUncheckedBody,
+                key: const ValueKey('mobile_account_remove_private_usd'),
+                style: _bodyStyle.copyWith(color: colors.text.destructive),
+              ),
+            ],
             const SizedBox(height: AppSpacing.md),
             AppButton(
               key: const ValueKey('mobile_account_remove_confirm'),
@@ -855,7 +917,12 @@ class MobileAccountRemovalSheet extends StatelessWidget {
               onPressed: () => Navigator.of(context).pop(true),
               leading: isLastAccount ? null : const AppIcon(AppIcons.trash),
               child: Text(
-                isLastAccount ? 'Reset Vizor' : 'Remove',
+                switch ((isLastAccount, privateUsdUnfinishedCount != 0)) {
+                  (true, true) => PrivateUsdCopy.resetAnyway,
+                  (true, false) => 'Reset Veylor',
+                  (false, true) => PrivateUsdCopy.deleteAnyway,
+                  (false, false) => 'Remove',
+                },
                 style: _buttonLabelStyle.copyWith(
                   color: colors.button.destructive.label,
                 ),

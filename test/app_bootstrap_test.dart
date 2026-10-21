@@ -449,6 +449,60 @@ void main() {
       );
     });
   });
+
+  group('portfolio chart preferences', () {
+    AppSecureStore storeWith(Map<String, String> values) {
+      FlutterSecureStorage.setMockInitialValues(values);
+      return AppSecureStore.testing(storage: const FlutterSecureStorage());
+    }
+
+    test('a new install shows the chart, with market prices off', () async {
+      final preferences = await readPortfolioChartPreferences(storeWith({}));
+
+      expect(preferences.enabled, isTrue);
+      expect(preferences.marketPrices, isFalse);
+      expect(preferences.range, isNull);
+      expect(AppBootstrapState.empty.portfolioChartEnabled, isTrue);
+      expect(AppBootstrapState.empty.portfolioChartMarketPrices, isFalse);
+      expect(AppBootstrapState.empty.portfolioChartRange, isNull);
+    });
+
+    test('keeps what the user saved, either way', () async {
+      final turnedOn = await readPortfolioChartPreferences(
+        storeWith({
+          kPortfolioChartEnabledKey: 'false',
+          kPortfolioChartMarketPricesKey: 'true',
+          kPortfolioChartRangeKey: '1y',
+        }),
+      );
+      expect(turnedOn.enabled, isFalse);
+      expect(turnedOn.marketPrices, isTrue);
+      expect(turnedOn.range, '1y');
+
+      final turnedOff = await readPortfolioChartPreferences(
+        storeWith({
+          kPortfolioChartEnabledKey: 'true',
+          kPortfolioChartMarketPricesKey: 'false',
+        }),
+      );
+      expect(turnedOff.enabled, isTrue);
+      expect(turnedOff.marketPrices, isFalse);
+    });
+
+    test('an unreadable value never turns a server on', () async {
+      final garbled = await readPortfolioChartPreferences(
+        storeWith({kPortfolioChartMarketPricesKey: 'yes'}),
+      );
+      expect(garbled.marketPrices, isFalse);
+
+      final unreadable = await readPortfolioChartPreferences(
+        _UnreadableSecureStore(),
+      );
+      expect(unreadable.enabled, isTrue);
+      expect(unreadable.marketPrices, isFalse);
+      expect(unreadable.range, isNull);
+    });
+  });
 }
 
 class _FakeEnhancePirStore implements EnhancePirPreferenceStore {

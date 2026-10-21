@@ -117,7 +117,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/fonts/ShieldingSerif-OFL.txt
     - assets/animations/
     # Desktop artwork is omitted from iOS and Android bundles.
     - path: assets/animations/desktop/
@@ -144,46 +143,10 @@ flutter:
         - windows
     - assets/swap/tokens/
     - assets/swap/chains/
-
-  fonts:
-    - family: Inter
-      fonts:
-        - asset: assets/fonts/Inter-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Inter-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Inter-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Inter-Bold.ttf
-          weight: 700
-    - family: Geist
-      fonts:
-        - asset: assets/fonts/Geist-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Geist-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Geist-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Geist-Bold.ttf
-          weight: 700
-    - family: Geist Mono
-      fonts:
-        # Used by AppTypography.codeSmall / codeMedium for monospace text
-        # (addresses, transaction IDs, mnemonics).
-        - asset: assets/fonts/GeistMono-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/GeistMono-Medium.ttf
-          weight: 500
-    - family: Young Serif
-      fonts:
-        # Upstream Young Serif assets; the serif family behind the
-        # AppTypography display/headline tokens.
-        - asset: assets/fonts/YoungSerif-Regular.ttf
-          weight: 400
-    # Isolated reference-video weights; other app serif tokens keep their fonts.
-    - family: Shielding Serif
-      fonts:
-        - asset: assets/fonts/ShieldingSerif-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/ShieldingSerif-Bold.ttf
-          weight: 700
+    - assets/private_usd/
+    # Gotham, the app's only typeface. These are plain assets, not a
+    # `fonts:` family: loadGothamFonts() registers them at startup because
+    # Flutter takes a face's weight from the font file, and these files'
+    # OS/2 weight classes are off the CSS scale. See
+    # lib/src/core/theme/gotham_fonts.dart.
+    - assets/fonts/

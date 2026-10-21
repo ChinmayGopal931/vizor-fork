@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'app_secure_store.dart';
+import 'device_backup.dart';
 
 const kPaymentLinkClaimWalletDirectoryPrefix = 'payment_link_claim_';
 
@@ -178,5 +180,120 @@ Future<void> deleteGiftCardTrackingDirectories() async {
             .startsWith('gift_card_tracking_')) {
       await entity.delete(recursive: true);
     }
+  }
+}
+
+const _privateUsdPrefix = 'private_usd_';
+const _privateUsdTokenStorePrefix = 'private_usd_tokens_';
+
+// The Private USD directories this process has kept out of backups.
+final _privateUsdBackupMarked = <String>{};
+
+void _checkPrivateUsdNetwork(String network) {
+  if (!RegExp(r'^[a-z0-9]+$').hasMatch(network)) {
+    throw ArgumentError.value(network, 'network');
+  }
+}
+
+Future<Directory> _privateUsdDirectory(
+  String network,
+  String walletName,
+) async {
+  final support = await getWalletSupportDirectory();
+  return Directory(
+    '${support.path}${Platform.pathSeparator}$_privateUsdPrefix${walletName}_$network',
+  );
+}
+
+/// Private USD's `swaps.db` and `joint.db` directory for one wallet and
+/// network: `<support>/private_usd_<walletDbName>_<network>`.
+///
+/// The swap records hold relayer tickets and token blinding secrets, so on iOS
+/// the directory stays out of iCloud and device backups, marked before
+/// anything is written in it. The mark goes with the directory, so it is set
+/// whenever the directory is made, and once per process for one made earlier.
+/// A failed mark is tried again on the next call: a weaker backup posture must
+/// not stop a conversion that is under way.
+Future<String> getPrivateUsdDirPath(
+  String network, {
+  Future<void> Function(String directory) excludeFromBackup =
+      excludeFromDeviceBackup,
+}) async {
+  _checkPrivateUsdNetwork(network);
+  final directory = await _privateUsdDirectory(
+    network,
+    await getWalletDbName(),
+  );
+  final made = !await directory.exists();
+  await directory.create(recursive: true);
+  if (_privateUsdBackupMarked.add(directory.path) || made) {
+    try {
+      await excludeFromBackup(directory.path);
+    } catch (error) {
+      _privateUsdBackupMarked.remove(directory.path);
+      if (kDebugMode) {
+        debugPrint('Private USD directory not kept out of backups: $error');
+      }
+    }
+  }
+  return directory.path;
+}
+
+/// [getPrivateUsdDirPath] when that directory already exists, else null.
+/// Reads that must not create anything use it: a wallet that never
+/// converted has no Private USD directory (and desktop never gets one).
+/// Like [getExistingWalletDbPath], it never assigns a wallet database name.
+Future<String?> getExistingPrivateUsdDirPath(String network) async {
+  _checkPrivateUsdNetwork(network);
+  final walletName = await AppSecureStore.instance.readPlain(kWalletDbNameKey);
+  if (walletName == null || walletName.isEmpty) return null;
+  final directory = await _privateUsdDirectory(network, walletName);
+  return await directory.exists() ? directory.path : null;
+}
+
+/// Removes every wallet's Private USD directory (swap records and joint
+/// accounts), for a full reset. Attempts every directory and then rethrows
+/// the first failure, so one that cannot be deleted does not leave the others'
+/// swap secrets on disk.
+Future<void> deletePrivateUsdDirectories() async {
+  final support = await getWalletSupportDirectory();
+  Object? firstError;
+  StackTrace? firstStackTrace;
+  await for (final entity in support.list(followLinks: false)) {
+    if (entity is! Directory) continue;
+    final directoryName = entity.path.split(Platform.pathSeparator).last;
+    if (!directoryName.startsWith(_privateUsdPrefix)) continue;
+    try {
+      await entity.delete(recursive: true);
+    } catch (error, stackTrace) {
+      firstError ??= error;
+      firstStackTrace ??= stackTrace;
+    }
+  }
+  if (firstError != null) {
+    Error.throwWithStackTrace(firstError, firstStackTrace!);
+  }
+}
+
+/// Removes the device-wide token stores and their temporary files, for a
+/// full reset. The Keystore attestation key stays. Attempts every file and
+/// then rethrows the first failure.
+Future<void> deletePrivateUsdTokenStores() async {
+  final support = await getWalletSupportDirectory();
+  Object? firstError;
+  StackTrace? firstStackTrace;
+  await for (final entity in support.list(followLinks: false)) {
+    if (entity is! File) continue;
+    final fileName = entity.path.split(Platform.pathSeparator).last;
+    if (!fileName.startsWith(_privateUsdTokenStorePrefix)) continue;
+    try {
+      await entity.delete();
+    } catch (error, stackTrace) {
+      firstError ??= error;
+      firstStackTrace ??= stackTrace;
+    }
+  }
+  if (firstError != null) {
+    Error.throwWithStackTrace(firstError, firstStackTrace!);
   }
 }

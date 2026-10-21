@@ -181,7 +181,7 @@ func migrationPreparationTrackingCompletionPresentation(
   guard let progress = batch.progress else {
     return MigrationPreparationTrackingCompletionPresentation(
       title: "Preparation transactions confirmed",
-      subtitle: "Open Vizor to start the next step"
+      subtitle: "Open Veylor to start the next step"
     )
   }
   if progress.totalTransactionCount > 0
@@ -189,13 +189,13 @@ func migrationPreparationTrackingCompletionPresentation(
   {
     return MigrationPreparationTrackingCompletionPresentation(
       title: "Migration preparation complete",
-      subtitle: "Open Vizor to continue your migration"
+      subtitle: "Open Veylor to continue your migration"
     )
   }
   return MigrationPreparationTrackingCompletionPresentation(
     title:
       "\(progress.completedTransactionCount) of \(progress.totalTransactionCount) preparation transactions confirmed",
-    subtitle: "Open Vizor to start the next step"
+    subtitle: "Open Veylor to start the next step"
   )
 }
 
@@ -2272,7 +2272,7 @@ final class BackgroundMigrationPreparationManager {
       // leaving a caption that implies counting is still happening.
       task.updateTitle(
         "Preparation tracking paused",
-        subtitle: "Open Vizor to resume"
+        subtitle: "Open Veylor to resume"
       )
     } else if runtime.quiesced {
       // The activity is still captioned "Checking transaction confirmations".
@@ -2793,7 +2793,7 @@ final class BackgroundMigrationPreparationManager {
     }
     let content = UNMutableNotificationContent()
     content.title = "Preparation tracking paused"
-    content.body = "Open Vizor to resume migration preparation."
+    content.body = "Open Veylor to resume migration preparation."
     content.sound = .default
     let request = UNNotificationRequest(
       identifier: Self.watchdogIdentifier,

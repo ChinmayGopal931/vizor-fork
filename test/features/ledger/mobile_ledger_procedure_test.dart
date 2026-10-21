@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/tron_glyph.dart';
 import 'package:zcash_wallet/src/features/ledger/widgets/ledger_procedure.dart';
 import 'package:zcash_wallet/src/features/ledger/widgets/mobile/mobile_ledger_sheet_content.dart';
+import 'package:zcash_wallet/src/features/ledger/widgets/mobile/neon_ledger_step_marker.dart';
 import 'package:zcash_wallet/src/features/ledger/widgets/mobile_ledger_signing_surface.dart';
 
 import '../../figma_compare/figma_compare_font_loader.dart';
@@ -23,9 +25,9 @@ const _steps = [
 ];
 const _boundaryKey = ValueKey('procedure_capture');
 const _output = String.fromEnvironment('LEDGER_CAPTURE_DIR');
-const _preparing = 'Keep Ledger connected while Vizor checks the Zcash app.';
+const _preparing = 'Keep Ledger connected while Veylor checks the Zcash app.';
 const _reviewing = 'When prompted, check the amount and recipient on Ledger.';
-const _saving = 'Keep Vizor open while it saves the signed transaction.';
+const _saving = 'Keep Veylor open while it saves the signed transaction.';
 
 Widget _motionHarness(
   int current, {
@@ -186,6 +188,53 @@ void main() {
     } finally {
       semantics.dispose();
     }
+  });
+
+  testWidgets('steps are marked by neon plates', (tester) async {
+    await tester.pumpWidget(_motionHarness(1));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      tester
+          .widgetList<NeonLedgerStepMarker>(find.byType(NeonLedgerStepMarker))
+          .map((marker) => marker.progress),
+      [
+        LedgerStepProgress.done,
+        LedgerStepProgress.current,
+        LedgerStepProgress.ahead,
+      ],
+    );
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is TronGlyph && w.kind == TronGlyphKind.check,
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('1'), findsNothing);
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Container &&
+            w.decoration is BoxDecoration &&
+            (w.decoration! as BoxDecoration).shape == BoxShape.circle,
+      ),
+      findsNothing,
+    );
+
+    await tester.pumpWidget(_motionHarness(2));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      tester
+          .widgetList<NeonLedgerStepMarker>(find.byType(NeonLedgerStepMarker))
+          .map((marker) => marker.progress),
+      [
+        LedgerStepProgress.done,
+        LedgerStepProgress.done,
+        LedgerStepProgress.current,
+      ],
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('rapid step reversal continues from the current visible layout', (

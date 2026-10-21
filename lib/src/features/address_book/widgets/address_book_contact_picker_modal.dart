@@ -166,7 +166,7 @@ class _AddressBookContactPickerModalState
                   overflow: TextOverflow.ellipsis,
                   style: AppTypography.bodyLarge.copyWith(
                     color: colors.text.accent,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: AppFontWeight.semiBold,
                   ),
                 ),
               ),
@@ -458,7 +458,7 @@ class _ContactPickerRowState extends State<_ContactPickerRow> {
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.labelMedium.copyWith(
                         color: colors.text.secondary,
-                        fontWeight: FontWeight.w400,
+                        fontWeight: AppFontWeight.regular,
                       ),
                     ),
                   ],

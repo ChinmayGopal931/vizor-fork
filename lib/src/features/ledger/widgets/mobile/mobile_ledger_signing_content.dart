@@ -66,7 +66,7 @@ class MobileLedgerSigningContent extends StatelessWidget {
         onClose: null,
         children: [
           MobileLedgerMessage(
-            'Keep Vizor open while the Ledger request is cancelled.',
+            'Keep Veylor open while the Ledger request is cancelled.',
           ),
           MobileLedgerStatus('Cancelling…'),
         ],
@@ -88,7 +88,7 @@ class MobileLedgerSigningContent extends StatelessWidget {
         : saving
         ? 'Saving the signed transaction.'
         : finishing
-        ? 'Approved on Ledger. Vizor is finishing the transaction.'
+        ? 'Approved on Ledger. Veylor is finishing the transaction.'
         : stage == LedgerSigningStage.preparing
         ? opening
               ? 'Confirm opening Zcash on Ledger.'
@@ -163,7 +163,7 @@ class MobileLedgerSigningContent extends StatelessWidget {
               LedgerStep(
                 'Finish transaction',
                 message: current == 2 ? currentMessage : null,
-                note: current == 2 ? 'Keep Vizor open.' : null,
+                note: current == 2 ? 'Keep Veylor open.' : null,
                 busy: current == 2 && active,
               ),
             ],
@@ -190,7 +190,7 @@ class MobileLedgerSigningContent extends StatelessWidget {
         ],
         if (failed && actionLabel == null && onClose == null) ...[
           const SizedBox(height: AppSpacing.sm),
-          const MobileLedgerMessage('Keep Vizor open.'),
+          const MobileLedgerMessage('Keep Veylor open.'),
         ],
       ],
     );

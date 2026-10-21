@@ -4,7 +4,6 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,6 +23,7 @@ import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/features/activity/activity_eta_provider.dart';
 import 'package:zcash_wallet/src/rust/api/sync.dart' as rust_sync;
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 import '../../support/wallet_path_read_blocker.dart';
@@ -311,9 +311,7 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(393, 852));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await (FontLoader(
-      'Geist',
-    )..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))).load();
+    await loadGothamFonts();
     final labels = [
       'Est. 1–3 min',
       'Est. 2–6 min',
@@ -413,10 +411,11 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(find.byType(MobileTransactionStatusScreen), findsOneWidget);
+    // The receipt's title is drawn uppercase in its top bar.
     expect(
       find.descendant(
         of: find.byType(MobileTransactionStatusScreen),
-        matching: find.text('Received'),
+        matching: find.text('RECEIVED'),
       ),
       findsOneWidget,
     );
@@ -444,7 +443,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Activity'), findsOneWidget);
+    // The page title and the date heads are drawn as uppercase captions.
+    expect(find.text('ACTIVITY'), findsOneWidget);
     expect(
       find.byWidgetPredicate(
         (widget) =>
@@ -458,7 +458,7 @@ void main() {
       tester.getTopLeft(find.byKey(const ValueKey('mobile_activity_feed'))).dy,
       moreOrLessEquals(kMobileTopNavHeight + AppSpacing.s),
     );
-    expect(find.text('This week'), findsOneWidget);
+    expect(find.text('THIS WEEK'), findsOneWidget);
     // The older entry lands in a month-year section.
     final olderDate = now.subtract(const Duration(days: 70));
     expect(find.textContaining('${olderDate.year}'), findsOneWidget);

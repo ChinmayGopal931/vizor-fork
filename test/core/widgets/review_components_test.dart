@@ -35,7 +35,7 @@ void main() {
       );
 
       final valueText = tester.widget<Text>(find.text('u195091 ... 190591'));
-      expect(valueText.style?.fontFamily, 'Young Serif');
+      expect(valueText.style?.fontFamily, 'Gotham');
       expect(valueText.style?.fontSize, 32);
       expect(valueText.style?.decoration, isNull);
       expect(valueText.style?.color, AppThemeData.light.colors.text.accent);

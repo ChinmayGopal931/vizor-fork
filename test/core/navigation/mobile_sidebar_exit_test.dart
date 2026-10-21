@@ -37,6 +37,8 @@ void main() {
         '/about',
         '/voting',
         '/voting/poll/round/results',
+        '/private-usd',
+        '/portfolio-chart',
       ]) {
         expect(requiresMobileSidebarExitPolicy(path), isFalse, reason: path);
       }
@@ -58,12 +60,39 @@ void main() {
         '/settings/change-password',
         '/settings/seed-phrase',
         '/settings/viewing-key',
+        '/private-usd/convert',
+        '/private-usd/convert/review',
+        '/private-usd/conversion/forward/3',
+        '/private-usd/conversion/reverse/3',
+        '/private-usd/send',
+        '/private-usd/send/review',
+        '/private-usd/send/status',
+        '/private-usd/withdraw',
+        '/private-usd/withdraw/review',
+        '/private-usd/refunds',
         '/future-wallet-flow',
       ]) {
         expect(requiresMobileSidebarExitPolicy(path), isTrue, reason: path);
       }
     },
   );
+
+  test('the sidebar lists the tabs and stays beside the pages Home opens', () {
+    expect(
+      [for (final destination in mobileDestinations) destination.path],
+      ['/home', '/activity', '/settings'],
+    );
+    for (final path in [
+      '/swap',
+      '/swap/review',
+      '/private-usd',
+      '/private-usd/convert',
+      '/private-usd/conversion/forward/3',
+      '/portfolio-chart',
+    ]) {
+      expect(hasMobileWalletSidebar(path), isTrue, reason: path);
+    }
+  });
 
   testWidgets('screen state separates menu navigation from account switching', (
     tester,

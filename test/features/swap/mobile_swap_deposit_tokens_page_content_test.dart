@@ -11,6 +11,8 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/core/widgets/dot_qr_shape.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/neon_glyph_badge.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/tron_glyph.dart';
 import 'package:zcash_wallet/src/features/swap/domain/swap_asset.dart';
 import 'package:zcash_wallet/src/features/swap/widgets/mobile/mobile_swap_timeout_content.dart';
 import 'package:zcash_wallet/src/features/swap/widgets/swap_deposit_tokens_page_content.dart';
@@ -245,10 +247,10 @@ void main() {
     final title = find.text('This deposit address is no longer valid');
 
     expect(tester.getSize(content).width, 340);
-    expect(tester.getSize(illustration), const Size(340, 220));
+    expect(tester.getSize(illustration), const Size.square(96));
     expect(
-      (tester.widget<Image>(illustration).image as AssetImage).assetName,
-      'assets/illustrations/swap_failed_illustration.webp',
+      tester.widget<NeonGlyphBadge>(illustration).glyph,
+      TronGlyphKind.warning,
     );
     expect(tester.getSize(message).width, 300);
     expect(

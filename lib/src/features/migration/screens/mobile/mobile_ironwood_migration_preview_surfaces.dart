@@ -393,8 +393,8 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final base = _MigrationPreviewPage(
       navTitle: 'Enable notifications',
-      backgroundColor: const Color(0xFF007F49),
-      navForegroundColor: const Color(0xFFFFFFFF),
+      backgroundColor: context.colors.background.window,
+      navForegroundColor: context.colors.text.accent,
       onBack: onBack,
       bottom: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -404,7 +404,7 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
               errorMessage!,
               textAlign: TextAlign.center,
               style: AppTypography.bodySmall.copyWith(
-                color: const Color(0xFFFFFFFF),
+                color: context.colors.text.destructive,
               ),
             ),
             const SizedBox(height: AppSpacing.s),
@@ -415,10 +415,6 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
             expand: true,
             height: 50,
             onPressed: busy ? null : onNotNow ?? () {},
-            enabledBackgroundColor: const Color(0x00000000),
-            pressedBackgroundColor: const Color(0x1A052C1B),
-            enabledLabelColor: const Color(0xFF052C1B),
-            pressedLabelColor: const Color(0xFF052C1B),
             child: const Text('Not now'),
           ),
           const SizedBox(height: AppSpacing.s),
@@ -429,11 +425,6 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
             constrainContent: true,
             height: 50,
             onPressed: busy ? null : onAllow ?? () {},
-            enabledBackgroundColor: const Color(0xFF052C1B),
-            pressedBackgroundColor: GreenPrimitives.p50Dark,
-            enabledLabelColor: const Color(0xFFDDEAE4),
-            pressedLabelColor: const Color(0xFFDDEAE4),
-            enabledBorderColor: const Color(0x1AFFFFFF),
             leading: const AppIcon(AppIcons.notificationBell, size: 20),
             child: Text(busy ? 'Checking...' : 'Allow notifications'),
           ),
@@ -448,9 +439,9 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
               child: Column(
                 children: [
                   SizedBox(
-                    height: compact ? 190 : 280,
+                    height: compact ? 136 : 192,
                     child: _MigrationNotificationIllustration(
-                      size: compact ? 180 : 256,
+                      size: compact ? 96 : 128,
                     ),
                   ),
                   Center(
@@ -460,7 +451,7 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
                         'Keep your migration on schedule',
                         textAlign: TextAlign.center,
                         style: AppTypography.displayLarge.copyWith(
-                          color: const Color(0xFFFFFFFF),
+                          color: context.colors.text.accent,
                         ),
                       ),
                     ),
@@ -475,7 +466,7 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
                         'avoid unnecessary delays.',
                         textAlign: TextAlign.center,
                         style: AppTypography.bodyMedium.copyWith(
-                          color: const Color(0xFFFFFFFF),
+                          color: context.colors.text.secondary,
                         ),
                       ),
                     ),
@@ -533,7 +524,6 @@ class _MigrationNotificationConfirmationContent extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppTypography.bodyLarge.copyWith(
                 color: context.colors.text.accent,
-                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -543,7 +533,7 @@ class _MigrationNotificationConfirmationContent extends StatelessWidget {
           child: SizedBox(
             width: 280,
             child: Text(
-              'Without notifications, you’ll need to remember to open Vizor '
+              'Without notifications, you’ll need to remember to open Veylor '
               'regularly and approve the next migration step when it’s ready.',
               style: AppTypography.bodyMedium.copyWith(
                 color: context.colors.text.primary,
@@ -580,21 +570,16 @@ class _MigrationNotificationConfirmationContent extends StatelessWidget {
   }
 }
 
+/// The notification page's hero: a lit bell on the neon badge plate.
 class _MigrationNotificationIllustration extends StatelessWidget {
-  const _MigrationNotificationIllustration({this.size = 256});
+  const _MigrationNotificationIllustration({this.size = 128});
 
   final double size;
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: SizedBox.square(
-        dimension: size,
-        child: Image.asset(
-          'assets/illustrations/ironwood_notification_bell.webp',
-          fit: BoxFit.contain,
-        ),
-      ),
+      child: NeonGlyphBadge(iconName: AppIcons.notificationBell, size: size),
     );
   }
 }
@@ -618,18 +603,18 @@ enum _MigrationPreparationState {
 }
 
 const _migrationPreparationAdvancingMessage =
-    'Preparing the next transactions. Keep Vizor open.';
+    'Preparing the next transactions. Keep Veylor open.';
 // Rendered inside the 200px-wide preparation ring — keep it two short
 // sentences or it fills the dial.
 const _migrationPreparationBackgroundTrackingMessage =
-    'Confirming in the background. You can close Vizor.';
+    'Confirming in the background. You can close Veylor.';
 const _migrationPreparationNotificationsDisabledMessage =
-    'Allow notifications to continue in the background, or keep Vizor open.';
+    'Allow notifications to continue in the background, or keep Veylor open.';
 // Deliberately distinct from the message above: this device has no background
 // preparation lane at all, so telling the user to allow notifications would
 // promise something granting them cannot deliver.
 const _migrationPreparationBackgroundUnsupportedMessage =
-    'This device can\u2019t confirm in the background. Keep Vizor open.';
+    'This device can\u2019t confirm in the background. Keep Veylor open.';
 
 class _MigrationPreparationPreview extends StatelessWidget {
   const _MigrationPreparationPreview({
@@ -1659,7 +1644,6 @@ class _MigrationSkeletonValueRow extends StatelessWidget {
       color: accented
           ? context.colors.text.accent
           : context.colors.text.primary,
-      fontWeight: FontWeight.w400,
     );
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1890,14 +1874,14 @@ class _MigrationProgressStatus extends StatelessWidget {
       _MigrationProgressState.waitingNotificationsOff => (
         AppIcons.warningCircle,
         'Waiting for next migration step',
-        'Notifications are disabled. Open Vizor after block 123456 '
+        'Notifications are disabled. Open Veylor after block 123456 '
             '(~1 hr 30 mins) and approve the next migration batch.',
       ),
       _MigrationProgressState.readyToSubmit => (
         AppIcons.migrationTimer,
         'Ready now',
         'The scheduled transaction is ready for automatic submission. '
-            'Keep Vizor open.',
+            'Keep Veylor open.',
       ),
       _MigrationProgressState.broadcasting => (
         AppIcons.notificationBell,
@@ -1906,12 +1890,12 @@ class _MigrationProgressStatus extends StatelessWidget {
             : 'All clear. Migration is in progress',
         'Next migration step expected in\n'
             '~2 hrs 15 mins.\n'
-            'Notifications are on. You can leave Vizor and check back later.',
+            'Notifications are on. You can leave Veylor and check back later.',
       ),
       _MigrationProgressState.confirming => (
         AppIcons.migrationTimer,
         'Waiting for confirmations',
-        'Confirmations are still arriving.\nYou can leave Vizor and check '
+        'Confirmations are still arriving.\nYou can leave Veylor and check '
             'again later.',
       ),
       _MigrationProgressState.needsInput => (
@@ -1946,7 +1930,6 @@ class _MigrationProgressStatus extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppTypography.bodyLarge.copyWith(
                 color: context.colors.text.accent,
-                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -2190,9 +2173,7 @@ class _AnimatedMigrationWaitLoopState extends State<_AnimatedMigrationWaitLoop>
               painter: _MigrationWaitLoopPainter(
                 lineColor: context.colors.text.accent,
                 successColor: context.colors.icon.success,
-                labelStyle: AppTypography.bodyLarge.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                labelStyle: AppTypography.bodyLarge,
               ),
             ),
           ),
@@ -2350,47 +2331,24 @@ class _MigrationCompletePreview extends StatelessWidget {
     return _MigrationPreviewPage(
       navTitle: 'You’re all set!',
       onBack: onDone,
-      backgroundColor: const Color(0xFF007F49),
-      navForegroundColor: const Color(0xFFFFFFFF),
-      bottom: Semantics(
-        button: true,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onDone ?? () {},
-          child: Container(
-            height: 50,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7F7F7),
-              borderRadius: BorderRadius.circular(AppRadii.full),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              'Done',
-              style: AppTypography.labelLarge.copyWith(
-                color: const Color(0xFF1B1F1F),
-              ),
-            ),
-          ),
-        ),
+      backgroundColor: context.colors.background.window,
+      navForegroundColor: context.colors.text.accent,
+      bottom: AppButton(
+        expand: true,
+        height: 50,
+        onPressed: onDone ?? () {},
+        child: const Text('Done'),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox.square(
-            dimension: 256,
-            child: Image(
-              image: AssetImage(
-                'assets/illustrations/ironwood_migration_done_coins.webp',
-              ),
-              fit: BoxFit.contain,
-            ),
-          ),
+          const NeonGlyphBadge(glyph: TronGlyphKind.check, size: 128),
           const SizedBox(height: AppSpacing.xl),
           Text(
             'Your\n$amountText\nare on Ironwood!',
             textAlign: TextAlign.center,
             style: AppTypography.displayLarge.copyWith(
-              color: const Color(0xFFFFFFFF),
+              color: context.colors.text.accent,
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -2399,7 +2357,7 @@ class _MigrationCompletePreview extends StatelessWidget {
             'usual.',
             textAlign: TextAlign.center,
             style: AppTypography.bodyMedium.copyWith(
-              color: const Color(0xFFFFFFFF),
+              color: context.colors.text.secondary,
             ),
           ),
         ],
@@ -2461,7 +2419,6 @@ class _MigrationHomeAttentionPreview extends StatelessWidget {
               'Recent activity',
               style: AppTypography.bodyLarge.copyWith(
                 color: context.colors.text.accent,
-                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -2665,17 +2622,11 @@ class _MigrationValueRow extends StatelessWidget {
       height: 20,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final style =
-              (emphasized
-                      ? AppTypography.labelLarge
-                      : AppTypography.labelLarge.copyWith(
-                          fontWeight: FontWeight.w400,
-                        ))
-                  .copyWith(
-                    color: emphasized || accented
-                        ? context.colors.text.accent
-                        : context.colors.text.primary,
-                  );
+          final style = AppTypography.labelLarge.copyWith(
+            color: emphasized || accented
+                ? context.colors.text.accent
+                : context.colors.text.primary,
+          );
           final labelPainter = TextPainter(
             text: TextSpan(text: label, style: style),
             maxLines: 1,

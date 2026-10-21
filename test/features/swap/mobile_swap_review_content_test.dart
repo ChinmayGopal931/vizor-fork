@@ -248,7 +248,7 @@ void main() {
     expect(find.text('Solana address'), findsOneWidget);
     final title = tester.widget<Text>(find.text('Solana address'));
     expect(title.style?.fontSize, AppTypography.bodyLarge.fontSize);
-    expect(title.style?.fontWeight, FontWeight.w600);
+    expect(title.style?.fontWeight, FontWeight.w100);
 
     final addressScope = find.byKey(
       const ValueKey('mobile_address_verify_chunks'),
@@ -262,7 +262,7 @@ void main() {
       find.byKey(const ValueKey('full_address_text')),
     );
     expect(addressText.softWrap, isTrue);
-    expect(addressText.style?.fontFamily, 'Geist Mono');
+    expect(addressText.style?.fontFamily, 'Gotham');
     expect(find.text('Copy address'), findsOneWidget);
     expect(find.text('Cancel'), findsNothing);
     expect(find.bySemanticsLabel('Close'), findsOneWidget);

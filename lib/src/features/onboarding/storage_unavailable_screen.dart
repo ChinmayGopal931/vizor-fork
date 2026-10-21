@@ -108,12 +108,14 @@ class _StorageUnavailablePane extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          const Positioned.fill(
-            child: OnboardingWelcomeBackdrop(
-              fit: BoxFit.fitWidth,
-              alignment: Alignment.bottomCenter,
+          // The neon redesign (mobile) drops the painted welcome art.
+          if (kAppFormFactor != AppFormFactor.mobile)
+            const Positioned.fill(
+              child: OnboardingWelcomeBackdrop(
+                fit: BoxFit.fitWidth,
+                alignment: Alignment.bottomCenter,
+              ),
             ),
-          ),
           Positioned.fill(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -235,21 +237,21 @@ class _StorageUnavailableContent extends ConsumerWidget {
       return 'Unable to update wallet database';
     }
     if (failureKind == AppBootstrapFailureKind.startupFailure) {
-      return 'Unable to open Vizor';
+      return 'Unable to open Veylor';
     }
     return _isLinux ? 'Unlock your keyring' : 'Secure storage is locked';
   }
 
   String _body(AppBootstrapFailureKind? failureKind) {
     if (failureKind == AppBootstrapFailureKind.walletDbMigrationFailed) {
-      return 'Vizor needs to update the local wallet database before opening this version. Try again, or quit and restart Vizor.';
+      return 'Veylor needs to update the local wallet database before opening this version. Try again, or quit and restart Veylor.';
     }
     if (failureKind == AppBootstrapFailureKind.startupFailure) {
-      return 'Vizor could not load the local startup state. Try again, or quit and restart Vizor.';
+      return 'Veylor could not load the local startup state. Try again, or quit and restart Veylor.';
     }
     return _isLinux
-        ? 'Vizor needs access to the system keyring before it can open your wallet. Unlock the keyring, then try again.'
-        : 'Vizor needs access to secure storage before it can open your wallet. Unlock secure storage, then try again.';
+        ? 'Veylor needs access to the system keyring before it can open your wallet. Unlock the keyring, then try again.'
+        : 'Veylor needs access to secure storage before it can open your wallet. Unlock secure storage, then try again.';
   }
 
   bool get _isLinux => !kIsWeb && defaultTargetPlatform == TargetPlatform.linux;

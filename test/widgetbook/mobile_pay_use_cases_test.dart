@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/mobile_transaction_progress_screen.dart';
 import 'package:zcash_wallet/src/features/pay/screens/mobile/mobile_pay_submitted_screen.dart';
 import 'package:zcash_wallet/src/features/pay/widgets/mobile/mobile_pay_add_contact_card.dart';
 import 'package:zcash_wallet/src/features/pay/widgets/mobile/mobile_pay_amount_step.dart';
@@ -19,7 +20,7 @@ void main() {
     await _pumpUseCase(tester, buildMobilePayAmountUseCase, AppThemeData.light);
 
     expect(find.byType(MobilePayAmountStep), findsOneWidget);
-    expect(find.text('Pay in USDC'), findsOneWidget);
+    expect(find.text('PAY IN USDC'), findsOneWidget);
     expect(
       tester.getSize(find.byKey(const ValueKey('mobile_pay_preview_frame'))),
       const Size(393, 852),
@@ -106,7 +107,7 @@ void main() {
   ) async {
     await _pumpUseCase(tester, buildMobilePayReviewUseCase, AppThemeData.light);
     expect(find.byType(MobilePayReviewContent), findsOneWidget);
-    expect(find.text('Review Payment'), findsOneWidget);
+    expect(find.text('REVIEW PAYMENT'), findsOneWidget);
     expect(find.text('Confirm & pay'), findsOneWidget);
 
     await _pumpUseCase(
@@ -137,7 +138,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('submitted preview uses the shared transaction status asset', (
+  testWidgets('submitted preview uses the shared transaction status page', (
     tester,
   ) async {
     await _pumpUseCase(
@@ -148,16 +149,7 @@ void main() {
 
     expect(find.byType(MobilePaySubmittedScreen), findsOneWidget);
     expect(find.text('Payment\nSubmitted'), findsOneWidget);
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Image &&
-            widget.image is AssetImage &&
-            (widget.image as AssetImage).assetName ==
-                'assets/illustrations/mobile_send_status_background.webp',
-      ),
-      findsOneWidget,
-    );
+    expect(find.byType(MobileTransactionProgressScreen), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

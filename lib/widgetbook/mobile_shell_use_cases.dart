@@ -18,7 +18,6 @@ import '../src/core/widgets/mobile/mobile_surface_card.dart';
 
 const _mobileTabItems = [
   AppMobileTabItem(iconName: AppIcons.home, label: 'Home'),
-  AppMobileTabItem(iconName: AppIcons.swapArrows, label: 'Swap'),
   AppMobileTabItem(iconName: AppIcons.history, label: 'Activity'),
   AppMobileTabItem(iconName: AppIcons.cog, label: 'Settings'),
 ];
@@ -38,25 +37,17 @@ Widget buildMobileTopNavVariantsUseCase(BuildContext context) {
     Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        MobileTopNav.account(
-          accountName: 'Account1',
-          syncLabel: 'Vizor is synced',
-          onAccountTap: () {},
-        ),
+        // Home's bar: the portrait, whose tap reveals the name.
+        MobileTopNav.account(accountName: 'Account1', onAccountTap: () {}),
         MobileTopNav.account(
           accountName: 'Account1',
           balanceLabel: '140.12 ZEC',
-          syncLabel: 'Vizor is synced',
           onAccountTap: () {},
         ),
+        // The migration status screens add the sync label.
         MobileTopNav.account(
           accountName: 'Account1',
           syncLabel: '20% Syncing...',
-          syncLabelColor: context.colors.sync.textSyncing,
-          syncIndicatorColor: context.colors.text.muted,
-          syncHighlightColor: context.colors.sync.lightSuccess,
-          syncAnimated: true,
-          onAccountTap: () {},
         ),
         MobileTopNav.steps(progress: 0.3, onBack: () {}),
         MobileTopNav.back(title: 'Activity', onBack: () {}),
@@ -110,14 +101,11 @@ class _ShellPreviewState extends State<_ShellPreview> {
 
   @override
   Widget build(BuildContext context) {
-    final labels = ['Home', 'Swap', 'Activity', 'Settings'];
+    final labels = ['Home', 'Activity', 'Settings'];
     return AppMobileShell(
       body: Column(
         children: [
-          MobileTopNav.account(
-            accountName: 'Account1',
-            syncLabel: 'Vizor is synced',
-          ),
+          MobileTopNav.account(accountName: 'Account1'),
           Expanded(
             child: Center(
               child: Text(

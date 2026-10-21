@@ -207,7 +207,7 @@ void main() {
       await waitForShieldedBalance(tester, '1.25 $mobileE2eTicker');
       await pumpUntil(
         tester,
-        () => tester.any(find.text('Vizor is synced')),
+        () => tester.any(find.text('Veylor is synced')),
         description: 'sync to complete',
         timeout: const Duration(minutes: 2),
       );
@@ -279,7 +279,7 @@ void main() {
       await tapWidget(tester, const ValueKey('mobile_home_send'));
       await pumpUntil(
         tester,
-        () => tester.any(find.text('Select Recipient')),
+        () => tester.any(find.text('SELECT RECIPIENT')),
         description: 'send recipient step',
       );
       await shot('19_send_recipient');
@@ -296,7 +296,7 @@ void main() {
       );
       await pumpUntil(
         tester,
-        () => tester.any(find.text('Enter Amount')),
+        () => tester.any(find.text('ENTER AMOUNT')),
         description: 'send amount step',
       );
       await shot('21_send_amount_empty');
@@ -319,7 +319,7 @@ void main() {
       );
       await pumpUntil(
         tester,
-        () => tester.any(find.text('Review Send')),
+        () => tester.any(find.text('REVIEW SEND')),
         description: 'send review step',
       );
       await shot('23_send_review');

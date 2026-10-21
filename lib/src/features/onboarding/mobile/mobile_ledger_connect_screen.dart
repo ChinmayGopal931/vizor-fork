@@ -165,7 +165,7 @@ class _MobileLedgerConnectScreenState
                     error,
                     requestKind: LedgerRequestKind.viewingKey,
                   )?.message ??
-                  'Vizor could not read this Ledger account. Check the connection and try again.';
+                  'Veylor could not read this Ledger account. Check the connection and try again.';
       });
     } finally {
       if (mounted && generation == _generation) {
@@ -285,7 +285,7 @@ class _MobileLedgerConnectScreenState
                         : _error ??
                               (opening
                                   ? 'Confirm opening Zcash on Ledger.'
-                                  : 'Keep Ledger connected while Vizor checks the app.')
+                                  : 'Keep Ledger connected while Veylor checks the app.')
                   : null,
               note: current == 1 && opening && _error == null
                   ? 'Keep $appName open.'
@@ -299,10 +299,10 @@ class _MobileLedgerConnectScreenState
                   ? _closing
                         ? 'Cancelling the Ledger request…'
                         : _error ??
-                              'Approve sharing your viewing key with Vizor.'
+                              'Approve sharing your viewing key with Veylor.'
                   : null,
               note: current == 2 && _error == null && !_closing
-                  ? 'View your balance and activity in Vizor. Transactions still need approval on Ledger.'
+                  ? 'View your balance and activity in Veylor. Transactions still need approval on Ledger.'
                   : null,
               busy: current == 2 && pending,
               requiresDeviceAction: pending && !_closing,
@@ -373,12 +373,8 @@ class _MobileLedgerConnectScreenState
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
+              MobileSurfaceCard(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: colors.background.ground,
-                  borderRadius: BorderRadius.circular(AppRadii.large),
-                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -390,7 +386,6 @@ class _MobileLedgerConnectScreenState
                           child: Text(
                             'On your Ledger',
                             style: AppTypography.bodyLarge.copyWith(
-                              fontWeight: FontWeight.w500,
                               color: colors.text.accent,
                             ),
                           ),
@@ -453,7 +448,6 @@ class _MobileLedgerConnectScreenState
                             horizontal: AppSpacing.s,
                             vertical: AppSpacing.sm,
                           ),
-                          borderRadius: BorderRadius.circular(AppRadii.large),
                           onPressed: _sessionOpen
                               ? null
                               : _toggleAdvancedOptions,
@@ -523,7 +517,7 @@ class _MobileLedgerConnectScreenState
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'See your balance and activity in Vizor.\nApprove transactions on Ledger.',
+                'See your balance and activity in Veylor.\nApprove transactions on Ledger.',
                 style: AppTypography.bodyMedium.copyWith(
                   color: colors.text.accent,
                 ),

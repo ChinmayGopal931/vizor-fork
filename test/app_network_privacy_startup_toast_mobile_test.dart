@@ -35,7 +35,7 @@ void main() {
       expect(find.text(kTorStartupFailureNotice), findsNothing);
       expect(
         find.text(
-          'Vizor could not connect to Tor. Requests stay blocked until it connects or you turn Tor off.',
+          'Veylor could not connect to Tor. Requests stay blocked until it connects or you turn Tor off.',
         ),
         findsOneWidget,
       );

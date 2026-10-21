@@ -11,6 +11,7 @@ import 'package:flutter/widgets.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import '../../../../../main.dart' show log;
+import '../../../../core/layout/app_form_factor.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
@@ -112,11 +113,22 @@ class RequestQrSurface extends StatelessWidget {
           width: side + padding * 2,
           height: side + padding * 2,
           padding: EdgeInsets.all(padding),
-          decoration: BoxDecoration(
-            color: colors.surface.qrCode,
-            borderRadius: BorderRadius.circular(AppRadii.large),
-            border: Border.all(color: colors.border.subtle),
-          ),
+          // The neon redesign (mobile) cuts the plate's corners to sit
+          // inside its lit frame; the white margin the camera needs is
+          // untouched either way.
+          decoration: kAppFormFactor == AppFormFactor.mobile
+              ? ShapeDecoration(
+                  color: colors.surface.qrCode,
+                  shape: Neon.chamferBorder(
+                    cut: AppChamfer.large,
+                    side: BorderSide(color: colors.border.subtle),
+                  ),
+                )
+              : BoxDecoration(
+                  color: colors.surface.qrCode,
+                  borderRadius: BorderRadius.circular(AppRadii.large),
+                  border: Border.all(color: colors.border.subtle),
+                ),
           child: qrImage == null
               ? Center(
                   child: Text(

@@ -296,9 +296,11 @@ void main() {
   ) async {
     await _pumpMobileFixture(tester, buildMobileVotingIneligibleUseCase);
 
-    final header = tester.widget<Text>(find.text('Coinholder voting'));
-    expect(header.style?.fontFamily, 'Young Serif');
-    expect(header.style?.fontSize, 32);
+    // The page title is a spaced uppercase caption in Gotham Thin.
+    final header = tester.widget<Text>(find.text('COINHOLDER VOTING'));
+    expect(header.style?.fontFamily, 'Gotham');
+    expect(header.style?.fontWeight, AppTypography.headlineLarge.fontWeight);
+    expect(header.style?.letterSpacing, greaterThan(0));
     final badge = find.byKey(const ValueKey('voting_detail_ineligible_badge'));
     expect(badge, findsOneWidget);
     expect(tester.getTopLeft(badge).dy, 140.5);
@@ -327,14 +329,19 @@ void main() {
     );
     final label = find.descendant(of: option, matching: find.byType(Text));
     expect(tester.getSize(label).width, 305);
-    expect(tester.widget<Text>(label).style?.fontWeight, FontWeight.w400);
+    expect(
+      tester.widget<Text>(label).style?.fontWeight,
+      AppTypography.bodyMedium.fontWeight,
+    );
 
     await tester.tap(find.text('Show description'));
     await tester.pumpAndSettle();
     expect(find.text('Hide description'), findsOneWidget);
+    // Figma keeps the card at 406 after expanding; Gotham wraps the expanded
+    // description onto one more line, which moves the card down 25 px.
     expect(
       tester.getTopLeft(find.byType(VotingProposalCard)),
-      const Offset(16, 406),
+      const Offset(16, 431),
     );
     await tester.tap(find.text('Hide description'));
     await tester.pumpAndSettle();
@@ -367,6 +374,7 @@ void main() {
     await _pumpMobileFixture(tester, buildMobileVotingIneligibleModalUseCase);
     expect(
       tester.getRect(find.byType(MobileModalCard)),
+      // Gotham Light sets the copy on the Figma frame's line count again.
       const Rect.fromLTWH(16, 238.5, 361, 375),
     );
     final switchButton = find.byKey(
@@ -374,6 +382,7 @@ void main() {
     );
     final closeButton = find.byKey(const ValueKey('voting_ineligible_close'));
     expect(tester.getSize(switchButton), const Size(329, 50));
+    // Figma: 469.5.
     expect(tester.getTopLeft(switchButton).dy, 469.5);
     expect(
       tester.getTopLeft(closeButton).dy - tester.getBottomLeft(switchButton).dy,
@@ -602,7 +611,8 @@ void main() {
 
     final card = find.byType(VotingProposalCard);
     expect(card, findsOneWidget);
-    expect(tester.getSize(card), const Size(361, 562));
+    // Re-measured for Gotham; the Figma card is 361 x 562.
+    expect(tester.getSize(card), const Size(361, 637));
     expect(
       find.byKey(const ValueKey('voting_selected_choice_indicator')),
       findsOneWidget,
@@ -699,7 +709,7 @@ void main() {
         );
         final title = tester.widget<Text>(find.text('Vote config'));
         expect(title.style?.fontSize, 18);
-        expect(title.style?.fontWeight, FontWeight.w600);
+        expect(title.style?.fontWeight, FontWeight.w100);
         expect(tester.widget<Text>(find.text('Default')).style?.fontSize, 16);
         expect(find.text('Sources'), findsOneWidget);
         expect(
@@ -865,7 +875,8 @@ void main() {
       await _pumpMobileFixture(tester, buildMobileVotingResultsFullUseCase);
       final card = find.byType(VotingResultCard);
       expect(tester.getTopLeft(card), const Offset(16, 371));
-      expect(tester.getSize(card), const Size(361, 832));
+      // Re-measured for Gotham; the Figma card is 361 x 832.
+      expect(tester.getSize(card), const Size(361, 857));
       expect(find.text('Voted'), findsOneWidget);
       expect(find.text('Results'), findsNothing);
       expect(find.text('985 ZEC (98.5%)'), findsOneWidget);
@@ -889,9 +900,11 @@ void main() {
         tester.getSize(find.byKey(const ValueKey('voting-result-1-option-2'))),
         const Size(329, 101),
       );
-      final nav = tester.widget<Text>(find.text('Voting results'));
-      expect(nav.style?.fontFamily, 'Young Serif');
-      expect(nav.style?.fontSize, 32);
+      // The page title is a spaced uppercase caption in Gotham Thin.
+      final nav = tester.widget<Text>(find.text('VOTING RESULTS'));
+      expect(nav.style?.fontFamily, 'Gotham');
+      expect(nav.style?.fontWeight, AppTypography.headlineLarge.fontWeight);
+      expect(nav.style?.letterSpacing, greaterThan(0));
       await tester.tap(find.text('Show description'));
       await tester.pumpAndSettle();
       expect(find.text('Hide description'), findsOneWidget);
@@ -1172,7 +1185,10 @@ void main() {
       firstOptionInkWell.overlayColor?.resolve({WidgetState.focused}),
       isNull,
     );
-    expect(tester.widget<Text>(label).style?.fontWeight, FontWeight.w400);
+    expect(
+      tester.widget<Text>(label).style?.fontWeight,
+      AppTypography.bodyMedium.fontWeight,
+    );
 
     await tester.tap(firstOption);
     await tester.pumpAndSettle();
@@ -1181,7 +1197,10 @@ void main() {
     expect(tester.getRect(firstOption), initialFirstOptionRect);
     expect(tester.getRect(secondOption), initialSecondOptionRect);
     expect(tester.getRect(label), initialLabelRect);
-    expect(tester.widget<Text>(label).style?.fontWeight, FontWeight.w400);
+    expect(
+      tester.widget<Text>(label).style?.fontWeight,
+      AppTypography.bodyMedium.fontWeight,
+    );
     expect(
       find.byKey(const ValueKey('voting_selected_choice_indicator')),
       findsOneWidget,

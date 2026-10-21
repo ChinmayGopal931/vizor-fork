@@ -1,8 +1,8 @@
-![Vizor banner](.github/assets/gh-vizor-banner.png)
+![Veylor banner](.github/assets/gh-vizor-banner.png)
 
-# Vizor
+# Veylor
 
-Vizor is a self-custody Zcash wallet for shielded ZEC, with a polished desktop
+Veylor is a self-custody Zcash wallet for shielded ZEC, with a polished desktop
 experience built around clarity, privacy, and ease of use. It is for users who
 want to create, receive, shield, and send ZEC without giving a hosted wallet
 service control over their funds.
@@ -53,7 +53,18 @@ fvm flutter build macos --release \
 
 `VIZOR_COINGECKO_PRICE_BASE_URL` controls the home screen ZEC price and 24h
 change source. Open-source builds should use the public CoinGecko base URL
-above; production builds can point this define at a Vizor-operated proxy.
+above; production builds can point this define at a Veylor-operated proxy,
+which then has to serve `/simple/price`.
+
+`VIZOR_PRICING_ENGINE_BASE_URL` controls the price history behind the mobile
+Home portfolio chart: the origin of a pricing engine that serves
+`GET /v1/prices` (daily ZEC prices in USD for a range of UTC dates). It
+defaults to `https://zapp-pricing-engine.majorworker.workers.dev`. The app asks
+it for nothing unless the user turns on "Use market prices" in Settings, and
+then a request names only the coin, the currency, the resolution and the dates
+(never anything from the wallet); the server sees the device's IP address
+unless Tor is on. An empty, non-https or invalid value turns the chart's market
+prices off.
 
 The built app is at:
 
@@ -122,7 +133,7 @@ TeamIdentifier=SZTB68DXM4
 
 ## Notes
 
-- Back up your mnemonic. Vizor cannot recover funds if you lose it.
+- Back up your mnemonic. Veylor cannot recover funds if you lose it.
 - The local password protects this device only. It does not replace the
   mnemonic backup.
 - Shielded transactions are scanned locally, but your lightwalletd endpoint can
@@ -156,9 +167,9 @@ repo root:
 flutter_rust_bridge_codegen generate
 ```
 
-## Support Vizor
+## Support Veylor
 
-If Vizor is useful to you, consider supporting its continued development with
+If Veylor is useful to you, consider supporting its continued development with
 a ZEC donation.
 
 <p align="center">

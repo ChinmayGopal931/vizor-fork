@@ -4,6 +4,7 @@ import 'package:flutter/animation.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 
+import '../../../../../../core/theme/app_theme.dart';
 import '../shield_haptics.dart';
 import '../shield_timeline.dart';
 import 'sprite_atlas.dart';
@@ -114,8 +115,12 @@ class ParticleField extends ChangeNotifier {
     required this.geometry,
     required this.atlas,
     required this.reduceMotion,
+    Color? glow,
+    Color? core,
     int seed = 11,
-  }) : n = geometry.count,
+  }) : glow = glow ?? AppNeonColors.dark.glow,
+       core = core ?? AppNeonColors.dark.core,
+       n = geometry.count,
        _rng = math.Random(seed) {
     _allocate();
     _seed();
@@ -124,6 +129,11 @@ class ParticleField extends ChangeNotifier {
   FieldGeometry geometry;
   SpriteAtlas atlas;
   bool reduceMotion;
+
+  /// The tube's light: a dot at rest glows [glow] and heats toward [core] as
+  /// it flashes or lands.
+  final Color glow;
+  final Color core;
 
   /// Replace artwork destinations without replaying the initial balance fall.
   /// Live positions, velocities, fades, springs and event clocks stay intact.
@@ -273,6 +283,21 @@ class ParticleField extends ChangeNotifier {
 
   Offset get _c0 => geometry.cloudCenter;
   double get _motion => reduceMotion ? 0 : 1;
+
+  late final double _glowR = glow.r * 255,
+      _glowG = glow.g * 255,
+      _glowB = glow.b * 255;
+  late final double _coreR = core.r * 255,
+      _coreG = core.g * 255,
+      _coreB = core.b * 255;
+
+  /// [glow] heated toward [core] by [white] (0..1), as packed RGB.
+  int _tint(double white) {
+    final r = (_glowR + (_coreR - _glowR) * white).round();
+    final g = (_glowG + (_coreG - _glowG) * white).round();
+    final b = (_glowB + (_coreB - _glowB) * white).round();
+    return r << 16 | g << 8 | b;
+  }
 
   void _allocate() {
     Float64List f() => Float64List(n);
@@ -723,7 +748,8 @@ class ParticleField extends ChangeNotifier {
       from: (
         _textDot,
         reduceMotion ? 0 : (_aY[i] >= geometry.textDimFrom ? _textZecAlpha : 1),
-        1,
+        // The unit is lit red, the numerals white-hot.
+        _aY[i] >= geometry.textDimFrom ? 0 : 1,
       ),
     );
   }
@@ -778,6 +804,7 @@ class ParticleField extends ChangeNotifier {
             a >= ShieldTimeline.split + _delayB[i]) {
           _mode[i] = _Mode.balance;
           final icon = _icon[i] == 1;
+          final unit = !icon && _bY[i] >= geometry.balanceDimFrom;
           _setSpring(
             i,
             icon ? _rand(0.65, 0.8) : _rand(0.65, 0.85),
@@ -788,10 +815,8 @@ class ParticleField extends ChangeNotifier {
             t,
             0.6,
             size: icon ? _iconDot : _balanceDot,
-            alpha: !icon && _bY[i] >= geometry.balanceDimFrom
-                ? _balanceZecAlpha
-                : 1,
-            white: 1,
+            alpha: unit ? _balanceZecAlpha : 1,
+            white: unit ? 0 : 1,
           );
         }
       }
@@ -979,6 +1004,9 @@ class ParticleField extends ChangeNotifier {
     final bump = reduceMotion ? 0.0 : 1.0;
     final (groupBalance, groupIcon) = _globalAlpha(a);
     final dustA = _dustAlpha(t, a);
+    final glowRgb = _tint(0);
+    final coreRgb = _tint(1);
+    final specRgb = _tint(0.15);
     _count = 0;
     _gCount = 0;
     _projected.clear();
@@ -1003,9 +1031,7 @@ class ParticleField extends ChangeNotifier {
             py,
             _dSize[j] * s,
             _dAlpha[j] * dustA,
-            0xD9,
-            0xD9,
-            0xD9,
+            glowRgb,
           );
         } else {
           _push(
@@ -1015,7 +1041,7 @@ class ParticleField extends ChangeNotifier {
             _dSize[j] * s,
             0,
             _dAlpha[j] * dustA,
-            0xD9,
+            specRgb,
           );
         }
       }
@@ -1058,7 +1084,7 @@ class ParticleField extends ChangeNotifier {
       var alpha = visAlpha + (1 - visAlpha) * flash;
       alpha *= global;
       final white = math.max(visWhite, flash);
-      final grey = (0xD9 + (0xFF - 0xD9) * white).round();
+      final rgb = _tint(white);
       if (captureProjectedParticles) {
         _projected.add(
           ShieldParticleSample(
@@ -1066,7 +1092,7 @@ class ParticleField extends ChangeNotifier {
             velocity: Offset(_vx[i] * s, _vy[i] * s),
             size: size,
             alpha: alpha,
-            color: Color.fromARGB(255, grey, grey, grey),
+            color: Color(0xFF000000 | rgb),
           ),
         );
       }
@@ -1091,9 +1117,19 @@ class ParticleField extends ChangeNotifier {
           rot = math.atan2(_vy[i], _vx[i]);
         }
       }
-      _push(sprite, px, py, size, rot, alpha, grey);
+      _push(sprite, px, py, size, rot, alpha, rgb);
 
-      // Wave glow: soft white light around the band.
+      // Each dot is a bead of light: a soft red halo around it.
+      _pushGlow(
+        SpriteAtlas.halo,
+        px,
+        py,
+        math.max(size * 3.5, 5),
+        0.3 * alpha,
+        glowRgb,
+      );
+
+      // Wave glow: the tube's light around the band.
       if (g > 0.05) {
         _pushGlow(
           SpriteAtlas.halo,
@@ -1101,13 +1137,11 @@ class ParticleField extends ChangeNotifier {
           py,
           math.max(size * 4.5, 8),
           0.24 * g * global,
-          0xFF,
-          0xFF,
-          0xFF,
+          glowRgb,
         );
       }
 
-      // Blink halo: white core, brand-pink bloom, added light.
+      // Blink halo: a white-hot core in a red bloom, added light.
       if (e > 0.02) {
         _pushGlow(
           SpriteAtlas.halo,
@@ -1115,9 +1149,7 @@ class ParticleField extends ChangeNotifier {
           py,
           math.max(size * 5, 9),
           0.55 * e * global,
-          0xFF,
-          0xFF,
-          0xFF,
+          coreRgb,
         );
         _pushGlow(
           SpriteAtlas.halo,
@@ -1125,9 +1157,7 @@ class ParticleField extends ChangeNotifier {
           py,
           math.max(size * 12, 22),
           0.4 * e * global,
-          0xA8,
-          0x38,
-          0x61,
+          glowRgb,
         );
       }
     }
@@ -1140,7 +1170,7 @@ class ParticleField extends ChangeNotifier {
     double size,
     double rot,
     double alpha,
-    int grey,
+    int rgb,
   ) {
     final o = _count * 4;
     final scale = size / sp.unit;
@@ -1155,7 +1185,7 @@ class ParticleField extends ChangeNotifier {
     _rects[o + 2] = sp.rect.right;
     _rects[o + 3] = sp.rect.bottom;
     final a8 = (alpha.clamp(0.0, 1.0) * 255).round();
-    _colors[_count] = (a8 << 24) | (grey << 16) | (grey << 8) | grey;
+    _colors[_count] = (a8 << 24) | rgb;
     _count++;
   }
 
@@ -1165,9 +1195,7 @@ class ParticleField extends ChangeNotifier {
     double y,
     double diameter,
     double alpha,
-    int r,
-    int g,
-    int b,
+    int rgb,
   ) {
     if (_gCount * 4 >= _gRst.length) return;
     final o = _gCount * 4;
@@ -1181,7 +1209,7 @@ class ParticleField extends ChangeNotifier {
     _gRects[o + 2] = sp.rect.right;
     _gRects[o + 3] = sp.rect.bottom;
     final a8 = (alpha.clamp(0.0, 1.0) * 255).round();
-    _gColors[_gCount] = (a8 << 24) | (r << 16) | (g << 8) | b;
+    _gColors[_gCount] = (a8 << 24) | rgb;
     _gCount++;
   }
 

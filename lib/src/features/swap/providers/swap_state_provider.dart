@@ -2256,7 +2256,7 @@ class SwapNotifier extends Notifier<SwapState> {
     }
     if (normalizedStatus ==
         SwapDepositBroadcastStatus.broadcastedStorageFailed) {
-      return 'The transaction reached the network, but Vizor could not store it locally. Do not try again until sync or an explorer confirms the latest status.';
+      return 'The transaction reached the network, but Veylor could not store it locally. Do not try again until sync or an explorer confirms the latest status.';
     }
     return 'The deposit status is uncertain. Check activity before trying again.';
   }

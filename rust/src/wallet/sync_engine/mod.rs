@@ -2812,12 +2812,16 @@ pub async fn run_sync_inner(
     Err(last_err)
 }
 
-/// Runs the bounded shielded scan needed by one payment-link claim wallet.
+/// Runs the bounded shielded scan needed by one payment-link claim wallet,
+/// or by Private USD's `joint.db`.
 ///
 /// Claim wallets are short-lived, single-account databases. They deliberately
 /// skip transparent refresh, transaction enhancement, migration preparation,
 /// and main-wallet completion metadata. Each caller owns its database, so this
-/// path does not take the main wallet's process-global sync guard or write lock.
+/// path does not take the main wallet's process-global sync guard. Its block
+/// scans write that database directly, but its send-lock recovery and subtree
+/// root writes take the process-global wallet write lock, so they wait on the
+/// main sync's batches, and the main sync waits on them.
 pub async fn run_payment_link_claim_sync(
     db_data_path: &str,
     lightwalletd_url: &str,

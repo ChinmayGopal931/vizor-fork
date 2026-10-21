@@ -19,6 +19,7 @@ import '../../../../providers/account_provider.dart';
 import '../../../../providers/receive_address_provider.dart';
 import '../../../../providers/sync_provider.dart';
 import '../../widgets/mobile/receive_address_info_sheet.dart';
+import '../../widgets/mobile/receive_qr_frame.dart';
 import '../../widgets/mobile/receive_request_sheet.dart';
 import '../../widgets/receive_address_widgets.dart';
 
@@ -37,8 +38,9 @@ bool _shouldRefreshTransparentAddressAfterSyncUpdate(
       (failedAt != null && failedAt != previous.lastSyncFailedAt);
 }
 
-/// Mobile receive screen — Figma `Receive` (4514:110524): pool tabs,
-/// QR with the renew control on its bottom edge, compact address line,
+/// Mobile receive screen — Figma `Receive` (4514:110524) in the neon look:
+/// pool tabs, the QR in a lit frame with the renew control set into its
+/// bottom edge, the account as a red caption over the compact address line,
 /// and share/copy actions, composed from the shared receive widgets.
 class MobileReceiveScreen extends ConsumerStatefulWidget {
   const MobileReceiveScreen({
@@ -235,7 +237,6 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
             children: [
               MobileTopNav.back(
                 title: 'Receive $kZcashDefaultCurrencyTicker',
-                titleStyle: AppTypography.headlineLarge,
                 height: _MobileReceiveMetrics.topNavHeight,
                 onBack: () => context.pop(),
               ),
@@ -265,23 +266,47 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                     const SizedBox(height: _MobileReceiveMetrics.tabsToQrGap),
                     Center(
                       child: SizedBox(
-                        width: _MobileReceiveMetrics.qrWrapWidth,
-                        height: _MobileReceiveMetrics.qrCodeHeight,
-                        child: PageView(
-                          key: const ValueKey('mobile_receive_qr_pager'),
-                          controller: _pageController,
-                          onPageChanged: _handlePageChanged,
+                        width: _MobileReceiveMetrics.qrFrameWidth,
+                        height:
+                            _MobileReceiveMetrics.qrFrameGap +
+                            _MobileReceiveMetrics.qrCodeHeight,
+                        // The frame stays put and the codes slide through it;
+                        // its glow is free to spill past the pager's edges.
+                        child: Stack(
+                          clipBehavior: Clip.none,
                           children: [
-                            for (final type in ReceiveAddressType.values)
-                              _ReceiveQrPage(
-                                key: ValueKey('mobile_receive_qr_${type.name}'),
-                                type: type,
-                                address: _addressFor(type),
-                                renewing: _renewing,
-                                scanOptimizedQr: scanOptimizedQr,
-                                onRenew: () =>
-                                    unawaited(_renewShieldedAddress()),
+                            const Positioned(
+                              left: 0,
+                              top: 0,
+                              width: _MobileReceiveMetrics.qrFrameWidth,
+                              height: _MobileReceiveMetrics.qrFrameHeight,
+                              child: IgnorePointer(child: ReceiveQrFrame()),
+                            ),
+                            Positioned(
+                              left: _MobileReceiveMetrics.qrFrameGap,
+                              top: _MobileReceiveMetrics.qrFrameGap,
+                              width: _MobileReceiveMetrics.qrWrapWidth,
+                              height: _MobileReceiveMetrics.qrCodeHeight,
+                              child: PageView(
+                                key: const ValueKey('mobile_receive_qr_pager'),
+                                controller: _pageController,
+                                onPageChanged: _handlePageChanged,
+                                children: [
+                                  for (final type in ReceiveAddressType.values)
+                                    _ReceiveQrPage(
+                                      key: ValueKey(
+                                        'mobile_receive_qr_${type.name}',
+                                      ),
+                                      type: type,
+                                      address: _addressFor(type),
+                                      renewing: _renewing,
+                                      scanOptimizedQr: scanOptimizedQr,
+                                      onRenew: () =>
+                                          unawaited(_renewShieldedAddress()),
+                                    ),
+                                ],
                               ),
+                            ),
                           ],
                         ),
                       ),
@@ -327,9 +352,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                                     ),
                                     child: Text(
                                       'Share $poolLabel address',
-                                      style: AppTypography.labelMedium.copyWith(
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                                      style: AppTypography.labelMedium,
                                     ),
                                   ),
                                 ),
@@ -397,15 +420,25 @@ abstract final class _MobileReceiveMetrics {
   static const tabsWidth = 320.0;
   static const tabsHeight = 44.0;
   static const tabsIconSize = 20.0;
-  static const tabsToQrGap = 32.0;
+
+  /// To the frame's top edge; the code's plate sits one frame gap below it.
+  static const tabsToQrGap = 24.0;
 
   static const qrWrapWidth = 292.0;
   static const qrCodeHeight = 340.0;
   static const qrSize = 260.0;
   static const qrPaddingX = 16.0;
   static const qrPaddingY = 24.0;
+  static const qrPlateHeight = qrSize + qrPaddingY * 2;
   static const qrBadgeSize = 54.26;
-  static const renewTop = 292.0;
+
+  /// The lit frame around the plate.
+  static const qrFrameGap = kReceiveQrFrameGap;
+  static const qrFrameWidth = qrWrapWidth + qrFrameGap * 2;
+  static const qrFrameHeight = qrPlateHeight + qrFrameGap * 2;
+
+  /// Centred on the frame's bottom edge.
+  static const renewTop = qrPlateHeight + qrFrameGap - renewSize / 2;
   static const renewSize = 48.0;
 
   static const qrToAddressGap = 24.0;
@@ -497,16 +530,7 @@ class _ReceiveAddressSummary extends StatelessWidget {
         children: [
           SizedBox(
             height: _MobileReceiveMetrics.accountNameHeight,
-            child: Text(
-              accountName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: AppTypography.bodyLarge.copyWith(
-                color: colors.text.accent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: _ReceiveAccountCaption(name: accountName),
           ),
           const SizedBox(height: AppSpacing.xxs),
           AnimatedSwitcher(
@@ -519,7 +543,6 @@ class _ReceiveAddressSummary extends StatelessWidget {
               key: ValueKey('mobile_receive_address_line_${type.name}'),
               type: type,
               address: address,
-              secondaryTint: true,
               height: _MobileReceiveMetrics.addressLineHeight,
               helpButtonSize: _MobileReceiveMetrics.addressLineHeight,
               helpIconSize: 20,
@@ -535,6 +558,59 @@ class _ReceiveAddressSummary extends StatelessWidget {
   }
 }
 
+/// The account whose address this is, as the address line's red HUD caption
+/// between two hairlines that light up toward it.
+class _ReceiveAccountCaption extends StatelessWidget {
+  const _ReceiveAccountCaption({required this.name});
+
+  final String name;
+
+  /// Leaves each hairline at least a short run beside a long name.
+  static const _maxNameWidth = 200.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final glow = context.colors.neon.glow;
+    Widget rule({required bool towardRight}) {
+      final lit = glow.withValues(alpha: 0.45);
+      final dark = glow.withValues(alpha: 0);
+      return Expanded(
+        child: Container(
+          height: 1,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: towardRight ? [dark, lit] : [lit, dark],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        rule(towardRight: true),
+        const SizedBox(width: AppSpacing.s),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _maxNameWidth),
+          child: Text(
+            name.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: kNeonHudCaptionStyle.copyWith(
+              color: glow,
+              shadows: Neon.textGlow(glow, intensity: 0.35),
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.s),
+        rule(towardRight: false),
+      ],
+    );
+  }
+}
+
+/// Copy, under the share row: a ghost button, its glyph lit red.
 class _CopyAddressTextButton extends StatelessWidget {
   const _CopyAddressTextButton({
     required this.label,
@@ -550,38 +626,32 @@ class _CopyAddressTextButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final color = enabled ? colors.text.accent : colors.text.disabled;
     return Semantics(
       button: true,
       enabled: enabled,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: enabled ? onTap : null,
-        child: SizedBox(
-          width: _MobileReceiveMetrics.buttonStackWidth,
+      child: SizedBox(
+        width: _MobileReceiveMetrics.buttonStackWidth,
+        height: _MobileReceiveMetrics.buttonHeight,
+        child: AppButton(
+          variant: AppButtonVariant.ghost,
+          expand: true,
+          constrainContent: true,
           height: _MobileReceiveMetrics.buttonHeight,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppIcon(
-                AppIcons.copy,
-                size: _MobileReceiveMetrics.buttonIconSize,
-                color: color,
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.labelMedium.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
+          iconGap: AppSpacing.xs,
+          enabledLabelColor: colors.text.accent,
+          pressedLabelColor: colors.text.accent,
+          disabledBackgroundColor: const Color(0x00000000),
+          onPressed: enabled ? onTap : null,
+          leading: AppIcon(
+            AppIcons.copy,
+            size: _MobileReceiveMetrics.buttonIconSize,
+            color: enabled ? colors.neon.glow : colors.text.disabled,
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypography.labelMedium,
           ),
         ),
       ),

@@ -49,10 +49,10 @@ class LedgerBluetoothAccessStatus {
           : 'Choose Allow permission to connect to your Ledger. If no prompt appears, open Settings.';
     }
     return locationPermission
-        ? 'This Android version needs location permission to find your Ledger. Allow location access for Vizor in Settings.'
+        ? 'This Android version needs location permission to find your Ledger. Allow location access for Veylor in Settings.'
         : macOS
-        ? 'Open System Settings > Privacy & Security > Bluetooth and allow access for Vizor.'
-        : 'Allow Bluetooth access for Vizor in your device settings.';
+        ? 'Open System Settings > Privacy & Security > Bluetooth and allow access for Veylor.'
+        : 'Allow Bluetooth access for Veylor in your device settings.';
   }
 }
 

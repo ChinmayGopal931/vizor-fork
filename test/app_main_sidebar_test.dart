@@ -6,7 +6,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
     as frb;
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
@@ -28,14 +27,11 @@ import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_failure.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/rust/api/sync.dart' as rust_sync;
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   setUpAll(() async {
-    final loader = FontLoader('Geist')
-      ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-SemiBold.ttf'));
-    await loader.load();
+    await loadGothamFonts();
   });
 
   testWidgets('sidebar shows additional Checking progress', (tester) async {
@@ -94,7 +90,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(kSyncStatusConnectingToTorLabel), findsOneWidget);
-    expect(find.text('Vizor is synced'), findsNothing);
+    expect(find.text('Veylor is synced'), findsNothing);
   });
 
   testWidgets('sidebar shows primary navigation', (tester) async {

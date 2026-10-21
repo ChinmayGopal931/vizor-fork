@@ -23,7 +23,7 @@ const _sampleFullAddress =
 
 const _sampleTransparentAddress = 't1PV7nyJ3J6pZBh6sCrd5dSDd6uhXGVSpEX';
 
-/// Showcase address that mixes letter `O` and digit `0` so Geist Mono's
+/// Showcase address that mixes letter `O` and digit `0` so the font's
 /// glyph distinction is visible in Widgetbook / figma-compare.
 const kAddressViewerShowcaseAddress =
     'u10O0qrstuvwxyzO0O0abcdefghijklO0O0mnopqrstuvwxO0O001234567890O0O0'

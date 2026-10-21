@@ -1,6 +1,9 @@
 import 'package:flutter/painting.dart';
 
+import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
+
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Component-level surface colors.
 ///
@@ -33,9 +36,12 @@ class AppSurfaceColors {
   final Color qrCode;
   final Color scrollbarThumb;
 
-  static const dark = AppSurfaceColors(
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
+
+  static const figmaDark = AppSurfaceColors(
     card: Primitives.p100Dark,
-    input: AppInputSurfaceColors.dark,
+    input: AppInputSurfaceColors.figmaDark,
     nav: Primitives.p50Dark,
     navActive: Primitives.p150Dark,
     tooltip: Primitives.p200Dark,
@@ -43,9 +49,9 @@ class AppSurfaceColors {
     scrollbarThumb: Primitives.p200Dark,
   );
 
-  static const light = AppSurfaceColors(
+  static const figmaLight = AppSurfaceColors(
     card: Primitives.p50Light,
-    input: AppInputSurfaceColors.light,
+    input: AppInputSurfaceColors.figmaLight,
     nav: Primitives.p0Light,
     navActive: Primitives.p100Light,
     // Tooltip is the same concrete value in both modes; picking p800Light here
@@ -53,6 +59,26 @@ class AppSurfaceColors {
     tooltip: Primitives.p800Light,
     qrCode: Primitives.p0Light,
     scrollbarThumb: Primitives.p150Light,
+  );
+
+  static const neonDark = AppSurfaceColors(
+    card: NeonPrimitives.n100Dark,
+    input: AppInputSurfaceColors.neonDark,
+    nav: NeonPrimitives.n50Dark,
+    navActive: NeonPrimitives.n150Dark,
+    tooltip: NeonPrimitives.n200Dark,
+    qrCode: NeonPrimitives.white,
+    scrollbarThumb: NeonPrimitives.n200Dark,
+  );
+
+  static const neonLight = AppSurfaceColors(
+    card: NeonPrimitives.n50Light,
+    input: AppInputSurfaceColors.neonLight,
+    nav: NeonPrimitives.n0Light,
+    navActive: NeonPrimitives.n100Light,
+    tooltip: NeonPrimitives.n200Dark,
+    qrCode: NeonPrimitives.white,
+    scrollbarThumb: NeonPrimitives.n150Light,
   );
 }
 
@@ -68,15 +94,30 @@ class AppInputSurfaceColors {
   final Color secondary;
   final Color focus;
 
-  static const dark = AppInputSurfaceColors(
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
+
+  static const figmaDark = AppInputSurfaceColors(
     primary: Primitives.p50Dark,
     secondary: Primitives.p150Dark,
     focus: Primitives.p100Dark,
   );
 
-  static const light = AppInputSurfaceColors(
+  static const figmaLight = AppInputSurfaceColors(
     primary: Primitives.p0Light,
     secondary: Primitives.p100Light,
     focus: Primitives.p50Light,
+  );
+
+  static const neonDark = AppInputSurfaceColors(
+    primary: NeonPrimitives.n50Dark,
+    secondary: NeonPrimitives.n150Dark,
+    focus: NeonPrimitives.n100Dark,
+  );
+
+  static const neonLight = AppInputSurfaceColors(
+    primary: NeonPrimitives.n0Light,
+    secondary: NeonPrimitives.n100Light,
+    focus: NeonPrimitives.n50Light,
   );
 }

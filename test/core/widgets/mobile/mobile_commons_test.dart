@@ -59,19 +59,31 @@ void main() {
     expect(taps, 0);
   });
 
-  testWidgets('MobileSurfaceCard paints the ground surface', (tester) async {
+  testWidgets('MobileSurfaceCard paints a neon glass panel', (tester) async {
     await tester.pumpWidget(
       _harness(const MobileSurfaceCard(child: Text('content'))),
     );
 
-    final box = tester.widget<DecoratedBox>(
+    final panel = tester.widget<CustomPaint>(
       find.ancestor(
         of: find.text('content'),
-        matching: find.byType(DecoratedBox),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is CustomPaint && widget.painter is NeonGlassPanelPainter,
+        ),
       ),
     );
-    final decoration = box.decoration as BoxDecoration;
-    expect(decoration.color, AppThemeData.dark.colors.background.ground);
+    final painter = panel.painter! as NeonGlassPanelPainter;
+    final colors = AppThemeData.dark.colors;
+    // A see-through pane of the window colour, with lit cut corners.
+    expect(
+      painter.fill.withValues(alpha: 1),
+      colors.background.window.withValues(alpha: 1),
+    );
+    expect(painter.fill.a, inExclusiveRange(0, 1));
+    expect(painter.glow, colors.neon.glow);
+    expect(painter.core, colors.neon.core);
+    expect(painter.cut, AppChamfer.large);
   });
 
   testWidgets('MobileTopNav.account applies sync color overrides', (

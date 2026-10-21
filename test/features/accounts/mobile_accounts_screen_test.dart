@@ -25,6 +25,7 @@ import 'package:zcash_wallet/src/features/accounts/widgets/mobile/account_edit_s
 import 'package:zcash_wallet/src/features/migration/providers/ironwood_migration_coordinator_provider.dart';
 import 'package:zcash_wallet/src/features/payment_links/services/payment_link_received_store.dart';
 import 'package:zcash_wallet/src/features/payment_links/services/payment_link_recovery_reconciler.dart';
+import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/biometric_unlock_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
@@ -178,6 +179,7 @@ class _FakeAccountNotifier extends AccountNotifier {
   Future<void> removeAccount(
     String uuid, {
     int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
   }) async {
     if (removeError case final error?) throw error;
     confirmedUnsharedGiftCardCounts.add(confirmedUnsharedGiftCardCount);
@@ -202,7 +204,10 @@ class _FakeAccountNotifier extends AccountNotifier {
   }
 
   @override
-  Future<void> resetWallet({int? confirmedUnsharedGiftCardCount}) async {
+  Future<void> resetWallet({
+    int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
+  }) async {
     confirmedUnsharedGiftCardCounts.add(confirmedUnsharedGiftCardCount);
     beforeRemove?.call(confirmedUnsharedGiftCardCount);
     resetCount += 1;
@@ -564,7 +569,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('deletes every account'), findsOneWidget);
-      expect(find.text('Reset Vizor'), findsOneWidget);
+      expect(find.text('Reset Veylor'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('mobile_account_remove_backup_warning')),
         setupPending ? findsOneWidget : findsNothing,
@@ -641,7 +646,7 @@ void main() {
       accounts: const ['a'],
       count: 2,
       message:
-          '2 funded gift card links have not been shared. Resetting Vizor '
+          '2 funded gift card links have not been shared. Resetting Veylor '
           'loses them. Copy the links first.',
     ),
     (
@@ -658,7 +663,7 @@ void main() {
       count: null,
       message:
           "Couldn't check for unshared gift card links. Copy any links you "
-          'still need before resetting Vizor.',
+          'still need before resetting Veylor.',
     ),
   ]) {
     testWidgets('removal sheet warns about ${testCase.name}', (tester) async {
@@ -754,10 +759,10 @@ void main() {
       await tester.pumpAndSettle();
 
       final subject = isLastAccount
-          ? 'Resetting Vizor'
+          ? 'Resetting Veylor'
           : 'Removing this account';
       final action = isLastAccount
-          ? 'resetting Vizor'
+          ? 'resetting Veylor'
           : 'removing this account';
       expect(
         find.byKey(const ValueKey('mobile_account_remove_backup_warning')),
@@ -975,7 +980,7 @@ void main() {
       findsOneWidget,
     );
     final accountLabel = tester.widget<Text>(find.text('Account name'));
-    expect(accountLabel.style?.fontWeight, FontWeight.w400);
+    expect(accountLabel.style?.fontWeight, AppTypography.labelLarge.fontWeight);
     expect(accountLabel.style?.fontSize, AppTypography.labelLarge.fontSize);
     expect(accountLabel.style?.height, AppTypography.labelLarge.height);
     expect(
@@ -1057,7 +1062,7 @@ void main() {
     final profilePictureTitle = tester.widget<Text>(
       find.text('Select profile picture'),
     );
-    expect(profilePictureTitle.style?.fontWeight, FontWeight.w600);
+    expect(profilePictureTitle.style?.fontWeight, FontWeight.w100);
     expect(
       profilePictureTitle.style?.fontSize,
       AppTypography.bodyLarge.fontSize,
@@ -1068,10 +1073,17 @@ void main() {
       ),
       const Size(72, 72),
     );
-    for (final suffix in ['01', '02', '03', '04', '05', '06', '15']) {
+    // The seven neon portraits; the retired knights are no longer offered.
+    for (final suffix in ['01', '02', '03', '04', '05', '06', '07']) {
       expect(
         find.byKey(ValueKey('mobile_account_pfp_option_pfp-$suffix')),
         findsOneWidget,
+      );
+    }
+    for (final suffix in ['08', '15']) {
+      expect(
+        find.byKey(ValueKey('mobile_account_pfp_option_pfp-$suffix')),
+        findsNothing,
       );
     }
     final firstRowTop = tester
@@ -1241,21 +1253,21 @@ void main() {
     final title = tester.widget<Text>(find.text('Remove account'));
     expect(title.style?.fontSize, 16);
     expect(title.style?.height, 24 / 16);
-    expect(title.style?.fontWeight, FontWeight.w600);
+    expect(title.style?.fontWeight, FontWeight.w100);
     final body = tester.widget<Text>(
       find.textContaining('deletes its local data'),
     );
     expect(body.style?.fontSize, 14);
     expect(body.style?.height, 21 / 14);
-    expect(body.style?.fontWeight, FontWeight.w400);
+    expect(body.style?.fontWeight, FontWeight.w300);
     final remove = tester.widget<Text>(find.text('Remove'));
     expect(remove.style?.fontSize, 14);
     expect(remove.style?.height, 16 / 14);
-    expect(remove.style?.fontWeight, FontWeight.w500);
+    expect(remove.style?.fontWeight, FontWeight.w300);
     final cancel = tester.widget<Text>(find.text('Cancel'));
     expect(cancel.style?.fontSize, 14);
     expect(cancel.style?.height, 16 / 14);
-    expect(cancel.style?.fontWeight, FontWeight.w500);
+    expect(cancel.style?.fontWeight, FontWeight.w300);
 
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -1397,6 +1409,73 @@ void main() {
     expect(find.byType(MobileAccountRemovalSheet), findsNothing);
   });
 
+  for (final isLastAccount in [false, true]) {
+    testWidgets('removal warns with the private USD conversions under way '
+        '(lastAccount: $isLastAccount)', (tester) async {
+      tester.view
+        ..physicalSize = const Size(393, 852)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) =>
+              AppTheme(data: AppThemeData.dark, child: child!),
+          home: Scaffold(
+            body: MobileAccountRemovalSheet(
+              account: _account('a', 'Knight'),
+              isLastAccount: isLastAccount,
+              hasActiveMigration: false,
+              unsharedGiftCardCount: 0,
+              privateUsdUnfinishedCount: 2,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text(PrivateUsdCopy.deleteUnfinishedTitle), findsOneWidget);
+      expect(
+        find.text(
+          isLastAccount
+              ? PrivateUsdCopy.resetUnfinishedBody(2)
+              : PrivateUsdCopy.deleteUnfinishedBody(2),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          isLastAccount
+              ? PrivateUsdCopy.resetAnyway
+              : PrivateUsdCopy.deleteAnyway,
+        ),
+        findsOneWidget,
+      );
+    });
+  }
+
+  testWidgets('removal has no conversion warning without one under way', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) =>
+            AppTheme(data: AppThemeData.dark, child: child!),
+        home: Scaffold(
+          body: MobileAccountRemovalSheet(
+            account: _account('a', 'Knight'),
+            isLastAccount: false,
+            hasActiveMigration: false,
+            unsharedGiftCardCount: 0,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text(PrivateUsdCopy.deleteUnfinishedTitle), findsNothing);
+    expect(find.text('Remove'), findsOneWidget);
+  });
+
   testWidgets('remove explains what happens to an active migration', (
     tester,
   ) async {
@@ -1424,7 +1503,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.textContaining('will no longer continue in Vizor'),
+      find.textContaining('will no longer continue in Veylor'),
       findsOneWidget,
     );
     expect(
@@ -1462,6 +1541,6 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('fully sync'), findsOneWidget);
-    expect(find.text('Reset Vizor'), findsOneWidget);
+    expect(find.text('Reset Veylor'), findsOneWidget);
   });
 }

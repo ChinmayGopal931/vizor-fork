@@ -24,6 +24,11 @@ import '../core/storage/app_secure_store.dart';
 import '../core/storage/linux_keyring_coordinator.dart';
 import '../core/storage/wallet_paths.dart';
 import '../features/payment_links/providers/gift_card_tracking_lifecycle_provider.dart';
+import '../features/private_usd/providers/private_usd_custom_rpc_provider.dart'
+    show privateUsdCustomRpcProvider;
+import '../features/private_usd/services/private_usd_account_data.dart';
+import '../features/private_usd/services/railgun_engine.dart'
+    show RailgunWalletDeletion;
 import '../features/swap/providers/swap_activity_store.dart';
 import '../features/migration/services/ironwood_migration_background_credential_store.dart';
 import '../features/migration/services/ironwood_migration_operation_registry.dart';
@@ -38,6 +43,7 @@ import '../rust/api/wallet.dart' as rust_wallet;
 import 'account_models.dart';
 import 'app_security_provider.dart';
 import 'enhance_pir_provider.dart';
+import 'private_usd_lifecycle_provider.dart';
 import 'public_details_loads_provider.dart';
 import 'network_privacy_provider.dart';
 import 'rpc_endpoint_failover_provider.dart';
@@ -88,7 +94,7 @@ class WalletAccountSetupInterruptedException implements Exception {
 
   @override
   String toString() =>
-      'Couldn’t finish saving your wallet. Close and reopen Vizor to finish setup.';
+      'Couldn’t finish saving your wallet. Close and reopen Veylor to finish setup.';
 }
 
 class GiftClaimAccountCreatedException
@@ -100,7 +106,7 @@ class GiftClaimAccountCreatedException
 }
 
 const kWalletAccountStateUncertainMessage =
-    "Vizor couldn't verify the existing wallet. Close and reopen Vizor before trying again.";
+    "Veylor couldn't verify the existing wallet. Close and reopen Veylor before trying again.";
 
 /// A first-account operation was refused because the wallet DB may already
 /// contain an account that is not represented in Dart state.
@@ -298,6 +304,9 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         name: accountName,
         order: accounts.length,
         isSeedAnchor: accounts.isEmpty,
+        // Both Rust paths create ZIP-32 account 0 of this mnemonic, as
+        // `list_accounts` reports after the next launch.
+        zip32AccountIndex: 0,
       );
       final updatedAccounts = [...accounts, newAccount];
       await _saveAccounts(updatedAccounts);
@@ -415,6 +424,9 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         order: accounts.length,
         isSeedAnchor: accounts.isEmpty,
         profilePictureId: normalizedProfilePictureId,
+        // Both Rust paths create ZIP-32 account 0 of this mnemonic, as
+        // `list_accounts` reports after the next launch.
+        zip32AccountIndex: 0,
       );
       final updatedAccounts = [...accounts, newAccount];
       await _saveAccounts(updatedAccounts);
@@ -1593,15 +1605,22 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
   ///
   /// [confirmedUnsharedGiftCardCount] is the unshared Gift Card count the user
   /// was warned about; null skips the post-drain recheck.
+  ///
+  /// [confirmedPrivateUsdUnfinishedCount] is the number of Private USD
+  /// conversions under way the user was warned about; null skips the
+  /// post-drain recheck, as for Gift Cards.
   Future<void> removeAccount(
     String uuid, {
     int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
   }) => ref
       .read(linuxKeyringCoordinatorProvider)
       .runMutation(
         () => _removeAccount(
           uuid,
           confirmedUnsharedGiftCardCount: confirmedUnsharedGiftCardCount,
+          confirmedPrivateUsdUnfinishedCount:
+              confirmedPrivateUsdUnfinishedCount,
         ),
       );
 
@@ -1635,9 +1654,35 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
     }
   }
 
+  /// Refuses when more Private USD conversions are under way across
+  /// [accountUuids] than the user confirmed: their funds sit in a joint
+  /// account or escrow that only this seed and swap index can recover. Read
+  /// after the drain, so one that started meanwhile is counted.
+  Future<void> _throwIfPrivateUsdConversionsUnconfirmed(
+    Iterable<String> accountUuids,
+    int? confirmedCount,
+  ) async {
+    if (confirmedCount == null) return;
+    final int count;
+    try {
+      count = await ref
+          .read(privateUsdLifecycleProvider)
+          .unfinishedCount(accountUuids);
+    } catch (e, st) {
+      // Conversions may be under way; reconfirm without a count rather than
+      // proceed silently.
+      log('private USD conversion recheck failed: $e\n$st');
+      throw const PrivateUsdUnfinishedConversionsException();
+    }
+    if (count > confirmedCount) {
+      throw PrivateUsdUnfinishedConversionsException(count: count);
+    }
+  }
+
   Future<void> _removeAccount(
     String uuid, {
     int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
   }) async {
     ref.read(votingSubmissionGuardProvider.notifier).throwIfActive();
     final prev = state.value ?? const AccountState();
@@ -1651,6 +1696,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
     final shareTracking = ref.read(votingShareTrackingRegistryProvider);
     final ledgerLifecycle = ref.read(ledgerOperationLifecycleProvider);
     final publicLoads = ref.read(publicDetailsLoadsProvider);
+    final privateUsd = ref.read(privateUsdLifecycleProvider);
     try {
       await ledgerLifecycle.quiesceAndDrain();
       await publicLoads.quiesceAndDrain();
@@ -1665,15 +1711,22 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
       // deletion. The pause holds until the wallet rows are gone.
       await giftTracking.quiesceAndDrain();
       await claimLifecycle.quiesceAndDrain();
+      // The Railgun page holds an account's wallet: it closes before any
+      // account data goes.
+      await privateUsd.quiesceAndDrain();
       await shareTracking.quiesceAndDrain(accountUuid: uuid);
       await _throwIfUnsharedGiftCardsIncreased([
         uuid,
       ], confirmedUnsharedGiftCardCount);
+      await _throwIfPrivateUsdConversionsUnconfirmed([
+        uuid,
+      ], confirmedPrivateUsdUnfinishedCount);
       await _removeAccountWithShareTrackingStopped(uuid);
     } finally {
       ledgerLifecycle.resume();
       publicLoads.resume();
       claimLifecycle.resume();
+      privateUsd.resume();
       giftTracking.resume();
       shareTracking.resume(accountUuid: uuid);
       shareTracking.requestRestore();
@@ -1703,12 +1756,16 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
     ];
     final dbPath = await _getDbPath();
     final network = await _getNetwork();
+    final privateUsd = ref.read(privateUsdLifecycleProvider);
     final migrationRevocation = await IronwoodMigrationOperationRegistry
         .instance
         .revokeAndWait(network: network, accountUuid: uuid);
     final migrationLifecycle = IronwoodMigrationBackgroundLifecycle.instance;
     final migrationQuiescenceManagedByCaller =
         migrationLifecycle.isQuiescenceManagedByCaller;
+    // Its Railgun wallet's mnemonic, which Rust derives only while the
+    // account exists; the wallet leaves the page's storage last, below.
+    RailgunWalletDeletion? railgunWallet;
     try {
       if (!migrationQuiescenceManagedByCaller) {
         await migrationLifecycle.quiesce();
@@ -1718,6 +1775,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         network: network,
         accountUuid: uuid,
       );
+      railgunWallet = await privateUsd.prepareRailgunWalletDeletion(uuid);
       final rustDeleteWatch = Stopwatch()..start();
       await rust_wallet.deleteAccount(
         dbPath: dbPath,
@@ -1730,6 +1788,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         '${rustDeleteWatch.elapsedMilliseconds}ms uuid=$uuid',
       );
     } catch (_) {
+      railgunWallet?.discard();
       migrationRevocation.rollback();
       if (!migrationQuiescenceManagedByCaller) {
         try {
@@ -1761,6 +1820,25 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
           .read(swapActivityStoreProvider)
           .deleteForAccount(accountUuid: uuid);
     } catch (_) {}
+    // Its Railgun engine key and balance cache; the page's stored wallet
+    // goes last, below.
+    try {
+      await deletePrivateUsdAccountData(_storage, uuid);
+    } catch (e, st) {
+      log(
+        'removeAccount: failed to delete Private USD data for $uuid: $e\n$st',
+      );
+    }
+    // Its conversion records and joint accounts, only now that the wallet
+    // account is gone (the user confirmed losing any under way).
+    try {
+      await privateUsd.deleteAccountConversions(uuid);
+    } catch (e, st) {
+      log(
+        'removeAccount: failed to delete Private USD conversions for '
+        '$uuid: $e\n$st',
+      );
+    }
     // Only after the Rust delete, which also drops this account's Ledger
     // outbox: a checkpointed draft must never lose its secret while its
     // signed transaction can still be broadcast.
@@ -1838,6 +1916,10 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         );
       }
     }
+    // Its wallet in the Railgun page's storage, now that the account is gone
+    // and saved as gone, while the engine is still drained: best effort and
+    // bounded, so a failure leaves it until a reset and never fails this.
+    await privateUsd.deleteRailgunWallet(railgunWallet);
     log('removeAccount: $uuid');
   }
 
@@ -1862,15 +1944,26 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
   ///
   /// [confirmedUnsharedGiftCardCount] works as in [removeAccount], summed over
   /// every account.
-  Future<void> resetWallet({int? confirmedUnsharedGiftCardCount}) => ref
+  ///
+  /// [confirmedPrivateUsdUnfinishedCount] works as in [removeAccount],
+  /// summed over every account; only an unlocked wallet rechecks.
+  Future<void> resetWallet({
+    int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
+  }) => ref
       .read(linuxKeyringCoordinatorProvider)
       .runMutation(
         () => _resetWallet(
           confirmedUnsharedGiftCardCount: confirmedUnsharedGiftCardCount,
+          confirmedPrivateUsdUnfinishedCount:
+              confirmedPrivateUsdUnfinishedCount,
         ),
       );
 
-  Future<void> _resetWallet({int? confirmedUnsharedGiftCardCount}) async {
+  Future<void> _resetWallet({
+    int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
+  }) async {
     ref.read(votingSubmissionGuardProvider.notifier).throwIfActive();
 
     final claimLifecycle = ref.read(paymentLinkClaimLifecycleRegistryProvider);
@@ -1878,6 +1971,7 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
     final shareTracking = ref.read(votingShareTrackingRegistryProvider);
     final ledgerLifecycle = ref.read(ledgerOperationLifecycleProvider);
     final publicLoads = ref.read(publicDetailsLoadsProvider);
+    final privateUsd = ref.read(privateUsdLifecycleProvider);
     var restoreAfterFailure = false;
     var resumeClaimLifecycle = false;
     var resetCompleted = false;
@@ -1887,11 +1981,22 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
       _storage.invalidatePendingSecretOperations();
       await giftTracking.quiesceAndDrain();
       await claimLifecycle.quiesceAndDrain();
+      await privateUsd.quiesceAndDrain();
       await shareTracking.quiesceAndDrain();
       await _throwIfUnsharedGiftCardsIncreased([
         for (final account in state.value?.accounts ?? const <AccountInfo>[])
           account.uuid,
       ], confirmedUnsharedGiftCardCount);
+      // Unlocked only, like the in-flight Gift Card claim refusal: a locked
+      // reset is the way back into a wallet whose passcode is lost, and
+      // conversions cannot finish while it is locked anyway, so it only
+      // warns.
+      if (!ref.read(appSecurityProvider).requiresUnlock) {
+        await _throwIfPrivateUsdConversionsUnconfirmed([
+          for (final account in state.value?.accounts ?? const <AccountInfo>[])
+            account.uuid,
+        ], confirmedPrivateUsdUnfinishedCount);
+      }
       await _resetWalletWithShareTrackingStopped();
       resetCompleted = true;
       resumeClaimLifecycle = true;
@@ -1902,7 +2007,10 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
     } finally {
       ledgerLifecycle.resume();
       publicLoads.resume();
-      if (resumeClaimLifecycle) claimLifecycle.resume();
+      if (resumeClaimLifecycle) {
+        claimLifecycle.resume();
+        privateUsd.resume();
+      }
       // Release only after all destructive work has finished. New onboarding
       // reuses this registry; stale registrations re-read the now-empty store.
       if (resetCompleted || restoreAfterFailure) giftTracking.resume();
@@ -2054,6 +2162,25 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
       } catch (e, st) {
         recordError('gift-card observer db cleanup', e, st);
       }
+      // Every account's Railgun wallet and scan cache in the page's storage,
+      // the swap records and joint accounts, and the device-wide token
+      // stores. The secure-storage wipe below takes the engine keys and
+      // balance caches.
+      try {
+        await ref.read(privateUsdLifecycleProvider).wipeRailgunPage();
+      } catch (e, st) {
+        recordError('private USD page wipe', e, st);
+      }
+      try {
+        await deletePrivateUsdDirectories();
+      } catch (e, st) {
+        recordError('private USD storage cleanup', e, st);
+      }
+      try {
+        await deletePrivateUsdTokenStores();
+      } catch (e, st) {
+        recordError('private USD token store cleanup', e, st);
+      }
       try {
         // The wallet's own companions went with it. No wallet is current
         // now, so any left by an earlier one go too.
@@ -2073,6 +2200,9 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
       } catch (e, st) {
         recordError('secure storage wipe', e, st);
       }
+      // The wipe took the user's own Ethereum RPC URL for Private USD; the
+      // copy held in memory is read again.
+      ref.invalidate(privateUsdCustomRpcProvider);
       // The saved Private queries choice is install-scoped and survives this
       // wipe. After the reset succeeds, its runtime is reapplied below and the
       // deleted wallet's pending transition is cleared. The

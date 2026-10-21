@@ -62,7 +62,9 @@ rust_sync.TransactionDetail _detail(String memo, {String kind = 'received'}) =>
 
 void transactionLoadingTests({required bool mobile}) {
   setUpAll(loadFigmaCompareFonts);
-  final receivedTitle = mobile ? 'Received' : 'Received successfully';
+  // Mobile draws the receipt title uppercase in its top bar.
+  final receivedTitle = mobile ? 'RECEIVED' : 'Received successfully';
+  final sentTitle = mobile ? 'SENT SUCCESSFULLY' : 'Sent successfully';
   testWidgets('summary appears while history and detail remain unresolved', (
     tester,
   ) async {
@@ -125,7 +127,7 @@ void transactionLoadingTests({required bool mobile}) {
         }
         expect(find.text('Show full address'), findsNothing);
         if (kind == 'sent') {
-          expect(find.text('Sent successfully'), findsOneWidget);
+          expect(find.text(sentTitle), findsOneWidget);
           expect(find.text('Shielded'), findsNothing);
         }
         history.complete([_tx(kind: kind)]);
@@ -229,7 +231,7 @@ void transactionLoadingTests({required bool mobile}) {
           await tester.pump();
           // Desktop and mobile both keep the send title without a recipient.
           expect(
-            find.text(kind == 'received' ? receivedTitle : 'Sent successfully'),
+            find.text(kind == 'received' ? receivedTitle : sentTitle),
             findsOneWidget,
           );
           expect(find.text('Completed'), findsOneWidget);

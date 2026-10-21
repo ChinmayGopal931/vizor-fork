@@ -412,11 +412,11 @@ void main() {
 
     expect(find.byType(GiftClaimScreen), findsOneWidget);
     expect(
-      find.text('Create wallet by redeeming Vizor Gift Card'),
+      find.text('Create wallet by redeeming Veylor Gift Card'),
       findsOneWidget,
     );
     expect(
-      find.text('Create a new Vizor wallet to receive the card’s balance.'),
+      find.text('Create a new Veylor wallet to receive the card’s balance.'),
       findsOneWidget,
     );
     expect(find.text('Paste card link'), findsOneWidget);
@@ -448,7 +448,7 @@ void main() {
     expect(location(tester), '/gift');
     expect(
       tester
-          .getTopLeft(find.text('Create wallet by redeeming Vizor Gift Card'))
+          .getTopLeft(find.text('Create wallet by redeeming Veylor Gift Card'))
           .dy,
       greaterThanOrEqualTo(topInset),
     );
@@ -1305,7 +1305,7 @@ void main() {
       await tester.tap(keyed('mobile_welcome_redeem_card'));
       await tester.pumpAndSettle();
       expect(
-        find.text('Create account by redeeming Vizor Gift Card'),
+        find.text('Create account by redeeming Veylor Gift Card'),
         findsOneWidget,
       );
       expect(
@@ -1313,7 +1313,7 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text('Create wallet by redeeming Vizor Gift Card'),
+        find.text('Create wallet by redeeming Veylor Gift Card'),
         findsNothing,
       );
       await tester.tap(find.text('Paste card link'));

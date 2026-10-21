@@ -1,7 +1,12 @@
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../../core/layout/app_form_factor.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import 'mobile/neon_ledger_step_marker.dart';
+
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 class LedgerStep {
   const LedgerStep(
@@ -39,6 +44,7 @@ class LedgerProcedure extends StatefulWidget {
 
 class _LedgerProcedureState extends State<LedgerProcedure> {
   final _stepKeys = <int, GlobalKey>{};
+  final _bodyKeys = <int, GlobalKey>{};
   String? _layout;
 
   void _reveal(String layout, {bool afterExpansion = false}) {
@@ -51,17 +57,32 @@ class _LedgerProcedureState extends State<LedgerProcedure> {
       if (targetContext == null || target is! RenderBox) return;
       final position = Scrollable.maybeOf(targetContext)?.position;
       if (position == null || position.maxScrollExtent <= 0) return;
+      final animate =
+          afterExpansion && !MediaQuery.disableAnimationsOf(targetContext);
       position.ensureVisible(
         target,
-        duration:
-            afterExpansion && !MediaQuery.disableAnimationsOf(targetContext)
-            ? const Duration(milliseconds: 180)
-            : Duration.zero,
+        duration: animate ? const Duration(milliseconds: 180) : Duration.zero,
         curve: Curves.easeOutCubic,
         alignmentPolicy: target.size.height > position.viewportDimension
             ? ScrollPositionAlignmentPolicy.explicit
             : ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
       );
+      if (animate) return;
+      // Guidance still folding away above the step lifts it by that height,
+      // so keep the step's top in view where it settles.
+      var folding = 0.0;
+      for (var index = 0; index < widget.currentStep; index++) {
+        final body = _bodyKeys[index]?.currentContext?.findRenderObject();
+        if (body is RenderBox && body.hasSize) folding += body.size.height;
+      }
+      if (folding == 0) return;
+      final viewport = RenderAbstractViewport.of(target);
+      final settledTop = viewport.getOffsetToReveal(target, 0).offset - folding;
+      if (position.pixels > settledTop) {
+        position.jumpTo(
+          settledTop.clamp(position.minScrollExtent, position.maxScrollExtent),
+        );
+      }
     });
   }
 
@@ -103,7 +124,18 @@ class _LedgerProcedureState extends State<LedgerProcedure> {
                         width: markerSize,
                         height: lineHeight,
                         child: Center(
-                          child: index < widget.currentStep
+                          child: _mobile
+                              ? NeonLedgerStepMarker(
+                                  ordinal: index + 1,
+                                  progress: index < widget.currentStep
+                                      ? LedgerStepProgress.done
+                                      : index == widget.currentStep
+                                      ? LedgerStepProgress.current
+                                      : LedgerStepProgress.ahead,
+                                  size: markerSize,
+                                  style: style,
+                                )
+                              : index < widget.currentStep
                               ? AppIcon(
                                   AppIcons.check,
                                   size: 20,
@@ -146,10 +178,21 @@ class _LedgerProcedureState extends State<LedgerProcedure> {
                               Flexible(
                                 child: Text(
                                   widget.steps[index].label,
+                                  // On mobile the current step is lit, as the
+                                  // swap timeline's.
                                   style: style.copyWith(
                                     color: index == widget.currentStep
-                                        ? colors.text.accent
+                                        ? _mobile
+                                              ? colors.neon.core
+                                              : colors.text.accent
                                         : colors.text.secondary,
+                                    shadows:
+                                        _mobile && index == widget.currentStep
+                                        ? Neon.textGlow(
+                                            colors.neon.glow,
+                                            intensity: 0.3,
+                                          )
+                                        : null,
                                   ),
                                 ),
                               ),
@@ -164,13 +207,16 @@ class _LedgerProcedureState extends State<LedgerProcedure> {
                                     AppIcons.loader,
                                     animated: true,
                                     size: 20,
-                                    color: colors.icon.regular,
+                                    color: _mobile
+                                        ? colors.neon.glow
+                                        : colors.icon.regular,
                                   ),
                                 ),
                               ],
                             ],
                           ),
                           _LedgerStepBody(
+                            key: _bodyKeys.putIfAbsent(index, GlobalKey.new),
                             step: widget.steps[index],
                             expanded: index == widget.currentStep,
                             onExpanded: () =>
@@ -197,6 +243,7 @@ class _LedgerStepBody extends StatefulWidget {
     required this.step,
     required this.expanded,
     required this.onExpanded,
+    super.key,
   });
   final LedgerStep step;
   final bool expanded;

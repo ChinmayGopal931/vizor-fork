@@ -20,6 +20,11 @@ import '../../theme/app_theme.dart';
 import '../app_button.dart';
 import '../app_icon.dart';
 import '../biometric_icon.dart';
+import 'neon_done_sign.dart';
+import 'neon_glyph_badge.dart';
+import 'neon_motion.dart';
+import 'neon_scramble_text.dart';
+import 'tron_glyph.dart';
 
 class SyncKeepAwakePrivacyLockHost extends ConsumerStatefulWidget {
   const SyncKeepAwakePrivacyLockHost({
@@ -37,8 +42,19 @@ class SyncKeepAwakePrivacyLockHost extends ConsumerStatefulWidget {
 }
 
 class _SyncKeepAwakePrivacyLockHostState
-    extends ConsumerState<SyncKeepAwakePrivacyLockHost> {
+    extends ConsumerState<SyncKeepAwakePrivacyLockHost>
+    with SingleTickerProviderStateMixin {
   Timer? _idleTimer;
+
+  /// The last mode shown, kept on screen while it switches off.
+  SyncKeepAwakePrivacyLockMode? _shownMode;
+  late final AnimationController _crtOff =
+      AnimationController(vsync: this, duration: NeonMotion.crtOff)
+        ..addStatusListener((status) {
+          if (status == AnimationStatus.completed && mounted) {
+            setState(() => _shownMode = null);
+          }
+        });
   AppLifecycleListener? _lifecycleListener;
   bool _isInForeground = true;
   bool _clearScheduled = false;
@@ -69,12 +85,42 @@ class _SyncKeepAwakePrivacyLockHostState
     final visible = mode != SyncKeepAwakePrivacyLockMode.hidden;
     _syncIdleTimer(active: active, interaction: interaction, visible: visible);
 
+    if (visible) {
+      _shownMode = mode;
+      if (_crtOff.value > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _crtOff.value = 0;
+        });
+      }
+    } else if (_shownMode != null && !_crtOff.isAnimating) {
+      if (NeonMotion.reduced(context) ||
+          ref.read(appSecurityProvider).requiresUnlock) {
+        _shownMode = null;
+      } else {
+        // Switch off as a CRT, then drop the screen (see [_crtOff]).
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _shownMode != null && !_crtOff.isAnimating) {
+            unawaited(_crtOff.forward(from: 0));
+          }
+        });
+      }
+    }
+    final shown = _shownMode;
+
     return Stack(
       fit: StackFit.expand,
       children: [
         widget.child,
-        if (visible)
-          Positioned.fill(child: SyncKeepAwakePrivacyLockScreen(mode: mode)),
+        if (shown != null)
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: !visible,
+              child: _CrtSwitchOff(
+                animation: _crtOff,
+                child: SyncKeepAwakePrivacyLockScreen(mode: shown),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -83,6 +129,7 @@ class _SyncKeepAwakePrivacyLockHostState
   void dispose() {
     _lifecycleListener?.dispose();
     _idleTimer?.cancel();
+    _crtOff.dispose();
     super.dispose();
   }
 
@@ -185,8 +232,10 @@ class SyncKeepAwakePrivacyLockScreen extends ConsumerStatefulWidget {
   static const _doneStatusHeight = 200.0;
   static const _doneStatusToButtonGap = 147.0;
   static const _minimumDoneStatusToButtonGap = 48.0;
-  static const _bodyWidth = 130.0;
-  static const _doneBodyWidth = 200.0;
+
+  /// Wide enough to keep each body line whole.
+  static const _bodyWidth = 200.0;
+  static const _doneBodyWidth = 280.0;
 
   @override
   ConsumerState<SyncKeepAwakePrivacyLockScreen> createState() =>
@@ -283,7 +332,7 @@ class _SyncKeepAwakePrivacyLockScreenState
     final wasEnabled = biometric.enabled;
     final passcode = await ref
         .read(biometricUnlockProvider.notifier)
-        .readPasscode(reason: 'Unlock Vizor');
+        .readPasscode(reason: 'Unlock Veylor');
     if (!mounted) return;
 
     if (passcode == null) {
@@ -369,29 +418,28 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
         BiometricUnlockState.initial;
     final main = switch (mode) {
       SyncKeepAwakePrivacyLockMode.done => const _SyncKeepAwakeStatusLockup(
-        iconName: AppIcons.checkCircle,
-        iconKey: ValueKey('sync_keep_awake_privacy_done_check'),
-        title: 'Sync Complete',
-        body: 'Unlock Vizor to continue',
-        success: true,
+        glyph: TronGlyphKind.check,
+        glyphKey: ValueKey('sync_keep_awake_privacy_done_check'),
+        title: 'Sync complete',
+        body: 'Unlock Veylor to continue',
+        animate: true,
       ),
       SyncKeepAwakePrivacyLockMode.interrupted =>
         const _SyncKeepAwakeStatusLockup(
-          iconName: AppIcons.warning,
-          iconKey: ValueKey('sync_keep_awake_privacy_interrupted_warning'),
+          glyph: TronGlyphKind.warning,
+          glyphKey: ValueKey('sync_keep_awake_privacy_interrupted_warning'),
           title: 'Sync paused',
-          body: 'Unlock Vizor to continue.',
-          success: false,
+          body: 'Unlock Veylor to continue.',
         ),
       SyncKeepAwakePrivacyLockMode.hidden ||
       SyncKeepAwakePrivacyLockMode.syncing =>
         const _SyncKeepAwakeDisplayProgressLockup(),
     };
     final semanticsLabel = switch (mode) {
-      SyncKeepAwakePrivacyLockMode.done => 'Vizor is synced',
-      SyncKeepAwakePrivacyLockMode.interrupted => 'Vizor sync is paused',
+      SyncKeepAwakePrivacyLockMode.done => 'Veylor is synced',
+      SyncKeepAwakePrivacyLockMode.interrupted => 'Veylor sync is paused',
       SyncKeepAwakePrivacyLockMode.hidden ||
-      SyncKeepAwakePrivacyLockMode.syncing => 'Vizor is syncing',
+      SyncKeepAwakePrivacyLockMode.syncing => 'Veylor is syncing',
     };
 
     return Material(
@@ -421,14 +469,29 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
                   SizedBox(height: layout.logoToMainGap),
                   main,
                   SizedBox(height: layout.mainToButtonGap),
-                  AppButton(
-                    key: const ValueKey(
-                      'sync_keep_awake_privacy_unlock_button',
+                  NeonIgnition(
+                    key: ValueKey(mode == SyncKeepAwakePrivacyLockMode.done),
+                    delay: mode == SyncKeepAwakePrivacyLockMode.done
+                        ? const Duration(milliseconds: 1500)
+                        : Duration.zero,
+                    // Dark until it switches on, and not to be tapped then.
+                    builder: (context, light) => IgnorePointer(
+                      ignoring: light == 0,
+                      child: Opacity(
+                        opacity: light,
+                        child: AppButton(
+                          key: const ValueKey(
+                            'sync_keep_awake_privacy_unlock_button',
+                          ),
+                          onPressed: onUnlockPressed,
+                          leading: _SyncKeepAwakeUnlockIcon(
+                            biometric: biometric,
+                          ),
+                          minWidth: 165,
+                          child: const Text('Unlock Veylor'),
+                        ),
+                      ),
                     ),
-                    onPressed: onUnlockPressed,
-                    leading: _SyncKeepAwakeUnlockIcon(biometric: biometric),
-                    minWidth: 165,
-                    child: const Text('Unlock Vizor'),
                   ),
                 ],
               );
@@ -611,7 +674,7 @@ class _SyncKeepAwakePasscodeConfirmScreen extends StatelessWidget {
         scopesRoute: true,
         namesRoute: true,
         explicitChildNodes: true,
-        label: 'Confirm passcode to unlock Vizor',
+        label: 'Confirm passcode to unlock Veylor',
         child: SafeArea(
           child: Column(
             children: [
@@ -622,9 +685,6 @@ class _SyncKeepAwakePasscodeConfirmScreen extends StatelessWidget {
                             mode == SyncKeepAwakePrivacyLockMode.hidden
                         ? ref.watch(syncDisplayWholePercentageProvider)
                         : 0,
-                  ),
-                  titleStyle: AppTypography.bodyMediumStrong.copyWith(
-                    color: colors.text.accent,
                   ),
                   height: _topNavHeight,
                   onBack: submitting ? null : onBack,
@@ -648,19 +708,13 @@ class _SyncKeepAwakePasscodeConfirmScreen extends StatelessWidget {
                       child: Column(
                         children: [
                           SizedBox(height: topGap),
-                          Text(
-                            'Welcome Back',
-                            textAlign: TextAlign.center,
-                            style: AppTypography.displayLarge.copyWith(
-                              color: colors.text.accent,
-                            ),
-                          ),
+                          const _SyncKeepAwakeTitle('Welcome back'),
                           const SizedBox(height: AppSpacing.s),
                           Text(
                             _bodyForMode(),
                             textAlign: TextAlign.center,
-                            style: AppTypography.bodyMediumStrong.copyWith(
-                              color: colors.text.primary,
+                            style: AppTypography.bodyMedium.copyWith(
+                              color: colors.text.secondary,
                             ),
                           ),
                           SizedBox(height: sectionGap),
@@ -708,29 +762,56 @@ class _SyncKeepAwakePasscodeConfirmScreen extends StatelessWidget {
     if (submitting) return 'Checking passcode...';
     return switch (mode) {
       SyncKeepAwakePrivacyLockMode.done =>
-        'Synced successfully. Unlock Vizor to continue.',
+        'Synced successfully. Unlock Veylor to continue.',
       SyncKeepAwakePrivacyLockMode.interrupted =>
-        'Sync paused. Unlock Vizor to continue.',
+        'Sync paused. Unlock Veylor to continue.',
       SyncKeepAwakePrivacyLockMode.hidden ||
       SyncKeepAwakePrivacyLockMode.syncing => 'Unlock to continue',
     };
   }
 }
 
+/// A title on the privacy screen, drawn as a page title
+/// ([kNeonPageTitleStyle]). The string stays sentence case: it is upper-cased
+/// where drawn, and screen readers get it as written.
+class _SyncKeepAwakeTitle extends StatelessWidget {
+  const _SyncKeepAwakeTitle(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      semanticsLabel: text,
+      textAlign: TextAlign.center,
+      style: kNeonPageTitleStyle.copyWith(color: context.colors.text.accent),
+    );
+  }
+}
+
+/// Done and paused: a lit glyph on a cut-corner plate over the state's
+/// title and a line of Light body text.
 class _SyncKeepAwakeStatusLockup extends StatelessWidget {
   const _SyncKeepAwakeStatusLockup({
-    required this.iconName,
-    required this.iconKey,
+    required this.glyph,
+    required this.glyphKey,
     required this.title,
     required this.body,
-    required this.success,
+    this.animate = false,
   });
 
-  final String iconName;
-  final Key iconKey;
+  final TronGlyphKind glyph;
+  final Key glyphKey;
   final String title;
   final String body;
-  final bool success;
+
+  /// Switch on as a sign: a scanline, a light cycle drawing the badge, then
+  /// the title decrypting in.
+  final bool animate;
+
+  static const _badgeSize = 72.0;
+  static const _titleTop = 100.0;
 
   @override
   Widget build(BuildContext context) {
@@ -745,41 +826,55 @@ class _SyncKeepAwakeStatusLockup extends StatelessWidget {
             left: 0,
             right: 0,
             child: Center(
-              child: AppIcon(
-                iconName,
-                key: iconKey,
-                size: 40,
-                color: success ? colors.sync.lightSuccess : colors.icon.warning,
-              ),
+              child: animate
+                  ? NeonDoneSign(key: glyphKey, glyph: glyph, size: _badgeSize)
+                  : NeonGlyphBadge(
+                      key: glyphKey,
+                      glyph: glyph,
+                      size: _badgeSize,
+                    ),
             ),
           ),
           Positioned(
-            top: 100,
-            left: 0,
-            right: 0,
-            child: Text(
-              title,
-              textAlign: TextAlign.center,
-              style: AppTypography.displayLarge.copyWith(
-                color: colors.text.accent,
-              ),
-            ),
-          ),
-          Positioned(
-            top: 150,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: SizedBox(
-                width: SyncKeepAwakePrivacyLockScreen._doneBodyWidth,
-                child: Text(
-                  body,
-                  textAlign: TextAlign.center,
-                  style: AppTypography.bodyMediumStrong.copyWith(
-                    color: colors.text.primary,
+            top: _titleTop,
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (animate)
+                  NeonIgnition(
+                    delay: const Duration(milliseconds: 1000),
+                    builder: (context, light) => light == 0
+                        ? Opacity(opacity: 0, child: _SyncKeepAwakeTitle(title))
+                        : NeonScrambleText(
+                            text: title.toUpperCase(),
+                            semanticsLabel: title,
+                            style: kNeonPageTitleStyle.copyWith(
+                              color: colors.text.accent,
+                            ),
+                            cipherStyle: kNeonPageTitleStyle.copyWith(
+                              color: colors.neon.glow,
+                            ),
+                            decryptOnAppear: true,
+                          ),
+                  )
+                else
+                  _SyncKeepAwakeTitle(title),
+                const SizedBox(height: AppSpacing.s),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: SyncKeepAwakePrivacyLockScreen._doneBodyWidth,
+                  ),
+                  child: Text(
+                    body,
+                    textAlign: TextAlign.center,
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: colors.text.secondary,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -788,120 +883,285 @@ class _SyncKeepAwakeStatusLockup extends StatelessWidget {
   }
 }
 
+/// Syncing: the progress as a lit ring around Thin numerals lit like the
+/// balance sign's. The ring and its numerals switch on as a sign does.
 class _SyncKeepAwakeProgressLockup extends StatelessWidget {
   const _SyncKeepAwakeProgressLockup({required this.progress});
 
   static const _progressAnimationDuration = Duration(milliseconds: 420);
+
+  /// Neon numerals: Gotham Thin, whose hairline strokes read as tubes.
+  static const _numeralStyle = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w100,
+    fontSize: 56,
+    height: 1,
+    letterSpacing: -0.5,
+  );
+
+  /// The percent sign, set beside them as the sign's ticker is.
+  static const _percentSignStyle = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w300,
+    fontSize: 22,
+    height: 1,
+    letterSpacing: 1.2,
+  );
 
   final double progress;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final neon = colors.neon;
     final targetProgress = progress.clamp(0.0, 1.0).toDouble();
     return SizedBox.square(
       dimension: SyncKeepAwakePrivacyLockScreen._ringSize,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween<double>(begin: targetProgress, end: targetProgress),
-        duration: _progressAnimationDuration,
-        curve: Curves.easeOutCubic,
-        builder: (context, animatedProgress, _) {
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _SyncKeepAwakeSegmentedRingPainter(
-                    progress: animatedProgress,
-                    trackColor: colors.background.raised,
-                    progressColor: colors.sync.lightSuccess,
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 118,
-                left: 0,
-                right: 0,
-                child: Text(
-                  '${formatSyncStatusPercentage(animatedProgress)}%',
-                  textAlign: TextAlign.center,
-                  style: AppTypography.displayLarge.copyWith(
-                    color: colors.text.accent,
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 170,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: SizedBox(
-                    width: SyncKeepAwakePrivacyLockScreen._bodyWidth,
-                    child: Text(
-                      'Vizor is syncing',
-                      textAlign: TextAlign.center,
-                      style: AppTypography.bodyMediumStrong.copyWith(
-                        color: colors.text.primary,
-                      ),
+      child: NeonIgnition(
+        builder: (context, light) => TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: targetProgress, end: targetProgress),
+          duration: _progressAnimationDuration,
+          curve: Curves.easeOutCubic,
+          builder: (context, animatedProgress, _) {
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _SyncKeepAwakeRingPainter(
+                      progress: animatedProgress,
+                      light: light,
+                      glow: neon.glow,
+                      core: neon.core,
                     ),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: formatSyncStatusPercentage(
+                                animatedProgress,
+                              ),
+                              style: _numeralStyle.copyWith(
+                                color: neon.core,
+                                shadows: Neon.textGlow(
+                                  neon.glow,
+                                  intensity: light,
+                                ),
+                              ),
+                            ),
+                            TextSpan(
+                              text: '%',
+                              style: _percentSignStyle.copyWith(
+                                color: neon.glow,
+                                shadows: Neon.textGlow(
+                                  neon.glow,
+                                  intensity: 0.6 * light,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      SizedBox(
+                        width: SyncKeepAwakePrivacyLockScreen._bodyWidth,
+                        child: Text(
+                          'Veylor is syncing',
+                          textAlign: TextAlign.center,
+                          style: AppTypography.bodyMedium.copyWith(
+                            color: colors.text.secondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 }
 
-class _SyncKeepAwakeSegmentedRingPainter extends CustomPainter {
-  const _SyncKeepAwakeSegmentedRingPainter({
+/// The progress ring: the synced share is a lit tube that runs clockwise
+/// from the top to a bright head, and the rest is a scale of unlit ticks
+/// that the head burns along.
+class _SyncKeepAwakeRingPainter extends CustomPainter {
+  const _SyncKeepAwakeRingPainter({
     required this.progress,
-    required this.trackColor,
-    required this.progressColor,
+    required this.light,
+    required this.glow,
+    required this.core,
   });
 
   final double progress;
-  final Color trackColor;
-  final Color progressColor;
+
+  /// The sign's light level, 0..1 ([NeonIgnition]).
+  final double light;
+  final Color glow;
+  final Color core;
+
+  static const _tickCount = 96;
+  static const _tickLength = 7.0;
+  static const _tubeWidth = 2.2;
+
+  /// Room around the ring for its glow.
+  static const _inset = 18.0;
 
   @override
   void paint(Canvas canvas, Size size) {
-    const segmentCount = 96;
-    const progressTickLength = 28.0;
-    const trackTickLength = 16.0;
-    const strokeWidth = 2.5;
-    final clampedProgress = progress.clamp(0.0, 1.0).toDouble();
-    final center = Offset(size.width / 2, size.height / 2);
-    final tickCenterRadius =
-        (size.shortestSide / 2) - (progressTickLength / 2) - 1;
-    final scaledProgress = segmentCount * clampedProgress;
-    final trackPaint = Paint()
-      ..color = trackColor
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
+    final p = progress.clamp(0.0, 1.0).toDouble();
+    final k = light.clamp(0.0, 1.0).toDouble();
+    final center = size.center(Offset.zero);
+    final radius = size.shortestSide / 2 - _inset;
+    const start = -math.pi / 2;
+    final headAngle = start + math.pi * 2 * p;
 
-    for (var index = 0; index < segmentCount; index++) {
-      final angle = (-math.pi / 2) + (math.pi * 2 * index / segmentCount);
+    // The unlit scale still ahead of the head, kept clear of its glow.
+    final tick = Paint()
+      ..color = glow.withValues(alpha: 0.24)
+      ..strokeWidth = 1;
+    for (var i = (p * _tickCount + 1).ceil(); i < _tickCount; i++) {
+      final angle = start + math.pi * 2 * i / _tickCount;
       final direction = Offset(math.cos(angle), math.sin(angle));
-      final segmentFill = (scaledProgress - index).clamp(0.0, 1.0).toDouble();
-      final tickLength =
-          trackTickLength +
-          ((progressTickLength - trackTickLength) * segmentFill);
-      final tickCenter = center + direction * tickCenterRadius;
-      final inner = tickCenter - (direction * tickLength / 2);
-      final outer = tickCenter + (direction * tickLength / 2);
-      final paint = trackPaint
-        ..color = Color.lerp(trackColor, progressColor, segmentFill)!;
-
-      canvas.drawLine(inner, outer, paint);
+      canvas.drawLine(
+        center + direction * (radius - _tickLength / 2),
+        center + direction * (radius + _tickLength / 2),
+        tick,
+      );
     }
+
+    if (p > 0) {
+      final ring = Rect.fromCircle(center: center, radius: radius);
+      Neon.strokeTube(
+        canvas,
+        p >= 1
+            ? (Path()..addOval(ring))
+            : (Path()..addArc(ring, start, math.pi * 2 * p)),
+        glow: glow,
+        core: core,
+        width: _tubeWidth,
+        intensity: 0.9 * k,
+      );
+    }
+
+    // The head: a lit bead square to the ring, as the sync line's head.
+    if (k <= 0) return;
+    final head =
+        center + Offset(math.cos(headAngle), math.sin(headAngle)) * radius;
+    canvas
+      ..save()
+      ..translate(head.dx, head.dy)
+      ..rotate(headAngle);
+    Neon.bead(
+      canvas,
+      Offset.zero,
+      glow: glow,
+      core: core,
+      size: 7,
+      blur: 6,
+      rim: 2,
+      intensity: k,
+    );
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant _SyncKeepAwakeSegmentedRingPainter oldDelegate) {
+  bool shouldRepaint(covariant _SyncKeepAwakeRingPainter oldDelegate) {
     return oldDelegate.progress != progress ||
-        oldDelegate.trackColor != trackColor ||
-        oldDelegate.progressColor != progressColor;
+        oldDelegate.light != light ||
+        oldDelegate.glow != glow ||
+        oldDelegate.core != core;
   }
+}
+
+/// A screen switching off as a CRT does: it folds to a bright scanline,
+/// the line pulls in to a dot, and the dot goes out.
+class _CrtSwitchOff extends StatelessWidget {
+  const _CrtSwitchOff({required this.animation, required this.child});
+
+  final Animation<double> animation;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final neon = context.colors.neon;
+    return AnimatedBuilder(
+      animation: animation,
+      child: child,
+      builder: (context, child) {
+        final t = animation.value;
+        final fold = Curves.easeInCubic.transform(NeonMotion.span(t, 0, 0.5));
+        final pull = Curves.easeInCubic.transform(
+          NeonMotion.span(t, 0.45, 0.85),
+        );
+        // One tree throughout, so the screen keeps its state as it folds.
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Transform.scale(scaleY: math.max(0.004, 1 - fold), child: child),
+            if (t > 0)
+              CustomPaint(
+                painter: _CrtLinePainter(
+                  fold: fold,
+                  pull: pull,
+                  fade: 1 - NeonMotion.span(t, 0.85, 1),
+                  glow: neon.glow,
+                  core: neon.core,
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _CrtLinePainter extends CustomPainter {
+  const _CrtLinePainter({
+    required this.fold,
+    required this.pull,
+    required this.fade,
+    required this.glow,
+    required this.core,
+  });
+
+  final double fold;
+  final double pull;
+  final double fade;
+  final Color glow;
+  final Color core;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (fold < 0.6) return;
+    final center = size.center(Offset.zero);
+    final half = size.width / 2 * (1 - pull);
+    paintNeonScanline(
+      canvas,
+      center.dy,
+      center.dx - half,
+      center.dx + half,
+      glow: glow,
+      core: core,
+      width: 1.8,
+      intensity: NeonMotion.span(fold, 0.6, 1) * fade,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_CrtLinePainter oldDelegate) =>
+      oldDelegate.fold != fold ||
+      oldDelegate.pull != pull ||
+      oldDelegate.fade != fade ||
+      oldDelegate.glow != glow ||
+      oldDelegate.core != core;
 }

@@ -276,7 +276,7 @@ class _IronwoodMigrationPrivateStatusErrorContent extends StatelessWidget {
                 SizedBox(
                   width: 318,
                   child: Text(
-                    "Vizor couldn't verify the current Ironwood migration "
+                    "Veylor couldn't verify the current Ironwood migration "
                     'state. No new migration will start until the status can '
                     'be checked.',
                     textAlign: TextAlign.center,
@@ -301,7 +301,7 @@ class _IronwoodMigrationPrivateStatusErrorContent extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
                 child: Text(
                   'Return home and try again after sync refreshes. If a '
-                  'migration is already in progress, Vizor will continue from '
+                  'migration is already in progress, Veylor will continue from '
                   'the saved state after it can be read.',
                   textAlign: TextAlign.center,
                   style: AppTypography.bodyMedium.copyWith(
@@ -387,7 +387,7 @@ _StatusPresentation _statusPresentation(rust_sync.MigrationStatus status) {
       const _StatusPresentation(
         title: 'Preparing...',
         body: 'This usually takes around 30 minutes per split.',
-        footer: 'You can leave this screen.\nBut keep Vizor open & running.',
+        footer: 'You can leave this screen.\nBut keep Veylor open & running.',
         buttonLabel: '',
       ),
     kIronwoodMigrationReadyToMigratePhase => const _StatusPresentation(
@@ -406,29 +406,29 @@ _StatusPresentation _statusPresentation(rust_sync.MigrationStatus status) {
           'Your migration transaction is prepared and waiting for its '
           'scheduled broadcast window.',
       footer:
-          'When Vizor is open, scheduled broadcasts will be advanced by the '
+          'When Veylor is open, scheduled broadcasts will be advanced by the '
           'migration worker.',
       buttonLabel: 'Continue migration',
     ),
     kIronwoodMigrationBroadcastingPhase => const _StatusPresentation(
       title: 'Migrating...',
       body:
-          'Vizor is broadcasting the prepared Ironwood migration transaction.',
-      footer: 'You can leave this screen.\nBut keep Vizor open & running.',
+          'Veylor is broadcasting the prepared Ironwood migration transaction.',
+      footer: 'You can leave this screen.\nBut keep Veylor open & running.',
       buttonLabel: 'Broadcasting',
     ),
     kIronwoodMigrationWaitingConfirmationsPhase => const _StatusPresentation(
       title: 'Migrating...',
       body:
-          'The migration transaction was broadcast. Vizor is waiting for '
+          'The migration transaction was broadcast. Veylor is waiting for '
           'network confirmations.',
-      footer: 'You can leave this screen.\nBut keep Vizor open & running.',
+      footer: 'You can leave this screen.\nBut keep Veylor open & running.',
       buttonLabel: 'Waiting for confirmations',
     ),
     kIronwoodMigrationCompletePhase => const _StatusPresentation(
       title: 'Migration Complete',
       body: 'Your funds have moved into the Ironwood pool.',
-      footer: 'You can return home and continue using Vizor.',
+      footer: 'You can return home and continue using Veylor.',
       buttonLabel: 'Back home',
     ),
     kIronwoodMigrationPausedPhase => const _StatusPresentation(
@@ -442,16 +442,16 @@ _StatusPresentation _statusPresentation(rust_sync.MigrationStatus status) {
     kIronwoodMigrationFailedRecoverablePhase => const _StatusPresentation(
       title: 'Migration Needs Attention',
       body:
-          'Vizor hit a recoverable migration error before completing the '
+          'Veylor hit a recoverable migration error before completing the '
           'Ironwood transition.',
       footer:
-          'No funds are lost. Retry migration after checking that Vizor is '
+          'No funds are lost. Retry migration after checking that Veylor is '
           'synced and online.',
       buttonLabel: 'Retry migration',
     ),
     _ => const _StatusPresentation(
       title: 'Migration Status',
-      body: 'Vizor is tracking the current Ironwood migration state.',
+      body: 'Veylor is tracking the current Ironwood migration state.',
       footer:
           'This state is visible for diagnostics while the migration flow is '
           'being connected.',

@@ -5,7 +5,6 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/widgetbook/screen_use_cases.dart';
@@ -13,17 +12,11 @@ import 'package:zcash_wallet/src/features/activity/widgets/activity_feed.dart';
 import 'package:zcash_wallet/src/features/payment_links/widgets/payment_link_gift_card.dart';
 import 'package:zcash_wallet/src/features/activity/activity_row_mapper.dart';
 import 'package:zcash_wallet/src/features/activity/screens/mobile/mobile_transaction_status_screen.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   setUpAll(() async {
-    final fonts = FontLoader('Geist')
-      ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-SemiBold.ttf'));
-    await fonts.load();
-    await (FontLoader(
-      'Young Serif',
-    )..addFont(rootBundle.load('assets/fonts/YoungSerif-Regular.ttf'))).load();
+    await loadGothamFonts();
   });
   testWidgets(
     'claim stages preserve identity and restore the pool after confirmation',
@@ -123,7 +116,8 @@ void main() {
       final claimTime = formatActivityTimestamp(
         screen.args.giftCard!.activityTimestamp,
       );
-      expect(find.text('Redeeming a card...'), findsOneWidget);
+      // The receipt's title is drawn uppercase in its top bar.
+      expect(find.text('REDEEMING A CARD...'), findsOneWidget);
       expect(find.text(claimTime), findsOneWidget);
       for (var stage = 1; stage <= 4; stage++) {
         await tester.tap(find.byKey(ValueKey('gift_card_stage_$stage')));
@@ -131,7 +125,7 @@ void main() {
         expect(find.text(claimTime), findsOneWidget);
         expect(
           find.text(
-            stage >= 2 ? 'Redeemed a gift card' : 'Redeeming a card...',
+            stage >= 2 ? 'REDEEMED A GIFT CARD' : 'REDEEMING A CARD...',
           ),
           findsOneWidget,
         );
@@ -139,6 +133,8 @@ void main() {
     },
   );
 
+  // Activity rows keep sentence case; a receipt (detail) draws its title
+  // uppercase in the top bar.
   final scenarios = [
     (
       'creating-row',
@@ -148,7 +144,7 @@ void main() {
     (
       'created-detail',
       buildGiftCardCreatedDetailPreview,
-      'Created a gift card',
+      'CREATED A GIFT CARD',
     ),
     ('created-row', buildGiftCardCreatedActivityPreview, 'Created a gift card'),
     (
@@ -170,17 +166,17 @@ void main() {
     (
       'creating-detail',
       buildGiftCardCreatingDetailPreview,
-      'Creating a card...',
+      'CREATING A CARD...',
     ),
     (
       'redeeming-detail',
       buildGiftCardRedeemingDetailPreview,
-      'Redeeming a card...',
+      'REDEEMING A CARD...',
     ),
     (
       'redeemed-detail',
       buildGiftCardRedeemedDetailPreview,
-      'Redeemed a gift card',
+      'REDEEMED A GIFT CARD',
     ),
   ];
   for (final (name, builder, title) in scenarios) {

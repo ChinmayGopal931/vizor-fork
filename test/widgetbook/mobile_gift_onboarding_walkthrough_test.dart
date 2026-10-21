@@ -42,6 +42,15 @@ Future<void> _advance(WidgetTester tester) async {
   expect(tester.takeException(), isNull);
 }
 
+/// Home's top-left account is a portrait only; the account's name is the
+/// portrait's semantics label until a tap reveals it.
+Finder _homeAccountNamed(String name) => find.byWidgetPredicate(
+  (widget) =>
+      widget is Semantics &&
+      widget.key == const ValueKey('mobile_top_nav_account_semantics') &&
+      widget.properties.label == name,
+);
+
 Future<void> _reachCustomise(WidgetTester tester) async {
   if (find
       .byKey(const ValueKey('mobile_welcome_redeem_card'))
@@ -155,7 +164,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_biometrics_enable')));
     await _advance(tester);
     expect(container.read(biometricUnlockProvider).value?.enabled, isTrue);
-    expect(find.text('My gift wallet'), findsWidgets);
+    expect(_homeAccountNamed('My gift wallet'), findsOneWidget);
     expect(find.text('Redeeming a card...'), findsOneWidget);
     expect(find.text('No activity'), findsNothing);
     expect(find.byKey(const ValueKey('mobile_home_send')), findsNothing);
@@ -163,7 +172,6 @@ void main() {
       find.byKey(const ValueKey('mobile_home_receive')),
     );
     expect(receive.onPressed, isNotNull);
-    expect(find.byKey(const ValueKey('mobile_home_pay')), findsNothing);
     await tester.pump(const Duration(seconds: 6));
     await _advance(tester);
     expect(
@@ -200,7 +208,7 @@ void main() {
     expect(find.byType(MobileCustomiseAccountScreen), findsNothing);
     await tester.tap(find.byKey(const ValueKey('mobile_intro_skip')));
     await _advance(tester);
-    expect(find.text('My gift wallet'), findsWidgets);
+    expect(_homeAccountNamed('My gift wallet'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('mobile_home_zcash_education')),
       findsNothing,
@@ -221,7 +229,7 @@ void main() {
     await tester.ensureVisible(backedUp);
     await tester.tap(backedUp);
     await _advance(tester);
-    expect(find.text('My gift wallet'), findsWidgets);
+    expect(_homeAccountNamed('My gift wallet'), findsOneWidget);
     expect(find.byKey(const ValueKey('mobile_home_backup')), findsNothing);
     expect(
       find.byKey(const ValueKey('mobile_home_zcash_education')),
@@ -257,7 +265,7 @@ void main() {
     expect(await container.read(giftClaimImportStoreProvider).load(), isNull);
     await tester.tap(find.byKey(const ValueKey('mobile_biometrics_not_now')));
     await _advance(tester);
-    expect(find.text(name), findsWidgets);
+    expect(_homeAccountNamed(name), findsOneWidget);
     expect(find.byKey(const ValueKey('mobile_home_backup')), findsOneWidget);
   });
   testWidgets('a pre-account error retains the entered name', (tester) async {
@@ -464,7 +472,7 @@ void main() {
     expect(find.byType(MobileBiometricsScreen), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('mobile_biometrics_not_now')));
     await _advance(tester);
-    expect(find.text('My imported wallet'), findsWidgets);
+    expect(_homeAccountNamed('My imported wallet'), findsOneWidget);
     expect(find.byType(MobileCustomiseAccountScreen), findsNothing);
   });
 }

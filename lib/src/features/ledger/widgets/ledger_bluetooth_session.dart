@@ -93,7 +93,7 @@ class _LedgerBluetoothSessionState extends ConsumerState<LedgerBluetoothSession>
         if (!mounted) return;
         if (!opened) {
           error =
-              'Could not open Settings. Open your device settings manually and allow access for Vizor.';
+              'Could not open Settings. Open your device settings manually and allow access for Veylor.';
         }
       }
       final status = await access.bluetoothAccessStatus();
@@ -171,7 +171,7 @@ class _LedgerBluetoothSessionState extends ConsumerState<LedgerBluetoothSession>
             : requestable
             ? (status!.locationPermission
                   ? 'This Android version needs location access to find your Ledger.'
-                  : 'Vizor needs Bluetooth access to connect to your Ledger.')
+                  : 'Veylor needs Bluetooth access to connect to your Ledger.')
             : (_requestAttempted &&
                           status?.permission ==
                               LedgerBluetoothPermission.requestable
@@ -181,7 +181,7 @@ class _LedgerBluetoothSessionState extends ConsumerState<LedgerBluetoothSession>
                           macOS: status.macOS,
                         ).message
                       : status?.message) ??
-                  'Checking whether Vizor can connect to your Ledger.');
+                  'Checking whether Veylor can connect to your Ledger.');
     final label = _busy
         ? 'Checking access'
         : _error != null || status == null

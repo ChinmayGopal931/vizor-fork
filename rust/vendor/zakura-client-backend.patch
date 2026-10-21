@@ -1,0 +1,29 @@
+diff --git a/src/tor.rs b/src/tor.rs
+index 67b449d..25d4537 100644
+--- a/src/tor.rs
++++ b/src/tor.rs
+@@ -14,6 +14,7 @@ pub mod http;
+ // Re-exported as this is currently the only `arti_client` type users would need to use
+ // our minimal client API.
+ pub use arti_client::DormantMode;
++pub use arti_client::DataStream;
+ 
+ /// Deadlines applied to network operations performed by a [`Client`].
+ ///
+@@ -205,6 +206,16 @@ impl Client {
+         }
+     }
+ 
++    /// Opens a raw TCP stream to `host:port` through this client's circuits.
++    /// The name is resolved by the exit, so nothing leaks to local DNS.
++    pub async fn connect_stream(&self, host: &str, port: u16) -> Result<DataStream, Error> {
++        self.ensure_bootstrapped().await?;
++        tokio::time::timeout(self.timeouts.connect, self.inner.connect((host, port)))
++            .await
++            .map_err(|_| Error::Http(http::HttpError::Timeout(http::TimeoutPhase::Connect)))?
++            .map_err(Error::from)
++    }
++
+     /// Changes the client's current dormant mode, putting background tasks to sleep or
+     /// waking them up as appropriate.
+     ///

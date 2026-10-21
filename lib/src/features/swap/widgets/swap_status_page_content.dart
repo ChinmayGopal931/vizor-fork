@@ -1140,6 +1140,7 @@ class SwapAnimatedProgressRoute extends StatefulWidget {
     required this.progressIndex,
     required this.badgeKind,
     this.interval = swapStatusDefaultProgressAdvanceInterval,
+    this.builder,
     super.key,
   });
 
@@ -1147,6 +1148,11 @@ class SwapAnimatedProgressRoute extends StatefulWidget {
   final int progressIndex;
   final SwapStatusBadgeKind badgeKind;
   final Duration interval;
+
+  /// Draws the walked steps; [SwapProgressRoute] when null. The mobile status
+  /// content passes its neon timeline.
+  final Widget Function(BuildContext context, List<SwapStatusStepData> steps)?
+  builder;
 
   @override
   State<SwapAnimatedProgressRoute> createState() =>
@@ -1182,9 +1188,11 @@ class _SwapAnimatedProgressRouteState extends State<SwapAnimatedProgressRoute> {
     super.dispose();
   }
 
+  /// [index] within the steps; one past the last (every step done) stays
+  /// there, so a finished route keeps no step current.
   int _bounded(int index) {
     if (widget.steps.isEmpty) return 0;
-    return index.clamp(0, widget.steps.length - 1);
+    return index.clamp(0, widget.steps.length);
   }
 
   bool get _animate {
@@ -1234,17 +1242,17 @@ class _SwapAnimatedProgressRouteState extends State<SwapAnimatedProgressRoute> {
   @override
   Widget build(BuildContext context) {
     if (widget.steps.isEmpty) return const SizedBox.shrink();
-    return SwapProgressRoute(
-      steps: [
-        for (var index = 0; index < widget.steps.length; index++)
-          widget.steps[index].copyWithState(
-            index < _displayIndex
-                ? SwapStatusStepState.complete
-                : index == _displayIndex
-                ? SwapStatusStepState.active
-                : SwapStatusStepState.pending,
-          ),
-      ],
-    );
+    final steps = [
+      for (var index = 0; index < widget.steps.length; index++)
+        widget.steps[index].copyWithState(
+          index < _displayIndex
+              ? SwapStatusStepState.complete
+              : index == _displayIndex
+              ? SwapStatusStepState.active
+              : SwapStatusStepState.pending,
+        ),
+    ];
+    return widget.builder?.call(context, steps) ??
+        SwapProgressRoute(steps: steps);
   }
 }

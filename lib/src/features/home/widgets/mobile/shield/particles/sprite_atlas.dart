@@ -2,7 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/painting.dart';
 
-import '../shield_motion.dart';
+import '../../../../../../core/theme/app_theme.dart';
 
 /// One sprite inside the atlas: its source rect, the anchor the particle
 /// position maps to, and how many atlas pixels equal one "size" unit.
@@ -120,8 +120,8 @@ class SpriteAtlas {
         text: TextSpan(
           text: '$d',
           style: const TextStyle(
-            fontFamily: VText.geist,
-            fontWeight: FontWeight.w500,
+            fontFamily: kGothamFamily,
+            fontWeight: FontWeight.w300,
             fontSize: 32,
             height: 1,
             color: Color(0xFFFFFFFF),

@@ -192,7 +192,7 @@ class _MobileVotingConfigSettingsSheetState
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Choose where Vizor gets authenticated voting rounds.',
+                  'Choose where Veylor gets authenticated voting rounds.',
                   style: AppTypography.bodyMedium.copyWith(
                     color: context.colors.text.secondary,
                   ),
@@ -378,7 +378,6 @@ class _MobileSourceRow extends StatelessWidget {
                       title,
                       style: AppTypography.labelLarge.copyWith(
                         color: colors.text.accent,
-                        fontWeight: FontWeight.w600,
                         letterSpacing: -0.04,
                       ),
                     ),
@@ -389,7 +388,6 @@ class _MobileSourceRow extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.labelLarge.copyWith(
                         color: colors.text.secondary,
-                        fontWeight: FontWeight.w400,
                         letterSpacing: -0.04,
                       ),
                     ),

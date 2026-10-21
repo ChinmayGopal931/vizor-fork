@@ -146,7 +146,7 @@ class NetworkPrivacyControl extends ConsumerWidget {
                               overflow: TextOverflow.ellipsis,
                               style: AppTypography.labelLarge.copyWith(
                                 color: presentation.statusColor(colors),
-                                fontWeight: FontWeight.w400,
+                                fontWeight: AppFontWeight.regular,
                               ),
                             ),
                           ),
@@ -256,7 +256,7 @@ class NetworkPrivacyControl extends ConsumerWidget {
                 key: const ValueKey('network_privacy_surface_title'),
                 style: AppTypography.labelLarge.copyWith(
                   color: colors.text.secondary,
-                  fontWeight: FontWeight.w400,
+                  fontWeight: AppFontWeight.regular,
                 ),
               ),
             ),
@@ -424,7 +424,7 @@ _NetworkPrivacyPresentation _presentationFor(
     return _NetworkPrivacyPresentation(
       statusLabel: 'Connected',
       description:
-          'Vizor’s network requests go through Tor, but software updates are unavailable.',
+          'Veylor’s network requests go through Tor, but software updates are unavailable.',
       statusColor: (colors) => colors.text.destructive,
       iconColor: (colors) => colors.icon.brandCrimson,
       descriptionColor: (colors) => colors.text.destructive,
@@ -447,7 +447,7 @@ _NetworkPrivacyPresentation _presentationFor(
     (NetworkPrivacyConnectionStatus.off, _) => _NetworkPrivacyPresentation(
       statusLabel: 'Direct',
       description: isLinux
-          ? 'Tor is off. Vizor requests, including software update checks, '
+          ? 'Tor is off. Veylor requests, including software update checks, '
                 'connect directly. Update pages and downloads open in another app.'
           : 'Tor is off. Requests to the Zcash network, in-app services, and software updates connect directly.',
       statusColor: (colors) => colors.text.secondary,
@@ -477,9 +477,9 @@ _NetworkPrivacyPresentation _presentationFor(
       _NetworkPrivacyPresentation(
         statusLabel: 'Switching to direct…',
         description: isLinux
-            ? 'Vizor is switching its requests, including software update '
+            ? 'Veylor is switching its requests, including software update '
                   'checks, to a direct connection.'
-            : 'Vizor is switching network requests and software updates to a direct connection.',
+            : 'Veylor is switching network requests and software updates to a direct connection.',
         statusIconName: AppIcons.loader,
         statusColor: (colors) => colors.text.secondary,
         iconColor: (colors) => colors.icon.brandCrimson,
@@ -488,7 +488,7 @@ _NetworkPrivacyPresentation _presentationFor(
     (NetworkPrivacyConnectionStatus.connected, _) => _NetworkPrivacyPresentation(
       statusLabel: 'Connected',
       description:
-          'Vizor’s network requests go through Tor. Links opened in other apps use those apps’ network settings.',
+          'Veylor’s network requests go through Tor. Links opened in other apps use those apps’ network settings.',
       statusColor: (colors) => colors.text.brandCrimson,
       iconColor: (colors) => colors.icon.brandCrimson,
       descriptionColor: (colors) => colors.text.accent,
@@ -506,7 +506,7 @@ _NetworkPrivacyPresentation _presentationFor(
       _NetworkPrivacyPresentation(
         statusLabel: 'Switch failed',
         description:
-            'Vizor could not switch to a direct connection. Try again.',
+            'Veylor could not switch to a direct connection. Try again.',
         statusColor: (colors) => colors.text.destructive,
         iconColor: (colors) => colors.icon.destructive,
         descriptionColor: (colors) => colors.text.destructive,

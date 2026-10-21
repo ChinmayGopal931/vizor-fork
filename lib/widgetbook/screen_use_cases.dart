@@ -21,6 +21,14 @@ import 'package:flutter/material.dart' show ThemeMode, MaterialApp, Material;
 import 'package:flutter/widgets.dart';
 import '../src/providers/voting/voting_home_entry_provider.dart';
 import '../src/features/payment_links/models/vizor_payment_link.dart';
+import '../src/features/private_usd/providers/private_usd_available_provider.dart';
+import '../src/features/private_usd/models/private_usd_record_key.dart';
+import '../src/features/private_usd/providers/private_usd_balance_provider.dart';
+import '../src/features/private_usd/providers/private_usd_unfinished_provider.dart';
+import '../src/features/private_usd/services/private_usd_engine.dart';
+import '../src/features/private_usd/services/private_usd_balance_repository.dart';
+import 'private_usd_reverse_use_cases.dart';
+import 'private_usd_use_cases.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
     as frb;
@@ -109,6 +117,11 @@ import '../src/providers/receive_address_provider.dart';
 import '../src/providers/sync_failure.dart';
 import '../src/providers/sync_provider.dart';
 import '../src/providers/zec_price_change_provider.dart';
+import '../src/features/portfolio_chart/models/portfolio_chart_models.dart';
+import '../src/features/portfolio_chart/providers/portfolio_chart_provider.dart';
+import '../src/features/portfolio_chart/providers/portfolio_chart_settings_provider.dart';
+import '../src/features/settings/widgets/mobile/mobile_portfolio_chart_settings_card.dart';
+import 'portfolio_chart_fixtures.dart';
 import '../src/rust/api/sync.dart' as rust_sync;
 import '../src/services/biometric_unlock.dart';
 
@@ -803,7 +816,7 @@ class _MobileSettingsMainPreview extends StatelessWidget {
       body: const MobileSettingsScreen(),
       tabBar: AppMobileTabBar(
         items: _mobileHomeTabItems,
-        currentIndex: 3,
+        currentIndex: 2,
         onSelect: (_) {},
       ),
     );
@@ -817,8 +830,52 @@ Widget buildSettingsSupportVizorUseCase(BuildContext context) {
   );
 }
 
-/// Real mobile settings and tab bar, pinned to the app footer for visual review.
-/// The version still comes from VIZOR_RELEASE_VERSION, just as in a release.
+/// The Settings card for the portfolio chart, market prices on.
+Widget buildMobileSettingsPortfolioChartUseCase(BuildContext context) =>
+    _buildMobileSettingsPortfolioChartUseCase(
+      PortfolioChartSettings.defaults.copyWith(marketPrices: true),
+    );
+
+/// Market prices off, as a fresh install has them.
+Widget buildMobileSettingsPortfolioChartLocalUseCase(BuildContext context) =>
+    _buildMobileSettingsPortfolioChartUseCase(PortfolioChartSettings.defaults);
+
+/// The chart switched off.
+Widget buildMobileSettingsPortfolioChartHiddenUseCase(BuildContext context) =>
+    _buildMobileSettingsPortfolioChartUseCase(
+      PortfolioChartSettings.defaults.copyWith(enabled: false),
+    );
+
+Widget _buildMobileSettingsPortfolioChartUseCase(
+  PortfolioChartSettings settings,
+) {
+  return ProviderScope(
+    overrides: [
+      zecMarketDataAvailableProvider.overrideWithValue(true),
+      portfolioChartSettingsProvider.overrideWith(
+        () => PreviewPortfolioChartSettingsNotifier(settings),
+      ),
+    ],
+    child: _MobilePreviewFrame(
+      constrainToDesignSize: false,
+      child: Builder(
+        builder: (context) => ColoredBox(
+          color: context.colors.background.window,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              child: const Align(
+                alignment: Alignment.topCenter,
+                child: MobilePortfolioChartSettingsCard(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 Widget buildMobileSettingsFooterUseCase(BuildContext context) =>
     _buildMobileSettingsFooterUseCase();
 Widget _buildMobileSettingsFooterUseCase({bool recoveryChanging = false}) {
@@ -891,7 +948,7 @@ class _MobileSettingsFooterPreviewState
       ),
       tabBar: AppMobileTabBar(
         items: _mobileHomeTabItems,
-        currentIndex: 3,
+        currentIndex: 2,
         onSelect: (_) {},
       ),
     );
@@ -952,7 +1009,7 @@ class _MobileSettingsExplorerPreviewState
       ),
       tabBar: AppMobileTabBar(
         items: _mobileHomeTabItems,
-        currentIndex: 3,
+        currentIndex: 2,
         onSelect: (_) {},
       ),
     );
@@ -1766,6 +1823,163 @@ Widget buildMobileHomeDefaultUseCase(
     ),
   );
 }
+
+Widget _buildMobileHomePrivateUsdUseCase(
+  PrivateUsdBalanceState balance, {
+  bool privacyModeEnabled = false,
+  bool converting = false,
+  bool attention = false,
+}) {
+  return _buildMobileHomeUseCase(
+    accountState: _accountsDesignState,
+    syncState: _homeSyncedState(
+      orchardBalance: BigInt.from(14312000000),
+      recentTransactions: [_homeTx(1), _homeTx(2)],
+    ),
+    privateUsdBalance: balance,
+    privateUsdConversions: converting
+        ? previewPrivateUsdConverting(_accountsDesignState.activeAccountUuid!)
+        : null,
+    privateUsdReverseConversions: attention
+        ? previewPrivateUsdReverseAttention(
+            _accountsDesignState.activeAccountUuid!,
+          )
+        : null,
+    privacyModeEnabled: privacyModeEnabled,
+  );
+}
+
+/// Home with a reverse conversion waiting for "Authorize settlement": the
+/// banner asks for attention.
+Widget buildMobileHomePrivateUsdAttentionUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(
+      previewPrivateUsdBalance(available: 1250.4),
+      attention: true,
+    );
+
+/// Home with a conversion under way: the forward banner.
+Widget buildMobileHomePrivateUsdConvertingUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(
+      previewPrivateUsdBalance(available: 1250.4),
+      converting: true,
+    );
+
+/// Home with the Private USD strip: the balance and its `≈ ZEC` worth.
+Widget buildMobileHomePrivateUsdUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(
+      previewPrivateUsdBalance(available: 1250.4),
+    );
+
+/// Not used yet: "—", and no page starts.
+Widget buildMobileHomePrivateUsdUnknownUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(previewPrivateUsdUnknown);
+
+Widget buildMobileHomePrivateUsdLoadingUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(previewPrivateUsdLoading);
+
+Widget buildMobileHomePrivateUsdArrivingUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(
+      previewPrivateUsdBalance(available: 1250.4, arriving: 200),
+    );
+
+Widget buildMobileHomePrivateUsdBlockedUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(
+      previewPrivateUsdBalance(available: 80, blocked: 25),
+    );
+
+Widget buildMobileHomePrivateUsdHiddenUseCase(BuildContext context) =>
+    _buildMobileHomePrivateUsdUseCase(
+      previewPrivateUsdBalance(available: 1250.4, arriving: 200),
+      privacyModeEnabled: true,
+    );
+
+Widget _buildMobileHomePortfolioChartUseCase(
+  PortfolioChartViewState chart, {
+  bool privacyModeEnabled = false,
+}) {
+  return _buildMobileHomeUseCase(
+    accountState: _accountsDesignState,
+    syncState: _homeSyncedState(
+      orchardBalance: BigInt.from(14312000000),
+      recentTransactions: [_homeTx(1), _homeTx(2)],
+    ),
+    portfolioChart: chart,
+    privacyModeEnabled: privacyModeEnabled,
+  );
+}
+
+/// Home with the portfolio chart: the balance valued at public prices.
+Widget buildMobileHomePortfolioChartUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      PortfolioChartReady(previewPortfolioChartData()),
+    );
+
+/// A falling month, so the change reads in the destructive colour.
+Widget buildMobileHomePortfolioChartFallingUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      PortfolioChartReady(
+        previewPortfolioChartData(
+          range: PortfolioChartRange.month,
+          falling: true,
+        ),
+      ),
+    );
+
+/// All the history there is, from the pricing server's first day.
+Widget buildMobileHomePortfolioChartAllUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      PortfolioChartReady(
+        previewPortfolioChartData(range: PortfolioChartRange.all),
+      ),
+    );
+
+/// Market prices off: the ZEC balance over a year, with no request made.
+Widget buildMobileHomePortfolioChartZecUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      PortfolioChartReady(
+        previewPortfolioChartData(
+          mode: PortfolioChartMode.zec,
+          range: PortfolioChartRange.year,
+        ),
+      ),
+    );
+
+/// Prices asked for but not to be had: the ZEC balance, and a line saying so.
+Widget buildMobileHomePortfolioChartUnavailableUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      PortfolioChartReady(
+        previewPortfolioChartData(
+          mode: PortfolioChartMode.zec,
+          notice: PortfolioChartNotice.pricesUnavailable,
+        ),
+      ),
+    );
+
+Widget buildMobileHomePortfolioChartLoadingUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      const PortfolioChartLoading(
+        PortfolioChartRange.week,
+        PortfolioChartMode.usd,
+      ),
+    );
+
+Widget buildMobileHomePortfolioChartEmptyUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      const PortfolioChartEmpty(
+        PortfolioChartRange.quarter,
+        PortfolioChartMode.usd,
+      ),
+    );
+
+/// Privacy mode on: neither the values nor the shape of the history show.
+Widget buildMobileHomePortfolioChartPrivateUseCase(BuildContext context) =>
+    _buildMobileHomePortfolioChartUseCase(
+      const PortfolioChartPrivate(
+        PortfolioChartRange.week,
+        PortfolioChartMode.usd,
+      ),
+      privacyModeEnabled: true,
+    );
 
 /// Interactive visual fixture: production home, routing, snapshot and software
 /// shield owner. Only balances and the transaction result are supplied samples.
@@ -3518,6 +3732,12 @@ Widget _buildMobileHomeUseCase({
   bool constrainToPreviewFrame = true,
   GiftCardActivityIndex giftCardActivityIndex = GiftCardActivityIndex.empty,
   NetworkPrivacyState? networkPrivacyState,
+  PrivateUsdBalanceState? privateUsdBalance,
+  Map<PrivateUsdRecordKey, PrivateUsdConversionStatus>? privateUsdConversions,
+  Map<PrivateUsdRecordKey, PrivateUsdReverseStatus>?
+  privateUsdReverseConversions,
+  bool privacyModeEnabled = false,
+  PortfolioChartViewState portfolioChart = const PortfolioChartHidden(),
 }) {
   final harness = _MobileHomeHarness(
     adaptive: adaptive,
@@ -3549,7 +3769,32 @@ Widget _buildMobileHomeUseCase({
         networkPrivacyProvider.overrideWith(
           () => _PreviewNetworkPrivacyNotifier(networkPrivacyState),
         ),
-      appBootstrapProvider.overrideWithValue(_homeBootstrap(accountState)),
+      appBootstrapProvider.overrideWithValue(
+        _homeBootstrap(accountState, privacyModeEnabled: privacyModeEnabled),
+      ),
+      // Private USD with a fixed balance: no page, Rust or network.
+      if (privateUsdBalance != null) ...[
+        privateUsdAvailableProvider.overrideWithValue(true),
+        privateUsdBalanceProvider.overrideWith2(
+          (uuid) => FixedPrivateUsdBalanceNotifier(uuid, privateUsdBalance),
+        ),
+      ],
+      // A conversion under way, with no engine or deployment behind it.
+      if (privateUsdConversions != null) ...[
+        privateUsdConversionsProvider.overrideWith(
+          () => FixedPrivateUsdConversionsNotifier(privateUsdConversions),
+        ),
+        privateUsdCurrentDeploymentProvider.overrideWithValue(null),
+      ],
+      if (privateUsdReverseConversions != null) ...[
+        privateUsdReverseConversionsProvider.overrideWith(
+          () => FixedPrivateUsdReverseConversionsNotifier(
+            privateUsdReverseConversions,
+          ),
+        ),
+        if (privateUsdConversions == null)
+          privateUsdCurrentDeploymentProvider.overrideWithValue(null),
+      ],
       if (!inheritWalletState)
         accountProvider.overrideWith(
           () => setupPreview
@@ -3613,6 +3858,9 @@ Widget _buildMobileHomeUseCase({
       ),
       zecHomeUsdUnitPriceProvider.overrideWithValue(marketData.usdPrice),
       zecPriceChange24hPctProvider.overrideWithValue(marketData.change24hPct),
+      // No wallet database or price service behind the Home chart: it draws
+      // the state it is given, and nothing by default.
+      portfolioChartViewProvider.overrideWithValue(portfolioChart),
       swapFeatureEnabledProvider.overrideWithValue(swapEnabled),
       swapActivityRowItemsProvider.overrideWith((ref, accountUuid) async {
         return const [];
@@ -4484,6 +4732,11 @@ class _MobileHomeHarnessState extends State<_MobileHomeHarness> {
         path: '/add-account',
         builder: (_, _) =>
             const _PreviewRoutePlaceholder(label: '/add-account'),
+      ),
+      GoRoute(
+        path: '/private-usd',
+        builder: (_, _) =>
+            const _PreviewRoutePlaceholder(label: '/private-usd'),
       ),
     ];
     _router = GoRouter(
@@ -5511,7 +5764,6 @@ final _homeKeystoneState = AccountState(
 
 const _mobileHomeTabItems = [
   AppMobileTabItem(iconName: AppIcons.home, label: 'Home'),
-  AppMobileTabItem(iconName: AppIcons.swapArrows, label: 'Swap'),
   AppMobileTabItem(iconName: AppIcons.history, label: 'Activity'),
   AppMobileTabItem(iconName: AppIcons.cog, label: 'Settings'),
 ];
@@ -5555,7 +5807,10 @@ AppBootstrapState _utilityBootstrap(
   );
 }
 
-AppBootstrapState _homeBootstrap(AccountState accountState) {
+AppBootstrapState _homeBootstrap(
+  AccountState accountState, {
+  bool privacyModeEnabled = false,
+}) {
   return AppBootstrapState(
     initialLocation: '/home',
     initialAccountState: accountState,
@@ -5563,7 +5818,7 @@ AppBootstrapState _homeBootstrap(AccountState accountState) {
     network: 'main',
     rpcEndpointConfig: defaultRpcEndpointConfig('main'),
     themeMode: ThemeMode.system,
-    privacyModeEnabled: false,
+    privacyModeEnabled: privacyModeEnabled,
     isPasswordConfigured: true,
     isUnlocked: true,
     passwordRotationRecoveryFailed: false,
@@ -6521,6 +6776,7 @@ class _PreviewAccountNotifier extends AccountNotifier {
   Future<void> removeAccount(
     String uuid, {
     int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
   }) async {
     final prev = state.value ?? initialState;
     final updated = [
@@ -6531,7 +6787,10 @@ class _PreviewAccountNotifier extends AccountNotifier {
   }
 
   @override
-  Future<void> resetWallet({int? confirmedUnsharedGiftCardCount}) async {
+  Future<void> resetWallet({
+    int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
+  }) async {
     state = const AsyncData(AccountState());
   }
 }

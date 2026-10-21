@@ -1,131 +1,33 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-import '../../../services/native_modal_corners.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/app_modal_shape.dart';
+import '../../widgets/mobile/mobile_surface_card.dart';
 
-typedef _PanelGeometry = ({Rect rect, Size viewSize, double scale});
+/// The sidebar's panel: neon glass with its top-left and bottom-right corners
+/// cut and lit, as the mobile surfaces are. Its content is clipped to the
+/// same outline.
+class MobileSidebarSurface extends StatelessWidget {
+  const MobileSidebarSurface({required this.child, super.key});
 
-/// Owns one shared outline for the panel fill and clipping. Only iOS asks
-/// UIKit to resolve container-concentric corners at the panel's actual frame.
-class MobileSidebarSurface extends StatefulWidget {
-  const MobileSidebarSurface({required Widget this.child, super.key})
-    : builder = null;
+  /// How far the panel's corner cuts reach.
+  static const cut = AppChamfer.xLarge;
 
-  /// Shares the same resolved corners with content that hugs the panel edge.
-  const MobileSidebarSurface.builder({
-    required Widget Function(BuildContext context, BorderRadius corners)
-    this.builder,
-    super.key,
-  }) : child = null;
-
-  final Widget? child;
-  final Widget Function(BuildContext context, BorderRadius corners)? builder;
-
-  @override
-  State<MobileSidebarSurface> createState() => _MobileSidebarSurfaceState();
-}
-
-class _MobileSidebarSurfaceState extends State<MobileSidebarSurface>
-    with WidgetsBindingObserver {
-  static const _fallback = BorderRadius.all(Radius.circular(AppRadii.large));
-  final _key = GlobalKey();
-  BorderRadius _radius = _fallback;
-  _PanelGeometry? _request;
-  int _epoch = 0;
-  bool _scheduled = false;
-  bool _active = true;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  void _schedule() {
-    if (_scheduled || !_active || defaultTargetPlatform != TargetPlatform.iOS) {
-      return;
-    }
-    _scheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scheduled = false;
-      if (mounted && _active) _resolve();
-    });
-  }
-
-  @override
-  void didChangeMetrics() {
-    _epoch++;
-    _request = null;
-    _schedule();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    _active = state == AppLifecycleState.resumed;
-    _epoch++;
-    _request = null;
-    if (_active) {
-      _schedule();
-      WidgetsBinding.instance.ensureVisualUpdate();
-    }
-  }
-
-  Future<void> _resolve() async {
-    final box = _key.currentContext?.findRenderObject();
-    if (box is! RenderBox || !box.hasSize || box.size.isEmpty) return;
-    final view = View.of(context);
-    final geometry = (
-      rect: box.localToGlobal(Offset.zero) & box.size,
-      viewSize: view.physicalSize / view.devicePixelRatio,
-      scale: view.devicePixelRatio,
-    );
-    if (_request == geometry) return;
-    _request = geometry;
-    final epoch = ++_epoch;
-    // Do not keep the old posture's radius while awaiting a new geometry.
-    if (_radius != _fallback) setState(() => _radius = _fallback);
-    final radius = await NativeModalCorners.resolveSidebar(
-      rect: geometry.rect,
-      viewSize: geometry.viewSize,
-      scale: geometry.scale,
-    );
-    if (!mounted || !_active || epoch != _epoch) return;
-    final target = radius ?? _fallback;
-    if (_radius != target) setState(() => _radius = target);
-  }
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    // Parent positioning can change without resizing the panel itself.
-    _schedule();
-    final shape = appModalShape(_radius);
-    return NotificationListener<SizeChangedLayoutNotification>(
-      onNotification: (_) {
-        _schedule();
-        return false;
-      },
-      child: SizeChangedLayoutNotifier(
-        child: DecoratedBox(
-          key: _key,
-          decoration: ShapeDecoration(
-            color: context.colors.background.raised,
-            shape: shape,
-          ),
-          child: ClipPath(
-            clipper: ShapeBorderClipper(shape: shape),
-            child: widget.builder?.call(context, _radius) ?? widget.child!,
-          ),
-        ),
+    final colors = context.colors;
+    return CustomPaint(
+      painter: NeonGlassPanelPainter(
+        fill: colors.background.window.withValues(alpha: 0.62),
+        glow: colors.neon.glow,
+        core: colors.neon.core,
+        cut: cut,
+      ),
+      child: ClipPath(
+        clipper: ShapeBorderClipper(shape: Neon.wedgeBorder(cut: cut)),
+        child: child,
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _epoch++;
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
   }
 }

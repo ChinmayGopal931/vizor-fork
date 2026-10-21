@@ -12,7 +12,6 @@ import '../../../providers/sync_display_progress_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../../services/native_mobile_navigation_geometry.dart';
 import '../../config/swap_feature_config.dart';
-import '../../formatting/sync_status_label.dart';
 import '../../navigation/external_action_guard_provider.dart';
 import '../../navigation/mobile_destinations.dart';
 import '../../navigation/mobile_sidebar_route_observer.dart';
@@ -27,6 +26,7 @@ import 'mobile_navigation_scope.dart';
 import 'mobile_wallet_sidebar.dart';
 import 'mobile_window_layout.dart';
 import 'mobile_window_policy.dart';
+import 'neon_sync_backdrop.dart';
 
 /// Wallet route shell below the full-window root Navigator. Resizing changes
 /// pane rectangles without replacing the nested Navigator or its state.
@@ -128,6 +128,18 @@ class _MobileAdaptiveFrameState extends ConsumerState<MobileAdaptiveFrame>
     super.dispose();
   }
 
+  /// The wallet's sync line, as Home's reads; the sidebar needs only its
+  /// whole percentage, never the per-frame one.
+  NeonSyncLine _sidebarSyncLine() {
+    final whole = ref.watch(syncDisplayWholePercentageProvider);
+    return NeonSyncLine.wallet(
+      ref.watch(syncProvider).value ?? SyncState(),
+      whole: whole,
+      networkPrivacy: ref.watch(networkPrivacyProvider),
+      climbProgress: () => whole / 100,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final observer = ref.watch(mobileSidebarRouteObserverProvider);
@@ -148,7 +160,7 @@ class _MobileAdaptiveFrameState extends ConsumerState<MobileAdaptiveFrame>
       media: media,
       native: _geometry,
       wallet: wallet,
-      navigationItemCount: swapEnabled ? 4 : 3,
+      navigationItemCount: mobileDestinations.length,
     );
     final guard = ref.watch(externalActionGuardProvider);
     bool navigationUnblocked() =>
@@ -279,15 +291,9 @@ class _MobileAdaptiveFrameState extends ConsumerState<MobileAdaptiveFrame>
                               kDefaultProfilePictureId,
                           size: AppProfilePictureSize.navLarge,
                           hardwareSignerKind: account?.hardwareSignerKind,
-                          badgeRingColor: context.colors.background.raised,
+                          badgeRingColor: context.colors.background.window,
                         ),
-                        status: SyncStatusLabel.from(
-                          ref.watch(syncProvider).value ?? SyncState(),
-                          displayWholePercentage: ref.watch(
-                            syncDisplayWholePercentageProvider,
-                          ),
-                          networkPrivacy: ref.watch(networkPrivacyProvider),
-                        ),
+                        sync: _sidebarSyncLine(),
                         currentPath: path,
                         swapEnabled: swapEnabled,
                         onSelect: enabled

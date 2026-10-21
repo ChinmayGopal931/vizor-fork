@@ -56,7 +56,7 @@ class AppToast extends StatelessWidget {
     final textStyle = switch (tone) {
       AppToastTone.neutral => AppTypography.labelLarge,
       AppToastTone.destructive => AppTypography.labelLarge.copyWith(
-        fontWeight: FontWeight.w400,
+        fontWeight: AppFontWeight.regular,
       ),
     };
     final dismissButton = onDismiss == null

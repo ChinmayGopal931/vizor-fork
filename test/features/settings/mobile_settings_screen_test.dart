@@ -314,6 +314,14 @@ class _FakeNetworkPrivacyNotifier extends NetworkPrivacyNotifier {
   }
 }
 
+/// The Portfolio chart card made the settings list taller than the default
+/// test viewport, so the rows below it are not built until scrolled to. A tall
+/// surface keeps every row on screen for the tests that look for them.
+Future<void> _useTallSurface(WidgetTester tester) async {
+  await tester.binding.setSurfaceSize(const Size(800, 2400));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+}
+
 void main() {
   testWidgets('mobile private recovery is labelled experimental', (
     tester,
@@ -332,7 +340,7 @@ void main() {
     (
       TargetPlatform.iOS,
       '$kPrivateQueriesSettingsCopy While on, migration confirmations are '
-          'checked only when Vizor is open.',
+          'checked only when Veylor is open.',
     ),
     (TargetPlatform.android, kPrivateQueriesSettingsCopy),
   ]) {
@@ -478,12 +486,12 @@ void main() {
               ),
               findsNothing,
             );
-            expect(find.text('About Vizor'), findsNothing);
+            expect(find.text('About Veylor'), findsNothing);
             final semantics = tester.ensureSemantics();
             try {
               await tester.pump();
               expect(
-                find.bySemanticsLabel('Vizor, version $kVizorReleaseVersion'),
+                find.bySemanticsLabel('Veylor, version $kVizorReleaseVersion'),
                 findsOneWidget,
               );
             } finally {
@@ -622,8 +630,8 @@ void main() {
           .data;
       expect(
         description,
-        'Vizor’s network requests go through Tor. Ironwood private migration '
-        'uses a direct connection while Vizor is closed. Links opened in other '
+        'Veylor’s network requests go through Tor. Ironwood private migration '
+        'uses a direct connection while Veylor is closed. Links opened in other '
         'apps use those apps’ network settings.',
       );
     } finally {
@@ -644,6 +652,7 @@ void main() {
 
   testWidgets('off mainnet a durably private wallet can still be returned to '
       'public lookups', (tester) async {
+    await _useTallSurface(tester);
     final enhancePir = _RecordingToggle(false);
     await tester.pumpWidget(
       _app(
@@ -797,7 +806,7 @@ void main() {
           .data;
       expect(
         description,
-        'Vizor’s network requests go through Tor. Links opened in other apps '
+        'Veylor’s network requests go through Tor. Links opened in other apps '
         'use those apps’ network settings.',
       );
       expect(description, isNot(contains('migration')));
@@ -1063,12 +1072,14 @@ void main() {
   });
 
   testWidgets('renders the grouped settings with live values', (tester) async {
+    await _useTallSurface(tester);
     await tester.pumpWidget(_app());
     await tester.pump();
 
-    expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('Account'), findsOneWidget);
-    expect(find.text('System'), findsOneWidget);
+    // The page title and group heads are drawn as uppercase captions.
+    expect(find.text('SETTINGS'), findsOneWidget);
+    expect(find.text('ACCOUNT'), findsOneWidget);
+    expect(find.text('SYSTEM'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('mobile_settings_gift_cards_row')),
       findsOneWidget,
@@ -1076,7 +1087,8 @@ void main() {
     expect(find.text('My gift cards'), findsOneWidget);
     expect(find.text('New'), findsOneWidget);
     expect(find.text('John'), findsOneWidget);
-    expect(find.text('Knight'), findsOneWidget);
+    // The default portrait's own label.
+    expect(find.text('Light cycle'), findsOneWidget);
     final pfpRow = find.byKey(const ValueKey('mobile_settings_pfp_row'));
     final pfp = find.descendant(
       of: pfpRow,
@@ -1084,7 +1096,7 @@ void main() {
     );
     expect(
       tester.getTopLeft(pfp).dx,
-      lessThan(tester.getTopLeft(find.text('Knight')).dx),
+      lessThan(tester.getTopLeft(find.text('Light cycle')).dx),
     );
     expect(
       _chevronIn(tester, const ValueKey('mobile_settings_seed_row')).color,
@@ -1094,8 +1106,6 @@ void main() {
       _chevronIn(tester, const ValueKey('mobile_settings_pfp_row')).color,
       AppThemeData.dark.colors.icon.accent,
     );
-    expect(find.text('Theme'), findsOneWidget);
-    expect(find.text('Dark'), findsOneWidget);
     expect(find.text('Syncing'), findsOneWidget);
     final keepAwakeRow = find.byKey(
       const ValueKey('mobile_settings_sync_keep_awake_row'),
@@ -1116,7 +1126,7 @@ void main() {
       findsOneWidget,
     );
     // The About entry stays hidden until the legal documents are ready.
-    expect(find.text('About Vizor'), findsNothing);
+    expect(find.text('About Veylor'), findsNothing);
     // Endpoint shows the live RPC host:port.
     expect(
       find.text(defaultRpcEndpointConfig('main').hostPort),
@@ -1142,19 +1152,20 @@ void main() {
 
     // The System group is located by its first row because "System" is
     // also a theme value.
-    expect(top('Personal'), lessThan(top('Account')));
-    expect(top('Account'), lessThan(top('Endpoint')));
+    // Group heads are drawn uppercase; the Privacy card keeps its own head.
+    expect(top('PERSONAL'), lessThan(top('ACCOUNT')));
+    expect(top('ACCOUNT'), lessThan(top('Endpoint')));
     expect(top('Endpoint'), lessThan(top('Privacy')));
 
     // Personal owns the gift cards and address book entries.
     expect(find.text('Address book'), findsOneWidget);
     expect(find.text('Contacts'), findsNothing);
     expect(top('My gift cards'), lessThan(top('Address book')));
-    expect(top('Address book'), lessThan(top('Account')));
+    expect(top('Address book'), lessThan(top('ACCOUNT')));
 
     // Mobile keeps its own pieces and never offers to link to itself.
     expect(find.text('Syncing'), findsOneWidget);
-    expect(find.textContaining('Link Vizor'), findsNothing);
+    expect(find.textContaining('Link Veylor'), findsNothing);
   });
 
   testWidgets('Gift Cards settings row opens the feature', (tester) async {
@@ -1193,115 +1204,6 @@ void main() {
 
     expect(find.text('home route'), findsOneWidget);
     expect(find.textContaining('payment links route'), findsNothing);
-  });
-
-  testWidgets('Gift Cards drops a slow open once a sheet takes over', (
-    tester,
-  ) async {
-    final cards = Completer<PaymentLinkCardsSnapshot>();
-    await tester.pumpWidget(_routedApp(cardsLoader: () => cards.future));
-    await tester.pump();
-
-    final row = find.byKey(const ValueKey('mobile_settings_gift_cards_row'));
-    await tester.scrollUntilVisible(row, 200);
-    await tester.ensureVisible(row);
-    await tester.pump();
-    await tester.tap(row);
-    await tester.pump();
-
-    // The screen stays interactive while the cards load, and the sheet goes
-    // to the root navigator over the shell, not to this branch.
-    await tester.ensureVisible(find.text('Theme'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Theme'));
-    await tester.pumpAndSettle();
-    expect(find.text('System (Auto)'), findsOneWidget);
-
-    cards.complete(const PaymentLinkCardsSnapshot(created: [], received: []));
-    await tester.pumpAndSettle();
-
-    expect(find.text('System (Auto)'), findsOneWidget);
-    expect(find.textContaining('payment links route'), findsNothing);
-  });
-
-  testWidgets('theme row opens the sheet and applies the selection', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_app());
-    await tester.pump();
-
-    await tester.ensureVisible(find.text('Theme'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Theme'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('System (Auto)'), findsOneWidget);
-    final modal = find.byType(MobileModalScaffold);
-    final modalTitle = find.descendant(of: modal, matching: find.text('Theme'));
-    final closeIcon = find.descendant(
-      of: modal,
-      matching: find.byWidgetPredicate(
-        (widget) => widget is AppIcon && widget.name == AppIcons.cross,
-      ),
-    );
-    final titleCenterY = tester.getCenter(modalTitle).dy;
-    final closeCenterY = tester.getCenter(closeIcon).dy;
-    expect(titleCenterY, greaterThan(closeCenterY));
-    expect(titleCenterY - closeCenterY, lessThanOrEqualTo(16));
-    expect(tester.widget<AppIcon>(closeIcon).size, 20);
-    expect(
-      _leadingIconOpacityIn(
-        tester,
-        const ValueKey('mobile_theme_option_light'),
-      ),
-      0.5,
-    );
-    expect(
-      tester
-          .getSize(find.byKey(const ValueKey('mobile_theme_option_system')))
-          .height,
-      64,
-    );
-    expect(
-      tester
-              .getTopLeft(
-                find.byKey(const ValueKey('mobile_theme_option_light')),
-              )
-              .dy -
-          tester
-              .getBottomLeft(
-                find.byKey(const ValueKey('mobile_theme_option_system')),
-              )
-              .dy,
-      AppSpacing.xs,
-    );
-    expect(
-      tester.getTopLeft(find.byKey(const ValueKey('mobile_theme_update'))).dy -
-          tester
-              .getBottomLeft(
-                find.byKey(const ValueKey('mobile_theme_option_dark')),
-              )
-              .dy,
-      AppSpacing.md,
-    );
-    expect(
-      find.byKey(const ValueKey('mobile_theme_option_light')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('mobile_theme_option_dark')),
-      findsOneWidget,
-    );
-
-    // Selection commits through Update, not on tap.
-    await tester.tap(find.byKey(const ValueKey('mobile_theme_option_light')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('mobile_theme_update')));
-    await tester.pumpAndSettle();
-
-    // Sheet closed and the row value reflects the new mode.
-    expect(find.text('System (Auto)'), findsNothing);
-    expect(find.text('Light'), findsOneWidget);
   });
 
   testWidgets('sync keep-awake row toggles the persisted setting', (
@@ -1456,6 +1358,7 @@ void main() {
   });
 
   testWidgets('labels Face ID hardware by brand', (tester) async {
+    await _useTallSurface(tester);
     await tester.pumpWidget(
       _app(
         biometric: const BiometricUnlockState(
@@ -1484,6 +1387,7 @@ void main() {
   });
 
   testWidgets('asks before turning off Face ID unlock', (tester) async {
+    await _useTallSurface(tester);
     final biometricNotifier = _FakeBiometricNotifier(
       const BiometricUnlockState(
         availability: BiometricAvailability(
@@ -1528,6 +1432,7 @@ void main() {
   });
 
   testWidgets('cancel keeps biometric unlock enabled', (tester) async {
+    await _useTallSurface(tester);
     final biometricNotifier = _FakeBiometricNotifier(
       const BiometricUnlockState(
         availability: BiometricAvailability(
@@ -1570,6 +1475,7 @@ void main() {
   testWidgets('Touch ID settings and disable sheet use Apple naming', (
     tester,
   ) async {
+    await _useTallSurface(tester);
     final biometricNotifier = _FakeBiometricNotifier(
       const BiometricUnlockState(
         availability: BiometricAvailability(
@@ -1610,6 +1516,7 @@ void main() {
   });
 
   testWidgets('close keeps biometric unlock enabled', (tester) async {
+    await _useTallSurface(tester);
     final biometricNotifier = _FakeBiometricNotifier(
       const BiometricUnlockState(
         availability: BiometricAvailability(
@@ -1650,6 +1557,7 @@ void main() {
   });
 
   testWidgets('labels fingerprint hardware by modality', (tester) async {
+    await _useTallSurface(tester);
     await tester.pumpWidget(
       _app(
         biometric: const BiometricUnlockState(
@@ -1699,14 +1607,6 @@ AppIcon _chevronIn(WidgetTester tester, ValueKey<String> rowKey) {
       ),
     ),
   );
-}
-
-double _leadingIconOpacityIn(WidgetTester tester, ValueKey<String> rowKey) {
-  return tester
-      .widget<Opacity>(
-        find.descendant(of: find.byKey(rowKey), matching: find.byType(Opacity)),
-      )
-      .opacity;
 }
 
 final _turnOffSheet = find.byKey(

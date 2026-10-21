@@ -286,9 +286,9 @@ void main() {
 
   group('request QR export', () {
     test('names the file after the amount, or nothing when there is none', () {
-      expect(requestQrFileName('0.5'), 'vizor-request-0.5.png');
-      expect(requestQrFileName(''), 'vizor-request.png');
-      expect(requestQrFileName('1 ZEC'), 'vizor-request-1.png');
+      expect(requestQrFileName('0.5'), 'veylor-request-0.5.png');
+      expect(requestQrFileName(''), 'veylor-request.png');
+      expect(requestQrFileName('1 ZEC'), 'veylor-request-1.png');
     });
 
     test('writes the PNG where the save dialog pointed it', () async {
@@ -308,7 +308,7 @@ void main() {
         },
       );
 
-      expect(suggested, ['vizor-request-0.5.png']);
+      expect(suggested, ['veylor-request-0.5.png']);
       expect(saved, isNotNull);
       expect(saved!.path, endsWith('chosen.png'));
       expect(

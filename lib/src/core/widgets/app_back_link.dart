@@ -40,7 +40,7 @@ class _AppBackLinkState extends State<AppBackLink> {
   bool _focused = false;
 
   static const _labelStyle = TextStyle(
-    fontFamily: 'Geist',
+    fontFamily: kGothamFamily,
     fontWeight: FontWeight.w500,
     fontSize: 14,
     height: 16 / 14,

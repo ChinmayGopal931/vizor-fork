@@ -146,7 +146,6 @@ class _MobilePoolMigrationHero extends StatelessWidget {
                           amount,
                           style: AppTypography.labelLarge.copyWith(
                             color: colors.text.accent,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -166,7 +165,6 @@ class _MobilePoolMigrationHero extends StatelessWidget {
                           amount,
                           style: AppTypography.labelLarge.copyWith(
                             color: colors.text.accent,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -231,7 +229,7 @@ class _MobileMigrationProcessCard extends StatelessWidget {
                 number: 2,
                 title: 'Prepare your balance',
                 body:
-                    'Vizor reorganizes your balance into common-sized parts '
+                    'Veylor reorganizes your balance into common-sized parts '
                     'before migration begins.',
               ),
               SizedBox(height: AppSpacing.sm),
@@ -326,7 +324,6 @@ class _ProcessRow extends StatelessWidget {
                 '$number',
                 style: AppTypography.labelLarge.copyWith(
                   color: colors.text.secondary,
-                  fontWeight: FontWeight.w400,
                 ),
               ),
             ),

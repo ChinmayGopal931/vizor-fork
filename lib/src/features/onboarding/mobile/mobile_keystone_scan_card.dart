@@ -226,10 +226,7 @@ class _KeystonePermissionMessage extends StatelessWidget {
           textAlign: TextAlign.center,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: AppTypography.bodyLarge.copyWith(
-            color: colors.text.accent,
-            fontWeight: FontWeight.w600,
-          ),
+          style: AppTypography.bodyLarge.copyWith(color: colors.text.accent),
         ),
         const SizedBox(height: AppSpacing.xxs),
         for (final line in description.split('\n'))

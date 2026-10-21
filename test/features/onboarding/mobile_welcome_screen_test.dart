@@ -19,9 +19,7 @@ import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_hardware_sele
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_keystone_screens.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_method_selection_screen.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_wallet_link_screens.dart';
-import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_welcome_backdrop.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_welcome_screen.dart';
-import 'package:zcash_wallet/src/features/onboarding/shared/welcome_art_assets.dart';
 import 'package:zcash_wallet/src/features/payment_links/screens/gift_claim_screen.dart';
 import 'package:zcash_wallet/src/features/onboarding/shared/welcome_button_tokens.dart';
 import '../../figma_compare/figma_compare_font_loader.dart';
@@ -89,6 +87,11 @@ double _stepsProgress(WidgetTester tester) {
   );
   return fill.widthFactor!;
 }
+
+const _horizon = ValueKey('mobile_welcome_horizon');
+
+/// Present only in the wide composition, where the actions sit in a pane.
+const _widePane = ValueKey('mobile_welcome_wide_pane');
 
 void main() {
   setUpAll(loadFigmaCompareFonts);
@@ -196,8 +199,8 @@ void main() {
 
     expect(find.byType(MobileMethodSelectionScreen), findsOneWidget);
     expect(find.text('Import secret passphrase'), findsOneWidget);
-    expect(find.text('Import Account\nto Vizor'), findsOneWidget);
-    expect(find.text('Link Vizor Desktop'), findsOneWidget);
+    expect(find.text('Import Account\nto Veylor'), findsOneWidget);
+    expect(find.text('Link Veylor Desktop'), findsOneWidget);
     expect(find.text('Connect hardware wallet'), findsOneWidget);
     expect(_stepsProgress(tester), closeTo(60 / 196, 0.0001));
     expect(find.textContaining('you agree to our'), findsNothing);
@@ -301,7 +304,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Go to Settings → Link Vizor Mobile'), findsOneWidget);
+    expect(find.text('Go to Settings → Link Veylor Mobile'), findsOneWidget);
     expect(
       find.text('Scan the QR code on your desktop from the next screen.'),
       findsOneWidget,
@@ -364,7 +367,7 @@ void main() {
     await tester.tap(button);
     await tester.pumpAndSettle();
     expect(
-      find.text('Create wallet by redeeming Vizor Gift Card'),
+      find.text('Create wallet by redeeming Veylor Gift Card'),
       findsOneWidget,
     );
     semantics.dispose();
@@ -435,18 +438,11 @@ void main() {
     expect(find.text('home-route'), findsOneWidget);
   });
 
-  testWidgets('reduced motion uses the poster at the Figma video slot', (
-    tester,
-  ) async {
+  testWidgets('the neon horizon spans the welcome screen', (tester) async {
     await pump(tester);
-    final poster = find.byWidgetPredicate(
-      (widget) =>
-          widget is Image &&
-          widget.image is AssetImage &&
-          (widget.image as AssetImage).assetName == kMobileWelcomePosterAsset,
-    );
-    expect(poster, findsOneWidget);
-    expect(tester.getSize(poster).width, 394);
+    final horizon = find.byKey(_horizon);
+    expect(horizon, findsOneWidget);
+    expect(tester.getSize(horizon).width, 393);
   });
 
   for (final entry in ['/welcome', '/add-account']) {
@@ -457,6 +453,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       await tester.pumpWidget(_app(initialLocation: entry));
       await tester.pumpAndSettle();
+      expect(find.byKey(_widePane), findsNothing);
       final welcomeState = tester.state(find.byType(MobileWelcomeScreen));
       final originalButton = tester.getRect(
         find.byKey(const ValueKey('mobile_welcome_get_started')),
@@ -468,14 +465,11 @@ void main() {
         tester.state(find.byType(MobileWelcomeScreen)),
         same(welcomeState),
       );
-      final image = tester.widget<Image>(find.byType(Image).first);
-      expect(
-        (image.image as AssetImage).assetName,
-        kLandscapeWelcomePosterAsset,
-      );
-      final art = tester.getSize(find.byWidget(image));
-      expect(art.height, 669);
-      expect(art.width / art.height, closeTo(16 / 9, 0.0001));
+      // The horizon moves beside the pane instead of behind the buttons.
+      final pane = tester.getRect(find.byKey(_widePane));
+      final horizon = tester.getRect(find.byKey(_horizon));
+      expect(horizon.left, greaterThanOrEqualTo(pane.right));
+      expect(horizon.right, lessThanOrEqualTo(951));
       for (final key in [
         'mobile_welcome_get_started',
         'mobile_welcome_import',
@@ -495,6 +489,7 @@ void main() {
         tester.state(find.byType(MobileWelcomeScreen)),
         same(welcomeState),
       );
+      expect(find.byKey(_widePane), findsNothing);
       expect(
         tester.getRect(
           find.byKey(const ValueKey('mobile_welcome_get_started')),
@@ -548,21 +543,13 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     await tester.pumpWidget(_app(padding: const EdgeInsets.only(right: 120)));
     await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<MobileWelcomeBackdrop>(find.byType(MobileWelcomeBackdrop))
-          .landscape,
-      isFalse,
-    );
+    expect(find.byKey(_widePane), findsNothing);
 
     tester.view.physicalSize = const Size(951, 669);
     await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<MobileWelcomeBackdrop>(find.byType(MobileWelcomeBackdrop))
-          .landscape,
-      isTrue,
-    );
+    expect(find.byKey(_widePane), findsOneWidget);
+    // The art is decorative and runs on under the inset; the controls do not.
+    expect(tester.getRect(find.byKey(_horizon)).right, 951);
     expect(
       tester
           .getRect(
@@ -571,6 +558,44 @@ void main() {
           .right,
       lessThanOrEqualTo(951 - 120),
     );
+    for (final key in [
+      'mobile_welcome_get_started',
+      'mobile_welcome_import',
+      'mobile_welcome_redeem_card',
+    ]) {
+      expect(
+        tester.getRect(find.byKey(ValueKey(key))).right,
+        lessThanOrEqualTo(951 - 120),
+      );
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the wide horizon is clipped beside the pane on true black', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(852, 393);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(
+      _app(padding: const EdgeInsets.only(left: 59, right: 59, bottom: 21)),
+    );
+    await tester.pumpAndSettle();
+    final pane = tester.getRect(find.byKey(_widePane));
+    final horizon = find.byKey(_horizon);
+    // The floor's lines fan out past its box; none may run under the pane.
+    final clip = find
+        .ancestor(of: horizon, matching: find.byType(ClipRect))
+        .first;
+    expect(tester.getRect(clip), tester.getRect(horizon));
+    expect(tester.getRect(horizon).left, pane.right);
+    expect(tester.getRect(horizon).right, 852);
+    final scaffold = tester.widget<Scaffold>(
+      find.descendant(
+        of: find.byType(MobileWelcomeScreen),
+        matching: find.byType(Scaffold),
+      ),
+    );
+    expect(scaffold.backgroundColor, const Color(0xff000000));
     expect(tester.takeException(), isNull);
   });
 
@@ -589,10 +614,8 @@ void main() {
       await tester.pumpWidget(_app(initialLocation: '/add-account'));
       await tester.pumpAndSettle();
       expect(
-        tester
-            .widget<MobileWelcomeBackdrop>(find.byType(MobileWelcomeBackdrop))
-            .landscape,
-        sample.wide,
+        find.byKey(_widePane),
+        sample.wide ? findsOneWidget : findsNothing,
       );
       expect(tester.takeException(), isNull);
       if (sample.wide) {
@@ -618,12 +641,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<MobileWelcomeBackdrop>(find.byType(MobileWelcomeBackdrop))
-          .landscape,
-      isFalse,
-    );
+    expect(find.byKey(_widePane), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

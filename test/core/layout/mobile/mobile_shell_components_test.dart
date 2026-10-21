@@ -2,22 +2,21 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_shell.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_sheet.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_tab_bar.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_top_nav.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
+import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/neon_scramble_text.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/tron_glyph.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   setUpAll(() async {
-    final loader = FontLoader('Geist')
-      ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/Geist-SemiBold.ttf'));
-    await loader.load();
+    await loadGothamFonts();
   });
 
   testWidgets('Checking label fits the mobile top nav at 320 pixels', (
@@ -42,28 +41,53 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('MobileTopNav.account shows name, balance, and sync label', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _harness(
-        MobileTopNav.account(
-          accountName: 'Account1',
-          balanceLabel: '140.12 ZEC',
-          syncLabel: 'Vizor is synced',
+  testWidgets(
+    'MobileTopNav.account is a portrait that reveals its name on tap',
+    (tester) async {
+      var switcherOpens = 0;
+      await tester.pumpWidget(
+        _harness(
+          MobileTopNav.account(
+            accountName: 'Account1',
+            balanceLabel: '140.12 ZEC',
+            syncLabel: 'Veylor is synced',
+            onAccountTap: () => switcherOpens++,
+          ),
         ),
-      ),
-    );
+      );
+      const account = ValueKey('mobile_top_nav_account');
+      const name = ValueKey('mobile_top_nav_account_name');
 
-    expect(find.text('Account1'), findsOneWidget);
-    expect(find.text('140.12 ZEC'), findsOneWidget);
-    expect(find.text('Vizor is synced'), findsOneWidget);
+      // Only the portrait shows; screen readers still get the name.
+      expect(find.byKey(name), findsNothing);
+      expect(find.text('140.12 ZEC'), findsNothing);
+      expect(find.bySemanticsLabel('Account1'), findsOneWidget);
+      expect(find.text('Veylor is synced'), findsOneWidget);
+      final sync = tester.widget<Text>(find.text('Veylor is synced'));
+      expect(sync.style?.color, AppThemeData.dark.colors.sync.text);
 
-    final name = tester.widget<Text>(find.text('Account1'));
-    expect(name.style?.color, AppThemeData.dark.colors.text.accent);
-    final sync = tester.widget<Text>(find.text('Vizor is synced'));
-    expect(sync.style?.color, AppThemeData.dark.colors.sync.text);
-  });
+      // A tap decrypts the name in beside the portrait, the balance under it.
+      await tester.tap(find.byKey(account));
+      await tester.pumpAndSettle();
+      final revealed = tester.widget<NeonScrambleText>(find.byKey(name));
+      expect(revealed.text, 'Account1');
+      expect(revealed.style.color, AppThemeData.dark.colors.text.accent);
+      expect(find.text('140.12 ZEC'), findsOneWidget);
+      expect(switcherOpens, 0);
+
+      // A second tap opens the switcher and folds the name away.
+      await tester.tap(find.byKey(account));
+      await tester.pumpAndSettle();
+      expect(switcherOpens, 1);
+      expect(find.byKey(name), findsNothing);
+
+      // A long press opens it straight away.
+      await tester.longPress(find.byKey(account));
+      await tester.pumpAndSettle();
+      expect(switcherOpens, 2);
+      expect(find.byKey(name), findsNothing);
+    },
+  );
 
   testWidgets('MobileTopNav.account syncing shimmers the label', (
     tester,
@@ -136,17 +160,19 @@ void main() {
     expect(greyBars, isNotEmpty);
   });
 
-  testWidgets('MobileTopNav.back shows serif title and fires onBack', (
-    tester,
-  ) async {
+  testWidgets('MobileTopNav.back shows a spaced uppercase Thin title and fires '
+      'onBack', (tester) async {
     var backs = 0;
     await tester.pumpWidget(
       _harness(MobileTopNav.back(title: 'Activity', onBack: () => backs++)),
     );
 
-    final title = tester.widget<Text>(find.text('Activity'));
+    // The title is passed in sentence case and drawn as an uppercase caption.
+    expect(find.text('Activity'), findsNothing);
+    final title = tester.widget<Text>(find.text('ACTIVITY'));
     expect(title.style?.fontFamily, AppTypography.headlineLarge.fontFamily);
-    expect(title.style?.fontSize, AppTypography.headlineLarge.fontSize);
+    expect(title.style?.fontWeight, AppTypography.headlineLarge.fontWeight);
+    expect(title.style?.letterSpacing, greaterThan(0));
 
     await tester.tap(find.bySemanticsLabel('Back'));
     expect(backs, 1);
@@ -181,13 +207,11 @@ void main() {
     expect(fill.widthFactor, 0.5);
   });
 
-  testWidgets('AppMobileTabBar slides the pill and tints the active icon', (
-    tester,
-  ) async {
+  testWidgets('AppMobileTabBar slides the light pool and lights the active '
+      'glyph', (tester) async {
     final taps = <int>[];
     const items = [
       AppMobileTabItem(iconName: 'home', label: 'Home'),
-      AppMobileTabItem(iconName: 'swap_arrows', label: 'Swap'),
       AppMobileTabItem(iconName: 'history', label: 'Activity'),
       AppMobileTabItem(iconName: 'cog', label: 'Settings'),
     ];
@@ -201,44 +225,61 @@ void main() {
         ),
       ),
     );
-    Alignment pillAlignment() =>
+    Alignment poolAlignment() =>
         tester
                 .widget<AnimatedAlign>(
                   find.byKey(AppMobileTabBar.activePillKey),
                 )
                 .alignment
             as Alignment;
-    List<AppIcon> icons() =>
-        tester.widgetList<AppIcon>(find.byType(AppIcon)).toList();
+    List<TronGlyph> glyphs() =>
+        tester.widgetList<TronGlyph>(find.byType(TronGlyph)).toList();
+    final colors = AppThemeData.dark.colors;
 
     await tester.pumpWidget(bar(0));
 
-    // One shared pill carries the active decoration, parked on item 0.
-    expect(pillAlignment(), const Alignment(-1, 0));
-    final pillBox = tester.widget<DecoratedBox>(
+    // The app's tabs are drawn as Tron glyphs, never the icon set.
+    expect(glyphs().map((glyph) => glyph.kind), [
+      TronGlyphKind.home,
+      TronGlyphKind.activity,
+      TronGlyphKind.settings,
+    ]);
+    expect(find.byType(AppIcon), findsNothing);
+
+    // One shared pool of the active glyph's light, parked on item 0.
+    expect(poolAlignment(), const Alignment(-1, 0));
+    final poolBox = tester.widget<DecoratedBox>(
       find.descendant(
         of: find.byKey(AppMobileTabBar.activePillKey),
         matching: find.byType(DecoratedBox),
       ),
     );
+    final pool = (poolBox.decoration as BoxDecoration).gradient!;
+    expect(pool, isA<RadialGradient>());
     expect(
-      (pillBox.decoration as BoxDecoration).color,
-      AppThemeData.dark.colors.navPanel.activeBg,
+      pool.colors.first.withValues(alpha: 1),
+      colors.navPanel.activeIcon.withValues(alpha: 1),
     );
-    expect(icons()[0].color, AppThemeData.dark.colors.navPanel.activeIcon);
-    expect(icons()[2].color, AppThemeData.dark.colors.icon.muted);
+    expect(pool.colors.first.a, greaterThan(0));
+    expect(pool.colors.last.a, 0);
+    expect(glyphs()[0].color, colors.navPanel.activeIcon);
+    expect(glyphs()[0].lit, 1);
+    expect(glyphs()[1].color, colors.icon.muted);
+    expect(glyphs()[1].lit, 0);
 
     await tester.tap(find.bySemanticsLabel('Activity'));
     await tester.pumpAndSettle();
-    expect(taps, [2]);
+    expect(taps, [1]);
 
     // Selection is owned by the caller — rebuilding with the new index
-    // slides the pill there and swaps the icon tints.
-    await tester.pumpWidget(bar(2));
+    // slides the pool there and moves the light to its glyph.
+    await tester.pumpWidget(bar(1));
     await tester.pumpAndSettle();
-    expect(pillAlignment().x, closeTo(-1 + 2 * 2 / 3, 1e-9));
-    expect(icons()[0].color, AppThemeData.dark.colors.icon.muted);
-    expect(icons()[2].color, AppThemeData.dark.colors.navPanel.activeIcon);
+    expect(poolAlignment().x, closeTo(-1 + 2 * 1 / 2, 1e-9));
+    expect(glyphs()[0].color, colors.icon.muted);
+    expect(glyphs()[0].lit, 0);
+    expect(glyphs()[1].color, colors.navPanel.activeIcon);
+    expect(glyphs()[1].lit, 1);
   });
 
   testWidgets('AppMobileShell extends body behind the floating tab bar', (
@@ -386,6 +427,53 @@ void main() {
       );
       expect(rim.foregroundPainter, isNotNull);
     }
+  });
+
+  testWidgets('MobileModalCard floats Back as a cut-corner glass chevron', (
+    tester,
+  ) async {
+    var backs = 0;
+    await tester.pumpWidget(
+      _harness(
+        SizedBox(
+          width: 393,
+          height: 852,
+          child: MobileModalCard(
+            onBack: () => backs++,
+            child: const SizedBox(height: 200),
+          ),
+        ),
+      ),
+    );
+
+    final back = find.byKey(const ValueKey('mobile_modal_back_button'));
+    final button = tester.widget<AppButton>(back);
+    expect(button.variant, AppButtonVariant.secondary);
+    // Glass, not the card's opaque surface.
+    expect(button.enabledBackgroundColor, isNull);
+    final plate =
+        tester
+                .widget<AnimatedContainer>(
+                  find.descendant(
+                    of: back,
+                    matching: find.byType(AnimatedContainer),
+                  ),
+                )
+                .decoration
+            as ShapeDecoration;
+    expect(plate.shape, isA<BeveledRectangleBorder>());
+    expect(plate.color, AppThemeData.dark.colors.button.secondary.bg);
+    expect(
+      tester
+          .widget<AppIcon>(
+            find.descendant(of: back, matching: find.byType(AppIcon)),
+          )
+          .name,
+      AppIcons.chevronBackward,
+    );
+    expect(tester.getSize(back), const Size(44, 44));
+    await tester.tap(back);
+    expect(backs, 1);
   });
 }
 

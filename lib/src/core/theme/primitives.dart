@@ -361,3 +361,89 @@ abstract final class GreenPrimitives {
   static const p900Alpha65Dark = Color(0xA6D3FFE4);
   static const p900Alpha65Light = Color(0xA6001E0A);
 }
+
+/// Veylor's mobile "neon" palette: true black, neon red and white light.
+/// Mobile builds only: the semantic categories pick these faces when
+/// `kAppFormFactor` is mobile, and desktop keeps the Figma ladders above.
+///
+/// `*Dark` faces are near-black steps with a faint cool cast; `*Light` faces
+/// are brushed-steel greys. Like the ladders above, widgets never reference
+/// these directly.
+abstract final class NeonPrimitives {
+  static const white = Color(0xFFFFFFFF);
+
+  static const n0Dark = Color(0xFF000000);
+  static const n50Dark = Color(0xFF09090B);
+  static const n100Dark = Color(0xFF0F0F12);
+  static const n150Dark = Color(0xFF16161A);
+  static const n200Dark = Color(0xFF1F1F24);
+  static const n300Dark = Color(0xFF2D2D34);
+  static const n400Dark = Color(0xFF47474F);
+  static const n500Dark = Color(0xFF75757F);
+  static const n600Dark = Color(0xFF9C9CA6);
+  static const n700Dark = Color(0xFFCDCDD4);
+  static const n800Dark = Color(0xFFF2F2F5);
+
+  static const n0Light = Color(0xFFFAFAF8);
+  static const n50Light = Color(0xFFF3F3F0);
+  static const n100Light = Color(0xFFEAEAE6);
+  static const n150Light = Color(0xFFE0E0DC);
+  static const n200Light = Color(0xFFD3D3CE);
+  static const n300Light = Color(0xFFBDBDB7);
+  static const n400Light = Color(0xFF9C9C96);
+  static const n600Light = Color(0xFF55555C);
+  static const n700Light = Color(0xFF26262B);
+  static const n800Light = Color(0xFF0B0B0D);
+
+  /// White light with a cool cast.
+  static const headlight = Color(0xFFDCE4FF);
+
+  /// The tube colour: what a lit neon line and the primary fill are.
+  static const red = Color(0xFFFF2E3E);
+
+  /// Hover and lifted fills.
+  static const redHot = Color(0xFFFF5966);
+
+  /// The white-hot centre of a lit tube; neon glyphs draw in it and glow red.
+  static const redCore = Color(0xFFFFE4E7);
+
+  /// Pressed fills.
+  static const redPressed = Color(0xFFD01828);
+
+  /// Dim red: soft fills behind red content.
+  static const redDeep = Color(0xFF6E0B15);
+  static const redSubtle = Color(0xFF240509);
+
+  /// The red that holds contrast on the light (steel) faces.
+  static const redOnLight = Color(0xFFDC1027);
+  static const redOnLightPressed = Color(0xFFB30A1E);
+  static const redSubtleOnLight = Color(0xFFFBE3E5);
+
+  static const red8 = Color(0x14FF2E3E);
+  static const red14 = Color(0x24FF2E3E);
+  static const red22 = Color(0x38FF2E3E);
+  static const redOnLight10 = Color(0x1ADC1027);
+  static const redOnLight18 = Color(0x2EDC1027);
+
+  static const black0 = Color(0x00000000);
+  static const black15 = Color(0x26000000);
+  static const black30 = Color(0x4D000000);
+  static const black50 = Color(0x80000000);
+  static const black70 = Color(0xB3000000);
+  static const white6 = Color(0x0FFFFFFF);
+  static const white8 = Color(0x14FFFFFF);
+  static const white14 = Color(0x24FFFFFF);
+  static const white50 = Color(0x80FFFFFF);
+  static const white60 = Color(0x99FFFFFF);
+  static const ink5 = Color(0x0D0B0B0D);
+  static const ink10 = Color(0x1A0B0B0D);
+  static const ink50 = Color(0x800B0B0D);
+  static const ink60 = Color(0x990B0B0D);
+  static const n400Alpha20Dark = Color(0x3347474F);
+  static const n400Alpha50Dark = Color(0x8047474F);
+  static const n300Alpha40Dark = Color(0x662D2D34);
+  static const n500Alpha60Dark = Color(0x9975757F);
+  static const n300Alpha20Light = Color(0x33BDBDB7);
+  static const n300Alpha35Light = Color(0x59BDBDB7);
+  static const n500Alpha50Light = Color(0x8075757F);
+}

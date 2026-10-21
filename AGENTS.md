@@ -130,9 +130,11 @@ Untagged tests may run in either lane and must be lane-agnostic:
   both modes inside one binary (widgetbook galleries, token tests).
 - New tokens with per-mode values follow the same pattern: a `*Desktop`
   + `*Mobile` const namespace pair plus a const selector in the
-  unsuffixed class. The `Spacing`, `Radii`, `Units`, and `Window` groups
-  are identical across Figma modes and stay single-mode (`AppSpacing`,
-  `AppRadii`, `AppWindowSizing`).
+  unsuffixed class. The `Spacing`, `Units`, and `Window` groups are
+  identical across Figma modes and stay single-mode (`AppSpacing`,
+  `AppWindowSizing`). `AppRadii` is per-mode only because of the neon
+  redesign (`AppRadiiDesktop` / `AppRadiiMobile`; see "Mobile neon
+  redesign").
 - Form-factor branching in app code uses `kAppFormFactor` (const, so the
   dead branch is tree-shaken) — never `Platform.isIOS`-style checks.
   Runtime `Platform` checks remain only for OS-specific *behavior*
@@ -142,6 +144,198 @@ Untagged tests may run in either lane and must be lane-agnostic:
   mobile tokens on a desktop host is legitimate —
   `fvm flutter run -t lib/widgetbook.dart --dart-define=VIZOR_FORM_FACTOR=mobile`.
   Only `lib/main.dart` asserts the match.
+
+## Mobile neon redesign (Veylor)
+
+The mobile form factor (iOS and Android) has its own look: true black, neon
+red, white light, Gotham Thin and Light, and 45° cuts instead of rounded
+corners, after the Tesla Roadster teaser frames, Tron and Cyberpunk 2077.
+Desktop keeps the Figma design. The owner directs it on a device rather than
+in Figma, so the Figma comparison rules above do not apply to these
+surfaces. Behaviour is unchanged unless a bullet below says otherwise.
+
+- **Palette.** Every semantic colour group has four named sets: `figmaDark`
+  / `figmaLight` (desktop) and `neonDark` / `neonLight` (mobile), with
+  `dark` / `light` selecting by `kAppFormFactor` (as `AppColors.dark`
+  does). Tests that must pin one design regardless of lane read the named
+  sets. The neon faces come from `NeonPrimitives` (`primitives.dart`).
+  `AppNeonColors` (`colors.neon`) carries the lit elements' colours: the
+  tube glow and its white-hot core on the page, the balance sign's light,
+  the grid, and the white "headlight" frame. Light mode is brushed steel
+  with the same red; the balance sign stays black in both. For now the
+  mobile app is dark only (owner, 2026-10-17): `kThemeLockedToDark` pins
+  the theme and hides Settings' Theme row, and iOS sets
+  `UIUserInterfaceStyle` to Dark.
+- **Shapes.** `AppRadiiMobile` is near-square (2 to 4 px, `full` is 4).
+  `AppChamfer` sizes the 45° cuts drawn with `BeveledRectangleBorder`
+  (`Neon.chamferBorder`, two-corner `Neon.wedgeBorder`). `AppButton` cuts
+  its corners on mobile, and the primary slab casts a red glow;
+  secondary buttons are glass with a hairline edge. `MobileSurfaceCard` is
+  a glass panel with lit cut corners (`NeonGlassPanelPainter`). Avatars
+  are cut-corner plates with a red edge.
+- **Light.** `lib/src/core/theme/neon.dart`: `Neon.textGlow`,
+  `Neon.boxGlow`, `Neon.strokeTube` (halo, glow and core: every lit line
+  uses it), the shared painter recipes (`Neon.bead`, `Neon.perspectiveGrid`,
+  `Neon.chamferCuts`, `Neon.strokeUnlit`), `kNeonHudCaptionStyle` and
+  `kNeonPageTitleStyle` (the page title). Motion lives in
+  `lib/src/core/widgets/mobile/neon_motion.dart`: `NeonIgnition` (a sign's
+  switch-on flicker, with an optional delay, off under reduced motion) and
+  the `NeonAppearMotion` mixin for one-shot entrances.
+- **Type.** Gotham everywhere, lighter on mobile, and nothing on mobile is
+  Book (400) or heavier. Headings are Thin (100): screen, step, page and
+  sheet titles, a state's statement (Home's "We're importing your
+  wallet..."), and display numerals. Everything else is Light (300):
+  subtitles, body, labels, field and helper text, buttons, chips, rows,
+  card titles and the HUD captions. Emphasis comes from colour and size,
+  not weight. Every `AppTypographyMobile` token is Thin or Light
+  (`bodyMediumStrong` and the code styles included), so mobile code leaves
+  the token's weight alone. Widgets both form factors draw use
+  `AppFontWeight` for a one-off emphasis weight (desktop keeps the Figma
+  weight, mobile resolves it to Light; `AppFontWeight.heading` is the Thin
+  heading weight); the legacy Material theme goes through it too, so
+  unstyled mobile text is Light. There are no exceptions.
+  Page titles (`MobileTopNav.back`) are spaced uppercase Thin; section heads
+  (Settings groups, Activity dates, Home's recent activity) are uppercase
+  red HUD captions. These uppercase captions are a deliberate exception to
+  the sentence-case rule; the strings themselves stay sentence case and are
+  upper-cased where drawn.
+- **Home.** The balance is a frameless neon sign: Thin red digits with a
+  glow, the privacy eye (a bare glyph) to their right, the fiat line
+  above, and the portfolio chart's line as a light trail below
+  (`NeonPlotPainter`). Toggling the eye re-encrypts the digits
+  (`NeonScrambleText`). Tapping the sign opens the full chart at
+  `/portfolio-chart` (`MobilePortfolioChartScreen`), with the holdings
+  under it (`MobileHoldingsPanel`: Ironwood, Orchard, Sapling and
+  transparent ZEC with what is pending, the shielded total, and Private
+  USD); a hidden chart (off, or no history) leaves the sign inert. The
+  account sits in the top-left
+  corner as a portrait only: a tap decrypts the name beside it for a few
+  seconds, a second tap (or a long press) opens the account switcher, and
+  screen readers get the name and the switcher directly.
+- **Shielding.** Home's Shield button opens upstream's immersive flow
+  (`/home/shield`, `/home/keystone-shield`, `/home/ledger-shield`) over a
+  frozen Home, in the neon look:
+  - Black over Home's Tron floor, which flows only while the wallet works
+    or the shield assembles.
+  - The amount in the balance sign's light, and red particles that turn
+    white-hot as they land.
+  - A cut-corner glass slider whose `Neon.strokeTube` edge lights up to the
+    pin.
+  - Success as a `NeonDoneSign`. Complete is the primary slab and Cancel a
+    ghost button.
+  - The Keystone QR stays black on white with its quiet zone.
+- **Sync line.** `NeonSyncBackdrop` replaces the top bar's sync label on
+  Home. A Tron floor lies behind the content and flows only while
+  something scans (idle, nothing moves and no frame is drawn), and a red
+  line at 85% of the width (Railgun's on the Private USD screen too, since
+  2026-10-19) rises from the bottom with the progress,
+  its head reading `SYNC n%`, `SYNCED`, `SYNC FAILED` or `TOR …`
+  (`NeonSyncReadout`). It has two layers (`NeonSyncLineLayer`): while
+  syncing the line is drawn over the content (`NeonSyncLayer.front`,
+  ignoring touches); once synced it runs behind, and Home backs its blocks
+  with solid black (`NeonSyncOcclude`) so the line shows only in the gaps.
+  Its head, from just above it down past the readout, stays in the front
+  layer (`NeonSyncLinePart.head`), so nothing between the layers (the top
+  bar, a scroll fade) cuts the line beside its readout. Scrolled away from
+  the top (`NeonSyncScrolled`), a synced line's head and readout fade and
+  the whole line runs behind; it follows the list's metrics notifications
+  as well as its scroll ones, since a list clamped back to its top when
+  its content shrinks sends no scroll notification (a finished bridge's
+  banner going away once left the readout hidden at the top).
+  A scan that starts at most 20 blocks behind the tip counts as synced, so
+  the line does not drop and re-climb every block. The Private USD screen
+  draws Railgun's sync the same way (`privateUsdSyncLine`), with readouts
+  that name Railgun (`RAILGUN SYNC n%`, `RAILGUN SYNCED`, `RAILGUN SYNC
+  FAILED`; the Tor ones are Home's): a first sync climbs, and a refresh of
+  a wallet that synced before stays `RAILGUN SYNCED` while the floor flows,
+  unless the page reports a long catch-up on Railgun's transaction list
+  (1,000 or more behind): that climbs as `RAILGUN SYNC n%`, since screening a
+  send's change waits on the list. Private USD's Processing row adds a live
+  line (smaller, in the accent colour) saying what the screening work is
+  doing: syncing that list, downloading proving files, building a proof, or
+  waiting on the screening service (`privateUsdScreeningStatus`).
+- **Tab bar.** Glyphs only: no slab, border or caption. `TronGlyph` draws
+  the tab icons (and, on mobile, `AppIcon` draws its round icons —
+  check, arrow-down, plus, warning, cancel, help — as angular glyphs). The active
+  glyph is lit with a pool of light sliding under it; content fades to
+  black beneath the bar. It has three tabs, Home, Activity and Settings
+  (owner, 2026-10-19). Swap opens over them from a full-width button on
+  Home, under Send and Receive, which split their row in half. Home has
+  no Pay button.
+- **Wide window.** A landscape window with at least 568 pt of safe width,
+  a foldable or a tablet shows the wallet in a 440 pt pane beside a
+  sidebar (`MobileWalletSidebar`, upstream's adaptive frame).
+  - The panel is neon glass (`MobileSidebarSurface`, painted by
+    `NeonGlassPanelPainter`) with its top-left and bottom-right corners cut
+    and lit. It follows no display curve.
+  - Its destinations are the tab bar's three: Home, Activity and Settings,
+    never Swap. Swap, the chart and Private USD open in the pane, with
+    Home kept lit. They use the tab bar's glyphs (`NeonSidebarGlyph`)
+    beside Light labels. The active row is lit rather than filled: its
+    glyph and red label glow over a pool of light that crossfades to a
+    newly selected row.
+  - The panel's foot keeps a sync readout for the pages without a sync
+    line (`NeonSidebarSyncReadout`): a short rising line beside a red HUD
+    caption. `NeonSyncLine.wallet` builds both it and Home's line, so the
+    two always read the same.
+  - The stateful Private USD flows keep the sidebar veiled (Back only)
+    until their exits are designed against the invariants.
+  - The vertical tab rail, shown when iOS reports a system side edge,
+    stands in the bottom bar's fade.
+  - A nested sheet's floating Back is a cut-corner glass button.
+- **Art.** The medieval illustrations are gone from mobile: empty states use
+  `NeonHorizon` (a striped 80s sun over a grid floor), hero and status
+  spots `NeonGlyphBadge`, and painted backgrounds are dropped. The account
+  pictures are the seven neon portraits in `assets/profile_pictures/`
+  (`pfp-01` to `pfp-07`, lossless WebP); ids of the retired knights
+  (`pfp-08` to `pfp-15`) map onto them. Payment-link gift card designs are
+  unchanged. `VizorWordmark` draws a VEYLOR wordmark in tube strokes on
+  mobile (`VeylorWordmarkPainter`: lit red, or plain lines where a caller
+  sets a colour); desktop keeps `vizor_logo.svg`.
+- **Keys and money flows.** The passcode keys are cut-corner glass plates
+  that light red under the finger. Private USD calls a conversion a bridge
+  in every user-facing string (owner, 2026-10-19: "Bridge", "Bridging",
+  "Bridge progress", "Bridged to ZEC", "Bridged to 0zkUSDC"); code, keys
+  and routes keep `convert`. Private USD's convert screens put red
+  captions on their panels and a direction switch between them that keeps
+  its place (dimmed while unavailable, its edge breathing while a quote is
+  on its way); the estimate churns as cipher (`NeonCipherChurn`) until the
+  quote decrypts in, and every ledger row stays on one line
+  (`PrivateUsdLedgerRow`, smaller type, hairlines between rows). Swap and
+  conversion progress (`mobile_swap_status_content.dart`) is a red
+  timeline: lit checks for done steps, the spinner kept for the current
+  one, and a packet of light running down the rail into it; a finished
+  bridge keeps no step current (`SwapAnimatedProgressRoute` lets its index
+  sit one past the last step). A bridge that finishes in view lights a
+  "Bridged" sign (`PrivateUsdBridgedHero`): `NeonDoneSign`, the sync
+  screen's done badge, with a shockwave of two lit rings (the send
+  screen's ripple as neon) and the send success haptic; opened later, the
+  sign is simply lit.
+- **Receive.** The address and request codes sit in a lit cut-corner frame
+  (`ReceiveQrFrame`), always dark modules on a light plate, with Veylor's
+  helmet as the badge in place of the pool's; the pool switch names the
+  pools without glyphs. A Keystone account's
+  `ReceiveQrSurface(scanOptimized: true)` renders as before, but for the
+  badge.
+- **Sync privacy screen.** The screen over a kept-awake sync
+  (`SyncKeepAwakePrivacyLockScreen`) draws the progress as a lit red ring
+  (a `Neon.strokeTube` arc to a bright head, unlit ticks ahead of it) that
+  switches on around Thin glowing numerals, done and paused as
+  `NeonGlyphBadge`s, and every title, its passcode prompt's included, as
+  the page title.
+- **Chart card.** The chart is drawn as a neon trail on a Tron grid; a
+  scrub reads the line under the finger (interpolated value and time), not
+  the nearest data point. Neither the card nor Settings names the price
+  server. Settings offers no default range: the saved one (a week unless
+  changed before) still opens the chart.
+- **iOS.** The sync and transaction Live Activities
+  (`ios/SyncWidget/SyncWidgetLiveActivity.swift`) are black and neon red
+  with thin type and a thin red progress line; nothing starts them yet
+  (`DynamicIslandManager` has no callers). The launch screen paints the
+  `LaunchBackground` colour (black in dark mode, steel in light), and the
+  numeric keyboard's Done check is neon red. Sheets keep 4 px top corners
+  and, on iOS, bottom corners that follow the display's curve, which would
+  clip square ones.
 
 ## Google Play opt-out (VIZOR_DEGOOGLED)
 
@@ -163,7 +357,7 @@ classified as a new user; retry recovery supplies the successful snapshot.
 
 ## Deep-link Host (VIZOR_DEEPLINK_BASE_URL)
 
-The HTTPS origin Vizor claims for incoming links has **one** knob on
+The HTTPS origin Veylor claims for incoming links has **one** knob on
 Android and Dart: `--dart-define=VIZOR_DEEPLINK_BASE_URL` (default
 `https://link.vizor.cash`).
 
@@ -298,7 +492,7 @@ Ledger accounts keep the decorative dot style.
   tooltips, error messages, status labels, form labels, picker headers, empty
   states, page titles. Only capitalize the first word and proper nouns. Keep
   proper-noun acronyms in their canonical form (`ZEC`, `USDC`, `USDT`, `NEAR`,
-  `Vizor`, `Keystone`, `Zcash`, `Ethereum`).
+  `Veylor`, `Keystone`, `Zcash`, `Ethereum`).
 - Figma-authored display headings may keep title case.
 - This applies to interpolated labels too: `'$symbol deposit tx'`, not
   `'$symbol Deposit tx'`. The asset symbol carries its own casing; the rest of
@@ -506,7 +700,7 @@ The entire sync loop runs in Rust (`rust/src/wallet/sync_engine.rs`). A single c
    `transaction_enhancement_work()`. `transaction_data_requests()` feeds only
    transparent-address history (`TransactionsInvolvingAddress`). librustzcash
    persistently requests `GetStatus` only when compact-block scanning cannot
-   observe the transaction's mined state. During recovery, Vizor separately
+   observe the transaction's mined state. During recovery, Veylor separately
    excludes previously mined transactions from resubmission while a pending
    scan range can still restore their mined heights.
 6. Progress streamed to Dart via FRB `StreamSink` per batch. Each event has a
@@ -567,11 +761,12 @@ rust/src/
 ├── ffi.rs              # Thin, read-only C adapter for iOS Ironwood migration
 │                        # inspection and observable preparation-txid listing.
 ├── migration_preparation.rs
-│                       # Platform-neutral mobile preparation core. Android JNI
-│                       # uses its operation lifecycle, preparation-only sync,
-│                       # inspect/advance, cancellation, and foreground-sync
-│                       # exclusion. iOS C FFI exposes only read-only inspect,
-│                       # proof-readiness, and observable txid reads.
+│                       # Platform-neutral mobile preparation core. iOS C FFI
+│                       # uses only its read-only inspect, proof-readiness, and
+│                       # observable txid reads. Its operation lifecycle,
+│                       # preparation-only sync, advance, and cancellation have
+│                       # had no native caller since the Android adapter was
+│                       # removed (459a8565b).
 │                       # Located outside api/ to avoid FRB codegen picking it up.
 ├── wallet/
 │   ├── mod.rs          # pub mod keys, sync, sync_engine, keystone
@@ -622,15 +817,14 @@ Normal wallet sync has one path: Dart calls `start_full_sync()` through
 `DESIRED_SYNC_MODE`, `SYNC_CANCEL`, and `SYNC_RUNNING` belong to that foreground
 path.
 
-iOS and Android intentionally have different preparation contracts:
+Only iOS has native background migration work. Android has none: commit
+`459a8565b` removed its preparation and outbox WorkManager workers, their
+Kotlin bridge, and `rust/src/android_jni.rs`. The private (denomination
+preparation) mobile migration is iOS-only, and on Android its routes
+redirect to the fast migration (`supportsPrivateMobileIronwoodMigration`).
+The iOS contract:
 
 ```
-Android IronwoodMigrationPreparationWorker
-    → JNI adapter
-    → begin preparation operation
-    → preparation-only Rust full sync / inspect / advance
-    → end preparation operation
-
 Swift BackgroundMigrationPreparationManager
     → submit user-visible BGContinuedProcessingTask
     → read-only C FFI inspect / observable preparation txids
@@ -660,16 +854,16 @@ Swift BackgroundMigrationPreparationManager
   pass is reported as pause-and-re-arm, never as failure. Foreground reentry
   owns the wallet sync, denomination advance, and submission of a fresh
   read-only task for the next wave.
-- Android keeps its WorkManager foreground worker and native preparation path.
-  The worker may run the existing mode-2 full sync, inspect proof readiness,
-  advance denomination preparation, and enqueue a continuation.
-- `rust/src/migration_preparation.rs` owns the mobile preparation operation's
-  cancel token and desired mode. Foreground `cancelFullSync()` does not cancel
-  that operation; the paths share `SYNC_RUNNING` while the sync engine is active
-  so two wallet scans cannot run concurrently.
-- Already-signed migration outbox transport remains background-capable. It may
-  query the chain tip and broadcast exact signed bytes, but it never scans the
-  wallet.
+- Android has no background worker and no native preparation or outbox path.
+  Its migration runs in the foreground only.
+- `rust/src/migration_preparation.rs` still owns a preparation operation's
+  cancel token and desired mode, which foreground `cancelFullSync()` does not
+  cancel; such an operation would share `SYNC_RUNNING` with the sync engine so
+  two wallet scans cannot run concurrently. Nothing starts one today: the iOS
+  task is read-only.
+- The iOS already-signed migration outbox transport remains background-capable.
+  It may query the chain tip and broadcast exact signed bytes, but it never
+  scans the wallet.
 - Account DB mutations quiesce and drain native migration work before changing
   the wallet DB.
 - The removed general iOS background-sync identifier
@@ -707,7 +901,6 @@ policy-aware openers and fails closed while Tor is starting or broken.
 
 Key files:
 - `rust/src/migration_preparation.rs` — shared mobile preparation core
-- `rust/src/android_jni.rs` — Android preparation execution adapter
 - `rust/src/ffi.rs` — iOS read-only inspection and query adapter
 - `ios/Runner/zcash_sync.h` — matching C header
 - `ios/Runner/BackgroundMigrationPreparationManager.swift` — continued-task
@@ -715,6 +908,72 @@ Key files:
 - `lib/src/providers/wallet_mutation_guard.dart` — mutation ordering fence
 - `lib/src/features/migration/services/ironwood_migration_service.dart` —
   foreground preparation recovery
+
+### Home portfolio chart
+
+Mobile Home draws the chart's line as the balance sign's light trail, and a
+tap on the sign opens the full chart at `/portfolio-chart`
+(`lib/src/features/portfolio_chart/`). Its wallet side is read from the local
+wallet DB alone: `getTransactionHistory`, `account_balance_delta` per mined
+block, folded into a balance step function once a sync has completed (nothing
+while locked, and a mask in privacy mode). Its market side is public ZEC/USD
+daily price history from the zapp pricing engine, `GET /v1/prices` on
+`VIZOR_PRICING_ENGINE_BASE_URL` (default
+`https://zapp-pricing-engine.majorworker.workers.dev`), through
+`NetworkHttpClient`, so it follows the Tor route and fails closed. The Home
+price is separate and stays on CoinGecko (`VIZOR_COINGECKO_PRICE_BASE_URL`);
+the chart no longer reads that define.
+
+- **Opt-in.** "Show on home" is on by default; "Use market prices" is off, so a
+  fresh install makes no chart request and the chart is the ZEC balance. A
+  saved choice is kept as written, and an unreadable "Use market prices" reads
+  as off. The mobile settings card has no explanatory text under its
+  switches (the owner removed it on 2026-10-17).
+- **What a request carries.** The coin (`asset=ZEC`), the currency
+  (`fiat=USD`), `resolution=1d`, two UTC dates (`from`, `to`) and `limit=1000`,
+  in that order (the order is part of the server's cache key), and nothing
+  else. The dates are whole UTC days ending at the last completed UTC day
+  (yesterday, or the day before in the first ten minutes of a UTC day) over a
+  fixed window per chip: 7, 30, 90 or 365 days, or for All from the server's own
+  first day (`availableFrom`, learned from the 1w answer, as zapp does, so All
+  costs one more fixed request; at most the newest 4,000 days), so every device
+  sends the same request on a given day. Never put an address, key, seed,
+  balance, account, wallet identifier, wallet-derived date or wallet-derived
+  timing in it; balances and prices are joined on the device.
+  `pricingEnginePricesUri` is the only place the request is built, and
+  `test/features/portfolio_chart/portfolio_chart_history_test.dart` pins its
+  keys and values.
+- **When it may leave the device.** `portfolioPriceRequestsAllowedProvider` is
+  the one gate in front of the price source: "Use market prices" is on, the
+  chart is shown on Home, market prices are shown at all
+  (`zecMarketDataAvailableProvider`, the Home price's own gate, which follows
+  the active account through Private USD) and there is a usable server, the
+  wallet is unlocked, privacy mode is off, and the app is in the foreground
+  (`appInForegroundProvider`). While any of these does not hold nothing is
+  requested; only an already cached series is drawn. An empty, non-https or
+  invalid `VIZOR_PRICING_ENGINE_BASE_URL` has the same effect for good: no
+  price switch in Settings and no request.
+- **The answer is untrusted data.** `parsePricingEnginePage` and
+  `assemblePriceSeries` accept a series only when it is the documented
+  document for the same asset, currency, resolution and dates; its
+  availability is whole UTC days; every price is finite, positive and
+  consistent; and its timestamps are UTC midnights, ascending, one day apart,
+  inside the window and the availability. A page that is not `complete`
+  follows its `nextCursor` (its UTC date becomes the next `from`, as in zapp)
+  for at most four pages, and a series that would need more, or whose cursor
+  repeats or goes back, is refused rather than drawn short. https only, 30 s
+  per request and 90 s in all, 512 KiB per page.
+- **Fallback and cache.** Any failure falls back to the ZEC balance with
+  "Prices unavailable" on the card and a five minute cool-down. Prices are
+  cached in memory only, per range and window (a window moves at UTC
+  midnight); a window the server had not finished is asked again after 30
+  minutes; a series more than a day behind is marked "Older prices".
+- **Valuation.** The balance side is exact (block times) and the prices are
+  daily, so `buildPortfolioChart` draws every price of the window and places a
+  balance change between two prices at its own time, valued on the straight
+  line between them. Do not sample the balance at the price timestamps alone:
+  that draws a receipt as a day-long slope and gives a wallet funded since the
+  last price no chart. A daily price is dated by its UTC day when scrubbed.
 
 ### iOS Preparation Confirmation Tracking
 
@@ -731,7 +990,7 @@ while an executed denomination preparation waits for confirmations.
   confirmations. A normal mined height contributes
   `tip - minedHeight + 1`, capped at 3.
 - Reaching 3 confirmations finishes only the current observation wave. The
-  manager stores a foreground-continuation token, posts an “Open Vizor”
+  manager stores a foreground-continuation token, posts an “Open Veylor”
   notification under its own `confirmedWaveReady` kind so healthy copy never
   reuses failure copy, and immediately completes that system task successfully
   without opening the wallet DB for sync or advance. It does not wait for the
@@ -832,7 +1091,7 @@ apply this cancellable device policy to already-submitted durable broadcasts.
 Normal hardware sends use Keystone's signatures-only batch protocol, even for
 one transaction. The device cannot generate ZK proofs (proving keys are too
 big for the device), and the phone cannot sign (the spending key lives on the
-device), so Vizor retains the proof PCZT and applies only the compact
+device), so Veylor retains the proof PCZT and applies only the compact
 Orchard/Ironwood signatures returned by Keystone.
 
 ```
@@ -1123,6 +1382,254 @@ edge in `MobileBottomSafeArea`
   `Padding(...)`; both platform geometries are pinned in
   `test/core/layout/mobile/mobile_bottom_safe_area_test.dart`.
 
+## Private USD
+
+A Railgun USDC ("private USD") balance, conversion both ways with shielded
+ZEC by atomic swap (with refunds and rescue), and private send and withdraw.
+It runs on Android, mobile form factor only. The iOS port (iOS 17 and later,
+behind the same define) has its code in but has not yet run on a simulator
+or an iPhone. Before changing it,
+read `docs/private-usd-android-plan.md`: §3.5 lists the invariants and why
+each one exists. The pinned config and defines are in
+`docs/private-usd-reference.md` §7. Progress and deviations are in
+`docs/private-usd-progress.md`, and the device runs in
+`docs/private-usd-device-checklist.md`. The iOS port follows
+`docs/private-usd-ios-plan.md`, with its reference, progress and device
+checklist beside it (`docs/private-usd-ios-*.md`); its progress doc says what
+has run.
+
+Code:
+
+- Rust: `rust/src/wallet/private_usd/`, `rust/src/api/private_usd.rs`,
+  `rust/src/wallet/routed_http.rs` and `rust/src/railgun_bridge.rs`.
+- Dart: `lib/src/features/private_usd/`,
+  `lib/src/core/config/private_usd_feature_config.dart` and
+  `lib/src/providers/private_usd_lifecycle_provider.dart`.
+- Kotlin: `android/app/src/main/kotlin/com/keplr/vizor/railgun/`.
+- Swift: `ios/Runner/Railgun/`.
+- The Railgun page: `android/app/src/main/assets/railgun/`, built from
+  `android/railgun-web/`; the same build copies it as is to
+  `ios/Runner/Railgun/railgun/`.
+
+**Defines (reference §7.3).** Each is a Dart define read once in
+`private_usd_feature_config.dart`. Gradle needs none of them.
+
+- `VIZOR_PRIVATE_USD_ENABLED` (default `false`) turns the feature on.
+  Release builds turn it on only after the owner's sign-off.
+- `VIZOR_ETHEREUM_RPC_URL_{MAINNET,SEPOLIA}` are the keyed RPC URLs. They
+  are the only secrets: pass them only with
+  `--dart-define-from-file=<gitignored json>`. Their host must be
+  `eth-{mainnet,sepolia}.g.alchemy.com` or `{mainnet,sepolia}.infura.io`. Any
+  other host needs a bundle rebuild and changes to the Kotlin, Swift and
+  Rust allowlists. Users can set their own URL in Settings (Ethereum RPC),
+  on the network's Alchemy, Infura or publicnode host; it replaces the
+  build's keyed URL with no fallback, and is checked with `eth_chainId`
+  before it is saved.
+- `VIZOR_PRIVATE_USD_FLAG_URL` is the kill switch. Only an explicit `false`
+  hides the feature. A missing key or a failed fetch keeps the last value,
+  which defaults to available. Even `false` never stops conversions already
+  under way.
+- `VIZOR_SUPPORT_URL` is optional.
+
+**Foreground and unlocked only (plan D9).**
+
+- Every key-using step runs only while the app is unlocked and in the
+  foreground. That covers the deposit, claim, payout signature, refund,
+  sweep and Railgun proving.
+- There is no worker, alarm or notification, and no per-swap key is stored.
+- Background cancels the Rust step and stops polling, but leaves the
+  Railgun page open.
+- Lock cancels the step, closes the page and drops Dart-held secrets.
+- Screen-off means background, so the screen stays on while a
+  conversion's progress shows with a key step to come, and through a
+  Railgun first sync while unlocked (`privateUsdKeepAwakeProvider`, through
+  `SyncKeepAwakeNativeHost`'s one native flag, foreground only).
+- On a USD → ZEC conversion the phone buzzes when "Authorize settlement" is
+  first offered (the user's turn), and again two minutes before it closes if
+  still unauthorized, once when the two fall together: it holds, then fades
+  out (`privateUsdSettlementReminderProvider`, `AppHaptics.settlementDeadline`;
+  on Android under the install-time `VIBRATE` permission). It too needs the
+  app in the foreground and unlocked, so a closed app cannot buzz; a step
+  offered while the app was away buzzes on its return.
+- While unlocked, the engine (`PrivateUsdEngineHost` in `lib/app.dart`)
+  advances the conversions of every software account, not only the active
+  one (D14).
+- Hardware accounts, accounts without ZIP-32 metadata, and regtest hide the
+  feature.
+
+**Separate databases.** Rust owns both, in
+`<support>/private_usd_<walletDbName>_<network>/` (`getPrivateUsdDirPath`):
+
+- `swaps.db` holds the swap index counter, the swap records, the
+  joint-account index and the Railgun send log. Records decode strictly: an
+  unreadable record is an error, never a reset.
+- `joint.db` is a librustzcash DB for the short-lived joint accounts.
+
+Never put joint accounts in `zcash_wallet.db`: hidden accounts would leak
+into account lists, sync, voting, PIR and the migration. Never let losing
+`joint.db` take `swaps.db` with it. Account deletion removes that account's
+rows. A full reset removes the whole directory (`deletePrivateUsdDirectories`)
+and the page's WebView origin.
+
+Account deletion also deletes the account's Railgun wallet from the page's
+storage, best effort, if it has a Railgun engine key. Its mnemonic is
+derived before the Rust delete (Rust checks the seed only while the account
+exists). After it, a fresh page behind an offline bridge
+(`start_offline_railgun_bridge`: it refuses every connection, so no Tor wait)
+calls `deleteWallet`. A failure leaves the wallet until a reset.
+
+**Invariants (plan §3.5).** Each one guards funds or privacy. Keep them, and
+keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
+`test/features/private_usd/`.
+
+- Commit `next_index + 1` before any quote leaves the device, and never
+  reuse a swap index (a shared `z` hands that swap to its maker).
+- Save the record before accept, and treat an accept that timed out or
+  failed in transport as maybe opened.
+- Never pay a deposit twice. Save `Started` before building it and the bytes
+  before the first broadcast. Rebuild only once the old one is proven
+  expired.
+- Derive the deposit address from the on-chain shares, never from the API.
+- Reveal `z` only under a fresh, confirmed lock with more than 300 s left.
+  Only confirmed reads authorize anything, and only a fresh head counts.
+- Never prove a second reverse funding because a response was lost. Never
+  re-sign `ready` after a restart; resend it.
+- Keep every signed payout, refund payout, refund lock, `ready` and Railgun
+  send proof before posting it. Cap every relayer fee at 2 USDC.
+- Joint sweeps broadcast before they store. `PROPOSAL_STORE` is
+  consume-on-entry with an idempotent discard, as in the hardware invariants.
+- Joint sweeps use Discard OVK, while the deposit uses the sender's OVK.
+- Import joint accounts at the exact birthday, never the rounded restore
+  birthday.
+- Run one conversion at a time per account, and one outgoing Railgun payment
+  at a time per wallet (the spend guard).
+- The chain is the only evidence; the maker's status API never is.
+- Never quote per keystroke. Every quote spends a swap index.
+- Derive keys only after the seed-fingerprint check, and refuse a Railgun
+  session whose address differs from Rust's.
+- Deleting an account, or resetting, with a conversion under way warns with
+  the count and waits for the user's explicit confirmation. Drain
+  `privateUsdLifecycleProvider` first, and clean up only after the Rust
+  delete succeeds.
+
+**Deposits (plan M9).** Public USDC sent to the account's own deposit
+addresses (`m/44'/60'|1'/(1000 + zip32)'/0/index`, from the seed) is
+shielded into its private balance by an EIP-3009 authorization the relayer
+sends (`rust/src/wallet/private_usd/deposits.rs`, zecSwap's
+`docs/deposits.md`). The Receive sheet (`private_usd_receive_sheet.dart`)
+switches, as ZEC's Receive does its pools (`NeonSwitchTabs`), between public
+USDC at the deposit address (the default) and 0zkUSDC at the account's 0zk
+address, for another Railgun wallet; it replaced the screen's 0zk card
+(owner, 2026-10-19). Only a network with a Deposits pin shows the USDC side:
+testnet and, since 2026-10-19, mainnet; elsewhere the sheet shows the 0zk
+address alone. Send and Withdraw scan their recipient as ZEC Send does (the
+shared `MobileScanAddressRow` and `MobileAddressScanCard`): Send takes a 0zk
+address and Withdraw a 0x one (`privateUsdScanOutcome`); an `ethereum:`
+request gives up its recipient, never its token, and one for another chain
+is refused.
+
+- Pin the Deposits contract, the relayer's deposits account (not the
+  top-level relayer) and the token; refuse terms that differ, never follow
+  them. Read the token's EIP-712 domain from the token and check its
+  `DOMAIN_SEPARATOR()`.
+- Sign only within the cap: `fee ≤ 2 USDC + ⌈value × 0.5%⌉` and
+  `fee < value` (D23); a rescue pays the terms' `fee` alone, at most 2 USDC.
+- Keep every request in `swaps.db` before posting it, post only what was
+  kept, and re-sign one only while the relayer named no transaction for
+  it. Only a mined receipt with the pinned contract's event for this
+  address and one of this wallet's notes settles a deposit.
+- Post the same bytes again when a named transaction has not mined in a
+  minute: mainnet's relayer sends through Flashbots Protect, which the node
+  never sees before a transaction mines and which drops one it cannot land.
+- The deposit key signs only the authorization and a rescue: never
+  delegate a deposit address (EIP-7702) or use one otherwise.
+- Deposits follow the active account only, in the foreground and unlocked,
+  on a lane of their own in the engine; the kill switch stops new ones,
+  never one under way. `swaps.db` is at schema 2 since deposits: a build
+  that knows only 1 refuses it as newer.
+
+**Network: Tor and the Railgun page.**
+
+- All engine HTTP (maker, relayer, Ethereum RPC) goes through `routed_http`.
+  It follows the route policy, fails closed while Tor starts or is broken,
+  and never falls back to the clearnet.
+- The Railgun page runs in a native Kotlin WebView host behind
+  `com.zcash.wallet/railgun` (no Dart WebView plugin and no injected JS
+  bridge). It loads only its own assets through `WebViewAssetLoader` and
+  intercepts every subresource against a fixed host allowlist. The Kotlin
+  and Swift allowlists (`RailgunEndpoints`), the Rust bridge's allowlist and
+  the page's CSP must agree; a Rust test in `railgun_bridge.rs` pins them.
+- On iOS a Swift `WKWebView` host behind the same channel serves the page
+  from `veylor-railgun://app/`, in a data store of its own whose SOCKS5
+  proxy is the bridge (no failover), with a `WKContentRuleList` allowlist
+  (iOS reference §6).
+- The page's traffic leaves only through the Rust loopback SOCKS5 bridge
+  (`railgun_bridge.rs`), which uses arti when Tor is on. Its direct
+  connections try IPv6 and IPv4 side by side (hyper-util's connector, as
+  every other direct path): a network that hands out IPv6 it cannot carry
+  otherwise stalls the page on its first IPv6 address.
+- The page downloads Railgun's circuit artifacts from ipfs-lb.com and falls
+  back to our mirror (`android/railgun-web/src/artifact-mirror.js`); the
+  mirror's tooling is in `scripts/private-usd/artifacts-mirror/`.
+- The POI nodes verify only proofs from the POI circuits wallet 11.2.0 ships
+  (older ones get `Invalid proof`). A wallet bump that changes circuit
+  artifacts needs the mirror refreshed and deployed first: every send and
+  withdrawal proves POIs too, so a build the mirror cannot serve cannot send.
+- On any route change, close the page and stop the bridge, then reopen on a
+  new bridge: Chromium keeps pooled sockets (plan U19). The page also
+  closes on lock, on an account switch, and after 10 idle minutes.
+- The bundle is GPL-3.0 and ships as a separately licensed asset with its
+  notices. Never read `railgun.js` or the `.wasm` files into context.
+
+**Never log secrets, and keep each one in its own store.**
+
+- The keyed RPC URL is never logged or stored: a swap record pins only the
+  keyless URL.
+- Relayer tickets and token blinding secrets stay in `swaps.db` and the
+  token state, and are never logged.
+- The mnemonic and the Railgun encryption key live only in secure storage.
+
+How the code keeps to this:
+
+- Rust's Private USD logs carry error codes and indices, never URLs,
+  headers or bodies. Dart's debug lines carry runtime types.
+- The page's console lines are never printed. Page error text is redacted
+  (`redactRailgunMessage`) before any debug print.
+- `RailgunStartParams.toString` hides `rpcUrls`.
+- `run_device_round.sh --keyed-rpc` checks the logs and files on the device.
+
+**Device rounds.** Use the Galaxy A35 over USB, never an emulator, and run
+`ANDROID_SERIAL=RZCX40721QZ scripts/private-usd/run_device_round.sh`:
+
+1. Run it with no flags first: this M3 round creates the testnet wallet.
+2. Fund that wallet with testnet ZEC.
+3. Run it again with
+   `--m5 --m6 --m7 --m7-to 0x… [--m8-route] [--keyed-rpc <json>]`.
+
+The rounds are heavy and need the owner's funds and services, so run them
+only when asked. The checklist maps each flag to what it checks. The iOS
+rounds use `scripts/private-usd/ios/run_device_round.sh` (the M3 round so
+far), per `docs/private-usd-ios-device-checklist.md`.
+
+**Local stand-ins.** `rust/Cargo.toml` carries two stand-ins for releases
+that do not exist yet:
+
+- `~/dev/zapp/zecSwap-zakura-v3`, a zecSwap `[patch]` outside the
+  repository: `zecswap-core` on Zakura Common v3 (E1). A clean clone builds
+  only where that checkout exists.
+- `rust/vendor/zakura-client-backend`, the published 0.1.0-rc9 with the
+  `connect_stream` patch the Railgun bridge needs
+  (`rust/vendor/zakura-client-backend.patch`, E4). Before every push,
+  `diff -r` it against the published crate: only `src/tor.rs` may differ.
+  Never run `cargo fmt --all`, which reformats it, and vendor it again for
+  a new backend release.
+
+The owner merged Private USD into the fork's `main` with the zecSwap
+stand-in in place (2026-10-20). Replace it with a pushed zecSwap rev once E1
+lands (progress B-6). Push to the owner's fork (`origin`) only when the owner
+asks; never merge into `main` or open a PR unprompted, and never against
+upstream.
+
 ## Testing
 
 - Keep small Rust internal tests in the source file's `#[cfg(test)] mod tests`.
@@ -1133,6 +1640,17 @@ edge in `MobileBottomSafeArea`
   Mobile-UI tests:
   `fvm flutter test --tags mobile --run-skipped --dart-define=VIZOR_FORM_FACTOR=mobile`.
   Lane rules in "Design Token Form Factor" above.
+- Fonts: Gotham is the app's only family. It is a plain asset (`assets/fonts/`),
+  not a pubspec `fonts:` family: Flutter takes a face's weight from the font
+  file, and these files' OS/2 weight classes are off the CSS scale, so
+  `FontWeight.w400` would resolve to the Bold file. `loadGothamFonts()`
+  (`lib/src/core/theme/gotham_fonts.dart`) rewrites the weights in memory and
+  registers the family; `initializeZcashWalletRuntime`, Widgetbook and the
+  Figma-compare entry points call it. A widget test that needs real glyphs
+  instead of the square test font calls `loadGothamFonts()` too, never a
+  hand-rolled `FontLoader` over the `Gotham-*.otf` files. Gotham has no
+  SemiBold (`w600` resolves to Bold) and no monospace face. The mobile serif
+  headline tokens are set below the Figma sizes for it (see `_headlineLMobile`).
 - Integration tests: `fvm flutter test integration_test/` (requires device/simulator)
 - Flutter regtest E2E notes:
   - Run app tests with `--dart-define=ZCASH_DEFAULT_NETWORK=regtest`; do not use the old `ZCASH_USE_E2E_STORAGE` path. Secure storage and wallet DB names are network-scoped.

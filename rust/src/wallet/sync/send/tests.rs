@@ -3087,7 +3087,7 @@ fn scheduled_storage_failure_after_acceptance_marks_broadcasted() {
     assert_eq!(result.migrated_zatoshi, 100_000);
     let message = result.message.as_deref().unwrap();
     assert!(message.contains("accepted by lightwalletd"));
-    assert!(message.contains("Vizor will retry"));
+    assert!(message.contains("Veylor will retry"));
     // Critical: leave due selection so later parts are not HOL-blocked.
     assert_eq!(
         migration::scheduled_pending_count(&db_path, &run_id).unwrap(),

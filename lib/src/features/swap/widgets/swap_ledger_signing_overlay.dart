@@ -744,12 +744,12 @@ class _SwapLedgerSigningOverlayState
                   : 'Action needed',
               message: postBroadcastRecovery
                   ? expiredRecovery
-                        ? 'The transaction expired before it was sent. Vizor still needs to release its reserved funds.'
+                        ? 'The transaction expired before it was sent. Veylor still needs to release its reserved funds.'
                         : broadcastConfirmed
-                        ? 'The transaction was sent, but Vizor could not finish saving it.'
-                        : 'Vizor could not confirm whether the transaction was sent, and still needs to save its status.'
+                        ? 'The transaction was sent, but Veylor could not finish saving it.'
+                        : 'Veylor could not confirm whether the transaction was sent, and still needs to save its status.'
                   : _operationClaimUnavailable
-                  ? 'Vizor is already finishing this transaction in the background.'
+                  ? 'Veylor is already finishing this transaction in the background.'
                   : _error ?? 'Ledger signing could not be completed.',
               showDeviceAppPrompt:
                   !postBroadcastRecovery &&

@@ -78,10 +78,10 @@ class TransparentBalanceDisplay {
           'Private queries discards privately recovered records and looks up '
           'transparent funds publicly.',
     rust_sync.TransparentStopReason.withdrawn =>
-      'The private recovery service withdrew data for this account. Vizor '
+      'The private recovery service withdrew data for this account. Veylor '
           'will try again later.',
     rust_sync.TransparentStopReason.stalled =>
-      "Private recovery can't make progress for this account. Vizor will try "
+      "Private recovery can't make progress for this account. Veylor will try "
           'again later.',
     rust_sync.TransparentStopReason.optOutUnfinished =>
       "Turning off Private queries didn't finish. Turn it off again in "

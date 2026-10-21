@@ -17,21 +17,21 @@ const TRANSPARENT_PREVIEW_UNAVAILABLE: &str =
 /// probe proves nothing about higher accounts, so import stops rather than
 /// silently importing only the primary account.
 pub(crate) const SOFTWARE_ACCOUNT_DISCOVERY_UNAVAILABLE: &str =
-    "Vizor can't check this recovery phrase for additional accounts while \
+    "Veylor can't check this recovery phrase for additional accounts while \
      Private queries is on. Turn off Private queries to import it.";
 
 /// Returned when private account discovery fails or does not cover every
 /// candidate: import stops rather than offering a shorter list, and the user
 /// retries.
 pub(crate) const SOFTWARE_ACCOUNT_DISCOVERY_PRIVATE_FAILED: &str =
-    "Vizor couldn't privately check this recovery phrase for additional \
+    "Veylor couldn't privately check this recovery phrase for additional \
      accounts. Try again.";
 
 /// [`SOFTWARE_ACCOUNT_DISCOVERY_PRIVATE_FAILED`] for an import into an existing
 /// wallet, whose Settings can turn Private queries off; a first wallet has no
 /// Settings yet.
 pub(crate) const SOFTWARE_ACCOUNT_DISCOVERY_PRIVATE_FAILED_IN_WALLET: &str =
-    "Vizor couldn't privately check this recovery phrase for additional \
+    "Veylor couldn't privately check this recovery phrase for additional \
      accounts. Try again, or turn off Private queries in Settings and import \
      it again.";
 use zcash_protocol::consensus::{BlockHeight, NetworkUpgrade, Parameters};

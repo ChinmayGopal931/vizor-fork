@@ -46,7 +46,7 @@ class MobileLedgerBluetoothContent extends StatelessWidget {
     if (access?.permission == LedgerBluetoothPermission.settings &&
         !access!.locationPermission &&
         !access.macOS) {
-      return 'Allow Bluetooth access for Vizor in your phone settings to $purpose.';
+      return 'Allow Bluetooth access for Veylor in your phone settings to $purpose.';
     }
     return model.message;
   }

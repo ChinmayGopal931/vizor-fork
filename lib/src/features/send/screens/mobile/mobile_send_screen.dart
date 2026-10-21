@@ -35,6 +35,7 @@ import '../../../../providers/sync_provider.dart';
 import '../../../../providers/zec_price_change_provider.dart';
 import '../../../../rust/api/sync.dart' as rust_sync;
 import '../../../address_book/models/address_book_contact.dart';
+import '../../../address_scan/widgets/mobile_scan_address_row.dart';
 import '../../../address_book/providers/address_book_provider.dart';
 import '../../../address_book/widgets/contact_name_inline.dart';
 import '../../../../providers/payment_request_flow_provider.dart';
@@ -2301,62 +2302,14 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
               AppSpacing.md,
             ),
             children: [
-              Semantics(
-                button: true,
-                child: GestureDetector(
-                  key: const ValueKey('mobile_send_scan_row'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => unawaited(_openScanner()),
-                  child: SizedBox(
-                    height: 44,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppAssetSize.padding,
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            key: const ValueKey('mobile_send_scan_icon_frame'),
-                            width: AppAssetSize.size,
-                            height: AppAssetSize.size,
-                            decoration: BoxDecoration(
-                              color: colors.background.neutralSubtleOpacity,
-                              borderRadius: BorderRadius.circular(
-                                AppRadii.full,
-                              ),
-                            ),
-                            child: Center(
-                              child: AppIcon(
-                                AppIcons.qr,
-                                size: AppAssetSize.icon,
-                                color: colors.icon.accent,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.s),
-                          Expanded(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _RecipientLineText(
-                                  'Scan a QR Code',
-                                  color: colors.text.accent,
-                                ),
-                                const SizedBox(height: AppSpacing.xxs),
-                                _RecipientLineText(
-                                  'Scan an address using camera',
-                                  color: colors.text.secondary,
-                                  fontWeight: FontWeight.w400,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+              MobileScanAddressRow(
+                key: const ValueKey('mobile_send_scan_row'),
+                iconFrameKey: const ValueKey('mobile_send_scan_icon_frame'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppAssetSize.padding,
                 ),
+                scalesText: false,
+                onTap: () => unawaited(_openScanner()),
               ),
               if (contacts.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.md),
@@ -2426,7 +2379,6 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
                                         _RecipientLineText(
                                           _truncateAddress(contacts[i].address),
                                           color: colors.text.secondary,
-                                          fontWeight: FontWeight.w400,
                                         ),
                                       ],
                                     ),
@@ -2638,7 +2590,6 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
       color: showError ? colors.text.destructive : colors.text.accent,
       fontSize: _kMobileSendAmountFontSize,
       height: _kMobileSendAmountLineHeightPx / _kMobileSendAmountFontSize,
-      fontWeight: FontWeight.w500,
     );
     final amountUnitStyle = amountStyle.copyWith(
       color: amountStyle.color?.withValues(alpha: 0.5),
@@ -2837,10 +2788,7 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
               spendableText,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: AppTypography.labelLarge.copyWith(
-                color: textColor,
-                fontWeight: FontWeight.w600,
-              ),
+              style: AppTypography.labelLarge.copyWith(color: textColor),
             ),
           ),
           const SizedBox(width: AppSpacing.xs),
@@ -4077,7 +4025,6 @@ class _MemoSheetState extends State<_MemoSheet> {
     final error = overLimit ? 'Message is too long' : null;
     final labelStyle = AppTypography.labelLarge.copyWith(
       color: colors.text.secondary,
-      fontWeight: FontWeight.w400,
     );
     final primaryIsClear = _showClearMemo;
     final primaryDisabled = error != null && !primaryIsClear;
@@ -4599,15 +4546,10 @@ class MobileSaplingParamsSheet extends StatelessWidget {
 }
 
 class _RecipientLineText extends StatelessWidget {
-  const _RecipientLineText(
-    this.text, {
-    required this.color,
-    this.fontWeight = FontWeight.w500,
-  });
+  const _RecipientLineText(this.text, {required this.color});
 
   final String text;
   final Color color;
-  final FontWeight fontWeight;
 
   @override
   Widget build(BuildContext context) {
@@ -4623,10 +4565,7 @@ class _RecipientLineText extends StatelessWidget {
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTypography.labelLarge.copyWith(
-              color: color,
-              fontWeight: fontWeight,
-            ),
+            style: AppTypography.labelLarge.copyWith(color: color),
           ),
         ),
       ),

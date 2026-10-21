@@ -15,9 +15,14 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import '../../../../main.dart' show log;
 import '../../../core/config/network_config.dart'
     show kZcashDefaultCurrencyTicker;
+import '../../../core/layout/app_form_factor.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/dot_qr_shape.dart';
+import '../../../core/widgets/mobile/neon_switch_tabs.dart';
+
+/// The neon redesign (mobile) restyles these blocks; desktop keeps Figma's.
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Which receiving pool an address belongs to.
 enum ReceiveAddressType { shielded, transparent }
@@ -50,11 +55,13 @@ class ReceiveTabs extends StatelessWidget {
   final FontWeight? labelFontWeight;
 
   /// Mobile Figma keeps the selected segment dark on both tabs; the
-  /// desktop pane lightens it on the transparent tab.
+  /// desktop pane lightens it on the transparent tab. The neon switch lights
+  /// the same plate on both, so it ignores this.
   final bool alwaysDarkSelected;
 
   @override
   Widget build(BuildContext context) {
+    if (_mobile) return _buildNeon(context);
     final colors = context.colors;
     final shieldedActive = selectedType == ReceiveAddressType.shielded;
     final darkSelected = alwaysDarkSelected || shieldedActive;
@@ -126,6 +133,25 @@ class ReceiveTabs extends StatelessWidget {
       ),
     );
   }
+
+  /// The neon switch ([NeonSwitchTabs]): it names the pools without their
+  /// glyphs.
+  Widget _buildNeon(BuildContext context) => NeonSwitchTabs(
+    key: const ValueKey('receive_address_type_tabs'),
+    labels: ('Shielded', 'Transparent'),
+    selected: selectedType == ReceiveAddressType.shielded ? 0 : 1,
+    onChanged: (index) => onChanged(
+      index == 0 ? ReceiveAddressType.shielded : ReceiveAddressType.transparent,
+    ),
+    width: width,
+    height: height,
+    labelStyle: labelStyle,
+    indicatorKey: const ValueKey('receive_address_type_tabs_indicator'),
+    tabKeys: (
+      const ValueKey('receive_address_type_tab_shielded'),
+      const ValueKey('receive_address_type_tab_transparent'),
+    ),
+  );
 }
 
 class _ReceiveTab extends StatelessWidget {
@@ -224,13 +250,17 @@ class ReceiveQrSurface extends StatelessWidget {
     final colors = context.colors;
     final isDark = AppTheme.of(context) == AppThemeData.dark;
     final isShielded = type == ReceiveAddressType.shielded;
-    final usesDarkQrSurface = !scanOptimized && (isDark || isShielded);
-    final qrColor = scanOptimized
+    // The neon redesign (mobile) draws every receive code dark on a light
+    // plate, never inverted, so its lit frame sits around a code a camera
+    // reads as easily as the scan-first one. The dots and the badge stay.
+    final lightPlate = scanOptimized || _mobile;
+    final usesDarkQrSurface = !lightPlate && (isDark || isShielded);
+    final qrColor = lightPlate
         ? _scanOptimizedQrInk
         : usesDarkQrSurface
         ? (isDark ? colors.text.accent : colors.text.inverse)
         : colors.text.accent;
-    final qrBackground = scanOptimized
+    final qrBackground = lightPlate
         ? colors.surface.qrCode
         : usesDarkQrSurface
         ? (isDark ? colors.background.ground : colors.background.inverse)
@@ -244,15 +274,25 @@ class ReceiveQrSurface extends StatelessWidget {
       width: size + paddingX * 2,
       height: size + paddingY * 2,
       padding: EdgeInsets.symmetric(horizontal: paddingX, vertical: paddingY),
-      decoration: BoxDecoration(
-        color: qrBackground,
-        borderRadius: BorderRadius.circular(_wrapperRadius),
-        border: Border.all(
-          color: usesDarkQrSurface
-              ? colors.border.subtle
-              : colors.border.inverseOpacity,
-        ),
-      ),
+      // The scan-first plate keeps its shape on every form factor; the
+      // decorative one is cut at the corners on mobile, inside its frame.
+      decoration: _mobile && !scanOptimized
+          ? ShapeDecoration(
+              color: qrBackground,
+              shape: Neon.chamferBorder(
+                cut: AppChamfer.large,
+                side: BorderSide(color: colors.border.inverseOpacity),
+              ),
+            )
+          : BoxDecoration(
+              color: qrBackground,
+              borderRadius: BorderRadius.circular(_wrapperRadius),
+              border: Border.all(
+                color: usesDarkQrSurface
+                    ? colors.border.subtle
+                    : colors.border.inverseOpacity,
+              ),
+            ),
       child: address.isNotEmpty
           ? _CachedQrBitmap(
               data: address,
@@ -277,6 +317,9 @@ class ReceiveQrSurface extends StatelessWidget {
 }
 
 abstract final class _ReceiveQrEmbeddedImage {
+  /// The neon redesign (mobile) badges every code with Veylor's helmet, cut
+  /// at the corners; desktop names the pool.
+  static const _veylor = 'assets/icons/receive_qr_veylor.webp';
   static const _shield = 'assets/icons/receive_qr_shield_crimson.png';
   static const _transparentLight =
       'assets/icons/receive_qr_transparent_light.png';
@@ -287,6 +330,7 @@ abstract final class _ReceiveQrEmbeddedImage {
     ReceiveAddressType type, {
     required bool usesDarkQrSurface,
   }) {
+    if (_mobile) return _veylor;
     return switch (type) {
       ReceiveAddressType.shielded => _shield,
       ReceiveAddressType.transparent =>
@@ -583,6 +627,41 @@ class ReceiveRenewButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final glow = colors.neon.glow;
+    // The neon plate (mobile) has cut corners and a lit edge, and is set into
+    // the QR frame's bottom line: its ring in the window colour opens a gap
+    // in the line around it.
+    final decoration = _mobile
+        ? ShapeDecoration(
+            color: Color.alphaBlend(
+              glow.withValues(alpha: 0.08),
+              colors.background.window,
+            ),
+            shadows: [
+              BoxShadow(
+                color: colors.background.window,
+                blurRadius: 0,
+                spreadRadius: 4,
+              ),
+            ],
+            shape: Neon.chamferBorder(
+              side: BorderSide(color: glow.withValues(alpha: 0.85), width: 1.2),
+            ),
+          )
+        : ShapeDecoration(
+            color: colors.background.homeCard,
+            shadows: [
+              BoxShadow(
+                color: colors.macosUtility.window,
+                blurRadius: 0,
+                spreadRadius: 4,
+              ),
+            ],
+            shape: CircleBorder(
+              side: BorderSide(color: colors.border.inverseOpacity, width: 2),
+            ),
+          );
+    final glyphColor = _mobile ? glow : colors.text.homeCard;
 
     return MouseRegion(
       cursor: onTap == null || renewing
@@ -595,19 +674,7 @@ class ReceiveRenewButton extends StatelessWidget {
           width: size,
           height: size,
           child: DecoratedBox(
-            decoration: ShapeDecoration(
-              color: colors.background.homeCard,
-              shadows: [
-                BoxShadow(
-                  color: colors.macosUtility.window,
-                  blurRadius: 0,
-                  spreadRadius: 4,
-                ),
-              ],
-              shape: CircleBorder(
-                side: BorderSide(color: colors.border.inverseOpacity, width: 2),
-              ),
-            ),
+            decoration: decoration,
             child: Center(
               child: renewing
                   ? SizedBox(
@@ -615,13 +682,13 @@ class ReceiveRenewButton extends StatelessWidget {
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: colors.text.homeCard,
+                        color: glyphColor,
                       ),
                     )
                   : AppIcon(
                       AppIcons.renew,
                       size: AppIconSize.large,
-                      color: colors.text.homeCard,
+                      color: glyphColor,
                       semanticLabel: 'Generate new shielded address',
                     ),
             ),
@@ -947,13 +1014,13 @@ List<ReceiveAddressInfoItem> receiveAddressInfoItems(
     const ReceiveAddressInfoItem(
       iconName: AppIcons.renew,
       text:
-          'After this address receives ZEC and Vizor syncs, your next transparent address will automatically change. Previous addresses still belong to this wallet.',
+          'After this address receives ZEC and Veylor syncs, your next transparent address will automatically change. Previous addresses still belong to this wallet.',
     ),
     ReceiveAddressInfoItem(
       iconName: touchUi ? AppIcons.shieldKeyholeOutline : AppIcons.shieldAsset,
       text:
           'After receiving $kZcashDefaultCurrencyTicker to your transparent '
-          "address, Vizor will guide you to shield the balance. Otherwise, "
+          "address, Veylor will guide you to shield the balance. Otherwise, "
           "you won't be able to send it.",
     ),
   ];

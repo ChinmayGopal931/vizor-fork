@@ -625,7 +625,7 @@ class _SetPasswordTitle extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          'Set password for signing in to Vizor wallet.',
+          'Set password for signing in to Veylor wallet.',
           style: AppTypography.bodyMediumStrong.copyWith(
             color: colors.text.accent,
           ),

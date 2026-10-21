@@ -1,7 +1,6 @@
 import 'dart:ui' show Size;
 
 import 'package:flutter/material.dart' show MaterialApp;
-import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter/widgets.dart' show Text, Widget;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +10,7 @@ import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/features/onboarding/keystone/keystone_how_to_connect_screen.dart';
 import 'package:zcash_wallet/src/features/onboarding/keystone/keystone_onboarding_flow.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   setUpAll(_loadAppFonts);
@@ -87,15 +87,7 @@ void main() {
 }
 
 Future<void> _loadAppFonts() async {
-  final youngSerif = FontLoader('Young Serif')
-    ..addFont(rootBundle.load('assets/fonts/YoungSerif-Regular.ttf'));
-  final geist = FontLoader('Geist')
-    ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-    ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'));
-  final geistMono = FontLoader('Geist Mono')
-    ..addFont(rootBundle.load('assets/fonts/GeistMono-Medium.ttf'));
-
-  await Future.wait([youngSerif.load(), geist.load(), geistMono.load()]);
+  await loadGothamFonts();
 }
 
 Future<void> _setDesktopViewport(WidgetTester tester) async {

@@ -1,6 +1,9 @@
 import 'package:flutter/painting.dart';
 
+import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
+
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Text color hierarchy.
 ///
@@ -50,7 +53,10 @@ class AppTextColors {
   final Color brandCrimson;
   final Color homeCard;
 
-  static const dark = AppTextColors(
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
+
+  static const figmaDark = AppTextColors(
     accent: Primitives.p900Dark,
     primary: Primitives.p700Dark,
     secondary: Primitives.p600Dark,
@@ -66,7 +72,7 @@ class AppTextColors {
     homeCard: Primitives.p800Dark,
   );
 
-  static const light = AppTextColors(
+  static const figmaLight = AppTextColors(
     // Accent in light mode reaches the *opposite* extreme of the ladder
     // (p900Light = near-black) rather than mirroring p800Dark's step.
     accent: Primitives.p900Light,
@@ -82,5 +88,37 @@ class AppTextColors {
     success: GoldPrimitives.p400Light,
     brandCrimson: CrimsonPrimitives.p300Light,
     homeCard: Primitives.p0Light,
+  );
+
+  static const neonDark = AppTextColors(
+    accent: NeonPrimitives.n800Dark,
+    primary: NeonPrimitives.n700Dark,
+    secondary: NeonPrimitives.n600Dark,
+    muted: NeonPrimitives.n500Dark,
+    disabled: NeonPrimitives.n400Dark,
+    inverse: NeonPrimitives.n0Dark,
+    warning: GoldPrimitives.p500Dark,
+    positiveStrong: GreenPrimitives.p400Dark,
+    destructive: NeonPrimitives.redHot,
+    destructiveLight: NeonPrimitives.red,
+    success: GoldPrimitives.p500Dark,
+    brandCrimson: NeonPrimitives.red,
+    homeCard: NeonPrimitives.n800Dark,
+  );
+
+  static const neonLight = AppTextColors(
+    accent: NeonPrimitives.n800Light,
+    primary: NeonPrimitives.n700Light,
+    secondary: NeonPrimitives.n600Light,
+    muted: NeonPrimitives.n500Dark,
+    disabled: NeonPrimitives.n400Light,
+    inverse: NeonPrimitives.n0Light,
+    warning: GoldPrimitives.p400Light,
+    positiveStrong: GreenPrimitives.p500Light,
+    destructive: NeonPrimitives.redOnLight,
+    destructiveLight: NeonPrimitives.redHot,
+    success: GoldPrimitives.p400Light,
+    brandCrimson: NeonPrimitives.redOnLight,
+    homeCard: NeonPrimitives.n800Dark,
   );
 }

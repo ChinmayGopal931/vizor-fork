@@ -153,7 +153,7 @@ class _LedgerImmediateMigrationSigningOverlayState
       return 'The amount or fee changed. Return and review the updated plan.';
     }
     if (message.contains('proof')) {
-      return 'Vizor could not finish preparing migration proofs.';
+      return 'Veylor could not finish preparing migration proofs.';
     }
     if (message.contains('broadcast') || message.contains('sendtransaction')) {
       return 'The migration transaction could not be broadcast.';

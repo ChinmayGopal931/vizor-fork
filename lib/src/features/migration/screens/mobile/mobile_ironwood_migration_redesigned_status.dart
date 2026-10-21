@@ -1084,7 +1084,7 @@ class _MobileMigrationRedesignedStatusState
     final torDisclosure =
         defaultTargetPlatform == TargetPlatform.iOS &&
             ref.watch(networkPrivacyProvider).torEnabled
-        ? '\nWhile Vizor is closed, migration continues over a direct '
+        ? '\nWhile Veylor is closed, migration continues over a direct '
               'connection.'
         : '';
     final currentHeight = _currentHeight();
@@ -1097,10 +1097,10 @@ class _MobileMigrationRedesignedStatusState
         : 'Timing is updating';
     if (state == _MigrationProgressState.waitingNotificationsOff) {
       if (nextHeight != null) {
-        return 'Notifications are disabled. Open Vizor after block '
+        return 'Notifications are disabled. Open Veylor after block '
             '$nextHeight ($timing) and approve the next migration batch.';
       }
-      return 'Notifications are disabled. Open Vizor again when the timing '
+      return 'Notifications are disabled. Open Veylor again when the timing '
           'is available and approve the next migration batch.';
     }
     if (state == _MigrationProgressState.broadcasting) {
@@ -1112,27 +1112,27 @@ class _MobileMigrationRedesignedStatusState
           : 'Next migration step expected in\n$timing.';
       return switch (_notificationsAuthorized) {
         true =>
-          '$expectation\nNotifications are on. You can leave Vizor and check '
+          '$expectation\nNotifications are on. You can leave Veylor and check '
               'back later.$torDisclosure',
         false =>
-          '$expectation\nNotifications are disabled. Open Vizor again to '
+          '$expectation\nNotifications are disabled. Open Veylor again to '
               'continue.',
         null => expectation,
       };
     }
     if (state == _MigrationProgressState.readyToSubmit) {
       return 'The scheduled transaction is ready for automatic submission. '
-          'Keep Vizor open.';
+          'Keep Veylor open.';
     }
     if (state == _MigrationProgressState.confirming) {
-      return 'Confirmations are still arriving.\nYou can leave Vizor and '
+      return 'Confirmations are still arriving.\nYou can leave Veylor and '
           'check again later.$torDisclosure';
     }
     if (timing == 'ready now') {
-      return 'The next migration step is ready. Keep Vizor open to continue.';
+      return 'The next migration step is ready. Keep Veylor open to continue.';
     }
     return '$timing until the next migration step.\n'
-        'Notifications are on; you can leave Vizor and check back later.'
+        'Notifications are on; you can leave Veylor and check back later.'
         '$torDisclosure';
   }
 

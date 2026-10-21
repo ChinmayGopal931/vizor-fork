@@ -40,7 +40,7 @@ const _preparationItems = [
 const _migrationItems = [
   AppCarouselItem.icon(
     message:
-        'You can close Vizor anytime. Migration will pause, and you can '
+        'You can close Veylor anytime. Migration will pause, and you can '
         'restart it when you return.',
     tileColor: _historyTile,
     icon: AppIcons.pause,
@@ -55,7 +55,7 @@ const _migrationItems = [
   ),
   AppCarouselItem.image(
     message:
-        'Keep Vizor running and the migration will automatically run in the '
+        'Keep Veylor running and the migration will automatically run in the '
         'background.',
     tileColor: _helmetTile,
     imageAsset: _helmetAsset,

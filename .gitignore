@@ -81,3 +81,6 @@ app.*.map.json
 # Generated when selecting Linux release flavors.
 /linux/FlavorOverrides.cmake
 .design-refs/
+
+# Railgun bundle build
+/android/railgun-web/node_modules/

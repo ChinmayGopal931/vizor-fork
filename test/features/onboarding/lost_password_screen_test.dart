@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
@@ -15,6 +14,7 @@ import 'package:zcash_wallet/src/providers/biometric_unlock_provider.dart';
 import 'package:zcash_wallet/src/providers/device_owner_auth_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/services/device_owner_auth.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 class _FakeDeviceOwnerAuth extends DeviceOwnerAuth {
   _FakeDeviceOwnerAuth({required this.result, bool hasOsResetGate = true})
@@ -56,7 +56,10 @@ class _FakeAccountNotifier extends AccountNotifier {
   );
 
   @override
-  Future<void> resetWallet({int? confirmedUnsharedGiftCardCount}) async {
+  Future<void> resetWallet({
+    int? confirmedUnsharedGiftCardCount,
+    int? confirmedPrivateUsdUnfinishedCount,
+  }) async {
     resets += 1;
     state = const AsyncData(AccountState());
   }
@@ -476,17 +479,11 @@ void main() {
 
     expect(auth.calls, 1);
     expect(auth.lastReason, kWalletResetDeviceAuthReason);
-    expect(find.text('Confirm reset Vizor'), findsNothing);
+    expect(find.text('Confirm reset Veylor'), findsNothing);
     expect(resetCalls, 1);
   });
 }
 
 Future<void> _loadAppFonts() async {
-  final geist = FontLoader('Geist')
-    ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-    ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'));
-  final youngSerif = FontLoader('Young Serif')
-    ..addFont(rootBundle.load('assets/fonts/YoungSerif-Regular.ttf'));
-
-  await Future.wait([geist.load(), youngSerif.load()]);
+  await loadGothamFonts();
 }

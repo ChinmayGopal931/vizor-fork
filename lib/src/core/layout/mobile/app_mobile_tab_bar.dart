@@ -1,43 +1,42 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/widgets.dart';
 
 import '../../feedback/app_haptics.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_icon.dart';
+import '../../widgets/mobile/tron_glyph.dart';
 
-/// Height of [AppMobileTabBar] — Figma `Mobile Nav` (node 4394:88550):
-/// 56px items inside 4px padding.
+/// Height of [AppMobileTabBar] — Figma `Mobile Nav` (node 4394:88550).
 const double kMobileTabBarHeight = 64;
 
 /// One destination in the floating mobile tab bar.
 class AppMobileTabItem {
   const AppMobileTabItem({required this.iconName, required this.label});
 
-  /// `AppIcons` name rendered at 28px.
+  /// `AppIcons` name, drawn as its [TronGlyph] when it has one.
   final String iconName;
 
   /// Accessibility label; the bar itself is icon-only.
   final String label;
+
+  /// The line glyph drawn for the app's tabs; any other icon keeps the icon
+  /// set.
+  TronGlyphKind? get glyph => switch (iconName) {
+    AppIcons.home => TronGlyphKind.home,
+    AppIcons.history => TronGlyphKind.activity,
+    AppIcons.cog => TronGlyphKind.settings,
+    _ => null,
+  };
 }
 
-/// Floating pill-shaped bottom tab bar — Figma `Mobile Nav`
-/// (node 4394:88550).
+/// The mobile tab bar: only the glyphs, Tron line icons ([TronGlyph])
+/// floating over a fade, the active one lit, with a pool of its light
+/// sliding under it.
 ///
-/// Shares the glass recipe of the desktop sidebar (17.5px backdrop blur
-/// over `macosUtility.navPanel`, thin hairline shadow ring). Items are
-/// equal-width; the active one is tinted with the nav panel active
-/// tokens. Figma gives the active item a slightly wider fixed width
-/// (100px vs flex) — equal widths keep the widget tree shape constant
-/// across selection changes and read the same at this size.
-///
-/// The resting states match the Figma frame exactly; only transitions
-/// move. One shared highlight pill slides between items (instead of
-/// fading out/in per item), the icon tint crossfades on the same curve,
-/// the newly active icon does a one-shot pop, and pressing an item
-/// scales its icon down with a light haptic. All of it collapses to
-/// instant switches under reduced motion.
+/// Selecting slides the light pool on a mild easeOutBack, crossfades the
+/// glyph's light, pops the arriving glyph once, and presses with a light
+/// haptic; all of it is instant under reduced motion.
 class AppMobileTabBar extends StatelessWidget {
   const AppMobileTabBar({
     required this.items,
@@ -52,11 +51,10 @@ class AppMobileTabBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onSelect;
 
-  static const _blur = 17.5;
   static const _itemHeight = 56.0;
-  static const _iconSize = 28.0;
+  static const _glyphSize = 26.0;
 
-  /// Selection transition — shared by the sliding pill and the icon
+  /// Selection transition — shared by the sliding light pool and the icon
   /// tint so they read as one move. The curve is easeOutBack
   /// (cubic(0.34, 1.56, 0.64, 1)) with its back overshoot halved by
   /// lowering the second control point: ~5% past the target instead of
@@ -70,91 +68,60 @@ class AppMobileTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final radius = BorderRadius.circular(AppRadii.full);
     final motion = !(MediaQuery.maybeDisableAnimationsOf(context) ?? false);
     final vertical = axis == Axis.vertical;
     final selection = items.length > 1
         ? -1 + 2 * currentIndex / (items.length - 1)
         : 0.0;
-    final pillAlignment = Alignment(
+    final poolAlignment = Alignment(
       vertical ? 0 : selection,
       vertical ? selection : 0,
     );
+    final light = colors.navPanel.activeIcon;
 
     return SizedBox(
       height: vertical ? _itemHeight * items.length + 8 : kMobileTabBarHeight,
       width: vertical ? kMobileTabBarHeight : null,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          boxShadow: [
-            BoxShadow(
-              color: colors.macosUtility.thinBorder,
-              blurRadius: 0,
-              spreadRadius: 1,
-            ),
-            BoxShadow(
-              color: const Color(0xFF000000).withValues(alpha: 0.05),
-              offset: const Offset(0, 25),
-              blurRadius: 25,
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: radius,
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: _blur, sigmaY: _blur),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.macosUtility.navPanel,
-                borderRadius: radius,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.xxs),
-                child: Stack(
-                  children: [
-                    AnimatedAlign(
-                      key: activePillKey,
-                      duration: motion ? selectDuration : Duration.zero,
-                      curve: _selectCurve,
-                      alignment: pillAlignment,
-                      child: FractionallySizedBox(
-                        widthFactor: vertical ? 1 : 1 / items.length,
-                        heightFactor: vertical ? 1 / items.length : null,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: colors.navPanel.activeBg,
-                            borderRadius: BorderRadius.circular(AppRadii.full),
-                            border: Border.all(
-                              color: colors.border.subtleOpacity,
-                            ),
-                          ),
-                          child: SizedBox(
-                            height: vertical ? double.infinity : _itemHeight,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Flex(
-                      direction: axis,
-                      children: [
-                        for (var i = 0; i < items.length; i++)
-                          Expanded(
-                            child: _TabBarItem(
-                              item: items[i],
-                              active: i == currentIndex,
-                              motion: motion,
-                              onTap: () => onSelect(i),
-                            ),
-                          ),
+      child: Stack(
+        children: [
+          AnimatedAlign(
+            key: activePillKey,
+            duration: motion ? selectDuration : Duration.zero,
+            curve: _selectCurve,
+            alignment: poolAlignment,
+            child: FractionallySizedBox(
+              widthFactor: vertical ? 1 : 1 / items.length,
+              heightFactor: vertical ? 1 / items.length : null,
+              child: Center(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: [
+                        light.withValues(alpha: 0.22),
+                        light.withValues(alpha: 0),
                       ],
                     ),
-                  ],
+                  ),
+                  child: const SizedBox.square(dimension: _itemHeight),
                 ),
               ),
             ),
           ),
-        ),
+          Flex(
+            direction: axis,
+            children: [
+              for (var i = 0; i < items.length; i++)
+                Expanded(
+                  child: _TabBarItem(
+                    item: items[i],
+                    active: i == currentIndex,
+                    motion: motion,
+                    onTap: () => onSelect(i),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -180,7 +147,7 @@ class _TabBarItem extends StatefulWidget {
 class _TabBarItemState extends State<_TabBarItem>
     with SingleTickerProviderStateMixin {
   /// One-shot pop when this item becomes the active one — a small
-  /// bounce timed to land with the arriving pill.
+  /// bounce timed to land with the arriving light.
   late final AnimationController _pop = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 250),
@@ -226,11 +193,6 @@ class _TabBarItemState extends State<_TabBarItem>
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    // Inactive items use the muted decorative tint per the Figma nav
-    // (grey, not the max-contrast accent).
-    final iconColor = widget.active
-        ? colors.navPanel.activeIcon
-        : colors.icon.muted;
 
     return Semantics(
       label: widget.item.label,
@@ -254,16 +216,33 @@ class _TabBarItemState extends State<_TabBarItem>
               curve: _pressed ? Curves.easeOut : Curves.easeOutBack,
               child: ScaleTransition(
                 scale: _popScale,
-                child: TweenAnimationBuilder<Color?>(
-                  tween: ColorTween(end: iconColor),
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(end: widget.active ? 1 : 0),
                   duration: widget.motion
                       ? AppMobileTabBar.selectDuration
                       : Duration.zero,
-                  builder: (_, color, _) => AppIcon(
-                    widget.item.iconName,
-                    size: AppMobileTabBar._iconSize,
-                    color: color ?? iconColor,
-                  ),
+                  builder: (_, lit, _) {
+                    final color = Color.lerp(
+                      colors.icon.muted,
+                      colors.navPanel.activeIcon,
+                      lit,
+                    )!;
+                    final glyph = widget.item.glyph;
+                    if (glyph == null) {
+                      return AppIcon(
+                        widget.item.iconName,
+                        size: AppMobileTabBar._glyphSize,
+                        color: color,
+                      );
+                    }
+                    return TronGlyph(
+                      glyph,
+                      color: color,
+                      core: colors.neon.core,
+                      lit: lit,
+                      size: AppMobileTabBar._glyphSize,
+                    );
+                  },
                 ),
               ),
             ),

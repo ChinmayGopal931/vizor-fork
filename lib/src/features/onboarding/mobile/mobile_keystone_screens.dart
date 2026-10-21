@@ -85,7 +85,7 @@ class MobileKeystoneIntroScreen extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xxs),
                 for (final (i, step) in const [
                   'Tap ••• (top right), then Connect software wallet.',
-                  'Select Vizor (or ZODL)',
+                  'Select Veylor (or ZODL)',
                 ].indexed)
                   _NumberedStep(
                     index: i + 1,
@@ -93,7 +93,7 @@ class MobileKeystoneIntroScreen extends StatelessWidget {
                     isFirstInGroup: i == 0,
                   ),
                 const SizedBox(height: AppSpacing.sm),
-                const _StepGroupHeading('On Vizor'),
+                const _StepGroupHeading('On Veylor'),
                 const SizedBox(height: AppSpacing.xxs),
                 const _NumberedStep(
                   index: 3,
@@ -564,25 +564,22 @@ class _AccountCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Label M; SemiBold when selected, Medium otherwise.
+                    // Label M. The selected card is marked by its check and
+                    // the detail's colour, not by weight.
                     Text(
                       name,
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.labelLarge.copyWith(
-                        fontWeight: selected
-                            ? FontWeight.w600
-                            : FontWeight.w500,
                         color: colors.text.accent,
                       ),
                     ),
                     const SizedBox(height: 2),
-                    // Label M Regular; accent on the selected card, secondary
+                    // Label M; accent on the selected card, secondary
                     // otherwise.
                     Text(
                       detail,
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.labelLarge.copyWith(
-                        fontWeight: FontWeight.w400,
                         color: selected
                             ? colors.text.accent
                             : colors.text.secondary,

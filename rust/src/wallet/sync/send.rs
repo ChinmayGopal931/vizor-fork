@@ -107,7 +107,9 @@ use crate::wallet::keys::parse_account_uuid;
 use crate::wallet::network::WalletNetwork;
 use crate::wallet::sync_engine;
 use crate::wallet::sync_engine::enhancement::private_queries_active;
-use crate::wallet::{confirmations_policy, payment_link_claim_confirmations_policy};
+use crate::wallet::{
+    confirmations_policy, joint_sweep_confirmations_policy, payment_link_claim_confirmations_policy,
+};
 
 mod gift_card_input;
 use super::migration::MIN_IRONWOOD_MIGRATION_OUTPUT_ZATOSHI;
@@ -126,6 +128,9 @@ pub(crate) enum SendPurpose {
     Ordinary,
     /// Spends a Gift Card's bearer wallet into the recipient's account.
     PaymentLinkClaim,
+    /// Sweeps a Private USD joint account home with the combined key. The
+    /// maker holds the joint viewing key, so the sweep discards its OVK.
+    JointSweep,
 }
 
 impl SendPurpose {
@@ -133,13 +138,14 @@ impl SendPurpose {
         match self {
             Self::Ordinary => confirmations_policy(),
             Self::PaymentLinkClaim => payment_link_claim_confirmations_policy(),
+            Self::JointSweep => joint_sweep_confirmations_policy(),
         }
     }
 
     fn ovk_policy(self) -> StoredOvkPolicy {
         match self {
             Self::Ordinary => StoredOvkPolicy::Sender,
-            Self::PaymentLinkClaim => StoredOvkPolicy::Discard,
+            Self::PaymentLinkClaim | Self::JointSweep => StoredOvkPolicy::Discard,
         }
     }
 }
@@ -427,7 +433,7 @@ fn accepted_migration_processing_failure_result(
 ) -> MigrationBroadcastAdvance {
     let accepted_txid_list = accepted_txids.join(",");
     let message = format!(
-        "Migration transaction {accepted_txid_list} was accepted by lightwalletd, but local migration bookkeeping failed: {error}. Vizor will reconcile it on the next advance."
+        "Migration transaction {accepted_txid_list} was accepted by lightwalletd, but local migration bookkeeping failed: {error}. Veylor will reconcile it on the next advance."
     );
     log::warn!("migration: {message}");
     MigrationBroadcastAdvance {
@@ -782,7 +788,7 @@ fn retry_store_then_pending_migration_policy_rebuild_message(
     .len();
     if still_missing > 0 {
         return Err(format!(
-            "{still_missing} accepted migration transaction(s) are still missing from local wallet storage. Vizor will retry until local state is recorded."
+            "{still_missing} accepted migration transaction(s) are still missing from local wallet storage. Veylor will retry until local state is recorded."
         ));
     }
     pending_migration_policy_rebuild_message(db_path, network, run_id, chain_tip_height)
@@ -859,8 +865,6 @@ fn propose_send_with_request(
     request: SendRequest<'_>,
     purpose: SendPurpose,
 ) -> Result<ProposalResult, String> {
-    use zcash_protocol::{PoolType, ShieldedPool as SP};
-
     if send_flow_id.is_empty() {
         return Err("Send flow id is required".to_string());
     }
@@ -879,49 +883,328 @@ fn propose_send_with_request(
             purpose,
             "creating a send",
         )?;
-
-        let needs_sapling = proposal
-            .steps()
-            .iter()
-            .any(|step| step.involves(PoolType::Shielded(SP::Sapling)));
-
-        let fee: u64 = proposal
-            .steps()
-            .iter()
-            .map(|step| u64::from(step.balance().fee_required()))
-            .sum();
-
-        let input_refs = proposal_input_refs(&proposal);
-        let lock_expiry_height =
-            send_proposal_lock_expiry(BlockHeight::from(proposal.min_target_height()));
-        let (id, _) = super::reserve_proposal_inputs(
+        lock_and_store_proposal(
             &mut db,
             db_path,
             network,
-            input_refs,
-            lock_expiry_height,
+            account_id,
             send_flow_id,
-        )?;
-        let mut store = PROPOSAL_STORE
-            .lock()
-            .map_err(|e| format!("Lock proposal store: {e}"))?;
-        store.proposals.insert(
-            id,
-            StoredProposal {
-                proposal_id: id,
-                proposal,
-                proposed_tx_version: stored_tx_version,
-                network,
-                account_id,
-                send_flow_id: send_flow_id.to_string(),
-                ovk_policy: purpose.ovk_policy(),
-            },
-        );
+            proposal,
+            stored_tx_version,
+            purpose,
+        )
+    })
+}
 
-        Ok(ProposalResult {
+/// Locks a built proposal's inputs for a fresh owner, then stores it in
+/// `PROPOSAL_STORE` under a new id. The caller holds the wallet write lock,
+/// with `db` open on `db_path`. On failure nothing stays locked or stored.
+fn lock_and_store_proposal(
+    db: &mut WalletDatabase,
+    db_path: &str,
+    network: WalletNetwork,
+    account_id: AccountUuid,
+    send_flow_id: &str,
+    proposal: Proposal<WalletFeeRule, ReceivedNoteId>,
+    proposed_tx_version: Option<TxVersion>,
+    purpose: SendPurpose,
+) -> Result<ProposalResult, String> {
+    let needs_sapling = proposal_needs_sapling(&proposal);
+
+    let fee: u64 = proposal
+        .steps()
+        .iter()
+        .map(|step| u64::from(step.balance().fee_required()))
+        .sum();
+
+    let input_refs = proposal_input_refs(&proposal);
+    let lock_expiry_height =
+        send_proposal_lock_expiry(BlockHeight::from(proposal.min_target_height()));
+    let (id, _) = super::reserve_proposal_inputs(
+        db,
+        db_path,
+        network,
+        input_refs,
+        lock_expiry_height,
+        send_flow_id,
+    )?;
+    let mut store = PROPOSAL_STORE
+        .lock()
+        .map_err(|e| format!("Lock proposal store: {e}"))?;
+    store.proposals.insert(
+        id,
+        StoredProposal {
             proposal_id: id,
-            needs_sapling_params: needs_sapling,
-            fee_zatoshi: fee,
+            proposal,
+            proposed_tx_version,
+            network,
+            account_id,
+            send_flow_id: send_flow_id.to_string(),
+            ovk_policy: purpose.ovk_policy(),
+            purpose,
+        },
+    );
+
+    Ok(ProposalResult {
+        proposal_id: id,
+        needs_sapling_params: needs_sapling,
+        fee_zatoshi: fee,
+    })
+}
+
+/// Whether creating `proposal` needs the Sapling proving parameters: one of
+/// its steps spends or pays Sapling.
+fn proposal_needs_sapling(proposal: &Proposal<WalletFeeRule, ReceivedNoteId>) -> bool {
+    use zcash_protocol::{PoolType, ShieldedPool as SP};
+
+    proposal
+        .steps()
+        .iter()
+        .any(|step| step.involves(PoolType::Shielded(SP::Sapling)))
+}
+
+/// The one transaction a swap proposal may make: a Private USD deposit or a
+/// joint sweep is never split across several.
+fn single_swap_transaction(
+    proposal: &Proposal<WalletFeeRule, ReceivedNoteId>,
+) -> Result<&zcash_client_backend::proposal::Step<ReceivedNoteId>, String> {
+    match proposal.steps().len() {
+        1 => Ok(proposal.steps().first()),
+        steps => Err(format!(
+            "A swap transaction must be one transaction; this one takes {steps}"
+        )),
+    }
+}
+
+/// What a stored Private USD swap proposal pays: one transaction, its fee,
+/// and the amount its recipient receives.
+pub(crate) struct SwapProposal {
+    pub proposal_id: u64,
+    /// Whether creating it needs the Sapling proving parameters, as for an
+    /// ordinary send that spends Sapling notes.
+    pub needs_sapling_params: bool,
+    pub fee_zatoshi: u64,
+    pub amount_zatoshi: u64,
+}
+
+/// Why a Private USD deposit was not proposed.
+#[derive(Debug)]
+pub(crate) enum SwapDepositError {
+    /// It does not fit: input selection cannot pay it, it takes more than
+    /// one transaction, or it costs more than approved.
+    Unpayable(String),
+    Wallet(String),
+}
+
+impl std::fmt::Display for SwapDepositError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unpayable(message) | Self::Wallet(message) => f.write_str(message),
+        }
+    }
+}
+
+/// Proposes a Private USD deposit from the account to a swap's joint address
+/// and stores it like any send: inputs locked, sender OVK kept so the account
+/// still recovers it. The deposit must be one transaction whose amount plus
+/// fee stays within the approved `max_total_zatoshi`; otherwise nothing is
+/// locked or stored.
+pub(crate) fn propose_swap_deposit(
+    db_path: &str,
+    network: WalletNetwork,
+    account_uuid: &str,
+    send_flow_id: &str,
+    joint_ua: &str,
+    deposit_zatoshi: u64,
+    max_total_zatoshi: u64,
+) -> Result<SwapProposal, SwapDepositError> {
+    if send_flow_id.is_empty() {
+        return Err(SwapDepositError::Wallet(
+            "Send flow id is required".to_string(),
+        ));
+    }
+
+    with_wallet_db_write_lock("send.propose_swap_deposit", || {
+        super::proposal_locks::require_active_session().map_err(SwapDepositError::Wallet)?;
+        let mut db = open_wallet_db(db_path, network).map_err(SwapDepositError::Wallet)?;
+        let account_id = parse_account_uuid(account_uuid).map_err(SwapDepositError::Wallet)?;
+        let (proposal, stored_tx_version) = propose_swap_deposit_request(
+            &db,
+            db_path,
+            network,
+            account_uuid,
+            account_id,
+            joint_ua,
+            deposit_zatoshi,
+            "creating a swap deposit",
+        )?;
+        let fee_zatoshi = proposal_fee_zatoshi(&proposal);
+        let total = deposit_zatoshi
+            .checked_add(fee_zatoshi)
+            .ok_or_else(|| SwapDepositError::Wallet("Swap deposit total overflows".to_string()))?;
+        if total > max_total_zatoshi {
+            return Err(SwapDepositError::Unpayable(format!(
+                "The swap deposit costs {total} zatoshi with its fee, more than the approved \
+                 {max_total_zatoshi}"
+            )));
+        }
+        let stored = lock_and_store_proposal(
+            &mut db,
+            db_path,
+            network,
+            account_id,
+            send_flow_id,
+            proposal,
+            stored_tx_version,
+            SendPurpose::Ordinary,
+        )
+        .map_err(SwapDepositError::Wallet)?;
+        Ok(SwapProposal {
+            proposal_id: stored.proposal_id,
+            needs_sapling_params: stored.needs_sapling_params,
+            fee_zatoshi,
+            amount_zatoshi: deposit_zatoshi,
+        })
+    })
+}
+
+/// The network fee of a Private USD deposit of `deposit_zatoshi` from the
+/// account to `joint_ua`, were it proposed now: the quote screen's preview.
+/// `None` when it does not fit, or would need the Sapling proving parameters.
+/// Nothing is locked or stored.
+pub(crate) fn estimate_swap_deposit_fee(
+    db_path: &str,
+    network: WalletNetwork,
+    account_uuid: &str,
+    joint_ua: &str,
+    deposit_zatoshi: u64,
+) -> Result<Option<u64>, String> {
+    let db = open_wallet_db_for_read(db_path, network)?;
+    let account_id = parse_account_uuid(account_uuid)?;
+    match propose_swap_deposit_request(
+        &db,
+        db_path,
+        network,
+        account_uuid,
+        account_id,
+        joint_ua,
+        deposit_zatoshi,
+        "estimating a swap deposit fee",
+    ) {
+        Ok((proposal, _)) if !proposal_needs_sapling(&proposal) => {
+            Ok(Some(proposal_fee_zatoshi(&proposal)))
+        }
+        Ok(_) | Err(SwapDepositError::Unpayable(_)) => Ok(None),
+        Err(SwapDepositError::Wallet(error)) => Err(error),
+    }
+}
+
+/// A deposit of `deposit_zatoshi` to `joint_ua` as one ordinary send.
+fn propose_swap_deposit_request(
+    db: &WalletDatabase,
+    db_path: &str,
+    network: WalletNetwork,
+    account_uuid: &str,
+    account_id: AccountUuid,
+    joint_ua: &str,
+    deposit_zatoshi: u64,
+    context: &str,
+) -> Result<(Proposal<WalletFeeRule, ReceivedNoteId>, Option<TxVersion>), SwapDepositError> {
+    let (proposal, tx_version) = propose_request(
+        db,
+        db_path,
+        network,
+        account_uuid,
+        account_id,
+        SendRequest::Single {
+            to_address: joint_ua,
+            amount_zatoshi: deposit_zatoshi,
+            memo_str: None,
+        },
+        SendPurpose::Ordinary,
+        context,
+    )
+    .map_err(|error| {
+        // Input selection (`propose_send_with_reserved_notes`) words a request
+        // the account's funds cannot pay this way.
+        if error.starts_with("Propose failed") {
+            SwapDepositError::Unpayable(error)
+        } else {
+            SwapDepositError::Wallet(error)
+        }
+    })?;
+    single_swap_transaction(&proposal).map_err(SwapDepositError::Unpayable)?;
+    Ok((proposal, tx_version))
+}
+
+/// Proposes sending everything in a Private USD joint account to `home_ua`
+/// with no change. Every note must be spendable under the sweep's
+/// two-confirmation policy, or the proposal fails rather than leave one
+/// behind. The sweep discards its OVK. It must be one transaction with a fee
+/// of at most `max_fee_zatoshi`; otherwise nothing is locked or stored.
+pub(crate) fn propose_joint_sweep(
+    joint_db: &str,
+    network: WalletNetwork,
+    joint_uuid: &str,
+    send_flow_id: &str,
+    home_ua: &str,
+    max_fee_zatoshi: u64,
+) -> Result<SwapProposal, String> {
+    if send_flow_id.is_empty() {
+        return Err("Send flow id is required".to_string());
+    }
+    let home: zcash_address::ZcashAddress = home_ua
+        .parse()
+        .map_err(|e| format!("Bad sweep destination: {e}"))?;
+
+    with_wallet_db_write_lock("send.propose_joint_sweep", || {
+        super::proposal_locks::require_active_session()?;
+        let mut db = open_wallet_db(joint_db, network)?;
+        let account_id = parse_account_uuid(joint_uuid)?;
+        let proposal = propose_send_max_transfer::<_, _, _, Infallible>(
+            &mut db,
+            &network,
+            account_id,
+            &[ShieldedPool::Orchard, ShieldedPool::Ironwood],
+            &ConservativeZip317FeeRule,
+            home,
+            None,
+            MaxSpendMode::Everything,
+            SendPurpose::JointSweep.confirmations_policy(),
+            &LockedInputPolicy::Exclude,
+            None,
+        )
+        .map_err(|e| format!("Propose joint sweep: {e}"))?;
+        let amount_zatoshi = single_swap_transaction(&proposal)?
+            .transaction_request()
+            .total()
+            .map_err(|e| format!("Joint sweep amount: {e:?}"))?
+            .map(u64::from)
+            .ok_or("Joint sweep amount is missing")?;
+        let fee_zatoshi = proposal_fee_zatoshi(&proposal);
+        if fee_zatoshi > max_fee_zatoshi {
+            return Err(format!(
+                "The joint sweep fee of {fee_zatoshi} zatoshi exceeds its limit of \
+                 {max_fee_zatoshi}"
+            ));
+        }
+        // The version follows the target height: 6 from NU6.3, which a spend
+        // of the joint account's Ironwood notes needs.
+        let stored = lock_and_store_proposal(
+            &mut db,
+            joint_db,
+            network,
+            account_id,
+            send_flow_id,
+            proposal,
+            None,
+            SendPurpose::JointSweep,
+        )?;
+        Ok(SwapProposal {
+            proposal_id: stored.proposal_id,
+            needs_sapling_params: stored.needs_sapling_params,
+            fee_zatoshi,
+            amount_zatoshi,
         })
     })
 }
@@ -1518,6 +1801,131 @@ async fn execute_stored_proposal(
     spend_params_path: Option<&str>,
     output_params_path: Option<&str>,
 ) -> Result<ExecuteProposalResult, String> {
+    let txids = create_stored_transactions(
+        db_path,
+        lightwalletd_url,
+        stored,
+        seed,
+        spend_params_path,
+        output_params_path,
+    )
+    .await?;
+    Ok(
+        broadcast_created_transactions(db_path, lightwalletd_url, &txids, "send")
+            .await
+            .into_execute_result(),
+    )
+}
+
+/// A transaction the wallet created and stored but has not broadcast.
+#[derive(Clone)]
+pub(crate) struct CreatedTransaction {
+    /// In internal byte order, as `transactions.txid` stores it. Display hex
+    /// and lightwalletd's JSON reverse it.
+    pub txid: TxId,
+    pub raw: Vec<u8>,
+    pub expiry_height: u32,
+}
+
+impl std::fmt::Debug for CreatedTransaction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CreatedTransaction")
+            .field("txid", &self.txid.to_string())
+            .field("expiry_height", &self.expiry_height)
+            .finish_non_exhaustive()
+    }
+}
+
+/// The create half of [`execute_proposal`], for a Private USD deposit:
+/// consumes the stored proposal, signs its transactions and stores them in
+/// the wallet DB, and returns them without broadcasting. The caller keeps the
+/// bytes before it sends them with [`broadcast_raw`]; until they are mined or
+/// expire, the main sync's resubmission sends them too.
+///
+/// A failure before storage releases the proposal's inputs. If storage
+/// succeeds but the bytes cannot be read back, the error says so and the
+/// transactions stay stored.
+pub(crate) async fn create_stored_proposal_transactions(
+    db_path: &str,
+    lightwalletd_url: &str,
+    proposal_id: u64,
+    send_flow_id: &str,
+    seed: SecretVec<u8>,
+    spend_params_path: Option<&str>,
+    output_params_path: Option<&str>,
+) -> Result<Vec<CreatedTransaction>, String> {
+    let stored = consume_stored_proposal(
+        proposal_id,
+        send_flow_id,
+        "Proposal not found (expired or already executed)",
+    )?;
+    let txids = create_stored_transactions(
+        db_path,
+        lightwalletd_url,
+        stored,
+        seed,
+        spend_params_path,
+        output_params_path,
+    )
+    .await?;
+    read_created_transactions(db_path, &txids).map_err(|error| {
+        format!("The transactions were created and stored, but reading them back failed: {error}")
+    })
+}
+
+fn read_created_transactions(
+    db_path: &str,
+    txids: &[TxId],
+) -> Result<Vec<CreatedTransaction>, String> {
+    let conn = open_readonly_conn(db_path)?;
+    txids
+        .iter()
+        .map(|txid| {
+            let (raw, expiry_height) = conn
+                .query_row(
+                    "SELECT raw, expiry_height FROM transactions WHERE txid = ?1",
+                    rusqlite::params![txid.as_ref()],
+                    |row| {
+                        Ok((
+                            row.get::<_, Option<Vec<u8>>>(0)?,
+                            row.get::<_, Option<u32>>(1)?,
+                        ))
+                    },
+                )
+                .map_err(|e| format!("Read created transaction {txid}: {e}"))?;
+            Ok(CreatedTransaction {
+                txid: *txid,
+                raw: raw
+                    .ok_or_else(|| format!("Created transaction {txid} has no stored bytes"))?,
+                expiry_height: expiry_height
+                    .ok_or_else(|| format!("Created transaction {txid} has no expiry height"))?,
+            })
+        })
+        .collect()
+}
+
+/// Sends `raw_tx` once over an isolated route; a transaction the node already
+/// has counts as sent. A Private USD kept transaction is sent again with this
+/// until it is mined.
+pub(crate) async fn broadcast_raw(lightwalletd_url: &str, raw_tx: &[u8]) -> Result<(), String> {
+    broadcast_raw_transaction_isolated(lightwalletd_url, raw_tx).await
+}
+
+/// Whether a broadcast failed because the node refused the transaction.
+pub(crate) fn broadcast_rejected(error: &str) -> bool {
+    migration_broadcast_failure_requires_rebuild(error)
+}
+
+/// Signs and stores a consumed proposal's transactions, releasing its inputs
+/// on any failure before they are stored. Nothing is broadcast.
+async fn create_stored_transactions(
+    db_path: &str,
+    lightwalletd_url: &str,
+    stored: StoredProposal,
+    seed: SecretVec<u8>,
+    spend_params_path: Option<&str>,
+    output_params_path: Option<&str>,
+) -> Result<Vec<TxId>, String> {
     let network = stored.network;
     let proposal_id = stored.proposal_id;
     let send_flow_id = stored.send_flow_id.clone();
@@ -1669,12 +2077,7 @@ async fn execute_stored_proposal(
         }
     };
 
-    let txids: Vec<TxId> = txids.iter().cloned().collect();
-    Ok(
-        broadcast_created_transactions(db_path, lightwalletd_url, &txids, "send")
-            .await
-            .into_execute_result(),
-    )
+    Ok(txids.iter().cloned().collect())
 }
 
 pub(crate) async fn migrate_orchard_to_ironwood(
@@ -2513,7 +2916,7 @@ async fn reconcile_migration_stop_candidates(
             MigrationStopDisposition::Block => {
                 return Err(format!(
                     "Migration cannot stop until transaction {} is recorded locally or expires at block {}. \
-                     Vizor records a submitted transaction after the wallet syncs.",
+                     Veylor records a submitted transaction after the wallet syncs.",
                     candidate.txid_hex, candidate.expiry_height
                 ));
             }
@@ -6461,7 +6864,7 @@ fn reconcile_orchard_migration_outbox_receipt(
 
 fn migration_storage_retry_message(tx_label: &str, txid_hex: &str, error: &str) -> String {
     format!(
-        "{tx_label} {txid_hex} was accepted by lightwalletd, but local wallet storage failed: {error}. Vizor will retry until local state is recorded."
+        "{tx_label} {txid_hex} was accepted by lightwalletd, but local wallet storage failed: {error}. Veylor will retry until local state is recorded."
     )
 }
 
@@ -7245,3 +7648,6 @@ impl OutputProver for NoOpOutputProver {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod orchard_receiver_tests;

@@ -128,7 +128,7 @@ void main() {
       final addressText = tester.widget<Text>(
         find.byKey(const ValueKey('full_address_text')),
       );
-      expect(addressText.style?.fontFamily, 'Geist Mono');
+      expect(addressText.style?.fontFamily, 'Gotham');
     });
   });
 

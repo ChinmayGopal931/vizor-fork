@@ -939,7 +939,7 @@ void main() {
         (w) => w is AppIcon && w.name == AppIcons.loader,
       );
       expect(
-        find.text('Keep Ledger connected while Vizor checks the app.'),
+        find.text('Keep Ledger connected while Veylor checks the app.'),
         findsOneWidget,
       );
       await _capture(tester, 'connect-checking');

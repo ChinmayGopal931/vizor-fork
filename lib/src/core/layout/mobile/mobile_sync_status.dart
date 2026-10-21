@@ -67,6 +67,9 @@ class MobileSyncStatus extends StatefulWidget {
 
   /// Physical left edge for the sidebar; the header retains its right edge.
   final bool leading;
+
+  /// The sidebar wraps a long label; the header keeps it on one line, ending
+  /// in an ellipsis when it does not fit.
   final bool wrapLabel;
   final String? semanticsLabel;
   final bool liveRegion;
@@ -179,6 +182,9 @@ class _SyncStatusState extends State<MobileSyncStatus>
         ? Text(
             widget.label,
             textAlign: widget.leading ? TextAlign.left : null,
+            maxLines: widget.wrapLabel ? null : 1,
+            softWrap: widget.wrapLabel,
+            overflow: widget.wrapLabel ? null : TextOverflow.ellipsis,
             style: AppTypography.labelMedium.copyWith(color: widget.baseColor),
           )
         : _ShimmerLabel(
@@ -186,6 +192,7 @@ class _SyncStatusState extends State<MobileSyncStatus>
             baseColor: widget.baseColor,
             highlightColor: widget.highlightColor,
             leading: widget.leading,
+            wrap: widget.wrapLabel,
             progress: widget.leading ? 1 - progress : progress,
           );
     final indicator = _SyncEdgeIndicator(
@@ -208,7 +215,10 @@ class _SyncStatusState extends State<MobileSyncStatus>
             indicator,
             const SizedBox(width: AppSpacing.s),
           ],
-          if (widget.wrapLabel) Expanded(child: label) else label,
+          if (widget.wrapLabel)
+            Expanded(child: label)
+          else
+            Flexible(child: label),
           if (!widget.leading) ...[
             const SizedBox(width: AppSpacing.s),
             indicator,
@@ -240,6 +250,7 @@ class _ShimmerLabel extends StatelessWidget {
     required this.highlightColor,
     required this.progress,
     required this.leading,
+    required this.wrap,
   });
 
   final String label;
@@ -247,6 +258,7 @@ class _ShimmerLabel extends StatelessWidget {
   final Color highlightColor;
   final double progress;
   final bool leading;
+  final bool wrap;
 
   @override
   Widget build(BuildContext context) {
@@ -276,6 +288,9 @@ class _ShimmerLabel extends StatelessWidget {
       child: Text(
         label,
         textAlign: leading ? TextAlign.left : null,
+        maxLines: wrap ? null : 1,
+        softWrap: wrap,
+        overflow: wrap ? null : TextOverflow.ellipsis,
         style: AppTypography.labelMedium.copyWith(
           color: const Color(0xFFFFFFFF),
         ),

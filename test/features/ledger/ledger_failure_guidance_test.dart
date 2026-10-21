@@ -241,7 +241,7 @@ void main() {
           'Connect and unlock your Ledger with USB, then try again.',
           cause: LedgerAppReadinessException(
             LedgerAppReadinessFailure.rejected,
-            'Vizor could not prepare the Ledger Zcash app. Try again.',
+            'Veylor could not prepare the Ledger Zcash app. Try again.',
             cause: 'ledger_status_6a80: Ledger rejected the PCZT data',
           ),
         ),

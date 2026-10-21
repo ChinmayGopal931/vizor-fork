@@ -764,7 +764,6 @@ class _MobileSeedPhraseScreenState
                         Text(
                           'Secret Passphrase',
                           style: AppTypography.bodyMediumStrong.copyWith(
-                            fontWeight: FontWeight.w600,
                             color: colors.text.accent,
                           ),
                         ),
@@ -997,7 +996,6 @@ class _LightWordGrid extends StatelessWidget {
                     words[i],
                     overflow: TextOverflow.ellipsis,
                     style: AppTypography.labelMedium.copyWith(
-                      fontWeight: FontWeight.w500,
                       color: colors.text.accent,
                     ),
                   ),
@@ -1100,18 +1098,12 @@ class _BirthdayRow extends StatelessWidget {
     final colors = context.colors;
     final labelText = Text(
       label,
-      style: AppTypography.labelMedium.copyWith(
-        fontWeight: FontWeight.w500,
-        color: colors.text.accent,
-      ),
+      style: AppTypography.labelMedium.copyWith(color: colors.text.accent),
     );
     final valueText = Text(
       value,
       textAlign: TextAlign.end,
-      style: AppTypography.labelMedium.copyWith(
-        fontWeight: FontWeight.w400,
-        color: colors.text.accent,
-      ),
+      style: AppTypography.labelMedium.copyWith(color: colors.text.accent),
     );
     final copyButton = onCopy == null
         ? null
@@ -1188,8 +1180,8 @@ class _MobileSeedScreenshotWarningSheetState
   );
 
   static const _titleStyle = TextStyle(
-    fontFamily: 'Young Serif',
-    fontWeight: FontWeight.w500,
+    fontFamily: 'Gotham',
+    fontWeight: FontWeight.w100,
     fontSize: 24,
     height: 28 / 24,
     letterSpacing: -0.4,

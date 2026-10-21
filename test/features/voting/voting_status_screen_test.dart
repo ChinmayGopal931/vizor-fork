@@ -2558,7 +2558,8 @@ void main() {
       await tester.tap(find.text('Yes'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Review answers').hitTestable());
-      await _pumpUntilFound(tester, find.text('Review your answers'));
+      // The mobile review's page title is drawn uppercase.
+      await _pumpUntilFound(tester, find.text('REVIEW YOUR ANSWERS'));
 
       router.pop();
       await _pumpUntilFound(tester, find.text('Review answers'));
@@ -2618,10 +2619,11 @@ void main() {
         ),
       );
       unawaited(router.push(votingReviewRoute(_roundId)));
-      await _pumpUntilFound(tester, find.text('Review your answers'));
+      // The mobile review's page title is drawn uppercase.
+      await _pumpUntilFound(tester, find.text('REVIEW YOUR ANSWERS'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Review your answers'), findsOneWidget);
+      expect(find.text('REVIEW YOUR ANSWERS'), findsOneWidget);
       expect(find.text('Review vote'), findsNothing);
       final reviewScroll = find.byKey(
         const ValueKey('mobile_voting_review_scroll'),
@@ -2743,11 +2745,11 @@ void main() {
         .dx;
     expect(headerSnapshotRight, lessThanOrEqualTo(cardRight));
     final completedTitle = tester.widget<Text>(find.text('Poll'));
-    expect(completedTitle.style?.fontFamily, 'Geist');
+    expect(completedTitle.style?.fontFamily, 'Gotham');
     expect(completedTitle.style?.fontSize, 20);
     expect(completedTitle.style?.fontWeight, FontWeight.w600);
     final completedSnapshot = tester.widget<Text>(find.text('#123'));
-    expect(completedSnapshot.style?.fontFamily, 'Geist');
+    expect(completedSnapshot.style?.fontFamily, 'Gotham');
     expect(completedSnapshot.style?.fontSize, 20);
     await tester.tap(find.text('View more'));
     await tester.pumpAndSettle();
@@ -3743,7 +3745,7 @@ void main() {
     expect(find.text('Review your answers'), findsOneWidget);
     final reviewTitle = tester.widget<Text>(find.text('Review your answers'));
     expect(reviewTitle.textAlign, TextAlign.center);
-    expect(reviewTitle.style?.fontFamily, 'Young Serif');
+    expect(reviewTitle.style?.fontFamily, 'Gotham');
     expect(reviewTitle.style?.fontSize, 32);
     expect(reviewTitle.style?.letterSpacing, 0);
     expect(find.text(longRoundDescription), findsNothing);

@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/sync_keep_awake_native_host.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_keep_awake_provider.dart';
 import 'package:zcash_wallet/src/providers/account_models.dart';
 import 'package:zcash_wallet/src/providers/sync_keep_awake_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
@@ -292,6 +293,46 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await _drainNativeQueue(tester);
     expect(_enabledArgs(calls), [true, false, true]);
+  });
+
+  // iOS progress VI-18: a Railgun first sync shares the one native flag, in
+  // the foreground only, whatever the wallet sync is doing.
+  testWidgets('a Railgun first sync keeps the screen on in the foreground', (
+    tester,
+  ) async {
+    final calls = _recordScreenAwakeCalls();
+    final syncNotifier = FakeSyncNotifier(
+      _sync(
+        isSyncing: false,
+        percentage: 1,
+        scannedHeight: 200,
+        chainTipHeight: 200,
+      ),
+    );
+    await tester.pumpWidget(_app(syncNotifier: syncNotifier));
+    await _drainNativeQueue(tester);
+    expect(calls, isEmpty);
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SyncKeepAwakeNativeHost)),
+    );
+    final firstSync = container
+        .read(privateUsdFirstSyncsProvider.notifier)
+        .begin('account-1');
+    await _drainNativeQueue(tester);
+    expect(_enabledArgs(calls), [true]);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await _drainNativeQueue(tester);
+    expect(_enabledArgs(calls), [true, false]);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await _drainNativeQueue(tester);
+    expect(_enabledArgs(calls), [true, false, true]);
+
+    firstSync.end();
+    await _drainNativeQueue(tester);
+    expect(_enabledArgs(calls), [true, false, true, false]);
   });
 
   testWidgets('does not call native API when the setting is disabled', (

@@ -8,8 +8,10 @@ import 'mobile_onboarding_progress.dart';
 import '../../../../main.dart' show log;
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/biometric_icon.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/biometric_unlock_provider.dart';
 import '../../../services/biometric_unlock.dart';
@@ -141,24 +143,37 @@ class _BiometricHero extends StatelessWidget {
 
   final BiometricKind kind;
 
-  static const _frameHeight = 321.0;
+  static const _frameHeight = 200.0;
+  static const _badgeSize = 144.0;
 
   @override
   Widget build(BuildContext context) {
-    if (kind == BiometricKind.none) {
-      return const SizedBox(height: _frameHeight);
-    }
-    final isFingerprint =
-        kind == BiometricKind.fingerprint || kind == BiometricKind.touchId;
-    final assetName = isFingerprint
-        ? 'assets/illustrations/biometrics_fingerprint_knight.webp'
-        : 'assets/illustrations/biometrics_faceid_knight.webp';
-    final imageHeight = isFingerprint ? 262.0 : 300.0;
-    return SizedBox(
-      height: _frameHeight,
-      child: Center(
-        child: Image.asset(assetName, height: imageHeight, fit: BoxFit.contain),
+    final badge = switch (kind) {
+      // Until the probe names the method there is nothing to show; the
+      // frame still holds its height so the title does not jump.
+      BiometricKind.none => null,
+      BiometricKind.face => const NeonGlyphBadge(
+        iconName: AppIcons.faceId,
+        size: _badgeSize,
       ),
+      BiometricKind.touchId => const NeonGlyphBadge(
+        iconName: AppIcons.touchId,
+        size: _badgeSize,
+      ),
+      // Android's fingerprint has no `AppIcons` artwork, and Apple's Touch ID
+      // glyph is kept for Touch ID alone (see [BiometricIcon]).
+      BiometricKind.fingerprint => NeonGlyphBadge(
+        size: _badgeSize,
+        child: BiometricIcon(
+          kind: BiometricKind.fingerprint,
+          fingerprintSize: _badgeSize * 0.46,
+        ),
+      ),
+    };
+    return SizedBox(
+      key: const ValueKey('mobile_biometrics_hero'),
+      height: _frameHeight,
+      child: badge == null ? null : Center(child: badge),
     );
   }
 }

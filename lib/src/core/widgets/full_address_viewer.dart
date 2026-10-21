@@ -19,9 +19,10 @@ void copyFullAddress(BuildContext context, String address) {
   );
 }
 
-/// Continuous, wrapping Geist Mono address. Soft-wrap only — the string
-/// itself stays unspaced so `O` / `0` sit in a fixed-width grid the eye
-/// can scan, and a copy action can take the exact value.
+/// Continuous, wrapping address in the code style. Soft-wrap only — the
+/// string itself stays unspaced so a copy action can take the exact value.
+/// Gotham is proportional, so glyph widths vary along a line and `O` / `0`
+/// are told apart by shape alone.
 class FullAddressText extends StatelessWidget {
   const FullAddressText({required this.address, this.color, super.key});
 

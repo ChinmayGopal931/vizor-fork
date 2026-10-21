@@ -580,7 +580,7 @@ class _MobileMigrationStartLoadingContent extends StatelessWidget {
         SizedBox(
           width: 286,
           child: Text(
-            'Vizor is preparing your migration. This may take a moment.',
+            'Veylor is preparing your migration. This may take a moment.',
             textAlign: TextAlign.center,
             style: AppTypography.bodyMedium.copyWith(
               color: context.colors.text.primary,

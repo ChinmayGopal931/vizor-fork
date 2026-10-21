@@ -111,7 +111,7 @@ Widget _iconCard(BuildContext context, String name) {
         Text(
           name,
           style: TextStyle(
-            fontFamily: 'Geist Mono',
+            fontFamily: kGothamFamily,
             fontSize: 11,
             color: colors.text.primary,
           ),

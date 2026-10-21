@@ -773,7 +773,7 @@ class _LedgerShieldSigningOverlayState
                   : null,
               showResultAmount: _shieldedTotalKnown,
               title: !_momentStarted
-                  ? 'Transparent Balance'
+                  ? 'Transparent balance'
                   : _momentComplete
                   ? 'Shielded successfully'
                   : broadcasting

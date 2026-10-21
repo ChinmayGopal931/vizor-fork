@@ -174,10 +174,10 @@ void main() {
     final clipboard = FakePaymentLinkClipboard();
     await pumpPaymentLinksScreen(
       tester,
+      logicalSize: const Size(390, 844),
       operations: operations,
       clipboard: clipboard,
     );
-    await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpAndSettle();
     final newestRow = find.byKey(
       ValueKey('payment_link_mobile_recovery_${incomingLink.address}'),
@@ -227,6 +227,7 @@ void main() {
     final images = <Uint8List>[];
     await pumpPaymentLinksScreen(
       tester,
+      logicalSize: const Size(390, 844),
       operations: operations,
       clipboard: clipboard,
       qrShareHandler: ({required png, required sharePositionOrigin}) async {
@@ -234,7 +235,6 @@ void main() {
         return shareGate.future;
       },
     );
-    await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpAndSettle();
     await tester.tap(find.bySemanticsLabel('Show gift card QR code'));
     await tester.pumpAndSettle();
@@ -293,10 +293,10 @@ void main() {
     );
     await pumpPaymentLinksScreen(
       tester,
+      logicalSize: const Size(390, 844),
       operations: operations,
       clipboard: clipboard,
     );
-    await tester.binding.setSurfaceSize(const Size(390, 844));
     await tester.pumpAndSettle();
     final copy = find.byKey(
       const ValueKey('payment_link_mobile_card_copy_action'),
@@ -353,12 +353,12 @@ void main() {
         final clipboard = FakePaymentLinkClipboard();
         await pumpPaymentLinksScreen(
           tester,
+          logicalSize: const Size(390, 844),
           operations: operations,
           clipboard: clipboard,
           marketDataSource: source,
           pricingEnabled: settings.$1,
         );
-        await tester.binding.setSurfaceSize(const Size(390, 844));
         await tester.pumpAndSettle();
         await tester.tap(
           find.byKey(const ValueKey('payment_links_mobile_create_button')),
@@ -466,12 +466,12 @@ void main() {
         ..claimAvailability = outcome.$1;
       await pumpPaymentLinksScreen(
         tester,
+        logicalSize: const Size(390, 844),
         operations: operations,
         clipboard: FakePaymentLinkClipboard(
           text: incomingLink.toUri().toString(),
         ),
       );
-      await tester.binding.setSurfaceSize(const Size(390, 844));
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('payment_links_mobile_redeem_button')),
@@ -482,7 +482,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Redeem the Card'), findsOneWidget);
+      expect(find.text('REDEEM THE CARD'), findsOneWidget);
       expect(
         find.descendant(
           of: find.byKey(
@@ -509,10 +509,10 @@ void main() {
     ) async {
       await pumpPaymentLinksScreen(
         tester,
+        logicalSize: const Size(390, 844),
         bootstrap: homeBootstrap,
         pricingEnabled: settings.$1,
       );
-      await tester.binding.setSurfaceSize(const Size(390, 844));
       final link = VizorPaymentLink(
         network: incomingLink.network,
         address: incomingLink.address,
@@ -629,10 +629,10 @@ void main() {
       final source = _PendingCardPrice();
       await pumpPaymentLinksScreen(
         tester,
+        logicalSize: const Size(390, 844),
         pricingEnabled: false,
         marketDataSource: source,
       );
-      await tester.binding.setSurfaceSize(const Size(390, 844));
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('payment_links_mobile_create_button')),
@@ -697,8 +697,11 @@ void main() {
     'actual amount screen replaces Use max with fiat loading and the latest value',
     (tester) async {
       final source = _PendingCardPrice();
-      await pumpPaymentLinksScreen(tester, marketDataSource: source);
-      await tester.binding.setSurfaceSize(const Size(390, 844));
+      await pumpPaymentLinksScreen(
+        tester,
+        logicalSize: const Size(390, 844),
+        marketDataSource: source,
+      );
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('payment_links_mobile_create_button')),
@@ -761,7 +764,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('Review a Card'), findsOneWidget);
+      expect(find.text('REVIEW A CARD'), findsOneWidget);
       expect(find.text(fiat), findsOneWidget);
       expect(loading, findsNothing);
       expect(source.fetchCount, 1);
@@ -772,8 +775,11 @@ void main() {
     'fiat fetch failure ends loading without blocking card creation',
     (tester) async {
       final source = _PendingCardPrice();
-      await pumpPaymentLinksScreen(tester, marketDataSource: source);
-      await tester.binding.setSurfaceSize(const Size(390, 844));
+      await pumpPaymentLinksScreen(
+        tester,
+        logicalSize: const Size(390, 844),
+        marketDataSource: source,
+      );
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('payment_links_mobile_create_button')),
@@ -816,6 +822,7 @@ void main() {
       var scanCalls = 0;
       await pumpPaymentLinksScreen(
         tester,
+        logicalSize: const Size(390, 844),
         operations: operations,
         scanner: (context, {required networkName}) {
           expect(networkName, 'main');
@@ -842,6 +849,7 @@ void main() {
       final operations = FakePaymentLinkOperations();
       await pumpPaymentLinksScreen(
         tester,
+        logicalSize: const Size(390, 844),
         operations: operations,
         scanner: (context, {required networkName}) async => incomingLink,
       );
@@ -865,6 +873,7 @@ void main() {
       );
       await pumpPaymentLinksScreen(
         tester,
+        logicalSize: const Size(390, 844),
         operations: operations,
         accountNotifier: accounts,
         scanner: (context, {required networkName}) async => incomingLink,
@@ -906,6 +915,7 @@ void main() {
       var scanCalls = 0;
       await pumpPaymentLinksScreen(
         tester,
+        logicalSize: const Size(390, 844),
         operations: operations,
         scanner: (context, {required networkName}) async {
           scanCalls++;
@@ -1568,6 +1578,7 @@ void main() {
       Rect? origin;
       await pumpPaymentLinksScreen(
         tester,
+        logicalSize: const Size(390, 844),
         operations: operations,
         qrShareHandler: ({required png, required sharePositionOrigin}) async {
           images.add(png);
@@ -1575,7 +1586,6 @@ void main() {
           return result.future;
         },
       );
-      await tester.binding.setSurfaceSize(const Size(390, 844));
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsLabel('Show gift card QR code'));
       await tester.pumpAndSettle();
@@ -1748,7 +1758,6 @@ class _PendingCardPrice implements ZecMarketDataSource {
 }
 
 Future<void> _openRedeemScanner(WidgetTester tester) async {
-  await tester.binding.setSurfaceSize(const Size(390, 844));
   await tester.pumpAndSettle();
   await tester.tap(
     find.byKey(const ValueKey('payment_links_mobile_redeem_button')),
@@ -1767,11 +1776,11 @@ Future<GoRouter> _openReceivedCard(
 }) async {
   await pumpPaymentLinksScreen(
     tester,
+    logicalSize: const Size(390, 844),
     operations: operations,
     bootstrap: homeBootstrap,
     accountNotifier: accountNotifier,
   );
-  await tester.binding.setSurfaceSize(const Size(390, 844));
   await tester.pumpAndSettle();
   final container = ProviderScope.containerOf(
     tester.element(find.byType(MaterialApp)),

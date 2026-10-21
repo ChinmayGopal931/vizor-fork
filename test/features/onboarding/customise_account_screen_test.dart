@@ -8,8 +8,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/router_refresh_provider.dart';
 import 'package:zcash_wallet/src/providers/app_security_provider.dart';
-import 'package:flutter/services.dart'
-    show FontLoader, LogicalKeyboardKey, rootBundle;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
@@ -20,6 +19,7 @@ import 'package:zcash_wallet/src/features/onboarding/create/customise_account_sc
 import 'package:zcash_wallet/src/features/onboarding/create/onboarding_split_view.dart';
 import 'package:zcash_wallet/src/features/onboarding/ledger/ledger_connect_screen.dart';
 import 'package:zcash_wallet/src/features/onboarding/shared/onboarding_flow_args.dart';
+import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 void main() {
   testWidgets('Ledger duplicate error preserves branding and permits retry', (
@@ -375,10 +375,12 @@ void main() {
     expect(find.text('Windborne Wardbearer'), findsOneWidget);
     expect(find.text('Finish setup'), findsOneWidget);
     expect(random.nextIntCallCount, 3);
-    expect(
-      tester.getSize(find.byKey(const ValueKey('customise_account_card'))),
-      const Size(396, 140),
+    // Gotham's line metrics leave the card a hair off the Figma 140 px.
+    final cardSize = tester.getSize(
+      find.byKey(const ValueKey('customise_account_card')),
     );
+    expect(cardSize.width, moreOrLessEquals(396, epsilon: 0.1));
+    expect(cardSize.height, moreOrLessEquals(140, epsilon: 0.1));
 
     await tester.binding.setSurfaceSize(const Size(1279, 900));
     await tester.pump();
@@ -448,7 +450,9 @@ void main() {
       final field = find.byKey(const ValueKey('customise_account_name_field'));
       final cardRect = tester.getRect(card);
       final fieldRect = tester.getRect(field);
-      expect(cardRect.size, const Size(396, 140));
+      // Gotham's line metrics leave the card a hair off the Figma 140 px.
+      expect(cardRect.size.width, moreOrLessEquals(396, epsilon: 0.1));
+      expect(cardRect.size.height, moreOrLessEquals(140, epsilon: 0.1));
       expect(tester.getSize(button), const Size.square(44));
       expect(tester.getSize(visual), const Size.square(28));
       expect(cardRect.contains(tester.getTopLeft(visual)), isTrue);
@@ -482,7 +486,8 @@ void main() {
       );
       await tester.pump();
       expect(submittedName, 'Resolute Herald');
-      expect(submittedPicture, 'pfp-09');
+      // The third draw (8) picks among the seven portraits: 8 % 7 = 1.
+      expect(submittedPicture, 'pfp-02');
       expect(random.nextIntCallCount, 9);
       expect(tester.takeException(), isNull);
     });
@@ -743,12 +748,7 @@ AppButton _finishButton(WidgetTester tester) => tester.widget<AppButton>(
 );
 
 Future<void> _loadAppFonts() async {
-  final youngSerif = FontLoader('Young Serif')
-    ..addFont(rootBundle.load('assets/fonts/YoungSerif-Regular.ttf'));
-  final geist = FontLoader('Geist')
-    ..addFont(rootBundle.load('assets/fonts/Geist-Regular.ttf'))
-    ..addFont(rootBundle.load('assets/fonts/Geist-Medium.ttf'));
-  await Future.wait([youngSerif.load(), geist.load()]);
+  await loadGothamFonts();
 }
 
 Future<void> _setDesktopViewport(WidgetTester tester) async {

@@ -3,7 +3,8 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart' show CupertinoRouteTransitionMixin;
+import 'package:flutter/cupertino.dart'
+    show CupertinoPage, CupertinoRouteTransitionMixin;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -21,7 +22,7 @@ import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_tab_bar.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_top_nav_account.dart';
 import 'package:zcash_wallet/src/services/native_mobile_navigation_geometry.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_wallet_sidebar.dart';
-import 'package:zcash_wallet/src/core/layout/mobile/mobile_sync_status.dart';
+import 'package:zcash_wallet/src/core/layout/mobile/neon_sidebar.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_page_viewport.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_window_policy.dart';
 import 'package:zcash_wallet/src/core/widgets/app_toast.dart';
@@ -36,15 +37,14 @@ import 'package:zcash_wallet/src/features/activity/screens/mobile/mobile_activit
 import 'package:zcash_wallet/src/features/home/screens/mobile/mobile_home_screen.dart';
 import 'package:zcash_wallet/src/features/home/widgets/mobile/shield/mobile_shield_scene.dart';
 import 'package:zcash_wallet/src/features/pay/screens/mobile/mobile_pay_screen.dart';
+import 'package:zcash_wallet/src/features/portfolio_chart/screens/mobile/mobile_portfolio_chart_screen.dart';
 import 'package:zcash_wallet/src/features/pay/screens/mobile/mobile_pay_submitted_screen.dart';
 import 'package:zcash_wallet/src/features/receive/screens/mobile/mobile_receive_screen.dart';
 import 'package:zcash_wallet/src/features/send/models/send_prefill_args.dart';
 import 'package:zcash_wallet/src/features/send/screens/mobile/mobile_send_screen.dart';
 import 'package:zcash_wallet/src/features/swap/models/swap_activity_navigation.dart';
 import 'package:zcash_wallet/src/features/swap/models/swap_models.dart';
-import 'package:zcash_wallet/src/features/swap/providers/pay_selected_asset_store.dart';
 import 'package:zcash_wallet/src/features/swap/providers/swap_hardware_signing_service.dart';
-import 'package:zcash_wallet/src/features/swap/providers/swap_state_provider.dart';
 import 'package:zcash_wallet/src/features/swap/screens/mobile/mobile_swap_keystone_sign_screen.dart';
 import 'package:zcash_wallet/src/features/swap/screens/mobile/mobile_swap_screen.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
@@ -55,7 +55,6 @@ import 'package:zcash_wallet/src/rust/api/sync.dart' as rust_sync;
 
 import '../../fakes/fake_sync_notifier.dart';
 import '../../support/go_route_descendants.dart';
-import '../../features/swap/support/static_near_intents_swap_provider.dart';
 
 class _NativeGeometryFixture extends NativeMobileNavigationGeometry {
   _NativeGeometryFixture(this.value);
@@ -454,10 +453,10 @@ void main() {
       expect(tester.getRect(sidebar).bottom, 653);
       final sync = find.descendant(
         of: sidebar,
-        matching: find.byType(MobileSyncStatus),
+        matching: find.byType(NeonSidebarSyncReadout),
       );
-      // No native corner mock here: the 24pt fallback plus 16pt glow gap.
-      expect(tester.getRect(sync).bottom, 653 - AppRadii.large - AppSpacing.sm);
+      // The readout keeps above the native safe area's bottom, 635.
+      expect(tester.getRect(sync).bottom, 635);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
     },
@@ -688,13 +687,24 @@ void main() {
                     ? theme.colors.navPanel.activeIcon
                     : unselectedPaint.label,
               );
-              expect(
-                paints[item + 1].fill,
-                selected
-                    ? theme.colors.navPanel.activeBg
-                    : unselectedPaint.fill,
-              );
+              // The active row is lit, not filled.
+              expect(paints[item + 1].fill, unselectedPaint.fill);
             }
+            expect(
+              [
+                for (final glyph in tester.widgetList<NeonSidebarGlyph>(
+                  find.descendant(
+                    of: sidebar,
+                    matching: find.byType(NeonSidebarGlyph),
+                  ),
+                ))
+                  glyph.selected,
+              ],
+              [
+                for (final path in ['/home', '/activity', '/settings'])
+                  path == current,
+              ],
+            );
             expect(find.byType(MobileAccountsSheet), findsNothing);
           }
           await tester.pumpAndSettle();
@@ -915,12 +925,24 @@ void main() {
         tester.widget<FadeTransition>(fade).opacity.value,
         closeTo(0.5, 0.01),
       );
+      // The route's fade is the scene's only one; the buttons' focus rings
+      // fade on their own.
+      final buttonFades = find
+          .descendant(
+            of: find.byType(AppButton),
+            matching: find.byType(FadeTransition),
+          )
+          .evaluate()
+          .toSet();
       expect(
-        find.descendant(
-          of: find.byType(MobileShieldScene),
-          matching: find.byType(FadeTransition),
-        ),
-        findsNothing,
+        find
+            .descendant(
+              of: find.byType(MobileShieldScene),
+              matching: find.byType(FadeTransition),
+            )
+            .evaluate()
+            .where((element) => !buttonFades.contains(element)),
+        isEmpty,
       );
       await tester.pump(const Duration(milliseconds: 120));
       final scene = tester.widget<MobileShieldScene>(
@@ -978,7 +1000,7 @@ void main() {
           route.reverseTransitionDuration,
           const Duration(milliseconds: 180),
         );
-        expect(find.text('Transparent Balance'), findsOneWidget);
+        expect(find.text('Transparent balance'), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       });
@@ -1026,7 +1048,7 @@ void main() {
     expect(notifications.redirect, isNotNull);
   });
 
-  testWidgets('tab shell renders all four tabs and switches branches', (
+  testWidgets('tab shell renders three tabs and Home opens Swap over them', (
     tester,
   ) async {
     await tester.pumpWidget(_app(_router()));
@@ -1037,9 +1059,22 @@ void main() {
       tester.element(find.byType(AppMobileShell)),
     );
     expect(shellRoute, isA<CupertinoRouteTransitionMixin<dynamic>>());
-    for (final label in ['Home', 'Swap', 'Activity', 'Settings']) {
-      expect(find.bySemanticsLabel(label), findsWidgets);
-    }
+    expect(
+      tester
+          .widget<AppMobileTabBar>(find.byType(AppMobileTabBar))
+          .items
+          .map((item) => item.label),
+      ['Home', 'Activity', 'Settings'],
+    );
+
+    // Swap is pushed over the tabs from Home's button, and back returns.
+    await tester.tap(find.byKey(const ValueKey('mobile_home_swap')));
+    await tester.pumpAndSettle();
+    expect(find.byType(MobileSwapScreen), findsOneWidget);
+    expect(find.byType(AppMobileShell), findsNothing);
+    await tester.tap(find.bySemanticsLabel('Back').last);
+    await tester.pumpAndSettle();
+    expect(find.byType(MobileHomeScreen), findsOneWidget);
 
     await tester.tap(find.bySemanticsLabel('Activity').last);
     await tester.pumpAndSettle();
@@ -1047,26 +1082,165 @@ void main() {
     expect(find.byType(MobileHomeScreen), findsNothing);
     expect(find.bySemanticsLabel('Back'), findsNothing);
 
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
-    expect(find.byType(MobileSwapScreen), findsOneWidget);
-    expect(find.bySemanticsLabel('Back'), findsNothing);
-    expect(find.bySemanticsLabel('Close'), findsNothing);
-
     await tester.tap(find.bySemanticsLabel('Settings').last);
     await tester.pumpAndSettle();
-    expect(find.text('Settings'), findsOneWidget);
+    // The page title is drawn as an uppercase caption.
+    expect(find.text('SETTINGS'), findsOneWidget);
     expect(find.bySemanticsLabel('Back'), findsNothing);
     expect(find.byType(AppMobileShell), findsOneWidget);
   });
 
-  testWidgets('swap tab is hidden when the swap feature is disabled', (
+  testWidgets('the sidebar lists the tabs and leaves the pages Home opens', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 720);
+    final router = _router();
+    addTearDown(router.dispose);
+    await tester.pumpWidget(_app(router));
+    await tester.pumpAndSettle();
+    Finder row(String label) => find.descendant(
+      of: find.byType(MobileWalletSidebar),
+      matching: find.text(label),
+    );
+    for (final label in ['Home', 'Activity', 'Settings']) {
+      expect(row(label), findsOneWidget, reason: label);
+    }
+    expect(row('Swap'), findsNothing);
+    final homeRect = tester.getRect(find.byType(MobileHomeScreen));
+    for (final (path, screen) in [
+      ('/swap', MobileSwapScreen),
+      ('/portfolio-chart', MobilePortfolioChartScreen),
+    ]) {
+      unawaited(router.push<void>(path));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.byType(screen)), homeRect, reason: path);
+      final sidebar = tester.widget<MobileWalletSidebar>(
+        find.byType(MobileWalletSidebar),
+      );
+      expect(sidebar.currentPath, path);
+      expect(sidebar.onSelect, isNotNull, reason: path);
+      sidebar.onSelect!('/home');
+      await tester.pumpAndSettle();
+      expect(find.byType(screen), findsNothing, reason: path);
+      expect(mobileVisiblePath(router), '/home');
+    }
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+    'Private USD flows keep the sidebar shut while Back leaves them',
+    (tester) async {
+      tester.view.physicalSize = const Size(900, 720);
+      final router = GoRouter(
+        initialLocation: '/private-usd',
+        routes: [
+          ShellRoute(
+            builder: (context, state, child) =>
+                MobileAdaptiveFrame(router: GoRouter.of(context), child: child),
+            routes: [
+              for (final path in [
+                '/private-usd',
+                '/private-usd/convert',
+                '/activity',
+              ])
+                GoRoute(
+                  path: path,
+                  builder: (_, _) => Scaffold(body: Text(path)),
+                ),
+            ],
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(_app(router));
+      await tester.pumpAndSettle();
+      MobileWalletSidebar sidebar() =>
+          tester.widget<MobileWalletSidebar>(find.byType(MobileWalletSidebar));
+      expect(sidebar().onSelect, isNotNull);
+      expect(sidebar().onAccountTap, isNotNull);
+      unawaited(router.push<void>('/private-usd/convert'));
+      await tester.pumpAndSettle();
+      // The flow publishes no exit: a quote or a proof is never left from
+      // the sidebar.
+      expect(sidebar().onSelect, isNull);
+      expect(sidebar().onAccountTap, isNull);
+      expect(
+        find.byKey(const ValueKey('mobile_sidebar_controls_veil')),
+        findsOneWidget,
+      );
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(mobileVisiblePath(router), '/private-usd');
+      sidebar().onSelect!('/activity');
+      await tester.pumpAndSettle();
+      expect(mobileVisiblePath(router), '/activity');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets('Swap, the chart and Private USD keep to the content pane', (
+    tester,
+  ) async {
+    final router = _router();
+    addTearDown(router.dispose);
+    await tester.pumpWidget(const SizedBox());
+    final context = tester.element(find.byType(SizedBox));
+    final paths = <String>[];
+    for (final route in _leafRoutes().where(
+      (route) =>
+          route.path == '/swap' ||
+          route.path == '/portfolio-chart' ||
+          route.path.startsWith('/private-usd'),
+    )) {
+      paths.add(route.path);
+      final page = route.pageBuilder!(
+        context,
+        GoRouterState(
+          router.configuration,
+          uri: Uri(path: route.path),
+          matchedLocation: route.path,
+          fullPath: route.path,
+          pathParameters: const {'direction': 'forward', 'index': '3'},
+          pageKey: ValueKey(route.path),
+        ),
+      );
+      expect(page, isA<CupertinoPage<dynamic>>(), reason: route.path);
+      final child = (page as CupertinoPage<dynamic>).child;
+      expect(child, isA<MobilePageViewport>(), reason: route.path);
+      expect(
+        (child as MobilePageViewport).constrainContent,
+        isTrue,
+        reason: route.path,
+      );
+    }
+    expect(
+      paths,
+      containsAll([
+        '/swap',
+        '/portfolio-chart',
+        '/private-usd',
+        '/private-usd/convert',
+        '/private-usd/convert/review',
+        '/private-usd/conversion/:direction/:index',
+        '/private-usd/send',
+        '/private-usd/send/review',
+        '/private-usd/send/status',
+        '/private-usd/withdraw',
+        '/private-usd/withdraw/review',
+        '/private-usd/refunds',
+      ]),
+    );
+  });
+
+  testWidgets('home hides Swap when the swap feature is disabled', (
     tester,
   ) async {
     await tester.pumpWidget(_app(_router(), swapFeatureEnabled: false));
     await tester.pumpAndSettle();
 
-    expect(find.bySemanticsLabel('Swap'), findsNothing);
+    expect(find.byKey(const ValueKey('mobile_home_swap')), findsNothing);
     for (final label in ['Home', 'Activity', 'Settings']) {
       expect(find.bySemanticsLabel(label), findsWidgets);
     }
@@ -1107,7 +1281,7 @@ void main() {
 
   for (final path in ['/swap/keystone-sign', '/swap/ledger-sign']) {
     for (final extra in [null, 'invalid signing arguments']) {
-      testWidgets('$path with invalid arguments returns to the swap tab '
+      testWidgets('$path with invalid arguments returns to Swap '
           '($extra)', (tester) async {
         final router = GoRouter(
           initialLocation: path,
@@ -1119,10 +1293,9 @@ void main() {
 
         expect(router.routeInformationProvider.value.uri.path, '/swap');
         expect(find.byType(MobileSwapScreen), findsOneWidget);
-        expect(find.byType(AppMobileShell), findsOneWidget);
-        expect(find.bySemanticsLabel('Back'), findsNothing);
+        // Nothing is under it, so its back button goes home.
         expect(router.canPop(), isFalse);
-        await tester.tap(find.bySemanticsLabel('Home').last);
+        await tester.tap(find.bySemanticsLabel('Back').last);
         await tester.pumpAndSettle();
         expect(find.byType(MobileHomeScreen), findsOneWidget);
       });
@@ -1383,174 +1556,6 @@ void main() {
     final screen = tester.widget<MobilePayScreen>(find.byType(MobilePayScreen));
     expect(screen.preservePreparedComposer, isTrue);
   });
-
-  testWidgets('home Pay waits only for its saved live asset', (tester) async {
-    final router = _router();
-    final savedAsset = SwapAsset.live(
-      assetId: 'base-usdc',
-      symbol: 'USDC',
-      blockchain: 'base',
-      decimals: 6,
-    );
-    final payAssetStore = _DeferredPaySelectedAssetStore(savedAsset);
-    final swapProvider = _DeferredSupportedAssetsSwapProvider();
-    await tester.pumpWidget(
-      _app(
-        router,
-        overrides: [
-          paySelectedAssetStoreProvider.overrideWithValue(payAssetStore),
-          swapIntentProvider.overrideWithValue(swapProvider),
-        ],
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const ValueKey('mobile_home_pay')));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 600));
-
-    expect(payAssetStore.loadStarted, isTrue);
-    expect(payAssetStore.loadCount, 1);
-    expect(swapProvider.loadStarted, isTrue);
-    expect(router.routerDelegate.currentConfiguration.uri.path, '/home');
-    expect(find.byType(MobilePayScreen), findsNothing);
-
-    payAssetStore.completeLoad();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 600));
-    await tester.pump();
-
-    final container = ProviderScope.containerOf(
-      tester.element(find.byType(MobileHomeScreen)),
-      listen: false,
-    );
-    expect(container.read(paySelectedAssetProvider), savedAsset);
-    expect(container.read(swapStateProvider).payMode, isTrue);
-    expect(container.read(swapStateProvider).externalAsset, savedAsset);
-    expect(container.read(swapStateProvider).pricingLoading, isTrue);
-    expect(find.byType(MobilePayScreen), findsOneWidget);
-    final assetSelector = find.byKey(
-      const ValueKey('mobile_pay_asset_selector'),
-    );
-    expect(
-      find.descendant(of: assetSelector, matching: find.text('Base')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: assetSelector, matching: find.text('Ethereum')),
-      findsNothing,
-    );
-
-    await tester.pump();
-    expect(container.read(swapStateProvider).externalAsset, savedAsset);
-    expect(payAssetStore.loadCount, 1);
-
-    swapProvider.completeSupportedAssets([savedAsset]);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(container.read(swapStateProvider).pricingLoading, isFalse);
-    expect(container.read(swapStateProvider).externalAsset, savedAsset);
-  });
-
-  testWidgets(
-    'home Pay does not treat a periodic catalog refresh as initial loading',
-    (tester) async {
-      final router = _router();
-      final savedAsset = SwapAsset.live(
-        assetId: 'removed-base-usdc',
-        symbol: 'USDC',
-        blockchain: 'base',
-        decimals: 6,
-      );
-      final payAssetStore = _DeferredPaySelectedAssetStore(savedAsset);
-      final swapProvider = _DeferredRefreshSupportedAssetsSwapProvider(const [
-        SwapAsset.usdc,
-      ]);
-      await tester.pumpWidget(
-        _app(
-          router,
-          overrides: [
-            paySelectedAssetStoreProvider.overrideWithValue(payAssetStore),
-            swapIntentProvider.overrideWithValue(swapProvider),
-            swapPriceRefreshIntervalProvider.overrideWithValue(
-              const Duration(seconds: 5),
-            ),
-          ],
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const ValueKey('mobile_home_pay')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-      expect(swapProvider.loadCount, 1);
-
-      await tester.pump(const Duration(seconds: 5));
-      await tester.pump();
-      await tester.pump();
-      expect(swapProvider.loadCount, 2);
-
-      payAssetStore.completeLoad();
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 600));
-      await tester.pump();
-
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(MobileHomeScreen)),
-        listen: false,
-      );
-      expect(container.read(swapStateProvider).pricingLoading, isTrue);
-      expect(container.read(swapStateProvider).externalAsset, SwapAsset.usdc);
-      final assetSelector = find.byKey(
-        const ValueKey('mobile_pay_asset_selector'),
-      );
-      expect(
-        find.descendant(of: assetSelector, matching: find.text('Ethereum')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: assetSelector, matching: find.text('Base')),
-        findsNothing,
-      );
-
-      swapProvider.completeRefresh(const [SwapAsset.usdc]);
-      await tester.pump();
-    },
-  );
-
-  testWidgets('home Pay restore does not navigate after leaving Home', (
-    tester,
-  ) async {
-    final router = _router();
-    final payAssetStore = _DeferredPaySelectedAssetStore(SwapAsset.sol);
-    await tester.pumpWidget(
-      _app(
-        router,
-        overrides: [
-          paySelectedAssetStoreProvider.overrideWithValue(payAssetStore),
-        ],
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const ValueKey('mobile_home_pay')));
-    await tester.pump();
-    expect(payAssetStore.loadStarted, isTrue);
-
-    await tester.tap(find.bySemanticsLabel('Swap').last);
-    await tester.pumpAndSettle();
-    expect(find.byType(MobileSwapScreen), findsOneWidget);
-
-    await tester.tap(find.bySemanticsLabel('Home').last);
-    await tester.pumpAndSettle();
-    expect(find.byType(MobileHomeScreen), findsOneWidget);
-
-    payAssetStore.completeLoad();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(find.byType(MobileHomeScreen), findsOneWidget);
-    expect(find.byType(MobilePayScreen), findsNothing);
-  });
 }
 
 final _hardwareSwapIntent = SwapIntent(
@@ -1628,68 +1633,5 @@ class _FakeSwapHardwareSigningService implements SwapHardwareSigningService {
     String? outputParamsPath,
   }) {
     throw UnimplementedError();
-  }
-}
-
-class _DeferredPaySelectedAssetStore implements PaySelectedAssetStore {
-  _DeferredPaySelectedAssetStore(this.asset);
-
-  final SwapAsset? asset;
-  final _loadCompleter = Completer<void>();
-  int loadCount = 0;
-
-  bool get loadStarted => loadCount > 0;
-
-  void completeLoad() => _loadCompleter.complete();
-
-  @override
-  Future<SwapAsset?> loadSelectedAsset({required String accountUuid}) async {
-    loadCount += 1;
-    await _loadCompleter.future;
-    return asset;
-  }
-
-  @override
-  Future<void> saveSelectedAsset({
-    required String accountUuid,
-    required SwapAsset asset,
-  }) async {}
-}
-
-class _DeferredSupportedAssetsSwapProvider
-    extends StaticNearIntentsSwapProvider {
-  final _supportedAssetsCompleter = Completer<List<SwapAsset>>();
-  var loadCount = 0;
-
-  bool get loadStarted => loadCount > 0;
-
-  void completeSupportedAssets(List<SwapAsset> assets) {
-    _supportedAssetsCompleter.complete(assets);
-  }
-
-  @override
-  Future<List<SwapAsset>> listSupportedExternalAssets() {
-    loadCount += 1;
-    return _supportedAssetsCompleter.future;
-  }
-}
-
-class _DeferredRefreshSupportedAssetsSwapProvider
-    extends StaticNearIntentsSwapProvider {
-  _DeferredRefreshSupportedAssetsSwapProvider(this.initialAssets);
-
-  final List<SwapAsset> initialAssets;
-  final _refreshCompleter = Completer<List<SwapAsset>>();
-  var loadCount = 0;
-
-  void completeRefresh(List<SwapAsset> assets) {
-    _refreshCompleter.complete(assets);
-  }
-
-  @override
-  Future<List<SwapAsset>> listSupportedExternalAssets() {
-    loadCount += 1;
-    if (loadCount == 1) return Future.value(initialAssets);
-    return _refreshCompleter.future;
   }
 }

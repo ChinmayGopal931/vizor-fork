@@ -122,6 +122,18 @@ final _nearEthImplicit = RegExp(r'^0x[0-9a-f]{40}$');
 final _nearNamed = RegExp(r'^[a-z0-9]+([._-][a-z0-9]+)*$');
 final _bech32Body = RegExp(r'^[a-z0-9]+$');
 
+/// Whether [value] is a `0x` Ethereum address something can be sent to: a
+/// lowercase `0x` and 40 hex digits, a mixed-case one carrying its EIP-55
+/// checksum (which catches a mistyped character), and not the zero address,
+/// which nobody holds. It does not trim.
+bool isValidEvmAddress(String value) =>
+    value.startsWith('0x') && _isEvmAddress(value) && !isZeroEvmAddress(value);
+
+/// Whether [value] is the zero address (`0x` and 40 zeros): anything sent
+/// there is lost for good.
+bool isZeroEvmAddress(String value) =>
+    _evm.hasMatch(value) && value.substring(2).replaceAll('0', '').isEmpty;
+
 bool _isEvmAddress(String value) {
   if (!_evm.hasMatch(value)) return false;
   final body = value.substring(2);

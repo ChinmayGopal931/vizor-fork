@@ -1,6 +1,9 @@
 import 'package:flutter/painting.dart';
 
+import '../../layout/app_form_factor.dart';
 import '../primitives.dart';
+
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Border / divider weights.
 ///
@@ -43,7 +46,10 @@ class AppBorderColors {
   final Color utilityPositiveStrong;
   final Color brandCrimsonStrong;
 
-  static const dark = AppBorderColors(
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
+
+  static const figmaDark = AppBorderColors(
     subtle: Primitives.p150Dark,
     subtleOpacity: Primitives.p900Alpha10Dark,
     inverseOpacity: Primitives.p150Alpha15Dark,
@@ -57,7 +63,7 @@ class AppBorderColors {
     brandCrimsonStrong: CrimsonPrimitives.p400Dark,
   );
 
-  static const light = AppBorderColors(
+  static const figmaLight = AppBorderColors(
     subtle: Primitives.p150Light,
     subtleOpacity: Primitives.p900Alpha5Light,
     inverseOpacity: Primitives.p0Alpha10Light,
@@ -69,5 +75,33 @@ class AppBorderColors {
     utilitySuccess: GoldPrimitives.p400Light,
     utilityPositiveStrong: GreenPrimitives.p500Light,
     brandCrimsonStrong: CrimsonPrimitives.p300Light,
+  );
+
+  static const neonDark = AppBorderColors(
+    subtle: NeonPrimitives.n200Dark,
+    subtleOpacity: NeonPrimitives.white8,
+    inverseOpacity: NeonPrimitives.black15,
+    regular: NeonPrimitives.n300Dark,
+    medium: NeonPrimitives.n400Dark,
+    strong: NeonPrimitives.n800Dark,
+    utilityDestructive: NeonPrimitives.red,
+    utilityDestructiveSubtle: NeonPrimitives.redDeep,
+    utilitySuccess: GoldPrimitives.p500Dark,
+    utilityPositiveStrong: GreenPrimitives.p300Dark,
+    brandCrimsonStrong: NeonPrimitives.red,
+  );
+
+  static const neonLight = AppBorderColors(
+    subtle: NeonPrimitives.n150Light,
+    subtleOpacity: NeonPrimitives.ink5,
+    inverseOpacity: NeonPrimitives.white8,
+    regular: NeonPrimitives.n200Light,
+    medium: NeonPrimitives.n300Light,
+    strong: NeonPrimitives.n800Light,
+    utilityDestructive: NeonPrimitives.redOnLight,
+    utilityDestructiveSubtle: NeonPrimitives.redSubtleOnLight,
+    utilitySuccess: GoldPrimitives.p400Light,
+    utilityPositiveStrong: GreenPrimitives.p500Light,
+    brandCrimsonStrong: NeonPrimitives.redOnLight,
   );
 }

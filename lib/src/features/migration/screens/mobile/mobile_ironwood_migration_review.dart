@@ -13,7 +13,7 @@ String _mobilePrivateMigrationStartErrorMessage(Object error) {
   }
   if (message.contains('secret storage') ||
       message.contains('unlocked session')) {
-    return 'Unlock Vizor before starting migration.';
+    return 'Unlock Veylor before starting migration.';
   }
   if (message.contains('sync')) {
     return 'Wait for sync to finish, then try again.';
@@ -390,7 +390,6 @@ class _MobileMigrationFastReviewState
                               'Privacy trade-off',
                               style: AppTypography.bodySmall.copyWith(
                                 color: colors.text.homeCard,
-                                fontWeight: FontWeight.w600,
                                 height: 16 / 14,
                                 letterSpacing: -0.06,
                               ),
@@ -423,9 +422,6 @@ class _MobileMigrationFastReviewState
                                               'for Ledger accounts.'
                                         : 'Consider choosing a Private '
                                               'Migration option.',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                    ),
                                   ),
                                 ],
                               ),

@@ -12,6 +12,7 @@ import '../src/core/formatting/zec_amount.dart';
 import '../src/core/layout/mobile/app_mobile_sheet.dart';
 import '../src/core/theme/app_theme.dart';
 import '../src/core/widgets/app_icon.dart';
+import '../src/core/widgets/mobile/neon_horizon.dart';
 import '../src/features/address_scan/widgets/address_qr_scan_modal.dart';
 import '../src/features/address_scan/widgets/mobile_address_scan_card.dart';
 import '../src/features/payment_links/models/gift_card_usage.dart';
@@ -433,11 +434,7 @@ class _PaymentLinkHomeFixture extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PaymentLinksHomeMobileView(
-      illustration: Image.asset(
-        'assets/illustrations/payment_links/payment_link_empty_card.webp',
-        fit: BoxFit.contain,
-        excludeFromSemantics: true,
-      ),
+      illustration: const Center(child: NeonHorizon()),
       onBack: _noop,
       onShowHelp: () => showAppMobileSheet<void>(
         context: context,

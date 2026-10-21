@@ -45,7 +45,7 @@ void main() {
         defaultPixelRatio: 1,
         overrideConfiguration: FigmaCompareConfiguration(
           scenarioId: 'mobile-ledger-shield-home-flow',
-          themeMode: ThemeMode.light,
+          themeMode: ThemeMode.dark,
           logicalSize: shot.size,
           pixelRatio: 1,
           outputPath: output.isEmpty ? '' : '$output/${shot.name}.png',

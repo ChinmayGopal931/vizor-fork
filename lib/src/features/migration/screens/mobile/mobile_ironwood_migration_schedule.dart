@@ -359,7 +359,6 @@ class _MobileMigrationPartScheduleRow extends StatelessWidget {
                         '$number. ${_migrationDisplayZec(part.valueZatoshi)} ZEC ',
                     style: AppTypography.labelLarge.copyWith(
                       color: context.colors.text.accent,
-                      fontWeight: FontWeight.w500,
                     ),
                     children: [
                       TextSpan(
@@ -369,7 +368,6 @@ class _MobileMigrationPartScheduleRow extends StatelessWidget {
                         ),
                         style: AppTypography.labelLarge.copyWith(
                           color: context.colors.text.secondary,
-                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
@@ -520,7 +518,6 @@ class _MobilePreparationRoundSection extends StatelessWidget {
           'Split round $round',
           style: AppTypography.labelLarge.copyWith(
             color: context.colors.text.accent,
-            fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -593,7 +590,6 @@ class _MobilePreparationTransactionCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.labelLarge.copyWith(
                         color: context.colors.text.accent,
-                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
@@ -711,7 +707,6 @@ class _MobilePreparationOutputRow extends StatelessWidget {
             destination,
             style: AppTypography.labelMedium.copyWith(
               color: context.colors.text.secondary,
-              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -929,7 +924,6 @@ class _MobileMigrationFooterRow extends StatelessWidget {
               textAlign: TextAlign.right,
               style: AppTypography.labelLarge.copyWith(
                 color: context.colors.text.primary,
-                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -961,7 +955,7 @@ class _MobileMigrationScheduleError extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.s),
             Text(
-              "Vizor couldn't load the latest schedule. "
+              "Veylor couldn't load the latest schedule. "
               'Your saved migration state is unchanged.',
               textAlign: TextAlign.center,
               style: AppTypography.bodyMedium.copyWith(

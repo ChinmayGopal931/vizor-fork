@@ -18,21 +18,21 @@ class MobileMethodSelectionScreen extends ConsumerWidget {
         ledgerSupportsBluetooth(ref.watch(ledgerTargetPlatformProvider));
     return MobileOnboardingSelectionPage(
       scrollKey: const ValueKey('mobile_method_selection_scroll'),
-      title: 'Import Account\nto Vizor',
+      title: 'Import Account\nto Veylor',
       subtitle: 'Select the method you want.',
       cards: [
         MobileOnboardingSelectionCard(
           key: const ValueKey('mobile_import_passphrase'),
           iconName: AppIcons.key,
           title: 'Import secret passphrase',
-          description: 'Vizor, ZODL, or any other wallet',
+          description: 'Veylor, ZODL, or any other wallet',
           onPressed: () => context.pushOnboarding('/import'),
         ),
         MobileOnboardingSelectionCard(
           key: const ValueKey('mobile_welcome_link_desktop'),
           iconName: AppIcons.monitor,
-          title: 'Link Vizor Desktop',
-          description: 'Scan & connect to Vizor Desktop',
+          title: 'Link Veylor Desktop',
+          description: 'Scan & connect to Veylor Desktop',
           onPressed: () => context.pushOnboarding('/onboarding/link-desktop'),
         ),
         MobileOnboardingSelectionCard(

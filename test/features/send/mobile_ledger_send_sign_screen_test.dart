@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:zcash_wallet/src/features/ledger/services/ledger_device_request.dart';
 import 'package:zcash_wallet/src/features/ledger/services/ledger_device_selection.dart';
 import 'package:zcash_wallet/src/features/ledger/widgets/ledger_procedure.dart';
+import 'package:zcash_wallet/src/features/ledger/widgets/mobile/neon_ledger_step_marker.dart';
 import 'package:flutter/services.dart';
 import 'package:zcash_wallet/src/features/ledger/services/ledger_failure_guidance.dart';
 import 'package:zcash_wallet/src/features/ledger/services/ledger_mobile_ble_service.dart';
@@ -284,11 +285,11 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(
-        find.text('Approved on Ledger. Vizor is finishing the transaction.'),
+        find.text('Approved on Ledger. Veylor is finishing the transaction.'),
         findsOneWidget,
       );
       expect(find.text('Finish transaction'), findsOneWidget);
-      expect(find.text('Keep Vizor open.'), findsOneWidget);
+      expect(find.text('Keep Veylor open.'), findsOneWidget);
       expect(find.text('Keep Ledger connected.'), findsNothing);
       expect(
         find.byWidgetPredicate(
@@ -548,7 +549,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.text(
-          'Keep Vizor open and try again. No new Ledger approval needed.',
+          'Keep Veylor open and try again. No new Ledger approval needed.',
         ),
         findsOneWidget,
       );
@@ -648,7 +649,11 @@ void main() {
         1,
       );
       expect(
-        find.byWidgetPredicate((w) => w is AppIcon && w.name == AppIcons.check),
+        find.byWidgetPredicate(
+          (w) =>
+              w is NeonLedgerStepMarker &&
+              w.progress == LedgerStepProgress.done,
+        ),
         findsOneWidget,
       );
       expect(
@@ -705,7 +710,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       expect(
-        find.text('Approved on Ledger. Vizor is finishing the transaction.'),
+        find.text('Approved on Ledger. Veylor is finishing the transaction.'),
         findsOneWidget,
       );
       expect(service.checkpointCalls, 0);
@@ -1144,7 +1149,7 @@ void main() {
 
     expect(
       find.text(
-        'Keep Vizor open and retry saving. No new Ledger approval needed.',
+        'Keep Veylor open and retry saving. No new Ledger approval needed.',
       ),
       findsOneWidget,
     );
@@ -1326,7 +1331,7 @@ void main() {
 
     expect(
       find.text(
-        'Keep Vizor open and retry saving. No new Ledger approval needed.',
+        'Keep Veylor open and retry saving. No new Ledger approval needed.',
       ),
       findsOneWidget,
     );

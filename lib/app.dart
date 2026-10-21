@@ -35,8 +35,10 @@ import 'src/core/motion/onboarding_motion.dart';
 import 'src/core/security/background_auto_lock_host.dart';
 import 'src/core/theme/app_theme.dart';
 import 'src/core/theme/app_theme_host.dart';
+import 'src/core/theme/gotham_fonts.dart';
 import 'src/core/theme/legacy_material_theme.dart';
 import 'src/core/widgets/mobile/mobile_numeric_keyboard_toolbar.dart';
+import 'src/core/widgets/mobile/unlock_reveal_host.dart';
 import 'src/core/widgets/app_button.dart';
 import 'src/core/widgets/app_icon.dart';
 import 'src/core/widgets/app_toast.dart';
@@ -100,6 +102,10 @@ import 'src/features/payment_links/providers/payment_link_intake_provider.dart';
 import 'src/features/payment_links/providers/gift_claim_flow_provider.dart';
 import 'src/features/payment_links/screens/gift_claim_screen.dart';
 import 'src/features/payment_links/screens/desktop_payment_link_scan_screen.dart';
+import 'src/features/private_usd/models/private_usd_record_key.dart';
+import 'src/features/private_usd/providers/private_usd_available_provider.dart';
+import 'src/features/private_usd/providers/private_usd_unfinished_provider.dart';
+import 'src/features/private_usd/widgets/mobile/private_usd_engine_host.dart';
 import 'src/features/send/screens/payment_request_scan_screen.dart';
 import 'src/features/payment_links/screens/desktop_gift_password_screen.dart';
 import 'src/features/payment_links/screens/desktop_gift_customise_screen.dart';
@@ -205,8 +211,19 @@ void _startVotingObservabilityLogging() {
       );
 }
 
+/// Registers Gotham before the first frame. A missing or unreadable font
+/// falls back to the platform face instead of keeping a wallet from opening.
+Future<void> _registerAppFonts() async {
+  try {
+    await loadGothamFonts();
+  } catch (error) {
+    log('runtime: Gotham unavailable, using the platform font: $error');
+  }
+}
+
 Future<void> initializeZcashWalletRuntime() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await _registerAppFonts();
   await SecureStorageDiagnostics.instance.initialize();
   log('runtime: initializing RustLib');
   await RustLib.init();
@@ -554,6 +571,13 @@ final _routerProvider = Provider<_AppRouter>((ref) {
   ref.listen(swapFeatureEnabledProvider, (_, _) {
     refresh.requestRefresh();
   });
+  ref.listen(privateUsdAvailableProvider, (_, _) {
+    refresh.requestRefresh();
+  });
+  // A conversion under way keeps its progress route reachable.
+  ref.listen(privateUsdUnfinishedProvider, (_, _) {
+    refresh.requestRefresh();
+  });
   log('router: initialized');
 
   final navigatorKey = GlobalKey<NavigatorState>();
@@ -690,6 +714,10 @@ String? appRedirect({
       _isRouteOrChild(state.matchedLocation, '/pay') ||
       _isRouteOrChild(state.matchedLocation, '/activity/swap');
   final swapFeatureEnabled = ref.read(swapFeatureEnabledProvider);
+  // Hardware accounts, accounts without a ZIP-32 index, networks without a
+  // deployment and the kill switch all leave it unavailable, except the
+  // progress of a conversion still under way for the active account.
+  final isPrivateUsd = _isRouteOrChild(state.matchedLocation, '/private-usd');
 
   log(
     'router redirect: location=${state.matchedLocation}, hasWallet=$hasWallet, '
@@ -738,6 +766,19 @@ String? appRedirect({
     return requiresUnlock ? '/unlock' : '/home';
   }
   if (!swapFeatureEnabled && isSwap) return '/home';
+  if (isPrivateUsd && !ref.read(privateUsdAvailableProvider)) {
+    final conversion = PrivateUsdRoutePath.tryParseLocation(
+      state.matchedLocation,
+    );
+    final account = ref.read(accountProvider).value?.activeAccountUuid;
+    final underWay =
+        conversion != null &&
+        account != null &&
+        ref
+            .read(privateUsdUnfinishedProvider)
+            .contains(conversion.keyFor(account));
+    if (!underWay) return '/home';
+  }
   return null;
 }
 
@@ -1844,7 +1885,7 @@ class ZcashWalletApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
-      title: 'Vizor',
+      title: 'Veylor',
       debugShowCheckedModeBanner: false,
       theme: buildLegacyLightTheme(),
       darkTheme: buildLegacyDarkTheme(),
@@ -1903,9 +1944,13 @@ class ZcashWalletApp extends ConsumerWidget {
                                         child: MobileNumericKeyboardToolbar(
                                           child: BackgroundAutoLockHost(
                                             router: router,
-                                            child: AppReviewHost(
-                                              router: router,
-                                              child: child!,
+                                            child: PrivateUsdEngineHost(
+                                              child: AppReviewHost(
+                                                router: router,
+                                                child: UnlockRevealHost(
+                                                  child: child!,
+                                                ),
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -2878,7 +2923,7 @@ class _WindowsUpdatePrompt extends StatelessWidget {
         'Update ${state.availableVersion} available',
       WindowsUpdateStatus.downloading => 'Downloading update',
       WindowsUpdateStatus.ready => 'Update ready',
-      WindowsUpdateStatus.applying => 'Restarting Vizor',
+      WindowsUpdateStatus.applying => 'Restarting Veylor',
       WindowsUpdateStatus.failed => 'Update failed',
       _ => 'Update available',
     };
@@ -2890,7 +2935,7 @@ class _WindowsUpdatePrompt extends StatelessWidget {
       WindowsUpdateStatus.downloading =>
         '${state.downloadProgress}% downloaded.',
       WindowsUpdateStatus.ready => 'Restart when you are ready.',
-      WindowsUpdateStatus.applying => 'Applying after Vizor closes.',
+      WindowsUpdateStatus.applying => 'Applying after Veylor closes.',
       WindowsUpdateStatus.failed =>
         state.message.trim().isEmpty
             ? "Couldn't complete the update. Try again."
@@ -3023,10 +3068,10 @@ class _LinuxUpdateNoticeListener extends ConsumerWidget {
           SnackBar(
             content: Text(
               torEnabled
-                  ? 'Vizor ${update.assetVersion} is available. The release '
-                        'page opens in your browser, outside Vizor’s Tor '
+                  ? 'Veylor ${update.assetVersion} is available. The release '
+                        'page opens in your browser, outside Veylor’s Tor '
                         'connection.'
-                  : 'Vizor ${update.assetVersion} is available.',
+                  : 'Veylor ${update.assetVersion} is available.',
             ),
             duration: const Duration(seconds: 8),
             action: SnackBarAction(

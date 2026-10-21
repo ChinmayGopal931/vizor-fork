@@ -289,6 +289,64 @@ impl<T: hyper::rt::Write + Unpin> hyper::rt::Write for DirectRouteIo<T> {
     }
 }
 
+/// The tokio counterparts of the hyper impls above, for raw tunnels such as
+/// the Railgun bridge's `copy_bidirectional`. Every poll goes through the same
+/// lease, so a Tor enable aborts a tunnel exactly as it aborts a request.
+impl<T: tokio::io::AsyncRead + Unpin> tokio::io::AsyncRead for DirectRouteIo<T> {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        let this = self.as_mut().get_mut();
+        this.route.poll(cx, |cx| {
+            tokio::io::AsyncRead::poll_read(Pin::new(&mut this.inner), cx, buf)
+        })
+    }
+}
+
+impl<T: tokio::io::AsyncWrite + Unpin> tokio::io::AsyncWrite for DirectRouteIo<T> {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let this = self.as_mut().get_mut();
+        this.route.poll(cx, |cx| {
+            tokio::io::AsyncWrite::poll_write(Pin::new(&mut this.inner), cx, buf)
+        })
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        let this = self.as_mut().get_mut();
+        this.route.poll(cx, |cx| {
+            tokio::io::AsyncWrite::poll_flush(Pin::new(&mut this.inner), cx)
+        })
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        let this = self.as_mut().get_mut();
+        this.route.poll(cx, |cx| {
+            tokio::io::AsyncWrite::poll_shutdown(Pin::new(&mut this.inner), cx)
+        })
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        tokio::io::AsyncWrite::is_write_vectored(&self.inner)
+    }
+
+    fn poll_write_vectored(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        let this = self.as_mut().get_mut();
+        this.route.poll(cx, |cx| {
+            tokio::io::AsyncWrite::poll_write_vectored(Pin::new(&mut this.inner), cx, bufs)
+        })
+    }
+}
+
 /// Reports the wrapped connection's metadata unchanged.
 ///
 /// The route lease governs when the connection may be polled, not what it is

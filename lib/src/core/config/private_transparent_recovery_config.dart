@@ -9,7 +9,7 @@ const kPrivateQueriesSettingsCopy =
 /// Appended on iOS: background migration tracking cannot run privately, so
 /// it stays off while private queries is on.
 const kPrivateQueriesIosMigrationCopy =
-    'While on, migration confirmations are checked only when Vizor is open.';
+    'While on, migration confirmations are checked only when Veylor is open.';
 
 /// The private queries description for mobile settings on [platform].
 String privateQueriesMobileSettingsCopy(TargetPlatform platform) =>

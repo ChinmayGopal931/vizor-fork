@@ -9,10 +9,6 @@ const mobileDestinations = <({String path, AppMobileTabItem item})>[
     item: AppMobileTabItem(iconName: AppIcons.home, label: 'Home'),
   ),
   (
-    path: '/swap',
-    item: AppMobileTabItem(iconName: AppIcons.swapArrows, label: 'Swap'),
-  ),
-  (
     path: '/activity',
     item: AppMobileTabItem(iconName: AppIcons.history, label: 'Activity'),
   ),
@@ -38,6 +34,8 @@ bool hasMobileWalletSidebar(String path) => const [
   '/migration',
   '/about',
   '/setup/backup',
+  '/private-usd',
+  '/portfolio-chart',
 ].any((root) => path == root || path.startsWith('$root/'));
 
 /// Stateful flows must publish their current exit permission. Unknown/new
@@ -52,6 +50,8 @@ bool requiresMobileSidebarExitPolicy(String path) =>
           '/receive',
           '/about',
           '/voting',
+          '/private-usd',
+          '/portfolio-chart',
         ].contains(path) ||
         path.startsWith('/activity/') ||
         RegExp(r'^/voting/poll/[^/]+/results$').hasMatch(path) ||

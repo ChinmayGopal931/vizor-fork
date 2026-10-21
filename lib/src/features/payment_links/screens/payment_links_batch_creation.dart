@@ -70,9 +70,9 @@ mixin _PaymentLinksBatchCreation on ConsumerState<PaymentLinksScreen> {
 
   String? get _batchErrorText => switch (_batchSubmission) {
     _BatchUncertain() =>
-      'Vizor couldn’t confirm the payment was sent. Check this group in Gift Cards before creating another.',
+      'Veylor couldn’t confirm the payment was sent. Check this group in Gift Cards before creating another.',
     _BatchUnsaved() =>
-      'Funding was sent, but the cards could not be saved. Try again before closing Vizor.',
+      'Funding was sent, but the cards could not be saved. Try again before closing Veylor.',
     _ => switch (_batchQuote) {
       _BatchQuoteReady(:final problem) => problem,
       _BatchQuoteFailed(:final message) => message,

@@ -262,10 +262,13 @@ class _IronwoodMigrationImmediateReviewContentState
               ],
             ),
           ),
+          // Figma: 230 px column at left 95. Gotham's "Consider another
+          // option" label overflowed it by 4.7 px, so it is 240 px at left 90
+          // (still centred in the 420 px frame).
           Positioned(
-            left: 95,
+            left: 90,
             top: 540,
-            width: 230,
+            width: 240,
             child: Column(
               children: [
                 AppButton(
@@ -274,7 +277,7 @@ class _IronwoodMigrationImmediateReviewContentState
                       : () => context.go('/migration/options'),
                   variant: AppButtonVariant.ghost,
                   height: 44,
-                  minWidth: 230,
+                  minWidth: 240,
                   expand: true,
                   leading: const AppIcon(AppIcons.chevronBackward, size: 18),
                   child: Text(
@@ -297,7 +300,7 @@ class _IronwoodMigrationImmediateReviewContentState
                       ? AppButtonVariant.primary
                       : AppButtonVariant.destructive,
                   height: 44,
-                  minWidth: 230,
+                  minWidth: 240,
                   expand: true,
                   leading: _isBroadcasting
                       ? const AppIcon(

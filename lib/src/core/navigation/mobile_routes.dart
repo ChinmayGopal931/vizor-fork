@@ -28,6 +28,17 @@ import '../../features/pay/screens/mobile/mobile_pay_submitted_screen.dart';
 import '../../features/pay/models/pay_recent_recipients.dart';
 import '../../features/payment_links/providers/payment_link_cards_provider.dart';
 import '../../features/payment_links/screens/payment_links_screen.dart';
+import '../../features/private_usd/models/private_usd_record_key.dart';
+import '../../features/private_usd/models/private_usd_send.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_conversion_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_convert_review_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_convert_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_refunds_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_reverse_conversion_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_send_review_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_send_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_send_status_screen.dart';
 import '../../features/receive/screens/mobile/mobile_receive_screen.dart';
 import '../../features/address_book/screens/mobile/mobile_address_book_screen.dart';
 import '../../features/activity/screens/mobile/mobile_swap_activity_detail_screen.dart';
@@ -50,6 +61,7 @@ import '../../features/send/screens/mobile/mobile_send_screen.dart';
 import '../../features/send/screens/mobile/mobile_send_status_screen.dart';
 import '../../rust/api/sync.dart' as rust_sync;
 import '../../features/about/screens/mobile/mobile_about_screens.dart';
+import '../../features/portfolio_chart/screens/mobile/mobile_portfolio_chart_screen.dart';
 import '../../features/settings/screens/mobile/mobile_change_passcode_screen.dart';
 import '../../features/settings/screens/mobile/mobile_endpoint_screen.dart';
 import '../../features/settings/screens/mobile/mobile_explorer_screen.dart';
@@ -58,7 +70,6 @@ import '../../features/settings/screens/mobile/mobile_settings_screen.dart';
 import '../../features/settings/screens/mobile/mobile_viewing_key_screen.dart';
 import '../../features/swap/screens/mobile/mobile_swap_screen.dart';
 import '../../features/voting/screens/mobile/mobile_voting_screens.dart';
-import '../config/swap_feature_config.dart';
 import '../layout/mobile/app_mobile_shell.dart';
 import '../layout/mobile/mobile_adaptive_frame.dart';
 import '../layout/mobile/app_mobile_tab_bar.dart';
@@ -70,7 +81,7 @@ import 'payload_page_key.dart';
 import 'mobile_shield_page.dart';
 
 /// The mobile route tree: the shared entry/onboarding routes, a
-/// stateful tab shell (home / swap / activity / settings), and
+/// stateful tab shell (home / activity / settings), and
 /// full-screen flows pushed over the shell as [CupertinoPage]s so iOS
 /// edge-swipe back works.
 ///
@@ -301,6 +312,13 @@ List<RouteBase> _walletRoutes() {
         return _mobilePage(key: state.pageKey, child: child);
       },
     ),
+    // Swap opens from Home's Swap button, over the tabs, as Pay does; the
+    // tab bar and the sidebar keep Home, Activity and Settings.
+    GoRoute(
+      path: '/swap',
+      pageBuilder: (context, state) =>
+          _mobilePage(key: state.pageKey, child: const MobileSwapScreen()),
+    ),
     GoRoute(
       path: '/swap/review',
       pageBuilder: (context, state) => _mobilePage(
@@ -357,6 +375,125 @@ List<RouteBase> _walletRoutes() {
           intentId: state.pathParameters['intentId'] ?? '',
         ),
       ),
+    ),
+    // Private USD. The shared redirect sends these routes home while Private
+    // USD is unavailable, except a conversion's progress while that
+    // conversion is unfinished.
+    GoRoute(
+      path: '/private-usd',
+      pageBuilder: (context, state) => _mobilePage(
+        key: state.pageKey,
+        child: const MobilePrivateUsdScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/private-usd/convert',
+      // `?to=zec` opens the reverse direction (private USD → ZEC).
+      pageBuilder: (context, state) => _mobilePage(
+        key: state.pageKey,
+        child: MobilePrivateUsdConvertScreen(
+          initialDirection: state.uri.queryParameters['to'] == 'zec'
+              ? PrivateUsdDirection.reverse
+              : PrivateUsdDirection.forward,
+        ),
+      ),
+    ),
+    // Send and Withdraw: one screen per mode, its review, and the status
+    // while it proves and posts.
+    GoRoute(
+      path: '/private-usd/send',
+      pageBuilder: (context, state) => _mobilePage(
+        key: state.pageKey,
+        child: const MobilePrivateUsdSendScreen(
+          mode: PrivateUsdSendMode.private,
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/private-usd/withdraw',
+      pageBuilder: (context, state) => _mobilePage(
+        key: state.pageKey,
+        child: const MobilePrivateUsdSendScreen(
+          mode: PrivateUsdSendMode.withdraw,
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/private-usd/send/review',
+      pageBuilder: (context, state) => _mobilePage(
+        key: state.pageKey,
+        child: const MobilePrivateUsdSendReviewScreen(
+          mode: PrivateUsdSendMode.private,
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/private-usd/withdraw/review',
+      pageBuilder: (context, state) => _mobilePage(
+        key: state.pageKey,
+        child: const MobilePrivateUsdSendReviewScreen(
+          mode: PrivateUsdSendMode.withdraw,
+        ),
+      ),
+    ),
+    GoRoute(
+      path: '/private-usd/send/status',
+      redirect: (_, state) =>
+          state.extra is PrivateUsdSendMode ? null : '/private-usd',
+      // `extra` does not survive a lock (the trip to /unlock and back), and
+      // the navigator rebuilds every page in its stack then; never assume it.
+      pageBuilder: (context, state) {
+        final mode = state.extra;
+        return _mobilePage(
+          key: state.pageKey,
+          child: mode is PrivateUsdSendMode
+              ? MobilePrivateUsdSendStatusScreen(mode: mode)
+              : const MobilePrivateUsdScreen(),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/private-usd/refunds',
+      pageBuilder: (context, state) => _mobilePage(
+        key: state.pageKey,
+        child: const MobilePrivateUsdRefundsScreen(),
+      ),
+    ),
+    GoRoute(
+      path: '/private-usd/convert/review',
+      redirect: (_, state) =>
+          state.extra is PrivateUsdReviewArgs ? null : '/private-usd/convert',
+      // As for the send status: after a lock the review has lost its quote
+      // (quotes are dropped on lock), so it starts over.
+      pageBuilder: (context, state) {
+        final args = state.extra;
+        return _mobilePage(
+          key: state.pageKey,
+          child: args is PrivateUsdReviewArgs
+              ? MobilePrivateUsdConvertReviewScreen(args: args)
+              : const MobilePrivateUsdConvertScreen(
+                  initialDirection: PrivateUsdDirection.forward,
+                ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/private-usd/conversion/:direction/:index',
+      // The key is in the path, so a cold start, the banner and a deep link
+      // all open it, in either direction.
+      redirect: (_, state) =>
+          PrivateUsdRoutePath.tryParse(state.pathParameters) == null
+          ? '/private-usd'
+          : null,
+      pageBuilder: (context, state) {
+        final path = PrivateUsdRoutePath.tryParse(state.pathParameters)!;
+        return _mobilePage(
+          key: state.pageKey,
+          child: path.direction == PrivateUsdDirection.reverse
+              ? MobilePrivateUsdReverseConversionScreen(path: path)
+              : MobilePrivateUsdConversionScreen(path: path),
+        );
+      },
     ),
     GoRoute(
       path: '/pay',
@@ -711,6 +848,13 @@ List<RouteBase> _walletRoutes() {
       ),
     ),
     GoRoute(
+      path: '/portfolio-chart',
+      pageBuilder: (context, state) => _mobilePage(
+        key: state.pageKey,
+        child: const MobilePortfolioChartScreen(),
+      ),
+    ),
+    GoRoute(
       path: '/about',
       pageBuilder: (context, state) =>
           _mobilePage(key: state.pageKey, child: const MobileAboutScreen()),
@@ -753,7 +897,6 @@ final List<_MobileTab> _allMobileTabs = [
       item: mobileDestinations[i].item,
       screen: switch (mobileDestinations[i].path) {
         '/home' => const MobileHomeScreen(),
-        '/swap' => const MobileSwapScreen(),
         '/activity' => const MobileActivityScreen(),
         '/settings' => const MobileSettingsScreen(),
         _ => throw StateError('Missing mobile destination screen'),
@@ -809,20 +952,11 @@ class _MobileTabShellState extends ConsumerState<_MobileTabShell> {
     final tabs = widget.tabs;
     final navigationShell = widget.navigationShell;
 
-    final swapFeatureEnabled = ref.watch(swapFeatureEnabledProvider);
-    final visibleTabs = [
-      for (final tab in tabs)
-        if (swapFeatureEnabled || tab.path != '/swap') tab,
-    ];
     final currentBranchIndex = navigationShell.currentIndex;
-    final currentTab =
+    final tabBarCurrentIndex =
         currentBranchIndex >= 0 && currentBranchIndex < tabs.length
-        ? tabs[currentBranchIndex]
-        : tabs.first;
-    final currentVisibleIndex = visibleTabs.indexOf(currentTab);
-    final tabBarCurrentIndex = currentVisibleIndex < 0
-        ? 0
-        : currentVisibleIndex;
+        ? currentBranchIndex
+        : 0;
 
     return AppMobileShell(
       body: navigationShell,
@@ -832,10 +966,10 @@ class _MobileTabShellState extends ConsumerState<_MobileTabShell> {
                 MobileNavigationMode.systemSideTabs
             ? Axis.vertical
             : Axis.horizontal,
-        items: [for (final tab in visibleTabs) tab.item],
+        items: [for (final tab in tabs) tab.item],
         currentIndex: tabBarCurrentIndex,
         onSelect: (index) {
-          _selectPath(visibleTabs[index].path);
+          _selectPath(tabs[index].path);
         },
       ),
     );

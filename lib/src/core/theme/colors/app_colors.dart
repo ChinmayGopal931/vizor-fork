@@ -1,3 +1,4 @@
+import '../../layout/app_form_factor.dart';
 import 'app_background_colors.dart';
 import 'app_border_colors.dart';
 import 'app_button_colors.dart';
@@ -5,6 +6,7 @@ import 'app_fade_colors.dart';
 import 'app_icon_colors.dart';
 import 'app_macos_utility_colors.dart';
 import 'app_nav_panel_colors.dart';
+import 'app_neon_colors.dart';
 import 'app_shadow_colors.dart';
 import 'app_state_colors.dart';
 import 'app_surface_colors.dart';
@@ -18,11 +20,14 @@ export 'app_fade_colors.dart';
 export 'app_icon_colors.dart';
 export 'app_macos_utility_colors.dart';
 export 'app_nav_panel_colors.dart';
+export 'app_neon_colors.dart';
 export 'app_shadow_colors.dart';
 export 'app_state_colors.dart';
 export 'app_surface_colors.dart';
 export 'app_sync_colors.dart';
 export 'app_text_colors.dart';
+
+const _mobile = kAppFormFactor == AppFormFactor.mobile;
 
 /// Aggregated semantic color palette for the app. Sourced from the Zcash
 /// design system Figma spec; organized into semantic categories that mirror
@@ -45,6 +50,7 @@ class AppColors {
     required this.shadows,
     required this.sync,
     required this.macosUtility,
+    required this.neon,
   });
 
   final AppBackgroundColors background;
@@ -59,34 +65,76 @@ class AppColors {
   final AppShadowColors shadows;
   final AppSyncColors sync;
   final AppMacosUtilityColors macosUtility;
+  final AppNeonColors neon;
 
-  static const dark = AppColors(
-    background: AppBackgroundColors.dark,
-    surface: AppSurfaceColors.dark,
-    border: AppBorderColors.dark,
-    text: AppTextColors.dark,
-    icon: AppIconColors.dark,
-    button: AppButtonColors.dark,
-    state: AppStateColors.dark,
-    fade: AppFadeColors.dark,
-    navPanel: AppNavPanelColors.dark,
-    shadows: AppShadowColors.dark,
-    sync: AppSyncColors.dark,
-    macosUtility: AppMacosUtilityColors.dark,
+  /// The Figma sets on desktop builds, the neon sets on mobile builds. Every
+  /// colour group selects the same way. Tests that must pin one design
+  /// regardless of lane read the named sets below.
+  static const dark = _mobile ? neonDark : figmaDark;
+  static const light = _mobile ? neonLight : figmaLight;
+
+  static const figmaDark = AppColors(
+    background: AppBackgroundColors.figmaDark,
+    surface: AppSurfaceColors.figmaDark,
+    border: AppBorderColors.figmaDark,
+    text: AppTextColors.figmaDark,
+    icon: AppIconColors.figmaDark,
+    button: AppButtonColors.figmaDark,
+    state: AppStateColors.figmaDark,
+    fade: AppFadeColors.figmaDark,
+    navPanel: AppNavPanelColors.figmaDark,
+    shadows: AppShadowColors.figmaDark,
+    sync: AppSyncColors.figmaDark,
+    macosUtility: AppMacosUtilityColors.figmaDark,
+    neon: AppNeonColors.figmaDark,
   );
 
-  static const light = AppColors(
-    background: AppBackgroundColors.light,
-    surface: AppSurfaceColors.light,
-    border: AppBorderColors.light,
-    text: AppTextColors.light,
-    icon: AppIconColors.light,
-    button: AppButtonColors.light,
-    state: AppStateColors.light,
-    fade: AppFadeColors.light,
-    navPanel: AppNavPanelColors.light,
-    shadows: AppShadowColors.light,
-    sync: AppSyncColors.light,
-    macosUtility: AppMacosUtilityColors.light,
+  static const figmaLight = AppColors(
+    background: AppBackgroundColors.figmaLight,
+    surface: AppSurfaceColors.figmaLight,
+    border: AppBorderColors.figmaLight,
+    text: AppTextColors.figmaLight,
+    icon: AppIconColors.figmaLight,
+    button: AppButtonColors.figmaLight,
+    state: AppStateColors.figmaLight,
+    fade: AppFadeColors.figmaLight,
+    navPanel: AppNavPanelColors.figmaLight,
+    shadows: AppShadowColors.figmaLight,
+    sync: AppSyncColors.figmaLight,
+    macosUtility: AppMacosUtilityColors.figmaLight,
+    neon: AppNeonColors.figmaLight,
+  );
+
+  /// Veylor's mobile look: true black, neon red, white light.
+  static const neonDark = AppColors(
+    background: AppBackgroundColors.neonDark,
+    surface: AppSurfaceColors.neonDark,
+    border: AppBorderColors.neonDark,
+    text: AppTextColors.neonDark,
+    icon: AppIconColors.neonDark,
+    button: AppButtonColors.neonDark,
+    state: AppStateColors.neonDark,
+    fade: AppFadeColors.neonDark,
+    navPanel: AppNavPanelColors.neonDark,
+    shadows: AppShadowColors.neonDark,
+    sync: AppSyncColors.neonDark,
+    macosUtility: AppMacosUtilityColors.neonDark,
+    neon: AppNeonColors.neonDark,
+  );
+
+  static const neonLight = AppColors(
+    background: AppBackgroundColors.neonLight,
+    surface: AppSurfaceColors.neonLight,
+    border: AppBorderColors.neonLight,
+    text: AppTextColors.neonLight,
+    icon: AppIconColors.neonLight,
+    button: AppButtonColors.neonLight,
+    state: AppStateColors.neonLight,
+    fade: AppFadeColors.neonLight,
+    navPanel: AppNavPanelColors.neonLight,
+    shadows: AppShadowColors.neonLight,
+    sync: AppSyncColors.neonLight,
+    macosUtility: AppMacosUtilityColors.neonLight,
+    neon: AppNeonColors.neonLight,
   );
 }
