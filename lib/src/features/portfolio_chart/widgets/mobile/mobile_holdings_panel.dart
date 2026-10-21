@@ -13,14 +13,17 @@ import '../../../../providers/privacy_mode_provider.dart';
 import '../../../../providers/sync_provider.dart';
 import '../../../../providers/zec_price_change_provider.dart';
 import '../../../../rust/api/sync.dart' as rust_sync;
+import '../../../private_usd/models/private_usd_balances.dart';
+import '../../../private_usd/private_usd_copy.dart';
 import '../../../private_usd/providers/private_usd_available_provider.dart';
+import '../../../private_usd/providers/private_usd_balance_provider.dart';
 import '../../../private_usd/widgets/mobile/private_usd_home_strip.dart';
 import '../../../send/services/send_amount_conversion.dart';
 import '../../models/zec_pool_holdings.dart';
 
-/// The full chart page's holdings: the active account's ZEC in each pool, the
-/// shielded total the Home balance shows, and Private USD where the account
-/// has it.
+/// The full chart page's holdings: the active account's shielded ZEC in each
+/// pool and Private USD (shielded too, on Ethereum) where the account has it,
+/// their total, then the transparent ZEC.
 class MobileHoldingsPanel extends ConsumerWidget {
   const MobileHoldingsPanel({super.key});
 
@@ -38,18 +41,30 @@ class MobileHoldingsPanel extends ConsumerWidget {
       ),
     );
     final privacyModeEnabled = ref.watch(privacyModeProvider);
+    // Gated as Home gates its strip.
+    final privateUsdAccount =
+        accountUuid != null && ref.watch(privateUsdAvailableProvider)
+        ? accountUuid
+        : null;
     return MobileHoldingsPanelView(
       holdings: holdings,
       privacyModeEnabled: privacyModeEnabled,
       zecUsdUnitPrice: ref.watch(zecHomeUsdUnitPriceProvider),
-      // Gated as Home gates its strip.
-      privateUsd: accountUuid != null && ref.watch(privateUsdAvailableProvider)
-          ? PrivateUsdHomeStrip(
-              accountUuid: accountUuid,
+      privateUsd: privateUsdAccount == null
+          ? null
+          : PrivateUsdHomeStrip(
+              accountUuid: privateUsdAccount,
               privacyModeEnabled: privacyModeEnabled,
+              caption: PrivateUsdCopy.holdingsShieldedOnEthereum,
               onTap: () => context.push('/private-usd'),
-            )
-          : null,
+            ),
+      privateUsdDollars: privateUsdAccount == null
+          ? null
+          : ref.watch(
+              privateUsdBalanceProvider(
+                privateUsdAccount,
+              ).select((state) => state.balances?.spendable),
+            ),
     );
   }
 }
@@ -65,6 +80,7 @@ class MobileHoldingsPanelView extends StatelessWidget {
     required this.privacyModeEnabled,
     this.zecUsdUnitPrice,
     this.privateUsd,
+    this.privateUsdDollars,
     super.key,
   });
 
@@ -76,6 +92,10 @@ class MobileHoldingsPanelView extends StatelessWidget {
 
   /// The Private USD row, present only while Private USD is available.
   final Widget? privateUsd;
+
+  /// What the Private USD row reads, in micro-dollars, for the shielded
+  /// total; null while it is not known, or without Private USD.
+  final BigInt? privateUsdDollars;
 
   /// Shown for an amount that has not been read yet.
   static const _unknown = '—';
@@ -111,6 +131,27 @@ class MobileHoldingsPanelView extends StatelessWidget {
         : compact;
   }
 
+  /// `$1,250.40`, masked in privacy mode.
+  String _dollars(BigInt microDollars) => hideAmountIfPrivacyMode(
+    formatPrivateUsd(microDollars),
+    privacyModeEnabled: privacyModeEnabled,
+    denomination: '',
+  );
+
+  /// The shielded ZEC, with Private USD where it is known: in dollars at
+  /// Home's price, or as both amounts without one.
+  String _shieldedTotal(BigInt zatoshi) {
+    final dollars = privateUsdDollars;
+    if (!holdings.hasBalance) return _unknown;
+    if (dollars == null) return _zec(zatoshi);
+    final price = zecUsdUnitPrice;
+    if (price == null) return '${_zec(zatoshi)} + ${_dollars(dollars)}';
+    final zecDollars = BigInt.from(
+      (zatoshi.toDouble() / zatoshiPerZec.toDouble() * price * 1e6).round(),
+    );
+    return _dollars(zecDollars + dollars);
+  }
+
   Widget _poolRow(String id, String name, ShieldedPoolHoldings pool) {
     return _HoldingsRow(
       id: id,
@@ -144,6 +185,18 @@ class MobileHoldingsPanelView extends StatelessWidget {
           _poolRow('ironwood', 'Ironwood', holdings.ironwood),
           _poolRow('orchard', 'Orchard', holdings.orchard),
           _poolRow('sapling', 'Sapling', holdings.sapling),
+          ?privateUsd,
+          const _Rule(),
+          _HoldingsRow(
+            id: 'shielded_total',
+            label: 'Total shielded',
+            amount: _shieldedTotal(shielded.total),
+            pending: _pending(shielded.pending),
+            // A total with dollars in it already reads in dollars.
+            usd: privateUsdDollars == null ? _usd(shielded.total) : null,
+            emphasized: true,
+          ),
+          const _Rule(),
           _HoldingsRow(
             id: 'transparent',
             label: 'Transparent',
@@ -162,16 +215,6 @@ class MobileHoldingsPanelView extends StatelessWidget {
                 transparentCurrent &&
                 transparentAmount == BigInt.zero,
           ),
-          const _Rule(),
-          _HoldingsRow(
-            id: 'shielded_total',
-            label: 'Total shielded',
-            amount: _amount(shielded.total),
-            pending: _pending(shielded.pending),
-            usd: _usd(shielded.total),
-            emphasized: true,
-          ),
-          if (privateUsd != null) ...[const _Rule(), privateUsd],
         ],
       ),
     );
@@ -217,7 +260,7 @@ class _HudHead extends StatelessWidget {
   }
 }
 
-/// A faint rule between the pools, the total and Private USD.
+/// A faint rule around the shielded total.
 class _Rule extends StatelessWidget {
   const _Rule();
 

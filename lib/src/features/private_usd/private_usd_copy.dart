@@ -183,6 +183,9 @@ abstract final class PrivateUsdCopy {
   static const activitySent = 'Sent privately';
   static const activityWithdrew = 'Withdrew';
   static const activityReceived = 'Received privately';
+
+  /// Private USD's line among the holdings: shielded, but on Ethereum.
+  static const holdingsShieldedOnEthereum = 'Shielded on Ethereum';
   static String activityDetail(String a, String b) => '$a · $b';
   static String activityTo(String address) => 'to $address';
   static String activityFrom(String address) => 'from $address';

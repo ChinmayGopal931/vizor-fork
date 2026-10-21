@@ -205,9 +205,11 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   (`NeonPlotPainter`). Toggling the eye re-encrypts the digits
   (`NeonScrambleText`). Tapping the sign opens the full chart at
   `/portfolio-chart` (`MobilePortfolioChartScreen`), with the holdings
-  under it (`MobileHoldingsPanel`: Ironwood, Orchard, Sapling and
-  transparent ZEC with what is pending, the shielded total, and Private
-  USD); a hidden chart (off, or no history) leaves the sign inert. The
+  under it (`MobileHoldingsPanel`: the shielded holdings, Ironwood,
+  Orchard and Sapling ZEC and Private USD "shielded on Ethereum", then
+  their total, in dollars at Home's price once Private USD is in it, then
+  the transparent ZEC, each with what is pending); a hidden chart (off, or
+  no history) leaves the sign inert. The
   account sits in the top-left
   corner as a portrait only: a tap decrypts the name beside it for a few
   seconds, a second tap (or a long press) opens the account switcher, and

@@ -2111,6 +2111,15 @@ M8 status (2026-10-14): the non-device parts are done.
   - Unit tests: the page's `received.test.mjs` (3); in Dart, the parsing,
     the balance provider and the row, with both lanes' Private USD tests
     (138 and 400 passed, every mobile Figma scenario included).
+
+- **D-141 (owner, 2026-10-21): Private USD counts in the total shielded.**
+  The chart page's holdings list Private USD with the shielded pools,
+  captioned "Shielded on Ethereum" (the Home strip with a caption in place
+  of its ZEC worth). The total under them adds its headline amount (what
+  the row reads, `spendable`) to the shielded ZEC: in dollars at Home's
+  price, or "X ZEC + $Y" without one, and as before while Private USD is
+  unknown or unavailable. The transparent ZEC moved under the total, as it
+  is not part of it. Home's balance sign is unchanged (ZEC).
   - Not yet seen clearing a stuck send on a phone.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
