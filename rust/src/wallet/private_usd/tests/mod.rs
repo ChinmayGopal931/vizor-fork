@@ -4,8 +4,8 @@
 //! against the regtest stack, `forward` the forward conversion's fund-safety
 //! tests on the `fakes`, `lifecycle` the account deletion and drain guards,
 //! `reverse` the reverse conversion's fund-safety tests and its funding
-//! calldata, and `sends` the send log's keep-before-post, guard and
-//! settlement.
+//! calldata, `sends` the send log's keep-before-post, guard and settlement,
+//! and `windows` the reveal decisions against zecSwap's port oracle.
 
 use serde_json::Value;
 use zecswap_core::{
@@ -26,6 +26,7 @@ mod joint;
 mod lifecycle;
 mod reverse;
 mod sends;
+mod windows;
 
 fn vectors() -> Value {
     serde_json::from_str(include_str!("vectors.json")).unwrap()
@@ -215,17 +216,12 @@ fn swap_keys_notes_ids_and_eip712_match_zecswap() {
     }
     let (own_note, railgun_note) = (commitments[0], commitments[1]);
 
-    // EIP-712, signed by the swap's auth key.
+    // EIP-712, signed by the swap's auth key. The windows contract keeps
+    // these digests; it has no locks to sign for.
     let domain = Domain {
         chain_id: inputs["chainId"].as_u64().unwrap(),
         contract: bytes(&inputs["contract"]),
     };
-    let lock = domain.lock_claim(&id, deadline);
-    assert_eq!(hex0x(&lock), text(&vector["lockClaimDigest"]));
-    assert_eq!(
-        hex0x(&keys.auth.sign(&lock)),
-        text(&vector["lockClaimSignature"])
-    );
     let payout = domain.payout(&id, &relayer, fee);
     assert_eq!(hex0x(&payout), text(&vector["payoutDigest"]));
     assert_eq!(
@@ -250,10 +246,6 @@ fn swap_keys_notes_ids_and_eip712_match_zecswap() {
     for (digest, signature) in [
         (domain.open_reverse(&open), "openReverseSignature"),
         (domain.ready(&reverse_id, deadline), "readySignature"),
-        (
-            domain.lock_refund(&reverse_id, deadline),
-            "lockRefundSignature",
-        ),
         (
             domain.refund_payout(&reverse_id, &relayer, fee),
             "refundPayoutSignature",

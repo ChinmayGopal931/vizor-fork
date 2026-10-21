@@ -1,6 +1,7 @@
 //! `swaps.db`: the swap-index counter, swap records, active pointers, the
 //! joint-account index, the Railgun send log, and since schema 2 the deposits
-//! and each account's last deposit scan.
+//! and each account's last deposit scan. Since schema 3 records follow the
+//! windows contract.
 //!
 //! A plain SQLite file in app-private storage, opened per call (WAL,
 //! `synchronous = FULL`, a busy timeout), migrated by `PRAGMA user_version`.
@@ -19,10 +20,11 @@ use super::models::{Direction, StoredRecord};
 use super::{fail, ErrorCode, PrivateUsdError, Result};
 
 const FILE_NAME: &str = "swaps.db";
-/// 1: swaps, the send log and the joint accounts. 2: deposits. A build that
-/// knows only 1 refuses a store at 2 as newer than itself, never resetting
-/// it.
-const SCHEMA_VERSION: i32 = 2;
+/// 1: swaps, the send log and the joint accounts. 2: deposits. 3: records of
+/// the windows contract, which a build of the lock contract's would drive by
+/// the wrong rules: it refuses the store as newer. A build refuses a store
+/// newer than itself, never resetting it.
+const SCHEMA_VERSION: i32 = 3;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// Finished records kept per direction. Reverse `REFUNDED` ones are kept
 /// beyond it: a rescue may still be possible.
@@ -219,10 +221,13 @@ impl SwapStore {
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
-            // 1 → 2: the deposits tables join; every row already kept stays
-            // as it was.
-            1 => {
-                tx.execute_batch(SCHEMA_V2).map_err(sql)?;
+            // 1 → 2: the deposits tables join. 2 → 3 changes no table: the
+            // lock contract's records stay as they were, read and never
+            // driven.
+            1 | 2 => {
+                if version == 1 {
+                    tx.execute_batch(SCHEMA_V2).map_err(sql)?;
+                }
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
@@ -483,6 +488,36 @@ impl SwapStore {
             .optional()
             .map_err(sql)?;
         Ok(updated.map(|seconds| u64::try_from(seconds).unwrap_or_default()))
+    }
+
+    /// The account's conversions under way, read: forward unfinished,
+    /// reverse unfinished and past its quote.
+    pub(crate) fn unfinished(&self, account: &str) -> Result<Vec<StoredRecord>> {
+        let mut statement = self
+            .conn
+            .prepare(
+                "SELECT direction, swap_index, record_json FROM swaps
+                 WHERE account_uuid = ?1 AND finished = 0
+                   AND NOT (direction = 'reverse' AND phase = 'QUOTED')
+                 ORDER BY direction, swap_index",
+            )
+            .map_err(sql)?;
+        let rows = statement
+            .query_map([account], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            })
+            .map_err(sql)?;
+        rows.map(|row| {
+            let (direction, index, json) = row.map_err(sql)?;
+            let direction = Direction::parse(&direction)
+                .ok_or_else(|| unreadable("unknown record direction"))?;
+            decode(direction, index, &json)
+        })
+        .collect()
     }
 
     /// Conversions under way: forward unfinished, reverse unfinished and past
@@ -1055,11 +1090,11 @@ mod tests {
         assert_eq!(store.take_index(ACCOUNT).unwrap(), next + 1);
     }
 
-    /// A store schema 1 wrote opens at schema 2: the deposits tables join,
+    /// A store schema 1 wrote opens at schema 3: the deposits tables join,
     /// and every record, the counter, the active pointer and the send log
     /// stay as they were.
     #[test]
-    fn a_version_1_store_migrates_to_2_keeping_its_records() {
+    fn a_version_1_store_migrates_keeping_its_records() {
         let dir = tempfile::tempdir().unwrap();
         let conn = Connection::open(dir.path().join(FILE_NAME)).unwrap();
         conn.execute_batch(SCHEMA).unwrap();
@@ -1096,7 +1131,7 @@ mod tests {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
         assert_eq!(version, SCHEMA_VERSION);
-        assert_eq!(SCHEMA_VERSION, 2);
+        assert_eq!(SCHEMA_VERSION, 3);
         assert_eq!(
             store.active(ACCOUNT, Direction::Forward).unwrap(),
             Some(StoredRecord::Forward(Box::new(forward(&json))))
@@ -1131,6 +1166,39 @@ mod tests {
             store.active(ACCOUNT, Direction::Forward).unwrap(),
             Some(StoredRecord::Forward(Box::new(forward(&json))))
         );
+    }
+
+    /// A store schema 2 wrote, with the lock contract's records, opens at
+    /// schema 3 with every record as it was: still read strictly, refund
+    /// locks included, and never dropped.
+    #[test]
+    fn a_version_2_store_keeps_the_lock_contracts_records() {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = Connection::open(dir.path().join(FILE_NAME)).unwrap();
+        conn.execute_batch(SCHEMA).unwrap();
+        conn.execute_batch(SCHEMA_V2).unwrap();
+        conn.pragma_update(None, "user_version", 2).unwrap();
+        let refunded = reverse_states().pop().unwrap();
+        assert!(refunded.contains(r#""refundLock""#));
+        conn.execute(
+            "INSERT INTO swaps(account_uuid, direction, swap_index, deployment, swap_id, phase,
+                               finished, record_json, updated_at)
+             VALUES (?1, 'reverse', 4, 'testnet', ?2, 'REFUNDED', 1, ?3, 1790000000)",
+            params![ACCOUNT, hex(32, 0x5c), refunded],
+        )
+        .unwrap();
+        drop(conn);
+
+        let store = SwapStore::open(dir.path()).unwrap();
+        let version: i32 = store
+            .conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 3);
+        let kept = store.history(ACCOUNT, Direction::Reverse).unwrap();
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].to_json().unwrap(), refunded);
+        assert!(store.unfinished(ACCOUNT).unwrap().is_empty());
     }
 
     #[test]

@@ -90,8 +90,8 @@ tendermint = "0.40.4"
 tendermint-light-client-verifier = "0.40.4"
 
 # Private USD. One zecSwap rev for both crates.
-zecswap-core    = { git = "https://github.com/JustZappIt/zecSwap", rev = "d69e3fb2d5c3bfc99fd20844dfdcd0d9d2509a11" }
-zecswap-railgun = { git = "https://github.com/JustZappIt/zecSwap", rev = "d69e3fb2d5c3bfc99fd20844dfdcd0d9d2509a11" }
+zecswap-core    = { git = "https://github.com/JustZappIt/zecSwap", rev = "b18135cbe314c2467e0cffd8fe8fe6e1736fe6cc" }
+zecswap-railgun = { git = "https://github.com/JustZappIt/zecSwap", rev = "b18135cbe314c2467e0cffd8fe8fe6e1736fe6cc" }
 # The Railgun wallet's BIP-32 path, over the same secp256k1 as the rest of the
 # wallet: the bip32 and secp256k1 releases the Zakura transparent crates use.
 bip32  = { version = "=0.6.0", default-features = false, features = ["alloc", "secp256k1-ffi"] }
@@ -277,11 +277,12 @@ assertions_on_constants = "allow"
 [patch.crates-io]
 zakura-client-backend = { path = "vendor/zakura-client-backend" }
 
-# LOCAL STAND-IN, DO NOT MERGE: a Zakura Common v3 build of zecswap-core,
-# outside this repository. Drop this once the zecSwap rev above carries the
-# Zakura manifest.
+# LOCAL STAND-IN: zecswap-core of the rev above (the windows contract's) on
+# Zakura Common v3, in a checkout outside this repository, so a clean clone
+# builds only where that checkout exists. Drop this once a zecSwap rev
+# carries the Zakura manifest.
 [patch."https://github.com/JustZappIt/zecSwap"]
-zecswap-core = { path = "../../zapp/zecSwap-zakura-v3/crates/zecswap-core" }   # relative to rust/
+zecswap-core = { path = "../../zapp/zecSwap-zakura-windows/crates/zecswap-core" }   # relative to rust/
 
 # Flutter debug builds use Cargokit + Cargo's dev profile (`cargo build`
 # without `--release`). Rust crypto and voting flows are slow under the default

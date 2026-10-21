@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use super::{fail, ErrorCode, PrivateUsdNetwork, Result};
+use super::{fail, ErrorCode, PrivateUsdError, PrivateUsdNetwork, Result};
 
 /// The highest relayer fee any signature pays: 2 USDC in 6-decimal base
 /// units. It caps the forward payout, the refund payout, the reverse funding
@@ -11,11 +11,19 @@ use super::{fail, ErrorCode, PrivateUsdNetwork, Result};
 pub(crate) const MAX_RELAYER_FEE: u128 = 2_000_000;
 /// The swap token's decimals on both networks.
 pub(crate) const TOKEN_DECIMALS: u32 = 6;
-/// How long a signed lock or `ready` holds; below every `LOCK_DURATION`.
+/// How long a signed `ready` or rescue holds.
 pub(crate) const SIGNATURE_TTL_SECONDS: u64 = 120;
-/// A share is revealed only under a lock with more than this left (the claim
-/// margin).
+/// A claim is revealed only with more than this left in its window (the
+/// claim margin): one landing after the window closes reverts with `z`
+/// public.
 pub(crate) const REVEAL_MARGIN_SECONDS: u64 = 300;
+/// Before `t0` a claim goes out on a ready only once it is this many blocks
+/// deep: one a reorg dropped would leave the claim reverted, `z` public and
+/// the swap the maker's to cancel.
+pub(crate) const READY_DEPTH_BLOCKS: u64 = 12;
+/// The latest `t1` a forward swap may have after its `t0`: until the maker
+/// refunds, the deposit waits on it.
+pub(crate) const MAX_T0_TO_T1_SECONDS: u64 = 2 * 60 * 60;
 /// An accept is not sent this close to the quote's expiry.
 pub(crate) const ACCEPT_MARGIN_SECONDS: u64 = 15;
 /// Railgun's shield fee, in basis points.
@@ -71,7 +79,13 @@ pub(crate) struct Deployment {
     /// The key the maker hands tokens back under, base64url SPKI.
     pub maker_token_return_key: &'static str,
     pub chain_id: u64,
-    pub contract: [u8; 20],
+    /// The windows contract swaps settle on; `None` where bridging is off,
+    /// and quotes and swaps are refused.
+    pub swaps: Option<SwapContract>,
+    /// Lock contracts swaps of this network settled on before, by rules this
+    /// build does not follow. An index used there is never used again: its
+    /// share may be public.
+    pub retired_contracts: &'static [[u8; 20]],
     pub token: [u8; 20],
     /// The dollar tokens the private USD balance counts, the swap token
     /// first (Sepolia adds Circle's test USDC, which Railgun accepts). Their
@@ -87,8 +101,8 @@ pub(crate) struct Deployment {
     pub relay_adapt: [u8; 20],
     /// Confirmations the maker waits for before it counts a deposit.
     pub zcash_confirmations: u32,
-    /// Ethereum confirmations, its own block included, for escrow, locks and
-    /// payouts.
+    /// Ethereum confirmations, its own block included, for opens, escrows
+    /// and payouts.
     pub escrow_confirmations: u32,
     /// The soonest `t0` a forward deposit may be paid for.
     pub min_seconds_to_t0: u64,
@@ -103,6 +117,25 @@ pub(crate) struct Deployment {
     /// Where public USDC is shielded into the private balance; `None` where no
     /// Deposits contract is pinned, and deposits are hidden.
     pub deposits: Option<DepositsPin>,
+}
+
+/// A windows contract as a deployment pins it. At every moment one side at
+/// most may reveal: the maker may cancel a forward swap until `t0` unless it
+/// made it ready, the user may claim once it is ready or from `t0` until
+/// `t1`, the maker may refund from `t1` for `late_window`, and the user may
+/// claim again after that; a reverse escrow is the maker's to claim once
+/// ready until `t1`, and the user's to refund while not ready and from `t1`.
+/// The chain must answer both windows as pinned before any swap read is
+/// trusted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SwapContract {
+    pub address: [u8; 20],
+    /// `MIN_WINDOW()`: the least an open leaves before `t0`, and from `t0`
+    /// to `t1`.
+    pub min_window: u64,
+    /// `LATE_WINDOW()`: how long from `t1` only the maker may refund a
+    /// forward swap.
+    pub late_window: u64,
 }
 
 /// What a wallet pins of a Deposits deployment, never what a relayer says:
@@ -149,7 +182,11 @@ const MAINNET: Deployment = Deployment {
     issuer_token_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEAuA8Rq3Fo644QG48Kmxsyg1UFAKd-kfsS9t7BgPVwJqXHIEmlH4gS1UaxDBdu7awf0n9lv7yYozNTE5PysBh01LBhGbcIMWyTSNXkF2l1Mi0AOVVhVJZr-KTyr0u6ZFI2EGRVxT1BF2B4QgzQgJ64xqj-tzX_ctpwYQiE1Gf74zG4Yd0mdEbDjTYhgzoaR0lV5uHHSnVN2fmnlskAkZl6mfrJKfcfivp-UQ8qgBEs-7ke67lMhMyC3BxoDG7qoY0B4eIQRQ_-fu3eYT1RifuO5LgvMYkzRe58X63emOvYls19En0Vbkeq2Y73kMRA2AOYMp5gD3DyF4t5LM535p4-GQIDAQAB",
     maker_token_return_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEArte6ewR0iOfbhxrByZ1vj_MMkKiQLQ-2R3OdCyHeKr_G4FrsCHvLhJ0uuu5r-papDogiMb_btM5-nPaOWzC1olxbmEUypJWgz-yCXD3K4wp_jgeqlP7EnlJE3IT5iTwv_S1hK5yV4Fka5mRoyhvZlhvDW3eCWoMix15Fp-TD3AGm7GttqzW4QyLXV_mQcnqlWPwuCacmTYch93eMZ7CaTHHRMmsfqR7_kZdskZh_JM55_lw_puDvvdRtu4vYItvo5wMI5mkwmSEwi6UahZDx_OI8IAF2JpeqRIKwbhT6FVGwahDeu6PRTww71C0i13EOwC3GQ85pxDRIAzF01W14wQIDAQAB",
     chain_id: 1,
-    contract: address("0x4708D7d36992b7e33Ad97a1ab0A31c3ac6C4fe6D"),
+    // zecSwap's mainnet still settles on its lock contract, whose rules this
+    // build does not follow: bridging stays off until a windows contract is
+    // deployed there.
+    swaps: None,
+    retired_contracts: &[address("0x4708D7d36992b7e33Ad97a1ab0A31c3ac6C4fe6D")],
     token: MAINNET_USDC,
     usd_tokens: &[UsdToken {
         address: MAINNET_USDC,
@@ -185,7 +222,13 @@ const TESTNET: Deployment = Deployment {
     issuer_token_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEAqAp6ClskrSdfUjiFvS2H9eTxKKNxrtVPM-n0n8WCgCj508sXiyQj21W9Dpjki-JYLbYS7xkHaTCuplU7-Kg6EFK_xwFB-BmQZcW9qk1GTYcZAqJ5YmfttMFHMDsdroUq5v6RnQxLRINIh5UIiFgn_516Wp2CcizaU-lwuwP4f8hp-0cLvynQ119pUTIfwgaYhrRaxngHFu0JnQF6l4AK4rhtIt6g7AG_bSSV06cYowKuOVEncE45CaUDOUJbP18MfRSP42HPnWZ0-h6n3_uBYvxHYsKp7KQ5_Hr-QpOafUoXhFANv4mfpk3MUQxo2m7vZZAMaFa9ELsIIiaLkACGhQIDAQAB",
     maker_token_return_key: "MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQMEAgKiAwIBMAOCAQ8AMIIBCgKCAQEA5boFzxSM2UDd-NfwWUnT_lVo23Td6wOH5twYjLo2wLDEWmGKSNBgdZy3t3JC2JkzD8j9rVRdehpll_i3GRKmUq0wr6xkHHuHxswr3TehMUqUrztg-nxDS4U2f0V0yYno3I5YPo2SByOz_-jHNWM6Mlx-TZsWzALQTb3NmRXdynqecz3-8hqd_OPhUJtH7M3pK9ikkUbSzV1ofXkyM6FnaNAGkHZ1kAMEF2pGe69tOJJqGq6wpTuZMtzaaxu9t1C4xoR7R7pbdkjPM_Wxd15LoXa1N26V-PToIeD06VmwX51VjrO_2VHWFat4Rtu7eLPeiEX-5kKsyvCY7EhpkNK1DQIDAQAB",
     chain_id: 11_155_111,
-    contract: address("0xD75Efc6a157CC0A95f66962DA86DDf35d9F2617c"),
+    // Deployed at block 11958709, in place of the lock contract.
+    swaps: Some(SwapContract {
+        address: address("0x459b0a69e0f736666b66a3ffe0fc17c11f05980d"),
+        min_window: 30 * 60,
+        late_window: 60 * 60,
+    }),
+    retired_contracts: &[address("0xD75Efc6a157CC0A95f66962DA86DDf35d9F2617c")],
     token: SEPOLIA_TEST_USD,
     usd_tokens: &[
         UsdToken {
@@ -244,11 +287,23 @@ impl Deployment {
         }
     }
 
-    pub(crate) fn domain(&self) -> zecswap_core::Domain {
-        zecswap_core::Domain {
+    /// The windows contract, or `Unavailable` where bridging is off.
+    pub(crate) fn swap_contract(&self) -> Result<&SwapContract> {
+        self.swaps.as_ref().ok_or_else(|| {
+            PrivateUsdError::new(ErrorCode::Unavailable, "bridging is off on this network")
+        })
+    }
+
+    /// Whether `contract` is this deployment's windows contract.
+    pub(crate) fn settles_on(&self, contract: &[u8; 20]) -> bool {
+        self.swaps.is_some_and(|swaps| swaps.address == *contract)
+    }
+
+    pub(crate) fn domain(&self) -> Result<zecswap_core::Domain> {
+        Ok(zecswap_core::Domain {
             chain_id: self.chain_id,
-            contract: self.contract,
-        }
+            contract: self.swap_contract()?.address,
+        })
     }
 }
 

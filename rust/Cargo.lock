@@ -9478,7 +9478,7 @@ dependencies = [
 [[package]]
 name = "zecswap-railgun"
 version = "0.1.0"
-source = "git+https://github.com/JustZappIt/zecSwap?rev=d69e3fb2d5c3bfc99fd20844dfdcd0d9d2509a11#d69e3fb2d5c3bfc99fd20844dfdcd0d9d2509a11"
+source = "git+https://github.com/JustZappIt/zecSwap?rev=b18135cbe314c2467e0cffd8fe8fe6e1736fe6cc#b18135cbe314c2467e0cffd8fe8fe6e1736fe6cc"
 dependencies = [
  "aes",
  "aes-gcm",

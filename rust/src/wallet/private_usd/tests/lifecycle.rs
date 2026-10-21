@@ -146,10 +146,11 @@ async fn a_drain_cancels_the_step_in_flight_and_the_delete_waits_for_it() {
     let h = Harness::new();
     h.deposited().await;
     let release = Arc::new(Notify::new());
+    let terms_read = h.paths().iter().filter(|path| *path == "/v1/terms").count();
     {
         let mut state = h.world.set();
         state.stage = SwapStage::Ready;
-        state.hold_lock = Some(release.clone());
+        state.hold_terms = Some(release.clone());
     }
     let op_id = rand::random::<u32>();
     let op = OpHandle::begin(op_id).unwrap();
@@ -162,7 +163,8 @@ async fn a_drain_cancels_the_step_in_flight_and_the_delete_waits_for_it() {
             .await
     };
     let drain = async {
-        while h.paths().iter().all(|path| path != "/v1/lock-claim") {
+        // The claim's payout asks the relayer's fee before it is signed.
+        while h.paths().iter().filter(|path| *path == "/v1/terms").count() == terms_read {
             tokio::task::yield_now().await;
         }
         // The user confirmed the warning; the delete waits for the step.

@@ -92,7 +92,7 @@ struct PayoutRequest<'a> {
     signature: &'a Signature,
 }
 
-/// A share revealed under a held lock, with the payout that follows it. The
+/// A share revealed in its window, with the payout that follows it. The
 /// secret is `z`: never logged.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -220,18 +220,10 @@ impl<'a, T: HttpTransport> RelayerClient<'a, T> {
         .await
     }
 
-    pub(crate) async fn lock_claim(
-        &self,
-        authorization: &SwapAuthorization,
-        terms: &Terms,
-        ticket: Option<&Ticket>,
-    ) -> Result<Sent, SwapHttpError> {
-        self.authorization("/v1/lock-claim", authorization, terms, ticket)
-            .await
-    }
-
     /// `POST /v1/claim`: reveals `secret` (`z`, big-endian) and pays out.
-    /// Send only under a fresh, held claim lock.
+    /// Send only in the claim's window with the margin, judged on one
+    /// consistent read just before. `400 rejected` sent nothing; a `503`
+    /// asks for the same post again later.
     pub(crate) async fn claim(
         &self,
         secret: &[u8; 32],
@@ -262,17 +254,9 @@ impl<'a, T: HttpTransport> RelayerClient<'a, T> {
             .await
     }
 
-    pub(crate) async fn lock_refund(
-        &self,
-        authorization: &SwapAuthorization,
-        terms: &Terms,
-        ticket: Option<&Ticket>,
-    ) -> Result<Sent, SwapHttpError> {
-        self.authorization("/v1/reverse/lock-refund", authorization, terms, ticket)
-            .await
-    }
-
-    /// `POST /v1/reverse/refund`: reveals `secret` under a held refund lock.
+    /// `POST /v1/reverse/refund`: reveals `secret` once no `ready` of ours
+    /// can land, or from `t1`. The relayer answers `503` while a `ready` it
+    /// sent may still land.
     pub(crate) async fn refund(
         &self,
         secret: &[u8; 32],
@@ -523,13 +507,13 @@ mod tests {
         };
 
         let answer = relayer
-            .lock_claim(&authorization, &terms(), Some(&ticket))
+            .ready(&authorization, &terms(), Some(&ticket))
             .await
             .unwrap();
         assert_eq!(answer.transactions.len(), 2);
 
         let spent = relayer
-            .lock_claim(&authorization, &terms(), None)
+            .ready(&authorization, &terms(), None)
             .await
             .unwrap_err();
         let SwapHttpError::Refused(refusal) = &spent else {
@@ -557,7 +541,7 @@ mod tests {
         );
 
         let received = server.received();
-        assert_eq!(received[0].path, "/relayer/v1/lock-claim");
+        assert_eq!(received[0].path, "/relayer/v1/reverse/ready");
         assert_eq!(
             received[0].header("zecswap-ticket"),
             Some(ticket.0.as_str())
@@ -681,7 +665,7 @@ mod tests {
             let mut terms = json!({
                 "relayer": hex0x(&pins.relayer),
                 "chainId": chain_id,
-                "contract": hex0x(&pins.contract),
+                "contract": hex0x(&pins.swap_contract().unwrap().address),
                 "fee": "20000",
             });
             if let Some(sends) = sends {

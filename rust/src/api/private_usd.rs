@@ -45,7 +45,6 @@ pub enum ApiPrivateUsdErrorCode {
     RelayerFee,
     EthereumUnreachable,
     RailgunClosed,
-    ClaimTurn,
     ZcashWallet,
     DepositUnpayable,
     ZcashRejected,
@@ -68,7 +67,8 @@ pub enum ApiPrivateUsdErrorCode {
     /// The call was cancelled (`private_usd_cancel`): never a failure.
     Cancelled,
     /// A record, a service or the node belongs to another deployment than
-    /// this build pins: a conversion pinned to the retired testnet token, or
+    /// this build pins: a conversion of the lock contract or of the retired
+    /// testnet token, a contract that is not the pinned windows contract, or
     /// deposit terms that are not the pin's. Never followed.
     WrongDeployment,
 }
@@ -103,7 +103,6 @@ fn api_code(code: ErrorCode) -> ApiPrivateUsdErrorCode {
         ErrorCode::RelayerFee => Api::RelayerFee,
         ErrorCode::EthereumUnreachable => Api::EthereumUnreachable,
         ErrorCode::RailgunClosed => Api::RailgunClosed,
-        ErrorCode::ClaimTurn => Api::ClaimTurn,
         ErrorCode::ZcashWallet => Api::ZcashWallet,
         ErrorCode::DepositUnpayable => Api::DepositUnpayable,
         ErrorCode::ZcashRejected => Api::ZcashRejected,
@@ -171,6 +170,10 @@ pub struct ApiDeployment {
     /// Where public USDC is shielded into the private balance; `None` where
     /// no Deposits contract is pinned, which hides deposits.
     pub deposits: Option<ApiDepositsPin>,
+    /// Whether a windows contract is pinned, so bridging runs. Off, quotes
+    /// and conversions are refused (`Unavailable`): hide Bridge. Balance,
+    /// deposits, sends and withdrawals work either way.
+    pub bridge_available: bool,
 }
 
 /// A network's pinned Deposits deployment.
@@ -243,6 +246,7 @@ pub fn private_usd_deployment(network: String) -> Option<ApiDeployment> {
             }
             .to_owned(),
         }),
+        bridge_available: pins.swaps.is_some(),
     })
 }
 
@@ -315,7 +319,7 @@ pub enum ApiActivity {
     Funding,
     /// Sending the kept `ready` again.
     Readying,
-    /// Locking, revealing or paying out a reverse refund.
+    /// Revealing or paying out a reverse refund.
     Refunding,
 }
 
@@ -453,8 +457,8 @@ pub struct ApiAcceptResult {
 pub enum ApiForwardWait {
     /// The maker has not opened the swap on chain yet.
     Opening,
-    /// The deposit is out; waiting for the maker to mark the swap ready, or
-    /// for `t0`.
+    /// The deposit is out; waiting for the maker to mark the swap ready (and
+    /// the ready to be 12 blocks deep), or for `t0`.
     Confirming,
     /// The maker called the swap off while the deposit was unmined.
     DepositUnsettled,
@@ -462,6 +466,11 @@ pub enum ApiForwardWait {
     Refunding,
     /// The Zcash wallet is syncing: never a problem.
     ZcashSyncing,
+    /// Too late to claim before `t1`, and from `t1` the swap is the maker's
+    /// to refund: the swap unwinds, and the ZEC comes back after the maker's
+    /// refund. If the maker never refunds, the claim goes out from
+    /// `late_claim_at`.
+    Unwinding,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -505,6 +514,10 @@ pub struct ApiForwardRecord {
     pub relayer_fee: String,
     pub t0: Option<i64>,
     pub t1: Option<i64>,
+    /// `t1` and the contract's late window: from here a swap the maker never
+    /// refunded is claimed after all. `None` before the maker answered, and
+    /// for a conversion of another deployment.
+    pub late_claim_at: Option<i64>,
     /// Internal byte order hex, as wallet history rows carry it; show it with
     /// `zcashDisplayTxidHex`.
     pub deposit_txid: Option<String>,
@@ -652,7 +665,8 @@ pub fn private_usd_forward_advance(
 /// Drops swap `index` before it reached the chain: an unanswered accept ends
 /// `MakerUnavailable` (a turn-away at the token gate included), an answered
 /// one `NeverOpened`. `TooLate` once a deposit started or the chain shows
-/// the swap. No key is needed.
+/// the swap; `WrongDeployment` for a conversion of another deployment, such
+/// as the lock contract's, which is never ended or driven. No key is needed.
 pub fn private_usd_forward_abandon(
     network: String,
     account_uuid: String,
@@ -2141,6 +2155,7 @@ fn api_advance(report: &AdvanceReport, db_path: &str, network: WalletNetwork) ->
             ForwardWait::DepositUnsettled => ApiForwardWait::DepositUnsettled,
             ForwardWait::Refunding => ApiForwardWait::Refunding,
             ForwardWait::ZcashSyncing => ApiForwardWait::ZcashSyncing,
+            ForwardWait::Unwinding => ApiForwardWait::Unwinding,
         }),
         next_poll_ms: u32::try_from(report.next_poll.as_millis()).unwrap_or(u32::MAX),
         problem: report.problem.map(api_code),
@@ -2188,6 +2203,7 @@ fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> Api
         relayer_fee: record.relayer_fee.0.to_string(),
         t0: record.t0.map(seconds),
         t1: record.t1.map(seconds),
+        late_claim_at: late_claim_at(record),
         deposit_txid: record
             .deposit
             .as_ref()
@@ -2203,6 +2219,16 @@ fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> Api
         nothing_sent_cause,
         ended_at: record.finished_at.map(seconds),
     }
+}
+
+/// When a forward swap the maker never refunded is claimed after all, `t1`
+/// and the late window of the contract its quote names; `None` before `t1`
+/// is known, and for a conversion of another deployment.
+fn late_claim_at(record: &ForwardRecord) -> Option<i64> {
+    let swaps = deployment::for_chain_id(record.quote.chain_id)?
+        .swaps
+        .filter(|swaps| swaps.address == record.quote.contract.0)?;
+    Some(seconds(record.t1?.saturating_add(swaps.late_window)))
 }
 
 /// The kept deposit's depth in the main wallet while the conversion is under

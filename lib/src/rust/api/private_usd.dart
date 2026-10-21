@@ -6,7 +6,7 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`
+// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 /// The deployment for the wallet network `"main"` or `"test"`; `None` on
@@ -197,7 +197,8 @@ Future<ApiForwardAdvance> privateUsdForwardAdvance({
 /// Drops swap `index` before it reached the chain: an unanswered accept ends
 /// `MakerUnavailable` (a turn-away at the token gate included), an answered
 /// one `NeverOpened`. `TooLate` once a deposit started or the chain shows
-/// the swap. No key is needed.
+/// the swap; `WrongDeployment` for a conversion of another deployment, such
+/// as the lock contract's, which is never ended or driven. No key is needed.
 Future<ApiForwardRecord> privateUsdForwardAbandon({
   required String network,
   required String accountUuid,
@@ -746,7 +747,7 @@ enum ApiActivity {
   /// Sending the kept `ready` again.
   readying,
 
-  /// Locking, revealing or paying out a reverse refund.
+  /// Revealing or paying out a reverse refund.
   refunding,
 }
 
@@ -788,6 +789,11 @@ class ApiDeployment {
   /// no Deposits contract is pinned, which hides deposits.
   final ApiDepositsPin? deposits;
 
+  /// Whether a windows contract is pinned, so bridging runs. Off, quotes
+  /// and conversions are refused (`Unavailable`): hide Bridge. Balance,
+  /// deposits, sends and withdrawals work either way.
+  final bool bridgeAvailable;
+
   const ApiDeployment({
     required this.network,
     required this.railgunNetwork,
@@ -808,6 +814,7 @@ class ApiDeployment {
     required this.maxRelayerFee,
     required this.usdTokens,
     this.deposits,
+    required this.bridgeAvailable,
   });
 
   @override
@@ -830,7 +837,8 @@ class ApiDeployment {
       screeningSeconds.hashCode ^
       maxRelayerFee.hashCode ^
       usdTokens.hashCode ^
-      deposits.hashCode;
+      deposits.hashCode ^
+      bridgeAvailable.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -855,7 +863,8 @@ class ApiDeployment {
           screeningSeconds == other.screeningSeconds &&
           maxRelayerFee == other.maxRelayerFee &&
           usdTokens == other.usdTokens &&
-          deposits == other.deposits;
+          deposits == other.deposits &&
+          bridgeAvailable == other.bridgeAvailable;
 }
 
 /// The deposit address to show and its index.
@@ -1363,6 +1372,11 @@ class ApiForwardRecord {
   final PlatformInt64? t0;
   final PlatformInt64? t1;
 
+  /// `t1` and the contract's late window: from here a swap the maker never
+  /// refunded is claimed after all. `None` before the maker answered, and
+  /// for a conversion of another deployment.
+  final PlatformInt64? lateClaimAt;
+
   /// Internal byte order hex, as wallet history rows carry it; show it with
   /// `zcashDisplayTxidHex`.
   final String? depositTxid;
@@ -1394,6 +1408,7 @@ class ApiForwardRecord {
     required this.relayerFee,
     this.t0,
     this.t1,
+    this.lateClaimAt,
     this.depositTxid,
     this.depositConfirmations,
     this.sweepTxid,
@@ -1418,6 +1433,7 @@ class ApiForwardRecord {
       relayerFee.hashCode ^
       t0.hashCode ^
       t1.hashCode ^
+      lateClaimAt.hashCode ^
       depositTxid.hashCode ^
       depositConfirmations.hashCode ^
       sweepTxid.hashCode ^
@@ -1444,6 +1460,7 @@ class ApiForwardRecord {
           relayerFee == other.relayerFee &&
           t0 == other.t0 &&
           t1 == other.t1 &&
+          lateClaimAt == other.lateClaimAt &&
           depositTxid == other.depositTxid &&
           depositConfirmations == other.depositConfirmations &&
           sweepTxid == other.sweepTxid &&
@@ -1458,8 +1475,8 @@ enum ApiForwardWait {
   /// The maker has not opened the swap on chain yet.
   opening,
 
-  /// The deposit is out; waiting for the maker to mark the swap ready, or
-  /// for `t0`.
+  /// The deposit is out; waiting for the maker to mark the swap ready (and
+  /// the ready to be 12 blocks deep), or for `t0`.
   confirming,
 
   /// The maker called the swap off while the deposit was unmined.
@@ -1470,6 +1487,12 @@ enum ApiForwardWait {
 
   /// The Zcash wallet is syncing: never a problem.
   zcashSyncing,
+
+  /// Too late to claim before `t1`, and from `t1` the swap is the maker's
+  /// to refund: the swap unwinds, and the ZEC comes back after the maker's
+  /// refund. If the maker never refunds, the claim goes out from
+  /// `late_claim_at`.
+  unwinding,
 }
 
 /// The page's `prepareReverse` params, ready to JSON-encode: `{amount,
@@ -1564,7 +1587,6 @@ enum ApiPrivateUsdErrorCode {
   relayerFee,
   ethereumUnreachable,
   railgunClosed,
-  claimTurn,
   zcashWallet,
   depositUnpayable,
   zcashRejected,
@@ -1589,7 +1611,8 @@ enum ApiPrivateUsdErrorCode {
   cancelled,
 
   /// A record, a service or the node belongs to another deployment than
-  /// this build pins: a conversion pinned to the retired testnet token, or
+  /// this build pins: a conversion of the lock contract or of the retired
+  /// testnet token, a contract that is not the pinned windows contract, or
   /// deposit terms that are not the pin's. Never followed.
   wrongDeployment,
 }

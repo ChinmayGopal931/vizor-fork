@@ -55,7 +55,6 @@ String? privateUsdErrorMessage(ApiPrivateUsdErrorCode code) => switch (code) {
   ApiPrivateUsdErrorCode.storeUnreadable => PrivateUsdCopy.convertErrorStore,
   ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.routeBlocked,
   ApiPrivateUsdErrorCode.railgunClosed ||
-  ApiPrivateUsdErrorCode.claimTurn ||
   ApiPrivateUsdErrorCode.zcashRejected ||
   ApiPrivateUsdErrorCode.mismatch ||
   ApiPrivateUsdErrorCode.fundingCostChanged ||
@@ -77,7 +76,6 @@ String privateUsdProblemMessage(ApiPrivateUsdErrorCode code) => switch (code) {
   ApiPrivateUsdErrorCode.ethereumUnreachable ||
   ApiPrivateUsdErrorCode.chainLagging => PrivateUsdCopy.convertProblemEthereum,
   ApiPrivateUsdErrorCode.railgunClosed => PrivateUsdCopy.convertProblemRailgun,
-  ApiPrivateUsdErrorCode.claimTurn => PrivateUsdCopy.convertProblemTurn,
   ApiPrivateUsdErrorCode.zcashWallet => PrivateUsdCopy.convertProblemWallet,
   ApiPrivateUsdErrorCode.depositUnpayable =>
     PrivateUsdCopy.convertProblemUnpayable,

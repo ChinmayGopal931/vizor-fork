@@ -1,12 +1,16 @@
 //! A forward conversion, ZEC → private USD, and its refund.
 //!
 //! Every step reads the chain first, so any of them can run again after an
-//! interruption. Only a confirmed read authorizes a deposit, a reveal or the
-//! end. The record is saved before the user's share leaves the device, a
-//! deposit is marked started before it is created and kept before it is first
-//! sent, and a payout is kept before it is posted. `z` is revealed only under
-//! a claim lock with more than `REVEAL_MARGIN_SECONDS` left, read again from a
-//! fresh head immediately before sending.
+//! interruption. Only a confirmed read authorizes a deposit or the end. The
+//! record is saved before the user's share leaves the device, a deposit is
+//! marked started before it is created and kept before it is first sent, and
+//! a payout is kept before it is posted. `z` is revealed only in the claim's
+//! window: once the swap is ready, `READY_DEPTH_BLOCKS` deep before `t0`, or
+//! from `t0`, with more than `REVEAL_MARGIN_SECONDS` left before `t1`; or for
+//! good from `t1 + LATE`. It is judged on one consistent read of a fresh
+//! head, again immediately before the claim is posted, and the claim is
+//! marked posted before it goes. Between `t1` and `t1 + LATE` the swap is the
+//! maker's to refund, and the deposit comes home.
 //!
 //! The driver runs over seams: [`ChainReader`], [`HttpTransport`],
 //! [`ForwardZcash`] (the wallet's side, [`WalletZcash`]) and [`Clock`]. The
@@ -18,7 +22,10 @@ use std::time::Duration;
 use zecswap_core::{JointAccount, NetworkType, SpendKey, Terms};
 use zeroize::Zeroizing;
 
-use super::deployment::{self, Deployment, ACCEPT_MARGIN_SECONDS, MAX_SECONDS_TO_T0};
+use super::deployment::{
+    self, Deployment, ACCEPT_MARGIN_SECONDS, MAX_SECONDS_TO_T0, MAX_T0_TO_T1_SECONDS,
+    READY_DEPTH_BLOCKS, REVEAL_MARGIN_SECONDS,
+};
 use super::engine::{self, Activity, Clock, MakerChecks, Offer, OpHandle, SystemClock};
 use super::evm_rpc::{ChainReader, EvmRpc, SwapStage, SwapState};
 use super::joint::{SwapTxStatus, WalletZcash};
@@ -26,15 +33,14 @@ use super::keys::SwapKeyContext;
 use super::maker_client::MakerClient;
 use super::models::{
     Amount, DepositProgress, Direction, ForwardOutcome, ForwardRecord, Hex, NothingSentCause,
-    RefundCause, RelayerTerms, SwapAcceptance, SwapAuthorization, SwapNote, SwapPayout, SwapQuote,
-    Word, ZcashTransaction,
+    RefundCause, RelayerTerms, SwapAcceptance, SwapNote, SwapPayout, SwapQuote, Word,
+    ZcashTransaction,
 };
 use super::relayer_client::RelayerClient;
 use super::store::SwapStore;
 use super::swap::{
-    self, find, load, lock_deadline, payout_after_fees, pinned_relayer_terms, quote_error,
-    require_payout_fee, require_pays_out, reveal_margin_holds, save, serves, update, PostError,
-    SwapCall,
+    self, find, load, payout_after_fees, pinned_relayer_terms, quote_error, require_payout_fee,
+    require_pays_out, save, serves, update, ClaimWindow, PostError, SwapCall, WindowView,
 };
 use super::transport::{HttpTransport, Refusal, SwapErrorCode, SwapHttpError};
 use super::{fail, indices, terms, ErrorCode, PrivateUsdError, Result};
@@ -62,6 +68,10 @@ pub(crate) enum ForwardWait {
     /// The main wallet has not scanned to the chain's tip: no deposit is
     /// built on a stale wallet.
     ZcashSyncing,
+    /// Too late to claim before `t1`, and from it the swap is the maker's to
+    /// refund for its late window: the deposit comes back with the refund,
+    /// or from `t1 + LATE` the claim goes out after all.
+    Unwinding,
 }
 
 /// One look at a forward swap.
@@ -88,7 +98,9 @@ pub(crate) fn nap(wait: ForwardWait) -> Duration {
     match wait {
         ForwardWait::Opening => Duration::from_secs(5),
         ForwardWait::Confirming => Duration::from_secs(20),
-        ForwardWait::DepositUnsettled | ForwardWait::Refunding => Duration::from_secs(30),
+        ForwardWait::DepositUnsettled | ForwardWait::Refunding | ForwardWait::Unwinding => {
+            Duration::from_secs(30)
+        }
         ForwardWait::ZcashSyncing => engine::RETRY_DELAY,
     }
 }
@@ -205,7 +217,7 @@ enum Deposit {
 
 #[derive(Clone, Copy)]
 enum PayoutPost {
-    /// `/v1/claim`: reveals `z` under the claim lock, then pays out.
+    /// `/v1/claim`: reveals `z` in the claim's window, then pays out.
     Claim,
     /// `/v1/payout`, after a claim that revealed but did not pay out.
     Payout,
@@ -268,7 +280,8 @@ where
     /// persisted.
     pub(crate) async fn quote(&self, store: &mut SwapStore, units: u32) -> Result<Quoted> {
         let session = engine::session();
-        swap::require_none_under_way(store, self.account)?;
+        self.pins.swap_contract()?;
+        swap::require_none_under_way(store, self.account, self.pins)?;
         swap::check_maker(&self.maker, self.pins, self.makers, false).await?;
         let index = indices::take_index(
             store,
@@ -331,7 +344,7 @@ where
         if let Some(record) = find(store, self.account, index)? {
             return self.accept_again(store, record).await;
         }
-        swap::require_none_under_way(store, self.account)?;
+        swap::require_none_under_way(store, self.account, self.pins)?;
         let now = self.clock.now();
         let offer =
             engine::offer(self.account, index, self.keys.network(), now).ok_or_else(|| {
@@ -373,6 +386,7 @@ where
             deposit: None,
             sweep: None,
             payout: None,
+            claim_posted: false,
             t0: None,
             t1: None,
             fee_expires_at: offer.fee_expires_at,
@@ -395,6 +409,7 @@ where
             Some(_) => return Ok(AcceptOutcome::Accepted),
             None => {}
         }
+        require_served(self.pins, &record)?;
         // Answered: under way; the engine follows it.
         if record.t0.is_some() {
             return Ok(AcceptOutcome::Accepted);
@@ -444,7 +459,14 @@ where
         opened.t1 = Some(accepted.t1);
         opened.ticket = accepted.ticket_for(&opened.swap_id);
         update(store, self.account, &opened)?;
-        if accepted.swap_id != opened.swap_id {
+        // A maker that names another late window settles on another
+        // contract than ours: nothing is paid into it.
+        let late_window = self.pins.swap_contract()?.late_window;
+        if accepted.swap_id != opened.swap_id
+            || accepted
+                .late_window
+                .is_some_and(|window| window != late_window)
+        {
             self.finish(
                 store,
                 &opened,
@@ -506,6 +528,7 @@ where
         if let Some(outcome) = &record.outcome {
             return Ok(ForwardStep::Finished(outcome.clone()));
         }
+        require_served(self.pins, &record)?;
         engine::check_cancelled(self.op)?;
         match self.terms(&record)? {
             None => self.not_on_chain(store, &record, false).await,
@@ -591,12 +614,8 @@ where
                 }
                 self.finish_paid(store, record).await
             }
-            SwapStage::Ready => {
-                engine::set_activity(self.op, Activity::Claiming);
-                self.claim(store, record, terms, swap).await?;
-                self.finish_paid(store, record).await
-            }
-            SwapStage::Open => self.open(store, record, terms, swap).await,
+            SwapStage::Ready => self.claim(store, record, terms).await,
+            SwapStage::Open => self.open(store, record, terms).await,
         }
     }
 
@@ -605,9 +624,8 @@ where
         store: &mut SwapStore,
         record: &ForwardRecord,
         terms: &Terms,
-        swap: &SwapState,
     ) -> Result<ForwardStep> {
-        match self.ensure_paid(store, record, terms, swap).await? {
+        match self.ensure_paid(store, record, terms).await? {
             Deposit::Unpayable(cause) => self.finish(
                 store,
                 record,
@@ -616,32 +634,22 @@ where
                 None,
             ),
             Deposit::Syncing => Ok(waiting(ForwardWait::ZcashSyncing)),
-            // Past t0 the claim needs no `ready`: a maker gone quiet holds
+            // From t0 the claim needs no `ready`: a maker gone quiet holds
             // the deposit no longer.
-            Deposit::Kept if self.chain.head().await?.timestamp >= terms.t0 => {
-                engine::set_activity(self.op, Activity::Claiming);
-                self.claim(store, record, terms, swap).await?;
-                self.finish_paid(store, record).await
-            }
-            Deposit::Kept => Ok(ForwardStep::Waiting {
-                wait: ForwardWait::Confirming,
-                t0: Some(terms.t0),
-                t1: Some(terms.t1),
-            }),
+            Deposit::Kept => self.claim(store, record, terms).await,
         }
     }
 
     // ---- the deposit ----
 
     /// Sends the deposit again until it is mined; pays anew only once the
-    /// last is proven expired, in time for t0 and with no refund lock. A
-    /// deposit is never paid twice.
+    /// last is proven expired, and in time for t0. A deposit is never paid
+    /// twice.
     async fn ensure_paid(
         &self,
         store: &mut SwapStore,
         record: &ForwardRecord,
         terms: &Terms,
-        swap: &SwapState,
     ) -> Result<Deposit> {
         // From the maker share the contract confirmed, never the API's alone.
         let address = self
@@ -649,7 +657,7 @@ where
             .joint(record.index, &terms.maker_share)?
             .unified_address(self.zcash_network());
         let chain_now = self.chain.head().await?.timestamp;
-        let unpayable = unpayable(self.pins, terms, swap, chain_now);
+        let unpayable = unpayable(self.pins, terms, chain_now)?;
         let mut current = self.with_found(store, record, &address).await?;
 
         let deposit = current.deposit.clone();
@@ -712,9 +720,7 @@ where
                 (created, status)
             }
         };
-        // A deposit the maker is calling off is left to be mined or expire,
-        // not pushed.
-        if !matches!(status, SwapTxStatus::Mined { .. }) && swap.refund_lock_until == 0 {
+        if !matches!(status, SwapTxStatus::Mined { .. }) {
             self.zcash.broadcast(&deposit).await?;
         }
         Ok(Deposit::Kept)
@@ -836,7 +842,7 @@ where
         if confirmations < self.pins.zcash_confirmations {
             return Ok(waiting(ForwardWait::Refunding));
         }
-        let cause = self.refund_cause(terms, swap).await?;
+        let cause = self.refund_cause(record, terms).await?;
         let step = self.finish(
             store,
             &current,
@@ -858,43 +864,55 @@ where
         Ok(step)
     }
 
-    /// A refund lock taken before t0 is the maker calling it off; one taken
-    /// later waited out the user.
-    async fn refund_cause(&self, terms: &Terms, swap: &SwapState) -> Result<RefundCause> {
-        let lock_duration = self.chain.lock_duration().await?;
-        Ok(
-            if swap.refund_lock_until.saturating_sub(lock_duration) < terms.t0 {
-                RefundCause::MakerCancelled
-            } else {
-                RefundCause::NotClaimedInTime
-            },
-        )
+    /// A refund mined before t0 is the maker calling the swap off; one from
+    /// t1, the only other time a forward swap refunds, waited out the claim.
+    /// Without the refund's event, the chain's time now says the same.
+    async fn refund_cause(&self, record: &ForwardRecord, terms: &Terms) -> Result<RefundCause> {
+        let refunded_at = match self
+            .chain
+            .confirmed_refund_time(&record.swap_id.0, record.accepted_at)
+            .await?
+        {
+            Some(at) => at,
+            None => self.chain.head().await?.timestamp,
+        };
+        Ok(if refunded_at < terms.t1 {
+            RefundCause::MakerCancelled
+        } else {
+            RefundCause::NotClaimedInTime
+        })
     }
 
     // ---- the claim ----
 
-    /// Reveals `z` under a held claim lock once Railgun would take the
-    /// payout, then pays out.
+    /// Reveals `z` once the claim's window is open, then pays out; while the
+    /// windows hold the claim, waits. The window is judged again immediately
+    /// before the claim is posted, after every preparatory step.
     async fn claim(
         &self,
         store: &mut SwapStore,
         record: &ForwardRecord,
         terms: &Terms,
-        swap: &SwapState,
-    ) -> Result<()> {
+    ) -> Result<ForwardStep> {
+        if let Some(wait) = self.claim_window(record, terms).await? {
+            return Ok(holding(wait, terms));
+        }
+        engine::set_activity(self.op, Activity::Claiming);
         let payout = self.signed_payout(store, record, terms, None).await?;
-        self.require_railgun_open().await?;
         engine::check_cancelled(self.op)?;
-        self.hold_claim_lock(record, terms, swap).await?;
-        self.send_payout(store, record, terms, payout, PayoutPost::Claim)
-            .await?;
+        if let Some(wait) = self
+            .send_payout(store, record, terms, payout, PayoutPost::Claim)
+            .await?
+        {
+            return Ok(holding(wait, terms));
+        }
         let claimed = self
             .caught_up(record, terms, |swap| swap.stage == SwapStage::Claimed)
             .await?;
         if !claimed.paid_out {
             self.pay_out(store, record, terms).await?;
         }
-        Ok(())
+        self.finish_paid(store, record).await
     }
 
     /// Pays out a claim that revealed without paying out.
@@ -950,7 +968,7 @@ where
         }
         let digest = self
             .pins
-            .domain()
+            .domain()?
             .payout(&current.swap_id.0, &self.pins.relayer, fee.0);
         let signature = self.keys.user_keys(current.index)?.auth.sign(&digest);
         let payout = SwapPayout {
@@ -964,9 +982,10 @@ where
         Ok(payout)
     }
 
-    /// Posts `payout`. A refusal sends nothing: one turning the fee down is
-    /// signed again only at a higher fee the relayer asks now, and posted
-    /// once more.
+    /// Posts `payout`; with a claim, `Some(wait)` while the windows hold it,
+    /// and nothing is revealed. A refusal sends nothing: one turning the fee
+    /// down is signed again only at a higher fee the relayer asks now, and
+    /// posted once more.
     async fn send_payout(
         &self,
         store: &mut SwapStore,
@@ -974,9 +993,9 @@ where
         terms: &Terms,
         payout: SwapPayout,
         post: PayoutPost,
-    ) -> Result<()> {
-        let refusal = match self.post_payout(record, terms, &payout, post).await {
-            Ok(()) => return Ok(()),
+    ) -> Result<Option<ForwardWait>> {
+        let refusal = match self.post_payout(store, record, terms, &payout, post).await {
+            Ok(held) => return Ok(held),
             Err(PostError::Refused(refusal)) if refusal.code == Some(SwapErrorCode::Rejected) => {
                 refusal
             }
@@ -987,18 +1006,22 @@ where
             return Err(SwapHttpError::Refused(refusal).into());
         }
         let repriced = self.signed_payout(store, record, terms, Some(fee)).await?;
-        self.post_payout(record, terms, &repriced, post)
+        self.post_payout(store, record, terms, &repriced, post)
             .await
             .map_err(PrivateUsdError::from)
     }
 
+    /// Posts `payout`. A claim goes only once its window is judged open again
+    /// on a read immediately before it (`Ok(Some(wait))` while held, nothing
+    /// sent), and is kept as posted before it goes.
     async fn post_payout(
         &self,
+        store: &mut SwapStore,
         record: &ForwardRecord,
         terms: &Terms,
         payout: &SwapPayout,
         post: PayoutPost,
-    ) -> std::result::Result<(), PostError> {
+    ) -> std::result::Result<Option<ForwardWait>, PostError> {
         let ticket = record.ticket.as_ref();
         let sent = match post {
             PayoutPost::Claim => {
@@ -1009,20 +1032,34 @@ where
                         .share
                         .to_be_bytes(),
                 );
-                // Read the lock and the clock again after every preparatory
-                // step, immediately before the reveal.
-                self.require_fresh_claim_lock(record, terms)
+                if let Some(wait) = self
+                    .claim_window(record, terms)
                     .await
+                    .map_err(PostError::Failed)?
+                {
+                    return Ok(Some(wait));
+                }
+                self.mark_claim_posted(store, record)
                     .map_err(PostError::Failed)?;
                 self.relayer.claim(&secret, payout, terms, ticket).await
             }
             PayoutPost::Payout => self.relayer.payout(payout, terms, ticket).await,
         };
         match sent {
-            Ok(_) => Ok(()),
+            Ok(_) => Ok(None),
             Err(SwapHttpError::Refused(refusal)) => Err(PostError::Refused(refusal)),
             Err(error) => Err(PostError::Failed(error.into())),
         }
+    }
+
+    /// Keeps the claim as posted on the record as stored, before it goes.
+    fn mark_claim_posted(&self, store: &mut SwapStore, record: &ForwardRecord) -> Result<()> {
+        let mut current: ForwardRecord = load(store, self.account, record.index)?;
+        if !current.claim_posted {
+            current.claim_posted = true;
+            update(store, self.account, &current)?;
+        }
+        Ok(())
     }
 
     async fn require_railgun_open(&self) -> Result<()> {
@@ -1035,61 +1072,51 @@ where
         Ok(())
     }
 
-    /// A reveal must land before the lock lapses, or the maker's next turn
-    /// knows both halves; and no lock is asked for that the contract will
-    /// not give, such as in the maker's turn after ours lapsed.
-    async fn hold_claim_lock(
+    /// The claim's window on one consistent read of a fresh head: `None` to
+    /// claim now, else what the windows wait for. Before `t0`, a ready counts
+    /// once the block `READY_DEPTH_BLOCKS` below the head shows it. Railgun
+    /// is asked only once the windows would let the claim go.
+    async fn claim_window(
         &self,
         record: &ForwardRecord,
         terms: &Terms,
-        swap: &SwapState,
-    ) -> Result<()> {
-        let now = swap::fresh_head(self.chain.head().await?.timestamp, self.clock.now())?;
-        if reveal_margin_holds(swap.claim_lock_until, now, self.clock.now()) {
-            return Ok(());
+    ) -> Result<Option<ForwardWait>> {
+        let read = self.chain.read_swap(&record.swap_id.0, terms).await?;
+        let device_now = self.clock.now();
+        let view = WindowView {
+            stage: read.swap.as_ref().map(|swap| swap.stage),
+            head: swap::fresh_head(read.head.timestamp, device_now)?,
+            head_number: read.head.number,
+            device_now,
+            t0: terms.t0,
+            t1: terms.t1,
+            late_window: self.pins.swap_contract()?.late_window,
+        };
+        let ready_block = if view.stage == Some(SwapStage::Ready) && view.head < view.t0 {
+            let deep = read.head.number.saturating_sub(READY_DEPTH_BLOCKS);
+            self.chain
+                .swap_at(&record.swap_id.0, terms, deep)
+                .await?
+                .is_some_and(|then| then.stage == SwapStage::Ready)
+                .then_some(deep)
+        } else {
+            None
+        };
+        let window = match swap::claim_window(&view, ready_block, true) {
+            ClaimWindow::Open => {
+                swap::claim_window(&view, ready_block, self.chain.railgun_accepts().await?)
+            }
+            held => held,
+        };
+        match window {
+            ClaimWindow::Open => Ok(None),
+            ClaimWindow::NotYet | ClaimWindow::Shut => Ok(Some(ForwardWait::Confirming)),
+            ClaimWindow::Unwinding => Ok(Some(ForwardWait::Unwinding)),
+            ClaimWindow::RailgunClosed => fail(
+                ErrorCode::RailgunClosed,
+                "Railgun is not taking the payout now",
+            ),
         }
-        let lock_duration = self.chain.lock_duration().await?;
-        let Some(deadline) = lock_deadline(
-            swap.claim_lock_until,
-            swap.refund_lock_until,
-            now,
-            lock_duration,
-        )?
-        else {
-            return fail(
-                ErrorCode::ClaimTurn,
-                "no claim lock to reveal under; claim once the next turn is ours",
-            );
-        };
-        let digest = self.pins.domain().lock_claim(&record.swap_id.0, deadline);
-        let signature = self.keys.user_keys(record.index)?.auth.sign(&digest);
-        let authorization = SwapAuthorization {
-            swap_id: record.swap_id,
-            deadline,
-            signature: Hex(signature),
-        };
-        self.relayer
-            .lock_claim(&authorization, terms, record.ticket.as_ref())
-            .await?;
-        self.caught_up(record, terms, |swap| swap.claim_lock_until > now)
-            .await?;
-        Ok(())
-    }
-
-    /// The claim lock read again from a fresh confirmed head: held, with
-    /// more than the margin left, on a swap still open or ready.
-    async fn require_fresh_claim_lock(&self, record: &ForwardRecord, terms: &Terms) -> Result<()> {
-        let fresh = self.chain.confirmed_swap(&record.swap_id.0, terms).await?;
-        let Some(swap) = fresh.swap else {
-            return fail(ErrorCode::ChainLagging, "the claim lock isn't confirmed");
-        };
-        let now = swap::fresh_head(fresh.head.timestamp, self.clock.now())?;
-        let safe = matches!(swap.stage, SwapStage::Open | SwapStage::Ready)
-            && reveal_margin_holds(swap.claim_lock_until, now, self.clock.now());
-        if !safe {
-            return fail(ErrorCode::ClaimTurn, "no safe claim lock to reveal under");
-        }
-        Ok(())
     }
 
     /// The swap once our node shows what `seen` expects: it can lag the node
@@ -1205,6 +1232,7 @@ where
 /// chain shows the swap: it goes on.
 pub(crate) async fn abandon<C: ChainReader, K: Clock>(
     store: &mut SwapStore,
+    pins: &Deployment,
     chain: &C,
     clock: &K,
     account: &str,
@@ -1214,6 +1242,7 @@ pub(crate) async fn abandon<C: ChainReader, K: Clock>(
     if record.finished() {
         return Ok(record);
     }
+    require_served(pins, &record)?;
     if record.deposit_progress() != DepositProgress::NotStarted
         || chain.swap(&record.swap_id.0).await?.is_some()
     {
@@ -1254,21 +1283,48 @@ fn require_time_to_accept(quote: &SwapQuote, now: u64) -> Result<()> {
 }
 
 /// Why no deposit may be paid now, or `None` when one may. Until t0 an
-/// unresponsive maker holds it.
-fn unpayable(
-    pins: &Deployment,
-    terms: &Terms,
-    swap: &SwapState,
-    chain_now: u64,
-) -> Option<NothingSentCause> {
-    if swap.refund_lock_until != 0 {
-        Some(NothingSentCause::MakerCancelled)
-    } else if terms.t1 <= terms.t0 || terms.t0 > chain_now.saturating_add(MAX_SECONDS_TO_T0) {
-        Some(NothingSentCause::Mismatch)
-    } else if terms.t0 < chain_now.saturating_add(pins.min_seconds_to_t0) {
-        Some(NothingSentCause::DepositWindowMissed)
-    } else {
-        None
+/// unresponsive maker holds it, and until the maker refunds from t1 a
+/// deposit it never readied: `t1` must leave the claim from `t0` the
+/// contract's least window and twice the margin, and be no further off than
+/// `MAX_T0_TO_T1_SECONDS`.
+fn unpayable(pins: &Deployment, terms: &Terms, chain_now: u64) -> Result<Option<NothingSentCause>> {
+    let least_claim = pins
+        .swap_contract()?
+        .min_window
+        .max(2 * REVEAL_MARGIN_SECONDS);
+    let claim = terms.t1.checked_sub(terms.t0);
+    Ok(
+        if claim.is_none_or(|claim| !(least_claim..=MAX_T0_TO_T1_SECONDS).contains(&claim))
+            || terms.t0 > chain_now.saturating_add(MAX_SECONDS_TO_T0)
+        {
+            Some(NothingSentCause::Mismatch)
+        } else if terms.t0 < chain_now.saturating_add(pins.min_seconds_to_t0) {
+            Some(NothingSentCause::DepositWindowMissed)
+        } else {
+            None
+        },
+    )
+}
+
+/// The record is pinned to this build's deployment: its quote names the
+/// pinned chain, windows contract, token and maker. One of another, such as
+/// the lock contract's, is never followed.
+fn require_served(pins: &Deployment, record: &ForwardRecord) -> Result<()> {
+    if !serves(pins, &record.quote) {
+        return fail(
+            ErrorCode::WrongDeployment,
+            "the conversion belongs to another deployment",
+        );
+    }
+    Ok(())
+}
+
+/// Waiting on the windows, with the deadlines they run on.
+fn holding(wait: ForwardWait, terms: &Terms) -> ForwardStep {
+    ForwardStep::Waiting {
+        wait,
+        t0: Some(terms.t0),
+        t1: Some(terms.t1),
     }
 }
 
@@ -1366,8 +1422,9 @@ pub(crate) async fn abandon_with(
     account: &str,
     index: u32,
 ) -> Result<ForwardRecord> {
+    let pins = deployment::deployment(network);
     let transport = RoutedHttp::new();
-    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url);
+    let chain = EvmRpc::new(&transport, pins, eth_rpc_url);
     let mut store = SwapStore::open(store_dir)?;
-    abandon(&mut store, &chain, &SystemClock, account, index).await
+    abandon(&mut store, pins, &chain, &SystemClock, account, index).await
 }

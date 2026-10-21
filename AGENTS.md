@@ -1478,6 +1478,18 @@ exists). After it, a fresh page behind an offline bridge
 (`start_offline_railgun_bridge`: it refuses every connection, so no Tor wait)
 calls `deleteWallet`. A failure leaves the wallet until a reset.
 
+**The windows contract.** Swaps settle on zecSwap's windows contract, where
+at every moment one side at most may reveal its share, by the clock and the
+swap's stage; there are no locks. Testnet pins
+`0x459b0a69e0f736666b66a3ffe0fc17c11f05980d` (`MIN_WINDOW` 1800 s,
+`LATE_WINDOW` 3600 s, deployed at block 11958709). Mainnet pins none:
+zecSwap's mainnet still runs the lock contract, so quotes and conversions are
+refused there (`ApiDeployment.bridgeAvailable` is false) until a windows
+contract is deployed; the balance, deposits, send and withdraw work. The
+reveal rules are `swap::claim_window`, `swap::may_sign_ready` and
+`swap::may_refund`, held to the vectors of zecSwap's port oracle
+(`rust/src/wallet/private_usd/tests/windows_vectors.json`).
+
 **Invariants (plan §3.5).** Each one guards funds or privacy. Keep them, and
 keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 `test/features/private_usd/`.
@@ -1490,12 +1502,29 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   before the first broadcast. Rebuild only once the old one is proven
   expired.
 - Derive the deposit address from the on-chain shares, never from the API.
-- Reveal `z` only under a fresh, confirmed lock with more than 300 s left.
-  Only confirmed reads authorize anything, and only a fresh head counts.
-- Never prove a second reverse funding because a response was lost. Never
-  re-sign `ready` after a restart; resend it.
-- Keep every signed payout, refund payout, refund lock, `ready` and Railgun
-  send proof before posting it. Cap every relayer fee at 2 USDC.
+- Trust no swap read until the contract answers `MIN_WINDOW()` and
+  `LATE_WINDOW()` as pinned and reverts `LOCK_DURATION()`. Refuse a maker or
+  relayer that names other windows. A record of the lock contract is read,
+  never driven (`WrongDeployment`), and holds up no new conversion; its
+  indices are still skipped.
+- Reveal `z` only in its window, decided on one consistent read (the swap at
+  the newest block's hash, with that block's number and time) of a fresh
+  head, and again immediately before the post. A window opens by the block's
+  time and closes by the later of it and the device clock. A forward claim
+  goes once the swap is ready (12 blocks deep before `t0`) or from `t0`, with
+  more than 300 s left before `t1`, or for good from `t1 + LATE_WINDOW`; in
+  between, the swap unwinds through the maker's refund. A reverse refund goes
+  on an open escrow once the chain is past every `ready` deadline signed (or
+  at `t0`), on a ready one from `t1`. Never `eth_call` or `eth_estimateGas`
+  anything carrying a share.
+- Only confirmed reads authorize a deposit or the end.
+- Never prove a second reverse funding because a response was lost. Sign
+  `ready` only before `t0` (its deadline, the head plus 120 s, before it),
+  keep that deadline first, and never sign or send one once a refund was
+  posted. Never re-sign `ready` after a restart; resend it.
+- Keep every signed payout, refund payout, `ready` and Railgun send proof
+  before posting it, and a claim or refund as posted before it goes. Cap
+  every relayer fee at 2 USDC.
 - Joint sweeps broadcast before they store. `PROPOSAL_STORE` is
   consume-on-entry with an idempotent discard, as in the hardware invariants.
 - Joint sweeps use Discard OVK, while the deposit uses the sender's OVK.
@@ -1545,8 +1574,9 @@ is refused.
   delegate a deposit address (EIP-7702) or use one otherwise.
 - Deposits follow the active account only, in the foreground and unlocked,
   on a lane of their own in the engine; the kill switch stops new ones,
-  never one under way. `swaps.db` is at schema 2 since deposits: a build
-  that knows only 1 refuses it as newer.
+  never one under way. `swaps.db` gained deposits at schema 2 and the windows
+  contract's records at 3: a build that knows an older schema refuses it as
+  newer.
 
 **Network: Tor and the Railgun page.**
 
@@ -1614,9 +1644,10 @@ far), per `docs/private-usd-ios-device-checklist.md`.
 **Local stand-ins.** `rust/Cargo.toml` carries two stand-ins for releases
 that do not exist yet:
 
-- `~/dev/zapp/zecSwap-zakura-v3`, a zecSwap `[patch]` outside the
-  repository: `zecswap-core` on Zakura Common v3 (E1). A clean clone builds
-  only where that checkout exists.
+- `~/dev/zapp/zecSwap-zakura-windows`, a zecSwap `[patch]` outside the
+  repository: `zecswap-core` of the pinned rev (the windows contract's) on
+  Zakura Common v3 (E1). A clean clone builds only where that checkout
+  exists.
 - `rust/vendor/zakura-client-backend`, the published 0.1.0-rc9 with the
   `connect_stream` patch the Railgun bridge needs
   (`rust/vendor/zakura-client-backend.patch`, E4). Before every push,

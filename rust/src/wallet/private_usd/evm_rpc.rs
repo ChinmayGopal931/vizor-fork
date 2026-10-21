@@ -4,11 +4,22 @@
 //! One JSON-RPC 2.0 request per call (publicnode limits batches), through the
 //! engine's [`HttpTransport`]. Calls and answers are encoded by [`abi`].
 //!
-//! Only [`ChainReader::confirmed_swap`] (and the reverse equivalent) reads a
+//! No swap read is trusted before the chain shows the pinned contract is a
+//! windows one: it answers `MIN_WINDOW()` and `LATE_WINDOW()` as pinned and
+//! reverts `LOCK_DURATION()`, which only the lock contract answers. The lock
+//! contract's six-word swap records would otherwise read as if they followed
+//! the windows.
+//!
+//! [`ChainReader::confirmed_swap`] (and the reverse equivalent) reads a
 //! confirmed block, `head − confirmations + 1`, after checking the node's
-//! chain id; it is the only read that may authorize a deposit, a reveal or a
-//! completion. `swap` reads `latest` and serves index skipping and "did it
+//! chain id; it is the only read that may authorize a deposit or a
+//! completion. A reveal is decided on [`ChainReader::read_swap`]: the swap as
+//! of the newest block, read at that block's hash, with that block's number
+//! and time. `swap` reads `latest` and serves index skipping and "did it
 //! ever open".
+//!
+//! Nothing that carries a share is ever simulated here (`eth_call` or
+//! `eth_estimateGas`): the node would see it before the relayer sends it.
 //!
 //! The RPC URL may carry an API key: it is never logged or stored.
 
@@ -30,14 +41,19 @@ use super::transport::HttpTransport;
 use super::{fail, ErrorCode, PrivateUsdError, Result};
 use crate::wallet::routed_http::RoutedRequest;
 
-/// `getSwap`'s static struct: termsHash, stage, paidOut, claimLockUntil,
-/// refundLockUntil, secret.
-const GET_SWAP_WORDS: usize = 6;
+/// `getSwap`'s static struct: termsHash, stage, paidOut, secret.
+const GET_SWAP_WORDS: usize = 4;
 /// Public nodes cap a log query's range.
 const LOG_WINDOW_BLOCKS: u64 = 5_000;
 const SECONDS_PER_BLOCK: u64 = 12;
+/// A read pinned to the newest block's hash is tried this many times: a
+/// load-balanced node may not know that block yet.
+const PINNED_READ_ATTEMPTS: u32 = 3;
 
 pub(crate) const GET_SWAP: &str = "getSwap(bytes32)";
+pub(crate) const MIN_WINDOW: &str = "MIN_WINDOW()";
+pub(crate) const LATE_WINDOW: &str = "LATE_WINDOW()";
+/// Only the lock contract answers it; the windows contract reverts.
 pub(crate) const LOCK_DURATION: &str = "LOCK_DURATION()";
 pub(crate) const MAKER_KEY_USED: &str = "makerKeyUsed(bytes32)";
 pub(crate) const REVERSE_FUNDING: &str = "reverseFunding(bytes32)";
@@ -46,6 +62,7 @@ pub(crate) const RESCUE_NONCES: &str = "rescueNonces(bytes32)";
 pub(crate) const TOKEN_BLOCKLIST: &str = "tokenBlocklist(address)";
 pub(crate) const BALANCE_OF: &str = "balanceOf(address)";
 pub(crate) const PAID_OUT_EVENT: &str = "PaidOut(bytes32,address,uint256)";
+pub(crate) const REFUNDED_EVENT: &str = "Refunded(bytes32,uint256)";
 /// Railgun's proxy: whether a note's nullifier in a tree is spent.
 pub(crate) const NULLIFIERS: &str = "nullifiers(uint256,bytes32)";
 /// A relayed send counts as landed once its receipt has this many blocks.
@@ -65,10 +82,13 @@ pub(crate) const AUTHORIZATION_STATE: &str = "authorizationState(address,bytes32
 /// blocks, as a relayed send does.
 pub(crate) const DEPOSIT_CONFIRMATIONS: u32 = SEND_CONFIRMATIONS;
 
+/// A block's number, time and hash: the time is the clock the contract's
+/// windows run on, and the hash pins a read to that very block.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Head {
     pub number: u64,
     pub timestamp: u64,
+    pub hash: [u8; 32],
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -87,8 +107,6 @@ pub(crate) struct SwapState {
     pub stage: SwapStage,
     /// A payout into Railgun has left the contract.
     pub paid_out: bool,
-    pub claim_lock_until: u64,
-    pub refund_lock_until: u64,
     /// The share a claim or refund revealed, big-endian, once there was one
     /// (what `SecretShare::from_be_bytes` takes).
     pub secret: [u8; 32],
@@ -102,6 +120,15 @@ pub(crate) struct ConfirmedSwap {
     pub swap: Option<SwapState>,
 }
 
+/// One consistent read: the swap as of the newest block, and that block.
+/// Two reads from a load-balanced node can be a block apart, and one block
+/// is all that lies between a last-moment reveal and the other side's.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SwapRead {
+    pub head: Head,
+    pub swap: Option<SwapState>,
+}
+
 /// A reverse escrow at one confirmed block: its swap, and the refund note
 /// and funding block the contract keeps apart (`refund_note` zero: none).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -110,7 +137,6 @@ pub(crate) struct ReverseChainState {
     pub swap: Option<SwapState>,
     pub refund_note: [u8; 32],
     pub funding_block: u64,
-    pub lock_duration: u64,
 }
 
 /// A confirmed `PaidOut(id, relayer, fee)` event.
@@ -139,11 +165,18 @@ pub(crate) trait ChainReader {
     async fn head(&self) -> Result<Head>;
     /// `latest`, unconfirmed: never authorizes anything.
     async fn swap(&self, id: &[u8; 32]) -> Result<Option<SwapState>>;
-    /// The only read that authorizes a deposit, a reveal or completion.
+    /// The only read that authorizes a deposit or completion.
     async fn confirmed_swap(&self, id: &[u8; 32], terms: &Terms) -> Result<ConfirmedSwap>;
-    /// Immutable, so read once.
-    async fn lock_duration(&self) -> Result<u64>;
+    /// The swap as of the newest block, with that block: the read a reveal
+    /// is decided on.
+    async fn read_swap(&self, id: &[u8; 32], terms: &Terms) -> Result<SwapRead>;
+    /// The swap as of block `number`.
+    async fn swap_at(&self, id: &[u8; 32], terms: &Terms, number: u64)
+        -> Result<Option<SwapState>>;
     async fn maker_key_used(&self, key: &[u8; 32]) -> Result<bool>;
+    /// Whether a retired contract shows swap `id`, or maker key `key`, in
+    /// use.
+    async fn used_before(&self, id: &[u8; 32], key: &[u8; 32]) -> Result<bool>;
     async fn reverse_state(&self, id: &[u8; 32], terms: &Terms) -> Result<ReverseChainState>;
     async fn vault_balance(&self, id: &[u8; 32]) -> Result<u128>;
     async fn rescue_nonce(&self, id: &[u8; 32]) -> Result<u64>;
@@ -152,6 +185,9 @@ pub(crate) trait ChainReader {
     async fn railgun_accepts(&self) -> Result<bool>;
     /// The confirmed payout of `id`, looking back to `since` (unix seconds).
     async fn confirmed_payout(&self, id: &[u8; 32], since: u64) -> Result<Option<PaidOut>>;
+    /// When the confirmed refund of `id` mined (its block's time), looking
+    /// back to `since`.
+    async fn confirmed_refund_time(&self, id: &[u8; 32], since: u64) -> Result<Option<u64>>;
     async fn transaction_status(
         &self,
         transaction: &[u8; 32],
@@ -270,12 +306,20 @@ struct LogEntry {
     removed: bool,
 }
 
+/// A confirmed log of the swap contract: its block, transaction and data.
+struct SwapEvent {
+    block: u64,
+    transaction: [u8; 32],
+    data: Vec<u8>,
+}
+
 /// One deployment's contract over JSON-RPC at `url`.
 pub(crate) struct EvmRpc<'a, T: HttpTransport> {
     transport: &'a T,
     url: String,
     pins: &'static Deployment,
-    lock_duration: OnceLock<u64>,
+    /// Set once the chain showed the pinned contract is a windows one.
+    windows: OnceLock<()>,
     next_id: AtomicU64,
 }
 
@@ -287,7 +331,7 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
             transport,
             url: pins.rpc_url(keyed_rpc_url).to_owned(),
             pins,
-            lock_duration: OnceLock::new(),
+            windows: OnceLock::new(),
             next_id: AtomicU64::new(1),
         }
     }
@@ -366,6 +410,16 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
         data: Vec<u8>,
         block: &str,
     ) -> std::result::Result<Vec<u8>, RpcError> {
+        self.eth_call_at(to, data, json!(block)).await
+    }
+
+    /// `eth_call` at `block`: a tag, a number, or `{"blockHash": …}`.
+    async fn eth_call_at(
+        &self,
+        to: &[u8; 20],
+        data: Vec<u8>,
+        block: Value,
+    ) -> std::result::Result<Vec<u8>, RpcError> {
         let result = self
             .rpc(
                 "eth_call",
@@ -378,16 +432,65 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
         hex_bytes(&result).map_err(RpcError::Failed)
     }
 
-    /// `signature(word)` on the swap contract at `block`.
+    /// `signature(word)` on the swap contract at `block`, once it is the
+    /// pinned windows contract.
     async fn contract_call(
         &self,
         signature: &str,
         word: &[u8; 32],
         block: &str,
     ) -> Result<Vec<u8>> {
+        let contract = self.windows_contract().await?;
         Ok(self
-            .eth_call(&self.pins.contract, call_data(signature, &[*word]), block)
+            .eth_call(&contract, call_data(signature, &[*word]), block)
             .await?)
+    }
+
+    /// The pinned windows contract, once the chain shows it is one: it
+    /// answers `MIN_WINDOW()` and `LATE_WINDOW()` with the pinned windows and
+    /// reverts `LOCK_DURATION()`. Checked once; `WrongDeployment` for any
+    /// other contract, the lock contract included, and `Unavailable` where
+    /// bridging is off.
+    async fn windows_contract(&self) -> Result<[u8; 20]> {
+        let pinned = self.pins.swap_contract()?;
+        if self.windows.get().is_some() {
+            return Ok(pinned.address);
+        }
+        let min = self.window(&pinned.address, MIN_WINDOW).await?;
+        let late = self.window(&pinned.address, LATE_WINDOW).await?;
+        let locks = self
+            .call_unless_reverted(&pinned.address, LOCK_DURATION)
+            .await?;
+        if min != Some(pinned.min_window) || late != Some(pinned.late_window) || locks.is_some() {
+            return fail(
+                ErrorCode::WrongDeployment,
+                "the swap contract is not the pinned windows contract",
+            );
+        }
+        let _ = self.windows.set(());
+        Ok(pinned.address)
+    }
+
+    /// A window's length as `contract` answers `signature()`; `None` where
+    /// it reverts.
+    async fn window(&self, contract: &[u8; 20], signature: &str) -> Result<Option<u64>> {
+        self.call_unless_reverted(contract, signature)
+            .await?
+            .map(|data| u64_word(&exact_word(&data)?))
+            .transpose()
+    }
+
+    /// `signature()` on `to` at `latest`; `None` where it reverts.
+    async fn call_unless_reverted(
+        &self,
+        to: &[u8; 20],
+        signature: &str,
+    ) -> Result<Option<Vec<u8>>> {
+        match self.eth_call(to, call_data(signature, &[]), "latest").await {
+            Ok(data) => Ok(Some(data)),
+            Err(RpcError::Reverted) => Ok(None),
+            Err(RpcError::Failed(error)) => Err(error),
+        }
     }
 
     async fn require_chain(&self) -> Result<()> {
@@ -406,6 +509,70 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
         let result = self.rpc(method, json!([hex0x(transaction)])).await?;
         Ok((!result.is_null()).then_some(result))
     }
+
+    /// The swap contract's confirmed `event` for `id`, looking back to
+    /// `since` (unix seconds) in bounded pages, events delayed past it
+    /// included.
+    async fn confirmed_event(
+        &self,
+        event: &str,
+        id: &[u8; 32],
+        since: u64,
+    ) -> Result<Option<SwapEvent>> {
+        self.require_chain().await?;
+        let contract = hex0x(&self.windows_contract().await?);
+        let head = self.head().await?;
+        let confirmed = self.confirmed_number(head);
+        let elapsed = head.timestamp - since.min(head.timestamp);
+        let around = head.number.saturating_sub(elapsed / SECONDS_PER_BLOCK);
+        let earliest = around.saturating_sub(LOG_WINDOW_BLOCKS).min(confirmed);
+        let topic = hex0x(&keccak(&[event.as_bytes()]));
+        let id_topic = hex0x(id);
+        let mut to = confirmed;
+        loop {
+            let from = (to + 1).saturating_sub(LOG_WINDOW_BLOCKS).max(earliest);
+            let logs = self
+                .rpc(
+                    "eth_getLogs",
+                    json!([{
+                        "address": contract,
+                        "topics": [topic, id_topic],
+                        "fromBlock": block_tag(from),
+                        "toBlock": block_tag(to),
+                    }]),
+                )
+                .await?;
+            let logs: Vec<LogEntry> = serde_json::from_value(logs).map_err(|_| {
+                PrivateUsdError::new(ErrorCode::ChainUnreadable, "unreadable swap logs")
+            })?;
+            for log in logs {
+                let block = quantity(&Value::String(log.block_number.clone()))?;
+                if log.removed
+                    || !log.address.eq_ignore_ascii_case(&contract)
+                    || log.topics.len() != 2
+                    || !log.topics[0].eq_ignore_ascii_case(&topic)
+                    || !log.topics[1].eq_ignore_ascii_case(&id_topic)
+                    || !(from..=to).contains(&block)
+                {
+                    continue;
+                }
+                let transaction = super::models::Word::parse(&log.transaction_hash)
+                    .ok_or_else(|| {
+                        PrivateUsdError::new(ErrorCode::ChainUnreadable, "unreadable log hash")
+                    })?
+                    .0;
+                return Ok(Some(SwapEvent {
+                    block,
+                    transaction,
+                    data: hex_bytes(&Value::String(log.data))?,
+                }));
+            }
+            if from <= earliest {
+                return Ok(None);
+            }
+            to = from - 1;
+        }
+    }
 }
 
 impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
@@ -420,10 +587,7 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
         if block.is_null() {
             return fail(ErrorCode::ChainUnreadable, "the node has no latest block");
         }
-        Ok(Head {
-            number: quantity(&block["number"])?,
-            timestamp: quantity(&block["timestamp"])?,
-        })
+        head_of(&block)
     }
 
     async fn swap(&self, id: &[u8; 32]) -> Result<Option<SwapState>> {
@@ -440,20 +604,63 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
         Ok(ConfirmedSwap { head, swap })
     }
 
-    async fn lock_duration(&self) -> Result<u64> {
-        if let Some(duration) = self.lock_duration.get() {
-            return Ok(*duration);
+    async fn read_swap(&self, id: &[u8; 32], terms: &Terms) -> Result<SwapRead> {
+        self.require_chain().await?;
+        let contract = self.windows_contract().await?;
+        let mut attempts = 0;
+        loop {
+            attempts += 1;
+            let head = self.head().await?;
+            let at = json!({ "blockHash": hex0x(&head.hash) });
+            match self
+                .eth_call_at(&contract, call_data(GET_SWAP, &[*id]), at)
+                .await
+            {
+                Ok(data) => {
+                    let swap = decode_swap_state(&data)?
+                        .map(|state| state.verified(terms))
+                        .transpose()?;
+                    return Ok(SwapRead { head, swap });
+                }
+                // A node behind its balancer's newest block does not know
+                // its hash yet: read both again.
+                Err(RpcError::Failed(_)) if attempts < PINNED_READ_ATTEMPTS => {}
+                Err(error) => return Err(error.into()),
+            }
         }
-        let data = self
-            .eth_call(&self.pins.contract, call_data(LOCK_DURATION, &[]), "latest")
-            .await?;
-        let duration = u64_word(&words(&data, 1)?[0])?;
-        Ok(*self.lock_duration.get_or_init(|| duration))
+    }
+
+    async fn swap_at(
+        &self,
+        id: &[u8; 32],
+        terms: &Terms,
+        number: u64,
+    ) -> Result<Option<SwapState>> {
+        decode_swap_state(&self.contract_call(GET_SWAP, id, &block_tag(number)).await?)?
+            .map(|state| state.verified(terms))
+            .transpose()
     }
 
     async fn maker_key_used(&self, key: &[u8; 32]) -> Result<bool> {
         let data = self.contract_call(MAKER_KEY_USED, key, "latest").await?;
         Ok(words(&data, 1)?[0][WORD - 1] != 0)
+    }
+
+    async fn used_before(&self, id: &[u8; 32], key: &[u8; 32]) -> Result<bool> {
+        for contract in self.pins.retired_contracts {
+            // A lock contract's swap record is six words, its stage the
+            // second.
+            let record = self
+                .eth_call(contract, call_data(GET_SWAP, &[*id]), "latest")
+                .await?;
+            let used = self
+                .eth_call(contract, call_data(MAKER_KEY_USED, &[*key]), "latest")
+                .await?;
+            if words(&record, 2)?[1] != [0; WORD] || words(&used, 1)?[0] != [0; WORD] {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     async fn reverse_state(&self, id: &[u8; 32], terms: &Terms) -> Result<ReverseChainState> {
@@ -470,7 +677,6 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
             swap,
             refund_note: funding[0],
             funding_block: u64_word(&funding[1])?,
-            lock_duration: self.lock_duration().await?,
         })
     }
 
@@ -509,63 +715,31 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
     }
 
     async fn confirmed_payout(&self, id: &[u8; 32], since: u64) -> Result<Option<PaidOut>> {
-        self.require_chain().await?;
-        let head = self.head().await?;
-        let confirmed = self.confirmed_number(head);
-        // Walk back in bounded pages to before the swap was accepted,
-        // including payouts delayed past `since`.
-        let elapsed = head.timestamp - since.min(head.timestamp);
-        let around = head.number.saturating_sub(elapsed / SECONDS_PER_BLOCK);
-        let earliest = around.saturating_sub(LOG_WINDOW_BLOCKS).min(confirmed);
-        let topic = hex0x(&keccak(&[PAID_OUT_EVENT.as_bytes()]));
-        let id_topic = hex0x(id);
-        let contract = hex0x(&self.pins.contract);
-        let mut to = confirmed;
-        loop {
-            let from = (to + 1).saturating_sub(LOG_WINDOW_BLOCKS).max(earliest);
-            let logs = self
-                .rpc(
-                    "eth_getLogs",
-                    json!([{
-                        "address": contract,
-                        "topics": [topic, id_topic],
-                        "fromBlock": block_tag(from),
-                        "toBlock": block_tag(to),
-                    }]),
-                )
-                .await?;
-            let logs: Vec<LogEntry> = serde_json::from_value(logs).map_err(|_| {
-                PrivateUsdError::new(ErrorCode::ChainUnreadable, "unreadable payout logs")
-            })?;
-            for log in logs {
-                let block = quantity(&Value::String(log.block_number.clone()))?;
-                if log.removed
-                    || !log.address.eq_ignore_ascii_case(&contract)
-                    || log.topics.len() != 2
-                    || !log.topics[0].eq_ignore_ascii_case(&topic)
-                    || !log.topics[1].eq_ignore_ascii_case(&id_topic)
-                    || !(from..=to).contains(&block)
-                {
-                    continue;
-                }
-                let data = hex_bytes(&Value::String(log.data))?;
-                let fields = words(&data, 2)?;
-                let transaction = super::models::Word::parse(&log.transaction_hash)
-                    .ok_or_else(|| {
-                        PrivateUsdError::new(ErrorCode::ChainUnreadable, "unreadable payout hash")
-                    })?
-                    .0;
-                return Ok(Some(PaidOut {
-                    transaction,
-                    relayer: fields[0][12..].try_into().expect("20 bytes"),
-                    fee: u128_word(&fields[1])?,
-                }));
-            }
-            if from <= earliest {
-                return Ok(None);
-            }
-            to = from - 1;
+        let Some(event) = self.confirmed_event(PAID_OUT_EVENT, id, since).await? else {
+            return Ok(None);
+        };
+        let fields = words(&event.data, 2)?;
+        Ok(Some(PaidOut {
+            transaction: event.transaction,
+            relayer: fields[0][12..].try_into().expect("20 bytes"),
+            fee: u128_word(&fields[1])?,
+        }))
+    }
+
+    async fn confirmed_refund_time(&self, id: &[u8; 32], since: u64) -> Result<Option<u64>> {
+        let Some(event) = self.confirmed_event(REFUNDED_EVENT, id, since).await? else {
+            return Ok(None);
+        };
+        let block = self
+            .rpc(
+                "eth_getBlockByNumber",
+                json!([block_tag(event.block), false]),
+            )
+            .await?;
+        if block.is_null() {
+            return fail(ErrorCode::ChainUnreadable, "the refund's block is unknown");
         }
+        Ok(Some(head_of(&block)?.timestamp))
     }
 
     async fn transaction_status(
@@ -800,8 +974,9 @@ impl SwapState {
     }
 }
 
-/// `getSwap`'s answer: exactly six words, or another contract's ABI
-/// (`WRONG_DEPLOYMENT`). Stage 0 is no swap.
+/// `getSwap`'s answer: exactly four words, or another contract's ABI
+/// (`WRONG_DEPLOYMENT`; the lock contract's records are six). Stage 0 is no
+/// swap.
 pub(crate) fn decode_swap_state(data: &[u8]) -> Result<Option<SwapState>> {
     if data.len() != GET_SWAP_WORDS * WORD {
         return fail(
@@ -810,7 +985,7 @@ pub(crate) fn decode_swap_state(data: &[u8]) -> Result<Option<SwapState>> {
         );
     }
     let words = words(data, GET_SWAP_WORDS)?;
-    let stage = match words[1][WORD - 1] {
+    let stage = match u64_word(&words[1])? {
         0 => return Ok(None),
         1 => SwapStage::Open,
         2 => SwapStage::Ready,
@@ -826,11 +1001,22 @@ pub(crate) fn decode_swap_state(data: &[u8]) -> Result<Option<SwapState>> {
     Ok(Some(SwapState {
         terms_hash: words[0],
         stage,
-        paid_out: words[2][WORD - 1] != 0,
-        claim_lock_until: u64_word(&words[3])?,
-        refund_lock_until: u64_word(&words[4])?,
-        secret: words[5],
+        paid_out: bool_word(&words[2])?,
+        secret: words[3],
     }))
+}
+
+/// A block's number, time and hash, as `eth_getBlockByNumber` gives them.
+fn head_of(block: &Value) -> Result<Head> {
+    let hash = block["hash"]
+        .as_str()
+        .and_then(super::models::Word::parse)
+        .ok_or_else(|| PrivateUsdError::new(ErrorCode::ChainUnreadable, "unreadable block hash"))?;
+    Ok(Head {
+        number: quantity(&block["number"])?,
+        timestamp: quantity(&block["timestamp"])?,
+        hash: hash.0,
+    })
 }
 
 fn block_tag(number: u64) -> String {
@@ -875,7 +1061,7 @@ mod tests {
     }
 
     fn get_swap_answer(stage: u8) -> Vec<u8> {
-        [word(0xaa), word(stage), word(0), word(5), word(0), word(0)].concat()
+        [word(0xaa), word(stage), word(1), word(7)].concat()
     }
 
     fn method(request: &RoutedRequest) -> (String, Value) {
@@ -886,15 +1072,97 @@ mod tests {
         )
     }
 
+    /// The selector an `eth_call` asks for, `0x` and four bytes.
+    fn selector_of(params: &Value) -> String {
+        params[0]["data"].as_str().unwrap()[..10].to_owned()
+    }
+
+    fn word_answer(value: u64) -> RoutedResponse {
+        rpc_result(json!(hex0x(&uint_word(value.into()))))
+    }
+
+    fn block(number: u64, hash: u8) -> Value {
+        json!({
+            "number": format!("0x{number:x}"),
+            "timestamp": "0x6ab0f200",
+            "hash": hex0x(&[hash; 32]),
+        })
+    }
+
+    /// A node on the pinned chain whose swap contract answers `min` and
+    /// `late` as its windows, `LOCK_DURATION()` with `locks` (`None`
+    /// reverts), and `getSwap` with `record`; one pinned to the first head's
+    /// hash fails, as a node that does not know that block yet does.
+    fn node(
+        min: Option<u64>,
+        late: Option<u64>,
+        locks: Option<u64>,
+        record: Vec<u8>,
+    ) -> ScriptedTransport<
+        impl Fn(&RoutedRequest) -> std::result::Result<RoutedResponse, RoutedError>,
+    > {
+        let known = std::cell::Cell::new(0u8);
+        ScriptedTransport::new(move |request: &RoutedRequest| {
+            let (method, params) = method(request);
+            let answer = |value: Option<u64>| {
+                value.map_or_else(|| rpc_error(3, "execution reverted"), word_answer)
+            };
+            Ok::<RoutedResponse, RoutedError>(match method.as_str() {
+                "eth_chainId" => rpc_result(json!("0xaa36a7")),
+                "eth_getBlockByNumber" => {
+                    known.set(known.get() + 1);
+                    rpc_result(block(100, known.get()))
+                }
+                "eth_call" => match selector_of(&params).as_str() {
+                    "0x52b65c4b" => answer(min),
+                    "0x4d9fef3e" => answer(late),
+                    "0x485d3834" => answer(locks),
+                    "0x3da0e66e" => match params[1].get("blockHash") {
+                        // The first head's block is not known yet.
+                        Some(hash) if *hash == json!(hex0x(&[1; 32])) => {
+                            rpc_error(-32001, "block not found")
+                        }
+                        _ => rpc_result(json!(hex0x(&record))),
+                    },
+                    other => panic!("unexpected call {other}"),
+                },
+                other => panic!("unexpected method {other}"),
+            })
+        })
+    }
+
+    fn terms(pins: &Deployment) -> Terms {
+        zecswap_core::Terms {
+            maker: pins.maker,
+            token: pins.token,
+            amount: 1,
+            maker_share: zecswap_core::derive_maker_share(&[9; 32], 0)
+                .unwrap()
+                .public(),
+            user_share: zecswap_core::derive_maker_share(&[8; 32], 0)
+                .unwrap()
+                .public(),
+            user: [4; 20],
+            t0: 1,
+            t1: 2,
+            payout_note: [0; 32],
+        }
+    }
+
     #[test]
-    fn get_swap_reads_exactly_six_words() {
+    fn get_swap_reads_exactly_four_words() {
         assert_eq!(decode_swap_state(&get_swap_answer(0)).unwrap(), None);
         let open = decode_swap_state(&get_swap_answer(1)).unwrap().unwrap();
         assert_eq!(open.stage, SwapStage::Open);
-        assert_eq!(open.claim_lock_until, 5);
+        assert!(open.paid_out);
         assert_eq!(open.terms_hash, word(0xaa));
+        assert_eq!(open.secret, word(7));
+        // The lock contract's six-word record is another deployment's, as is
+        // any other length.
+        let lock_record = [get_swap_answer(1), word(5).to_vec(), word(0).to_vec()].concat();
         for data in [
-            get_swap_answer(1)[..191].to_vec(),
+            lock_record,
+            get_swap_answer(1)[..127].to_vec(),
             [get_swap_answer(1), vec![0]].concat(),
             Vec::new(),
         ] {
@@ -905,12 +1173,134 @@ mod tests {
                 data.len()
             );
         }
-        // A lock time beyond u64 is not this contract's.
-        let mut wide = get_swap_answer(1);
-        wide[3 * 32] = 1;
+        // A stage beyond the contract's, or a flag that is not a bool, does
+        // not read.
+        let mut stage = get_swap_answer(5);
+        assert!(decode_swap_state(&stage).is_err());
+        stage[32] = 1;
+        assert!(decode_swap_state(&stage).is_err());
+        let mut flag = get_swap_answer(1);
+        flag[2 * 32 + 31] = 2;
+        assert!(decode_swap_state(&flag).is_err());
+    }
+
+    /// No swap read is trusted until the contract shows it is the pinned
+    /// windows contract: the lock contract (which answers `LOCK_DURATION()`
+    /// and no windows), other windows, or a contract answering both are
+    /// refused, and nothing is read of the swap.
+    #[tokio::test]
+    async fn only_the_pinned_windows_contract_is_read() {
+        let pins = deployment::deployment(PrivateUsdNetwork::Testnet);
+        let swaps = pins.swap_contract().unwrap();
+        let (min, late) = (Some(swaps.min_window), Some(swaps.late_window));
+        let open = get_swap_answer(1);
+        for (case, transport) in [
+            (
+                "the lock contract",
+                node(None, None, Some(600), open.clone()),
+            ),
+            (
+                "another minimum window",
+                node(Some(3_600), late, None, open.clone()),
+            ),
+            (
+                "another late window",
+                node(min, Some(86_400), None, open.clone()),
+            ),
+            (
+                "windows and locks",
+                node(min, late, Some(600), open.clone()),
+            ),
+        ] {
+            let rpc = EvmRpc::new(&transport, pins, "https://rpc.invalid");
+            let error = rpc.swap(&[1; 32]).await.unwrap_err();
+            assert_eq!(error.code, ErrorCode::WrongDeployment, "{case}");
+            let read = rpc.read_swap(&[1; 32], &terms(pins)).await.unwrap_err();
+            assert_eq!(read.code, ErrorCode::WrongDeployment, "{case}");
+            let asked: Vec<String> = transport
+                .sent
+                .borrow()
+                .iter()
+                .map(method)
+                .filter(|(method, _)| method == "eth_call")
+                .map(|(_, params)| selector_of(&params))
+                .collect();
+            assert!(
+                !asked.contains(&"0x3da0e66e".to_owned()),
+                "{case}: {asked:?}"
+            );
+        }
+
+        // The pinned windows: checked once, then the swap is read.
+        let windows = node(min, late, None, get_swap_answer(0));
+        let rpc = EvmRpc::new(&windows, pins, "https://rpc.invalid");
+        assert_eq!(rpc.swap(&[1; 32]).await.unwrap(), None);
+        assert_eq!(rpc.swap(&[1; 32]).await.unwrap(), None);
+        assert_eq!(windows.sent.borrow().len(), 3 + 2);
+
+        // Mainnet pins no swap contract: nothing is asked of any.
+        let mainnet = node(min, late, None, open);
+        let rpc = EvmRpc::new(
+            &mainnet,
+            deployment::deployment(PrivateUsdNetwork::Mainnet),
+            "https://rpc.invalid",
+        );
         assert_eq!(
-            decode_swap_state(&wide).unwrap_err().code,
-            ErrorCode::WrongDeployment
+            rpc.swap(&[1; 32]).await.unwrap_err().code,
+            ErrorCode::Unavailable
+        );
+        assert!(mainnet.sent.borrow().is_empty());
+    }
+
+    /// A reveal's read takes the swap at the newest block's hash, with that
+    /// block's number and time; a node that does not know the hash yet is
+    /// asked again from a new head.
+    #[tokio::test]
+    async fn a_reveals_read_is_one_block_by_its_hash() {
+        let pins = deployment::deployment(PrivateUsdNetwork::Testnet);
+        let swaps = pins.swap_contract().unwrap();
+        let terms = terms(pins);
+        let mut record = get_swap_answer(2);
+        record[..32].copy_from_slice(&terms.hash());
+        let transport = node(
+            Some(swaps.min_window),
+            Some(swaps.late_window),
+            None,
+            record,
+        );
+        let rpc = EvmRpc::new(&transport, pins, "https://rpc.invalid");
+
+        let read = rpc.read_swap(&[1; 32], &terms).await.unwrap();
+        assert_eq!(
+            read.head,
+            Head {
+                number: 100,
+                timestamp: 0x6ab0_f200,
+                hash: [2; 32],
+            }
+        );
+        assert_eq!(read.swap.map(|swap| swap.stage), Some(SwapStage::Ready));
+        let pinned: Vec<Value> = transport
+            .sent
+            .borrow()
+            .iter()
+            .map(method)
+            .filter(|(method, params)| method == "eth_call" && selector_of(params) == "0x3da0e66e")
+            .map(|(_, params)| params[1].clone())
+            .collect();
+        assert_eq!(
+            pinned,
+            vec![
+                json!({ "blockHash": hex0x(&[1; 32]) }),
+                json!({ "blockHash": hex0x(&[2; 32]) }),
+            ]
+        );
+
+        // Terms the record does not hash to are refused.
+        let other = Terms { amount: 2, ..terms };
+        assert_eq!(
+            rpc.read_swap(&[1; 32], &other).await.unwrap_err().code,
+            ErrorCode::Mismatch
         );
     }
 
@@ -947,22 +1337,10 @@ mod tests {
             Ok::<RoutedResponse, RoutedError>(rpc_result(json!("0x1")))
         });
         let rpc = EvmRpc::new(&mainnet_node, pins, "https://rpc.invalid");
-        let terms = zecswap_core::Terms {
-            maker: pins.maker,
-            token: pins.token,
-            amount: 1,
-            maker_share: zecswap_core::derive_maker_share(&[9; 32], 0)
-                .unwrap()
-                .public(),
-            user_share: zecswap_core::derive_maker_share(&[8; 32], 0)
-                .unwrap()
-                .public(),
-            user: [4; 20],
-            t0: 1,
-            t1: 2,
-            payout_note: [0; 32],
-        };
-        let error = rpc.confirmed_swap(&[1; 32], &terms).await.unwrap_err();
+        let error = rpc
+            .confirmed_swap(&[1; 32], &terms(pins))
+            .await
+            .unwrap_err();
         assert_eq!(error.code, ErrorCode::WrongDeployment);
         assert_eq!(mainnet_node.sent.borrow().len(), 1);
     }

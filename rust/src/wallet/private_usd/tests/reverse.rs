@@ -12,8 +12,10 @@ use super::super::evm_rpc::{SwapStage, TransactionStatus};
 use super::super::funding_calls;
 use super::super::joint::SwapTxStatus;
 use super::super::models::{
-    Direction, Hex, ReverseFundingTransaction, ReversePhase, ReverseReceiveEstimate, StoredRecord,
+    Direction, Hex, NothingSentCause, ReverseFundingTransaction, ReversePhase,
+    ReverseReceiveEstimate, ReverseRecord, StoredRecord,
 };
+use super::super::reverse::ReverseAccept;
 use super::super::terms;
 use super::super::ErrorCode;
 use super::fakes::*;
@@ -36,15 +38,35 @@ fn argument(data: &[u8], index: usize) -> [u8; 32] {
         .unwrap()
 }
 
-/// Funded and called off with the escrow open: the refund lock is taken.
-async fn called_off_with_escrow() -> Harness {
+/// Funded, with the escrow open on chain and no `ready` signed.
+async fn escrowed() -> Harness {
     let h = Harness::new();
     h.prepared().await;
     h.fund().await.unwrap();
     h.funded();
-    let cancelled = h.reverse().cancel(&mut h.store(), 0).await.unwrap();
-    assert_eq!(cancelled.phase, ReversePhase::Refunding);
     h
+}
+
+/// Escrowed, the maker's ZEC in, and `ready` authorized and handed out; the
+/// escrow is still open.
+async fn authorized() -> Harness {
+    let h = escrowed().await;
+    h.world.set().paid_in = REVERSE_DEPOSIT_ZAT;
+    h.advance_reverse().await.unwrap();
+    h.reverse()
+        .authorize_ready(&mut h.store(), 0)
+        .await
+        .unwrap();
+    h
+}
+
+impl Harness {
+    /// Replaces the kept reverse record, as an earlier run left it.
+    fn keep_reverse(&self, record: ReverseRecord) {
+        self.store()
+            .update(&self.account, &StoredRecord::Reverse(Box::new(record)))
+            .unwrap();
+    }
 }
 
 /// A funding whose answer was lost is never proved again: the kept bytes go
@@ -207,7 +229,10 @@ async fn ready_is_signed_only_by_the_user_and_never_again_after_a_restart() {
     assert_eq!(settling.phase, ReversePhase::Settling);
     let ready = settling.ready.clone().unwrap();
     assert_eq!(ready.deadline, h.world.get().chain_now + 120);
-    let digest = pins().domain().ready(&settling.swap_id.0, ready.deadline);
+    let digest = pins()
+        .domain()
+        .unwrap()
+        .ready(&settling.swap_id.0, ready.deadline);
     assert_eq!(
         zecswap_core::signer(&digest, &ready.signature.0),
         Some(h.keys.auth_address(0).unwrap())
@@ -227,15 +252,78 @@ async fn ready_is_signed_only_by_the_user_and_never_again_after_a_restart() {
     );
 
     // Lapsed: neither sent nor signed again; called off, the refund goes on
-    // without it.
+    // without it, the chain being past its deadline.
     h.world.set().pass(121);
     let lapsed = h.advance_reverse().await.unwrap();
     assert_eq!(lapsed.phase, ReversePhase::RefundWait);
     h.reverse().cancel(&mut h.store(), 0).await.unwrap();
+    assert_eq!(h.posts("/v1/reverse/refund"), 1);
+    // Posted again, the same, until it lands; the ready never again.
     h.advance_reverse().await.unwrap();
+    assert_eq!(h.posts("/v1/reverse/refund"), 2);
     assert_eq!(h.posts("/v1/reverse/ready"), 2);
-    assert!(h.posts("/v1/reverse/lock-refund") > 0);
     assert_eq!(h.reverse_record(0).ready, Some(ready));
+}
+
+/// Once a refund was posted no `ready` is signed, nor a kept one sent again:
+/// landing first, it would revert the refund with `z` public.
+#[tokio::test]
+async fn no_ready_is_signed_or_sent_after_a_refund_was_posted() {
+    let h = escrowed().await;
+    h.world.set().paid_in = REVERSE_DEPOSIT_ZAT;
+    assert_eq!(
+        h.advance_reverse().await.unwrap().phase,
+        ReversePhase::AwaitingReady
+    );
+    let mut record = h.reverse_record(0);
+    record.refund_posted = true;
+    h.keep_reverse(record);
+    let refused = h
+        .reverse()
+        .authorize_ready(&mut h.store(), 0)
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code, ErrorCode::TooLate);
+    assert_eq!(h.reverse_record(0).ready, None);
+    assert_eq!(h.posts("/v1/reverse/ready"), 0);
+
+    let h = authorized().await;
+    assert_eq!(h.posts("/v1/reverse/ready"), 1);
+    let mut record = h.reverse_record(0);
+    record.refund_posted = true;
+    h.keep_reverse(record);
+    h.advance_reverse().await.unwrap();
+    assert_eq!(h.posts("/v1/reverse/ready"), 1);
+}
+
+/// `ready` is offered only while its signature's deadline falls before t0,
+/// by the chain's clock, from when no ready lands.
+#[tokio::test]
+async fn ready_is_signed_only_with_its_deadline_before_t0() {
+    let h = escrowed().await;
+    h.world.set().paid_in = REVERSE_DEPOSIT_ZAT;
+    h.advance_reverse().await.unwrap();
+    let to_cutoff = READY - 120 - h.world.get().chain_now;
+    h.world.set().pass(to_cutoff);
+    let refused = h
+        .reverse()
+        .authorize_ready(&mut h.store(), 0)
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code, ErrorCode::TooLate);
+    assert_eq!(h.posts("/v1/reverse/ready"), 0);
+
+    let h = escrowed().await;
+    h.world.set().paid_in = REVERSE_DEPOSIT_ZAT;
+    h.advance_reverse().await.unwrap();
+    let to_cutoff = READY - 121 - h.world.get().chain_now;
+    h.world.set().pass(to_cutoff);
+    let settling = h
+        .reverse()
+        .authorize_ready(&mut h.store(), 0)
+        .await
+        .unwrap();
+    assert_eq!(settling.ready.unwrap().deadline, READY - 1);
 }
 
 /// The sweep home pays at most the fee the user reviewed with `ready`,
@@ -309,80 +397,133 @@ async fn the_sweep_home_pays_no_more_than_the_reviewed_fee() {
     assert_eq!(h.world.get().forgotten, 1);
 }
 
-/// `z` is revealed only under our refund lock with more than the margin
-/// left, read from a fresh head again immediately before the reveal: never
-/// inside the margin, never when the lock lapses or the escrow settles while
-/// the reveal is prepared, never through a node minutes behind.
+/// `z` is revealed to refund an open escrow only once no `ready` of ours can
+/// land, the chain past its deadline; a ready one only from t1. Judged on one
+/// consistent read, again immediately before the reveal, and never through a
+/// node minutes behind; the refund is kept as posted before it goes.
 #[tokio::test]
-async fn the_refund_secret_is_revealed_only_under_a_fresh_lock_with_time_to_spare() {
-    let h = called_off_with_escrow().await;
-    assert_eq!(h.posts("/v1/reverse/lock-refund"), 1);
-    assert_eq!(h.posts("/v1/reverse/refund"), 0);
-    // No more than the margin left: nothing revealed, no payout signed.
-    let now = h.world.get().chain_now;
-    h.world.set().refund_lock_until = now + 300;
+async fn the_refund_secret_is_revealed_only_once_no_ready_of_ours_can_land() {
+    // Open, no ready signed: called off, the refund goes at once.
+    let h = escrowed().await;
+    let cancelled = h.reverse().cancel(&mut h.store(), 0).await.unwrap();
+    assert_eq!(cancelled.phase, ReversePhase::Refunding);
+    assert!(cancelled.refund_posted);
+    assert_eq!(h.posts("/v1/reverse/refund"), 1);
+    let payout = cancelled.payout.unwrap();
+    let z = h.keys.user_keys(0).unwrap().share.to_be_bytes();
+    {
+        let state = h.world.get();
+        let posted = &state.bodies["/v1/reverse/refund"];
+        assert_eq!(posted["secret"], hex0x(&z));
+        assert_eq!(posted["payout"]["signature"], payout.signature.to_hex());
+    }
+
+    // A ready handed out: the refund waits until the chain is past its
+    // deadline.
+    let h = authorized().await;
+    let deadline = h.reverse_record(0).ready.unwrap().deadline;
+    let waiting = h.reverse().cancel(&mut h.store(), 0).await.unwrap();
+    assert_eq!(waiting.phase, ReversePhase::RefundWait);
+    let to_deadline = deadline - h.world.get().chain_now;
+    h.world.set().pass(to_deadline);
     h.advance_reverse().await.unwrap();
     assert_eq!(h.posts("/v1/reverse/refund"), 0);
-    assert_eq!(h.reverse_record(0).payout, None);
+    let held = h.reverse_record(0);
+    assert!(!held.refund_posted);
+    assert_eq!(held.payout, None, "nothing signed while it waits");
+    h.world.set().pass(1);
+    h.advance_reverse().await.unwrap();
+    assert_eq!(h.posts("/v1/reverse/refund"), 1);
 
-    // The lock lapses while the reveal is prepared: before its payout is
-    // signed, or after it is kept, at the read immediately before the reveal.
-    for before_signing in [true, false] {
-        let h = called_off_with_escrow().await;
+    // Ready: the maker's to claim until t1, then the user's to refund.
+    let h = authorized().await;
+    h.world.set().stage = SwapStage::Ready;
+    h.reverse().cancel(&mut h.store(), 0).await.unwrap();
+    assert_eq!(h.reverse_record(0).phase, ReversePhase::RefundWait);
+    let to_t1 = REFUND - 1 - h.world.get().chain_now;
+    h.world.set().pass(to_t1);
+    h.advance_reverse().await.unwrap();
+    assert_eq!(h.posts("/v1/reverse/refund"), 0);
+    h.world.set().pass(1);
+    h.advance_reverse().await.unwrap();
+    assert_eq!(h.posts("/v1/reverse/refund"), 1);
+
+    // Claimed or readied while the reveal is prepared: nothing revealed.
+    type Change = fn(&mut State);
+    let changes: [Change; 2] = [
+        |state| {
+            state.stage = SwapStage::Claimed;
+            state.secret = maker_secret().to_be_bytes();
+        },
+        |state| state.stage = SwapStage::Ready,
+    ];
+    for change in changes {
+        let h = escrowed().await;
         {
             let mut state = h.world.set();
-            state.refund_lock_until = state.chain_now + 600;
-            if before_signing {
-                state.on_terms = Some(Box::new(|state: &mut State| state.pass(601)));
-            } else {
-                state.reverse_reads = 0;
-                state.on_reverse_read = Some(Box::new(|state: &mut State, read| {
-                    if read == 3 {
-                        state.pass(601);
-                    }
-                }));
-            }
+            state.reads = 0;
+            state.on_read = Some(Box::new(move |state: &mut State, read| {
+                if read == 2 {
+                    change(state);
+                }
+            }));
         }
-        h.advance_reverse().await.unwrap();
-        assert_eq!(h.posts("/v1/reverse/refund"), 0, "{before_signing}");
+        h.reverse().cancel(&mut h.store(), 0).await.unwrap();
+        assert_eq!(h.posts("/v1/reverse/refund"), 0);
+        assert!(!h.reverse_record(0).refund_posted);
     }
-    // The maker claims while the secret is derived.
-    let h = called_off_with_escrow().await;
-    {
-        let mut state = h.world.set();
-        state.refund_lock_until = state.chain_now + 600;
-        state.reverse_reads = 0;
-        state.on_reverse_read = Some(Box::new(|state: &mut State, read| {
-            if read == 3 {
-                state.stage = SwapStage::Claimed;
-                state.secret = maker_secret().to_be_bytes();
-            }
-        }));
-    }
-    h.advance_reverse().await.unwrap();
-    assert_eq!(h.posts("/v1/reverse/refund"), 0);
 
     // A node minutes behind this device's clock is not trusted with it.
-    let h = called_off_with_escrow().await;
+    let h = escrowed().await;
     let now = h.world.get().chain_now;
-    {
-        let mut state = h.world.set();
-        state.refund_lock_until = now + 600;
-        state.clock = now + 4 * 60;
-    }
-    let lagging = h.advance_reverse().await.unwrap_err();
+    h.world.set().clock = now + 4 * 60;
+    let lagging = h.reverse().cancel(&mut h.store(), 0).await.unwrap_err();
     assert_eq!(lagging.code, ErrorCode::ChainLagging);
     assert_eq!(h.posts("/v1/reverse/refund"), 0);
     h.world.set().clock = now + 90;
     h.advance_reverse().await.unwrap();
     assert_eq!(h.posts("/v1/reverse/refund"), 1);
-    // The payout was kept before it went, and the secret is `z`.
-    let payout = h.reverse_record(0).payout.unwrap();
-    let z = h.keys.user_keys(0).unwrap().share.to_be_bytes();
-    let state = h.world.get();
-    let posted = &state.bodies["/v1/reverse/refund"];
-    assert_eq!(posted["secret"], hex0x(&z));
-    assert_eq!(posted["payout"]["signature"], payout.signature.to_hex());
+}
+
+/// A quote whose deadlines leave less than the contract's least window from
+/// funding to t0, or from t0 to t1, would never open: refused at quote.
+#[tokio::test]
+async fn a_reverse_quote_leaving_less_than_the_contracts_window_is_refused() {
+    for (ready, refund, quoted) in [
+        (FUNDING + 30 * 60 - 1, FUNDING + 60 * 60, false),
+        (FUNDING + 30 * 60, FUNDING + 60 * 60 - 1, false),
+        (FUNDING + 30 * 60, FUNDING + 60 * 60, true),
+    ] {
+        let h = Harness::new();
+        h.world.set().reverse_deadlines = (FUNDING, ready, refund);
+        let quote = h.reverse_quote().await;
+        if quoted {
+            assert!(quote.is_ok());
+        } else {
+            assert_eq!(quote.unwrap_err().code, ErrorCode::Mismatch);
+        }
+    }
+
+    // A maker naming another late window as it accepts serves another
+    // contract: nothing is funded.
+    let h = Harness::new();
+    h.world.set().accepted_late_window = Some(24 * 60 * 60);
+    let quoted = h.reverse_quote().await.unwrap();
+    let (debit, railgun_fee) = h.page_cost(quoted.price.fee.0);
+    let reverse = h.reverse();
+    reverse
+        .view()
+        .set_cost(&mut h.store(), 0, debit, railgun_fee)
+        .await
+        .unwrap();
+    reverse.view().go_ahead(&mut h.store(), 0).await.unwrap();
+    assert_eq!(
+        reverse.accept(&mut h.store(), 0).await.unwrap(),
+        ReverseAccept::Ended(Some(NothingSentCause::Mismatch))
+    );
+    let ended = h.reverse_record(0);
+    assert_eq!(ended.phase, ReversePhase::Cancelled);
+    assert_eq!(ended.account, None);
 }
 
 /// A refund is rescued only once it was paid out and its vault holds more
@@ -431,7 +572,7 @@ async fn a_refund_is_rescued_only_from_a_vault_holding_more_than_the_fee() {
     let rescue = rescued.rescue.clone().unwrap();
     assert_eq!(rescue.nonce, 7);
     assert_eq!(rescue.deadline, h.world.get().chain_now + 120);
-    let digest = pins().domain().rescue(
+    let digest = pins().domain().unwrap().rescue(
         &rescued.swap_id.0,
         &h.keys.note(0).unwrap().commitment(),
         &pins().relayer,
@@ -525,9 +666,12 @@ async fn open_reverse_calldata_matches_the_independent_encoding_and_zapps_roles(
     let calls = &request.calls;
     assert_eq!(
         calls.iter().map(|call| call.to).collect::<Vec<_>>(),
-        vec![pins.token, pins.contract, pins.token]
+        vec![pins.token, super::fakes::contract(), pins.token]
     );
-    assert_eq!(argument(&calls[0].data, 0), address_word(&pins.contract));
+    assert_eq!(
+        argument(&calls[0].data, 0),
+        address_word(&super::fakes::contract())
+    );
     assert_eq!(argument(&calls[0].data, 1), uint_word(AMOUNT));
     let opened = &calls[1].data;
     let user = h.keys.auth_address(0).unwrap();
@@ -538,7 +682,7 @@ async fn open_reverse_calldata_matches_the_independent_encoding_and_zapps_roles(
     assert_eq!(argument(opened, 3), uint_word(AMOUNT));
     assert_eq!(argument(opened, 10), note);
     let signed: [u8; 65] = opened[4 + 14 * 32..4 + 14 * 32 + 65].try_into().unwrap();
-    let digest = pins.domain().open_reverse(&ReverseOpen {
+    let digest = pins.domain().unwrap().open_reverse(&ReverseOpen {
         maker: pins.maker,
         user,
         token: pins.token,

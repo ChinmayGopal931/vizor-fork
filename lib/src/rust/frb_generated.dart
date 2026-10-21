@@ -13929,8 +13929,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiDeployment dco_decode_api_deployment(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 19)
-      throw Exception('unexpected arr length: expect 19 but see ${arr.length}');
+    if (arr.length != 20)
+      throw Exception('unexpected arr length: expect 20 but see ${arr.length}');
     return ApiDeployment(
       network: dco_decode_String(arr[0]),
       railgunNetwork: dco_decode_String(arr[1]),
@@ -13951,6 +13951,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       maxRelayerFee: dco_decode_String(arr[16]),
       usdTokens: dco_decode_list_api_usd_token(arr[17]),
       deposits: dco_decode_opt_box_autoadd_api_deposits_pin(arr[18]),
+      bridgeAvailable: dco_decode_bool(arr[19]),
     );
   }
 
@@ -14167,8 +14168,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiForwardRecord dco_decode_api_forward_record(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 20)
-      throw Exception('unexpected arr length: expect 20 but see ${arr.length}');
+    if (arr.length != 21)
+      throw Exception('unexpected arr length: expect 21 but see ${arr.length}');
     return ApiForwardRecord(
       index: dco_decode_u_32(arr[0]),
       swapId: dco_decode_String(arr[1]),
@@ -14182,16 +14183,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       relayerFee: dco_decode_String(arr[9]),
       t0: dco_decode_opt_box_autoadd_i_64(arr[10]),
       t1: dco_decode_opt_box_autoadd_i_64(arr[11]),
-      depositTxid: dco_decode_opt_String(arr[12]),
-      depositConfirmations: dco_decode_opt_box_autoadd_u_32(arr[13]),
-      sweepTxid: dco_decode_opt_String(arr[14]),
-      payoutTx: dco_decode_opt_String(arr[15]),
-      outcome: dco_decode_opt_box_autoadd_api_forward_outcome(arr[16]),
-      refundCause: dco_decode_opt_box_autoadd_api_refund_cause(arr[17]),
+      lateClaimAt: dco_decode_opt_box_autoadd_i_64(arr[12]),
+      depositTxid: dco_decode_opt_String(arr[13]),
+      depositConfirmations: dco_decode_opt_box_autoadd_u_32(arr[14]),
+      sweepTxid: dco_decode_opt_String(arr[15]),
+      payoutTx: dco_decode_opt_String(arr[16]),
+      outcome: dco_decode_opt_box_autoadd_api_forward_outcome(arr[17]),
+      refundCause: dco_decode_opt_box_autoadd_api_refund_cause(arr[18]),
       nothingSentCause: dco_decode_opt_box_autoadd_api_nothing_sent_cause(
-        arr[18],
+        arr[19],
       ),
-      endedAt: dco_decode_opt_box_autoadd_i_64(arr[19]),
+      endedAt: dco_decode_opt_box_autoadd_i_64(arr[20]),
     );
   }
 
@@ -18736,6 +18738,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_deposits = sse_decode_opt_box_autoadd_api_deposits_pin(
       deserializer,
     );
+    var var_bridgeAvailable = sse_decode_bool(deserializer);
     return ApiDeployment(
       network: var_network,
       railgunNetwork: var_railgunNetwork,
@@ -18756,6 +18759,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       maxRelayerFee: var_maxRelayerFee,
       usdTokens: var_usdTokens,
       deposits: var_deposits,
+      bridgeAvailable: var_bridgeAvailable,
     );
   }
 
@@ -19023,6 +19027,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_relayerFee = sse_decode_String(deserializer);
     var var_t0 = sse_decode_opt_box_autoadd_i_64(deserializer);
     var var_t1 = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_lateClaimAt = sse_decode_opt_box_autoadd_i_64(deserializer);
     var var_depositTxid = sse_decode_opt_String(deserializer);
     var var_depositConfirmations = sse_decode_opt_box_autoadd_u_32(
       deserializer,
@@ -19051,6 +19056,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       relayerFee: var_relayerFee,
       t0: var_t0,
       t1: var_t1,
+      lateClaimAt: var_lateClaimAt,
       depositTxid: var_depositTxid,
       depositConfirmations: var_depositConfirmations,
       sweepTxid: var_sweepTxid,
@@ -25118,6 +25124,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.maxRelayerFee, serializer);
     sse_encode_list_api_usd_token(self.usdTokens, serializer);
     sse_encode_opt_box_autoadd_api_deposits_pin(self.deposits, serializer);
+    sse_encode_bool(self.bridgeAvailable, serializer);
   }
 
   @protected
@@ -25342,6 +25349,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.relayerFee, serializer);
     sse_encode_opt_box_autoadd_i_64(self.t0, serializer);
     sse_encode_opt_box_autoadd_i_64(self.t1, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.lateClaimAt, serializer);
     sse_encode_opt_String(self.depositTxid, serializer);
     sse_encode_opt_box_autoadd_u_32(self.depositConfirmations, serializer);
     sse_encode_opt_String(self.sweepTxid, serializer);
