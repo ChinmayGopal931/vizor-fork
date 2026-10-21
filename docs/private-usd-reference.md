@@ -719,7 +719,7 @@ JSON strings go over one `WebMessagePort`. The page side is `rl/web/src/index.js
 |---|---|---|---|---|
 | `start` | 2 min | `{network: "mainnet"\|"sepolia", rpcUrls: [String], poiNodeUrls: [String], debug: Bool}` | `{fees: {unshield: Int bps}}` (the JS also returns `shield`) | `wallet.js:53-88` |
 | `openWallet` | 1 min | `{encryptionKey: hex32, mnemonic: String}` | `{address: "0zk…"}` | `wallet.js:91, 96-112` |
-| `refresh` | **2 h** | `{}` | `{ "<bucket>": [{token: 0xAddr, amount: dec}] }` | `wallet.js:115-161` |
+| `refresh` | **2 h** | `{}` | `{balances: {"<bucket>": [{token: 0xAddr, amount: dec}]}, received: [{txid, timestamp, token, amount: dec, bucket, sender}] \| null, screening: "ok" \| "failed"}` | `wallet.js` `refresh`, `received.js` |
 | `broadcasterFee` | 2 min | `{to: 0zk\|0x, token, amount, broadcaster: B}` | `{fee: dec}` | `transact.js:38-56` |
 | `transfer` | 10 min | `{to: 0zk, token, amount, fee, broadcaster: B}` | `{chainId, to, data, value:"0", spends:[{tree, nullifiers:[hex]}], proofMs}` | `transact.js:59-76` |
 | `unshield` | 10 min | `{to: 0x, token, amount, fee, broadcaster: B}` | same as `transfer` | `transact.js:79-95` |
@@ -800,6 +800,7 @@ A call whose coroutine is cancelled is answered `closed`, so every call gets exa
   1. `refreshBalances` for the notes scan, retried until a scan actually starts: 20 attempts × 3 s, and `Incomplete` throws (`:136-150`)
   2. `refreshReceivePOIsForWallet` and `generatePOIsForWallet`, best effort (`:118-124`)
   3. `getTokenBalancesByBucket` (`:153-161`)
+  4. As built: `getWalletTransactionHistory` for the private sends the wallet received (`received.js`: `TransferReceiveERC20s` only, so no shield, deposit, payout or change). The SDK builds it from the notes the scan already decrypted, so it sends no request. `sender` is set only where the sender showed its 0zk address, and `timestamp` is null where the engine has no block time. A history it cannot read gives `null`, and the balances stand.
 - **Serialized spends.** `broadcasterFee`, `transfer`, `unshield` and `prepareReverse` run one at a time (`transact.js:24-31`).
 - **First sync.** The first sync reads all of Railgun's history (using the `rail-squid.squids.live` quick sync). Its notes phase alone took about 40 minutes on a Galaxy A35 over Wi-Fi, about 60 % of the sync, before the txid batches; the milestone table is at `ui/common/privateusd/PrivateUsdBalanceRepository.kt:436-448, 480-483`. Nothing is kept until it completes, and a timeout restarts it (`RailgunProtocol.kt:39-42`).
 - **The engine wrapper** (`ui/common/repository/RailgunEngine.kt`):
@@ -2005,6 +2006,7 @@ Rules are zapp's unless marked **veylor**. Data references point to §6.6 (balan
   | Send or withdraw, confirmed | "Sent privately" or "Withdrew" | date · "to 0zk1qy86…l4zu" (8 + 4 characters) | `−$amount` | tx on Etherscan |
   | Send not in a block yet | same | date · "not in a block yet" | same | tx if known |
   | Send still proving | same | date · "sending…" | same | none |
+  | Private send received (as built) | "Received privately" | date · "from 0zk1qy86…l4zu" where the sender showed it, else "sender hidden"; "available once screened" until spendable | `+$amount`, positive once screened | tx on Etherscan |
 
   The empty state reads "Your conversions, sends and withdrawals will show here." A "Refunds" button sits beside the "Activity" heading (`PrivateUsdView.kt:193-214`).
 - **Primary button:** "Convert". It opens the conversion under way if there is one, else the convert screen. It is enabled when a conversion exists or `canStartConversion` (§6.7: `AVAILABLE` or `CONVERTING`).
@@ -2312,6 +2314,9 @@ Flags:
 | `private_usd_activity_sent` / `_withdrew` | Sent privately / Withdrew |
 | `private_usd_activity_detail` | {a} · {b} |
 | `private_usd_activity_to` | to {address} |
+| N `private_usd_activity_received` | Received privately (a private send another wallet made to this one; on `/private-usd` only, as sends) |
+| N `private_usd_activity_from` / `_sender_hidden` | from {address} / sender hidden |
+| N `private_usd_activity_received_screening` | available once screened |
 | `private_usd_activity_in` / `_out` | +{$} / −{$} |
 | `private_usd_activity_sending` / `_unconfirmed` | sending… / not in a block yet |
 | `private_usd_activity_open_conversion` / `_open_transaction` | Open conversion / View transaction |

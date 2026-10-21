@@ -2084,6 +2084,33 @@ M8 status (2026-10-14): the non-device parts are done.
   - Unit tests: Rust's Private USD tests (91 passed; the three removed
     covered old records); in Dart, the Private USD tests in both lanes
     (135 and 187 passed) and every mobile Figma scenario (330).
+
+- **D-140 (owner, 2026-10-21): private sends received show in Activity.**
+  A private send from another wallet raised the receiver's balance but left
+  no row: Activity listed only what the phone did itself.
+  - **From the page's own history.** `refresh` also returns the wallet's
+    received private sends (`received.js`), read with the SDK's
+    `getWalletTransactionHistory`, which builds them from the notes the
+    scan already decrypted. Nothing new is requested, so nothing leaves
+    the phone. Shields (deposits, a bridge's payout) and change are left
+    out, so nothing shows twice. A history the page cannot read is `null`
+    and the balances stand.
+  - **The row.** "Received privately", `+$amount`, on the Private USD
+    screen as "Sent privately" is. Until the sender's screening clears it
+    reads "available once screened" with a spinner; then it shows the
+    sender ("from 0zk1…") where the sender showed it, else "sender
+    hidden". Veylor's own sends never show the sender. It opens the
+    transaction.
+  - **Kept in memory only**, with the balance: the deployment's dollar
+    tokens only, and a sync that cannot read the history keeps the last
+    list. A receipt with no block time takes the time of the sync that
+    first listed it.
+  - The page bundle was rebuilt with bun 1.3.2, which reproduces the
+    committed bundle from unchanged sources byte for byte (node is no
+    longer installed here).
+  - Unit tests: the page's `received.test.mjs` (3); in Dart, the parsing,
+    the balance provider and the row, with both lanes' Private USD tests
+    (138 and 400 passed, every mobile Figma scenario included).
   - Not yet seen clearing a stuck send on a phone.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not

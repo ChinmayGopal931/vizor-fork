@@ -182,8 +182,12 @@ abstract final class PrivateUsdCopy {
   static const activityRefundedZecDetail = 'your dollars came back';
   static const activitySent = 'Sent privately';
   static const activityWithdrew = 'Withdrew';
+  static const activityReceived = 'Received privately';
   static String activityDetail(String a, String b) => '$a · $b';
   static String activityTo(String address) => 'to $address';
+  static String activityFrom(String address) => 'from $address';
+  static const activitySenderHidden = 'sender hidden';
+  static const activityReceivedScreening = 'available once screened';
   static String activityIn(String usd) => '+$usd';
   static String activityOut(String usd) => '−$usd';
   static const activityUnconfirmed = 'not in a block yet';

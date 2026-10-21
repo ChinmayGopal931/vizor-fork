@@ -121,6 +121,7 @@ class RailgunSync {
     required this.balances,
     required this.screening,
     required this.at,
+    this.received,
   });
 
   final String accountUuid;
@@ -128,6 +129,9 @@ class RailgunSync {
   final RailgunBalances balances;
   final RailgunScreening screening;
   final DateTime at;
+
+  /// Null when the page could not read its history.
+  final List<RailgunReceipt>? received;
 }
 
 /// What the engine is doing, for progress lines. It carries no messages: an
@@ -321,6 +325,7 @@ class RailgunEngine {
           balances: refreshed.balances,
           screening: refreshed.screening,
           at: _now(),
+          received: refreshed.received,
         );
         _publish(state.value.copyWith(lastSync: sync));
         return sync;

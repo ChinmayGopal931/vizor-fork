@@ -126,6 +126,9 @@ class _MobilePrivateUsdScreenState
         onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
         onOpenRefunds: openRefunds,
         sendRecords: ref.watch(privateUsdSendRecordsProvider(uuid)),
+        receipts: ref.watch(
+          privateUsdBalanceProvider(uuid).select((state) => state.received),
+        ),
       )..sort(compareActivityEntries))
         entry.row,
     ];

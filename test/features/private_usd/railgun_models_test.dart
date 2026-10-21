@@ -71,23 +71,97 @@ void main() {
     );
   });
 
-  test('a refresh without a screening it knows, or without balances, fails',
-      () {
+  test(
+    'a refresh without a screening it knows, or without balances, fails',
+    () {
+      for (final body in [
+        '{"balances":{}}',
+        '{"balances":{},"screening":"maybe"}',
+        '{"balances":{},"screening":false}',
+        '{"screening":"ok"}',
+        // The answer before screening was added: its buckets at the top.
+        '{"Spendable":[{"token":"$_token","amount":"1"}]}',
+      ]) {
+        expect(
+          () => RailgunRefresh.parse(jsonDecode(body)),
+          throwsA(isA<RailgunProtocolException>()),
+          reason: body,
+        );
+      }
+    },
+  );
+
+  test('a refresh lists the private sends received; one it cannot read is '
+      'left out, never failing the balances', () {
+    final txid = '0x${'AB' * 32}';
+    final refresh = RailgunRefresh.parse(
+      jsonDecode(
+        '{"balances":{},"screening":"ok","received":['
+        '{"txid":"$txid","timestamp":1790000000,"token":"$_token",'
+        '"amount":"5000000","bucket":"Spendable","sender":null},'
+        '{"txid":"$txid","timestamp":null,"token":"$_token","amount":"1",'
+        '"bucket":"MissingExternalPOI","sender":"0zk1sender"},'
+        '{"txid":"$txid","timestamp":0,"token":"$_token","amount":"2",'
+        '"bucket":"SomeNewBucket","sender":"0x1234"},'
+        '{"txid":"$txid","timestamp":1,"token":"$_token","amount":12},'
+        '{"txid":"0x12","timestamp":1,"token":"$_token","amount":"3"},'
+        '{"txid":"$txid","timestamp":1,"token":"0x12","amount":"4"},'
+        '"not a receipt"]}',
+      ),
+    );
+
+    final lowerTxid = txid.toLowerCase();
+    expect(refresh.received, [
+      RailgunReceipt(
+        txid: lowerTxid,
+        token: _token,
+        amount: BigInt.from(5000000),
+        bucket: RailgunBalanceBucket.spendable,
+        at: DateTime.fromMillisecondsSinceEpoch(1790000000 * 1000),
+      ),
+      RailgunReceipt(
+        txid: lowerTxid,
+        token: _token,
+        amount: BigInt.one,
+        bucket: RailgunBalanceBucket.missingExternalPoi,
+        sender: '0zk1sender',
+      ),
+      RailgunReceipt(txid: lowerTxid, token: _token, amount: BigInt.two),
+    ]);
+    expect(refresh.received!.map((receipt) => receipt.settled), [
+      true,
+      false,
+      false,
+    ]);
     for (final body in [
-      '{"balances":{}}',
-      '{"balances":{},"screening":"maybe"}',
-      '{"balances":{},"screening":false}',
-      '{"screening":"ok"}',
-      // The answer before screening was added: its buckets at the top.
-      '{"Spendable":[{"token":"$_token","amount":"1"}]}',
+      '{"balances":{},"screening":"ok"}',
+      '{"balances":{},"screening":"ok","received":null}',
+      '{"balances":{},"screening":"ok","received":{}}',
     ]) {
-      expect(
-        () => RailgunRefresh.parse(jsonDecode(body)),
-        throwsA(isA<RailgunProtocolException>()),
-        reason: body,
-      );
+      expect(RailgunRefresh.parse(jsonDecode(body)).received, isNull);
     }
   });
+
+  test(
+    'a receipt with no block time takes the one given, and keeps its own',
+    () {
+      final at = DateTime(2026, 10, 21, 12);
+      final undated = RailgunReceipt(
+        txid: '0x${'ab' * 32}',
+        token: _token,
+        amount: BigInt.one,
+      );
+      final dated = RailgunReceipt(
+        txid: '0x${'ab' * 32}',
+        token: _token,
+        amount: BigInt.one,
+        at: DateTime(2026, 10, 20),
+      );
+
+      expect(undated.orDated(at).at, at);
+      expect(dated.orDated(at), same(dated));
+    },
+  );
 
   test('a transaction that is not a transact call for the broadcaster is '
       'refused', () {

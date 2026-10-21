@@ -129,6 +129,25 @@ ApiSendRecord previewPrivateUsdSendRecord({
   );
 }
 
+/// A private send of $[dollars] received [ago] before [previewPrivateUsdNow]:
+/// screened unless [settled] is off, from [sender] where the sender showed
+/// it.
+RailgunReceipt previewPrivateUsdReceipt({
+  double dollars = 25,
+  bool settled = true,
+  String? sender,
+  Duration ago = const Duration(hours: 2),
+}) => RailgunReceipt(
+  txid: '0x${'5e' * 32}',
+  token: previewPrivateUsdUsdc.address,
+  amount: BigInt.from((dollars * 1e6).round()),
+  bucket: settled
+      ? RailgunBalanceBucket.spendable
+      : RailgunBalanceBucket.missingExternalPoi,
+  at: previewPrivateUsdNow.subtract(ago),
+  sender: sender,
+);
+
 /// Holds the text controllers a form preview edits, one per [texts].
 class PrivateUsdPreviewControllers extends StatefulWidget {
   const PrivateUsdPreviewControllers({
@@ -175,6 +194,7 @@ Widget buildMobilePrivateUsdDefaultUseCase(BuildContext context) =>
         processing: 12.5,
       ),
       sends: [previewPrivateUsdSendRecord()],
+      receipts: [previewPrivateUsdReceipt()],
       records: [
         previewPrivateUsdRecord(
           index: 4,
@@ -243,6 +263,7 @@ class _PrivateUsdScreenPreview extends StatelessWidget {
     this.privacyModeEnabled = false,
     this.records = const [],
     this.sends = const [],
+    this.receipts = const [],
     this.canSend = true,
     this.canConvert = true,
     this.bridgeAvailable = true,
@@ -253,6 +274,7 @@ class _PrivateUsdScreenPreview extends StatelessWidget {
   final bool privacyModeEnabled;
   final List<ApiForwardRecord> records;
   final List<ApiSendRecord> sends;
+  final List<RailgunReceipt> receipts;
   final bool canSend;
   final bool canConvert;
   final bool bridgeAvailable;
@@ -272,6 +294,13 @@ class _PrivateUsdScreenPreview extends StatelessWidget {
               buildPrivateUsdSendActivityRow(
                 context: context,
                 record: record,
+                privacyModeEnabled: privacyModeEnabled,
+                onOpenTransaction: () {},
+              ),
+            for (final receipt in receipts)
+              buildPrivateUsdReceivedActivityRow(
+                context: context,
+                receipt: receipt,
                 privacyModeEnabled: privacyModeEnabled,
                 onOpenTransaction: () {},
               ),
