@@ -268,8 +268,63 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(PrivateUsdCopy.infoTitle), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.infoConvert), findsOneWidget);
     expect(find.text(PrivateUsdCopy.infoReceive), findsOneWidget);
     expect(find.text(PrivateUsdCopy.infoScreening(_hour)), findsOneWidget);
+  });
+
+  // Mainnet pins no windows contract yet (`ApiDeployment.bridgeAvailable`).
+  testWidgets('with bridging off, nothing on the screen leads to Bridge', (
+    tester,
+  ) async {
+    Future<void> pump({required bool bridgeAvailable}) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppTheme(
+            data: AppThemeData.dark,
+            child: MobilePrivateUsdView(
+              state: previewPrivateUsdBalance(),
+              zecUsdPrice: 50,
+              privacyModeEnabled: false,
+              screening: const Duration(hours: 1),
+              onBack: () {},
+              onRefresh: () {},
+              onConvert: () {},
+              onSend: () {},
+              onWithdraw: () {},
+              onReceive: () {},
+              bridgeAvailable: bridgeAvailable,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    const bridge = ValueKey('mobile_private_usd_convert');
+    await pump(bridgeAvailable: true);
+    expect(find.byKey(bridge), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.emptyBody), findsOneWidget);
+
+    await pump(bridgeAvailable: false);
+    expect(find.byKey(bridge), findsNothing);
+    expect(find.text(PrivateUsdCopy.actionConvert), findsNothing);
+    expect(find.text(PrivateUsdCopy.emptyBody), findsNothing);
+    expect(find.text(PrivateUsdCopy.emptyBodyReceive), findsOneWidget);
+    // Receive, Send and Withdraw stay.
+    for (final key in [
+      'mobile_private_usd_receive_usdc',
+      'mobile_private_usd_send',
+      'mobile_private_usd_withdraw',
+    ]) {
+      expect(find.byKey(ValueKey(key)), findsOneWidget, reason: key);
+    }
+
+    await tester.tap(find.byKey(const ValueKey('mobile_private_usd_info')));
+    await tester.pumpAndSettle();
+    expect(find.text(PrivateUsdCopy.infoTitle), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.infoConvert), findsNothing);
+    expect(find.text(PrivateUsdCopy.infoReceive), findsOneWidget);
   });
 }
 

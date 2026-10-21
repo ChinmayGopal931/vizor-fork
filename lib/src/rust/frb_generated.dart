@@ -14168,8 +14168,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiForwardRecord dco_decode_api_forward_record(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 21)
-      throw Exception('unexpected arr length: expect 21 but see ${arr.length}');
+    if (arr.length != 22)
+      throw Exception('unexpected arr length: expect 22 but see ${arr.length}');
     return ApiForwardRecord(
       index: dco_decode_u_32(arr[0]),
       swapId: dco_decode_String(arr[1]),
@@ -14184,16 +14184,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       t0: dco_decode_opt_box_autoadd_i_64(arr[10]),
       t1: dco_decode_opt_box_autoadd_i_64(arr[11]),
       lateClaimAt: dco_decode_opt_box_autoadd_i_64(arr[12]),
-      depositTxid: dco_decode_opt_String(arr[13]),
-      depositConfirmations: dco_decode_opt_box_autoadd_u_32(arr[14]),
-      sweepTxid: dco_decode_opt_String(arr[15]),
-      payoutTx: dco_decode_opt_String(arr[16]),
-      outcome: dco_decode_opt_box_autoadd_api_forward_outcome(arr[17]),
-      refundCause: dco_decode_opt_box_autoadd_api_refund_cause(arr[18]),
+      otherDeployment: dco_decode_bool(arr[13]),
+      depositTxid: dco_decode_opt_String(arr[14]),
+      depositConfirmations: dco_decode_opt_box_autoadd_u_32(arr[15]),
+      sweepTxid: dco_decode_opt_String(arr[16]),
+      payoutTx: dco_decode_opt_String(arr[17]),
+      outcome: dco_decode_opt_box_autoadd_api_forward_outcome(arr[18]),
+      refundCause: dco_decode_opt_box_autoadd_api_refund_cause(arr[19]),
       nothingSentCause: dco_decode_opt_box_autoadd_api_nothing_sent_cause(
-        arr[19],
+        arr[20],
       ),
-      endedAt: dco_decode_opt_box_autoadd_i_64(arr[20]),
+      endedAt: dco_decode_opt_box_autoadd_i_64(arr[21]),
     );
   }
 
@@ -14480,8 +14481,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiReverseRecord dco_decode_api_reverse_record(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 24)
-      throw Exception('unexpected arr length: expect 24 but see ${arr.length}');
+    if (arr.length != 25)
+      throw Exception('unexpected arr length: expect 25 but see ${arr.length}');
     return ApiReverseRecord(
       index: dco_decode_u_32(arr[0]),
       swapId: dco_decode_String(arr[1]),
@@ -14507,6 +14508,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       receiveConfirmations: dco_decode_u_32(arr[21]),
       acceptedAt: dco_decode_opt_box_autoadd_i_64(arr[22]),
       updatedAt: dco_decode_i_64(arr[23]),
+      otherDeployment: dco_decode_bool(arr[24]),
     );
   }
 
@@ -19028,6 +19030,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_t0 = sse_decode_opt_box_autoadd_i_64(deserializer);
     var var_t1 = sse_decode_opt_box_autoadd_i_64(deserializer);
     var var_lateClaimAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_otherDeployment = sse_decode_bool(deserializer);
     var var_depositTxid = sse_decode_opt_String(deserializer);
     var var_depositConfirmations = sse_decode_opt_box_autoadd_u_32(
       deserializer,
@@ -19057,6 +19060,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       t0: var_t0,
       t1: var_t1,
       lateClaimAt: var_lateClaimAt,
+      otherDeployment: var_otherDeployment,
       depositTxid: var_depositTxid,
       depositConfirmations: var_depositConfirmations,
       sweepTxid: var_sweepTxid,
@@ -19419,6 +19423,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_receiveConfirmations = sse_decode_u_32(deserializer);
     var var_acceptedAt = sse_decode_opt_box_autoadd_i_64(deserializer);
     var var_updatedAt = sse_decode_i_64(deserializer);
+    var var_otherDeployment = sse_decode_bool(deserializer);
     return ApiReverseRecord(
       index: var_index,
       swapId: var_swapId,
@@ -19444,6 +19449,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       receiveConfirmations: var_receiveConfirmations,
       acceptedAt: var_acceptedAt,
       updatedAt: var_updatedAt,
+      otherDeployment: var_otherDeployment,
     );
   }
 
@@ -25350,6 +25356,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_box_autoadd_i_64(self.t0, serializer);
     sse_encode_opt_box_autoadd_i_64(self.t1, serializer);
     sse_encode_opt_box_autoadd_i_64(self.lateClaimAt, serializer);
+    sse_encode_bool(self.otherDeployment, serializer);
     sse_encode_opt_String(self.depositTxid, serializer);
     sse_encode_opt_box_autoadd_u_32(self.depositConfirmations, serializer);
     sse_encode_opt_String(self.sweepTxid, serializer);
@@ -25652,6 +25659,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_32(self.receiveConfirmations, serializer);
     sse_encode_opt_box_autoadd_i_64(self.acceptedAt, serializer);
     sse_encode_i_64(self.updatedAt, serializer);
+    sse_encode_bool(self.otherDeployment, serializer);
   }
 
   @protected

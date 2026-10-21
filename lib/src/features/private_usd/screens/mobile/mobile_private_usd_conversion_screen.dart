@@ -52,10 +52,16 @@ class _MobilePrivateUsdConversionScreenState
     final key = widget.path.keyFor(account);
     final state = ref.watch(privateUsdConversionProvider(key));
     final status = state.status;
+    final bridge = ref.watch(privateUsdBridgeAvailableProvider);
     if (status == null && state.loaded) {
-      // No such conversion for this account: start a new one instead.
+      // No such conversion for this account: start a new one instead, where
+      // bridging runs.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) context.pushReplacement('/private-usd/convert');
+        if (mounted) {
+          context.pushReplacement(
+            bridge ? '/private-usd/convert' : '/private-usd',
+          );
+        }
       });
     }
     // A conversion runs only on a deployment, whose numbers it shows.
@@ -100,6 +106,7 @@ class _MobilePrivateUsdConversionScreenState
             balance: balance,
             privacyModeEnabled: ref.watch(privacyModeProvider),
             explorerTxPrefix: deployment.explorerTxPrefix,
+            bridgeAvailable: bridge,
           );
     if (presentation != null) noteBridged(presentation.bridged);
     final notifier = ref.read(privateUsdConversionProvider(key).notifier);

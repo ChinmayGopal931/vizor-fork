@@ -24,6 +24,7 @@ use super::evm_rpc::{SendChain, TransactionStatus};
 use super::models::{decode_strict, Address, Amount, Hex, RailgunTransactRequest, Word};
 use super::relayer_client::{RailgunBroadcast, RelayerClient};
 use super::store::{SendRow, SendState, SwapStore};
+use super::swap;
 use super::transport::HttpTransport;
 use super::{fail, railgun_keys, with_operations, ErrorCode, PrivateUsdError, Result};
 
@@ -201,9 +202,9 @@ struct PageSpend {
 /// proof must be this deployment's (its chain, Railgun's proxy, no value,
 /// nullifiers in every spend) and pay the relayer no more than the cap
 /// (`RelayerFee`). `Busy` while another payment of the account is unsettled
-/// or a conversion is under way: one outgoing payment at a time, across
-/// restarts. The same send kept again is the send already kept; another
-/// proof under its id is `Mismatch`, never kept.
+/// or a conversion this build drives is under way: one outgoing payment at a
+/// time, across restarts. The same send kept again is the send already kept;
+/// another proof under its id is `Mismatch`, never kept.
 pub(crate) fn keep(
     store: &mut SwapStore,
     pins: &Deployment,
@@ -224,9 +225,7 @@ pub(crate) fn keep(
         if kept.iter().any(|earlier| !earlier.confirmed()) {
             return fail(ErrorCode::Busy, "an earlier payment is not settled yet");
         }
-        if store.unfinished_count(account)? > 0 {
-            return fail(ErrorCode::Busy, "a conversion is under way");
-        }
+        swap::require_none_under_way(store, account, pins)?;
         write(store, account, &record)?;
         Ok(record)
     })

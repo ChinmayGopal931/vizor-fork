@@ -202,6 +202,8 @@ pub(super) struct State {
     pub reverse_accepts: u32,
     /// The late window an accept names; `None` names none.
     pub accepted_late_window: Option<u64>,
+    /// What `/v1/info` adds: the contract's windows and kind.
+    pub info_windows: Option<Value>,
 
     // The relayer.
     pub relayer: [u8; 20],
@@ -322,6 +324,7 @@ impl State {
             reverse_deadlines: (FUNDING, READY, REFUND),
             reverse_accepts: 0,
             accepted_late_window: Some(late_window()),
+            info_windows: None,
             relayer: pins.relayer,
             relayer_fee: RELAYER_FEE,
             fee_expires_at: None,
@@ -711,9 +714,8 @@ impl FakeServices {
     ) -> std::result::Result<RoutedResponse, RoutedError> {
         let pins = pins();
         match (method, path) {
-            (&Method::GET, "/v1/info") => answer(
-                200,
-                json!({
+            (&Method::GET, "/v1/info") => {
+                let mut info = json!({
                     "apiVersion": 1,
                     "maker": hex0x(&pins.maker),
                     "chainId": pins.chain_id,
@@ -721,8 +723,14 @@ impl FakeServices {
                     "token": hex0x(&pins.token),
                     "zcashNetwork": "testnet",
                     "reverseEnabled": true,
-                }),
-            ),
+                });
+                if let Some(Value::Object(windows)) = &self.0.get().info_windows {
+                    for (name, value) in windows {
+                        info[name] = value.clone();
+                    }
+                }
+                answer(200, info)
+            }
             (&Method::POST, "/v1/quote") => {
                 let context = SwapContext {
                     chain_id: pins.chain_id,

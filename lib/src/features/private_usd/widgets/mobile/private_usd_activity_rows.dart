@@ -31,9 +31,10 @@ const _glyph = AppIcons.moneyBag;
 const _logo = PrivateUsdLogo(size: AppAssetSize.size);
 
 /// A forward conversion's activity row, or null when it moved no money
-/// (nothing sent). Under way, it shows its stage and opens its progress;
-/// paid, the ZEC paid, opening the payout; refunded, that the ZEC came
-/// back, with no amount.
+/// (nothing sent). Under way, it shows its stage and opens its progress
+/// (one of another deployment, never driven, says so instead); paid, the
+/// ZEC paid, opening the payout; refunded, that the ZEC came back, with no
+/// amount.
 ActivityRowData? buildPrivateUsdActivityRow({
   required BuildContext context,
   required ApiForwardRecord record,
@@ -67,17 +68,19 @@ ActivityRowData? buildPrivateUsdActivityRow({
         leading: _logo,
         leadingBackgroundColor: base.leadingBackgroundColor,
         leadingIconColor: base.leadingIconColor,
-        subtitle: privateUsdForwardStageLabel(
-          PrivateUsdConversionStatus(record: record),
-          zcashConfirmations: zcashConfirmations,
-        ),
+        subtitle: record.otherDeployment
+            ? PrivateUsdCopy.activityOtherDeployment
+            : privateUsdForwardStageLabel(
+                PrivateUsdConversionStatus(record: record),
+                zcashConfirmations: zcashConfirmations,
+              ),
         amountText: activityAmountTextForFormFactor(
           PrivateUsdCopy.activityIn(usd),
         ),
         amountColor: outgoingAmountColor(colors),
         statusText: '',
-        statusIconName: AppIcons.loader,
-        statusColor: colors.text.secondary,
+        statusIconName: record.otherDeployment ? null : AppIcons.loader,
+        statusColor: record.otherDeployment ? null : colors.text.secondary,
         timestampText: timestamp,
         onTap: onOpenConversion,
       );
@@ -122,8 +125,9 @@ ActivityRowData? buildPrivateUsdActivityRow({
 
 /// A reverse conversion's activity row, or null when it moved no money (a
 /// draft, or cancelled). Under way, it shows its step and opens its
-/// progress; complete, the ZEC received, opening the funding; refunded,
-/// that the dollars came back, opening Refunds.
+/// progress (one of another deployment, never driven, says so instead);
+/// complete, the ZEC received, opening the funding; refunded, that the
+/// dollars came back, opening Refunds.
 ActivityRowData? buildPrivateUsdReverseActivityRow({
   required BuildContext context,
   required ApiReverseRecord record,
@@ -192,14 +196,16 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
         leading: _logo,
         leadingBackgroundColor: background,
         leadingIconColor: icon,
-        subtitle: privateUsdReverseStageLabel(record),
+        subtitle: record.otherDeployment
+            ? PrivateUsdCopy.activityOtherDeployment
+            : privateUsdReverseStageLabel(record),
         amountText: activityAmountTextForFormFactor(
           PrivateUsdCopy.activityOut(usd),
         ),
         amountColor: outgoingAmountColor(colors),
         statusText: '',
-        statusIconName: AppIcons.loader,
-        statusColor: colors.text.secondary,
+        statusIconName: record.otherDeployment ? null : AppIcons.loader,
+        statusColor: record.otherDeployment ? null : colors.text.secondary,
         timestampText: timestamp,
         onTap: onOpenConversion,
       );

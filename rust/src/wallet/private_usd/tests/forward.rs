@@ -1246,15 +1246,25 @@ async fn services_naming_other_windows_are_refused() {
         assert_eq!(
             code(h.quote().await),
             ErrorCode::WrongDeployment,
-            "{windows}"
+            "terms {windows}"
         );
+        let h = Harness::new();
+        h.world.set().info_windows = Some(windows.clone());
+        assert_eq!(
+            code(h.quote().await),
+            ErrorCode::WrongDeployment,
+            "info {windows}"
+        );
+        assert_eq!(h.posted("/v1/quote"), 0, "info {windows}");
     }
-    let h = Harness::new();
-    h.world.set().terms_windows = Some(serde_json::json!({
+    let pinned = serde_json::json!({
         "minWindow": 30 * 60,
         "lateWindow": late_window(),
         "contractKind": "windows",
-    }));
+    });
+    let h = Harness::new();
+    h.world.set().terms_windows = Some(pinned.clone());
+    h.world.set().info_windows = Some(pinned);
     assert!(h.quote().await.is_ok());
 }
 
@@ -1287,6 +1297,22 @@ async fn a_conversion_of_the_lock_contract_is_never_driven() {
     assert_eq!(h.record(), record);
 
     assert_eq!(h.quote().await.unwrap().index, 1);
+}
+
+/// A conversion under way holds up a private payment; one of the lock
+/// contract, which this build never drives, does not.
+#[tokio::test]
+async fn only_a_conversion_this_build_drives_holds_up_a_payment() {
+    let h = Harness::new();
+    h.deposited().await;
+    let proof = super::sends::page_proof(&[[1; 32]]);
+    let held = super::sends::keep(&mut h.store(), &h.account, "send-1", &proof).unwrap_err();
+    assert_eq!(held.code, ErrorCode::Busy);
+
+    let mut record = h.record();
+    record.quote.contract = Hex(hex_literal("d75efc6a157cc0a95f66962da86ddf35d9f2617c"));
+    h.keep(&record);
+    super::sends::keep(&mut h.store(), &h.account, "send-1", &proof).unwrap();
 }
 
 /// Mainnet pins no windows contract: no bridge is quoted there, and nothing

@@ -37,8 +37,8 @@ class PrivateUsdRefundRow {
   final bool? recoverable;
   final bool checkFailed;
 
-  /// Pinned to another deployment than this build's (the retired testnet
-  /// token): never checked or recovered here.
+  /// Pinned to another deployment than this build's (the lock contract, or
+  /// the retired testnet token): never recovered here.
   final bool otherDeployment;
 
   /// Why its last recovery did not go through.
@@ -135,7 +135,10 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
         for (final record in _refunded(
           ref.read(privateUsdReverseConversionsProvider),
         ))
-          PrivateUsdRefundRow(record: record),
+          PrivateUsdRefundRow(
+            record: record,
+            otherDeployment: record.otherDeployment,
+          ),
       ],
     );
   }
@@ -172,7 +175,10 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
       rows: [
         for (final record in records)
           known[record.index]?.copyWith(record: record) ??
-              PrivateUsdRefundRow(record: record),
+              PrivateUsdRefundRow(
+                record: record,
+                otherDeployment: record.otherDeployment,
+              ),
       ],
     );
   }
@@ -229,7 +235,11 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
     if (!_engine.canRun) return;
     final pass = ++_pass;
     state = state.copyWith(refreshing: true);
-    final pending = [for (final row in state.rows) row.record.index];
+    // A record of another deployment is said so without asking Rust.
+    final pending = [
+      for (final row in state.rows)
+        if (!row.record.otherDeployment) row.record.index,
+    ];
     Future<void> worker() async {
       while (pending.isNotEmpty) {
         final index = pending.removeAt(0);
@@ -241,7 +251,7 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
               .reverseCanRescue(accountUuid, index: index)
               .timeout(PrivateUsdRefundsTiming.timeout);
         } on rust.ApiPrivateUsdError catch (error) {
-          // A record of the retired testnet token: said so, never retried.
+          // Refused as another deployment's: said so, never recovered.
           otherDeployment =
               error.code == rust.ApiPrivateUsdErrorCode.wrongDeployment;
           failed = !otherDeployment;

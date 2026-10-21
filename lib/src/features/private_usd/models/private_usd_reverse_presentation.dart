@@ -28,11 +28,13 @@ DateTime _at(int seconds) =>
     DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
 
 /// "Authorize settlement" is a user action only, enabled in
-/// `awaitingReady` (not called off) until `readyDeadline − 120 s` on the
-/// device clock; Rust checks the chain's clock again as it signs.
+/// `awaitingReady` (not called off, and this deployment's) until
+/// `readyDeadline − 120 s` on the device clock; Rust checks the chain's
+/// clock again as it signs.
 bool privateUsdCanAuthorizeReady(ApiReverseRecord record, DateTime now) =>
     record.phase == ApiReversePhase.awaitingReady &&
     !record.cancelRequested &&
+    !record.otherDeployment &&
     now.isBefore(_at(record.readyDeadline).subtract(kPrivateUsdReadyMargin));
 
 /// The settlement deadline the review and the keep-open note name.
@@ -153,7 +155,8 @@ class PrivateUsdReverseProgressPresentation {
 
 /// The reverse progress for [status] at [now]. [funding] is the funding's
 /// state and [proofProgress] the page's proof (0..1) while it proves;
-/// [busy] disables the actions while one of them runs.
+/// [busy] disables the actions while one of them runs. With
+/// [bridgeAvailable] off, an ended conversion offers no new one.
 PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
   required PrivateUsdReverseStatus status,
   required DateTime now,
@@ -162,6 +165,7 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
   bool busy = false,
   bool privacyModeEnabled = false,
   String? explorerTxPrefix,
+  bool bridgeAvailable = true,
 }) {
   final record = status.record;
   final debit = privateUsdReverseDebit(record);
@@ -200,25 +204,39 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     String? amounts,
     bool viewRefunds = false,
     bool bridged = false,
-  }) => PrivateUsdReverseProgressPresentation(
-    status: presentation(
-      steps: steps,
-      progressIndex: progressIndex,
-      badgeKind: badgeKind,
+    bool offersNew = true,
+  }) {
+    final newConversion = offersNew && bridgeAvailable;
+    return PrivateUsdReverseProgressPresentation(
+      status: presentation(
+        steps: steps,
+        progressIndex: progressIndex,
+        badgeKind: badgeKind,
+        bridged: bridged,
+      ),
+      payAmountText: usdText,
+      receiveAmountText: zecText,
+      amountsText: amounts,
+      resultTitle: title,
+      resultBody: body,
+      action: newConversion ? PrivateUsdReverseAction.newConversion : null,
+      actionLabel: newConversion ? PrivateUsdCopy.reverseNew : null,
+      actionEnabled: newConversion,
+      showsViewRefunds: viewRefunds,
+      title: PrivateUsdCopy.actionConvert,
       bridged: bridged,
-    ),
-    payAmountText: usdText,
-    receiveAmountText: zecText,
-    amountsText: amounts,
-    resultTitle: title,
-    resultBody: body,
-    action: PrivateUsdReverseAction.newConversion,
-    actionLabel: PrivateUsdCopy.reverseNew,
-    actionEnabled: true,
-    showsViewRefunds: viewRefunds,
-    title: PrivateUsdCopy.actionConvert,
-    bridged: bridged,
-  );
+    );
+  }
+
+  // Never driven: nothing runs, and nothing is asked of the user.
+  if (status.otherDeployment && status.isUnderWay) {
+    return ended(
+      badgeKind: SwapStatusBadgeKind.failed,
+      title: PrivateUsdCopy.otherDeploymentTitle,
+      body: PrivateUsdCopy.otherDeploymentBody,
+      offersNew: false,
+    );
+  }
 
   switch (record.phase) {
     case ApiReversePhase.complete:

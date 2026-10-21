@@ -1505,8 +1505,8 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 - Trust no swap read until the contract answers `MIN_WINDOW()` and
   `LATE_WINDOW()` as pinned and reverts `LOCK_DURATION()`. Refuse a maker or
   relayer that names other windows. A record of the lock contract is read,
-  never driven (`WrongDeployment`), and holds up no new conversion; its
-  indices are still skipped.
+  never driven (`WrongDeployment`), and holds up no new conversion or
+  payment; its indices are still skipped.
 - Reveal `z` only in its window, decided on one consistent read (the swap at
   the newest block's hash, with that block's number and time) of a fresh
   head, and again immediately before the post. A window opens by the block's

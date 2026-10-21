@@ -167,14 +167,14 @@ class PrivateUsdBannerState {
 
 /// [accountUuid]'s conversion under way as a banner, or null. It stays while
 /// a conversion is unfinished, even when Private USD is otherwise
-/// unavailable: only one runs at a time per account.
+/// unavailable: only one runs at a time per account. One of another
+/// deployment, never driven, has none.
 final privateUsdConversionBannerProvider = Provider.autoDispose
     .family<PrivateUsdBannerState?, String>((ref, accountUuid) {
       final status = ref.watch(
         privateUsdConversionsProvider.select((all) {
           for (final entry in all.entries) {
-            if (entry.key.accountUuid == accountUuid &&
-                entry.value.isUnderWay) {
+            if (entry.key.accountUuid == accountUuid && entry.value.isDriven) {
               return entry;
             }
           }
@@ -206,7 +206,7 @@ PrivateUsdBannerState? _reverseBanner(Ref ref, String accountUuid) {
   final entry = ref.watch(
     privateUsdReverseConversionsProvider.select((all) {
       for (final entry in all.entries) {
-        if (entry.key.accountUuid == accountUuid && entry.value.isUnderWay) {
+        if (entry.key.accountUuid == accountUuid && entry.value.isDriven) {
           return entry;
         }
       }

@@ -354,6 +354,11 @@ pub(crate) struct MakerInfo {
     pub reverse_enabled: bool,
     /// The key accepts' tokens come back under, base64url SPKI.
     pub token_return_key: Option<String>,
+    /// The contract's `MIN_WINDOW`, `LATE_WINDOW` and kind, where the maker
+    /// names them.
+    pub min_window: Option<u64>,
+    pub late_window: Option<u64>,
+    pub contract_kind: Option<String>,
 }
 
 /// The swap a maker opened for an accepted quote, with the deadlines it

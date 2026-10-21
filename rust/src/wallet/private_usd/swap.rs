@@ -8,7 +8,8 @@ use std::path::Path;
 use zecswap_core::{JointAccount, SecretShare, SpendKey, SwapContext};
 
 use super::deployment::{
-    self, Deployment, READY_DEPTH_BLOCKS, REVEAL_MARGIN_SECONDS, SIGNATURE_TTL_SECONDS,
+    self, Deployment, SwapContract, READY_DEPTH_BLOCKS, REVEAL_MARGIN_SECONDS,
+    SIGNATURE_TTL_SECONDS,
 };
 use super::engine::{self, MakerChecks, OpHandle};
 use super::evm_rpc::SwapStage;
@@ -293,9 +294,23 @@ pub(crate) fn quote_error(error: SwapHttpError) -> PrivateUsdError {
     }
 }
 
-/// The maker's `/v1/info` against the pins, once per session and direction.
-/// A reverse conversion also needs the maker to take them
-/// (`reverseEnabled`), else `Unavailable`.
+/// Whether the windows and contract kind a service names, where it names
+/// them, are the pinned contract's.
+fn names_pinned_windows(
+    contract: &SwapContract,
+    min_window: Option<u64>,
+    late_window: Option<u64>,
+    contract_kind: Option<&str>,
+) -> bool {
+    min_window.is_none_or(|window| window == contract.min_window)
+        && late_window.is_none_or(|window| window == contract.late_window)
+        && contract_kind.is_none_or(|kind| kind == WINDOWS_CONTRACT_KIND)
+}
+
+/// The maker's `/v1/info` against the pins, once per session and direction,
+/// windows and contract kind included where it names them. A reverse
+/// conversion also needs the maker to take them (`reverseEnabled`), else
+/// `Unavailable`.
 pub(crate) async fn check_maker<T: HttpTransport>(
     maker: &MakerClient<'_, T>,
     pins: &Deployment,
@@ -306,14 +321,20 @@ pub(crate) async fn check_maker<T: HttpTransport>(
     if makers.checked(network, reverse) {
         return Ok(());
     }
-    let contract = pins.swap_contract()?.address;
+    let contract = pins.swap_contract()?;
     let info = maker.info().await?;
     let serves = info.api_version == MAKER_API_VERSION
         && info.maker.0 == pins.maker
         && info.chain_id == pins.chain_id
-        && info.contract.0 == contract
+        && info.contract.0 == contract.address
         && info.token.0 == pins.token
-        && info.zcash_network == SwapZcashNetwork::from(network);
+        && info.zcash_network == SwapZcashNetwork::from(network)
+        && names_pinned_windows(
+            contract,
+            info.min_window,
+            info.late_window,
+            info.contract_kind.as_deref(),
+        );
     if !serves {
         return fail(
             ErrorCode::WrongDeployment,
@@ -356,16 +377,12 @@ pub(crate) async fn pinned_relayer_terms<T: HttpTransport>(
         && terms.contract.0 == contract.address
         && terms.relayer.0 == pins.relayer
         && terms.relayer.0 != pins.maker
-        && terms
-            .min_window
-            .is_none_or(|window| window == contract.min_window)
-        && terms
-            .late_window
-            .is_none_or(|window| window == contract.late_window)
-        && terms
-            .contract_kind
-            .as_deref()
-            .is_none_or(|kind| kind == WINDOWS_CONTRACT_KIND);
+        && names_pinned_windows(
+            contract,
+            terms.min_window,
+            terms.late_window,
+            terms.contract_kind.as_deref(),
+        );
     if !serves {
         return fail(ErrorCode::WrongDeployment, "another deployment's relayer");
     }

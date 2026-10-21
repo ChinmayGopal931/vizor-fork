@@ -2596,6 +2596,22 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     mobile: true,
   ),
   FigmaCompareScenario(
+    id: 'mobile-private-usd-progress-unwinding',
+    description:
+        "Private USD progress unwinding: waiting for the maker's refund, "
+        'with the late claim time',
+    builder: buildMobilePrivateUsdProgressUnwindingUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-progress-other-deployment',
+    description: 'Private USD progress of a bridge of another deployment',
+    builder: buildMobilePrivateUsdProgressOtherDeploymentUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
     id: 'mobile-private-usd-progress-refunded',
     description: 'Private USD progress after the ZEC came back',
     builder: buildMobilePrivateUsdProgressRefundedUseCase,
@@ -2692,6 +2708,14 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     mobile: true,
   ),
   FigmaCompareScenario(
+    id: 'mobile-private-usd-reverse-other-deployment',
+    description:
+        'Private USD reverse progress of a bridge of another deployment',
+    builder: buildMobilePrivateUsdReverseOtherDeploymentUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
     id: 'mobile-private-usd-refunds',
     description:
         'Private USD refunds: checking, recoverable, none, check failed',
@@ -2711,6 +2735,22 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     description:
         'Private USD with a send not in a block yet: spending note, Send and Withdraw disabled',
     builder: buildMobilePrivateUsdPaymentPendingUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-bridge-off',
+    description:
+        'Private USD on a network without a windows contract: no Bridge',
+    builder: buildMobilePrivateUsdBridgeOffUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-other-deployment',
+    description:
+        'Private USD with an unfinished bridge of another deployment: its quiet row',
+    builder: buildMobilePrivateUsdOtherDeploymentUseCase,
     desktop: false,
     mobile: true,
   ),

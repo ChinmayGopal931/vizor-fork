@@ -127,6 +127,11 @@ abstract final class PrivateUsdCopy {
       'Bridge ZEC into dollars nobody else can see: not your balance, and '
       'not who you pay.';
 
+  /// [emptyBody] where bridging is off: Receive is the way in.
+  static const emptyBodyReceive =
+      'Receive dollars nobody else can see: not your balance, and not who '
+      'you pay.';
+
   static String receiveShieldedTab(String symbol) => '0zk$symbol';
   static const receiveShieldedOnly = 'Only from a Railgun wallet';
   static const receiveAddressNote =
@@ -182,6 +187,7 @@ abstract final class PrivateUsdCopy {
   static String activityIn(String usd) => '+$usd';
   static String activityOut(String usd) => '−$usd';
   static const activityUnconfirmed = 'not in a block yet';
+  static const activityOtherDeployment = 'From an earlier test deployment';
   static const refundsView = 'View refunds';
 
   // ── Convert (both directions): amount and quote ─────────────────────
@@ -318,6 +324,7 @@ abstract final class PrivateUsdCopy {
   static const convertStepArrive = 'Arriving in your private balance';
   static const convertStepScreen = 'Screening';
   static const convertStepRefund = 'Bringing your ZEC back';
+  static const convertStepUnwind = "Waiting for the market maker's refund";
   static const convertEtaSeconds = 'A few seconds';
   static const convertEtaMinute = 'About a minute';
   static const convertWaitSyncing = 'Waiting for your Zcash wallet to sync';
@@ -341,13 +348,22 @@ abstract final class PrivateUsdCopy {
   static const convertRefunding =
       'The swap was called off. Veylor is bringing your ZEC back to your '
       'wallet.';
+  static const convertUnwinding =
+      "The swap couldn't be completed in time, so it unwinds: your ZEC comes "
+      "back after the market maker's refund.";
+
+  /// [convertUnwinding], and when Veylor claims instead: [time] is the
+  /// record's `lateClaimAt`.
+  static String convertUnwindingUntil(String time) =>
+      "$convertUnwinding If the market maker hasn't refunded by $time, "
+      'Veylor claims your dollars instead.';
   static const convertBackgroundNote =
       "Keep Veylor open until this finishes. If you leave, it pauses and picks "
       "up when you're back.";
 
   static const convertProgressInfoTitle = "What's happening";
   static const convertProgressInfoOpen =
-      'The market maker opens the swap on Ethereum and locks the dollars in '
+      'The market maker opens the swap on Ethereum and puts the dollars in '
       'it.';
   static const convertProgressInfoDeposit =
       'Veylor sends your ZEC to the deposit address you and the market maker '
@@ -392,9 +408,6 @@ abstract final class PrivateUsdCopy {
       "Railgun isn't accepting deposits right now, so Veylor holds off "
       "claiming. If it doesn't reopen in time, the swap is called off and "
       'your ZEC comes back.';
-  static const convertProblemTurn =
-      'The market maker holds the claim for a few minutes. Veylor claims as '
-      "soon as it's your turn.";
   static const convertProblemWallet =
       "Veylor couldn't complete this step with your Zcash wallet. It will "
       'keep trying while open and unlocked.';
@@ -451,6 +464,13 @@ abstract final class PrivateUsdCopy {
       'ZEC never left your wallet.';
   static const convertResultViewBalance = 'View private USD';
   static const convertResultTryAgain = 'Try again';
+
+  // A conversion of another deployment (the lock contract's, or the retired
+  // testnet token's), in either direction: never driven.
+  static const otherDeploymentTitle = "Can't continue";
+  static const otherDeploymentBody =
+      "This bridge is from an earlier test deployment. It can't continue in "
+      'this version.';
 
   // ── Reverse: amount, review and info ──────────────────────────────────
 

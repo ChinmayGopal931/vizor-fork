@@ -81,7 +81,8 @@ class PrivateUsdProgressPresentation {
 
 /// The forward progress for [status] at [now]. [balance] is the account's
 /// private balance (whether a payout arrived and was screened);
-/// [zcashConfirmations] and [screening] come from the deployment.
+/// [zcashConfirmations] and [screening] come from the deployment. With
+/// [bridgeAvailable] off, an ended conversion offers no new one.
 PrivateUsdProgressPresentation privateUsdProgressPresentation({
   required PrivateUsdConversionStatus status,
   required DateTime now,
@@ -90,6 +91,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
   PrivateUsdBalanceState? balance,
   bool privacyModeEnabled = false,
   String? explorerTxPrefix,
+  bool bridgeAvailable = true,
 }) {
   final record = status.record;
   final totalZat = record.maxTotalZat ?? record.depositZat;
@@ -123,7 +125,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
     required SwapStatusBadgeKind badgeKind,
     required String title,
     required String body,
-    required PrivateUsdProgressAction action,
+    PrivateUsdProgressAction? action,
     List<SwapStatusStepData> steps = const [],
     int progressIndex = 0,
   }) => PrivateUsdProgressPresentation(
@@ -144,6 +146,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
     bridged: badgeKind == SwapStatusBadgeKind.completed,
   );
 
+  final tryAgain = bridgeAvailable ? PrivateUsdProgressAction.tryAgain : null;
   switch (record.outcome) {
     case ApiForwardOutcome.paid:
       final about = PrivateUsdCopy.about(screening);
@@ -180,17 +183,25 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
         badgeKind: SwapStatusBadgeKind.refunded,
         title: PrivateUsdCopy.convertResultRefundedTitle,
         body: privateUsdRefundedMessage(record.refundCause),
-        action: PrivateUsdProgressAction.tryAgain,
+        action: tryAgain,
       );
     case ApiForwardOutcome.nothingSent:
       return ended(
         badgeKind: SwapStatusBadgeKind.failed,
         title: PrivateUsdCopy.convertResultNothingTitle,
         body: privateUsdNothingSentMessage(record.nothingSentCause),
-        action: PrivateUsdProgressAction.tryAgain,
+        action: tryAgain,
       );
     case null:
       break;
+  }
+  // Never driven: nothing runs, and nothing is asked of the user.
+  if (status.otherDeployment) {
+    return ended(
+      badgeKind: SwapStatusBadgeKind.failed,
+      title: PrivateUsdCopy.otherDeploymentTitle,
+      body: PrivateUsdCopy.otherDeploymentBody,
+    );
   }
 
   final problem = status.problem;
@@ -199,6 +210,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
       record.phase == ApiForwardPhase.refunding ||
       status.wait == ApiForwardWait.refunding ||
       status.activity == ApiActivity.sweeping;
+  final unwinding = !refunding && privateUsdForwardUnwinding(status);
 
   final List<SwapStatusStepData> steps;
   final int active;
@@ -211,6 +223,13 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
         description: syncing ? PrivateUsdCopy.convertWaitSyncing : null,
       ),
     ];
+  } else if (unwinding) {
+    // The maker's refund, then the ZEC home.
+    active = 0;
+    steps = privateUsdProgressSteps(const [
+      PrivateUsdCopy.convertStepUnwind,
+      PrivateUsdCopy.convertStepRefund,
+    ], active: active);
   } else {
     active = privateUsdForwardStepIndex(status);
     steps = _forwardSteps(
@@ -247,11 +266,20 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
       t0 != null &&
       t0.isAfter(now);
 
+  final lateClaimAt = record.lateClaimAt;
   final String? note;
   if (status.resuming) {
     note = PrivateUsdCopy.convertResuming;
   } else if (refunding) {
     note = PrivateUsdCopy.convertRefunding;
+  } else if (unwinding) {
+    note = lateClaimAt == null
+        ? PrivateUsdCopy.convertUnwinding
+        : PrivateUsdCopy.convertUnwindingUntil(
+            formatDayMonthTime(
+              DateTime.fromMillisecondsSinceEpoch(lateClaimAt * 1000),
+            ),
+          );
   } else if (status.wait == ApiForwardWait.depositUnsettled) {
     note = PrivateUsdCopy.convertUnsettled;
   } else if (slowOpening) {
@@ -308,6 +336,14 @@ int privateUsdForwardStepIndex(PrivateUsdConversionStatus status) {
   };
 }
 
+/// Whether [status] waits as its swap unwinds: too late to claim before
+/// `t1`, and from it the maker's to refund until `lateClaimAt`, with no claim
+/// running. Its ZEC comes back after the maker's refund.
+bool privateUsdForwardUnwinding(PrivateUsdConversionStatus status) =>
+    status.wait == ApiForwardWait.unwinding &&
+    status.activity != ApiActivity.claiming &&
+    status.activity != ApiActivity.payingOut;
+
 /// The banner's detail for a forward conversion under way: its step, with
 /// the confirmation count while confirming ("Waiting for confirmations · 1
 /// of 2").
@@ -320,6 +356,9 @@ String privateUsdForwardStageLabel(
       status.wait == ApiForwardWait.refunding ||
       status.activity == ApiActivity.sweeping) {
     return PrivateUsdCopy.convertStepRefund;
+  }
+  if (privateUsdForwardUnwinding(status)) {
+    return PrivateUsdCopy.convertStepUnwind;
   }
   return switch (privateUsdForwardStepIndex(status)) {
     0 => PrivateUsdCopy.convertStepOpen,

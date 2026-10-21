@@ -7,6 +7,13 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **The windows contract (2026-10-20, D-137).** Testnet swaps settle on
+  zecSwap's windows contract, with no claim or refund locks. Mainnet
+  bridging is off until zecSwap deploys one there, so the app hides Bridge;
+  the balance, deposits, sends and withdrawals work. A bridge left on the
+  lock contract shows as from an earlier test deployment, is never driven,
+  and holds up nothing. Not yet run on the A35.
+
 - **Sepolia's Railgun list (2026-10-20, D-138).** Railgun's Sepolia
   indexer breaks its hash chain at transaction 4188, which held relayed
   sends' change in Processing. The page reads it through our worker
@@ -1969,6 +1976,60 @@ M8 status (2026-10-14): the non-device parts are done.
   - rc9's migrations (one-time IVKs) run on `zcash_wallet.db` and
     `joint.db` and cannot be undone: an older build cannot open them, so
     never install one while a conversion is under way.
+- **D-137 (owner, 2026-10-20): swaps on zecSwap's windows contract;
+  bridging off on mainnet.** zecSwap's testnet contract has no claim or
+  refund locks: at every moment one side at most may reveal, by the clock
+  and the swap's stage (zecSwap #17, its `PORT-SPEC.md`; plan §3.5 items
+  3, 5 to 8 and 16, reference §5.4).
+  - **Pins.** Sepolia pins `0x459b…980d` (`MIN_WINDOW` 1800 s,
+    `LATE_WINDOW` 3600 s). No swap read is trusted until the contract
+    answers both as pinned and reverts `LOCK_DURATION()`, and `getSwap` must
+    be four words.
+  - **Mainnet bridging stays off** until zecSwap deploys a windows contract
+    there: mainnet pins none, so quotes and conversions are `Unavailable`
+    (`ApiDeployment.bridgeAvailable` false). The app hides Bridge, its
+    screens redirect to `/private-usd`, and an ended conversion offers no
+    new one. The balance, deposits, sends and withdrawals are unchanged.
+  - **Reveals.** Each is decided on one consistent read (the newest block's
+    number, time and hash, then `getSwap` at that hash) and again just
+    before the post, with `claim_posted` or `refund_posted` kept first. A
+    forward claim goes on a ready before `t0`, or from `t0`, until
+    `t1 − 300 s`; between it and `t1 + LATE_WINDOW` the swap unwinds
+    through the maker's refund, and then the claim goes for good. A reverse
+    `ready` is signed only while its deadline falls before `t0` and no
+    refund was posted (`ChainLagging` on a head over 3 minutes behind); an
+    open escrow is refunded once no `ready` of ours can land.
+  - **The ready depth.** Before `t0` a claim goes only on a ready 12 blocks
+    deep: the oracle's rule. Veylor reads the swap at `head − 12`, one block
+    stricter than zecSwap's reference code (`head − 11`).
+  - **Old records.** Lock-era records are kept and read, but never driven
+    (`WrongDeployment`, `swaps.db` schema 3); the retired contracts' used
+    indices are still skipped. Each API record carries `otherDeployment`,
+    which Rust sets for a record this build never drives (`swap::serves`
+    or `serves_reverse` against the pins of the record's chain). The
+    engine never advances one or reads a seed for it, and Rust reports it
+    waiting on no one (`awaitingUser` and `cancellable` false). Its progress
+    reads
+    "This bridge is from an earlier test deployment. It can't continue in
+    this version.", with no problem card, banner, keep-awake or settlement
+    buzz, and a refunded one is marked on Refunds without a check.
+  - **They hold up nothing:** not a new bridge, not Send or Withdraw.
+    `sends::keep` refuses only beside a conversion this build drives
+    (`swap::require_none_under_way`, as the quote does).
+    `private_usd_unfinished_count` still counts every unfinished record,
+    on purpose: it only feeds the account-deletion warning, and the
+    deletion removes those records with the account.
+  - **The maker's `/v1/info` and the relayer's terms** may name
+    `contractKind`, `minWindow` and `lateWindow`; each must match the pins,
+    else `WrongDeployment`. All three are optional because mainnet's
+    lock-contract services name none; the testnet maker and relayer serve
+    all three (`windows`, 1800, 3600). An accept's `lateWindow` is optional
+    the same way.
+  - Unit tests: the oracle's 44 app vectors replay in Rust (`cargo test
+    --lib`: 1570 passed, the 21 failures upstream's); in Dart, the
+    Private USD and provider tests (956 passed) and the mobile lane's
+    Private USD, Widgetbook and Home tests (352 passed), with every mobile
+    Figma scenario rendering. Not yet run on the A35.
 
 - **D-138 (owner, 2026-10-20): Sepolia's Railgun list, read through a
   worker that repairs it.** Relayed sends' outputs on Sepolia stayed in

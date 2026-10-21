@@ -1377,6 +1377,10 @@ class ApiForwardRecord {
   /// for a conversion of another deployment.
   final PlatformInt64? lateClaimAt;
 
+  /// A conversion of another deployment, such as the lock contract's: read,
+  /// never driven, and holding up nothing.
+  final bool otherDeployment;
+
   /// Internal byte order hex, as wallet history rows carry it; show it with
   /// `zcashDisplayTxidHex`.
   final String? depositTxid;
@@ -1409,6 +1413,7 @@ class ApiForwardRecord {
     this.t0,
     this.t1,
     this.lateClaimAt,
+    required this.otherDeployment,
     this.depositTxid,
     this.depositConfirmations,
     this.sweepTxid,
@@ -1434,6 +1439,7 @@ class ApiForwardRecord {
       t0.hashCode ^
       t1.hashCode ^
       lateClaimAt.hashCode ^
+      otherDeployment.hashCode ^
       depositTxid.hashCode ^
       depositConfirmations.hashCode ^
       sweepTxid.hashCode ^
@@ -1461,6 +1467,7 @@ class ApiForwardRecord {
           t0 == other.t0 &&
           t1 == other.t1 &&
           lateClaimAt == other.lateClaimAt &&
+          otherDeployment == other.otherDeployment &&
           depositTxid == other.depositTxid &&
           depositConfirmations == other.depositConfirmations &&
           sweepTxid == other.sweepTxid &&
@@ -1962,6 +1969,10 @@ class ApiReverseRecord {
   /// When the record last changed (device clock).
   final PlatformInt64 updatedAt;
 
+  /// A conversion of another deployment, such as the lock contract's: read,
+  /// never driven, and holding up nothing.
+  final bool otherDeployment;
+
   const ApiReverseRecord({
     required this.index,
     required this.swapId,
@@ -1987,6 +1998,7 @@ class ApiReverseRecord {
     required this.receiveConfirmations,
     this.acceptedAt,
     required this.updatedAt,
+    required this.otherDeployment,
   });
 
   @override
@@ -2014,7 +2026,8 @@ class ApiReverseRecord {
       receivedZat.hashCode ^
       receiveConfirmations.hashCode ^
       acceptedAt.hashCode ^
-      updatedAt.hashCode;
+      updatedAt.hashCode ^
+      otherDeployment.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -2044,7 +2057,8 @@ class ApiReverseRecord {
           receivedZat == other.receivedZat &&
           receiveConfirmations == other.receiveConfirmations &&
           acceptedAt == other.acceptedAt &&
-          updatedAt == other.updatedAt;
+          updatedAt == other.updatedAt &&
+          otherDeployment == other.otherDeployment;
 }
 
 /// One send or withdrawal of the log.

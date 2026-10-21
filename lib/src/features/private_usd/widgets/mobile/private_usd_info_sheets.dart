@@ -8,15 +8,18 @@ import '../../private_usd_copy.dart';
 
 /// The Private USD screen's info sheet: what each action does, then the
 /// notes on screening, privacy and keeping the app open. [screening] is the
-/// deployment's screening time.
+/// deployment's screening time; with [bridgeAvailable] off, Bridge is not
+/// among the actions.
 Future<void> showPrivateUsdInfoSheet(
   BuildContext context, {
   required Duration screening,
+  bool bridgeAvailable = true,
 }) {
   return showAppMobileSheet<void>(
     context: context,
     builder: (sheetContext) => PrivateUsdInfoSheetBody(
       screening: screening,
+      bridgeAvailable: bridgeAvailable,
       onClose: () => Navigator.of(sheetContext).pop(),
     ),
   );
@@ -137,17 +140,19 @@ class PrivateUsdInfoSheetBody extends StatelessWidget {
   const PrivateUsdInfoSheetBody({
     required this.screening,
     required this.onClose,
+    this.bridgeAvailable = true,
     super.key,
   });
 
   final Duration screening;
+  final bool bridgeAvailable;
   final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) => PrivateUsdTextSheetBody(
     title: PrivateUsdCopy.infoTitle,
-    steps: const [
-      PrivateUsdCopy.infoConvert,
+    steps: [
+      if (bridgeAvailable) PrivateUsdCopy.infoConvert,
       PrivateUsdCopy.infoReceive,
       PrivateUsdCopy.infoSend,
       PrivateUsdCopy.infoWithdraw,

@@ -102,7 +102,6 @@ import 'src/features/payment_links/providers/payment_link_intake_provider.dart';
 import 'src/features/payment_links/providers/gift_claim_flow_provider.dart';
 import 'src/features/payment_links/screens/gift_claim_screen.dart';
 import 'src/features/payment_links/screens/desktop_payment_link_scan_screen.dart';
-import 'src/features/private_usd/models/private_usd_record_key.dart';
 import 'src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'src/features/private_usd/providers/private_usd_unfinished_provider.dart';
 import 'src/features/private_usd/widgets/mobile/private_usd_engine_host.dart';
@@ -714,10 +713,6 @@ String? appRedirect({
       _isRouteOrChild(state.matchedLocation, '/pay') ||
       _isRouteOrChild(state.matchedLocation, '/activity/swap');
   final swapFeatureEnabled = ref.read(swapFeatureEnabledProvider);
-  // Hardware accounts, accounts without a ZIP-32 index, networks without a
-  // deployment and the kill switch all leave it unavailable, except the
-  // progress of a conversion still under way for the active account.
-  final isPrivateUsd = _isRouteOrChild(state.matchedLocation, '/private-usd');
 
   log(
     'router redirect: location=${state.matchedLocation}, hasWallet=$hasWallet, '
@@ -766,20 +761,22 @@ String? appRedirect({
     return requiresUnlock ? '/unlock' : '/home';
   }
   if (!swapFeatureEnabled && isSwap) return '/home';
-  if (isPrivateUsd && !ref.read(privateUsdAvailableProvider)) {
-    final conversion = PrivateUsdRoutePath.tryParseLocation(
-      state.matchedLocation,
-    );
-    final account = ref.read(accountProvider).value?.activeAccountUuid;
-    final underWay =
-        conversion != null &&
-        account != null &&
-        ref
-            .read(privateUsdUnfinishedProvider)
-            .contains(conversion.keyFor(account));
-    if (!underWay) return '/home';
-  }
-  return null;
+  // Hardware accounts, accounts without a ZIP-32 index, networks without a
+  // deployment and the kill switch all leave Private USD unavailable, except
+  // the progress of a conversion still under way for the active account; a
+  // network without a windows contract leaves the bridge's screens out.
+  return privateUsdRedirect(
+    state.matchedLocation,
+    available: () => ref.read(privateUsdAvailableProvider),
+    bridgeAvailable: () => ref.read(privateUsdBridgeAvailableProvider),
+    underWay: (conversion) {
+      final account = ref.read(accountProvider).value?.activeAccountUuid;
+      return account != null &&
+          ref
+              .read(privateUsdUnfinishedProvider)
+              .contains(conversion.keyFor(account));
+    },
+  );
 }
 
 bool _isRouteOrChild(String matchedLocation, String routePath) {

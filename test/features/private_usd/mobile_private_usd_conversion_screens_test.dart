@@ -3,13 +3,16 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/formatting/date_format.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
+import 'package:zcash_wallet/src/features/activity/models/activity_row_data.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_status_presentation.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_convert_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_screen.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
+import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_activity_rows.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_banner.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_scramble_text.dart';
@@ -233,6 +236,7 @@ void main() {
       WidgetTester tester,
       PrivateUsdConversionStatus status, {
       PrivateUsdBalanceState? balance,
+      bool bridgeAvailable = true,
     }) => pump(
       tester,
       MobilePrivateUsdConversionView(
@@ -242,6 +246,7 @@ void main() {
           zcashConfirmations: 2,
           screening: const Duration(hours: 1),
           balance: balance,
+          bridgeAvailable: bridgeAvailable,
         ),
         onBack: () {},
         onInfo: () {},
@@ -433,6 +438,117 @@ void main() {
       expect(find.text(PrivateUsdCopy.convertRefunding), findsOneWidget);
       expect(find.text(PrivateUsdCopy.convertStepOpen), findsNothing);
     });
+
+    testWidgets('unwinding waits on the maker\'s refund, then the ZEC home, '
+        'and says when Veylor claims instead', (tester) async {
+      final status = previewPrivateUsdUnwinding();
+      await pumpProgress(tester, status);
+
+      final lateClaimAt = DateTime.fromMillisecondsSinceEpoch(
+        status.record.lateClaimAt! * 1000,
+      );
+      expect(find.text(PrivateUsdCopy.convertStepUnwind), findsOneWidget);
+      expect(find.text(PrivateUsdCopy.convertStepRefund), findsOneWidget);
+      expect(find.text(PrivateUsdCopy.convertStepClaim), findsNothing);
+      expect(
+        find.text(
+          PrivateUsdCopy.convertUnwindingUntil(formatDayMonthTime(lateClaimAt)),
+        ),
+        findsOneWidget,
+      );
+      // Its sweep or late claim needs the seed: keep the app open.
+      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('mobile_private_usd_progress_action')),
+        findsNothing,
+      );
+      expect(find.text(PrivateUsdCopy.convertCallOff), findsNothing);
+
+      // The banner and the activity row name the wait; a late claim running
+      // reads as the claim again.
+      expect(
+        privateUsdForwardStageLabel(status, zcashConfirmations: 2),
+        PrivateUsdCopy.convertStepUnwind,
+      );
+      expect(
+        privateUsdForwardStageLabel(
+          status.copyWith(activity: ApiActivity.claiming),
+          zcashConfirmations: 2,
+        ),
+        PrivateUsdCopy.convertStepClaim,
+      );
+    });
+
+    testWidgets('a bridge of another deployment says it can\'t continue, and '
+        'asks nothing of the user', (tester) async {
+      await pumpProgress(
+        tester,
+        PrivateUsdConversionStatus(
+          record: previewPrivateUsdRecord(
+            phase: ApiForwardPhase.claiming,
+            otherDeployment: true,
+          ),
+        ),
+      );
+
+      expect(find.text(PrivateUsdCopy.otherDeploymentTitle), findsOneWidget);
+      expect(find.text(PrivateUsdCopy.otherDeploymentBody), findsOneWidget);
+      expect(find.text(PrivateUsdCopy.convertProblemTitle), findsNothing);
+      expect(find.text(PrivateUsdCopy.convertStepClaim), findsNothing);
+      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsNothing);
+      expect(
+        find.byKey(const ValueKey('mobile_private_usd_progress_action')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('with bridging off, an ended bridge offers no new one', (
+      tester,
+    ) async {
+      final refunded = PrivateUsdConversionStatus(
+        record: previewPrivateUsdRecord(
+          phase: ApiForwardPhase.refunded,
+          outcome: ApiForwardOutcome.refunded,
+          refundCause: ApiRefundCause.notClaimedInTime,
+        ),
+      );
+      await pumpProgress(tester, refunded, bridgeAvailable: false);
+      expect(
+        find.text(PrivateUsdCopy.convertResultRefundedTitle),
+        findsOneWidget,
+      );
+      expect(find.text(PrivateUsdCopy.convertResultTryAgain), findsNothing);
+      expect(
+        find.byKey(const ValueKey('mobile_private_usd_progress_action')),
+        findsNothing,
+      );
+    });
+  });
+
+  testWidgets('an unfinished bridge of another deployment is a quiet row', (
+    tester,
+  ) async {
+    late ActivityRowData row;
+    await pump(
+      tester,
+      Builder(
+        builder: (context) {
+          row = buildPrivateUsdActivityRow(
+            context: context,
+            record: previewPrivateUsdRecord(
+              phase: ApiForwardPhase.claiming,
+              otherDeployment: true,
+            ),
+            zcashConfirmations: 2,
+          )!;
+          return const SizedBox.shrink();
+        },
+      ),
+    );
+
+    expect(row.title, PrivateUsdCopy.convertingToUsd);
+    expect(row.subtitle, PrivateUsdCopy.activityOtherDeployment);
+    expect(row.statusIconName, isNull, reason: 'nothing runs');
   });
 
   testWidgets('the banner names the conversion, its stage, and keep-open', (

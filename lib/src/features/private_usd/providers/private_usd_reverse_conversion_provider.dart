@@ -266,11 +266,13 @@ class PrivateUsdReverseConversionNotifier
   }
 
   /// After a refused funding the relayer's new fee cleared the cost: price
-  /// it again (a read and the page; no index, no key), once.
+  /// it again (a read and the page; no index, no key), once. Never for a
+  /// conversion of another deployment, which is never paid.
   void _priceIfCleared() {
     final record = state.status?.record;
     if (_priced ||
         record == null ||
+        record.otherDeployment ||
         record.phase != rust.ApiReversePhase.awaitingFunding ||
         record.cost != null ||
         record.funded ||
