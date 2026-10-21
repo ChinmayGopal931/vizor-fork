@@ -1611,11 +1611,12 @@ only when asked. The checklist maps each flag to what it checks. The iOS
 rounds use `scripts/private-usd/ios/run_device_round.sh` (the M3 round so
 far), per `docs/private-usd-ios-device-checklist.md`.
 
-**Do not merge the local stand-in.** `rust/Cargo.toml` carries two
-stand-ins for releases that do not exist yet:
+**Local stand-ins.** `rust/Cargo.toml` carries two stand-ins for releases
+that do not exist yet:
 
 - `~/dev/zapp/zecSwap-zakura-v3`, a zecSwap `[patch]` outside the
-  repository: `zecswap-core` on Zakura Common v3 (E1), marked do-not-merge.
+  repository: `zecswap-core` on Zakura Common v3 (E1). A clean clone builds
+  only where that checkout exists.
 - `rust/vendor/zakura-client-backend`, the published 0.1.0-rc9 with the
   `connect_stream` patch the Railgun bridge needs
   (`rust/vendor/zakura-client-backend.patch`, E4). Before every push,
@@ -1623,11 +1624,11 @@ stand-ins for releases that do not exist yet:
   Never run `cargo fmt --all`, which reformats it, and vendor it again for
   a new backend release.
 
-With the zapp-ported code and the Railgun bundle (E2), the zecSwap stand-in
-keeps `feature/private-usd-android` out of `main` until the owner delivers
-E1 and E2 (progress B-6). Push the branch to the owner's
-fork (`origin`) only when the owner asks (they did on 2026-10-14 and
-2026-10-16); never merge it or open a PR unprompted.
+The owner merged Private USD into the fork's `main` with the zecSwap
+stand-in in place (2026-10-20). Replace it with a pushed zecSwap rev once E1
+lands (progress B-6). Push to the owner's fork (`origin`) only when the owner
+asks; never merge into `main` or open a PR unprompted, and never against
+upstream.
 
 ## Testing
 
