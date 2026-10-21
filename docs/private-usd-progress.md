@@ -7,6 +7,12 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **Sepolia's Railgun list (2026-10-20, D-138).** Railgun's Sepolia
+  indexer breaks its hash chain at transaction 4188, which held relayed
+  sends' change in Processing. The page reads it through our worker
+  `railgun-sepolia-list`, which repairs the chain and logs nothing. Checked
+  live against the screening node; not yet seen on a phone.
+
 - **Zakura Common v3 (2026-10-20, D-136).** The branch builds on upstream
   `main` at `75d3fae57` and the published Common 3.0.0 crates. Both
   stand-ins moved (B-6). Not yet run on the A35.
@@ -1963,6 +1969,35 @@ M8 status (2026-10-14): the non-device parts are done.
   - rc9's migrations (one-time IVKs) run on `zcash_wallet.db` and
     `joint.db` and cannot be undone: an older build cannot open them, so
     never install one while a conversion is under way.
+
+- **D-138 (owner, 2026-10-20): Sepolia's Railgun list, read through a
+  worker that repairs it.** Relayed sends' outputs on Sepolia stayed in
+  Processing (`MissingExternalPOI`). Railgun's Sepolia indexer breaks its
+  verification-hash chain at transaction 4188 (block 11816741), so the
+  SDK's transaction-ID sync stops there and the wallet cannot prove a send
+  made after it.
+  - **Not the pre-send proofs.** Submitting the SDK's pre-send screening
+    proofs would have shown the screening node each note's `npk`, and with
+    it the amounts. The owner ruled it out: privacy is not traded for a
+    testnet convenience, and Sepolia and mainnet run the same code.
+  - **The worker.** `railgun-sepolia-list` (`scripts/private-usd/sepolia-list/`,
+    on the owner's Cloudflare account) relays every query to the indexer
+    unchanged and recomputes only the hashes from 4188 on. It keeps no logs
+    and stores nothing; its `X-Verification-Hashes` header says what it
+    did. The page's build points only Sepolia's queries at it
+    (`android/railgun-web/sepolia-list-plugin.mjs`), and its host is in the
+    Kotlin, Swift and Rust allowlists and the page's CSP. Mainnet's chain is
+    whole (143,458 transactions) and is read directly.
+  - **Checked live.** `verify.mjs` reads the live list through the SDK's
+    own client: the engine accepts every hash from 0, and the
+    transaction-ID root it builds at 4566 is the one the screening node
+    validated (`261c2820…e1ec5d`).
+  - **Cost.** A keccak per transaction since the break, about 19 more a
+    day. Past the free plan's 10 ms per request (error 1102), the worker
+    moves to the paid plan.
+  - **Drop it** once the header reads `intact`: the worker, its host in the
+    allowlists and the CSP, and the plugin.
+  - Not yet seen clearing a stuck send on a phone.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

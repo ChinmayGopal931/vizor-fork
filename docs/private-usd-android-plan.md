@@ -979,7 +979,7 @@ Then, with the owner's go-ahead, run the regtest test once (M2.7b; done 2026-10-
   - a send arrives at a second account's `0zk` address
   - a withdrawal reaches a `0x` address
   - killed between proving and the post, it resends the same bytes and never re-proves
-  - on Sepolia, outputs stay "Processing" (`MissingExternalPOI`)
+  - on Sepolia, outputs leave "Processing" once the wallet has proved the send (through the repaired list, progress D-138)
 
 **Traps.**
 
@@ -1132,6 +1132,6 @@ Skip unit tests for UI glue, provider wiring and copy; the device rounds cover t
 - **The no-auth loopback proxy** is reachable by other local apps while the page is open (§6.8).
 - **Foreground-only conversions fail more often** than zapp's (D9). The copy says to keep Veylor open, and X8 keeps the screen awake.
 - **The same seed in zapp and veylor** on ZIP-32 index 0 shares the Railgun wallet and the swap index space. Chain-checked index skipping prevents reuse (§3.3).
-- **The Sepolia screening indexer is broken,** so relayed-send outputs stay `MissingExternalPOI` (Processing) on testnet.
+- **The Sepolia screening indexer is broken.** Our worker `railgun-sepolia-list` repairs its transaction list (progress D-138), so on testnet the wallet's proofs of its own sends depend on that worker until Railgun mends the indexer.
 - **The first Railgun sync is slow.** On mainnet the notes phase alone took ~40 minutes on a Galaxy A35 over Wi-Fi (~60 % of the sync). It needs the foreground and the screen on (U21). In M0 a restarted sync finished faster (68.5 s against about 100 s on Sepolia), so some progress persists.
 - **AGENTS.md described an Android preparation worker and `rust/src/android_jni.rs` that this repo no longer has** (removed in `459a8565b`). M8 corrected AGENTS.md (progress D-106). Do not build on them.
