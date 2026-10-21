@@ -1,0 +1,8 @@
+{
+  "name": "railgun-sepolia-list",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  // Requests carry wallets' sync queries: Cloudflare keeps no logs of them.
+  "observability": { "enabled": false }
+}

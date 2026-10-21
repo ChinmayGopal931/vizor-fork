@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { artifactMirror } from './artifact-mirror-plugin.mjs';
+import { sepoliaList } from './sepolia-list-plugin.mjs';
 
 const require = createRequire(import.meta.url);
 // From this file, not the working directory: both outputs are deleted before each build.
@@ -62,8 +63,9 @@ const result = await build({
     crypto: 'crypto-browserify',
     stream: 'stream-browserify',
   },
-  // The SDK's circuit artifacts come from its own gateway, and from our mirror when that fails.
-  plugins: [browserBuilds, artifactMirror],
+  // The SDK's circuit artifacts come from its own gateway, and from our mirror when that fails; Sepolia's transaction
+  // list comes from our repaired copy.
+  plugins: [browserBuilds, artifactMirror, sepoliaList],
   logLevel: 'warning',
 });
 

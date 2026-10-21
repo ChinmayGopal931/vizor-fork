@@ -13,6 +13,7 @@ void main() {
       'sepolia.infura.io',
       'ppoi.fdi.network',
       'rail-squid.squids.live',
+      'railgun-sepolia-list.pepeman931.workers.dev',
       'ipfs-lb.com',
       'railgun-artifacts.pepeman931.workers.dev',
     ];

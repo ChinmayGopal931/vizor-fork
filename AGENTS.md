@@ -1605,6 +1605,19 @@ is refused.
   (older ones get `Invalid proof`). A wallet bump that changes circuit
   artifacts needs the mirror refreshed and deployed first: every send and
   withdrawal proves POIs too, so a build the mirror cannot serve cannot send.
+- On Sepolia the page reads Railgun's indexer (the transaction list and the
+  quick-sync events) through our worker `railgun-sepolia-list`
+  (`scripts/private-usd/sepolia-list/`, `sepolia-list-plugin.mjs`):
+  - **Why.** The indexer's verification-hash chain breaks at transaction
+    4188, which stops a wallet's transaction-ID sync and with it the
+    screening of its own relayed sends.
+  - **What it does.** The worker relays every query unchanged and
+    recomputes only the broken hashes. It keeps no logs and stores nothing.
+  - **When to drop it.** Its `X-Verification-Hashes` header reads `intact`
+    once Railgun mends the indexer: then drop the worker, its host and the
+    plugin.
+
+  Mainnet reads the indexer directly.
 - On any route change, close the page and stop the bridge, then reopen on a
   new bridge: Chromium keeps pooled sockets (plan U19). The page also
   closes on lock, on an account switch, and after 10 idle minutes.

@@ -48,7 +48,7 @@ pub(crate) const MAX_LOGS_BODY: usize = 8 << 20;
 /// What the Railgun page may reach besides its own assets, on both networks.
 /// Kotlin's and Swift's `RailgunEndpoints.hosts` and the bundle's CSP list the
 /// same hosts, and a keyed RPC URL must use one of them.
-pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 10] = [
+pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 11] = [
     "ethereum-rpc.publicnode.com",
     "ethereum-sepolia-rpc.publicnode.com",
     "eth-mainnet.g.alchemy.com",
@@ -57,6 +57,8 @@ pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 10] = [
     "sepolia.infura.io",
     "ppoi.fdi.network",
     "rail-squid.squids.live",
+    // On Sepolia, our copy of its transaction list with the hash chain repaired.
+    "railgun-sepolia-list.pepeman931.workers.dev",
     // The proving artifacts: the SDK's own gateway, then our mirror when the
     // gateway fails.
     "ipfs-lb.com",

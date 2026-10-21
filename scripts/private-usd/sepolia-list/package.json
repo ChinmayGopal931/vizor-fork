@@ -1,0 +1,18 @@
+{
+  "name": "railgun-sepolia-list",
+  "private": true,
+  "description": "Railgun's Sepolia transaction list with its verification-hash chain repaired, for Veylor's Railgun page",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "node --test test/*.test.mjs",
+    "verify": "node verify.mjs"
+  },
+  "dependencies": {
+    "@noble/hashes": "2.4.0"
+  },
+  "devDependencies": {
+    "wrangler": "4.147.0"
+  }
+}
