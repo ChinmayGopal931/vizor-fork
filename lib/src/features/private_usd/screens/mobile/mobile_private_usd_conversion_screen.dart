@@ -129,6 +129,7 @@ class _MobilePrivateUsdConversionScreenState
                 context,
                 zcashConfirmations: deployment.zcashConfirmations,
                 screening: screening,
+                relayerClaims: status?.claimHandedOver ?? false,
               ),
         onRetry: notifier.retryNow,
         onCallOff: () => unawaited(notifier.callOff()),

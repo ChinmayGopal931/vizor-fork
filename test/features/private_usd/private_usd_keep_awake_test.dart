@@ -12,9 +12,13 @@ import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_keep
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_unfinished_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/railgun_engine_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_cache.dart';
+import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/railgun_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/railgun_host_channel.dart';
 import 'package:zcash_wallet/src/providers/app_security_provider.dart';
+import 'package:zcash_wallet/src/rust/api/private_usd.dart';
+
+import 'support/fake_private_usd_backend.dart';
 
 // iOS progress VI-14 and VI-18: the screen stays on through a Railgun first
 // sync while the wallet is unlocked; `SyncKeepAwakeNativeHost` lets go in the
@@ -132,6 +136,49 @@ void main() {
     container.read(privateUsdProgressVisibleProvider.notifier).show(key);
     expect(keepAwake(container), isFalse, reason: 'no key step to come');
     container.read(privateUsdUnfinishedProvider.notifier).publish({key});
+    expect(keepAwake(container), isTrue);
+  });
+
+  test('once the relayer holds the claim, the progress keeps nothing on', () {
+    final container = containerWith();
+    const key = PrivateUsdRecordKey(
+      accountUuid: _account,
+      direction: PrivateUsdDirection.forward,
+      index: 1,
+    );
+    void publish(PrivateUsdConversionStatus status) => container
+        .read(privateUsdConversionsProvider.notifier)
+        .publish({key: status});
+
+    container.read(privateUsdProgressVisibleProvider.notifier).show(key);
+    container.read(privateUsdUnfinishedProvider.notifier).publish({key});
+    publish(
+      PrivateUsdConversionStatus(
+        record: forwardRecord(index: 1),
+        wait: ApiForwardWait.confirming,
+      ),
+    );
+    expect(keepAwake(container), isTrue, reason: 'not handed over yet');
+
+    publish(
+      PrivateUsdConversionStatus(
+        record: forwardRecord(index: 1, claimHeld: true),
+        wait: ApiForwardWait.confirming,
+      ),
+    );
+    expect(keepAwake(container), isFalse);
+
+    // A refund after the hand-over is Veylor's to sweep.
+    publish(
+      PrivateUsdConversionStatus(
+        record: forwardRecord(
+          index: 1,
+          phase: ApiForwardPhase.refunding,
+          claimHeld: true,
+        ),
+        wait: ApiForwardWait.refunding,
+      ),
+    );
     expect(keepAwake(container), isTrue);
   });
 }

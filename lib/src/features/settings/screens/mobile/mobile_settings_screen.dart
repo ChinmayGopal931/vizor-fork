@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../../payment_links/providers/payment_link_cards_provider.dart';
 import '../../../private_usd/private_usd_copy.dart';
 import '../../../private_usd/providers/private_usd_custom_rpc_provider.dart';
+import '../../../private_usd/providers/private_usd_relayer_claims_provider.dart';
 import '../../../private_usd/widgets/mobile/private_usd_rpc_sheet.dart';
 import '../../../../app_bootstrap.dart';
 import '../../../../core/config/app_version_config.dart';
@@ -269,12 +270,14 @@ class MobileSettingsScreen extends ConsumerWidget {
                       showChevron: true,
                       onTap: () => context.push('/settings/explorer'),
                     ),
-                    if (showEthereumRpc)
+                    if (showEthereumRpc) ...[
                       _EthereumRpcRow(
                         textStyle: settingsRowStyle,
                         valueColor: settingsValueColor,
                         chevronColor: settingsChevronColor,
                       ),
+                      _RelayerClaimsRow(textStyle: settingsRowStyle),
+                    ],
                     if (!kThemeLockedToDark)
                       MobileListRow(
                         key: const ValueKey('mobile_settings_theme_row'),
@@ -802,6 +805,53 @@ class _EthereumRpcRow extends ConsumerWidget {
   Future<void> _open(BuildContext context) async {
     final done = await showPrivateUsdRpcSheet(context);
     if (done != null && context.mounted) showAppToast(context, done);
+  }
+}
+
+/// Private USD's relayer claims: whether a new bridge to private USD hands
+/// its claim to the relayer once its ZEC is out.
+class _RelayerClaimsRow extends ConsumerWidget {
+  const _RelayerClaimsRow({required this.textStyle});
+
+  final TextStyle textStyle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(privateUsdRelayerClaimsProvider).value ?? true;
+    void toggle() => unawaited(_set(context, ref, !enabled));
+    return Semantics(
+      button: true,
+      toggled: enabled,
+      label: PrivateUsdCopy.relayerClaimsSetting,
+      onTap: toggle,
+      excludeSemantics: true,
+      child: MobileListRow(
+        key: const ValueKey('mobile_settings_relayer_claims_row'),
+        leading: const _RowIcon(AppIcons.plane),
+        label: PrivateUsdCopy.relayerClaimsSetting,
+        minRowHeight: _settingsRowHeight,
+        textStyle: textStyle,
+        trailing: MobilePrivacyToggle(
+          key: const ValueKey('mobile_settings_relayer_claims_toggle'),
+          enabled: enabled,
+          interactive: true,
+          thumbKey: const ValueKey(
+            'mobile_settings_relayer_claims_toggle_thumb',
+          ),
+        ),
+        onTap: toggle,
+      ),
+    );
+  }
+
+  Future<void> _set(BuildContext context, WidgetRef ref, bool enabled) async {
+    try {
+      await ref.read(privateUsdRelayerClaimsProvider.notifier).set(enabled);
+    } catch (_) {
+      if (context.mounted) {
+        showAppToast(context, PrivateUsdCopy.settingSaveFailed);
+      }
+    }
   }
 }
 

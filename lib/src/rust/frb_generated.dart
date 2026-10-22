@@ -1248,6 +1248,7 @@ abstract class RustLibApi extends BaseApi {
     required String ethRpcUrl,
     required int index,
     required BigInt maxTotalZat,
+    required bool relayerClaims,
   });
 
   Future<ApiForwardAdvance> crateApiPrivateUsdPrivateUsdForwardAdvance({
@@ -9589,6 +9590,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String ethRpcUrl,
     required int index,
     required BigInt maxTotalZat,
+    required bool relayerClaims,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -9603,6 +9605,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(ethRpcUrl, serializer);
           sse_encode_u_32(index, serializer);
           sse_encode_u_64(maxTotalZat, serializer);
+          sse_encode_bool(relayerClaims, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -9625,6 +9628,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           ethRpcUrl,
           index,
           maxTotalZat,
+          relayerClaims,
         ],
         apiImpl: this,
       ),
@@ -9644,6 +9648,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "ethRpcUrl",
           "index",
           "maxTotalZat",
+          "relayerClaims",
         ],
       );
 
@@ -14168,8 +14173,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiForwardRecord dco_decode_api_forward_record(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 21)
-      throw Exception('unexpected arr length: expect 21 but see ${arr.length}');
+    if (arr.length != 22)
+      throw Exception('unexpected arr length: expect 22 but see ${arr.length}');
     return ApiForwardRecord(
       index: dco_decode_u_32(arr[0]),
       swapId: dco_decode_String(arr[1]),
@@ -14188,12 +14193,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       depositConfirmations: dco_decode_opt_box_autoadd_u_32(arr[14]),
       sweepTxid: dco_decode_opt_String(arr[15]),
       payoutTx: dco_decode_opt_String(arr[16]),
-      outcome: dco_decode_opt_box_autoadd_api_forward_outcome(arr[17]),
-      refundCause: dco_decode_opt_box_autoadd_api_refund_cause(arr[18]),
+      claimHeld: dco_decode_bool(arr[17]),
+      outcome: dco_decode_opt_box_autoadd_api_forward_outcome(arr[18]),
+      refundCause: dco_decode_opt_box_autoadd_api_refund_cause(arr[19]),
       nothingSentCause: dco_decode_opt_box_autoadd_api_nothing_sent_cause(
-        arr[19],
+        arr[20],
       ),
-      endedAt: dco_decode_opt_box_autoadd_i_64(arr[20]),
+      endedAt: dco_decode_opt_box_autoadd_i_64(arr[21]),
     );
   }
 
@@ -19034,6 +19040,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
     var var_sweepTxid = sse_decode_opt_String(deserializer);
     var var_payoutTx = sse_decode_opt_String(deserializer);
+    var var_claimHeld = sse_decode_bool(deserializer);
     var var_outcome = sse_decode_opt_box_autoadd_api_forward_outcome(
       deserializer,
     );
@@ -19061,6 +19068,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       depositConfirmations: var_depositConfirmations,
       sweepTxid: var_sweepTxid,
       payoutTx: var_payoutTx,
+      claimHeld: var_claimHeld,
       outcome: var_outcome,
       refundCause: var_refundCause,
       nothingSentCause: var_nothingSentCause,
@@ -25354,6 +25362,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_box_autoadd_u_32(self.depositConfirmations, serializer);
     sse_encode_opt_String(self.sweepTxid, serializer);
     sse_encode_opt_String(self.payoutTx, serializer);
+    sse_encode_bool(self.claimHeld, serializer);
     sse_encode_opt_box_autoadd_api_forward_outcome(self.outcome, serializer);
     sse_encode_opt_box_autoadd_api_refund_cause(self.refundCause, serializer);
     sse_encode_opt_box_autoadd_api_nothing_sent_cause(

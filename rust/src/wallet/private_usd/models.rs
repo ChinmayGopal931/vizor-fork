@@ -549,6 +549,21 @@ pub(crate) enum ForwardOutcome {
     NothingSent { cause: NothingSentCause },
 }
 
+/// Where a forward swap's claim stands with the relayer it was handed to,
+/// which sends it once its window opens.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum ClaimHold {
+    /// Kept as handed over before it was posted, with no answer yet: posted
+    /// again as it was kept.
+    Posted,
+    /// The relayer holds it, or answered for a swap already claimed.
+    Held,
+    /// The relayer turned it down or takes no claims to hold: the app
+    /// claims in the window itself.
+    Declined,
+}
+
 /// How far a forward swap's deposit got. It is marked started before it is
 /// created, so an interrupted one is never paid twice.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -596,6 +611,13 @@ pub(crate) struct ForwardRecord {
     /// A claim was posted, `z` with it: kept before it goes.
     #[serde(default, skip_serializing_if = "is_false")]
     pub claim_posted: bool,
+    /// Chosen at accept: once the deposit is out, the claim, `z` with it,
+    /// goes to the relayer to hold until its window opens.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub relayer_claims: bool,
+    /// The claim handed to the relayer, kept before it is posted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claim_hold: Option<ClaimHold>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub t0: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -649,13 +671,23 @@ impl ForwardRecord {
         self.outcome.is_some()
     }
 
+    /// The relayer may hold the claim: posted to it, and not turned down.
+    pub(crate) fn claim_handed_over(&self) -> bool {
+        matches!(self.claim_hold, Some(ClaimHold::Posted | ClaimHold::Held))
+    }
+
     pub(crate) fn phase(&self) -> ForwardPhase {
         match (&self.outcome, self.deposit_progress()) {
             (Some(ForwardOutcome::Paid), _) => ForwardPhase::Paid,
             (Some(ForwardOutcome::Refunded { .. }), _) => ForwardPhase::Refunded,
             (Some(ForwardOutcome::NothingSent { .. }), _) => ForwardPhase::NothingSent,
             (None, _) if self.sweep.is_some() => ForwardPhase::Refunding,
-            (None, _) if self.payout.is_some() => ForwardPhase::Claiming,
+            // A payout signed to hand the claim over is no claim yet.
+            (None, _)
+                if self.claim_posted || (self.payout.is_some() && self.claim_hold.is_none()) =>
+            {
+                ForwardPhase::Claiming
+            }
             (None, DepositProgress::Kept(_)) => ForwardPhase::Confirming,
             (None, DepositProgress::Started) => ForwardPhase::Depositing,
             (None, DepositProgress::NotStarted) => ForwardPhase::Opening,

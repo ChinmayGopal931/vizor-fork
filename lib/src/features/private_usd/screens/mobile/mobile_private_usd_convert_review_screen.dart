@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../models/private_usd_record_key.dart';
 import '../../providers/private_usd_convert_provider.dart';
+import '../../providers/private_usd_relayer_claims_provider.dart';
 import '../../providers/private_usd_reverse_convert_provider.dart';
 import '../../widgets/mobile/private_usd_convert_views.dart';
 import 'mobile_private_usd_convert_screen.dart';
@@ -40,6 +41,8 @@ class MobilePrivateUsdConvertReviewScreen extends ConsumerWidget {
     }
     final state = ref.watch(privateUsdConvertProvider);
     final notifier = ref.read(privateUsdConvertProvider.notifier);
+    final relayerClaims =
+        ref.watch(privateUsdRelayerClaimsProvider).value ?? true;
     return _guarded(
       context,
       reviewable: state.quote != null,
@@ -48,6 +51,7 @@ class MobilePrivateUsdConvertReviewScreen extends ConsumerWidget {
       view: (onBack) => MobilePrivateUsdConvertReviewView(
         state: state,
         privacyModeEnabled: privacyModeEnabled,
+        relayerClaims: relayerClaims,
         onBack: onBack,
         onConfirm: () => _confirm(context, notifier.confirm),
         onRefreshQuote: notifier.refreshQuote,

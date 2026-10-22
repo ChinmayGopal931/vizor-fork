@@ -68,8 +68,9 @@ final privateUsdFirstSyncKeepAwakeProvider = Provider<bool>((ref) {
 
 /// Keeps the screen awake while a conversion's progress shows and a key
 /// step (deposit, claim, sweep) is still to come: screen-off means
-/// background, and background means pause. Also through a Railgun first
-/// sync ([privateUsdFirstSyncKeepAwakeProvider]). OR-ed into
+/// background, and background means pause. Not once the relayer holds the
+/// claim, which it sends without the app. Also through a Railgun first sync
+/// ([privateUsdFirstSyncKeepAwakeProvider]). OR-ed into
 /// `SyncKeepAwakeNativeHost`, which owns the one native flag and lets go in
 /// the background.
 final privateUsdKeepAwakeProvider = Provider<bool>((ref) {
@@ -77,5 +78,10 @@ final privateUsdKeepAwakeProvider = Provider<bool>((ref) {
   final visible = ref.watch(privateUsdProgressVisibleProvider);
   if (visible.isEmpty) return false;
   final unfinished = ref.watch(privateUsdUnfinishedProvider);
-  return visible.any(unfinished.contains);
+  final conversions = ref.watch(privateUsdConversionsProvider);
+  return visible.any(
+    (key) =>
+        unfinished.contains(key) &&
+        !(conversions[key]?.claimHandedOver ?? false),
+  );
 });

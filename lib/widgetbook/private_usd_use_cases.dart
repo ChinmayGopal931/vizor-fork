@@ -469,6 +469,7 @@ ApiForwardRecord previewPrivateUsdRecord({
   Duration ago = const Duration(minutes: 3),
   int? depositConfirmations,
   bool deposited = true,
+  bool claimHeld = false,
 }) {
   final acceptedAt = previewPrivateUsdNow.subtract(ago);
   int at(Duration after) => previewPrivateUsdUnix(acceptedAt.add(after));
@@ -499,6 +500,7 @@ ApiForwardRecord previewPrivateUsdRecord({
     payoutTx: outcome == ApiForwardOutcome.paid
         ? '0x5e3a9c1f7b2d4e6a8c0b1d3f5a7c9e2b4d6f8a0c2e4b6d8f0a1c3e5b7d9f1a3c'
         : null,
+    claimHeld: claimHeld,
     outcome: outcome,
     refundCause: refundCause,
     nothingSentCause: nothingSentCause,
@@ -513,6 +515,7 @@ Widget _convertPreview(PrivateUsdConvertState state) => PrivateUsdPreviewFrame(
       state: state,
       controller: controllers.single,
       autofocus: false,
+      relayerClaims: true,
       privateUsdAvailable: BigInt.from(1250400000),
       onAmountChanged: (_) {},
       onMax: () {},
@@ -555,23 +558,38 @@ Widget buildMobilePrivateUsdConvertSyncingUseCase(BuildContext context) =>
       ),
     );
 
-Widget _reviewPreview(PrivateUsdConvertState state) => PrivateUsdPreviewFrame(
+Widget _reviewPreview(
+  PrivateUsdConvertState state, {
+  bool relayerClaims = true,
+}) => PrivateUsdPreviewFrame(
   child: MobilePrivateUsdConvertReviewView(
     state: state,
     privacyModeEnabled: false,
+    relayerClaims: relayerClaims,
     onBack: () {},
     onConfirm: () {},
     onRefreshQuote: () {},
   ),
 );
 
-/// The forward review.
+/// The forward review, the relayer claiming (the default).
 Widget buildMobilePrivateUsdReviewUseCase(BuildContext context) =>
     _reviewPreview(
       previewPrivateUsdConvertState(
         quote: previewPrivateUsdQuote(),
         step: PrivateUsdConvertStep.review,
       ),
+    );
+
+/// The forward review with relayer claims off: Veylor claims, so it stays
+/// open.
+Widget buildMobilePrivateUsdReviewManualUseCase(BuildContext context) =>
+    _reviewPreview(
+      previewPrivateUsdConvertState(
+        quote: previewPrivateUsdQuote(),
+        step: PrivateUsdConvertStep.review,
+      ),
+      relayerClaims: false,
     );
 
 /// The review once its quote ran out.
@@ -612,6 +630,19 @@ Widget buildMobilePrivateUsdProgressUseCase(BuildContext context) =>
     _progressPreview(
       PrivateUsdConversionStatus(
         record: previewPrivateUsdRecord(depositConfirmations: 1),
+        wait: ApiForwardWait.confirming,
+      ),
+    );
+
+/// Waiting for confirmations with the claim handed to the relayer: the user
+/// can leave.
+Widget buildMobilePrivateUsdProgressRelayerUseCase(BuildContext context) =>
+    _progressPreview(
+      PrivateUsdConversionStatus(
+        record: previewPrivateUsdRecord(
+          depositConfirmations: 1,
+          claimHeld: true,
+        ),
         wait: ApiForwardWait.confirming,
       ),
     );
@@ -771,22 +802,25 @@ class FixedPrivateUsdReverseConversionsNotifier
   Map<PrivateUsdRecordKey, PrivateUsdReverseStatus> build() => fixed;
 }
 
-/// The banner a conversion under way shows.
-PrivateUsdBannerState previewPrivateUsdBanner() => PrivateUsdBannerState(
-  path: const PrivateUsdRoutePath(
-    direction: PrivateUsdDirection.forward,
-    index: 7,
-  ),
-  title: PrivateUsdCopy.convertingToUsd,
-  detail: privateUsdForwardStageLabel(
-    PrivateUsdConversionStatus(
-      record: previewPrivateUsdRecord(depositConfirmations: 1),
-      wait: ApiForwardWait.confirming,
-    ),
-    zcashConfirmations: _confirmations,
-  ),
-  attention: false,
-);
+/// The banner a conversion under way shows; [claimHandedOver] once the
+/// relayer holds its claim.
+PrivateUsdBannerState previewPrivateUsdBanner({bool claimHandedOver = false}) =>
+    PrivateUsdBannerState(
+      path: const PrivateUsdRoutePath(
+        direction: PrivateUsdDirection.forward,
+        index: 7,
+      ),
+      title: PrivateUsdCopy.convertingToUsd,
+      detail: privateUsdForwardStageLabel(
+        PrivateUsdConversionStatus(
+          record: previewPrivateUsdRecord(depositConfirmations: 1),
+          wait: ApiForwardWait.confirming,
+        ),
+        zcashConfirmations: _confirmations,
+      ),
+      attention: false,
+      claimHandedOver: claimHandedOver,
+    );
 
 /// Activity rows for [records], as the screens build them.
 List<ActivityRowData> previewPrivateUsdActivityRows(

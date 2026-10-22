@@ -24,8 +24,8 @@ use crate::wallet::private_usd::{
     joint::{self as joint_ops, SwapTxStatus},
     keys::{account_derivation, SwapKeyContext},
     models::{
-        Address, Amount, Direction, ForwardOutcome, ForwardPhase, ForwardRecord, NothingSentCause,
-        RefundCause, ReversePhase, ReverseRecord, ZcashTxId,
+        Address, Amount, ClaimHold, Direction, ForwardOutcome, ForwardPhase, ForwardRecord,
+        NothingSentCause, RefundCause, ReversePhase, ReverseRecord, ZcashTxId,
     },
     railgun_keys,
     relayer_client::{RailgunBroadcast, RelayerClient},
@@ -457,7 +457,8 @@ pub enum ApiForwardWait {
     /// The maker has not opened the swap on chain yet.
     Opening,
     /// The deposit is out; waiting for the maker to mark the swap ready (and
-    /// the ready to be 12 blocks deep), or for `t0`.
+    /// the ready to be 2 blocks deep), or for `t0`. A claim the relayer
+    /// holds is left to it for the window's first minute.
     Confirming,
     /// The maker called the swap off while the deposit was unmined.
     DepositUnsettled,
@@ -526,6 +527,9 @@ pub struct ApiForwardRecord {
     pub sweep_txid: Option<String>,
     /// The Ethereum transaction that shielded the payout, `0x` hex.
     pub payout_tx: Option<String>,
+    /// The relayer holds the claim and sends it once the claim's window
+    /// opens: the claim no longer needs Veylor open.
+    pub claim_held: bool,
     pub outcome: Option<ApiForwardOutcome>,
     pub refund_cause: Option<ApiRefundCause>,
     pub nothing_sent_cause: Option<ApiNothingSentCause>,
@@ -579,7 +583,9 @@ pub fn private_usd_forward_quote(
 /// accept. A missing offer is `QuoteExpired`. Called again for the same
 /// index, it posts the saved quote once more (never a new index). An error
 /// after the save means "maybe opened": read the records and show the
-/// conversion's progress if it is under way.
+/// conversion's progress if it is under way. With `relayer_claims` (the
+/// setting, kept on the record), the claim goes to the relayer once the
+/// deposit is out, for it to send when the claim's window opens.
 pub fn private_usd_forward_accept(
     db_path: String,
     network: String,
@@ -590,6 +596,7 @@ pub fn private_usd_forward_accept(
     eth_rpc_url: String,
     index: u32,
     max_total_zat: u64,
+    relayer_claims: bool,
 ) -> Result<ApiAcceptResult, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
@@ -604,7 +611,9 @@ pub fn private_usd_forward_accept(
             None,
             async |call, op| {
                 call.forward(op, async |forward, store| {
-                    forward.accept(store, index, max_total_zat).await
+                    forward
+                        .accept(store, index, max_total_zat, relayer_claims)
+                        .await
                 })
                 .await
             },
@@ -2211,6 +2220,7 @@ fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> Api
             .as_ref()
             .and_then(|sweep| internal_hex(&sweep.tx_id)),
         payout_tx: record.payout_tx.map(|transaction| transaction.to_hex()),
+        claim_held: record.claim_hold == Some(ClaimHold::Held),
         outcome,
         refund_cause,
         nothing_sent_cause,

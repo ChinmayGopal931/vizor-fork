@@ -146,6 +146,7 @@ class PrivateUsdBannerState {
     required this.title,
     required this.detail,
     required this.attention,
+    this.claimHandedOver = false,
   });
 
   final PrivateUsdRoutePath path;
@@ -153,16 +154,21 @@ class PrivateUsdBannerState {
   final String detail;
   final bool attention;
 
+  /// The relayer holds the claim: the user can leave.
+  final bool claimHandedOver;
+
   @override
   bool operator ==(Object other) =>
       other is PrivateUsdBannerState &&
       other.path == path &&
       other.title == title &&
       other.detail == detail &&
-      other.attention == attention;
+      other.attention == attention &&
+      other.claimHandedOver == claimHandedOver;
 
   @override
-  int get hashCode => Object.hash(path, title, detail, attention);
+  int get hashCode =>
+      Object.hash(path, title, detail, attention, claimHandedOver);
 }
 
 /// [accountUuid]'s conversion under way as a banner, or null. It stays while
@@ -196,6 +202,7 @@ final privateUsdConversionBannerProvider = Provider.autoDispose
           zcashConfirmations: confirmations,
         ),
         attention: attention,
+        claimHandedOver: status.value.claimHandedOver,
       );
     });
 

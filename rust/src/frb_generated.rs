@@ -7635,6 +7635,7 @@ fn wire__crate__api__private_usd__private_usd_forward_accept_impl(
             let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
             let api_index = <u32>::sse_decode(&mut deserializer);
             let api_max_total_zat = <u64>::sse_decode(&mut deserializer);
+            let api_relayer_claims = <bool>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
@@ -7649,6 +7650,7 @@ fn wire__crate__api__private_usd__private_usd_forward_accept_impl(
                             api_eth_rpc_url,
                             api_index,
                             api_max_total_zat,
+                            api_relayer_claims,
                         )?;
                         Ok(output_ok)
                     })(),
@@ -12612,6 +12614,7 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
         let mut var_depositConfirmations = <Option<u32>>::sse_decode(deserializer);
         let mut var_sweepTxid = <Option<String>>::sse_decode(deserializer);
         let mut var_payoutTx = <Option<String>>::sse_decode(deserializer);
+        let mut var_claimHeld = <bool>::sse_decode(deserializer);
         let mut var_outcome =
             <Option<crate::api::private_usd::ApiForwardOutcome>>::sse_decode(deserializer);
         let mut var_refundCause =
@@ -12637,6 +12640,7 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
             deposit_confirmations: var_depositConfirmations,
             sweep_txid: var_sweepTxid,
             payout_tx: var_payoutTx,
+            claim_held: var_claimHeld,
             outcome: var_outcome,
             refund_cause: var_refundCause,
             nothing_sent_cause: var_nothingSentCause,
@@ -19202,6 +19206,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiForwardRecord
             self.deposit_confirmations.into_into_dart().into_dart(),
             self.sweep_txid.into_into_dart().into_dart(),
             self.payout_tx.into_into_dart().into_dart(),
+            self.claim_held.into_into_dart().into_dart(),
             self.outcome.into_into_dart().into_dart(),
             self.refund_cause.into_into_dart().into_dart(),
             self.nothing_sent_cause.into_into_dart().into_dart(),
@@ -24681,6 +24686,7 @@ impl SseEncode for crate::api::private_usd::ApiForwardRecord {
         <Option<u32>>::sse_encode(self.deposit_confirmations, serializer);
         <Option<String>>::sse_encode(self.sweep_txid, serializer);
         <Option<String>>::sse_encode(self.payout_tx, serializer);
+        <bool>::sse_encode(self.claim_held, serializer);
         <Option<crate::api::private_usd::ApiForwardOutcome>>::sse_encode(self.outcome, serializer);
         <Option<crate::api::private_usd::ApiRefundCause>>::sse_encode(
             self.refund_cause,

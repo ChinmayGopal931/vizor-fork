@@ -1,7 +1,8 @@
 //! `swaps.db`: the swap-index counter, swap records, active pointers, the
 //! joint-account index, the Railgun send log, and since schema 2 the deposits
 //! and each account's last deposit scan. Since schema 3 records follow the
-//! windows contract.
+//! windows contract, and since schema 4 a forward record may hand its claim
+//! to the relayer.
 //!
 //! A plain SQLite file in app-private storage, opened per call (WAL,
 //! `synchronous = FULL`, a busy timeout), migrated by `PRAGMA user_version`.
@@ -21,9 +22,9 @@ use super::{fail, ErrorCode, PrivateUsdError, Result};
 
 const FILE_NAME: &str = "swaps.db";
 /// 1: swaps, the send log and the joint accounts. 2: deposits. 3: records of
-/// the windows contract. A build refuses a store newer than itself, never
-/// resetting it.
-const SCHEMA_VERSION: i32 = 3;
+/// the windows contract. 4: claims handed to the relayer. A build refuses a
+/// store newer than itself, never resetting it.
+const SCHEMA_VERSION: i32 = 4;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// Finished records kept per direction. Reverse `REFUNDED` ones are kept
 /// beyond it: a rescue may still be possible.
@@ -220,8 +221,9 @@ impl SwapStore {
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
-            // 1 → 2: the deposits tables join. 2 → 3 changes no table.
-            1 | 2 => {
+            // 1 → 2: the deposits tables join. 2 → 3 and 3 → 4 change no
+            // table.
+            1..=3 => {
                 if version == 1 {
                     tx.execute_batch(SCHEMA_V2).map_err(sql)?;
                 }
@@ -847,7 +849,8 @@ mod tests {
     }
 
     /// Forward record fixtures: accepted, depositing, deposited, paid,
-    /// refunded, ended unsent, and with a ticket.
+    /// refunded, ended unsent, with a ticket, and with its claim held by the
+    /// relayer.
     fn forward_states() -> Vec<String> {
         let head = format!(
             r#"{{"index":7,"quote":{{"quoteId":"{}","maker":"{MAKER}","makerShare":"{}","makerProof":"{}","chainId":11155111,"contract":"{CONTRACT}","token":"{TOKEN}","amount":"1000000","depositZat":202021,"expiresAt":1790000300}},"swapId":"{}","zcashHeight":4200000,"acceptedAt":1790000000,"receives":"977550","relayerFee":"20000""#,
@@ -861,6 +864,16 @@ mod tests {
             "ab".repeat(32)
         );
         let sweep = "cd".repeat(32);
+        let payout = format!(
+            r#""payout":{{"swapId":"{}","note":{{"npk":"{}","encryptedBundle":["{}","{}","{}"],"shieldKey":"{}"}},"fee":"20000","signature":"{}"}}"#,
+            hex(32, 0x5c),
+            hex(32, 0x11),
+            hex(32, 0x12),
+            hex(32, 0x13),
+            hex(32, 0x14),
+            hex(32, 0x15),
+            hex(65, 0x16),
+        );
         vec![
             format!("{head}}}"),
             format!(r#"{head},"depositAttempted":true,"maxTotalZat":212021}}"#),
@@ -877,6 +890,10 @@ mod tests {
             ),
             format!(
                 r#"{head},"t0":1790002100,"t1":1790002400,"ticket":"{}"}}"#,
+                ticket()
+            ),
+            format!(
+                r#"{head},"depositAttempted":true,"maxTotalZat":212021,{deposit},{payout},"relayerClaims":true,"claimHold":"held","t0":1790002100,"t1":1790002400,"ticket":"{}"}}"#,
                 ticket()
             ),
         ]
@@ -1057,15 +1074,24 @@ mod tests {
         assert_eq!(store.take_index(ACCOUNT).unwrap(), next + 1);
     }
 
-    /// A store schema 1 wrote opens at schema 3: the deposits tables join,
-    /// and every record, the counter, the active pointer and the send log
-    /// stay as they were.
+    /// A store schema 1 or 3 wrote opens at schema 4: the deposits tables
+    /// join schema 1's, and every record, the counter, the active pointer and
+    /// the send log stay as they were.
     #[test]
-    fn a_version_1_store_migrates_keeping_its_records() {
+    fn an_older_store_migrates_keeping_its_records() {
+        for version in [1, 3] {
+            older_store_migrates_keeping_its_records(version);
+        }
+    }
+
+    fn older_store_migrates_keeping_its_records(version: i32) {
         let dir = tempfile::tempdir().unwrap();
         let conn = Connection::open(dir.path().join(FILE_NAME)).unwrap();
         conn.execute_batch(SCHEMA).unwrap();
-        conn.pragma_update(None, "user_version", 1).unwrap();
+        if version >= 2 {
+            conn.execute_batch(SCHEMA_V2).unwrap();
+        }
+        conn.pragma_update(None, "user_version", version).unwrap();
         let json = forward_json();
         conn.execute(
             "INSERT INTO swaps(account_uuid, direction, swap_index, deployment, swap_id, phase,
@@ -1098,7 +1124,7 @@ mod tests {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
         assert_eq!(version, SCHEMA_VERSION);
-        assert_eq!(SCHEMA_VERSION, 3);
+        assert_eq!(SCHEMA_VERSION, 4);
         assert_eq!(
             store.active(ACCOUNT, Direction::Forward).unwrap(),
             Some(StoredRecord::Forward(Box::new(forward(&json))))

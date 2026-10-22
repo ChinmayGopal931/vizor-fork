@@ -67,8 +67,8 @@ class PrivateUsdProgressPresentation {
   final bool showsKeepOpen;
   final PrivateUsdProgressAction? action;
 
-  /// A key-using step (deposit, claim, sweep) is still to come: the screen
-  /// stays awake while this progress shows.
+  /// A key-using step (deposit, claim, sweep) is still to come, and not the
+  /// relayer's: the screen stays awake while this progress shows.
   final bool keyStepPending;
 
   /// The top bar's: "Bridging" while it runs (screening included),
@@ -258,6 +258,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
       t0 != null &&
       t0.isAfter(now);
 
+  final handedOver = status.claimHandedOver;
   final lateClaimAt = record.lateClaimAt;
   final String? note;
   if (status.resuming) {
@@ -277,7 +278,11 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
   } else if (slowOpening) {
     note = PrivateUsdCopy.convertOpeningSlow;
   } else if (makerSilent) {
-    note = PrivateUsdCopy.convertMakerSilent(formatDayMonthTime(t0));
+    note = handedOver
+        ? PrivateUsdCopy.convertRelayerMakerSilent(formatDayMonthTime(t0))
+        : PrivateUsdCopy.convertMakerSilent(formatDayMonthTime(t0));
+  } else if (handedOver) {
+    note = PrivateUsdCopy.convertRelayerClaims;
   } else {
     note = null;
   }
@@ -296,8 +301,8 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
     note: note,
     problem: problem == null ? null : privateUsdProblemMessage(problem),
     showsCallOff: slowOpening && problem == null,
-    showsKeepOpen: true,
-    keyStepPending: true,
+    showsKeepOpen: !handedOver,
+    keyStepPending: !handedOver,
   );
 }
 

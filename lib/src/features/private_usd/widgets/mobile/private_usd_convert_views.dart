@@ -22,7 +22,7 @@ import 'private_usd_info_sheets.dart';
 import 'private_usd_logo.dart';
 
 /// How long a forward conversion usually takes, for the info sheet.
-const _forwardTakes = Duration(minutes: 10);
+const _forwardTakes = Duration(minutes: 8);
 
 String _masked(String text, bool privacyModeEnabled) => hideAmountIfPrivacyMode(
   text,
@@ -43,6 +43,7 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
     required this.onMax,
     required this.onReview,
     required this.onBack,
+    required this.relayerClaims,
     this.focusNode,
     this.privacyModeEnabled = false,
     this.privateUsdAvailable,
@@ -55,6 +56,9 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode? focusNode;
   final bool privacyModeEnabled;
+
+  /// The relayer claims for a new bridge (Settings).
+  final bool relayerClaims;
 
   /// The private USD that can be spent, in micro-dollars; null while unknown.
   final BigInt? privateUsdAvailable;
@@ -77,8 +81,11 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
     final available = privateUsdAvailable;
     return _ConvertLayout(
       onBack: onBack,
-      onInfo: () =>
-          showPrivateUsdConvertInfoSheet(context, takes: _forwardTakes),
+      onInfo: () => showPrivateUsdConvertInfoSheet(
+        context,
+        takes: _forwardTakes,
+        relayerClaims: relayerClaims,
+      ),
       pay: PrivateUsdAmountPanel(
         key: const ValueKey('mobile_private_usd_convert_zec'),
         caption: const PrivateUsdPanelCaption.zec(),
@@ -322,11 +329,12 @@ class _ConvertLayout extends StatelessWidget {
 }
 
 /// The forward review: what is paid and what arrives, the quote's ledger
-/// and how long it holds, and the keep-open note.
+/// and how long it holds, and how long to keep Veylor open.
 class MobilePrivateUsdConvertReviewView extends StatelessWidget {
   const MobilePrivateUsdConvertReviewView({
     required this.state,
     required this.privacyModeEnabled,
+    required this.relayerClaims,
     required this.onBack,
     required this.onConfirm,
     required this.onRefreshQuote,
@@ -335,6 +343,10 @@ class MobilePrivateUsdConvertReviewView extends StatelessWidget {
 
   final PrivateUsdConvertState state;
   final bool privacyModeEnabled;
+
+  /// The relayer claims for this bridge (Settings): Veylor stays open only
+  /// until the ZEC is sent.
+  final bool relayerClaims;
   final VoidCallback onBack;
   final VoidCallback onConfirm;
   final VoidCallback onRefreshQuote;
@@ -347,6 +359,7 @@ class MobilePrivateUsdConvertReviewView extends StatelessWidget {
       onInfo: () => showPrivateUsdReviewInfoSheet(
         context,
         railgunPercent: kPrivateUsdRailgunFeePercent,
+        relayerClaims: relayerClaims,
       ),
       pay: quote == null
           ? null
@@ -374,7 +387,9 @@ class MobilePrivateUsdConvertReviewView extends StatelessWidget {
               quote: quote,
               privacyModeEnabled: privacyModeEnabled,
             ),
-      note: PrivateUsdCopy.convertBackgroundNote,
+      note: relayerClaims
+          ? PrivateUsdCopy.convertRelayerReviewNote
+          : PrivateUsdCopy.convertBackgroundNote,
       state: state,
       message: state.message,
       onConfirm: onConfirm,

@@ -733,6 +733,10 @@ class WidgetbookApp extends StatelessWidget {
                       builder: buildMobilePrivateUsdReviewUseCase,
                     ),
                     WidgetbookUseCase(
+                      name: 'To 0zkUSDC, Veylor claims',
+                      builder: buildMobilePrivateUsdReviewManualUseCase,
+                    ),
+                    WidgetbookUseCase(
                       name: 'Quote expired',
                       builder: buildMobilePrivateUsdReviewExpiredUseCase,
                     ),
@@ -748,6 +752,10 @@ class WidgetbookApp extends StatelessWidget {
                     WidgetbookUseCase(
                       name: 'Confirming',
                       builder: buildMobilePrivateUsdProgressUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Claim with the relayer',
+                      builder: buildMobilePrivateUsdProgressRelayerUseCase,
                     ),
                     WidgetbookUseCase(
                       name: 'Opening slowly',

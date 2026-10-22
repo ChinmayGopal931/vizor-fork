@@ -123,6 +123,18 @@ class PrivateUsdConversionStatus
 
   final rust.ApiForwardWait? wait;
 
+  /// The relayer holds the claim and sends it once the claim's window opens,
+  /// so the bridge no longer needs Veylor open. A refund, or a swap that
+  /// unwinds, still does.
+  bool get claimHandedOver =>
+      record.claimHeld &&
+      isUnderWay &&
+      record.phase != rust.ApiForwardPhase.refunding &&
+      activity != rust.ApiActivity.sweeping &&
+      wait != rust.ApiForwardWait.refunding &&
+      wait != rust.ApiForwardWait.unwinding &&
+      wait != rust.ApiForwardWait.depositUnsettled;
+
   @override
   int get index => record.index;
 
@@ -827,13 +839,15 @@ class PrivateUsdEngine {
     dropLateResult: false,
   );
 
-  /// Accepts swap [index]'s quote. Afterwards (also after a failure: an
-  /// accept cut short may still have opened the swap) the records are read
-  /// again and the loop starts.
+  /// Accepts swap [index]'s quote, handing its claim to the relayer once the
+  /// deposit is out with [relayerClaims]. Afterwards (also after a failure:
+  /// an accept cut short may still have opened the swap) the records are
+  /// read again and the loop starts.
   Future<rust.ApiAcceptResult> accept(
     String accountUuid, {
     required int index,
     required BigInt maxTotalZat,
+    required bool relayerClaims,
   }) async {
     try {
       return await runFor(
@@ -843,6 +857,7 @@ class PrivateUsdEngine {
           secret,
           index: index,
           maxTotalZat: maxTotalZat,
+          relayerClaims: relayerClaims,
         ),
       );
     } finally {

@@ -10,6 +10,7 @@ import '../../models/private_usd_record_key.dart';
 import '../../providers/private_usd_balance_provider.dart';
 import '../../providers/private_usd_convert_provider.dart';
 import '../../providers/private_usd_engine_provider.dart';
+import '../../providers/private_usd_relayer_claims_provider.dart';
 import '../../providers/private_usd_reverse_convert_provider.dart';
 import '../../widgets/mobile/private_usd_convert_views.dart';
 
@@ -183,6 +184,7 @@ class _MobilePrivateUsdConvertScreenState
       controller: _amount,
       focusNode: _focus,
       privacyModeEnabled: privacyModeEnabled,
+      relayerClaims: ref.watch(privateUsdRelayerClaimsProvider).value ?? true,
       privateUsdAvailable: balance?.spendable,
       onAmountChanged: notifier.onAmountChanged,
       onMax: notifier.onMax,
