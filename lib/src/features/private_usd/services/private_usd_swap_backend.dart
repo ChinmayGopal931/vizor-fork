@@ -140,12 +140,14 @@ abstract interface class PrivateUsdSwapBackend {
     required int units,
   });
 
-  /// Accepts the quote of swap [index]; re-entrant for the same index.
+  /// Accepts the quote of swap [index]; re-entrant for the same index. With
+  /// [relayerClaims] the relayer gets the claim once the deposit is out.
   Future<rust.ApiAcceptResult> forwardAccept(
     String accountUuid,
     PrivateUsdSecretReader secret, {
     required int index,
     required BigInt maxTotalZat,
+    required bool relayerClaims,
   });
 
   /// One look at the chain for swap [index], then at most one key step.
@@ -345,6 +347,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
     PrivateUsdSecretReader secret, {
     required int index,
     required BigInt maxTotalZat,
+    required bool relayerClaims,
   }) async {
     final context = _context();
     final storeDir = await getPrivateUsdDirPath(context.network);
@@ -362,6 +365,7 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         ethRpcUrl: ethRpcUrl,
         index: index,
         maxTotalZat: maxTotalZat,
+        relayerClaims: relayerClaims,
       ),
     );
   }

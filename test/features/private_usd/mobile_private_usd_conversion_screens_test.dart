@@ -64,6 +64,7 @@ void main() {
           state: state,
           controller: controller,
           autofocus: false,
+          relayerClaims: true,
           onAmountChanged: (_) {},
           onMax: () {},
           onReview: () {},
@@ -167,12 +168,14 @@ void main() {
   group('review', () {
     Future<void> pumpReview(
       WidgetTester tester,
-      PrivateUsdConvertState state,
-    ) => pump(
+      PrivateUsdConvertState state, {
+      bool relayerClaims = false,
+    }) => pump(
       tester,
       MobilePrivateUsdConvertReviewView(
         state: state,
         privacyModeEnabled: false,
+        relayerClaims: relayerClaims,
         onBack: () {},
         onConfirm: () {},
         onRefreshQuote: () {},
@@ -203,6 +206,24 @@ void main() {
         button(tester, 'mobile_private_usd_review_convert').onPressed,
         isNotNull,
       );
+    });
+
+    testWidgets('with the relayer claiming, Veylor stays open only until '
+        'the ZEC is sent', (tester) async {
+      await pumpReview(
+        tester,
+        previewPrivateUsdConvertState(
+          quote: previewPrivateUsdQuote(),
+          step: PrivateUsdConvertStep.review,
+        ),
+        relayerClaims: true,
+      );
+
+      expect(
+        find.text(PrivateUsdCopy.convertRelayerReviewNote),
+        findsOneWidget,
+      );
+      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsNothing);
     });
 
     testWidgets('an expired quote offers "Refresh quote" instead', (
@@ -274,6 +295,60 @@ void main() {
         findsNothing,
       );
       expect(find.text(PrivateUsdCopy.convertCallOff), findsNothing);
+    });
+
+    testWidgets('once the relayer holds the claim, the user can leave', (
+      tester,
+    ) async {
+      final status = PrivateUsdConversionStatus(
+        record: previewPrivateUsdRecord(
+          depositConfirmations: 1,
+          claimHeld: true,
+        ),
+        wait: ApiForwardWait.confirming,
+      );
+      await pumpProgress(tester, status);
+
+      expect(find.text(PrivateUsdCopy.convertRelayerClaims), findsOneWidget);
+      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsNothing);
+      expect(find.text('1 of 2 · about 1 min'), findsOneWidget);
+
+      // The maker silent past its confirmations: the relayer claims anyway.
+      final silent = PrivateUsdConversionStatus(
+        record: previewPrivateUsdRecord(
+          depositConfirmations: 2,
+          claimHeld: true,
+        ),
+        wait: ApiForwardWait.confirming,
+      );
+      await pumpProgress(tester, silent);
+      final t0 = DateTime.fromMillisecondsSinceEpoch(silent.record.t0! * 1000);
+      expect(
+        find.text(
+          PrivateUsdCopy.convertRelayerMakerSilent(formatDayMonthTime(t0)),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsNothing);
+    });
+
+    testWidgets('a refund after the hand-over needs Veylor open again', (
+      tester,
+    ) async {
+      await pumpProgress(
+        tester,
+        PrivateUsdConversionStatus(
+          record: previewPrivateUsdRecord(
+            phase: ApiForwardPhase.refunding,
+            claimHeld: true,
+          ),
+          wait: ApiForwardWait.refunding,
+        ),
+      );
+
+      expect(find.text(PrivateUsdCopy.convertRefunding), findsOneWidget);
+      expect(find.text(PrivateUsdCopy.convertRelayerClaims), findsNothing);
+      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsOneWidget);
     });
 
     testWidgets('an opening over 90 s says so and offers to call it off', (
@@ -525,6 +600,29 @@ void main() {
       find.byKey(const ValueKey('private_usd_conversion_banner')),
     );
     expect(opened, 1);
+  });
+
+  testWidgets('once the relayer holds the claim, the banner says to leave', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      Scaffold(
+        body: PrivateUsdConversionBannerView(
+          banner: previewPrivateUsdBanner(claimHandedOver: true),
+          onTap: () {},
+        ),
+      ),
+    );
+
+    expect(
+      find.text(
+        'Waiting for confirmations · 1 of 2\n'
+        '${PrivateUsdCopy.bannerRelayerClaims}',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining(PrivateUsdCopy.bannerKeepOpen), findsNothing);
   });
 
   testWidgets('/private-usd shows the conversion, its activity and Convert', (

@@ -1438,14 +1438,25 @@ Code:
 - Every key-using step runs only while the app is unlocked and in the
   foreground. That covers the deposit, claim, payout signature, refund,
   sweep and Railgun proving.
+- Relayer claims (Settings, on by default; each ZEC → USD bridge keeps the
+  choice it began with) let the user leave about a minute after tapping
+  Bridge. Right after the deposit goes out, Veylor signs and keeps the
+  payout, marks the hand-over (`claim_hold`), then posts the claim, `z`
+  with it, to the pinned relayer's `/v1/claim/hold`, which sends it when the
+  window opens. If Veylor is open then, it posts the claim itself only once
+  the window has been open a minute (five blocks for a ready before `t0`)
+  with nothing landed. A post with no answer goes again with the same bytes;
+  a 404 or a refusal leaves that bridge to claim without the relayer. A
+  refund's sweep still needs Veylor open.
 - There is no worker, alarm or notification, and no per-swap key is stored.
 - Background cancels the Rust step and stops polling, but leaves the
   Railgun page open.
 - Lock cancels the step, closes the page and drops Dart-held secrets.
 - Screen-off means background, so the screen stays on while a
-  conversion's progress shows with a key step to come, and through a
-  Railgun first sync while unlocked (`privateUsdKeepAwakeProvider`, through
-  `SyncKeepAwakeNativeHost`'s one native flag, foreground only).
+  conversion's progress shows with a key step to come (not once the relayer
+  holds the claim), and through a Railgun first sync while unlocked
+  (`privateUsdKeepAwakeProvider`, through `SyncKeepAwakeNativeHost`'s one
+  native flag, foreground only).
 - On a USD → ZEC conversion the phone buzzes when "Authorize settlement" is
   first offered (the user's turn), and again two minutes before it closes if
   still unauthorized, once when the two fall together: it holds, then fades
@@ -1512,20 +1523,24 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   the newest block's hash, with that block's number and time) of a fresh
   head, and again immediately before the post. A window opens by the block's
   time and closes by the later of it and the device clock. A forward claim
-  goes once the swap is ready (12 blocks deep before `t0`) or from `t0`, with
+  goes once the swap is ready (2 blocks deep before `t0`) or from `t0`, with
   more than 300 s left before `t1`, or for good from `t1 + LATE_WINDOW`; in
   between, the swap unwinds through the maker's refund. A reverse refund goes
   on an open escrow once the chain is past every `ready` deadline signed (or
   at `t0`), on a ready one from `t1`. Never `eth_call` or `eth_estimateGas`
-  anything carrying a share.
+  anything carrying a share. The one exception is a claim handed to the
+  relayer: `z` goes once, as soon as the deposit is out, to the pinned
+  relayer alone, which reveals it on chain in the window. The owner accepts
+  this, since the joint account's `nk` and `rivk` go only to the maker, so
+  the relayer alone cannot spend the deposit.
 - Only confirmed reads authorize a deposit or the end.
 - Never prove a second reverse funding because a response was lost. Sign
   `ready` only before `t0` (its deadline, the head plus 120 s, before it),
   keep that deadline first, and never sign or send one once a refund was
   posted. Never re-sign `ready` after a restart; resend it.
 - Keep every signed payout, refund payout, `ready` and Railgun send proof
-  before posting it, and a claim or refund as posted before it goes. Cap
-  every relayer fee at 2 USDC.
+  before posting it, and a claim or refund as posted, or a claim as handed
+  over, before it goes. Cap every relayer fee at 2 USDC.
 - Joint sweeps broadcast before they store. `PROPOSAL_STORE` is
   consume-on-entry with an idempotent discard, as in the hardware invariants.
 - Joint sweeps use Discard OVK, while the deposit uses the sender's OVK.

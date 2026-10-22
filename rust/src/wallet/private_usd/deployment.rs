@@ -20,7 +20,12 @@ pub(crate) const REVEAL_MARGIN_SECONDS: u64 = 300;
 /// Before `t0` a claim goes out on a ready only once it is this many blocks
 /// deep: one a reorg dropped would leave the claim reverted, `z` public and
 /// the swap the maker's to cancel.
-pub(crate) const READY_DEPTH_BLOCKS: u64 = 12;
+pub(crate) const READY_DEPTH_BLOCKS: u64 = 2;
+/// A claim handed to the relayer is left to it for this long after its
+/// window opens; then the app posts it itself. Before `t0` the window opens
+/// at the ready's depth, so there the wait counts Ethereum's 12 s slots.
+pub(crate) const RELAYER_CLAIM_WAIT_SECONDS: u64 = 60;
+pub(crate) const RELAYER_CLAIM_WAIT_BLOCKS: u64 = 5;
 /// The latest `t1` a forward swap may have after its `t0`: until the maker
 /// refunds, the deposit waits on it.
 pub(crate) const MAX_T0_TO_T1_SECONDS: u64 = 2 * 60 * 60;

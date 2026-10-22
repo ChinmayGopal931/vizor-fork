@@ -7,6 +7,16 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **Relayer claims (2026-10-21, D-142).** Right after a ZEC → USD bridge's
+  deposit goes out, Veylor hands its claim to the pinned relayer
+  (`/v1/claim/hold`), which sends it when the window opens, so the user can
+  leave about a minute after tapping Bridge. A Settings toggle, on by
+  default, chooses it per new bridge; with it off, bridges claim as before.
+  Built against fakes: the relayer's endpoint is being built in zecSwap and
+  is not deployed, and a relayer without it leaves the bridge to claim as
+  before. Before `t0` a ready now counts 2 blocks deep, not 12, held to
+  zecSwap's regenerated oracle. Not yet run on a phone.
+
 - **The windows contract (2026-10-20, D-137).** Testnet swaps settle on
   zecSwap's windows contract, with no claim or refund locks. Mainnet
   bridging is off until zecSwap deploys one there, so the app hides Bridge;
@@ -2121,6 +2131,84 @@ M8 status (2026-10-14): the non-device parts are done.
   unknown or unavailable. The transparent ZEC moved under the total, as it
   is not part of it. Home's balance sign is unchanged (ZEC).
   - Not yet seen clearing a stuck send on a phone.
+
+- **D-142 (owner, 2026-10-21): relayer claims; a 2-block ready depth.** A
+  ZEC → USD bridge can hand its claim to the relayer right after its
+  deposit goes out, so the user can leave about a minute after tapping
+  Bridge (plan D9 and §3.5 items 5, 8 and 14; reference §5.3, §5.4 and
+  §5.6). USD → ZEC, the contract and the maker are unchanged.
+  - **The setting.** "Let the relayer claim for me", in Settings beside
+    Ethereum RPC and shown with it, on by default. It is kept in secure
+    storage as the RPC is (`vizor_private_usd_relayer_claims_v1`, one for
+    the app; a reset's wipe takes it). Accept takes it
+    (`private_usd_forward_accept(…, relayer_claims)`) and the record keeps
+    it (`relayerClaims`), so a change affects new bridges only. A setting
+    that can't be read fails the bridge before anything is saved, rather
+    than fall back to the default.
+  - **The hand-over.** Once per bridge, once the deposit is kept and out
+    (in the step that broadcast it, or on a ready swap): the payout is
+    signed as for a claim (the offer's fee within its window, under the
+    cap) and kept, `claimHold = posted` is kept, and only then is
+    `POST /v1/claim/hold` sent, `/v1/claim`'s body with the ticket. A held
+    answer, or a claimed swap's, makes it `held`. A `400 rejected` is
+    checked against the relayer's terms and signed again once at a higher
+    fee within the cap; otherwise a refusal, or a `404` from a relayer
+    without the endpoint, makes it `declined`, and the bridge claims as
+    without the setting. With no answer (transport, `5xx`) it stays
+    `posted`, and the next step posts the kept payout again, the same
+    bytes. A failure never holds up the rest of the step.
+  - **The backup.** A claim handed over (`posted` or `held`) is the
+    relayer's for the window's first minute. Veylor, while open, posts
+    `/v1/claim` itself, as before, only once the window was open on the
+    same read taken a minute back (the head five blocks lower for a ready
+    before `t0`, both clocks 60 s earlier; `WindowView::before_relayer_wait`),
+    and until then waits as the window stood. A claim the relayer landed
+    ends the bridge on its confirmed `PaidOut` event, as before.
+  - **`z` and the relayer.** The hold shows `z` to the pinned relayer
+    before the window. The owner accepts it: the joint account's `nk` and
+    `rivk` go only to the maker, so the relayer alone cannot spend the
+    deposit; theft would need the maker too, and the owner runs both for
+    now. No other mitigation was added.
+  - **Screens.** Once the relayer holds the claim (`ApiForwardRecord
+    .claimHeld`, and the bridge not refunding, unwinding or unsettled;
+    `PrivateUsdConversionStatus.claimHandedOver`), the progress note says
+    the user can leave and the relayer claims once the market maker
+    confirms the deposit (with the maker silent, by `t0` anyway). No note
+    says to keep Veylor open, the Home banner reads "You can leave: the
+    relayer claims your dollars", the info sheet names the relayer, and
+    `privateUsdKeepAwakeProvider` no longer holds the screen. Before the
+    hand-over, and with the setting off, everything is as before. The
+    review says to keep Veylor open for about a minute, until the ZEC is
+    sent, and the convert and review info sheets follow the setting. A
+    refund after the hand-over still needs Veylor, and says so.
+  - **Store.** `swaps.db` schema 4, with no table change: forward records
+    may carry `relayerClaims` and `claimHold`. A build that knows schema 3
+    refuses the store as newer; records from before read as without the
+    setting.
+  - **The ready depth.** Before `t0` a claim now goes on a ready 2 blocks
+    deep, not 12 (`READY_DEPTH_BLOCKS`), as zecSwap's regenerated port
+    oracle has it (`ready_depth` 2, the relayer's depth too). Its 44 app
+    vectors were copied into `windows_vectors.json` unchanged, with the
+    same counts (25 claims, 7 readies and 12 refunds; 17 sends): only the
+    depth, three boundary vectors' `ready_block` and one reason changed.
+    The info sheet's "about 10 min" (`_forwardTakes`) is now about 8: the
+    depth saves about ten 12 s blocks.
+  - Unit tests: Rust's Private USD tests 101 passed (10 new: the hand-over
+    once, only after the deposit and only with the setting; kept before
+    posted; declined on a 404 or a refusal; resent with the same bytes;
+    signed again once at a higher fee; the relayer's minute in each window,
+    posted or held; a claim the relayer landed; and the relayer client's
+    `/v1/claim/hold`), the oracle's 44 vectors at depth 2 included;
+    `cargo test --lib` 1,577 passed, and its 21 failures are ones base
+    `3a3916dff` has too (the integration and doc tests passed). Dart (new:
+    the setting on by default, kept and unreadable; the accept taking it;
+    keep-awake; the review, progress and banner in both modes; the Settings
+    row): `fvm flutter analyze` clean; the desktop lane 7,121 passed, 193
+    skipped, and the 7 failures base `3a3916dff` has too, with
+    `test/widgetbook/settings_use_cases_test.dart` left out as it hangs at
+    base as well; the mobile lane's Private USD, Settings and Figma tests
+    456 passed (every mobile Figma scenario, the two new included). Not yet
+    run on a phone.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

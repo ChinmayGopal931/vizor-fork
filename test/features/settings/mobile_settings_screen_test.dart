@@ -25,6 +25,10 @@ import 'package:zcash_wallet/src/core/widgets/mobile/mobile_list_row.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/mobile_surface_card.dart';
 import 'package:zcash_wallet/src/features/onboarding/shared/onboarding_welcome_art.dart';
 import 'package:zcash_wallet/src/features/payment_links/providers/payment_link_cards_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_available_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_custom_rpc_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_relayer_claims_provider.dart';
 import 'package:zcash_wallet/src/features/settings/screens/mobile/mobile_settings_screen.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/biometric_unlock_provider.dart';
@@ -36,6 +40,8 @@ import 'package:zcash_wallet/src/providers/theme_mode_provider.dart';
 import 'package:zcash_wallet/src/services/biometric_unlock.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
+import '../private_usd/support/fake_private_usd_backend.dart'
+    show MemoryRelayerClaimsStore;
 import '../../figma_compare/figma_compare_font_loader.dart';
 
 const _accountState = AccountState(
@@ -165,6 +171,7 @@ Widget _app({
   bool enhancePirEnabled = false,
   EnhancePirNotifier Function()? enhancePir,
   bool walletTransparentPrivate = false,
+  PrivateUsdRelayerClaimsStore? privateUsdSettings,
 }) {
   Widget themedBuilder(BuildContext context, Widget? child) => AppTheme(
     data: themeData ?? AppThemeData.dark,
@@ -220,6 +227,14 @@ Widget _app({
       syncKeepAwakeProvider.overrideWith(
         () => syncKeepAwakeNotifier ?? _FakeSyncKeepAwakeNotifier(),
       ),
+      // Private USD's rows, where it is available.
+      if (privateUsdSettings != null) ...[
+        privateUsdRpcSettingVisibleProvider.overrideWithValue(true),
+        privateUsdDeploymentProvider.overrideWith((ref, network) => null),
+        privateUsdRelayerClaimsStoreProvider.overrideWithValue(
+          privateUsdSettings,
+        ),
+      ],
       if (biometricNotifier != null)
         biometricUnlockProvider.overrideWith(biometricNotifier)
       else if (biometric != null)
@@ -1264,6 +1279,51 @@ void main() {
       findsOneWidget,
     );
     expect(tester.getCenter(thumb).dx, greaterThan(tester.getCenter(track).dx));
+  });
+
+  testWidgets('relayer claims sit beside Ethereum RPC, on by default, and '
+      'the toggle keeps the choice', (tester) async {
+    await _useTallSurface(tester);
+    final store = MemoryRelayerClaimsStore();
+    await tester.pumpWidget(_app(privateUsdSettings: store));
+    await tester.pumpAndSettle();
+
+    final rows = tester
+        .widgetList<MobileListRow>(find.byType(MobileListRow))
+        .map((row) => row.label)
+        .toList();
+    expect(
+      rows.indexOf(PrivateUsdCopy.relayerClaimsSetting),
+      rows.indexOf(PrivateUsdCopy.rpcTitle) + 1,
+    );
+    final row = find.byKey(
+      const ValueKey('mobile_settings_relayer_claims_row'),
+    );
+    final thumb = find.byKey(
+      const ValueKey('mobile_settings_relayer_claims_toggle_thumb'),
+    );
+    final track = find.byKey(
+      const ValueKey('mobile_settings_relayer_claims_toggle'),
+    );
+    expect(tester.getCenter(thumb).dx, greaterThan(tester.getCenter(track).dx));
+
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    expect(store.stored, isFalse);
+    expect(tester.getCenter(thumb).dx, lessThan(tester.getCenter(track).dx));
+
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    expect(store.stored, isTrue);
+  });
+
+  testWidgets('relayer claims hide with the Ethereum RPC row', (tester) async {
+    await _useTallSurface(tester);
+    await tester.pumpWidget(_app());
+    await tester.pump();
+
+    expect(find.text(PrivateUsdCopy.rpcTitle), findsNothing);
+    expect(find.text(PrivateUsdCopy.relayerClaimsSetting), findsNothing);
   });
 
   testWidgets('every settings row renders active', (tester) async {

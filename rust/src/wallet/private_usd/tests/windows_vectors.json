@@ -1,5 +1,5 @@
 {
- "source": "zecSwap docs/local/windows/audit3/spec/vectors.json (port_spec.py's oracle for the windows contract, zecSwap b18135cbe): its user_claim, user_ready and user_refund vectors, copied unchanged. Never regenerated here.",
+ "source": "zecSwap docs/local/windows/audit3/spec/vectors.json (port_spec.py's oracle for the windows contract of zecSwap b18135cbe, regenerated with a ready depth of 2 for relayer claims): its user_claim, user_ready and user_refund vectors, copied unchanged. Never regenerated here.",
  "vectors": [
   {
    "reveal": "user_claim",
@@ -33,7 +33,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -75,7 +75,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -97,7 +97,7 @@
     "t1": 1792013600,
     "min_window": 3600,
     "late_window": 86400,
-    "ready_block": 987,
+    "ready_block": 997,
     "finalized_number": 900,
     "railgun_accepts": true,
     "deposit_confirmed": false,
@@ -117,7 +117,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -159,7 +159,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -201,7 +201,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -243,7 +243,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -285,7 +285,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -327,7 +327,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -369,7 +369,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -413,7 +413,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -457,7 +457,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -499,7 +499,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -541,7 +541,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -563,7 +563,7 @@
     "t1": 1792013600,
     "min_window": 3600,
     "late_window": 86400,
-    "ready_block": 988,
+    "ready_block": 998,
     "finalized_number": 900,
     "railgun_accepts": true,
     "deposit_confirmed": false,
@@ -583,7 +583,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -625,7 +625,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -667,7 +667,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -709,7 +709,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -751,7 +751,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -793,7 +793,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -835,7 +835,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -879,7 +879,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -923,7 +923,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -965,7 +965,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1007,7 +1007,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1029,7 +1029,7 @@
     "t1": 1792013600,
     "min_window": 3600,
     "late_window": 86400,
-    "ready_block": 989,
+    "ready_block": 999,
     "finalized_number": 900,
     "railgun_accepts": true,
     "deposit_confirmed": false,
@@ -1049,12 +1049,12 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
     "send": false,
-    "reason": "the ready is 11 deep; before t0 it must be 12: a reorg could drop it under the claim",
+    "reason": "the ready is 1 deep; before t0 it must be 2: a reorg could drop it under the claim",
     "edge": null,
     "start": 1792010000
    }
@@ -1091,7 +1091,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1133,7 +1133,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1175,7 +1175,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1217,7 +1217,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1259,7 +1259,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1301,7 +1301,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1345,7 +1345,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1389,7 +1389,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1431,7 +1431,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1473,7 +1473,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1515,7 +1515,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1557,7 +1557,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1599,7 +1599,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1641,7 +1641,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1683,7 +1683,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1725,7 +1725,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1767,7 +1767,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1809,7 +1809,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {
@@ -1851,7 +1851,7 @@
     "claim_relayer": 300,
     "ready_land": 600,
     "ready_sig_ttl": 120,
-    "ready_depth": 12,
+    "ready_depth": 2,
     "final_depth": 64
    },
    "expect": {

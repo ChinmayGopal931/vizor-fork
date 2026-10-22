@@ -55,8 +55,11 @@ class PrivateUsdConversionBannerView extends StatelessWidget {
       // Private USD's logo, unless it asks for attention.
       leading: banner.attention ? null : const PrivateUsdLogo(),
       title: banner.title,
-      // Every step still to come needs the seed, so the app must stay open.
-      subtitle: PrivateUsdCopy.bannerDetail(banner.detail),
+      // Every step still to come needs the seed, so the app must stay open,
+      // unless the relayer holds the claim.
+      subtitle: banner.claimHandedOver
+          ? PrivateUsdCopy.bannerRelayerDetail(banner.detail)
+          : PrivateUsdCopy.bannerDetail(banner.detail),
       emphasized: true,
       onTap: onTap,
     );

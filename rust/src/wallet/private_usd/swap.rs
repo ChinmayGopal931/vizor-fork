@@ -8,8 +8,8 @@ use std::path::Path;
 use zecswap_core::{JointAccount, SecretShare, SpendKey, SwapContext};
 
 use super::deployment::{
-    self, Deployment, SwapContract, READY_DEPTH_BLOCKS, REVEAL_MARGIN_SECONDS,
-    SIGNATURE_TTL_SECONDS,
+    self, Deployment, SwapContract, READY_DEPTH_BLOCKS, RELAYER_CLAIM_WAIT_BLOCKS,
+    RELAYER_CLAIM_WAIT_SECONDS, REVEAL_MARGIN_SECONDS, SIGNATURE_TTL_SECONDS,
 };
 use super::engine::{self, MakerChecks, OpHandle};
 use super::evm_rpc::SwapStage;
@@ -78,6 +78,20 @@ impl WindowView {
 
     fn end_clock(&self) -> u64 {
         self.head.max(self.device_now)
+    }
+
+    /// This view the relayer's wait ago: the head `RELAYER_CLAIM_WAIT_BLOCKS`
+    /// back and both clocks `RELAYER_CLAIM_WAIT_SECONDS` back, the stage as
+    /// now (a ready's depth is read below that head). A claim the relayer
+    /// may hold is the user's to post only once its window was open on it
+    /// too.
+    pub(crate) fn before_relayer_wait(&self) -> Self {
+        Self {
+            head: self.head.saturating_sub(RELAYER_CLAIM_WAIT_SECONDS),
+            head_number: self.head_number.saturating_sub(RELAYER_CLAIM_WAIT_BLOCKS),
+            device_now: self.device_now.saturating_sub(RELAYER_CLAIM_WAIT_SECONDS),
+            ..*self
+        }
     }
 }
 

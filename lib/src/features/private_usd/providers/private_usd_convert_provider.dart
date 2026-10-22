@@ -17,6 +17,7 @@ import '../services/private_usd_pause.dart';
 import '../services/private_usd_zec_quote_search.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_engine_provider.dart';
+import 'private_usd_relayer_claims_provider.dart';
 
 /// The convert flows' timing.
 abstract final class PrivateUsdConvertTiming {
@@ -594,10 +595,12 @@ class PrivateUsdConvertNotifier
       index: quote.index,
     );
     try {
+      final relayerClaims = await privateUsdRelayerClaimsOf(ref);
       final result = await engine.accept(
         account,
         index: quote.index,
         maxTotalZat: quote.maxTotalZat,
+        relayerClaims: relayerClaims,
       );
       if (!ref.mounted) return null;
       switch (result.kind) {

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_relayer_claims_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_swap_backend.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
@@ -25,6 +26,7 @@ ApiForwardRecord forwardRecord({
   int? depositConfirmations,
   String? sweepTxid,
   String? payoutTx,
+  bool claimHeld = false,
   int? endedAt,
 }) => ApiForwardRecord(
   index: index,
@@ -43,6 +45,7 @@ ApiForwardRecord forwardRecord({
   depositConfirmations: depositConfirmations,
   sweepTxid: sweepTxid,
   payoutTx: payoutTx,
+  claimHeld: claimHeld,
   outcome: outcome,
   refundCause: refundCause,
   nothingSentCause: nothingSentCause,
@@ -104,6 +107,9 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
   ApiAcceptResult Function(int index)? onAccept;
   Object? acceptError;
 
+  /// The relayer-claims choice each accept was given.
+  final acceptedRelayerClaims = <bool>[];
+
   @override
   Future<List<String>> accountsWithUnfinished() async => [
     for (final account in {...records.keys, ...reverse.keys})
@@ -158,8 +164,10 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
     PrivateUsdSecretReader secret, {
     required int index,
     required BigInt maxTotalZat,
+    required bool relayerClaims,
   }) async {
     await _secret(secret);
+    acceptedRelayerClaims.add(relayerClaims);
     final error = acceptError;
     if (error != null) throw error;
     return onAccept?.call(index) ??
@@ -327,4 +335,21 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
 
   @override
   void clearSessions() => sessionClears++;
+}
+
+/// The relayer-claims setting in memory; while [failing], it can't be read.
+class MemoryRelayerClaimsStore implements PrivateUsdRelayerClaimsStore {
+  MemoryRelayerClaimsStore([this.stored]);
+
+  bool? stored;
+  bool failing = false;
+
+  @override
+  Future<bool?> read() async {
+    if (failing) throw StateError('secure storage is unavailable');
+    return stored;
+  }
+
+  @override
+  Future<void> write(bool enabled) async => stored = enabled;
 }

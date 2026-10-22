@@ -215,6 +215,16 @@ pub(super) struct State {
     pub fee_after_claim: Option<u128>,
     /// A status and code every claim is refused with, sending nothing.
     pub claim_refusal: Option<(u16, &'static str)>,
+    /// The relayer takes claims to hold; without, `/v1/claim/hold` is a 404.
+    pub holds_claims: bool,
+    /// A status and code every hold is refused with, holding nothing.
+    pub hold_refusal: Option<(u16, &'static str)>,
+    /// Every claim handed over, as posted.
+    pub holds: Vec<Value>,
+    /// The claim the relayer holds.
+    pub held: Option<Value>,
+    /// Runs as each claim handed over arrives, before it is answered.
+    pub on_hold: Option<Hook>,
     /// What `/v1/terms` adds: the contract's windows and kind.
     pub terms_windows: Option<Value>,
     /// Holds the answer to `/v1/terms` until notified.
@@ -240,8 +250,14 @@ pub(super) struct State {
     /// The fee of every payout posted with a claim or alone.
     pub posted_fees: Vec<u128>,
 
+    // The user.
+    /// Accepts with relayer claims.
+    pub relayer_claims: bool,
+
     // The wallet's Zcash side.
     pub synced: bool,
+    /// Every broadcast fails.
+    pub broadcast_fails: bool,
     pub deposit_fee: Option<u64>,
     pub unpayable: bool,
     pub deposits: Vec<(String, u64)>,
@@ -332,6 +348,11 @@ impl State {
             claim_pays_out: true,
             fee_after_claim: None,
             claim_refusal: None,
+            holds_claims: true,
+            hold_refusal: None,
+            holds: Vec::new(),
+            held: None,
+            on_hold: None,
             terms_windows: None,
             hold_terms: None,
             unreachable: None,
@@ -344,7 +365,9 @@ impl State {
             bodies: HashMap::new(),
             headers: HashMap::new(),
             posted_fees: Vec::new(),
+            relayer_claims: false,
             synced: true,
+            broadcast_fails: false,
             deposit_fee: Some(DEPOSIT_FEE_ZAT),
             unpayable: false,
             deposits: Vec::new(),
@@ -953,6 +976,30 @@ impl FakeServices {
                     json!({ "transactions": [hex0x(&word(0)), hex0x(&word(1))] }),
                 )
             }
+            (&Method::POST, "/v1/claim/hold") => {
+                let hook = self.0.set().on_hold.take();
+                if let Some(mut hook) = hook {
+                    hook(&mut self.0.set());
+                    self.0.set().on_hold = Some(hook);
+                }
+                let fee: u128 = body["payout"]["fee"].as_str().unwrap().parse().unwrap();
+                let mut state = self.0.set();
+                state.holds.push(body.clone());
+                if !state.holds_claims {
+                    return answer(404, json!({ "code": "notFound", "error": "no such path" }));
+                }
+                if let Some((status, code)) = state.hold_refusal {
+                    return answer(status, json!({ "code": code, "error": "not held" }));
+                }
+                if fee < state.least_fee {
+                    return rejected();
+                }
+                if state.stage == SwapStage::Claimed {
+                    return answer(200, json!({ "transactions": [] }));
+                }
+                state.held = Some(body.clone());
+                answer(200, json!({ "held": true }))
+            }
             (&Method::POST, "/v1/payout") => {
                 let fee: u128 = body["fee"].as_str().unwrap().parse().unwrap();
                 let mut state = self.0.set();
@@ -1037,6 +1084,9 @@ impl ForwardZcash for FakeZcash {
     }
 
     async fn broadcast(&self, transaction: &ZcashTransaction) -> Result<()> {
+        if self.0.get().broadcast_fails {
+            return fail(ErrorCode::ZcashRejected, "lightwalletd turned it down");
+        }
         self.0.set().submitted.push(transaction.tx_id.clone());
         Ok(())
     }
@@ -1267,8 +1317,9 @@ impl Harness {
     pub(super) async fn accepted(&self) -> ForwardRecord {
         let quoted = self.quote().await.unwrap();
         let max_total = quoted.offer.max_total_zatoshi().unwrap();
+        let relayer_claims = self.world.get().relayer_claims;
         self.forward()
-            .accept(&mut self.store(), quoted.index, max_total)
+            .accept(&mut self.store(), quoted.index, max_total, relayer_claims)
             .await
             .unwrap();
         self.record()
@@ -1296,6 +1347,17 @@ impl Harness {
         let mut state = self.world.set();
         state.stage = SwapStage::Refunded;
         state.secret = maker_secret().to_be_bytes();
+    }
+
+    /// The relayer sends the claim it holds, then its payout at the fee it
+    /// held.
+    pub(super) fn relayer_sends_held_claim(&self) {
+        let mut state = self.world.set();
+        let held = state.held.clone().expect("the relayer holds a claim");
+        state.stage = SwapStage::Claimed;
+        state.paid_out = true;
+        state.payout_hash = word(2);
+        state.payout_fee = held["payout"]["fee"].as_str().unwrap().parse().unwrap();
     }
 
     pub(super) async fn advance(&self) -> Result<ForwardStep> {

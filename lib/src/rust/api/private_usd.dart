@@ -143,7 +143,9 @@ Future<ApiForwardQuote> privateUsdForwardQuote({
 /// accept. A missing offer is `QuoteExpired`. Called again for the same
 /// index, it posts the saved quote once more (never a new index). An error
 /// after the save means "maybe opened": read the records and show the
-/// conversion's progress if it is under way.
+/// conversion's progress if it is under way. With `relayer_claims` (the
+/// setting, kept on the record), the claim goes to the relayer once the
+/// deposit is out, for it to send when the claim's window opens.
 Future<ApiAcceptResult> privateUsdForwardAccept({
   required String dbPath,
   required String network,
@@ -154,6 +156,7 @@ Future<ApiAcceptResult> privateUsdForwardAccept({
   required String ethRpcUrl,
   required int index,
   required BigInt maxTotalZat,
+  required bool relayerClaims,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdForwardAccept(
   dbPath: dbPath,
   network: network,
@@ -164,6 +167,7 @@ Future<ApiAcceptResult> privateUsdForwardAccept({
   ethRpcUrl: ethRpcUrl,
   index: index,
   maxTotalZat: maxTotalZat,
+  relayerClaims: relayerClaims,
 );
 
 /// One look at the chain for swap `index`, then at most one key-using step
@@ -1388,6 +1392,10 @@ class ApiForwardRecord {
 
   /// The Ethereum transaction that shielded the payout, `0x` hex.
   final String? payoutTx;
+
+  /// The relayer holds the claim and sends it once the claim's window
+  /// opens: the claim no longer needs Veylor open.
+  final bool claimHeld;
   final ApiForwardOutcome? outcome;
   final ApiRefundCause? refundCause;
   final ApiNothingSentCause? nothingSentCause;
@@ -1411,6 +1419,7 @@ class ApiForwardRecord {
     this.depositConfirmations,
     this.sweepTxid,
     this.payoutTx,
+    required this.claimHeld,
     this.outcome,
     this.refundCause,
     this.nothingSentCause,
@@ -1436,6 +1445,7 @@ class ApiForwardRecord {
       depositConfirmations.hashCode ^
       sweepTxid.hashCode ^
       payoutTx.hashCode ^
+      claimHeld.hashCode ^
       outcome.hashCode ^
       refundCause.hashCode ^
       nothingSentCause.hashCode ^
@@ -1463,6 +1473,7 @@ class ApiForwardRecord {
           depositConfirmations == other.depositConfirmations &&
           sweepTxid == other.sweepTxid &&
           payoutTx == other.payoutTx &&
+          claimHeld == other.claimHeld &&
           outcome == other.outcome &&
           refundCause == other.refundCause &&
           nothingSentCause == other.nothingSentCause &&
@@ -1474,7 +1485,8 @@ enum ApiForwardWait {
   opening,
 
   /// The deposit is out; waiting for the maker to mark the swap ready (and
-  /// the ready to be 12 blocks deep), or for `t0`.
+  /// the ready to be 2 blocks deep), or for `t0`. A claim the relayer
+  /// holds is left to it for the window's first minute.
   confirming,
 
   /// The maker called the swap off while the deposit was unmined.

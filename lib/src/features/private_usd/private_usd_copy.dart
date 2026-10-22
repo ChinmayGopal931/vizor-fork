@@ -56,6 +56,12 @@ abstract final class PrivateUsdCopy {
   static const bannerKeepOpen = 'Keep Veylor open to finish';
   static String bannerDetail(String detail) => '$detail\n$bannerKeepOpen';
 
+  /// [bannerKeepOpen] once the relayer holds the bridge's claim.
+  static const bannerRelayerClaims =
+      'You can leave: the relayer claims your dollars';
+  static String bannerRelayerDetail(String detail) =>
+      '$detail\n$bannerRelayerClaims';
+
   // ── Private USD screen ─────────────────────────────────────────────────
 
   static const subtitle = '0zkUSDC held on Ethereum';
@@ -290,6 +296,9 @@ abstract final class PrivateUsdCopy {
   static const convertInfoStepClaim =
       'Once the deposit is confirmed, Veylor claims the dollars into your '
       'private balance.';
+  static const convertInfoStepClaimRelayer =
+      'Once the deposit is confirmed, the relayer claims the dollars into '
+      'your private balance.';
   static const convertInfoNoteEither =
       'Either the dollars reach your private balance, or your ZEC comes back '
       'to you.';
@@ -297,6 +306,11 @@ abstract final class PrivateUsdCopy {
       'Takes $about. Keep Veylor open and unlocked until it\'s done. If you '
       "leave, it pauses; if it can't finish in time, it's called off and "
       'your ZEC comes back, less a network fee.';
+  static String convertInfoNoteTimeRelayer(String about) =>
+      'Takes $about. Keep Veylor open and unlocked for about a minute, until '
+      "your ZEC is sent; the relayer does the rest. If it can't finish in "
+      "time, it's called off and your ZEC comes back, less a network fee, "
+      'the next time you open Veylor.';
 
   static const convertReviewInfoTitle = 'Before you bridge';
   static const convertReviewInfoPay =
@@ -308,6 +322,18 @@ abstract final class PrivateUsdCopy {
   static const convertReviewInfoQuote =
       'The quote holds for a few minutes. If it expires, refresh it: nothing '
       'is sent until you bridge.';
+
+  /// The review's note when the relayer claims (Settings), in place of
+  /// [convertBackgroundNote].
+  static const convertRelayerReviewNote =
+      'Keep Veylor open for about a minute, until your ZEC is sent. Then the '
+      'relayer claims your dollars, and you can leave.';
+
+  /// [infoKeepOpen] for a bridge the relayer claims.
+  static const convertRelayerInfoKeepOpen =
+      "Veylor sends your ZEC while it's open and unlocked, then hands the "
+      'claim to the relayer. Refunds and sends run only while Veylor is '
+      'open and unlocked.';
 
   // ── Convert: progress (forward) ───────────────────────────────────────
 
@@ -339,6 +365,17 @@ abstract final class PrivateUsdCopy {
       "The market maker hasn't confirmed your deposit yet. If it still "
       "hasn't by $time, Veylor claims your dollars itself. Keep Veylor open "
       'until then.';
+
+  /// The note once the relayer holds the bridge's claim.
+  static const convertRelayerClaims =
+      'You can leave Veylor now. The relayer claims your dollars once the '
+      'market maker confirms your deposit.';
+
+  /// [convertMakerSilent] once the relayer holds the bridge's claim.
+  static String convertRelayerMakerSilent(String time) =>
+      "The market maker hasn't confirmed your deposit yet. If it still "
+      "hasn't by $time, the relayer claims your dollars anyway. You can "
+      'leave Veylor now.';
   static const convertOpeningSlow =
       "The market maker hasn't opened the swap yet. Nothing has been sent.";
   static const convertCallOff = 'Call it off';
@@ -379,6 +416,9 @@ abstract final class PrivateUsdCopy {
       '${confirmations == 1 ? 'confirmation' : 'confirmations'}.';
   static const convertProgressInfoClaim =
       'Veylor claims the dollars into your private balance. A relayer pays the '
+      'Ethereum fees.';
+  static const convertProgressInfoClaimRelayer =
+      'The relayer claims the dollars into your private balance and pays the '
       'Ethereum fees.';
   static String convertProgressInfoScreen(String about) =>
       'Railgun screens them for $about before they can be spent.';
@@ -809,6 +849,13 @@ abstract final class PrivateUsdCopy {
   static String withdrawInfoNoteFee(String percent) =>
       'Railgun keeps $percent% of what you withdraw.';
 
+  // ── Settings ───────────────────────────────────────────────────────────
+
+  static const settingSaveFailed = "Couldn't save the setting. Try again.";
+
+  /// Whether a new bridge to private USD hands its claim to the relayer.
+  static const relayerClaimsSetting = 'Let the relayer claim for me';
+
   // ── Settings: the user's own Ethereum RPC ──────────────────────────────
 
   static const rpcTitle = 'Ethereum RPC';
@@ -835,7 +882,7 @@ abstract final class PrivateUsdCopy {
       "That RPC didn't answer. Check the URL, or try again in a moment.";
   static String rpcErrorWrongChain(String network) =>
       'That RPC is for another network. Use one for $network.';
-  static const rpcErrorSave = "Couldn't save the setting. Try again.";
+  static const rpcErrorSave = settingSaveFailed;
   static const rpcSaved = 'Ethereum RPC saved';
   static const rpcCleared = 'Using the default Ethereum RPC';
   static const rpcNotAnswering = "Your Ethereum RPC isn't answering.";

@@ -4,13 +4,20 @@
 //! interruption. Only a confirmed read authorizes a deposit or the end. The
 //! record is saved before the user's share leaves the device, a deposit is
 //! marked started before it is created and kept before it is first sent, and
-//! a payout is kept before it is posted. `z` is revealed only in the claim's
-//! window: once the swap is ready, `READY_DEPTH_BLOCKS` deep before `t0`, or
-//! from `t0`, with more than `REVEAL_MARGIN_SECONDS` left before `t1`; or for
-//! good from `t1 + LATE`. It is judged on one consistent read of a fresh
-//! head, again immediately before the claim is posted, and the claim is
-//! marked posted before it goes. Between `t1` and `t1 + LATE` the swap is the
-//! maker's to refund, and the deposit comes home.
+//! a payout is kept before it is posted. The app posts its claim, `z` with
+//! it, only in the claim's window: once the swap is ready,
+//! `READY_DEPTH_BLOCKS` deep before `t0`, or from `t0`, with more than
+//! `REVEAL_MARGIN_SECONDS` left before `t1`; or for good from `t1 + LATE`. It
+//! is judged on one consistent read of a fresh head, again immediately
+//! before the claim is posted, and the claim is marked posted before it
+//! goes. Between `t1` and `t1 + LATE` the swap is the maker's to refund, and
+//! the deposit comes home.
+//!
+//! With relayer claims, chosen at accept, the claim goes to the pinned
+//! relayer once, as soon as the deposit is out, for it to hold and send when
+//! the window opens: the payout is kept and the hand-over marked before it
+//! is posted. The app then leaves the window's first minute to the relayer,
+//! and claims itself only if nothing landed by then.
 //!
 //! The driver runs over seams: [`ChainReader`], [`HttpTransport`],
 //! [`ForwardZcash`] (the wallet's side, [`WalletZcash`]) and [`Clock`]. The
@@ -32,9 +39,9 @@ use super::joint::{SwapTxStatus, WalletZcash};
 use super::keys::SwapKeyContext;
 use super::maker_client::MakerClient;
 use super::models::{
-    Amount, DepositProgress, Direction, ForwardOutcome, ForwardRecord, Hex, NothingSentCause,
-    RefundCause, RelayerTerms, SwapAcceptance, SwapNote, SwapPayout, SwapQuote, Word,
-    ZcashTransaction,
+    Amount, ClaimHold, DepositProgress, Direction, ForwardOutcome, ForwardRecord, Hex,
+    NothingSentCause, RefundCause, RelayerTerms, SwapAcceptance, SwapNote, SwapPayout, SwapQuote,
+    Word, ZcashTransaction,
 };
 use super::relayer_client::RelayerClient;
 use super::store::SwapStore;
@@ -334,12 +341,15 @@ where
     /// Accepts the offer held for `index`, saving the record before the
     /// maker sees our share, so an accept cut short is still known. Again for
     /// an index already saved, unfinished and unanswered, it posts the saved
-    /// quote once more and never takes another index.
+    /// quote once more and never takes another index. `relayer_claims` is
+    /// kept on the new record: a later change of the setting leaves this
+    /// swap as it began.
     pub(crate) async fn accept(
         &self,
         store: &mut SwapStore,
         index: u32,
         max_total_zatoshi: u64,
+        relayer_claims: bool,
     ) -> Result<AcceptOutcome> {
         if let Some(record) = find(store, self.account, index)? {
             return self.accept_again(store, record).await;
@@ -387,6 +397,8 @@ where
             sweep: None,
             payout: None,
             claim_posted: false,
+            relayer_claims,
+            claim_hold: None,
             t0: None,
             t1: None,
             fee_expires_at: offer.fee_expires_at,
@@ -884,14 +896,18 @@ where
     // ---- the claim ----
 
     /// Reveals `z` once the claim's window is open, then pays out; while the
-    /// windows hold the claim, waits. The window is judged again immediately
-    /// before the claim is posted, after every preparatory step.
+    /// windows hold the claim, waits. With relayer claims the claim is handed
+    /// over first, and the app posts it only once the relayer had its wait.
+    /// The window is judged again immediately before the claim is posted,
+    /// after every preparatory step.
     async fn claim(
         &self,
         store: &mut SwapStore,
         record: &ForwardRecord,
         terms: &Terms,
     ) -> Result<ForwardStep> {
+        let record = &self.hand_over(store, record, terms).await?;
+        engine::check_cancelled(self.op)?;
         if let Some(wait) = self.claim_window(record, terms).await? {
             return Ok(holding(wait, terms));
         }
@@ -1060,6 +1076,114 @@ where
         Ok(())
     }
 
+    // ---- the hand-over ----
+
+    /// With relayer claims, hands the claim to the relayer once the deposit
+    /// is out, to hold until its window opens: once per swap, unless a post
+    /// got no answer, which goes again as it was kept. A failure never holds
+    /// up the claim, which the app makes itself in the window. Returns the
+    /// record as kept.
+    async fn hand_over(
+        &self,
+        store: &mut SwapStore,
+        record: &ForwardRecord,
+        terms: &Terms,
+    ) -> Result<ForwardRecord> {
+        let current: ForwardRecord = load(store, self.account, record.index)?;
+        let due = current.relayer_claims
+            && current.deposit.is_some()
+            && !current.claim_posted
+            && matches!(current.claim_hold, None | Some(ClaimHold::Posted));
+        if !due {
+            return Ok(current);
+        }
+        if let Err(error) = self.post_hold(store, &current, terms).await {
+            engine::check_cancelled(self.op)?;
+            log::warn!(
+                "private usd: forward swap {}: handing the claim over failed ({:?})",
+                current.index,
+                error.code
+            );
+        }
+        load(store, self.account, record.index)
+    }
+
+    /// Signs and keeps the payout, marks the hand-over, then posts the claim
+    /// to hold; one already marked goes again with the payout kept. One the
+    /// relayer turns down is signed again, once, at a higher fee it asks
+    /// now; any other refusal, or a relayer without the endpoint, declines
+    /// it. Unanswered, it stays posted.
+    async fn post_hold(
+        &self,
+        store: &mut SwapStore,
+        record: &ForwardRecord,
+        terms: &Terms,
+    ) -> Result<()> {
+        let payout = match (record.claim_hold, &record.payout) {
+            (Some(ClaimHold::Posted), Some(kept)) => kept.clone(),
+            _ => self.signed_payout(store, record, terms, None).await?,
+        };
+        self.keep_hold(store, record, ClaimHold::Posted)?;
+        let mut refusal = match self.hold(record, terms, &payout).await? {
+            None => return self.keep_hold(store, record, ClaimHold::Held),
+            Some(refusal) => refusal,
+        };
+        if refusal.code == Some(SwapErrorCode::Rejected) {
+            let fee = self.relayer_terms().await?.fee;
+            if fee > payout.fee && require_payout_fee(Amount(terms.amount), fee).is_ok() {
+                let repriced = self.signed_payout(store, record, terms, Some(fee)).await?;
+                match self.hold(record, terms, &repriced).await? {
+                    None => return self.keep_hold(store, record, ClaimHold::Held),
+                    Some(again) => refusal = again,
+                }
+            }
+        }
+        log::warn!(
+            "private usd: forward swap {}: the relayer declined its claim ({})",
+            record.index,
+            refusal.status
+        );
+        self.keep_hold(store, record, ClaimHold::Declined)
+    }
+
+    /// Posts the claim, `z` with `payout`, for the relayer to hold: `None`
+    /// once held, else its refusal, a `4xx` that holds nothing. Anything else
+    /// leaves the post unanswered.
+    async fn hold(
+        &self,
+        record: &ForwardRecord,
+        terms: &Terms,
+        payout: &SwapPayout,
+    ) -> Result<Option<Refusal>> {
+        let secret = Zeroizing::new(self.keys.user_keys(record.index)?.share.to_be_bytes());
+        match self
+            .relayer
+            .hold_claim(&secret, payout, terms, record.ticket.as_ref())
+            .await
+        {
+            Ok(()) => Ok(None),
+            Err(SwapHttpError::Refused(refusal)) if (400..500).contains(&refusal.status) => {
+                Ok(Some(refusal))
+            }
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    /// Keeps where the claim stands with the relayer on the record as stored.
+    fn keep_hold(
+        &self,
+        store: &mut SwapStore,
+        record: &ForwardRecord,
+        hold: ClaimHold,
+    ) -> Result<()> {
+        let mut current: ForwardRecord = load(store, self.account, record.index)?;
+        if current.claim_hold != Some(hold) {
+            current.claim_hold = Some(hold);
+            update(store, self.account, &current)?;
+        }
+        Ok(())
+    }
+
     async fn require_railgun_open(&self) -> Result<()> {
         if !self.chain.railgun_accepts().await? {
             return fail(
@@ -1072,8 +1196,10 @@ where
 
     /// The claim's window on one consistent read of a fresh head: `None` to
     /// claim now, else what the windows wait for. Before `t0`, a ready counts
-    /// once the block `READY_DEPTH_BLOCKS` below the head shows it. Railgun
-    /// is asked only once the windows would let the claim go.
+    /// once the block `READY_DEPTH_BLOCKS` below the head shows it. A claim
+    /// the relayer may hold is its own until the window has been open for
+    /// the relayer's wait. Railgun is asked only once the windows would let
+    /// the claim go.
     async fn claim_window(
         &self,
         record: &ForwardRecord,
@@ -1090,17 +1216,21 @@ where
             t1: terms.t1,
             late_window: self.pins.swap_contract()?.late_window,
         };
-        let ready_block = if view.stage == Some(SwapStage::Ready) && view.head < view.t0 {
-            let deep = read.head.number.saturating_sub(READY_DEPTH_BLOCKS);
-            self.chain
-                .swap_at(&record.swap_id.0, terms, deep)
-                .await?
-                .is_some_and(|then| then.stage == SwapStage::Ready)
-                .then_some(deep)
-        } else {
-            None
-        };
+        let ready_block = self.ready_block(record, terms, &view).await?;
         let window = match swap::claim_window(&view, ready_block, true) {
+            // A claim the relayer may hold is its to send as the window
+            // opens: the app posts it only once the window was open the
+            // relayer's wait ago, and until then waits as it stood then.
+            ClaimWindow::Open if record.claim_handed_over() => {
+                let then = view.before_relayer_wait();
+                let ready_then = self.ready_block(record, terms, &then).await?;
+                match swap::claim_window(&then, ready_then, true) {
+                    ClaimWindow::Open => {
+                        swap::claim_window(&view, ready_block, self.chain.railgun_accepts().await?)
+                    }
+                    waiting => waiting,
+                }
+            }
             ClaimWindow::Open => {
                 swap::claim_window(&view, ready_block, self.chain.railgun_accepts().await?)
             }
@@ -1115,6 +1245,27 @@ where
                 "Railgun is not taking the payout now",
             ),
         }
+    }
+
+    /// The block `READY_DEPTH_BLOCKS` below `view`'s head, if the swap was
+    /// ready there: read only for a ready swap before `t0`, where the depth
+    /// decides.
+    async fn ready_block(
+        &self,
+        record: &ForwardRecord,
+        terms: &Terms,
+        view: &WindowView,
+    ) -> Result<Option<u64>> {
+        if view.stage != Some(SwapStage::Ready) || view.head >= view.t0 {
+            return Ok(None);
+        }
+        let deep = view.head_number.saturating_sub(READY_DEPTH_BLOCKS);
+        Ok(self
+            .chain
+            .swap_at(&record.swap_id.0, terms, deep)
+            .await?
+            .is_some_and(|then| then.stage == SwapStage::Ready)
+            .then_some(deep))
     }
 
     /// The swap once our node shows what `seen` expects: it can lag the node

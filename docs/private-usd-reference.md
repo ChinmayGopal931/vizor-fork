@@ -101,6 +101,7 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
 |---|---|
 | `GET /v1/terms` | answer: `{relayer, chainId, contract, minWindow?, lateWindow?, contractKind?, fee, feeExpiresAt?, reverseFunding?, railgunSends?}`. `reverseFunding` is `{relayAdapt, token, maker, maxGasLimit, maxGasPriceWei, maxCalldataBytes, fee}`. Windows the terms name must be the pinned ones, and a kind must be `windows` (`WrongDeployment`); all three are optional because mainnet's lock-contract services name none. |
 | `/v1/claim` | `{swapId, terms, secret: z (32 B big-endian), payout: <Payout>}` → 2 transactions (claim, then payout) |
+| `/v1/claim/hold` | the body of `/v1/claim` → `{held: true}`; a claimed swap is answered as `/v1/claim` answers it |
 | `/v1/payout` | `{swapId, terms, note: {npk, encryptedBundle:[3×bytes32], shieldKey}, fee, signature}` |
 | `/v1/reverse/fund` | `{swapId, chainId, to: relayAdapt, data, value:"0"}` → 0 or 1 transaction. An empty list means a matching escrow already exists. |
 | `/v1/reverse/ready` | `{swapId, terms, deadline, signature}` |
@@ -108,7 +109,8 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
 | `/v1/reverse/refund-payout` | `<Payout>` |
 | `/v1/reverse/rescue` | `{swapId, terms, note, fee, nonce, deadline, signature}` |
 
-- **The windows contract's relayer** has no `/v1/lock-claim` or `/v1/reverse/lock-refund`. A `400 rejected` is final and sent nothing (a claim between `t1` and `t1 + LATE_WINDOW`, or under the margin before `t1`; a `ready` after the relayer sent a refund). A `503` with `Retry-After` asks for the same post again: the relayer holds a claim on a ready not yet 12 blocks deep before `t0`, and a reverse refund while a `ready` it sent may still land.
+- **`/v1/claim/hold`** (relayer claims, plan D9) keeps the claim and sends it, with its payout at the fee accepted when held, as soon as the claim's window opens: once the ready is 2 blocks deep before `t0`, from `t0`, or from `t1 + LATE_WINDOW` if the maker did not refund. It deletes the claim once the swap is claimed or refunded. Holding the same claim again changes nothing, and a new valid payout replaces the held one. A refusal holds nothing (`400 rejected`: a refunded swap, a bad payout, or a fee it does not honour); a relayer without the endpoint answers `404`.
+- **The windows contract's relayer** has no `/v1/lock-claim` or `/v1/reverse/lock-refund`. A `400 rejected` is final and sent nothing (a claim between `t1` and `t1 + LATE_WINDOW`, or under the margin before `t1`; a `ready` after the relayer sent a refund). A `503` with `Retry-After` asks for the same post again: the relayer holds a claim on a ready not yet 2 blocks deep before `t0`, and a reverse refund while a `ready` it sent may still land.
 
 ### 5.4 Contract reads (Ethereum JSON-RPC, `of/AtomicSwapChain.kt`)
 
@@ -157,7 +159,8 @@ The Kotlin driver in `of/` is the source of truth. Where `zc/` (the Rust referen
   - Reverse: the maker may claim a `Ready` escrow until `t1`; the user may refund an `Open` escrow, and a `Ready` one from `t1`. `ready` lands only before `t0`.
   - `openReverse` refuses an escrow that leaves less than `MIN_WINDOW` before `t0`, or between `t0` and `t1`.
 - **When Veylor reveals** (`swap::claim_window`, `swap::may_sign_ready`, `swap::may_refund`; held to the vectors of zecSwap's port oracle, `rust/src/wallet/private_usd/tests/windows_vectors.json`). Each is judged on one consistent read of a fresh head, and again immediately before the post. A window has opened once the block's time is at or past its start; how much is left counts from the later of the block's time and the device clock (either can only make a reveal go earlier, and the margin covers a device clock behind).
-  - Forward claim: on a `Ready` swap 12 blocks deep before `t0` (`swap_at(head − 12)` still `Ready`; the relayer answers `503` meanwhile), or from `t0` on an `Open` or `Ready` one, while `max(head, device) + 300 s < t1`. Under that margin, and from `t1` until `t1 + LATE_WINDOW`, the swap unwinds (`UNWINDING`): its ZEC comes back after the maker's refund. From `t1 + LATE_WINDOW` the claim goes for good.
+  - Forward claim: on a `Ready` swap 2 blocks deep before `t0` (`swap_at(head − 2)` still `Ready`; the relayer answers `503` meanwhile), or from `t0` on an `Open` or `Ready` one, while `max(head, device) + 300 s < t1`. Under that margin, and from `t1` until `t1 + LATE_WINDOW`, the swap unwinds (`UNWINDING`): its ZEC comes back after the maker's refund. From `t1 + LATE_WINDOW` the claim goes for good.
+  - A claim handed to the relayer (relayer claims, §5.6 step 7) is the relayer's to send as the window opens. Veylor posts it itself only once the window was open on the same read taken a minute back too: the head five blocks lower (12 s slots) and both clocks 60 s earlier (`WindowView::before_relayer_wait`), with the ready's depth read below that head. Until then the step waits as the window stood a minute ago (`CONFIRMING`, or `UNWINDING` in the minute after `t1 + LATE_WINDOW`).
   - Reverse `ready`: only on an `Open` escrow with the maker's deposit confirmed, no refund of ours ever posted, and its deadline (`head + 120 s`) before `t0`.
   - Reverse refund: a `Ready` escrow from `t1`; an `Open` one once the chain is past every `ready` deadline signed, or at `t0`.
   - Never `eth_call` or `eth_estimateGas` a claim or refund: the simulation would show the node the share. Reveals go through the relayer, which on mainnet sends them through Flashbots Protect.
@@ -253,6 +256,8 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
 | `deposit` | `NotStarted` \| `Started` \| `Kept(ZcashTransaction)` | stored as `depositAttempted: Bool` + `deposit?` |
 | `sweep?` | `ZcashTransaction` | `{txId (display hex), raw (hex), expiryHeight}` |
 | `payout?` | `SwapPayout` | `{swapId, note, fee, signature}`, signed and kept |
+| `relayerClaims` | Bool | the user's choice at accept (Settings, on by default): the claim goes to the relayer once the deposit is out |
+| `claimHold?` | `posted` \| `held` \| `declined` | the claim handed to the relayer: kept as `posted` before it is posted; `held` once the relayer holds it; `declined` after a `404` or a refusal |
 | `t0?`, `t1?`, `ticket?` | | from the accept answer |
 | `end?` | `{outcome, at}` | `Paid` \| `Refunded(sweepTxId, MAKER_CANCELLED\|NOT_CLAIMED_IN_TIME)` \| `NothingSent(QUOTE_EXPIRED\|MAKER_REFUSED\|MAKER_UNAVAILABLE\|NEVER_OPENED\|MISMATCH\|DEPOSIT_WINDOW_MISSED\|MAKER_CANCELLED)` |
 | `payoutTx?` | hash | from the `PaidOut` event |
@@ -271,7 +276,7 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
 2. **Accept** (`:57-105`):
    1. Refuse if unfinished, if `fee ≥ amount` (`RELAYER_FEE`), or if `now ≥ expiresAt − 15 s` (`QUOTE_EXPIRED`).
    2. `keys.accept` verifies the maker's share proof and builds `{userShare, userProof, viewingKeys}` (native `accept`, `zs/crates/zecswap-jni/src/ops.rs:164-188`).
-   3. **Save the record** with `t0`/`t1` null, `zcashHeight = Zcash tip` and `acceptedAt`, *before* the share leaves the device.
+   3. **Save the record** with `t0`/`t1` null, `zcashHeight = Zcash tip`, `acceptedAt` and the relayer-claims choice, *before* the share leaves the device.
    4. `POST accept`, with the token loop (§5.9). Then:
 
    | Outcome | Result |
@@ -319,9 +324,10 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
    - Unpayable and no deposit → `NothingSent(cause)`.
    - `chain.now ≥ t0` → claim (the maker went quiet).
    - Otherwise `Waiting(CONFIRMING, t0, t1)`.
-6. **`READY`** → claim. **`CLAIMED`** and not `paidOut` → payout. Then `finishPaid`.
+6. **`READY`** → claim. **`CLAIMED`** and not `paidOut` → payout. Then `finishPaid`. A claim the relayer held and sent ends the same way.
 7. **Claim** (zapp's `AtomicSwapClaim.claim`, `:330-345`, with the lock replaced by the claim's window, §5.4):
-   1. The window on one consistent read (`claim_window`): before `t0` and not `Ready` 12 blocks deep → `Waiting(CONFIRMING)`; under the margin before `t1`, or from `t1` until `t1 + LATE_WINDOW` → `Waiting(UNWINDING)`; otherwise open.
+   0. **Hand-over** (relayer claims, once the deposit is kept and out: reached from step 5 in the step that broadcast it, or on a `Ready` swap). Once per swap: sign the payout as in step 8 and keep it, keep `claimHold = posted`, then post `/v1/claim/hold` with the ticket. Held, or answered as a claim, → `held`. A `4xx` holds nothing: on `400 rejected`, re-read the terms, and if the fee rose within the cap, sign again at it, keep it and post once more; otherwise, and on a `404`, → `declined`, and the swap claims as without relayer claims. No answer (transport, `5xx`) leaves `posted`, and the next step posts the kept payout again, the same bytes. A failure never holds up the rest of the step.
+   1. The window on one consistent read (`claim_window`): before `t0` and not `Ready` 2 blocks deep → `Waiting(CONFIRMING)`; under the margin before `t1`, or from `t1` until `t1 + LATE_WINDOW` → `Waiting(UNWINDING)`; otherwise open. A claim handed over (`posted` or `held`) waits until the window has been open a minute (§5.4).
    2. Build or reuse the payout (step 8).
    3. Require Railgun open (`RAILGUN_CLOSED`), asked only once the window is open.
    4. Derive `z`.
@@ -1060,7 +1066,8 @@ MIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAqEaMBgGCSqGSIb3DQEBCDALBglghkgBZQME
 
 - `SIGNATURE_TTL_SECONDS` = 120 (`of/SwapTypes.kt:33`): a `ready` or rescue holds this long
 - `REVEAL_MARGIN_SECONDS`, the `CLAIM_MARGIN`, = 300 (`:36`, and `zs/crates/zecswap-client/src/user.rs:24`): a claim goes only while `max(head, device) + 300 s < t1`
-- `READY_DEPTH_BLOCKS` = 12: before `t0` a claim goes on a ready only this deep, the port oracle's rule. Veylor reads the swap at `head − 12`, one block stricter than zecSwap's reference client (`head − 11`)
+- `READY_DEPTH_BLOCKS` = 2: before `t0` a claim goes on a ready only this deep, the port oracle's rule (12 until relayer claims). Veylor reads the swap at `head − 2`.
+- `RELAYER_CLAIM_WAIT_SECONDS` = 60 and `RELAYER_CLAIM_WAIT_BLOCKS` = 5: a claim handed to the relayer is the relayer's for this long after its window opens (in blocks for a ready before `t0`); then Veylor, if open, posts it itself (§5.4)
 - `MAX_T0_TO_T1_SECONDS` = 2 h: the most a forward swap's `t1` may follow its `t0`; the least is `max(MIN_WINDOW, 600 s)`
 - `MAX_HEAD_LAG_SECONDS` = 180 (`freshHead`)
 - `ACCEPT_MARGIN_SECONDS` = 15 (`of/AtomicSwapDriver.kt:294`)

@@ -2533,6 +2533,13 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     mobile: true,
   ),
   FigmaCompareScenario(
+    id: 'mobile-private-usd-review-manual',
+    description: 'Private USD forward review with relayer claims off',
+    builder: buildMobilePrivateUsdReviewManualUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
     id: 'mobile-private-usd-review-expired',
     description: 'Private USD review once its quote expired',
     builder: buildMobilePrivateUsdReviewExpiredUseCase,
@@ -2543,6 +2550,14 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     id: 'mobile-private-usd-progress',
     description: 'Private USD forward progress, waiting for confirmations',
     builder: buildMobilePrivateUsdProgressUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-progress-relayer',
+    description:
+        'Private USD forward progress with the claim handed to the relayer',
+    builder: buildMobilePrivateUsdProgressRelayerUseCase,
     desktop: false,
     mobile: true,
   ),

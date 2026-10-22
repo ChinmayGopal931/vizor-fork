@@ -1,19 +1,27 @@
 //! The forward conversion's fund-safety rules on fakes: the driver, the
 //! claim's windows and settlement, the deposit's crash points and sync gate,
-//! the 2 USDC cap, the token gate without a tokens client, records of
-//! another contract, and one driver step per account.
+//! the 2 USDC cap, the token gate without a tokens client, claims handed to
+//! the relayer, records of another contract, and one driver step per
+//! account.
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use tokio::sync::Notify;
 
+use super::super::deployment::{
+    READY_DEPTH_BLOCKS, RELAYER_CLAIM_WAIT_BLOCKS, RELAYER_CLAIM_WAIT_SECONDS,
+};
 use super::super::engine;
 use super::super::evm_rpc::SwapStage;
 use super::super::forward::{AcceptOutcome, ForwardStep, ForwardWait};
 use super::super::joint::SwapTxStatus;
 use super::super::models::{
-    Amount, DepositProgress, Direction, ForwardOutcome, Hex, NothingSentCause, RefundCause,
+    Amount, ClaimHold, DepositProgress, Direction, ForwardOutcome, ForwardPhase, ForwardRecord,
+    Hex, NothingSentCause, RefundCause, StoredRecord,
 };
+use super::super::store::SwapStore;
 use super::super::terms::swap_id;
 use super::super::{ErrorCode, Result};
 use super::fakes::*;
@@ -63,8 +71,14 @@ impl Harness {
     }
 
     async fn accept(&self, index: u32) -> Result<AcceptOutcome> {
+        let relayer_claims = self.world.get().relayer_claims;
         self.forward()
-            .accept(&mut self.store(), index, DEPOSIT_ZAT + DEPOSIT_FEE_ZAT)
+            .accept(
+                &mut self.store(),
+                index,
+                DEPOSIT_ZAT + DEPOSIT_FEE_ZAT,
+                relayer_claims,
+            )
             .await
     }
 
@@ -111,7 +125,7 @@ async fn the_happy_path_claims_into_railgun() {
         ]
     );
     // The claim reveals z with the swap's ticket, on a ready read at the
-    // block 12 below the head.
+    // block READY_DEPTH_BLOCKS below the head.
     let z = h.keys.user_keys(0).unwrap().share.to_be_bytes();
     let state = h.world.get();
     assert_eq!(
@@ -126,7 +140,10 @@ async fn the_happy_path_claims_into_railgun() {
         ticket,
         record.ticket.as_ref().map(|ticket| ticket.0.clone())
     );
-    assert_eq!(state.depth_reads, vec![state.head_number - 12; 2]);
+    assert_eq!(
+        state.depth_reads,
+        vec![state.head_number - READY_DEPTH_BLOCKS; 2]
+    );
     drop(state);
     let ended = h.record();
     assert!(ended.claim_posted, "kept as posted before it went");
@@ -805,24 +822,24 @@ async fn the_share_stays_secret_when_railgun_is_not_taking_payouts() {
     assert_eq!(h.posted("/v1/payout"), 0);
 }
 
-/// Before t0 a ready counts once it is 12 blocks deep: one a reorg drops
-/// would leave the claim reverted with `z` public. From t0 an open swap is
-/// claimed without one.
+/// Before t0 a ready counts once it is `READY_DEPTH_BLOCKS` deep: one a
+/// reorg drops would leave the claim reverted with `z` public. From t0 an
+/// open swap is claimed without one.
 #[tokio::test]
-async fn a_ready_is_claimed_on_before_t0_only_once_it_is_twelve_blocks_deep() {
+async fn a_ready_is_claimed_on_before_t0_only_once_it_is_deep_enough() {
     let h = Harness::new();
     h.deposited().await;
     let head = h.world.get().head_number;
     {
         let mut state = h.world.set();
         state.stage = SwapStage::Ready;
-        state.ready_block = Some(head - 11);
+        state.ready_block = Some(head - READY_DEPTH_BLOCKS + 1);
     }
     assert_eq!(h.advance().await.unwrap(), h.confirming());
     assert_eq!(h.posted("/v1/claim"), 0);
     assert_eq!(h.record().payout, None, "nothing signed while it waits");
 
-    h.world.set().ready_block = Some(head - 12);
+    h.world.set().ready_block = Some(head - READY_DEPTH_BLOCKS);
     assert_eq!(h.advance().await.unwrap(), paid());
     assert_eq!(h.posted("/v1/claim"), 1);
 
@@ -1215,6 +1232,373 @@ async fn an_orphaned_payout_is_retried_until_it_has_its_confirmations() {
     assert_eq!(h.advance().await.unwrap(), paid());
     assert_eq!(h.posted("/v1/payout"), 2);
     assert_eq!(h.record().deposit, record.deposit);
+}
+
+// ---- relayer claims ----
+
+/// Accepted with relayer claims, its deposit out and its claim held.
+async fn handed_over() -> Harness {
+    let h = Harness::new();
+    h.world.set().relayer_claims = true;
+    h.deposited().await;
+    assert_eq!(h.record().claim_hold, Some(ClaimHold::Held));
+    h
+}
+
+fn holds(h: &Harness) -> Vec<serde_json::Value> {
+    h.world.get().holds.clone()
+}
+
+/// Right after the deposit goes out, in the same step, the claim goes to the
+/// relayer: `z` with the payout kept for it, under the swap's ticket. Once:
+/// later steps, a ready swap included, never hand it over again, and the
+/// app claims nothing of its own yet.
+#[tokio::test]
+async fn the_claim_is_handed_to_the_relayer_once_right_after_the_deposit() {
+    let h = Harness::new();
+    h.world.set().relayer_claims = true;
+    let accepted = h.accepted().await;
+    assert!(accepted.relayer_claims);
+    assert_eq!(h.posted("/v1/claim/hold"), 0);
+
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    assert_eq!(h.submitted(), vec![tx_id("deposit1")]);
+    assert_eq!(h.paths().last().map(String::as_str), Some("/v1/claim/hold"));
+    let record = h.record();
+    assert_eq!(record.claim_hold, Some(ClaimHold::Held));
+    assert_eq!(record.phase(), ForwardPhase::Confirming);
+    assert!(!record.claim_posted);
+    let payout = record.payout.clone().unwrap();
+    assert_eq!(payout.fee, Amount(RELAYER_FEE));
+    {
+        let state = h.world.get();
+        let held = state.held.as_ref().unwrap();
+        let z = h.keys.user_keys(0).unwrap().share.to_be_bytes();
+        assert_eq!(held["secret"], format!("0x{}", hex::encode(z)));
+        assert_eq!(held["swapId"], record.swap_id.to_hex());
+        assert_eq!(held["payout"]["fee"], payout.fee.0.to_string());
+        assert_eq!(held["payout"]["signature"], payout.signature.to_hex());
+        let ticket = state.headers["/v1/claim/hold"]
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case("zecswap-ticket"))
+            .map(|(_, value)| value.clone());
+        assert_eq!(
+            ticket,
+            record.ticket.as_ref().map(|ticket| ticket.0.clone())
+        );
+    }
+
+    h.advance().await.unwrap();
+    let head = h.world.get().head_number;
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.ready_block = Some(head);
+    }
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    assert_eq!(h.posted("/v1/claim/hold"), 1);
+    assert_eq!(h.posted("/v1/claim"), 0);
+}
+
+/// The payout and the hand-over are both kept before the claim is posted.
+#[tokio::test]
+async fn the_hand_over_is_kept_before_it_is_posted() {
+    let h = Harness::new();
+    h.world.set().relayer_claims = true;
+    h.accepted().await;
+    let kept: Rc<RefCell<Option<ForwardRecord>>> = Rc::default();
+    {
+        let dir = h.dir.path().to_owned();
+        let account = h.account.clone();
+        let kept = kept.clone();
+        h.world.set().on_hold = Some(Box::new(move |_| {
+            let found = SwapStore::open(&dir)
+                .unwrap()
+                .find(&account, Direction::Forward, 0)
+                .unwrap();
+            let Some(StoredRecord::Forward(record)) = found else {
+                panic!("no record as the claim is posted");
+            };
+            *kept.borrow_mut() = Some(*record);
+        }));
+    }
+
+    h.advance().await.unwrap();
+    let kept = kept.borrow().clone().expect("the claim was handed over");
+    assert_eq!(kept.claim_hold, Some(ClaimHold::Posted));
+    let payout = kept.payout.expect("the payout was kept first");
+    let posted = holds(&h)[0]["payout"].clone();
+    assert_eq!(posted["fee"], payout.fee.0.to_string());
+    assert_eq!(posted["signature"], payout.signature.to_hex());
+}
+
+/// No claim goes to the relayer before the deposit is out (a wallet still
+/// scanning, a broadcast turned down), and none in manual mode, where the
+/// claim goes as the window opens.
+#[tokio::test]
+async fn nothing_is_handed_over_before_the_deposit_is_out_nor_in_manual_mode() {
+    let h = Harness::new();
+    h.world.set().relayer_claims = true;
+    h.accepted().await;
+    h.world.set().synced = false;
+    assert_eq!(
+        h.advance().await.unwrap(),
+        waiting(ForwardWait::ZcashSyncing)
+    );
+    {
+        let mut state = h.world.set();
+        state.synced = true;
+        state.broadcast_fails = true;
+    }
+    assert_eq!(code(h.advance().await), ErrorCode::ZcashRejected);
+    assert_eq!(h.deposits(), 1, "kept, not out");
+    assert_eq!(h.posted("/v1/claim/hold"), 0);
+    let record = h.record();
+    assert_eq!((record.claim_hold, record.payout), (None, None));
+
+    h.world.set().broadcast_fails = false;
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    assert_eq!(h.posted("/v1/claim/hold"), 1);
+    assert_eq!(h.record().claim_hold, Some(ClaimHold::Held));
+
+    let h = Harness::new();
+    h.deposited().await;
+    let record = h.record();
+    assert!(!record.relayer_claims);
+    assert_eq!((record.claim_hold, record.payout), (None, None));
+    let head = h.world.get().head_number;
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.ready_block = Some(head - READY_DEPTH_BLOCKS);
+    }
+    assert_eq!(h.advance().await.unwrap(), paid());
+    assert_eq!(h.posted("/v1/claim/hold"), 0);
+    assert_eq!(h.posted("/v1/claim"), 1);
+}
+
+/// A relayer without the endpoint, or one that turns the claim down, holds
+/// nothing: the hand-over is declined, never posted again, and the app
+/// claims as the window opens.
+#[tokio::test]
+async fn a_hand_over_turned_down_leaves_the_claim_to_the_app() {
+    for (holds_claims, refusal) in [
+        (false, None),
+        (true, Some((400, "rejected"))),
+        (true, Some((409, "conflict"))),
+    ] {
+        let h = Harness::new();
+        {
+            let mut state = h.world.set();
+            state.relayer_claims = true;
+            state.holds_claims = holds_claims;
+            state.hold_refusal = refusal;
+        }
+        h.deposited().await;
+        assert_eq!(
+            h.record().claim_hold,
+            Some(ClaimHold::Declined),
+            "{refusal:?}"
+        );
+        h.advance().await.unwrap();
+        assert_eq!(h.posted("/v1/claim/hold"), 1, "{refusal:?}");
+
+        let head = h.world.get().head_number;
+        {
+            let mut state = h.world.set();
+            state.stage = SwapStage::Ready;
+            state.ready_block = Some(head - READY_DEPTH_BLOCKS);
+        }
+        assert_eq!(h.advance().await.unwrap(), paid(), "{refusal:?}");
+        assert_eq!(h.posted("/v1/claim"), 1);
+    }
+}
+
+/// A hand-over that got no answer goes again on the next step with the same
+/// bytes, though the relayer asks more now; once held, never again.
+#[tokio::test]
+async fn a_hand_over_without_an_answer_goes_again_with_the_same_bytes() {
+    let h = Harness::new();
+    {
+        let mut state = h.world.set();
+        state.relayer_claims = true;
+        state.fee_expires_at = Some(NOW + 60);
+        state.unreachable = Some("/v1/claim/hold");
+    }
+    h.deposited().await;
+    let first = h.record();
+    assert_eq!(first.claim_hold, Some(ClaimHold::Posted));
+    let sent = h.world.get().bodies["/v1/claim/hold"].clone();
+
+    {
+        let mut state = h.world.set();
+        state.unreachable = None;
+        state.relayer_fee = 30_000;
+        state.pass(120);
+    }
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    assert_eq!(h.posted("/v1/claim/hold"), 2);
+    assert_eq!(holds(&h), vec![sent]);
+    let record = h.record();
+    assert_eq!(record.claim_hold, Some(ClaimHold::Held));
+    assert_eq!(record.payout, first.payout);
+
+    h.advance().await.unwrap();
+    assert_eq!(h.posted("/v1/claim/hold"), 2);
+}
+
+/// A hand-over turned down for its fee is signed again, once, at the higher
+/// fee the relayer asks now, and kept before it goes; turned down at the fee
+/// it asks, or asking above the cap, it is declined with nothing signed
+/// again.
+#[tokio::test]
+async fn a_hand_over_refused_for_its_fee_is_signed_again_once_at_the_higher_fee() {
+    let h = Harness::new();
+    {
+        let mut state = h.world.set();
+        state.relayer_claims = true;
+        state.fee_expires_at = Some(NOW + 3_600);
+    }
+    h.accepted().await;
+    {
+        let mut state = h.world.set();
+        state.relayer_fee = 30_000;
+        state.least_fee = 30_000;
+    }
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    let fees: Vec<serde_json::Value> = holds(&h)
+        .iter()
+        .map(|hold| hold["payout"]["fee"].clone())
+        .collect();
+    assert_eq!(fees, ["20000", "30000"]);
+    let record = h.record();
+    assert_eq!(record.claim_hold, Some(ClaimHold::Held));
+    assert_eq!(record.payout.map(|payout| payout.fee), Some(Amount(30_000)));
+
+    const CAP: u128 = 2_000_000;
+    for (amount, asked) in [(AMOUNT, RELAYER_FEE), (5_000_000, CAP + 1)] {
+        let h = Harness::new();
+        {
+            let mut state = h.world.set();
+            state.relayer_claims = true;
+            state.amount = amount;
+            state.fee_expires_at = Some(NOW + 3_600);
+        }
+        h.accepted().await;
+        {
+            let mut state = h.world.set();
+            state.least_fee = RELAYER_FEE + 1;
+            state.relayer_fee = asked;
+        }
+        assert_eq!(h.advance().await.unwrap(), h.confirming(), "{asked}");
+        assert_eq!(holds(&h).len(), 1, "{asked}");
+        let record = h.record();
+        assert_eq!(record.claim_hold, Some(ClaimHold::Declined));
+        assert_eq!(
+            record.payout.map(|payout| payout.fee),
+            Some(Amount(RELAYER_FEE))
+        );
+    }
+}
+
+/// The app leaves the relayer the window's first minute: a ready before t0
+/// five blocks past its depth, an open swap a minute after t0, a late claim
+/// a minute after t1 + LATE. Then it claims itself, with the payout it
+/// handed over.
+#[tokio::test]
+async fn the_app_claims_a_minute_into_a_window_the_relayer_left_open() {
+    let h = handed_over().await;
+    let handed = h.record().payout;
+    let head = h.world.get().head_number;
+    for depth in [
+        READY_DEPTH_BLOCKS,
+        READY_DEPTH_BLOCKS + RELAYER_CLAIM_WAIT_BLOCKS - 1,
+    ] {
+        {
+            let mut state = h.world.set();
+            state.stage = SwapStage::Ready;
+            state.ready_block = Some(head - depth);
+        }
+        assert_eq!(h.advance().await.unwrap(), h.confirming(), "{depth}");
+    }
+    assert_eq!(h.posted("/v1/claim"), 0);
+    h.world.set().ready_block = Some(head - READY_DEPTH_BLOCKS - RELAYER_CLAIM_WAIT_BLOCKS);
+    assert_eq!(h.advance().await.unwrap(), paid());
+    assert_eq!(h.posted("/v1/claim"), 1);
+    let ended = h.record();
+    assert!(ended.claim_posted);
+    assert_eq!(ended.payout, handed);
+
+    let h = handed_over().await;
+    let t0 = h.world.get().t0;
+    for now in [t0, t0 + RELAYER_CLAIM_WAIT_SECONDS - 1] {
+        at(&h, now);
+        assert_eq!(h.advance().await.unwrap(), h.confirming(), "{now}");
+    }
+    assert_eq!(h.posted("/v1/claim"), 0);
+    at(&h, t0 + RELAYER_CLAIM_WAIT_SECONDS);
+    assert_eq!(h.advance().await.unwrap(), paid());
+
+    let h = handed_over().await;
+    let late = h.world.get().t1() + late_window();
+    for now in [late, late + RELAYER_CLAIM_WAIT_SECONDS - 1] {
+        at(&h, now);
+        assert_eq!(h.advance().await.unwrap(), unwinding(&h), "{now}");
+    }
+    assert_eq!(h.posted("/v1/claim"), 0);
+    at(&h, late + RELAYER_CLAIM_WAIT_SECONDS);
+    assert_eq!(h.advance().await.unwrap(), paid());
+}
+
+/// A hand-over that got no answer may still be held: the app leaves the
+/// relayer its minute all the same.
+#[tokio::test]
+async fn a_hand_over_without_an_answer_still_leaves_the_relayer_its_minute() {
+    let h = Harness::new();
+    {
+        let mut state = h.world.set();
+        state.relayer_claims = true;
+        state.unreachable = Some("/v1/claim/hold");
+    }
+    h.deposited().await;
+    let t0 = h.world.get().t0;
+    at(&h, t0);
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    assert_eq!(h.posted("/v1/claim"), 0);
+    at(&h, t0 + RELAYER_CLAIM_WAIT_SECONDS);
+    assert_eq!(h.advance().await.unwrap(), paid());
+    assert_eq!(h.posted("/v1/claim"), 1);
+}
+
+/// A claim the relayer landed, with its payout, finishes the bridge on the
+/// payout's event, the app posting nothing; one landed without its payout
+/// gets the payout the app handed over.
+#[tokio::test]
+async fn a_claim_the_relayer_landed_finishes_the_bridge() {
+    let h = handed_over().await;
+    h.relayer_sends_held_claim();
+    assert_eq!(h.advance().await.unwrap(), paid());
+    assert_eq!(h.posted("/v1/claim"), 0);
+    assert_eq!(h.posted("/v1/payout"), 0);
+    let ended = h.record();
+    assert_eq!(ended.outcome, Some(ForwardOutcome::Paid));
+    assert_eq!(ended.payout_tx, Some(Hex(word(2))));
+    assert_eq!(ended.receives, Amount(977_550));
+    assert!(!ended.claim_posted);
+
+    let h = handed_over().await;
+    let handed = h.record().payout.unwrap();
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Claimed;
+    }
+    assert_eq!(h.advance().await.unwrap(), paid());
+    assert_eq!(h.posted("/v1/claim"), 0);
+    assert_eq!(h.posted("/v1/payout"), 1);
+    assert_eq!(
+        h.world.get().bodies["/v1/payout"]["signature"],
+        handed.signature.to_hex()
+    );
 }
 
 // ---- the deployment ----

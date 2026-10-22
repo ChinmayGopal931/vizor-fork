@@ -25,28 +25,36 @@ Future<void> showPrivateUsdInfoSheet(
   );
 }
 
-/// The convert screen's info sheet.
+/// The convert screen's info sheet; with [relayerClaims] (Settings), the
+/// relayer claims.
 Future<void> showPrivateUsdConvertInfoSheet(
   BuildContext context, {
   required Duration takes,
+  required bool relayerClaims,
 }) => _show(
   context,
   title: PrivateUsdCopy.convertInfoTitle,
-  steps: const [
+  steps: [
     PrivateUsdCopy.convertInfoStepQuote,
     PrivateUsdCopy.convertInfoStepDeposit,
-    PrivateUsdCopy.convertInfoStepClaim,
+    relayerClaims
+        ? PrivateUsdCopy.convertInfoStepClaimRelayer
+        : PrivateUsdCopy.convertInfoStepClaim,
   ],
   notes: [
     PrivateUsdCopy.convertInfoNoteEither,
-    PrivateUsdCopy.convertInfoNoteTime(PrivateUsdCopy.about(takes)),
+    relayerClaims
+        ? PrivateUsdCopy.convertInfoNoteTimeRelayer(PrivateUsdCopy.about(takes))
+        : PrivateUsdCopy.convertInfoNoteTime(PrivateUsdCopy.about(takes)),
   ],
 );
 
-/// The review's info sheet.
+/// The review's info sheet; with [relayerClaims] (Settings), the relayer
+/// claims.
 Future<void> showPrivateUsdReviewInfoSheet(
   BuildContext context, {
   required String railgunPercent,
+  required bool relayerClaims,
 }) => _show(
   context,
   title: PrivateUsdCopy.convertReviewInfoTitle,
@@ -55,14 +63,20 @@ Future<void> showPrivateUsdReviewInfoSheet(
     PrivateUsdCopy.convertReviewInfoReceive(railgunPercent),
     PrivateUsdCopy.convertReviewInfoQuote,
   ],
-  notes: const [PrivateUsdCopy.infoKeepOpen],
+  notes: [
+    relayerClaims
+        ? PrivateUsdCopy.convertRelayerInfoKeepOpen
+        : PrivateUsdCopy.infoKeepOpen,
+  ],
 );
 
-/// The progress screen's info sheet.
+/// The progress screen's info sheet; with [relayerClaims], the relayer holds
+/// the claim.
 Future<void> showPrivateUsdProgressInfoSheet(
   BuildContext context, {
   required int zcashConfirmations,
   required Duration screening,
+  required bool relayerClaims,
 }) => _show(
   context,
   title: PrivateUsdCopy.convertProgressInfoTitle,
@@ -70,12 +84,16 @@ Future<void> showPrivateUsdProgressInfoSheet(
     PrivateUsdCopy.convertProgressInfoOpen,
     PrivateUsdCopy.convertProgressInfoDeposit,
     PrivateUsdCopy.convertProgressInfoConfirm(zcashConfirmations),
-    PrivateUsdCopy.convertProgressInfoClaim,
+    relayerClaims
+        ? PrivateUsdCopy.convertProgressInfoClaimRelayer
+        : PrivateUsdCopy.convertProgressInfoClaim,
     PrivateUsdCopy.convertProgressInfoScreen(PrivateUsdCopy.about(screening)),
   ],
-  notes: const [
+  notes: [
     PrivateUsdCopy.convertProgressInfoRefund,
-    PrivateUsdCopy.infoKeepOpen,
+    relayerClaims
+        ? PrivateUsdCopy.convertRelayerInfoKeepOpen
+        : PrivateUsdCopy.infoKeepOpen,
   ],
 );
 

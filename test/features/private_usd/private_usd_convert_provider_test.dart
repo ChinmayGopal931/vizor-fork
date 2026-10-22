@@ -11,6 +11,7 @@ import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_avai
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_balance_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_convert_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_engine_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_relayer_claims_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_reverse_convert_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
@@ -41,6 +42,7 @@ void main() {
   late int? nextFee;
   var allowed = true;
   late _UnavailableReversePage reversePage;
+  late MemoryRelayerClaimsStore relayerClaims;
 
   PrivateUsdConvertNotifier notifier() =>
       container.read(privateUsdConvertProvider.notifier);
@@ -60,6 +62,7 @@ void main() {
     quoteGate = null;
     allowed = true;
     reversePage = _UnavailableReversePage();
+    relayerClaims = MemoryRelayerClaimsStore();
     DateTime now() => tester.binding.clock.now();
     backend = FakePrivateUsdBackend(records: {account: []})
       ..onQuote = (units) {
@@ -89,6 +92,7 @@ void main() {
         privateUsdEngineProvider.overrideWithValue(engine),
         privateUsdCurrentDeploymentProvider.overrideWithValue(null),
         privateUsdReversePageProvider.overrideWithValue(reversePage),
+        privateUsdRelayerClaimsStoreProvider.overrideWithValue(relayerClaims),
         privateUsdBalanceProvider(
           account,
         ).overrideWith(() => _EmptyBalance(account)),
@@ -375,6 +379,31 @@ void main() {
         index: state().quote!.index,
       ),
     );
+    // Relayer claims are on by default.
+    expect(backend.acceptedRelayerClaims, [true]);
+  });
+
+  convertTest('a bridge takes the relayer-claims setting as it is', (
+    tester,
+  ) async {
+    await start(tester, holdings: spendable(oneZec));
+    relayerClaims.stored = false;
+    await type(tester, '0.5');
+    expect(notifier().openReview(), isTrue);
+    expect(await notifier().confirm(), isNotNull);
+    expect(backend.acceptedRelayerClaims, [false]);
+  });
+
+  convertTest('a relayer-claims setting that cannot be read starts nothing', (
+    tester,
+  ) async {
+    await start(tester, holdings: spendable(oneZec));
+    relayerClaims.failing = true;
+    await type(tester, '0.5');
+    expect(notifier().openReview(), isTrue);
+    expect(await notifier().confirm(), isNull);
+    expect(state().startError, PrivateUsdCopy.convertStartFailed);
+    expect(backend.acceptedRelayerClaims, isEmpty);
   });
 
   convertTest(
@@ -524,6 +553,7 @@ class _GatedBackend extends FakePrivateUsdBackend {
     PrivateUsdSecretReader secret, {
     required int index,
     required BigInt maxTotalZat,
+    required bool relayerClaims,
   }) async {
     final hold = gate();
     if (hold != null) await hold.future;
@@ -532,6 +562,7 @@ class _GatedBackend extends FakePrivateUsdBackend {
       secret,
       index: index,
       maxTotalZat: maxTotalZat,
+      relayerClaims: relayerClaims,
     );
   }
 }

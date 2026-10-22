@@ -11,7 +11,7 @@
 //! to the deployment's pins, and each post's answer says whether the send is
 //! dropped or posted again as the same bytes.
 
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use zecswap_core::Terms;
 
 use super::deployment::{require_within_fee_cap, Deployment, CLIENT_TIMEOUT, TICKET_HEADER};
@@ -92,8 +92,8 @@ struct PayoutRequest<'a> {
     signature: &'a Signature,
 }
 
-/// A share revealed in its window, with the payout that follows it. The
-/// secret is `z`: never logged.
+/// A share revealed in its window, or handed over to be, with the payout
+/// that follows it. The secret is `z`: never logged.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RevealRequest<'a> {
@@ -101,6 +101,15 @@ struct RevealRequest<'a> {
     terms: &'a WireTerms,
     secret: Word,
     payout: PayoutRequest<'a>,
+}
+
+/// `/v1/claim/hold`'s answer: held, or for a swap already claimed, the
+/// transactions `/v1/claim` answers with.
+#[derive(Deserialize)]
+struct HoldAnswer {
+    #[serde(default)]
+    held: bool,
+    transactions: Option<Vec<Word>>,
 }
 
 #[derive(Serialize)]
@@ -235,6 +244,37 @@ impl<'a, T: HttpTransport> RelayerClient<'a, T> {
             .await
     }
 
+    /// `POST /v1/claim/hold`: the claim `/v1/claim` takes, `secret` and all,
+    /// for the relayer to keep and send with its payout once the claim's
+    /// window opens. A swap already claimed is answered as `/v1/claim`
+    /// answers it. Held again, nothing changes, and a new payout replaces the
+    /// one held. A refusal holds nothing; a relayer without the endpoint
+    /// answers `404`.
+    pub(crate) async fn hold_claim(
+        &self,
+        secret: &[u8; 32],
+        payout: &SwapPayout,
+        terms: &Terms,
+        ticket: Option<&Ticket>,
+    ) -> Result<(), SwapHttpError> {
+        let terms = WireTerms::from(terms);
+        let body = RevealRequest {
+            swap_id: &payout.swap_id,
+            terms: &terms,
+            secret: Hex(*secret),
+            payout: payout_request(payout, &terms),
+        };
+        self.send("/v1/claim/hold", &body, ticket, |answer: &HoldAnswer| {
+            if answer.held || answer.transactions.is_some() {
+                Ok(())
+            } else {
+                Err("the relayer did not hold the claim".into())
+            }
+        })
+        .await
+        .map(|_| ())
+    }
+
     pub(crate) async fn payout(
         &self,
         payout: &SwapPayout,
@@ -363,13 +403,13 @@ impl<'a, T: HttpTransport> RelayerClient<'a, T> {
         self.send(path, &body, ticket, |_: &Sent| Ok(())).await
     }
 
-    async fn send<B: Serialize>(
+    async fn send<B: Serialize, R: DeserializeOwned>(
         &self,
         path: &str,
         body: &B,
         ticket: Option<&Ticket>,
-        check: impl FnOnce(&Sent) -> Result<(), String>,
-    ) -> Result<Sent, SwapHttpError> {
+        check: impl FnOnce(&R) -> Result<(), String>,
+    ) -> Result<R, SwapHttpError> {
         let headers: Vec<(&str, &str)> = ticket
             .map(|ticket| (TICKET_HEADER, ticket.0.as_str()))
             .into_iter()
@@ -554,6 +594,73 @@ mod tests {
         assert_eq!(body["terms"]["user"], format!("0x{}", "04".repeat(20)));
         assert_eq!(received[2].path, "/relayer/v1/reverse/ready");
         assert_eq!(received[3].path, "/relayer/v1/reverse/fund");
+    }
+
+    /// A claim handed over is `/v1/claim`'s body with the swap's ticket. It is
+    /// held on `held`, or on the transactions a swap already claimed answers
+    /// with; a refusal and a relayer without the endpoint keep their status.
+    #[tokio::test]
+    async fn a_claim_handed_over_is_held_or_refused() {
+        let _policy = lock_route_policy();
+        let server = TestServer::start(vec![
+            Reply::json(200, r#"{"held":true}"#),
+            Reply::json(
+                200,
+                &format!(r#"{{"transactions":["0x{}"]}}"#, "ab".repeat(32)),
+            ),
+            Reply::json(400, r#"{"code":"rejected","error":"the fee is too low"}"#),
+            Reply::json(404, "not found"),
+            Reply::json(200, r#"{"held":false}"#),
+        ]);
+        let transport = RoutedHttp::new();
+        let relayer = RelayerClient::new(&transport, &format!("{}/relayer", server.url));
+        let ticket: Ticket = Redacted(format!("0x{}.{}", "5c".repeat(32), "3f".repeat(32)));
+        let payout = SwapPayout {
+            swap_id: Hex([0x5c; 32]),
+            note: SwapNote {
+                npk: Hex([0x11; 32]),
+                encrypted_bundle: [Hex([0x12; 32]), Hex([0x13; 32]), Hex([0x14; 32])],
+                shield_key: Hex([0x15; 32]),
+            },
+            fee: Amount(20_000),
+            signature: Hex([0x16; 65]),
+        };
+        let secret = [0x2a; 32];
+        let terms = terms();
+        let hold = || relayer.hold_claim(&secret, &payout, &terms, Some(&ticket));
+
+        hold().await.unwrap();
+        hold().await.unwrap();
+        for status in [400, 404] {
+            let refused = hold().await.unwrap_err();
+            let SwapHttpError::Refused(refusal) = &refused else {
+                panic!("{refused:?}");
+            };
+            assert_eq!(refusal.status, status);
+        }
+        let unread = hold().await.unwrap_err();
+        assert!(
+            matches!(unread, SwapHttpError::Unreadable { .. }),
+            "{unread:?}"
+        );
+
+        let received = server.received();
+        assert_eq!(received.len(), 5);
+        assert_eq!(received[0].path, "/relayer/v1/claim/hold");
+        assert_eq!(
+            received[0].header("zecswap-ticket"),
+            Some(ticket.0.as_str())
+        );
+        println!("VEYLOR_HOLD_BODY={}", String::from_utf8_lossy(&received[0].body));
+        let body: Value = serde_json::from_slice(&received[0].body).unwrap();
+        assert_eq!(body["swapId"], format!("0x{}", "5c".repeat(32)));
+        assert_eq!(body["secret"], format!("0x{}", "2a".repeat(32)));
+        assert_eq!(body["terms"]["amount"], "1000000");
+        assert_eq!(body["payout"]["swapId"], body["swapId"]);
+        assert_eq!(body["payout"]["terms"], body["terms"]);
+        assert_eq!(body["payout"]["fee"], "20000");
+        // Posted again, the same claim is the same bytes.
+        assert_eq!(received[1].body, received[0].body);
     }
 
     /// A Railgun send goes out as proved, and each answer says whether to drop
