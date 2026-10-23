@@ -19,6 +19,13 @@
 //! is posted. The app then leaves the window's first minute to the relayer,
 //! and claims itself only if nothing landed by then.
 //!
+//! A paid swap's payout that Railgun's screening sent back to the swap's
+//! vault is rescued on the user's word: a rescue is signed with the
+//! contract's nonce and a fresh deadline, kept, then posted to the relayer,
+//! which shields the vault's balance again into the same note, less its fee.
+//! The record stays paid, and paid records are kept beyond the history
+//! limit for it.
+//!
 //! The driver runs over seams: [`ChainReader`], [`HttpTransport`],
 //! [`ForwardZcash`] (the wallet's side, [`WalletZcash`]) and [`Clock`]. The
 //! engine tests fake all but the keys and the store.
@@ -26,12 +33,12 @@
 use std::path::Path;
 use std::time::Duration;
 
-use zecswap_core::{JointAccount, NetworkType, SpendKey, Terms};
+use zecswap_core::{JointAccount, NetworkType, RescueAuthorization, SpendKey, Terms};
 use zeroize::Zeroizing;
 
 use super::deployment::{
     self, Deployment, ACCEPT_MARGIN_SECONDS, MAX_SECONDS_TO_T0, MAX_T0_TO_T1_SECONDS,
-    READY_DEPTH_BLOCKS, REVEAL_MARGIN_SECONDS,
+    READY_DEPTH_BLOCKS, REVEAL_MARGIN_SECONDS, SIGNATURE_TTL_SECONDS,
 };
 use super::engine::{self, Activity, Clock, MakerChecks, Offer, OpHandle, SystemClock};
 use super::evm_rpc::{ChainReader, EvmRpc, SwapStage, SwapState};
@@ -41,7 +48,7 @@ use super::maker_client::MakerClient;
 use super::models::{
     Amount, ClaimHold, DepositProgress, Direction, ForwardOutcome, ForwardRecord, Hex,
     NothingSentCause, RefundCause, RelayerTerms, SwapAcceptance, SwapNote, SwapPayout, SwapQuote,
-    Word, ZcashTransaction,
+    SwapRescue, Word, ZcashTransaction,
 };
 use super::relayer_client::RelayerClient;
 use super::store::SwapStore;
@@ -230,11 +237,93 @@ enum PayoutPost {
     Payout,
 }
 
+/// A paid swap's payout that Railgun's screening sent back to its vault,
+/// which holds more than a rescue's fee (`returned_payouts`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ReturnedPayout {
+    pub index: u32,
+    pub held: u128,
+    pub fee: Amount,
+}
+
+/// One account's forward swaps where no key is needed: which paid swaps'
+/// payouts Railgun sent back to their vaults (a chain read only).
+pub(crate) struct ForwardView<'a, C, T>
+where
+    T: HttpTransport,
+{
+    pins: &'static Deployment,
+    account: &'a str,
+    chain: &'a C,
+    relayer: RelayerClient<'a, T>,
+}
+
+impl<'a, C, T> ForwardView<'a, C, T>
+where
+    C: ChainReader,
+    T: HttpTransport,
+{
+    pub(crate) fn new(
+        network: super::PrivateUsdNetwork,
+        account: &'a str,
+        chain: &'a C,
+        transport: &'a T,
+    ) -> Self {
+        let pins = deployment::deployment(network);
+        Self {
+            pins,
+            account,
+            chain,
+            relayer: RelayerClient::new(transport, pins.relayer_url),
+        }
+    }
+
+    /// The paid swaps whose vaults hold more than a rescue's fee: Railgun's
+    /// screening sent their payouts back there. Every paid record's vault is
+    /// read in one call; the relayer's fee is read once and held to the cap.
+    pub(crate) async fn returned_payouts(&self, store: &SwapStore) -> Result<Vec<ReturnedPayout>> {
+        let paid: Vec<ForwardRecord> = swap::records::<ForwardRecord>(store, self.account)?
+            .into_iter()
+            .filter(|record| record.outcome == Some(ForwardOutcome::Paid))
+            .collect();
+        if paid.is_empty() {
+            return Ok(Vec::new());
+        }
+        let fee = pinned_relayer_terms(&self.relayer, self.pins).await?.fee;
+        deployment::require_within_fee_cap(fee.0)?;
+        let ids: Vec<[u8; 32]> = paid.iter().map(|record| record.swap_id.0).collect();
+        let held = self.chain.swap_vault_balances(&ids).await?;
+        if held.len() != ids.len() {
+            return fail(ErrorCode::ChainUnreadable, "the vaults answered short");
+        }
+        Ok(paid
+            .iter()
+            .zip(held)
+            .filter(|(_, held)| *held > fee.0)
+            .map(|(record, held)| ReturnedPayout {
+                index: record.index,
+                held,
+                fee,
+            })
+            .collect())
+    }
+
+    /// The rescue fee, when `record`'s vault holds more than it. The fee is
+    /// the relayer's now, within the cap and leaving something of the amount.
+    async fn rescue_fee(&self, record: &ForwardRecord) -> Result<Option<Amount>> {
+        let fee = pinned_relayer_terms(&self.relayer, self.pins).await?.fee;
+        require_payout_fee(record.quote.amount, fee)?;
+        let vault = self.chain.vault_balance(&record.swap_id.0).await?;
+        Ok((vault > fee.0).then_some(fee))
+    }
+}
+
 /// One account's forward swaps, over the seams.
 pub(crate) struct Forward<'a, C, T, Z, K>
 where
     T: HttpTransport,
 {
+    view: ForwardView<'a, C, T>,
     pins: &'static Deployment,
     account: &'a str,
     keys: &'a SwapKeyContext,
@@ -266,6 +355,7 @@ where
     ) -> Self {
         let pins = deployment::deployment(keys.network());
         Self {
+            view: ForwardView::new(keys.network(), account, chain, transport),
             pins,
             account,
             keys,
@@ -398,6 +488,7 @@ where
             payout: None,
             claim_posted: false,
             relayer_claims,
+            rescue: None,
             claim_hold: None,
             t0: None,
             t1: None,
@@ -945,6 +1036,59 @@ where
         })
         .await?;
         Ok(())
+    }
+
+    /// Asks the relayer to shield swap `index`'s payout, which Railgun sent
+    /// back to its vault, again into this account's note: a fresh nonce and
+    /// deadline signed, kept, then sent. Only a paid swap the chain shows
+    /// paid out, and only once its vault holds more than the fee; the record
+    /// stays paid, so it never holds up another conversion.
+    pub(crate) async fn rescue(&self, store: &mut SwapStore, index: u32) -> Result<ForwardRecord> {
+        let record: ForwardRecord = load(store, self.account, index)?;
+        if record.outcome != Some(ForwardOutcome::Paid) {
+            return fail(ErrorCode::Other, "only a paid conversion is rescued");
+        }
+        let Some(terms) = self.terms(&record)? else {
+            return fail(ErrorCode::Mismatch, "the paid conversion has no terms");
+        };
+        let read = self.chain.read_swap(&record.swap_id.0, &terms).await?;
+        let paid_out = read
+            .swap
+            .as_ref()
+            .is_some_and(|swap| swap.stage == SwapStage::Claimed && swap.paid_out);
+        if !paid_out {
+            return fail(ErrorCode::Mismatch, "the chain doesn't show the payout");
+        }
+        let Some(fee) = self.view.rescue_fee(&record).await? else {
+            return Ok(record);
+        };
+        let nonce = self.chain.rescue_nonce(&record.swap_id.0).await?;
+        let now = swap::fresh_head(read.head.timestamp, self.clock.now())?;
+        let deadline = now + SIGNATURE_TTL_SECONDS;
+        let note = self.keys.note(index)?;
+        let digest = self.pins.domain()?.rescue(
+            &record.swap_id.0,
+            &note.commitment(),
+            &self.pins.relayer,
+            fee.0,
+            RescueAuthorization { nonce, deadline },
+        );
+        let rescue = SwapRescue {
+            swap_id: record.swap_id,
+            note: SwapNote::from(&note),
+            fee,
+            nonce,
+            deadline,
+            signature: Hex(self.keys.user_keys(index)?.auth.sign(&digest)),
+        };
+        let mut rescued = record;
+        rescued.rescue = Some(rescue.clone());
+        // In place: the active conversion may be a newer one.
+        update(store, self.account, &rescued)?;
+        self.relayer
+            .rescue_payout(&rescue, &terms, rescued.ticket.as_ref())
+            .await?;
+        load(store, self.account, index)
     }
 
     /// The payout to send: the saved one while its fee is the fee to pay,
@@ -1545,6 +1689,27 @@ impl SwapCall<'_> {
         let mut store = SwapStore::open(self.store_dir)?;
         step(&forward, &mut store).await
     }
+}
+
+/// A forward view over the real seams.
+pub(crate) type WalletForwardView<'a> = ForwardView<'a, EvmRpc<'a, RoutedHttp>, RoutedHttp>;
+
+/// Runs `step` on a forward view over routed HTTP and the pinned contract;
+/// no key is needed. `None` when the wallet never converted.
+pub(crate) async fn run_view<R>(
+    store_dir: &Path,
+    network: super::PrivateUsdNetwork,
+    eth_rpc_url: &str,
+    account: &str,
+    step: impl AsyncFnOnce(&WalletForwardView<'_>, &SwapStore) -> Result<R>,
+) -> Result<Option<R>> {
+    let Some(store) = SwapStore::open_existing(store_dir)? else {
+        return Ok(None);
+    };
+    let transport = RoutedHttp::new();
+    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url);
+    let view = ForwardView::new(network, account, &chain, &transport);
+    step(&view, &store).await.map(Some)
 }
 
 /// [`abandon`] over the pinned contract; no key is needed. The caller holds

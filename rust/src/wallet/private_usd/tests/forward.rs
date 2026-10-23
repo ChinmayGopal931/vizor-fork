@@ -1,8 +1,8 @@
 //! The forward conversion's fund-safety rules on fakes: the driver, the
 //! claim's windows and settlement, the deposit's crash points and sync gate,
 //! the 2 USDC cap, the token gate without a tokens client, claims handed to
-//! the relayer, records of another contract, and one driver step per
-//! account.
+//! the relayer, the rescue of a payout Railgun sent back, records of another
+//! contract, and one driver step per account.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -15,7 +15,7 @@ use super::super::deployment::{
 };
 use super::super::engine;
 use super::super::evm_rpc::SwapStage;
-use super::super::forward::{AcceptOutcome, ForwardStep, ForwardWait};
+use super::super::forward::{AcceptOutcome, ForwardStep, ForwardWait, ReturnedPayout};
 use super::super::joint::SwapTxStatus;
 use super::super::models::{
     Amount, ClaimHold, DepositProgress, Direction, ForwardOutcome, ForwardPhase, ForwardRecord,
@@ -1605,6 +1605,96 @@ async fn a_claim_the_relayer_landed_finishes_the_bridge() {
 
 /// A maker or relayer that names other windows, or another kind of
 /// contract, serves another deployment: nothing is paid into its swaps.
+/// A paid swap's payout Railgun sent back to its vault is listed, and
+/// rescued, only once the vault holds more than the relayer's fee; a rescue
+/// keeps the contract's nonce and its deadline exactly, is kept before it is
+/// sent, leaves the swap paid, and the next takes the next nonce. A swap the
+/// chain does not show paid out is never rescued.
+#[tokio::test]
+async fn a_returned_payout_is_rescued_only_from_a_vault_holding_more_than_the_fee() {
+    let h = Harness::new();
+    h.accepted().await;
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    h.world.set().stage = SwapStage::Ready;
+    assert_eq!(h.advance().await.unwrap(), paid());
+    let record = h.record();
+
+    // A vault holding no more than the fee: nothing listed, nothing signed
+    // or sent.
+    for vault in [0, RELAYER_FEE] {
+        h.world.set().vault = vault;
+        assert_eq!(
+            h.forward_view()
+                .returned_payouts(&h.store())
+                .await
+                .unwrap(),
+            vec![]
+        );
+        h.forward().rescue(&mut h.store(), 0).await.unwrap();
+        assert_eq!(h.record().rescue, None);
+    }
+    assert_eq!(h.posts("/v1/rescue"), 0);
+
+    // More: listed with what it holds, then rescued under the contract's
+    // nonce, kept exactly before it is sent.
+    {
+        let mut state = h.world.set();
+        state.vault = 900_000;
+        state.rescue_nonce = 7;
+    }
+    assert_eq!(
+        h.forward_view()
+            .returned_payouts(&h.store())
+            .await
+            .unwrap(),
+        vec![ReturnedPayout {
+            index: 0,
+            held: 900_000,
+            fee: Amount(RELAYER_FEE),
+        }]
+    );
+    let rescued = h.forward().rescue(&mut h.store(), 0).await.unwrap();
+    let rescue = rescued.rescue.clone().unwrap();
+    assert_eq!(rescue.nonce, 7);
+    assert_eq!(rescue.fee, Amount(RELAYER_FEE));
+    assert_eq!(rescue.deadline, h.world.get().chain_now + 120);
+    let digest = pins().domain().unwrap().rescue(
+        &record.swap_id.0,
+        &h.keys.note(0).unwrap().commitment(),
+        &pins().relayer,
+        RELAYER_FEE,
+        zecswap_core::RescueAuthorization {
+            nonce: 7,
+            deadline: rescue.deadline,
+        },
+    );
+    assert_eq!(
+        zecswap_core::signer(&digest, &rescue.signature.0),
+        Some(h.keys.auth_address(0).unwrap())
+    );
+    let state = h.world.get();
+    assert_eq!(state.bodies["/v1/rescue"]["nonce"], 7);
+    assert_eq!(state.bodies["/v1/rescue"]["swapId"], record.swap_id.to_hex());
+    drop(state);
+    assert_eq!(rescued.outcome, Some(ForwardOutcome::Paid));
+    assert_eq!(h.posts("/v1/rescue"), 1);
+    assert_eq!(h.store().unfinished_count(&h.account).unwrap(), 0);
+
+    // The next takes the next nonce.
+    h.world.set().rescue_nonce = 8;
+    let again = h.forward().rescue(&mut h.store(), 0).await.unwrap();
+    assert_eq!(again.rescue.unwrap().nonce, 8);
+    assert_eq!(h.posts("/v1/rescue"), 2);
+
+    // A chain that does not show the payout: nothing is signed.
+    h.world.set().paid_out = false;
+    assert_eq!(
+        code(h.forward().rescue(&mut h.store(), 0).await),
+        ErrorCode::Mismatch
+    );
+    assert_eq!(h.posts("/v1/rescue"), 2);
+}
+
 #[tokio::test]
 async fn services_naming_other_windows_are_refused() {
     let h = Harness::new();

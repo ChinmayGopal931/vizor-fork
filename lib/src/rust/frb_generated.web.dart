@@ -188,6 +188,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiForwardRecord dco_decode_api_forward_record(dynamic raw);
 
   @protected
+  ApiForwardReturnedPayout dco_decode_api_forward_returned_payout(dynamic raw);
+
+  @protected
   ApiForwardWait dco_decode_api_forward_wait(dynamic raw);
 
   @protected
@@ -788,6 +791,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ApiForwardRecord> dco_decode_list_api_forward_record(dynamic raw);
+
+  @protected
+  List<ApiForwardReturnedPayout> dco_decode_list_api_forward_returned_payout(
+    dynamic raw,
+  );
 
   @protected
   List<ApiKeystoneSignatureInput> dco_decode_list_api_keystone_signature_input(
@@ -1785,6 +1793,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiForwardRecord sse_decode_api_forward_record(SseDeserializer deserializer);
 
   @protected
+  ApiForwardReturnedPayout sse_decode_api_forward_returned_payout(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ApiForwardWait sse_decode_api_forward_wait(SseDeserializer deserializer);
 
   @protected
@@ -2577,6 +2590,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ApiForwardRecord> sse_decode_list_api_forward_record(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ApiForwardReturnedPayout> sse_decode_list_api_forward_returned_payout(
     SseDeserializer deserializer,
   );
 
@@ -3872,6 +3890,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_api_forward_returned_payout(
+    ApiForwardReturnedPayout self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_api_forward_wait(
     ApiForwardWait self,
     SseSerializer serializer,
@@ -4846,6 +4870,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_api_forward_record(
     List<ApiForwardRecord> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_api_forward_returned_payout(
+    List<ApiForwardReturnedPayout> self,
     SseSerializer serializer,
   );
 

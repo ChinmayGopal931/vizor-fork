@@ -25,7 +25,9 @@ use super::super::evm_rpc::{
     ChainReader, ConfirmedSwap, Head, PaidOut, ReverseChainState, SwapRead, SwapStage, SwapState,
     TransactionStatus,
 };
-use super::super::forward::{Forward, ForwardStep, ForwardWait, ForwardZcash, Quoted};
+use super::super::forward::{
+    Forward, ForwardStep, ForwardView, ForwardWait, ForwardZcash, Quoted,
+};
 use super::super::joint::SwapTxStatus;
 use super::super::keys::SwapKeyContext;
 use super::super::models::{
@@ -614,6 +616,20 @@ impl ChainReader for FakeChain {
         Ok(self.0.get().vault)
     }
 
+    async fn swap_vault_balances(&self, ids: &[[u8; 32]]) -> Result<Vec<u128>> {
+        let state = self.0.get();
+        Ok(ids
+            .iter()
+            .map(|id| {
+                if state.swap_id.as_ref() == Some(id) {
+                    state.vault
+                } else {
+                    0
+                }
+            })
+            .collect())
+    }
+
     async fn rescue_nonce(&self, _id: &[u8; 32]) -> Result<u64> {
         Ok(self.0.get().rescue_nonce)
     }
@@ -950,7 +966,8 @@ impl FakeServices {
                 "/v1/reverse/ready"
                 | "/v1/reverse/refund"
                 | "/v1/reverse/refund-payout"
-                | "/v1/reverse/rescue",
+                | "/v1/reverse/rescue"
+                | "/v1/rescue",
             ) => answer(200, json!({ "transactions": [] })),
             (&Method::POST, "/v1/claim") => {
                 let fee: u128 = body["payout"]["fee"].as_str().unwrap().parse().unwrap();
@@ -1292,6 +1309,10 @@ impl Harness {
             &self.makers,
             op,
         )
+    }
+
+    pub(super) fn forward_view(&self) -> ForwardView<'_, FakeChain, FakeServices> {
+        ForwardView::new(self.keys.network(), &self.account, &self.chain, &self.services)
     }
 
     pub(super) fn chain(&self) -> &FakeChain {

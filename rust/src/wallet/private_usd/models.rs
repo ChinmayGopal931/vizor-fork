@@ -618,6 +618,10 @@ pub(crate) struct ForwardRecord {
     /// The claim handed to the relayer, kept before it is posted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub claim_hold: Option<ClaimHold>,
+    /// The last rescue of a payout Railgun sent back to the swap's vault,
+    /// kept before it is posted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rescue: Option<SwapRescue>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub t0: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

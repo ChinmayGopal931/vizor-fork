@@ -694,6 +694,83 @@ pub fn private_usd_forward_abandon(
     })
 }
 
+/// A paid conversion whose payout Railgun's screening sent back to its
+/// vault, which holds more than the relayer's fee: "Recover" is offered.
+pub struct ApiForwardReturnedPayout {
+    pub index: u32,
+    /// What the vault holds, token base units.
+    pub held: String,
+    /// The relayer's fee a rescue pays, token base units.
+    pub fee: String,
+}
+
+/// The account's paid conversions whose payouts Railgun's screening sent
+/// back to their vaults, each holding more than the relayer's fee. A chain
+/// read only (every paid record's vault in one call); no key and no lock.
+/// Empty when the wallet never converted.
+pub fn private_usd_forward_returned_payouts(
+    network: String,
+    account_uuid: String,
+    store_dir: String,
+    eth_rpc_url: String,
+) -> Result<Vec<ApiForwardReturnedPayout>, ApiPrivateUsdError> {
+    catch(|| {
+        let network = swap_network(&network)?;
+        let returned = block_on(forward::run_view(
+            Path::new(&store_dir),
+            network,
+            &eth_rpc_url,
+            &account_uuid,
+            async |view, store| view.returned_payouts(store).await,
+        ))?;
+        Ok(returned
+            .unwrap_or_default()
+            .into_iter()
+            .map(|payout| ApiForwardReturnedPayout {
+                index: payout.index,
+                held: payout.held.to_string(),
+                fee: payout.fee.0.to_string(),
+            })
+            .collect())
+    })
+}
+
+/// "Recover payout": signs a rescue with a fresh nonce and deadline, keeps
+/// it, and asks the relayer to shield the returned payout again into this
+/// account's note. The record stays `Paid`. Nothing happens when the vault
+/// holds no more than the fee (check `private_usd_forward_returned_payouts`
+/// again).
+pub fn private_usd_forward_rescue(
+    db_path: String,
+    network: String,
+    account_uuid: String,
+    store_dir: String,
+    mnemonic_bytes: Vec<u8>,
+    eth_rpc_url: String,
+    index: u32,
+) -> Result<ApiForwardRecord, ApiPrivateUsdError> {
+    let secret = Zeroizing::new(mnemonic_bytes);
+    catch(panic::AssertUnwindSafe(|| {
+        drive(
+            &db_path,
+            &network,
+            &account_uuid,
+            &store_dir,
+            &secret,
+            "",
+            &eth_rpc_url,
+            None,
+            async |call, op| {
+                call.forward(op, async |forward, store| {
+                    let record = forward.rescue(store, index).await?;
+                    Ok(api_record(&record, None))
+                })
+                .await
+            },
+        )
+    }))
+}
+
 /// The account's forward conversions: the active one first, then the rest,
 /// newest first.
 pub fn private_usd_forward_records(

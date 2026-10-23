@@ -318,8 +318,32 @@ impl<'a, T: HttpTransport> RelayerClient<'a, T> {
             .await
     }
 
+    /// `POST /v1/reverse/rescue`: shields a refund Railgun sent back to its
+    /// escrow's vault again.
     pub(crate) async fn rescue(
         &self,
+        rescue: &SwapRescue,
+        terms: &Terms,
+        ticket: Option<&Ticket>,
+    ) -> Result<Sent, SwapHttpError> {
+        self.rescue_at("/v1/reverse/rescue", rescue, terms, ticket)
+            .await
+    }
+
+    /// `POST /v1/rescue`: shields a forward payout Railgun sent back to its
+    /// swap's vault again.
+    pub(crate) async fn rescue_payout(
+        &self,
+        rescue: &SwapRescue,
+        terms: &Terms,
+        ticket: Option<&Ticket>,
+    ) -> Result<Sent, SwapHttpError> {
+        self.rescue_at("/v1/rescue", rescue, terms, ticket).await
+    }
+
+    async fn rescue_at(
+        &self,
+        path: &str,
         rescue: &SwapRescue,
         terms: &Terms,
         ticket: Option<&Ticket>,
@@ -334,8 +358,7 @@ impl<'a, T: HttpTransport> RelayerClient<'a, T> {
             deadline: rescue.deadline,
             signature: &rescue.signature,
         };
-        self.send("/v1/reverse/rescue", &body, ticket, |_: &Sent| Ok(()))
-            .await
+        self.send(path, &body, ticket, |_: &Sent| Ok(())).await
     }
 
     /// `POST /v1/deposits/shield`: a kept deposit, as it was signed.

@@ -216,6 +216,45 @@ Future<ApiForwardRecord> privateUsdForwardAbandon({
   index: index,
 );
 
+/// The account's paid conversions whose payouts Railgun's screening sent
+/// back to their vaults, each holding more than the relayer's fee. A chain
+/// read only (every paid record's vault in one call); no key and no lock.
+/// Empty when the wallet never converted.
+Future<List<ApiForwardReturnedPayout>> privateUsdForwardReturnedPayouts({
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required String ethRpcUrl,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdForwardReturnedPayouts(
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  ethRpcUrl: ethRpcUrl,
+);
+
+/// "Recover payout": signs a rescue with a fresh nonce and deadline, keeps
+/// it, and asks the relayer to shield the returned payout again into this
+/// account's note. The record stays `Paid`. Nothing happens when the vault
+/// holds no more than the fee (check `private_usd_forward_returned_payouts`
+/// again).
+Future<ApiForwardRecord> privateUsdForwardRescue({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String storeDir,
+  required List<int> mnemonicBytes,
+  required String ethRpcUrl,
+  required int index,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdForwardRescue(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  storeDir: storeDir,
+  mnemonicBytes: mnemonicBytes,
+  ethRpcUrl: ethRpcUrl,
+  index: index,
+);
+
 /// The account's forward conversions: the active one first, then the rest,
 /// newest first.
 Future<List<ApiForwardRecord>> privateUsdForwardRecords({
@@ -1478,6 +1517,36 @@ class ApiForwardRecord {
           refundCause == other.refundCause &&
           nothingSentCause == other.nothingSentCause &&
           endedAt == other.endedAt;
+}
+
+/// A paid conversion whose payout Railgun's screening sent back to its
+/// vault, which holds more than the relayer's fee: "Recover" is offered.
+class ApiForwardReturnedPayout {
+  final int index;
+
+  /// What the vault holds, token base units.
+  final String held;
+
+  /// The relayer's fee a rescue pays, token base units.
+  final String fee;
+
+  const ApiForwardReturnedPayout({
+    required this.index,
+    required this.held,
+    required this.fee,
+  });
+
+  @override
+  int get hashCode => index.hashCode ^ held.hashCode ^ fee.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiForwardReturnedPayout &&
+          runtimeType == other.runtimeType &&
+          index == other.index &&
+          held == other.held &&
+          fee == other.fee;
 }
 
 enum ApiForwardWait {

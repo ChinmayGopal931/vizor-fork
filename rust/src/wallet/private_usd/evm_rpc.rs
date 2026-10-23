@@ -36,7 +36,9 @@ use super::abi::{
     self, address_of_word, address_word, bool_word, call_data, exact_word, hex0x, keccak,
     u128_word, u64_word, uint_word, words, Call, WORD,
 };
-use super::deployment::{Deployment, DepositsPin, MAX_LOGS_BODY, MAX_SERVICE_BODY, QUICK_TIMEOUT};
+use super::deployment::{
+    Deployment, DepositsPin, MAX_LOGS_BODY, MAX_SERVICE_BODY, MULTICALL3, QUICK_TIMEOUT,
+};
 use super::transport::HttpTransport;
 use super::{fail, ErrorCode, PrivateUsdError, Result};
 use crate::wallet::routed_http::RoutedRequest;
@@ -179,6 +181,9 @@ pub(crate) trait ChainReader {
     async fn used_before(&self, id: &[u8; 32], key: &[u8; 32]) -> Result<bool>;
     async fn reverse_state(&self, id: &[u8; 32], terms: &Terms) -> Result<ReverseChainState>;
     async fn vault_balance(&self, id: &[u8; 32]) -> Result<u128>;
+    /// What each swap's vault (`vaultOf`) holds of the token, in `ids`'
+    /// order: Railgun sends a payout its screening refused back there.
+    async fn swap_vault_balances(&self, ids: &[[u8; 32]]) -> Result<Vec<u128>>;
     async fn rescue_nonce(&self, id: &[u8; 32]) -> Result<u64>;
     /// Whether Railgun's proxy takes the swap token. Any revert means paused,
     /// so closed.
@@ -693,6 +698,38 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
             )
             .await?;
         u128_word(&words(&balance, 1)?[0])
+    }
+
+    async fn swap_vault_balances(&self, ids: &[[u8; 32]]) -> Result<Vec<u128>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let contract = self.windows_contract().await?;
+        let vault_calls: Vec<Call> = ids
+            .iter()
+            .map(|id| Call {
+                to: contract,
+                data: call_data(VAULT_OF, &[*id]),
+            })
+            .collect();
+        let vaults = self
+            .aggregate(&MULTICALL3, &vault_calls)
+            .await?
+            .iter()
+            .map(|answer| address_of_word(&exact_word(answer)?))
+            .collect::<Result<Vec<_>>>()?;
+        let balance_calls: Vec<Call> = vaults
+            .iter()
+            .map(|vault| Call {
+                to: self.pins.token,
+                data: call_data(BALANCE_OF, &[address_word(vault)]),
+            })
+            .collect();
+        self.aggregate(&MULTICALL3, &balance_calls)
+            .await?
+            .iter()
+            .map(|answer| u128_word(&exact_word(answer)?))
+            .collect()
     }
 
     async fn rescue_nonce(&self, id: &[u8; 32]) -> Result<u64> {

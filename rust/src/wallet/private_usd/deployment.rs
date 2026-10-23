@@ -176,7 +176,7 @@ const MAINNET_USDC: [u8; 20] = address("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB
 /// version `2`, 6 decimals, with EIP-3009 for deposits.
 const SEPOLIA_TEST_USD: [u8; 20] = address("0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c");
 /// Multicall3, at its canonical address on every chain.
-const MULTICALL3: [u8; 20] = address("0xcA11bde05977b3631167028862bE2a173976CA11");
+pub(crate) const MULTICALL3: [u8; 20] = address("0xcA11bde05977b3631167028862bE2a173976CA11");
 /// Circle's test USDC, the one Railgun accepts on Sepolia.
 const SEPOLIA_USDC: [u8; 20] = address("0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238");
 

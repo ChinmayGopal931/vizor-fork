@@ -1,8 +1,9 @@
 //! `swaps.db`: the swap-index counter, swap records, active pointers, the
 //! joint-account index, the Railgun send log, and since schema 2 the deposits
 //! and each account's last deposit scan. Since schema 3 records follow the
-//! windows contract, and since schema 4 a forward record may hand its claim
-//! to the relayer.
+//! windows contract, since schema 4 a forward record may hand its claim to
+//! the relayer, and since schema 5 it may rescue a payout Railgun sent back,
+//! so paid records are kept.
 //!
 //! A plain SQLite file in app-private storage, opened per call (WAL,
 //! `synchronous = FULL`, a busy timeout), migrated by `PRAGMA user_version`.
@@ -22,12 +23,13 @@ use super::{fail, ErrorCode, PrivateUsdError, Result};
 
 const FILE_NAME: &str = "swaps.db";
 /// 1: swaps, the send log and the joint accounts. 2: deposits. 3: records of
-/// the windows contract. 4: claims handed to the relayer. A build refuses a
-/// store newer than itself, never resetting it.
-const SCHEMA_VERSION: i32 = 4;
+/// the windows contract. 4: claims handed to the relayer. 5: rescues of
+/// returned payouts, and paid forward records kept for them. A build refuses
+/// a store newer than itself, never resetting it.
+const SCHEMA_VERSION: i32 = 5;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
-/// Finished records kept per direction. Reverse `REFUNDED` ones are kept
-/// beyond it: a rescue may still be possible.
+/// Finished records kept per direction. Reverse `REFUNDED` and forward
+/// `PAID` ones are kept beyond it: a rescue may still be possible.
 const MAX_HISTORY: u32 = 100;
 /// Confirmed sends kept per account; unconfirmed ones are never trimmed.
 const MAX_CONFIRMED_SENDS: u32 = 100;
@@ -221,9 +223,9 @@ impl SwapStore {
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
-            // 1 → 2: the deposits tables join. 2 → 3 and 3 → 4 change no
-            // table.
-            1..=3 => {
+            // 1 → 2: the deposits tables join. 2 → 3, 3 → 4 and 4 → 5
+            // change no table.
+            1..=4 => {
                 if version == 1 {
                     tx.execute_batch(SCHEMA_V2).map_err(sql)?;
                 }
@@ -375,17 +377,20 @@ impl SwapStore {
         )
         .map_err(sql)?;
         // Finished records beyond the newest MAX_HISTORY go, never the active
-        // one, an unfinished one or a refunded reverse swap.
+        // one, an unfinished one, a refunded reverse swap or a paid forward
+        // one: a payout Railgun sends back is rescued from its record.
         tx.execute(
             "DELETE FROM swaps
              WHERE account_uuid = ?1 AND direction = ?2 AND finished = 1
                AND NOT (direction = 'reverse' AND phase = 'REFUNDED')
+               AND NOT (direction = 'forward' AND phase = 'PAID')
                AND swap_index NOT IN (SELECT swap_index FROM active
                                       WHERE account_uuid = ?1 AND direction = ?2)
                AND swap_index NOT IN (
                  SELECT swap_index FROM swaps
                  WHERE account_uuid = ?1 AND direction = ?2 AND finished = 1
                    AND NOT (direction = 'reverse' AND phase = 'REFUNDED')
+                   AND NOT (direction = 'forward' AND phase = 'PAID')
                  ORDER BY swap_index DESC LIMIT ?3)",
             params![account, direction, MAX_HISTORY],
         )
@@ -896,6 +901,18 @@ mod tests {
                 r#"{head},"depositAttempted":true,"maxTotalZat":212021,{deposit},{payout},"relayerClaims":true,"claimHold":"held","t0":1790002100,"t1":1790002400,"ticket":"{}"}}"#,
                 ticket()
             ),
+            format!(
+                r#"{head},"depositAttempted":true,"outcome":{{"type":"paid"}},"finishedAt":1790003000,"payoutTx":"{}","maxTotalZat":212021,{deposit},{payout},"claimPosted":true,"rescue":{{"swapId":"{}","note":{{"npk":"{}","encryptedBundle":["{}","{}","{}"],"shieldKey":"{}"}},"fee":"20000","nonce":7,"deadline":1790003200,"signature":"{}"}},"t0":1790002100,"t1":1790002400,"ticket":"{}"}}"#,
+                hex(32, 0xa1),
+                hex(32, 0x5c),
+                hex(32, 0x11),
+                hex(32, 0x12),
+                hex(32, 0x13),
+                hex(32, 0x14),
+                hex(32, 0x15),
+                hex(65, 0x17),
+                ticket()
+            ),
         ]
     }
 
@@ -1019,6 +1036,37 @@ mod tests {
         assert_eq!(store.unfinished_count(ACCOUNT).unwrap(), 1);
     }
 
+    /// Finished records beyond the newest `MAX_HISTORY` go, but never a paid
+    /// forward swap: a payout Railgun sends back is rescued from its record.
+    #[test]
+    fn paid_forward_records_outlive_the_history_limit() {
+        let states = forward_states();
+        let mut paid = forward(&states[3]);
+        paid.index = 0;
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SwapStore::open(dir.path()).unwrap();
+        store
+            .save(ACCOUNT, &StoredRecord::Forward(Box::new(paid.clone())))
+            .unwrap();
+        for index in 1..=MAX_HISTORY + 1 {
+            let mut over = forward(&states[5]);
+            over.index = index;
+            store
+                .save(ACCOUNT, &StoredRecord::Forward(Box::new(over)))
+                .unwrap();
+        }
+        let kept: Vec<u32> = store
+            .history(ACCOUNT, Direction::Forward)
+            .unwrap()
+            .iter()
+            .map(StoredRecord::index)
+            .collect();
+        assert_eq!(kept.len() as u32, MAX_HISTORY + 1);
+        assert!(kept.contains(&0), "the paid record is kept");
+        assert!(!kept.contains(&1), "the oldest unpaid one went");
+        assert!(kept.contains(&2));
+    }
+
     /// Records read only as this build writes them, and every fixture reads
     /// and writes back unchanged; anything else is an error, never a reset.
     #[test]
@@ -1074,12 +1122,12 @@ mod tests {
         assert_eq!(store.take_index(ACCOUNT).unwrap(), next + 1);
     }
 
-    /// A store schema 1 or 3 wrote opens at schema 4: the deposits tables
+    /// A store schema 1, 3 or 4 wrote opens at schema 5: the deposits tables
     /// join schema 1's, and every record, the counter, the active pointer and
     /// the send log stay as they were.
     #[test]
     fn an_older_store_migrates_keeping_its_records() {
-        for version in [1, 3] {
+        for version in [1, 3, 4] {
             older_store_migrates_keeping_its_records(version);
         }
     }
@@ -1124,7 +1172,7 @@ mod tests {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
         assert_eq!(version, SCHEMA_VERSION);
-        assert_eq!(SCHEMA_VERSION, 4);
+        assert_eq!(SCHEMA_VERSION, 5);
         assert_eq!(
             store.active(ACCOUNT, Direction::Forward).unwrap(),
             Some(StoredRecord::Forward(Box::new(forward(&json))))
