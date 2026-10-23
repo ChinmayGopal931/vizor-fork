@@ -206,7 +206,7 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   (`NeonScrambleText`). Tapping the sign opens the full chart at
   `/portfolio-chart` (`MobilePortfolioChartScreen`), with the holdings
   under it (`MobileHoldingsPanel`: the shielded holdings, Ironwood,
-  Orchard and Sapling ZEC and Private USD "shielded on Ethereum", then
+  Orchard and Sapling ZEC and Shielded USD "on Ethereum", then
   their total, in dollars at Home's price once Private USD is in it, then
   the transparent ZEC, each with what is pending); a hidden chart (off, or
   no history) leaves the sign inert. The
@@ -298,7 +298,9 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   that light red under the finger. Private USD calls a conversion a bridge
   in every user-facing string (owner, 2026-10-19: "Bridge", "Bridging",
   "Bridge progress", "Bridged to ZEC", "Bridged to 0zkUSDC"); code, keys
-  and routes keep `convert`. Private USD's convert screens put red
+  and routes keep `convert`. It calls itself Shielded USD, and what it
+  holds the shielded balance (owner, 2026-10-22: "Shielded USD", "Sent",
+  "Received", "Shielding…"); code, keys and routes keep `privateUsd`. Private USD's convert screens put red
   captions on their panels and a direction switch between them that keeps
   its place (dimmed while unavailable, its edge breathing while a quote is
   on its way); the estimate churns as cipher (`NeonCipherChurn`) until the
@@ -1452,11 +1454,15 @@ Code:
 - Background cancels the Rust step and stops polling, but leaves the
   Railgun page open.
 - Lock cancels the step, closes the page and drops Dart-held secrets.
-- Screen-off means background, so the screen stays on while a
-  conversion's progress shows with a key step to come (not once the relayer
-  holds the claim), and through a Railgun first sync while unlocked
+- Screen-off means background, so while unlocked the screen stays on
+  through a bridge with a key step to come, whichever screen shows (not
+  once the relayer holds the claim), and through a Railgun first sync
   (`privateUsdKeepAwakeProvider`, through `SyncKeepAwakeNativeHost`'s one
-  native flag, foreground only).
+  native flag, foreground only). A bridge's progress says so in a card that
+  slides in while the bridge needs Veylor (`PrivateUsdKeepOpenCard`, either
+  direction; a ZEC → USD bridge the relayer is to claim says instead to stay
+  until its ZEC is sent), with "Keep screen on": on by default, and off lets
+  that bridge's screen sleep (`privateUsdScreenMaySleepProvider`, in memory).
 - On a USD → ZEC conversion the phone buzzes when "Authorize settlement" is
   first offered (the user's turn), and again two minutes before it closes if
   still unauthorized, once when the two fall together: it holds, then fades
@@ -1495,11 +1501,13 @@ calls `deleteWallet`. A failure leaves the wallet until a reset.
 at every moment one side at most may reveal its share, by the clock and the
 swap's stage; there are no locks. Testnet pins
 `0x459b0a69e0f736666b66a3ffe0fc17c11f05980d` (`MIN_WINDOW` 1800 s,
-`LATE_WINDOW` 3600 s, deployed at block 11958709). Mainnet pins none:
-zecSwap's mainnet still runs the lock contract, so quotes and conversions are
-refused there (`ApiDeployment.bridgeAvailable` is false) until a windows
-contract is deployed; the balance, deposits, send and withdraw work. The
-reveal rules are `swap::claim_window`, `swap::may_sign_ready` and
+`LATE_WINDOW` 3600 s, deployed at block 11958709). Mainnet pins
+`0xeB3A00bcB6c9fF626fE57a5dBbDCf01730e7898f` (`MIN_WINDOW` 3600 s,
+`LATE_WINDOW` 86400 s, deployed at block 26250774 on 2026-10-22), where the
+relayer sends claims and refunds, and the maker its reveals, through
+Flashbots Protect. A network without one would refuse quotes and
+conversions (`ApiDeployment.bridgeAvailable` false) and keep the balance,
+deposits, send and withdraw. The reveal rules are `swap::claim_window`, `swap::may_sign_ready` and
 `swap::may_refund`, held to the vectors of zecSwap's port oracle
 (`rust/src/wallet/private_usd/tests/windows_vectors.json`).
 

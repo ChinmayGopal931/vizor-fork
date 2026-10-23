@@ -1651,16 +1651,6 @@ async fn services_naming_other_windows_are_refused() {
     assert!(h.quote().await.is_ok());
 }
 
-/// Mainnet pins no windows contract: no bridge is quoted there, and nothing
-/// is asked of its maker or relayer.
-#[tokio::test]
-async fn mainnet_takes_no_bridge() {
-    let h = Harness::on(super::super::PrivateUsdNetwork::Mainnet);
-    assert_eq!(code(h.quote().await), ErrorCode::Unavailable);
-    assert_eq!(code(h.reverse_quote().await), ErrorCode::Unavailable);
-    assert!(h.paths().is_empty());
-}
-
 // ---- one driver step per account ----
 
 /// An advance while an accept is in flight gets `Busy`; the accept's `t0`

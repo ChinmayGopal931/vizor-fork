@@ -45,8 +45,8 @@ class PrivateUsdUnfinishedConversionsException implements Exception {
 
   @override
   String toString() => count == null
-      ? "Couldn't check for private USD conversions. Confirm to continue."
-      : '$count unfinished private USD conversion(s). Confirm to continue.';
+      ? "Couldn't check for shielded USD bridges. Confirm to continue."
+      : '$count unfinished shielded USD bridge(s). Confirm to continue.';
 }
 
 /// The Private USD work an account deletion or a wallet reset drains first:

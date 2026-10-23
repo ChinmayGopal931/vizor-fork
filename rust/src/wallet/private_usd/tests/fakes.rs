@@ -1262,13 +1262,6 @@ impl Harness {
         Self::with(other.dir.clone(), &[8; 64])
     }
 
-    /// An account on `network`'s deployment, over the same fakes.
-    pub(super) fn on(network: PrivateUsdNetwork) -> Self {
-        let mut harness = Self::new();
-        harness.keys = SwapKeyContext::for_tests(&[7; 64], network, 0);
-        harness
-    }
-
     fn with(dir: Rc<tempfile::TempDir>, seed: &[u8]) -> Self {
         let world = World::new();
         Self {

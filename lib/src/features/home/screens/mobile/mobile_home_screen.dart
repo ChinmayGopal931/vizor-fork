@@ -814,7 +814,8 @@ class _HomeContent extends ConsumerStatefulWidget {
   ConsumerState<_HomeContent> createState() => _HomeContentState();
 }
 
-class _HomeContentState extends ConsumerState<_HomeContent> {
+class _HomeContentState extends ConsumerState<_HomeContent>
+    with PrivateUsdActivityDetailsState {
   void _expectReviewVisit(String path) {
     expectAppReviewVisit(ref, path);
   }
@@ -1057,7 +1058,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
         privacyModeEnabled: privacyModeEnabled,
         dateOnlyTimestamp: true,
         onOpenConversion: (path) => _pushUsedScreen(path.location),
-        onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
+        details: privateUsdActivityDetails(),
         onOpenRefunds: () => _pushUsedScreen('/private-usd/refunds'),
       ),
     ]..sort(compareActivityEntries);

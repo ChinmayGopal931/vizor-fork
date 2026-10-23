@@ -21,8 +21,8 @@ import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'support/fake_private_usd_backend.dart';
 
 // iOS progress VI-14 and VI-18: the screen stays on through a Railgun first
-// sync while the wallet is unlocked; `SyncKeepAwakeNativeHost` lets go in the
-// background (its own test).
+// sync while the wallet is unlocked, as through a bridge that needs Veylor;
+// `SyncKeepAwakeNativeHost` lets go in the background (its own test).
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -125,33 +125,55 @@ void main() {
     page.refreshing!.complete(_refreshJson);
   });
 
-  test("a conversion's progress still keeps the screen on", () {
+  test('a bridge that needs Veylor keeps the screen on, whichever screen '
+      'shows', () {
     final container = containerWith();
-    const key = PrivateUsdRecordKey(
-      accountUuid: _account,
-      direction: PrivateUsdDirection.forward,
-      index: 1,
-    );
 
-    container.read(privateUsdProgressVisibleProvider.notifier).show(key);
-    expect(keepAwake(container), isFalse, reason: 'no key step to come');
-    container.read(privateUsdUnfinishedProvider.notifier).publish({key});
+    expect(keepAwake(container), isFalse, reason: 'no bridge under way');
+    container.read(privateUsdUnfinishedProvider.notifier).publish({_forward});
+    expect(keepAwake(container), isTrue);
+
+    container.read(privateUsdUnfinishedProvider.notifier).publish({});
+    expect(keepAwake(container), isFalse, reason: 'it ended');
+  });
+
+  test('a bridge the user lets sleep keeps nothing on; another still does', () {
+    final container = containerWith();
+    final screen = container.read(privateUsdScreenMaySleepProvider.notifier);
+    container.read(privateUsdUnfinishedProvider.notifier).publish({_forward});
+
+    screen.keepScreenOn(_forward, on: false);
+    expect(keepAwake(container), isFalse);
+
+    // A second account's bridge, which the engine runs too.
+    container.read(privateUsdUnfinishedProvider.notifier).publish({
+      _forward,
+      _reverse,
+    });
+    expect(keepAwake(container), isTrue);
+
+    screen.keepScreenOn(_reverse, on: false);
+    expect(keepAwake(container), isFalse);
+    screen.keepScreenOn(_forward, on: true);
     expect(keepAwake(container), isTrue);
   });
 
-  test('once the relayer holds the claim, the progress keeps nothing on', () {
+  test("a lock lets go of a bridge's screen", () {
     final container = containerWith();
-    const key = PrivateUsdRecordKey(
-      accountUuid: _account,
-      direction: PrivateUsdDirection.forward,
-      index: 1,
-    );
+    container.read(privateUsdUnfinishedProvider.notifier).publish({_forward});
+    expect(keepAwake(container), isTrue);
+
+    security.lockNow();
+    expect(keepAwake(container), isFalse);
+  });
+
+  test('once the relayer holds the claim, the bridge keeps nothing on', () {
+    final container = containerWith();
     void publish(PrivateUsdConversionStatus status) => container
         .read(privateUsdConversionsProvider.notifier)
-        .publish({key: status});
+        .publish({_forward: status});
 
-    container.read(privateUsdProgressVisibleProvider.notifier).show(key);
-    container.read(privateUsdUnfinishedProvider.notifier).publish({key});
+    container.read(privateUsdUnfinishedProvider.notifier).publish({_forward});
     publish(
       PrivateUsdConversionStatus(
         record: forwardRecord(index: 1),
@@ -184,6 +206,18 @@ void main() {
 }
 
 const _account = 'account';
+
+const _forward = PrivateUsdRecordKey(
+  accountUuid: _account,
+  direction: PrivateUsdDirection.forward,
+  index: 1,
+);
+
+const _reverse = PrivateUsdRecordKey(
+  accountUuid: 'other account',
+  direction: PrivateUsdDirection.reverse,
+  index: 2,
+);
 
 const _balancesJson =
     '{"Spendable":[{"token":"0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c",'

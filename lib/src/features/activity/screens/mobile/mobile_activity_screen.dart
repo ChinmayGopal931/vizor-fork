@@ -49,7 +49,8 @@ class MobileActivityScreen extends ConsumerStatefulWidget {
       _MobileActivityScreenState();
 }
 
-class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen> {
+class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen>
+    with PrivateUsdActivityDetailsState {
   List<rust_sync.TransactionInfo>? _transactions;
   String? _transactionsAccountUuid;
   (int?, int?, DateTime?)? _transactionsSnapshot;
@@ -327,7 +328,7 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen> {
         activity: privateUsd,
         privacyModeEnabled: privacyModeEnabled,
         onOpenConversion: (path) => context.push(path.location),
-        onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
+        details: privateUsdActivityDetails(),
         onOpenRefunds: () => context.push('/private-usd/refunds'),
       ),
     ];

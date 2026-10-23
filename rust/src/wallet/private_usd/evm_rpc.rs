@@ -1237,19 +1237,6 @@ mod tests {
         assert_eq!(rpc.swap(&[1; 32]).await.unwrap(), None);
         assert_eq!(rpc.swap(&[1; 32]).await.unwrap(), None);
         assert_eq!(windows.sent.borrow().len(), 3 + 2);
-
-        // Mainnet pins no swap contract: nothing is asked of any.
-        let mainnet = node(min, late, None, open);
-        let rpc = EvmRpc::new(
-            &mainnet,
-            deployment::deployment(PrivateUsdNetwork::Mainnet),
-            "https://rpc.invalid",
-        );
-        assert_eq!(
-            rpc.swap(&[1; 32]).await.unwrap_err().code,
-            ErrorCode::Unavailable
-        );
-        assert!(mainnet.sent.borrow().is_empty());
     }
 
     /// A reveal's read takes the swap at the newest block's hash, with that

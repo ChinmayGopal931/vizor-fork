@@ -140,17 +140,26 @@ fn the_windows_contracts_reads() {
         "0x1535ab411323bb41ad642ccf14068bbd78818ed38dd9b4421c927cc6eeb07e2d"
     );
 
-    // Testnet pins the windows contract deployed at block 11958709; mainnet
-    // pins none until zecSwap deploys one there.
-    let testnet = deployment::deployment(PrivateUsdNetwork::Testnet)
-        .swap_contract()
-        .unwrap();
-    assert_eq!(
-        hex0x(&testnet.address),
-        "0x459b0a69e0f736666b66a3ffe0fc17c11f05980d"
-    );
-    assert_eq!((testnet.min_window, testnet.late_window), (1_800, 3_600));
-    assert!(deployment::deployment(PrivateUsdNetwork::Mainnet)
-        .swaps
-        .is_none());
+    // Each network pins the windows contract zecSwap deployed there:
+    // testnet's at block 11958709, mainnet's at block 26250774.
+    for (network, address, windows) in [
+        (
+            PrivateUsdNetwork::Testnet,
+            "0x459b0a69e0f736666b66a3ffe0fc17c11f05980d",
+            (1_800, 3_600),
+        ),
+        (
+            PrivateUsdNetwork::Mainnet,
+            "0xeb3a00bcb6c9ff626fe57a5dbbdcf01730e7898f",
+            (3_600, 86_400),
+        ),
+    ] {
+        let swaps = deployment::deployment(network).swap_contract().unwrap();
+        assert_eq!(hex0x(&swaps.address), address, "{network:?}");
+        assert_eq!(
+            (swaps.min_window, swaps.late_window),
+            windows,
+            "{network:?}"
+        );
+    }
 }

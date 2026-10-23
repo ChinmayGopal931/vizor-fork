@@ -11,6 +11,7 @@ import {
   deleteWalletByID,
   generatePOIsForWallet,
   getEngine,
+  getFallbackProviderForNetwork,
   getLatestRailgunTxidData,
   getProver,
   getSerializedERC20Balances,
@@ -33,7 +34,7 @@ import { groth16 } from 'snarkjs';
 import { setArtifactProgressListener } from './artifact-mirror.js';
 import { artifactStore } from './artifacts.js';
 import { badRequest } from './errors.js';
-import { receivedSends } from './received.js';
+import { hasUndatedReceipts, receivedSends } from './received.js';
 import { screeningActivity } from './screening-activity.js';
 import { catchUpTxids, txidCompleteHold } from './txid-catch-up.js';
 import { walletNamespaces } from './wallet-namespaces.js';
@@ -300,15 +301,28 @@ async function scanNotesNow(walletId) {
 }
 
 /**
- * The private sends this wallet received (`receivedSends`), from the notes its scans already decrypted: nothing is
- * fetched. `null` when the history can't be read: the balances stand without it.
+ * The private sends this wallet received (`receivedSends`), from the notes its scans already decrypted. Only where
+ * the engine has no time for one is the newest block read, to date it from. `null` when the history can't be read:
+ * the balances stand without it.
  */
 async function received(emit) {
   try {
-    return receivedSends(await getWalletTransactionHistory(chain(), session().walletId, undefined));
+    const history = await getWalletTransactionHistory(chain(), session().walletId, undefined);
+    return receivedSends(history, hasUndatedReceipts(history) ? await newestBlock(emit) : undefined);
   } catch (error) {
     emit('log', `received sends not read: ${error?.message ?? error}`);
     return null;
+  }
+}
+
+/** The newest block's number and time; undefined when it can't be read, and the sends it would date go undated. */
+async function newestBlock(emit) {
+  try {
+    const block = await getFallbackProviderForNetwork(network).getBlock('latest');
+    return block ? { blockNumber: block.number, timestamp: block.timestamp } : undefined;
+  } catch (error) {
+    emit('log', `newest block not read: ${error?.message ?? error}`);
+    return undefined;
   }
 }
 

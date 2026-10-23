@@ -7,6 +7,7 @@ import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/features/activity/models/activity_row_data.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
+import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_activity_details.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_activity_rows.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
@@ -34,16 +35,19 @@ void main() {
     return built;
   }
 
-  testWidgets('a screened send reads received, in, from a hidden sender', (
-    tester,
-  ) async {
-    var opened = 0;
+  testWidgets('a screened send reads received, in, from a hidden sender, and '
+      'unfolds into its details', (tester) async {
+    final toggled = <String>[];
     final received = await row(
       tester,
       (context) => buildPrivateUsdReceivedActivityRow(
         context: context,
         receipt: previewPrivateUsdReceipt(),
-        onOpenTransaction: () => opened++,
+        details: PrivateUsdActivityDetailsConfig(
+          open: const {},
+          onToggle: toggled.add,
+          onOpenTransaction: (_, _) {},
+        ),
       ),
     );
 
@@ -51,8 +55,9 @@ void main() {
     expect(received.subtitle, PrivateUsdCopy.activitySenderHidden);
     expect(received.amountText, endsWith(r'+$25.00'));
     expect(received.statusIconName, isNull);
+    expect(received.details, isNotNull);
     received.onTap!();
-    expect(opened, 1);
+    expect(toggled, [received.stableId]);
   });
 
   testWidgets('one still in screening says when it is spendable, with a '

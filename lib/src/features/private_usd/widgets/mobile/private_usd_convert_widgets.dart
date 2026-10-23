@@ -26,8 +26,8 @@ import 'private_usd_logo.dart';
 /// The side of an asset's logo beside a panel's caption.
 const _captionLogoSize = 20.0;
 
-/// A panel's caption, the asset it holds, as a red HUD caption after the
-/// asset's logo.
+/// A panel's caption as a red HUD caption: the asset it holds, after the
+/// asset's logo, or what the panel is about.
 class PrivateUsdPanelCaption extends StatelessWidget {
   const PrivateUsdPanelCaption(this.text, {this.logo, super.key});
 

@@ -33,7 +33,7 @@ const _sheetRefresh = Duration(seconds: 15);
 /// The Receive sheet's two ways in, as ZEC's Receive has its pools.
 enum PrivateUsdReceiveKind {
   /// Public USDC from an exchange or any wallet, to the deposit address,
-  /// made private on its own.
+  /// shielded on its own.
   usdc,
 
   /// 0zkUSDC from another Railgun wallet, to the account's 0zk address.
@@ -528,12 +528,15 @@ class PrivateUsdDepositLineText extends StatelessWidget {
         PrivateUsdCopy.depositWaitingLine(usd),
         colors.text.secondary,
       ),
-      PrivateUsdDepositPhase.makingPrivate => (
-        PrivateUsdCopy.depositMakingPrivateLine(usd),
+      PrivateUsdDepositPhase.shielding => (
+        PrivateUsdCopy.depositShieldingLine(usd),
         colors.text.accent,
       ),
-      PrivateUsdDepositPhase.private => (
-        PrivateUsdCopy.depositPrivateLine(usd, PrivateUsdCopy.about(screening)),
+      PrivateUsdDepositPhase.shielded => (
+        PrivateUsdCopy.depositShieldedLine(
+          usd,
+          PrivateUsdCopy.about(screening),
+        ),
         colors.text.positiveStrong,
       ),
       PrivateUsdDepositPhase.notShielding => (

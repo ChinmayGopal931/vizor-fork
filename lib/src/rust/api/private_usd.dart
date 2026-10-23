@@ -1136,10 +1136,10 @@ enum ApiDepositState {
   /// `waiting`, "Waiting for the network").
   signed,
 
-  /// Posted, until it mines: "Making it private…".
+  /// Posted, until it mines: "Shielding…".
   sent,
 
-  /// Mined and believed: "Private, available in …".
+  /// Mined and believed: "Shielded, available in …".
   landed,
 
   /// Refused: the address shows as received but not shielding.

@@ -768,6 +768,7 @@ class ActivityFeedRowGroup extends StatelessWidget {
             ],
           ),
         ),
+        ?row.details,
       ],
     );
   }

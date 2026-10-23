@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +8,9 @@ import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_loading_icon.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../../core/widgets/mobile/mobile_warning_notice.dart';
-import '../../../../providers/account_provider.dart';
+import '../../../../core/widgets/mobile/neon_motion.dart';
+import '../../../settings/widgets/mobile/mobile_tor_control.dart'
+    show MobilePrivacyToggle;
 import '../../../swap/domain/swap_asset.dart';
 import '../../../swap/models/swap_activity_status_mapper.dart';
 import '../../../swap/models/swap_status_presentation.dart';
@@ -24,6 +24,7 @@ import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_keep_awake_provider.dart';
 import '../../providers/private_usd_reverse_conversion_provider.dart';
 import 'private_usd_bridged_hero.dart';
+import 'private_usd_convert_widgets.dart';
 import 'private_usd_flow_widgets.dart';
 import 'private_usd_logo.dart';
 
@@ -52,6 +53,8 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
     this.detailsExpanded = false,
     this.onTabChanged,
     this.onToggleDetails,
+    this.keepScreenOn = true,
+    this.onKeepScreenOnChanged,
     super.key,
   });
 
@@ -77,6 +80,10 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
   final VoidCallback onCallOff;
   final VoidCallback onViewBalance;
   final VoidCallback onTryAgain;
+
+  /// The keep-open card's "Keep screen on".
+  final bool keepScreenOn;
+  final ValueChanged<bool>? onKeepScreenOnChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -120,6 +127,8 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
                   ),
               ],
               showsKeepOpen: presentation.showsKeepOpen,
+              keepScreenOn: keepScreenOn,
+              onKeepScreenOnChanged: onKeepScreenOnChanged,
               activeTab: activeTab,
               detailsExpanded: detailsExpanded,
               onTabChanged: onTabChanged,
@@ -164,6 +173,8 @@ class MobilePrivateUsdReverseConversionView extends StatelessWidget {
     this.detailsExpanded = false,
     this.onTabChanged,
     this.onToggleDetails,
+    this.keepScreenOn = true,
+    this.onKeepScreenOnChanged,
     super.key,
   });
 
@@ -189,6 +200,10 @@ class MobilePrivateUsdReverseConversionView extends StatelessWidget {
   final VoidCallback? onAction;
   final VoidCallback? onCallOff;
   final VoidCallback? onViewRefunds;
+
+  /// The keep-open card's "Keep screen on".
+  final bool keepScreenOn;
+  final ValueChanged<bool>? onKeepScreenOnChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -246,6 +261,8 @@ class MobilePrivateUsdReverseConversionView extends StatelessWidget {
               ],
               provingNote: presentation.provingNote,
               showsKeepOpen: presentation.showsKeepOpen,
+              keepScreenOn: keepScreenOn,
+              onKeepScreenOnChanged: onKeepScreenOnChanged,
               activeTab: activeTab,
               detailsExpanded: detailsExpanded,
               onTabChanged: onTabChanged,
@@ -268,7 +285,7 @@ class MobilePrivateUsdReverseConversionView extends StatelessWidget {
 
 /// A conversion's progress, both directions: the finished sign or the
 /// result, the note, the problem card, the direction's own [actions], the
-/// steps with their details, and the notes under them.
+/// keep-open card, the steps with their details, and the note under them.
 class PrivateUsdProgressBody extends StatelessWidget {
   const PrivateUsdProgressBody({
     required this.status,
@@ -285,6 +302,8 @@ class PrivateUsdProgressBody extends StatelessWidget {
     this.actions = const [],
     this.provingNote,
     this.showsKeepOpen = false,
+    this.keepScreenOn = true,
+    this.onKeepScreenOnChanged,
     this.activeTab = SwapStatusTab.progress,
     this.detailsExpanded = false,
     this.onTabChanged,
@@ -312,7 +331,11 @@ class PrivateUsdProgressBody extends StatelessWidget {
 
   /// Under the steps while the page proves a payment.
   final String? provingNote;
+
+  /// [PrivateUsdKeepOpenCard] slides in over the steps.
   final bool showsKeepOpen;
+  final bool keepScreenOn;
+  final ValueChanged<bool>? onKeepScreenOnChanged;
   final SwapStatusTab activeTab;
   final bool detailsExpanded;
   final ValueChanged<SwapStatusTab>? onTabChanged;
@@ -387,6 +410,16 @@ class PrivateUsdProgressBody extends StatelessWidget {
           const SizedBox(height: AppSpacing.s),
           action,
         ],
+        _Reveal(
+          visible: showsKeepOpen,
+          child: Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.s),
+            child: PrivateUsdKeepOpenCard(
+              keepScreenOn: keepScreenOn,
+              onKeepScreenOnChanged: onKeepScreenOnChanged ?? (_) {},
+            ),
+          ),
+        ),
         MobileSwapStatusContent(
           presentation: status,
           payHeaderRow: _headerRow(
@@ -410,14 +443,6 @@ class PrivateUsdProgressBody extends StatelessWidget {
           Text(
             provingNote,
             key: const ValueKey('mobile_private_usd_progress_proving'),
-            style: footnote,
-          ),
-        ],
-        if (showsKeepOpen) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            PrivateUsdCopy.convertBackgroundNote,
-            key: const ValueKey('mobile_private_usd_progress_keep_open'),
             style: footnote,
           ),
         ],
@@ -501,15 +526,171 @@ class PrivateUsdProblemCard extends StatelessWidget {
   }
 }
 
+/// The keep-open card slides in once the progress has been on screen a
+/// moment, as the user watches.
+const _keepOpenDelay = Duration(milliseconds: 500);
+const _keepOpenSlide = Duration(milliseconds: 300);
+
+/// While a bridge needs Veylor: why it has to stay open and online, and
+/// "Keep screen on", which holds the screen on, whichever screen shows,
+/// until the bridge no longer needs Veylor.
+class PrivateUsdKeepOpenCard extends StatelessWidget {
+  const PrivateUsdKeepOpenCard({
+    required this.keepScreenOn,
+    required this.onKeepScreenOnChanged,
+    super.key,
+  });
+
+  final bool keepScreenOn;
+  final ValueChanged<bool> onKeepScreenOnChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    void toggle() => onKeepScreenOnChanged(!keepScreenOn);
+    return MobileSurfaceCard(
+      key: const ValueKey('mobile_private_usd_progress_keep_open'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const PrivateUsdPanelCaption(PrivateUsdCopy.keepOpenTitle),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            PrivateUsdCopy.keepOpenBody,
+            style: AppTypography.bodySmall.copyWith(
+              color: colors.text.secondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Semantics(
+            button: true,
+            toggled: keepScreenOn,
+            label: PrivateUsdCopy.keepScreenOn,
+            onTap: toggle,
+            excludeSemantics: true,
+            child: GestureDetector(
+              key: const ValueKey('mobile_private_usd_keep_screen_on'),
+              behavior: HitTestBehavior.opaque,
+              onTap: toggle,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
+                child: Row(
+                  children: [
+                    AppIcon(
+                      AppIcons.day,
+                      size: AppIconSize.medium,
+                      color: colors.icon.accent,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        PrivateUsdCopy.keepScreenOn,
+                        style: AppTypography.labelLarge.copyWith(
+                          color: colors.text.accent,
+                        ),
+                      ),
+                    ),
+                    MobilePrivacyToggle(
+                      enabled: keepScreenOn,
+                      interactive: true,
+                      thumbKey: const ValueKey(
+                        'mobile_private_usd_keep_screen_on_thumb',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Unfolds [child] when [visible] turns on and folds it away when it turns
+/// off. Visible from the start, it unfolds after [_keepOpenDelay]; under
+/// reduced motion it simply shows.
+class _Reveal extends StatefulWidget {
+  const _Reveal({required this.visible, required this.child});
+
+  final bool visible;
+  final Widget child;
+
+  @override
+  State<_Reveal> createState() => _RevealState();
+}
+
+class _RevealState extends State<_Reveal>
+    with SingleTickerProviderStateMixin, NeonAppearMotion<_Reveal> {
+  late final AnimationController _controller = AnimationController(vsync: this);
+
+  @override
+  void onAppear() {
+    if (!widget.visible) return;
+    final total = _keepOpenDelay + _keepOpenSlide;
+    _controller.animateTo(
+      1,
+      duration: total,
+      curve: Interval(
+        _keepOpenDelay.inMilliseconds / total.inMilliseconds,
+        1,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+  }
+
+  @override
+  void onAppearReduced() {
+    if (widget.visible) _controller.value = 1;
+  }
+
+  @override
+  void didUpdateWidget(_Reveal oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.visible == oldWidget.visible) return;
+    final target = widget.visible ? 1.0 : 0.0;
+    if (NeonMotion.reduced(context)) {
+      _controller.value = target;
+      return;
+    }
+    _controller.animateTo(
+      target,
+      duration: _keepOpenSlide,
+      curve: widget.visible ? Curves.easeOutCubic : Curves.easeInCubic,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _controller,
+    child: widget.child,
+    builder: (context, child) {
+      final t = _controller.value;
+      if (t == 0) return const SizedBox.shrink();
+      // Slides down into the room it opens.
+      return ClipRect(
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          heightFactor: t,
+          child: Opacity(opacity: t, child: child),
+        ),
+      );
+    },
+  );
+}
+
 /// What both progress screens' states share: opening the progress resumes
-/// the engine and marks it visible, which keeps the screen awake through a
-/// key step; a bridge that finishes in view plays its sign.
+/// the engine, the keep-open card's "Keep screen on" follows the bridge's
+/// choice, and a bridge that finishes in view plays its sign.
 mixin PrivateUsdProgressScreenState<W extends ConsumerStatefulWidget>
     on ConsumerState<W> {
-  PrivateUsdRoutePath get path;
-
-  PrivateUsdRecordKey? _visible;
-  PrivateUsdProgressVisibleNotifier? _visibility;
   bool? _wasBridged;
 
   SwapStatusTab tab = SwapStatusTab.progress;
@@ -522,34 +703,19 @@ mixin PrivateUsdProgressScreenState<W extends ConsumerStatefulWidget>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final account = ref.read(accountProvider).value?.activeAccountUuid;
-      if (account == null) return;
-      final key = path.keyFor(account);
-      ref.read(privateUsdEngineProvider).start();
-      final visibility = ref.read(privateUsdProgressVisibleProvider.notifier);
-      visibility.show(key);
-      _visibility = visibility;
-      _visible = key;
+      if (mounted) ref.read(privateUsdEngineProvider).start();
     });
   }
 
-  @override
-  void dispose() {
-    final visibility = _visibility;
-    final key = _visible;
-    if (visibility != null && key != null) {
-      // After the frame: the keep-awake host listens to it.
-      scheduleMicrotask(() {
-        try {
-          visibility.hide(key);
-        } catch (_) {
-          // The container went first.
-        }
-      });
-    }
-    super.dispose();
-  }
+  /// Whether bridge [key] keeps the screen on while it needs Veylor: on
+  /// until the user turns it off.
+  bool keepsScreenOn(PrivateUsdRecordKey key) => !ref.watch(
+    privateUsdScreenMaySleepProvider.select((keys) => keys.contains(key)),
+  );
+
+  void keepScreenOn(PrivateUsdRecordKey key, {required bool on}) => ref
+      .read(privateUsdScreenMaySleepProvider.notifier)
+      .keepScreenOn(key, on: on);
 
   /// Follows whether the progress shows as bridged.
   void noteBridged(bool bridged) {

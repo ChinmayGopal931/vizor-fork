@@ -7,20 +7,41 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **Mainnet bridging (2026-10-22, D-145).** zecSwap moved mainnet to a
+  windows contract (`0xeB3A…898f`, block 26250774, `MIN_WINDOW` 3600 s,
+  `LATE_WINDOW` 86400 s), and the app pins it, so Bridge shows on mainnet.
+  Its relayer holds claims, as testnet's does. No swap has run on it yet.
+
+- **Activity details (2026-10-22, D-144).** A tap on a finished Private USD
+  row unfolds it in place into its details: from and to, amounts and fees,
+  status, times and a bridge's swap ID, with each transaction linked to
+  Railscan and Etherscan on the deployment's chain (Sepolia on testnet,
+  Ethereum on mainnet) or, for a Zcash one, the wallet's explorer. The
+  synced Railgun line no longer breaks beside the Activity heading. Not yet
+  run on a phone.
+
+- **Keep screen on (2026-10-22, D-143).** While a bridge needs Veylor, in
+  either direction, its progress shows a card that says so, with "Keep
+  screen on": on by default, it now holds the screen on through the whole
+  bridge, whichever screen shows, not only on its progress. Off lets that
+  bridge's screen sleep. A ZEC → USD bridge the relayer is to claim says
+  instead to stay until its ZEC is sent. Not yet run on a phone.
+
 - **Relayer claims (2026-10-21, D-142).** Right after a ZEC → USD bridge's
   deposit goes out, Veylor hands its claim to the pinned relayer
   (`/v1/claim/hold`), which sends it when the window opens, so the user can
   leave about a minute after tapping Bridge. A Settings toggle, on by
   default, chooses it per new bridge; with it off, bridges claim as before.
-  Built against fakes: the relayer's endpoint is being built in zecSwap and
-  is not deployed, and a relayer without it leaves the bridge to claim as
-  before. Before `t0` a ready now counts 2 blocks deep, not 12, held to
-  zecSwap's regenerated oracle. Not yet run on a phone.
+  Built against fakes; the testnet relayer has served the route since
+  2026-10-22 (zecSwap release `20261021-held-claims-47650c6`, its ready
+  depth 2 and its monitor counting held claims), and a relayer without it
+  leaves the bridge to claim as before. Before `t0` a ready now counts 2
+  blocks deep, not 12, held to zecSwap's regenerated oracle. Not yet run
+  on a phone.
 
 - **The windows contract (2026-10-20, D-137).** Testnet swaps settle on
-  zecSwap's windows contract, with no claim or refund locks. Mainnet
-  bridging is off until zecSwap deploys one there, so the app hides Bridge;
-  the balance, deposits, sends and withdrawals work. The app keeps no code
+  zecSwap's windows contract, with no claim or refund locks; mainnet's do
+  too since 2026-10-22 (D-145). The app keeps no code
   for the lock contract's bridges (D-139): a phone that holds some has its
   Private USD store cleared first. Not yet run on the A35.
 
@@ -2209,6 +2230,118 @@ M8 status (2026-10-14): the non-device parts are done.
     base as well; the mobile lane's Private USD, Settings and Figma tests
     456 passed (every mobile Figma scenario, the two new included). Not yet
     run on a phone.
+  - **The relayer's side (2026-10-22).** zecSwap PR #20 (held claims, and
+    its ready depth 12 → 2) is merged and runs on the testnet relayer as
+    release `20261021-held-claims-47650c6`, `[held_claims]` in its config.
+    `POST /relayer/v1/claim/hold` on the testnet gateway takes `/v1/claim`'s
+    body with the ticket and answers `{"held":true}`, a claimed swap's
+    `Sent`, or `400 rejected` (a refunded swap, a bad payout, a fee under
+    the relayer's); an empty body gets its `422`, not a `404`. The relayer
+    judges held claims on every block and sends one on a ready 2 blocks
+    deep before `t0`, from `t0`, or from `t1 + LATE_WINDOW`, at the fee it
+    was held with; a refunded swap's is dropped. Its monitor shows
+    `heldClaims {held, sent, dropped}`. Veylor's pinned crates
+    (`zecswap-core` and `zecswap-railgun` at `b18135c`) are untouched.
+    Testnet timing: `t0` 45 min after the open, `t1` an hour after `t0`;
+    the maker readies once the deposit has 2 Zcash confirmations.
+
+- **D-143 (owner, 2026-10-22): keep screen on, whichever screen shows.**
+  The line under a bridge's steps ("Keep Veylor open until this
+  finishes…") was easy to miss, and the screen stayed on, unasked, only
+  while the progress showed.
+  - **The card.** While a bridge needs Veylor (a key-using step to come, and
+    not the relayer's), its progress shows a card over the steps, in place
+    of that line: "Keep Veylor open", why, and "Keep screen on". It slides
+    in half a second after the progress opens, and folds away once the
+    bridge no longer needs Veylor (reduced motion: no slide). Both
+    directions. Before its deposit is out, a ZEC → USD bridge the relayer
+    is to claim shows the review's relayer note instead ("Keep Veylor open
+    for about a minute…"); the setting is the only sign of that before the
+    hand-over.
+  - **The toggle.** On by default, so the screen is never kept on less than
+    before. It holds the screen on while the wallet is unlocked and a bridge
+    needs Veylor, whichever screen shows
+    (`privateUsdBridgeKeepAwakeProvider`), through the native host's one
+    flag, which still lets go in the background. Off lets that bridge's
+    screen sleep until the app restarts (`privateUsdScreenMaySleepProvider`,
+    in memory); other bridges, another account's included, keep theirs.
+  - The progress screens no longer register as shown
+    (`privateUsdProgressVisibleProvider` is gone), nor do the presentations
+    carry the unused `keyStepPending`.
+  - Unit tests: the keep-awake provider (any screen, a bridge let sleep
+    beside one kept on, a lock, the relayer's hand-over), the card in both
+    directions (its slide in and out, the toggle, the relayer's first
+    minute), and two new Figma scenarios (`…-progress-screen-may-sleep`,
+    `…-progress-opening-relayer`). Not yet run on a phone.
+
+- **D-144 (owner, 2026-10-22): activity rows unfold into their details.**
+  A tap on a row opened its Ethereum transaction on Etherscan, and nothing
+  more.
+  - **The details.** A finished row (a send or withdrawal, a received send,
+    a deposit, an ended bridge either way) unfolds in place into what its
+    record already holds, nothing fetched for it: whom it went to or came
+    from (a hidden sender stays hidden), amounts and fees, status and
+    times, a bridge's swap ID, and why a refunded one ended. A shortened
+    address or ID copies whole on a tap, and privacy mode masks every
+    amount. A bridge under way still opens its progress, and a refunded
+    USD → ZEC one Refunds.
+  - **The links.** An Ethereum transaction opens on Railscan and Etherscan
+    at the prefixes the deployment pins (`railscanTxPrefix`,
+    `explorerTxPrefix`): `railscan.io/sepolia/tx/` and
+    `sepolia.etherscan.io` on testnet, `railscan.io/ethereum/tx/` and
+    `etherscan.io` on mainnet. A Zcash one opens on the wallet's explorer
+    (Settings), in display byte order.
+  - Rows unfold per screen (`PrivateUsdActivityDetailsState`, the screen's
+    own state), and another account's start folded: row ids repeat across
+    accounts.
+  - **The sync line.** Once synced, the Railgun line broke beside the
+    Activity heading, whose whole width was backed in black; now only the
+    caption and the Refunds button are.
+  - Unit tests: each kind's lines, the explorers per network, the unfolding
+    (tap and fold, reduced motion, copy, links, per screen and per account)
+    and a Figma scenario (`mobile-private-usd-activity-details`). Not yet
+    run on a phone.
+
+- **D-145 (owner, 2026-10-22): mainnet bridges on its windows contract.**
+  zecSwap deployed the windows contract on mainnet at 21:21 UTC
+  (`0xeB3A00bcB6c9fF626fE57a5dBbDCf01730e7898f`, block 26250774) and
+  retired the lock contract, now empty. The mainnet maker and relayer run
+  testnet's builds (`98db2b6`, `47650c6`) and name it.
+  - **Checked before pinning.** Its code first appears at block 26250774;
+    it answers `MIN_WINDOW()` 3600 and `LATE_WINDOW()` 86400 and reverts
+    `LOCK_DURATION()`. The maker's `/v1/info` and the relayer's `/v1/terms`
+    name it with those windows, and every other address they name matches
+    the mainnet pins.
+  - **The pin.** `swaps` names it; the lock contract stays retired, so the
+    indices it used are still skipped. The deposits pins are unchanged.
+  - **Held claims.** The mainnet relayer has served `/v1/claim/hold` since
+    21:50 UTC (an empty body gets 400 there, as on testnet; an unknown route
+    gets 404), so Relayer claims needs no per-network switch.
+  - Mainnet's relayer sends claims, refunds and held claims, and the maker
+    its reveals, through Flashbots Protect, and the maker's deadlines are
+    longer than testnet's (reference §7.1).
+  - Tests: the pin test names mainnet's contract and windows, and a mainnet
+    quote now asks the maker and refuses one serving another deployment.
+    No swap has run on the mainnet contract yet.
+
+- **D-146 (owner, 2026-10-22): Shielded USD.** The feature calls itself
+  Shielded USD in every user-facing string, and what it holds the shielded
+  balance; code, keys and routes keep `privateUsd`. A deposit is shielded,
+  as Railgun calls the step and the wallet's Shield does for ZEC:
+  "Shielding…", "Shielded, available in …", "Received, but not shielded
+  yet", and a landed deposit's row "Shielded". Activity rows read "Sent"
+  and "Received", the holdings line "On Ethereum", and the withdraw note
+  says why to wait without the word: so a withdrawal can't be linked to
+  the bridge.
+
+- **D-147 (owner, 2026-10-22): received sends keep their place.** The engine
+  has no time for the blocks of some received sends, and the app dated such
+  a send by when it first saw it, in memory only, so after an account switch
+  or a restart each one jumped to the top as new, above the sends and
+  withdrawals after it. The page now dates it from the nearest block whose
+  time it knows, in the history or the newest block (read only then), at
+  Ethereum's 12 s a slot, and the activity stays newest first. Page tests
+  cover both; not yet run on a phone.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

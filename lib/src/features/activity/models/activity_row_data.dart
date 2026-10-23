@@ -25,6 +25,7 @@ class ActivityRowData {
     this.backgroundColor,
     this.selected = false,
     this.childRows = const [],
+    this.details,
     this.onTap,
   });
 
@@ -54,5 +55,9 @@ class ActivityRowData {
   final Color? backgroundColor;
   final bool selected;
   final List<ActivityRowData> childRows;
+
+  /// Drawn under the row and its [childRows]: what a row that unfolds in
+  /// place shows once [onTap] opens it (a Private USD row's details).
+  final Widget? details;
   final VoidCallback? onTap;
 }

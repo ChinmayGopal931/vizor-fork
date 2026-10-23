@@ -34,9 +34,6 @@ class MobilePrivateUsdReverseConversionScreen extends ConsumerStatefulWidget {
 class _MobilePrivateUsdReverseConversionScreenState
     extends ConsumerState<MobilePrivateUsdReverseConversionScreen>
     with PrivateUsdProgressScreenState {
-  @override
-  PrivateUsdRoutePath get path => widget.path;
-
   Future<void> _callOff(
     PrivateUsdReverseConversionNotifier notifier,
     PrivateUsdReverseProgressPresentation presentation,
@@ -106,6 +103,8 @@ class _MobilePrivateUsdReverseConversionScreenState
         detailsExpanded: detailsExpanded,
         onTabChanged: selectTab,
         onToggleDetails: toggleDetails,
+        keepScreenOn: keepsScreenOn(key),
+        onKeepScreenOnChanged: (on) => keepScreenOn(key, on: on),
         onBack: holds ? null : back,
         onInfo: () => showPrivateUsdReverseInfoSheet(context),
         onRetry: notifier.retryNow,

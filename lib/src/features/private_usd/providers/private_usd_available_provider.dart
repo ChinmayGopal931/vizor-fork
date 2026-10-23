@@ -30,9 +30,8 @@ BigInt? privateUsdRelayerFeeCap(rust_private_usd.ApiDeployment? deployment) =>
     BigInt.tryParse(deployment?.maxRelayerFee ?? '');
 
 /// Whether this build's network pins a windows contract, so bridging runs.
-/// Off (mainnet until one is deployed there), Bridge is hidden and its
-/// screens redirect; the balance, deposits, sends and withdrawals work
-/// either way.
+/// Off, Bridge is hidden and its screens redirect; the balance, deposits,
+/// sends and withdrawals work either way.
 final privateUsdBridgeAvailableProvider = Provider<bool>((ref) {
   // Const, so desktop builds and builds without the define drop the rest.
   if (!kPrivateUsdBuildEnabled) return false;

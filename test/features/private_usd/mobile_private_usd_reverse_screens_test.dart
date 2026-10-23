@@ -184,9 +184,11 @@ void main() {
 
   // The timeline once capped a finished bridge's current step at its last
   // row, which kept spinning beside the button for a new one.
-  testWidgets('a finished bridge keeps no step current and lights its sign', (
-    tester,
-  ) async {
+  testWidgets('a finished bridge keeps no step current, lights its sign and '
+      'folds its keep-open card', (tester) async {
+    final keepOpenCard = find.byKey(
+      const ValueKey('mobile_private_usd_progress_keep_open'),
+    );
     Future<void> show(ApiReversePhase phase, {bool celebrate = false}) => pump(
       tester,
       MobilePrivateUsdReverseConversionView(
@@ -204,6 +206,9 @@ void main() {
     );
 
     await show(ApiReversePhase.receiving);
+    // The sweep home needs Veylor: the card slides in a moment later.
+    await tester.pump(const Duration(seconds: 1));
+    expect(keepOpenCard, findsOneWidget);
     expect(
       find.byKey(const ValueKey('swap_status_active_step_loader')),
       findsOneWidget,
@@ -215,6 +220,7 @@ void main() {
 
     await show(ApiReversePhase.complete);
     await tester.pump(const Duration(seconds: 1));
+    expect(keepOpenCard, findsNothing);
     expect(
       find.byKey(const ValueKey('swap_status_active_step_loader')),
       findsNothing,

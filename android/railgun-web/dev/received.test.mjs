@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { TransactionHistoryItemCategory } from '@railgun-community/shared-models';
-import { receivedSends } from '../src/received.js';
+import { hasUndatedReceipts, receivedSends } from '../src/received.js';
 
 const USDC = '0x1c7d4b196cb0c7b01d743fbc6116a902379c7238';
 
@@ -45,4 +45,34 @@ test('shields, sends, withdrawals and mixed items are not received sends', () =>
     TransactionHistoryItemCategory.Unknown,
   ].map((category) => item(category, [amount(3n)]));
   assert.deepEqual(receivedSends(others), []);
+});
+
+test('a send the engine has no time for is dated from the nearest dated block, 12 s a block', () => {
+  const { ShieldERC20s, TransferReceiveERC20s, UnshieldERC20s } = TransactionHistoryItemCategory;
+  const sends = receivedSends([
+    item(ShieldERC20s, [], { blockNumber: 100, timestamp: 1790000000 }),
+    item(TransferReceiveERC20s, [amount(1n)], { blockNumber: 105, timestamp: undefined }),
+    item(UnshieldERC20s, [], { blockNumber: 200, timestamp: 1790002000 }),
+    item(TransferReceiveERC20s, [amount(2n)], { blockNumber: 190, timestamp: undefined }),
+  ]);
+  assert.deepEqual(
+    sends.map(({ timestamp }) => timestamp),
+    [1790000000 + 5 * 12, 1790002000 - 10 * 12],
+  );
+});
+
+test('with no dated block in the history, the newest block dates it', () => {
+  const history = [
+    item(TransactionHistoryItemCategory.TransferReceiveERC20s, [amount(1n)], { blockNumber: 990, timestamp: undefined }),
+  ];
+  assert.equal(hasUndatedReceipts(history), true);
+  const [send] = receivedSends(history, { blockNumber: 1000, timestamp: 1790000000 });
+  assert.equal(send.timestamp, 1790000000 - 10 * 12);
+  assert.equal(receivedSends(history)[0].timestamp, null);
+});
+
+test('only an undated received send asks for the newest block', () => {
+  const { ShieldERC20s, TransferReceiveERC20s } = TransactionHistoryItemCategory;
+  assert.equal(hasUndatedReceipts([item(TransferReceiveERC20s, [amount(1n)])]), false);
+  assert.equal(hasUndatedReceipts([item(ShieldERC20s, [amount(1n)], { timestamp: undefined })]), false);
 });

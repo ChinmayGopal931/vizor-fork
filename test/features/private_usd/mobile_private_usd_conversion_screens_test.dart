@@ -16,6 +16,7 @@ import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_scramble_text.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_convert_views.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_progress_views.dart';
+import 'package:zcash_wallet/src/features/settings/widgets/mobile/mobile_tor_control.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
@@ -251,32 +252,46 @@ void main() {
   });
 
   group('progress', () {
+    final keepOpenCard = find.byKey(
+      const ValueKey('mobile_private_usd_progress_keep_open'),
+    );
+
     Future<void> pumpProgress(
       WidgetTester tester,
       PrivateUsdConversionStatus status, {
       PrivateUsdBalanceState? balance,
       bool bridgeAvailable = true,
-    }) => pump(
-      tester,
-      MobilePrivateUsdConversionView(
-        presentation: privateUsdProgressPresentation(
-          status: status,
-          now: previewPrivateUsdNow,
-          zcashConfirmations: 2,
-          screening: const Duration(hours: 1),
-          balance: balance,
-          bridgeAvailable: bridgeAvailable,
+      bool relayerClaims = false,
+      bool keepScreenOn = true,
+      ValueChanged<bool>? onKeepScreenOnChanged,
+    }) async {
+      await pump(
+        tester,
+        MobilePrivateUsdConversionView(
+          presentation: privateUsdProgressPresentation(
+            status: status,
+            now: previewPrivateUsdNow,
+            zcashConfirmations: 2,
+            screening: const Duration(hours: 1),
+            balance: balance,
+            bridgeAvailable: bridgeAvailable,
+            relayerClaims: relayerClaims,
+          ),
+          keepScreenOn: keepScreenOn,
+          onKeepScreenOnChanged: onKeepScreenOnChanged,
+          onBack: () {},
+          onInfo: () {},
+          onRetry: () {},
+          onCallOff: () {},
+          onViewBalance: () {},
+          onTryAgain: () {},
         ),
-        onBack: () {},
-        onInfo: () {},
-        onRetry: () {},
-        onCallOff: () {},
-        onViewBalance: () {},
-        onTryAgain: () {},
-      ),
-    );
+      );
+      // The keep-open card slides in a moment after the progress shows.
+      await tester.pump(const Duration(seconds: 1));
+    }
 
-    testWidgets('confirmations count up, and the keep-open note shows', (
+    testWidgets('confirmations count up, and the keep-open card shows', (
       tester,
     ) async {
       await pumpProgress(
@@ -289,7 +304,9 @@ void main() {
 
       expect(find.text(PrivateUsdCopy.convertStepConfirm), findsOneWidget);
       expect(find.text('1 of 2 · about 1 min'), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsOneWidget);
+      expect(keepOpenCard, findsOneWidget);
+      expect(find.text(PrivateUsdCopy.keepOpenBody), findsOneWidget);
+      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsNothing);
       expect(
         find.byKey(const ValueKey('mobile_private_usd_progress_action')),
         findsNothing,
@@ -310,7 +327,7 @@ void main() {
       await pumpProgress(tester, status);
 
       expect(find.text(PrivateUsdCopy.convertRelayerClaims), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsNothing);
+      expect(keepOpenCard, findsNothing);
       expect(find.text('1 of 2 · about 1 min'), findsOneWidget);
 
       // The maker silent past its confirmations: the relayer claims anyway.
@@ -329,7 +346,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsNothing);
+      expect(keepOpenCard, findsNothing);
     });
 
     testWidgets('a refund after the hand-over needs Veylor open again', (
@@ -348,7 +365,73 @@ void main() {
 
       expect(find.text(PrivateUsdCopy.convertRefunding), findsOneWidget);
       expect(find.text(PrivateUsdCopy.convertRelayerClaims), findsNothing);
-      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsOneWidget);
+      expect(keepOpenCard, findsOneWidget);
+    });
+
+    testWidgets('"Keep screen on" starts on, and a tap turns it off', (
+      tester,
+    ) async {
+      final changes = <bool>[];
+      final status = PrivateUsdConversionStatus(
+        record: previewPrivateUsdRecord(depositConfirmations: 1),
+        wait: ApiForwardWait.confirming,
+      );
+      bool toggleOn() => tester
+          .widget<MobilePrivacyToggle>(find.byType(MobilePrivacyToggle))
+          .enabled;
+      final row = find.byKey(
+        const ValueKey('mobile_private_usd_keep_screen_on'),
+      );
+
+      await pumpProgress(tester, status, onKeepScreenOnChanged: changes.add);
+      expect(find.text(PrivateUsdCopy.keepScreenOn), findsOneWidget);
+      expect(toggleOn(), isTrue);
+      await tester.tap(row);
+      expect(changes, [false]);
+
+      await pumpProgress(
+        tester,
+        status,
+        keepScreenOn: false,
+        onKeepScreenOnChanged: changes.add,
+      );
+      expect(toggleOn(), isFalse);
+      await tester.tap(row);
+      expect(changes, [false, true]);
+    });
+
+    testWidgets('with the relayer to claim, the opening asks for Veylor only '
+        'until the ZEC is sent', (tester) async {
+      await pumpProgress(
+        tester,
+        PrivateUsdConversionStatus(
+          record: previewPrivateUsdRecord(
+            phase: ApiForwardPhase.opening,
+            deposited: false,
+            ago: const Duration(seconds: 30),
+          ),
+          wait: ApiForwardWait.opening,
+        ),
+        relayerClaims: true,
+      );
+      expect(
+        find.text(PrivateUsdCopy.convertRelayerReviewNote),
+        findsOneWidget,
+      );
+      expect(keepOpenCard, findsNothing);
+
+      // The deposit out and the claim not held: Veylor claims it, so it
+      // stays open after all.
+      await pumpProgress(
+        tester,
+        PrivateUsdConversionStatus(
+          record: previewPrivateUsdRecord(depositConfirmations: 1),
+          wait: ApiForwardWait.confirming,
+        ),
+        relayerClaims: true,
+      );
+      expect(find.text(PrivateUsdCopy.convertRelayerReviewNote), findsNothing);
+      expect(keepOpenCard, findsOneWidget);
     });
 
     testWidgets('an opening over 90 s says so and offers to call it off', (
@@ -417,7 +500,7 @@ void main() {
         find.text(PrivateUsdCopy.convertResultViewBalance),
         findsOneWidget,
       );
-      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsNothing);
+      expect(keepOpenCard, findsNothing);
     });
 
     testWidgets('paid and screened: the "Bridged" sign', (tester) async {
@@ -530,7 +613,7 @@ void main() {
         findsOneWidget,
       );
       // Its sweep or late claim needs the seed: keep the app open.
-      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsOneWidget);
+      expect(keepOpenCard, findsOneWidget);
       expect(
         find.byKey(const ValueKey('mobile_private_usd_progress_action')),
         findsNothing,

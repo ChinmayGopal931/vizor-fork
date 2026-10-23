@@ -658,6 +658,10 @@ class WidgetbookApp extends StatelessWidget {
                       builder: buildMobilePrivateUsdDefaultUseCase,
                     ),
                     WidgetbookUseCase(
+                      name: 'Activity details',
+                      builder: buildMobilePrivateUsdActivityDetailsUseCase,
+                    ),
+                    WidgetbookUseCase(
                       name: 'Empty',
                       builder: buildMobilePrivateUsdEmptyUseCase,
                     ),
@@ -752,6 +756,16 @@ class WidgetbookApp extends StatelessWidget {
                     WidgetbookUseCase(
                       name: 'Confirming',
                       builder: buildMobilePrivateUsdProgressUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Confirming, screen may sleep',
+                      builder:
+                          buildMobilePrivateUsdProgressScreenMaySleepUseCase,
+                    ),
+                    WidgetbookUseCase(
+                      name: 'Opening, the relayer to claim',
+                      builder:
+                          buildMobilePrivateUsdProgressOpeningRelayerUseCase,
                     ),
                     WidgetbookUseCase(
                       name: 'Claim with the relayer',

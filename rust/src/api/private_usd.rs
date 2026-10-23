@@ -1605,9 +1605,9 @@ pub enum ApiDepositState {
     /// Kept, not yet answered with a transaction: "Received $X" (or, with
     /// `waiting`, "Waiting for the network").
     Signed,
-    /// Posted, until it mines: "Making it private…".
+    /// Posted, until it mines: "Shielding…".
     Sent,
-    /// Mined and believed: "Private, available in …".
+    /// Mined and believed: "Shielded, available in …".
     Landed,
     /// Refused: the address shows as received but not shielding.
     Refused,

@@ -42,7 +42,6 @@ class PrivateUsdProgressPresentation {
     this.showsCallOff = false,
     this.showsKeepOpen = false,
     this.action,
-    this.keyStepPending = false,
     this.title = PrivateUsdCopy.convertProgressTitle,
     this.bridged = false,
   });
@@ -63,13 +62,10 @@ class PrivateUsdProgressPresentation {
   /// "Call it off": an opening that has taken over 90 s, with no problem.
   final bool showsCallOff;
 
-  /// [PrivateUsdCopy.convertBackgroundNote] shows under the progress.
+  /// The keep-open card shows: a key-using step (deposit, claim, sweep) is
+  /// still to come, and not the relayer's.
   final bool showsKeepOpen;
   final PrivateUsdProgressAction? action;
-
-  /// A key-using step (deposit, claim, sweep) is still to come, and not the
-  /// relayer's: the screen stays awake while this progress shows.
-  final bool keyStepPending;
 
   /// The top bar's: "Bridging" while it runs (screening included),
   /// "Bridge" once it ended.
@@ -83,6 +79,9 @@ class PrivateUsdProgressPresentation {
 /// private balance (whether a payout arrived and was screened);
 /// [zcashConfirmations] and [screening] come from the deployment. With
 /// [bridgeAvailable] off, an ended conversion offers no new one.
+/// [relayerClaims] is the relayer-claims setting, which a bridge takes as it
+/// starts: until its deposit is out, the only sign that the relayer is to
+/// claim it.
 PrivateUsdProgressPresentation privateUsdProgressPresentation({
   required PrivateUsdConversionStatus status,
   required DateTime now,
@@ -92,6 +91,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
   bool privacyModeEnabled = false,
   String? explorerTxPrefix,
   bool bridgeAvailable = true,
+  bool relayerClaims = false,
 }) {
   final record = status.record;
   final totalZat = record.maxTotalZat ?? record.depositZat;
@@ -259,6 +259,10 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
       t0.isAfter(now);
 
   final handedOver = status.claimHandedOver;
+  // Its claim goes to the relayer as the deposit goes out, so Veylor is
+  // needed only until then.
+  final relayerToClaim =
+      relayerClaims && !refunding && !unwinding && active <= 1;
   final lateClaimAt = record.lateClaimAt;
   final String? note;
   if (status.resuming) {
@@ -277,6 +281,8 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
     note = PrivateUsdCopy.convertUnsettled;
   } else if (slowOpening) {
     note = PrivateUsdCopy.convertOpeningSlow;
+  } else if (relayerToClaim) {
+    note = PrivateUsdCopy.convertRelayerReviewNote;
   } else if (makerSilent) {
     note = handedOver
         ? PrivateUsdCopy.convertRelayerMakerSilent(formatDayMonthTime(t0))
@@ -301,8 +307,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
     note: note,
     problem: problem == null ? null : privateUsdProblemMessage(problem),
     showsCallOff: slowOpening && problem == null,
-    showsKeepOpen: !handedOver,
-    keyStepPending: !handedOver,
+    showsKeepOpen: !handedOver && !relayerToClaim,
   );
 }
 

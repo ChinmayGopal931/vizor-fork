@@ -19,6 +19,7 @@ import '../src/features/private_usd/screens/mobile/mobile_private_usd_screen.dar
 import '../src/features/private_usd/services/private_usd_balance_repository.dart';
 import '../src/features/private_usd/services/private_usd_engine.dart';
 import '../src/features/private_usd/services/private_usd_zec_quote_search.dart';
+import '../src/features/private_usd/widgets/mobile/private_usd_activity_details.dart';
 import '../src/features/private_usd/widgets/mobile/private_usd_activity_rows.dart';
 import '../src/features/private_usd/widgets/mobile/private_usd_convert_views.dart';
 import '../src/features/private_usd/widgets/mobile/private_usd_progress_views.dart';
@@ -257,7 +258,25 @@ Widget buildMobilePrivateUsdBridgeOffUseCase(BuildContext context) =>
       bridgeAvailable: false,
     );
 
-class _PrivateUsdScreenPreview extends StatelessWidget {
+/// A send, a received send and a bridge, the send unfolded into its
+/// details.
+Widget buildMobilePrivateUsdActivityDetailsUseCase(BuildContext context) =>
+    _PrivateUsdScreenPreview(
+      state: previewPrivateUsdBalance(available: 1250.4),
+      sends: [previewPrivateUsdSendRecord()],
+      receipts: [previewPrivateUsdReceipt()],
+      records: [
+        previewPrivateUsdRecord(
+          index: 4,
+          phase: ApiForwardPhase.paid,
+          outcome: ApiForwardOutcome.paid,
+          ago: const Duration(days: 1),
+        ),
+      ],
+      unfoldFirstRow: true,
+    );
+
+class _PrivateUsdScreenPreview extends StatefulWidget {
   const _PrivateUsdScreenPreview({
     required this.state,
     this.privacyModeEnabled = false,
@@ -268,6 +287,7 @@ class _PrivateUsdScreenPreview extends StatelessWidget {
     this.canConvert = true,
     this.bridgeAvailable = true,
     this.spendNote,
+    this.unfoldFirstRow = false,
   });
 
   final PrivateUsdBalanceState state;
@@ -280,50 +300,83 @@ class _PrivateUsdScreenPreview extends StatelessWidget {
   final bool bridgeAvailable;
   final String? spendNote;
 
+  /// The first activity row starts unfolded into its details.
+  final bool unfoldFirstRow;
+
+  @override
+  State<_PrivateUsdScreenPreview> createState() =>
+      _PrivateUsdScreenPreviewState();
+}
+
+class _PrivateUsdScreenPreviewState extends State<_PrivateUsdScreenPreview> {
+  // The rows unfolded; null until the first build.
+  Set<String>? _open;
+
+  void _toggle(String rowId) => setState(() {
+    final open = {...?_open};
+    if (!open.remove(rowId)) open.add(rowId);
+    _open = open;
+  });
+
+  List<ActivityRowData> _rows(BuildContext context, Set<String> open) {
+    final details = PrivateUsdActivityDetailsConfig(
+      open: open,
+      onToggle: _toggle,
+      onOpenTransaction: (_, _) {},
+    );
+    return [
+      for (final record in widget.sends)
+        buildPrivateUsdSendActivityRow(
+          context: context,
+          record: record,
+          privacyModeEnabled: widget.privacyModeEnabled,
+          details: details,
+        ),
+      for (final receipt in widget.receipts)
+        buildPrivateUsdReceivedActivityRow(
+          context: context,
+          receipt: receipt,
+          privacyModeEnabled: widget.privacyModeEnabled,
+          details: details,
+        ),
+      for (final record in widget.records)
+        ?buildPrivateUsdActivityRow(
+          context: context,
+          record: record,
+          zcashConfirmations: _confirmations,
+          privacyModeEnabled: widget.privacyModeEnabled,
+          details: details,
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return PrivateUsdPreviewFrame(
       child: Builder(
-        builder: (context) => MobilePrivateUsdView(
-          state: state,
-          zecUsdPrice: 70,
-          privacyModeEnabled: privacyModeEnabled,
-          screening: const Duration(hours: 1),
-          activityRows: [
-            for (final record in sends)
-              buildPrivateUsdSendActivityRow(
-                context: context,
-                record: record,
-                privacyModeEnabled: privacyModeEnabled,
-                onOpenTransaction: () {},
-              ),
-            for (final receipt in receipts)
-              buildPrivateUsdReceivedActivityRow(
-                context: context,
-                receipt: receipt,
-                privacyModeEnabled: privacyModeEnabled,
-                onOpenTransaction: () {},
-              ),
-            for (final record in records)
-              ?buildPrivateUsdActivityRow(
-                context: context,
-                record: record,
-                zcashConfirmations: _confirmations,
-                privacyModeEnabled: privacyModeEnabled,
-                onOpenTransaction: () {},
-              ),
-          ],
-          onBack: () {},
-          onRefresh: () {},
-          onConvert: () {},
-          onSend: () {},
-          onWithdraw: () {},
-          onReceive: () {},
-          canSend: canSend,
-          canConvert: canConvert,
-          bridgeAvailable: bridgeAvailable,
-          spendNote: spendNote,
-        ),
+        builder: (context) {
+          final open = _open ??= {
+            if (widget.unfoldFirstRow)
+              ?_rows(context, const {}).firstOrNull?.stableId,
+          };
+          return MobilePrivateUsdView(
+            state: widget.state,
+            zecUsdPrice: 70,
+            privacyModeEnabled: widget.privacyModeEnabled,
+            screening: const Duration(hours: 1),
+            activityRows: _rows(context, open),
+            onBack: () {},
+            onRefresh: () {},
+            onConvert: () {},
+            onSend: () {},
+            onWithdraw: () {},
+            onReceive: () {},
+            canSend: widget.canSend,
+            canConvert: widget.canConvert,
+            bridgeAvailable: widget.bridgeAvailable,
+            spendNote: widget.spendNote,
+          );
+        },
       ),
     );
   }
@@ -605,6 +658,8 @@ Widget _progressPreview(
   PrivateUsdConversionStatus status, {
   PrivateUsdBalanceState? balance,
   bool callingOff = false,
+  bool relayerClaims = false,
+  bool keepScreenOn = true,
 }) => PrivateUsdPreviewFrame(
   child: MobilePrivateUsdConversionView(
     presentation: privateUsdProgressPresentation(
@@ -614,8 +669,11 @@ Widget _progressPreview(
       screening: const Duration(hours: 1),
       balance: balance,
       explorerTxPrefix: 'https://sepolia.etherscan.io/tx/',
+      relayerClaims: relayerClaims,
     ),
     callingOff: callingOff,
+    keepScreenOn: keepScreenOn,
+    onKeepScreenOnChanged: (_) {},
     onBack: () {},
     onInfo: () {},
     onRetry: () {},
@@ -633,6 +691,33 @@ Widget buildMobilePrivateUsdProgressUseCase(BuildContext context) =>
         wait: ApiForwardWait.confirming,
       ),
     );
+
+/// Waiting for confirmations with "Keep screen on" turned off.
+Widget buildMobilePrivateUsdProgressScreenMaySleepUseCase(
+  BuildContext context,
+) => _progressPreview(
+  PrivateUsdConversionStatus(
+    record: previewPrivateUsdRecord(depositConfirmations: 1),
+    wait: ApiForwardWait.confirming,
+  ),
+  keepScreenOn: false,
+);
+
+/// Opening a bridge the relayer is to claim: Veylor stays open only until
+/// the ZEC is sent.
+Widget buildMobilePrivateUsdProgressOpeningRelayerUseCase(
+  BuildContext context,
+) => _progressPreview(
+  PrivateUsdConversionStatus(
+    record: previewPrivateUsdRecord(
+      phase: ApiForwardPhase.opening,
+      deposited: false,
+      ago: const Duration(seconds: 30),
+    ),
+    wait: ApiForwardWait.opening,
+  ),
+  relayerClaims: true,
+);
 
 /// Waiting for confirmations with the claim handed to the relayer: the user
 /// can leave.

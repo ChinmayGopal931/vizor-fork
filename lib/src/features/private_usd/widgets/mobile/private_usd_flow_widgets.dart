@@ -163,16 +163,30 @@ class PrivateUsdLedgerRow extends StatelessWidget {
   const PrivateUsdLedgerRow({
     required this.label,
     required this.value,
+    this.trailing,
     super.key,
   });
 
   final String label;
   final String value;
 
+  /// An icon after the value for what a tap on the row does: a copy, say.
+  final Widget? trailing;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     const style = AppTypography.bodyExtraSmall;
+    final valueText = FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerRight,
+      child: Text(
+        value,
+        maxLines: 1,
+        style: style.copyWith(color: colors.text.accent),
+      ),
+    );
+    final trailing = this.trailing;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       child: LayoutBuilder(
@@ -191,15 +205,16 @@ class PrivateUsdLedgerRow extends StatelessWidget {
               constraints: BoxConstraints(
                 maxWidth: constraints.maxWidth * 0.64,
               ),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
-                child: Text(
-                  value,
-                  maxLines: 1,
-                  style: style.copyWith(color: colors.text.accent),
-                ),
-              ),
+              child: trailing == null
+                  ? valueText
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(child: valueText),
+                        const SizedBox(width: AppSpacing.xxs),
+                        trailing,
+                      ],
+                    ),
             ),
           ],
         ),

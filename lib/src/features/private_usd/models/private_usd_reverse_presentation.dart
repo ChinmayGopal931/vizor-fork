@@ -106,7 +106,6 @@ class PrivateUsdReverseProgressPresentation {
     this.showsViewRefunds = false,
     this.showsKeepOpen = false,
     this.provingNote,
-    this.keyStepPending = false,
     this.title = PrivateUsdCopy.convertProgressTitle,
     this.bridged = false,
   });
@@ -135,14 +134,11 @@ class PrivateUsdReverseProgressPresentation {
   final bool callOffPaid;
   final bool showsViewRefunds;
 
-  /// [PrivateUsdCopy.convertBackgroundNote] shows under the progress.
+  /// The keep-open card shows: a key-using step is still to come.
   final bool showsKeepOpen;
 
   /// Under the steps while the page proves the payment.
   final String? provingNote;
-
-  /// A key-using step is still to come: the screen stays awake.
-  final bool keyStepPending;
 
   /// The top bar's: "Bridging" while it runs, "Bridge" once it ended.
   final String title;
@@ -367,7 +363,6 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     callOffPaid: !unpaid,
     showsKeepOpen: true,
     provingNote: proving ? PrivateUsdCopy.reverseProvingNote : null,
-    keyStepPending: true,
   );
 }
 

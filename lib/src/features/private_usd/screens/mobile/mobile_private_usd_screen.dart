@@ -70,8 +70,8 @@ class MobilePrivateUsdScreen extends ConsumerStatefulWidget {
 /// deposit address on chain, and deposits show here only in passing.
 const _depositRefresh = Duration(seconds: 60);
 
-class _MobilePrivateUsdScreenState
-    extends ConsumerState<MobilePrivateUsdScreen> {
+class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
+    with PrivateUsdActivityDetailsState {
   Timer? _depositTimer;
 
   @override
@@ -123,7 +123,7 @@ class _MobilePrivateUsdScreenState
         activity: feed,
         privacyModeEnabled: privacyModeEnabled,
         onOpenConversion: open,
-        onOpenPayout: (payoutTx) => openPrivateUsdPayout(ref, payoutTx),
+        details: privateUsdActivityDetails(),
         onOpenRefunds: openRefunds,
         sendRecords: ref.watch(privateUsdSendRecordsProvider(uuid)),
         receipts: ref.watch(
@@ -1113,7 +1113,7 @@ class _EmptyCard extends StatelessWidget {
 }
 
 /// The deposits' state now: what each deposit address received, what is
-/// being made private, and what is being screened. Opens the Receive sheet.
+/// being shielded, and what is being screened. Opens the Receive sheet.
 class _DepositsCard extends StatelessWidget {
   const _DepositsCard({
     required this.lines,
@@ -1177,27 +1177,34 @@ class _ActivitySection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          NeonSyncOcclude(
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    PrivateUsdCopy.activityTitle.toUpperCase(),
-                    style: kNeonHudCaptionStyle.copyWith(
-                      color: colors.neon.glow,
+          // Only what the heading draws is backed, so a synced line crossing
+          // its empty stretch stays whole.
+          Row(
+            children: [
+              Expanded(
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: NeonSyncOcclude(
+                    child: Text(
+                      PrivateUsdCopy.activityTitle.toUpperCase(),
+                      style: kNeonHudCaptionStyle.copyWith(
+                        color: colors.neon.glow,
+                      ),
                     ),
                   ),
                 ),
-                if (onRefunds case final onRefunds?)
-                  AppButton(
+              ),
+              if (onRefunds case final onRefunds?)
+                NeonSyncOcclude(
+                  child: AppButton(
                     key: const ValueKey('mobile_private_usd_refunds'),
                     variant: AppButtonVariant.secondary,
                     size: AppButtonSize.small,
                     onPressed: onRefunds,
                     child: const Text(PrivateUsdCopy.refundsTitle),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
           const SizedBox(height: AppSpacing.s),
           if (rows.isEmpty)

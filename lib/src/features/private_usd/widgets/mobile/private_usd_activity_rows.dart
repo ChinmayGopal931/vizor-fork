@@ -1,17 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/config/zcash_explorer.dart';
 import '../../../../core/formatting/address_display.dart';
 import '../../../../core/formatting/zec_amount.dart';
 import '../../../../core/privacy/privacy_mask.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_icon.dart';
+import '../../../../providers/account_provider.dart';
+import '../../../../providers/rpc_endpoint_provider.dart';
+import '../../../../providers/zcash_explorer_provider.dart';
 import '../../../../rust/api/private_usd.dart';
 import '../../../activity/activity_amount_text.dart';
 import '../../../activity/activity_feed_sections.dart';
 import '../../../activity/activity_row_mapper.dart';
 import '../../../activity/models/activity_row_data.dart';
+import '../../models/private_usd_activity_details.dart';
 import '../../models/private_usd_balances.dart';
 import '../../models/private_usd_deposits.dart';
 import '../../models/private_usd_explorer.dart';
@@ -24,6 +31,7 @@ import '../../private_usd_copy.dart';
 import '../../providers/private_usd_activity_provider.dart';
 import '../../providers/private_usd_available_provider.dart';
 import '../../services/private_usd_engine.dart';
+import 'private_usd_activity_details.dart';
 import 'private_usd_logo.dart';
 
 // Private USD's rows lead with its logo; the glyph stands in only where a
@@ -33,8 +41,8 @@ const _logo = PrivateUsdLogo(size: AppAssetSize.size);
 
 /// A forward conversion's activity row, or null when it moved no money
 /// (nothing sent). Under way, it shows its stage and opens its progress;
-/// paid, the ZEC paid, opening the payout; refunded, that the ZEC came
-/// back, with no amount.
+/// paid, the ZEC paid; refunded, that the ZEC came back, with no amount.
+/// Ended, it unfolds into its [details].
 ActivityRowData? buildPrivateUsdActivityRow({
   required BuildContext context,
   required ApiForwardRecord record,
@@ -42,7 +50,7 @@ ActivityRowData? buildPrivateUsdActivityRow({
   bool privacyModeEnabled = false,
   bool dateOnlyTimestamp = false,
   VoidCallback? onOpenConversion,
-  VoidCallback? onOpenTransaction,
+  PrivateUsdActivityDetailsConfig? details,
 }) {
   final colors = context.colors;
   final usd = hideAmountIfPrivacyMode(
@@ -58,6 +66,14 @@ ActivityRowData? buildPrivateUsdActivityRow({
     stableId: 'private-usd:forward:${record.index}',
     leadingBackgroundColor: colors.background.neutralSubtleOpacity,
     leadingIconColor: colors.icon.regular,
+  );
+  late final unfold = _unfold(
+    details,
+    base.stableId,
+    () => privateUsdForwardDetails(
+      record,
+      privacyModeEnabled: privacyModeEnabled,
+    ),
   );
   switch (record.outcome) {
     case null:
@@ -102,7 +118,8 @@ ActivityRowData? buildPrivateUsdActivityRow({
         amountColor: colors.text.positiveStrong,
         statusText: '',
         timestampText: timestamp,
-        onTap: onOpenTransaction,
+        details: unfold.details,
+        onTap: unfold.onTap,
       );
     case ApiForwardOutcome.refunded:
       return ActivityRowData(
@@ -115,6 +132,8 @@ ActivityRowData? buildPrivateUsdActivityRow({
         amountText: '',
         statusText: '',
         timestampText: timestamp,
+        details: unfold.details,
+        onTap: unfold.onTap,
       );
     case ApiForwardOutcome.nothingSent:
       return null;
@@ -123,15 +142,15 @@ ActivityRowData? buildPrivateUsdActivityRow({
 
 /// A reverse conversion's activity row, or null when it moved no money (a
 /// draft, or cancelled). Under way, it shows its step and opens its
-/// progress; complete, the ZEC received, opening the funding; refunded,
-/// that the dollars came back, opening Refunds.
+/// progress; complete, the ZEC received, unfolding into its [details];
+/// refunded, that the dollars came back, opening Refunds.
 ActivityRowData? buildPrivateUsdReverseActivityRow({
   required BuildContext context,
   required ApiReverseRecord record,
   bool privacyModeEnabled = false,
   bool dateOnlyTimestamp = false,
   VoidCallback? onOpenConversion,
-  VoidCallback? onOpenTransaction,
+  PrivateUsdActivityDetailsConfig? details,
   VoidCallback? onOpenRefunds,
 }) {
   final colors = context.colors;
@@ -156,6 +175,14 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
           : ZecAmount.fromZatoshi(
               privateUsdReverseReceivedZat(record),
             ).activity.toString();
+      final unfold = _unfold(
+        details,
+        stableId,
+        () => privateUsdReverseDetails(
+          record,
+          privacyModeEnabled: privacyModeEnabled,
+        ),
+      );
       return ActivityRowData(
         stableId: stableId,
         title: PrivateUsdCopy.activityConvertedToZec,
@@ -170,7 +197,8 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
         amountColor: outgoingAmountColor(colors),
         statusText: '',
         timestampText: timestamp,
-        onTap: onOpenTransaction,
+        details: unfold.details,
+        onTap: unfold.onTap,
       );
     case ApiReversePhase.refunded:
       return ActivityRowData(
@@ -208,14 +236,14 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
 }
 
 /// A send or withdrawal's activity row: to its truncated recipient once in
-/// a block, else not in a block yet; it opens its transaction once known. A
-/// send still being proved is not in the log, so it has no row.
+/// a block, else not in a block yet; it unfolds into its [details]. A send
+/// still being proved is not in the log, so it has no row.
 ActivityRowData buildPrivateUsdSendActivityRow({
   required BuildContext context,
   required ApiSendRecord record,
   bool privacyModeEnabled = false,
   bool dateOnlyTimestamp = false,
-  VoidCallback? onOpenTransaction,
+  PrivateUsdActivityDetailsConfig? details,
 }) {
   final colors = context.colors;
   final unconfirmed = record.state == ApiSendState.unconfirmed;
@@ -227,8 +255,14 @@ ActivityRowData buildPrivateUsdSendActivityRow({
     privacyModeEnabled: privacyModeEnabled,
     denomination: '',
   );
+  final stableId = 'private-usd:send:${record.sendId}';
+  final unfold = _unfold(
+    details,
+    stableId,
+    () => privateUsdSendDetails(record, privacyModeEnabled: privacyModeEnabled),
+  );
   return ActivityRowData(
-    stableId: 'private-usd:send:${record.sendId}',
+    stableId: stableId,
     title: record.withdraw
         ? PrivateUsdCopy.activityWithdrew
         : PrivateUsdCopy.activitySent,
@@ -250,7 +284,8 @@ ActivityRowData buildPrivateUsdSendActivityRow({
       privateUsdSendActivityTime(record),
       dateOnly: dateOnlyTimestamp,
     ),
-    onTap: onOpenTransaction,
+    details: unfold.details,
+    onTap: unfold.onTap,
   );
 }
 
@@ -260,13 +295,13 @@ DateTime privateUsdSendActivityTime(ApiSendRecord record) =>
 
 /// A private send this wallet received: in once screened (spendable, or spent
 /// since), from its sender's truncated address where the sender showed it;
-/// it opens its transaction.
+/// it unfolds into its [details].
 ActivityRowData buildPrivateUsdReceivedActivityRow({
   required BuildContext context,
   required RailgunReceipt receipt,
   bool privacyModeEnabled = false,
   bool dateOnlyTimestamp = false,
-  VoidCallback? onOpenTransaction,
+  PrivateUsdActivityDetailsConfig? details,
 }) {
   final colors = context.colors;
   final settled = receipt.settled;
@@ -276,10 +311,19 @@ ActivityRowData buildPrivateUsdReceivedActivityRow({
     privacyModeEnabled: privacyModeEnabled,
     denomination: '',
   );
+  final stableId =
+      'private-usd:received:${receipt.txid}:${receipt.token}:'
+      '${receipt.amount}';
+  final unfold = _unfold(
+    details,
+    stableId,
+    () => privateUsdReceivedDetails(
+      receipt,
+      privacyModeEnabled: privacyModeEnabled,
+    ),
+  );
   return ActivityRowData(
-    stableId:
-        'private-usd:received:${receipt.txid}:${receipt.token}:'
-        '${receipt.amount}',
+    stableId: stableId,
     title: PrivateUsdCopy.activityReceived,
     leadingIconName: _glyph,
     leading: _logo,
@@ -301,7 +345,8 @@ ActivityRowData buildPrivateUsdReceivedActivityRow({
       privateUsdReceivedActivityTime(receipt),
       dateOnly: dateOnlyTimestamp,
     ),
-    onTap: onOpenTransaction,
+    details: unfold.details,
+    onTap: unfold.onTap,
   );
 }
 
@@ -312,7 +357,7 @@ DateTime privateUsdReceivedActivityTime(RailgunReceipt receipt) =>
 /// A deposit's activity row, or null for one that moved nothing (it was
 /// signed again in its place, ran out, was refused or reverted: the money is
 /// still at the deposit address, which the screen shows). Once landed it
-/// counts as arrived, and opens its transaction.
+/// counts as arrived. It unfolds into its [details].
 ActivityRowData? buildPrivateUsdDepositActivityRow({
   required BuildContext context,
   required ApiDepositRecord record,
@@ -320,7 +365,7 @@ ActivityRowData? buildPrivateUsdDepositActivityRow({
   DateTime Function() now = DateTime.now,
   bool privacyModeEnabled = false,
   bool dateOnlyTimestamp = false,
-  VoidCallback? onOpenTransaction,
+  PrivateUsdActivityDetailsConfig? details,
 }) {
   final colors = context.colors;
   final arrives = hideAmountIfPrivacyMode(
@@ -341,11 +386,11 @@ ActivityRowData? buildPrivateUsdDepositActivityRow({
           ? PrivateUsdCopy.depositWaiting
           : PrivateUsdCopy.depositReceived(value);
     case ApiDepositState.sent:
-      subtitle = PrivateUsdCopy.depositMakingPrivate;
+      subtitle = PrivateUsdCopy.depositShielding;
     case ApiDepositState.landed:
       subtitle = landedAt != null && now().difference(landedAt) < screening
-          ? PrivateUsdCopy.depositPrivate(PrivateUsdCopy.about(screening))
-          : PrivateUsdCopy.activityDepositPrivate;
+          ? PrivateUsdCopy.depositShielded(PrivateUsdCopy.about(screening))
+          : PrivateUsdCopy.activityDepositShielded;
     case ApiDepositState.refused ||
         ApiDepositState.reverted ||
         ApiDepositState.replaced ||
@@ -353,8 +398,17 @@ ActivityRowData? buildPrivateUsdDepositActivityRow({
       return null;
   }
   final landed = record.state == ApiDepositState.landed;
+  final stableId = 'private-usd:deposit:${record.id}';
+  final unfold = _unfold(
+    details,
+    stableId,
+    () => privateUsdDepositDetails(
+      record,
+      privacyModeEnabled: privacyModeEnabled,
+    ),
+  );
   return ActivityRowData(
-    stableId: 'private-usd:deposit:${record.id}',
+    stableId: stableId,
     title: record.kind == ApiDepositKind.rescue
         ? PrivateUsdCopy.activityDepositRescue
         : PrivateUsdCopy.activityDeposit,
@@ -376,7 +430,8 @@ ActivityRowData? buildPrivateUsdDepositActivityRow({
       privateUsdDepositActivityTime(record),
       dateOnly: dateOnlyTimestamp,
     ),
-    onTap: landed ? onOpenTransaction : null,
+    details: unfold.details,
+    onTap: unfold.onTap,
   );
 }
 
@@ -385,22 +440,32 @@ DateTime privateUsdDepositActivityTime(ApiDepositRecord record) =>
     privateUsdDepositLandedAt(record) ??
     DateTime.fromMillisecondsSinceEpoch(record.createdAt * 1000);
 
+/// A row's details and the tap that unfolds them; neither without [config].
+({Widget? details, VoidCallback? onTap}) _unfold(
+  PrivateUsdActivityDetailsConfig? config,
+  String rowId,
+  List<PrivateUsdActivityDetail> Function() lines,
+) => config == null
+    ? (details: null, onTap: null)
+    : (
+        details: config.detailsOf(rowId, lines()),
+        onTap: () => config.onToggle(rowId),
+      );
+
 /// [activity] (and on `/private-usd`, [sendRecords] and [receipts]) as feed
-/// entries. [onOpenPayout] opens any row's transaction, not only a payout: a
-/// deposit's, a send's, a received send's or a funding's too.
+/// entries. A conversion under way opens its progress, a refunded reverse
+/// one Refunds; every other row unfolds into its [details].
 List<ActivityEntry> privateUsdFeedEntries({
   required BuildContext context,
   required PrivateUsdActivity activity,
   required bool privacyModeEnabled,
   required ValueChanged<PrivateUsdRoutePath> onOpenConversion,
-  required ValueChanged<String> onOpenPayout,
+  required PrivateUsdActivityDetailsConfig details,
   VoidCallback? onOpenRefunds,
   List<ApiSendRecord> sendRecords = const [],
   List<RailgunReceipt> receipts = const [],
   bool dateOnlyTimestamp = false,
 }) {
-  VoidCallback? openTransaction(String? tx) =>
-      tx == null ? null : () => onOpenPayout(tx);
   void openConversion(PrivateUsdDirection direction, int index) =>
       onOpenConversion(PrivateUsdRoutePath(direction: direction, index: index));
   return [
@@ -411,7 +476,7 @@ List<ActivityEntry> privateUsdFeedEntries({
             screening: activity.screening,
             privacyModeEnabled: privacyModeEnabled,
             dateOnlyTimestamp: dateOnlyTimestamp,
-            onOpenTransaction: openTransaction(record.txHash),
+            details: details,
           )
           case final row?)
         ActivityEntry(
@@ -426,7 +491,7 @@ List<ActivityEntry> privateUsdFeedEntries({
           record: record,
           privacyModeEnabled: privacyModeEnabled,
           dateOnlyTimestamp: dateOnlyTimestamp,
-          onOpenTransaction: openTransaction(record.txHash),
+          details: details,
         ),
       ),
     for (final receipt in receipts)
@@ -437,7 +502,7 @@ List<ActivityEntry> privateUsdFeedEntries({
           receipt: receipt,
           privacyModeEnabled: privacyModeEnabled,
           dateOnlyTimestamp: dateOnlyTimestamp,
-          onOpenTransaction: openTransaction(receipt.txid),
+          details: details,
         ),
       ),
     for (final record in activity.reverseRecords)
@@ -448,7 +513,7 @@ List<ActivityEntry> privateUsdFeedEntries({
             dateOnlyTimestamp: dateOnlyTimestamp,
             onOpenConversion: () =>
                 openConversion(PrivateUsdDirection.reverse, record.index),
-            onOpenTransaction: openTransaction(record.fundingTx),
+            details: details,
             onOpenRefunds: onOpenRefunds,
           )
           case final row?)
@@ -465,19 +530,68 @@ List<ActivityEntry> privateUsdFeedEntries({
             dateOnlyTimestamp: dateOnlyTimestamp,
             onOpenConversion: () =>
                 openConversion(PrivateUsdDirection.forward, record.index),
-            onOpenTransaction: openTransaction(record.payoutTx),
+            details: details,
           )
           case final row?)
         ActivityEntry(timestamp: privateUsdActivityTime(record), row: row),
   ];
 }
 
-/// Opens [txHash] on the deployment's Ethereum explorer, outside the app.
-Future<void> openPrivateUsdPayout(WidgetRef ref, String txHash) async {
-  final uri = privateUsdExplorerUri(
-    ref.read(privateUsdCurrentDeploymentProvider)?.explorerTxPrefix,
-    txHash,
-  );
-  if (uri == null) return;
-  await launchUrl(uri, mode: LaunchMode.externalApplication);
+/// What a screen with a feed of Private USD rows keeps: the rows unfolded
+/// into their details, for the active account (another account's start
+/// folded), and their transactions opened outside the app on a tap.
+mixin PrivateUsdActivityDetailsState<W extends ConsumerStatefulWidget>
+    on ConsumerState<W> {
+  var _unfolded = (account: '', rows: const <String>{});
+
+  Set<String> _unfoldedOf(String account) =>
+      _unfolded.account == account ? _unfolded.rows : const {};
+
+  /// How the feed being built unfolds its rows.
+  PrivateUsdActivityDetailsConfig privateUsdActivityDetails() {
+    final account =
+        ref.watch(accountProvider.select((s) => s.value?.activeAccountUuid)) ??
+        '';
+    return PrivateUsdActivityDetailsConfig(
+      open: _unfoldedOf(account),
+      onToggle: (rowId) => setState(() {
+        final rows = _unfoldedOf(account);
+        _unfolded = (
+          account: account,
+          rows: rows.contains(rowId)
+              ? ({...rows}..remove(rowId))
+              : {...rows, rowId},
+        );
+      }),
+      zcashExplorerLabel: explorerSettingsLabel(
+        ref.watch(zcashExplorerProvider),
+        networkName: ref.watch(
+          rpcEndpointProvider.select((config) => config.networkName),
+        ),
+      ),
+      onOpenTransaction: (hash, explorer) =>
+          unawaited(_openTransaction(hash, explorer)),
+    );
+  }
+
+  // The deployment is read only here, on a tap: a feed without Private USD
+  // rows never makes its FRB call.
+  Future<void> _openTransaction(
+    String hash,
+    PrivateUsdExplorer explorer,
+  ) async {
+    final deployment = ref.read(privateUsdCurrentDeploymentProvider);
+    final uri = PrivateUsdExplorers(
+      etherscanTxPrefix: deployment?.explorerTxPrefix,
+      railscanTxPrefix: deployment?.railscanTxPrefix,
+      zcashNetworkName: ref.read(rpcEndpointProvider).networkName,
+      zcashExplorerTemplate: ref.read(zcashExplorerProvider),
+    ).uri(hash, explorer);
+    if (uri == null) return;
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      // Opening the browser is best effort.
+    }
+  }
 }

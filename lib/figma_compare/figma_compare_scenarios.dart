@@ -2462,6 +2462,13 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     mobile: true,
   ),
   FigmaCompareScenario(
+    id: 'mobile-private-usd-activity-details',
+    description: 'Private USD screen with a send unfolded into its details',
+    builder: buildMobilePrivateUsdActivityDetailsUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
     id: 'mobile-private-usd-empty',
     description: 'Private USD screen with no private dollars yet',
     builder: buildMobilePrivateUsdEmptyUseCase,
@@ -2550,6 +2557,22 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     id: 'mobile-private-usd-progress',
     description: 'Private USD forward progress, waiting for confirmations',
     builder: buildMobilePrivateUsdProgressUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-progress-screen-may-sleep',
+    description:
+        'Private USD forward progress with "Keep screen on" turned off',
+    builder: buildMobilePrivateUsdProgressScreenMaySleepUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-private-usd-progress-opening-relayer',
+    description:
+        'Private USD forward progress opening a bridge the relayer claims',
+    builder: buildMobilePrivateUsdProgressOpeningRelayerUseCase,
     desktop: false,
     mobile: true,
   ),

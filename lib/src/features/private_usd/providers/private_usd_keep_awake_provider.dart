@@ -4,22 +4,22 @@ import '../../../providers/app_security_provider.dart';
 import '../models/private_usd_record_key.dart';
 import 'private_usd_unfinished_provider.dart';
 
-/// The progress screens showing now, so the screen stays awake while a key
-/// step is pending.
-final privateUsdProgressVisibleProvider =
+/// The bridges whose screen may sleep: the user turned "Keep screen on" off
+/// on their progress. Every other bridge keeps the screen on while it needs
+/// Veylor ([privateUsdBridgeKeepAwakeProvider]).
+final privateUsdScreenMaySleepProvider =
     NotifierProvider<
-      PrivateUsdProgressVisibleNotifier,
+      PrivateUsdScreenMaySleepNotifier,
       Set<PrivateUsdRecordKey>
-    >(PrivateUsdProgressVisibleNotifier.new);
+    >(PrivateUsdScreenMaySleepNotifier.new);
 
-class PrivateUsdProgressVisibleNotifier
+class PrivateUsdScreenMaySleepNotifier
     extends Notifier<Set<PrivateUsdRecordKey>> {
   @override
   Set<PrivateUsdRecordKey> build() => const {};
 
-  void show(PrivateUsdRecordKey key) => state = {...state, key};
-
-  void hide(PrivateUsdRecordKey key) => state = {...state}..remove(key);
+  void keepScreenOn(PrivateUsdRecordKey key, {required bool on}) =>
+      state = on ? ({...state}..remove(key)) : {...state, key};
 }
 
 /// One first sync of an account's Railgun wallet, running: the sync of a
@@ -66,22 +66,33 @@ final privateUsdFirstSyncKeepAwakeProvider = Provider<bool>((ref) {
   return !ref.watch(appSecurityProvider.select((s) => s.requiresUnlock));
 });
 
-/// Keeps the screen awake while a conversion's progress shows and a key
-/// step (deposit, claim, sweep) is still to come: screen-off means
-/// background, and background means pause. Not once the relayer holds the
-/// claim, which it sends without the app. Also through a Railgun first sync
-/// ([privateUsdFirstSyncKeepAwakeProvider]). OR-ed into
-/// `SyncKeepAwakeNativeHost`, which owns the one native flag and lets go in
-/// the background.
-final privateUsdKeepAwakeProvider = Provider<bool>((ref) {
-  if (ref.watch(privateUsdFirstSyncKeepAwakeProvider)) return true;
-  final visible = ref.watch(privateUsdProgressVisibleProvider);
-  if (visible.isEmpty) return false;
+/// Keeps the screen awake while a bridge needs Veylor and the wallet is
+/// unlocked, whichever screen shows: screen-off means background, and
+/// background means pause. Not once the relayer holds the claim, which it
+/// sends without the app, nor for a bridge whose screen may sleep
+/// ([privateUsdScreenMaySleepProvider]). Locked, no step runs.
+final privateUsdBridgeKeepAwakeProvider = Provider<bool>((ref) {
   final unfinished = ref.watch(privateUsdUnfinishedProvider);
+  if (unfinished.isEmpty) return false;
+  if (ref.watch(appSecurityProvider.select((s) => s.requiresUnlock))) {
+    return false;
+  }
+  final maySleep = ref.watch(privateUsdScreenMaySleepProvider);
   final conversions = ref.watch(privateUsdConversionsProvider);
-  return visible.any(
+  return unfinished.any(
     (key) =>
-        unfinished.contains(key) &&
+        !maySleep.contains(key) &&
         !(conversions[key]?.claimHandedOver ?? false),
   );
 });
+
+/// Keeps the screen awake through a bridge that needs Veylor
+/// ([privateUsdBridgeKeepAwakeProvider]) or a Railgun first sync
+/// ([privateUsdFirstSyncKeepAwakeProvider]). OR-ed into
+/// `SyncKeepAwakeNativeHost`, which owns the one native flag and lets go in
+/// the background.
+final privateUsdKeepAwakeProvider = Provider<bool>(
+  (ref) =>
+      ref.watch(privateUsdFirstSyncKeepAwakeProvider) ||
+      ref.watch(privateUsdBridgeKeepAwakeProvider),
+);

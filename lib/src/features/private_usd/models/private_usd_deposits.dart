@@ -4,7 +4,7 @@ import '../../../rust/api/private_usd.dart' as rust;
 
 /// How a deposit address or a deposit shows.
 enum PrivateUsdDepositPhase {
-  /// The address holds money not yet made private: "Received $X".
+  /// The address holds money not yet shielded: "Received $X".
   received,
 
   /// It holds less than the relayer's minimum.
@@ -13,11 +13,11 @@ enum PrivateUsdDepositPhase {
   /// The relayer asked to wait over 30 s, or could not be reached.
   waiting,
 
-  /// Posted, until it mines: "Making it private…".
-  makingPrivate,
+  /// Posted, until it mines: "Shielding…".
+  shielding,
 
-  /// Mined: "Private, available in …" while Railgun screens it.
-  private,
+  /// Mined: "Shielded, available in …" while Railgun screens it.
+  shielded,
 
   /// Received, but refused, or the relayer's fee is above the cap.
   notShielding,
@@ -94,7 +94,7 @@ List<PrivateUsdDepositLine> privateUsdDepositLines(
           PrivateUsdDepositLine(
             index: record.index,
             address: record.address,
-            phase: PrivateUsdDepositPhase.makingPrivate,
+            phase: PrivateUsdDepositPhase.shielding,
             amount: value,
           ),
         );
@@ -117,7 +117,7 @@ List<PrivateUsdDepositLine> privateUsdDepositLines(
             PrivateUsdDepositLine(
               index: record.index,
               address: record.address,
-              phase: PrivateUsdDepositPhase.private,
+              phase: PrivateUsdDepositPhase.shielded,
               amount: BigInt.tryParse(record.arrives) ?? BigInt.zero,
               at: at,
             ),

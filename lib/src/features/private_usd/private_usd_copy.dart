@@ -1,13 +1,13 @@
 import '../../core/config/private_usd_feature_config.dart';
 
-/// Every user-facing Private USD string, sentence case, in one place so
-/// widgets, tests and Widgetbook share it. "Private USD" is the feature's
-/// name: capitalized at the start of a sentence and as a title, "private
+/// Every user-facing Shielded USD string, sentence case, in one place so
+/// widgets, tests and Widgetbook share it. "Shielded USD" is the feature's
+/// name: capitalized at the start of a sentence and as a title, "shielded
 /// USD" mid-sentence.
 abstract final class PrivateUsdCopy {
   // ── Shared ─────────────────────────────────────────────────────────────
 
-  static const title = 'Private USD';
+  static const title = 'Shielded USD';
 
   static String about(Duration duration) {
     final minutes = duration.inMinutes < 1 ? 1 : duration.inMinutes;
@@ -47,7 +47,7 @@ abstract final class PrivateUsdCopy {
   static String homeBlocked(String usd) => '$usd needs attention';
   static String homeBlockedDescription(String usd) => 'Needs attention: $usd';
   static String homeBalanceDescription(String amount) => '$title $amount';
-  static const homeOpen = 'Open private USD';
+  static const homeOpen = 'Open shielded USD';
   static String homeZecEquivalent(String zec) => '≈ $zec ZEC';
 
   static const convertingToUsd = 'Bridging to 0zkUSDC';
@@ -62,7 +62,7 @@ abstract final class PrivateUsdCopy {
   static String bannerRelayerDetail(String detail) =>
       '$detail\n$bannerRelayerClaims';
 
-  // ── Private USD screen ─────────────────────────────────────────────────
+  // ── Shielded USD screen ─────────────────────────────────────────────────
 
   static const subtitle = '0zkUSDC held on Ethereum';
   static const rowAvailable = 'Available';
@@ -115,10 +115,10 @@ abstract final class PrivateUsdCopy {
   static const actionReceive = 'Receive';
 
   static const firstLoad =
-      "Loading your private balance. The first time reads Railgun's history "
+      "Loading your shielded balance. The first time reads Railgun's history "
       'and can take a while. Keep Veylor open.';
   static String firstLoadProgress(int percent) =>
-      'Loading your private balance: $percent%. The first time reads '
+      'Loading your shielded balance: $percent%. The first time reads '
       "Railgun's history and can take a while. Keep Veylor open.";
   static const refreshFailed =
       "Couldn't update the balance. Showing the last known amounts.";
@@ -128,7 +128,7 @@ abstract final class PrivateUsdCopy {
   static const syncReadoutSynced = 'Railgun synced';
   static const syncReadoutFailed = 'Railgun sync failed';
 
-  static const emptyTitle = 'No private dollars yet';
+  static const emptyTitle = 'No shielded dollars yet';
   static const emptyBody =
       'Bridge ZEC into dollars nobody else can see: not your balance, and '
       'not who you pay.';
@@ -141,7 +141,7 @@ abstract final class PrivateUsdCopy {
   static String receiveShieldedTab(String symbol) => '0zk$symbol';
   static const receiveShieldedOnly = 'Only from a Railgun wallet';
   static const receiveAddressNote =
-      'Private USD from another Railgun wallet arrives here, with no fee.';
+      'Shielded USD from another Railgun wallet arrives here, with no fee.';
   static const receiveShieldedCopy = 'Copy Railgun address';
   static const addressCopied = 'Address copied';
 
@@ -153,21 +153,21 @@ abstract final class PrivateUsdCopy {
       'A bridge is in progress. Sending will be available when it '
       'finishes.';
 
-  static const infoTitle = 'About private USD';
-  static const infoConvert = 'Bridge: move between ZEC and private USD.';
+  static const infoTitle = 'About shielded USD';
+  static const infoConvert = 'Bridge: move between ZEC and shielded USD.';
   static const infoReceive =
       'Receive: public USDC from an exchange or any wallet goes to your '
-      'deposit address (Receive), and Veylor makes it private for a small '
-      'fee. Private USD from another Railgun wallet goes to your Railgun '
+      'deposit address (Receive), and Veylor shields it for a small fee. '
+      'Shielded USD from another Railgun wallet goes to your Railgun '
       'address on this screen, with no fee.';
   static const infoSend =
-      'Send: transfer private USD to another Railgun address. The recipient '
-      'receives it privately.';
+      'Send: transfer shielded USD to another Railgun address. It stays '
+      'shielded.';
   static const infoWithdraw =
-      'Withdraw: move private USD to a public Ethereum address. The '
+      'Withdraw: move shielded USD to a public Ethereum address. The '
       'destination and amount are visible on Ethereum.';
   static const infoRefunds =
-      "Refunds: recover a refund that couldn't enter your private balance.";
+      "Refunds: recover a refund that couldn't enter your shielded balance.";
   static String infoScreening(String about) =>
       'Railgun screens new funds for $about before they can be spent.';
   static const infoPrivate =
@@ -186,12 +186,12 @@ abstract final class PrivateUsdCopy {
   static const activityRefunded = 'Bridge called off';
   static const activityRefundedDetail = 'your ZEC came back';
   static const activityRefundedZecDetail = 'your dollars came back';
-  static const activitySent = 'Sent privately';
+  static const activitySent = 'Sent';
   static const activityWithdrew = 'Withdrew';
-  static const activityReceived = 'Received privately';
+  static const activityReceived = 'Received';
 
-  /// Private USD's line among the holdings: shielded, but on Ethereum.
-  static const holdingsShieldedOnEthereum = 'Shielded on Ethereum';
+  /// Shielded USD's line among the holdings: shielded, but on Ethereum.
+  static const holdingsShieldedOnEthereum = 'On Ethereum';
   static String activityDetail(String a, String b) => '$a · $b';
   static String activityTo(String address) => 'to $address';
   static String activityFrom(String address) => 'from $address';
@@ -201,6 +201,30 @@ abstract final class PrivateUsdCopy {
   static String activityOut(String usd) => '−$usd';
   static const activityUnconfirmed = 'not in a block yet';
   static const refundsView = 'View refunds';
+
+  // ── Activity: a row's details ──────────────────────────────────────────
+
+  static const detailsFrom = 'From';
+  static const detailsSenderHidden = 'Hidden';
+  static const detailsStatus = 'Status';
+  static const detailsConfirmed = 'Confirmed';
+  static const detailsUnconfirmed = 'Not in a block yet';
+  static const detailsSent = 'Sent';
+  static const detailsReceived = 'Received';
+  static const detailsEnded = 'Ended';
+  static const detailsDepositAddress = 'Deposit address';
+  static const detailsRelayerFee = 'Relayer fee';
+  static const detailsTransaction = 'Transaction';
+  static const detailsCopied = 'Copied';
+
+  /// The screen reader's hint on a value a tap copies.
+  static const detailsCopyHint = 'Copy';
+  static const explorerRailscan = 'Railscan';
+  static const explorerEtherscan = 'Etherscan';
+
+  /// A transaction link's screen reader label: "Payout on Railscan".
+  static String detailsOpenOn(String transaction, String explorer) =>
+      '$transaction on $explorer';
 
   // ── Convert (both directions): amount and quote ─────────────────────
 
@@ -288,19 +312,19 @@ abstract final class PrivateUsdCopy {
   static const convertInfoTitle = 'How bridging works';
   static const convertInfoStepQuote =
       'Enter the ZEC you want to bridge, including the network fee. The '
-      'market maker quotes how much private USD you receive. The quote holds '
+      'market maker quotes how much shielded USD you receive. The quote holds '
       'for a few minutes.';
   static const convertInfoStepDeposit =
       'Your ZEC goes to a deposit address that you and the market maker '
       'control together.';
   static const convertInfoStepClaim =
       'Once the deposit is confirmed, Veylor claims the dollars into your '
-      'private balance.';
+      'shielded balance.';
   static const convertInfoStepClaimRelayer =
       'Once the deposit is confirmed, the relayer claims the dollars into '
-      'your private balance.';
+      'your shielded balance.';
   static const convertInfoNoteEither =
-      'Either the dollars reach your private balance, or your ZEC comes back '
+      'Either the dollars reach your shielded balance, or your ZEC comes back '
       'to you.';
   static String convertInfoNoteTime(String about) =>
       'Takes $about. Keep Veylor open and unlocked until it\'s done. If you '
@@ -324,7 +348,7 @@ abstract final class PrivateUsdCopy {
       'is sent until you bridge.';
 
   /// The review's note when the relayer claims (Settings), in place of
-  /// [convertBackgroundNote].
+  /// [convertBackgroundNote]; the progress's too, until the ZEC is sent.
   static const convertRelayerReviewNote =
       'Keep Veylor open for about a minute, until your ZEC is sent. Then the '
       'relayer claims your dollars, and you can leave.';
@@ -353,7 +377,7 @@ abstract final class PrivateUsdCopy {
   static const convertStepConfirm = 'Waiting for confirmations';
   static const convertStepClaim = 'Claiming your dollars';
   static String convertStepConfirmCount(int count, int of) => '$count of $of';
-  static const convertStepArrive = 'Arriving in your private balance';
+  static const convertStepArrive = 'Arriving in your shielded balance';
   static const convertStepScreen = 'Screening';
   static const convertStepRefund = 'Bringing your ZEC back';
   static const convertStepUnwind = "Waiting for the market maker's refund";
@@ -404,6 +428,14 @@ abstract final class PrivateUsdCopy {
       "Keep Veylor open until this finishes. If you leave, it pauses and picks "
       "up when you're back.";
 
+  /// The card over a bridge's progress, either direction, while the bridge
+  /// needs Veylor.
+  static const keepOpenTitle = 'Keep Veylor open';
+  static const keepOpenBody =
+      "This can take a while. Veylor needs to stay open and online until "
+      "it's done: if your screen turns off, it pauses until you're back.";
+  static const keepScreenOn = 'Keep screen on';
+
   static const convertProgressInfoTitle = "What's happening";
   static const convertProgressInfoOpen =
       'The market maker opens the swap on Ethereum and puts the dollars in '
@@ -415,10 +447,10 @@ abstract final class PrivateUsdCopy {
       'The market maker waits for $confirmations Zcash '
       '${confirmations == 1 ? 'confirmation' : 'confirmations'}.';
   static const convertProgressInfoClaim =
-      'Veylor claims the dollars into your private balance. A relayer pays the '
+      'Veylor claims the dollars into your shielded balance. A relayer pays the '
       'Ethereum fees.';
   static const convertProgressInfoClaimRelayer =
-      'The relayer claims the dollars into your private balance and pays the '
+      'The relayer claims the dollars into your shielded balance and pays the '
       'Ethereum fees.';
   static String convertProgressInfoScreen(String about) =>
       'Railgun screens them for $about before they can be spent.';
@@ -476,10 +508,10 @@ abstract final class PrivateUsdCopy {
 
   static const convertResultPaidTitle = 'Dollars on their way';
   static String convertResultPaidBody(String usd, String about) =>
-      '$usd is in your private balance. Railgun screens new funds for $about '
+      '$usd is in your shielded balance. Railgun screens new funds for $about '
       'before they can be spent.';
   static String convertResultScreenedBody(String usd) =>
-      '$usd is in your private balance, ready to use.';
+      '$usd is in your shielded balance, ready to use.';
   static const convertResultRefundedTitle = 'Your ZEC came back';
   static const convertResultRefundedMaker =
       'The market maker called the swap off, so your ZEC came back to your '
@@ -508,14 +540,14 @@ abstract final class PrivateUsdCopy {
   static const convertResultMakerCancelled =
       'The market maker called the swap off before your ZEC was sent. Your '
       'ZEC never left your wallet.';
-  static const convertResultViewBalance = 'View private USD';
+  static const convertResultViewBalance = 'View shielded USD';
   static const convertResultTryAgain = 'Try again';
 
   // ── Reverse: amount, review and info ──────────────────────────────────
 
   static const convertSwapDirection = 'Swap bridge direction';
   static const reverseInsufficient =
-      'Not enough private USD for this amount and its fees.';
+      'Not enough shielded USD for this amount and its fees.';
   static const reverseErrorMax =
       "Couldn't work out the most you can bridge. Try again in a moment.";
 
@@ -527,9 +559,9 @@ abstract final class PrivateUsdCopy {
       'The fees changed, so nothing was paid. Review the new total, then pay '
       'it or cancel.';
 
-  static const reverseTitle = 'Private USD to ZEC';
+  static const reverseTitle = 'Shielded USD to ZEC';
   static const reverseIntro =
-      'Approve sending private USD first. After your wallet confirms the full '
+      'Approve sending shielded USD first. After your wallet confirms the full '
       'ZEC deposit itself, approve settlement to receive shielded ZEC.';
   static const reverseRefundNote =
       'Before you approve settlement, you can cancel. After that, a refund '
@@ -537,7 +569,7 @@ abstract final class PrivateUsdCopy {
       "Railgun's shielding fee. Closing Veylor never approves settlement.";
   static String reverseKeepOpen(String time) =>
       'Keep Veylor open after you pay. Once the ZEC is confirmed, you approve '
-      "settlement here by $time. If you don't, your private USD is refunded, "
+      "settlement here by $time. If you don't, your shielded USD is refunded, "
       'less fees.';
 
   static const reverseEscrow = 'Escrow value';
@@ -553,15 +585,15 @@ abstract final class PrivateUsdCopy {
 
   static const reverseAccepting = 'Preparing your receiving account';
   static const reverseReview = 'Review and approve your payment';
-  static const reverseStepFund = 'Sending private USD to escrow';
+  static const reverseStepFund = 'Sending shielded USD to escrow';
 
   /// [reverseStepFund] while it waits for the user's tap: theirs to take,
   /// not a payment already going.
-  static const reverseStepPay = 'Pay private USD to escrow';
+  static const reverseStepPay = 'Pay shielded USD to escrow';
   static String reverseStepPayDetail(String debit) =>
-      'Tap Pay to send $debit of private USD to escrow.';
+      'Tap Pay to send $debit of shielded USD to escrow.';
 
-  static const reverseSending = 'Sending private USD';
+  static const reverseSending = 'Sending shielded USD';
   static const reverseConfirming = 'Confirming escrow';
   static const reverseReceiving = 'Waiting for confirmed ZEC';
   static const reverseReady = 'Authorize settlement';
@@ -569,7 +601,7 @@ abstract final class PrivateUsdCopy {
       'Your approval is needed to continue.';
   static const reverseReadyExplanation =
       'The full ZEC deposit is confirmed. Authorize settlement to release '
-      'your private USD and move ZEC to your shielded wallet.';
+      'your shielded USD and move ZEC to your shielded wallet.';
   static const reverseStepSettle = 'Settling your bridge';
   static const reverseSettling = 'Waiting for settlement';
   static const reverseSweeping = 'Moving ZEC to your wallet';
@@ -577,11 +609,12 @@ abstract final class PrivateUsdCopy {
       'Zcash confirmations: $count';
   static const reverseRefundWait =
       "Waiting until a refund can proceed. Veylor retries while it's open.";
-  static const reverseRefunding = 'Securing your private refund';
-  static const reversePayout = 'Returning your private USD to Railgun';
+  static const reverseRefunding = 'Securing your refund';
+  static const reversePayout = 'Returning your shielded USD to Railgun';
   static const reverseComplete = 'ZEC received in your shielded wallet';
   static const reverseRefunded =
-      'Private refund paid. Railgun screening may delay availability.';
+      'Refund paid into your shielded balance. Railgun screening may delay '
+      'availability.';
   static const reverseCancelled =
       'Bridge cancelled. No escrow payment remains.';
 
@@ -601,7 +634,7 @@ abstract final class PrivateUsdCopy {
 
   static const reverseCancelConfirmTitle = 'Cancel this bridge?';
   static const reverseCancelConfirmBody =
-      "Your private USD comes back, less the relayer's and Railgun's fees. "
+      "Your shielded USD comes back, less the relayer's and Railgun's fees. "
       "This can't be undone.";
   static const reverseCancelConfirmUnpaidBody =
       "Nothing has been paid yet, so nothing is lost. This can't be undone.";
@@ -643,7 +676,7 @@ abstract final class PrivateUsdCopy {
   static const refundsTitle = 'Refunds';
   static const refundsSubtitle = 'Refunds from earlier bridges';
   static const refundsInfo =
-      "If a refund couldn't enter your private balance, recover it here. "
+      "If a refund couldn't enter your shielded balance, recover it here. "
       'Railgun screening may delay availability.';
   static const refundsOriginalAmount = 'Original bridge amount';
   static const refundsEmpty = 'No refunded bridges yet.';
@@ -668,7 +701,7 @@ abstract final class PrivateUsdCopy {
   static const refundsDepositTitle = 'Deposit sent back by screening';
   static String refundsDepositBody(String usd) =>
       "Railgun's screening sent $usd back to your deposit address's vault. "
-      'Recover it to make it private again.';
+      'Recover it to shield it again.';
   static const refundsDepositRecover = 'Recover deposit';
   static const refundsDepositRecovering = 'Recovering your deposit…';
   static const refundsDepositRecoverFailed =
@@ -685,8 +718,8 @@ abstract final class PrivateUsdCopy {
   static String depositOnly(String symbol, String chain) =>
       'Only $symbol on $chain';
   static const depositHow =
-      'Send it from an exchange or any wallet. Veylor makes it private on '
-      'its own while it is open and unlocked.';
+      'Send it from an exchange or any wallet. Veylor shields it on its own '
+      'while it is open and unlocked.';
   static String depositMinimum(String usd) => 'Minimum $usd';
   static String depositRelayerFee(String fixed, String percent) =>
       'Relayer fee: $fixed + $percent%';
@@ -707,44 +740,45 @@ abstract final class PrivateUsdCopy {
   static String depositReceived(String usd) => 'Received $usd';
   static String depositUnderMinimum(String usd, String minimum) =>
       'Received $usd, under the $minimum minimum. Send more to this address.';
-  static const depositMakingPrivate = 'Making it private…';
-  static String depositPrivate(String about) => 'Private, available in $about';
+  static const depositShielding = 'Shielding…';
+  static String depositShielded(String about) =>
+      'Shielded, available in $about';
   static const depositWaiting =
       'Waiting for the network; your money is safe at your deposit address';
   static const depositNotShielding =
-      "Received, but not made private yet. Veylor tries again later; your "
+      "Received, but not shielded yet. Veylor tries again later; your "
       'money is safe at your deposit address.';
   static String depositWaitingLine(String usd) =>
       '${depositReceived(usd)}. $depositWaiting';
-  static String depositMakingPrivateLine(String usd) =>
-      '${depositReceived(usd)}. $depositMakingPrivate';
-  static String depositPrivateLine(String usd, String about) =>
-      '$usd: ${depositPrivate(about)}';
+  static String depositShieldingLine(String usd) =>
+      '${depositReceived(usd)}. $depositShielding';
+  static String depositShieldedLine(String usd, String about) =>
+      '$usd: ${depositShielded(about)}';
   static String depositNotShieldingLine(String usd) =>
       '${depositReceived(usd)}. $depositNotShielding';
 
   static const depositsTitle = 'Deposits';
   static const activityDeposit = 'Deposit';
   static const activityDepositRescue = 'Recovered deposit';
-  static const activityDepositPrivate = 'Now private';
+  static const activityDepositShielded = 'Shielded';
 
   // ── Accounts and reset ─────────────────────────────────────────────────
 
   static const deleteUnfinishedTitle = 'Bridge in progress';
   static String deleteUnfinishedBody(int count) =>
-      'This account has $count unfinished private USD '
+      'This account has $count unfinished shielded USD '
       '${_conversions(count)}. Only this account can recover their funds, '
       'so deleting it now can lose them. Keep Veylor open until they finish '
       'or are refunded.';
   static String resetUnfinishedBody(int count) =>
-      'Your wallet has $count unfinished private USD ${_conversions(count)}. '
+      'Your wallet has $count unfinished shielded USD ${_conversions(count)}. '
       'Only this wallet can recover their funds, so resetting now can lose '
       'them.';
   static const deleteUncheckedBody =
-      "Couldn't check for unfinished private USD bridges. Only this account "
+      "Couldn't check for unfinished shielded USD bridges. Only this account "
       'can recover their funds, so deleting it now can lose them.';
   static const resetUncheckedBody =
-      "Couldn't check for unfinished private USD bridges. Only this wallet "
+      "Couldn't check for unfinished shielded USD bridges. Only this wallet "
       'can recover their funds, so resetting now can lose them.';
   static const deleteAnyway = 'Delete anyway';
   static const resetAnyway = 'Reset anyway';
@@ -753,7 +787,7 @@ abstract final class PrivateUsdCopy {
 
   // ── Send and withdraw ──────────────────────────────────────────────────
 
-  static const sendTitle = 'Send privately';
+  static const sendTitle = 'Send';
   static const sendAsset = 'Asset';
   static const sendAmount = 'Amount';
   static const sendToPrivate = 'To a Railgun address';
@@ -773,7 +807,7 @@ abstract final class PrivateUsdCopy {
   static const scanUseWithdraw =
       'This is a public 0x address. To send to it, use Withdraw.';
   static const scanUseSend =
-      'This is a private 0zk address. To pay it, use Send.';
+      'This is a shielded 0zk address. To pay it, use Send.';
   static const scanOtherNetwork = 'This QR code is for another network.';
 
   static const sendTooMuch = 'More than you have available.';
@@ -818,14 +852,14 @@ abstract final class PrivateUsdCopy {
   static const sendViewTx = 'View on Etherscan';
   static const sendNotSent = 'Nothing was sent. Try again in a moment.';
   static const sendUnavailable =
-      'Private sends are unavailable right now. Nothing was sent. Try again '
+      'Shielded sends are unavailable right now. Nothing was sent. Try again '
       'later.';
   static String sendFeeRose(String fee) =>
       'The network fee went up to $fee. Nothing was sent.';
   static const sendUnconfirmed =
       "It isn't in a block yet. Check your activity before sending again.";
 
-  static const sendInfoTitle = 'Sending privately';
+  static const sendInfoTitle = 'Sending shielded USD';
   static const sendInfoStepAddress =
       "Enter the amount and the recipient's Railgun address, which starts "
       'with 0zk.';
@@ -844,8 +878,9 @@ abstract final class PrivateUsdCopy {
       'Once withdrawn, the amount and the address are visible to anyone on '
       'Ethereum.';
   static const withdrawInfoNotePrivate =
-      "To stay private, don't withdraw the exact amount you just bridged, "
-      'wait a while first, and use a fresh address each time.';
+      "So a withdrawal can't be linked to your bridge, don't withdraw the "
+      'exact amount you just bridged, wait a while first, and use a fresh '
+      'address each time.';
   static String withdrawInfoNoteFee(String percent) =>
       'Railgun keeps $percent% of what you withdraw.';
 
@@ -853,7 +888,7 @@ abstract final class PrivateUsdCopy {
 
   static const settingSaveFailed = "Couldn't save the setting. Try again.";
 
-  /// Whether a new bridge to private USD hands its claim to the relayer.
+  /// Whether a new bridge to shielded USD hands its claim to the relayer.
   static const relayerClaimsSetting = 'Let the relayer claim for me';
 
   // ── Settings: the user's own Ethereum RPC ──────────────────────────────
@@ -867,7 +902,7 @@ abstract final class PrivateUsdCopy {
   static const rpcNetworkSepolia = 'Sepolia';
   static const rpcNetworkMainnet = 'Ethereum mainnet';
   static String rpcBody(String network) =>
-      'Use your own Alchemy, Infura or publicnode URL for $network. Private '
+      'Use your own Alchemy, Infura or publicnode URL for $network. Shielded '
       'USD then uses only it.';
   static const rpcSees =
       "The RPC sees the app's Ethereum requests, and your IP address unless "

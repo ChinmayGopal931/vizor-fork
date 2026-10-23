@@ -13,6 +13,7 @@ import '../../models/private_usd_status_presentation.dart';
 import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_balance_provider.dart';
 import '../../providers/private_usd_conversion_provider.dart';
+import '../../providers/private_usd_relayer_claims_provider.dart';
 import '../../services/private_usd_balance_repository.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
 import '../../widgets/mobile/private_usd_progress_views.dart';
@@ -34,9 +35,6 @@ class MobilePrivateUsdConversionScreen extends ConsumerStatefulWidget {
 class _MobilePrivateUsdConversionScreenState
     extends ConsumerState<MobilePrivateUsdConversionScreen>
     with PrivateUsdProgressScreenState {
-  @override
-  PrivateUsdRoutePath get path => widget.path;
-
   void _viewBalance() {
     final router = GoRouter.of(context);
     router.go('/home');
@@ -107,6 +105,8 @@ class _MobilePrivateUsdConversionScreenState
             privacyModeEnabled: ref.watch(privacyModeProvider),
             explorerTxPrefix: deployment.explorerTxPrefix,
             bridgeAvailable: bridge,
+            relayerClaims:
+                ref.watch(privateUsdRelayerClaimsProvider).value ?? true,
           );
     if (presentation != null) noteBridged(presentation.bridged);
     final notifier = ref.read(privateUsdConversionProvider(key).notifier);
@@ -122,6 +122,8 @@ class _MobilePrivateUsdConversionScreenState
         detailsExpanded: detailsExpanded,
         onTabChanged: selectTab,
         onToggleDetails: toggleDetails,
+        keepScreenOn: keepsScreenOn(key),
+        onKeepScreenOnChanged: (on) => keepScreenOn(key, on: on),
         onBack: state.callingOff ? null : back,
         onInfo: deployment == null
             ? null
