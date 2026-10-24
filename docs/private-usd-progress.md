@@ -2395,10 +2395,16 @@ M8 status (2026-10-14): the non-device parts are done.
     "(≈ $9.80)", on the right of the line under it (the fee note, or
     "Estimated amount"), with no new request; none in privacy mode or
     without a price.
+  - **The price over Tor.** With Tor on, Home's price never loaded:
+    CoinGecko answers 403 to a request without a User-Agent, and the Tor
+    route sends only the headers the caller gives (direct requests get
+    Dart's). The price request now sends one, `kVizorCoinGeckoUserAgent`,
+    the same on every install, so it says nothing the query does not.
   - Tests: the escrow over a sweep of totals against the page's debit (a
     cent more would pass it) and fees that take it all, rounding to the
-    nearest cent, the ledger without a total, and the market value (shown;
-    hidden in privacy mode and without a price).
+    nearest cent, the ledger without a total, the market value (shown;
+    hidden in privacy mode and without a price), and the price request's
+    headers over Tor.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
