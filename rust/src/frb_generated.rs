@@ -8517,7 +8517,8 @@ fn wire__crate__api__private_usd__private_usd_reverse_quote_impl(
             let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
             let api_lightwalletd_url = <String>::sse_decode(&mut deserializer);
             let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
-            let api_units = <u32>::sse_decode(&mut deserializer);
+            let api_total = <u32>::sse_decode(&mut deserializer);
+            let api_unshield_basis_points = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
@@ -8530,7 +8531,8 @@ fn wire__crate__api__private_usd__private_usd_reverse_quote_impl(
                             api_mnemonic_bytes,
                             api_lightwalletd_url,
                             api_eth_rpc_url,
-                            api_units,
+                            api_total,
+                            api_unshield_basis_points,
                         )?;
                         Ok(output_ok)
                     })(),

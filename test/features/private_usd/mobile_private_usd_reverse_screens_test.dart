@@ -17,6 +17,7 @@ import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
 
 // The reverse conversion's screens, built from the Widgetbook fixtures.
 void main() {
@@ -51,6 +52,55 @@ void main() {
   AppButton button(WidgetTester tester, String key) =>
       tester.widget<AppButton>(find.byKey(ValueKey(key)));
 
+  testWidgets('the ZEC estimate shows its market value at the ZEC price, but '
+      'not in privacy mode or without a price', (tester) async {
+    Future<void> amount({double? price, bool privacy = false}) async {
+      final state = previewPrivateUsdReverseConvertState();
+      final controller = TextEditingController(text: state.amountText);
+      addTearDown(controller.dispose);
+      await pump(
+        tester,
+        MobilePrivateUsdReverseConvertView(
+          state: state,
+          controller: controller,
+          autofocus: false,
+          zecUsdPrice: price,
+          privacyModeEnabled: privacy,
+          onAmountChanged: (_) {},
+          onMax: () {},
+          onReview: () {},
+          onBack: () {},
+        ),
+      );
+    }
+
+    final marketValue = find.byKey(
+      const ValueKey('mobile_private_usd_convert_market_value'),
+    );
+    await amount(price: 70);
+    final estimate = privateUsdReverseReceivedZat(
+      previewPrivateUsdReverseConvertState().draft!,
+    );
+    expect(
+      tester.widget<Text>(marketValue).data,
+      PrivateUsdCopy.convertMarketValue(
+        fiatTextForZatoshi(estimate, zecUsdUnitPrice: 70)!,
+      ),
+    );
+    // On the right of the line under the estimate.
+    final label = find.text(PrivateUsdCopy.convertEstimatedAmount);
+    expect(tester.getTopLeft(marketValue).dy, tester.getTopLeft(label).dy);
+    expect(
+      tester.getTopLeft(marketValue).dx,
+      greaterThan(tester.getTopRight(label).dx),
+    );
+
+    await amount(price: 70, privacy: true);
+    expect(marketValue, findsNothing);
+    await amount();
+    expect(marketValue, findsNothing);
+  });
+
   testWidgets('the amount step: a priced quote can be reviewed; '
       'more than 2 decimals cannot', (tester) async {
     Future<void> amount(PrivateUsdReverseConvertState state) async {
@@ -77,12 +127,13 @@ void main() {
       PrivateUsdCopy.reverseEscrow,
       PrivateUsdCopy.reverseRailgunFee,
       PrivateUsdCopy.reverseBroadcasterFee,
-      PrivateUsdCopy.reverseTotal,
       PrivateUsdCopy.reverseReceiveEstimate,
     ]) {
       expect(find.text(label), findsOneWidget, reason: label);
     }
-    expect(find.text(r'$25.31'), findsOneWidget);
+    // The total paid is the amount typed: no row repeats it.
+    expect(find.text('Total paid'), findsNothing);
+    expect(find.text(r'$25.00'), findsOneWidget);
     expect(
       find.bySemanticsLabel(PrivateUsdCopy.convertSwapDirection),
       findsOneWidget,

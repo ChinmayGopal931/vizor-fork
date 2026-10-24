@@ -919,11 +919,14 @@ pub struct ApiReverseAdvance {
     pub needs_you: bool,
 }
 
-/// Quotes `units` of private dollars (token base units, whole cents) for a
-/// fresh swap index, which counts as spent from here on, and keeps the
-/// verified quote as a `QUOTED` draft, replacing any earlier draft. Price it
-/// next: the page's `reverseCost` with `cost_request`, then
-/// `private_usd_reverse_set_cost`. `Busy` while a conversion is under way.
+/// Quotes the most that `total` private dollars (token base units, whole
+/// cents) fund once Railgun's unshield fee (`unshield_basis_points`, as the
+/// page loads it) and the relayer's funding fee come off it, for a fresh swap
+/// index, which counts as spent from here on, and keeps the verified quote as
+/// a `QUOTED` draft, replacing any earlier draft. Price it next: the page's
+/// `reverseCost` with `cost_request`, then `private_usd_reverse_set_cost`.
+/// `Busy` while a conversion is under way; `AmountUnquotable` when the fees
+/// take it all.
 pub fn private_usd_reverse_quote(
     db_path: String,
     network: String,
@@ -932,7 +935,8 @@ pub fn private_usd_reverse_quote(
     mnemonic_bytes: Vec<u8>,
     lightwalletd_url: String,
     eth_rpc_url: String,
-    units: u32,
+    total: u32,
+    unshield_basis_points: u32,
 ) -> Result<ApiReverseQuote, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
@@ -947,7 +951,7 @@ pub fn private_usd_reverse_quote(
             None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
-                    let quoted = reverse.quote(store, units).await?;
+                    let quoted = reverse.quote(store, total, unshield_basis_points).await?;
                     Ok(ApiReverseQuote {
                         record: api_reverse_record(store, &account_uuid, &quoted.record),
                         cost_request: api_cost_request(&quoted.price),

@@ -546,10 +546,14 @@ abstract final class PrivateUsdCopy {
   // ── Reverse: amount, review and info ──────────────────────────────────
 
   static const convertSwapDirection = 'Swap bridge direction';
+
+  /// A ZEC amount's market value, on its panel's right: "(≈ $9.80)".
+  static String convertMarketValue(String usd) => '(≈ $usd)';
   static const reverseInsufficient =
       'Not enough shielded USD for this amount and its fees.';
-  static const reverseErrorMax =
-      "Couldn't work out the most you can bridge. Try again in a moment.";
+  static const reverseErrorAmountRefused =
+      "This amount can't be bridged. It may be too small to cover the fees, "
+      'or over the limit for one bridge.';
 
   /// Whole cents: Rust refuses finer reverse amounts.
   static const reverseAmountCents = 'Use at most 2 decimal places.';
@@ -575,7 +579,6 @@ abstract final class PrivateUsdCopy {
   static const reverseEscrow = 'Escrow value';
   static const reverseRailgunFee = 'Railgun unshield fee';
   static const reverseBroadcasterFee = 'Broadcast fee';
-  static const reverseTotal = 'Total paid';
   static const reverseReceiveEstimate = 'Estimated ZEC after sweep fee';
   static const reverseProblemRelayer =
       "Veylor can't reach the relayer that moves your dollars. It keeps trying "
