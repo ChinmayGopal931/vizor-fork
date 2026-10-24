@@ -7,6 +7,7 @@ use tokio::sync::Notify;
 use zecswap_core::{Domain, PublicShare, RescueAuthorization, ReverseOpen};
 
 use super::super::abi::address_word;
+use super::super::deployment::BPS_MAX;
 use super::super::engine;
 use super::super::evm_rpc::{SwapStage, TransactionStatus};
 use super::super::funding_calls;
@@ -15,7 +16,7 @@ use super::super::models::{
     Direction, Hex, NothingSentCause, ReverseFundingTransaction, ReversePhase,
     ReverseReceiveEstimate, ReverseRecord, StoredRecord,
 };
-use super::super::reverse::ReverseAccept;
+use super::super::reverse::{self, ReverseAccept};
 use super::super::terms;
 use super::super::ErrorCode;
 use super::fakes::*;
@@ -697,4 +698,39 @@ async fn open_reverse_calldata_matches_the_independent_encoding_and_zapps_roles(
     assert_eq!(zecswap_core::signer(&digest, &signed), Some(user));
     assert_eq!(argument(&calls[2].data, 0), address_word(&pins.relayer));
     assert_eq!(argument(&calls[2].data, 1), uint_word(FUNDING_FEE));
+}
+
+/// A conversion to ZEC is asked for as the total it may debit: Railgun's
+/// unshield fee comes off the debit, the relayer's fee off what is left, and
+/// the escrow is the most whole cents that remain. The page's debit of it
+/// never passes the total, and a cent more would. Fees that take it all
+/// quote nothing, and the maker is not asked.
+#[tokio::test]
+async fn a_total_pays_the_escrow_and_both_fees() {
+    // The page's `fundingAmounts`.
+    let debit = |funded: u128| (funded - 1) * BPS_MAX / (BPS_MAX - UNSHIELD_BPS) + 1;
+    for total in (300_000u128..5_000_000).step_by(9_973) {
+        let total = total / 10_000 * 10_000;
+        let escrow = reverse::escrow_for(total, UNSHIELD_BPS, FUNDING_FEE)
+            .unwrap()
+            .0;
+        assert_eq!(escrow % 10_000, 0, "{total}");
+        assert!(debit(escrow + FUNDING_FEE) <= total, "{total}");
+        assert!(debit(escrow + 10_000 + FUNDING_FEE) > total, "{total}");
+    }
+    assert_eq!(
+        reverse::escrow_for(u128::from(REVERSE_TOTAL), UNSHIELD_BPS, FUNDING_FEE)
+            .unwrap()
+            .0,
+        AMOUNT
+    );
+
+    let h = Harness::new();
+    let error = h
+        .reverse()
+        .quote(&mut h.store(), 250_000, UNSHIELD_BPS as u32)
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::AmountUnquotable);
+    assert!(!h.paths().iter().any(|path| path == "/v1/reverse/quote"));
 }

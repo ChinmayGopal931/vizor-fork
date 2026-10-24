@@ -166,7 +166,7 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
   final zat = privateUsdReverseReceivedZat(record);
   final usdText = privacyModeEnabled
       ? fixedPrivacyMask()
-      : formatPrivateUsd(debit);
+      : formatPrivateUsdNearest(debit);
   final zecText = privacyModeEnabled
       ? fixedPrivacyMask()
       : ZecAmount.fromZatoshi(zat).activity.toString();

@@ -117,8 +117,9 @@ async fn the_happy_path_claims_into_railgun() {
         h.paths(),
         [
             "/v1/info",
-            "/v1/quote",
+            // Asked beside the index, before the maker's quote.
             "/v1/terms",
+            "/v1/quote",
             &accept_path(),
             "/v1/terms",
             "/v1/claim",
@@ -1624,10 +1625,7 @@ async fn a_returned_payout_is_rescued_only_from_a_vault_holding_more_than_the_fe
     for vault in [0, RELAYER_FEE] {
         h.world.set().vault = vault;
         assert_eq!(
-            h.forward_view()
-                .returned_payouts(&h.store())
-                .await
-                .unwrap(),
+            h.forward_view().returned_payouts(&h.store()).await.unwrap(),
             vec![]
         );
         h.forward().rescue(&mut h.store(), 0).await.unwrap();
@@ -1643,10 +1641,7 @@ async fn a_returned_payout_is_rescued_only_from_a_vault_holding_more_than_the_fe
         state.rescue_nonce = 7;
     }
     assert_eq!(
-        h.forward_view()
-            .returned_payouts(&h.store())
-            .await
-            .unwrap(),
+        h.forward_view().returned_payouts(&h.store()).await.unwrap(),
         vec![ReturnedPayout {
             index: 0,
             held: 900_000,
@@ -1674,7 +1669,10 @@ async fn a_returned_payout_is_rescued_only_from_a_vault_holding_more_than_the_fe
     );
     let state = h.world.get();
     assert_eq!(state.bodies["/v1/rescue"]["nonce"], 7);
-    assert_eq!(state.bodies["/v1/rescue"]["swapId"], record.swap_id.to_hex());
+    assert_eq!(
+        state.bodies["/v1/rescue"]["swapId"],
+        record.swap_id.to_hex()
+    );
     drop(state);
     assert_eq!(rescued.outcome, Some(ForwardOutcome::Paid));
     assert_eq!(h.posts("/v1/rescue"), 1);

@@ -71,6 +71,15 @@ void main() {
     expect(formatPrivateUsd(BigInt.from(1000000000000)), r'$1,000,000.00');
   });
 
+  test('a payment shows to the nearest cent, half up', () {
+    // A $19.90 total's debit and Railgun's fee on it.
+    expect(formatPrivateUsdNearest(BigInt.from(19899750)), r'$19.90');
+    expect(formatPrivateUsdNearest(BigInt.from(49750)), r'$0.05');
+    expect(formatPrivateUsdNearest(BigInt.from(19894999)), r'$19.89');
+    expect(formatPrivateUsdNearest(BigInt.from(5000)), r'$0.01');
+    expect(formatPrivateUsdNearest(BigInt.zero), r'$0.00');
+  });
+
   test('the ZEC equivalent needs a price', () {
     expect(
       privateUsdZecEquivalentZatoshi(BigInt.from(50000000), zecUsdPrice: 50),

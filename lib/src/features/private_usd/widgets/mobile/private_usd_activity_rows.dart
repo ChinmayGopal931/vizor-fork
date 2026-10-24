@@ -155,7 +155,7 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
 }) {
   final colors = context.colors;
   final usd = hideAmountIfPrivacyMode(
-    formatPrivateUsd(privateUsdReverseDebit(record)),
+    formatPrivateUsdNearest(privateUsdReverseDebit(record)),
     privacyModeEnabled: privacyModeEnabled,
     denomination: '',
   );
@@ -452,9 +452,9 @@ DateTime privateUsdDepositActivityTime(ApiDepositRecord record) =>
         onTap: () => config.onToggle(rowId),
       );
 
-/// [activity] (and on `/private-usd`, [sendRecords] and [receipts]) as feed
-/// entries. A conversion under way opens its progress, a refunded reverse
-/// one Refunds; every other row unfolds into its [details].
+/// [activity] as feed entries, alike on Home, in Activity and on
+/// `/private-usd`. A conversion under way opens its progress, a refunded
+/// reverse one Refunds; every other row unfolds into its [details].
 List<ActivityEntry> privateUsdFeedEntries({
   required BuildContext context,
   required PrivateUsdActivity activity,
@@ -462,8 +462,6 @@ List<ActivityEntry> privateUsdFeedEntries({
   required ValueChanged<PrivateUsdRoutePath> onOpenConversion,
   required PrivateUsdActivityDetailsConfig details,
   VoidCallback? onOpenRefunds,
-  List<ApiSendRecord> sendRecords = const [],
-  List<RailgunReceipt> receipts = const [],
   bool dateOnlyTimestamp = false,
 }) {
   void openConversion(PrivateUsdDirection direction, int index) =>
@@ -483,7 +481,7 @@ List<ActivityEntry> privateUsdFeedEntries({
           timestamp: privateUsdDepositActivityTime(record),
           row: row,
         ),
-    for (final record in sendRecords)
+    for (final record in activity.sends)
       ActivityEntry(
         timestamp: privateUsdSendActivityTime(record),
         row: buildPrivateUsdSendActivityRow(
@@ -494,7 +492,7 @@ List<ActivityEntry> privateUsdFeedEntries({
           details: details,
         ),
       ),
-    for (final receipt in receipts)
+    for (final receipt in activity.receipts)
       ActivityEntry(
         timestamp: privateUsdReceivedActivityTime(receipt),
         row: buildPrivateUsdReceivedActivityRow(

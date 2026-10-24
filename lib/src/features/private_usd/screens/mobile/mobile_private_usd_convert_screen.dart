@@ -4,6 +4,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../providers/zec_price_change_provider.dart'
+    show zecHomeUsdUnitPriceProvider;
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../models/private_usd_record_key.dart';
@@ -158,8 +160,9 @@ class _MobilePrivateUsdConvertScreenState
         controller: _amount,
         focusNode: _focus,
         privacyModeEnabled: privacyModeEnabled,
+        zecUsdPrice: ref.watch(zecHomeUsdUnitPriceProvider),
         onAmountChanged: notifier.onAmountChanged,
-        onMax: () => unawaited(notifier.onMax()),
+        onMax: notifier.onMax,
         onReview: () => _review(notifier),
         onBack: () => context.pop(),
         onSwitchDirection: _directionSwitch(state),
@@ -186,6 +189,7 @@ class _MobilePrivateUsdConvertScreenState
       privacyModeEnabled: privacyModeEnabled,
       relayerClaims: ref.watch(privateUsdRelayerClaimsProvider).value ?? true,
       privateUsdAvailable: balance?.spendable,
+      zecUsdPrice: ref.watch(zecHomeUsdUnitPriceProvider),
       onAmountChanged: notifier.onAmountChanged,
       onMax: notifier.onMax,
       onReview: () => _review(notifier),

@@ -269,11 +269,14 @@ Future<List<ApiForwardRecord>> privateUsdForwardRecords({
   storeDir: storeDir,
 );
 
-/// Quotes `units` of private dollars (token base units, whole cents) for a
-/// fresh swap index, which counts as spent from here on, and keeps the
-/// verified quote as a `QUOTED` draft, replacing any earlier draft. Price it
-/// next: the page's `reverseCost` with `cost_request`, then
-/// `private_usd_reverse_set_cost`. `Busy` while a conversion is under way.
+/// Quotes the most that `total` private dollars (token base units, whole
+/// cents) fund once Railgun's unshield fee (`unshield_basis_points`, as the
+/// page loads it) and the relayer's funding fee come off it, for a fresh swap
+/// index, which counts as spent from here on, and keeps the verified quote as
+/// a `QUOTED` draft, replacing any earlier draft. Price it next: the page's
+/// `reverseCost` with `cost_request`, then `private_usd_reverse_set_cost`.
+/// `Busy` while a conversion is under way; `AmountUnquotable` when the fees
+/// take it all.
 Future<ApiReverseQuote> privateUsdReverseQuote({
   required String dbPath,
   required String network,
@@ -282,7 +285,8 @@ Future<ApiReverseQuote> privateUsdReverseQuote({
   required List<int> mnemonicBytes,
   required String lightwalletdUrl,
   required String ethRpcUrl,
-  required int units,
+  required int total,
+  required int unshieldBasisPoints,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseQuote(
   dbPath: dbPath,
   network: network,
@@ -291,7 +295,8 @@ Future<ApiReverseQuote> privateUsdReverseQuote({
   mnemonicBytes: mnemonicBytes,
   lightwalletdUrl: lightwalletdUrl,
   ethRpcUrl: ethRpcUrl,
-  units: units,
+  total: total,
+  unshieldBasisPoints: unshieldBasisPoints,
 );
 
 /// What to price swap `index`'s funding at now (for a draft whose pricing

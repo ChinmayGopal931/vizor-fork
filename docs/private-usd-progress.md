@@ -2343,6 +2343,63 @@ M8 status (2026-10-14): the non-device parts are done.
   Ethereum's 12 s a slot, and the activity stays newest first. Page tests
   cover both; not yet run on a phone.
 
+- **D-148 (owner, 2026-10-22): one activity everywhere, and an honest
+  Max.**
+  - Home and Activity list sends, withdrawals and received sends too, as
+    the Shielded USD screen does: `PrivateUsdActivity` carries the send
+    log and the receipts, so the three feeds build the same rows. Nothing
+    new is fetched: the send log is local, and the receipts are read as
+    the balance holds them (Home's strip keeps it fresh once Shielded USD
+    is in use); reading them starts no Railgun sync.
+  - Max on a conversion to ZEC set aside the relayer's 2 USDC cap unless a
+    draft could name the fee, so up to about 1.75 USDC stayed behind. Max is
+    now the whole balance, since the amount typed is the total paid (D-150).
+  - Tests: the activity provider (both lists carried; no balance read
+    without the engine) and Max as the whole balance.
+
+- **D-149 (owner, 2026-10-22): quotes in fewer round trips.** A quote was
+  about nine requests in a row, each on a fresh Tor circuit with Tor on,
+  and a ZEC amount took two quotes.
+  - **One chain read per index.** The windows check (`MIN_WINDOW`,
+    `LATE_WINDOW`, `LOCK_DURATION`) and the index's swap and key reads, on
+    the pinned contract and each retired one, go in one Multicall3
+    `aggregate3` at one block (`ChainReader::index_used`), every call
+    allowed to fail, so the windows are held to the pin before any swap read
+    counts. The windows ride on the first index only. Seven reads became one.
+  - **Side by side.** A ZEC → USD quote asks the relayer's terms while the
+    index is checked (and refuses a fee above the cap before the maker is
+    asked); a USD → ZEC quote asks the terms, the index and the joint
+    account's birthday height at once. An index may then be spent on terms
+    that fail, which costs nothing: indices are never reused.
+  - Tests: the batch's encoding both ways, one read per index with the
+    windows on the first, another windows contract refused in that read,
+    and the happy path's request order.
+
+- **D-150 (owner, 2026-10-22): a conversion to ZEC is asked for as what it
+  pays.** The amount typed was the escrow, with Railgun's unshield fee and
+  the broadcast fee on top, so the field said 19.35 while 19.89 left the
+  balance, and a "Total paid" row said so below.
+  - **The total.** The amount typed is the most the conversion debits. The
+    reverse quote (`private_usd_reverse_quote`'s `total` and the page's
+    `unshield_basis_points`) works out the escrow from it with the funding
+    fee it quotes at: the most whole cents whose debit, by the page's
+    `fundingAmounts`, stays within the total (`reverse::escrow_for`). Fees
+    that take it all quote nothing ("This amount can't be bridged…"). Max
+    is the whole balance to the cent.
+  - **The ledger.** No "Total paid" row: the amount, and the review's
+    header, are the total. Fees and amounts paid show to the nearest cent
+    (`formatPrivateUsdNearest`), so the rows add up to it; balances still
+    round down.
+  - **Market value.** The ZEC on either convert screen (the amount on ZEC
+    → USD, the estimate on USD → ZEC) shows its worth at Home's ZEC price,
+    "(≈ $9.80)", on the right of the line under it (the fee note, or
+    "Estimated amount"), with no new request; none in privacy mode or
+    without a price.
+  - Tests: the escrow over a sweep of totals against the page's debit (a
+    cent more would pass it) and fees that take it all, rounding to the
+    nearest cent, the ledger without a total, and the market value (shown;
+    hidden in privacy mode and without a price).
+
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
   `zakura-client-backend` pins `digest =0.11.0-pre.9` (through

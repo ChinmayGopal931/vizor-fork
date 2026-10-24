@@ -25,9 +25,7 @@ use super::super::evm_rpc::{
     ChainReader, ConfirmedSwap, Head, PaidOut, ReverseChainState, SwapRead, SwapStage, SwapState,
     TransactionStatus,
 };
-use super::super::forward::{
-    Forward, ForwardStep, ForwardView, ForwardWait, ForwardZcash, Quoted,
-};
+use super::super::forward::{Forward, ForwardStep, ForwardView, ForwardWait, ForwardZcash, Quoted};
 use super::super::joint::SwapTxStatus;
 use super::super::keys::SwapKeyContext;
 use super::super::models::{
@@ -58,7 +56,10 @@ pub(super) const FUNDING_FEE: u128 = 250_000;
 /// The maker's ZEC deposit into a reverse conversion's joint account.
 pub(super) const REVERSE_DEPOSIT_ZAT: u64 = 100_000;
 /// Railgun's unshield fee, as the Railgun page loads it.
-const UNSHIELD_BPS: u128 = 25;
+pub(super) const UNSHIELD_BPS: u128 = 25;
+/// What a conversion to ZEC is asked for: the least whole cents whose debit
+/// funds an escrow of [`AMOUNT`] at [`FUNDING_FEE`] and [`UNSHIELD_BPS`].
+pub(super) const REVERSE_TOTAL: u32 = 1_260_000;
 
 pub(super) fn pins() -> &'static Deployment {
     deployment::deployment(NETWORK)
@@ -1312,7 +1313,12 @@ impl Harness {
     }
 
     pub(super) fn forward_view(&self) -> ForwardView<'_, FakeChain, FakeServices> {
-        ForwardView::new(self.keys.network(), &self.account, &self.chain, &self.services)
+        ForwardView::new(
+            self.keys.network(),
+            &self.account,
+            &self.chain,
+            &self.services,
+        )
     }
 
     pub(super) fn chain(&self) -> &FakeChain {
@@ -1438,7 +1444,9 @@ impl Harness {
 
     /// A reverse quote of `AMOUNT` for a fresh index, kept as a draft.
     pub(super) async fn reverse_quote(&self) -> Result<ReverseQuoted> {
-        self.reverse().quote(&mut self.store(), AMOUNT as u32).await
+        self.reverse()
+            .quote(&mut self.store(), REVERSE_TOTAL, UNSHIELD_BPS as u32)
+            .await
     }
 
     /// The Railgun page's `reverseCost` for the escrow and the relayer's
