@@ -2414,6 +2414,11 @@ M8 status (2026-10-14): the non-device parts are done.
     route sends only the headers the caller gives (direct requests get
     Dart's). The price request now sends one, `kVizorCoinGeckoUserAgent`,
     the same on every install, so it says nothing the query does not.
+    Review (owner, 2026-10-25): it first read `Veylor`, which on the direct
+    route told CoinGecko the address runs Veylor rather than upstream
+    Vizor; it is now Dart's own `Dart/3.x (dart:io)` on both routes, so a
+    direct request is what it always was and a Tor one looks like any
+    Vizor install's.
   - Tests: the escrow over a sweep of totals against the page's debit (a
     cent more would pass it) and fees that take it all, rounding to the
     nearest cent, the ledger without a total, the market value (shown;

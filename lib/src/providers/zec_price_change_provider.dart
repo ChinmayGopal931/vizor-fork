@@ -20,8 +20,21 @@ const kVizorCoinGeckoPriceBaseUrl = String.fromEnvironment(
 );
 
 /// CoinGecko refuses a request without a User-Agent (403), and the Tor route
-/// sends only the headers given. Every install sends this same value.
-const kVizorCoinGeckoUserAgent = 'Veylor';
+/// sends only the headers given. Both routes send what Dart's `HttpClient`
+/// sends by itself (`Dart/3.x (dart:io)`), as every upstream Vizor install
+/// does: a name of our own would tell CoinGecko, on the direct route, that
+/// the address behind the request runs Veylor.
+final kVizorCoinGeckoUserAgent = _dartUserAgent();
+
+// What `dart:io`'s `HttpClient` sends by itself: `Dart/<major>.<minor>
+// (dart:io)`, as its `_getHttpVersion` builds it from `Platform.version`.
+String _dartUserAgent() {
+  final version = RegExp(r'^(\d+)\.(\d+)').firstMatch(Platform.version);
+  return version == null
+      ? 'Dart (dart:io)'
+      : 'Dart/${version[1]}.${version[2]} (dart:io)';
+}
+
 const zecMarketDataRefreshInterval = Duration(minutes: 3);
 const zecMarketDataCacheTtl = Duration(hours: 1);
 const zecMarketDataCacheStorageKey = 'vizor_zec_market_data_v1';
@@ -135,7 +148,7 @@ class CoinGeckoZecMarketDataSource implements ZecMarketDataSource {
       final response = await _client.request(
         'GET',
         endpoint,
-        headers: const {
+        headers: {
           HttpHeaders.acceptHeader: 'application/json',
           HttpHeaders.userAgentHeader: kVizorCoinGeckoUserAgent,
         },
