@@ -359,6 +359,22 @@ attempts and a seven-day retry interval. Legacy history keeps its attempt budget
 and dates when the classification field is added. Blocked startup must not be
 classified as a new user; retry recovery supplies the successful snapshot.
 
+## Android Package (VIZOR_APPLICATION_ID)
+
+Google Play lists Veylor as `com.veylor.app`; the tree's development id is
+`com.keplr.vizor`. A Play bundle passes
+`--dart-define=VIZOR_APPLICATION_ID=com.veylor.app`, which Gradle reads from
+the forwarded dart-defines like `VIZOR_DEGOOGLED`; without it the build keeps
+the development id. Never edit `applicationId` in place for a release. The
+Play bundle is otherwise `flutter build appbundle --release` with
+`--target-platform android-arm64,android-arm,android-x64` (every ABI the
+plugins ship, or Play serves some devices a build without the core), signed
+with the upload keystore through the `ANDROID_KEYSTORE_*` variables, a build
+number above the last upload, and the keyed RPC JSON through
+`--dart-define-from-file`. Keystore and attestation aliases do not depend on
+the id, but app-link verification (`assetlinks.json`) and zecSwap's token
+issuer allowlist name the shipped id.
+
 ## Deep-link Host (VIZOR_DEEPLINK_BASE_URL)
 
 The HTTPS origin Veylor claims for incoming links has **one** knob on
