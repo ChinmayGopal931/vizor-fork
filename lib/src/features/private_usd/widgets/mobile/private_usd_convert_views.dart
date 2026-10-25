@@ -376,7 +376,7 @@ class MobilePrivateUsdConvertReviewView extends StatelessWidget {
   final bool privacyModeEnabled;
 
   /// The relayer claims for this bridge (Settings): Veylor stays open only
-  /// until the ZEC is sent.
+  /// until the market maker confirms the deposit.
   final bool relayerClaims;
   final VoidCallback onBack;
   final VoidCallback onConfirm;

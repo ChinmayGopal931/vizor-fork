@@ -130,6 +130,7 @@ class RailgunHostHandler(
                 is RailgunException.Unavailable -> "unavailable"
                 is RailgunException.Protocol -> "protocol"
                 is RailgunException.Failed -> FAILED
+                is RailgunException.RpcFailed -> "rpc_failed"
             }
     }
 

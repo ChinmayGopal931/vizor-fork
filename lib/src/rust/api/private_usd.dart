@@ -145,7 +145,8 @@ Future<ApiForwardQuote> privateUsdForwardQuote({
 /// after the save means "maybe opened": read the records and show the
 /// conversion's progress if it is under way. With `relayer_claims` (the
 /// setting, kept on the record), the claim goes to the relayer once the
-/// deposit is out, for it to send when the claim's window opens.
+/// deposit is out and the maker's ready is confirmed, for it to send when
+/// the claim's window opens.
 Future<ApiAcceptResult> privateUsdForwardAccept({
   required String dbPath,
   required String network,
@@ -1440,6 +1441,10 @@ class ApiForwardRecord {
   /// The relayer holds the claim and sends it once the claim's window
   /// opens: the claim no longer needs Veylor open.
   final bool claimHeld;
+
+  /// The relayer turned the claim down or takes none to hold: Veylor
+  /// claims it itself, so the bridge needs it open.
+  final bool claimDeclined;
   final ApiForwardOutcome? outcome;
   final ApiRefundCause? refundCause;
   final ApiNothingSentCause? nothingSentCause;
@@ -1464,6 +1469,7 @@ class ApiForwardRecord {
     this.sweepTxid,
     this.payoutTx,
     required this.claimHeld,
+    required this.claimDeclined,
     this.outcome,
     this.refundCause,
     this.nothingSentCause,
@@ -1490,6 +1496,7 @@ class ApiForwardRecord {
       sweepTxid.hashCode ^
       payoutTx.hashCode ^
       claimHeld.hashCode ^
+      claimDeclined.hashCode ^
       outcome.hashCode ^
       refundCause.hashCode ^
       nothingSentCause.hashCode ^
@@ -1518,6 +1525,7 @@ class ApiForwardRecord {
           sweepTxid == other.sweepTxid &&
           payoutTx == other.payoutTx &&
           claimHeld == other.claimHeld &&
+          claimDeclined == other.claimDeclined &&
           outcome == other.outcome &&
           refundCause == other.refundCause &&
           nothingSentCause == other.nothingSentCause &&

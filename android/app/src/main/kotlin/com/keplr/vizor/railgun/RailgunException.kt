@@ -31,4 +31,9 @@ sealed class RailgunException(
     class Failed(
         message: String
     ) : RailgunException(message)
+
+    /** A sync failed while the Ethereum RPC did not answer, or turned requests away. */
+    class RpcFailed(
+        message: String
+    ) : RailgunException(message)
 }

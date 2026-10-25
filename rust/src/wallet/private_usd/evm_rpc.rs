@@ -339,15 +339,20 @@ pub(crate) struct EvmRpc<'a, T: HttpTransport> {
 
 impl<'a, T: HttpTransport> EvmRpc<'a, T> {
     /// Over the build's keyed RPC URL, or publicnode when `keyed_rpc_url` is
-    /// empty.
-    pub(crate) fn new(transport: &'a T, pins: &'static Deployment, keyed_rpc_url: &str) -> Self {
-        Self {
+    /// empty; `WrongDeployment` for a URL off the network's RPC providers
+    /// (`Deployment::rpc_url`).
+    pub(crate) fn new(
+        transport: &'a T,
+        pins: &'static Deployment,
+        keyed_rpc_url: &str,
+    ) -> Result<Self> {
+        Ok(Self {
             transport,
-            url: pins.rpc_url(keyed_rpc_url).to_owned(),
+            url: pins.rpc_url(keyed_rpc_url)?.to_owned(),
             pins,
             windows: OnceLock::new(),
             next_id: AtomicU64::new(1),
-        }
+        })
     }
 
     async fn rpc(&self, method: &str, params: Value) -> std::result::Result<Value, RpcError> {
@@ -1329,7 +1334,7 @@ mod tests {
                 node(min, late, Some(600), open.clone()),
             ),
         ] {
-            let rpc = EvmRpc::new(&transport, pins, "https://rpc.invalid");
+            let rpc = EvmRpc::new(&transport, pins, "").unwrap();
             let error = rpc.swap(&[1; 32]).await.unwrap_err();
             assert_eq!(error.code, ErrorCode::WrongDeployment, "{case}");
             let read = rpc.read_swap(&[1; 32], &terms(pins)).await.unwrap_err();
@@ -1350,7 +1355,7 @@ mod tests {
 
         // The pinned windows: checked once, then the swap is read.
         let windows = node(min, late, None, get_swap_answer(0));
-        let rpc = EvmRpc::new(&windows, pins, "https://rpc.invalid");
+        let rpc = EvmRpc::new(&windows, pins, "").unwrap();
         assert_eq!(rpc.swap(&[1; 32]).await.unwrap(), None);
         assert_eq!(rpc.swap(&[1; 32]).await.unwrap(), None);
         assert_eq!(windows.sent.borrow().len(), 3 + 2);
@@ -1372,7 +1377,7 @@ mod tests {
             None,
             record,
         );
-        let rpc = EvmRpc::new(&transport, pins, "https://rpc.invalid");
+        let rpc = EvmRpc::new(&transport, pins, "").unwrap();
 
         let read = rpc.read_swap(&[1; 32], &terms).await.unwrap();
         assert_eq!(
@@ -1417,13 +1422,14 @@ mod tests {
             assert_eq!(params[0]["to"], hex0x(&pins.railgun_proxy));
             Ok::<RoutedResponse, RoutedError>(rpc_error(3, "execution reverted"))
         });
-        let rpc = EvmRpc::new(&reverting, pins, "https://rpc.invalid");
+        let rpc = EvmRpc::new(&reverting, pins, "").unwrap();
         assert!(!rpc.railgun_accepts().await.unwrap());
 
         let open = ScriptedTransport::new(|_: &RoutedRequest| {
             Ok::<RoutedResponse, RoutedError>(rpc_result(json!(hex0x(&word(0)))))
         });
-        assert!(EvmRpc::new(&open, pins, "https://rpc.invalid")
+        assert!(EvmRpc::new(&open, pins, "")
+            .unwrap()
             .railgun_accepts()
             .await
             .unwrap());
@@ -1440,7 +1446,7 @@ mod tests {
             );
             Ok::<RoutedResponse, RoutedError>(rpc_result(json!("0x1")))
         });
-        let rpc = EvmRpc::new(&mainnet_node, pins, "https://rpc.invalid");
+        let rpc = EvmRpc::new(&mainnet_node, pins, "").unwrap();
         let error = rpc
             .confirmed_swap(&[1; 32], &terms(pins))
             .await

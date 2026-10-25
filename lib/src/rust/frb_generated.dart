@@ -14298,8 +14298,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiForwardRecord dco_decode_api_forward_record(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 22)
-      throw Exception('unexpected arr length: expect 22 but see ${arr.length}');
+    if (arr.length != 23)
+      throw Exception('unexpected arr length: expect 23 but see ${arr.length}');
     return ApiForwardRecord(
       index: dco_decode_u_32(arr[0]),
       swapId: dco_decode_String(arr[1]),
@@ -14319,12 +14319,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       sweepTxid: dco_decode_opt_String(arr[15]),
       payoutTx: dco_decode_opt_String(arr[16]),
       claimHeld: dco_decode_bool(arr[17]),
-      outcome: dco_decode_opt_box_autoadd_api_forward_outcome(arr[18]),
-      refundCause: dco_decode_opt_box_autoadd_api_refund_cause(arr[19]),
+      claimDeclined: dco_decode_bool(arr[18]),
+      outcome: dco_decode_opt_box_autoadd_api_forward_outcome(arr[19]),
+      refundCause: dco_decode_opt_box_autoadd_api_refund_cause(arr[20]),
       nothingSentCause: dco_decode_opt_box_autoadd_api_nothing_sent_cause(
-        arr[20],
+        arr[21],
       ),
-      endedAt: dco_decode_opt_box_autoadd_i_64(arr[21]),
+      endedAt: dco_decode_opt_box_autoadd_i_64(arr[22]),
     );
   }
 
@@ -19189,6 +19190,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_sweepTxid = sse_decode_opt_String(deserializer);
     var var_payoutTx = sse_decode_opt_String(deserializer);
     var var_claimHeld = sse_decode_bool(deserializer);
+    var var_claimDeclined = sse_decode_bool(deserializer);
     var var_outcome = sse_decode_opt_box_autoadd_api_forward_outcome(
       deserializer,
     );
@@ -19217,6 +19219,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       sweepTxid: var_sweepTxid,
       payoutTx: var_payoutTx,
       claimHeld: var_claimHeld,
+      claimDeclined: var_claimDeclined,
       outcome: var_outcome,
       refundCause: var_refundCause,
       nothingSentCause: var_nothingSentCause,
@@ -25540,6 +25543,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.sweepTxid, serializer);
     sse_encode_opt_String(self.payoutTx, serializer);
     sse_encode_bool(self.claimHeld, serializer);
+    sse_encode_bool(self.claimDeclined, serializer);
     sse_encode_opt_box_autoadd_api_forward_outcome(self.outcome, serializer);
     sse_encode_opt_box_autoadd_api_refund_cause(self.refundCause, serializer);
     sse_encode_opt_box_autoadd_api_nothing_sent_cause(

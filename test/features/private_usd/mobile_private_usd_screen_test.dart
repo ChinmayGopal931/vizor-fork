@@ -39,6 +39,8 @@ void main() {
     PrivateUsdPendingPayment? pendingPayment,
     String? spendNote,
     RailgunScreeningEvent? screeningActivity,
+    VoidCallback? onUseDefaultRpc,
+    VoidCallback? onChangeRpc,
   }) async {
     refreshes = 0;
     await tester.pumpWidget(
@@ -55,6 +57,8 @@ void main() {
             onRefresh: () => refreshes++,
             pendingPayment: pendingPayment,
             spendNote: spendNote,
+            onUseDefaultRpc: onUseDefaultRpc,
+            onChangeRpc: onChangeRpc,
           ),
         ),
       ),
@@ -239,6 +243,44 @@ void main() {
 
     await pumpScreen(tester, const PrivateUsdBalanceState(refreshFailed: true));
     expect(find.text(PrivateUsdCopy.loadFailed), findsOneWidget);
+  });
+
+  testWidgets('a sync the default RPC failed offers another RPC, and the '
+      'user\'s own the default', (tester) async {
+    var changes = 0;
+    await pumpScreen(
+      tester,
+      const PrivateUsdBalanceState(refreshFailed: true, rpcFailed: true),
+      onChangeRpc: () => changes++,
+    );
+    expect(find.text(PrivateUsdCopy.rpcDefaultNotAnswering), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.loadFailed), findsNothing);
+    await tester.tap(
+      find.byKey(const ValueKey('mobile_private_usd_rpc_change')),
+    );
+    expect(changes, 1);
+
+    // The verdict outlives the retry, which shows as loading.
+    await pumpScreen(
+      tester,
+      const PrivateUsdBalanceState(isRefreshing: true, rpcFailed: true),
+      onChangeRpc: () => changes++,
+    );
+    expect(find.text(PrivateUsdCopy.rpcDefaultNotAnswering), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.firstLoad), findsOneWidget);
+
+    await pumpScreen(
+      tester,
+      const PrivateUsdBalanceState(refreshFailed: true, rpcFailed: true),
+      onUseDefaultRpc: () {},
+      onChangeRpc: () => changes++,
+    );
+    expect(find.text(PrivateUsdCopy.rpcNotAnswering), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.rpcDefaultNotAnswering), findsNothing);
+    expect(
+      find.byKey(const ValueKey('mobile_private_usd_rpc_change')),
+      findsNothing,
+    );
   });
 
   testWidgets('refused funds show their row in the danger colour', (

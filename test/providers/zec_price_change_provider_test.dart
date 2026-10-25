@@ -178,6 +178,11 @@ void main() {
       'accept': 'application/json',
       'user-agent': kVizorCoinGeckoUserAgent,
     });
+    // Dart's own, as the direct route sends it: nothing names Veylor.
+    expect(
+      kVizorCoinGeckoUserAgent,
+      matches(RegExp(r'^Dart/\d+\.\d+ \(dart:io\)$')),
+    );
   });
 
   group('parseZecMarketData', () {

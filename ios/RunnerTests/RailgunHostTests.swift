@@ -65,6 +65,10 @@ final class RailgunHostTests: XCTestCase {
       .failure(id: 1, error: .failed("the RPC timed out"))
     )
     XCTAssertEqual(
+      RailgunProtocol.decode(#"{"id":1,"error":{"code":"RPC_FAILED","message":"the Ethereum RPC answers 403"}}"#),
+      .failure(id: 1, error: .rpcFailed("the Ethereum RPC answers 403"))
+    )
+    XCTAssertEqual(
       RailgunProtocol.decode(#"{"id":1,"error":{"code":"SOMETHING_NEW","message":"?"}}"#),
       .failure(id: 1, error: .failed("?"))
     )

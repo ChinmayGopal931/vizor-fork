@@ -7,6 +7,17 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **The hand-over waits for the ready; indices are the seed's (2026-10-25,
+  D-151, D-152).** A ZEC → USD bridge hands its claim to the relayer only
+  once the market maker has made the swap ready at its confirmation depth,
+  no longer as the deposit goes out: an open swap's maker may still cancel
+  it, and the cancel reveals `e`, with which the `z` the relayer held would
+  spend the deposit. The user leaves once the maker confirms, a few minutes
+  after tapping Bridge. Swap indices are counted per seed and ZIP-32 index
+  (`swaps.db` schema 6, `swap_indices`) and survive account deletion, so a
+  seed imported again never counts from 0; and Rust refuses an Ethereum
+  RPC URL off the network's providers. Not yet run on a phone.
+
 - **Mainnet bridging (2026-10-22, D-145).** zecSwap moved mainnet to a
   windows contract (`0xeB3A…898f`, block 26250774, `MIN_WINDOW` 3600 s,
   `LATE_WINDOW` 86400 s), and the app pins it, so Bridge shows on mainnet.
@@ -25,12 +36,14 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   screen on": on by default, it now holds the screen on through the whole
   bridge, whichever screen shows, not only on its progress. Off lets that
   bridge's screen sleep. A ZEC → USD bridge the relayer is to claim says
-  instead to stay until its ZEC is sent. Not yet run on a phone.
+  instead to stay until the market maker confirms the deposit (D-151; until
+  its ZEC was sent, before). Not yet run on a phone.
 
-- **Relayer claims (2026-10-21, D-142).** Right after a ZEC → USD bridge's
-  deposit goes out, Veylor hands its claim to the pinned relayer
+- **Relayer claims (2026-10-21, D-142).** Once a ZEC → USD bridge's deposit
+  is out and the swap ready (D-151; right after the deposit, before),
+  Veylor hands its claim to the pinned relayer
   (`/v1/claim/hold`), which sends it when the window opens, so the user can
-  leave about a minute after tapping Bridge. A Settings toggle, on by
+  leave once the market maker confirms the deposit. A Settings toggle, on by
   default, chooses it per new bridge; with it off, bridges claim as before.
   Built against fakes; the testnet relayer has served the route since
   2026-10-22 (zecSwap release `20261021-held-claims-47650c6`, its ready
@@ -2186,10 +2199,11 @@ M8 status (2026-10-14): the non-device parts are done.
     and until then waits as the window stood. A claim the relayer landed
     ends the bridge on its confirmed `PaidOut` event, as before.
   - **`z` and the relayer.** The hold shows `z` to the pinned relayer
-    before the window. The owner accepts it: the joint account's `nk` and
-    `rivk` go only to the maker, so the relayer alone cannot spend the
-    deposit; theft would need the maker too, and the owner runs both for
-    now. No other mitigation was added.
+    before the window. The owner accepted it on the reasoning that the
+    joint account's `nk` and `rivk` go only to the maker, so the relayer
+    alone could not spend the deposit. That held only while the maker's
+    `e` stayed secret: a maker's cancel reveals it. D-151 moved the
+    hand-over to a ready swap, which the maker can no longer cancel.
   - **Screens.** Once the relayer holds the claim (`ApiForwardRecord
     .claimHeld`, and the bridge not refunding, unwinding or unsettled;
     `PrivateUsdConversionStatus.claimHandedOver`), the progress note says
@@ -2400,11 +2414,125 @@ M8 status (2026-10-14): the non-device parts are done.
     route sends only the headers the caller gives (direct requests get
     Dart's). The price request now sends one, `kVizorCoinGeckoUserAgent`,
     the same on every install, so it says nothing the query does not.
+    Review (owner, 2026-10-25): it first read `Veylor`, which on the direct
+    route told CoinGecko the address runs Veylor rather than upstream
+    Vizor; it is now Dart's own `Dart/3.x (dart:io)` on both routes, so a
+    direct request is what it always was and a Tor one looks like any
+    Vizor install's.
   - Tests: the escrow over a sweep of totals against the page's debit (a
     cent more would pass it) and fees that take it all, rounding to the
     nearest cent, the ledger without a total, the market value (shown;
     hidden in privacy mode and without a price), and the price request's
     headers over Tor.
+
+- **D-151 (review, 2026-10-25): the claim is handed over only on a ready
+  swap.** The review found D-142's hand-over unsafe as reasoned: it posted
+  `z` to the relayer in the step that broadcast the deposit, while the swap
+  was open, and an open swap's maker may still cancel it until `t0`. The
+  cancel reveals `e` on chain for the user's sweep home, and `±(e+z)` is
+  the joint account's spend key, so from then the relayer alone could
+  sweep the deposit, and it would win: the app sweeps only in the
+  foreground, after the refund's confirmations. D9's rationale ("the
+  relayer alone cannot spend the deposit") held only while `e` stayed
+  secret.
+  - **The gate.** `hand_over` runs only from `on_chain`'s `Ready` arm, on
+    the confirmed read (`escrow_confirmations` deep), never from the open
+    swap's step; the maker cannot cancel a ready swap (reference §3.3
+    windows). An open swap the maker never made ready is claimed by the
+    app itself from `t0`, as before, with nothing handed over. On a ready
+    swap the relayer alone can take the deposit only by withholding the
+    claim until the maker refunds from `t1` while the app is away; the
+    owner, who runs the relayer, accepts that, and D9, §3.5 item 5 and
+    AGENTS.md now say so.
+  - **What the user sees.** Veylor is needed until the market maker
+    confirms the deposit, a few minutes rather than about a minute: the
+    review note, the convert and review info sheets and the progress note
+    say so, through the Confirming step, and the keep-open card stays off
+    the way it was while opening (D-143). Once held, "You can leave Veylor
+    now. The market maker confirmed your deposit, and the relayer claims
+    your dollars": a held claim can no longer meet a silent maker, so
+    `convertRelayerMakerSilent` is gone. A claim the relayer declined
+    (`ApiForwardRecord.claimDeclined`, new) shows the keep-open card, as
+    the app claims it.
+  - **Tests.** The forward hand-over tests make the swap ready first
+    (`made_ready`), and `the_claim_is_handed_to_the_relayer_once_the_swap
+    _is_ready` and `nothing_is_handed_over_before_the_swap_is_ready_nor
+    _in_manual_mode` pin that nothing goes while the swap is open, nor
+    from `t0` on an open one. The screens tests follow the copy.
+- **D-152 (review, 2026-10-25): swap indices are the seed's, and Rust
+  holds the RPC URL to the providers.** The review found `swap_counter`
+  keyed by account UUID and deleted with the account, so a seed imported
+  again counted from 0 and reuse protection rested on the chain probe
+  alone, through whichever RPC the user had saved.
+  - **The counter.** `swaps.db` schema 6 adds `swap_indices(index_space,
+    next_index)`, keyed by `SwapKeyContext::index_space`: the seed's
+    fingerprint and the ZIP-32 index, which every swap key derives from.
+    `take_index` takes the greater of the space's counter, the account's
+    `swap_counter` row from before (folded in and dropped) and the
+    account's highest kept record, and `delete_account` removes no
+    counter: a `swap_counter` row of an account deleted before its fold is
+    folded when that account's UUID takes an index again, which a
+    re-import never does; the chain probe still covers that one case.
+    The chain probe stays as it was.
+  - **The RPC URL.** `Deployment::rpc_url` takes a keyed URL only as https
+    on the default port, without credentials, on the network's `rpc_hosts`
+    (publicnode, Alchemy, Infura; a test pins them to
+    `RAILGUN_PAGE_HOSTS`), as Dart already keeps it; any other is
+    `WrongDeployment`, never replaced, so `EvmRpc::new` now returns a
+    result. Dart's rule is unchanged.
+  - **Tests.** The store's counter tests take an index space, pin the
+    fold, the survival of a deletion and a re-import going on from the
+    seed's count, and the 1, 3, 4 and 5 → 6 migration; the deployment
+    test covers the URL rule.
+- **D-153 (owner, 2026-10-25): a sync the RPC failed says so, and offers
+  another RPC.** On the OnePlus 15 the first sync sat on "Loading your
+  shielded balance… keep Veylor open" for most of an hour: each attempt
+  failed (`a Railgun page call failed: failed`) after minutes and the next
+  began 30 s later, so the failure line hardly showed, and the generic
+  `failed` code could not say what had failed. The page's console (DevTools
+  over adb, a debug build) showed publicnode answering 403 now and then
+  (rate limiting) and bursts of `ERR_SOCKS_CONNECTION_FAILED` on every
+  host, with the phone's Wi-Fi handing out IPv6 that carried nothing
+  (100% loss) while its IPv4 worked, and its own network flapping; through
+  the bridge itself every connect succeeded when tried by hand. The owner
+  asked for a message that tells the user to try another RPC.
+  - **The page.** As a sync fails, `rpc-probe.js` asks the first RPC URL
+    `eth_blockNumber` and, unless it answered 403 or 429 (rate limited), a
+    screening node, each with 10 s: the RPC not answering with 200 while
+    the screening node answers at all is `RPC_FAILED`; everything silent,
+    or nothing to compare against, leaves the failure as it was, so a
+    connection that is down is never put on the RPC. The message names no
+    URL (the RPC's can hold a key). `wallet.js` keeps the URLs the engine
+    started on for it.
+  - **The hosts.** `RPC_FAILED` maps to `RailgunException.RpcFailed` and
+    `RailgunError.rpcFailed`, channel code `rpc_failed`, treated as
+    `failed` everywhere but the balance.
+  - **The balance.** `PrivateUsdBalanceState.rpcFailed` is set by such a
+    failure and kept through the retries (a retry may fail before the
+    page asks), until a sync succeeds or the user changes the RPC. The
+    total card then says "The Ethereum RPC isn't answering, so your
+    balance can't load. Try a different RPC." with "Change RPC", which
+    opens Settings' Ethereum RPC sheet and syncs again on what it saved;
+    with the user's own RPC set, the existing "Use the default" stands.
+  - **Not changed.** The first sync's 2 h timeout, and the retries' back
+    off. The dead IPv6 is the network's; the bridge's direct connects try
+    both families side by side, as before.
+  - **The bursts, named.** The bridge now logs a failed connection's kind
+    alone, never its target (`railgun_bridge.rs`: "a direct connection
+    failed: dns error", a Tor connection failing, a connection refused as
+    the route changed), and a debug build prints a page failure's text
+    with the keyed URLs redacted (`RailgunEngine._call`). On the OnePlus
+    the bursts were the phone's resolver dropping lookups for a moment
+    (eight `dns error` in one burst, no page failure from them); a lookup
+    retried once before the page is answered would absorb them (open).
+  - **On the phone.** The first sync on publicnode over 4G completed with
+    every request answered, so the stall was that Wi-Fi's rate limiting
+    and flakiness; the owner then bridged USD to ZEC on their own Infura
+    RPC and it worked. The new message has not yet been seen on a phone:
+    no sync failed on the RPC after the build.
+  - Tests: the probe's verdicts (Node), the code through the Kotlin and
+    Swift decoders, the balance's flag through a failure, a retry and a
+    success, and the card's two offers.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

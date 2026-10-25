@@ -237,8 +237,9 @@ async fn run(listener: TcpListener, session: Session, mut shutdown: oneshot::Rec
                     connections.spawn(async move {
                         let allowed = session.allowed();
                         let connect = |host, port| connect_upstream(session, host, port);
-                        // Per-connection outcomes are not logged: they would
-                        // record the page's activity.
+                        // Per-connection outcomes are not logged, which would
+                        // record the page's activity; a failure logs its kind
+                        // alone, never the target (`connect_upstream`).
                         let _ = serve(stream, allowed, connect).await;
                     });
                 }
@@ -359,7 +360,10 @@ async fn connect_upstream(
             .connect_stream(&host, port)
             .await
             .map(|stream| Box::new(stream) as Box<dyn Tunnel>)
-            .map_err(|_| Reply::GeneralFailure),
+            .map_err(|_| {
+                log::info!("network privacy: Railgun bridge: a Tor connection failed");
+                Reply::GeneralFailure
+            }),
         (Session::Direct, Ok(None)) => {
             // The lease is taken before connecting, so a Tor enable that lands
             // mid-connect aborts the attempt too.
@@ -372,10 +376,22 @@ async fn connect_upstream(
             let stream =
                 std::future::poll_fn(|cx| route.poll(cx, |cx| connecting.as_mut().poll(cx)))
                     .await
-                    .map_err(|_| Reply::GeneralFailure)?;
+                    .map_err(|error| {
+                        // The error names the failure (a lookup, a refused or
+                        // timed-out connect, the route changing), not the host.
+                        log::info!(
+                            "network privacy: Railgun bridge: a direct connection failed: {error}"
+                        );
+                        Reply::GeneralFailure
+                    })?;
             Ok(Box::new(route.into_io(stream)))
         }
-        _ => Err(Reply::NotAllowed),
+        _ => {
+            log::info!(
+                "network privacy: Railgun bridge: a connection is refused, the route changed"
+            );
+            Err(Reply::NotAllowed)
+        }
     }
 }
 

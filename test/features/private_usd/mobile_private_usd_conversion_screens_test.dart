@@ -238,7 +238,7 @@ void main() {
     });
 
     testWidgets('with the relayer claiming, Veylor stays open only until '
-        'the ZEC is sent', (tester) async {
+        'the market maker confirms the deposit', (tester) async {
       await pumpReview(
         tester,
         previewPrivateUsdConvertState(
@@ -358,21 +358,24 @@ void main() {
       expect(keepOpenCard, findsNothing);
       expect(find.text('1 of 2 · about 1 min'), findsOneWidget);
 
-      // The maker silent past its confirmations: the relayer claims anyway.
-      final silent = PrivateUsdConversionStatus(
+      // The claim is handed over only once the market maker made the swap
+      // ready, so past the deposit's confirmations the maker is never
+      // called silent.
+      final confirmed = PrivateUsdConversionStatus(
         record: previewPrivateUsdRecord(
           depositConfirmations: 2,
           claimHeld: true,
         ),
         wait: ApiForwardWait.confirming,
       );
-      await pumpProgress(tester, silent);
-      final t0 = DateTime.fromMillisecondsSinceEpoch(silent.record.t0! * 1000);
+      await pumpProgress(tester, confirmed);
+      final t0 = DateTime.fromMillisecondsSinceEpoch(
+        confirmed.record.t0! * 1000,
+      );
+      expect(find.text(PrivateUsdCopy.convertRelayerClaims), findsOneWidget);
       expect(
-        find.text(
-          PrivateUsdCopy.convertRelayerMakerSilent(formatDayMonthTime(t0)),
-        ),
-        findsOneWidget,
+        find.text(PrivateUsdCopy.convertMakerSilent(formatDayMonthTime(t0))),
+        findsNothing,
       );
       expect(keepOpenCard, findsNothing);
     });
@@ -428,8 +431,8 @@ void main() {
       expect(changes, [false, true]);
     });
 
-    testWidgets('with the relayer to claim, the opening asks for Veylor only '
-        'until the ZEC is sent', (tester) async {
+    testWidgets('with the relayer to claim, the bridge asks for Veylor only '
+        'until the market maker confirms the deposit', (tester) async {
       await pumpProgress(
         tester,
         PrivateUsdConversionStatus(
@@ -448,12 +451,30 @@ void main() {
       );
       expect(keepOpenCard, findsNothing);
 
-      // The deposit out and the claim not held: Veylor claims it, so it
-      // stays open after all.
+      // The deposit out, waiting for the maker to confirm it: still so.
       await pumpProgress(
         tester,
         PrivateUsdConversionStatus(
           record: previewPrivateUsdRecord(depositConfirmations: 1),
+          wait: ApiForwardWait.confirming,
+        ),
+        relayerClaims: true,
+      );
+      expect(
+        find.text(PrivateUsdCopy.convertRelayerReviewNote),
+        findsOneWidget,
+      );
+      expect(keepOpenCard, findsNothing);
+
+      // The relayer declined the claim: Veylor claims it, so it stays open
+      // after all.
+      await pumpProgress(
+        tester,
+        PrivateUsdConversionStatus(
+          record: previewPrivateUsdRecord(
+            depositConfirmations: 1,
+            claimDeclined: true,
+          ),
           wait: ApiForwardWait.confirming,
         ),
         relayerClaims: true,

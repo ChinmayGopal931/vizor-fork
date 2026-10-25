@@ -23,6 +23,11 @@ enum RailgunHostErrorCode {
   /// The engine, the chain or a screening node failed.
   failed,
 
+  /// A sync failed while the Ethereum RPC did not answer, or turned requests
+  /// away (the page asked it, and a screening node, as the sync failed): as
+  /// [failed], and the balance offers another RPC.
+  rpcFailed,
+
   /// The handler refused its arguments: a bug.
   badArgs,
 
@@ -35,6 +40,7 @@ enum RailgunHostErrorCode {
     'unavailable' => unavailable,
     'protocol' => protocol,
     'failed' => failed,
+    'rpc_failed' => rpcFailed,
     'bad_args' => badArgs,
     _ => unknown,
   };

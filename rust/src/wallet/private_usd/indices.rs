@@ -2,10 +2,12 @@
 //!
 //! An index is spent once its share has gone to a maker: claiming reveals
 //! `z`, so another swap that shares it becomes spendable by its maker. The
-//! store commits each index as taken before it is used, and an index the chain
-//! already shows in use, on the pinned contract or one retired before it, is
-//! skipped (and stays spent), so a reinstall, or the same seed in another
-//! wallet, never reuses one.
+//! store commits each index as taken before it is used, under the seed and
+//! ZIP-32 index the keys derive from, so the counter outlives the account and
+//! an account imported again from the seed goes on from it; and an index the
+//! chain already shows in use, on the pinned contract or one retired before
+//! it, is skipped (and stays spent), so a reinstall, or the same seed in
+//! another wallet, never reuses one.
 
 use super::evm_rpc::ChainReader;
 use super::keys::SwapKeyContext;
@@ -26,7 +28,7 @@ pub(crate) async fn take_index<C: ChainReader>(
     account: &str,
 ) -> Result<u32> {
     for _ in 0..MAX_SKIPPED {
-        let index = with_operations(|| store.take_index(account))?;
+        let index = with_operations(|| store.take_index(&keys.index_space(), account))?;
         if !used_on_chain(contracts, keys, index).await? {
             return Ok(index);
         }
@@ -149,7 +151,7 @@ mod tests {
 
         // Indices 0 to 2 are in use on chain: 3 is taken, 0 to 2 stay spent.
         let first_three = node((0..3).map(id_of).collect(), HashSet::new(), pinned_min);
-        let chain = EvmRpc::new(&first_three, pins, "https://rpc.invalid");
+        let chain = EvmRpc::new(&first_three, pins, "").unwrap();
         let contracts = [(&chain, pins.maker)];
         assert_eq!(
             take_index(&mut store, &contracts, &keys, ACCOUNT)
@@ -160,20 +162,23 @@ mod tests {
 
         // Sixteen in a row in use: refused, and all sixteen stay spent.
         let all = node((4..40).map(id_of).collect(), HashSet::new(), pinned_min);
-        let chain = EvmRpc::new(&all, pins, "https://rpc.invalid");
+        let chain = EvmRpc::new(&all, pins, "").unwrap();
         let contracts = [(&chain, pins.maker)];
         let error = take_index(&mut store, &contracts, &keys, ACCOUNT)
             .await
             .unwrap_err();
         assert_eq!(error.code, ErrorCode::IndicesInUse);
-        assert_eq!(store.take_index(ACCOUNT).unwrap(), 4 + MAX_SKIPPED);
+        assert_eq!(
+            store.take_index(&keys.index_space(), ACCOUNT).unwrap(),
+            4 + MAX_SKIPPED
+        );
 
         // An index the retired lock contract shows in use is skipped too,
         // in a store that lost its counter.
         let dir = tempfile::tempdir().unwrap();
         let mut store = SwapStore::open(dir.path()).unwrap();
         let retired = node(HashSet::new(), (0..2).map(id_of).collect(), pinned_min);
-        let chain = EvmRpc::new(&retired, pins, "https://rpc.invalid");
+        let chain = EvmRpc::new(&retired, pins, "").unwrap();
         let contracts = [(&chain, pins.maker)];
         assert_eq!(
             take_index(&mut store, &contracts, &keys, ACCOUNT)
@@ -197,7 +202,7 @@ mod tests {
             HashSet::new(),
             pins.swap_contract().unwrap().min_window,
         );
-        let chain = EvmRpc::new(&first_two, pins, "https://rpc.invalid");
+        let chain = EvmRpc::new(&first_two, pins, "").unwrap();
         let contracts = [(&chain, pins.maker)];
         assert_eq!(
             take_index(&mut store, &contracts, &keys, ACCOUNT)
@@ -227,7 +232,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mut store = SwapStore::open(dir.path()).unwrap();
         let other = node(HashSet::new(), HashSet::new(), 3_600);
-        let chain = EvmRpc::new(&other, pins, "https://rpc.invalid");
+        let chain = EvmRpc::new(&other, pins, "").unwrap();
         let contracts = [(&chain, pins.maker)];
 
         let error = take_index(&mut store, &contracts, &keys, ACCOUNT)

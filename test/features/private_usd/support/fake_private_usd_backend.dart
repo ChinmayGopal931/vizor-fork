@@ -27,6 +27,7 @@ ApiForwardRecord forwardRecord({
   String? sweepTxid,
   String? payoutTx,
   bool claimHeld = false,
+  bool claimDeclined = false,
   int? endedAt,
 }) => ApiForwardRecord(
   index: index,
@@ -46,6 +47,7 @@ ApiForwardRecord forwardRecord({
   sweepTxid: sweepTxid,
   payoutTx: payoutTx,
   claimHeld: claimHeld,
+  claimDeclined: claimDeclined,
   outcome: outcome,
   refundCause: refundCause,
   nothingSentCause: nothingSentCause,
