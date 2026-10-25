@@ -209,6 +209,7 @@ pub(crate) fn clear_sessions() {
     drop(offers);
     lock(&FUNDINGS).clear();
     MAKER_CHECKS.clear();
+    super::tokens::clear_sessions();
 }
 
 // ---- reverse fundings ----
@@ -433,6 +434,10 @@ pub(crate) fn problem(code: ErrorCode) -> ErrorCode {
     match code {
         RelayerUnreachable | RelayerRefused | RelayerFee | EthereumUnreachable | RailgunClosed
         | ZcashWallet | DepositUnpayable | ZcashRejected | Mismatch | RouteBlocked => code,
+        // The token gate's: the engine runs the issuance, or says why not.
+        TokensNeeded | TokensRefused | TokensUnreachable | TokensDeviceRefused | NoTokensToday => {
+            code
+        }
         ChainLagging | ChainUnreadable => EthereumUnreachable,
         // A service serving another deployment reads as the relayer being
         // unreachable.

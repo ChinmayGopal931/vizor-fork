@@ -34,6 +34,8 @@ impl HttpTransport for RoutedHttp {
 pub(crate) enum Service {
     Maker,
     Relayer,
+    /// The Privacy Pass token issuer (`tokens.rs`).
+    Issuer,
 }
 
 impl Service {
@@ -41,6 +43,7 @@ impl Service {
         match self {
             Self::Maker => "maker",
             Self::Relayer => "relayer",
+            Self::Issuer => "token issuer",
         }
     }
 }
@@ -101,6 +104,9 @@ pub(crate) struct Refusal {
     pub transactions: Vec<[u8; 32]>,
     /// How long the service asked to wait (`Retry-After` delay-seconds).
     pub retry_after_secs: Option<u64>,
+    /// What a `401 tokenRequired` asks for: the `WWW-Authenticate` header
+    /// as sent, a `PrivateToken` challenge and key (`tokens::pay`).
+    pub www_authenticate: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -174,11 +180,13 @@ impl From<SwapHttpError> for PrivateUsdError {
                 (Service::Maker, Some(SwapErrorCode::TokenRequired)) => ErrorCode::TokensNeeded,
                 (Service::Maker, _) => ErrorCode::MakerUnavailable,
                 (Service::Relayer, _) => ErrorCode::RelayerRefused,
+                (Service::Issuer, _) => ErrorCode::TokensUnreachable,
             },
             SwapHttpError::Unreachable { service, .. }
             | SwapHttpError::Unreadable { service, .. } => match service {
                 Service::Maker => ErrorCode::MakerUnavailable,
                 Service::Relayer => ErrorCode::RelayerUnreachable,
+                Service::Issuer => ErrorCode::TokensUnreachable,
             },
         };
         PrivateUsdError::new(code, error.to_string())
@@ -281,6 +289,7 @@ fn refusal(service: Service, response: &RoutedResponse) -> Refusal {
         reason,
         transactions,
         retry_after_secs: response.header("retry-after").and_then(delay_seconds),
+        www_authenticate: response.header("www-authenticate").map(str::to_owned),
     }
 }
 

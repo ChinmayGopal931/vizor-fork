@@ -674,7 +674,10 @@ mod tests {
             received[0].header("zecswap-ticket"),
             Some(ticket.0.as_str())
         );
-        println!("VEYLOR_HOLD_BODY={}", String::from_utf8_lossy(&received[0].body));
+        println!(
+            "VEYLOR_HOLD_BODY={}",
+            String::from_utf8_lossy(&received[0].body)
+        );
         let body: Value = serde_json::from_slice(&received[0].body).unwrap();
         assert_eq!(body["swapId"], format!("0x{}", "5c".repeat(32)));
         assert_eq!(body["secret"], format!("0x{}", "2a".repeat(32)));

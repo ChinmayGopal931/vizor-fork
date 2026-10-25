@@ -1,6 +1,7 @@
 import '../../../rust/api/private_usd.dart'
     show ApiNothingSentCause, ApiPrivateUsdErrorCode, ApiRefundCause;
 import '../private_usd_copy.dart';
+import '../services/private_usd_attestation.dart';
 import '../services/private_usd_spend_guard.dart' show PrivateUsdSpendStatus;
 
 /// Why Send, Withdraw or a new conversion cannot start now; null when they
@@ -47,6 +48,11 @@ String? privateUsdErrorMessage(ApiPrivateUsdErrorCode code) => switch (code) {
     PrivateUsdCopy.convertErrorTokensUnavailable,
   ApiPrivateUsdErrorCode.tokensNeeded =>
     PrivateUsdCopy.convertResultMakerUnavailable,
+  ApiPrivateUsdErrorCode.tokensUnreachable => PrivateUsdCopy.tokensUnreachable,
+  ApiPrivateUsdErrorCode.tokensDeviceRefused =>
+    PrivateUsdCopy.tokensDeviceRefused,
+  ApiPrivateUsdErrorCode.noTokensToday => PrivateUsdCopy.tokensNoneToday,
+  ApiPrivateUsdErrorCode.keystore => PrivateUsdCopy.tokensKeystore,
   ApiPrivateUsdErrorCode.quoteExpired => PrivateUsdCopy.convertQuoteRanOut,
   ApiPrivateUsdErrorCode.makerUnavailable => PrivateUsdCopy.convertErrorMaker,
   ApiPrivateUsdErrorCode.makerBusy => PrivateUsdCopy.convertErrorMakerBusy,
@@ -83,8 +89,24 @@ String privateUsdProblemMessage(ApiPrivateUsdErrorCode code) => switch (code) {
   ApiPrivateUsdErrorCode.mismatch => PrivateUsdCopy.convertProblemMismatch,
   ApiPrivateUsdErrorCode.storeUnreadable => PrivateUsdCopy.convertErrorStore,
   ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.convertProblemRoute,
+  // The token gate's, while a resumed accept waits for the issuance.
+  ApiPrivateUsdErrorCode.tokensNeeded => PrivateUsdCopy.convertProblemTokens,
+  ApiPrivateUsdErrorCode.tokensRefused ||
+  ApiPrivateUsdErrorCode.tokensUnreachable => PrivateUsdCopy.tokensUnreachable,
+  ApiPrivateUsdErrorCode.tokensDeviceRefused =>
+    PrivateUsdCopy.tokensDeviceRefused,
+  ApiPrivateUsdErrorCode.noTokensToday => PrivateUsdCopy.tokensNoneToday,
+  ApiPrivateUsdErrorCode.keystore => PrivateUsdCopy.tokensKeystore,
   _ => PrivateUsdCopy.convertProblemUnexpected,
 };
+
+/// What to say when the phone could not attest an issuance.
+String privateUsdAttestationMessage(PrivateUsdAttestationErrorCode code) =>
+    switch (code) {
+      PrivateUsdAttestationErrorCode.unavailable =>
+        PrivateUsdCopy.tokensUnavailable,
+      PrivateUsdAttestationErrorCode.keystore => PrivateUsdCopy.tokensKeystore,
+    };
 
 /// Why a forward conversion ended with nothing sent.
 String privateUsdNothingSentMessage(

@@ -92,6 +92,8 @@ tendermint-light-client-verifier = "0.40.4"
 # Private USD. One zecSwap rev for both crates.
 zecswap-core    = { git = "https://github.com/JustZappIt/zecSwap", rev = "b18135cbe314c2467e0cffd8fe8fe6e1736fe6cc" }
 zecswap-railgun = { git = "https://github.com/JustZappIt/zecSwap", rev = "b18135cbe314c2467e0cffd8fe8fe6e1736fe6cc" }
+# Privacy Pass tokens for the makers' accepts (M4); its client half only.
+zecswap-tokens  = { git = "https://github.com/JustZappIt/zecSwap", rev = "b18135cbe314c2467e0cffd8fe8fe6e1736fe6cc", default-features = false }
 # The Railgun wallet's BIP-32 path, over the same secp256k1 as the rest of the
 # wallet: the bip32 and secp256k1 releases the Zakura transparent crates use.
 bip32  = { version = "=0.6.0", default-features = false, features = ["alloc", "secp256k1-ffi"] }

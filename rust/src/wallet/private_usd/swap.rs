@@ -22,6 +22,7 @@ use super::models::{
 };
 use super::relayer_client::RelayerClient;
 use super::store::SwapStore;
+use super::tokens::{TokenPins, TokenStore};
 use super::transport::{HttpTransport, Refusal, SwapErrorCode, SwapHttpError};
 use super::{fail, terms, with_operations, ErrorCode, PrivateUsdError, Result};
 use crate::wallet::network::WalletNetwork;
@@ -309,6 +310,7 @@ pub(crate) async fn check_maker<T: HttpTransport>(
     pins: &Deployment,
     makers: &MakerChecks,
     reverse: bool,
+    token_pins: &TokenPins,
 ) -> Result<()> {
     let network = pins.network;
     if makers.checked(network, reverse) {
@@ -345,7 +347,7 @@ pub(crate) async fn check_maker<T: HttpTransport>(
     if info
         .token_return_key
         .as_deref()
-        .is_some_and(|key| key != pins.maker_token_return_key)
+        .is_some_and(|key| key != token_pins.return_key)
     {
         return fail(
             ErrorCode::TokensRefused,
@@ -566,10 +568,23 @@ pub(crate) struct SwapCall<'s> {
     pub lightwalletd_url: &'s str,
     /// The keyed Ethereum RPC URL, or empty for publicnode. Never stored.
     pub eth_rpc_url: &'s str,
+    /// The device's token store (`tokens.rs`); `None` for a call that
+    /// neither pays nor collects, which gets one kept in memory alone.
+    pub tokens_path: Option<&'s Path>,
     pub keys: &'s SwapKeyContext,
 }
 
 impl<'s> SwapCall<'s> {
+    /// The device's token store, or one kept in memory alone for a call
+    /// that neither pays nor collects.
+    pub(crate) fn tokens(&self) -> TokenStore {
+        let pins = TokenPins::of(self.pins());
+        match self.tokens_path {
+            Some(path) => TokenStore::open(path, pins),
+            None => TokenStore::detached(pins),
+        }
+    }
+
     pub(crate) fn pins(&self) -> &'static Deployment {
         deployment::deployment(self.keys.network())
     }

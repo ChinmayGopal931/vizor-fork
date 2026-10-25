@@ -33,6 +33,7 @@
 		LEDGERIOS010000000000002 /* BleTransport in Frameworks */ = {isa = PBXBuildFile; productRef = LEDGERIOS030000000000001 /* BleTransport */; };
 		LEDGERIOS010000000000003 /* LedgerMobileHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = LEDGERIOS000000000000002 /* LedgerMobileHandlerTests.swift */; };
 		RAILGUNIOS01000000000001 /* RailgunHostHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000001 /* RailgunHostHandler.swift */; };
+		PUSDATTEST01000000000001 /* PrivateUsdAttestationHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = PUSDATTEST00000000000001 /* PrivateUsdAttestationHandler.swift */; };
 		RAILGUNIOS01000000000002 /* RailgunPageHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000002 /* RailgunPageHost.swift */; };
 		RAILGUNIOS01000000000003 /* RailgunPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000003 /* RailgunPage.swift */; };
 		RAILGUNIOS01000000000004 /* RailgunSchemeHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAILGUNIOS00000000000004 /* RailgunSchemeHandler.swift */; };
@@ -131,6 +132,7 @@
 		NUMPADIOS000000000000001 /* NumericKeyboardHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NumericKeyboardHandler.swift; sourceTree = "<group>"; };
 		LEDGERIOS000000000000002 /* LedgerMobileHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LedgerMobileHandlerTests.swift; sourceTree = "<group>"; };
 		RAILGUNIOS00000000000001 /* RailgunHostHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunHostHandler.swift; sourceTree = "<group>"; };
+		PUSDATTEST00000000000001 /* PrivateUsdAttestationHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateUsdAttestationHandler.swift; sourceTree = "<group>"; };
 		RAILGUNIOS00000000000002 /* RailgunPageHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunPageHost.swift; sourceTree = "<group>"; };
 		RAILGUNIOS00000000000003 /* RailgunPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunPage.swift; sourceTree = "<group>"; };
 		RAILGUNIOS00000000000004 /* RailgunSchemeHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RailgunSchemeHandler.swift; sourceTree = "<group>"; };
@@ -325,6 +327,7 @@
 				1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */,
 				1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */,
 				74858FAE1ED2DC5600515810 /* AppDelegate.swift */,
+				PUSDATTEST00000000000001 /* PrivateUsdAttestationHandler.swift */,
 				RAILGUNIOS00000000000000 /* Railgun */,
                 A0D001000000000000000002 /* MobileNavigationGeometryHandler.m */,
                 A0D001000000000000000003 /* MobileNavigationGeometryHandler.h */,
@@ -624,6 +627,7 @@
                 A0D001000000000000000001 /* MobileNavigationGeometryHandler.m in Sources */,
 				LEDGERIOS010000000000001 /* LedgerMobileHandler.swift in Sources */,
 				RAILGUNIOS01000000000001 /* RailgunHostHandler.swift in Sources */,
+				PUSDATTEST01000000000001 /* PrivateUsdAttestationHandler.swift in Sources */,
 				RAILGUNIOS01000000000002 /* RailgunPageHost.swift in Sources */,
 				RAILGUNIOS01000000000003 /* RailgunPage.swift in Sources */,
 				RAILGUNIOS01000000000004 /* RailgunSchemeHandler.swift in Sources */,

@@ -275,6 +275,17 @@ Future<void> deletePrivateUsdDirectories() async {
   }
 }
 
+/// The device-wide Privacy Pass token store for [network]:
+/// `<support>/private_usd_tokens_<network>.json`, one per network, never per
+/// account. Rust creates it on the first write and keeps a `.tmp` beside it
+/// while writing. A full reset deletes it ([deletePrivateUsdTokenStores]);
+/// the Keystore attestation key is never deleted.
+Future<String> getPrivateUsdTokenStorePath(String network) async {
+  _checkPrivateUsdNetwork(network);
+  final support = await getWalletSupportDirectory();
+  return '${support.path}${Platform.pathSeparator}$_privateUsdTokenStorePrefix$network.json';
+}
+
 /// Removes the device-wide token stores and their temporary files, for a
 /// full reset. The Keystore attestation key stays. Attempts every file and
 /// then rethrows the first failure.

@@ -359,6 +359,13 @@ class _ConvertLayout extends StatelessWidget {
   }
 }
 
+/// A review's note, with the Tor-off disclosure under it while a maker asks
+/// for Privacy Pass tokens and Tor is off (plan M4, D10).
+String privateUsdReviewNote(String note, {required bool torOffDisclosure}) =>
+    torOffDisclosure
+    ? '$note\n\n${PrivateUsdCopy.tokensTorOffDisclosure}'
+    : note;
+
 /// The forward review: what is paid and what arrives, the quote's ledger
 /// and how long it holds, and how long to keep Veylor open.
 class MobilePrivateUsdConvertReviewView extends StatelessWidget {
@@ -369,6 +376,7 @@ class MobilePrivateUsdConvertReviewView extends StatelessWidget {
     required this.onBack,
     required this.onConfirm,
     required this.onRefreshQuote,
+    this.torOffDisclosure = false,
     super.key,
   });
 
@@ -378,6 +386,10 @@ class MobilePrivateUsdConvertReviewView extends StatelessWidget {
   /// The relayer claims for this bridge (Settings): Veylor stays open only
   /// until the market maker confirms the deposit.
   final bool relayerClaims;
+
+  /// A maker asks for Privacy Pass tokens and Tor is off: the review says
+  /// the token issuer and the maker see one connection (plan M4, D10).
+  final bool torOffDisclosure;
   final VoidCallback onBack;
   final VoidCallback onConfirm;
   final VoidCallback onRefreshQuote;
@@ -418,9 +430,12 @@ class MobilePrivateUsdConvertReviewView extends StatelessWidget {
               quote: quote,
               privacyModeEnabled: privacyModeEnabled,
             ),
-      note: relayerClaims
-          ? PrivateUsdCopy.convertRelayerReviewNote
-          : PrivateUsdCopy.convertBackgroundNote,
+      note: privateUsdReviewNote(
+        relayerClaims
+            ? PrivateUsdCopy.convertRelayerReviewNote
+            : PrivateUsdCopy.convertBackgroundNote,
+        torOffDisclosure: torOffDisclosure,
+      ),
       state: state,
       message: state.message,
       onConfirm: onConfirm,
@@ -438,11 +453,15 @@ class MobilePrivateUsdReverseReviewView extends StatelessWidget {
     required this.onBack,
     required this.onConfirm,
     required this.onRefreshQuote,
+    this.torOffDisclosure = false,
     super.key,
   });
 
   final PrivateUsdReverseConvertState state;
   final bool privacyModeEnabled;
+
+  /// As [MobilePrivateUsdConvertReviewView.torOffDisclosure].
+  final bool torOffDisclosure;
   final VoidCallback onBack;
   final VoidCallback onConfirm;
   final VoidCallback onRefreshQuote;
@@ -484,8 +503,11 @@ class MobilePrivateUsdReverseReviewView extends StatelessWidget {
             ),
       note: draft == null
           ? null
-          : PrivateUsdCopy.reverseKeepOpen(
-              formatDayMonthTime(privateUsdReadyBy(draft)),
+          : privateUsdReviewNote(
+              PrivateUsdCopy.reverseKeepOpen(
+                formatDayMonthTime(privateUsdReadyBy(draft)),
+              ),
+              torOffDisclosure: torOffDisclosure,
             ),
       state: state,
       message: state.message,

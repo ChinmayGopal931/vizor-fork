@@ -1622,6 +1622,56 @@ is refused.
   contract's records at 3: a build that knows an older schema refuses it as
   newer.
 
+**Privacy Pass tokens (plan M4, reference §5.9).** A maker that takes
+tokens answers an unpaid accept `401` with a `WWW-Authenticate` challenge;
+the client is built and dormant until a maker does, so no app release is
+needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
+`PrivateUsdAttestationHandler` (channel
+`com.zcash.wallet/private_usd_attestation`; its Swift twin answers
+`unavailable`), Dart `services/private_usd_tokens_service.dart` and
+`private_usd_attestation.dart`.
+
+- **What is stored where.** The device-wide state is one file per network,
+  `<support>/private_usd_tokens_<network>.json`
+  (`getPrivateUsdTokenStorePath`), written atomically and read leniently:
+  the tokens held, the requests for tokens back (with the swap and its
+  direction), the last challenge a maker sent, the day the issuer ran out,
+  and whether the maker asks. Never per account. A full reset deletes it;
+  the Keystore attestation key (`vizor_privateusd_attest_<issuerName>`) is
+  never deleted and is remade only once a certificate in its chain expired:
+  a new key would be a fresh allowance (X4). Every secret in the file is
+  `Redacted`; log nothing but status codes.
+- **The pins.** Only the deployment's issuer name, token key and the
+  maker's return key are honoured (`TokenPins`): a challenge naming others,
+  or a day outside today ± 600 s, is `TokensRefused`, and `/v1/info` with
+  another return key refuses the maker at the quote.
+- **The 401 rule.** An accept posts unpaid first; with tokens on, a `401`
+  is answered before the quote is taken, so re-posting is safe. With a
+  token held it posts again with `Authorization: PrivateToken` and the
+  body's `tokenRequest` (only on a paid post; never on an unpaid one, and
+  never kept on a reverse record), at most 3 paid tries, settling each by
+  its answer: `2xx` and `401` drop the token, `401` its pending return too,
+  anything else or no answer keeps the token first in line. Issuer tokens
+  go before returned ones, which go only once today is spent. No token
+  held is `TokensNeeded`: Dart runs the issuance once and accepts the same
+  index again, else abandons.
+- **Issuance (X11)** is two FRB phases around the keystore:
+  `private_usd_tokens_issuance_begin` (the maker's `/v1/info` first, then
+  `GET /v1/token-key` against the pins, the blinded batch, `GET
+  /v1/challenge`, a 5-minute session) and `…_finish` (`POST /v1/tokens`,
+  the first `403 rejected` signed again once over a fresh challenge, the
+  second `TokensDeviceRefused`; `429` or a short batch mark today spent).
+  Sessions die on finish, expiry and `private_usd_clear_sessions`.
+- **The prefetch.** The maker's challenge is deterministic, so a batch is
+  fetched ahead whenever its info shows the pinned return key: on the
+  convert screen, after every conversion ends and from a resumed accept
+  turned away at the gate. Without the return key nothing is asked of the
+  issuer. Returns are collected on every step once the deposit is out (or
+  the escrow funded) and during each prefetch pass.
+- **Route.** Issuer requests go through `routed_http` like every other,
+  over Tor when Tor is on; with Tor off the review screens disclose that
+  the issuer and the maker see one connection.
+
 **Network: Tor and the Railgun page.**
 
 - All engine HTTP (maker, relayer, Ethereum RPC) goes through `routed_http`.

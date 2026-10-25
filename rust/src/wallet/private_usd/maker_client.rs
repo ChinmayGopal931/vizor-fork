@@ -8,7 +8,7 @@ use serde::Serialize;
 use super::deployment::{CLIENT_TIMEOUT, QUICK_TIMEOUT};
 use super::models::{
     is_fixed_hex, Address, Hex, MakerInfo, ReverseQuote, SwapAcceptance, SwapAccepted, SwapQuote,
-    Word,
+    SwapStatus, Word,
 };
 use super::transport::{get_json, post_json, HttpTransport, Service, SwapHttpError};
 use super::{ErrorCode, PrivateUsdError};
@@ -79,13 +79,44 @@ impl<'a, T: HttpTransport> MakerClient<'a, T> {
         .await
     }
 
-    /// `POST /v1/quote/{quoteId}/accept`.
+    /// `POST /v1/quote/{quoteId}/accept`; `authorization` spends a Privacy
+    /// Pass token (`tokens::Payment`), and the acceptance then carries its
+    /// `tokenRequest`.
     pub(crate) async fn accept(
         &self,
         quote_id: &str,
         acceptance: &SwapAcceptance,
+        authorization: Option<&str>,
     ) -> Result<SwapAccepted, SwapHttpError> {
-        self.accept_at("/v1/quote", quote_id, acceptance).await
+        self.accept_at("/v1/quote", quote_id, acceptance, authorization)
+            .await
+    }
+
+    /// `GET /v1/swaps/{id}`: what the maker keeps of a forward swap, the
+    /// accept's token handed back included once the user paid in.
+    pub(crate) async fn swap_status(&self, swap_id: &Word) -> Result<SwapStatus, SwapHttpError> {
+        get_json(
+            self.transport,
+            Service::Maker,
+            self.url(&format!("/v1/swaps/{}", swap_id.to_hex())),
+            |_| Ok(()),
+        )
+        .await
+    }
+
+    /// `GET /v1/reverse/swaps/{id}`: as [`Self::swap_status`], for a reverse
+    /// swap once its escrow is funded.
+    pub(crate) async fn reverse_swap_status(
+        &self,
+        swap_id: &Word,
+    ) -> Result<SwapStatus, SwapHttpError> {
+        get_json(
+            self.transport,
+            Service::Maker,
+            self.url(&format!("/v1/reverse/swaps/{}", swap_id.to_hex())),
+            |_| Ok(()),
+        )
+        .await
     }
 
     /// `POST /v1/reverse/quote`: `units` of the user's private dollars,
@@ -113,13 +144,15 @@ impl<'a, T: HttpTransport> MakerClient<'a, T> {
         .await
     }
 
-    /// `POST /v1/reverse/quote/{quoteId}/accept`.
+    /// `POST /v1/reverse/quote/{quoteId}/accept`; `authorization` as for
+    /// [`Self::accept`].
     pub(crate) async fn accept_reverse(
         &self,
         quote_id: &str,
         acceptance: &SwapAcceptance,
+        authorization: Option<&str>,
     ) -> Result<SwapAccepted, SwapHttpError> {
-        self.accept_at("/v1/reverse/quote", quote_id, acceptance)
+        self.accept_at("/v1/reverse/quote", quote_id, acceptance, authorization)
             .await
     }
 
@@ -128,6 +161,7 @@ impl<'a, T: HttpTransport> MakerClient<'a, T> {
         prefix: &str,
         quote_id: &str,
         acceptance: &SwapAcceptance,
+        authorization: Option<&str>,
     ) -> Result<SwapAccepted, SwapHttpError> {
         // The id becomes a path segment: only a well-formed one goes out.
         if !is_fixed_hex(quote_id, 32) {
@@ -142,7 +176,9 @@ impl<'a, T: HttpTransport> MakerClient<'a, T> {
             self.url(&format!("{prefix}/{quote_id}/accept")),
             acceptance,
             CLIENT_TIMEOUT,
-            &[],
+            &authorization
+                .map(|token| vec![("authorization", token)])
+                .unwrap_or_default(),
             |_: &SwapAccepted| Ok(()),
         )
         .await
@@ -221,19 +257,25 @@ mod tests {
 
         // An accept names the deadlines, the ticket and the contract's late
         // window.
-        let opened = maker.accept(&quote_id, &acceptance()).await.unwrap();
+        let opened = maker.accept(&quote_id, &acceptance(), None).await.unwrap();
         assert_eq!((opened.t0, opened.t1), (1_790_002_700, 1_790_006_300));
         assert_eq!(opened.late_window, Some(3_600));
         assert!(opened.ticket_for(&Hex([0x5c; 32])).is_some());
 
-        let token_required = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
+        let token_required = maker
+            .accept(&quote_id, &acceptance(), None)
+            .await
+            .unwrap_err();
         let SwapHttpError::Refused(refusal) = &token_required else {
             panic!("{token_required:?}");
         };
         assert_eq!(refusal.status, 401);
         assert_eq!(refusal.code, Some(SwapErrorCode::TokenRequired));
 
-        let busy = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
+        let busy = maker
+            .accept(&quote_id, &acceptance(), None)
+            .await
+            .unwrap_err();
         let SwapHttpError::Refused(refusal) = &busy else {
             panic!("{busy:?}");
         };
@@ -243,22 +285,34 @@ mod tests {
         );
         assert_eq!(refusal.retry_after_secs, Some(7));
 
-        let unknown = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
+        let unknown = maker
+            .accept(&quote_id, &acceptance(), None)
+            .await
+            .unwrap_err();
         assert_eq!(unknown.code(), None);
         assert!(matches!(&unknown, SwapHttpError::Refused(refusal) if refusal.reason == "later"));
 
-        let not_json = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
+        let not_json = maker
+            .accept(&quote_id, &acceptance(), None)
+            .await
+            .unwrap_err();
         assert!(
             matches!(&not_json, SwapHttpError::Refused(refusal) if refusal.reason == "not json")
         );
 
-        let unreadable = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
+        let unreadable = maker
+            .accept(&quote_id, &acceptance(), None)
+            .await
+            .unwrap_err();
         assert!(
             matches!(unreadable, SwapHttpError::Unreadable { .. }),
             "{unreadable:?}"
         );
 
-        let hangup = maker.accept(&quote_id, &acceptance()).await.unwrap_err();
+        let hangup = maker
+            .accept(&quote_id, &acceptance(), None)
+            .await
+            .unwrap_err();
         assert!(
             matches!(hangup, SwapHttpError::Unreachable { .. }),
             "{hangup:?}"

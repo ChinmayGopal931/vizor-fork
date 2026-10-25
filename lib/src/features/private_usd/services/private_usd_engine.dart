@@ -8,6 +8,7 @@ import '../models/private_usd_record_key.dart';
 import 'private_usd_deposit_backend.dart';
 import 'private_usd_pause.dart';
 import 'private_usd_swap_backend.dart';
+import 'private_usd_tokens_service.dart';
 
 /// The foreground loop's timing.
 abstract final class PrivateUsdEngineTiming {
@@ -344,6 +345,7 @@ class PrivateUsdEngine {
     PrivateUsdDepositBackend? depositBackend,
     String? Function()? depositAccount,
     bool Function()? depositsSignNew,
+    PrivateUsdTokensService? tokens,
   }) : _backend = backend,
        _readMnemonic = readMnemonic,
        _allowed = allowed,
@@ -351,11 +353,18 @@ class PrivateUsdEngine {
        _now = now ?? DateTime.now,
        _depositBackend = depositBackend,
        _depositAccount = depositAccount,
-       _depositsSignNew = depositsSignNew;
+       _depositsSignNew = depositsSignNew,
+       _tokens = tokens;
 
   static bool _anyAccount(String _) => true;
 
   final PrivateUsdSwapBackend _backend;
+
+  /// The makers' Privacy Pass tokens (plan M4): fetched ahead as each
+  /// conversion ends, and for a resumed accept the maker turned away at the
+  /// token gate, once per record while the engine runs.
+  final PrivateUsdTokensService? _tokens;
+  final _tokensAskedFor = <PrivateUsdRecordKey>{};
   final Future<Uint8List?> Function(String accountUuid) _readMnemonic;
 
   /// The host's conditions: in the foreground and unlocked.
@@ -608,7 +617,18 @@ class PrivateUsdEngine {
         return advance(opId, secret);
       });
       _advanced(book, key, result);
-      if (!result.status.isUnderWay) return null;
+      if (!result.status.isUnderWay) {
+        // The token this conversion spent may be back; today's are fetched
+        // ahead for the next one.
+        unawaited(_tokens?.prefetch());
+        return null;
+      }
+      if (result.problem == rust.ApiPrivateUsdErrorCode.tokensNeeded &&
+          _tokensAskedFor.add(key)) {
+        // A resumed accept the maker turned away at the gate: get today's
+        // tokens once; the next step accepts again, paid.
+        unawaited(_tokens?.prefetch());
+      }
       final asked = Duration(milliseconds: result.nextPollMs);
       return asked < PrivateUsdEngineTiming.minNap
           ? PrivateUsdEngineTiming.minNap

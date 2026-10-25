@@ -282,6 +282,31 @@ abstract final class PrivateUsdCopy {
   static const convertErrorTokensUnavailable =
       "Couldn't get this bridge's token, so nothing was sent. Try again "
       'in a moment.';
+
+  // The makers' Privacy Pass tokens (plan M4).
+  static const tokensNoneToday =
+      "This device has used today's conversions. More are available after "
+      'midnight UTC.';
+  static const tokensDeviceRefused =
+      "The token issuer doesn't recognize this device, so it can't convert. "
+      'Emulators, unlocked bootloaders, modified systems and unrecognized '
+      'builds are turned away.';
+  static const tokensKeystore =
+      "This phone's keystore couldn't sign for the token issuer. Try again "
+      'in a moment.';
+  static const tokensUnavailable =
+      'Conversions need an Android phone while the market maker asks for a '
+      'token with each one.';
+  static const tokensUnreachable =
+      "Couldn't reach the token issuer. Try again in a moment.";
+
+  /// The review's disclosure while a maker asks for tokens and Tor is off.
+  static const tokensTorOffDisclosure =
+      'With Tor off, the token issuer and the market maker can tell this '
+      'bridge and its token came from the same connection.';
+  static const convertProblemTokens =
+      'The market maker asks for a token. Veylor is getting one for today; '
+      "if it can't, this bridge is called off.";
   static const convertErrorRelayer =
       "The relayer that completes bridges can't be reached right now. "
       'Try again in a moment.';

@@ -35,6 +35,7 @@ pub(crate) mod sends;
 pub(crate) mod store;
 pub(crate) mod swap;
 pub(crate) mod terms;
+pub(crate) mod tokens;
 pub(crate) mod transport;
 
 #[cfg(test)]
@@ -134,6 +135,13 @@ pub(crate) enum ErrorCode {
     ChainUnreadable,
     /// Sixteen swap indices in a row are already in use on chain.
     IndicesInUse,
+    /// The token issuer gave no usable answer.
+    TokensUnreachable,
+    /// The issuer refused this device's attestation twice over.
+    TokensDeviceRefused,
+    /// The issuer has no tokens left for this device today, and none is
+    /// held.
+    NoTokensToday,
     /// More than a quote can name (`u32` token base units).
     AmountUnquotable,
 }

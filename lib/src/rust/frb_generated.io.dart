@@ -198,6 +198,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiGiftCardCheckProgress dco_decode_api_gift_card_check_progress(dynamic raw);
 
   @protected
+  ApiIssuanceBegin dco_decode_api_issuance_begin(dynamic raw);
+
+  @protected
+  ApiIssuanceFinish dco_decode_api_issuance_finish(dynamic raw);
+
+  @protected
+  ApiIssuanceKind dco_decode_api_issuance_kind(dynamic raw);
+
+  @protected
   ApiKeystoneSignatureBatchResult
   dco_decode_api_keystone_signature_batch_result(dynamic raw);
 
@@ -308,6 +317,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiSyncProgressEvent dco_decode_api_sync_progress_event(dynamic raw);
 
   @protected
+  ApiTokenStatus dco_decode_api_token_status(dynamic raw);
+
+  @protected
   ApiTransactKind dco_decode_api_transact_kind(dynamic raw);
 
   @protected
@@ -372,6 +384,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiForwardWait dco_decode_box_autoadd_api_forward_wait(dynamic raw);
+
+  @protected
+  ApiIssuanceBegin dco_decode_box_autoadd_api_issuance_begin(dynamic raw);
 
   @protected
   ApiNothingSentCause dco_decode_box_autoadd_api_nothing_sent_cause(
@@ -1129,6 +1144,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiForwardWait? dco_decode_opt_box_autoadd_api_forward_wait(dynamic raw);
 
   @protected
+  ApiIssuanceBegin? dco_decode_opt_box_autoadd_api_issuance_begin(dynamic raw);
+
+  @protected
   ApiNothingSentCause? dco_decode_opt_box_autoadd_api_nothing_sent_cause(
     dynamic raw,
   );
@@ -1809,6 +1827,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ApiIssuanceBegin sse_decode_api_issuance_begin(SseDeserializer deserializer);
+
+  @protected
+  ApiIssuanceFinish sse_decode_api_issuance_finish(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiIssuanceKind sse_decode_api_issuance_kind(SseDeserializer deserializer);
+
+  @protected
   ApiKeystoneSignatureBatchResult
   sse_decode_api_keystone_signature_batch_result(SseDeserializer deserializer);
 
@@ -1959,6 +1988,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ApiTokenStatus sse_decode_api_token_status(SseDeserializer deserializer);
+
+  @protected
   ApiTransactKind sse_decode_api_transact_kind(SseDeserializer deserializer);
 
   @protected
@@ -2049,6 +2081,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiForwardWait sse_decode_box_autoadd_api_forward_wait(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiIssuanceBegin sse_decode_box_autoadd_api_issuance_begin(
     SseDeserializer deserializer,
   );
 
@@ -3022,6 +3059,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ApiIssuanceBegin? sse_decode_opt_box_autoadd_api_issuance_begin(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ApiNothingSentCause? sse_decode_opt_box_autoadd_api_nothing_sent_cause(
     SseDeserializer deserializer,
   );
@@ -3912,6 +3954,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_api_issuance_begin(
+    ApiIssuanceBegin self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_issuance_finish(
+    ApiIssuanceFinish self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_issuance_kind(
+    ApiIssuanceKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_api_keystone_signature_batch_result(
     ApiKeystoneSignatureBatchResult self,
     SseSerializer serializer,
@@ -4107,6 +4167,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_api_token_status(
+    ApiTokenStatus self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_api_transact_kind(
     ApiTransactKind self,
     SseSerializer serializer,
@@ -4220,6 +4286,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_api_forward_wait(
     ApiForwardWait self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_api_issuance_begin(
+    ApiIssuanceBegin self,
     SseSerializer serializer,
   );
 
@@ -5396,6 +5468,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_api_forward_wait(
     ApiForwardWait? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_api_issuance_begin(
+    ApiIssuanceBegin? self,
     SseSerializer serializer,
   );
 

@@ -734,3 +734,135 @@ async fn a_total_pays_the_escrow_and_both_fees() {
     assert_eq!(error.code, ErrorCode::AmountUnquotable);
     assert!(!h.paths().iter().any(|path| path == "/v1/reverse/quote"));
 }
+
+// ---- Privacy Pass tokens (M4) ----
+
+/// Quoted, priced and gone ahead with: the accept is the test's.
+async fn gone_ahead(h: &Harness) -> u32 {
+    let quoted = h.reverse_quote().await.unwrap();
+    let (debit, railgun_fee) = h.page_cost(quoted.price.fee.0);
+    let reverse = h.reverse();
+    let index = quoted.record.index;
+    reverse
+        .view()
+        .set_cost(&mut h.store(), index, debit, railgun_fee)
+        .await
+        .unwrap();
+    reverse
+        .view()
+        .go_ahead(&mut h.store(), index)
+        .await
+        .unwrap();
+    index
+}
+
+fn code<T: std::fmt::Debug>(result: super::super::Result<T>) -> ErrorCode {
+    result.unwrap_err().code
+}
+
+fn accept_path(h: &Harness) -> String {
+    h.paths()
+        .into_iter()
+        .find(|path| path.starts_with("/v1/reverse/quote/") && path.ends_with("/accept"))
+        .expect("an accept was posted")
+}
+
+/// A reverse accept the maker asks a token for ends `TokensNeeded`, from a
+/// resume too (cancelling nothing); once the issuance ran it is paid, with
+/// the request for the token back on the paid post alone, never on the kept
+/// acceptance.
+#[tokio::test]
+async fn a_reverse_accept_the_maker_asks_a_token_for_is_paid_once_the_issuance_ran() {
+    let h = Harness::new();
+    h.world.set().tokens_required = true;
+    let now = h.world.get().clock;
+    let index = gone_ahead(&h).await;
+    let reverse = h.reverse();
+    assert_eq!(
+        reverse.accept(&mut h.store(), index).await.unwrap(),
+        ReverseAccept::TokensNeeded
+    );
+    let asked = h.reverse_record(index);
+    assert!(!asked.maker_accepted);
+    assert_eq!(asked.acceptance.token_request, None);
+    assert_eq!(
+        code(reverse.advance(&mut h.store(), index).await),
+        ErrorCode::TokensNeeded,
+        "a resume asks for the issuance too"
+    );
+    assert_eq!(
+        h.reverse_record(index).phase,
+        asked.phase,
+        "nothing called off"
+    );
+
+    h.issued().await;
+    assert_eq!(
+        reverse.accept(&mut h.store(), index).await.unwrap(),
+        ReverseAccept::Accepted
+    );
+    let accepted = h.reverse_record(index);
+    assert!(accepted.maker_accepted);
+    assert_eq!(
+        accepted.acceptance.token_request, None,
+        "the kept acceptance never carries the request"
+    );
+    let paid = h.world.get().bodies[&accept_path(&h)].clone();
+    assert!(paid["tokenRequest"].is_string());
+    assert_eq!(h.tokens.status(now).held, 2);
+    assert!(h.tokens.awaits_return(&accepted.swap_id, now));
+}
+
+/// Three tokens the maker refuses end a first accept `TokensNeeded`; a resume
+/// they end calls the conversion off, as a turn-away at the gate always did.
+#[tokio::test]
+async fn a_resume_whose_three_tokens_the_maker_refuses_calls_the_conversion_off() {
+    let h = Harness::new();
+    {
+        let mut state = h.world.set();
+        state.tokens_required = true;
+        state.refuses_tokens = true;
+    }
+    h.issued().await;
+    let index = gone_ahead(&h).await;
+    assert_eq!(
+        h.reverse().accept(&mut h.store(), index).await.unwrap(),
+        ReverseAccept::TokensNeeded
+    );
+    assert_eq!(h.posts(&accept_path(&h)), 4);
+    assert!(!h.reverse_record(index).finished());
+
+    h.issued().await;
+    let resumed = h.reverse().advance(&mut h.store(), index).await.unwrap();
+    assert_eq!(resumed.phase, ReversePhase::Cancelled);
+    assert_eq!(h.posts(&accept_path(&h)), 8);
+}
+
+/// The maker hands the token back once the escrow is funded: its status is
+/// read on each step from the funding, while the token is awaited.
+#[tokio::test]
+async fn the_token_comes_back_once_the_escrow_is_funded() {
+    let h = Harness::new();
+    h.world.set().tokens_required = true;
+    let now = h.world.get().clock;
+    h.issued().await;
+    let index = gone_ahead(&h).await;
+    assert_eq!(
+        h.reverse().accept(&mut h.store(), index).await.unwrap(),
+        ReverseAccept::Accepted
+    );
+    let swap_id = h.reverse_record(index).swap_id;
+    let status = h.status_path(Direction::Reverse, &swap_id);
+    h.advance_reverse().await.unwrap();
+    assert_eq!(h.posts(&status), 0, "nothing asked before the funding");
+
+    h.fund().await.unwrap();
+    h.funded();
+    h.advance_reverse().await.unwrap();
+    assert_eq!(h.posts(&status), 1);
+    assert_eq!(h.tokens.status(now).held, 2);
+    h.world.set().hands_back = true;
+    h.advance_reverse().await.unwrap();
+    assert_eq!(h.tokens.status(now).held, 3);
+    assert!(!h.tokens.awaits_return(&swap_id, now));
+}

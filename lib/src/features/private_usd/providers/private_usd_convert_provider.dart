@@ -12,12 +12,14 @@ import '../../migration/providers/ironwood_migration_announcement_provider.dart'
 import '../models/private_usd_messages.dart';
 import '../models/private_usd_record_key.dart';
 import '../private_usd_copy.dart';
+import '../services/private_usd_attestation.dart';
 import '../services/private_usd_engine.dart';
 import '../services/private_usd_pause.dart';
 import '../services/private_usd_zec_quote_search.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_engine_provider.dart';
 import 'private_usd_relayer_claims_provider.dart';
+import 'private_usd_tokens_provider.dart';
 
 /// The convert flows' timing.
 abstract final class PrivateUsdConvertTiming {
@@ -218,6 +220,30 @@ abstract class PrivateUsdConvertFlowNotifier<
       _pending?.cancel();
       tick.cancel();
     });
+    // Today's tokens, fetched ahead of the accept while the maker asks for
+    // them (plan M4): never inside a quote's window.
+    unawaited(ref.read(privateUsdTokensServiceProvider).prefetch());
+  }
+
+  /// Gets today's Privacy Pass tokens for an accept the maker turned away
+  /// at the token gate: null once tokens are held, else what to tell the
+  /// user. Nothing opened at the gate, so the accept is safe to repeat.
+  @protected
+  Future<String?> issueTokens() async {
+    try {
+      await ref.read(privateUsdTokensServiceProvider).issue();
+      return null;
+    } on rust.ApiPrivateUsdError catch (error) {
+      privateUsdLog('the issuance failed (${error.code.name})');
+      return privateUsdErrorMessage(error.code) ??
+          PrivateUsdCopy.convertErrorTokensUnavailable;
+    } on PrivateUsdAttestationException catch (error) {
+      privateUsdLog('the issuance failed (${error.code.name})');
+      return privateUsdAttestationMessage(error.code);
+    } catch (error) {
+      privateUsdLog('the issuance failed (${error.runtimeType})');
+      return PrivateUsdCopy.convertErrorTokensUnavailable;
+    }
   }
 
   /// Asks again for the quote that ran out on the amount step, when it may.
@@ -596,21 +622,35 @@ class PrivateUsdConvertNotifier
     );
     try {
       final relayerClaims = await privateUsdRelayerClaimsOf(ref);
-      final result = await engine.accept(
+      Future<rust.ApiAcceptResult> accept() => engine.accept(
         account,
         index: quote.index,
         maxTotalZat: quote.maxTotalZat,
         relayerClaims: relayerClaims,
       );
+      var result = await accept();
       if (!ref.mounted) return null;
+      if (result.kind == rust.ApiAcceptKind.tokensNeeded) {
+        // The maker wants a Privacy Pass token and none is held: nothing
+        // opened. Get today's once, then accept the same index again; with
+        // none to be had, end the record. Never in a loop.
+        final failure = await issueTokens();
+        if (!ref.mounted) return null;
+        if (failure == null) {
+          result = await accept();
+          if (!ref.mounted) return null;
+        }
+        if (failure != null || result.kind == rust.ApiAcceptKind.tokensNeeded) {
+          unawaited(_abandonQuietly(engine, account, quote.index));
+          startFailed(failure ?? PrivateUsdCopy.convertErrorTokensUnavailable);
+          return null;
+        }
+      }
       switch (result.kind) {
         case rust.ApiAcceptKind.accepted:
           return path;
         case rust.ApiAcceptKind.tokensNeeded:
-          // The maker wants a Privacy Pass token and none is held: nothing
-          // opened. End the record; never ask again in a loop.
-          unawaited(_abandonQuietly(engine, account, quote.index));
-          startFailed(PrivateUsdCopy.convertResultMakerUnavailable);
+          // Handled above.
           return null;
         case rust.ApiAcceptKind.nothingSent:
           startFailed(privateUsdNothingSentMessage(result.cause));
