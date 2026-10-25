@@ -19,6 +19,7 @@ import '../services/private_usd_spend_guard.dart';
 import '../services/private_usd_swap_backend.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_custom_rpc_provider.dart';
+import 'private_usd_tokens_provider.dart';
 import 'private_usd_unfinished_provider.dart';
 import 'railgun_engine_provider.dart';
 
@@ -106,6 +107,7 @@ final privateUsdEngineProvider = Provider<PrivateUsdEngine>((ref) {
   final depositsEnabled = ref.read(privateUsdDepositsEnabledProvider);
   final engine = PrivateUsdEngine(
     backend: ref.watch(privateUsdSwapBackendProvider),
+    tokens: ref.watch(privateUsdTokensServiceProvider),
     // Any account's seed while unlocked; null while locked.
     readMnemonic: (accountUuid) => ref
         .read(accountProvider.notifier)

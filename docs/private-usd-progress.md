@@ -7,6 +7,17 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **Privacy Pass tokens, dormant (M4, 2026-10-25, D-154).** The token
+  client the plan specified is built and unit-tested: `tokens.rs` (the
+  device-wide state, pay and settle, returns, the two-phase issuance), the
+  Kotlin attestation handler, Dart's issuance around it, and the paid
+  re-post in both accept paths. Until a maker turns `[tokens]` on nothing
+  changes: `/v1/info` without a return key asks nothing of the issuer.
+  N1 is closed (the crate resolves). E3 remains the owner's: the issuer
+  must list the shipped package (`com.veylor.app` on Play; `com.keplr
+  .vizor` for debug device tests) and its signing digests before a device
+  can fetch a batch. Not yet run on a phone.
+
 - **The hand-over waits for the ready; indices are the seed's (2026-10-25,
   D-151, D-152).** A ZEC → USD bridge hands its claim to the relayer only
   once the market maker has made the swap ready at its confirmation depth,
@@ -842,17 +853,18 @@ Memory (debug build): peak app PSS 662 MB, peak renderer PSS 335 MB
 
 ## M4. Privacy Pass tokens and attestation
 
-Skipped for now: blocked on N1 (B-5); M5–M7 proceed (D20).
-Tokens disabled on testnet by the owner (2026-10-13), temporarily; M5–M7
-testnet E2E are not blocked by tokens; N1 still open for when they return.
-Until M4 lands, the engine's token seam holds none (D-33).
+Built on 2026-10-25 (D-154), after N1 closed: the crate resolves beside the
+Zakura v3 stack. Tokens stay off at both makers (D20); the client is
+dormant until one turns them on, and E3 (the issuer's allowlist) gates the
+device test.
 
-- [ ] M4.1 `private_usd/tokens.rs`
-- [ ] M4.2 FRB issuance begin, finish and status
-- [ ] M4.3 Kotlin `PrivateUsdAttestationHandler.kt`
-- [ ] M4.4 Dart
-- [ ] M4.5 Error codes and copy
-- [ ] M4 gate
+- [x] M4.1 `private_usd/tokens.rs` (D-154)
+- [x] M4.2 FRB issuance begin, finish and status (D-154)
+- [x] M4.3 Kotlin `PrivateUsdAttestationHandler.kt` (D-154)
+- [x] M4.4 Dart (D-154)
+- [x] M4.5 Error codes and copy (D-154)
+- [ ] M4 gate: unit tests pass on every layer; the device acceptance (the
+      testnet issuer returning a batch) waits on E3.
 
 ## M5. Forward conversion, engine loop, lifecycle guards and forward refunds
 
@@ -2533,6 +2545,75 @@ M8 status (2026-10-14): the non-device parts are done.
   - Tests: the probe's verdicts (Node), the code through the Kotlin and
     Swift decoders, the balance's flag through a failure, a retry and a
     success, and the card's two offers.
+- **D-154 (owner, 2026-10-25): Privacy Pass tokens (M4), dormant until a
+  maker asks.** Built as plan M4 and reference §5.9 and §8.2 specify, with
+  the brief's changes and these as-built details (§5.9 "As built" lists
+  them too):
+  - **The crate.** `zecswap-tokens` is a git dependency at the pinned rev,
+    `default-features = false` (its client half), not vendored: N1 closed.
+  - **The state.** `tokens.rs` keeps the file per network, written
+    atomically (temp, fsync, rename) and read leniently. A pending return
+    records its direction, for the status it is read from. The store also
+    keeps whether the maker asks (`makerAsks`), which `issuance_begin`
+    learns from `/v1/info` and a `401` sets; `ApiTokenStatus.maker_asks`
+    shows it, and the review screens disclose the fetch-spend link while
+    it holds and Tor is off (`tokensTorOffDisclosure`).
+  - **Paying.** `tokens::accept_paying` serves both drivers: an unpaid
+    post, then at most 3 paid ones. The forward acceptance is built per
+    post; the reverse one is kept without `tokenRequest`, set on the paid
+    post alone and never persisted. `check_maker` compares the return key
+    with the store's pins (the deployment's in the app, generated keys in
+    tests). The transport keeps a refusal's `WWW-Authenticate`, and the
+    maker client takes the `Authorization` header and reads
+    `/v1/swaps/{id}` and `/v1/reverse/swaps/{id}`.
+  - **The reverse resume.** A `401` with no token held, while resuming,
+    is `TokensNeeded` as the advance's problem (copy "The market maker
+    asks for a token…"), and the Dart engine runs the issuance once per
+    record; three tokens refused on a resume cancel the conversion, as a
+    turn-away always did.
+  - **Issuance.** `begin` reads the maker's `/v1/info` first: without the
+    pinned return key it returns `None` and asks nothing of the issuer
+    (the dormant path); with another key it is `TokensRefused`. It then
+    collects every pending return, and fetches ahead for the last
+    challenge moved to today, or the maker's deterministic one. The batch
+    is `clamp(tokensPerDay, 1, 100)`; `session_id` is a `u64`; `finish`'s
+    `next` is the message bytes. `Keystore` is a Dart-raised code only.
+  - **Kotlin.** `PrivateUsdAttestationHandler` on
+    `com.zcash.wallet/private_usd_attestation`: one key per issuer, the
+    key challenge `SHA-256("zecswap-issuer-v1" ‖ issuerName)`, StrongBox
+    then the TEE (a generation both refuse is `unavailable`), remade only
+    on an expired certificate, `SHA256withECDSA`, base64url unpadded, on
+    `Dispatchers.IO` under a mutex. The Swift twin answers `unavailable`.
+  - **Dart.** `PrivateUsdTokensService` (begin → sign → finish, one
+    `SignAgain` repeat; `prefetch` swallows failures), run on the convert
+    screen, after every conversion ends and from a resumed accept; on
+    `tokensNeeded` both convert flows issue once and accept the same index
+    again, else abandon or cancel with the failure's words. Copy for
+    `NoTokensToday`, a refused device, the keystore, no attestation (iOS)
+    and the Tor-off disclosure. No Settings toggle.
+  - **Tests.** Rust: the token module's (the pins, days, issuer before
+    returned, settle by answer, the fold of a return, the day rollover,
+    the file across a restart, the signed message against the brief's
+    vector, both key challenges, the refusal retried once, sessions) and
+    the drivers' against the fake issuer and gate (an unpaid accept
+    carries no request; the paid re-post is the same acceptance plus the
+    request and header; three refused tokens; returns collected after the
+    deposit and after the funding; the return key pinned at the quote; the
+    reverse resume). Kotlin: the port of `AtomicSwapAttestationTest` (6
+    tests). Dart: the channel, the service's repeat, the convert flow's
+    issuance and its failures, the messages, the disclosure.
+  - **Live.** The dormant path ran on the owner's OnePlus 15 on mainnet
+    (2026-10-25): the convert and review screens opened and quotes came
+    back as before, with no prefetch failure logged and no token store
+    written (the maker's info shows no return key, so nothing was asked of
+    the issuer). The paid path waits on E3 (the testnet issuer refuses an
+    unlisted package). Play lists Veylor as `com.veylor.app` (owner,
+    2026-10-25) while this tree's Gradle builds `com.keplr.vizor`, so the
+    issuer needs the Play id with its upload and Play signing digests for
+    release, and `com.keplr.vizor` with the debug digest for device tests;
+    how the release build gets its id is not in this tree (open, owner). The dormant path, a maker whose info
+    shows no return key, is the unit-tested `maker_asks = false` case;
+    on the phone it is what every build does today.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

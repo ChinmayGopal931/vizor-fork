@@ -53,7 +53,8 @@ use super::models::{
     Amount, Direction, Hex, JointAccountId, NothingSentCause, RecordDeployment, RelayerTerms,
     ReverseFundingCost, ReverseFundingRequest, ReverseFundingTerms, ReverseFundingTransaction,
     ReversePhase, ReverseQuote, ReverseReceiveEstimate, ReverseReceiveTransaction, ReverseRecord,
-    StoredRecord, SwapAuthorization, SwapNote, SwapPayout, SwapRescue, ZcashTransaction,
+    StoredRecord, SwapAcceptance, SwapAuthorization, SwapNote, SwapPayout, SwapRescue,
+    ZcashTransaction,
 };
 use super::relayer_client::RelayerClient;
 use super::store::SwapStore;
@@ -61,6 +62,7 @@ use super::swap::{
     self, find, load, pinned_relayer_terms, quote_error, require_payout_fee, save, serves, update,
     PostError, SwapCall, WindowView,
 };
+use super::tokens::{self, AcceptError, Payment, TokenStore};
 use super::transport::{HttpTransport, Refusal, SwapErrorCode, SwapHttpError};
 use super::{fail, indices, terms, ErrorCode, PrivateUsdError, PrivateUsdNetwork, Result};
 use crate::wallet::routed_http::RoutedHttp;
@@ -619,6 +621,9 @@ where
     zcash: &'a Z,
     clock: &'a K,
     makers: &'a MakerChecks,
+    /// The device's Privacy Pass tokens, which pay for accepts the maker
+    /// asks a token for, and come back once the escrow is funded.
+    tokens: &'a TokenStore,
     op: Option<&'a OpHandle>,
 }
 
@@ -637,6 +642,7 @@ where
         zcash: &'a Z,
         clock: &'a K,
         makers: &'a MakerChecks,
+        tokens: &'a TokenStore,
         op: Option<&'a OpHandle>,
     ) -> Self {
         let network = keys.network();
@@ -651,6 +657,7 @@ where
             zcash,
             clock,
             makers,
+            tokens,
             op,
         }
     }
@@ -686,7 +693,14 @@ where
         }
         self.pins.swap_contract()?;
         swap::require_none_under_way(store, self.account)?;
-        swap::check_maker(&self.maker, self.pins, self.makers, true).await?;
+        swap::check_maker(
+            &self.maker,
+            self.pins,
+            self.makers,
+            true,
+            self.tokens.pins(),
+        )
+        .await?;
         let contracts = [(self.chain, self.pins.maker)];
         // The relayer's terms, the index and the joint account's birthday (any
         // height before the maker's deposit) don't wait on each other: all
@@ -907,6 +921,9 @@ where
             return Ok(snapshot);
         }
         engine::check_cancelled(self.op)?;
+        if snapshot.funding.is_some() {
+            self.collect_return(&snapshot).await;
+        }
         let estimate = if AWAITING_DEPOSIT.contains(&snapshot.phase) {
             Some(self.look_at_deposit(&snapshot).await?)
         } else {
@@ -920,9 +937,40 @@ where
         let current: ReverseRecord = load(store, self.account, index)?;
         if current.is_accepting() {
             engine::check_cancelled(self.op)?;
-            self.ensure_accepted(store, &current, true).await?;
+            // The maker wants a token and none is held: the loop's problem,
+            // which runs the issuance, then accepts again.
+            if let ReverseAccept::TokensNeeded = self.ensure_accepted(store, &current, true).await?
+            {
+                return fail(
+                    ErrorCode::TokensNeeded,
+                    "the maker wants a token for the accept",
+                );
+            }
         }
         load(store, self.account, index)
+    }
+
+    /// Reads the maker's status for a swap whose accept's token is still to
+    /// come back, once the escrow is funded, and holds the token it hands
+    /// back. A read that fails waits for the next step, never an error.
+    async fn collect_return(&self, record: &ReverseRecord) {
+        let now = self.clock.now();
+        if !self.tokens.awaits_return(&record.swap_id, now) {
+            return;
+        }
+        let Ok(status) = self.maker.reverse_swap_status(&record.swap_id).await else {
+            return;
+        };
+        let Some(token_return) = status.token_return else {
+            return;
+        };
+        if let Err(error) = self.tokens.collect(&record.swap_id, &token_return.0, now) {
+            log::warn!(
+                "private usd: reverse swap {}: holding the token back failed ({:?})",
+                record.index,
+                error.code
+            );
+        }
     }
 
     /// The user's second approval: once the maker's whole deposit has its
@@ -1096,17 +1144,35 @@ where
         record: &ReverseRecord,
         resuming: bool,
     ) -> Result<ReverseAccept> {
-        let accepted = match self
-            .maker
-            .accept_reverse(&record.quote.terms.quote_id, &record.acceptance)
-            .await
-        {
+        // The kept acceptance never carries the request for the token back:
+        // it is set on the paid post alone (`tokens::accept_paying`).
+        let posted = tokens::accept_paying(
+            self.tokens,
+            self.clock.now(),
+            record.swap_id,
+            Direction::Reverse,
+            async |payment: Option<&Payment>| {
+                let paid = SwapAcceptance {
+                    token_request: payment.map(|payment| payment.token_request.clone()),
+                    ..record.acceptance.clone()
+                };
+                self.maker
+                    .accept_reverse(
+                        &record.quote.terms.quote_id,
+                        &paid,
+                        payment.map(|payment| payment.authorization.0.as_str()),
+                    )
+                    .await
+            },
+        )
+        .await;
+        let accepted = match posted {
             Ok(accepted) => accepted,
-            // Turned away at the token gate: a refusal sends nothing.
-            Err(SwapHttpError::Refused(refusal))
-                if refusal.code == Some(SwapErrorCode::TokenRequired) =>
-            {
-                if !resuming {
+            // Turned away at the token gate: a refusal sends nothing. A
+            // resume whose tokens the maker refused three times over calls
+            // the conversion off; otherwise the issuance is asked for.
+            Err(AcceptError::TokensNeeded { tried }) => {
+                if !resuming || !tried {
                     return Ok(ReverseAccept::TokensNeeded);
                 }
                 self.finish(store, record.clone(), ReversePhase::Cancelled)
@@ -1115,7 +1181,8 @@ where
                     NothingSentCause::MakerUnavailable,
                 )));
             }
-            Err(SwapHttpError::Refused(refusal)) => match last_word(&refusal) {
+            Err(AcceptError::Tokens(error)) => return Err(error),
+            Err(AcceptError::Http(SwapHttpError::Refused(refusal))) => match last_word(&refusal) {
                 Some(cause) => {
                     self.finish(store, record.clone(), ReversePhase::Cancelled)
                         .await?;
@@ -1124,7 +1191,7 @@ where
                 None => return Err(SwapHttpError::Refused(refusal).into()),
             },
             // No answer, or one that does not read: maybe accepted.
-            Err(error) => return Err(error.into()),
+            Err(AcceptError::Http(error)) => return Err(error.into()),
         };
         // The maker takes the same keys again, on the quote's deadlines and
         // the contract's late window.
@@ -1881,6 +1948,7 @@ impl SwapCall<'_> {
         let transport = swap::transport(op);
         let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url)?;
         let zcash = self.zcash(op);
+        let tokens = self.tokens();
         let reverse = Reverse::new(
             self.account,
             self.keys,
@@ -1889,6 +1957,7 @@ impl SwapCall<'_> {
             &zcash,
             &SystemClock,
             &engine::MAKER_CHECKS,
+            &tokens,
             op,
         );
         let mut store = SwapStore::open(self.store_dir)?;

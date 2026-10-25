@@ -23,6 +23,7 @@ use super::super::models::{
 };
 use super::super::store::SwapStore;
 use super::super::terms::swap_id;
+use super::super::tokens::Finished;
 use super::super::{ErrorCode, Result};
 use super::fakes::*;
 
@@ -334,11 +335,7 @@ async fn an_accept_refusal_ends_only_when_nothing_can_have_opened() {
 #[tokio::test]
 async fn a_maker_asking_for_a_token_turns_the_accept_away_without_a_retry() {
     let h = Harness::new();
-    {
-        let mut state = h.world.set();
-        state.accept_status = 401;
-        state.accept_code = Some("tokenRequired");
-    }
+    h.world.set().tokens_required = true;
     let quoted = h.quote().await.unwrap();
 
     assert_eq!(
@@ -350,6 +347,16 @@ async fn a_maker_asking_for_a_token_turns_the_accept_away_without_a_retry() {
         .iter()
         .all(|(name, _)| !name.eq_ignore_ascii_case("authorization"));
     assert!(unauthorized, "no token is held, so none is sent");
+    assert!(
+        h.world.get().bodies[&accept_path()]
+            .get("tokenRequest")
+            .is_none(),
+        "an unpaid accept asks for no token back"
+    );
+    assert!(
+        h.tokens.maker_asks(),
+        "the challenge is kept for the issuance"
+    );
     let record = h.record();
     assert_eq!((record.outcome.clone(), record.t0), (None, None));
 
@@ -1814,4 +1821,135 @@ async fn a_concurrent_advance_and_accept_on_one_account_gives_busy_and_leaves_th
     // Released with the accept: the next step runs.
     let _driver = engine::lock_account(&h.account).unwrap();
     assert_eq!(h.advance().await.unwrap(), h.confirming());
+}
+
+// ---- Privacy Pass tokens (M4) ----
+
+/// The maker asks for a token: with none held the accept ends `TokensNeeded`
+/// and nothing opens; once the issuance ran, the same index is accepted with
+/// the same acceptance, paid: the token in the header and the request for it
+/// back in the body, and nothing else changed.
+#[tokio::test]
+async fn an_accept_the_maker_asks_a_token_for_is_paid_once_the_issuance_ran() {
+    let h = Harness::new();
+    h.world.set().tokens_required = true;
+    let now = h.world.get().clock;
+    let quoted = h.quote().await.unwrap();
+    assert_eq!(
+        h.accept(quoted.index).await.unwrap(),
+        AcceptOutcome::TokensNeeded
+    );
+    let unpaid = h.world.get().bodies[&accept_path()].clone();
+    assert!(unpaid.get("tokenRequest").is_none());
+
+    assert_eq!(
+        h.issued().await,
+        Finished::Issued {
+            held: 3,
+            short: false
+        }
+    );
+    assert_eq!(h.tokens.status(now).held, 3);
+    assert_eq!(
+        h.accept(quoted.index).await.unwrap(),
+        AcceptOutcome::Accepted
+    );
+    assert_eq!(h.posted(&accept_path()), 3, "unpaid, unpaid, then paid");
+    assert_eq!(h.world.get().quote_requests.len(), 1, "the same quote");
+    // The paid post is the unpaid one before it (the proof is made anew per
+    // accept call), with the request for the token back added.
+    let accepts = h.world.get().accepts.clone();
+    assert_eq!(accepts.len(), 3);
+    assert!(accepts[1].get("tokenRequest").is_none());
+    let paid = accepts[2].clone();
+    assert!(paid["tokenRequest"].is_string());
+    let mut without = paid.clone();
+    without.as_object_mut().unwrap().remove("tokenRequest");
+    assert_eq!(without, accepts[1], "the same acceptance otherwise");
+    let authorization = h.world.get().headers[&accept_path()]
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("authorization"))
+        .map(|(_, value)| value.clone())
+        .expect("the token");
+    assert!(authorization.starts_with("PrivateToken token="));
+    let record = h.record();
+    assert!(record.t0.is_some(), "opened");
+    assert_eq!(
+        h.tokens.status(now).held,
+        2,
+        "the token the maker took is gone"
+    );
+    assert!(h.tokens.awaits_return(&record.swap_id, now));
+}
+
+/// Three paid tries the maker refuses end the accept as a `401` does: nothing
+/// opened, each refused token gone with its request.
+#[tokio::test]
+async fn a_maker_refusing_every_token_ends_the_accept_after_three_paid_tries() {
+    let h = Harness::new();
+    {
+        let mut state = h.world.set();
+        state.tokens_required = true;
+        state.refuses_tokens = true;
+    }
+    let now = h.world.get().clock;
+    h.issued().await;
+    assert_eq!(h.tokens.status(now).held, 3);
+    let quoted = h.quote().await.unwrap();
+    assert_eq!(
+        h.accept(quoted.index).await.unwrap(),
+        AcceptOutcome::TokensNeeded
+    );
+    assert_eq!(h.posted(&accept_path()), 4, "one unpaid, three paid");
+    assert_eq!(h.tokens.status(now).held, 0);
+    assert!(h.tokens.pending_returns(now).is_empty());
+    assert_eq!(h.record().t0, None);
+}
+
+/// The maker hands the token back once the deposit is out: its status is read
+/// on each step from then, while the token is awaited, and the token comes
+/// back held under the return key.
+#[tokio::test]
+async fn the_token_comes_back_once_the_deposit_is_out() {
+    let h = Harness::new();
+    h.world.set().tokens_required = true;
+    let now = h.world.get().clock;
+    h.issued().await;
+    let quoted = h.quote().await.unwrap();
+    assert_eq!(
+        h.accept(quoted.index).await.unwrap(),
+        AcceptOutcome::Accepted
+    );
+    let swap_id = h.record().swap_id;
+    let status = h.status_path(Direction::Forward, &swap_id);
+    assert_eq!(h.posted(&status), 0);
+
+    // The step that sends the deposit asks nothing yet; the next does.
+    assert_eq!(h.advance().await.unwrap(), h.confirming());
+    assert_eq!(h.posted(&status), 0);
+    h.advance().await.unwrap();
+    assert_eq!(h.posted(&status), 1);
+    assert_eq!(h.tokens.status(now).held, 2, "nothing back yet");
+
+    h.world.set().hands_back = true;
+    h.advance().await.unwrap();
+    assert_eq!(h.tokens.status(now).held, 3);
+    assert!(!h.tokens.awaits_return(&swap_id, now));
+    assert_eq!(h.tokens.status(now).awaiting_returns, 0);
+    h.advance().await.unwrap();
+    assert_eq!(h.posted(&status), 2, "nothing more to ask once it is back");
+}
+
+/// A maker returning tokens under another key than the pinned one would mark
+/// the tokens it hands back: it is refused at the quote.
+#[tokio::test]
+async fn a_maker_returning_tokens_under_another_key_is_refused_at_the_quote() {
+    let h = Harness::new();
+    {
+        let mut state = h.world.set();
+        state.tokens_required = true;
+        state.info_windows = Some(serde_json::json!({ "tokenReturnKey": "AAAA" }));
+    }
+    assert_eq!(code(h.quote().await), ErrorCode::TokensRefused);
+    assert_eq!(h.posted("/v1/quote"), 0);
 }

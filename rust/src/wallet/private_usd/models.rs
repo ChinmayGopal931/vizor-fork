@@ -361,6 +361,17 @@ pub(crate) struct MakerInfo {
     pub contract_kind: Option<String>,
 }
 
+/// `GET /v1/swaps/{id}` and `/v1/reverse/swaps/{id}`: what the maker keeps
+/// of a swap besides the chain. Everything else about it is read on chain.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SwapStatus {
+    /// The accept's token handed back, once the user paid in: the blind
+    /// signature (base64url) of its `tokenRequest`, which only the blinding
+    /// secret turns into a token.
+    pub token_return: Option<Redacted<String>>,
+}
+
 /// The swap a maker opened for an accepted quote, with the deadlines it
 /// picked.
 #[derive(Clone, Debug, Deserialize)]

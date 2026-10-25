@@ -539,6 +539,17 @@ The real hazard is a reveal that lands outside its window: it reverts with the s
 
 At accept, the engine spends only tokens it already holds (the M5 seam is `engine::TokenSource`; until M4, `NoTokens` holds none, progress D-33). If the maker answers `401` with a pinned challenge and no token for it is held, the engine stores the challenge and returns `TokensNeeded`. Nothing was opened, because a `401` sends nothing. Dart then runs issuance once and calls accept again with the same saved acceptance. If issuance fails, Dart calls abandon, which ends the record as `NothingSent(MAKER_UNAVAILABLE)`, as zapp does for a turn-away at the token gate. Keep zapp's limit of 3 paid tries per accept.
 
+**As built (M4, progress D-154).** `rust/src/wallet/private_usd/tokens.rs` is the state file and the rules above, with these differences from the port:
+
+- Each pending return records its direction, so the prefetch pass knows which status (`/v1/swaps/{id}` or `/v1/reverse/swaps/{id}`) to read for it.
+- The store keeps `makerAsks`, set from the maker's `/v1/info` (the pinned return key) by `issuance_begin` and by a `401`; `ApiTokenStatus.maker_asks` shows it, and the review screens disclose the fetch-spend link while it holds and Tor is off.
+- The maker's challenge being deterministic (`(issuer, "maker", day)`), a batch is fetched ahead for it as soon as `makerAsks` holds, from install; a `401` that asks for another challenge drops the batch fetched ahead for the day and is paid for the asked one.
+- `begin` asks for `clamp(tokensPerDay, 1, 100)` blinded requests; `finish` holds a short batch and marks today spent.
+- One `tokens::accept_paying` runs both accepts: an unpaid post, then at most 3 paid ones, each settled by its answer (a success that does not read still took the token; a request that never went out left it). The forward acceptance is built per post; the reverse one is kept without `tokenRequest`, which goes on the paid post alone.
+- A reverse resume the maker turns away with no token held returns `TokensNeeded` as the advance's problem (`ErrorCode::TokensNeeded`, shown as "The market maker asks for a token…"), and the Dart engine runs the issuance once per record; only three tokens refused on a resume cancel the conversion.
+- Returns are collected on every forward advance once the deposit is kept and once more as the record ends paid, on every reverse advance once a funding is kept, and for every pending return during a prefetch pass.
+- `Keystore` is a Dart-raised code (`ApiPrivateUsdErrorCode::Keystore`, never from Rust) for the attestation channel's failures; `unavailable` from the channel (iOS, or no attested key) maps to "Conversions need an Android phone…".
+
 ### 5.10 The foreground loop (zapp's timing, without the worker)
 
 D9 drops zapp's `AtomicSwapWorker`, its scheduler, its wake alarms and its notifier. These are zapp's loop rules that veylor keeps, in `PrivateUsdEngineLoop` (`ua/SwapLoop.kt:160-345`):
@@ -1279,16 +1290,20 @@ pub fn private_usd_railgun_address(db_path: String, network: String, account_uui
 pub async fn start_railgun_bridge() -> Result<u16, String>;  // idempotent: returns the running port; allowlist = deployment::RAILGUN_PAGE_HOSTS
 pub async fn stop_railgun_bridge();                          // idempotent
 
-// M4. `tokens_path` = `<support>/private_usd_tokens_<network>.json`, from Dart `getPrivateUsdTokenStorePath(network)`.
-pub struct ApiIssuanceBegin { pub session_id: u32, pub issuer_name: String, pub message: Vec<u8> }
-pub struct ApiTokenStatus { pub held: u32, pub exhausted_today: bool, pub awaiting_returns: u32, pub device_refused: bool }
+// M4 (as built, D-154). `tokens_path` = `<support>/private_usd_tokens_<network>.json`, from Dart `getPrivateUsdTokenStorePath(network)`;
+// `private_usd_forward_accept`, `…_forward_advance`, `…_reverse_accept` and `…_reverse_advance` take it too, after `eth_rpc_url`.
+pub struct ApiIssuanceBegin { pub session_id: u64, pub issuer_name: String, pub message: Vec<u8> }
+/// `maker_asks`: the maker's `/v1/info` last showed the pinned return key (the review's Tor-off disclosure).
+pub struct ApiTokenStatus { pub held: u32, pub exhausted_today: bool, pub awaiting_returns: u32, pub device_refused: bool, pub maker_asks: bool }
+/// Reads the maker's `/v1/info` first: no return key, nothing is asked of the issuer (`None`); another key, `TokensRefused`.
+/// Then collects the tokens handed back for swaps still awaiting one, and fetches ahead unless a token is held or today is spent.
 pub fn private_usd_tokens_issuance_begin(tokens_path: String, network: String) -> Result<Option<ApiIssuanceBegin>, ApiPrivateUsdError>;
 /// `chain` and `signature` are passed through exactly as Kotlin returns them (base64url, no padding).
 pub enum ApiIssuanceKind { Issued, Exhausted, SignAgain }
-/// `SignAgain`: the issuer answered 403 once; `next` carries a fresh attestation challenge's message for the same blinded batch.
+/// `SignAgain`: the issuer answered 403 once; `next` is the message of a fresh attestation challenge over the same blinded batch.
 /// A second 403 is `Err(TokensDeviceRefused)` and records `refusedBy`.
-pub struct ApiIssuanceFinish { pub kind: ApiIssuanceKind, pub next: Option<ApiIssuanceBegin>, pub status: ApiTokenStatus }
-pub fn private_usd_tokens_issuance_finish(tokens_path: String, network: String, session_id: u32, chain: Vec<String>, signature: String) -> Result<ApiIssuanceFinish, ApiPrivateUsdError>;
+pub struct ApiIssuanceFinish { pub kind: ApiIssuanceKind, pub next: Option<Vec<u8>>, pub status: ApiTokenStatus }
+pub fn private_usd_tokens_issuance_finish(tokens_path: String, network: String, session_id: u64, chain: Vec<String>, signature: String) -> Result<ApiIssuanceFinish, ApiPrivateUsdError>;
 pub fn private_usd_tokens_status(tokens_path: String, network: String) -> Result<ApiTokenStatus, ApiPrivateUsdError>;
 #[frb(sync)] pub fn private_usd_clear_sessions();   // called on lock. As built it lands in M5: drops the forward offers and maker checks; M4 adds its issuance sessions
 ```

@@ -17,6 +17,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.security.MessageDigest
 import io.flutter.plugin.common.EventChannel
+import com.keplr.vizor.privateusd.PrivateUsdAttestationHandler
 import com.keplr.vizor.railgun.RailgunHostHandler
 
 // FlutterFragmentActivity: BiometricPrompt requires a FragmentActivity host.
@@ -121,6 +122,13 @@ class MainActivity : FlutterFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        // Private USD's Privacy Pass attestation: the install's Keystore key signs an issuance (plan M4).
+        val attestationHandler = PrivateUsdAttestationHandler()
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            PrivateUsdAttestationHandler.CHANNEL
+        ).setMethodCallHandler { call, result -> attestationHandler.handle(call, result) }
 
         val biometricUnlockHandler = BiometricUnlockHandler(this)
         MethodChannel(

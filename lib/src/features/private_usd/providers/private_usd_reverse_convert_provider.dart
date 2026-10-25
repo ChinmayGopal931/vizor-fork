@@ -307,16 +307,29 @@ class PrivateUsdReverseConvertNotifier
     }
     // Gone ahead: the conversion is under way from here, whatever follows.
     try {
-      final result = await engine.reverseAccept(account, index: index);
+      var result = await engine.reverseAccept(account, index: index);
       if (!ref.mounted) return null;
+      if (result.kind == rust.ApiAcceptKind.tokensNeeded) {
+        // The maker wants a Privacy Pass token and none is held: nothing
+        // paid. Get today's once, then accept again; with none to be had,
+        // call it off.
+        final failure = await issueTokens();
+        if (!ref.mounted) return null;
+        if (failure == null) {
+          result = await engine.reverseAccept(account, index: index);
+          if (!ref.mounted) return null;
+        }
+        if (failure != null || result.kind == rust.ApiAcceptKind.tokensNeeded) {
+          unawaited(_cancelQuietly(engine, account, index));
+          startFailed(failure ?? PrivateUsdCopy.convertErrorTokensUnavailable);
+          return null;
+        }
+      }
       switch (result.kind) {
         case rust.ApiAcceptKind.accepted:
           break;
         case rust.ApiAcceptKind.tokensNeeded:
-          // The maker wants a Privacy Pass token and none is held: call it
-          // off, nothing paid.
-          unawaited(_cancelQuietly(engine, account, index));
-          startFailed(PrivateUsdCopy.convertResultMakerUnavailable);
+          // Handled above.
           return null;
         case rust.ApiAcceptKind.nothingSent:
           startFailed(privateUsdReverseNothingSentMessage(result.cause));

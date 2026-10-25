@@ -23,6 +23,7 @@ use crate::wallet::private_usd::{
     forward::{self, AcceptOutcome, AdvanceReport, ForwardWait, Quoted},
     joint::{self as joint_ops, SwapTxStatus},
     keys::{account_derivation, SwapKeyContext},
+    maker_client::MakerClient,
     models::{
         Address, Amount, ClaimHold, Direction, ForwardOutcome, ForwardPhase, ForwardRecord,
         NothingSentCause, RefundCause, ReversePhase, ReverseRecord, ZcashTxId,
@@ -33,6 +34,7 @@ use crate::wallet::private_usd::{
     sends::{self, ProvedSend, SendRecord, Sends},
     store::SwapStore,
     swap::{self, SwapCall},
+    tokens::{self, TokenPins, TokenStore},
     ErrorCode, PrivateUsdError, PrivateUsdNetwork,
 };
 use crate::wallet::routed_http::RoutedHttp;
@@ -51,6 +53,16 @@ pub enum ApiPrivateUsdErrorCode {
     Mismatch,
     TokensRefused,
     TokensNeeded,
+    /// The token issuer gave no usable answer.
+    TokensUnreachable,
+    /// The token issuer refused this device's attestation.
+    TokensDeviceRefused,
+    /// This device's tokens for today are spent.
+    NoTokensToday,
+    /// The phone's keystore failed to make or use the attestation key.
+    /// Raised by Dart from the attestation channel, never by Rust; the code
+    /// lives here so one switch names every token message.
+    Keystore,
     ChainLagging,
     QuoteExpired,
     MakerUnavailable,
@@ -108,6 +120,9 @@ fn api_code(code: ErrorCode) -> ApiPrivateUsdErrorCode {
         ErrorCode::Mismatch => Api::Mismatch,
         ErrorCode::TokensRefused => Api::TokensRefused,
         ErrorCode::TokensNeeded => Api::TokensNeeded,
+        ErrorCode::TokensUnreachable => Api::TokensUnreachable,
+        ErrorCode::TokensDeviceRefused => Api::TokensDeviceRefused,
+        ErrorCode::NoTokensToday => Api::NoTokensToday,
         ErrorCode::ChainLagging => Api::ChainLagging,
         ErrorCode::QuoteExpired => Api::QuoteExpired,
         ErrorCode::MakerUnavailable => Api::MakerUnavailable,
@@ -355,6 +370,169 @@ pub fn private_usd_clear_sessions() {
     engine::clear_sessions();
 }
 
+// ---- Privacy Pass tokens (M4) ----
+
+/// What the device holds of the makers' Privacy Pass tokens (reference
+/// §5.9).
+pub struct ApiTokenStatus {
+    /// Tokens held for today's challenge.
+    pub held: u32,
+    /// The issuer had no more for this device today.
+    pub exhausted_today: bool,
+    /// Swaps whose token is still to come back.
+    pub awaiting_returns: u32,
+    /// The issuer refused this device's attestation when last asked.
+    pub device_refused: bool,
+    /// The maker takes tokens: its info showed the pinned return key.
+    pub maker_asks: bool,
+}
+
+/// An issuance's first phase: what the keystore signs (plan X11).
+pub struct ApiIssuanceBegin {
+    pub session_id: u64,
+    /// The issuer's name: the attestation key's alias and challenge derive
+    /// from it.
+    pub issuer_name: String,
+    /// `"zecswap-issuer-v1" ‖ challenge ‖ SHA-256(blinded₁ ‖ … ‖ blindedₙ)`.
+    pub message: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApiIssuanceKind {
+    /// Tokens are held.
+    Issued,
+    /// The issuer had none left for this device today.
+    Exhausted,
+    /// The issuer refused the attestation once: sign `next` and finish
+    /// again with the same session, once.
+    SignAgain,
+}
+
+pub struct ApiIssuanceFinish {
+    pub kind: ApiIssuanceKind,
+    /// With `SignAgain`: the message to sign once more.
+    pub next: Option<Vec<u8>>,
+    pub status: ApiTokenStatus,
+}
+
+fn api_token_status(status: tokens::TokenStatus) -> ApiTokenStatus {
+    ApiTokenStatus {
+        held: status.held,
+        exhausted_today: status.exhausted_today,
+        awaiting_returns: status.awaiting_returns,
+        device_refused: status.device_refused,
+        maker_asks: status.maker_asks,
+    }
+}
+
+fn token_store(tokens_path: &str, network: &str) -> Result<TokenStore, ApiPrivateUsdError> {
+    let network = swap_network(network)?;
+    let pins = deployment::deployment(network);
+    Ok(TokenStore::open(
+        Path::new(tokens_path),
+        TokenPins::of(pins),
+    ))
+}
+
+/// Starts an issuance of today's tokens, for the keystore to attest: `None`
+/// when nothing is needed. The maker's `/v1/info` decides first: without
+/// the pinned return key it takes no tokens, and nothing is asked of the
+/// issuer; with it, the tokens makers handed back for swaps still awaiting
+/// one are collected, then a batch is fetched ahead for today's challenge
+/// unless one is held or today is spent. Over the route policy, a fresh
+/// transport per call.
+pub fn private_usd_tokens_issuance_begin(
+    tokens_path: String,
+    network: String,
+) -> Result<Option<ApiIssuanceBegin>, ApiPrivateUsdError> {
+    catch(|| {
+        let pins = deployment::deployment(swap_network(&network)?);
+        let store = token_store(&tokens_path, &network)?;
+        let transport = RoutedHttp::new();
+        let now = SystemClock.now();
+        block_on(async {
+            let maker = MakerClient::new(&transport, pins.maker_url);
+            let info = maker.info().await?;
+            let asks = match info.token_return_key.as_deref() {
+                None => false,
+                Some(key) if key == pins.maker_token_return_key => true,
+                // A return key shown to only some devices would mark the
+                // tokens they get back.
+                Some(_) => {
+                    return Err(PrivateUsdError::new(
+                        ErrorCode::TokensRefused,
+                        "the maker returns tokens under another key",
+                    ))
+                }
+            };
+            store.set_maker_asks(asks)?;
+            if !asks {
+                return Ok(None);
+            }
+            for (swap_id, direction) in store.pending_returns(now) {
+                let status = match direction {
+                    Direction::Forward => maker.swap_status(&swap_id).await,
+                    Direction::Reverse => maker.reverse_swap_status(&swap_id).await,
+                };
+                if let Ok(status) = status {
+                    if let Some(token_return) = status.token_return {
+                        let _ = store.collect(&swap_id, &token_return.0, now);
+                    }
+                }
+            }
+            Ok(store
+                .begin(&transport, now)
+                .await?
+                .map(|issuance| ApiIssuanceBegin {
+                    session_id: issuance.session_id,
+                    issuer_name: issuance.issuer_name,
+                    message: issuance.message,
+                }))
+        })
+    })
+}
+
+/// Finishes the issuance `session_id` with the keystore's attestation: the
+/// key's certificate chain (leaf first, DER, base64url) and its signature
+/// over the message, and holds what the issuer signs. `SignAgain` once on
+/// the first refusal; `TokensDeviceRefused` on the second; `Exhausted`, or
+/// a short batch, marks today spent.
+pub fn private_usd_tokens_issuance_finish(
+    tokens_path: String,
+    network: String,
+    session_id: u64,
+    chain: Vec<String>,
+    signature: String,
+) -> Result<ApiIssuanceFinish, ApiPrivateUsdError> {
+    catch(|| {
+        let store = token_store(&tokens_path, &network)?;
+        let transport = RoutedHttp::new();
+        let now = SystemClock.now();
+        let finished = block_on(store.finish(&transport, session_id, chain, signature, now))?;
+        let (kind, next) = match finished {
+            tokens::Finished::Issued { .. } => (ApiIssuanceKind::Issued, None),
+            tokens::Finished::Exhausted => (ApiIssuanceKind::Exhausted, None),
+            tokens::Finished::SignAgain { message } => (ApiIssuanceKind::SignAgain, Some(message)),
+        };
+        Ok(ApiIssuanceFinish {
+            kind,
+            next,
+            status: api_token_status(store.status(now)),
+        })
+    })
+}
+
+/// What the device holds of the makers' tokens. Nothing is asked of anyone.
+pub fn private_usd_tokens_status(
+    tokens_path: String,
+    network: String,
+) -> Result<ApiTokenStatus, ApiPrivateUsdError> {
+    catch(|| {
+        let store = token_store(&tokens_path, &network)?;
+        Ok(api_token_status(store.status(SystemClock.now())))
+    })
+}
+
 /// The account's conversions under way, in either direction: a forward one
 /// not ended, a reverse one past its quote. The account deletion and reset
 /// warnings show it. 0 when the wallet never made one.
@@ -573,6 +751,7 @@ pub fn private_usd_forward_quote(
             &lightwalletd_url,
             &eth_rpc_url,
             None,
+            None,
             async |call, op| {
                 call.forward(op, async |forward, store| forward.quote(store, units).await)
                     .await
@@ -598,6 +777,7 @@ pub fn private_usd_forward_accept(
     mnemonic_bytes: Vec<u8>,
     lightwalletd_url: String,
     eth_rpc_url: String,
+    tokens_path: String,
     index: u32,
     max_total_zat: u64,
     relayer_claims: bool,
@@ -612,6 +792,7 @@ pub fn private_usd_forward_accept(
             &secret,
             &lightwalletd_url,
             &eth_rpc_url,
+            Some(&tokens_path),
             None,
             async |call, op| {
                 call.forward(op, async |forward, store| {
@@ -647,6 +828,7 @@ pub fn private_usd_forward_advance(
     mnemonic_bytes: Vec<u8>,
     lightwalletd_url: String,
     eth_rpc_url: String,
+    tokens_path: String,
     op_id: u32,
     index: u32,
 ) -> Result<ApiForwardAdvance, ApiPrivateUsdError> {
@@ -660,6 +842,7 @@ pub fn private_usd_forward_advance(
             &secret,
             &lightwalletd_url,
             &eth_rpc_url,
+            Some(&tokens_path),
             Some(op_id),
             async |call, op| {
                 let report = call
@@ -763,6 +946,7 @@ pub fn private_usd_forward_rescue(
             &secret,
             "",
             &eth_rpc_url,
+            None,
             None,
             async |call, op| {
                 call.forward(op, async |forward, store| {
@@ -953,6 +1137,7 @@ pub fn private_usd_reverse_quote(
             &lightwalletd_url,
             &eth_rpc_url,
             None,
+            None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
                     let quoted = reverse.quote(store, total, unshield_basis_points).await?;
@@ -1060,6 +1245,7 @@ pub fn private_usd_reverse_accept(
     mnemonic_bytes: Vec<u8>,
     lightwalletd_url: String,
     eth_rpc_url: String,
+    tokens_path: String,
     index: u32,
 ) -> Result<ApiAcceptResult, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
@@ -1072,6 +1258,7 @@ pub fn private_usd_reverse_accept(
             &secret,
             &lightwalletd_url,
             &eth_rpc_url,
+            Some(&tokens_path),
             None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
@@ -1117,6 +1304,7 @@ pub fn private_usd_reverse_funding_request(
             &secret,
             "",
             &eth_rpc_url,
+            None,
             None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
@@ -1190,6 +1378,7 @@ pub fn private_usd_reverse_advance(
     mnemonic_bytes: Vec<u8>,
     lightwalletd_url: String,
     eth_rpc_url: String,
+    tokens_path: String,
     op_id: u32,
     index: u32,
 ) -> Result<ApiReverseAdvance, ApiPrivateUsdError> {
@@ -1203,6 +1392,7 @@ pub fn private_usd_reverse_advance(
             &secret,
             &lightwalletd_url,
             &eth_rpc_url,
+            Some(&tokens_path),
             Some(op_id),
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
@@ -1242,6 +1432,7 @@ pub fn private_usd_reverse_authorize_ready(
             &lightwalletd_url,
             &eth_rpc_url,
             None,
+            None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
                     let record = reverse.authorize_ready(store, index).await?;
@@ -1279,6 +1470,7 @@ pub fn private_usd_reverse_cancel(
             &secret,
             &lightwalletd_url,
             &eth_rpc_url,
+            None,
             None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
@@ -1337,6 +1529,7 @@ pub fn private_usd_reverse_rescue(
             &secret,
             "",
             &eth_rpc_url,
+            None,
             None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
@@ -2187,6 +2380,7 @@ fn drive<T>(
     secret: &[u8],
     lightwalletd_url: &str,
     eth_rpc_url: &str,
+    tokens_path: Option<&str>,
     op_id: Option<u32>,
     step: impl AsyncFnOnce(&SwapCall<'_>, Option<&OpHandle>) -> Result<T, PrivateUsdError>,
 ) -> Result<T, ApiPrivateUsdError> {
@@ -2204,6 +2398,7 @@ fn drive<T>(
         store_dir: Path::new(store_dir),
         lightwalletd_url,
         eth_rpc_url,
+        tokens_path: tokens_path.map(Path::new),
         keys: &keys,
     };
     block_on(step(&call, op.as_ref()))

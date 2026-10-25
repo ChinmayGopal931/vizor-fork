@@ -6,6 +6,7 @@ import '../../../../providers/privacy_mode_provider.dart';
 import '../../models/private_usd_record_key.dart';
 import '../../providers/private_usd_convert_provider.dart';
 import '../../providers/private_usd_relayer_claims_provider.dart';
+import '../../providers/private_usd_tokens_provider.dart';
 import '../../providers/private_usd_reverse_convert_provider.dart';
 import '../../widgets/mobile/private_usd_convert_views.dart';
 import 'mobile_private_usd_convert_screen.dart';
@@ -33,6 +34,7 @@ class MobilePrivateUsdConvertReviewScreen extends ConsumerWidget {
         view: (onBack) => MobilePrivateUsdReverseReviewView(
           state: state,
           privacyModeEnabled: privacyModeEnabled,
+          torOffDisclosure: ref.watch(privateUsdTokensTorOffDisclosureProvider),
           onBack: onBack,
           onConfirm: () => _confirm(context, notifier.confirm),
           onRefreshQuote: notifier.refreshQuote,
@@ -52,6 +54,7 @@ class MobilePrivateUsdConvertReviewScreen extends ConsumerWidget {
         state: state,
         privacyModeEnabled: privacyModeEnabled,
         relayerClaims: relayerClaims,
+        torOffDisclosure: ref.watch(privateUsdTokensTorOffDisclosureProvider),
         onBack: onBack,
         onConfirm: () => _confirm(context, notifier.confirm),
         onRefreshQuote: notifier.refreshQuote,
