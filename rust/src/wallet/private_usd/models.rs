@@ -611,8 +611,9 @@ pub(crate) struct ForwardRecord {
     /// A claim was posted, `z` with it: kept before it goes.
     #[serde(default, skip_serializing_if = "is_false")]
     pub claim_posted: bool,
-    /// Chosen at accept: once the deposit is out, the claim, `z` with it,
-    /// goes to the relayer to hold until its window opens.
+    /// Chosen at accept: once the deposit is out and the swap is ready, the
+    /// claim, `z` with it, goes to the relayer to hold until its window
+    /// opens.
     #[serde(default, skip_serializing_if = "is_false")]
     pub relayer_claims: bool,
     /// The claim handed to the relayer, kept before it is posted.

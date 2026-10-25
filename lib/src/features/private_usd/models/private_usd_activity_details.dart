@@ -229,7 +229,7 @@ List<PrivateUsdActivityDetail> privateUsdReverseDetails(
   return [
     PrivateUsdDetailValue(
       PrivateUsdCopy.bridgedYouPaid,
-      _usd(privateUsdReverseDebit(record), privacyModeEnabled),
+      _paid(privateUsdReverseDebit(record), privacyModeEnabled),
     ),
     PrivateUsdDetailValue(
       PrivateUsdCopy.bridgedYouReceived,
@@ -238,11 +238,11 @@ List<PrivateUsdActivityDetail> privateUsdReverseDetails(
     if (cost != null) ...[
       PrivateUsdDetailValue(
         PrivateUsdCopy.reverseRailgunFee,
-        _usd(_units(cost.railgunFee), privacyModeEnabled),
+        _paid(_units(cost.railgunFee), privacyModeEnabled),
       ),
       PrivateUsdDetailValue(
         PrivateUsdCopy.reverseBroadcasterFee,
-        _usd(_units(cost.broadcasterFee), privacyModeEnabled),
+        _paid(_units(cost.broadcasterFee), privacyModeEnabled),
       ),
     ],
     PrivateUsdDetailValue(
@@ -270,6 +270,14 @@ BigInt _units(String value) => BigInt.tryParse(value) ?? BigInt.zero;
 String _usd(BigInt microDollars, bool privacyModeEnabled) =>
     hideAmountIfPrivacyMode(
       formatPrivateUsd(microDollars),
+      privacyModeEnabled: privacyModeEnabled,
+      denomination: '',
+    );
+
+// A payment and its fees, to the nearest cent, so its rows add up.
+String _paid(BigInt microDollars, bool privacyModeEnabled) =>
+    hideAmountIfPrivacyMode(
+      formatPrivateUsdNearest(microDollars),
       privacyModeEnabled: privacyModeEnabled,
       denomination: '',
     );

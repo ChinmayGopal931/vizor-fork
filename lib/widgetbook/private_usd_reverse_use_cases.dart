@@ -117,11 +117,13 @@ PrivateUsdReverseConvertState previewPrivateUsdReverseConvertState({
   PrivateUsdConvertStep step = PrivateUsdConvertStep.amount,
 }) => PrivateUsdReverseConvertState(
   now: previewPrivateUsdNow,
-  amountText: '25',
+  // The total that funds the draft's $25.00 escrow with both fees.
+  amountText: '25.32',
   draft: previewPrivateUsdReverseRecord(
     phase: ApiReversePhase.quoted,
     ago: Duration.zero,
   ),
+  draftTotal: BigInt.from(25320000),
   step: step,
   available: BigInt.from(1250400000),
 );
@@ -137,6 +139,7 @@ Widget buildMobilePrivateUsdConvertReverseUseCase(BuildContext context) {
         controller: controllers.single,
         autofocus: false,
         onAmountChanged: (_) {},
+        zecUsdPrice: 70,
         onMax: () {},
         onReview: () {},
         onBack: () {},

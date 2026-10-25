@@ -38,7 +38,8 @@ use zeroize::Zeroizing;
 
 use super::abi::Call;
 use super::deployment::{
-    self, Deployment, DEFAULT_MIN_SECONDS_TO_T0, MAX_READY_WAIT_SECONDS, SIGNATURE_TTL_SECONDS,
+    self, Deployment, BPS_MAX, DEFAULT_MIN_SECONDS_TO_T0, MAX_READY_WAIT_SECONDS,
+    SIGNATURE_TTL_SECONDS,
 };
 use super::engine::{self, Activity, Clock, FundingSession, MakerChecks, OpHandle, SystemClock};
 use super::evm_rpc::{
@@ -662,38 +663,56 @@ where
 
     // ---- quote, accept and funding ----
 
-    /// Quotes `units` of private dollars (whole cents) for a fresh index,
-    /// which counts as spent from here on, and keeps the verified quote as
-    /// a `QUOTED` draft, replacing any earlier draft. Nothing is accepted or
+    /// Quotes the most that `total` private dollars (whole cents) fund, once
+    /// Railgun's unshield fee (`unshield_basis_points`, as the page loads
+    /// it) and the relayer's funding fee come off it, for a fresh index,
+    /// which counts as spent from here on, and keeps the verified quote as a
+    /// `QUOTED` draft, replacing any earlier draft. Nothing is accepted or
     /// paid; the draft is not under way.
-    pub(crate) async fn quote(&self, store: &mut SwapStore, units: u32) -> Result<ReverseQuoted> {
-        if units == 0 || !units.is_multiple_of(CENT_UNITS) {
+    pub(crate) async fn quote(
+        &self,
+        store: &mut SwapStore,
+        total: u32,
+        unshield_basis_points: u32,
+    ) -> Result<ReverseQuoted> {
+        if total == 0 || !total.is_multiple_of(CENT_UNITS) {
             return fail(
                 ErrorCode::AmountUnquotable,
                 "a conversion to ZEC names a whole number of cents",
             );
         }
+        if u128::from(unshield_basis_points) >= BPS_MAX {
+            return fail(ErrorCode::Other, "an unshield fee of the whole amount");
+        }
         self.pins.swap_contract()?;
         swap::require_none_under_way(store, self.account)?;
         swap::check_maker(&self.maker, self.pins, self.makers, true).await?;
-        let requested = Amount(u128::from(units));
-        let relayer = pinned_relayer_terms(&self.view.relayer, self.pins).await?;
+        let contracts = [(self.chain, self.pins.maker)];
+        // The relayer's terms, the index and the joint account's birthday (any
+        // height before the maker's deposit) don't wait on each other: all
+        // three are asked at once.
+        let (relayer, index, birthday) = tokio::join!(
+            pinned_relayer_terms(&self.view.relayer, self.pins),
+            indices::take_index(store, &contracts, self.keys, self.account),
+            self.zcash.chain_height(),
+        );
+        let relayer = relayer?;
+        let payout_fee = relayer.fee;
+        let sponsored = within_cap(sponsorship(self.pins, relayer)?)?;
+        let requested = escrow_for(
+            u128::from(total),
+            u128::from(unshield_basis_points),
+            sponsored.fee.0,
+        )?;
         // A refund pays out less the relayer's fee: one it would take all of
         // could never come back.
-        require_payout_fee(requested, relayer.fee)?;
-        let sponsored = within_cap(sponsorship(self.pins, relayer)?)?;
-        let index = indices::take_index(
-            store,
-            &[(self.chain, self.pins.maker)],
-            self.keys,
-            self.account,
-        )
-        .await?;
+        require_payout_fee(requested, payout_fee)?;
+        let (index, birthday) = (index?, birthday?);
         let user = self.keys.auth_address(index)?;
         let note = self.keys.note(index)?.commitment();
         let quote = self
             .maker
-            .quote_reverse(units, user, note)
+            .quote_reverse(escrow_units(requested)?, user, note)
             .await
             .map_err(quote_error)?;
         verify_quote(self.pins, &quote, &user, &note)?;
@@ -709,7 +728,7 @@ where
             swap_id: Hex(terms::reverse_swap_id(&user, &maker_share)),
             user_share: acceptance.user_share,
             acceptance,
-            birthday: self.zcash.chain_height().await?,
+            birthday,
             quote,
             account: None,
             phase: ReversePhase::Quoted,
@@ -1650,6 +1669,36 @@ fn within_cap(sponsored: Sponsored) -> Result<Sponsored> {
     Ok(sponsored)
 }
 
+/// The most whole cents a debit of at most `total` puts in escrow: Railgun's
+/// unshield fee comes off the debit, as the page's `fundingAmounts` takes it
+/// (the escrow and the relayer's `funding_fee` get `total × (10000 − bps) /
+/// 10000` at most), then the funding fee. `AmountUnquotable` when the fees
+/// take it all.
+pub(crate) fn escrow_for(
+    total: u128,
+    unshield_basis_points: u128,
+    funding_fee: u128,
+) -> Result<Amount> {
+    let cent = u128::from(CENT_UNITS);
+    let funded = total * (BPS_MAX - unshield_basis_points) / BPS_MAX;
+    match funded
+        .checked_sub(funding_fee)
+        .map(|escrow| escrow / cent * cent)
+    {
+        Some(escrow) if escrow > 0 => Ok(Amount(escrow)),
+        _ => fail(
+            ErrorCode::AmountUnquotable,
+            "the fees take all of this amount",
+        ),
+    }
+}
+
+/// [`escrow_for`]'s amount as the maker's quote names it.
+fn escrow_units(escrow: Amount) -> Result<u32> {
+    u32::try_from(escrow.0)
+        .map_err(|_| PrivateUsdError::new(ErrorCode::AmountUnquotable, "more than one quote names"))
+}
+
 /// The conversion is under way and waiting on the user, not called off.
 fn require_going_ahead(record: &ReverseRecord) -> Result<()> {
     if record.is_draft() {
@@ -1830,7 +1879,7 @@ impl SwapCall<'_> {
         step: impl AsyncFnOnce(&WalletReverse<'_>, &mut SwapStore) -> Result<R>,
     ) -> Result<R> {
         let transport = swap::transport(op);
-        let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url);
+        let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url)?;
         let zcash = self.zcash(op);
         let reverse = Reverse::new(
             self.account,
@@ -1861,7 +1910,7 @@ pub(crate) async fn run_view<R>(
         return Ok(None);
     };
     let transport = RoutedHttp::new();
-    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url);
+    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url)?;
     let view = ReverseView::new(network, account, &chain, &transport, &SystemClock, None);
     step(&view, &mut store).await.map(Some)
 }

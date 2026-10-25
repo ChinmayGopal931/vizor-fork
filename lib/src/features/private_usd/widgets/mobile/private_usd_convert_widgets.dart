@@ -7,7 +7,6 @@ import '../../../../core/formatting/zec_amount.dart';
 import '../../../../core/privacy/privacy_mask.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
-import '../../../../core/widgets/app_loading_icon.dart';
 import '../../../../core/widgets/comma_to_dot_input_formatter.dart';
 import '../../../../core/widgets/decimal_amount_input_formatter.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
@@ -85,7 +84,7 @@ class PrivateUsdAmountPanel extends StatelessWidget {
     this.autofocus = true,
     this.readOnly = false,
     this.invalid = false,
-    this.maxBusy = false,
+    this.marketValue,
     this.note,
     this.error,
     this.footer,
@@ -108,8 +107,9 @@ class PrivateUsdAmountPanel extends StatelessWidget {
   final bool readOnly;
   final bool invalid;
 
-  /// Max is working out the amount.
-  final bool maxBusy;
+  /// What the amount is worth at market prices, shown in brackets on the
+  /// right of the line under the field; null hides it.
+  final String? marketValue;
 
   /// Under the field, what the amount includes.
   final String? note;
@@ -155,9 +155,9 @@ class PrivateUsdAmountPanel extends StatelessWidget {
               hintStyle: amountStyle.copyWith(color: colors.text.muted),
             ),
           ),
-          if (note != null) ...[
+          if (note != null || marketValue != null) ...[
             const SizedBox(height: AppSpacing.xxs),
-            Text(note, style: small.copyWith(color: colors.text.secondary)),
+            _UnderAmountLine(text: note, marketValue: marketValue),
           ],
           if (error != null) ...[
             const SizedBox(height: AppSpacing.xs),
@@ -186,9 +186,6 @@ class PrivateUsdAmountPanel extends StatelessWidget {
                   variant: AppButtonVariant.secondary,
                   size: AppButtonSize.small,
                   onPressed: onMax,
-                  leading: maxBusy
-                      ? const AppLoadingIcon(size: AppIconSize.medium)
-                      : null,
                   child: const Text(PrivateUsdCopy.max),
                 ),
               ),
@@ -212,6 +209,7 @@ class PrivateUsdEstimatePanel extends StatelessWidget {
     required this.quoting,
     required this.estimate,
     this.available,
+    this.marketValue,
     super.key,
   });
 
@@ -223,6 +221,10 @@ class PrivateUsdEstimatePanel extends StatelessWidget {
 
   /// What the receiving side holds already.
   final String? available;
+
+  /// What the estimate is worth at market prices, shown in brackets on the
+  /// right of the line under it; null hides it.
+  final String? marketValue;
 
   @override
   Widget build(BuildContext context) {
@@ -263,13 +265,50 @@ class PrivateUsdEstimatePanel extends StatelessWidget {
               ),
             ),
           const SizedBox(height: AppSpacing.xxs),
-          Text(PrivateUsdCopy.convertEstimatedAmount, style: small),
+          _UnderAmountLine(
+            text: PrivateUsdCopy.convertEstimatedAmount,
+            marketValue: marketValue,
+          ),
           if (available != null) ...[
             const SizedBox(height: AppSpacing.s),
             Text(PrivateUsdCopy.availableAmount(available), style: small),
           ],
         ],
       ),
+    );
+  }
+}
+
+/// The line under a panel's amount, with the amount's market value in
+/// brackets on its right where there is one.
+class _UnderAmountLine extends StatelessWidget {
+  const _UnderAmountLine({this.text, this.marketValue});
+
+  final String? text;
+  final String? marketValue;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = this.text;
+    final marketValue = this.marketValue;
+    final style = AppTypography.bodySmall.copyWith(
+      color: context.colors.text.secondary,
+    );
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: text == null ? const SizedBox() : Text(text, style: style),
+        ),
+        if (marketValue != null) ...[
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            PrivateUsdCopy.convertMarketValue(marketValue),
+            key: const ValueKey('mobile_private_usd_convert_market_value'),
+            style: style,
+          ),
+        ],
+      ],
     );
   }
 }
@@ -513,9 +552,10 @@ class PrivateUsdQuoteLedger extends StatelessWidget {
   }
 }
 
-/// A priced reverse quote's ledger: the escrow value, Railgun's unshield
-/// fee, the broadcast fee, the total paid, the maker's network cost when it
-/// names one, and the ZEC estimate.
+/// A priced reverse quote's ledger: the escrow value, and Railgun's unshield
+/// fee and the broadcast fee to the cent, which together make the total paid
+/// (the amount above, and the review's header), then the maker's network
+/// cost when it names one, and the ZEC estimate.
 class PrivateUsdReverseLedger extends StatelessWidget {
   const PrivateUsdReverseLedger({
     required this.record,
@@ -544,15 +584,11 @@ class PrivateUsdReverseLedger extends StatelessWidget {
       if (cost != null) ...[
         (
           PrivateUsdCopy.reverseRailgunFee,
-          formatPrivateUsd(BigInt.parse(cost.railgunFee)),
+          formatPrivateUsdNearest(BigInt.parse(cost.railgunFee)),
         ),
         (
           PrivateUsdCopy.reverseBroadcasterFee,
-          formatPrivateUsd(BigInt.parse(cost.broadcasterFee)),
-        ),
-        (
-          PrivateUsdCopy.reverseTotal,
-          _masked(formatPrivateUsd(BigInt.parse(cost.debit))),
+          formatPrivateUsdNearest(BigInt.parse(cost.broadcasterFee)),
         ),
       ],
       if (networkCost != null && networkCost > BigInt.zero)

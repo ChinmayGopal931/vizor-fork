@@ -53,6 +53,7 @@ class RailgunProtocolTest {
         assertTrue(failure("""{"code":"BAD_REQUEST","message":"no wallet is open"}""") is RailgunException.Protocol)
         assertTrue(failure("""{"code":"FAILED","message":"the RPC timed out"}""") is RailgunException.Failed)
         assertEquals("the RPC timed out", failure("""{"code":"FAILED","message":"the RPC timed out"}""").message)
+        assertTrue(failure("""{"code":"RPC_FAILED","message":"the Ethereum RPC answers 403"}""") is RailgunException.RpcFailed)
     }
 
     @Test

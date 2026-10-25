@@ -9,6 +9,8 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_loading_icon.dart';
 import '../../../../core/widgets/mobile/mobile_warning_notice.dart';
+import '../../../../providers/zec_price_change_provider.dart'
+    show fiatTextForZatoshi;
 import '../../../swap/domain/swap_asset.dart';
 import '../../../swap/widgets/mobile/mobile_swap_review_header.dart';
 import '../../models/private_usd_balances.dart';
@@ -33,6 +35,16 @@ String _masked(String text, bool privacyModeEnabled) => hideAmountIfPrivacyMode(
 String _zec(BigInt zatoshi) =>
     ZecAmount.fromZatoshi(zatoshi).activity.toString();
 
+// What [zatoshi] is worth at [zecUsdPrice], for its panel: none without a
+// price or an amount, or in privacy mode.
+String? _marketValue(
+  BigInt? zatoshi,
+  double? zecUsdPrice,
+  bool privacyModeEnabled,
+) => privacyModeEnabled || zatoshi == null
+    ? null
+    : fiatTextForZatoshi(zatoshi, zecUsdUnitPrice: zecUsdPrice);
+
 /// The forward amount step, ZEC → private USD: the total ZEC to spend
 /// (network fee included), its quote's estimate, ledger and countdown.
 class MobilePrivateUsdConvertView extends StatelessWidget {
@@ -47,6 +59,7 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
     this.focusNode,
     this.privacyModeEnabled = false,
     this.privateUsdAvailable,
+    this.zecUsdPrice,
     this.autofocus = true,
     this.onSwitchDirection,
     super.key,
@@ -62,6 +75,9 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
 
   /// The private USD that can be spent, in micro-dollars; null while unknown.
   final BigInt? privateUsdAvailable;
+
+  /// ZEC's market price (Home's), for the ZEC's worth; null hides it.
+  final double? zecUsdPrice;
   final bool autofocus;
   final ValueChanged<String> onAmountChanged;
   final VoidCallback onMax;
@@ -96,6 +112,11 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
         maxFractionDigits: 8,
         invalid: state.isAmountInvalid,
         note: PrivateUsdCopy.convertZecIncludesFee,
+        marketValue: _marketValue(
+          state.totalZat,
+          zecUsdPrice,
+          privacyModeEnabled,
+        ),
         available: spendable == null
             ? PrivateUsdCopy.unknown
             : _masked(_zec(spendable), privacyModeEnabled),
@@ -156,6 +177,7 @@ class MobilePrivateUsdReverseConvertView extends StatelessWidget {
     this.onViewRefunds,
     this.focusNode,
     this.privacyModeEnabled = false,
+    this.zecUsdPrice,
     this.autofocus = true,
     super.key,
   });
@@ -164,6 +186,9 @@ class MobilePrivateUsdReverseConvertView extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode? focusNode;
   final bool privacyModeEnabled;
+
+  /// ZEC's market price (Home's), for the estimate's worth; null hides it.
+  final double? zecUsdPrice;
   final bool autofocus;
   final ValueChanged<String> onAmountChanged;
   final VoidCallback onMax;
@@ -196,7 +221,6 @@ class MobilePrivateUsdReverseConvertView extends StatelessWidget {
             ? PrivateUsdCopy.unknown
             : _masked(formatPrivateUsd(available), privacyModeEnabled),
         onMax: state.canMax ? onMax : null,
-        maxBusy: state.lookingUp,
         onChanged: onAmountChanged,
       ),
       receive: PrivateUsdEstimatePanel(
@@ -208,11 +232,18 @@ class MobilePrivateUsdReverseConvertView extends StatelessWidget {
                 privacyModeEnabled,
               )
             : null,
+        marketValue: priced && !state.quoting
+            ? _marketValue(
+                privateUsdReverseReceivedZat(draft),
+                zecUsdPrice,
+                privacyModeEnabled,
+              )
+            : null,
       ),
       onSwitchDirection: onSwitchDirection,
-      busy: state.quoting || state.lookingUp,
+      busy: state.quoting,
       quoting: state.quoting,
-      ledger: priced && !state.quoting && !state.lookingUp
+      ledger: priced && !state.quoting
           ? PrivateUsdReverseLedger(
               record: draft,
               privacyModeEnabled: privacyModeEnabled,
@@ -345,7 +376,7 @@ class MobilePrivateUsdConvertReviewView extends StatelessWidget {
   final bool privacyModeEnabled;
 
   /// The relayer claims for this bridge (Settings): Veylor stays open only
-  /// until the ZEC is sent.
+  /// until the market maker confirms the deposit.
   final bool relayerClaims;
   final VoidCallback onBack;
   final VoidCallback onConfirm;
@@ -427,7 +458,7 @@ class MobilePrivateUsdReverseReviewView extends StatelessWidget {
           : MobileSwapReviewHeaderRow(
               label: PrivateUsdCopy.convertYouPay,
               amountText: _masked(
-                formatPrivateUsd(privateUsdReverseDebit(draft)),
+                formatPrivateUsdNearest(privateUsdReverseDebit(draft)),
                 privacyModeEnabled,
               ),
               asset: SwapAsset.usdc,

@@ -326,7 +326,7 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
    - Otherwise `Waiting(CONFIRMING, t0, t1)`.
 6. **`READY`** → claim. **`CLAIMED`** and not `paidOut` → payout. Then `finishPaid`. A claim the relayer held and sent ends the same way.
 7. **Claim** (zapp's `AtomicSwapClaim.claim`, `:330-345`, with the lock replaced by the claim's window, §5.4):
-   0. **Hand-over** (relayer claims, once the deposit is kept and out: reached from step 5 in the step that broadcast it, or on a `Ready` swap). Once per swap: sign the payout as in step 8 and keep it, keep `claimHold = posted`, then post `/v1/claim/hold` with the ticket. Held, or answered as a claim, → `held`. A `4xx` holds nothing: on `400 rejected`, re-read the terms, and if the fee rose within the cap, sign again at it, keep it and post once more; otherwise, and on a `404`, → `declined`, and the swap claims as without relayer claims. No answer (transport, `5xx`) leaves `posted`, and the next step posts the kept payout again, the same bytes. A failure never holds up the rest of the step.
+   0. **Hand-over** (relayer claims, on a `Ready` swap at its confirmation depth with the deposit kept and out: reached from step 6, never from step 5, since the maker may cancel an open swap and its cancel reveals `e` beside the `z` handed over; D-151). Once per swap: sign the payout as in step 8 and keep it, keep `claimHold = posted`, then post `/v1/claim/hold` with the ticket. Held, or answered as a claim, → `held`. A `4xx` holds nothing: on `400 rejected`, re-read the terms, and if the fee rose within the cap, sign again at it, keep it and post once more; otherwise, and on a `404`, → `declined`, and the swap claims as without relayer claims. No answer (transport, `5xx`) leaves `posted`, and the next step posts the kept payout again, the same bytes. A failure never holds up the rest of the step.
    1. The window on one consistent read (`claim_window`): before `t0` and not `Ready` 2 blocks deep → `Waiting(CONFIRMING)`; under the margin before `t1`, or from `t1` until `t1 + LATE_WINDOW` → `Waiting(UNWINDING)`; otherwise open. A claim handed over (`posted` or `held`) waits until the window has been open a minute (§5.4).
    2. Build or reuse the payout (step 8).
    3. Require Railgun open (`RAILGUN_CLOSED`), asked only once the window is open.
@@ -715,7 +715,7 @@ JSON strings go over one `WebMessagePort`. The page side is `rl/web/src/index.js
 - **Envelopes.**
   - Request: `{id: Long, method: String, params: Object}`.
   - Reply: `{id, result}`.
-  - Failure: `{id, error: {code: "BAD_REQUEST" | "FAILED", message}}`. `BAD_REQUEST` maps to `RailgunException.Protocol`; anything else maps to `Failed` (`rl/web/src/errors.js`, `RailgunProtocol.kt:251-264`).
+  - Failure: `{id, error: {code: "BAD_REQUEST" | "RPC_FAILED" | "FAILED", message}}`. `BAD_REQUEST` maps to `RailgunException.Protocol`, `RPC_FAILED` (a sync that failed while the Ethereum RPC did not answer or turned requests away, which the page tells from the connection by asking the RPC and a screening node as the sync fails; `rpc-probe.js`, D-153) to `RpcFailed`; anything else maps to `Failed` (`rl/web/src/errors.js`, `RailgunProtocol.kt:251-264`).
   - Event: `{event, data}`.
 - **Amounts.** Token amounts are decimal strings (`DecimalSerializer`, `:285-297`).
 - **Unreadable messages.** A reply that cannot be decoded still fails its call (`:197-206`). Unknown events are dropped.
@@ -770,6 +770,7 @@ Errors are `PlatformException(code, message)`, mapped from `RailgunException`:
 | `unavailable` | `Unavailable` (no WebView package, no `PROXY_OVERRIDE`) | show unavailable; do not retry in a loop |
 | `protocol` | `Protocol` (`BAD_REQUEST`, unreadable reply) | a bug: log the method only, never params |
 | `failed` | `Failed` (engine, chain or POI error) | retry per caller. The message is the engine's own text and can quote a keyed RPC URL (ethers puts request URLs in its errors): never log it, and redact the keyed URL before showing it |
+| `rpc_failed` | `RpcFailed` (`RPC_FAILED`: a sync failed while the RPC did not answer, or answered 403 or 429, and a screening node still answered) | as `failed`; the balance says the RPC is not answering and offers another one (`PrivateUsdBalanceState.rpcFailed`, "Change RPC", or "Use the default" with the user's own set) |
 | `bad_args` | handler-level argument check | a bug |
 
 A call whose coroutine is cancelled is answered `closed`, so every call gets exactly one answer.

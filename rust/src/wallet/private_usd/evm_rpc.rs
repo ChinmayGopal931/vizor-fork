@@ -37,7 +37,8 @@ use super::abi::{
     u128_word, u64_word, uint_word, words, Call, WORD,
 };
 use super::deployment::{
-    Deployment, DepositsPin, MAX_LOGS_BODY, MAX_SERVICE_BODY, MULTICALL3, QUICK_TIMEOUT,
+    Deployment, DepositsPin, SwapContract, MAX_LOGS_BODY, MAX_SERVICE_BODY, MULTICALL3,
+    QUICK_TIMEOUT,
 };
 use super::transport::HttpTransport;
 use super::{fail, ErrorCode, PrivateUsdError, Result};
@@ -179,6 +180,14 @@ pub(crate) trait ChainReader {
     /// Whether a retired contract shows swap `id`, or maker key `key`, in
     /// use.
     async fn used_before(&self, id: &[u8; 32], key: &[u8; 32]) -> Result<bool>;
+    /// Whether a swap index is spent: its forward swap `id` or its share's
+    /// `makerKeyUsed` key `key` in use, on the pinned contract or a retired
+    /// one. These reads one by one; [`EvmRpc`] makes them one read.
+    async fn index_used(&self, id: &[u8; 32], key: &[u8; 32]) -> Result<bool> {
+        Ok(self.swap(id).await?.is_some()
+            || self.maker_key_used(key).await?
+            || self.used_before(id, key).await?)
+    }
     async fn reverse_state(&self, id: &[u8; 32], terms: &Terms) -> Result<ReverseChainState>;
     async fn vault_balance(&self, id: &[u8; 32]) -> Result<u128>;
     /// What each swap's vault (`vaultOf`) holds of the token, in `ids`'
@@ -330,15 +339,20 @@ pub(crate) struct EvmRpc<'a, T: HttpTransport> {
 
 impl<'a, T: HttpTransport> EvmRpc<'a, T> {
     /// Over the build's keyed RPC URL, or publicnode when `keyed_rpc_url` is
-    /// empty.
-    pub(crate) fn new(transport: &'a T, pins: &'static Deployment, keyed_rpc_url: &str) -> Self {
-        Self {
+    /// empty; `WrongDeployment` for a URL off the network's RPC providers
+    /// (`Deployment::rpc_url`).
+    pub(crate) fn new(
+        transport: &'a T,
+        pins: &'static Deployment,
+        keyed_rpc_url: &str,
+    ) -> Result<Self> {
+        Ok(Self {
             transport,
-            url: pins.rpc_url(keyed_rpc_url).to_owned(),
+            url: pins.rpc_url(keyed_rpc_url)?.to_owned(),
             pins,
             windows: OnceLock::new(),
             next_id: AtomicU64::new(1),
-        }
+        })
     }
 
     async fn rpc(&self, method: &str, params: Value) -> std::result::Result<Value, RpcError> {
@@ -461,28 +475,42 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
         if self.windows.get().is_some() {
             return Ok(pinned.address);
         }
-        let min = self.window(&pinned.address, MIN_WINDOW).await?;
-        let late = self.window(&pinned.address, LATE_WINDOW).await?;
+        let min = self
+            .call_unless_reverted(&pinned.address, MIN_WINDOW)
+            .await?;
+        let late = self
+            .call_unless_reverted(&pinned.address, LATE_WINDOW)
+            .await?;
         let locks = self
             .call_unless_reverted(&pinned.address, LOCK_DURATION)
             .await?;
-        if min != Some(pinned.min_window) || late != Some(pinned.late_window) || locks.is_some() {
+        self.hold_windows(pinned, min, late, locks)?;
+        Ok(pinned.address)
+    }
+
+    /// Holds the contract's answers to `MIN_WINDOW()`, `LATE_WINDOW()` and
+    /// `LOCK_DURATION()` (`None` where one reverted) to the pin: both windows
+    /// as pinned, the locks' duration reverted. A pass is remembered.
+    fn hold_windows(
+        &self,
+        pinned: &SwapContract,
+        min: Option<Vec<u8>>,
+        late: Option<Vec<u8>>,
+        locks: Option<Vec<u8>>,
+    ) -> Result<()> {
+        let window =
+            |answer: Option<Vec<u8>>| answer.map(|data| u64_word(&exact_word(&data)?)).transpose();
+        if window(min)? != Some(pinned.min_window)
+            || window(late)? != Some(pinned.late_window)
+            || locks.is_some()
+        {
             return fail(
                 ErrorCode::WrongDeployment,
                 "the swap contract is not the pinned windows contract",
             );
         }
         let _ = self.windows.set(());
-        Ok(pinned.address)
-    }
-
-    /// A window's length as `contract` answers `signature()`; `None` where
-    /// it reverts.
-    async fn window(&self, contract: &[u8; 20], signature: &str) -> Result<Option<u64>> {
-        self.call_unless_reverted(contract, signature)
-            .await?
-            .map(|data| u64_word(&exact_word(&data)?))
-            .transpose()
+        Ok(())
     }
 
     /// `signature()` on `to` at `latest`; `None` where it reverts.
@@ -649,6 +677,51 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
     async fn maker_key_used(&self, key: &[u8; 32]) -> Result<bool> {
         let data = self.contract_call(MAKER_KEY_USED, key, "latest").await?;
         Ok(words(&data, 1)?[0][WORD - 1] != 0)
+    }
+
+    /// One read at one block: the windows too while they are unchecked.
+    /// Every call may fail, so the windows are held to the pin before any
+    /// swap read counts.
+    async fn index_used(&self, id: &[u8; 32], key: &[u8; 32]) -> Result<bool> {
+        let pinned = self.pins.swap_contract()?;
+        let unchecked = self.windows.get().is_none();
+        let call = |to: &[u8; 20], signature: &str, words: &[[u8; WORD]]| Call {
+            to: *to,
+            data: call_data(signature, words),
+        };
+        let mut calls = Vec::new();
+        if unchecked {
+            for signature in [MIN_WINDOW, LATE_WINDOW, LOCK_DURATION] {
+                calls.push(call(&pinned.address, signature, &[]));
+            }
+        }
+        for contract in std::iter::once(&pinned.address).chain(self.pins.retired_contracts) {
+            calls.push(call(contract, GET_SWAP, &[*id]));
+            calls.push(call(contract, MAKER_KEY_USED, &[*key]));
+        }
+        let mut answers = self.try_aggregate(&MULTICALL3, &calls).await?.into_iter();
+        let mut next = || answers.next().flatten();
+        if unchecked {
+            let (min, late, locks) = (next(), next(), next());
+            self.hold_windows(pinned, min, late, locks)?;
+        }
+        let mut read = || {
+            next().ok_or_else(|| {
+                PrivateUsdError::new(ErrorCode::ChainUnreadable, "a swap index read failed")
+            })
+        };
+        // The windows contract's swap and key, as `swap` and
+        // `maker_key_used` read them, then each retired one's, as
+        // `used_before` does. Both answers are taken before either is
+        // judged, so the next pair stays in step.
+        let (swap, key_used) = (read()?, read()?);
+        let mut used =
+            decode_swap_state(&swap)?.is_some() || words(&key_used, 1)?[0][WORD - 1] != 0;
+        for _ in self.pins.retired_contracts {
+            let (record, key_used) = (read()?, read()?);
+            used |= words(&record, 2)?[1] != [0; WORD] || words(&key_used, 1)?[0] != [0; WORD];
+        }
+        Ok(used)
     }
 
     async fn used_before(&self, id: &[u8; 32], key: &[u8; 32]) -> Result<bool> {
@@ -833,6 +906,18 @@ impl<T: HttpTransport> EvmRpc<'_, T> {
         let data = abi::encode_aggregate3(calls);
         let answer = self.eth_call(multicall, data, "latest").await?;
         abi::decode_aggregate3(&answer, calls.len())
+    }
+
+    /// Each call's return data from one `aggregate3` on Multicall3 at
+    /// `latest`, `None` for one that failed: none fails the read.
+    async fn try_aggregate(
+        &self,
+        multicall: &[u8; 20],
+        calls: &[Call],
+    ) -> Result<Vec<Option<Vec<u8>>>> {
+        let data = abi::encode_try_aggregate3(calls);
+        let answer = self.eth_call(multicall, data, "latest").await?;
+        abi::decode_try_aggregate3(&answer, calls.len())
     }
 
     /// `signature()` on `to` at `latest`.
@@ -1249,7 +1334,7 @@ mod tests {
                 node(min, late, Some(600), open.clone()),
             ),
         ] {
-            let rpc = EvmRpc::new(&transport, pins, "https://rpc.invalid");
+            let rpc = EvmRpc::new(&transport, pins, "").unwrap();
             let error = rpc.swap(&[1; 32]).await.unwrap_err();
             assert_eq!(error.code, ErrorCode::WrongDeployment, "{case}");
             let read = rpc.read_swap(&[1; 32], &terms(pins)).await.unwrap_err();
@@ -1270,7 +1355,7 @@ mod tests {
 
         // The pinned windows: checked once, then the swap is read.
         let windows = node(min, late, None, get_swap_answer(0));
-        let rpc = EvmRpc::new(&windows, pins, "https://rpc.invalid");
+        let rpc = EvmRpc::new(&windows, pins, "").unwrap();
         assert_eq!(rpc.swap(&[1; 32]).await.unwrap(), None);
         assert_eq!(rpc.swap(&[1; 32]).await.unwrap(), None);
         assert_eq!(windows.sent.borrow().len(), 3 + 2);
@@ -1292,7 +1377,7 @@ mod tests {
             None,
             record,
         );
-        let rpc = EvmRpc::new(&transport, pins, "https://rpc.invalid");
+        let rpc = EvmRpc::new(&transport, pins, "").unwrap();
 
         let read = rpc.read_swap(&[1; 32], &terms).await.unwrap();
         assert_eq!(
@@ -1337,13 +1422,14 @@ mod tests {
             assert_eq!(params[0]["to"], hex0x(&pins.railgun_proxy));
             Ok::<RoutedResponse, RoutedError>(rpc_error(3, "execution reverted"))
         });
-        let rpc = EvmRpc::new(&reverting, pins, "https://rpc.invalid");
+        let rpc = EvmRpc::new(&reverting, pins, "").unwrap();
         assert!(!rpc.railgun_accepts().await.unwrap());
 
         let open = ScriptedTransport::new(|_: &RoutedRequest| {
             Ok::<RoutedResponse, RoutedError>(rpc_result(json!(hex0x(&word(0)))))
         });
-        assert!(EvmRpc::new(&open, pins, "https://rpc.invalid")
+        assert!(EvmRpc::new(&open, pins, "")
+            .unwrap()
             .railgun_accepts()
             .await
             .unwrap());
@@ -1360,7 +1446,7 @@ mod tests {
             );
             Ok::<RoutedResponse, RoutedError>(rpc_result(json!("0x1")))
         });
-        let rpc = EvmRpc::new(&mainnet_node, pins, "https://rpc.invalid");
+        let rpc = EvmRpc::new(&mainnet_node, pins, "").unwrap();
         let error = rpc
             .confirmed_swap(&[1; 32], &terms(pins))
             .await

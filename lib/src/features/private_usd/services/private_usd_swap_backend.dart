@@ -170,12 +170,15 @@ abstract interface class PrivateUsdSwapBackend {
   /// draft too), then the rest, newest first.
   Future<List<rust.ApiReverseRecord>> reverseRecords(String accountUuid);
 
-  /// Quotes [units] (token base units, whole cents) for a fresh swap index
+  /// Quotes the most that [total] (token base units, whole cents) funds
+  /// once Railgun's unshield fee ([unshieldBasisPoints], as the page loads
+  /// it) and the relayer's funding fee come off it, for a fresh swap index,
   /// and keeps it as an unpriced `quoted` draft.
   Future<rust.ApiReverseQuote> reverseQuote(
     String accountUuid,
     PrivateUsdSecretReader secret, {
-    required int units,
+    required int total,
+    required int unshieldBasisPoints,
   });
 
   /// The page's `reverseCost` params for swap [index] now. No key.
@@ -427,7 +430,8 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
   Future<rust.ApiReverseQuote> reverseQuote(
     String accountUuid,
     PrivateUsdSecretReader secret, {
-    required int units,
+    required int total,
+    required int unshieldBasisPoints,
   }) async {
     final context = _context();
     // A quote may write the wallet's first record: the store may not exist.
@@ -444,7 +448,8 @@ class RustPrivateUsdSwapBackend implements PrivateUsdSwapBackend {
         mnemonicBytes: mnemonic,
         lightwalletdUrl: context.lightwalletdUrl,
         ethRpcUrl: ethRpcUrl,
-        units: units,
+        total: total,
+        unshieldBasisPoints: unshieldBasisPoints,
       ),
     );
   }

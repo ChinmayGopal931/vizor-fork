@@ -530,6 +530,9 @@ pub struct ApiForwardRecord {
     /// The relayer holds the claim and sends it once the claim's window
     /// opens: the claim no longer needs Veylor open.
     pub claim_held: bool,
+    /// The relayer turned the claim down or takes none to hold: Veylor
+    /// claims it itself, so the bridge needs it open.
+    pub claim_declined: bool,
     pub outcome: Option<ApiForwardOutcome>,
     pub refund_cause: Option<ApiRefundCause>,
     pub nothing_sent_cause: Option<ApiNothingSentCause>,
@@ -585,7 +588,8 @@ pub fn private_usd_forward_quote(
 /// after the save means "maybe opened": read the records and show the
 /// conversion's progress if it is under way. With `relayer_claims` (the
 /// setting, kept on the record), the claim goes to the relayer once the
-/// deposit is out, for it to send when the claim's window opens.
+/// deposit is out and the maker's ready is confirmed, for it to send when
+/// the claim's window opens.
 pub fn private_usd_forward_accept(
     db_path: String,
     network: String,
@@ -919,11 +923,14 @@ pub struct ApiReverseAdvance {
     pub needs_you: bool,
 }
 
-/// Quotes `units` of private dollars (token base units, whole cents) for a
-/// fresh swap index, which counts as spent from here on, and keeps the
-/// verified quote as a `QUOTED` draft, replacing any earlier draft. Price it
-/// next: the page's `reverseCost` with `cost_request`, then
-/// `private_usd_reverse_set_cost`. `Busy` while a conversion is under way.
+/// Quotes the most that `total` private dollars (token base units, whole
+/// cents) fund once Railgun's unshield fee (`unshield_basis_points`, as the
+/// page loads it) and the relayer's funding fee come off it, for a fresh swap
+/// index, which counts as spent from here on, and keeps the verified quote as
+/// a `QUOTED` draft, replacing any earlier draft. Price it next: the page's
+/// `reverseCost` with `cost_request`, then `private_usd_reverse_set_cost`.
+/// `Busy` while a conversion is under way; `AmountUnquotable` when the fees
+/// take it all.
 pub fn private_usd_reverse_quote(
     db_path: String,
     network: String,
@@ -932,7 +939,8 @@ pub fn private_usd_reverse_quote(
     mnemonic_bytes: Vec<u8>,
     lightwalletd_url: String,
     eth_rpc_url: String,
-    units: u32,
+    total: u32,
+    unshield_basis_points: u32,
 ) -> Result<ApiReverseQuote, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
     catch(panic::AssertUnwindSafe(|| {
@@ -947,7 +955,7 @@ pub fn private_usd_reverse_quote(
             None,
             async |call, op| {
                 call.reverse(op, async |reverse, store| {
-                    let quoted = reverse.quote(store, units).await?;
+                    let quoted = reverse.quote(store, total, unshield_basis_points).await?;
                     Ok(ApiReverseQuote {
                         record: api_reverse_record(store, &account_uuid, &quoted.record),
                         cost_request: api_cost_request(&quoted.price),
@@ -1578,7 +1586,7 @@ pub fn private_usd_send_settle_all(
         };
         let pins = deployment::deployment(network);
         let transport = RoutedHttp::new();
-        let chain = EvmRpc::new(&transport, pins, &eth_rpc_url);
+        let chain = EvmRpc::new(&transport, pins, &eth_rpc_url)?;
         let clock = SystemClock;
         let relay = Sends::new(&transport, pins.relayer_url, &clock, &account_uuid);
         Ok(block_on(relay.settle_all(&mut store, &chain))?
@@ -2298,6 +2306,7 @@ fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> Api
             .and_then(|sweep| internal_hex(&sweep.tx_id)),
         payout_tx: record.payout_tx.map(|transaction| transaction.to_hex()),
         claim_held: record.claim_hold == Some(ClaimHold::Held),
+        claim_declined: record.claim_hold == Some(ClaimHold::Declined),
         outcome,
         refund_cause,
         nothing_sent_cause,

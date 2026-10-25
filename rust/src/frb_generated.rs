@@ -8517,7 +8517,8 @@ fn wire__crate__api__private_usd__private_usd_reverse_quote_impl(
             let api_mnemonic_bytes = <Vec<u8>>::sse_decode(&mut deserializer);
             let api_lightwalletd_url = <String>::sse_decode(&mut deserializer);
             let api_eth_rpc_url = <String>::sse_decode(&mut deserializer);
-            let api_units = <u32>::sse_decode(&mut deserializer);
+            let api_total = <u32>::sse_decode(&mut deserializer);
+            let api_unshield_basis_points = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, crate::api::private_usd::ApiPrivateUsdError>(
@@ -8530,7 +8531,8 @@ fn wire__crate__api__private_usd__private_usd_reverse_quote_impl(
                             api_mnemonic_bytes,
                             api_lightwalletd_url,
                             api_eth_rpc_url,
-                            api_units,
+                            api_total,
+                            api_unshield_basis_points,
                         )?;
                         Ok(output_ok)
                     })(),
@@ -12708,6 +12710,7 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
         let mut var_sweepTxid = <Option<String>>::sse_decode(deserializer);
         let mut var_payoutTx = <Option<String>>::sse_decode(deserializer);
         let mut var_claimHeld = <bool>::sse_decode(deserializer);
+        let mut var_claimDeclined = <bool>::sse_decode(deserializer);
         let mut var_outcome =
             <Option<crate::api::private_usd::ApiForwardOutcome>>::sse_decode(deserializer);
         let mut var_refundCause =
@@ -12734,6 +12737,7 @@ impl SseDecode for crate::api::private_usd::ApiForwardRecord {
             sweep_txid: var_sweepTxid,
             payout_tx: var_payoutTx,
             claim_held: var_claimHeld,
+            claim_declined: var_claimDeclined,
             outcome: var_outcome,
             refund_cause: var_refundCause,
             nothing_sent_cause: var_nothingSentCause,
@@ -19330,6 +19334,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiForwardRecord
             self.sweep_txid.into_into_dart().into_dart(),
             self.payout_tx.into_into_dart().into_dart(),
             self.claim_held.into_into_dart().into_dart(),
+            self.claim_declined.into_into_dart().into_dart(),
             self.outcome.into_into_dart().into_dart(),
             self.refund_cause.into_into_dart().into_dart(),
             self.nothing_sent_cause.into_into_dart().into_dart(),
@@ -24832,6 +24837,7 @@ impl SseEncode for crate::api::private_usd::ApiForwardRecord {
         <Option<String>>::sse_encode(self.sweep_txid, serializer);
         <Option<String>>::sse_encode(self.payout_tx, serializer);
         <bool>::sse_encode(self.claim_held, serializer);
+        <bool>::sse_encode(self.claim_declined, serializer);
         <Option<crate::api::private_usd::ApiForwardOutcome>>::sse_encode(self.outcome, serializer);
         <Option<crate::api::private_usd::ApiRefundCause>>::sse_encode(
             self.refund_cause,

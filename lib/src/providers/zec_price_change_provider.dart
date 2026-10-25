@@ -18,6 +18,10 @@ const kVizorCoinGeckoPriceBaseUrl = String.fromEnvironment(
   kVizorCoinGeckoPriceBaseUrlEnvKey,
   defaultValue: kVizorCoinGeckoDefaultPriceBaseUrl,
 );
+
+/// CoinGecko refuses a request without a User-Agent (403), and the Tor route
+/// sends only the headers given. Every install sends this same value.
+const kVizorCoinGeckoUserAgent = 'Veylor';
 const zecMarketDataRefreshInterval = Duration(minutes: 3);
 const zecMarketDataCacheTtl = Duration(hours: 1);
 const zecMarketDataCacheStorageKey = 'vizor_zec_market_data_v1';
@@ -131,7 +135,10 @@ class CoinGeckoZecMarketDataSource implements ZecMarketDataSource {
       final response = await _client.request(
         'GET',
         endpoint,
-        headers: const {HttpHeaders.acceptHeader: 'application/json'},
+        headers: const {
+          HttpHeaders.acceptHeader: 'application/json',
+          HttpHeaders.userAgentHeader: kVizorCoinGeckoUserAgent,
+        },
         timeout: timeout,
       );
       final body = utf8.decode(response.bodyBytes);

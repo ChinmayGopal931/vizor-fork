@@ -39,6 +39,7 @@ import '../../providers/private_usd_balance_provider.dart';
 import '../../providers/private_usd_activity_provider.dart';
 import '../../providers/private_usd_conversion_provider.dart';
 import '../../providers/private_usd_custom_rpc_provider.dart';
+import '../../widgets/mobile/private_usd_rpc_sheet.dart';
 import '../../providers/private_usd_deposits_provider.dart';
 import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_receive_address_provider.dart';
@@ -125,10 +126,6 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
         onOpenConversion: open,
         details: privateUsdActivityDetails(),
         onOpenRefunds: openRefunds,
-        sendRecords: ref.watch(privateUsdSendRecordsProvider(uuid)),
-        receipts: ref.watch(
-          privateUsdBalanceProvider(uuid).select((state) => state.received),
-        ),
       )..sort(compareActivityEntries))
         entry.row,
     ];
@@ -161,6 +158,11 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
     return MobilePrivateUsdView(
       onUseDefaultRpc: rpcFailing
           ? () => unawaited(_useDefaultRpc(network, uuid))
+          : null,
+      // A sync that failed while the default RPC did not answer, or turned
+      // requests away (the page asked it): the card offers another one.
+      onChangeRpc: customRpc == null && balance.rpcFailed
+          ? () => unawaited(_changeRpc(uuid))
           : null,
       state: balance,
       screeningActivity: screeningActivity,
@@ -216,7 +218,20 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
     }
     if (!mounted) return;
     showAppToast(context, PrivateUsdCopy.rpcCleared);
-    ref.read(privateUsdBalanceProvider(uuid).notifier).refresh();
+    ref.read(privateUsdBalanceProvider(uuid).notifier)
+      ..clearRpcFailed()
+      ..refresh();
+  }
+
+  /// Opens Settings' Ethereum RPC sheet; a URL saved there (which closes the
+  /// Railgun page) syncs again on it.
+  Future<void> _changeRpc(String uuid) async {
+    final done = await showPrivateUsdRpcSheet(context);
+    if (done == null || !mounted) return;
+    showAppToast(context, done);
+    ref.read(privateUsdBalanceProvider(uuid).notifier)
+      ..clearRpcFailed()
+      ..refresh();
   }
 }
 
@@ -246,6 +261,7 @@ class MobilePrivateUsdView extends StatelessWidget {
     this.pendingPayment,
     this.onRefunds,
     this.onUseDefaultRpc,
+    this.onChangeRpc,
     this.onReceive,
     this.depositPass,
     super.key,
@@ -310,6 +326,11 @@ class MobilePrivateUsdView extends StatelessWidget {
   /// Ethereum RPC set: the card says so in place of its error, with the way
   /// back to the default.
   final VoidCallback? onUseDefaultRpc;
+
+  /// Set while a sync fails with the default Ethereum RPC not answering
+  /// ([PrivateUsdBalanceState.rpcFailed]): the card says so in place of its
+  /// error, with the way to another RPC.
+  final VoidCallback? onChangeRpc;
 
   /// Opens the Receive sheet; null hides it.
   final VoidCallback? onReceive;
@@ -390,6 +411,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                               privacyModeEnabled: privacyModeEnabled,
                               onRefresh: onRefresh,
                               onUseDefaultRpc: onUseDefaultRpc,
+                              onChangeRpc: onChangeRpc,
                             ),
                           ),
                           if ((onSend != null && onWithdraw != null) ||
@@ -608,6 +630,7 @@ class _TotalCard extends StatelessWidget {
     required this.privacyModeEnabled,
     required this.onRefresh,
     required this.onUseDefaultRpc,
+    required this.onChangeRpc,
   });
 
   final PrivateUsdBalanceState state;
@@ -615,6 +638,7 @@ class _TotalCard extends StatelessWidget {
   final bool privacyModeEnabled;
   final VoidCallback onRefresh;
   final VoidCallback? onUseDefaultRpc;
+  final VoidCallback? onChangeRpc;
 
   @override
   Widget build(BuildContext context) {
@@ -631,6 +655,7 @@ class _TotalCard extends StatelessWidget {
           );
     final updatedAt = state.updatedAt;
     final onUseDefaultRpc = this.onUseDefaultRpc;
+    final onChangeRpc = this.onChangeRpc;
     // The sync's progress is the sync line's: its percentage, and a refresh
     // as the floor flowing. What stays here is what to expect of a first
     // sync, and how old the balance is.
@@ -711,6 +736,23 @@ class _TotalCard extends StatelessWidget {
               size: AppButtonSize.small,
               onPressed: onUseDefaultRpc,
               child: const Text(PrivateUsdCopy.rpcUseDefault),
+            ),
+          ] else if (onChangeRpc != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              PrivateUsdCopy.rpcDefaultNotAnswering,
+              key: const ValueKey('mobile_private_usd_rpc_error'),
+              style: AppTypography.bodySmall.copyWith(
+                color: colors.text.destructive,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            AppButton(
+              key: const ValueKey('mobile_private_usd_rpc_change'),
+              variant: AppButtonVariant.secondary,
+              size: AppButtonSize.small,
+              onPressed: onChangeRpc,
+              child: const Text(PrivateUsdCopy.rpcChange),
             ),
           ] else if (error != null) ...[
             const SizedBox(height: AppSpacing.xs),

@@ -15,6 +15,7 @@ import '../services/private_usd_balance_cache.dart';
 import '../services/private_usd_balance_repository.dart';
 import '../services/private_usd_pause.dart';
 import '../services/railgun_engine.dart';
+import '../services/railgun_host_channel.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_keep_awake_provider.dart';
 import 'private_usd_unfinished_provider.dart';
@@ -180,23 +181,43 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       _settled();
     } catch (error) {
       privateUsdLog('refresh failed (${error.runtimeType})');
-      _failed();
+      _failed(
+        rpc:
+            error is RailgunHostException &&
+            error.code == RailgunHostErrorCode.rpcFailed,
+      );
     } finally {
       firstSync?.end();
     }
+  }
+
+  /// The user changed the Ethereum RPC: the last failure says nothing about
+  /// the new one.
+  void clearRpcFailed() {
+    if (state.rpcFailed) state = state.copyWith(rpcFailed: false);
   }
 
   void _shownIfMounted(RailgunSync sync) {
     if (!ref.mounted) return;
     _show(sync);
     _retries.record(succeeded: true);
-    state = state.copyWith(isRefreshing: false, refreshFailed: false);
+    state = state.copyWith(
+      isRefreshing: false,
+      refreshFailed: false,
+      rpcFailed: false,
+    );
   }
 
-  void _failed() {
+  // A failure the RPC is not known to be behind keeps an earlier verdict on
+  // it: the retry may have failed before asking.
+  void _failed({bool rpc = false}) {
     if (!ref.mounted) return;
     _retries.record(succeeded: false);
-    state = state.copyWith(isRefreshing: false, refreshFailed: true);
+    state = state.copyWith(
+      isRefreshing: false,
+      refreshFailed: true,
+      rpcFailed: rpc || state.rpcFailed,
+    );
   }
 
   void _settled() {
@@ -243,6 +264,7 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       updatedAt: sync.at,
       address: sync.address,
       refreshFailed: false,
+      rpcFailed: false,
       screeningFailed: sync.screening == RailgunScreening.failed,
       clearFirstSyncPercent: true,
       received: _receipts(sync),

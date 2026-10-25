@@ -120,6 +120,9 @@ pub(crate) struct Deployment {
     /// publicnode, which needs no key: the RPC of a build without a keyed
     /// URL.
     pub keyless_rpc_url: &'static str,
+    /// The RPC providers the engine may be pointed at, by the build's keyed
+    /// URL or the user's own: this network's among `RAILGUN_PAGE_HOSTS`.
+    pub rpc_hosts: &'static [&'static str],
     pub poi_node_url: &'static str,
     /// Where public USDC is shielded into the private balance; `None` where no
     /// Deposits contract is pinned, and deposits are hidden.
@@ -213,6 +216,11 @@ const MAINNET: Deployment = Deployment {
     explorer_tx_prefix: "https://etherscan.io/tx/",
     railscan_tx_prefix: "https://railscan.io/ethereum/tx/",
     keyless_rpc_url: "https://ethereum-rpc.publicnode.com",
+    rpc_hosts: &[
+        "ethereum-rpc.publicnode.com",
+        "eth-mainnet.g.alchemy.com",
+        "mainnet.infura.io",
+    ],
     poi_node_url: POI_NODE_URL,
     deposits: Some(DepositsPin {
         contract: address("0xebc7508e20bd4467491ee7e7589d5c7d4c5e8cb6"),
@@ -261,6 +269,11 @@ const TESTNET: Deployment = Deployment {
     explorer_tx_prefix: "https://sepolia.etherscan.io/tx/",
     railscan_tx_prefix: "https://railscan.io/sepolia/tx/",
     keyless_rpc_url: "https://ethereum-sepolia-rpc.publicnode.com",
+    rpc_hosts: &[
+        "ethereum-sepolia-rpc.publicnode.com",
+        "eth-sepolia.g.alchemy.com",
+        "sepolia.infura.io",
+    ],
     poi_node_url: POI_NODE_URL,
     deposits: Some(DepositsPin {
         contract: address("0x58324e9a866c9690aca08169d3c67630e84c9019"),
@@ -286,14 +299,33 @@ pub(crate) fn for_chain_id(chain_id: u64) -> Option<&'static Deployment> {
 
 impl Deployment {
     /// Where the engine reads the chain: the keyed URL when the build has one,
-    /// else publicnode. Nothing falls back from a keyed URL, and it is never
-    /// stored.
-    pub(crate) fn rpc_url<'a>(&'a self, keyed: &'a str) -> &'a str {
-        if keyed.trim().is_empty() {
-            self.keyless_rpc_url
-        } else {
-            keyed
+    /// else publicnode. A keyed URL, the build's or the user's own, is taken
+    /// only as https, on the default port and without credentials, on one of
+    /// this network's `rpc_hosts`; the Dart side keeps only such a URL, and
+    /// this holds the engine to it whatever reaches it. Any other is
+    /// `WrongDeployment`: nothing falls back from a keyed URL, and it is
+    /// never stored or logged.
+    pub(crate) fn rpc_url<'a>(&'a self, keyed: &'a str) -> Result<&'a str> {
+        let keyed = keyed.trim();
+        if keyed.is_empty() {
+            return Ok(self.keyless_rpc_url);
         }
+        let on_host = url::Url::parse(keyed).is_ok_and(|url| {
+            url.scheme() == "https"
+                && url.port().is_none_or(|port| port == 443)
+                && url.username().is_empty()
+                && url.password().is_none()
+                && url
+                    .host_str()
+                    .is_some_and(|host| self.rpc_hosts.contains(&host))
+        });
+        if !on_host {
+            return fail(
+                ErrorCode::WrongDeployment,
+                "the Ethereum RPC URL is not on one of this network's providers",
+            );
+        }
+        Ok(keyed)
     }
 
     /// The windows contract, or `Unavailable` where bridging is off.
@@ -351,5 +383,53 @@ const fn nibble(c: u8) -> u8 {
         b'a'..=b'f' => c - b'a' + 10,
         b'A'..=b'F' => c - b'A' + 10,
         _ => panic!("not hex"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The engine reads the chain only at this network's RPC providers, which
+    /// the page may reach: https, the default port, no credentials. An empty
+    /// URL is publicnode; another network's provider, a page host that is no
+    /// RPC, or any other host is refused, never replaced.
+    #[test]
+    fn an_rpc_url_is_taken_only_on_the_networks_providers() {
+        let refused = |pins: &Deployment, url: &str| pins.rpc_url(url).unwrap_err().code;
+        for pins in [&MAINNET, &TESTNET] {
+            assert_eq!(pins.rpc_url("").unwrap(), pins.keyless_rpc_url);
+            assert_eq!(pins.rpc_url(" ").unwrap(), pins.keyless_rpc_url);
+            let keyless = url::Url::parse(pins.keyless_rpc_url).unwrap();
+            assert!(pins.rpc_hosts.contains(&keyless.host_str().unwrap()));
+            for host in pins.rpc_hosts {
+                assert!(RAILGUN_PAGE_HOSTS.contains(host), "{host}");
+                let keyed = format!("https://{host}/v2/key");
+                assert_eq!(pins.rpc_url(&keyed).unwrap(), keyed);
+                assert_eq!(pins.rpc_url(&format!(" {keyed} ")).unwrap(), keyed);
+                let on_443 = format!("https://{host}:443/v2/key");
+                assert_eq!(pins.rpc_url(&on_443).unwrap(), on_443);
+                for off in [
+                    format!("http://{host}/v2/key"),
+                    format!("https://{host}:8545/v2/key"),
+                    format!("https://user:key@{host}/"),
+                    format!("https://{host}.evil.example/v2/key"),
+                ] {
+                    assert_eq!(refused(pins, &off), ErrorCode::WrongDeployment, "{off}");
+                }
+            }
+        }
+        for off in [
+            "https://eth-sepolia.g.alchemy.com/v2/key",
+            "https://ppoi.fdi.network/",
+            "https://rpc.invalid/",
+            "not a url",
+        ] {
+            assert_eq!(refused(&MAINNET, off), ErrorCode::WrongDeployment, "{off}");
+        }
+        assert_eq!(
+            refused(&TESTNET, "https://eth-mainnet.g.alchemy.com/v2/key"),
+            ErrorCode::WrongDeployment
+        );
     }
 }

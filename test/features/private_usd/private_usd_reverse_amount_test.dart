@@ -36,24 +36,6 @@ void main() {
     expect(privateUsdDollarText(BigInt.from(50000)), '0.05');
   });
 
-  test('Max is the balance less both fees, rounded down to the cent', () {
-    BigInt max(int available, {int basisPoints = 25, int fee = 250000}) =>
-        privateUsdReverseMax(
-          available: BigInt.from(available),
-          unshieldBasisPoints: basisPoints,
-          fundingFee: BigInt.from(fee),
-        );
-    // $10.00 − $0.025 (25 bps) − $0.25 = $9.725 → $9.72.
-    expect(max(10000000), BigInt.from(9720000));
-    // 1,234,567 − 3,086 − 0 = 1,231,481 → $1.23.
-    expect(max(1234567, fee: 0), BigInt.from(1230000));
-    // The fees take it all.
-    expect(max(250000), BigInt.zero);
-    expect(max(0), BigInt.zero);
-    // Never more than one quote can name.
-    expect(max(9000000000), kPrivateUsdReverseMaxUnits);
-  });
-
   test(
     '"Authorize settlement" holds until 120 s before the ready deadline',
     () {

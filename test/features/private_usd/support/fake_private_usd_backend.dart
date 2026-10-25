@@ -27,6 +27,7 @@ ApiForwardRecord forwardRecord({
   String? sweepTxid,
   String? payoutTx,
   bool claimHeld = false,
+  bool claimDeclined = false,
   int? endedAt,
 }) => ApiForwardRecord(
   index: index,
@@ -46,6 +47,7 @@ ApiForwardRecord forwardRecord({
   sweepTxid: sweepTxid,
   payoutTx: payoutTx,
   claimHeld: claimHeld,
+  claimDeclined: claimDeclined,
   outcome: outcome,
   refundCause: refundCause,
   nothingSentCause: nothingSentCause,
@@ -239,7 +241,8 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
   Future<ApiReverseQuote> reverseQuote(
     String accountUuid,
     PrivateUsdSecretReader secret, {
-    required int units,
+    required int total,
+    required int unshieldBasisPoints,
   }) => throw UnimplementedError();
 
   @override

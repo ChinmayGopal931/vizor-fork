@@ -809,7 +809,7 @@ class _EthereumRpcRow extends ConsumerWidget {
 }
 
 /// Private USD's relayer claims: whether a new bridge to private USD hands
-/// its claim to the relayer once its ZEC is out.
+/// its claim to the relayer once the market maker confirms its deposit.
 class _RelayerClaimsRow extends ConsumerWidget {
   const _RelayerClaimsRow({required this.textStyle});
 

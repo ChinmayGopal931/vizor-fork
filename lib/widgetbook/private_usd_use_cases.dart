@@ -523,6 +523,7 @@ ApiForwardRecord previewPrivateUsdRecord({
   int? depositConfirmations,
   bool deposited = true,
   bool claimHeld = false,
+  bool claimDeclined = false,
 }) {
   final acceptedAt = previewPrivateUsdNow.subtract(ago);
   int at(Duration after) => previewPrivateUsdUnix(acceptedAt.add(after));
@@ -554,6 +555,7 @@ ApiForwardRecord previewPrivateUsdRecord({
         ? '0x5e3a9c1f7b2d4e6a8c0b1d3f5a7c9e2b4d6f8a0c2e4b6d8f0a1c3e5b7d9f1a3c'
         : null,
     claimHeld: claimHeld,
+    claimDeclined: claimDeclined,
     outcome: outcome,
     refundCause: refundCause,
     nothingSentCause: nothingSentCause,
@@ -570,6 +572,7 @@ Widget _convertPreview(PrivateUsdConvertState state) => PrivateUsdPreviewFrame(
       autofocus: false,
       relayerClaims: true,
       privateUsdAvailable: BigInt.from(1250400000),
+      zecUsdPrice: 70,
       onAmountChanged: (_) {},
       onMax: () {},
       onReview: () {},
@@ -704,7 +707,7 @@ Widget buildMobilePrivateUsdProgressScreenMaySleepUseCase(
 );
 
 /// Opening a bridge the relayer is to claim: Veylor stays open only until
-/// the ZEC is sent.
+/// the market maker confirms the deposit.
 Widget buildMobilePrivateUsdProgressOpeningRelayerUseCase(
   BuildContext context,
 ) => _progressPreview(

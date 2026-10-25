@@ -31,8 +31,8 @@ class PrivateUsdReverseConvertState
     required super.now,
     super.amountText,
     this.draft,
+    this.draftTotal,
     super.quoting,
-    this.lookingUp = false,
     super.quoteError,
     super.startError,
     super.step,
@@ -43,11 +43,11 @@ class PrivateUsdReverseConvertState
     this.stale,
   });
 
-  /// The priced draft for the typed amount (a `quoted` record).
+  /// The priced draft for the typed total (a `quoted` record).
   final rust.ApiReverseRecord? draft;
 
-  /// Max is working out the most that can be converted.
-  final bool lookingUp;
+  /// The typed total [draft] was quoted for.
+  final BigInt? draftTotal;
 
   /// The swap token's spendable private balance in base units; null while
   /// unknown (no quote until it is known).
@@ -59,19 +59,17 @@ class PrivateUsdReverseConvertState
   /// The amount whose quote failed: not asked again until it changes.
   final BigInt? stale;
 
-  /// The typed dollars in base units; null when empty, malformed, zero or
-  /// more than 2 decimals.
+  /// The typed total, the most the conversion debits with both fees, in
+  /// base units; null when empty, malformed, zero or more than 2 decimals.
   BigInt? get units => privateUsdDollarUnits(amountText);
 
   bool get isPositive => privateUsdDollarIsPositive(amountText);
   bool get isTooPrecise => privateUsdTooPrecise(amountText, 2);
 
-  /// The reviewed debit, while the draft prices the typed amount.
+  /// The reviewed debit, while the draft prices the typed total.
   BigInt? get debit {
-    final draft = this.draft;
     final cost = draft?.cost;
-    if (draft == null || cost == null) return null;
-    if (BigInt.parse(draft.amount) != units) return null;
+    if (cost == null || draftTotal != units) return null;
     return BigInt.parse(cost.debit);
   }
 
@@ -102,20 +100,14 @@ class PrivateUsdReverseConvertState
   /// that covers its debit.
   @override
   bool get canGoOn =>
-      debit != null &&
-      !quoting &&
-      !lookingUp &&
-      !isExpired &&
-      available != null &&
-      !isShort;
+      debit != null && !quoting && !isExpired && available != null && !isShort;
 
   /// Max: on the amount step, with a balance to convert.
   bool get canMax {
     final available = this.available;
     return step == PrivateUsdConvertStep.amount &&
         available != null &&
-        available > BigInt.zero &&
-        !lookingUp;
+        available > BigInt.zero;
   }
 
   /// "View refunds": an earlier conversion was refunded, and nothing is
@@ -135,9 +127,9 @@ class PrivateUsdReverseConvertState
     DateTime? now,
     String? amountText,
     rust.ApiReverseRecord? draft,
+    BigInt? draftTotal,
     bool clearDraft = false,
     bool? quoting,
-    bool? lookingUp,
     String? quoteError,
     bool clearQuoteError = false,
     String? startError,
@@ -154,8 +146,8 @@ class PrivateUsdReverseConvertState
     now: now ?? this.now,
     amountText: amountText ?? this.amountText,
     draft: clearDraft ? null : (draft ?? this.draft),
+    draftTotal: clearDraft ? null : (draftTotal ?? this.draftTotal),
     quoting: quoting ?? this.quoting,
-    lookingUp: lookingUp ?? this.lookingUp,
     quoteError: clearQuoteError ? null : (quoteError ?? this.quoteError),
     startError: clearStartError ? null : (startError ?? this.startError),
     step: step ?? this.step,
@@ -226,8 +218,7 @@ class PrivateUsdReverseConvertNotifier
     return BigInt.zero;
   }
 
-  /// The amount field changed: an amount to quote, after typing stops.
-  /// Typing also cancels a Max look-up.
+  /// The amount field changed: a total to quote, after typing stops.
   void onAmountChanged(String text) {
     if (state.step != PrivateUsdConvertStep.amount) return;
     cancelQuote();
@@ -235,7 +226,6 @@ class PrivateUsdReverseConvertNotifier
       amountText: text,
       clearDraft: true,
       quoting: false,
-      lookingUp: false,
       clearQuoteError: true,
       clearStale: true,
     );
@@ -244,71 +234,18 @@ class PrivateUsdReverseConvertNotifier
     _requestQuote(units, debounce: PrivateUsdConvertTiming.typingDebounce);
   }
 
-  /// Max: the balance less Railgun's unshield fee and the relayer's funding
-  /// fee, rounded down to the cent, then quoted.
-  Future<void> onMax() async {
-    final account = this.account;
+  /// Max: the whole spendable balance, to the cent (and the most one quote
+  /// can name). The quote takes both fees out of it.
+  void onMax() {
     final available = state.available;
-    if (!state.canMax || account == null || available == null) return;
-    cancelQuote();
-    final generation = quoteGeneration;
-    state = state.copyWith(lookingUp: true, clearQuoteError: true);
-    try {
-      final fees = await ref.read(privateUsdReversePageProvider).fees(account);
-      final fundingFee = await _fundingFee(account);
-      // Typing meanwhile took over (it cleared the look-up).
-      if (!ref.mounted || generation != quoteGeneration) return;
-      final max = privateUsdReverseMax(
-        available: available,
-        unshieldBasisPoints: fees.unshieldBasisPoints,
-        fundingFee: fundingFee,
-      );
-      state = state.copyWith(lookingUp: false);
-      if (max <= BigInt.zero) {
-        state = state.copyWith(quoteError: PrivateUsdCopy.reverseInsufficient);
-        return;
-      }
-      onAmountChanged(privateUsdDollarText(max));
-    } catch (error) {
-      if (!ref.mounted || generation != quoteGeneration) return;
-      privateUsdLog('max failed (${error.runtimeType})');
-      state = state.copyWith(
-        lookingUp: false,
-        quoteError: PrivateUsdCopy.reverseErrorMax,
-      );
-    }
-  }
-
-  /// The relayer's funding fee now. Read through a draft an earlier quote
-  /// left, which spends no index; without one, the deployment's cap on it,
-  /// so Max never asks for more than the fees leave.
-  Future<BigInt> _fundingFee(String account) async {
-    final engine = ref.read(privateUsdEngineProvider);
-    final draft = ref
-        .read(privateUsdReverseConversionsProvider)
-        .entries
-        .where(
-          (entry) =>
-              entry.key.accountUuid == account &&
-              entry.value.record.phase == rust.ApiReversePhase.quoted,
-        )
-        .firstOrNull;
-    if (draft != null) {
-      try {
-        final request = await engine.reverseCostRequest(
-          account,
-          index: draft.key.index,
-        );
-        return BigInt.parse(request.fee);
-      } catch (_) {
-        // The cap below.
-      }
-    }
-    final cap = privateUsdRelayerFeeCap(
-      ref.read(privateUsdCurrentDeploymentProvider),
+    if (!state.canMax || available == null) return;
+    onAmountChanged(
+      privateUsdDollarText(
+        available > kPrivateUsdReverseMaxUnits
+            ? kPrivateUsdReverseMaxUnits
+            : available,
+      ),
     );
-    if (cap == null) throw StateError('no relayer fee cap');
-    return cap;
   }
 
   /// "Refresh quote" on the review: the same amount, a new index.
@@ -405,10 +342,7 @@ class PrivateUsdReverseConvertNotifier
   @override
   void replaceExpiredQuote() {
     final units = state.units;
-    if (state.lookingUp ||
-        units == null ||
-        units == state.stale ||
-        state.isShort) {
+    if (units == null || units == state.stale || state.isShort) {
       return;
     }
     _requestQuote(units);
@@ -463,7 +397,7 @@ class PrivateUsdReverseConvertNotifier
   }
 
   void _requestQuote(
-    BigInt units, {
+    BigInt total, {
     Duration debounce = Duration.zero,
     bool forReview = false,
   }) {
@@ -472,27 +406,39 @@ class PrivateUsdReverseConvertNotifier
     requestQuote<rust.ApiReverseRecord>(
       (current) async {
         // The page prices the quote: it opens first, so a page that cannot
-        // start spends no swap index.
-        await ref.read(privateUsdReversePageProvider).fees(account);
+        // start spends no swap index. Its unshield fee comes off the total.
+        final fees = await ref
+            .read(privateUsdReversePageProvider)
+            .fees(account);
         if (!current()) return null;
         final quote = await ref
             .read(privateUsdEngineProvider)
-            .reverseQuote(account, units: units.toInt());
+            .reverseQuote(
+              account,
+              total: total.toInt(),
+              unshieldBasisPoints: fees.unshieldBasisPoints,
+            );
         return ref
             .read(privateUsdReverseFundingProvider)
             .price(account, quote.costRequest);
       },
       debounce: debounce,
-      onQuote: (record) => _withDraft(record, forReview: forReview),
-      onFailure: (error) => _quoteFailed(error, units),
+      onQuote: (record) =>
+          _withDraft(record, total: total, forReview: forReview),
+      onFailure: (error) => _quoteFailed(error, total),
     );
   }
 
-  void _withDraft(rust.ApiReverseRecord record, {required bool forReview}) {
+  void _withDraft(
+    rust.ApiReverseRecord record, {
+    required BigInt total,
+    required bool forReview,
+  }) {
     if (!takesQuote(forReview: forReview)) return;
     final onReview = state.step != PrivateUsdConvertStep.amount;
     final next = state.copyWith(
       draft: record,
+      draftTotal: total,
       quoting: false,
       quoteSpent: false,
       clearQuoteError: true,
@@ -510,7 +456,7 @@ class PrivateUsdReverseConvertNotifier
     state = next;
   }
 
-  void _quoteFailed(Object error, BigInt units) {
+  void _quoteFailed(Object error, BigInt total) {
     if (showsUnderWay(error)) return;
     final message = switch (error) {
       rust.ApiPrivateUsdError(:final code) => privateUsdReverseQuoteMessage(
@@ -523,7 +469,7 @@ class PrivateUsdReverseConvertNotifier
       quoting: false,
       quoteError: message,
       clearQuoteError: message == null,
-      stale: units,
+      stale: total,
     );
   }
 }

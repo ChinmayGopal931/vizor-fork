@@ -145,7 +145,8 @@ Future<ApiForwardQuote> privateUsdForwardQuote({
 /// after the save means "maybe opened": read the records and show the
 /// conversion's progress if it is under way. With `relayer_claims` (the
 /// setting, kept on the record), the claim goes to the relayer once the
-/// deposit is out, for it to send when the claim's window opens.
+/// deposit is out and the maker's ready is confirmed, for it to send when
+/// the claim's window opens.
 Future<ApiAcceptResult> privateUsdForwardAccept({
   required String dbPath,
   required String network,
@@ -269,11 +270,14 @@ Future<List<ApiForwardRecord>> privateUsdForwardRecords({
   storeDir: storeDir,
 );
 
-/// Quotes `units` of private dollars (token base units, whole cents) for a
-/// fresh swap index, which counts as spent from here on, and keeps the
-/// verified quote as a `QUOTED` draft, replacing any earlier draft. Price it
-/// next: the page's `reverseCost` with `cost_request`, then
-/// `private_usd_reverse_set_cost`. `Busy` while a conversion is under way.
+/// Quotes the most that `total` private dollars (token base units, whole
+/// cents) fund once Railgun's unshield fee (`unshield_basis_points`, as the
+/// page loads it) and the relayer's funding fee come off it, for a fresh swap
+/// index, which counts as spent from here on, and keeps the verified quote as
+/// a `QUOTED` draft, replacing any earlier draft. Price it next: the page's
+/// `reverseCost` with `cost_request`, then `private_usd_reverse_set_cost`.
+/// `Busy` while a conversion is under way; `AmountUnquotable` when the fees
+/// take it all.
 Future<ApiReverseQuote> privateUsdReverseQuote({
   required String dbPath,
   required String network,
@@ -282,7 +286,8 @@ Future<ApiReverseQuote> privateUsdReverseQuote({
   required List<int> mnemonicBytes,
   required String lightwalletdUrl,
   required String ethRpcUrl,
-  required int units,
+  required int total,
+  required int unshieldBasisPoints,
 }) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdReverseQuote(
   dbPath: dbPath,
   network: network,
@@ -291,7 +296,8 @@ Future<ApiReverseQuote> privateUsdReverseQuote({
   mnemonicBytes: mnemonicBytes,
   lightwalletdUrl: lightwalletdUrl,
   ethRpcUrl: ethRpcUrl,
-  units: units,
+  total: total,
+  unshieldBasisPoints: unshieldBasisPoints,
 );
 
 /// What to price swap `index`'s funding at now (for a draft whose pricing
@@ -1435,6 +1441,10 @@ class ApiForwardRecord {
   /// The relayer holds the claim and sends it once the claim's window
   /// opens: the claim no longer needs Veylor open.
   final bool claimHeld;
+
+  /// The relayer turned the claim down or takes none to hold: Veylor
+  /// claims it itself, so the bridge needs it open.
+  final bool claimDeclined;
   final ApiForwardOutcome? outcome;
   final ApiRefundCause? refundCause;
   final ApiNothingSentCause? nothingSentCause;
@@ -1459,6 +1469,7 @@ class ApiForwardRecord {
     this.sweepTxid,
     this.payoutTx,
     required this.claimHeld,
+    required this.claimDeclined,
     this.outcome,
     this.refundCause,
     this.nothingSentCause,
@@ -1485,6 +1496,7 @@ class ApiForwardRecord {
       sweepTxid.hashCode ^
       payoutTx.hashCode ^
       claimHeld.hashCode ^
+      claimDeclined.hashCode ^
       outcome.hashCode ^
       refundCause.hashCode ^
       nothingSentCause.hashCode ^
@@ -1513,6 +1525,7 @@ class ApiForwardRecord {
           sweepTxid == other.sweepTxid &&
           payoutTx == other.payoutTx &&
           claimHeld == other.claimHeld &&
+          claimDeclined == other.claimDeclined &&
           outcome == other.outcome &&
           refundCause == other.refundCause &&
           nothingSentCause == other.nothingSentCause &&

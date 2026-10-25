@@ -1428,7 +1428,13 @@ Code:
   Rust allowlists. Users can set their own URL in Settings (Ethereum RPC),
   on the network's Alchemy, Infura or publicnode host; it replaces the
   build's keyed URL with no fallback, and is checked with `eth_chainId`
-  before it is saved.
+  before it is saved. Rust holds the engine to the same rule
+  (`Deployment::rpc_url`, the network's `rpc_hosts`, https without
+  credentials): a URL off them is `WrongDeployment`, never replaced. A
+  Railgun sync that fails while the RPC does not answer, or answers 403 or
+  429, and a screening node still answers, fails as `rpc_failed` (the page
+  asks both as the sync fails, `rpc-probe.js`), and the balance offers
+  another RPC; a connection that is down is never put on the RPC.
 - `VIZOR_PRIVATE_USD_FLAG_URL` is the kill switch. Only an explicit `false`
   hides the feature. A missing key or a failed fetch keeps the last value,
   which defaults to available. Even `false` never stops conversions already
@@ -1441,15 +1447,20 @@ Code:
   foreground. That covers the deposit, claim, payout signature, refund,
   sweep and Railgun proving.
 - Relayer claims (Settings, on by default; each ZEC → USD bridge keeps the
-  choice it began with) let the user leave about a minute after tapping
-  Bridge. Right after the deposit goes out, Veylor signs and keeps the
-  payout, marks the hand-over (`claim_hold`), then posts the claim, `z`
-  with it, to the pinned relayer's `/v1/claim/hold`, which sends it when the
-  window opens. If Veylor is open then, it posts the claim itself only once
+  choice it began with) let the user leave once the market maker has
+  confirmed the deposit, a few minutes after tapping Bridge. On the first
+  step that reads the swap ready at its confirmation depth, Veylor signs and
+  keeps the payout, marks the hand-over (`claim_hold`), then posts the
+  claim, `z` with it, to the pinned relayer's `/v1/claim/hold`, which sends
+  it when the window opens. Not before the ready: until then the maker may
+  cancel the swap, and its cancel reveals `e` on chain, with which the `z`
+  the relayer holds spends the deposit. An open swap the maker never made
+  ready Veylor claims itself from `t0`, handing nothing over. If Veylor is
+  open when the window opens, it posts a handed-over claim itself only once
   the window has been open a minute (five blocks for a ready before `t0`)
   with nothing landed. A post with no answer goes again with the same bytes;
-  a 404 or a refusal leaves that bridge to claim without the relayer. A
-  refund's sweep still needs Veylor open.
+  a 404 or a refusal leaves that bridge to claim without the relayer
+  (`claim_declined`). A refund's sweep still needs Veylor open.
 - There is no worker, alarm or notification, and no per-swap key is stored.
 - Background cancels the Rust step and stops polling, but leaves the
   Railgun page open.
@@ -1461,7 +1472,8 @@ Code:
   native flag, foreground only). A bridge's progress says so in a card that
   slides in while the bridge needs Veylor (`PrivateUsdKeepOpenCard`, either
   direction; a ZEC → USD bridge the relayer is to claim says instead to stay
-  until its ZEC is sent), with "Keep screen on": on by default, and off lets
+  until the market maker confirms the deposit), with "Keep screen on": on
+  by default, and off lets
   that bridge's screen sleep (`privateUsdScreenMaySleepProvider`, in memory).
 - On a USD → ZEC conversion the phone buzzes when "Authorize settlement" is
   first offered (the user's turn), and again two minutes before it closes if
@@ -1479,7 +1491,7 @@ Code:
 **Separate databases.** Rust owns both, in
 `<support>/private_usd_<walletDbName>_<network>/` (`getPrivateUsdDirPath`):
 
-- `swaps.db` holds the swap index counter, the swap records, the
+- `swaps.db` holds the swap index counters, the swap records, the
   joint-account index and the Railgun send log. Records decode strictly: an
   unreadable record is an error, never a reset.
 - `joint.db` is a librustzcash DB for the short-lived joint accounts.
@@ -1487,7 +1499,10 @@ Code:
 Never put joint accounts in `zcash_wallet.db`: hidden accounts would leak
 into account lists, sync, voting, PIR and the migration. Never let losing
 `joint.db` take `swaps.db` with it. Account deletion removes that account's
-rows. A full reset removes the whole directory (`deletePrivateUsdDirectories`)
+rows, but never an index counter: indices are counted per seed and ZIP-32
+index (`swap_indices`, keyed by `SwapKeyContext::index_space`), so an
+account imported again from the same seed goes on where the seed left off.
+A full reset removes the whole directory (`deletePrivateUsdDirectories`)
 and the page's WebView origin.
 
 Account deletion also deletes the account's Railgun wallet from the page's
@@ -1515,8 +1530,10 @@ deposits, send and withdraw. The reveal rules are `swap::claim_window`, `swap::m
 keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 `test/features/private_usd/`.
 
-- Commit `next_index + 1` before any quote leaves the device, and never
-  reuse a swap index (a shared `z` hands that swap to its maker).
+- Commit `next_index + 1` before any quote leaves the device, under the
+  seed and ZIP-32 index the keys derive from (never the account UUID, which
+  a re-import changes), and never reuse a swap index (a shared `z` hands
+  that swap to its maker).
 - Save the record before accept, and treat an accept that timed out or
   failed in transport as maybe opened.
 - Never pay a deposit twice. Save `Started` before building it and the bytes
@@ -1537,10 +1554,13 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   on an open escrow once the chain is past every `ready` deadline signed (or
   at `t0`), on a ready one from `t1`. Never `eth_call` or `eth_estimateGas`
   anything carrying a share. The one exception is a claim handed to the
-  relayer: `z` goes once, as soon as the deposit is out, to the pinned
-  relayer alone, which reveals it on chain in the window. The owner accepts
-  this, since the joint account's `nk` and `rivk` go only to the maker, so
-  the relayer alone cannot spend the deposit.
+  relayer: `z` goes once, to the pinned relayer alone, which reveals it on
+  chain in the window, and only once the swap is ready at its confirmation
+  depth. Never on an open swap: the maker may still cancel one, and its
+  cancel reveals `e`, which with `z` spends the deposit, so the relayer
+  alone could sweep it before the app does. On a ready swap the relayer
+  alone can take the deposit only by withholding the claim until the maker
+  refunds from `t1`, which the owner, who runs the relayer, accepts.
 - Only confirmed reads authorize a deposit or the end.
 - Never prove a second reverse funding because a response was lost. Sign
   `ready` only before `t0` (its deadline, the head plus 120 s, before it),

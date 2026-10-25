@@ -33,6 +33,7 @@ class PrivateUsdBalanceState {
     this.address,
     this.isRefreshing = false,
     this.refreshFailed = false,
+    this.rpcFailed = false,
     this.screeningFailed = false,
     this.firstSyncPercent,
     this.received = const [],
@@ -46,6 +47,12 @@ class PrivateUsdBalanceState {
   final String? address;
   final bool isRefreshing;
   final bool refreshFailed;
+
+  /// The last refresh failed while the Ethereum RPC did not answer, or
+  /// turned requests away, and none has succeeded since: the screen offers
+  /// another RPC. It outlives the retries, which show as loading, until a
+  /// sync succeeds or the user changes the RPC.
+  final bool rpcFailed;
 
   /// The last sync found the screening failing ([RailgunScreening.failed]),
   /// so what is processing is waiting on the screening nodes, not on a send.
@@ -68,6 +75,7 @@ class PrivateUsdBalanceState {
     String? address,
     bool? isRefreshing,
     bool? refreshFailed,
+    bool? rpcFailed,
     bool? screeningFailed,
     int? firstSyncPercent,
     bool clearFirstSyncPercent = false,
@@ -78,6 +86,7 @@ class PrivateUsdBalanceState {
     address: address ?? this.address,
     isRefreshing: isRefreshing ?? this.isRefreshing,
     refreshFailed: refreshFailed ?? this.refreshFailed,
+    rpcFailed: rpcFailed ?? this.rpcFailed,
     screeningFailed: screeningFailed ?? this.screeningFailed,
     firstSyncPercent: clearFirstSyncPercent
         ? null
@@ -93,6 +102,7 @@ class PrivateUsdBalanceState {
       other.address == address &&
       other.isRefreshing == isRefreshing &&
       other.refreshFailed == refreshFailed &&
+      other.rpcFailed == rpcFailed &&
       other.screeningFailed == screeningFailed &&
       other.firstSyncPercent == firstSyncPercent &&
       listEquals(other.received, received);
@@ -104,6 +114,7 @@ class PrivateUsdBalanceState {
     address,
     isRefreshing,
     refreshFailed,
+    rpcFailed,
     screeningFailed,
     firstSyncPercent,
     Object.hashAll(received),

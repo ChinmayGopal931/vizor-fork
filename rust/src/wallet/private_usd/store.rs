@@ -1,9 +1,10 @@
-//! `swaps.db`: the swap-index counter, swap records, active pointers, the
+//! `swaps.db`: the swap-index counters, swap records, active pointers, the
 //! joint-account index, the Railgun send log, and since schema 2 the deposits
 //! and each account's last deposit scan. Since schema 3 records follow the
 //! windows contract, since schema 4 a forward record may hand its claim to
 //! the relayer, and since schema 5 it may rescue a payout Railgun sent back,
-//! so paid records are kept.
+//! so paid records are kept. Since schema 6 indices are counted per seed and
+//! ZIP-32 index, not per account, and the counters survive the account.
 //!
 //! A plain SQLite file in app-private storage, opened per call (WAL,
 //! `synchronous = FULL`, a busy timeout), migrated by `PRAGMA user_version`.
@@ -24,9 +25,10 @@ use super::{fail, ErrorCode, PrivateUsdError, Result};
 const FILE_NAME: &str = "swaps.db";
 /// 1: swaps, the send log and the joint accounts. 2: deposits. 3: records of
 /// the windows contract. 4: claims handed to the relayer. 5: rescues of
-/// returned payouts, and paid forward records kept for them. A build refuses
-/// a store newer than itself, never resetting it.
-const SCHEMA_VERSION: i32 = 5;
+/// returned payouts, and paid forward records kept for them. 6: the index
+/// counters per seed and ZIP-32 index. A build refuses a store newer than
+/// itself, never resetting it.
+const SCHEMA_VERSION: i32 = 6;
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 /// Finished records kept per direction. Reverse `REFUNDED` and forward
 /// `PAID` ones are kept beyond it: a rescue may still be possible.
@@ -40,6 +42,8 @@ const MAX_FINISHED_DEPOSITS: u32 = 100;
 /// the index space and counts it in a signed 32-bit integer.
 const MAX_INDEX: i64 = i32::MAX as i64;
 
+/// Schema 1. `swap_counter` counted indices per account until schema 6; a
+/// row left there is folded into `swap_indices` on the next index taken.
 const SCHEMA: &str = "
 CREATE TABLE swap_counter(account_uuid TEXT PRIMARY KEY, next_index INTEGER NOT NULL);
 CREATE TABLE swaps(
@@ -80,6 +84,14 @@ CREATE TABLE deposit_scans(
   account_uuid TEXT PRIMARY KEY,
   scanned_at   INTEGER NOT NULL,
   scan_json    TEXT NOT NULL);
+";
+
+/// Schema 6: the next swap index per index space (`SwapKeyContext
+/// ::index_space`, the seed's fingerprint and the ZIP-32 index). An index is
+/// spent for the seed, not the account: the row outlives every account of
+/// the seed, so one imported again goes on where the seed left off.
+const SCHEMA_V6: &str = "
+CREATE TABLE swap_indices(index_space TEXT PRIMARY KEY, next_index INTEGER NOT NULL);
 ";
 
 /// A joint account a swap imported into `joint.db`.
@@ -220,15 +232,18 @@ impl SwapStore {
             0 => {
                 tx.execute_batch(SCHEMA).map_err(sql)?;
                 tx.execute_batch(SCHEMA_V2).map_err(sql)?;
+                tx.execute_batch(SCHEMA_V6).map_err(sql)?;
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
             // 1 → 2: the deposits tables join. 2 → 3, 3 → 4 and 4 → 5
-            // change no table.
-            1..=4 => {
+            // change no table. 5 → 6: the index counters per seed join; the
+            // per-account ones stay until each is folded in.
+            1..=5 => {
                 if version == 1 {
                     tx.execute_batch(SCHEMA_V2).map_err(sql)?;
                 }
+                tx.execute_batch(SCHEMA_V6).map_err(sql)?;
                 tx.pragma_update(None, "user_version", SCHEMA_VERSION)
                     .map_err(sql)?;
             }
@@ -252,15 +267,25 @@ impl SwapStore {
         Self::open(dir).map(Some)
     }
 
-    /// The account's next swap index, committed as taken before it is
+    /// The next swap index of `index_space` (the seed and ZIP-32 index
+    /// `account`'s keys derive from), committed as taken before it is
     /// returned: an index is spent once handed out, whatever follows. Never
-    /// below an index a kept record already has.
-    pub(crate) fn take_index(&mut self, account: &str) -> Result<u32> {
+    /// below an index a kept record of the account already has, nor below the
+    /// account's counter from before schema 6, which is folded in and dropped.
+    pub(crate) fn take_index(&mut self, index_space: &str, account: &str) -> Result<u32> {
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sql)?;
         let counter: Option<i64> = tx
+            .query_row(
+                "SELECT next_index FROM swap_indices WHERE index_space = ?1",
+                [index_space],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(sql)?;
+        let legacy: Option<i64> = tx
             .query_row(
                 "SELECT next_index FROM swap_counter WHERE account_uuid = ?1",
                 [account],
@@ -277,14 +302,20 @@ impl SwapStore {
             .map_err(sql)?;
         let index = counter
             .unwrap_or(0)
+            .max(legacy.unwrap_or(0))
             .max(highest.map_or(0, |highest| highest + 1));
         if !(0..MAX_INDEX).contains(&index) {
             return fail(ErrorCode::Other, "no swap index left for this account");
         }
         tx.execute(
-            "INSERT INTO swap_counter(account_uuid, next_index) VALUES (?1, ?2)
-             ON CONFLICT(account_uuid) DO UPDATE SET next_index = excluded.next_index",
-            params![account, index + 1],
+            "INSERT INTO swap_indices(index_space, next_index) VALUES (?1, ?2)
+             ON CONFLICT(index_space) DO UPDATE SET next_index = excluded.next_index",
+            params![index_space, index + 1],
+        )
+        .map_err(sql)?;
+        tx.execute(
+            "DELETE FROM swap_counter WHERE account_uuid = ?1",
+            [account],
         )
         .map_err(sql)?;
         tx.commit().map_err(sql)?;
@@ -521,15 +552,16 @@ impl SwapStore {
         rows.map(|row| row.map_err(sql)).collect()
     }
 
-    /// Removes every row of `account`, the counter included, in one
-    /// transaction.
+    /// Removes every row of `account` in one transaction, but no index
+    /// counter: the seed's indices stay spent, for an account imported from
+    /// it again (`swap_indices`), and an account's counter from before
+    /// schema 6 waits to be folded into the seed's.
     pub(crate) fn delete_account(&mut self, account: &str) -> Result<()> {
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sql)?;
         for table in [
-            "swap_counter",
             "swaps",
             "active",
             "joint_accounts",
@@ -837,6 +869,10 @@ mod tests {
     use super::*;
     use crate::wallet::private_usd::models::ForwardRecord;
 
+    /// A seed's and ZIP-32 index's swap index space (`SwapKeyContext
+    /// ::index_space`).
+    const SPACE: &str = "3b0f6a1d9c8e7f2a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f70/0";
+    const OTHER_SPACE: &str = "3b0f6a1d9c8e7f2a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f70/1";
     const ACCOUNT: &str = "550e8400-e29b-41d4-a716-446655440000";
 
     fn hex(bytes: usize, value: u8) -> String {
@@ -1110,7 +1146,7 @@ mod tests {
                 &StoredRecord::Forward(Box::new(forward(&forward_json()))),
             )
             .unwrap();
-        let next = store.take_index(ACCOUNT).unwrap();
+        let next = store.take_index(SPACE, ACCOUNT).unwrap();
         store
             .conn
             .execute("UPDATE swaps SET record_json = '{\"index\":7}'", [])
@@ -1119,15 +1155,16 @@ mod tests {
         assert_eq!(error.code, ErrorCode::StoreUnreadable);
         assert!(store.history(ACCOUNT, Direction::Forward).is_err());
         // The unreadable record is kept, and the counter goes on.
-        assert_eq!(store.take_index(ACCOUNT).unwrap(), next + 1);
+        assert_eq!(store.take_index(SPACE, ACCOUNT).unwrap(), next + 1);
     }
 
-    /// A store schema 1, 3 or 4 wrote opens at schema 5: the deposits tables
-    /// join schema 1's, and every record, the counter, the active pointer and
-    /// the send log stay as they were.
+    /// A store schema 1, 3, 4 or 5 wrote opens at schema 6: the deposits
+    /// tables and the seed's index counters join schema 1's, and every
+    /// record, the active pointer and the send log stay as they were. The
+    /// account's counter is folded into its seed's on the next index taken.
     #[test]
     fn an_older_store_migrates_keeping_its_records() {
-        for version in [1, 3, 4] {
+        for version in [1, 3, 4, 5] {
             older_store_migrates_keeping_its_records(version);
         }
     }
@@ -1172,13 +1209,15 @@ mod tests {
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
         assert_eq!(version, SCHEMA_VERSION);
-        assert_eq!(SCHEMA_VERSION, 5);
+        assert_eq!(SCHEMA_VERSION, 6);
         assert_eq!(
             store.active(ACCOUNT, Direction::Forward).unwrap(),
             Some(StoredRecord::Forward(Box::new(forward(&json))))
         );
         assert_eq!(store.unfinished_count(ACCOUNT).unwrap(), 1);
-        assert_eq!(store.take_index(ACCOUNT).unwrap(), 9);
+        assert_eq!(store.take_index(SPACE, ACCOUNT).unwrap(), 9);
+        assert_eq!(legacy_counter(&store, ACCOUNT), None, "folded in");
+        assert_eq!(store.take_index(SPACE, ACCOUNT).unwrap(), 10);
         let sends = store.sends(ACCOUNT).unwrap();
         assert_eq!(sends.len(), 1);
         assert_eq!(sends[0].send_id, "send-1");
@@ -1209,17 +1248,32 @@ mod tests {
         );
     }
 
+    /// The next index of an account from before schema 6, as `swap_counter`
+    /// kept it.
+    fn legacy_counter(store: &SwapStore, account: &str) -> Option<i64> {
+        store
+            .conn
+            .query_row(
+                "SELECT next_index FROM swap_counter WHERE account_uuid = ?1",
+                [account],
+                |row| row.get(0),
+            )
+            .optional()
+            .unwrap()
+    }
+
     #[test]
     fn the_counter_never_goes_backwards() {
         let dir = tempfile::tempdir().unwrap();
         let mut store = SwapStore::open(dir.path()).unwrap();
-        assert_eq!(store.take_index(ACCOUNT).unwrap(), 0);
-        assert_eq!(store.take_index(ACCOUNT).unwrap(), 1);
-        assert_eq!(store.take_index("another-account").unwrap(), 0);
+        assert_eq!(store.take_index(SPACE, ACCOUNT).unwrap(), 0);
+        assert_eq!(store.take_index(SPACE, ACCOUNT).unwrap(), 1);
+        // Another seed's account counts on its own.
+        assert_eq!(store.take_index(OTHER_SPACE, "another-account").unwrap(), 0);
         drop(store);
 
         let mut store = SwapStore::open(dir.path()).unwrap();
-        assert_eq!(store.take_index(ACCOUNT).unwrap(), 2);
+        assert_eq!(store.take_index(SPACE, ACCOUNT).unwrap(), 2);
         // A record kept under a higher index than the counter moves it past.
         store
             .save(
@@ -1227,7 +1281,11 @@ mod tests {
                 &StoredRecord::Forward(Box::new(forward(&forward_json()))),
             )
             .unwrap();
-        assert_eq!(store.take_index(ACCOUNT).unwrap(), 8);
+        assert_eq!(store.take_index(SPACE, ACCOUNT).unwrap(), 8);
+        // The counter is the seed's, not the account's: deleting the account
+        // leaves it, and the seed imported again, under a new UUID, goes on.
+        store.delete_account(ACCOUNT).unwrap();
+        assert_eq!(store.take_index(SPACE, "imported-again").unwrap(), 9);
         drop(store);
 
         // A store from a newer version is refused, never reset.
@@ -1239,5 +1297,29 @@ mod tests {
             SwapStore::open(dir.path()).err().map(|error| error.code),
             Some(ErrorCode::StoreUnreadable)
         );
+    }
+
+    /// An account's counter from before schema 6 survives the account's
+    /// deletion, and is folded into its seed's the next time the seed takes
+    /// an index, then dropped.
+    #[test]
+    fn a_counter_from_before_schema_6_outlives_the_account_and_is_folded_in() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SwapStore::open(dir.path()).unwrap();
+        store
+            .conn
+            .execute(
+                "INSERT INTO swap_counter(account_uuid, next_index) VALUES (?1, 5)",
+                [ACCOUNT],
+            )
+            .unwrap();
+        store.delete_account(ACCOUNT).unwrap();
+        assert_eq!(legacy_counter(&store, ACCOUNT), Some(5));
+
+        assert_eq!(store.take_index(SPACE, ACCOUNT).unwrap(), 5);
+        assert_eq!(legacy_counter(&store, ACCOUNT), None);
+        assert_eq!(store.take_index(SPACE, ACCOUNT).unwrap(), 6);
+        // Another seed's account never counts from it.
+        assert_eq!(store.take_index(OTHER_SPACE, ACCOUNT).unwrap(), 0);
     }
 }

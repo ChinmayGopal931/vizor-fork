@@ -54,10 +54,12 @@ pub(crate) fn account_derivation(
     }))
 }
 
-/// One account's seed, checked against the account, with its ZIP-32 index.
+/// One account's seed, checked against the account, with its ZIP-32 index
+/// and fingerprint.
 pub(crate) struct SwapKeyContext {
     network: PrivateUsdNetwork,
     zip32_index: u32,
+    seed_fingerprint: [u8; 32],
     seed: SecretVec<u8>,
 }
 
@@ -105,6 +107,7 @@ impl SwapKeyContext {
         Ok(Self {
             network: swap_network,
             zip32_index: derivation.zip32_index,
+            seed_fingerprint: derivation.seed_fingerprint,
             seed,
         })
     }
@@ -114,12 +117,27 @@ impl SwapKeyContext {
         Self {
             network,
             zip32_index,
+            seed_fingerprint: SeedFingerprint::from_seed(seed)
+                .expect("a test seed of 32 to 252 bytes")
+                .to_bytes(),
             seed: SecretVec::new(seed.to_vec()),
         }
     }
 
     pub(crate) fn network(&self) -> PrivateUsdNetwork {
         self.network
+    }
+
+    /// The swap index space the keys draw on: the seed's fingerprint and the
+    /// ZIP-32 index, which derive every swap key. The store counts indices
+    /// under it, so an account imported again from the same seed, under a
+    /// new UUID, goes on where it left off.
+    pub(crate) fn index_space(&self) -> String {
+        format!(
+            "{}/{}",
+            hex::encode(self.seed_fingerprint),
+            self.zip32_index
+        )
     }
 
     #[cfg(test)]
