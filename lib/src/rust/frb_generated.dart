@@ -1415,7 +1415,8 @@ abstract class RustLibApi extends BaseApi {
     required List<int> mnemonicBytes,
     required String lightwalletdUrl,
     required String ethRpcUrl,
-    required int units,
+    required int total,
+    required int unshieldBasisPoints,
   });
 
   Future<List<ApiReverseRecord>> crateApiPrivateUsdPrivateUsdReverseRecords({
@@ -10589,7 +10590,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required List<int> mnemonicBytes,
     required String lightwalletdUrl,
     required String ethRpcUrl,
-    required int units,
+    required int total,
+    required int unshieldBasisPoints,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -10602,7 +10604,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_list_prim_u_8_loose(mnemonicBytes, serializer);
           sse_encode_String(lightwalletdUrl, serializer);
           sse_encode_String(ethRpcUrl, serializer);
-          sse_encode_u_32(units, serializer);
+          sse_encode_u_32(total, serializer);
+          sse_encode_u_32(unshieldBasisPoints, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -10623,7 +10626,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           mnemonicBytes,
           lightwalletdUrl,
           ethRpcUrl,
-          units,
+          total,
+          unshieldBasisPoints,
         ],
         apiImpl: this,
       ),
@@ -10641,7 +10645,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "mnemonicBytes",
           "lightwalletdUrl",
           "ethRpcUrl",
-          "units",
+          "total",
+          "unshieldBasisPoints",
         ],
       );
 

@@ -209,6 +209,16 @@ String formatPrivateUsd(BigInt microDollars) {
   return '${microDollars.isNegative ? '-' : ''}\$$whole.$fraction';
 }
 
+/// [microDollars] to the nearest cent, half up: how a payment or a fee
+/// shows, so a debit's rows add up to it. A balance shows
+/// [formatPrivateUsd], rounded down, never more than it holds.
+String formatPrivateUsdNearest(BigInt microDollars) {
+  final halfCent = BigInt.from(5000);
+  return formatPrivateUsd(
+    microDollars.isNegative ? microDollars - halfCent : microDollars + halfCent,
+  );
+}
+
 /// The indicative zatoshi worth of [microDollars] at [zecUsdPrice], or null
 /// without a usable price or with nothing to price (callers then hide the
 /// line, as `fiatTextForZatoshi` does). Display only: never an amount to

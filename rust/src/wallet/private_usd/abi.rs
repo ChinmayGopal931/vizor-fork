@@ -79,13 +79,26 @@ pub(crate) fn hex0x(bytes: &[u8]) -> String {
 /// `aggregate3(calls)`'s calldata, selector included. None may fail
 /// (`allowFailure` false), so one failing reverts the whole read.
 pub(crate) fn encode_aggregate3(calls: &[Call]) -> Vec<u8> {
+    encode_aggregate3_allowing(calls, false)
+}
+
+/// [`encode_aggregate3`] with every call allowed to fail (`allowFailure`
+/// true): the read answers each call's success rather than reverting.
+pub(crate) fn encode_try_aggregate3(calls: &[Call]) -> Vec<u8> {
+    encode_aggregate3_allowing(calls, true)
+}
+
+fn encode_aggregate3_allowing(calls: &[Call], allow_failure: bool) -> Vec<u8> {
     let mut out = selector(AGGREGATE3).to_vec();
     // The one argument is a dynamic array: its offset, then the array.
     out.extend_from_slice(&uint_word(WORD as u128));
     out.extend_from_slice(&uint_word(calls.len() as u128));
     // Each element is a dynamic tuple: offsets from the start of the
     // element area, then the tuples.
-    let tuples: Vec<Vec<u8>> = calls.iter().map(encode_call3).collect();
+    let tuples: Vec<Vec<u8>> = calls
+        .iter()
+        .map(|call| encode_call3(call, allow_failure))
+        .collect();
     let mut offset = calls.len() * WORD;
     for tuple in &tuples {
         out.extend_from_slice(&uint_word(offset as u128));
@@ -97,12 +110,11 @@ pub(crate) fn encode_aggregate3(calls: &[Call]) -> Vec<u8> {
     out
 }
 
-/// `(address target, bool allowFailure, bytes callData)`, with
-/// `allowFailure` false.
-fn encode_call3(call: &Call) -> Vec<u8> {
+/// `(address target, bool allowFailure, bytes callData)`.
+fn encode_call3(call: &Call, allow_failure: bool) -> Vec<u8> {
     let mut tuple = Vec::with_capacity(5 * WORD + call.data.len());
     tuple.extend_from_slice(&address_word(&call.to));
-    tuple.extend_from_slice(&[0u8; WORD]);
+    tuple.extend_from_slice(&uint_word(u128::from(allow_failure)));
     // `callData` follows the tuple's three head words.
     tuple.extend_from_slice(&uint_word(3 * WORD as u128));
     tuple.extend_from_slice(&uint_word(call.data.len() as u128));
@@ -116,6 +128,19 @@ fn encode_call3(call: &Call) -> Vec<u8> {
 /// return data, in order. The count must be `expected`, and every call must
 /// have succeeded.
 pub(crate) fn decode_aggregate3(data: &[u8], expected: usize) -> Result<Vec<Vec<u8>>> {
+    decode_try_aggregate3(data, expected)?
+        .into_iter()
+        .map(|answer| {
+            answer.ok_or_else(|| {
+                PrivateUsdError::new(ErrorCode::ChainUnreadable, "a Multicall3 call failed")
+            })
+        })
+        .collect()
+}
+
+/// `aggregate3`'s answer: each call's return data in order, `None` for one
+/// that failed. The count must be `expected`.
+pub(crate) fn decode_try_aggregate3(data: &[u8], expected: usize) -> Result<Vec<Option<Vec<u8>>>> {
     let array = offset_at(data, 0, 0)?;
     let count = usize_at(data, array)?;
     if count != expected {
@@ -128,11 +153,13 @@ pub(crate) fn decode_aggregate3(data: &[u8], expected: usize) -> Result<Vec<Vec<
     let mut results = Vec::with_capacity(count);
     for i in 0..count {
         let element = offset_at(data, elements + i * WORD, elements)?;
-        if !bool_word(&word_at(data, element)?)? {
-            return fail(ErrorCode::ChainUnreadable, "a Multicall3 call failed");
-        }
+        let success = bool_word(&word_at(data, element)?)?;
         let bytes = offset_at(data, element + WORD, element)?;
-        results.push(bytes_at(data, bytes)?.to_vec());
+        results.push(
+            success
+                .then(|| bytes_at(data, bytes).map(<[u8]>::to_vec))
+                .transpose()?,
+        );
     }
     Ok(results)
 }
@@ -283,4 +310,118 @@ fn bytes_at(data: &[u8], at: usize) -> Result<&[u8]> {
                 "a byte string ends past the answer",
             )
         })
+}
+
+/// Multicall3 from the node's side, for test nodes that answer the reads a
+/// batch carries.
+#[cfg(test)]
+pub(crate) mod test_support {
+    use super::*;
+
+    /// The calls an `aggregate3` calldata carries, each with its
+    /// `allowFailure`.
+    pub(crate) fn decode_aggregate3_calls(calldata: &[u8]) -> Vec<(Call, bool)> {
+        assert_eq!(calldata[..4], selector(AGGREGATE3), "not aggregate3");
+        let data = &calldata[4..];
+        let array = offset_at(data, 0, 0).unwrap();
+        let count = usize_at(data, array).unwrap();
+        let elements = array + WORD;
+        (0..count)
+            .map(|i| {
+                let element = offset_at(data, elements + i * WORD, elements).unwrap();
+                let to = address_of_word(&word_at(data, element).unwrap()).unwrap();
+                let allow_failure = bool_word(&word_at(data, element + WORD).unwrap()).unwrap();
+                let bytes = offset_at(data, element + 2 * WORD, element).unwrap();
+                let data = bytes_at(data, bytes).unwrap().to_vec();
+                (Call { to, data }, allow_failure)
+            })
+            .collect()
+    }
+
+    /// `aggregate3`'s answer to calls answering `answers`, in order: `None`
+    /// for a call that failed.
+    pub(crate) fn encode_aggregate3_answers(answers: &[Option<Vec<u8>>]) -> Vec<u8> {
+        let mut out = uint_word(WORD as u128).to_vec();
+        out.extend_from_slice(&uint_word(answers.len() as u128));
+        let tuples: Vec<Vec<u8>> = answers
+            .iter()
+            .map(|answer| {
+                let data = answer.as_deref().unwrap_or_default();
+                let mut tuple = uint_word(u128::from(answer.is_some())).to_vec();
+                tuple.extend_from_slice(&uint_word(2 * WORD as u128));
+                tuple.extend_from_slice(&uint_word(data.len() as u128));
+                tuple.extend_from_slice(data);
+                let padding = (WORD - data.len() % WORD) % WORD;
+                tuple.extend(std::iter::repeat_n(0u8, padding));
+                tuple
+            })
+            .collect();
+        let mut offset = answers.len() * WORD;
+        for tuple in &tuples {
+            out.extend_from_slice(&uint_word(offset as u128));
+            offset += tuple.len();
+        }
+        for tuple in tuples {
+            out.extend_from_slice(&tuple);
+        }
+        out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::test_support::{decode_aggregate3_calls, encode_aggregate3_answers};
+    use super::*;
+
+    fn calls() -> Vec<Call> {
+        vec![
+            Call {
+                to: [1; 20],
+                data: call_data("MIN_WINDOW()", &[]),
+            },
+            Call {
+                to: [2; 20],
+                data: call_data("getSwap(bytes32)", &[[7; WORD]]),
+            },
+        ]
+    }
+
+    /// A batch carries its calls as given, none allowed to fail, or every
+    /// one in a batch that may fail.
+    #[test]
+    fn a_batch_carries_its_calls_and_whether_they_may_fail() {
+        for (calldata, allowed) in [
+            (encode_aggregate3(&calls()), false),
+            (encode_try_aggregate3(&calls()), true),
+        ] {
+            let carried = decode_aggregate3_calls(&calldata);
+            assert_eq!(carried.len(), 2);
+            for ((call, allow_failure), sent) in carried.iter().zip(calls()) {
+                assert_eq!((call.to, &call.data), (sent.to, &sent.data));
+                assert_eq!(*allow_failure, allowed);
+            }
+        }
+    }
+
+    /// The answers read back in order, a failed call as `None`; a batch that
+    /// must not fail refuses one, and a count that differs is refused.
+    #[test]
+    fn a_batchs_answers_read_back_in_order() {
+        let answers = vec![Some(vec![5; WORD]), None, Some(vec![9; 3])];
+        let encoded = encode_aggregate3_answers(&answers);
+        assert_eq!(decode_try_aggregate3(&encoded, 3).unwrap(), answers);
+        assert_eq!(
+            decode_aggregate3(&encoded, 3).unwrap_err().code,
+            ErrorCode::ChainUnreadable
+        );
+        assert_eq!(
+            decode_try_aggregate3(&encoded, 2).unwrap_err().code,
+            ErrorCode::ChainUnreadable
+        );
+        let all = encode_aggregate3_answers(&[Some(vec![1; WORD]), Some(Vec::new())]);
+        assert_eq!(
+            decode_aggregate3(&all, 2).unwrap(),
+            vec![vec![1; WORD], Vec::new()]
+        );
+    }
 }

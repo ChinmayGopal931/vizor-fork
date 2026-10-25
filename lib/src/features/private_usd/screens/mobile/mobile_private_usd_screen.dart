@@ -125,10 +125,6 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
         onOpenConversion: open,
         details: privateUsdActivityDetails(),
         onOpenRefunds: openRefunds,
-        sendRecords: ref.watch(privateUsdSendRecordsProvider(uuid)),
-        receipts: ref.watch(
-          privateUsdBalanceProvider(uuid).select((state) => state.received),
-        ),
       )..sort(compareActivityEntries))
         entry.row,
     ];

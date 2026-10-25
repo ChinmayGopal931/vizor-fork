@@ -380,13 +380,15 @@ where
         self.pins.swap_contract()?;
         swap::require_none_under_way(store, self.account)?;
         swap::check_maker(&self.maker, self.pins, self.makers, false).await?;
-        let index = indices::take_index(
-            store,
-            &[(self.chain, self.pins.maker)],
-            self.keys,
-            self.account,
-        )
-        .await?;
+        let contracts = [(self.chain, self.pins.maker)];
+        // The relayer's terms don't wait on the index: both are asked at once.
+        let (index, relayer) = tokio::join!(
+            indices::take_index(store, &contracts, self.keys, self.account),
+            self.relayer_terms(),
+        );
+        let (index, relayer) = (index?, relayer?);
+        // A fee above the cap is refused before anything is quoted.
+        deployment::require_within_fee_cap(relayer.fee.0)?;
         let note = self.keys.note(index)?;
         let quote = self
             .maker
@@ -399,9 +401,6 @@ where
                 "the quote is for another deployment",
             );
         }
-        let relayer = self.relayer_terms().await?;
-        // A fee above the cap is refused before anything is accepted.
-        deployment::require_within_fee_cap(relayer.fee.0)?;
         let receives = payout_after_fees(quote.amount, relayer.fee);
         // The preview pays the quote's share; the deposit itself goes to the
         // joint address of the confirmed on-chain terms.

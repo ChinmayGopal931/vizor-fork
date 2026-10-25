@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../rust/api/private_usd.dart' as rust;
 import '../models/private_usd_record_key.dart';
+import '../models/railgun_models.dart';
 import '../services/private_usd_engine.dart';
 import 'private_usd_available_provider.dart';
+import 'private_usd_balance_provider.dart';
 import 'private_usd_deposits_provider.dart';
 import 'private_usd_engine_provider.dart';
+import 'private_usd_spend_status_provider.dart';
 import 'private_usd_unfinished_provider.dart';
 
 /// Reads [accountUuid]'s conversion history into the engine once; the
@@ -105,6 +108,8 @@ class PrivateUsdActivity {
     this.records = const [],
     this.reverseRecords = const [],
     this.depositRecords = const [],
+    this.sends = const [],
+    this.receipts = const [],
     this.txids = const {},
     this.zcashConfirmations = 0,
     this.screening = Duration.zero,
@@ -116,6 +121,11 @@ class PrivateUsdActivity {
   final List<rust.ApiForwardRecord> records;
   final List<rust.ApiReverseRecord> reverseRecords;
   final List<rust.ApiDepositRecord> depositRecords;
+
+  /// Its sends and withdrawals, as the send log holds them, and the private
+  /// sends it received, as the last Railgun sync listed them.
+  final List<rust.ApiSendRecord> sends;
+  final List<RailgunReceipt> receipts;
 
   /// The main-wallet transactions these rows stand in for, in the internal
   /// byte order history rows carry: a feed drops those rows.
@@ -135,7 +145,20 @@ final privateUsdActivityProvider = Provider.autoDispose
         privateUsdReverseActivityRecordsProvider(accountUuid),
       );
       final deposits = ref.watch(privateUsdDepositRecordsProvider(accountUuid));
-      if (records.isEmpty && reverse.isEmpty && deposits.isEmpty) {
+      final sends = ref.watch(privateUsdSendRecordsProvider(accountUuid));
+      // Read as the balance holds it: this starts no Railgun sync.
+      final receipts = ref.watch(privateUsdEngineEnabledProvider)
+          ? ref.watch(
+              privateUsdBalanceProvider(
+                accountUuid,
+              ).select((state) => state.received),
+            )
+          : const <RailgunReceipt>[];
+      if (records.isEmpty &&
+          reverse.isEmpty &&
+          deposits.isEmpty &&
+          sends.isEmpty &&
+          receipts.isEmpty) {
         return PrivateUsdActivity.empty;
       }
       // Rows come only from a running engine, which runs on a deployment.
@@ -145,6 +168,8 @@ final privateUsdActivityProvider = Provider.autoDispose
         records: records,
         reverseRecords: reverse,
         depositRecords: deposits,
+        sends: sends,
+        receipts: receipts,
         txids: _privateUsdActivityTxids(records, reverse: reverse),
         zcashConfirmations: deployment.zcashConfirmations,
         screening: Duration(seconds: deployment.screeningSeconds),

@@ -8,7 +8,6 @@ import 'private_usd_send.dart';
 
 final _unitsPerCent = BigInt.from(10000);
 final _centsPerDollar = BigInt.from(100);
-final _basisPoints = BigInt.from(10000);
 
 /// The most one reverse quote can name: Rust takes `units` as a `u32`
 /// (4,294,967,295), in whole cents.
@@ -38,22 +37,4 @@ String privateUsdDollarText(BigInt units) {
   final whole = cents ~/ _centsPerDollar;
   final fraction = (cents % _centsPerDollar).toString().padLeft(2, '0');
   return fraction == '00' ? '$whole' : '$whole.$fraction';
-}
-
-/// Max: [available] less Railgun's unshield fee on it and the relayer's
-/// funding fee, rounded down to the cent (and to the most one quote can
-/// name); zero when the fees take it all.
-BigInt privateUsdReverseMax({
-  required BigInt available,
-  required int unshieldBasisPoints,
-  required BigInt fundingFee,
-}) {
-  final unshieldFee =
-      available * BigInt.from(unshieldBasisPoints) ~/ _basisPoints;
-  final left = available - unshieldFee - fundingFee;
-  if (left <= BigInt.zero) return BigInt.zero;
-  final rounded = left ~/ _unitsPerCent * _unitsPerCent;
-  return rounded > kPrivateUsdReverseMaxUnits
-      ? kPrivateUsdReverseMaxUnits
-      : rounded;
 }

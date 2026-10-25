@@ -948,16 +948,23 @@ class PrivateUsdEngine {
   bool isCurrent(PrivateUsdEngineTicket ticket) =>
       ticket._epoch == _epoch && canRun;
 
-  /// Quotes [units] for a fresh swap index and keeps the unpriced draft (it
-  /// replaces an earlier one). Like a forward quote, a result that lands
-  /// after a pause still counts: the index is spent either way.
+  /// Quotes what [total] funds after both fees for a fresh swap index and
+  /// keeps the unpriced draft (it replaces an earlier one). Like a forward
+  /// quote, a result that lands after a pause still counts: the index is
+  /// spent either way.
   Future<rust.ApiReverseQuote> reverseQuote(
     String accountUuid, {
-    required int units,
+    required int total,
+    required int unshieldBasisPoints,
   }) async {
     final quote = await runFor(
       accountUuid,
-      (_, secret) => _backend.reverseQuote(accountUuid, secret, units: units),
+      (_, secret) => _backend.reverseQuote(
+        accountUuid,
+        secret,
+        total: total,
+        unshieldBasisPoints: unshieldBasisPoints,
+      ),
       dropLateResult: false,
     );
     _merge(_reverse, accountUuid, quote.record);

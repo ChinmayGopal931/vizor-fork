@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:zcash_wallet/src/features/payment_links/providers/gift_card_entry_price_provider.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,6 +31,42 @@ class _CompleterSource implements ZecMarketDataSource {
     fetchCount += 1;
     return completer.future;
   }
+}
+
+/// CoinGecko over the Tor route: one price document, and the headers each
+/// request carried.
+class _CoinGeckoOverTor implements TorHttpBridge {
+  final headers = <Map<String, String>>[];
+
+  @override
+  Future<NetworkHttpResponse> get(
+    Uri uri, {
+    required Map<String, String> headers,
+    required Duration? timeout,
+    Future<void>? cancelSignal,
+  }) async {
+    this.headers.add(Map.of(headers));
+    return NetworkHttpResponse(
+      statusCode: 200,
+      bodyBytes: utf8.encode('{"zcash":{"usd":33.45,"usd_24h_change":-0.25}}'),
+    );
+  }
+
+  @override
+  Future<NetworkHttpResponse> post(
+    Uri uri, {
+    required Map<String, String> headers,
+    required List<int> bodyBytes,
+    required Duration? timeout,
+    Future<void>? cancelSignal,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<NetworkHttpResponse> download(
+    Uri uri, {
+    required Map<String, String> headers,
+    required String destinationPath,
+  }) => throw UnimplementedError();
 }
 
 class _FakeCache implements ZecMarketDataCache {
@@ -120,6 +157,27 @@ void main() {
     final source = CoinGeckoZecMarketDataSource(networkClient: networkClient);
 
     expect(source.timeout, const Duration(seconds: 20));
+  });
+
+  test('CoinGecko source sends a User-Agent, which CoinGecko requires, over '
+      'Tor too', () async {
+    final tor = _CoinGeckoOverTor();
+    final networkClient = NetworkHttpClient(
+      torDesired: () => true,
+      torBootstrapping: () => false,
+      torBridge: tor,
+    );
+    addTearDown(() => networkClient.close(force: true));
+
+    final data = await CoinGeckoZecMarketDataSource(
+      networkClient: networkClient,
+    ).fetchMarketData();
+
+    expect(data?.usdPrice, 33.45);
+    expect(tor.headers.single, {
+      'accept': 'application/json',
+      'user-agent': kVizorCoinGeckoUserAgent,
+    });
   });
 
   group('parseZecMarketData', () {

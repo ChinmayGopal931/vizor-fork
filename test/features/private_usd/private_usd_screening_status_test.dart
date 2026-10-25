@@ -9,44 +9,46 @@ import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd
 // The Processing row's live line and the sync line (owner, 2026-10-19): what
 // the page's screening work is doing, and a long txid catch-up shown as one.
 void main() {
-  test('the step furthest along speaks first: proving, downloading, the list',
-      () {
-    const all = RailgunScreeningEvent(
-      txids: 0.5,
-      downloading: true,
-      download: 0.25,
-      proving: RailgunPoiProving(index: 2, count: 3, progress: 0.704),
-    );
-    expect(
-      privateUsdScreeningStatus(activity: all, balances: _processing()),
-      PrivateUsdCopy.screeningProving(2, 3, 70),
-    );
-    expect(
-      privateUsdScreeningStatus(
-        activity: const RailgunScreeningEvent(
-          txids: 0.5,
-          downloading: true,
-          download: 0.25,
+  test(
+    'the step furthest along speaks first: proving, downloading, the list',
+    () {
+      const all = RailgunScreeningEvent(
+        txids: 0.5,
+        downloading: true,
+        download: 0.25,
+        proving: RailgunPoiProving(index: 2, count: 3, progress: 0.704),
+      );
+      expect(
+        privateUsdScreeningStatus(activity: all, balances: _processing()),
+        PrivateUsdCopy.screeningProving(2, 3, 70),
+      );
+      expect(
+        privateUsdScreeningStatus(
+          activity: const RailgunScreeningEvent(
+            txids: 0.5,
+            downloading: true,
+            download: 0.25,
+          ),
+          balances: _processing(),
         ),
-        balances: _processing(),
-      ),
-      PrivateUsdCopy.screeningDownloading(25),
-    );
-    expect(
-      privateUsdScreeningStatus(
-        activity: const RailgunScreeningEvent(downloading: true),
-        balances: _processing(),
-      ),
-      'Downloading proving files',
-    );
-    expect(
-      privateUsdScreeningStatus(
-        activity: const RailgunScreeningEvent(txids: 0.42),
-        balances: _processing(),
-      ),
-      "Syncing Railgun's transaction list · 42%",
-    );
-  });
+        PrivateUsdCopy.screeningDownloading(25),
+      );
+      expect(
+        privateUsdScreeningStatus(
+          activity: const RailgunScreeningEvent(downloading: true),
+          balances: _processing(),
+        ),
+        'Downloading proving files',
+      );
+      expect(
+        privateUsdScreeningStatus(
+          activity: const RailgunScreeningEvent(txids: 0.42),
+          balances: _processing(),
+        ),
+        "Syncing Railgun's transaction list · 42%",
+      );
+    },
+  );
 
   test('with nothing running, funds a node has taken wait on it, '
       'and otherwise there is nothing to say', () {
@@ -63,8 +65,7 @@ void main() {
     );
   });
 
-  test('a single proof is not counted, and a share never reads done early',
-      () {
+  test('a single proof is not counted, and a share never reads done early', () {
     expect(
       PrivateUsdCopy.screeningProving(1, 1, 30),
       'Building screening proof · 30%',
@@ -104,9 +105,10 @@ PrivateUsdBalances _processing({bool submitted = false}) =>
     PrivateUsdBalances.of(
       RailgunBalances({
         submitted
-                ? RailgunBalanceBucket.proofSubmitted
-                : RailgunBalanceBucket.missingInternalPoi:
-            [RailgunTokenAmount(token: _token.address, amount: BigInt.from(5))],
+            ? RailgunBalanceBucket.proofSubmitted
+            : RailgunBalanceBucket.missingInternalPoi: [
+          RailgunTokenAmount(token: _token.address, amount: BigInt.from(5)),
+        ],
       }),
       const [_token],
     );

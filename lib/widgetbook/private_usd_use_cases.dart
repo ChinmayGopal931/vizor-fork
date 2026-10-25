@@ -570,6 +570,7 @@ Widget _convertPreview(PrivateUsdConvertState state) => PrivateUsdPreviewFrame(
       autofocus: false,
       relayerClaims: true,
       privateUsdAvailable: BigInt.from(1250400000),
+      zecUsdPrice: 70,
       onAmountChanged: (_) {},
       onMax: () {},
       onReview: () {},

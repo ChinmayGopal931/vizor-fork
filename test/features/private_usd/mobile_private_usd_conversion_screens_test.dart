@@ -17,6 +17,7 @@ import 'package:zcash_wallet/src/core/widgets/mobile/neon_scramble_text.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_convert_views.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_progress_views.dart';
 import 'package:zcash_wallet/src/features/settings/widgets/mobile/mobile_tor_control.dart';
+import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
@@ -55,8 +56,9 @@ void main() {
   group('convert', () {
     Future<void> pumpConvert(
       WidgetTester tester,
-      PrivateUsdConvertState state,
-    ) async {
+      PrivateUsdConvertState state, {
+      double? zecUsdPrice,
+    }) async {
       final controller = TextEditingController(text: state.amountText);
       addTearDown(controller.dispose);
       await pump(
@@ -66,6 +68,7 @@ void main() {
           controller: controller,
           autofocus: false,
           relayerClaims: true,
+          zecUsdPrice: zecUsdPrice,
           onAmountChanged: (_) {},
           onMax: () {},
           onReview: () {},
@@ -106,6 +109,31 @@ void main() {
       expect(
         button(tester, 'mobile_private_usd_convert_review').onPressed,
         isNotNull,
+      );
+    });
+
+    testWidgets('what the ZEC is worth sits right of the fee note', (
+      tester,
+    ) async {
+      final state = previewPrivateUsdConvertState(
+        quote: previewPrivateUsdQuote(),
+      );
+      await pumpConvert(tester, state, zecUsdPrice: 70);
+
+      final marketValue = find.byKey(
+        const ValueKey('mobile_private_usd_convert_market_value'),
+      );
+      expect(
+        tester.widget<Text>(marketValue).data,
+        PrivateUsdCopy.convertMarketValue(
+          fiatTextForZatoshi(state.totalZat!, zecUsdUnitPrice: 70)!,
+        ),
+      );
+      final note = find.text(PrivateUsdCopy.convertZecIncludesFee);
+      expect(tester.getTopLeft(marketValue).dy, tester.getTopLeft(note).dy);
+      expect(
+        tester.getTopLeft(marketValue).dx,
+        greaterThan(tester.getTopRight(note).dx),
       );
     });
 

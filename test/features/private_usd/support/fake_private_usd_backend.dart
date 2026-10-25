@@ -239,7 +239,8 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
   Future<ApiReverseQuote> reverseQuote(
     String accountUuid,
     PrivateUsdSecretReader secret, {
-    required int units,
+    required int total,
+    required int unshieldBasisPoints,
   }) => throw UnimplementedError();
 
   @override

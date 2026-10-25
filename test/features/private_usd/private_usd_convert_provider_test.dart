@@ -191,6 +191,14 @@ void main() {
     expect(backend.secretsSeen, isEmpty);
   });
 
+  convertTest('Max on a conversion to ZEC is the whole balance, which the '
+      'quote splits into the escrow and both fees', (tester) async {
+    await start(tester);
+    container.listen(privateUsdReverseConvertProvider, (_, _) {});
+    container.read(privateUsdReverseConvertProvider.notifier).onMax();
+    expect(container.read(privateUsdReverseConvertProvider).amountText, '10');
+  });
+
   convertTest('clearing a paused reverse amount cancels the pending page '
       'and quote', (tester) async {
     await start(tester);

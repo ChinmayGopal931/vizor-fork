@@ -116,6 +116,9 @@ String? privateUsdReverseQuoteMessage(ApiPrivateUsdErrorCode code) =>
     switch (code) {
       ApiPrivateUsdErrorCode.unavailable =>
         PrivateUsdCopy.reverseErrorFundingUnavailable,
+      // The fees took all of the total, or the maker refused what is left.
+      ApiPrivateUsdErrorCode.amountRefused =>
+        PrivateUsdCopy.reverseErrorAmountRefused,
       _ => privateUsdErrorMessage(code),
     };
 
