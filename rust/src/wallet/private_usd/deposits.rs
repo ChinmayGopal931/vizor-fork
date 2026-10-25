@@ -1785,7 +1785,7 @@ pub(crate) async fn run<R>(
 ) -> Result<R> {
     let transport = swap::transport(op);
     let pins = deployment::deployment(keys.network());
-    let chain = EvmRpc::new(&transport, pins, eth_rpc_url);
+    let chain = EvmRpc::new(&transport, pins, eth_rpc_url)?;
     let clock = SystemClock;
     let deposits = Deposits::new(pins, account, keys, &transport, &chain, &clock, op)?;
     let mut store = SwapStore::open(store_dir)?;

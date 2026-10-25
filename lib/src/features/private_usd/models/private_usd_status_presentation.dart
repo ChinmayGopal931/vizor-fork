@@ -80,8 +80,8 @@ class PrivateUsdProgressPresentation {
 /// [zcashConfirmations] and [screening] come from the deployment. With
 /// [bridgeAvailable] off, an ended conversion offers no new one.
 /// [relayerClaims] is the relayer-claims setting, which a bridge takes as it
-/// starts: until its deposit is out, the only sign that the relayer is to
-/// claim it.
+/// starts: until its claim is handed over, the only sign that the relayer is
+/// to claim it.
 PrivateUsdProgressPresentation privateUsdProgressPresentation({
   required PrivateUsdConversionStatus status,
   required DateTime now,
@@ -259,10 +259,16 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
       t0.isAfter(now);
 
   final handedOver = status.claimHandedOver;
-  // Its claim goes to the relayer as the deposit goes out, so Veylor is
-  // needed only until then.
+  // Its claim goes to the relayer once the market maker confirms the
+  // deposit, so Veylor is needed only until then; a claim the relayer
+  // declined is Veylor's own.
   final relayerToClaim =
-      relayerClaims && !refunding && !unwinding && active <= 1;
+      relayerClaims &&
+      !handedOver &&
+      !record.claimDeclined &&
+      !refunding &&
+      !unwinding &&
+      active <= 2;
   final lateClaimAt = record.lateClaimAt;
   final String? note;
   if (status.resuming) {
@@ -281,14 +287,13 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
     note = PrivateUsdCopy.convertUnsettled;
   } else if (slowOpening) {
     note = PrivateUsdCopy.convertOpeningSlow;
+  } else if (handedOver) {
+    // Handed over only once the maker made the swap ready: never silent.
+    note = PrivateUsdCopy.convertRelayerClaims;
+  } else if (makerSilent) {
+    note = PrivateUsdCopy.convertMakerSilent(formatDayMonthTime(t0));
   } else if (relayerToClaim) {
     note = PrivateUsdCopy.convertRelayerReviewNote;
-  } else if (makerSilent) {
-    note = handedOver
-        ? PrivateUsdCopy.convertRelayerMakerSilent(formatDayMonthTime(t0))
-        : PrivateUsdCopy.convertMakerSilent(formatDayMonthTime(t0));
-  } else if (handedOver) {
-    note = PrivateUsdCopy.convertRelayerClaims;
   } else {
     note = null;
   }

@@ -15,6 +15,8 @@ enum RailgunError: Error, Equatable {
   case `protocol`(String)
   /// The engine, the chain or a screening node failed.
   case failed(String)
+  /// A sync failed while the Ethereum RPC did not answer, or turned requests away.
+  case rpcFailed(String)
 
   var code: String {
     switch self {
@@ -23,12 +25,14 @@ enum RailgunError: Error, Equatable {
     case .unavailable: return "unavailable"
     case .protocol: return "protocol"
     case .failed: return "failed"
+    case .rpcFailed: return "rpc_failed"
     }
   }
 
   var message: String {
     switch self {
-    case let .disconnected(message), let .unavailable(message), let .protocol(message), let .failed(message):
+    case let .disconnected(message), let .unavailable(message), let .protocol(message), let .failed(message),
+      let .rpcFailed(message):
       return message
     case let .timeout(what):
       return "\(what) timed out"

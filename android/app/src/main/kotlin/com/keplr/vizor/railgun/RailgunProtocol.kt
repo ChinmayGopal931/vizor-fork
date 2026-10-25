@@ -120,6 +120,7 @@ internal object RailgunProtocol {
         val message = optString("message").ifEmpty { "the page failed" }
         return when (optString("code")) {
             "BAD_REQUEST" -> RailgunException.Protocol(message)
+            "RPC_FAILED" -> RailgunException.RpcFailed(message)
             else -> RailgunException.Failed(message)
         }
     }

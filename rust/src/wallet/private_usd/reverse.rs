@@ -1879,7 +1879,7 @@ impl SwapCall<'_> {
         step: impl AsyncFnOnce(&WalletReverse<'_>, &mut SwapStore) -> Result<R>,
     ) -> Result<R> {
         let transport = swap::transport(op);
-        let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url);
+        let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url)?;
         let zcash = self.zcash(op);
         let reverse = Reverse::new(
             self.account,
@@ -1910,7 +1910,7 @@ pub(crate) async fn run_view<R>(
         return Ok(None);
     };
     let transport = RoutedHttp::new();
-    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url);
+    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url)?;
     let view = ReverseView::new(network, account, &chain, &transport, &SystemClock, None);
     step(&view, &mut store).await.map(Some)
 }

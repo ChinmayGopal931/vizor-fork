@@ -79,7 +79,12 @@ enum RailgunProtocol {
         return .failure(id: id.int64Value, error: unreadable)
       }
       let reason = (wire["message"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "the page failed"
-      let kind: RailgunError = (wire["code"] as? String) == "BAD_REQUEST" ? .protocol(reason) : .failed(reason)
+      let kind: RailgunError
+      switch wire["code"] as? String {
+      case "BAD_REQUEST": kind = .protocol(reason)
+      case "RPC_FAILED": kind = .rpcFailed(reason)
+      default: kind = .failed(reason)
+      }
       return .failure(id: id.int64Value, error: kind)
     }
     guard let result = rawJSON(message["result"]) else {

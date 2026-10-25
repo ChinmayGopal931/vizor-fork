@@ -14,10 +14,13 @@
 //! the deposit comes home.
 //!
 //! With relayer claims, chosen at accept, the claim goes to the pinned
-//! relayer once, as soon as the deposit is out, for it to hold and send when
-//! the window opens: the payout is kept and the hand-over marked before it
-//! is posted. The app then leaves the window's first minute to the relayer,
-//! and claims itself only if nothing landed by then.
+//! relayer once, as soon as the maker's ready is confirmed, for it to hold
+//! and send when the window opens: the payout is kept and the hand-over
+//! marked before it is posted. Not before: until the swap is ready the maker
+//! may still cancel it, and a cancel reveals `e`, which with `z` spends the
+//! deposit, so the relayer alone could take it. The app then leaves the
+//! window's first minute to the relayer, and claims itself only if nothing
+//! landed by then.
 //!
 //! A paid swap's payout that Railgun's screening sent back to the swap's
 //! vault is rescued on the user's word: a rescue is signed with the
@@ -714,7 +717,13 @@ where
                 }
                 self.finish_paid(store, record).await
             }
-            SwapStage::Ready => self.claim(store, record, terms).await,
+            // Ready at its confirmation depth: the maker can no longer cancel
+            // the swap, so the claim may go to the relayer.
+            SwapStage::Ready => {
+                let record = &self.hand_over(store, record, terms).await?;
+                engine::check_cancelled(self.op)?;
+                self.claim(store, record, terms).await
+            }
             SwapStage::Open => self.open(store, record, terms).await,
         }
     }
@@ -986,18 +995,15 @@ where
     // ---- the claim ----
 
     /// Reveals `z` once the claim's window is open, then pays out; while the
-    /// windows hold the claim, waits. With relayer claims the claim is handed
-    /// over first, and the app posts it only once the relayer had its wait.
-    /// The window is judged again immediately before the claim is posted,
-    /// after every preparatory step.
+    /// windows hold the claim, waits. A claim handed to the relayer is posted
+    /// only once the relayer had its wait. The window is judged again
+    /// immediately before the claim is posted, after every preparatory step.
     async fn claim(
         &self,
         store: &mut SwapStore,
         record: &ForwardRecord,
         terms: &Terms,
     ) -> Result<ForwardStep> {
-        let record = &self.hand_over(store, record, terms).await?;
-        engine::check_cancelled(self.op)?;
         if let Some(wait) = self.claim_window(record, terms).await? {
             return Ok(holding(wait, terms));
         }
@@ -1221,11 +1227,16 @@ where
 
     // ---- the hand-over ----
 
-    /// With relayer claims, hands the claim to the relayer once the deposit
-    /// is out, to hold until its window opens: once per swap, unless a post
-    /// got no answer, which goes again as it was kept. A failure never holds
-    /// up the claim, which the app makes itself in the window. Returns the
-    /// record as kept.
+    /// With relayer claims, hands the claim to the relayer, to hold until its
+    /// window opens, once the deposit is out and the swap is ready: once per
+    /// swap, unless a post got no answer, which goes again as it was kept. A
+    /// failure never holds up the claim, which the app makes itself in the
+    /// window. Returns the record as kept.
+    ///
+    /// The caller saw the swap ready at its confirmation depth. Until then
+    /// the maker may cancel it, and its cancel reveals `e` on chain: with
+    /// `z` in hand too, the relayer alone would spend the deposit before the
+    /// sweep home, which needs the app open.
     async fn hand_over(
         &self,
         store: &mut SwapStore,
@@ -1673,7 +1684,7 @@ impl SwapCall<'_> {
         step: impl AsyncFnOnce(&WalletForward<'_>, &mut SwapStore) -> Result<R>,
     ) -> Result<R> {
         let transport = swap::transport(op);
-        let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url);
+        let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url)?;
         let zcash = self.zcash(op);
         let forward = Forward::new(
             self.account,
@@ -1706,7 +1717,7 @@ pub(crate) async fn run_view<R>(
         return Ok(None);
     };
     let transport = RoutedHttp::new();
-    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url);
+    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url)?;
     let view = ForwardView::new(network, account, &chain, &transport);
     step(&view, &store).await.map(Some)
 }
@@ -1721,7 +1732,7 @@ pub(crate) async fn abandon_with(
     index: u32,
 ) -> Result<ForwardRecord> {
     let transport = RoutedHttp::new();
-    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url);
+    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url)?;
     let mut store = SwapStore::open(store_dir)?;
     abandon(&mut store, &chain, &SystemClock, account, index).await
 }

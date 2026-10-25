@@ -331,10 +331,10 @@ abstract final class PrivateUsdCopy {
       "leave, it pauses; if it can't finish in time, it's called off and "
       'your ZEC comes back, less a network fee.';
   static String convertInfoNoteTimeRelayer(String about) =>
-      'Takes $about. Keep Veylor open and unlocked for about a minute, until '
-      "your ZEC is sent; the relayer does the rest. If it can't finish in "
-      "time, it's called off and your ZEC comes back, less a network fee, "
-      'the next time you open Veylor.';
+      'Takes $about. Keep Veylor open and unlocked until the market maker '
+      'confirms your deposit, a few minutes; the relayer does the rest. If it '
+      "can't finish in time, it's called off and your ZEC comes back, less a "
+      'network fee, the next time you open Veylor.';
 
   static const convertReviewInfoTitle = 'Before you bridge';
   static const convertReviewInfoPay =
@@ -348,16 +348,17 @@ abstract final class PrivateUsdCopy {
       'is sent until you bridge.';
 
   /// The review's note when the relayer claims (Settings), in place of
-  /// [convertBackgroundNote]; the progress's too, until the ZEC is sent.
+  /// [convertBackgroundNote]; the progress's too, until the claim is handed
+  /// over.
   static const convertRelayerReviewNote =
-      'Keep Veylor open for about a minute, until your ZEC is sent. Then the '
-      'relayer claims your dollars, and you can leave.';
+      'Keep Veylor open until the market maker confirms your deposit, a few '
+      'minutes. Then the relayer claims your dollars, and you can leave.';
 
   /// [infoKeepOpen] for a bridge the relayer claims.
   static const convertRelayerInfoKeepOpen =
-      "Veylor sends your ZEC while it's open and unlocked, then hands the "
-      'claim to the relayer. Refunds and sends run only while Veylor is '
-      'open and unlocked.';
+      "Veylor sends your ZEC while it's open and unlocked and, once the "
+      'market maker confirms it, hands the claim to the relayer. Refunds and '
+      'sends run only while Veylor is open and unlocked.';
 
   // ── Convert: progress (forward) ───────────────────────────────────────
 
@@ -390,16 +391,11 @@ abstract final class PrivateUsdCopy {
       "hasn't by $time, Veylor claims your dollars itself. Keep Veylor open "
       'until then.';
 
-  /// The note once the relayer holds the bridge's claim.
+  /// The note once the relayer holds the bridge's claim, which it gets only
+  /// once the market maker confirmed the deposit.
   static const convertRelayerClaims =
-      'You can leave Veylor now. The relayer claims your dollars once the '
-      'market maker confirms your deposit.';
-
-  /// [convertMakerSilent] once the relayer holds the bridge's claim.
-  static String convertRelayerMakerSilent(String time) =>
-      "The market maker hasn't confirmed your deposit yet. If it still "
-      "hasn't by $time, the relayer claims your dollars anyway. You can "
-      'leave Veylor now.';
+      'You can leave Veylor now. The market maker confirmed your deposit, and '
+      'the relayer claims your dollars.';
   static const convertOpeningSlow =
       "The market maker hasn't opened the swap yet. Nothing has been sent.";
   static const convertCallOff = 'Call it off';
@@ -924,4 +920,11 @@ abstract final class PrivateUsdCopy {
   static const rpcSaved = 'Ethereum RPC saved';
   static const rpcCleared = 'Using the default Ethereum RPC';
   static const rpcNotAnswering = "Your Ethereum RPC isn't answering.";
+
+  /// A sync that failed while the default RPC did not answer, or turned
+  /// requests away.
+  static const rpcDefaultNotAnswering =
+      "The Ethereum RPC isn't answering, so your balance can't load. Try a "
+      'different RPC.';
+  static const rpcChange = 'Change RPC';
 }

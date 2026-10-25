@@ -546,7 +546,17 @@ class RailgunEngine {
     if (!identical(_session, session) || session._epoch != _epoch) {
       return Future.error(const RailgunEngineInterruptedException());
     }
-    return _host.call(method, params);
+    return _host.call(method, params).catchError((Object error) {
+      // Debug builds only, with the keyed RPC URLs redacted: the engine's
+      // text is what says which service failed.
+      if (error is RailgunHostException) {
+        privateUsdLog(
+          '$method failed (${error.code.name}): '
+          '${error.debugMessage(secrets: session.secrets)}',
+        );
+      }
+      throw error;
+    });
   }
 
   void _ensureCurrent(int epoch) {

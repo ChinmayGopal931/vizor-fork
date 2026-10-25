@@ -530,6 +530,9 @@ pub struct ApiForwardRecord {
     /// The relayer holds the claim and sends it once the claim's window
     /// opens: the claim no longer needs Veylor open.
     pub claim_held: bool,
+    /// The relayer turned the claim down or takes none to hold: Veylor
+    /// claims it itself, so the bridge needs it open.
+    pub claim_declined: bool,
     pub outcome: Option<ApiForwardOutcome>,
     pub refund_cause: Option<ApiRefundCause>,
     pub nothing_sent_cause: Option<ApiNothingSentCause>,
@@ -585,7 +588,8 @@ pub fn private_usd_forward_quote(
 /// after the save means "maybe opened": read the records and show the
 /// conversion's progress if it is under way. With `relayer_claims` (the
 /// setting, kept on the record), the claim goes to the relayer once the
-/// deposit is out, for it to send when the claim's window opens.
+/// deposit is out and the maker's ready is confirmed, for it to send when
+/// the claim's window opens.
 pub fn private_usd_forward_accept(
     db_path: String,
     network: String,
@@ -1582,7 +1586,7 @@ pub fn private_usd_send_settle_all(
         };
         let pins = deployment::deployment(network);
         let transport = RoutedHttp::new();
-        let chain = EvmRpc::new(&transport, pins, &eth_rpc_url);
+        let chain = EvmRpc::new(&transport, pins, &eth_rpc_url)?;
         let clock = SystemClock;
         let relay = Sends::new(&transport, pins.relayer_url, &clock, &account_uuid);
         Ok(block_on(relay.settle_all(&mut store, &chain))?
@@ -2302,6 +2306,7 @@ fn api_record(record: &ForwardRecord, deposit_confirmations: Option<u32>) -> Api
             .and_then(|sweep| internal_hex(&sweep.tx_id)),
         payout_tx: record.payout_tx.map(|transaction| transaction.to_hex()),
         claim_held: record.claim_hold == Some(ClaimHold::Held),
+        claim_declined: record.claim_hold == Some(ClaimHold::Declined),
         outcome,
         refund_cause,
         nothing_sent_cause,

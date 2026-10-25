@@ -35,6 +35,7 @@ import { setArtifactProgressListener } from './artifact-mirror.js';
 import { artifactStore } from './artifacts.js';
 import { badRequest } from './errors.js';
 import { hasUndatedReceipts, receivedSends } from './received.js';
+import { syncFailure } from './rpc-probe.js';
 import { screeningActivity } from './screening-activity.js';
 import { catchUpTxids, txidCompleteHold } from './txid-catch-up.js';
 import { walletNamespaces } from './wallet-namespaces.js';
@@ -68,6 +69,9 @@ let deleting;
 let network;
 let fees;
 let wallet;
+// What the engine was started on, for telling an RPC failure from the connection's.
+let providerUrls;
+let screeningUrls;
 let debug = false;
 let notesScan;
 let notesScans = Promise.resolve();
@@ -142,6 +146,8 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, debug, e
   const { feesSerialized } = await loadProvider(config, networkName, POLLING_INTERVAL_MS);
   fees = { shield: Number(feesSerialized.shieldFeeV2), unshield: Number(feesSerialized.unshieldFeeV2) };
   network = networkName;
+  providerUrls = rpcUrls;
+  screeningUrls = poiNodeUrls;
   return { fees };
 }
 
@@ -203,7 +209,8 @@ export async function deleteWallet({ network: name, mnemonic }) {
 /**
  * Scans to the chain's tip, catches up on txids, then has the screening nodes check the notes. Returns the balances,
  * the private sends received (`received`), and `screening`: `failed` when that check, or the proofs the engine last
- * sent for this wallet's sends, failed.
+ * sent for this wallet's sends, failed. A sync that fails while the RPC does not answer, or turns requests away,
+ * fails as `RPC_FAILED` (`rpc-probe.js`), so the host can offer another RPC.
  */
 export async function refresh(_params, emit) {
   const { walletId } = session();
@@ -222,6 +229,8 @@ export async function refresh(_params, emit) {
       wait: () => new Promise((resolve) => setTimeout(resolve, TXID_SYNC_WAIT_MS)),
       passes: TXID_SYNC_PASSES,
     });
+  } catch (error) {
+    throw await syncFailure(error, { rpcUrls: providerUrls, poiNodeUrls: screeningUrls });
   } finally {
     reporting?.stop();
     const complete = txidHold.end();

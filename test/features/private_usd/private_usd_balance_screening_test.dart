@@ -9,6 +9,7 @@ import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_avai
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_balance_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/railgun_engine_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_cache.dart';
+import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/railgun_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/railgun_host_channel.dart';
 import 'package:zcash_wallet/src/providers/app_security_provider.dart';
@@ -68,6 +69,42 @@ void main() {
 
   bool screeningFailed(ProviderContainer container) =>
       container.read(privateUsdBalanceProvider(_account)).screeningFailed;
+
+  test('a sync that failed on the RPC says so until one succeeds or the RPC '
+      'changes', () async {
+    final container = containerWith();
+    PrivateUsdBalanceState state() =>
+        container.read(privateUsdBalanceProvider(_account));
+    Future<void> syncFailing(RailgunHostErrorCode code) async {
+      await pumpEventQueue();
+      container.read(privateUsdBalanceProvider(_account).notifier).refresh();
+      await pumpEventQueue();
+      page.refreshing!.completeError(RailgunHostException(code));
+      await pumpEventQueue();
+    }
+
+    await syncFailing(RailgunHostErrorCode.failed);
+    expect(state().refreshFailed, isTrue);
+    expect(state().rpcFailed, isFalse);
+
+    await syncFailing(RailgunHostErrorCode.rpcFailed);
+    expect(state().rpcFailed, isTrue);
+    // A retry failing before the page asked the RPC keeps the verdict.
+    await syncFailing(RailgunHostErrorCode.failed);
+    expect(state().rpcFailed, isTrue);
+
+    container
+        .read(privateUsdBalanceProvider(_account).notifier)
+        .clearRpcFailed();
+    expect(state().rpcFailed, isFalse);
+    expect(state().refreshFailed, isTrue);
+
+    await syncFailing(RailgunHostErrorCode.rpcFailed);
+    expect(state().rpcFailed, isTrue);
+    await sync(container, 'ok');
+    expect(state().rpcFailed, isFalse);
+    expect(state().refreshFailed, isFalse);
+  });
 
   test('a sync whose screening failed marks the balance until one goes '
       'through', () async {
