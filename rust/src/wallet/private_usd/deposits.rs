@@ -1152,13 +1152,8 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
             .map_err(|error| {
                 PrivateUsdError::new(ErrorCode::Other, format!("deposit note: {error}"))
             })?;
-        // The five words a deposit's nonce commits to; their keccak is the
-        // note's commitment, which signing checks.
+        // The five words a deposit's nonce commits to.
         let words = note.words();
-        let parts: Vec<&[u8]> = words.iter().map(|word| &word[..]).collect();
-        if keccak(&parts) != note.commitment() {
-            return fail(ErrorCode::Other, "the note's words are not its commitment");
-        }
         let nonce = self.domain().deposit_nonce(&words, fee, &terms.relayer);
         let digest = token.receive_with_authorization(&ReceiveAuthorization {
             from,
