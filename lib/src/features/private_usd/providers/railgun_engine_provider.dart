@@ -223,7 +223,7 @@ class RustRailgunWalletSource implements RailgunWalletSource {
         ? null
         : privateUsdKeyedRpcUrl(
             deployment.railgunNetwork,
-            allowedHosts: deployment.allowedHosts,
+            rpcHosts: deployment.rpcHosts,
           );
     return RailgunWalletOpening(
       start: RailgunStartParams(

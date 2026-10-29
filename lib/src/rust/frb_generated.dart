@@ -14209,8 +14209,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiDeployment dco_decode_api_deployment(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 20)
-      throw Exception('unexpected arr length: expect 20 but see ${arr.length}');
+    if (arr.length != 22)
+      throw Exception('unexpected arr length: expect 22 but see ${arr.length}');
     return ApiDeployment(
       network: dco_decode_String(arr[0]),
       railgunNetwork: dco_decode_String(arr[1]),
@@ -14223,15 +14223,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       relayAdapt: dco_decode_String(arr[8]),
       relayerRailgunAddress: dco_decode_String(arr[9]),
       allowedHosts: dco_decode_list_String(arr[10]),
-      explorerTxPrefix: dco_decode_String(arr[11]),
-      railscanTxPrefix: dco_decode_String(arr[12]),
-      zcashConfirmations: dco_decode_u_32(arr[13]),
-      escrowConfirmations: dco_decode_u_32(arr[14]),
-      screeningSeconds: dco_decode_u_32(arr[15]),
-      maxRelayerFee: dco_decode_String(arr[16]),
-      usdTokens: dco_decode_list_api_usd_token(arr[17]),
-      deposits: dco_decode_opt_box_autoadd_api_deposits_pin(arr[18]),
-      bridgeAvailable: dco_decode_bool(arr[19]),
+      rpcHosts: dco_decode_list_String(arr[11]),
+      swapContract: dco_decode_opt_String(arr[12]),
+      explorerTxPrefix: dco_decode_String(arr[13]),
+      railscanTxPrefix: dco_decode_String(arr[14]),
+      zcashConfirmations: dco_decode_u_32(arr[15]),
+      escrowConfirmations: dco_decode_u_32(arr[16]),
+      screeningSeconds: dco_decode_u_32(arr[17]),
+      maxRelayerFee: dco_decode_String(arr[18]),
+      usdTokens: dco_decode_list_api_usd_token(arr[19]),
+      deposits: dco_decode_opt_box_autoadd_api_deposits_pin(arr[20]),
+      bridgeAvailable: dco_decode_bool(arr[21]),
     );
   }
 
@@ -19092,6 +19094,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_relayAdapt = sse_decode_String(deserializer);
     var var_relayerRailgunAddress = sse_decode_String(deserializer);
     var var_allowedHosts = sse_decode_list_String(deserializer);
+    var var_rpcHosts = sse_decode_list_String(deserializer);
+    var var_swapContract = sse_decode_opt_String(deserializer);
     var var_explorerTxPrefix = sse_decode_String(deserializer);
     var var_railscanTxPrefix = sse_decode_String(deserializer);
     var var_zcashConfirmations = sse_decode_u_32(deserializer);
@@ -19115,6 +19119,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       relayAdapt: var_relayAdapt,
       relayerRailgunAddress: var_relayerRailgunAddress,
       allowedHosts: var_allowedHosts,
+      rpcHosts: var_rpcHosts,
+      swapContract: var_swapContract,
       explorerTxPrefix: var_explorerTxPrefix,
       railscanTxPrefix: var_railscanTxPrefix,
       zcashConfirmations: var_zcashConfirmations,
@@ -25586,6 +25592,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.relayAdapt, serializer);
     sse_encode_String(self.relayerRailgunAddress, serializer);
     sse_encode_list_String(self.allowedHosts, serializer);
+    sse_encode_list_String(self.rpcHosts, serializer);
+    sse_encode_opt_String(self.swapContract, serializer);
     sse_encode_String(self.explorerTxPrefix, serializer);
     sse_encode_String(self.railscanTxPrefix, serializer);
     sse_encode_u_32(self.zcashConfirmations, serializer);

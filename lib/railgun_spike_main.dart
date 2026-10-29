@@ -80,7 +80,7 @@ Future<void> _run() async {
   _deployment = rust_private_usd.privateUsdDeployment(network: 'test')!;
   final keyed = privateUsdKeyedRpcUrl(
     _deployment.railgunNetwork,
-    allowedHosts: _deployment.allowedHosts,
+    rpcHosts: _deployment.rpcHosts,
   );
   _secrets = [?keyed];
   _log('keyed RPC: ${keyed == null ? 'none' : 'yes'}');

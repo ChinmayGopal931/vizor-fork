@@ -926,8 +926,12 @@ abstract final class PrivateUsdCopy {
   static const rpcNetworkSepolia = 'Sepolia';
   static const rpcNetworkMainnet = 'Ethereum mainnet';
   static String rpcBody(String network) =>
-      'Use your own Alchemy, Infura or publicnode URL for $network. Shielded '
-      'USD then uses only it.';
+      'Use your own Ethereum RPC URL for $network from a supported provider. '
+      'Shielded USD then uses only it.';
+  static const rpcProviders =
+      'Supported: Alchemy, Infura, QuickNode, Chainstack, Ankr, dRPC, '
+      'BlockPI, Tenderly, NodeReal, GetBlock, OnFinality, publicnode, Pocket '
+      'Network, MEV Blocker, Flashbots Protect, 0xRPC and Stakely.';
   static const rpcSees =
       "The RPC sees the app's Ethereum requests, and your IP address unless "
       'Tor is on.';
@@ -936,11 +940,14 @@ abstract final class PrivateUsdCopy {
   static const rpcChecking = 'Checking…';
   static const rpcUseDefault = 'Use the default';
   static String rpcErrorUrl(String network) =>
-      'Use an https Alchemy, Infura or publicnode URL for $network.';
+      'Use an https URL from a supported provider for $network.';
   static const rpcErrorUnreachable =
       "That RPC didn't answer. Check the URL, or try again in a moment.";
   static String rpcErrorWrongChain(String network) =>
       'That RPC is for another network. Use one for $network.';
+  static const rpcErrorLogs =
+      'That RPC caps log queries below what bridging needs. Try another '
+      'provider or plan.';
   static const rpcErrorSave = settingSaveFailed;
   static const rpcSaved = 'Ethereum RPC saved';
   static const rpcCleared = 'Using the default Ethereum RPC';

@@ -2,33 +2,32 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/config/private_usd_feature_config.dart';
 
 void main() {
-  test("a user's own RPC URL is https, on its network's RPC hosts", () {
-    // The deployment's page hosts (Rust's RAILGUN_PAGE_HOSTS).
-    const pageHosts = [
-      'ethereum-rpc.publicnode.com',
-      'ethereum-sepolia-rpc.publicnode.com',
-      'eth-mainnet.g.alchemy.com',
-      'eth-sepolia.g.alchemy.com',
-      'mainnet.infura.io',
-      'sepolia.infura.io',
-      'ppoi.fdi.network',
-      'rail-squid.squids.live',
-      'railgun-sepolia-list.pepeman931.workers.dev',
-      'ipfs-lb.com',
-      'railgun-artifacts.pepeman931.workers.dev',
-    ];
-    String? custom(String url, {String network = 'mainnet'}) =>
-        privateUsdCustomRpcUrl(url, network, allowedHosts: pageHosts);
+  // Some of mainnet's providers (Rust's `Deployment::rpc_hosts`).
+  const rpcHosts = [
+    'ethereum-rpc.publicnode.com',
+    'eth-mainnet.g.alchemy.com',
+    'mainnet.infura.io',
+    '*.quiknode.pro',
+    'rpc.ankr.com',
+    'lb.drpc.live',
+  ];
 
-    for (final (url, network) in [
-      ('https://eth-mainnet.g.alchemy.com/v2/key', 'mainnet'),
-      ('https://mainnet.infura.io:443/v3/key', 'mainnet'),
-      ('https://ethereum-rpc.publicnode.com', 'mainnet'),
-      ('https://eth-sepolia.g.alchemy.com/v2/key', 'sepolia'),
-      ('https://sepolia.infura.io/v3/key', 'sepolia'),
-      ('https://ethereum-sepolia-rpc.publicnode.com', 'sepolia'),
+  test("a user's own RPC URL is https, on one of the network's providers", () {
+    String? custom(String url) =>
+        privateUsdCustomRpcUrl(url, rpcHosts: rpcHosts);
+
+    for (final url in [
+      'https://eth-mainnet.g.alchemy.com/v2/key',
+      'https://mainnet.infura.io:443/v3/key',
+      'https://ethereum-rpc.publicnode.com',
+      'https://rpc.ankr.com/eth/key',
+      'https://lb.drpc.live/ethereum?dkey=key',
+      // A `*.` entry: an endpoint of the user's own name, one label or more.
+      'https://my-endpoint.quiknode.pro/key/',
+      'https://my-endpoint.ethereum-mainnet.quiknode.pro/key/',
+      'https://MY-ENDPOINT.QuikNode.pro/key/',
     ]) {
-      expect(custom(' $url ', network: network), url, reason: url);
+      expect(custom(' $url '), url, reason: url);
     }
     for (final url in [
       '',
@@ -40,19 +39,23 @@ void main() {
       'https://ppoi.fdi.network/',
       // The other network's provider.
       'https://eth-sepolia.g.alchemy.com/v2/key',
+      // The wildcard's domain itself, and lookalikes.
+      'https://quiknode.pro/key',
+      'https://my-endpoint.quiknode.pro.evil.example/key',
+      'https://evilquiknode.pro/key',
       'https://user:secret@mainnet.infura.io/v3/key',
       'https://mainnet.infura.io/v3/key#fragment',
     ]) {
       expect(custom(url), isNull, reason: url);
     }
-    // Only an RPC host the page may reach counts.
-    expect(
-      privateUsdCustomRpcUrl(
-        'https://mainnet.infura.io/v3/key',
-        'mainnet',
-        allowedHosts: const ['eth-mainnet.g.alchemy.com'],
-      ),
-      isNull,
-    );
+  });
+
+  test('a host matches a provider exactly, or a wildcard by subdomain', () {
+    expect(privateUsdHostAllowed(rpcHosts, 'RPC.ANKR.COM'), isTrue);
+    expect(privateUsdHostAllowed(rpcHosts, 'a.quiknode.pro'), isTrue);
+    expect(privateUsdHostAllowed(rpcHosts, 'quiknode.pro'), isFalse);
+    expect(privateUsdHostAllowed(rpcHosts, '.quiknode.pro'), isFalse);
+    expect(privateUsdHostAllowed(rpcHosts, 'a.rpc.ankr.com'), isFalse);
+    expect(privateUsdHostAllowed(rpcHosts, ''), isFalse);
   });
 }

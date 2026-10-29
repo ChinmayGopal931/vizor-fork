@@ -42,7 +42,7 @@ use tower_service::Service;
 use zcash_client_backend::tor::Client as TorClient;
 
 use crate::network_privacy::{self, DirectRouteLease};
-use crate::wallet::private_usd::deployment::RAILGUN_PAGE_HOSTS;
+use crate::wallet::private_usd::deployment::{host_allowed, RAILGUN_PAGE_HOSTS};
 
 const HTTPS_PORT: u16 = 443;
 /// A client that has not finished its handshake by then is dropped.
@@ -331,7 +331,7 @@ where
     let port = u16::from_be_bytes(port);
 
     let host = String::from_utf8(host).map_err(|_| HandshakeError::Refused(Reply::NotAllowed))?;
-    if port != HTTPS_PORT || !allowed.iter().any(|a| a.eq_ignore_ascii_case(&host)) {
+    if port != HTTPS_PORT || !host_allowed(allowed, &host) {
         return Err(HandshakeError::Refused(Reply::NotAllowed));
     }
     Ok(Target { host, port })
@@ -454,6 +454,14 @@ mod tests {
     async fn bridge_to(
         upstream: std::net::SocketAddr,
     ) -> (TcpStream, tokio::sync::oneshot::Receiver<Target>) {
+        bridge_allowing(upstream, &[HOST]).await
+    }
+
+    /// `bridge_to`, with `allowed` as the allowlist.
+    async fn bridge_allowing(
+        upstream: std::net::SocketAddr,
+        allowed: &'static [&'static str],
+    ) -> (TcpStream, tokio::sync::oneshot::Receiver<Target>) {
         let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
             .await
             .unwrap();
@@ -468,7 +476,7 @@ mod tests {
                     .map(|stream| Box::new(stream) as Box<dyn Tunnel>)
                     .map_err(|_| Reply::GeneralFailure)
             };
-            let _ = serve(stream, &[HOST], connect).await;
+            let _ = serve(stream, allowed, connect).await;
         });
         (TcpStream::connect(address).await.unwrap(), asked_rx)
     }
@@ -542,6 +550,44 @@ mod tests {
             refused(ipv4).await,
             (Reply::AddressTypeNotSupported as u8, false)
         );
+    }
+
+    /// A `*.` entry lets a subdomain through, one label or more, and never
+    /// the domain itself or a lookalike.
+    #[tokio::test]
+    async fn a_wildcard_entry_tunnels_subdomains_only() {
+        const ALLOWED: &[&str] = &["*.quiknode.pro"];
+        for host in [
+            "my-endpoint.quiknode.pro",
+            "my-endpoint.ethereum-sepolia.quiknode.pro",
+        ] {
+            let (mut client, asked) = bridge_allowing(echo_server().await, ALLOWED).await;
+            greet(&mut client).await;
+            client
+                .write_all(&connect_request(ATYP_DOMAIN, host.as_bytes(), 443))
+                .await
+                .unwrap();
+            assert_eq!(
+                reply_code(&mut client).await,
+                Reply::Succeeded as u8,
+                "{host}"
+            );
+            assert_eq!(asked.await.unwrap().host, host);
+        }
+        for host in ["quiknode.pro", "my-endpoint.quiknode.pro.evil.example"] {
+            let (mut client, asked) = bridge_allowing(echo_server().await, ALLOWED).await;
+            greet(&mut client).await;
+            client
+                .write_all(&connect_request(ATYP_DOMAIN, host.as_bytes(), 443))
+                .await
+                .unwrap();
+            assert_eq!(
+                reply_code(&mut client).await,
+                Reply::NotAllowed as u8,
+                "{host}"
+            );
+            assert!(asked.await.is_err(), "{host}");
+        }
     }
 
     #[tokio::test]
@@ -799,7 +845,7 @@ mod tests {
         let mut expected = RAILGUN_PAGE_HOSTS.map(str::to_owned).to_vec();
         expected.sort();
         expected.dedup();
-        assert_eq!(expected.len(), 11, "the allowlist has duplicates");
+        assert_eq!(expected.len(), 38, "the allowlist has duplicates");
 
         let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let read = |path: &str| {
@@ -859,7 +905,8 @@ mod tests {
     }
 
     /// The hosts of the CSP's `connect-src` sources other than `'self'`, each
-    /// of which must be a bare `https://` origin; sorted.
+    /// of which must be a bare `https://` origin (a `*.` host for a wildcard
+    /// entry); sorted.
     fn csp_connect_hosts(html: &str) -> Vec<String> {
         let start = html.find("connect-src").expect("a connect-src directive");
         let directive = &html[start..];
@@ -873,7 +920,10 @@ mod tests {
                     .strip_prefix("https://")
                     .unwrap_or_else(|| panic!("{source} is not an https origin"));
                 assert!(
-                    !host.contains(['/', ':', '*']),
+                    !host
+                        .strip_prefix("*.")
+                        .unwrap_or(host)
+                        .contains(['/', ':', '*']),
                     "{source} is not a bare https origin"
                 );
                 host.to_owned()

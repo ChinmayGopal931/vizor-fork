@@ -217,7 +217,11 @@ final class RailgunHostTests: XCTestCase {
       "blob:veylor-railgun://app/0f1e",
       "data:application/wasm;base64,AGFzbQ==",
       "https://eth-sepolia.g.alchemy.com/v2/key",
-    ] + RailgunEndpoints.hosts.map({ "https://\($0)/any/path" }) {
+      // A `*.` entry: an endpoint of the user's own name, one label or more.
+      "https://my-endpoint.quiknode.pro/key/",
+      "https://my-endpoint.ethereum-sepolia.quiknode.pro/key/",
+      "https://nd-123-456-789.p2pify.com/key",
+    ] + RailgunEndpoints.hosts.map({ "https://\($0.replacingOccurrences(of: "*.", with: "my-endpoint."))/any/path" }) {
       XCTAssertTrue(lets(url), url)
     }
     for url in [
@@ -225,6 +229,11 @@ final class RailgunHostTests: XCTestCase {
       "http://ethereum-sepolia-rpc.publicnode.com/",
       "https://ethereum-sepolia-rpc.publicnode.com:8443/",
       "https://evil.ipfs-lb.com/",
+      // A `*.` entry never takes the domain itself, or a lookalike.
+      "https://quiknode.pro/key",
+      "https://my-endpoint.quiknode.pro.evil.example/",
+      "https://evil.example/my-endpoint.quiknode.pro/",
+      "https://evilquiknode.pro/",
       "https://ipfs-lb.com.evil.example/",
       "https://ipfs-lbxcom/",
       "wss://ethereum-rpc.publicnode.com/",

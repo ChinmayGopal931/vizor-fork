@@ -196,6 +196,8 @@ const _sepolia = ApiDeployment(
   relayAdapt: '0x7e3d929EbD5bDC84d02Bd3205c777578f33A214D',
   relayerRailgunAddress: '0zk1relayer',
   allowedHosts: ['ethereum-sepolia-rpc.publicnode.com'],
+  rpcHosts: ['ethereum-sepolia-rpc.publicnode.com'],
+  swapContract: '0x459b0a69e0f736666b66a3ffe0fc17c11f05980d',
   explorerTxPrefix: 'https://sepolia.etherscan.io/tx/',
   railscanTxPrefix: 'https://railscan.io/tx/',
   zcashConfirmations: 2,

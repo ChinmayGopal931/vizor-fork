@@ -12,12 +12,20 @@ class RailgunBoundaryTest {
     @Test
     fun thePageReachesItsAssetsAndItsHostsOnly() {
         assertEquals(Route.OWN_ASSET, route(RailgunRequests.PAGE_URL))
-        RailgunEndpoints.hosts.forEach { assertEquals(Route.ALLOWED, route("https://$it/any/path")) }
-        // The keyed providers' URLs carry a key in the path, on an allowed host.
+        // A `*.` entry: an endpoint of the user's own name.
+        RailgunEndpoints.hosts.forEach {
+            assertEquals(it, Route.ALLOWED, route("https://${it.replace("*.", "my-endpoint.")}/any/path"))
+        }
+        // The keyed providers' URLs carry a key in the path, on an allowed host; QuickNode and a Chainstack
+        // dedicated node name the host too, in any case.
         listOf(
             "https://eth-sepolia.g.alchemy.com/v2/key",
             "https://mainnet.infura.io/v3/key",
             "https://ethereum-rpc.publicnode.com",
+            "https://my-endpoint.quiknode.pro/key/",
+            "https://my-endpoint.ethereum-sepolia.quiknode.pro/key/",
+            "https://MY-ENDPOINT.QuikNode.pro/key/",
+            "https://nd-123-456-789.p2pify.com/key",
         ).forEach { assertEquals(it, Route.ALLOWED, route(it)) }
         assertEquals(Route.ALLOWED, route("blob:https://railgun.appassets.androidplatform.net/0f1e"))
         assertEquals(Route.ALLOWED, route("data:application/wasm;base64,AGFzbQ=="))
@@ -30,6 +38,10 @@ class RailgunBoundaryTest {
             "http://ethereum-sepolia-rpc.publicnode.com/",
             "https://ethereum-sepolia-rpc.publicnode.com:8443/",
             "https://evil.ipfs-lb.com/",
+            // A `*.` entry never takes the domain itself, or a lookalike.
+            "https://quiknode.pro/key",
+            "https://my-endpoint.quiknode.pro.evil.example/",
+            "https://evilquiknode.pro/",
             "https://appassets.androidplatform.net/assets/railgun/index.html",
             "file:///data/data/com.keplr.vizor/shared_prefs/prefs.xml",
             "content://com.keplr.vizor.provider/x",

@@ -12495,6 +12495,8 @@ impl SseDecode for crate::api::private_usd::ApiDeployment {
         let mut var_relayAdapt = <String>::sse_decode(deserializer);
         let mut var_relayerRailgunAddress = <String>::sse_decode(deserializer);
         let mut var_allowedHosts = <Vec<String>>::sse_decode(deserializer);
+        let mut var_rpcHosts = <Vec<String>>::sse_decode(deserializer);
+        let mut var_swapContract = <Option<String>>::sse_decode(deserializer);
         let mut var_explorerTxPrefix = <String>::sse_decode(deserializer);
         let mut var_railscanTxPrefix = <String>::sse_decode(deserializer);
         let mut var_zcashConfirmations = <u32>::sse_decode(deserializer);
@@ -12518,6 +12520,8 @@ impl SseDecode for crate::api::private_usd::ApiDeployment {
             relay_adapt: var_relayAdapt,
             relayer_railgun_address: var_relayerRailgunAddress,
             allowed_hosts: var_allowedHosts,
+            rpc_hosts: var_rpcHosts,
+            swap_contract: var_swapContract,
             explorer_tx_prefix: var_explorerTxPrefix,
             railscan_tx_prefix: var_railscanTxPrefix,
             zcash_confirmations: var_zcashConfirmations,
@@ -19112,6 +19116,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::private_usd::ApiDeployment {
             self.relay_adapt.into_into_dart().into_dart(),
             self.relayer_railgun_address.into_into_dart().into_dart(),
             self.allowed_hosts.into_into_dart().into_dart(),
+            self.rpc_hosts.into_into_dart().into_dart(),
+            self.swap_contract.into_into_dart().into_dart(),
             self.explorer_tx_prefix.into_into_dart().into_dart(),
             self.railscan_tx_prefix.into_into_dart().into_dart(),
             self.zcash_confirmations.into_into_dart().into_dart(),
@@ -24889,6 +24895,8 @@ impl SseEncode for crate::api::private_usd::ApiDeployment {
         <String>::sse_encode(self.relay_adapt, serializer);
         <String>::sse_encode(self.relayer_railgun_address, serializer);
         <Vec<String>>::sse_encode(self.allowed_hosts, serializer);
+        <Vec<String>>::sse_encode(self.rpc_hosts, serializer);
+        <Option<String>>::sse_encode(self.swap_contract, serializer);
         <String>::sse_encode(self.explorer_tx_prefix, serializer);
         <String>::sse_encode(self.railscan_tx_prefix, serializer);
         <u32>::sse_encode(self.zcash_confirmations, serializer);

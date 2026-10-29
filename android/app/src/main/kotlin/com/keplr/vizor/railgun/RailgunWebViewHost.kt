@@ -366,7 +366,7 @@ internal object RailgunRequests {
         val isHttps = scheme == HTTPS && port == DEFAULT_PORT
         return when {
             isHttps && host == PAGE_HOST -> Route.OWN_ASSET
-            isHttps && host in RailgunEndpoints.hosts -> Route.ALLOWED
+            isHttps && host != null && RailgunEndpoints.allows(host) -> Route.ALLOWED
             scheme in LOCAL_SCHEMES -> Route.ALLOWED
             else -> Route.BLOCKED
         }

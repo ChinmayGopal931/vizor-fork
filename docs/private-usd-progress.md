@@ -7,6 +7,37 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **More RPC providers, checked for the log window (2026-10-29, D-155).**
+  Settings' Ethereum RPC takes a URL on seventeen providers now, not
+  three: publicnode, Alchemy, Infura, QuickNode, Chainstack, Ankr, dRPC,
+  BlockPI, Tenderly, NodeReal, GetBlock, OnFinality, Pocket Network, MEV
+  Blocker, Flashbots Protect, 0xRPC and Stakely (`Deployment::rpc_hosts`,
+  which `ApiDeployment.rpcHosts` now carries, so Dart keeps no list of its
+  own). A `*.` entry takes any subdomain, one label or more, never the
+  domain itself (Rust's `host_allowed`, Dart's `privateUsdHostAllowed`,
+  Kotlin's `RailgunEndpoints.allows`, and a label regex in the Swift
+  content rules, `RailgunContentRules.pattern`): QuickNode names each
+  endpoint (`<name>.quiknode.pro`, `<name>.ethereum-sepolia.quiknode.pro`)
+  and Chainstack each dedicated node (`nd-….p2pify.com`). The page's
+  filters grew with it, to 38 hosts; the Rust cross-check pins Kotlin,
+  Swift and the three CSP copies, and the Kotlin and Swift tests take the
+  wildcards. Before saving, the sheet now also asks `eth_blockNumber` and
+  `eth_getLogs` on the windows contract over the engine's 5,000-block
+  window ending at the RPC's own head (a topic no log carries, so the
+  answer is empty): a provider or plan that caps the range lower is refused
+  ("That RPC caps log queries below what bridging needs. Try another
+  provider or plan."), since the payout scan would otherwise fail at every
+  step. The sheet lists the providers under its text. Chosen from
+  chainlist's Ethereum and Sepolia lists by a probe of every candidate
+  (`eth_chainId`, then that window) on 2026-10-29: LlamaRPC, Blast API,
+  Lava and Grove are gone; 1RPC (50 blocks), Cloudflare, Nodies (50),
+  Tatum (100), MeowRPC (no `eth_getLogs`), thirdweb and dRPC's free tier
+  cap the window; Ankr and OnFinality's mainnet want a key; Merkle
+  rate-limits at once; BlockPI's old public host wants a key, its
+  `ethereum.public.blockpi.network` serves the window. `cargo test` for the
+  deployment and the bridge, `fvm flutter analyze` and the touched Dart
+  tests pass; the iOS rule list compiled under macOS WebKit. Not yet run
+  on a phone.
 - **Privacy Pass tokens, dormant (M4, 2026-10-25, D-154).** The token
   client the plan specified is built and unit-tested: `tokens.rs` (the
   device-wide state, pay and settle, returns, the two-phase issuance), the

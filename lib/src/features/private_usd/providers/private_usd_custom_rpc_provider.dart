@@ -59,11 +59,7 @@ class PrivateUsdCustomRpcNotifier extends AsyncNotifier<String?> {
         .read(deployment.railgunNetwork);
     if (stored == null) return null;
     // Saved checked; a URL this build's page could not reach goes unused.
-    return privateUsdCustomRpcUrl(
-      stored,
-      deployment.railgunNetwork,
-      allowedHosts: deployment.allowedHosts,
-    );
+    return privateUsdCustomRpcUrl(stored, rpcHosts: deployment.rpcHosts);
   }
 
   /// Keeps [url], which passed [PrivateUsdRpcChecker], and uses it from the
@@ -74,11 +70,7 @@ class PrivateUsdCustomRpcNotifier extends AsyncNotifier<String?> {
     final deployment = ref.read(privateUsdDeploymentProvider(network));
     final valid = deployment == null
         ? null
-        : privateUsdCustomRpcUrl(
-            url,
-            deployment.railgunNetwork,
-            allowedHosts: deployment.allowedHosts,
-          );
+        : privateUsdCustomRpcUrl(url, rpcHosts: deployment.rpcHosts);
     if (deployment == null || valid == null) {
       throw const FormatException('Not an Ethereum RPC URL Private USD takes');
     }

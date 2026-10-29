@@ -52,14 +52,52 @@ pub(crate) const MAX_LOGS_BODY: usize = 8 << 20;
 
 /// What the Railgun page may reach besides its own assets, on both networks.
 /// Kotlin's and Swift's `RailgunEndpoints.hosts` and the bundle's CSP list the
-/// same hosts, and a keyed RPC URL must use one of them.
-pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 11] = [
+/// same hosts, and an RPC URL, the build's keyed one or the user's own, must
+/// use one of this network's among them (`Deployment::rpc_hosts`). A `*.`
+/// entry stands for any subdomain, one label or more, never the domain itself
+/// (`host_allowed`): QuickNode names each endpoint, Chainstack each dedicated
+/// node.
+pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 38] = [
+    // Ethereum RPC: publicnode (the keyless default), Alchemy, Infura,
+    // QuickNode, Chainstack, Ankr, dRPC, BlockPI, Tenderly, NodeReal,
+    // GetBlock, OnFinality, Pocket Network, MEV Blocker, Flashbots Protect,
+    // 0xRPC and Stakely. Each keyless one answered `eth_getLogs` over the
+    // engine's 5,000-block window on 2026-10-29; a keyed one's plans vary, so
+    // Settings asks the same window before it saves a URL.
     "ethereum-rpc.publicnode.com",
     "ethereum-sepolia-rpc.publicnode.com",
     "eth-mainnet.g.alchemy.com",
     "eth-sepolia.g.alchemy.com",
     "mainnet.infura.io",
     "sepolia.infura.io",
+    "*.quiknode.pro",
+    "ethereum-mainnet.core.chainstack.com",
+    "ethereum-sepolia.core.chainstack.com",
+    "*.p2pify.com",
+    "rpc.ankr.com",
+    "lb.drpc.live",
+    "lb.drpc.org",
+    "eth.drpc.org",
+    "sepolia.drpc.org",
+    "ethereum.blockpi.network",
+    "ethereum-sepolia.blockpi.network",
+    "ethereum.public.blockpi.network",
+    "mainnet.gateway.tenderly.co",
+    "sepolia.gateway.tenderly.co",
+    "gateway.tenderly.co",
+    "eth-mainnet.nodereal.io",
+    "eth-sepolia.nodereal.io",
+    "go.getblock.io",
+    "go.getblock.us",
+    "go.getblock.asia",
+    "eth.api.onfinality.io",
+    "eth-sepolia.api.onfinality.io",
+    "eth.api.pocket.network",
+    "rpc.mevblocker.io",
+    "rpc.flashbots.net",
+    "0xrpc.io",
+    "ethereum-json-rpc.stakely.io",
+    // The screening node and the SDK's own quick sync.
     "ppoi.fdi.network",
     "rail-squid.squids.live",
     // On Sepolia, our copy of its transaction list with the hash chain repaired.
@@ -71,6 +109,31 @@ pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 11] = [
 ];
 
 pub(crate) const POI_NODE_URL: &str = "https://ppoi.fdi.network/";
+
+/// Whether `host` is one of `allowed`, where a `*.` entry stands for any
+/// subdomain: one label or more, never the domain itself. Case does not
+/// count; a host that is not ASCII (none is on the wire) matches nothing.
+pub(crate) fn host_allowed(allowed: &[&str], host: &str) -> bool {
+    allowed.iter().any(|pattern| host_matches(pattern, host))
+}
+
+fn host_matches(pattern: &str, host: &str) -> bool {
+    if !host.is_ascii() {
+        return false;
+    }
+    match pattern.strip_prefix("*.") {
+        Some(domain) => {
+            let Some(at) = host.len().checked_sub(domain.len() + 1) else {
+                return false;
+            };
+            let (prefix, suffix) = host.split_at(at);
+            !prefix.is_empty()
+                && suffix.as_bytes()[0] == b'.'
+                && suffix[1..].eq_ignore_ascii_case(domain)
+        }
+        None => host.eq_ignore_ascii_case(pattern),
+    }
+}
 
 /// One network's pins. Addresses are bytes; the hex in this file keeps the
 /// EIP-55 case the sources use, and the wire always gets lowercase.
@@ -220,6 +283,27 @@ const MAINNET: Deployment = Deployment {
         "ethereum-rpc.publicnode.com",
         "eth-mainnet.g.alchemy.com",
         "mainnet.infura.io",
+        "*.quiknode.pro",
+        "ethereum-mainnet.core.chainstack.com",
+        "*.p2pify.com",
+        "rpc.ankr.com",
+        "lb.drpc.live",
+        "lb.drpc.org",
+        "eth.drpc.org",
+        "ethereum.blockpi.network",
+        "ethereum.public.blockpi.network",
+        "mainnet.gateway.tenderly.co",
+        "gateway.tenderly.co",
+        "eth-mainnet.nodereal.io",
+        "go.getblock.io",
+        "go.getblock.us",
+        "go.getblock.asia",
+        "eth.api.onfinality.io",
+        "eth.api.pocket.network",
+        "rpc.mevblocker.io",
+        "rpc.flashbots.net",
+        "0xrpc.io",
+        "ethereum-json-rpc.stakely.io",
     ],
     poi_node_url: POI_NODE_URL,
     deposits: Some(DepositsPin {
@@ -273,6 +357,22 @@ const TESTNET: Deployment = Deployment {
         "ethereum-sepolia-rpc.publicnode.com",
         "eth-sepolia.g.alchemy.com",
         "sepolia.infura.io",
+        "*.quiknode.pro",
+        "ethereum-sepolia.core.chainstack.com",
+        "*.p2pify.com",
+        "rpc.ankr.com",
+        "lb.drpc.live",
+        "lb.drpc.org",
+        "sepolia.drpc.org",
+        "ethereum-sepolia.blockpi.network",
+        "sepolia.gateway.tenderly.co",
+        "gateway.tenderly.co",
+        "eth-sepolia.nodereal.io",
+        "go.getblock.io",
+        "go.getblock.us",
+        "go.getblock.asia",
+        "eth-sepolia.api.onfinality.io",
+        "0xrpc.io",
     ],
     poi_node_url: POI_NODE_URL,
     deposits: Some(DepositsPin {
@@ -301,10 +401,10 @@ impl Deployment {
     /// Where the engine reads the chain: the keyed URL when the build has one,
     /// else publicnode. A keyed URL, the build's or the user's own, is taken
     /// only as https, on the default port and without credentials, on one of
-    /// this network's `rpc_hosts`; the Dart side keeps only such a URL, and
-    /// this holds the engine to it whatever reaches it. Any other is
-    /// `WrongDeployment`: nothing falls back from a keyed URL, and it is
-    /// never stored or logged.
+    /// this network's `rpc_hosts` (`host_allowed`); the Dart side keeps only
+    /// such a URL, and this holds the engine to it whatever reaches it. Any
+    /// other is `WrongDeployment`: nothing falls back from a keyed URL, and it
+    /// is never stored or logged.
     pub(crate) fn rpc_url<'a>(&'a self, keyed: &'a str) -> Result<&'a str> {
         let keyed = keyed.trim();
         if keyed.is_empty() {
@@ -317,7 +417,7 @@ impl Deployment {
                 && url.password().is_none()
                 && url
                     .host_str()
-                    .is_some_and(|host| self.rpc_hosts.contains(&host))
+                    .is_some_and(|host| host_allowed(self.rpc_hosts, host))
         });
         if !on_host {
             return fail(
@@ -404,6 +504,8 @@ mod tests {
             assert!(pins.rpc_hosts.contains(&keyless.host_str().unwrap()));
             for host in pins.rpc_hosts {
                 assert!(RAILGUN_PAGE_HOSTS.contains(host), "{host}");
+                // A `*.` entry: an endpoint of the user's own name.
+                let host = host.replace("*.", "my-endpoint.");
                 let keyed = format!("https://{host}/v2/key");
                 assert_eq!(pins.rpc_url(&keyed).unwrap(), keyed);
                 assert_eq!(pins.rpc_url(&format!(" {keyed} ")).unwrap(), keyed);
@@ -431,5 +533,43 @@ mod tests {
             refused(&TESTNET, "https://eth-mainnet.g.alchemy.com/v2/key"),
             ErrorCode::WrongDeployment
         );
+    }
+
+    /// A `*.` entry takes any subdomain, one label or more, in any case:
+    /// never the domain itself, a lookalike, or a host that is not ASCII.
+    #[test]
+    fn a_wildcard_host_takes_subdomains_only() {
+        let allowed = ["*.quiknode.pro", "rpc.ankr.com"];
+        for host in [
+            "a.quiknode.pro",
+            "my-endpoint.ethereum-sepolia.quiknode.pro",
+            "A.QuikNode.PRO",
+            "rpc.ankr.com",
+            "RPC.ANKR.COM",
+        ] {
+            assert!(host_allowed(&allowed, host), "{host}");
+        }
+        for host in [
+            "quiknode.pro",
+            ".quiknode.pro",
+            "aquiknode.pro",
+            "a.quiknode.pro.evil.example",
+            "quiknode.pro.evil.example",
+            "a.quiknode.pr",
+            "ankr.com",
+            "a.rpc.ankr.com",
+            "ä.quiknode.pro",
+            "",
+        ] {
+            assert!(!host_allowed(&allowed, host), "{host}");
+        }
+        for pins in [&MAINNET, &TESTNET] {
+            let keyed = "https://my-endpoint.quiknode.pro/key";
+            assert_eq!(pins.rpc_url(keyed).unwrap(), keyed);
+            assert_eq!(
+                pins.rpc_url("https://quiknode.pro/key").unwrap_err().code,
+                ErrorCode::WrongDeployment
+            );
+        }
     }
 }
