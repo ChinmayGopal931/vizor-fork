@@ -232,14 +232,6 @@ fn validity(terms: &DepositTerms) -> u64 {
 
 // ---- notes and addresses ----
 
-/// The note as `abi.encode(npk, ciphertext)` writes it: the five words a
-/// deposit's nonce commits to. Their keccak is the note's commitment, which
-/// signing checks.
-pub(crate) fn note_words(note: &ShieldNote) -> [[u8; 32]; 5] {
-    let [first, second, third] = note.ciphertext.encrypted_bundle;
-    [note.npk, first, second, third, note.ciphertext.shield_key]
-}
-
 fn shield_note(note: &SwapNote) -> ShieldNote {
     ShieldNote {
         npk: note.npk.0,
@@ -1160,7 +1152,9 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
             .map_err(|error| {
                 PrivateUsdError::new(ErrorCode::Other, format!("deposit note: {error}"))
             })?;
-        let words = note_words(&note);
+        // The five words a deposit's nonce commits to; their keccak is the
+        // note's commitment, which signing checks.
+        let words = note.words();
         let parts: Vec<&[u8]> = words.iter().map(|word| &word[..]).collect();
         if keccak(&parts) != note.commitment() {
             return fail(ErrorCode::Other, "the note's words are not its commitment");
@@ -1962,6 +1956,51 @@ mod tests {
             let address = keys.deposit_keys(index).unwrap().key.address();
             assert_eq!(eip55(&address), expected, "{network:?} {account}/{index}");
         }
+    }
+
+    /// The notes the Android wallet builds for the same deposit address and
+    /// Railgun wallet (zecSwap's `crates/zecswap-jni/tests/deposits.rs` and
+    /// `AtomicSwapTest.depositNotes`): a shield for an authorization valid
+    /// before 1 790 000 000, and the vault's first rescue. The Railgun keys
+    /// are a seed's of its own, as libzecswap takes them; signing composes
+    /// the account's deposit keys with them the same way.
+    #[test]
+    fn deposit_notes_are_the_ones_the_android_wallet_builds() {
+        let context = SwapKeyContext::for_tests(&[7; 64], PrivateUsdNetwork::Testnet, 0);
+        let keys = context.deposit_keys(0).unwrap();
+        let railgun = zecswap_railgun::Keys::from_seed(&[8; 64], 0);
+
+        let shield = railgun.note(&keys.shield_entropy(1_790_000_000)).unwrap();
+        assert_eq!(
+            shield.words().map(|word| hex0x(&word)),
+            [
+                "0x15f85d1d25c867703e280aca9580d5e32936dab954250744893bf967f9b86758",
+                "0x8da3b2fca02e90a1ff4e8c84d2997579485257500db5935a9d39f1480650a2d5",
+                "0x6d9e51f2199703b7ae13b6435d63e1e232ba0c4cb64ac4f7d5cfcd8d1b5e55c7",
+                "0x1881c394f5d1926107f78fc402ade1354aa2d2a70021868691fd74d50dcc9298",
+                "0xdfd7ff431856fb4cfb9de4047e42f9481270266327a4c11361abe5f8b648a6dd",
+            ]
+        );
+        assert_eq!(
+            hex0x(&shield.commitment()),
+            "0x7544c517c31d651b094aa7d6eae02d4265f711a56cc4e0e11533cac7539bfa14"
+        );
+
+        let rescue = railgun.note(&keys.rescue_entropy(0)).unwrap();
+        assert_eq!(
+            rescue.words().map(|word| hex0x(&word)),
+            [
+                "0x2cb930fd875166de6013f1de6c85b7e3c8f92e056e397580a3353ca93c61de45",
+                "0xbc4c816d390cea4ce439b2bb5de87e6d2627b2c25f332248750a614e1c4a7ad6",
+                "0xbb1a50eaa74ed61b1fa7c0f40cfe709fb4176642e6939bb743d1b35dc8ab920b",
+                "0xd7fa1977849a1bf55fa460e415909e3390aaef0c894d8836a693f4629c16ecfa",
+                "0x2b19ea4d15e10221fba6ef9f984a38405dfb7affa618116f4bb16b537dd0ba1e",
+            ]
+        );
+        assert_eq!(
+            hex0x(&rescue.commitment()),
+            "0xc3eee5aa58bc19bf3b51b253422437ef3f85202c73154981583fcd619f0b329d"
+        );
     }
 
     /// The relayer's cases for `deposit_fee`, and the cap: over it refused, a

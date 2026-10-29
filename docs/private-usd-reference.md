@@ -238,6 +238,7 @@ Terms hashes (amount 150000000, t0 1790003600, t1 1790007200, makerKey E, userKe
 - The signatures are deterministic (RFC 6979), so compare them byte for byte. Share proofs are randomized: test a round trip (`SwapContext::prove_user` then `verify_user`), not a value.
 - The `LockClaim` and `LockRefund` lines are the lock contract's, kept as zecSwap printed them; nothing signs either type now.
 - zapp pins the same values in `of/../commonTest/.../ZecSwapVectors.kt` (64 lines).
+- Deposit notes have vectors of their own, inline in `deposits.rs`'s tests (`deposit_notes_are_the_ones_the_android_wallet_builds`): the seed above's testnet deposit address 0 shielding for an authorization valid before 1790000000, and its vault's first rescue (nonce 0), both into the Railgun wallet of a seed of 64 × `0x08`. zecSwap's `crates/zecswap-jni/tests/deposits.rs` and the Android module's `AtomicSwapTest.depositNotes` pin the same words, so every client that signs for a deposit address builds the note libzecswap would.
 
 ### 5.6 Forward (ZEC → USD) state machine
 
