@@ -13,6 +13,10 @@ enum PrivateUsdRpcCheckFailure {
   /// It answered for another chain than the deployment's.
   wrongChain,
 
+  /// It refused `eth_call`, which every contract read is: a transaction
+  /// RPC that forwards only some methods.
+  callsRefused,
+
   /// It refused `eth_getLogs` over the window the engine reads swap logs
   /// in: a provider, or a plan, that caps the range lower.
   logsLimited,
@@ -23,10 +27,13 @@ enum PrivateUsdRpcCheckFailure {
 const kPrivateUsdLogWindowBlocks = 5000;
 
 /// Asks an Ethereum RPC URL for its chain (`eth_chainId`) before Settings
-/// saves it and, where bridging runs, for the swap contract's logs over the
-/// engine's window ending at the RPC's own head (`eth_blockNumber`,
-/// `eth_getLogs`): a provider's plan may cap the range lower, which would
-/// leave a bridge waiting on its payout. All through [NetworkHttpClient]:
+/// saves it, for a contract read (`eth_call`: `tokenBlocklist(address)` on
+/// Railgun's proxy, the engine's own read; a transaction RPC may forward no
+/// contract reads at all) and, where bridging runs, for the swap contract's
+/// logs over the engine's window ending at the RPC's own head
+/// (`eth_blockNumber`, `eth_getLogs`): a provider's plan may cap the range
+/// lower, which would leave a bridge waiting on its payout. All through
+/// [NetworkHttpClient]:
 /// Tor when Tor is on, a direct connection otherwise, and never a fallback
 /// from one to the other. It is bounded by [timeout] per request, [deadline]
 /// in all (a wait for Tor's bootstrap included) and [maxBodyBytes] per
@@ -51,12 +58,25 @@ class PrivateUsdRpcChecker {
   /// what is checked, not the logs.
   static final _noTopic = '0x${'0' * 64}';
 
-  /// Null when [url] answers with [chainId] and, given [logsContract] (the
+  /// `tokenBlocklist(address)`, the read the engine makes on Railgun's
+  /// proxy (`evm_rpc.rs`).
+  static const _tokenBlocklistSelector = '0x815b534f';
+
+  /// The call data of `tokenBlocklist(token)`: the selector, then the
+  /// address as a 32-byte word.
+  static String _tokenBlocklistCall(String token) =>
+      _tokenBlocklistSelector +
+      token.toLowerCase().replaceFirst('0x', '').padLeft(64, '0');
+
+  /// Null when [url] answers with [chainId], reads [railgunProxy]'s
+  /// blocklist for [token] (`0x` addresses) and, given [logsContract] (the
   /// windows contract, `0x`; null where bridging is off), serves its logs
   /// over the engine's window; otherwise why it failed. Never throws.
   Future<PrivateUsdRpcCheckFailure?> check(
     String url, {
     required int chainId,
+    required String railgunProxy,
+    required String token,
     String? logsContract,
   }) async {
     final cancel = Completer<void>();
@@ -69,6 +89,15 @@ class PrivateUsdRpcChecker {
       if (answered == null) return PrivateUsdRpcCheckFailure.unreachable;
       if (answered != BigInt.from(chainId)) {
         return PrivateUsdRpcCheckFailure.wrongChain;
+      }
+      final read = await _call(url, 'eth_call', [
+        {'to': railgunProxy, 'data': _tokenBlocklistCall(token)},
+        'latest',
+      ], cancel.future);
+      if (read == null) return PrivateUsdRpcCheckFailure.unreachable;
+      // A paused proxy reverts every call: still a read served.
+      if (!_isWord(read.result) && !_isRevert(read.error)) {
+        return PrivateUsdRpcCheckFailure.callsRefused;
       }
       if (logsContract == null) return null;
       final head = await _call(url, 'eth_blockNumber', const [], cancel.future);
@@ -151,6 +180,20 @@ class _RpcAnswer {
 
   final Object? result;
   final Object? error;
+}
+
+/// Whether [result] is one 32-byte word, as a bool or a number comes back.
+bool _isWord(Object? result) =>
+    result is String && RegExp(r'^0x[0-9a-fA-F]{64}$').hasMatch(result);
+
+/// Whether [error] is a revert the way the engine reads one (`evm_rpc.rs`):
+/// geth's code 3, or "execution reverted" in the message.
+bool _isRevert(Object? error) {
+  if (error is! Map) return false;
+  final message = error['message'];
+  return error['code'] == 3 ||
+      (message is String &&
+          message.toLowerCase().contains('execution reverted'));
 }
 
 /// The number in a JSON-RPC quantity (`"0x1"`), or null when [result] is

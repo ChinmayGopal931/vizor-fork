@@ -864,7 +864,7 @@ A call whose coroutine is cancelled is answered `closed`, so every call gets exa
   - `ethereum-rpc.publicnode.com`, `ethereum-sepolia-rpc.publicnode.com`
   - `eth-mainnet.g.alchemy.com`, `eth-sepolia.g.alchemy.com`
   - `mainnet.infura.io`, `sepolia.infura.io`
-  - `*.quiknode.pro`; `ethereum-mainnet.core.chainstack.com`, `ethereum-sepolia.core.chainstack.com`, `*.p2pify.com`; `rpc.ankr.com`; `lb.drpc.live`, `lb.drpc.org`, `eth.drpc.org`, `sepolia.drpc.org`; `ethereum.blockpi.network`, `ethereum-sepolia.blockpi.network`, `ethereum.public.blockpi.network`; `mainnet.gateway.tenderly.co`, `sepolia.gateway.tenderly.co`, `gateway.tenderly.co`; `eth-mainnet.nodereal.io`, `eth-sepolia.nodereal.io`; `go.getblock.io`, `go.getblock.us`, `go.getblock.asia`; `eth.api.onfinality.io`, `eth-sepolia.api.onfinality.io`; `eth.api.pocket.network`; `rpc.mevblocker.io`; `rpc.flashbots.net`; `0xrpc.io`; `ethereum-json-rpc.stakely.io` (not in zapp)
+  - `*.quiknode.pro`; `ethereum-mainnet.core.chainstack.com`, `ethereum-sepolia.core.chainstack.com`, `*.p2pify.com`; `rpc.ankr.com`; `lb.drpc.live`, `lb.drpc.org`, `eth.drpc.org`, `sepolia.drpc.org`; `ethereum.blockpi.network`, `ethereum-sepolia.blockpi.network`, `ethereum.public.blockpi.network`; `mainnet.gateway.tenderly.co`, `sepolia.gateway.tenderly.co`, `gateway.tenderly.co`; `eth-mainnet.nodereal.io`, `eth-sepolia.nodereal.io`; `go.getblock.io`, `go.getblock.us`, `go.getblock.asia`; `eth.api.onfinality.io`, `eth-sepolia.api.onfinality.io`; `eth.api.pocket.network`; `rpc.mevblocker.io` (not in zapp)
   - `ppoi.fdi.network` (`POI_NODE_URL = https://ppoi.fdi.network/`)
   - `rail-squid.squids.live`
   - `ipfs-lb.com`

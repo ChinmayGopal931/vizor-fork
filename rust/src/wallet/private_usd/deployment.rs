@@ -57,13 +57,19 @@ pub(crate) const MAX_LOGS_BODY: usize = 8 << 20;
 /// entry stands for any subdomain, one label or more, never the domain itself
 /// (`host_allowed`): QuickNode names each endpoint, Chainstack each dedicated
 /// node.
-pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 38] = [
+pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 35] = [
     // Ethereum RPC: publicnode (the keyless default), Alchemy, Infura,
     // QuickNode, Chainstack, Ankr, dRPC, BlockPI, Tenderly, NodeReal,
-    // GetBlock, OnFinality, Pocket Network, MEV Blocker, Flashbots Protect,
-    // 0xRPC and Stakely. Each keyless one answered `eth_getLogs` over the
-    // engine's 5,000-block window on 2026-10-29; a keyed one's plans vary, so
-    // Settings asks the same window before it saves a URL.
+    // GetBlock, OnFinality, Pocket Network and MEV Blocker. Each keyless one
+    // answered every call the engine and the page make on 2026-10-29
+    // (`eth_chainId`, `eth_getBlockByNumber`, `eth_call` at a tag, a number
+    // and a block hash, a revert as code 3, `eth_getLogs` over the engine's
+    // 5,000-block window, the receipt and transaction reads, ethers' batches
+    // and the fee reads); a keyed one's plans vary, so Settings asks
+    // `eth_call` and the same window before it saves a URL. dRPC's free hosts
+    // (`eth.drpc.org`, `sepolia.drpc.org`) refuse the window on the free
+    // plan; they stay listed so a pasted one fails that check rather than as
+    // an unknown provider.
     "ethereum-rpc.publicnode.com",
     "ethereum-sepolia-rpc.publicnode.com",
     "eth-mainnet.g.alchemy.com",
@@ -94,9 +100,6 @@ pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 38] = [
     "eth-sepolia.api.onfinality.io",
     "eth.api.pocket.network",
     "rpc.mevblocker.io",
-    "rpc.flashbots.net",
-    "0xrpc.io",
-    "ethereum-json-rpc.stakely.io",
     // The screening node and the SDK's own quick sync.
     "ppoi.fdi.network",
     "rail-squid.squids.live",
@@ -301,9 +304,6 @@ const MAINNET: Deployment = Deployment {
         "eth.api.onfinality.io",
         "eth.api.pocket.network",
         "rpc.mevblocker.io",
-        "rpc.flashbots.net",
-        "0xrpc.io",
-        "ethereum-json-rpc.stakely.io",
     ],
     poi_node_url: POI_NODE_URL,
     deposits: Some(DepositsPin {
@@ -372,7 +372,6 @@ const TESTNET: Deployment = Deployment {
         "go.getblock.us",
         "go.getblock.asia",
         "eth-sepolia.api.onfinality.io",
-        "0xrpc.io",
     ],
     poi_node_url: POI_NODE_URL,
     deposits: Some(DepositsPin {

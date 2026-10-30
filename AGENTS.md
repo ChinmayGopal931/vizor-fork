@@ -1426,19 +1426,22 @@ Code:
   the network's RPC providers (`Deployment::rpc_hosts` in
   `rust/src/wallet/private_usd/deployment.rs`: publicnode, Alchemy, Infura,
   QuickNode, Chainstack, Ankr, dRPC, BlockPI, Tenderly, NodeReal, GetBlock,
-  OnFinality, Pocket Network, MEV Blocker, Flashbots Protect, 0xRPC and
-  Stakely; a `*.` entry takes any subdomain, one label or more, for
-  QuickNode's endpoint names and Chainstack's dedicated nodes). Every one
-  is in `RAILGUN_PAGE_HOSTS`, which the Kotlin and Swift `RailgunEndpoints`,
-  the page's CSP (and its two bundle copies of `index.html`) and the Rust
-  bridge repeat and a Rust test pins together: a new provider goes into all
-  of them, and only a provider that serves `eth_getLogs` over the engine's
-  5,000-block window belongs. Users can set their own URL in Settings
-  (Ethereum RPC) on the same providers (`ApiDeployment.rpcHosts`); it
-  replaces the build's keyed URL with no fallback, and is checked with
-  `eth_chainId`, then with `eth_getLogs` over that window on the windows
-  contract (a provider's plan may cap the range lower, which would leave a
-  bridge waiting on its payout), before it is saved. Rust holds the engine
+  OnFinality, Pocket Network and MEV Blocker; a `*.` entry takes any
+  subdomain, one label or more, for QuickNode's endpoint names and
+  Chainstack's dedicated nodes). Every one is in `RAILGUN_PAGE_HOSTS`, which
+  the Kotlin and Swift `RailgunEndpoints`, the page's CSP (and its two
+  bundle copies of `index.html`) and the Rust bridge repeat and a Rust test
+  pins together: a new provider goes into all of them, and only a provider
+  that serves every call the engine and the page make belongs (`eth_call`
+  at a block hash and `eth_getLogs` over the engine's 5,000-block window
+  included; a transaction RPC such as Flashbots Protect forwards no
+  `eth_call`). Users can set their own URL in Settings (Ethereum RPC) on
+  the same providers (`ApiDeployment.rpcHosts`); it replaces the build's
+  keyed URL with no fallback, and is checked with `eth_chainId`, then
+  `eth_call` (`tokenBlocklist(address)` on Railgun's proxy), then
+  `eth_getLogs` over that window on the windows contract (a provider's plan
+  may cap the range lower, which would leave a bridge waiting on its
+  payout), before it is saved. Rust holds the engine
   to the same rule (`Deployment::rpc_url`, the network's `rpc_hosts`, https
   without credentials): a URL off them is `WrongDeployment`, never
   replaced. A

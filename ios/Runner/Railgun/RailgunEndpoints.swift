@@ -5,10 +5,10 @@
 /// below, so keep them literal.
 enum RailgunEndpoints {
   // Ethereum RPC (keyless publicnode, then the providers a user's own URL may name: Alchemy, Infura, QuickNode,
-  // Chainstack, Ankr, dRPC, BlockPI, Tenderly, NodeReal, GetBlock, OnFinality, Pocket Network, MEV Blocker,
-  // Flashbots Protect, 0xRPC and Stakely), the screening node, the SDK's own quick sync and, on Sepolia, our copy of
-  // its transaction list with the hash chain repaired, and where the proving artifacts come from: the SDK's own
-  // gateway, then our mirror when the gateway fails.
+  // Chainstack, Ankr, dRPC, BlockPI, Tenderly, NodeReal, GetBlock, OnFinality, Pocket Network and MEV Blocker), the
+  // screening node, the SDK's own quick sync and, on Sepolia, our copy of its transaction list with the hash chain
+  // repaired, and where the proving artifacts come from: the SDK's own gateway, then our mirror when the gateway
+  // fails.
   static let hosts: [String] = [
     "ethereum-rpc.publicnode.com",
     "ethereum-sepolia-rpc.publicnode.com",
@@ -40,9 +40,6 @@ enum RailgunEndpoints {
     "eth-sepolia.api.onfinality.io",
     "eth.api.pocket.network",
     "rpc.mevblocker.io",
-    "rpc.flashbots.net",
-    "0xrpc.io",
-    "ethereum-json-rpc.stakely.io",
     "ppoi.fdi.network",
     "rail-squid.squids.live",
     "railgun-sepolia-list.pepeman931.workers.dev",

@@ -80,6 +80,8 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
         .check(
           url,
           chainId: deployment.chainId,
+          railgunProxy: deployment.railgunProxy,
+          token: deployment.token,
           logsContract: deployment.swapContract,
         );
     // Closed meanwhile: nothing is saved.
@@ -93,6 +95,8 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
             PrivateUsdCopy.rpcErrorUnreachable,
           PrivateUsdRpcCheckFailure.wrongChain =>
             PrivateUsdCopy.rpcErrorWrongChain(chain),
+          PrivateUsdRpcCheckFailure.callsRefused =>
+            PrivateUsdCopy.rpcErrorCalls,
           PrivateUsdRpcCheckFailure.logsLimited => PrivateUsdCopy.rpcErrorLogs,
         };
       });

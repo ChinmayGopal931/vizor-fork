@@ -931,7 +931,7 @@ abstract final class PrivateUsdCopy {
   static const rpcProviders =
       'Supported: Alchemy, Infura, QuickNode, Chainstack, Ankr, dRPC, '
       'BlockPI, Tenderly, NodeReal, GetBlock, OnFinality, publicnode, Pocket '
-      'Network, MEV Blocker, Flashbots Protect, 0xRPC and Stakely.';
+      'Network and MEV Blocker.';
   static const rpcSees =
       "The RPC sees the app's Ethereum requests, and your IP address unless "
       'Tor is on.';
@@ -945,6 +945,8 @@ abstract final class PrivateUsdCopy {
       "That RPC didn't answer. Check the URL, or try again in a moment.";
   static String rpcErrorWrongChain(String network) =>
       'That RPC is for another network. Use one for $network.';
+  static const rpcErrorCalls =
+      'That RPC does not answer contract reads. Try another provider.';
   static const rpcErrorLogs =
       'That RPC caps log queries below what bridging needs. Try another '
       'provider or plan.';
