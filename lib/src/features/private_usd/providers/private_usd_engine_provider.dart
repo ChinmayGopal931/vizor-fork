@@ -35,7 +35,7 @@ PrivateUsdSwapContext privateUsdSwapContextOf(Ref ref) {
     network: endpoint.networkName,
     lightwalletdUrl: endpoint.normalizedLightwalletdUrl,
     railgunNetwork: deployment?.railgunNetwork,
-    allowedHosts: deployment?.allowedHosts ?? const [],
+    rpcHosts: deployment?.rpcHosts ?? const [],
     customRpcUrl: deployment == null
         ? null
         : () => privateUsdCustomRpcUrlOf(ref, endpoint.networkName),

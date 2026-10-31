@@ -13,7 +13,17 @@ enum RailgunContentRules {
   /// The URL patterns let through, one rule each: WebKit's rule regexes have no alternation.
   static var allowedPatterns: [String] {
     ["^\(RailgunSchemeHandler.scheme)://\(RailgunSchemeHandler.host)/", "^blob:", "^data:"]
-      + RailgunEndpoints.hosts.map { "^https://\($0.replacingOccurrences(of: ".", with: "\\."))/" }
+      + RailgunEndpoints.hosts.map(pattern)
+  }
+
+  /// `^https://host/`; for a `*.domain` entry, one label or more before the domain (letters, digits and
+  /// hyphens, as hostnames are on the wire), never the domain itself. WebKit matches the rules regardless of case.
+  static func pattern(_ host: String) -> String {
+    let escaped = { (part: String) in part.replacingOccurrences(of: ".", with: "\\.") }
+    if host.hasPrefix("*.") {
+      return "^https://([a-z0-9]+(-+[a-z0-9]+)*\\.)+\(escaped(String(host.dropFirst(2))))/"
+    }
+    return "^https://\(escaped(host))/"
   }
 
   /// The rule list's JSON.

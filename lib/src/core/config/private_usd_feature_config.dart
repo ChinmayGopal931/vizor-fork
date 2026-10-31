@@ -52,12 +52,12 @@ void privateUsdLog(String line) {
 }
 
 /// The keyed RPC URL for a Railgun network (`mainnet` or `sepolia`), when the
-/// build has one whose host the page may reach; otherwise null. A URL on
-/// another host would be blocked by the page's filters anyway, so it is
-/// dropped here rather than started with.
+/// build has one on that network's RPC providers ([rpcHosts], the
+/// deployment's); otherwise null. A URL on another host would be blocked by
+/// the page's filters anyway, so it is dropped here rather than started with.
 String? privateUsdKeyedRpcUrl(
   String railgunNetwork, {
-  required List<String> allowedHosts,
+  required List<String> rpcHosts,
   String mainnet = kVizorEthereumRpcUrlMainnet,
   String sepolia = kVizorEthereumRpcUrlSepolia,
 }) {
@@ -67,15 +67,49 @@ String? privateUsdKeyedRpcUrl(
     _ => '',
   }.trim();
   if (keyed.isEmpty) return null;
-  final allowed = _privateUsdRpcUrlOn(keyed, allowedHosts);
+  final allowed = _privateUsdRpcUrlOn(keyed, rpcHosts);
   if (allowed == null) {
     privateUsdLog('the keyed RPC URL is not on an allowed host');
   }
   return allowed;
 }
 
+/// Whether [host] is one of [patterns], where a `*.` entry stands for any
+/// subdomain: one label or more of letters, digits and inner hyphens, never
+/// the domain itself (QuickNode names each endpoint, Chainstack each
+/// dedicated node). Case does not count. Rust's `host_allowed`, Kotlin's
+/// `RailgunEndpoints.allows` and the iOS content rules' regex
+/// (`RailgunContentRules.pattern`, whose grammar the others keep to, so a
+/// URL saved here is reachable on both platforms) are the same rule.
+bool privateUsdHostAllowed(Iterable<String> patterns, String host) {
+  final lower = host.toLowerCase();
+  if (lower.isEmpty) return false;
+  for (final pattern in patterns) {
+    final rule = pattern.toLowerCase();
+    if (rule.startsWith('*.')) {
+      final suffix = rule.substring(1);
+      if (lower.length > suffix.length &&
+          lower.endsWith(suffix) &&
+          lower
+              .substring(0, lower.length - suffix.length)
+              .split('.')
+              .every(_privateUsdHostLabel.hasMatch)) {
+        return true;
+      }
+    } else if (lower == rule) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// A hostname label as the iOS content rules match one: letters, digits and
+/// inner hyphens.
+final _privateUsdHostLabel = RegExp(r'^[a-z0-9]+(-+[a-z0-9]+)*$');
+
 /// The rule every Ethereum RPC URL the page and Rust are given follows:
-/// https on port 443, on one of [hosts]. The trimmed URL, or null.
+/// https on port 443, on one of [hosts] ([privateUsdHostAllowed]). The
+/// trimmed URL, or null.
 String? _privateUsdRpcUrlOn(String url, List<String> hosts) {
   final trimmed = url.trim();
   final uri = Uri.tryParse(trimmed);
@@ -83,44 +117,19 @@ String? _privateUsdRpcUrlOn(String url, List<String> hosts) {
       uri == null ||
       uri.scheme != 'https' ||
       (uri.hasPort && uri.port != 443) ||
-      !hosts.contains(uri.host)) {
+      !privateUsdHostAllowed(hosts, uri.host)) {
     return null;
   }
   return trimmed;
 }
 
-/// The hosts a user's own Ethereum RPC URL (Settings) may use, per Railgun
-/// network: the RPC providers the page already reaches, so the page's
-/// filters (Kotlin, Swift, the Rust bridge and the CSP) stay as they are.
-const _kPrivateUsdCustomRpcHosts = <String, List<String>>{
-  'mainnet': [
-    'eth-mainnet.g.alchemy.com',
-    'mainnet.infura.io',
-    'ethereum-rpc.publicnode.com',
-  ],
-  'sepolia': [
-    'eth-sepolia.g.alchemy.com',
-    'sepolia.infura.io',
-    'ethereum-sepolia-rpc.publicnode.com',
-  ],
-};
-
-/// [input] as a user's own Ethereum RPC URL for [railgunNetwork], or null
-/// when it can't be one: the keyed URL's rule, on that network's RPC hosts
-/// the page may reach ([allowedHosts], the deployment's). A URL carrying
+/// [input] as a user's own Ethereum RPC URL, or null when it can't be one:
+/// the keyed URL's rule, on the network's RPC providers ([rpcHosts], the
+/// deployment's, which the page's filters all reach). A URL carrying
 /// credentials or a fragment is refused too: the page's `fetch` rejects the
 /// first, and Rust's URL parser the second. It can hold a key: never log it.
-String? privateUsdCustomRpcUrl(
-  String input,
-  String railgunNetwork, {
-  required List<String> allowedHosts,
-}) {
-  final hosts = [
-    for (final host
-        in _kPrivateUsdCustomRpcHosts[railgunNetwork] ?? const <String>[])
-      if (allowedHosts.contains(host)) host,
-  ];
-  final url = _privateUsdRpcUrlOn(input, hosts);
+String? privateUsdCustomRpcUrl(String input, {required List<String> rpcHosts}) {
+  final url = _privateUsdRpcUrlOn(input, rpcHosts);
   if (url == null) return null;
   final uri = Uri.parse(url);
   return uri.userInfo.isEmpty && !uri.hasFragment ? url : null;

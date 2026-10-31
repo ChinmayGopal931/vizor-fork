@@ -204,7 +204,7 @@ New on both platforms:
 ]
 ```
 
-The last line repeats once per host in `RailgunEndpoints`: the ten of A-ref §6.4, the artifact mirror `railgun-artifacts.pepeman931.workers.dev` included (progress VI-20).
+The last line repeats once per host in `RailgunEndpoints`: the ten of A-ref §6.4, the artifact mirror `railgun-artifacts.pepeman931.workers.dev` included (progress VI-20), and since D-155 the RPC providers a user's own URL may name. A `*.` entry (`*.quiknode.pro`, `*.p2pify.com`) becomes `^https://([a-z0-9]+(-[a-z0-9]+)*\\.)+quiknode\\.pro/` (`RailgunContentRules.pattern`): one label or more, never the domain itself.
 
 - WebKit's rule regexes are a subset of the full syntax: no alternation, and no `{n}` quantifiers. Keep one rule per host, and escape the dots.
 - The identifier carries a version: change it whenever the hosts change, so a stale compiled list is never reused.

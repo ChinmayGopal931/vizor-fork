@@ -1422,15 +1422,32 @@ Code:
   Release builds turn it on only after the owner's sign-off.
 - `VIZOR_ETHEREUM_RPC_URL_{MAINNET,SEPOLIA}` are the keyed RPC URLs. They
   are the only secrets: pass them only with
-  `--dart-define-from-file=<gitignored json>`. Their host must be
-  `eth-{mainnet,sepolia}.g.alchemy.com` or `{mainnet,sepolia}.infura.io`. Any
-  other host needs a bundle rebuild and changes to the Kotlin, Swift and
-  Rust allowlists. Users can set their own URL in Settings (Ethereum RPC),
-  on the network's Alchemy, Infura or publicnode host; it replaces the
-  build's keyed URL with no fallback, and is checked with `eth_chainId`
-  before it is saved. Rust holds the engine to the same rule
-  (`Deployment::rpc_url`, the network's `rpc_hosts`, https without
-  credentials): a URL off them is `WrongDeployment`, never replaced. A
+  `--dart-define-from-file=<gitignored json>`. Their host must be one of
+  the network's RPC providers (`Deployment::rpc_hosts` in
+  `rust/src/wallet/private_usd/deployment.rs`: publicnode, Alchemy, Infura,
+  QuickNode, Chainstack, Ankr, dRPC, BlockPI, Tenderly, NodeReal, GetBlock,
+  OnFinality, Pocket Network and MEV Blocker; a `*.` entry takes any
+  subdomain, one label or more of letters, digits and inner hyphens, for
+  QuickNode's endpoint names and Chainstack's dedicated nodes). Every one
+  is in `RAILGUN_PAGE_HOSTS`, which the Kotlin and Swift `RailgunEndpoints`,
+  the page's CSP (and its two bundle copies of `index.html`) and the Rust
+  bridge repeat and a Rust test pins together: a new provider goes into all
+  of them, and only a provider that serves every call the engine and the
+  page make belongs (`eth_call` at a block hash and `eth_getLogs` over the
+  engine's 5,000-block window included; a transaction RPC such as Flashbots
+  Protect forwards no `eth_call`). Users can set their own URL in Settings
+  (Ethereum RPC) on the same providers (`ApiDeployment.rpcHosts`); it
+  replaces the build's keyed URL with no fallback, and is checked with
+  `eth_chainId`, then `eth_getBlockByNumber` and `eth_call`
+  (`tokenBlocklist(address)` on Railgun's proxy at the head's hash, the
+  engine's pinned read), then `eth_getLogs` over that window on the windows
+  contract (a provider's plan may cap the range lower, which would leave a
+  bridge waiting on its payout), before it is saved; a rate limit reads as
+  unreachable, never as a verdict. A Rust test holds the Dart copy of the
+  window and of the read's selector to the engine's. Rust holds the engine
+  to the same rule (`Deployment::rpc_url`, the network's `rpc_hosts`, https
+  without credentials): a URL off them is `WrongDeployment`, never
+  replaced. A
   Railgun sync that fails while the RPC does not answer, or answers 403 or
   429, and a screening node still answers, fails as `rpc_failed` (the page
   asks both as the sync fails, `rpc-probe.js`), and the balance offers

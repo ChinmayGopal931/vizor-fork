@@ -79,7 +79,7 @@ class PrivateUsdSwapContext {
     required this.network,
     required this.lightwalletdUrl,
     this.railgunNetwork,
-    this.allowedHosts = const [],
+    this.rpcHosts = const [],
     Future<String?> Function()? customRpcUrl,
   }) : _customRpcUrl = customRpcUrl;
 
@@ -87,26 +87,26 @@ class PrivateUsdSwapContext {
   final String network;
   final String lightwalletdUrl;
 
-  /// The deployment's Railgun network (`mainnet`, `sepolia`) and the hosts
-  /// its pages may reach, to pick the keyed Ethereum RPC. Without them Rust
-  /// uses the deployment's keyless endpoint.
+  /// The deployment's Railgun network (`mainnet`, `sepolia`) and its RPC
+  /// providers, to pick the keyed Ethereum RPC. Without them Rust uses the
+  /// deployment's keyless endpoint.
   final String? railgunNetwork;
-  final List<String> allowedHosts;
+  final List<String> rpcHosts;
 
   /// Reads the user's own RPC URL (Settings), null for the default.
   final Future<String?> Function()? _customRpcUrl;
 
   /// The Ethereum RPC URL for Rust: the user's own when set (alone, Rust
   /// never falls back from it), else the keyed URL when the build has one on
-  /// an allowed host, else empty (Rust then uses publicnode). A secret: never
-  /// log it. Resolve it before reading a seed, which must go to Rust in the
-  /// same synchronous step.
+  /// one of the network's providers, else empty (Rust then uses publicnode).
+  /// A secret: never log it. Resolve it before reading a seed, which must go
+  /// to Rust in the same synchronous step.
   Future<String> ethRpcUrl() async {
     final custom = await _customRpcUrl?.call();
     if (custom != null) return custom;
     final railgun = railgunNetwork;
     if (railgun == null) return '';
-    return privateUsdKeyedRpcUrl(railgun, allowedHosts: allowedHosts) ?? '';
+    return privateUsdKeyedRpcUrl(railgun, rpcHosts: rpcHosts) ?? '';
   }
 }
 

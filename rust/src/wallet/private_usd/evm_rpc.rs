@@ -1168,6 +1168,34 @@ fn hex_bytes(value: &Value) -> Result<Vec<u8>> {
 mod tests {
     use serde_json::{json, Value};
 
+    /// Settings' check of a user's RPC (`private_usd_rpc_check.dart`)
+    /// repeats the engine's log window and the selector of its Railgun read,
+    /// which `ApiDeployment` does not carry: this holds them to the engine's.
+    #[test]
+    fn the_settings_check_asks_the_engines_window_and_read() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../lib/src/features/private_usd/services/private_usd_rpc_check.dart");
+        let dart = std::fs::read_to_string(&path).expect("the Dart check");
+        let assigned = |name: &str| {
+            let assignment = format!("{name} = ");
+            let start = dart
+                .find(&assignment)
+                .unwrap_or_else(|| panic!("{name} in the Dart check"));
+            let value = &dart[start + assignment.len()..];
+            value[..value.find(';').expect("an assignment")]
+                .trim()
+                .to_owned()
+        };
+        assert_eq!(
+            assigned("kPrivateUsdLogWindowBlocks"),
+            LOG_WINDOW_BLOCKS.to_string()
+        );
+        assert_eq!(
+            assigned("_tokenBlocklistSelector"),
+            format!("'{}'", hex0x(&abi::selector(TOKEN_BLOCKLIST)))
+        );
+    }
+
     use super::*;
     use crate::wallet::private_usd::{
         deployment,
