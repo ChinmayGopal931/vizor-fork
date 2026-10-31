@@ -21,16 +21,23 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   and Chainstack each dedicated node (`nd-….p2pify.com`). The page's
   filters grew with it, to 35 hosts; the Rust cross-check pins Kotlin,
   Swift and the three CSP copies, and the Kotlin and Swift tests take the
-  wildcards. Before saving, the sheet now also asks `eth_call`
-  (`tokenBlocklist(address)` on Railgun's proxy, the engine's own read; a
-  transaction RPC may forward no contract reads at all), then
-  `eth_blockNumber` and `eth_getLogs` on the windows contract over the
-  engine's 5,000-block window ending at the RPC's own head (a topic no log
-  carries, so the answer is empty): a provider that refuses the read ("That
-  RPC does not answer contract reads. Try another provider.") or caps the
-  range lower ("That RPC caps log queries below what bridging needs. Try
-  another provider or plan.") is refused, since the payout scan would
-  otherwise fail at every step. The sheet lists the providers under its
+  wildcards. Before saving, the sheet now also asks `eth_getBlockByNumber`
+  and `eth_call` at the head's hash (`tokenBlocklist(address)` on Railgun's
+  proxy, the engine's own read, pinned as `read_swap` pins one, with one
+  more try at a fresh head; a transaction RPC may forward no contract reads
+  at all, and a plan may not serve a read by hash), then `eth_getLogs` on
+  the windows contract over the engine's 5,000-block window ending at that
+  head (a topic no log carries, so the answer is empty): a provider that
+  refuses the read ("That RPC does not answer contract reads. Try another
+  provider.") or caps the range lower ("That RPC caps log queries below what
+  bridging needs. Try another provider or plan.") is refused, since the
+  payout scan would otherwise fail at every step; a rate limit (429, or
+  JSON-RPC's -32005) reads as unreachable, never as a verdict, and the check
+  has 90 s in all for its four calls over Tor. A Rust test holds the Dart
+  copy of the window and of the read's selector to the engine's. The `*.`
+  rule takes labels of letters, digits and inner hyphens on every platform,
+  the grammar of the iOS rules' regex, so a URL Dart saves is reachable on
+  both. The sheet lists the providers under its
   text. Chosen from chainlist's Ethereum and Sepolia lists by two probes on
   2026-10-29: first `eth_chainId` and that window on every candidate, then,
   on each keyless host that passed, every call the engine and the page make
@@ -62,9 +69,19 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   fails as `rpc_failed` once Tor is on, which offers another RPC); Pocket
   Network dropped two calls in seventeen (499); Stakely served from that
   exit the window it refused directly, so its limits vary by backend.
-  `cargo test` for the deployment and the bridge, `fvm flutter analyze`,
-  the touched Dart tests and the Kotlin boundary test pass; the iOS rule
-  list compiled under macOS WebKit. Not yet run on a phone.
+  An independent review of the diff (2026-10-31) raised seven points. Six
+  are in: a rate limit or a malformed answer no longer reads as a verdict
+  on the provider, the read is made by block hash as the engine makes it,
+  the deadline fits four calls over Tor, the Dart constants are pinned to
+  the engine's, and the four `*.` implementations share one label grammar.
+  The seventh, that the wildcards let a compromised page reach any QuickNode
+  or Chainstack customer's host from every install, is noted in the PR and
+  not acted on: a keyed provider's URL already reaches any customer's
+  account by its path, so the boundary is what it was, and an allowlist
+  narrowed per session to the configured host stays a follow-up. `cargo
+  test` for Private USD and the bridge, `fvm flutter analyze`, the Private
+  USD Dart tests and the Kotlin boundary test pass; the iOS rule list
+  compiled under macOS WebKit. Not yet run on a phone.
 - **Privacy Pass tokens, dormant (M4, 2026-10-25, D-154).** The token
   client the plan specified is built and unit-tested: `tokens.rs` (the
   device-wide state, pay and settle, returns, the two-phase issuance), the

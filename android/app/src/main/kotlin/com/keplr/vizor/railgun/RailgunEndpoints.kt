@@ -52,14 +52,23 @@ internal object RailgunEndpoints {
             "railgun-artifacts.pepeman931.workers.dev",
         )
 
-    /** Whether [host] is one of [hosts], a `*.` entry taking any subdomain: one label or more, never the domain. */
+    /**
+     * Whether [host] is one of [hosts], a `*.` entry taking any subdomain: one label or more of letters, digits and
+     * inner hyphens, never the domain. The iOS content rules match a regex (`RailgunContentRules.pattern`), so this
+     * keeps to its grammar and a URL one platform accepts is reachable on the other.
+     */
     fun allows(host: String): Boolean =
         hosts.any { pattern ->
             if (pattern.startsWith("*.")) {
                 val suffix = pattern.substring(1)
-                host.length > suffix.length && host.endsWith(suffix, ignoreCase = true)
+                host.length > suffix.length &&
+                    host.endsWith(suffix, ignoreCase = true) &&
+                    host.dropLast(suffix.length).split('.').all(LABEL::matches)
             } else {
                 host.equals(pattern, ignoreCase = true)
             }
         }
+
+    /** A hostname label as the iOS content rules match one: letters, digits and inner hyphens. */
+    private val LABEL = Regex("[a-z0-9]+(-+[a-z0-9]+)*", RegexOption.IGNORE_CASE)
 }

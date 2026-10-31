@@ -75,9 +75,12 @@ String? privateUsdKeyedRpcUrl(
 }
 
 /// Whether [host] is one of [patterns], where a `*.` entry stands for any
-/// subdomain: one label or more, never the domain itself (QuickNode names
-/// each endpoint, Chainstack each dedicated node). Case does not count.
-/// Rust's `host_allowed` is the same rule.
+/// subdomain: one label or more of letters, digits and inner hyphens, never
+/// the domain itself (QuickNode names each endpoint, Chainstack each
+/// dedicated node). Case does not count. Rust's `host_allowed`, Kotlin's
+/// `RailgunEndpoints.allows` and the iOS content rules' regex
+/// (`RailgunContentRules.pattern`, whose grammar the others keep to, so a
+/// URL saved here is reachable on both platforms) are the same rule.
 bool privateUsdHostAllowed(Iterable<String> patterns, String host) {
   final lower = host.toLowerCase();
   if (lower.isEmpty) return false;
@@ -85,13 +88,24 @@ bool privateUsdHostAllowed(Iterable<String> patterns, String host) {
     final rule = pattern.toLowerCase();
     if (rule.startsWith('*.')) {
       final suffix = rule.substring(1);
-      if (lower.length > suffix.length && lower.endsWith(suffix)) return true;
+      if (lower.length > suffix.length &&
+          lower.endsWith(suffix) &&
+          lower
+              .substring(0, lower.length - suffix.length)
+              .split('.')
+              .every(_privateUsdHostLabel.hasMatch)) {
+        return true;
+      }
     } else if (lower == rule) {
       return true;
     }
   }
   return false;
 }
+
+/// A hostname label as the iOS content rules match one: letters, digits and
+/// inner hyphens.
+final _privateUsdHostLabel = RegExp(r'^[a-z0-9]+(-+[a-z0-9]+)*$');
 
 /// The rule every Ethereum RPC URL the page and Rust are given follows:
 /// https on port 443, on one of [hosts] ([privateUsdHostAllowed]). The

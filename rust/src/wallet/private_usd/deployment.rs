@@ -133,9 +133,23 @@ fn host_matches(pattern: &str, host: &str) -> bool {
             !prefix.is_empty()
                 && suffix.as_bytes()[0] == b'.'
                 && suffix[1..].eq_ignore_ascii_case(domain)
+                && prefix.split('.').all(is_label)
         }
         None => host.eq_ignore_ascii_case(pattern),
     }
+}
+
+/// A hostname label as every platform's filter takes one: letters, digits
+/// and inner hyphens. The iOS content rules match a regex
+/// (`RailgunContentRules.pattern`), so the others keep to its grammar and a
+/// URL one platform accepts is reachable on the other.
+fn is_label(label: &str) -> bool {
+    !label.is_empty()
+        && !label.starts_with('-')
+        && !label.ends_with('-')
+        && label
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
 }
 
 /// One network's pins. Addresses are bytes; the hex in this file keeps the
@@ -542,6 +556,7 @@ mod tests {
         for host in [
             "a.quiknode.pro",
             "my-endpoint.ethereum-sepolia.quiknode.pro",
+            "xn--abc.a-b.quiknode.pro",
             "A.QuikNode.PRO",
             "rpc.ankr.com",
             "RPC.ANKR.COM",
@@ -558,6 +573,11 @@ mod tests {
             "ankr.com",
             "a.rpc.ankr.com",
             "ä.quiknode.pro",
+            // Labels the iOS content rules would not match.
+            "a_b.quiknode.pro",
+            "a..quiknode.pro",
+            "-a.quiknode.pro",
+            "a-.quiknode.pro",
             "",
         ] {
             assert!(!host_allowed(&allowed, host), "{host}");

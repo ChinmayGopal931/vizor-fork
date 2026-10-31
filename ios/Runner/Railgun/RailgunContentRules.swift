@@ -21,7 +21,7 @@ enum RailgunContentRules {
   static func pattern(_ host: String) -> String {
     let escaped = { (part: String) in part.replacingOccurrences(of: ".", with: "\\.") }
     if host.hasPrefix("*.") {
-      return "^https://([a-z0-9]+(-[a-z0-9]+)*\\.)+\(escaped(String(host.dropFirst(2))))/"
+      return "^https://([a-z0-9]+(-+[a-z0-9]+)*\\.)+\(escaped(String(host.dropFirst(2))))/"
     }
     return "^https://\(escaped(host))/"
   }

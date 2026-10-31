@@ -221,6 +221,7 @@ final class RailgunHostTests: XCTestCase {
       "https://my-endpoint.quiknode.pro/key/",
       "https://my-endpoint.ethereum-sepolia.quiknode.pro/key/",
       "https://nd-123-456-789.p2pify.com/key",
+      "https://xn--abc.quiknode.pro/key/",
     ] + RailgunEndpoints.hosts.map({ "https://\($0.replacingOccurrences(of: "*.", with: "my-endpoint."))/any/path" }) {
       XCTAssertTrue(lets(url), url)
     }
@@ -234,6 +235,9 @@ final class RailgunHostTests: XCTestCase {
       "https://my-endpoint.quiknode.pro.evil.example/",
       "https://evil.example/my-endpoint.quiknode.pro/",
       "https://evilquiknode.pro/",
+      // Labels the rules' grammar does not take, which Dart, Kotlin and Rust refuse too.
+      "https://a_b.quiknode.pro/key",
+      "https://a..quiknode.pro/key",
       "https://ipfs-lb.com.evil.example/",
       "https://ipfs-lbxcom/",
       "wss://ethereum-rpc.publicnode.com/",

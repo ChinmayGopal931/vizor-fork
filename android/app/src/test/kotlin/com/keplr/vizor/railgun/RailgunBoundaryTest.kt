@@ -4,6 +4,8 @@ import com.keplr.vizor.railgun.RailgunRequests.Route
 import java.io.File
 import java.net.URI
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 // Unit tests run in `android/app`, so the page source is `../railgun-web/src/` and the built page
@@ -46,6 +48,16 @@ class RailgunBoundaryTest {
             "file:///data/data/com.keplr.vizor/shared_prefs/prefs.xml",
             "content://com.keplr.vizor.provider/x",
         ).forEach { assertEquals(it, Route.BLOCKED, route(it)) }
+    }
+
+    @Test
+    fun aWildcardTakesHostnameLabelsOnly() {
+        // As the iOS content rules match them: letters, digits and inner hyphens, in any case.
+        listOf("a.quiknode.pro", "xn--abc.a-b.quiknode.pro", "A.QuikNode.PRO", "nd-1.p2pify.com").forEach {
+            assertTrue(it, RailgunEndpoints.allows(it))
+        }
+        listOf("quiknode.pro", "a_b.quiknode.pro", "a..quiknode.pro", "-a.quiknode.pro", "a-.quiknode.pro", "")
+            .forEach { assertFalse(it, RailgunEndpoints.allows(it)) }
     }
 
     @Test

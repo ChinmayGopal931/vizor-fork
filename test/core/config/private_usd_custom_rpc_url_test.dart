@@ -26,6 +26,7 @@ void main() {
       'https://my-endpoint.quiknode.pro/key/',
       'https://my-endpoint.ethereum-mainnet.quiknode.pro/key/',
       'https://MY-ENDPOINT.QuikNode.pro/key/',
+      'https://xn--abc.quiknode.pro/key/',
     ]) {
       expect(custom(' $url '), url, reason: url);
     }
@@ -43,6 +44,10 @@ void main() {
       'https://quiknode.pro/key',
       'https://my-endpoint.quiknode.pro.evil.example/key',
       'https://evilquiknode.pro/key',
+      // Labels the iOS content rules would not match.
+      'https://a_b.quiknode.pro/key',
+      'https://a..quiknode.pro/key',
+      'https://-a.quiknode.pro/key',
       'https://user:secret@mainnet.infura.io/v3/key',
       'https://mainnet.infura.io/v3/key#fragment',
     ]) {
@@ -53,6 +58,9 @@ void main() {
   test('a host matches a provider exactly, or a wildcard by subdomain', () {
     expect(privateUsdHostAllowed(rpcHosts, 'RPC.ANKR.COM'), isTrue);
     expect(privateUsdHostAllowed(rpcHosts, 'a.quiknode.pro'), isTrue);
+    expect(privateUsdHostAllowed(rpcHosts, 'a-b.c-d.quiknode.pro'), isTrue);
+    expect(privateUsdHostAllowed(rpcHosts, 'a_b.quiknode.pro'), isFalse);
+    expect(privateUsdHostAllowed(rpcHosts, 'a-.quiknode.pro'), isFalse);
     expect(privateUsdHostAllowed(rpcHosts, 'quiknode.pro'), isFalse);
     expect(privateUsdHostAllowed(rpcHosts, '.quiknode.pro'), isFalse);
     expect(privateUsdHostAllowed(rpcHosts, 'a.rpc.ankr.com'), isFalse);
