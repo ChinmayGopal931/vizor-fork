@@ -29,6 +29,10 @@ String? privateUsdScreeningStatus({
       privateUsdScreeningPercent(txids),
     );
   }
+  final checks = activity?.checks;
+  if (checks != null) {
+    return PrivateUsdCopy.screeningChecking(checks.done, checks.count);
+  }
   if (balances.submitted > BigInt.zero) return PrivateUsdCopy.screeningWaiting;
   return null;
 }

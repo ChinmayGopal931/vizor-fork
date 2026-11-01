@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { TransactionHistoryItemCategory } from '@railgun-community/shared-models';
-import { hasUndatedReceipts, receivedSends } from '../src/received.js';
+import { hasUndatedReceipts, hasUndatedShields, pendingShields, receivedSends } from '../src/received.js';
 
 const USDC = '0x1c7d4b196cb0c7b01d743fbc6116a902379c7238';
 
@@ -75,4 +75,27 @@ test('only an undated received send asks for the newest block', () => {
   const { ShieldERC20s, TransferReceiveERC20s } = TransactionHistoryItemCategory;
   assert.equal(hasUndatedReceipts([item(TransferReceiveERC20s, [amount(1n)])]), false);
   assert.equal(hasUndatedReceipts([item(ShieldERC20s, [amount(1n)], { timestamp: undefined })]), false);
+});
+
+test('the shields screening still holds are listed with their time, and screened ones are not', () => {
+  const { ShieldERC20s, TransferReceiveERC20s } = TransactionHistoryItemCategory;
+  const pending = { balanceBucket: 'ShieldPending' };
+  const shields = pendingShields([
+    item(ShieldERC20s, [amount(5n, pending)], { blockNumber: 100, timestamp: 1790000000 }),
+    item(ShieldERC20s, [amount(6n)], { blockNumber: 101, timestamp: 1790000012 }),
+    item(ShieldERC20s, [amount(7n, pending)], { blockNumber: 110, timestamp: undefined }),
+    item(TransferReceiveERC20s, [amount(8n, { balanceBucket: 'MissingExternalPOI' })]),
+  ]);
+  assert.deepEqual(shields, [
+    { timestamp: 1790000000, token: USDC },
+    { timestamp: 1790000012 + 9 * 12, token: USDC },
+  ]);
+});
+
+test('only an undated shield screening still holds asks for the newest block', () => {
+  const { ShieldERC20s } = TransactionHistoryItemCategory;
+  const pending = { balanceBucket: 'ShieldPending' };
+  assert.equal(hasUndatedShields([item(ShieldERC20s, [amount(1n, pending)], { timestamp: undefined })]), true);
+  assert.equal(hasUndatedShields([item(ShieldERC20s, [amount(1n, pending)])]), false);
+  assert.equal(hasUndatedShields([item(ShieldERC20s, [amount(1n)], { timestamp: undefined })]), false);
 });

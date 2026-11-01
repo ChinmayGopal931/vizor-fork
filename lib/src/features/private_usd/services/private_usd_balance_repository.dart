@@ -36,7 +36,9 @@ class PrivateUsdBalanceState {
     this.rpcFailed = false,
     this.screeningFailed = false,
     this.firstSyncPercent,
+    this.refreshPercent,
     this.received = const [],
+    this.shieldingSince,
   });
 
   /// Null until a sync or the cache has something to show.
@@ -62,9 +64,19 @@ class PrivateUsdBalanceState {
   /// How far the wallet's first sync has come, while nothing shows yet.
   final int? firstSyncPercent;
 
+  /// How far a refresh the user waits on has come, in whole percent below
+  /// 100, while it runs: one asked for outright, or by opening the screen.
+  /// Null for the automatic ones, which show no percentage.
+  final int? refreshPercent;
+
   /// The private sends the wallet received, as the last sync that could read
   /// them found them. Never cached.
   final List<RailgunReceipt> received;
+
+  /// When the newest dollar shield screening still holds landed, as the last
+  /// sync that could read it found it; null with none, or none dated. Never
+  /// cached.
+  final DateTime? shieldingSince;
 
   /// No balance yet, and one is on its way.
   bool get isLoading => balances == null && (!refreshFailed || isRefreshing);
@@ -79,7 +91,11 @@ class PrivateUsdBalanceState {
     bool? screeningFailed,
     int? firstSyncPercent,
     bool clearFirstSyncPercent = false,
+    int? refreshPercent,
+    bool clearRefreshPercent = false,
     List<RailgunReceipt>? received,
+    DateTime? shieldingSince,
+    bool clearShieldingSince = false,
   }) => PrivateUsdBalanceState(
     balances: balances ?? this.balances,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -91,7 +107,13 @@ class PrivateUsdBalanceState {
     firstSyncPercent: clearFirstSyncPercent
         ? null
         : (firstSyncPercent ?? this.firstSyncPercent),
+    refreshPercent: clearRefreshPercent
+        ? null
+        : (refreshPercent ?? this.refreshPercent),
     received: received ?? this.received,
+    shieldingSince: clearShieldingSince
+        ? null
+        : (shieldingSince ?? this.shieldingSince),
   );
 
   @override
@@ -105,7 +127,9 @@ class PrivateUsdBalanceState {
       other.rpcFailed == rpcFailed &&
       other.screeningFailed == screeningFailed &&
       other.firstSyncPercent == firstSyncPercent &&
-      listEquals(other.received, received);
+      other.refreshPercent == refreshPercent &&
+      listEquals(other.received, received) &&
+      other.shieldingSince == shieldingSince;
 
   @override
   int get hashCode => Object.hash(
@@ -117,7 +141,9 @@ class PrivateUsdBalanceState {
     rpcFailed,
     screeningFailed,
     firstSyncPercent,
+    refreshPercent,
     Object.hashAll(received),
+    shieldingSince,
   );
 }
 

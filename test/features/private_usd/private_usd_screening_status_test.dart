@@ -1,13 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_balances.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_screening_status.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_sync_line.dart';
+import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
 
 // The Processing row's live line and the sync line (owner, 2026-10-19): what
 // the page's screening work is doing, and a long txid catch-up shown as one.
+// A refresh the user waits on climbs the line too.
 void main() {
   test(
     'the step furthest along speaks first: proving, downloading, the list',
@@ -42,10 +45,17 @@ void main() {
       );
       expect(
         privateUsdScreeningStatus(
-          activity: const RailgunScreeningEvent(txids: 0.42),
+          activity: const RailgunScreeningEvent(txids: 0.42, checks: _checks),
           balances: _processing(),
         ),
         "Syncing Railgun's transaction list · 42%",
+      );
+      expect(
+        privateUsdScreeningStatus(
+          activity: const RailgunScreeningEvent(checks: _checks),
+          balances: _processing(submitted: true),
+        ),
+        "Checking with Railgun's screening service · 20 of 45",
       );
     },
   );
@@ -93,7 +103,47 @@ void main() {
       expect(synced.climbing, isFalse);
     }
   });
+
+  test('a refresh the user waits on climbs with its percentage, after the Tor '
+      'readout while Tor connects; an automatic one stays synced', () {
+    final state = PrivateUsdBalanceState(
+      balances: _processing(),
+      updatedAt: DateTime(2026, 10, 19),
+      isRefreshing: true,
+      refreshPercent: 64,
+    );
+    final climbing = privateUsdSyncLine(state, txidCatchUp: 0.2);
+    expect(climbing.readout, PrivateUsdCopy.syncReadoutProgress(64));
+    expect(climbing.semanticsLabel, PrivateUsdCopy.updatingProgress(64));
+    expect(climbing.climbing, isTrue);
+    expect(climbing.progress, closeTo(0.64, 1e-9));
+
+    const connecting = NetworkPrivacyState(
+      torEnabled: true,
+      status: NetworkPrivacyConnectionStatus.connecting,
+    );
+    expect(
+      privateUsdSyncLine(
+        state.copyWith(refreshPercent: 0),
+        networkPrivacy: connecting,
+      ).readout,
+      NeonSyncReadout.torWaiting,
+    );
+    expect(
+      privateUsdSyncLine(state, networkPrivacy: connecting).readout,
+      PrivateUsdCopy.syncReadoutProgress(64),
+      reason: 'under way, it is past Tor',
+    );
+
+    final automatic = privateUsdSyncLine(
+      state.copyWith(clearRefreshPercent: true),
+    );
+    expect(automatic.readout, PrivateUsdCopy.syncReadoutSynced);
+    expect(automatic.climbing, isFalse);
+  });
 }
+
+const _checks = RailgunScreeningChecks(done: 20, count: 45);
 
 const _token = PrivateUsdToken(
   address: '0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c',

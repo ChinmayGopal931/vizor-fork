@@ -137,14 +137,22 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
   }
 
   /// Refreshes unless the balance is younger than [maxAge]. An explicit
-  /// refresh ([maxAge] zero) ignores the back-off after failures.
-  void refresh({Duration maxAge = Duration.zero}) {
+  /// refresh ([maxAge] zero) ignores the back-off after failures. One the
+  /// user waits on ([showProgress]) climbs the sync line with its progress;
+  /// asked for while another runs, it shows that one's instead.
+  void refresh({Duration maxAge = Duration.zero, bool showProgress = false}) {
     if (!_allowed) return;
+    if (_refreshing != null) {
+      if (showProgress) _showRefreshProgress();
+      return;
+    }
     final updatedAt = state.updatedAt;
     final isFresh = updatedAt != null && _now().difference(updatedAt) < maxAge;
     final isBackingOff = maxAge > Duration.zero && !_retries.isDue;
-    if (_refreshing != null || isFresh || isBackingOff) return;
-    _refreshing = _refreshNow().whenComplete(() => _refreshing = null);
+    if (isFresh || isBackingOff) return;
+    _refreshing = _refreshNow(
+      showProgress: showProgress,
+    ).whenComplete(() => _refreshing = null);
   }
 
   bool get _allowed =>
@@ -153,7 +161,7 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       !ref.read(appSecurityProvider).requiresUnlock &&
       !ref.read(privateUsdLifecycleProvider).isQuiesced;
 
-  Future<void> _refreshNow() async {
+  Future<void> _refreshNow({required bool showProgress}) async {
     // With nothing shown yet, this may be the wallet's first sync, which
     // keeps the screen on until it completes or fails, even past this
     // notifier: the page goes on syncing.
@@ -161,7 +169,12 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
         ? ref.read(privateUsdFirstSyncsProvider.notifier).begin(accountUuid)
         : null;
     _runningFirstSync = firstSync;
-    state = state.copyWith(isRefreshing: true, refreshFailed: false);
+    state = state.copyWith(
+      isRefreshing: true,
+      refreshFailed: false,
+      refreshPercent: showProgress ? 0 : null,
+      clearRefreshPercent: !showProgress,
+    );
     final timeout = firstSync != null
         ? PrivateUsdBalanceTiming.firstSyncTimeout
         : PrivateUsdBalanceTiming.refreshTimeout;
@@ -205,6 +218,7 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       isRefreshing: false,
       refreshFailed: false,
       rpcFailed: false,
+      clearRefreshPercent: true,
     );
   }
 
@@ -217,12 +231,39 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       isRefreshing: false,
       refreshFailed: true,
       rpcFailed: rpc || state.rpcFailed,
+      clearRefreshPercent: true,
     );
   }
 
   void _settled() {
     if (!ref.mounted) return;
-    state = state.copyWith(isRefreshing: false);
+    state = state.copyWith(isRefreshing: false, clearRefreshPercent: true);
+  }
+
+  // The user now waits on the refresh under way: the sync line climbs from
+  // where the page has come.
+  void _showRefreshProgress() {
+    if (!state.isRefreshing || state.refreshPercent != null) return;
+    state = state.copyWith(
+      refreshPercent:
+          _refreshPercentOf(ref.read(railgunEngineStateProvider)) ?? 0,
+    );
+  }
+
+  // A refresh the user waits on climbs with the page's progress, never down.
+  void _followRefresh(RailgunEngineState engine) {
+    final shown = state.refreshPercent;
+    if (shown == null || !state.isRefreshing) return;
+    final percent = _refreshPercentOf(engine);
+    if (percent != null && percent > shown) {
+      state = state.copyWith(refreshPercent: percent);
+    }
+  }
+
+  int? _refreshPercentOf(RailgunEngineState engine) {
+    final progress = engine.refresh;
+    if (progress == null || engine.accountUuid != accountUuid) return null;
+    return (progress * 100).floor().clamp(0, 99);
   }
 
   Future<void> _load() async {
@@ -259,6 +300,8 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
     _shown = sync;
     final balances = PrivateUsdBalances.of(sync.balances, _tokens());
     if (balances.total > BigInt.zero) _inUse = true;
+    final shielding = sync.shielding;
+    final shieldingSince = shielding == null ? null : _newestShield(shielding);
     state = state.copyWith(
       balances: balances,
       updatedAt: sync.at,
@@ -268,6 +311,9 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       screeningFailed: sync.screening == RailgunScreening.failed,
       clearFirstSyncPercent: true,
       received: _receipts(sync),
+      // A sync that could not read the history keeps the last one's.
+      shieldingSince: shieldingSince,
+      clearShieldingSince: shielding != null && shieldingSince == null,
     );
     _runningFirstSync?.end();
     unawaited(
@@ -301,11 +347,25 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
     ]);
   }
 
+  // The newest dated dollar shield in screening: every shield waits out the
+  // same screening, so the newest clears last.
+  DateTime? _newestShield(List<RailgunPendingShield> shielding) {
+    final tokens = {for (final token in _tokens()) token.address};
+    DateTime? newest;
+    for (final shield in shielding) {
+      final at = shield.at;
+      if (at == null || !tokens.contains(shield.token)) continue;
+      if (newest == null || at.isAfter(newest)) newest = at;
+    }
+    return newest;
+  }
+
   void _onEngine(RailgunEngineState engine) {
     if (!ref.mounted) return;
     final lastSync = engine.lastSync;
     if (lastSync != null) _show(lastSync);
     _showFirstSync(engine);
+    _followRefresh(engine);
   }
 
   // Between the engine's reports the number creeps, so it is worked out

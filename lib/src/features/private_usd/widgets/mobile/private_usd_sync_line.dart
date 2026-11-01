@@ -11,12 +11,15 @@ import '../../services/private_usd_balance_repository.dart';
 /// starts one.
 ///
 /// A first sync climbs over the content with its percentage, or the Tor
-/// readout while the page waits for Tor. A wallet that synced before stays
-/// synced through a refresh, as Home's catch-up does, except while the page
-/// catches up on Railgun's transaction list ([txidCatchUp], reported only
-/// 1,000 or more behind): screening a send's change waits on that list, so
-/// the line climbs with its percentage. Screen readers hear the first load's
-/// progress, the update, the last update's time, or the failure.
+/// readout while the page waits for Tor. So does a refresh the user waits on
+/// ([PrivateUsdBalanceState.refreshPercent]: one asked for, or the screen's
+/// own as it opens), with the page's progress. A wallet that synced before
+/// stays synced through the automatic refreshes, as Home's catch-up does,
+/// except while the page catches up on Railgun's transaction list
+/// ([txidCatchUp], reported only 1,000 or more behind): screening a send's
+/// change waits on that list, so the line climbs with its percentage. Screen
+/// readers hear the load's or the update's progress, the update, the last
+/// update's time, or the failure.
 NeonSyncLine privateUsdSyncLine(
   PrivateUsdBalanceState state, {
   NetworkPrivacyState? networkPrivacy,
@@ -40,6 +43,20 @@ NeonSyncLine privateUsdSyncLine(
           : PrivateUsdCopy.refreshFailed,
       failed: true,
       readoutStyle: _railgunFailedReadout,
+    );
+  }
+  final refreshPercent = state.refreshPercent;
+  if (balances != null && refreshPercent != null && state.isRefreshing) {
+    if (refreshPercent == 0 && _waitsForTor(networkPrivacy)) {
+      return _torWaiting();
+    }
+    final whole = refreshPercent.clamp(0, 99);
+    return NeonSyncLine(
+      progress: _climbed(whole),
+      readout: PrivateUsdCopy.syncReadoutProgress(whole),
+      semanticsLabel: PrivateUsdCopy.updatingProgress(whole),
+      climbing: true,
+      readoutStyle: _railgunReadout,
     );
   }
   if (balances != null && txidCatchUp != null && txidCatchUp < 1) {
@@ -66,19 +83,7 @@ NeonSyncLine privateUsdSyncLine(
       readoutStyle: _railgunReadout,
     );
   }
-  // The page waits for the bridge, which waits out a Tor bootstrap.
-  if (state.isRefreshing &&
-      networkPrivacy != null &&
-      torIsTargetRoute(networkPrivacy) &&
-      networkPrivacy.status == NetworkPrivacyConnectionStatus.connecting) {
-    return NeonSyncLine(
-      progress: _climbed(0),
-      readout: NeonSyncReadout.torWaiting,
-      semanticsLabel: kSyncStatusConnectingToTorSemanticsLabel,
-      climbing: true,
-      readoutStyle: _railgunReadout,
-    );
-  }
+  if (state.isRefreshing && _waitsForTor(networkPrivacy)) return _torWaiting();
   final percent = state.firstSyncPercent;
   final whole = (percent ?? 0).clamp(0, 99);
   return NeonSyncLine(
@@ -91,6 +96,20 @@ NeonSyncLine privateUsdSyncLine(
     readoutStyle: _railgunReadout,
   );
 }
+
+// The page waits for the bridge, which waits out a Tor bootstrap.
+bool _waitsForTor(NetworkPrivacyState? networkPrivacy) =>
+    networkPrivacy != null &&
+    torIsTargetRoute(networkPrivacy) &&
+    networkPrivacy.status == NetworkPrivacyConnectionStatus.connecting;
+
+NeonSyncLine _torWaiting() => NeonSyncLine(
+  progress: _climbed(0),
+  readout: NeonSyncReadout.torWaiting,
+  semanticsLabel: kSyncStatusConnectingToTorSemanticsLabel,
+  climbing: true,
+  readoutStyle: _railgunReadout,
+);
 
 // As Home's: a climbing line always shows a stub, and never reaches the top.
 const _climbStub = 0.03;

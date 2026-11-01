@@ -21,6 +21,7 @@ import {
   loadWalletByID,
   refreshBalances,
   refreshReceivePOIsForWallet,
+  setBatchListCallback,
   setLoggers,
   setOnTXIDMerkletreeScanCallback,
   setOnUTXOMerkletreeScanCallback,
@@ -34,7 +35,8 @@ import { groth16 } from 'snarkjs';
 import { setArtifactProgressListener } from './artifact-mirror.js';
 import { artifactStore } from './artifacts.js';
 import { badRequest } from './errors.js';
-import { hasUndatedReceipts, receivedSends } from './received.js';
+import { hasUndatedReceipts, hasUndatedShields, pendingShields, receivedSends } from './received.js';
+import { refreshProgress } from './refresh-progress.js';
 import { syncFailure } from './rpc-probe.js';
 import { screeningActivity } from './screening-activity.js';
 import { catchUpTxids, txidCompleteHold } from './txid-catch-up.js';
@@ -80,6 +82,7 @@ let notesScans = Promise.resolve();
 let proofsFailed = false;
 const txidHold = txidCompleteHold();
 let activity;
+let syncProgress;
 
 const chain = () => NETWORK_CONFIG[network].chain;
 
@@ -121,6 +124,9 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, debug, e
       if (scanStatus === MerkletreeScanStatus.Updated && progress <= NOTES_SCAN_START) notesScan.started = true;
       if (scanStatus === MerkletreeScanStatus.Incomplete) notesScan.incomplete = true;
     }
+    // The notes scan goes on to its own txid sync, which the catch-up's share already counts.
+    if (scanStatus === MerkletreeScanStatus.Complete) syncProgress?.done('notes');
+    else syncProgress?.update('notes', progress);
     emit('scan', { tree: 'utxo', status: scanStatus, progress });
   });
   setOnTXIDMerkletreeScanCallback(({ scanStatus, progress }) => {
@@ -128,7 +134,13 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, debug, e
     if (txidHold.pass(event)) emit('scan', event);
   });
   activity = screeningActivity((state) => emit('screening', state));
+  syncProgress = refreshProgress((progress) => emit('refresh', { progress }));
   setArtifactProgressListener((url, loaded, total) => activity.download(url, loaded, total));
+  // The screening nodes' check of the notes not yet cleared, a batch at a time, whoever started it.
+  setBatchListCallback(({ current, total }) => {
+    activity.checks(current, total);
+    if (total > 0) syncProgress.update('checks', current / total);
+  });
   setOnWalletPOIProofProgressCallback(({ status, railgunWalletID, progress, index, totalCount }) => {
     if (railgunWalletID !== wallet?.walletId) return;
     if (status === POIProofEventStatus.InProgress) {
@@ -208,18 +220,31 @@ export async function deleteWallet({ network: name, mnemonic }) {
 
 /**
  * Scans to the chain's tip, catches up on txids, then has the screening nodes check the notes. Returns the balances,
- * the private sends received (`received`), and `screening`: `failed` when that check, or the proofs the engine last
- * sent for this wallet's sends, failed. A sync that fails while the RPC does not answer, or turns requests away,
- * fails as `RPC_FAILED` (`rpc-probe.js`), so the host can offer another RPC.
+ * the private sends received (`received`), the shields screening still holds (`shielding`), and `screening`: `failed`
+ * when that check, or the proofs the engine last sent for this wallet's sends, failed. How far it has come goes out
+ * meanwhile as `refresh` events (`refresh-progress.js`). A sync that fails while the RPC does not answer, or turns
+ * requests away, fails as `RPC_FAILED` (`rpc-probe.js`), so the host can offer another RPC.
  */
 export async function refresh(_params, emit) {
   const { walletId } = session();
+  syncProgress.begin();
+  try {
+    return await refreshWallet(walletId, emit);
+  } finally {
+    syncProgress.end();
+  }
+}
+
+async function refreshWallet(walletId, emit) {
   txidHold.begin();
   let reporting;
   try {
     reporting = await reportTxids();
     const before = await latestTxidIndex();
+    syncProgress.step('notes');
     await scanNotes(walletId);
+    syncProgress.step('txids');
+    await reporting.report();
     const tree = getEngine().getTXIDMerkletree(TXID_VERSION, chain());
     await catchUpTxids({
       before,
@@ -236,6 +261,7 @@ export async function refresh(_params, emit) {
     const complete = txidHold.end();
     if (complete !== undefined) emit('scan', complete);
   }
+  syncProgress.step('checks');
   let checkFailed = false;
   try {
     await refreshReceivePOIsForWallet(TXID_VERSION, network, walletId);
@@ -246,9 +272,13 @@ export async function refresh(_params, emit) {
     // The balances stand; their screening statuses catch up on a later sync.
     emit('log', `screening not refreshed: ${error?.message ?? error}`);
   }
+  syncProgress.step('finishing');
+  const amounts = await balances();
+  const history = await walletHistory(emit);
   return {
-    balances: await balances(),
-    received: await received(emit),
+    balances: amounts,
+    received: history?.received ?? null,
+    shielding: history?.shielding ?? null,
     screening: checkFailed || proofsFailed ? 'failed' : 'ok',
   };
 }
@@ -256,8 +286,9 @@ export async function refresh(_params, emit) {
 const latestTxidIndex = async () => (await getLatestRailgunTxidData(TXID_VERSION, network)).txidIndex;
 
 /**
- * Reports how far a long txid catch-up has come, from the txids the screening nodes have validated (which bound it)
- * and the ones stored, until `stop`. A short one, or one whose bound can't be read, isn't reported.
+ * Reports how far the txid catch-up has come, from the txids the screening nodes have validated (which bound it) and
+ * the ones stored, until `stop`: to the refresh's progress, and to the Processing row only for a long one. `report`
+ * reads it now. One whose bound can't be read isn't reported.
  */
 async function reportTxids() {
   const start = await latestTxidIndex();
@@ -267,20 +298,25 @@ async function reportTxids() {
   } catch {
     // The catch-up runs as before; it just goes unreported.
   }
-  if (target === undefined || target - start < TXID_REPORT_GAP) return { stop() {} };
+  if (target === undefined) return { report: async () => {}, stop() {} };
+  const long = target - start >= TXID_REPORT_GAP;
   const report = async () => {
     try {
-      activity?.txids(Math.min(1, Math.max(0, ((await latestTxidIndex()) - start) / (target - start))));
+      const done = target > start ? ((await latestTxidIndex()) - start) / (target - start) : 1;
+      const share = Math.min(1, Math.max(0, done));
+      syncProgress?.update('txids', share);
+      if (long) activity?.txids(share);
     } catch {
       // The next read reports it.
     }
   };
-  await report();
+  if (long) await report();
   const timer = setInterval(report, TXID_REPORT_MS);
   return {
+    report,
     stop() {
       clearInterval(timer);
-      activity?.txids(null);
+      if (long) activity?.txids(null);
     },
   };
 }
@@ -310,16 +346,18 @@ async function scanNotesNow(walletId) {
 }
 
 /**
- * The private sends this wallet received (`receivedSends`), from the notes its scans already decrypted. Only where
- * the engine has no time for one is the newest block read, to date it from. `null` when the history can't be read:
- * the balances stand without it.
+ * The private sends this wallet received (`receivedSends`) and the shields screening still holds (`pendingShields`),
+ * from the notes its scans already decrypted. Only where the engine has no time for one is the newest block read, to
+ * date it from. `null` when the history can't be read: the balances stand without it.
  */
-async function received(emit) {
+async function walletHistory(emit) {
   try {
     const history = await getWalletTransactionHistory(chain(), session().walletId, undefined);
-    return receivedSends(history, hasUndatedReceipts(history) ? await newestBlock(emit) : undefined);
+    const undated = hasUndatedReceipts(history) || hasUndatedShields(history);
+    const head = undated ? await newestBlock(emit) : undefined;
+    return { received: receivedSends(history, head), shielding: pendingShields(history, head) };
   } catch (error) {
-    emit('log', `received sends not read: ${error?.message ?? error}`);
+    emit('log', `wallet history not read: ${error?.message ?? error}`);
     return null;
   }
 }

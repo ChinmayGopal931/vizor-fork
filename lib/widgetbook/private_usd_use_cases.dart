@@ -68,7 +68,7 @@ int previewPrivateUsdUnix(DateTime time) => time.millisecondsSinceEpoch ~/ 1000;
 const _confirmations = 2;
 
 /// A balance with [available], [arriving], [blocked] and [processing]
-/// dollars of USDC.
+/// dollars of USDC; with [refreshPercent], a refresh the user waits on.
 PrivateUsdBalanceState previewPrivateUsdBalance({
   double available = 0,
   double arriving = 0,
@@ -76,6 +76,7 @@ PrivateUsdBalanceState previewPrivateUsdBalance({
   double processing = 0,
   bool isRefreshing = false,
   bool refreshFailed = false,
+  int? refreshPercent,
 }) {
   BigInt units(double dollars) => BigInt.from((dollars * 1e6).round());
   final buckets = <RailgunBalanceBucket, List<RailgunTokenAmount>>{
@@ -90,8 +91,9 @@ PrivateUsdBalanceState previewPrivateUsdBalance({
     ]),
     updatedAt: previewPrivateUsdUpdatedAt,
     address: previewPrivateUsdAddress,
-    isRefreshing: isRefreshing,
+    isRefreshing: isRefreshing || refreshPercent != null,
     refreshFailed: refreshFailed,
+    refreshPercent: refreshPercent,
   );
 }
 
@@ -219,6 +221,13 @@ Widget buildMobilePrivateUsdEmptyUseCase(BuildContext context) =>
 Widget buildMobilePrivateUsdFirstLoadUseCase(BuildContext context) =>
     const _PrivateUsdScreenPreview(
       state: PrivateUsdBalanceState(isRefreshing: true, firstSyncPercent: 42),
+    );
+
+/// A refresh the user asked for, two thirds of the way: the line climbs with
+/// it.
+Widget buildMobilePrivateUsdRefreshingUseCase(BuildContext context) =>
+    _PrivateUsdScreenPreview(
+      state: previewPrivateUsdBalance(available: 1250.4, refreshPercent: 64),
     );
 
 Widget buildMobilePrivateUsdRefreshFailedUseCase(BuildContext context) =>
@@ -866,7 +875,7 @@ class FixedPrivateUsdBalanceNotifier extends PrivateUsdBalanceNotifier {
   VoidCallback watch({required bool ifUsed}) => () {};
 
   @override
-  void refresh({Duration maxAge = Duration.zero}) {}
+  void refresh({Duration maxAge = Duration.zero, bool showProgress = false}) {}
 }
 
 /// Conversions that only show [fixed]. No engine runs.

@@ -17,7 +17,8 @@ import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 
 // A send's change stays processing until Railgun's screening nodes take its
 // proofs. The page reports when its screening last failed, and the balance
-// says so instead of "a send is being confirmed" for days.
+// says so instead of "a send is being confirmed" for days. A sync also says
+// how far it has come, and what still waits on screening.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -164,6 +165,82 @@ void main() {
     expect(receipts(), hasLength(2));
   });
 
+  // The sync line climbs only for a refresh the user waits on; the automatic
+  // ones keep the line synced.
+  test("a refresh the user waits on follows the page's progress, never back "
+      'down, and an automatic one shows none until the user asks', () async {
+    final container = containerWith();
+    final notifier = container.read(
+      privateUsdBalanceProvider(_account).notifier,
+    );
+    int? percent() =>
+        container.read(privateUsdBalanceProvider(_account)).refreshPercent;
+    Future<void> progress(double share) async {
+      page.pageEvents.add('{"event":"refresh","data":{"progress":$share}}');
+      await pumpEventQueue();
+    }
+
+    await pumpEventQueue();
+    notifier.refresh(showProgress: true);
+    expect(percent(), 0, reason: 'it drops at once');
+    await pumpEventQueue();
+    await progress(0.3);
+    expect(percent(), 30);
+    await progress(0.2);
+    expect(percent(), 30);
+    await progress(0.999);
+    expect(percent(), 99, reason: 'never 100 while it runs');
+    page.refreshing!.complete('{"balances":$_balancesJson,"screening":"ok"}');
+    await pumpEventQueue();
+    expect(percent(), isNull);
+
+    notifier.refresh();
+    await pumpEventQueue();
+    await progress(0.5);
+    expect(percent(), isNull, reason: 'an automatic refresh');
+    notifier.refresh(showProgress: true);
+    expect(percent(), 50, reason: 'asked for while it runs: that one shows');
+    await progress(0.7);
+    expect(percent(), 70);
+    page.refreshing!.completeError(
+      RailgunHostException(RailgunHostErrorCode.failed),
+    );
+    await pumpEventQueue();
+    expect(percent(), isNull, reason: 'a failed refresh shows its failure');
+  });
+
+  test('the newest dollar shield in screening dates what arrives; a sync '
+      'that could not read the history keeps it', () async {
+    final container = containerWith(deployment: _sepolia);
+    DateTime? since() =>
+        container.read(privateUsdBalanceProvider(_account)).shieldingSince;
+    DateTime at(int seconds) =>
+        DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+
+    await syncAnswering(
+      container,
+      '{"balances":{},"screening":"ok","shielding":['
+      '{"timestamp":1790000000,"token":"$_dollars"},'
+      '{"timestamp":1790000600,"token":"$_dollars"},'
+      '{"timestamp":null,"token":"$_dollars"},'
+      '{"timestamp":1790001200,'
+      '"token":"0x1111111111111111111111111111111111111111"}]}',
+    );
+    expect(since(), at(1790000600));
+
+    await syncAnswering(
+      container,
+      '{"balances":{},"screening":"ok","shielding":null}',
+    );
+    expect(since(), at(1790000600));
+
+    await syncAnswering(
+      container,
+      '{"balances":{},"screening":"ok","shielding":[]}',
+    );
+    expect(since(), isNull);
+  });
+
   test('a cached balance shows without it', () async {
     final container = containerWith(
       cached: CachedPrivateUsdBalances(
@@ -285,6 +362,9 @@ class _Page implements RailgunHost {
   @override
   Future<bool> isOpen() async => _open;
 
+  /// What the page sends unasked, as the host forwards it.
+  final pageEvents = StreamController<String>.broadcast();
+
   @override
-  Stream<String> get events => const Stream.empty();
+  Stream<String> get events => pageEvents.stream;
 }

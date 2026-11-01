@@ -59,6 +59,35 @@ void main() {
     await engine.dispose();
   });
 
+  test("a refresh's progress lands in the engine's state while it runs, and "
+      'the shields screening still holds come with the sync', () async {
+    final log = <String>[];
+    final refresh = Completer<String>();
+    final host = _FakeHost(log, pageAddress: _address, refresh: refresh);
+    final engine = _engineWith(host, log);
+
+    final sync = engine.sync('account');
+    await _until(() => log.contains('call refresh'));
+    expect(engine.state.value.refresh, isNull, reason: 'before the page says');
+    host.pageEvents.add('{"event":"refresh","data":{"progress":0.6}}');
+    await pumpEventQueue();
+    expect(engine.state.value.refresh, 0.6);
+
+    refresh.complete(
+      '{"balances":{},"screening":"ok","shielding":[{"timestamp":1790000000,'
+      '"token":"0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c"}]}',
+    );
+    final synced = await sync;
+    expect(engine.state.value.refresh, isNull, reason: 'none runs now');
+    expect(synced.shielding, [
+      RailgunPendingShield(
+        token: '0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c',
+        at: DateTime.fromMillisecondsSinceEpoch(1790000000 * 1000),
+      ),
+    ]);
+    await engine.dispose();
+  });
+
   test("a sync carries the page's failed screening", () async {
     final log = <String>[];
     final refresh = Completer<String>();

@@ -1,21 +1,25 @@
 import '../../../rust/api/private_usd.dart' as rust;
 import '../private_usd_copy.dart';
 
-/// When the private USD arriving now landed, as far as the account's own
-/// payouts tell; null when they don't. Every payout waits out the same
-/// screening, so the newest clears last and the estimate follows it: a paid
-/// conversion's (`endedAt`, as Rust read it confirmed), a refunded USD → ZEC
-/// conversion's (`updatedAt`) or a landed deposit's (`endedAt`). The page
-/// reports balances only, so when [arriving] (micro-dollars) is less than
-/// what the newest payout brought (`receives`, `arrives`), that payout is not
-/// what is arriving: null. A refund keeps no amount; it is taken as it comes.
+/// When the private USD arriving now landed; null when nothing tells. Every
+/// shield waits out the same screening, so the newest clears last and the
+/// estimate follows it. The page's history dates every shield screening
+/// still holds ([shielded], the newest), another wallet's included. Without
+/// it, the account's own payouts tell: a paid conversion's (`endedAt`, as
+/// Rust read it confirmed), a refunded USD → ZEC conversion's (`updatedAt`)
+/// or a landed deposit's (`endedAt`). Those come with no word on what still
+/// arrives, so when [arriving] (micro-dollars) is less than what the newest
+/// payout brought (`receives`, `arrives`), that payout is not what is
+/// arriving: null. A refund keeps no amount; it is taken as it comes.
 DateTime? privateUsdArrivingSince({
   required BigInt arriving,
+  DateTime? shielded,
   Iterable<rust.ApiForwardRecord> forward = const [],
   Iterable<rust.ApiReverseRecord> reverse = const [],
   Iterable<rust.ApiDepositRecord> deposits = const [],
 }) {
   if (arriving <= BigInt.zero) return null;
+  if (shielded != null) return shielded;
   int? landedAt;
   BigInt? amount;
   for (final record in forward) {

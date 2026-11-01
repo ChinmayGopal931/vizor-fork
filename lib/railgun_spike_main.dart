@@ -256,6 +256,8 @@ void _onEvent(String raw) {
         final percent = (progress * 100).toStringAsFixed(0);
         _log('scan ${scan.tree.name} ${scan.status.wireName} $percent%');
       }
+    case final RailgunRefreshEvent refresh:
+      _log('refresh ${(refresh.progress * 100).toStringAsFixed(0)}%');
     case final RailgunProofEvent proof:
       _log('proof ${proof.status} ${proof.progress}');
     case final RailgunScreeningEvent screening:

@@ -248,14 +248,23 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   the line does not drop and re-climb every block. The Private USD screen
   draws Railgun's sync the same way (`privateUsdSyncLine`), with readouts
   that name Railgun (`RAILGUN SYNC n%`, `RAILGUN SYNCED`, `RAILGUN SYNC
-  FAILED`; the Tor ones are Home's): a first sync climbs, and a refresh of
-  a wallet that synced before stays `RAILGUN SYNCED` while the floor flows,
-  unless the page reports a long catch-up on Railgun's transaction list
-  (1,000 or more behind): that climbs as `RAILGUN SYNC n%`, since screening a
-  send's change waits on the list. Private USD's Processing row adds a live
-  line (smaller, in the accent colour) saying what the screening work is
-  doing: syncing that list, downloading proving files, building a proof, or
-  waiting on the screening service (`privateUsdScreeningStatus`).
+  FAILED`; the Tor ones are Home's): a first sync climbs, and so does a
+  refresh the user waits on (the refresh button, the screen's own on
+  opening, a new RPC: `refresh(showProgress: true)`), with the page's
+  `refresh` events (`refresh-progress.js`: a bar split over its steps, never
+  going back). The automatic ones (every 30 s while funds arrive, else every
+  5 min) keep a wallet that synced before at `RAILGUN SYNCED` while the floor
+  flows, unless the page reports a long catch-up on Railgun's transaction
+  list (1,000 or more behind): that climbs as `RAILGUN SYNC n%`, since
+  screening a send's change waits on the list. The refresh arrow never spins
+  and always takes a tap: during an automatic refresh, a tap shows that
+  refresh's progress instead of starting another. Private USD's Processing
+  row adds a live line (smaller, in the accent colour) saying what the
+  screening work is doing: syncing that list, downloading proving files,
+  building a proof, the screening service checking notes (`n of m`), or
+  waiting on the screening service (`privateUsdScreeningStatus`). Its
+  Arriving row estimates from the newest shield the page's history lists in
+  screening, any wallet's, else from the account's own payouts.
 - **Tab bar.** Glyphs only: no slab, border or caption. `TronGlyph` draws
   the tab icons (and, on mobile, `AppIcon` draws its round icons —
   check, arrow-down, plus, warning, cancel, help — as angular glyphs). The active

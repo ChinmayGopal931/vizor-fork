@@ -7,6 +7,35 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
 
 ## Where things stand (2026-10-17; read this first)
 
+- **A refresh the user waits on shows its progress (2026-11-01, D-156).**
+  On a wallet that synced before, the sync line read `RAILGUN SYNCED`
+  through every refresh while the total's arrow spun, and a tap on the
+  arrow during an automatic refresh did nothing: the owner found it stuck
+  at 100% with nothing to do, and asked for the percentage and the line to
+  move.
+  - **The page** sends `refresh` events, `{progress}` 0 to 1
+    (`refresh-progress.js`): one bar split over the refresh's steps, the
+    txid bound's read 0-5%, the notes scan 5-60% (the engine's share), the
+    txid catch-up 60-80% (txids stored against the screening nodes'
+    validated bound; the notes scan's own txid sync counts from the scan's
+    Complete), the screening nodes' check 80-95% (the SDK's
+    `setBatchListCallback`, 20 notes a request) and the balances and
+    history 95-100%. Steps only move forward and the bar never goes back; a
+    share goes out at most every 250 ms. The Kotlin and Swift hosts forward
+    the new event.
+  - **Dart.** The button, the screen's own refresh on opening and a new RPC
+    ask `refresh(showProgress: true)`; the timer's refreshes do not.
+    `PrivateUsdBalanceState.refreshPercent` follows the engine's `refresh`
+    up, never down, and the line climbs as `RAILGUN SYNC n%` (`TOR …` at 0%
+    while Tor connects). One asked for while another runs shows that one's.
+    The automatic refreshes keep `RAILGUN SYNCED` with the floor flowing.
+  - **The arrow** never spins and always takes a tap.
+  - **The Processing row** names the screening nodes' check: "Checking with
+    Railgun's screening service · n of m" (`screening.checks`).
+  - **Arriving** estimates from the newest dollar shield the page's history
+    lists in screening (`refresh` answers `shielding`), so a shield from
+    another wallet gets a percentage too; without it, from the account's
+    own payouts as before. It stays a percentage of the screening time.
 - **More RPC providers, checked for the log window (2026-10-29, D-155).**
   Settings' Ethereum RPC takes a URL on fourteen providers now, not
   three: publicnode, Alchemy, Infura, QuickNode, Chainstack, Ankr, dRPC,

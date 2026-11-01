@@ -88,13 +88,14 @@ enum RailgunScreening {
   }
 }
 
-/// What `refresh` answers: the balances, the private sends received, and
-/// how the screening last went.
+/// What `refresh` answers: the balances, the private sends received, the
+/// shields screening still holds, and how the screening last went.
 class RailgunRefresh {
   const RailgunRefresh({
     required this.balances,
     required this.screening,
     this.received,
+    this.shielding,
   });
 
   final RailgunBalances balances;
@@ -102,6 +103,9 @@ class RailgunRefresh {
 
   /// Null when the page could not read its history.
   final List<RailgunReceipt>? received;
+
+  /// Null when the page could not read its history.
+  final List<RailgunPendingShield>? shielding;
 
   static RailgunRefresh parse(Object? json) {
     final map = _object(json, 'refresh');
@@ -113,8 +117,48 @@ class RailgunRefresh {
       balances: RailgunBalances.parse(map['balances']),
       screening: screening,
       received: RailgunReceipt.parseAll(map['received']),
+      shielding: RailgunPendingShield.parseAll(map['shielding']),
     );
   }
+}
+
+/// A shield screening still holds ([token]'s), with when it landed ([at]),
+/// null where nothing dates it: a deposit, a bridge's payout, or a shield
+/// from another wallet.
+class RailgunPendingShield {
+  const RailgunPendingShield({required this.token, this.at});
+
+  final String token;
+  final DateTime? at;
+
+  /// Null where the page had no history to give. A shield it cannot read is
+  /// left out.
+  static List<RailgunPendingShield>? parseAll(Object? json) {
+    if (json is! List) return null;
+    return List.unmodifiable([for (final item in json) ?_shield(item)]);
+  }
+
+  static RailgunPendingShield? _shield(Object? item) {
+    if (item is! Map<String, dynamic>) return null;
+    final timestamp = item['timestamp'];
+    try {
+      return RailgunPendingShield(
+        token: _evmAddress(item['token'], 'token'),
+        at: timestamp is int && timestamp > 0
+            ? DateTime.fromMillisecondsSinceEpoch(timestamp * 1000)
+            : null,
+      );
+    } on RailgunProtocolException {
+      return null;
+    }
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is RailgunPendingShield && other.token == token && other.at == at;
+
+  @override
+  int get hashCode => Object.hash(token, at);
 }
 
 /// A private send the wallet received, from the notes its sync decrypted.
@@ -724,6 +768,13 @@ sealed class RailgunEvent {
       case 'screening':
         if (data is! Map<String, dynamic>) return null;
         return RailgunScreeningEvent.decode(data);
+      case 'refresh':
+        if (data is! Map<String, dynamic>) return null;
+        final progress = data['progress'];
+        if (progress is! num) return null;
+        return RailgunRefreshEvent(
+          progress.toDouble().clamp(0.0, 1.0).toDouble(),
+        );
       case 'log':
         return data is String ? RailgunLogEvent(data) : null;
       default:
@@ -755,6 +806,21 @@ class RailgunScanEvent extends RailgunEvent {
   int get hashCode => Object.hash(tree, status, progress);
 }
 
+/// How far the page's `refresh` has come, [progress] 0 to 1 and never going
+/// back within one.
+class RailgunRefreshEvent extends RailgunEvent {
+  const RailgunRefreshEvent(this.progress);
+
+  final double progress;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RailgunRefreshEvent && other.progress == progress;
+
+  @override
+  int get hashCode => progress.hashCode;
+}
+
 /// [progress] runs from 0 to 1.
 class RailgunProofEvent extends RailgunEvent {
   const RailgunProofEvent({required this.progress, required this.status});
@@ -775,23 +841,27 @@ class RailgunProofEvent extends RailgunEvent {
 /// What the page's screening work is doing now, each step null while idle:
 /// catching up on Railgun's transaction ids ([txids], their share done),
 /// downloading proving files ([downloading], with [download] their share
-/// when known), and proving POIs ([proving]). The page sends the whole state
-/// on every change, so the latest one is all that is running.
+/// when known), proving POIs ([proving]), and the screening nodes checking
+/// the notes not yet cleared ([checks]). The page sends the whole state on
+/// every change, so the latest one is all that is running.
 class RailgunScreeningEvent extends RailgunEvent {
   const RailgunScreeningEvent({
     this.txids,
     this.downloading = false,
     this.download,
     this.proving,
+    this.checks,
   });
 
   final double? txids;
   final bool downloading;
   final double? download;
   final RailgunPoiProving? proving;
+  final RailgunScreeningChecks? checks;
 
   /// Nothing running.
-  bool get isIdle => txids == null && !downloading && proving == null;
+  bool get isIdle =>
+      txids == null && !downloading && proving == null && checks == null;
 
   /// A step it cannot read is left out rather than failing the rest.
   static RailgunScreeningEvent decode(Map<String, dynamic> data) {
@@ -816,11 +886,21 @@ class RailgunScreeningEvent extends RailgunEvent {
         );
       }
     }
+    final checks = data['checks'];
+    RailgunScreeningChecks? checking;
+    if (checks is Map<String, dynamic>) {
+      final done = checks['done'];
+      final count = checks['count'];
+      if (done is int && count is int && done >= 0 && count > done) {
+        checking = RailgunScreeningChecks(done: done, count: count);
+      }
+    }
     return RailgunScreeningEvent(
       txids: share(data['txids']),
       downloading: download is Map<String, dynamic>,
       download: share(download),
       proving: proof,
+      checks: checking,
     );
   }
 
@@ -830,10 +910,30 @@ class RailgunScreeningEvent extends RailgunEvent {
       other.txids == txids &&
       other.downloading == downloading &&
       other.download == download &&
-      other.proving == proving;
+      other.proving == proving &&
+      other.checks == checks;
 
   @override
-  int get hashCode => Object.hash(txids, downloading, download, proving);
+  int get hashCode =>
+      Object.hash(txids, downloading, download, proving, checks);
+}
+
+/// The screening nodes checking the notes not yet cleared: [done] of
+/// [count] so far.
+class RailgunScreeningChecks {
+  const RailgunScreeningChecks({required this.done, required this.count});
+
+  final int done;
+  final int count;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RailgunScreeningChecks &&
+      other.done == done &&
+      other.count == count;
+
+  @override
+  int get hashCode => Object.hash(done, count);
 }
 
 /// POI proof [index] (from 1) of [count], [progress] 0 to 1.

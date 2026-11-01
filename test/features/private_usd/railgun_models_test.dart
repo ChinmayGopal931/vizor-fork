@@ -142,6 +142,33 @@ void main() {
     }
   });
 
+  test('a refresh lists the shields screening still holds; one it cannot '
+      'read is left out', () {
+    final refresh = RailgunRefresh.parse(
+      jsonDecode(
+        '{"balances":{},"screening":"ok","shielding":['
+        '{"timestamp":1790000000,"token":"$_token"},'
+        '{"timestamp":null,"token":"$_token"},'
+        '{"timestamp":1790000000,"token":"0x12"},'
+        '"not a shield"]}',
+      ),
+    );
+
+    expect(refresh.shielding, [
+      RailgunPendingShield(
+        token: _token,
+        at: DateTime.fromMillisecondsSinceEpoch(1790000000 * 1000),
+      ),
+      const RailgunPendingShield(token: _token),
+    ]);
+    for (final body in [
+      '{"balances":{},"screening":"ok"}',
+      '{"balances":{},"screening":"ok","shielding":null}',
+    ]) {
+      expect(RailgunRefresh.parse(jsonDecode(body)).shielding, isNull);
+    }
+  });
+
   test(
     'a receipt with no block time takes the one given, and keeps its own',
     () {
@@ -272,6 +299,15 @@ void main() {
       ),
       const RailgunProofEvent(progress: 0.25, status: 'proving'),
     );
+    expect(
+      RailgunEvent.decode('{"event":"refresh","data":{"progress":0.6}}'),
+      const RailgunRefreshEvent(0.6),
+    );
+    expect(
+      RailgunEvent.decode('{"event":"refresh","data":{"progress":3}}'),
+      const RailgunRefreshEvent(1),
+      reason: 'a share is kept to 0-1',
+    );
     for (final raw in [
       'not json',
       '[1]',
@@ -279,6 +315,8 @@ void main() {
       '{"event":"scan","data":{"tree":"other","status":"Updated"}}',
       '{"event":"scan","data":{"tree":"utxo","status":"Sideways"}}',
       '{"event":"proof","data":{"status":"proving"}}',
+      '{"event":"refresh","data":{"progress":null}}',
+      '{"event":"refresh","data":0.5}',
     ]) {
       expect(RailgunEvent.decode(raw), isNull, reason: raw);
     }
@@ -299,10 +337,21 @@ void main() {
     );
     final idle = RailgunEvent.decode(
       '{"event":"screening","data":{"txids":null,"download":null,'
-      '"proving":null}}',
+      '"proving":null,"checks":null}}',
     );
     expect(idle, const RailgunScreeningEvent());
     expect((idle! as RailgunScreeningEvent).isIdle, isTrue);
+    final checking = RailgunEvent.decode(
+      '{"event":"screening","data":{"txids":null,"download":null,'
+      '"proving":null,"checks":{"done":20,"count":45}}}',
+    );
+    expect(
+      checking,
+      const RailgunScreeningEvent(
+        checks: RailgunScreeningChecks(done: 20, count: 45),
+      ),
+    );
+    expect((checking! as RailgunScreeningEvent).isIdle, isFalse);
   });
 
   test('a screening step it cannot read is left out, not the rest', () {
@@ -315,6 +364,21 @@ void main() {
       // A share is kept to 0-1; proof 4 of 3 is no proof.
       const RailgunScreeningEvent(txids: 1, downloading: true, download: 0.5),
     );
+    // A check is done once its last batch is in.
+    for (final checks in [
+      '{"done":45,"count":45}',
+      '{"done":-1,"count":45}',
+      '{"done":"20","count":45}',
+    ]) {
+      expect(
+        RailgunEvent.decode(
+          '{"event":"screening","data":{"txids":{"progress":0.5},'
+          '"checks":$checks}}',
+        ),
+        const RailgunScreeningEvent(txids: 0.5),
+        reason: checks,
+      );
+    }
     expect(RailgunEvent.decode('{"event":"screening","data":7}'), isNull);
   });
 

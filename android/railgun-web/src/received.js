@@ -1,4 +1,4 @@
-import { TransactionHistoryItemCategory } from '@railgun-community/shared-models';
+import { RailgunWalletBalanceBucket, TransactionHistoryItemCategory } from '@railgun-community/shared-models';
 
 // Ethereum's slot time. A slot can pass without a block, so a block dated this way is off by the slots missed
 // between it and the block it is dated from.
@@ -13,7 +13,7 @@ const SECONDS_PER_BLOCK = 12;
  * or `head` (`{blockNumber, timestamp}`, the newest block), at 12 s a block; `timestamp` is null where neither dates it.
  */
 export function receivedSends(history, head) {
-  const dated = [...history, head].filter((item) => item?.timestamp && item.blockNumber != null);
+  const dated = datedItems(history, head);
   return history
     .filter(isReceived)
     .flatMap((item) =>
@@ -32,6 +32,28 @@ const isReceived = ({ category }) => category === TransactionHistoryItemCategory
 
 /** Whether a received send in `history` has no time of its own: then the newest block is worth reading to date it. */
 export const hasUndatedReceipts = (history) => history.some((item) => isReceived(item) && !item.timestamp);
+
+/**
+ * The shields screening still holds (`ShieldPending`), from the wallet's history: `{timestamp, token}` for each token
+ * amount, dated as `receivedSends` dates a send. A deposit, a bridge's payout and a shield from another wallet all
+ * land as one.
+ */
+export function pendingShields(history, head) {
+  const dated = datedItems(history, head);
+  return history.flatMap((item) =>
+    item.receiveERC20Amounts
+      .filter(isPending)
+      .map(({ tokenAddress }) => ({ timestamp: timeOf(item, dated), token: tokenAddress })),
+  );
+}
+
+/** Whether a shield screening still holds has no time of its own: then the newest block is worth reading too. */
+export const hasUndatedShields = (history) =>
+  history.some((item) => !item.timestamp && item.receiveERC20Amounts.some(isPending));
+
+const isPending = ({ balanceBucket }) => balanceBucket === RailgunWalletBalanceBucket.ShieldPending;
+
+const datedItems = (history, head) => [...history, head].filter((item) => item?.timestamp && item.blockNumber != null);
 
 function timeOf({ timestamp, blockNumber }, dated) {
   if (timestamp) return timestamp;
