@@ -591,9 +591,9 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
 }
 
 abstract final class _MobileReceiveMetrics {
-  // The framed 292px QR + 16px gap + 220px actions + 16px padding on each
-  // side.
-  static const minimumSplitWidth = 560.0 + qrFrameGap * 2;
+  // 292px QR + 16px gap + 220px actions + 16px padding on each side. The
+  // frame's edges come out of the actions' share.
+  static const minimumSplitWidth = 560.0;
   static const topNavHeight = 74.0;
   static const topGap = 16.5;
   static const tabsWidth = 320.0;
@@ -749,6 +749,7 @@ class _ReceiveAccountCaption extends StatelessWidget {
 
   /// Leaves each hairline at least a short run beside a long name.
   static const _maxNameWidth = 200.0;
+  static const _minRuleWidth = AppSpacing.sm;
 
   @override
   Widget build(BuildContext context) {
@@ -768,26 +769,38 @@ class _ReceiveAccountCaption extends StatelessWidget {
       );
     }
 
-    return Row(
-      children: [
-        rule(towardRight: true),
-        const SizedBox(width: AppSpacing.s),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: _maxNameWidth),
-          child: Text(
-            name.toUpperCase(),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: kNeonHudCaptionStyle.copyWith(
-              color: glow,
-              shadows: Neon.textGlow(glow, intensity: 0.35),
+    // A narrow column (the wide layout's details, large text) shortens the
+    // name rather than the hairlines.
+    return LayoutBuilder(
+      builder: (context, constraints) => Row(
+        children: [
+          rule(towardRight: true),
+          const SizedBox(width: AppSpacing.s),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: math.max(
+                0.0,
+                math.min(
+                  _maxNameWidth,
+                  constraints.maxWidth - 2 * (AppSpacing.s + _minRuleWidth),
+                ),
+              ),
+            ),
+            child: Text(
+              name.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: kNeonHudCaptionStyle.copyWith(
+                color: glow,
+                shadows: Neon.textGlow(glow, intensity: 0.35),
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: AppSpacing.s),
-        rule(towardRight: false),
-      ],
+          const SizedBox(width: AppSpacing.s),
+          rule(towardRight: false),
+        ],
+      ),
     );
   }
 }
