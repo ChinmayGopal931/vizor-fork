@@ -16,10 +16,25 @@ test('a step starting or ending goes out at once, with the whole state', () => {
   tracker.proving({ index: 1, count: 3, progress: 0 });
   tracker.txids(null);
   assert.deepEqual(sent, [
-    { txids: { progress: 0.1 }, download: null, proving: null },
-    { txids: { progress: 0.1 }, download: null, proving: { index: 1, count: 3, progress: 0 } },
-    { txids: null, download: null, proving: { index: 1, count: 3, progress: 0 } },
+    { txids: { progress: 0.1 }, download: null, proving: null, checks: null },
+    { txids: { progress: 0.1 }, download: null, proving: { index: 1, count: 3, progress: 0 }, checks: null },
+    { txids: null, download: null, proving: { index: 1, count: 3, progress: 0 }, checks: null },
   ]);
+});
+
+// The SDK reports each batch of notes the screening nodes check before and after asking, from 0 to the whole count.
+test("the screening nodes' check runs until its last batch, and an empty one never starts", () => {
+  const { tracker, sent, tick } = activity();
+  tracker.checks(0, 0);
+  assert.equal(sent.length, 0);
+  tracker.checks(0, 45);
+  assert.deepEqual(sent.at(-1).checks, { done: 0, count: 45 });
+  tick(PUBLISH_MS);
+  tracker.checks(20, 45);
+  assert.deepEqual(sent.at(-1).checks, { done: 20, count: 45 });
+  tracker.checks(45, 45);
+  assert.equal(sent.at(-1).checks, null);
+  assert.equal(sent.length, 3);
 });
 
 test('progress goes out at most every PUBLISH_MS, carrying the latest', () => {

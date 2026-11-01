@@ -185,8 +185,8 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('a refresh of a synced balance stays synced, with a faster '
-      'floor', (tester) async {
+  testWidgets('an automatic refresh of a synced balance stays synced, with a '
+      'faster floor', (tester) async {
     final semantics = tester.ensureSemantics();
     await pumpView(
       tester,
@@ -202,6 +202,27 @@ void main() {
     expect(layer(tester, NeonSyncLayer.front).linePart, NeonSyncLinePart.head);
     expect(find.text(PrivateUsdCopy.updating), findsNothing);
     expect(find.bySemanticsLabel(PrivateUsdCopy.updating), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('a refresh the user waits on climbs over the content with its '
+      'percentage', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await pumpView(
+      tester,
+      previewPrivateUsdBalance(available: 100, refreshPercent: 64),
+    );
+
+    final front = layer(tester, NeonSyncLayer.front);
+    expect(readout(tester), 'RAILGUN SYNC 64%');
+    expect(front.line.progress, 0.64);
+    expect(front.linePart, NeonSyncLinePart.whole);
+    expect(front.line.climbing, isTrue);
+    expect(layer(tester, NeonSyncLayer.back).line.scanning, isTrue);
+    expect(
+      find.bySemanticsLabel(PrivateUsdCopy.updatingProgress(64)),
+      findsOneWidget,
+    );
     semantics.dispose();
   });
 

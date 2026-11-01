@@ -19,6 +19,8 @@ abstract final class PrivateUsdCopy {
   static const unknown = '—';
   static const refresh = 'Refresh';
   static const updating = 'Updating…';
+  static String updatingProgress(int percent) =>
+      'Updating your shielded balance: $percent%';
   static String updated(String time) => 'Updated $time';
   static const review = 'Review';
   static const done = 'Done';
@@ -87,6 +89,9 @@ abstract final class PrivateUsdCopy {
   static String screeningProving(int index, int count, int percent) => count > 1
       ? 'Building screening proof $index of $count · $percent%'
       : 'Building screening proof · $percent%';
+
+  static String screeningChecking(int done, int count) =>
+      "Checking with Railgun's screening service · $done of $count";
 
   static const screeningWaiting = "Waiting for Railgun's screening service";
 

@@ -3,11 +3,12 @@ export const PUBLISH_MS = 250;
 
 /**
  * What the screening work is doing now, for the Processing row: catching up on txids, downloading the proving files,
- * proving POIs. Every change goes out through `publish` as the whole state, `{txids, download, proving}`, each null
- * while idle, so the host always knows what is still running and needs no timers of its own.
+ * proving POIs, the screening nodes checking notes. Every change goes out through `publish` as the whole state,
+ * `{txids, download, proving, checks}`, each null while idle, so the host always knows what is still running and needs
+ * no timers of its own.
  */
 export function screeningActivity(publish, now = Date.now) {
-  const state = { txids: null, download: null, proving: null };
+  const state = { txids: null, download: null, proving: null, checks: null };
   const downloads = new Map();
   let published = -Infinity;
 
@@ -45,6 +46,13 @@ export function screeningActivity(publish, now = Date.now) {
     /** Proof `index` (from 1) of `count`, `progress` 0 to 1, or null once proving ends. */
     proving(proof) {
       set('proving', proof);
+    },
+    /** The screening nodes' check of the notes not yet cleared, `done` of `count` so far; it ends with the last. */
+    checks(done, count) {
+      const value = count > 0 && done < count ? { done, count } : null;
+      // The SDK also clears the check when none runs.
+      if (value === null && state.checks === null) return;
+      set('checks', value);
     },
   };
 }

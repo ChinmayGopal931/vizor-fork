@@ -122,6 +122,7 @@ class RailgunSync {
     required this.screening,
     required this.at,
     this.received,
+    this.shielding,
   });
 
   final String accountUuid;
@@ -132,6 +133,10 @@ class RailgunSync {
 
   /// Null when the page could not read its history.
   final List<RailgunReceipt>? received;
+
+  /// The shields screening still holds; null when the page could not read
+  /// its history.
+  final List<RailgunPendingShield>? shielding;
 }
 
 /// What the engine is doing, for progress lines. It carries no messages: an
@@ -144,6 +149,7 @@ class RailgunEngineState {
     this.fees,
     this.utxoScan,
     this.txidScan,
+    this.refresh,
     this.proof,
     this.screening,
     this.lastSync,
@@ -158,6 +164,10 @@ class RailgunEngineState {
   final RailgunFees? fees;
   final RailgunScanEvent? utxoScan;
   final RailgunScanEvent? txidScan;
+
+  /// How far the page's running `refresh` has come, 0 to 1; null while none
+  /// runs, and before it says.
+  final double? refresh;
   final RailgunProofEvent? proof;
 
   /// What the open page's screening work is doing, as it last said; null
@@ -174,10 +184,12 @@ class RailgunEngineState {
     RailgunEnginePhase? phase,
     RailgunScanEvent? utxoScan,
     RailgunScanEvent? txidScan,
+    double? refresh,
     RailgunProofEvent? proof,
     RailgunScreeningEvent? screening,
     RailgunSync? lastSync,
     bool clearScans = false,
+    bool clearRefresh = false,
     bool clearProof = false,
   }) => RailgunEngineState(
     phase: phase ?? this.phase,
@@ -186,6 +198,7 @@ class RailgunEngineState {
     fees: fees,
     utxoScan: clearScans ? null : (utxoScan ?? this.utxoScan),
     txidScan: clearScans ? null : (txidScan ?? this.txidScan),
+    refresh: clearRefresh ? null : (refresh ?? this.refresh),
     proof: clearProof ? null : (proof ?? this.proof),
     screening: screening ?? this.screening,
     lastSync: lastSync ?? this.lastSync,
@@ -326,6 +339,7 @@ class RailgunEngine {
           screening: refreshed.screening,
           at: _now(),
           received: refreshed.received,
+          shielding: refreshed.shielding,
         );
         _publish(state.value.copyWith(lastSync: sync));
         return sync;
@@ -630,6 +644,8 @@ class RailgunEngine {
               ? state.value.copyWith(utxoScan: scan)
               : state.value.copyWith(txidScan: scan),
         );
+      case final RailgunRefreshEvent refresh:
+        _publish(state.value.copyWith(refresh: refresh.progress));
       case final RailgunProofEvent proof:
         _publish(state.value.copyWith(proof: proof));
       case final RailgunScreeningEvent screening:
@@ -701,19 +717,24 @@ class RailgunSession {
 
   /// Syncs to the chain's tip, asks the screening nodes about new notes, and
   /// returns the balances with how the screening last went. A first sync
-  /// reads all of Railgun's history.
+  /// reads all of Railgun's history. How far it has come shows meanwhile in
+  /// [RailgunEngineState.refresh].
   Future<RailgunRefresh> refresh() async {
     _engine._publish(
       _engine.state.value.copyWith(
         phase: RailgunEnginePhase.syncing,
         clearScans: true,
+        clearRefresh: true,
       ),
     );
     final refreshed = RailgunRefresh.parse(
       _engine._decode(await _engine._call(this, 'refresh', '{}')),
     );
     _engine._publish(
-      _engine.state.value.copyWith(phase: RailgunEnginePhase.ready),
+      _engine.state.value.copyWith(
+        phase: RailgunEnginePhase.ready,
+        clearRefresh: true,
+      ),
     );
     if (refreshed.screening == RailgunScreening.failed) {
       privateUsdLog('Railgun screening failed');

@@ -79,7 +79,8 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
   void initState() {
     super.initState();
     // On open: a balance older than 30 s refreshes, and the deposits are
-    // read, with the vaults a refund can come from.
+    // read, with the vaults a refund can come from. The user waits on that
+    // refresh, or on one already under way, so it shows its progress.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(privateUsdDepositActionsProvider).refresh(checkVaults: true);
@@ -87,7 +88,10 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
       if (uuid == null) return;
       ref
           .read(privateUsdBalanceProvider(uuid).notifier)
-          .refresh(maxAge: PrivateUsdBalanceTiming.arrivingPoll);
+          .refresh(
+            maxAge: PrivateUsdBalanceTiming.arrivingPoll,
+            showProgress: true,
+          );
     });
     _depositTimer = Timer.periodic(_depositRefresh, (_) {
       if (mounted) ref.read(privateUsdDepositActionsProvider).refresh();
@@ -172,6 +176,7 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
       screening: screening,
       arrivingSince: privateUsdArrivingSince(
         arriving: balance.balances?.arriving ?? BigInt.zero,
+        shielded: balance.shieldingSince,
         forward: feed.records,
         reverse: feed.reverseRecords,
         deposits: feed.depositRecords,
@@ -190,8 +195,9 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
       activityRows: activity,
       onRefunds: hasRefunds ? openRefunds : null,
       onBack: () => context.pop(),
-      onRefresh: () =>
-          ref.read(privateUsdBalanceProvider(uuid).notifier).refresh(),
+      onRefresh: () => ref
+          .read(privateUsdBalanceProvider(uuid).notifier)
+          .refresh(showProgress: true),
       onOpenConversion: open,
       // The conversion under way opens instead of a new one (one at a time).
       onConvert: () => underWay == null
@@ -220,7 +226,7 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
     showAppToast(context, PrivateUsdCopy.rpcCleared);
     ref.read(privateUsdBalanceProvider(uuid).notifier)
       ..clearRpcFailed()
-      ..refresh();
+      ..refresh(showProgress: true);
   }
 
   /// Opens Settings' Ethereum RPC sheet; a URL saved there (which closes the
@@ -231,7 +237,7 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
     showAppToast(context, done);
     ref.read(privateUsdBalanceProvider(uuid).notifier)
       ..clearRpcFailed()
-      ..refresh();
+      ..refresh(showProgress: true);
   }
 }
 
@@ -656,9 +662,9 @@ class _TotalCard extends StatelessWidget {
     final updatedAt = state.updatedAt;
     final onUseDefaultRpc = this.onUseDefaultRpc;
     final onChangeRpc = this.onChangeRpc;
-    // The sync's progress is the sync line's: its percentage, and a refresh
-    // as the floor flowing. What stays here is what to expect of a first
-    // sync, and how old the balance is.
+    // The sync's progress is the sync line's: its percentage, and an
+    // automatic refresh as the floor flowing. What stays here is what to
+    // expect of a first sync, and how old the balance is.
     final status = balances == null
         ? (state.isLoading ? PrivateUsdCopy.firstLoad : null)
         : updatedAt == null
@@ -690,10 +696,7 @@ class _TotalCard extends StatelessWidget {
                   ),
                 ),
               ),
-              _RefreshButton(
-                busy: state.isRefreshing,
-                onTap: state.isRefreshing ? null : onRefresh,
-              ),
+              _RefreshButton(onTap: onRefresh),
             ],
           ),
           if (zec != null) ...[
@@ -772,79 +775,33 @@ class _TotalCard extends StatelessWidget {
   }
 }
 
-/// The total's refresh: its arrow turns while the balance refreshes, and
-/// finishes its turn when the refresh ends. Under reduced motion it holds
-/// still.
-class _RefreshButton extends StatefulWidget {
-  const _RefreshButton({required this.busy, required this.onTap});
+/// The total's refresh. Its progress is the sync line's, so the arrow holds
+/// still and always takes a tap: during an automatic refresh, a tap shows
+/// that refresh's progress rather than starting another.
+class _RefreshButton extends StatelessWidget {
+  const _RefreshButton({required this.onTap});
 
-  final bool busy;
-  final VoidCallback? onTap;
-
-  @override
-  State<_RefreshButton> createState() => _RefreshButtonState();
-}
-
-class _RefreshButtonState extends State<_RefreshButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _syncTurn();
-  }
-
-  @override
-  void didUpdateWidget(_RefreshButton oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _syncTurn();
-  }
-
-  void _syncTurn() {
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _controller
-        ..stop()
-        ..value = 0;
-    } else if (widget.busy) {
-      if (!_controller.isAnimating) _controller.repeat();
-    } else if (_controller.isAnimating) {
-      // Finish the turn rather than snap back.
-      _controller.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Semantics(
       button: true,
-      enabled: widget.onTap != null,
+      enabled: true,
       label: PrivateUsdCopy.refresh,
       excludeSemantics: true,
       child: GestureDetector(
         key: const ValueKey('mobile_private_usd_refresh'),
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
+        onTap: onTap,
         child: SizedBox.square(
           dimension: 44,
           child: Center(
-            child: RotationTransition(
-              turns: _controller,
-              child: AppIcon(
-                AppIcons.renew,
-                size: 20,
-                color: widget.busy ? colors.text.disabled : colors.text.primary,
-              ),
+            child: AppIcon(
+              AppIcons.renew,
+              size: 20,
+              color: colors.text.primary,
             ),
           ),
         ),

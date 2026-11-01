@@ -303,6 +303,24 @@ void main() {
     expect(refreshes, 1);
   });
 
+  // The progress is the sync line's: a tap during an automatic refresh shows
+  // that one's.
+  testWidgets('refresh takes a tap while a refresh runs, and its arrow holds '
+      'still', (tester) async {
+    await pumpScreen(
+      tester,
+      previewPrivateUsdBalance(available: 1, isRefreshing: true),
+    );
+    final refresh = find.byKey(const ValueKey('mobile_private_usd_refresh'));
+
+    expect(
+      find.descendant(of: refresh, matching: find.byType(RotationTransition)),
+      findsNothing,
+    );
+    await tester.tap(refresh);
+    expect(refreshes, 1);
+  });
+
   testWidgets('the info sheet explains the feature', (tester) async {
     await pumpScreen(tester, previewPrivateUsdBalance(available: 1));
 
