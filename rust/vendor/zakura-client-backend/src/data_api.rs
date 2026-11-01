@@ -2268,6 +2268,10 @@ pub trait WalletRead {
     /// transaction), given the range of block heights that the backend
     /// knows about.
     ///
+    /// The anchor is at or below `target_height - 1 - min_confirmations`, so the
+    /// default depth of three means three blocks behind the chain tip. This is
+    /// independent of spend confirmations, which count back from the target height.
+    ///
     /// This will return `Ok(None)` if no block data is present in the database.
     fn get_target_and_anchor_heights(
         &self,
@@ -2853,6 +2857,8 @@ pub struct ScannedBlock<AccountId> {
     orchard: ScannedBundles<orchard::tree::MerkleHashOrchard, orchard::note::Nullifier>,
     #[cfg(feature = "orchard")]
     ironwood: ScannedBundles<orchard::tree::MerkleHashOrchard, orchard::note::Nullifier>,
+    #[cfg(feature = "orchard")]
+    scanned_accounts: Vec<AccountId>,
 }
 
 impl<AccountId> ScannedBlock<AccountId> {
@@ -2871,6 +2877,7 @@ impl<AccountId> ScannedBlock<AccountId> {
             orchard::tree::MerkleHashOrchard,
             orchard::note::Nullifier,
         >,
+        #[cfg(feature = "orchard")] scanned_accounts: Vec<AccountId>,
     ) -> Self {
         Self {
             block_height,
@@ -2882,7 +2889,20 @@ impl<AccountId> ScannedBlock<AccountId> {
             orchard,
             #[cfg(feature = "orchard")]
             ironwood,
+            #[cfg(feature = "orchard")]
+            scanned_accounts,
         }
+    }
+
+    /// Returns the accounts whose ordinary Ironwood keys scanned this block. Every
+    /// transaction in the block that one of their keys recognizes is among
+    /// [`Self::transactions`], with its [`WalletTx::ironwood_nullifiers`]. Both the
+    /// compact and the full-block scanner record them.
+    ///
+    /// [`WalletTx::ironwood_nullifiers`]: crate::wallet::WalletTx::ironwood_nullifiers
+    #[cfg(feature = "orchard")]
+    pub fn scanned_accounts(&self) -> &[AccountId] {
+        &self.scanned_accounts
     }
 
     /// Returns the height of the block that was scanned.
@@ -2978,8 +2998,6 @@ pub struct DecryptedTransaction<'a, Tx: DecryptableTransaction<AccountId>, Accou
     orchard_outputs: Vec<Tx::DecryptedOrchardOutput>,
     #[cfg(feature = "orchard")]
     ironwood_outputs: Vec<Tx::DecryptedOrchardOutput>,
-    #[cfg(feature = "orchard")]
-    one_time_ivks_applied: bool,
 }
 
 impl<'a, Tx: DecryptableTransaction<AccountId>, AccountId> DecryptedTransaction<'a, Tx, AccountId> {
@@ -3002,8 +3020,6 @@ impl<'a, Tx: DecryptableTransaction<AccountId>, AccountId> DecryptedTransaction<
             orchard_outputs,
             #[cfg(feature = "orchard")]
             ironwood_outputs,
-            #[cfg(feature = "orchard")]
-            one_time_ivks_applied: false,
         }
     }
 
@@ -3031,23 +3047,6 @@ impl<'a, Tx: DecryptableTransaction<AccountId>, AccountId> DecryptedTransaction<
     #[cfg(feature = "orchard")]
     pub fn ironwood_outputs(&self) -> &[Tx::DecryptedOrchardOutput] {
         &self.ironwood_outputs
-    }
-
-    /// Whether the wallet's one-time keys were tried, through
-    /// [`decrypt_transaction_with_one_time_ivks`]. While a one-time key is open, a
-    /// store may refuse a transaction decrypted without them.
-    ///
-    /// [`decrypt_transaction_with_one_time_ivks`]: crate::decrypt_transaction_with_one_time_ivks
-    #[cfg(feature = "orchard")]
-    pub fn one_time_ivks_applied(&self) -> bool {
-        self.one_time_ivks_applied
-    }
-
-    /// Records that the wallet's one-time keys were tried.
-    #[cfg(feature = "orchard")]
-    pub(crate) fn with_one_time_ivks_applied(mut self) -> Self {
-        self.one_time_ivks_applied = true;
-        self
     }
 
     /// Returns whether the transaction has decrypted outputs

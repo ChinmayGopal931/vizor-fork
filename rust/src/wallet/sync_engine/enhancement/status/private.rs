@@ -1,16 +1,15 @@
 //! Private status observation. A selected private lookup never issues a txid RPC.
-use super::super::{
-    super::WalletDatabase, transport::StatusPirTransport, DEFAULT_MAINNET_ENDPOINT,
-};
+use super::super::{super::WalletDatabase, transport::StatusPirTransport};
 use crate::wallet::network::WalletNetwork;
+use crate::wallet::pir_config::{client_origin, PirProduct};
 use crate::wallet::transaction_data::{LookupError, TransactionObservation};
 use std::time::{SystemTime, UNIX_EPOCH};
-use zakura_pir_status::{
+use zakura_pir_client::status::policy::{
+    StatusError, StatusObservation, StatusRequest, StatusSession, StatusSource,
+};
+use zakura_pir_client::status::{
     transport::{PendingClient, StatusPirClient},
     AcceptedAnchor, Error, LocalCoverageContext, Observation,
-};
-use zakura_transaction_status::{
-    StatusError, StatusObservation, StatusRequest, StatusSession, StatusSource,
 };
 use zcash_client_backend::data_api::WalletRead;
 use zcash_primitives::transaction::TxId;
@@ -18,17 +17,10 @@ use zcash_protocol::consensus::BlockHeight;
 
 const MAINNET_GENESIS_DISPLAY: &str =
     "00040fe8ec8471911baa1db1266ea15dd06b4a8a5c453883c000b031973dce08";
-/// Debug builds only: overrides the Status PIR endpoint. Release builds
-/// always use [`DEFAULT_MAINNET_ENDPOINT`] and never read it.
-#[cfg(debug_assertions)]
-const ENDPOINT_ENV: &str = "VIZOR_STATUS_PIR_URL";
-
+/// The Status PIR endpoint: the selected wallet PIR server. Empty when none
+/// is selected, which fails before any request (see `enhance_endpoint`).
 fn status_endpoint() -> String {
-    #[cfg(debug_assertions)]
-    if let Ok(endpoint) = std::env::var(ENDPOINT_ENV) {
-        return endpoint;
-    }
-    DEFAULT_MAINNET_ENDPOINT.into()
+    client_origin(PirProduct::Status).unwrap_or_default()
 }
 
 fn now_ms() -> Result<u64, LookupError> {
@@ -191,7 +183,7 @@ fn require_bound_for_absence(
 
 fn accepted_anchor(
     db: &WalletDatabase,
-    manifest: &zakura_pir_status::Manifest,
+    manifest: &zakura_pir_client::status::Manifest,
 ) -> Result<AcceptedAnchor, LookupError> {
     if manifest.network != mainnet_genesis() {
         return Err(LookupError::Unavailable);
@@ -352,8 +344,8 @@ mod tests {
         let scanned = db.block_fully_scanned().unwrap().unwrap();
         let height = scanned.block_height();
         let hash = db.get_block_hash(height).unwrap().unwrap().0;
-        let mut manifest = zakura_pir_status::Manifest {
-            protocol: zakura_pir_status::PROTOCOL.into(),
+        let mut manifest = zakura_pir_client::status::Manifest {
+            protocol: zakura_pir_client::status::PROTOCOL.into(),
             network: mainnet_genesis(),
             salt: [1; 32],
             generation: 1,

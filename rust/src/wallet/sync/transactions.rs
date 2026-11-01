@@ -35,7 +35,7 @@ use zcash_client_backend::data_api::{
         TransparentLedgerBalance, TransparentLedgerMode, TransparentLedgerRead,
         TransparentLedgerSnapshot,
     },
-    Account as _, Balance, WalletRead, WalletWrite,
+    Balance, WalletRead, WalletWrite,
 };
 use zcash_client_sqlite::{wallet::history::TransactionSummary, AccountUuid};
 use zcash_primitives::transaction::TxId;
@@ -558,6 +558,7 @@ pub fn set_transaction_status(
 
 // ======================== Transaction History ========================
 
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub(crate) struct TransactionInfo {
     pub txid_hex: String,
     pub mined_height: u64,
@@ -1056,12 +1057,27 @@ struct ClassifiedTx {
     info: TransactionInfo,
     /// The outputs this row counted, which its receipt shows.
     outputs: Vec<OutputKey>,
-    sort_pending_rank: u8,
-    sort_timestamp: u64,
-    sort_mined_height: u64,
-    tx_index: i64,
+    sort_key: HistorySortKey,
     row_order: u8,
 }
+
+/// Transaction-level order shared by candidate selection and final Activity
+/// rows. Detail attachment never changes these fields. Lower row_order breaks
+/// ties only between the rows of the same transaction.
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct HistorySortKey {
+    pending_rank: u8,
+    timestamp: u64,
+    mined_height: u64,
+    tx_index: i64,
+    // Byte order is the same as the lowercase hex string order used by rows.
+    txid: Vec<u8>,
+}
+
+#[path = "transactions/history_pages.rs"]
+pub(crate) mod history_pages;
+#[path = "transactions/recent_history.rs"]
+mod recent_history;
 
 pub(crate) fn get_transaction_history(
     db_path: &str,
@@ -1070,8 +1086,39 @@ pub(crate) fn get_transaction_history(
     account_uuid: &str,
 ) -> Result<Vec<TransactionInfo>, String> {
     let account = parse_account_uuid(account_uuid)?;
+    if let Some(limit) = limit {
+        return history_pages::recent(db_path, network, account, limit);
+    }
     let conn = open_readonly_conn(db_path)?;
     read_transaction_history(&conn, db_path, network, limit, account)
+}
+
+/// The Activity rows of one transaction, `txid_hex` as
+/// [`TransactionInfo::txid_hex`], exactly as [`get_transaction_history`]
+/// lists them, without reading the library's history view of the account's
+/// other transactions. Empty when the account has no such row.
+pub(crate) fn get_transaction_rows(
+    db_path: &str,
+    network: WalletNetwork,
+    account_uuid: &str,
+    txid_hex: &str,
+) -> Result<Vec<TransactionInfo>, String> {
+    get_transaction_rows_for_txids(db_path, network, account_uuid, &[txid_hex.to_owned()])
+}
+
+/// A bounded set of requested transactions, sharing one history snapshot.
+pub(crate) fn get_transaction_rows_for_txids(
+    db_path: &str,
+    network: WalletNetwork,
+    account_uuid: &str,
+    txid_hexes: &[String],
+) -> Result<Vec<TransactionInfo>, String> {
+    let account = parse_account_uuid(account_uuid)?;
+    let txids = txid_hexes
+        .iter()
+        .map(|txid| hex::decode(txid).map_err(|e| format!("Invalid txid: {e}")))
+        .collect::<Result<HashSet<_>, _>>()?;
+    history_pages::targeted(db_path, network, account, &txids)
 }
 
 fn read_transaction_history(
@@ -1088,12 +1135,46 @@ fn read_transaction_history(
     let read_tx = conn
         .unchecked_transaction()
         .map_err(|e| format!("SQL error: {e}"))?;
-    let mut bases = read_history_bases(&read_tx, db_path, network, account)?;
-    if let Some(state) = crate::wallet::sync_engine::gift_card_claim::snapshot_from_conn(&read_tx)?
-    {
+    let mut bases = read_history_bases_with_claim_state(&read_tx, db_path, network, account)?;
+    if bases.is_empty() {
+        return Ok(Vec::new());
+    }
+    if let Some(limit) = limit {
+        return recent_history::assemble_recent_history(bases, uuid_bytes, limit, |batch| {
+            attach_history_details(&read_tx, db_path, network, account, batch)?;
+            read_history_outputs(
+                &read_tx,
+                uuid_bytes,
+                batch.iter().map(|base| base.txid.as_slice()),
+            )
+        });
+    }
+    attach_history_details(&read_tx, db_path, network, account, &mut bases)?;
+    let outputs_by_txid = read_history_outputs(
+        &read_tx,
+        uuid_bytes,
+        bases.iter().map(|base| base.txid.as_slice()),
+    )?;
+    drop(read_tx);
+    Ok(assemble_history(
+        &bases,
+        &outputs_by_txid,
+        uuid_bytes,
+        limit,
+    ))
+}
+
+fn read_history_bases_with_claim_state(
+    conn: &rusqlite::Connection,
+    db_path: &str,
+    network: WalletNetwork,
+    account: AccountUuid,
+) -> Result<Vec<TxBase>, String> {
+    let mut bases = read_history_bases(conn, db_path, network, account)?;
+    if let Some(state) = crate::wallet::sync_engine::gift_card_claim::snapshot_from_conn(conn)? {
         for base in &mut bases {
             if base.created.is_some() {
-                base.mined_height = read_tx
+                base.mined_height = conn
                     .query_row(
                         "SELECT height FROM vizor_giftcard_mined WHERE txid=?1",
                         [&base.txid],
@@ -1109,28 +1190,7 @@ fn read_transaction_history(
             }
         }
     }
-    if bases.is_empty() {
-        return Ok(Vec::new());
-    }
-    attach_history_details(&read_tx, db_path, network, account, &mut bases)?;
-
-    // Bind the txids already in `bases` instead of re-querying
-    // `v_transactions` for DISTINCT txid. That view selects
-    // `transactions.raw`, so a second pass would re-materialize every
-    // raw blob even though this path never reads them.
-    let outputs_by_txid = read_history_outputs(
-        &read_tx,
-        uuid_bytes,
-        bases.iter().map(|base| base.txid.as_slice()),
-    )?;
-    drop(read_tx);
-
-    Ok(assemble_history(
-        &bases,
-        &outputs_by_txid,
-        uuid_bytes,
-        limit,
-    ))
+    Ok(bases)
 }
 
 /// How many transactions one library history read covers.
@@ -1153,6 +1213,8 @@ fn attach_history_details(
         .collect::<Result<Vec<_>, _>>()?;
     let mut read = HashMap::with_capacity(bases.len());
     for batch in txids.chunks(HISTORY_DETAILS_BATCH) {
+        #[cfg(test)]
+        history_summary_tests::targeted::record_details(batch);
         for details in db
             .transaction_history_details(account, batch)
             .map_err(|e| format!("Failed to read history details: {e}"))?
@@ -1254,12 +1316,8 @@ fn assemble_history(
     }
 
     visible.sort_by(|a, b| {
-        b.sort_pending_rank
-            .cmp(&a.sort_pending_rank)
-            .then_with(|| b.sort_timestamp.cmp(&a.sort_timestamp))
-            .then_with(|| b.sort_mined_height.cmp(&a.sort_mined_height))
-            .then_with(|| b.tx_index.cmp(&a.tx_index))
-            .then_with(|| b.info.txid_hex.cmp(&a.info.txid_hex))
+        b.sort_key
+            .cmp(&a.sort_key)
             .then_with(|| a.row_order.cmp(&b.row_order))
     });
 
@@ -1771,6 +1829,8 @@ fn read_history_bases(
     network: WalletNetwork,
     account: AccountUuid,
 ) -> Result<Vec<TxBase>, String> {
+    #[cfg(test)]
+    history_summary_tests::targeted::record_summary();
     wallet_db_on(conn, db_path, network)
         .transaction_history_summaries(account)
         .map(|summaries| summaries.into_iter().map(TxBase::from).collect())
@@ -1818,6 +1878,8 @@ fn read_history_outputs<'a>(
     if txid_array.is_empty() {
         return Ok(HashMap::new());
     }
+    #[cfg(test)]
+    history_summary_tests::targeted::record_outputs(&txid_array);
 
     let mut stmt = conn
         .prepare(
@@ -2526,7 +2588,6 @@ fn build_classified_tx_with_fee(
     row_order: u8,
     fee: Fee,
 ) -> ClassifiedTx {
-    let sort_timestamp = base.display_timestamp();
     ClassifiedTx {
         outputs: Vec::new(),
         info: TransactionInfo {
@@ -2550,15 +2611,22 @@ fn build_classified_tx_with_fee(
             provisional: base.history.provisional,
             amount_includes_fee: false,
         },
-        sort_pending_rank: u8::from(base.mined_height.is_none() && !base.expired_unmined),
-        sort_timestamp,
-        sort_mined_height: base.mined_height.unwrap_or(0) as u64,
-        tx_index: base.tx_index,
+        sort_key: base.history_sort_key(),
         row_order,
     }
 }
 
 impl TxBase {
+    fn history_sort_key(&self) -> HistorySortKey {
+        HistorySortKey {
+            pending_rank: u8::from(self.mined_height.is_none() && !self.expired_unmined),
+            timestamp: self.display_timestamp(),
+            mined_height: self.mined_height.unwrap_or(0).into(),
+            tx_index: self.tx_index,
+            txid: self.txid.clone(),
+        }
+    }
+
     /// Records the history read's view of this transaction. A shielding is
     /// inferred only where the payment details justify it.
     fn attach_history(&mut self, history: HistoryCompleteness) {

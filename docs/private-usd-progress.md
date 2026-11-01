@@ -179,6 +179,15 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   `railgun-sepolia-list`, which repairs the chain and logs nothing. Checked
   live against the screening node; not yet seen on a phone.
 
+- **Zakura Common v4 and NU7 (2026-11-01, branch `sync/upstream-2026-11`).**
+  Upstream `main` at `a546cd3ec` merged: the Common 4.0.0 crates, which carry
+  mainnet NU7 at 3,543,405 (v3 had none, so every mainnet transaction after
+  activation would commit to the old branch). Both stand-ins moved: E1 to
+  `~/dev/zapp/zecSwap-zakura-v4-windows` (pins only), E4 to rc9.4 with the
+  pinned wallet-libraries sources. Deposits and joint sweeps take upstream's
+  NU7 expiry cap and hold. The mainnet maker's `zcash_protocol`
+  0.11.0-pre.0 has no mainnet NU7 either; 0.11.0 does. Not yet run on a
+  phone.
 - **Zakura Common v3 (2026-10-20, D-136).** The branch builds on upstream
   `main` at `75d3fae57` and the published Common 3.0.0 crates. Both
   stand-ins moved (B-6). Not yet run on the A35.

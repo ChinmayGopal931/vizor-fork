@@ -624,6 +624,28 @@ transparent addresses had activity.
   on the app-start `/unlock` screen. Never show it in any other passcode keypad
   context.
 
+### Mobile Screen Privacy
+
+Mobile screen privacy applies only while secret material is visible. Keep
+`SensitivePrivacyOverlay` on seed creation/import/review, settings seed, and
+viewing-key screens. It covers exposed secrets when the app loses foreground
+interaction and uses `NativeSensitiveContentBridge` for selective native capture
+exclusion (Android `FLAG_SECURE`, iOS `SecureScreenshotShield`). Ordinary screens
+and access gates with no exposed secret must remain uncovered in the app
+switcher; do not add app-wide native lifecycle covers.
+
+Keep `RouteCoverageAware` on import screens so capture exclusion survives route
+transitions and releases only after full coverage. Keep biometric prompt
+suppression around sensitive access gates, and exclude shielded content from
+screen-reader semantics without unmounting it. Desktop continues to use
+`SensitivePrivacyOverlay`.
+
+The mobile keep-awake lock owns system Back before payment cards and routes.
+Back may return from passcode entry to the lock status screen, but never acts
+on the covered app or interrupts authentication. Its idle deadline counts
+pointer, keyboard and deliberate platform semantics actions; automatic focus
+notifications do not extend it. Remove global input listeners on disposal.
+
 ### Dart Provider Structure
 
 ```
@@ -665,7 +687,8 @@ SyncProvider (sync_provider.dart)
   ├── Sync itself is account-agnostic (covers all accounts)
   ├── Polling pauses on app background (onHide), resumes on foreground (onResume)
   ├── refreshAfterSend() called after account switch for immediate update
-  └── refreshAfterUnlock() refreshes balances/history before foreground sync recovery
+  ├── refreshAfterUnlock() restores only the selected account's persisted display balance
+  └── refreshHomeInBackground() refreshes live balance/history after sync starts; each publishes independently
 
 SyncDisplayPercentageProvider (sync_display_progress_provider.dart)
   ├── Owns the 20 ms UI-only interpolation timer between Rust progress events
@@ -683,9 +706,10 @@ until sync callback arrives" flash.
 
 - `loadAppBootstrap()` reads:
   - secure storage (`zcash_accounts`, `zcash_active_account`, `zcash_wallet_network`)
-  - Rust wallet DB via `list_accounts`
-  - active-account DB data via `get_sync_status`, `get_balance`,
-    `get_transaction_history(limit: 10)`
+  - Rust wallet DB metadata via `list_accounts` (one projection; no viewing-key
+    decoding or address reads)
+  - the selected account's receive address and persisted display balance, only
+    when unlocked; no live balance summary or transaction history before `runApp`
 - If the wallet is locked, bootstrap does **not** hydrate active address or
   initial balance/history; it routes straight to `/unlock` and lets the unlock
   flow repopulate that state.
@@ -696,7 +720,7 @@ until sync callback arrives" flash.
 - `SyncProvider` starts from `bootstrap.initialSyncSnapshot` (balances, recent
   txs, scanned/tip heights) and then kicks off the normal live sync flow.
 - Bootstrap is best-effort: route/account bootstrap can still succeed even if
-  initial balance/history hydration fails, in which case sync state falls back
+  initial address/cache hydration fails, in which case sync state falls back
   to empty and the live sync repopulates it.
 
 ### Sync Engine (Rust-only)
@@ -883,6 +907,13 @@ Swift BackgroundMigrationPreparationManager
   `com.keplr.vizor.sync` is cancelled once at launch as a tombstone for requests
   submitted by older builds; no handler is registered for it.
 
+### Network Upgrades
+
+Read [docs/network-upgrades.md](docs/network-upgrades.md) before changing send
+expiry or block-time and wait-time estimates. It covers what the wallet refuses
+around an upgrade, where those rules live
+(`rust/src/wallet/network_upgrade.rs`), and NU7's block spacing.
+
 ### Tor and the network route
 
 Tor covers the app's foreground traffic only. The desired route lives in Rust
@@ -1002,6 +1033,14 @@ while an executed denomination preparation waits for confirmations.
 - `NotFound`, mempool height `0`, and fork height `UInt64.max` contribute zero
   confirmations. A normal mined height contributes
   `tip - minedHeight + 1`, capped at 3.
+- A preparation transaction the tracker saw broadcast while the next block
+  was still before a network upgrade, and that the server reports `NotFound`
+  on two consecutive passes once it is past, was dropped at activation (nodes
+  clear old-branch transactions, ZIP 200). The wave goes to the foreground
+  without failing the task, since only the foreground can stop the run.
+  Transactions first seen later may target the new branch and are not judged.
+  The check reads `zcash_next_upgrade_activation_height` and process memory,
+  not the wallet DB.
 - Reaching 3 confirmations finishes only the current observation wave. The
   manager stores a foreground-continuation token, posts an “Open Veylor”
   notification under its own `confirmedWaveReady` kind so healthy copy never
@@ -1051,8 +1090,9 @@ Before changing a Ledger send, Gift Card, shielding, swap, or voting flow, read
 `docs/ledger/limitations.md`. **32 actions per pool does not mean 32 recipients:**
 the device can review only **4 external shielded outputs across both pools**;
 internal change is excluded. Numeric limits live in `rust/src/wallet/ledger/limits.rs`.
-Keep account-key verification before PCZT transmission and retain the
-Orchard-to-Ironwood gate until the actual supported app passes its canary.
+Keep account-key verification before PCZT transmission. Apps before 3.10.0
+reject the NU7 branch and an Orchard spend into Ironwood; `LedgerAppSupport`
+carries what the connected app can sign, and the serializer refuses the rest.
 
 ### Signing Cancellation
 
@@ -1231,8 +1271,12 @@ the setting off restores public discovery from height 0.
 `create_wallet()` fetches chain tip from lightwalletd as birthday height before creating the account. This prevents new wallets from doing a full chain scan. Birthday fetch failure blocks wallet creation (network required).
 
 On mainnet, the wallet API (`rust/src/api/wallet.rs`, `restored_birthday`)
-stores every restored birthday rounded down to one past a 10,000-block grid
-point (`tree_states::restore_birthday`), so lightwalletd learns only the bucket.
+stores every restored birthday rounded down to one past a grid point
+(`tree_states::restore_birthday`), so lightwalletd learns only the bucket. The
+grid is every 10,000 blocks before NU7 and every 30,000 from it, about 8.7 days
+in both eras, and the bucket containing the activation starts at the last grid
+point before it. It is a height grid, not a calendar, so every app version
+draws the same buckets.
 When the grid point is a compiled checkpoint (`rust/src/wallet/tree_states.rs`)
 the first scan batch reads its state locally instead of sending
 `GetTreeState`; a restore newer than the table fetches the grid point's state.
@@ -1308,6 +1352,19 @@ Seed-relevance rule:
 - `onResume`: refreshes balance → `_checkAndSync()` (which starts polling)
 - `onHide`: stops polling (no wasted network in background)
 - `SyncState.recentTransactions`: latest 10 transactions, updated on `hasNewTx`, sync completion, and app resume
+- `hasCachedBalance` permits Home to display the persisted snapshot without setting
+  `hasBalanceData`, current pool balances, sync completion, or spendability. An
+  accepted live read updates current balances independently of history. Persisted
+  display snapshots follow the same release conditions as in-memory completed-sync
+  snapshots: a valid balance at sync completion, or an explicit send, proposal-release,
+  or account-switch refresh. Intermediate reads preserve spendable, pending, and
+  holdings displays. `hasRecentTransactionsData` and `hasRecentTransactionsError`
+  own the activity loading state.
+- Only completed-sync or explicit-release balance reads enqueue display-only
+  snapshots through `walletBalanceCacheProvider`; intermediate reads leave the
+  saved snapshot intact. Deletion/reset suspend and drain its writes.
+  `ext_vizor_balance_cache` is in the wallet DB and removed with its account;
+  writes open existing DB files only and do not invalidate the wallet-summary cache.
 - All balance/history queries pass `activeAccountUuid` from `AccountProvider`
 
 ### Desktop Window Bootstrap
@@ -1777,16 +1834,20 @@ far), per `docs/private-usd-ios-device-checklist.md`.
 **Local stand-ins.** `rust/Cargo.toml` carries two stand-ins for releases
 that do not exist yet:
 
-- `~/dev/zapp/zecSwap-zakura-windows`, a zecSwap `[patch]` outside the
+- `~/dev/zapp/zecSwap-zakura-v4-windows`, a zecSwap `[patch]` outside the
   repository: `zecswap-core` of the pinned rev (the windows contract's) on
-  Zakura Common v3 (E1). A clean clone builds only where that checkout
-  exists.
-- `rust/vendor/zakura-client-backend`, the published 0.1.0-rc9 with the
-  `connect_stream` patch the Railgun bridge needs
-  (`rust/vendor/zakura-client-backend.patch`, E4). Before every push,
-  `diff -r` it against the published crate: only `src/tor.rs` may differ.
-  Never run `cargo fmt --all`, which reformats it, and vendor it again for
-  a new backend release.
+  Zakura Common v4 (E1), branch `zakura-v4-windows`. A clean clone builds
+  only where that checkout exists.
+- `rust/vendor/zakura-client-backend`, the published 0.1.0-rc9.4 with the
+  sources of the wallet-libraries rev the `[patch]` pins (only
+  `src/data_api/chain.rs` and its test differ from the published crate) and
+  the `connect_stream` patch the Railgun bridge needs
+  (`rust/vendor/zakura-client-backend.patch`, E4). The crates.io package and
+  the wallet-libraries source are both patched to it, so one backend stays
+  in the graph. Before every push, `diff -r` its `src` against that rev's
+  `librustzcash/zcash_client_backend/src`: only `src/tor.rs` may differ.
+  Never run `cargo fmt --all`, which reformats it, and vendor it again
+  whenever the rev moves.
 
 The owner merged Private USD into the fork's `main` with the zecSwap
 stand-in in place (2026-10-20). Replace it with a pushed zecSwap rev once E1

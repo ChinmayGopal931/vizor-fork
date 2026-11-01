@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'keystone.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api_proposal_result`, `catch`, `enhance_pir_enabled`, `fetch_block_time`, `migration_status_from_balance`, `parse_network_and_migrate`, `payment_link_batch_pairs`, `run_full_sync_internal`, `to_wallet_action_sigs`, `to_wallet_migration_schedule`, `to_wallet_signed_messages`
+// These functions are ignored because they are not marked as `pub`: `api_proposal_result`, `api_transaction_info`, `catch`, `enhance_pir_enabled`, `fetch_block_time`, `migration_status_from_balance`, `parse_network_and_migrate`, `payment_link_batch_pairs`, `run_full_sync_internal`, `to_wallet_action_sigs`, `to_wallet_migration_schedule`, `to_wallet_signed_messages`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `MempoolObserverState`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`, `from`, `from`
 
@@ -369,6 +369,14 @@ Future<ProposalResult> proposeSend({
   memo: memo,
 );
 
+Future<WalletFeePolicy> getWalletFeePolicy({
+  required String dbPath,
+  required String network,
+}) => RustLib.instance.api.crateApiSyncGetWalletFeePolicy(
+  dbPath: dbPath,
+  network: network,
+);
+
 /// Estimate the fee for a transfer without storing a proposal.
 Future<BigInt> estimateFee({
   required String dbPath,
@@ -528,6 +536,7 @@ Future<KeystoneMigrationSigningRequest> prepareOrchardMigrationImmediatePczt({
   required BigInt approvedFeeZatoshi,
   required BigInt approvedMigratedZatoshi,
   required int approvedInputNoteCount,
+  required bool keystoneBatch,
 }) => RustLib.instance.api.crateApiSyncPrepareOrchardMigrationImmediatePczt(
   dbPath: dbPath,
   network: network,
@@ -536,6 +545,7 @@ Future<KeystoneMigrationSigningRequest> prepareOrchardMigrationImmediatePczt({
   approvedFeeZatoshi: approvedFeeZatoshi,
   approvedMigratedZatoshi: approvedMigratedZatoshi,
   approvedInputNoteCount: approvedInputNoteCount,
+  keystoneBatch: keystoneBatch,
 );
 
 Future<IronwoodMigrationResult> completeOrchardMigrationImmediatePczt({
@@ -1011,6 +1021,32 @@ Future<void> setTransactionStatus({
   status: status,
 );
 
+Future<ActivityHistoryIndex> getActivityHistoryIndex({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+}) => RustLib.instance.api.crateApiSyncGetActivityHistoryIndex(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+);
+
+/// At most 20 requested transactions, plus their classification dependencies.
+/// Each native detail/output read also contains at most 20 transactions.
+Future<ActivityHistoryRows> getActivityHistoryRows({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String snapshotId,
+  required List<String> txidHexes,
+}) => RustLib.instance.api.crateApiSyncGetActivityHistoryRows(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  snapshotId: snapshotId,
+  txidHexes: txidHexes,
+);
+
 Future<List<TransactionInfo>> getTransactionHistory({
   required String dbPath,
   required String network,
@@ -1021,6 +1057,37 @@ Future<List<TransactionInfo>> getTransactionHistory({
   network: network,
   limit: limit,
   accountUuid: accountUuid,
+);
+
+/// The Activity rows of one transaction, `txid_hex` as
+/// [`TransactionInfo::txid_hex`], exactly as [`get_transaction_history`]
+/// lists them, without reading the history of the account's other
+/// transactions. Empty when the account has no row for it. A receipt reads
+/// its transaction with this instead of the whole history.
+Future<List<TransactionInfo>> getTransactionRows({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required String txidHex,
+}) => RustLib.instance.api.crateApiSyncGetTransactionRows(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  txidHex: txidHex,
+);
+
+/// Activity rows for a set of txids in TransactionInfo storage byte order.
+/// Shares one DB snapshot and returns no rows for unrelated transactions.
+Future<List<TransactionInfo>> getTransactionRowsForTxids({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+  required List<String> txidHexes,
+}) => RustLib.instance.api.crateApiSyncGetTransactionRowsForTxids(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+  txidHexes: txidHexes,
 );
 
 Future<int> getPreviousTransactionCountForAddress({
@@ -1353,6 +1420,86 @@ Future<EnhanceRecoveryStatus> getEnhanceRecoveryStatus({
   dbPath: dbPath,
   network: network,
 );
+
+/// Lightweight account-wide ordering metadata. Reused while this DB snapshot
+/// remains current; it does not establish payment amounts or completeness.
+class ActivityHistoryIndex {
+  final String snapshotId;
+  final List<ActivityHistorySummary> summaries;
+
+  const ActivityHistoryIndex({
+    required this.snapshotId,
+    required this.summaries,
+  });
+
+  @override
+  int get hashCode => snapshotId.hashCode ^ summaries.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ActivityHistoryIndex &&
+          runtimeType == other.runtimeType &&
+          snapshotId == other.snapshotId &&
+          summaries == other.summaries;
+}
+
+class ActivityHistoryRows {
+  final bool stale;
+  final List<TransactionInfo> transactions;
+
+  const ActivityHistoryRows({required this.stale, required this.transactions});
+
+  @override
+  int get hashCode => stale.hashCode ^ transactions.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ActivityHistoryRows &&
+          runtimeType == other.runtimeType &&
+          stale == other.stale &&
+          transactions == other.transactions;
+}
+
+class ActivityHistorySummary {
+  final String txidHex;
+  final BigInt minedHeight;
+  final bool expiredUnmined;
+  final BigInt blockTime;
+  final BigInt createdTime;
+  final int sourceOrder;
+
+  const ActivityHistorySummary({
+    required this.txidHex,
+    required this.minedHeight,
+    required this.expiredUnmined,
+    required this.blockTime,
+    required this.createdTime,
+    required this.sourceOrder,
+  });
+
+  @override
+  int get hashCode =>
+      txidHex.hashCode ^
+      minedHeight.hashCode ^
+      expiredUnmined.hashCode ^
+      blockTime.hashCode ^
+      createdTime.hashCode ^
+      sourceOrder.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ActivityHistorySummary &&
+          runtimeType == other.runtimeType &&
+          txidHex == other.txidHex &&
+          minedHeight == other.minedHeight &&
+          expiredUnmined == other.expiredUnmined &&
+          blockTime == other.blockTime &&
+          createdTime == other.createdTime &&
+          sourceOrder == other.sourceOrder;
+}
 
 /// Flat address-validation result for the Dart side.
 ///
@@ -2082,6 +2229,9 @@ class MigrationOutboxItem {
   final int scheduleStartHeight;
   final int expiryHeight;
 
+  /// Height the part was signed for; the outbox holds it like the foreground.
+  final int targetHeight;
+
   const MigrationOutboxItem({
     required this.itemId,
     required this.partIndex,
@@ -2091,6 +2241,7 @@ class MigrationOutboxItem {
     required this.scheduledHeight,
     required this.scheduleStartHeight,
     required this.expiryHeight,
+    required this.targetHeight,
   });
 
   @override
@@ -2102,7 +2253,8 @@ class MigrationOutboxItem {
       anchorBoundaryHeight.hashCode ^
       scheduledHeight.hashCode ^
       scheduleStartHeight.hashCode ^
-      expiryHeight.hashCode;
+      expiryHeight.hashCode ^
+      targetHeight.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -2116,7 +2268,8 @@ class MigrationOutboxItem {
           anchorBoundaryHeight == other.anchorBoundaryHeight &&
           scheduledHeight == other.scheduledHeight &&
           scheduleStartHeight == other.scheduleStartHeight &&
-          expiryHeight == other.expiryHeight;
+          expiryHeight == other.expiryHeight &&
+          targetHeight == other.targetHeight;
 }
 
 class MigrationOutboxScheduleUpdate {
@@ -2379,15 +2532,23 @@ class MigrationScheduledTransfer {
   final BigInt valueZatoshi;
   final int blockOffset;
 
+  /// Blocks per ZIP 318 reference block the schedule was drawn at; an
+  /// approved schedule drawn at another spacing is refused.
+  final int blocksPerReferenceBlock;
+
   const MigrationScheduledTransfer({
     required this.partIndex,
     required this.valueZatoshi,
     required this.blockOffset,
+    required this.blocksPerReferenceBlock,
   });
 
   @override
   int get hashCode =>
-      partIndex.hashCode ^ valueZatoshi.hashCode ^ blockOffset.hashCode;
+      partIndex.hashCode ^
+      valueZatoshi.hashCode ^
+      blockOffset.hashCode ^
+      blocksPerReferenceBlock.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -2396,7 +2557,8 @@ class MigrationScheduledTransfer {
           runtimeType == other.runtimeType &&
           partIndex == other.partIndex &&
           valueZatoshi == other.valueZatoshi &&
-          blockOffset == other.blockOffset;
+          blockOffset == other.blockOffset &&
+          blocksPerReferenceBlock == other.blocksPerReferenceBlock;
 }
 
 class MigrationStatus {
@@ -3631,4 +3793,33 @@ enum WalletBalanceAvailability {
   available,
   summaryUnavailable,
   accountUnavailable,
+}
+
+/// Fee policy for new transactions at this wallet's authoritative target height.
+/// Reads only local chain state; no network request is made.
+class WalletFeePolicy {
+  final int targetHeight;
+  final BigInt marginalFeeZatoshi;
+  final BigInt minimumFeeZatoshi;
+
+  const WalletFeePolicy({
+    required this.targetHeight,
+    required this.marginalFeeZatoshi,
+    required this.minimumFeeZatoshi,
+  });
+
+  @override
+  int get hashCode =>
+      targetHeight.hashCode ^
+      marginalFeeZatoshi.hashCode ^
+      minimumFeeZatoshi.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WalletFeePolicy &&
+          runtimeType == other.runtimeType &&
+          targetHeight == other.targetHeight &&
+          marginalFeeZatoshi == other.marginalFeeZatoshi &&
+          minimumFeeZatoshi == other.minimumFeeZatoshi;
 }

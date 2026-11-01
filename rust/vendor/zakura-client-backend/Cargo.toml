@@ -13,12 +13,12 @@
 edition = "2024"
 rust-version = "1.97"
 name = "zakura-client-backend"
-version = "0.1.0-rc9"
+version = "0.1.0-rc9.4"
 authors = [
     "Jack Grigg <jack@z.cash>",
     "Kris Nuttycombe <kris@electriccoin.co>",
 ]
-build = "build.rs"
+build = false
 exclude = ["*.proto"]
 autolib = false
 autobins = false
@@ -63,6 +63,7 @@ lightwalletd-tonic-transport = [
 ]
 non-standard-fees = ["zcash_primitives/non-standard-fees"]
 orchard = [
+    "zakura-pir-protocol/receiver",
     "dep:pasta_curves",
     "dep:zakura-one-time-ivk",
     "zcash_keys/orchard",
@@ -78,6 +79,11 @@ pczt = [
     "pczt/tx-extractor",
     "dep:postcard",
     "dep:serde",
+]
+proving-tests = [
+    "test-dependencies",
+    "pczt",
+    "zcash_proofs/bundled-prover",
 ]
 spend-index = ["transparent-inputs"]
 sync = [
@@ -104,7 +110,6 @@ test-dependencies = [
     "orchard/test-dependencies",
     "zcash_keys/test-dependencies",
     "zcash_primitives/test-dependencies",
-    "zcash_proofs/bundled-prover",
     "zcash_protocol/local-consensus",
     "incrementalmerkletree/test-dependencies",
 ]
@@ -129,6 +134,7 @@ tor = [
     "dep:webpki-roots",
 ]
 transparent-inputs = [
+    "zakura-pir-protocol/transparent-inputs",
     "dep:bip32",
     "dep:secp256k1",
     "transparent/transparent-inputs",
@@ -194,7 +200,7 @@ optional = true
 default-features = false
 
 [dependencies.bls12_381]
-version = "3.0.0"
+version = "4.0.0"
 package = "zakura-bls12-381"
 
 [dependencies.bs58]
@@ -260,12 +266,13 @@ version = "0.8.2"
 default-features = false
 
 [dependencies.jubjub]
-version = "3.0.0"
+version = "4.0.0"
 optional = true
 package = "zakura-jubjub"
 
 [dependencies.memuse]
 version = "0.2.2"
+features = ["std"]
 default-features = false
 
 [dependencies.nonempty]
@@ -273,17 +280,18 @@ version = "0.11"
 default-features = false
 
 [dependencies.orchard]
-version = "3.0.0"
+version = "4.0.0"
+features = ["backend-halo2"]
 default-features = false
 package = "zakura-orchard"
 
 [dependencies.pasta_curves]
-version = "3.0.0"
+version = "4.0.0"
 optional = true
 package = "zakura-pasta-curves"
 
 [dependencies.pczt]
-version = "0.1.0-rc6"
+version = "0.1.0-rc9"
 optional = true
 package = "zakura-pczt"
 
@@ -334,7 +342,7 @@ optional = true
 default-features = false
 
 [dependencies.sapling]
-version = "3.0.0"
+version = "4.0.0"
 default-features = false
 package = "zakura-sapling-crypto"
 
@@ -407,7 +415,7 @@ version = "0.1"
 optional = true
 
 [dependencies.transparent]
-version = "3.0.0"
+version = "4.0.0"
 default-features = false
 package = "zakura-transparent"
 
@@ -416,14 +424,18 @@ version = "1"
 optional = true
 
 [dependencies.zakura-one-time-ivk]
-version = "=0.0.1-rc0"
+version = "=0.0.1-rc4"
 optional = true
 
-[dependencies.zakura-pir-enhance-types]
-version = "=0.0.1-rc1"
+[dependencies.zakura-pir-protocol]
+version = "=0.0.1-rc3"
+features = [
+    "enhance",
+    "recovery",
+]
 
 [dependencies.zcash_address]
-version = "3.0.0"
+version = "4.0.0"
 default-features = false
 package = "zakura-address"
 
@@ -432,7 +444,7 @@ version = "0.4"
 default-features = false
 
 [dependencies.zcash_keys]
-version = "3.0.0"
+version = "4.0.0"
 features = [
     "std",
     "sapling",
@@ -442,26 +454,27 @@ default-features = false
 package = "zakura-keys"
 
 [dependencies.zcash_note_encryption]
-version = "3.0.0"
+version = "4.0.0"
 package = "zakura-note-encryption"
 
 [dependencies.zcash_primitives]
-version = "3.0.0"
+version = "4.0.0"
 features = [
     "std",
     "circuits",
+    "wallet",
 ]
 default-features = false
 package = "zakura-primitives"
 
 [dependencies.zcash_proofs]
-version = "3.0.0"
+version = "4.0.0"
 optional = true
 default-features = false
 package = "zakura-proofs"
 
 [dependencies.zcash_protocol]
-version = "3.0.0"
+version = "4.0.0"
 default-features = false
 package = "zakura-protocol"
 
@@ -474,7 +487,7 @@ version = "0.2"
 default-features = false
 
 [dependencies.zip321]
-version = "3.0.0"
+version = "4.0.0"
 package = "zakura-zip321"
 
 [dev-dependencies.ambassador]
@@ -492,7 +505,7 @@ features = ["test-dependencies"]
 default-features = false
 
 [dev-dependencies.jubjub]
-version = "3.0.0"
+version = "4.0.0"
 package = "zakura-jubjub"
 
 [dev-dependencies.proptest]
@@ -520,50 +533,42 @@ features = [
 ]
 
 [dev-dependencies.transparent]
-version = "3.0.0"
+version = "4.0.0"
 features = ["test-dependencies"]
 default-features = false
 package = "zakura-transparent"
 
 [dev-dependencies.zcash_address]
-version = "3.0.0"
+version = "4.0.0"
 features = ["test-dependencies"]
 default-features = false
 package = "zakura-address"
 
 [dev-dependencies.zcash_keys]
-version = "3.0.0"
+version = "4.0.0"
 features = ["test-dependencies"]
 default-features = false
 package = "zakura-keys"
 
 [dev-dependencies.zcash_primitives]
-version = "3.0.0"
+version = "4.0.0"
 features = ["test-dependencies"]
 default-features = false
 package = "zakura-primitives"
 
 [dev-dependencies.zcash_proofs]
-version = "3.0.0"
-features = ["bundled-prover"]
+version = "4.0.0"
 default-features = false
 package = "zakura-proofs"
 
 [dev-dependencies.zcash_protocol]
-version = "3.0.0"
+version = "4.0.0"
 features = [
     "local-consensus",
     "test-dependencies",
 ]
 default-features = false
 package = "zakura-protocol"
-
-[build-dependencies.tonic-prost-build]
-version = "0.14"
-default-features = false
-
-[build-dependencies.which]
-version = "8"
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

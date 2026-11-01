@@ -13,6 +13,7 @@ class MobileScanAddressRow extends StatelessWidget {
     this.padding = EdgeInsets.zero,
     this.iconFrameKey,
     this.scalesText = true,
+    this.subtitle = defaultSubtitle,
     super.key,
   });
 
@@ -28,9 +29,12 @@ class MobileScanAddressRow extends StatelessWidget {
   /// it keeps them unscaled.
   final bool scalesText;
 
+  /// The second line. ZEC send also opens payment requests from the scan.
+  final String subtitle;
+
   static const height = 44.0;
   static const title = 'Scan a QR code';
-  static const subtitle = 'Scan an address using camera';
+  static const defaultSubtitle = 'Scan an address using camera';
 
   /// Each line's own height, at the default text size: the two fit the row.
   static const _lineHeight = 17.0;

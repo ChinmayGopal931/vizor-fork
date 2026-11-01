@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../main.dart' show log;
 import '../../../core/config/pricing_engine_config.dart';
+import '../../../core/storage/wallet_paths.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/app_foreground_provider.dart';
 import '../../../providers/app_security_provider.dart';
@@ -9,7 +10,6 @@ import '../../../providers/privacy_mode_provider.dart';
 import '../../../providers/rpc_endpoint_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../../rust/api/sync.dart' as rust_sync;
-import '../../activity/activity_eta_provider.dart';
 import '../models/portfolio_chart_models.dart';
 import '../services/portfolio_balance_history.dart';
 import '../services/portfolio_price_history_source.dart';
@@ -112,6 +112,24 @@ class PortfolioBalanceSnapshot {
   final BalanceHistory history;
 }
 
+/// Every transaction of an account, from the local wallet DB: what the
+/// balance history is folded from.
+typedef PortfolioTransactionHistoryLoader =
+    Future<List<rust_sync.TransactionInfo>> Function(
+      String accountUuid,
+      String network,
+    );
+
+final portfolioTransactionHistoryLoaderProvider =
+    Provider<PortfolioTransactionHistoryLoader>(
+      (ref) =>
+          (accountUuid, network) async => rust_sync.getTransactionHistory(
+            dbPath: await getWalletDbPath(),
+            network: network,
+            accountUuid: accountUuid,
+          ),
+    );
+
 /// The active account's balance over time: `null` while the wallet is locked
 /// or still scanning, or when its transactions do not add up to a history.
 /// The previous snapshot stays the value while it reloads, so it names its
@@ -121,7 +139,7 @@ final portfolioBalanceHistoryProvider =
       final key = ref.watch(_historyKeyProvider);
       final accountUuid = key.accountUuid;
       if (accountUuid == null || !key.ready) return null;
-      final loader = ref.watch(activityEtaClaimHistoryLoaderProvider);
+      final loader = ref.watch(portfolioTransactionHistoryLoaderProvider);
       final network = ref.watch(
         rpcEndpointProvider.select((endpoint) => endpoint.networkName),
       );

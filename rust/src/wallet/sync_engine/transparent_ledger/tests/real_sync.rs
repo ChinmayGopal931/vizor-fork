@@ -11,7 +11,7 @@
 //! [`isolated_test`]: crate::wallet::db::isolated_test
 
 use transparent::address::TransparentAddress;
-use zakura_pir_transparent::testing::{transparent_filter, transparent_shard};
+use zakura_pir_client::transparent::testing::{filter, shard};
 
 use super::pir::{assert_private, BIRTHDAY, TOP};
 use super::qualification::disclosing;
@@ -410,10 +410,10 @@ fn a_shard_map_of_another_chain_recovers_nothing() {
     }
     misbehaving(
         |request, _, body| {
-            if request.path == "/v2/filters/shards" {
+            if request.path == "/transparent/v1/filters/shards" {
                 replace(
                     body,
-                    transparent_filter::MAINNET_GENESIS_DISPLAY.as_bytes(),
+                    filter::MAINNET_GENESIS_DISPLAY.as_bytes(),
                     "11".repeat(32).as_bytes(),
                     &TAMPERED,
                 );
@@ -435,10 +435,10 @@ fn a_service_on_another_schema_recovers_nothing() {
     }
     misbehaving(
         |request, _, body| {
-            if request.path == "/v2/shards/init" {
+            if request.path == "/transparent/v1/shards/init" {
                 replace(
                     body,
-                    transparent_shard::manifest::SCHEMA.as_bytes(),
+                    shard::manifest::SCHEMA.as_bytes(),
                     b"transparent-shard-v99",
                     &TAMPERED,
                 );

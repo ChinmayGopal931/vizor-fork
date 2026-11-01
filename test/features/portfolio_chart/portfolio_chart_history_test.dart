@@ -5,7 +5,6 @@ import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/pricing_engine_config.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
 import 'package:zcash_wallet/src/core/profile_pictures.dart';
-import 'package:zcash_wallet/src/features/activity/activity_eta_provider.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/models/portfolio_chart_models.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/providers/portfolio_chart_provider.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/providers/portfolio_chart_settings_provider.dart';
@@ -998,7 +997,7 @@ ProviderContainer _container({
       ),
       portfolioChartNowProvider.overrideWithValue(now ?? () => _now),
       portfolioPriceHistorySourceProvider.overrideWithValue(source),
-      activityEtaClaimHistoryLoaderProvider.overrideWithValue((
+      portfolioTransactionHistoryLoaderProvider.overrideWithValue((
         accountUuid,
         network,
       ) async {

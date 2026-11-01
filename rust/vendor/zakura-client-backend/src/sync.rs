@@ -36,14 +36,9 @@ use {
 };
 
 #[cfg(all(feature = "sync", feature = "orchard"))]
-use {
-    crate::data_api::{
-        chain::scan_cached_blocks_with_one_time_ivks, one_time_ivk::OneTimeIvkWrite,
-    },
-    orchard::tree::MerkleHashOrchard,
-};
+use orchard::tree::MerkleHashOrchard;
 
-#[cfg(all(feature = "sync", not(feature = "orchard")))]
+#[cfg(feature = "sync")]
 use crate::data_api::chain::scan_cached_blocks;
 
 #[cfg(all(feature = "sync", feature = "transparent-inputs"))]
@@ -61,20 +56,12 @@ use {
 #[cfg(feature = "sync-decryptor")]
 pub mod decryptor;
 
-/// The wallet store [`run`] scans into. With `orchard` it also holds one-time IVKs, and
-/// blocks are scanned with them (see [`scan_cached_blocks_with_one_time_ivks`]), since a
-/// store may refuse blocks scanned without its open one-time keys.
-#[cfg(all(feature = "sync", feature = "orchard"))]
-pub trait SyncWallet: OneTimeIvkWrite {}
-
-#[cfg(all(feature = "sync", feature = "orchard"))]
-impl<T: OneTimeIvkWrite> SyncWallet for T {}
-
-/// The wallet store [`run`] scans into.
-#[cfg(all(feature = "sync", not(feature = "orchard")))]
+/// A wallet store [`run`] can scan into: any [`WalletWrite`] store. Earlier releases also
+/// required one-time IVK storage in builds with `orchard`; ordinary sync no longer uses it.
+#[cfg(feature = "sync")]
 pub trait SyncWallet: WalletWrite {}
 
-#[cfg(all(feature = "sync", not(feature = "orchard")))]
+#[cfg(feature = "sync")]
 impl<T: WalletWrite> SyncWallet for T {}
 
 /// Scans the chain until the wallet is up-to-date.
@@ -94,7 +81,7 @@ where
     <ChT::ResponseBody as Body>::Error: Into<StdError> + Send,
     CaT: BlockCache,
     CaT::Error: std::error::Error + Send + Sync + 'static,
-    DbT: SyncWallet + WalletCommitmentTrees + TransparentLedgerRead,
+    DbT: WalletWrite + WalletCommitmentTrees + TransparentLedgerRead,
     <DbT as WalletRead>::AccountId: ConditionallySelectable + Default + Send + Sync + 'static,
     <DbT as WalletRead>::Error: std::error::Error + Send + Sync + 'static,
     <DbT as WalletCommitmentTrees>::Error: std::error::Error + Send + Sync + 'static,
@@ -124,7 +111,7 @@ where
     <ChT::ResponseBody as Body>::Error: Into<StdError> + Send,
     CaT: BlockCache,
     CaT::Error: std::error::Error + Send + Sync + 'static,
-    DbT: SyncWallet + TransparentLedgerRead,
+    DbT: WalletWrite + TransparentLedgerRead,
     <DbT as WalletRead>::AccountId: ConditionallySelectable + Default + Send + Sync + 'static,
     <DbT as WalletRead>::Error: std::error::Error + Send + Sync + 'static,
 {
@@ -455,13 +442,11 @@ where
     P: Parameters + Send + 'static,
     CaT: BlockCache,
     CaT::Error: std::error::Error + Send + Sync + 'static,
-    DbT: SyncWallet,
+    DbT: WalletWrite,
     <DbT as WalletRead>::AccountId: ConditionallySelectable + Default + Send + Sync + 'static,
     <DbT as WalletRead>::Error: std::error::Error + Send + Sync + 'static,
 {
     info!("Scanning {}", scan_range);
-    #[cfg(feature = "orchard")]
-    let scan_cached_blocks = scan_cached_blocks_with_one_time_ivks;
     let scan_result = scan_cached_blocks(
         params,
         db_cache,
@@ -752,5 +737,21 @@ mod tests {
         });
 
         assert_eq!(request_count.load(Ordering::Relaxed), 3);
+    }
+}
+
+#[cfg(all(test, feature = "sync", feature = "test-dependencies"))]
+mod sync_wallet_tests {
+    use super::SyncWallet;
+    use crate::data_api::testing::MockWalletDb;
+
+    /// Compiles only for a [`SyncWallet`].
+    fn syncs_into<T: SyncWallet>() {}
+
+    /// The `SyncWallet` bound published releases named still holds for every wallet store,
+    /// with `orchard` or without it.
+    #[test]
+    fn every_wallet_store_is_a_sync_wallet() {
+        syncs_into::<MockWalletDb>();
     }
 }

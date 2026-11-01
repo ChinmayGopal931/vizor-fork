@@ -8,7 +8,7 @@ use std::{
     num::{NonZeroU8, NonZeroU32, NonZeroU64},
 };
 
-#[cfg(feature = "pczt")]
+#[cfg(feature = "proving-tests")]
 use super::wallet::{create_pczt_from_proposal, extract_and_store_transaction_from_pczt};
 use assert_matches::assert_matches;
 use group::ff::Field;
@@ -53,7 +53,7 @@ use zcash_primitives::{
     block::BlockHash,
     transaction::{Transaction, TxId, components::sapling::zip212_enforcement, fees::FeeRule},
 };
-#[cfg(feature = "pczt")]
+#[cfg(feature = "proving-tests")]
 use zcash_proofs::prover::LocalTxProver;
 use zcash_protocol::{
     ShieldedPool,
@@ -240,7 +240,7 @@ where
     )
 }
 
-#[cfg(feature = "pczt")]
+#[cfg(feature = "proving-tests")]
 fn real_test_prover() -> &'static LocalTxProver {
     use std::sync::OnceLock;
 
@@ -1122,73 +1122,6 @@ where
     }
 }
 
-#[cfg(feature = "orchard")]
-impl<Cache, DbT, ParamsT> TestState<Cache, DbT, ParamsT>
-where
-    Cache: TestCache,
-    <Cache::BlockSource as BlockSource>::Error: fmt::Debug,
-    ParamsT: consensus::Parameters + Send + 'static,
-    DbT: InputSource + WalletTest + super::one_time_ivk::OneTimeIvkWrite + WalletCommitmentTrees,
-    <DbT as WalletRead>::AccountId:
-        std::fmt::Debug + ConditionallySelectable + Default + Send + Sync + 'static,
-{
-    /// Invokes [`scan_cached_blocks_with_one_time_ivks`] with the given arguments, expecting
-    /// success.
-    ///
-    /// [`scan_cached_blocks_with_one_time_ivks`]: super::chain::scan_cached_blocks_with_one_time_ivks
-    pub fn scan_cached_blocks_with_one_time_ivks(
-        &mut self,
-        from_height: BlockHeight,
-        limit: usize,
-    ) -> ScanSummary {
-        let result = self.try_scan_cached_blocks_with_one_time_ivks(from_height, limit);
-        assert_matches!(result, Ok(_));
-        result.unwrap()
-    }
-
-    /// Invokes [`scan_cached_blocks_with_one_time_ivks`] with the given arguments.
-    ///
-    /// [`scan_cached_blocks_with_one_time_ivks`]: super::chain::scan_cached_blocks_with_one_time_ivks
-    pub fn try_scan_cached_blocks_with_one_time_ivks(
-        &mut self,
-        from_height: BlockHeight,
-        limit: usize,
-    ) -> Result<
-        ScanSummary,
-        super::chain::error::Error<
-            <DbT as WalletRead>::Error,
-            <Cache::BlockSource as BlockSource>::Error,
-        >,
-    > {
-        let prior_cached_block = self
-            .latest_cached_block_below_height(from_height)
-            .cloned()
-            .unwrap_or_else(|| CachedBlock::none(from_height - 1));
-
-        super::chain::scan_cached_blocks_with_one_time_ivks(
-            &self.network,
-            self.cache.block_source(),
-            &mut self.wallet_data,
-            from_height,
-            &prior_cached_block.chain_state,
-            limit,
-        )
-    }
-
-    /// [`Self::generate_and_scan_empty_blocks`], scanning with one-time keys.
-    pub fn generate_and_scan_empty_blocks_with_one_time_ivks(&mut self, n: usize) -> BlockHeight {
-        for _ in 0..n {
-            let (height, _) = self.generate_empty_block();
-            self.scan_cached_blocks_with_one_time_ivks(height, 1);
-        }
-        self.wallet()
-            .block_fully_scanned()
-            .expect("the wallet reports its fully-scanned block")
-            .expect("the wallet is fully scanned")
-            .block_height()
-    }
-}
-
 impl<Cache, DbT, ParamsT> TestState<Cache, DbT, ParamsT>
 where
     Cache: TestCache,
@@ -1230,6 +1163,53 @@ where
             &prior_cached_block.chain_state,
             limit,
         )
+    }
+
+    /// Invokes [`decrypt_cached_blocks`] with the given arguments, expecting success.
+    ///
+    /// [`decrypt_cached_blocks`]: super::chain::decrypt_cached_blocks
+    pub fn decrypt_cached_blocks(
+        &self,
+        from_height: BlockHeight,
+        limit: usize,
+    ) -> super::chain::BlockDecryption<<DbT as WalletRead>::AccountId> {
+        match super::chain::decrypt_cached_blocks(
+            &self.network,
+            self.cache.block_source(),
+            &self.wallet_data,
+            from_height,
+            limit,
+        ) {
+            Ok(decryption) => decryption,
+            Err(e) => panic!("decrypt_cached_blocks failed: {e:?}"),
+        }
+    }
+
+    /// Invokes [`scan_decrypted_blocks`] with the given arguments, expecting success.
+    ///
+    /// [`scan_decrypted_blocks`]: super::chain::scan_decrypted_blocks
+    pub fn scan_decrypted_blocks(
+        &mut self,
+        from_height: BlockHeight,
+        limit: usize,
+        decryption: super::chain::BlockDecryption<<DbT as WalletRead>::AccountId>,
+    ) -> ScanSummary {
+        let prior_cached_block = self
+            .latest_cached_block_below_height(from_height)
+            .cloned()
+            .unwrap_or_else(|| CachedBlock::none(from_height - 1));
+
+        let result = super::chain::scan_decrypted_blocks(
+            &self.network,
+            self.cache.block_source(),
+            &mut self.wallet_data,
+            from_height,
+            &prior_cached_block.chain_state,
+            limit,
+            decryption,
+        );
+        assert_matches!(result, Ok(_));
+        result.unwrap()
     }
 
     /// Invokes [`scan_cached_blocks`] with a caller-supplied `from_state` instead of deriving it
@@ -1666,7 +1646,7 @@ where
     /// Invokes [`create_pczt_from_proposal`] with the given arguments.
     ///
     /// [`create_pczt_from_proposal`]: super::wallet::create_pczt_from_proposal
-    #[cfg(feature = "pczt")]
+    #[cfg(feature = "proving-tests")]
     #[allow(clippy::type_complexity)]
     pub fn create_pczt_from_proposal<InputsErrT, FeeRuleT, ChangeErrT>(
         &mut self,
@@ -1698,7 +1678,7 @@ where
     /// Invokes [`extract_and_store_transaction_from_pczt`] with the given arguments.
     ///
     /// [`extract_and_store_transaction_from_pczt`]: super::wallet::extract_and_store_transaction_from_pczt
-    #[cfg(feature = "pczt")]
+    #[cfg(feature = "proving-tests")]
     #[allow(clippy::type_complexity)]
     pub fn extract_and_store_transaction_from_pczt(
         &mut self,
@@ -1710,8 +1690,10 @@ where
         let prover = real_test_prover();
         let (spend_vk, output_vk) = prover.verifying_keys();
 
+        let params = self.network().clone();
         extract_and_store_transaction_from_pczt(
             self.wallet_mut(),
+            &params,
             pczt,
             Some((&spend_vk, &output_vk)),
             None,

@@ -44,6 +44,7 @@ class _CoinGeckoOverTor implements TorHttpBridge {
     required Map<String, String> headers,
     required Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
   }) async {
     this.headers.add(Map.of(headers));
     return NetworkHttpResponse(
@@ -59,6 +60,7 @@ class _CoinGeckoOverTor implements TorHttpBridge {
     required List<int> bodyBytes,
     required Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
   }) => throw UnimplementedError();
 
   @override
