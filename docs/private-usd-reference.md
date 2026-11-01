@@ -860,10 +860,11 @@ A call whose coroutine is cancelled is answered `closed`, so every call gets exa
   - A failed own-asset load closes the page early (`:229-237`).
   - `onRenderProcessGone` closes the page (`:221-227`).
   - `WebView` construction failure (package missing or updating) becomes `RailgunException.Unavailable` (`:267-273`).
-- **The allowlist.** It lives in `rl/.../RailgunModels.kt:28-58`, and the same hosts are repeated in the CSP (`rl/web/src/index.html:5`):
+- **The allowlist.** It lives in `rl/.../RailgunModels.kt:28-58`, and the same hosts are repeated in the CSP (`rl/web/src/index.html:5`). Veylor's copy (`RailgunEndpoints.kt`, `RailgunEndpoints.swift`, Rust's `RAILGUN_PAGE_HOSTS`, the CSP and its two bundle copies, pinned together by a Rust test) is longer since D-155 (2026-10-29): every RPC provider a user's own URL may name (`Deployment::rpc_hosts`), with `*.` entries for any subdomain, one label or more (QuickNode names each endpoint, Chainstack each dedicated node):
   - `ethereum-rpc.publicnode.com`, `ethereum-sepolia-rpc.publicnode.com`
   - `eth-mainnet.g.alchemy.com`, `eth-sepolia.g.alchemy.com`
   - `mainnet.infura.io`, `sepolia.infura.io`
+  - `*.quiknode.pro`; `ethereum-mainnet.core.chainstack.com`, `ethereum-sepolia.core.chainstack.com`, `*.p2pify.com`; `rpc.ankr.com`; `lb.drpc.live`, `lb.drpc.org`, `eth.drpc.org`, `sepolia.drpc.org`; `ethereum.blockpi.network`, `ethereum-sepolia.blockpi.network`, `ethereum.public.blockpi.network`; `mainnet.gateway.tenderly.co`, `sepolia.gateway.tenderly.co`, `gateway.tenderly.co`; `eth-mainnet.nodereal.io`, `eth-sepolia.nodereal.io`; `go.getblock.io`, `go.getblock.us`, `go.getblock.asia`; `eth.api.onfinality.io`, `eth-sepolia.api.onfinality.io`; `eth.api.pocket.network`; `rpc.mevblocker.io` (not in zapp)
   - `ppoi.fdi.network` (`POI_NODE_URL = https://ppoi.fdi.network/`)
   - `rail-squid.squids.live`
   - `ipfs-lb.com`
@@ -1106,7 +1107,7 @@ Every knob is a Dart define, read once with `String.fromEnvironment`/`bool.fromE
 **The keyed RPC URLs.**
 
 - They are the only secrets. The issuer keys, addresses and URLs are public pins.
-- **Their host must be `eth-{mainnet,sepolia}.g.alchemy.com` or `{mainnet,sepolia}.infura.io`.** The page allowlist and CSP admit only those (§6.4); any other provider needs a bundle rebuild and a Kotlin and Rust allowlist change.
+- **Their host must be one of the network's RPC providers** (`Deployment::rpc_hosts`; since D-155 the seventeen of §6.4, `*.quiknode.pro` and `*.p2pify.com` included). The page allowlist and CSP admit only those (§6.4); any other provider needs a bundle rebuild and the Kotlin, Swift and Rust allowlist changes, and must serve `eth_getLogs` over the engine's 5,000-block window.
 - Read them with `String.fromEnvironment` in one place (`private_usd_feature_config.dart`) and treat `''` as unset.
 - Pass them with `--dart-define-from-file=<gitignored json>`, so they stay out of shell history and CI logs.
 - Dart passes the URL to Rust on each engine call that reads the chain, and to the page's `start.rpcUrls` (keyed first, then publicnode). Rust's engine uses the keyed URL if it is set, else publicnode. Like zapp (`PrivateUsdTokens.kt:59-65`), it does not fall back from a keyed URL to publicnode.

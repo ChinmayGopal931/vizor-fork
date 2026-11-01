@@ -1,4 +1,3 @@
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/config/private_usd_feature_config.dart';
@@ -110,12 +109,12 @@ void main() {
     });
   });
 
-  test('a keyed RPC URL is used only on a host the page may reach', () {
+  test("a keyed RPC URL is used only on one of the network's providers", () {
     const hosts = ['eth-sepolia.g.alchemy.com', 'sepolia.infura.io'];
     expect(
       privateUsdKeyedRpcUrl(
         'sepolia',
-        allowedHosts: hosts,
+        rpcHosts: hosts,
         sepolia: 'https://eth-sepolia.g.alchemy.com/v2/key',
       ),
       'https://eth-sepolia.g.alchemy.com/v2/key',
@@ -127,7 +126,7 @@ void main() {
       'https://eth-sepolia.g.alchemy.com:8443/v2/key',
     ]) {
       expect(
-        privateUsdKeyedRpcUrl('sepolia', allowedHosts: hosts, sepolia: url),
+        privateUsdKeyedRpcUrl('sepolia', rpcHosts: hosts, sepolia: url),
         isNull,
         reason: url,
       );

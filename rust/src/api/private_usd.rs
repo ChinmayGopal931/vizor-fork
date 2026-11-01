@@ -171,6 +171,13 @@ pub struct ApiDeployment {
     /// The hosts the Railgun page may reach (both networks); a keyed RPC URL
     /// must use one of them.
     pub allowed_hosts: Vec<String>,
+    /// The RPC providers this network's Ethereum RPC URL, the build's keyed
+    /// one or the user's own, may name: hosts among `allowed_hosts`, where a
+    /// `*.` entry stands for any subdomain.
+    pub rpc_hosts: Vec<String>,
+    /// The windows contract swaps settle on, `0x` lowercase; `None` where
+    /// bridging is off.
+    pub swap_contract: Option<String>,
     pub explorer_tx_prefix: String,
     pub railscan_tx_prefix: String,
     pub zcash_confirmations: u32,
@@ -231,6 +238,12 @@ pub fn private_usd_deployment(network: String) -> Option<ApiDeployment> {
             .iter()
             .map(|host| (*host).to_owned())
             .collect(),
+        rpc_hosts: pins
+            .rpc_hosts
+            .iter()
+            .map(|host| (*host).to_owned())
+            .collect(),
+        swap_contract: pins.swaps.map(|swaps| hex0x(&swaps.address)),
         explorer_tx_prefix: pins.explorer_tx_prefix.into(),
         railscan_tx_prefix: pins.railscan_tx_prefix.into(),
         zcash_confirmations: pins.zcash_confirmations,

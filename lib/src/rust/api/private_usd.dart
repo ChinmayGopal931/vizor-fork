@@ -871,6 +871,15 @@ class ApiDeployment {
   /// The hosts the Railgun page may reach (both networks); a keyed RPC URL
   /// must use one of them.
   final List<String> allowedHosts;
+
+  /// The RPC providers this network's Ethereum RPC URL, the build's keyed
+  /// one or the user's own, may name: hosts among `allowed_hosts`, where a
+  /// `*.` entry stands for any subdomain.
+  final List<String> rpcHosts;
+
+  /// The windows contract swaps settle on, `0x` lowercase; `None` where
+  /// bridging is off.
+  final String? swapContract;
   final String explorerTxPrefix;
   final String railscanTxPrefix;
   final int zcashConfirmations;
@@ -905,6 +914,8 @@ class ApiDeployment {
     required this.relayAdapt,
     required this.relayerRailgunAddress,
     required this.allowedHosts,
+    required this.rpcHosts,
+    this.swapContract,
     required this.explorerTxPrefix,
     required this.railscanTxPrefix,
     required this.zcashConfirmations,
@@ -929,6 +940,8 @@ class ApiDeployment {
       relayAdapt.hashCode ^
       relayerRailgunAddress.hashCode ^
       allowedHosts.hashCode ^
+      rpcHosts.hashCode ^
+      swapContract.hashCode ^
       explorerTxPrefix.hashCode ^
       railscanTxPrefix.hashCode ^
       zcashConfirmations.hashCode ^
@@ -955,6 +968,8 @@ class ApiDeployment {
           relayAdapt == other.relayAdapt &&
           relayerRailgunAddress == other.relayerRailgunAddress &&
           allowedHosts == other.allowedHosts &&
+          rpcHosts == other.rpcHosts &&
+          swapContract == other.swapContract &&
           explorerTxPrefix == other.explorerTxPrefix &&
           railscanTxPrefix == other.railscanTxPrefix &&
           zcashConfirmations == other.zcashConfirmations &&
@@ -1815,8 +1830,9 @@ enum ApiPrivateUsdErrorCode {
   /// This device's tokens for today are spent.
   noTokensToday,
 
-  /// The phone's keystore failed (raised by Dart from the attestation
-  /// channel; the code lives here for one message switch).
+  /// The phone's keystore failed to make or use the attestation key.
+  /// Raised by Dart from the attestation channel, never by Rust; the code
+  /// lives here so one switch names every token message.
   keystore,
   chainLagging,
   quoteExpired,

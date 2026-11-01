@@ -17,11 +17,12 @@ import '../../providers/private_usd_custom_rpc_provider.dart';
 import '../../services/private_usd_rpc_check.dart';
 import 'private_usd_paste_button.dart';
 
-/// Settings' Ethereum RPC sheet: a URL of the user's own on one of the RPC
-/// providers the Railgun page already reaches, checked with `eth_chainId`
-/// before it is saved, or the default again. Pops the toast to show, or null
-/// when nothing changed. The field starts empty and the sheet shows only the
-/// saved URL's host: the URL can hold a key.
+/// Settings' Ethereum RPC sheet: a URL of the user's own on one of the
+/// network's RPC providers (all of which the Railgun page reaches), checked
+/// with `eth_chainId` and over the engine's log window before it is saved,
+/// or the default again. Pops the toast to show, or null when nothing
+/// changed. The field starts empty and the sheet shows only the saved URL's
+/// host: the URL can hold a key.
 Future<String?> showPrivateUsdRpcSheet(BuildContext context) =>
     showAppMobileSheet<String>(
       context: context,
@@ -62,8 +63,7 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
     final chain = privateUsdRpcNetworkName(deployment.railgunNetwork);
     final url = privateUsdCustomRpcUrl(
       _controller.text,
-      deployment.railgunNetwork,
-      allowedHosts: deployment.allowedHosts,
+      rpcHosts: deployment.rpcHosts,
     );
     if (url == null) {
       setState(() => _error = PrivateUsdCopy.rpcErrorUrl(chain));
@@ -77,7 +77,13 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
     });
     final failure = await ref
         .read(privateUsdRpcCheckerProvider)
-        .check(url, chainId: deployment.chainId);
+        .check(
+          url,
+          chainId: deployment.chainId,
+          railgunProxy: deployment.railgunProxy,
+          token: deployment.token,
+          logsContract: deployment.swapContract,
+        );
     // Closed meanwhile: nothing is saved.
     if (!mounted) return;
     setState(() => _checking = false);
@@ -89,6 +95,9 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
             PrivateUsdCopy.rpcErrorUnreachable,
           PrivateUsdRpcCheckFailure.wrongChain =>
             PrivateUsdCopy.rpcErrorWrongChain(chain),
+          PrivateUsdRpcCheckFailure.callsRefused =>
+            PrivateUsdCopy.rpcErrorCalls,
+          PrivateUsdRpcCheckFailure.logsLimited => PrivateUsdCopy.rpcErrorLogs,
         };
       });
       return;
@@ -154,6 +163,14 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
                   Text(
                     PrivateUsdCopy.rpcSees,
                     key: const ValueKey('private_usd_rpc_sees'),
+                    style: AppTypography.bodySmall.copyWith(
+                      color: colors.text.secondary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    PrivateUsdCopy.rpcProviders,
+                    key: const ValueKey('private_usd_rpc_providers'),
                     style: AppTypography.bodySmall.copyWith(
                       color: colors.text.secondary,
                     ),
