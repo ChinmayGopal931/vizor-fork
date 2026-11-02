@@ -642,6 +642,62 @@ void main() {
     },
   );
 
+  // Both routes follow the same rules: a POST goes on only after a 303, as a
+  // GET, or after a 307 or 308 within its origin, with its body.
+  for (final tor in [false, true]) {
+    for (final (status, location, follows) in [
+      (301, '/next', false),
+      (302, '/next', false),
+      (303, 'https://other.example.com/next', true),
+      (307, '/next', true),
+      (308, '/next', true),
+      (307, 'https://other.example.com/next', false),
+      (308, 'https://other.example.com/next', false),
+    ]) {
+      test('a POST answered $status to $location '
+          '${follows ? 'goes on' : 'goes back'} (tor=$tor)', () async {
+        final payload = utf8.encode('{}');
+        final bridge = _RecordingTorBridge([
+          NetworkHttpResponse(
+            statusCode: status,
+            bodyBytes: Uint8List(0),
+            headers: {
+              'location': [location],
+            },
+          ),
+          NetworkHttpResponse(statusCode: 200, bodyBytes: utf8.encode('done')),
+        ]);
+        final directClient = _ScriptedHttpClient([
+          (status, {'location': location}),
+          (200, const {}),
+        ]);
+        final client = NetworkHttpClient(
+          directClient: directClient,
+          torDesired: () => tor,
+          torBootstrapping: () => false,
+          torBridge: bridge,
+        );
+        addTearDown(() => client.close());
+
+        final response = await client.request(
+          'POST',
+          Uri.parse('https://example.com/start'),
+          bodyBytes: payload,
+        );
+
+        expect(response.statusCode, follows ? 200 : status);
+        final methods = tor
+            ? [for (final request in bridge.requests) request.method]
+            : directClient.methods;
+        final next = status == 303 ? 'GET' : 'POST';
+        expect(methods, follows ? ['POST', next] : ['POST']);
+        if (tor && follows) {
+          expect(bridge.requests[1].bodyBytes, status == 303 ? [] : payload);
+        }
+      });
+    }
+  }
+
   test('direct timeout aborts transport and drains its request slot', () async {
     final requestReceived = Completer<void>();
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

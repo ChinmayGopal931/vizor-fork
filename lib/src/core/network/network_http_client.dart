@@ -522,8 +522,8 @@ class NetworkHttpClient {
   }
 
   /// The direct route's redirects, followed here rather than by `dart:io`,
-  /// which would follow one from HTTPS to plain HTTP. Which requests follow
-  /// stays `dart:io`'s ([_directFollows]). Each hop is a direct request of its
+  /// which would follow one from HTTPS to plain HTTP, by the rules the Tor
+  /// route follows ([_redirectFrom]). Each hop is a direct request of its
   /// own, so a route change between hops stops the chain.
   Future<NetworkHttpResponse> _requestDirectWithRedirects(
     String method,
@@ -555,9 +555,6 @@ class NetworkHttpClient {
           maxBodyBytes: maxBodyBytes,
         ),
       );
-      if (!_directFollows(current.method, response.statusCode)) {
-        return response;
-      }
       final next = _redirectFrom(
         response,
         current,
@@ -568,14 +565,6 @@ class NetworkHttpClient {
       hop = next;
     }
   }
-
-  /// Which direct requests follow a redirect, as `dart:io` decided before the
-  /// route followed them itself: GET and HEAD any, a POST only a 303, as a
-  /// GET. Every other answer goes back to the caller.
-  static bool _directFollows(String method, int statusCode) =>
-      method == 'GET' ||
-      method == 'HEAD' ||
-      (method == 'POST' && statusCode == HttpStatus.seeOther);
 
   _DirectRequestOperation<NetworkHttpResponse> _requestDirect(
     String method,
@@ -756,9 +745,9 @@ class NetworkHttpClient {
       TimeoutException('Network HTTP request timed out', timeout);
 
   /// The hop [response] redirects [hop] to, or null when it is the answer.
-  /// Both routes follow the same rules: HTTPS never downgrades, credentials
-  /// stay with their origin, and a POST answered 301, 302 or 303 goes on as
-  /// a GET without its body or the headers that described it.
+  /// Both routes follow the same rules ([_follows]): HTTPS never downgrades,
+  /// credentials stay with their origin, and a POST answered 303 goes on as a
+  /// GET without its body or the headers that described it.
   static _RedirectHop? _redirectFrom(
     NetworkHttpResponse response,
     _RedirectHop hop, {
@@ -771,10 +760,13 @@ class NetworkHttpClient {
         maxRedirects == 0) {
       return null;
     }
+    final nextUri = hop.uri.resolve(location);
+    if (!_follows(hop.method, response.statusCode, hop.uri, nextUri)) {
+      return null;
+    }
     if (redirectCount == maxRedirects) {
       throw const HttpException('Too many HTTP redirects');
     }
-    final nextUri = hop.uri.resolve(location);
     if (hop.uri.scheme == 'https' && nextUri.scheme != 'https') {
       throw HttpException(
         'Refusing HTTPS redirect to ${nextUri.scheme}',
@@ -782,10 +774,7 @@ class NetworkHttpClient {
       );
     }
     final asGet =
-        hop.method == 'POST' &&
-        (response.statusCode == HttpStatus.movedPermanently ||
-            response.statusCode == HttpStatus.found ||
-            response.statusCode == HttpStatus.seeOther);
+        hop.method == 'POST' && response.statusCode == HttpStatus.seeOther;
     final headers = _headersForRedirect(hop.uri, nextUri, hop.headers);
     return _RedirectHop(
       method: asGet ? 'GET' : hop.method,
@@ -800,6 +789,21 @@ class NetworkHttpClient {
       bodyBytes: asGet ? const [] : hop.bodyBytes,
     );
   }
+
+  /// Which requests follow a redirect: GET and HEAD any; a POST a 303, as a
+  /// GET, and a 307 or 308 with its body only within its origin. Every other
+  /// answer goes back to the caller, so a body never reaches another origin
+  /// and a POST never turns into a GET whose answer reads as its own.
+  static bool _follows(String method, int statusCode, Uri from, Uri to) =>
+      switch (method) {
+        'GET' || 'HEAD' => true,
+        'POST' =>
+          statusCode == HttpStatus.seeOther ||
+              ((statusCode == HttpStatus.temporaryRedirect ||
+                      statusCode == HttpStatus.permanentRedirect) &&
+                  _sameOrigin(from, to)),
+        _ => false,
+      };
 
   static const _bodyHeaders = {
     HttpHeaders.contentTypeHeader,
