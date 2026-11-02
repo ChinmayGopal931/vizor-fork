@@ -555,14 +555,14 @@ pub async fn create_pczt_from_proposal(
             )),
         };
     }
-    let live_expiry_height = match super::send::live_send_expiry_height(
+    let live_expiry = match super::send::live_send_expiry(
         lightwalletd_url,
         network,
         zcash_protocol::consensus::BlockHeight::from(stored.proposal.min_target_height()),
     )
     .await
     {
-        Ok(height) => height,
+        Ok(live) => live,
         Err(error) => {
             return match finish_stored_proposal(stored.proposal_id, &stored.send_flow_id, true) {
                 Ok(()) => Err(error),
@@ -588,13 +588,14 @@ pub async fn create_pczt_from_proposal(
             );
         }
         let mut db = open_wallet_db(db_path, network)?;
+        let expiry = super::send::proposal_expiry(&network, &db, &stored.proposal, live_expiry)?;
         db.lock_outputs(
             &super::send::proposal_input_refs(&stored.proposal),
             current_lock.owner,
-            live_expiry_height,
+            expiry.height,
         )
         .map_err(|e| format!("Revalidate hardware proposal input locks: {e:?}"))?;
-        super::proposal_locks::update_expiry(db_path, current_lock.owner, live_expiry_height)?;
+        super::proposal_locks::update_expiry(db_path, current_lock.owner, expiry.height)?;
         // The transaction version rides on the proposal; expiry is pinned to
         // the live chain tip obtained immediately before this DB operation.
         let proposal_for_pczt = stored
@@ -609,7 +610,7 @@ pub async fn create_pczt_from_proposal(
             stored.account_id,
             stored.ovk_policy.to_ovk_policy(),
             &proposal_for_pczt,
-            Some(live_expiry_height),
+            expiry.requested,
             BundlePadding::DEFAULT,
         )
         .map_err(|e| format!("Create PCZT failed: {e}"))?;
@@ -670,14 +671,14 @@ pub async fn create_tex_pczts_from_proposal(
         let _ = finish_stored_proposal(stored.proposal_id, &stored.send_flow_id, true);
         return Err("Proposal belongs to a different wallet database or network".to_string());
     }
-    let live_expiry_height = match super::send::live_send_expiry_height(
+    let live_expiry = match super::send::live_send_expiry(
         lightwalletd_url,
         network,
         zcash_protocol::consensus::BlockHeight::from(stored.proposal.min_target_height()),
     )
     .await
     {
-        Ok(height) => height,
+        Ok(live) => live,
         Err(error) => {
             let _ = finish_stored_proposal(stored.proposal_id, &stored.send_flow_id, true);
             return Err(error);
@@ -698,10 +699,14 @@ pub async fn create_tex_pczts_from_proposal(
         db.lock_outputs(
             &super::send::proposal_input_refs(&stored.proposal),
             current_lock.owner,
-            live_expiry_height,
+            live_expiry.expiry_height,
         )
         .map_err(|e| format!("Revalidate hardware proposal input locks: {e:?}"))?;
-        super::proposal_locks::update_expiry(db_path, current_lock.owner, live_expiry_height)?;
+        super::proposal_locks::update_expiry(
+            db_path,
+            current_lock.owner,
+            live_expiry.expiry_height,
+        )?;
 
         let first_step = stored.proposal.steps().first().clone();
         let first_proposal = singleton_proposal(&stored.proposal, first_step.clone())?;
@@ -714,7 +719,7 @@ pub async fn create_tex_pczts_from_proposal(
             stored.account_id,
             OvkPolicy::Sender,
             &first_proposal,
-            Some(live_expiry_height),
+            Some(live_expiry.expiry_height),
             BundlePadding::DEFAULT,
         );
         // The backend reserves the ephemeral address even when this step fails.
@@ -850,7 +855,7 @@ pub async fn create_tex_pczts_from_proposal(
             stored.account_id,
             OvkPolicy::Sender,
             &second_proposal,
-            Some(live_expiry_height),
+            Some(live_expiry.expiry_height),
             BundlePadding::DEFAULT,
         )
         .map_err(|e| format!("Create TEX PCZT step 2 failed: {e}"))?;
@@ -1964,7 +1969,19 @@ async fn store_and_broadcast_pczts_inner(
             }
             // Once a round is out, a node refusing the next one ends the batch
             // the same way, so only the first submission is checked again.
-            let first_submission = newly_broadcasted == 0;
+            let precheck = if newly_broadcasted == 0 {
+                Some(
+                    precheck_pczt_submission(
+                        &transport,
+                        lightwalletd_url,
+                        network,
+                        &item.extracted.tx,
+                    )
+                    .await,
+                )
+            } else {
+                None
+            };
             let attempt = match super::hardware_authority::dispatch(
                 db_path,
                 network,
@@ -1972,8 +1989,9 @@ async fn store_and_broadcast_pczts_inner(
                 &earlier,
                 latest.height,
                 |dispatched| async move {
-                    if first_submission {
-                        ensure_pczt_submission_unexpired(
+                    if let Some(precheck) = precheck {
+                        confirm_pczt_submission(
+                            precheck,
                             &transport,
                             lightwalletd_url,
                             network,
@@ -2559,6 +2577,7 @@ pub async fn extract_and_broadcast_pczt(
         return Err(retryable_refusal(refusal));
     }
 
+    let precheck = precheck_pczt_submission(&transport, lightwalletd_url, network, &tx).await;
     let resp = match super::hardware_authority::dispatch(
         db_path,
         network,
@@ -2566,7 +2585,7 @@ pub async fn extract_and_broadcast_pczt(
         &[],
         latest.height,
         |dispatched| async {
-            ensure_pczt_submission_unexpired(&transport, lightwalletd_url, network, &tx).await?;
+            confirm_pczt_submission(precheck, &transport, lightwalletd_url, network, &tx).await?;
             crate::wallet::sync_engine::send_transaction_signalling(
                 transport, &tx_bytes, dispatched,
             )
@@ -2641,6 +2660,38 @@ async fn ensure_pczt_submission_unexpired(
         Some(error) => Err(PcztSubmissionError::Expired(error)),
         None => Ok(()),
     }
+}
+
+/// Reserving waits only while another writer holds the wallet, so a wait
+/// this long could have let a block land since the precheck.
+const SUBMISSION_TIP_STALE_AFTER: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// [`ensure_pczt_submission_unexpired`] before a broadcast's writer
+/// reservation, so the tip's round trip does not hold the wallet's write lock.
+/// Its verdict is applied under the reservation by [`confirm_pczt_submission`].
+async fn precheck_pczt_submission(
+    transport: &tonic::transport::Channel,
+    lightwalletd_url: &str,
+    network: WalletNetwork,
+    tx: &Transaction,
+) -> Result<std::time::Instant, PcztSubmissionError> {
+    ensure_pczt_submission_unexpired(transport, lightwalletd_url, network, tx).await?;
+    Ok(std::time::Instant::now())
+}
+
+/// The precheck's verdict as the request leaves, read again under the
+/// reservation only if reserving waited past [`SUBMISSION_TIP_STALE_AFTER`].
+async fn confirm_pczt_submission(
+    precheck: Result<std::time::Instant, PcztSubmissionError>,
+    transport: &tonic::transport::Channel,
+    lightwalletd_url: &str,
+    network: WalletNetwork,
+    tx: &Transaction,
+) -> Result<(), PcztSubmissionError> {
+    if precheck?.elapsed() >= SUBMISSION_TIP_STALE_AFTER {
+        ensure_pczt_submission_unexpired(transport, lightwalletd_url, network, tx).await?;
+    }
+    Ok(())
 }
 
 /// Refuses a signed transaction nodes would reject as expiring soon. Device

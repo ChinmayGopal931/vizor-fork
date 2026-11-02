@@ -57,6 +57,7 @@ use zcash_client_backend::data_api::wallet::input_selection::{
 };
 use zcash_client_backend::{
     data_api::{
+        anchor_retention::PoolMigrationParams,
         error::Error as WalletError,
         transparent_ledger::{TransparentAuthority, TransparentLedgerMode, TransparentLedgerRead},
         wallet::{
@@ -98,6 +99,7 @@ use zcash_protocol::{
     consensus::{self, BlockHeight, NetworkConstants, Parameters},
     memo::{Memo, MemoBytes},
     value::Zatoshis,
+    zip318::BlockSpacing,
     PoolType, ShieldedPool,
 };
 
@@ -208,16 +210,89 @@ fn send_proposal_is_expired<P: Parameters>(
     current_target_height >= send_proposal_lock_expiry(network, min_target_height)
 }
 
-pub(super) async fn live_send_expiry_height(
+/// The live chain tip a send is built after, and the ordinary expiry from it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct LiveSendExpiry {
+    pub(super) tip: u32,
+    pub(super) expiry_height: BlockHeight,
+}
+
+pub(super) async fn live_send_expiry(
     lightwalletd_url: &str,
     network: WalletNetwork,
     min_target_height: BlockHeight,
-) -> Result<BlockHeight, String> {
+) -> Result<LiveSendExpiry, String> {
     let tip = sync_engine::latest_block_for_transaction(lightwalletd_url, network)
         .await
         .map_err(|e| format!("Read live chain tip before transaction construction: {e}"))?;
     let tip = u32::try_from(tip.height).map_err(|_| "Live chain tip exceeds u32")?;
-    send_expiry_height_for_live_tip(&network, min_target_height, tip)
+    Ok(LiveSendExpiry {
+        tip,
+        expiry_height: send_expiry_height_for_live_tip(&network, min_target_height, tip)?,
+    })
+}
+
+/// The expiry a proposal's transactions carry, and the override the backend
+/// is given for it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct ProposalExpiry {
+    /// The expiry the transactions carry. Their inputs stay locked until then.
+    pub(super) height: BlockHeight,
+    /// `None` when the backend applies the expiry itself.
+    pub(super) requested: Option<BlockHeight>,
+}
+
+/// The expiry for `proposal`, sent after `live`.
+///
+/// A step the fee model built as a canonical ZIP 318 crossing must carry the
+/// rolling expiry every migration transfer in its period shares: with an
+/// ordinary expiry it would be canonical in every respect but one. The backend
+/// applies that expiry, and refuses an override, only for a step that pays the
+/// standard rule's fee, which is the fee before NU7. From NU7 the wallet pays
+/// the reduced fee its migration transfers pay, so the expiry is requested
+/// here. It is not capped at the branch end, so a crossing is held where
+/// migration transactions are: one that missed the branch's last block would
+/// keep its input spent until that expiry.
+pub(super) fn proposal_expiry<P: Parameters, DbT: InputSource, FeeRuleT, N>(
+    network: &P,
+    db: &DbT,
+    proposal: &Proposal<FeeRuleT, N>,
+    live: LiveSendExpiry,
+) -> Result<ProposalExpiry, String> {
+    let target_height = BlockHeight::from(proposal.min_target_height());
+    let zip318 = PoolMigrationParams::new(
+        BlockSpacing::for_network(network),
+        db.anchor_retention_interval(),
+    );
+    let crossing_at_fee = |fee: Zatoshis| {
+        proposal
+            .steps()
+            .iter()
+            .any(|step| step.is_canonical_crossing(&zip318, fee))
+    };
+    let wallet_fee =
+        canonical_migration_fee_zatoshi(network, u32::from(target_height)).and_then(|fee| {
+            Zatoshis::from_u64(fee).map_err(|e| format!("Canonical crossing fee: {e:?}"))
+        })?;
+    if !crossing_at_fee(wallet_fee) {
+        return Ok(ProposalExpiry {
+            height: live.expiry_height,
+            requested: Some(live.expiry_height),
+        });
+    }
+    if network_upgrade::holds_transaction(network, u32::from(target_height), live.tip) {
+        return Err(network_upgrade::SEND_HOLD_MESSAGE.to_string());
+    }
+    let height = BlockHeight::from_u32(super::migration::zip318_canonical_migration_expiry_height(
+        network,
+        u32::from(target_height),
+    )?);
+    let standard_fee = zcash_client_backend::fees::canonical_crossing_fee(network, target_height)
+        .map_err(|e| format!("Standard canonical crossing fee: {e:?}"))?;
+    Ok(ProposalExpiry {
+        height,
+        requested: (!crossing_at_fee(standard_fee)).then_some(height),
+    })
 }
 
 fn send_expiry_height_for_live_tip<P: Parameters>(
@@ -814,8 +889,8 @@ impl Zip317FeeRule for ConservativeZip317FeeRule {
     }
 }
 
-pub(super) fn canonical_migration_fee_zatoshi(
-    network: WalletNetwork,
+pub(super) fn canonical_migration_fee_zatoshi<P: Parameters>(
+    network: P,
     target_height: u32,
 ) -> Result<u64, String> {
     ConservativeZip317FeeRule::for_target(&network, BlockHeight::from_u32(target_height))
@@ -2091,18 +2166,17 @@ async fn create_stored_transactions(
     }
 
     let min_target_height = BlockHeight::from(stored.proposal.min_target_height());
-    let live_expiry_height =
-        match live_send_expiry_height(lightwalletd_url, network, min_target_height).await {
-            Ok(height) => height,
-            Err(error) => {
-                return match finish_stored_proposal(proposal_id, &send_flow_id, true) {
-                    Ok(()) => Err(error),
-                    Err(cleanup_error) => Err(format!(
-                        "{error}; additionally failed to release proposal inputs: {cleanup_error}"
-                    )),
-                };
-            }
-        };
+    let live_expiry = match live_send_expiry(lightwalletd_url, network, min_target_height).await {
+        Ok(live) => live,
+        Err(error) => {
+            return match finish_stored_proposal(proposal_id, &send_flow_id, true) {
+                Ok(()) => Err(error),
+                Err(cleanup_error) => Err(format!(
+                    "{error}; additionally failed to release proposal inputs: {cleanup_error}"
+                )),
+            };
+        }
+    };
 
     // Scope DB writes and signing material so they are dropped before network I/O (broadcast).
     let send_flow_id_for_create = send_flow_id.clone();
@@ -2132,16 +2206,17 @@ async fn create_stored_transactions(
                     "Send proposal expired; review the payment and create a new proposal",
                 ));
             }
+            let expiry = proposal_expiry(&network, &db, &stored.proposal, live_expiry)?;
             // Reassert ownership while holding the process-wide write lock.
             // If another flow acquired these inputs after this proposal's lock
             // expired, this fails before transaction construction.
             db.lock_outputs(
                 &proposal_input_refs(&stored.proposal),
                 current_lock.owner,
-                live_expiry_height,
+                expiry.height,
             )
             .map_err(|e| format!("Revalidate send proposal input locks: {e:?}"))?;
-            super::proposal_locks::update_expiry(db_path, current_lock.owner, live_expiry_height)?;
+            super::proposal_locks::update_expiry(db_path, current_lock.owner, expiry.height)?;
             let account_id = stored.account_id;
             let ovk_policy = stored.ovk_policy.to_ovk_policy();
             let account = db
@@ -2175,7 +2250,7 @@ async fn create_stored_transactions(
                         &wallet::SpendingKeys::from_unified_spending_key(usk),
                         ovk_policy.clone(),
                         &proposal,
-                        Some(live_expiry_height),
+                        expiry.requested,
                     )
                     .map_err(|e| format!("Create TX failed: {e}"))?
                 }
@@ -2190,7 +2265,7 @@ async fn create_stored_transactions(
                         &wallet::SpendingKeys::from_unified_spending_key(usk),
                         ovk_policy.clone(),
                         &proposal,
-                        Some(live_expiry_height),
+                        expiry.requested,
                     )
                     .map_err(|e| format!("Create TX failed: {e}"))?
                 }
@@ -7963,3 +8038,6 @@ mod tests;
 
 #[cfg(test)]
 mod orchard_receiver_tests;
+
+#[cfg(test)]
+mod crossing_expiry_tests;
