@@ -426,12 +426,22 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen>
     final sections = buildActivityFeedSections(
       entries,
       // Private USD rows are all loaded, so only the pager's rows fill its
-      // page; one older than its last row waits for the next page, and once
-      // there is nothing more to load every row shows.
+      // page, the transactions they stand in for among them; one older than
+      // its last row waits for the next page, and once there is nothing more
+      // to load every row shows.
       limit: pager != null && !pager.hasMore
           ? null
           : pager?.visibleCount ?? activityPageSize,
       countsTowardLimit: (entry) => !privateUsdEntries.contains(entry),
+      unshownPagedTimes: [
+        for (final tx in giftCardActivityIndex.withPendingClaims(transactions))
+          if (!absorption.absorbs(tx) &&
+              privateUsd.txids.contains(tx.txidHex.toLowerCase()))
+            giftCardActivityIndex
+                    .metadataFor(tx, transactions: transactions)
+                    ?.activityTimestamp ??
+                transactionActivityTimestamp(tx, now: activityNow),
+      ],
     );
 
     final content = SwapActivityStatusAutoRefresh(

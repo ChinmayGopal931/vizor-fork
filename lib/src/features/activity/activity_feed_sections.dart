@@ -46,14 +46,16 @@ DateTime? transactionActivityTimestamp(
 }
 
 /// Sorts [entries] newest-first and groups consecutive entries that
-/// share a section title. A [limit] ends the feed at its [limit]th entry
-/// that [countsTowardLimit] accepts (every entry when null), or at the last
-/// one when there are fewer: entries it does not count show only between
-/// counted ones.
+/// share a section title. A [limit] ends the feed at its [limit]th paged
+/// row: an entry [countsTowardLimit] accepts (every entry when null), or one
+/// of [unshownPagedTimes], the times of rows the pager counts that the feed
+/// leaves out. Other entries show up to that end, and every entry shows
+/// while there are fewer paged rows than [limit].
 List<ActivityFeedSectionData> buildActivityFeedSections(
   List<ActivityEntry> entries, {
   int? limit,
   bool Function(ActivityEntry entry)? countsTowardLimit,
+  List<DateTime?> unshownPagedTimes = const [],
 }) {
   // Dart List.sort is not stable. Preserve native/source order at equal
   // timestamps so a later page cannot reshuffle rows already on screen.
@@ -64,7 +66,9 @@ List<ActivityFeedSectionData> buildActivityFeedSections(
     });
   final visible = limit == null
       ? sorted
-      : sorted.take(_limitEnd(sorted, limit, countsTowardLimit));
+      : sorted.take(
+          _limitEnd(sorted, limit, countsTowardLimit, unshownPagedTimes),
+        );
   final sections = <ActivityFeedSectionData>[];
   List<ActivityRowData>? currentRows;
   String? currentTitle;
@@ -86,16 +90,34 @@ int _limitEnd(
   List<(int, ActivityEntry)> sorted,
   int limit,
   bool Function(ActivityEntry entry)? counts,
+  List<DateTime?> unshown,
 ) {
-  if (counts == null || limit <= 0) return limit;
+  if ((counts == null && unshown.isEmpty) || limit <= 0) return limit;
+  // The unshown rows take their places among the entries, after any entry
+  // of the same time.
+  final unshownSorted = [...unshown]..sort(_compareTimes);
   var counted = 0;
-  var end = 0;
+  var next = 0;
   for (var i = 0; i < sorted.length; i++) {
-    if (!counts(sorted[i].$2)) continue;
-    end = i + 1;
-    if (++counted == limit) break;
+    final entry = sorted[i].$2;
+    while (next < unshownSorted.length &&
+        _compareTimes(unshownSorted[next], entry.timestamp) < 0) {
+      next++;
+      if (++counted == limit) return i;
+    }
+    if (counts?.call(entry) ?? true) {
+      if (++counted == limit) return i + 1;
+    }
   }
-  return end;
+  return sorted.length;
+}
+
+/// Newest first; a missing time sorts last, as [compareActivityEntries] does.
+int _compareTimes(DateTime? a, DateTime? b) {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  return b.compareTo(a);
 }
 
 String _activitySectionTitle(DateTime? timestamp) {
