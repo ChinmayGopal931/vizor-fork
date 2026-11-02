@@ -629,8 +629,6 @@ void main() {
     final transactions = [
       _transaction(100, const Duration(days: 40), 40 * _zec),
       _transaction(300, const Duration(days: 3), 23 * _zec),
-      // Not part of the history: never mined.
-      _transaction(0, const Duration(days: 1), 9 * _zec),
     ];
 
     Future<PortfolioChartViewState> settle(ProviderContainer container) async {
@@ -842,28 +840,15 @@ void main() {
   });
 }
 
-rust_sync.TransactionInfo _transaction(int height, Duration ago, int delta) {
-  final seconds = BigInt.from(
-    _now.subtract(ago).millisecondsSinceEpoch ~/ 1000,
-  );
-  return rust_sync.TransactionInfo(
-    txidHex: 'tx-$height',
-    minedHeight: BigInt.from(height),
-    expiredUnmined: false,
-    accountBalanceDelta: delta,
-    fee: BigInt.zero,
-    feeState: rust_sync.TransactionFeeState.notApplicable,
-    blockTime: height == 0 ? BigInt.zero : seconds,
-    isTransparent: false,
-    txKind: 'received',
-    displayAmount: BigInt.from(delta),
-    displayPool: 'shielded',
-    createdTime: seconds,
-    detailsComplete: true,
-    provisional: false,
-    amountIncludesFee: false,
-  );
-}
+rust_sync.AccountBalanceDelta _transaction(
+  int height,
+  Duration ago,
+  int delta,
+) => rust_sync.AccountBalanceDelta(
+  minedHeight: height,
+  blockTime: BigInt.from(_now.subtract(ago).millisecondsSinceEpoch ~/ 1000),
+  zatoshi: delta,
+);
 
 /// A pricing server that answers every window with a flat series, or with
 /// nothing.
@@ -933,7 +918,7 @@ class _BlockedCase {
 /// leaves them at what a new install has, read from the app's own defaults.
 ProviderContainer _container({
   required PortfolioPriceHistorySource source,
-  required List<rust_sync.TransactionInfo> transactions,
+  required List<rust_sync.AccountBalanceDelta> transactions,
   List<String>? loads,
   bool? enabled,
   bool? marketPrices,
@@ -997,7 +982,7 @@ ProviderContainer _container({
       ),
       portfolioChartNowProvider.overrideWithValue(now ?? () => _now),
       portfolioPriceHistorySourceProvider.overrideWithValue(source),
-      portfolioTransactionHistoryLoaderProvider.overrideWithValue((
+      portfolioBalanceDeltaLoaderProvider.overrideWithValue((
         accountUuid,
         network,
       ) async {

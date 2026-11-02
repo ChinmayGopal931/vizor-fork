@@ -19,33 +19,27 @@ class BalanceDelta {
   final int zatoshi;
 }
 
-/// The transactions that moved the balance, as deltas the chart can place in
-/// time. Unmined and expired transactions did not move it. A mined transaction
-/// with no block time cannot be placed, so there is no coherent history:
-/// `null`.
-List<BalanceDelta>? balanceDeltasFromTransactions(
-  Iterable<rust_sync.TransactionInfo> transactions,
+/// The mined transactions' effects on the balance, which Rust lists once per
+/// transaction, as deltas the chart can place in time. One with no block time
+/// cannot be placed, so there is no coherent history: `null`.
+List<BalanceDelta>? balanceDeltasFromAccount(
+  Iterable<rust_sync.AccountBalanceDelta> deltas,
 ) {
-  final deltas = <BalanceDelta>[];
-  for (final transaction in transactions) {
-    if (transaction.expiredUnmined || transaction.minedHeight == BigInt.zero) {
-      continue;
-    }
-    final delta = transaction.accountBalanceDelta;
-    if (delta == 0) continue;
-    if (transaction.blockTime == BigInt.zero) return null;
-    deltas.add(
+  final placed = <BalanceDelta>[];
+  for (final delta in deltas) {
+    if (delta.blockTime == BigInt.zero) return null;
+    placed.add(
       BalanceDelta(
-        height: transaction.minedHeight.toInt(),
+        height: delta.minedHeight,
         time: DateTime.fromMillisecondsSinceEpoch(
-          transaction.blockTime.toInt() * 1000,
+          delta.blockTime.toInt() * 1000,
           isUtc: true,
         ),
-        zatoshi: delta,
+        zatoshi: delta.zatoshi,
       ),
     );
   }
-  return deltas;
+  return placed;
 }
 
 /// The balance from [time] until the next step.

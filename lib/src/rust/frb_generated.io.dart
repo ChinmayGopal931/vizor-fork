@@ -95,6 +95,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  AccountBalanceDelta dco_decode_account_balance_delta(dynamic raw);
+
+  @protected
   AccountCreationResult dco_decode_account_creation_result(dynamic raw);
 
   @protected
@@ -826,6 +829,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<AccountBalanceDelta> dco_decode_list_account_balance_delta(dynamic raw);
 
   @protected
   List<AccountInfo> dco_decode_list_account_info(dynamic raw);
@@ -1766,6 +1772,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
+
+  @protected
+  AccountBalanceDelta sse_decode_account_balance_delta(
+    SseDeserializer deserializer,
+  );
 
   @protected
   AccountCreationResult sse_decode_account_creation_result(
@@ -2731,6 +2742,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<AccountBalanceDelta> sse_decode_list_account_balance_delta(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<AccountInfo> sse_decode_list_account_info(SseDeserializer deserializer);
@@ -3931,6 +3947,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_account_balance_delta(
+    AccountBalanceDelta self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_account_creation_result(
@@ -5149,6 +5171,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_account_balance_delta(
+    List<AccountBalanceDelta> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_account_info(

@@ -1059,6 +1059,20 @@ Future<List<TransactionInfo>> getTransactionHistory({
   accountUuid: accountUuid,
 );
 
+/// Each mined transaction's net effect on the account's balance, once per
+/// transaction, for the portfolio chart. Unlike [`get_transaction_history`],
+/// whose rows can repeat a transaction's delta or leave a ZIP 320 funding
+/// step out, these add up to the balance.
+Future<List<AccountBalanceDelta>> getAccountBalanceDeltas({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+}) => RustLib.instance.api.crateApiSyncGetAccountBalanceDeltas(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+);
+
 /// The Activity rows of one transaction, `txid_hex` as
 /// [`TransactionInfo::txid_hex`], exactly as [`get_transaction_history`]
 /// lists them, without reading the history of the account's other
@@ -1420,6 +1434,33 @@ Future<EnhanceRecoveryStatus> getEnhanceRecoveryStatus({
   dbPath: dbPath,
   network: network,
 );
+
+/// One mined transaction's net effect on an account's balance, at the block
+/// that mined it.
+class AccountBalanceDelta {
+  final int minedHeight;
+  final BigInt blockTime;
+  final PlatformInt64 zatoshi;
+
+  const AccountBalanceDelta({
+    required this.minedHeight,
+    required this.blockTime,
+    required this.zatoshi,
+  });
+
+  @override
+  int get hashCode =>
+      minedHeight.hashCode ^ blockTime.hashCode ^ zatoshi.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AccountBalanceDelta &&
+          runtimeType == other.runtimeType &&
+          minedHeight == other.minedHeight &&
+          blockTime == other.blockTime &&
+          zatoshi == other.zatoshi;
+}
 
 /// Lightweight account-wide ordering metadata. Reused while this DB snapshot
 /// remains current; it does not establish payment amounts or completeness.

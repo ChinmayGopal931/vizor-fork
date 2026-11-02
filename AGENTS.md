@@ -958,9 +958,11 @@ Key files:
 Mobile Home draws the chart's line as the balance sign's light trail, and a
 tap on the sign opens the full chart at `/portfolio-chart`
 (`lib/src/features/portfolio_chart/`). Its wallet side is read from the local
-wallet DB alone: `getTransactionHistory`, `account_balance_delta` per mined
-block, folded into a balance step function once a sync has completed (nothing
-while locked, and a mask in privacy mode). Its market side is public ZEC/USD
+wallet DB alone: `getAccountBalanceDeltas`, each mined transaction's
+`account_balance_delta` once (Activity rows will not do: a transaction can show
+as two rows with its whole delta each, and a ZIP 320 funding step as none),
+folded per block into a balance step function once a sync has completed
+(nothing while locked, and a mask in privacy mode). Its market side is public ZEC/USD
 daily price history from the zapp pricing engine, `GET /v1/prices` on
 `VIZOR_PRICING_ENGINE_BASE_URL` (default
 `https://zapp-pricing-engine.majorworker.workers.dev`), through

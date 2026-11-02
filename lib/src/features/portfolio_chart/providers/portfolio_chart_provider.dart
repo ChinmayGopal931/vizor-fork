@@ -112,18 +112,18 @@ class PortfolioBalanceSnapshot {
   final BalanceHistory history;
 }
 
-/// Every transaction of an account, from the local wallet DB: what the
-/// balance history is folded from.
-typedef PortfolioTransactionHistoryLoader =
-    Future<List<rust_sync.TransactionInfo>> Function(
+/// Each mined transaction's effect on an account's balance, from the local
+/// wallet DB: what the balance history is folded from.
+typedef PortfolioBalanceDeltaLoader =
+    Future<List<rust_sync.AccountBalanceDelta>> Function(
       String accountUuid,
       String network,
     );
 
-final portfolioTransactionHistoryLoaderProvider =
-    Provider<PortfolioTransactionHistoryLoader>(
+final portfolioBalanceDeltaLoaderProvider =
+    Provider<PortfolioBalanceDeltaLoader>(
       (ref) =>
-          (accountUuid, network) async => rust_sync.getTransactionHistory(
+          (accountUuid, network) async => rust_sync.getAccountBalanceDeltas(
             dbPath: await getWalletDbPath(),
             network: network,
             accountUuid: accountUuid,
@@ -139,14 +139,15 @@ final portfolioBalanceHistoryProvider =
       final key = ref.watch(_historyKeyProvider);
       final accountUuid = key.accountUuid;
       if (accountUuid == null || !key.ready) return null;
-      final loader = ref.watch(portfolioTransactionHistoryLoaderProvider);
+      final loader = ref.watch(portfolioBalanceDeltaLoaderProvider);
       final network = ref.watch(
         rpcEndpointProvider.select((endpoint) => endpoint.networkName),
       );
       try {
-        final transactions = await loader(accountUuid, network);
+        final deltas = balanceDeltasFromAccount(
+          await loader(accountUuid, network),
+        );
         if (!ref.mounted) return null;
-        final deltas = balanceDeltasFromTransactions(transactions);
         final history = deltas == null ? null : buildBalanceHistory(deltas);
         return history == null
             ? null

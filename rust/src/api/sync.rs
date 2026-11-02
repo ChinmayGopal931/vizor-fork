@@ -3188,6 +3188,37 @@ pub fn get_transaction_history(
     })
 }
 
+/// One mined transaction's net effect on an account's balance, at the block
+/// that mined it.
+pub struct AccountBalanceDelta {
+    pub mined_height: u32,
+    pub block_time: u64,
+    pub zatoshi: i64,
+}
+
+/// Each mined transaction's net effect on the account's balance, once per
+/// transaction, for the portfolio chart. Unlike [`get_transaction_history`],
+/// whose rows can repeat a transaction's delta or leave a ZIP 320 funding
+/// step out, these add up to the balance.
+pub fn get_account_balance_deltas(
+    db_path: String,
+    network: String,
+    account_uuid: String,
+) -> Result<Vec<AccountBalanceDelta>, String> {
+    catch(|| {
+        let network = parse_network_and_migrate(&db_path, &network)?;
+        let deltas = wallet_sync::get_balance_deltas(&db_path, network, &account_uuid)?;
+        Ok(deltas
+            .into_iter()
+            .map(|delta| AccountBalanceDelta {
+                mined_height: delta.mined_height,
+                block_time: delta.block_time,
+                zatoshi: delta.zatoshi,
+            })
+            .collect())
+    })
+}
+
 /// The Activity rows of one transaction, `txid_hex` as
 /// [`TransactionInfo::txid_hex`], exactly as [`get_transaction_history`]
 /// lists them, without reading the history of the account's other

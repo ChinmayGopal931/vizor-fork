@@ -1093,6 +1093,42 @@ pub(crate) fn get_transaction_history(
     read_transaction_history(&conn, db_path, network, limit, account)
 }
 
+/// One mined transaction's net effect on an account's balance.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct BalanceDelta {
+    pub mined_height: u32,
+    pub block_time: u64,
+    pub zatoshi: i64,
+}
+
+/// Each mined transaction's net effect on the account's balance, once per
+/// transaction and none hidden: what a balance history is folded from.
+/// Activity rows cannot stand in for it, since one transaction can show as two
+/// rows that each carry its whole delta, and a ZIP 320 funding step as none.
+pub(crate) fn get_balance_deltas(
+    db_path: &str,
+    network: WalletNetwork,
+    account_uuid: &str,
+) -> Result<Vec<BalanceDelta>, String> {
+    let account = parse_account_uuid(account_uuid)?;
+    let conn = open_readonly_conn(db_path)?;
+    let read_tx = conn
+        .unchecked_transaction()
+        .map_err(|e| format!("SQL error: {e}"))?;
+    let bases = read_history_bases_with_claim_state(&read_tx, db_path, network, account)?;
+    Ok(bases
+        .into_iter()
+        .filter_map(|base| {
+            let mined_height = base.mined_height?;
+            (!base.expired_unmined && base.account_balance_delta != 0).then_some(BalanceDelta {
+                mined_height,
+                block_time: base.block_time,
+                zatoshi: base.account_balance_delta,
+            })
+        })
+        .collect())
+}
+
 /// The Activity rows of one transaction, `txid_hex` as
 /// [`TransactionInfo::txid_hex`], exactly as [`get_transaction_history`]
 /// lists them, without reading the library's history view of the account's
@@ -2929,6 +2965,10 @@ mod private_recovery_tests;
 #[cfg(test)]
 #[path = "transactions/history_golden_tests.rs"]
 mod history_golden_tests;
+
+#[cfg(test)]
+#[path = "transactions/balance_delta_tests.rs"]
+mod balance_delta_tests;
 
 #[cfg(test)]
 mod tests {

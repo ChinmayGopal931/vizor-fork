@@ -101,6 +101,35 @@ void main() {
     expect(text(tester, 'mobile_holdings_shielded_total_usd'), r'$60.00');
   });
 
+  test('the rows add up to the snapshot the Home sign shows', () {
+    // A 1 ZEC Orchard receipt mined during a catch-up sync: the sign keeps
+    // the last completed 5 ZEC until the sync finishes.
+    final catchingUp = ZecPoolHoldings.of(
+      SyncState(
+        hasBalanceData: true,
+        orchardBalance: BigInt.from(300000000),
+        orchardPendingBalance: BigInt.from(100000000),
+        saplingBalance: BigInt.from(100000000),
+        ironwoodBalance: BigInt.from(100000000),
+        displayOrchardBalance: BigInt.from(300000000),
+        displayOrchardPendingBalance: BigInt.zero,
+        displayIronwoodBalance: BigInt.from(100000000),
+        displayIronwoodPendingBalance: BigInt.zero,
+        displayShieldedBalance: BigInt.from(500000000),
+      ),
+    );
+
+    expect(catchingUp.shielded.total, BigInt.from(500000000));
+    expect(catchingUp.orchard, (
+      total: BigInt.from(300000000),
+      pending: BigInt.zero,
+    ));
+    expect(catchingUp.sapling, (
+      total: BigInt.from(100000000),
+      pending: BigInt.zero,
+    ));
+  });
+
   testWidgets('privacy mode masks the total', (tester) async {
     await pump(
       tester,
