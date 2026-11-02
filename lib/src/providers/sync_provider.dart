@@ -921,6 +921,9 @@ const kRecoveryRestartInitialBackoff = Duration(seconds: 30);
 @visibleForTesting
 const kRecoveryRestartMaxBackoff = Duration(minutes: 10);
 
+/// Retries of a failed shield status read, each after twice the last delay.
+const _kShieldStatusRetries = 3;
+
 /// Rate-limits sync restarts that exist only to retry private recovery.
 ///
 /// Durable PIR obligations stay pending for as long as the work cannot
@@ -1019,17 +1022,20 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
     Future<String> Function()? walletDbPathResolver,
     IronwoodMigrationBackgroundLifecycle? recoveryLifecycle,
     Duration recoveryTransitionTimeout = const Duration(seconds: 120),
+    Duration shieldStatusRetryDelay = const Duration(seconds: 2),
     Future<void> Function(String dbPath)? excludeCompanionsFromBackup,
   }) : _walletDbPathResolver = walletDbPathResolver ?? getWalletDbPath,
        _recoveryLifecycle =
            recoveryLifecycle ?? IronwoodMigrationBackgroundLifecycle.instance,
        _recoveryTransitionTimeout = recoveryTransitionTimeout,
+       _shieldStatusRetryDelay = shieldStatusRetryDelay,
        _excludeCompanionsFromBackup =
            excludeCompanionsFromBackup ??
            excludeTransparentRecoveryCompanionsFromBackup;
 
   final IronwoodMigrationBackgroundLifecycle _recoveryLifecycle;
   final Duration _recoveryTransitionTimeout;
+  final Duration _shieldStatusRetryDelay;
   final Future<void> Function(String dbPath) _excludeCompanionsFromBackup;
 
   /// Whether the wallet's transparent policy may be private now even though
@@ -1183,6 +1189,7 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
   StreamSubscription? _syncSub;
   AppLifecycleListener? _lifecycleListener;
   Timer? _pollTimer;
+  Timer? _shieldStatusRetry;
   bool _pollCheckInFlight = false;
   bool _resumeTipCheckPending = false;
   int _sensitiveStateEpoch = 0;
@@ -1324,6 +1331,7 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
       rust_sync.stopMempoolObserver();
       _lifecycleListener?.dispose();
       _pollTimer?.cancel();
+      _shieldStatusRetry?.cancel();
     });
 
     // Auto-start sync on account changes.
@@ -3116,6 +3124,16 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
         balanceReadIsCurrent;
     final useFetchedRecentTxs =
         useFetchedAccountData && didFetchRecentTxs && balanceReadIsCurrent;
+    if (useFetchedBalance && canShieldTransparentBalance == null) {
+      _retryShieldStatus(
+        dbPath: dbPath,
+        network: network,
+        accountUuid: accountUuid,
+        epoch: epoch,
+        balanceReadVersion: balanceReadVersion!,
+        transparentBalance: transparent!,
+      );
+    }
     // A stream error can be recorded while this handler awaits DB reads. Its
     // stopped failure state must win over this older progress event.
     final currentState = state.value;
@@ -3917,6 +3935,7 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
     required int epoch,
     required int balanceReadVersion,
     required BigInt transparentBalance,
+    int attempt = 0,
   }) async {
     final status = await _getShieldTransparentStatus(
       dbPath: dbPath,
@@ -3924,8 +3943,17 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
       accountUuid: accountUuid,
       transparentBalance: transparentBalance,
     );
-    if (status == null ||
-        !_acceptsAccountRead(accountUuid, epoch, balanceReadVersion)) {
+    if (!_acceptsAccountRead(accountUuid, epoch, balanceReadVersion)) return;
+    if (status == null) {
+      _retryShieldStatus(
+        dbPath: dbPath,
+        network: network,
+        accountUuid: accountUuid,
+        epoch: epoch,
+        balanceReadVersion: balanceReadVersion,
+        transparentBalance: transparentBalance,
+        attempt: attempt + 1,
+      );
       return;
     }
     final current = _previousScopedState(state.value, accountUuid);
@@ -3939,6 +3967,42 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
     );
   }
 
+  /// Reads the shield status again after a failed read, usually a busy wallet
+  /// DB, so the last status stands for seconds rather than until the next
+  /// sync. A newer balance read makes its own status read and drops this one.
+  void _retryShieldStatus({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+    required int epoch,
+    required int balanceReadVersion,
+    required BigInt transparentBalance,
+    int attempt = 1,
+  }) {
+    _shieldStatusRetry?.cancel();
+    _shieldStatusRetry = null;
+    if (attempt > _kShieldStatusRetries) return;
+    _shieldStatusRetry = Timer(
+      _shieldStatusRetryDelay * (1 << (attempt - 1)),
+      () {
+        if (!_acceptsAccountRead(accountUuid, epoch, balanceReadVersion)) {
+          return;
+        }
+        unawaited(
+          _refreshShieldStatus(
+            dbPath: dbPath,
+            network: network,
+            accountUuid: accountUuid,
+            epoch: epoch,
+            balanceReadVersion: balanceReadVersion,
+            transparentBalance: transparentBalance,
+            attempt: attempt,
+          ),
+        );
+      },
+    );
+  }
+
   String? _getActiveAccountUuid() {
     return ref.read(accountProvider).value?.activeAccountUuid;
   }
@@ -3949,6 +4013,17 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
     required String network,
     required String accountUuid,
   }) => rust_sync.getBalance(
+    dbPath: dbPath,
+    network: network,
+    accountUuid: accountUuid,
+  );
+
+  @protected
+  Future<rust_sync.ShieldTransparentStatus> readShieldTransparentStatus({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+  }) => rust_sync.getShieldTransparentStatus(
     dbPath: dbPath,
     network: network,
     accountUuid: accountUuid,
@@ -4011,7 +4086,7 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
     }
 
     try {
-      final status = await rust_sync.getShieldTransparentStatus(
+      final status = await readShieldTransparentStatus(
         dbPath: dbPath,
         network: network,
         accountUuid: accountUuid,

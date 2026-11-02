@@ -186,6 +186,89 @@ void main() {
     });
   }
 
+  group('a failed shield status read', () {
+    final transparent = BigInt.from(50000);
+
+    Future<(ProviderContainer, _BalanceRefreshTestSyncNotifier)> start(
+      List<rust_sync.ShieldTransparentStatus?> statuses,
+    ) async {
+      final notifier =
+          _BalanceRefreshTestSyncNotifier(
+              () async => 'wallet.db',
+              shieldStatusRetryDelay: Duration.zero,
+              initialState: SyncState(
+                accountUuid: _accountUuid,
+                hasBalanceData: true,
+                transparentBalance: transparent,
+                canShieldTransparentBalance: true,
+                shieldTransparentFee: BigInt.from(10000),
+                shieldTransparentAmount: BigInt.from(40000),
+              ),
+            )
+            ..balance = _availableBalance(
+              BigInt.from(100),
+              transparent: transparent,
+            )
+            ..shieldStatuses = statuses;
+      final container = ProviderContainer(
+        overrides: [
+          appBootstrapProvider.overrideWithValue(AppBootstrapState.empty),
+          accountProvider.overrideWith(_ExistingAccountNotifier.new),
+          syncProvider.overrideWith(() => notifier),
+          walletBalanceCacheProvider.overrideWithValue(
+            _TestBalanceCacheStore(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(accountProvider.future);
+      await container.read(syncProvider.future);
+      return (container, notifier);
+    }
+
+    test('is read again, the last status standing until it succeeds', () async {
+      // NU7 lowered the fee; the first read finds the wallet DB busy.
+      final (container, notifier) = await start([
+        null,
+        rust_sync.ShieldTransparentStatus(
+          canShield: true,
+          feeZatoshi: BigInt.from(2000),
+          shieldedZatoshi: BigInt.from(48000),
+          reason: '',
+        ),
+      ]);
+      final published = Completer<void>();
+      container.listen(syncProvider, (_, next) {
+        if (next.value?.shieldTransparentFee == BigInt.from(2000) &&
+            !published.isCompleted) {
+          published.complete();
+        }
+      });
+
+      await notifier.refreshAfterSend();
+      await published.future.timeout(const Duration(seconds: 5));
+
+      expect(notifier.shieldAmountsAtRead, [
+        BigInt.from(40000),
+        BigInt.from(40000),
+      ]);
+      final current = container.read(syncProvider).requireValue;
+      expect(current.canShieldTransparentBalance, isTrue);
+      expect(current.shieldTransparentAmount, BigInt.from(48000));
+    });
+
+    test('is read again three times at most', () async {
+      final (container, notifier) = await start(const []);
+
+      await notifier.refreshAfterSend();
+      await pumpEventQueue();
+
+      expect(notifier.shieldStatusReadCount, 4);
+      final current = container.read(syncProvider).requireValue;
+      expect(current.shieldTransparentAmount, BigInt.from(40000));
+    });
+  });
+
   for (final trigger in ['send', 'proposal release', 'account switch']) {
     test('cached snapshot honors explicit $trigger refresh', () async {
       final cached = SyncState(accountUuid: _accountUuid, isSyncing: true)
@@ -1762,10 +1845,32 @@ class _BalanceRefreshTestSyncNotifier extends SyncNotifier {
     Future<String> Function() walletDbPathResolver, {
     this.initialState,
     this.history = const [],
+    super.shieldStatusRetryDelay,
   }) : super(walletDbPathResolver: walletDbPathResolver);
 
   final SyncState? initialState;
   final List<rust_sync.TransactionInfo> history;
+
+  /// Shield status reads in order; a null, or a read past the end, fails as
+  /// a busy wallet DB's does.
+  List<rust_sync.ShieldTransparentStatus?> shieldStatuses = const [];
+  var shieldStatusReadCount = 0;
+
+  /// The shield amount shown as each status read started.
+  final shieldAmountsAtRead = <BigInt?>[];
+
+  @override
+  Future<rust_sync.ShieldTransparentStatus> readShieldTransparentStatus({
+    required String dbPath,
+    required String network,
+    required String accountUuid,
+  }) async {
+    final index = shieldStatusReadCount++;
+    shieldAmountsAtRead.add(state.value?.shieldTransparentAmount);
+    final status = index < shieldStatuses.length ? shieldStatuses[index] : null;
+    if (status == null) throw StateError('database is locked');
+    return status;
+  }
 
   Completer<List<rust_sync.TransactionInfo>>? historyGate;
   bool failHistory = false;
