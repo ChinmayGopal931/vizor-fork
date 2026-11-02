@@ -282,11 +282,9 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
   Future<WalletPirServerState> build() async {
     _lifecycle?.dispose();
     _stopAutomaticRefresh();
-    _retryAttempt = 0;
     _lifecycle = AppLifecycleListener(
       onStateChange: (state) {
         if (state == AppLifecycleState.resumed) {
-          _retryAttempt = 0;
           _startAutomaticRefresh();
           unawaited(refreshAutomatically());
         } else {
@@ -297,7 +295,6 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
     // The config is fetched only for the private queries that use it.
     ref.listen(privateQueriesControlEnabledProvider, (_, enabled) {
       if (enabled) {
-        _retryAttempt = 0;
         _startAutomaticRefresh();
         unawaited(refreshAutomatically());
       } else {
@@ -326,6 +323,7 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
   }
 
   void _startAutomaticRefresh() {
+    _resetRetries();
     if (ref.read(walletPirConfigSourceProvider) == null ||
         !ref.read(privateQueriesControlEnabledProvider)) {
       return;
@@ -344,6 +342,14 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
     _refreshTimer = null;
     _retryTimer?.cancel();
     _retryTimer = null;
+  }
+
+  /// A new start of automatic fetching, or a list fetched, earns the quick
+  /// retries again.
+  void _resetRetries() {
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    _retryAttempt = 0;
   }
 
   /// A failed fetch with no list at all leaves private queries without a
@@ -432,9 +438,7 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
         );
         await _applier(next.selectedBaseUrl);
         state = AsyncData(next);
-        _retryTimer?.cancel();
-        _retryTimer = null;
-        _retryAttempt = 0;
+        _resetRetries();
       });
     } catch (error) {
       if (!live()) return;
