@@ -389,6 +389,53 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  testWidgets('a fetch that leaves no list is tried again sooner', (
+    tester,
+  ) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    final h = _Harness();
+    h.fetcher.servers[_sourceA] = [_a];
+    h.fetcher.failing.add(_sourceA);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: h.container,
+        child: Consumer(
+          builder: (_, ref, _) {
+            ref.watch(walletPirServerProvider);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(h.fetcher.requests, 1);
+    expect(h.state.selectedBaseUrl, isNull);
+
+    await tester.pump(kWalletPirConfigRetryDelays[0]);
+    await tester.pumpAndSettle();
+    expect(h.fetcher.requests, 2);
+
+    h.fetcher.failing.remove(_sourceA);
+    await tester.pump(kWalletPirConfigRetryDelays[1]);
+    await tester.pumpAndSettle();
+    expect(h.state.selectedBaseUrl, 'https://a.example');
+    expect(h.applied.last, 'https://a.example');
+    final afterList = h.fetcher.requests;
+
+    // With a list loaded, a failed fetch waits for the regular refresh.
+    h.fetcher.failing.add(_sourceA);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(h.fetcher.requests, afterList + 1);
+    await tester.pump(kWalletPirConfigRetryDelays[0]);
+    await tester.pumpAndSettle();
+    expect(h.fetcher.requests, afterList + 1);
+    expect(h.state.selectedBaseUrl, 'https://a.example');
+    h.dispose();
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   test('automatic triggers do not replace an in-flight config fetch', () async {
     final h = _Harness();
     h.fetcher.servers[_sourceA] = [_a];

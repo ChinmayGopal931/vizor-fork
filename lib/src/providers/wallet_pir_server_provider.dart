@@ -14,6 +14,15 @@ import 'sync_provider.dart';
 const kWalletPirConfigCacheKeyPrefix = 'zcash_wallet_pir_config_v1_';
 const kWalletPirConfigRefreshInterval = Duration(minutes: 5);
 
+/// How soon a fetch that left private queries without any server list is
+/// tried again, before [kWalletPirConfigRefreshInterval] takes over.
+const kWalletPirConfigRetryDelays = [
+  Duration(seconds: 10),
+  Duration(seconds: 30),
+  Duration(minutes: 1),
+  Duration(minutes: 2),
+];
+
 /// Plain (non-secret) persistence of the last good snapshot and server choice,
 /// scoped to the app's fixed source and network. A future app source/pin change
 /// cannot reuse another source's cached config or choice.
@@ -259,6 +268,8 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
   Future<void> _commits = Future.value();
   AppLifecycleListener? _lifecycle;
   Timer? _refreshTimer;
+  Timer? _retryTimer;
+  int _retryAttempt = 0;
 
   WalletPirConfigStore get _store => ref.read(walletPirConfigStoreProvider);
   WalletPirConfigResolver get _resolver =>
@@ -270,26 +281,27 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
   @override
   Future<WalletPirServerState> build() async {
     _lifecycle?.dispose();
-    _refreshTimer?.cancel();
+    _stopAutomaticRefresh();
+    _retryAttempt = 0;
     _lifecycle = AppLifecycleListener(
       onStateChange: (state) {
         if (state == AppLifecycleState.resumed) {
+          _retryAttempt = 0;
           _startAutomaticRefresh();
           unawaited(refreshAutomatically());
         } else {
-          _refreshTimer?.cancel();
-          _refreshTimer = null;
+          _stopAutomaticRefresh();
         }
       },
     );
     // The config is fetched only for the private queries that use it.
     ref.listen(privateQueriesControlEnabledProvider, (_, enabled) {
       if (enabled) {
+        _retryAttempt = 0;
         _startAutomaticRefresh();
         unawaited(refreshAutomatically());
       } else {
-        _refreshTimer?.cancel();
-        _refreshTimer = null;
+        _stopAutomaticRefresh();
       }
     });
     ref.onDispose(() {
@@ -297,8 +309,7 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
       _refreshGeneration++;
       _lifecycle?.dispose();
       _lifecycle = null;
-      _refreshTimer?.cancel();
-      _refreshTimer = null;
+      _stopAutomaticRefresh();
     });
     final generation = ++_lifecycleGeneration;
     _refreshGeneration++;
@@ -325,6 +336,35 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
     _refreshTimer = Timer.periodic(
       kWalletPirConfigRefreshInterval,
       (_) => unawaited(refreshAutomatically()),
+    );
+  }
+
+  void _stopAutomaticRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+    _retryTimer?.cancel();
+    _retryTimer = null;
+  }
+
+  /// A failed fetch with no list at all leaves private queries without a
+  /// server, so it is tried again sooner than the regular refresh. A saved
+  /// custom server or an earlier list already serves them.
+  void _retryWithoutList() {
+    _retryTimer?.cancel();
+    _retryTimer = null;
+    final current = state.value;
+    if (current == null ||
+        current.config != null ||
+        current.customServer != null ||
+        _retryAttempt >= kWalletPirConfigRetryDelays.length ||
+        !ref.read(privateQueriesControlEnabledProvider)) {
+      return;
+    }
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
+    _retryTimer = Timer(
+      kWalletPirConfigRetryDelays[_retryAttempt++],
+      () => unawaited(refreshAutomatically()),
     );
   }
 
@@ -392,6 +432,9 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
         );
         await _applier(next.selectedBaseUrl);
         state = AsyncData(next);
+        _retryTimer?.cancel();
+        _retryTimer = null;
+        _retryAttempt = 0;
       });
     } catch (error) {
       if (!live()) return;
@@ -401,6 +444,7 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
           refreshError: '$error',
         ),
       );
+      _retryWithoutList();
     }
   }
 
