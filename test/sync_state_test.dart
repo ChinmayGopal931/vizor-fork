@@ -125,6 +125,51 @@ void main() {
       }
     });
 
+    test("keeps Sapling's pending part with the shielded total", () {
+      final saved = CachedWalletBalance(
+        _balance(
+          orchard: BigInt.zero,
+          ironwood: BigInt.zero,
+          sapling: BigInt.from(30),
+          saplingPending: BigInt.from(20),
+          spendable: BigInt.from(30),
+          total: BigInt.from(50),
+        ),
+        DateTime.utc(2026),
+      );
+      final restored = SyncState(
+        accountUuid: 'account-a',
+        isSyncing: true,
+      ).withCachedBalance(CachedWalletBalance.decode(saved.encode())!);
+      // Before the first live read only the snapshot knows the pending part.
+      expect(restored.saplingPendingBalance, BigInt.zero);
+      expect(restored.displaySaplingPendingBalance, BigInt.from(20));
+      expect(restored.displayShieldedBalance, BigInt.from(50));
+
+      final live = _balance(
+        orchard: BigInt.zero,
+        ironwood: BigInt.zero,
+        sapling: BigInt.from(30),
+        saplingPending: BigInt.from(70),
+        spendable: BigInt.from(30),
+        total: BigInt.from(100),
+      );
+      final catchingUp = restored.withFetchedAccountData(
+        balance: live,
+        syncComplete: false,
+      );
+      expect(catchingUp.saplingPendingBalance, BigInt.from(70));
+      expect(catchingUp.displaySaplingPendingBalance, BigInt.from(20));
+      expect(catchingUp.displayShieldedBalance, BigInt.from(50));
+
+      final completed = catchingUp.withFetchedAccountData(
+        balance: live,
+        syncComplete: true,
+      );
+      expect(completed.displaySaplingPendingBalance, BigInt.from(70));
+      expect(completed.displayShieldedBalance, BigInt.from(100));
+    });
+
     test('completion without a valid balance keeps the snapshot protected', () {
       final restored = restoreSnapshot();
       final afterLiveRead = restored.withFetchedAccountData(
@@ -806,6 +851,8 @@ rust_sync.WalletBalance _balance({
   required BigInt orchard,
   BigInt? orchardLocked,
   required BigInt ironwood,
+  BigInt? sapling,
+  BigInt? saplingPending,
   BigInt? orchardPending,
   BigInt? ironwoodPending,
   required BigInt spendable,
@@ -816,7 +863,7 @@ rust_sync.WalletBalance _balance({
     transparentAuthority: rust_sync.TransparentBalanceAuthority.current,
     transparentPrivate: false,
     transparent: BigInt.zero,
-    sapling: BigInt.zero,
+    sapling: sapling ?? BigInt.zero,
     orchard: orchard,
     ironwood: ironwood,
     transparentLocked: BigInt.zero,
@@ -824,7 +871,7 @@ rust_sync.WalletBalance _balance({
     orchardLocked: orchardLocked ?? BigInt.zero,
     ironwoodLocked: BigInt.zero,
     transparentPending: BigInt.zero,
-    saplingPending: BigInt.zero,
+    saplingPending: saplingPending ?? BigInt.zero,
     orchardPending: orchardPending ?? BigInt.zero,
     ironwoodPending: ironwoodPending ?? BigInt.zero,
     changePendingConfirmation: BigInt.zero,

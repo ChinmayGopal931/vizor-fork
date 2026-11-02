@@ -9,8 +9,8 @@ typedef ShieldedPoolHoldings = ({BigInt total, BigInt pending});
 
 /// The active account's ZEC by pool, from the `display*` snapshot the Home
 /// sign reads, so the rows add up to the sign while a catch-up sync holds
-/// it. The snapshot has no Sapling row: Sapling is what its shielded total
-/// leaves, and that row's pending part the current one, within it.
+/// it. The snapshot has no Sapling total: Sapling is what its shielded total
+/// leaves.
 @immutable
 class ZecPoolHoldings {
   ZecPoolHoldings.of(SyncState sync)
@@ -35,7 +35,7 @@ class ZecPoolHoldings {
         sync.displayOrchardBalance -
         sync.displayOrchardPendingBalance;
     final total = rest.isNegative ? BigInt.zero : rest;
-    final pending = sync.saplingPendingBalance;
+    final pending = sync.displaySaplingPendingBalance;
     return (total: total, pending: pending > total ? total : pending);
   }
 

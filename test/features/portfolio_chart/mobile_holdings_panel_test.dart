@@ -130,6 +130,35 @@ void main() {
     ));
   });
 
+  test("Sapling's pending part comes from the snapshot its total does", () {
+    // A launch on the saved snapshot, before the first live read: 1 ZEC of
+    // Sapling, a quarter of it pending.
+    final launch = ZecPoolHoldings.of(
+      SyncState(
+        hasCachedBalance: true,
+        displayShieldedBalance: BigInt.from(100000000),
+        displaySaplingPendingBalance: BigInt.from(25000000),
+      ),
+    );
+    expect(launch.sapling, (
+      total: BigInt.from(100000000),
+      pending: BigInt.from(25000000),
+    ));
+    expect(launch.shielded.pending, BigInt.from(25000000));
+
+    // A catch-up sync's live reads leave the held row as it was.
+    final catchingUp = ZecPoolHoldings.of(
+      SyncState(
+        hasBalanceData: true,
+        saplingBalance: BigInt.from(100000000),
+        saplingPendingBalance: BigInt.from(50000000),
+        displayShieldedBalance: BigInt.from(100000000),
+        displaySaplingPendingBalance: BigInt.from(25000000),
+      ),
+    );
+    expect(catchingUp.sapling.pending, BigInt.from(25000000));
+  });
+
   testWidgets('privacy mode masks the total', (tester) async {
     await pump(
       tester,
