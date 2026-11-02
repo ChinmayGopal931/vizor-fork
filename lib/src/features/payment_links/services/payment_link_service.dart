@@ -14,6 +14,7 @@ import '../../../core/config/rpc_endpoint_config.dart';
 import '../../../core/zcash/network_upgrade_hold.dart';
 import '../../../providers/zec_price_change_provider.dart';
 import '../../../providers/account_provider.dart';
+import '../../../providers/block_spacing_provider.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/rpc_endpoint_failover_provider.dart';
 import '../../../providers/sync_provider.dart';
@@ -46,15 +47,6 @@ final paymentLinkServiceProvider = Provider<PaymentLinkService>((ref) {
     ref.read(paymentLinkRecoveryReconcilerProvider),
   );
 });
-
-typedef WalletFeePolicyGetter =
-    Future<rust_sync.WalletFeePolicy> Function({
-      required String dbPath,
-      required String network,
-    });
-final walletFeePolicyGetterProvider = Provider<WalletFeePolicyGetter>(
-  (ref) => rust_sync.getWalletFeePolicy,
-);
 
 const kPaymentLinkShareConfirmationTarget = 1;
 const _paymentLinkClaimMetadataWriteAttempts = 2;

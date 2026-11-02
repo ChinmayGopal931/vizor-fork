@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../main.dart' show log;
+import '../core/storage/wallet_paths.dart';
 import '../core/zcash/block_spacing.dart';
+import '../rust/api/sync.dart' as rust_sync;
 import '../rust/api/wallet.dart' as rust_wallet;
 import 'rpc_endpoint_failover_provider.dart';
 import 'sync_provider.dart';
@@ -54,8 +57,135 @@ final nu7ActiveAtWalletTipProvider = Provider<bool>((ref) {
   return tipHeight >= activation;
 });
 
+typedef WalletFeePolicyGetter =
+    Future<rust_sync.WalletFeePolicy> Function({
+      required String dbPath,
+      required String network,
+    });
+final walletFeePolicyGetterProvider = Provider<WalletFeePolicyGetter>(
+  (ref) => rust_sync.getWalletFeePolicy,
+);
+
+/// The target the polled tip implies: one past the higher of the chain tip
+/// and the scan, or 0 before either is known.
+int _tipTarget(int chainTip, int scanned) {
+  final tip = math.max(chainTip, scanned);
+  return tip > 0 ? tip + 1 : 0;
+}
+
+final _walletTipTargetProvider = Provider<int>(
+  (ref) => ref.watch(
+    syncProvider.select((state) {
+      final sync = state.value;
+      return sync == null
+          ? 0
+          : _tipTarget(sync.chainTipHeight, sync.scannedHeight);
+    }),
+  ),
+);
+
+/// Rust's fee policy at the wallet DB's own target, the height it prices new
+/// transactions at; null with no wallet, or before its first sync.
+///
+/// The DB records a new chain tip only once a sync starts, after the polled
+/// tip has moved, so a read can predate it: while the polled tip puts NU7 on
+/// the other side of the last target read, each move of the tip or the scan
+/// reads it again.
+final walletFeePolicyProvider =
+    AsyncNotifierProvider<WalletFeePolicyNotifier, rust_sync.WalletFeePolicy?>(
+      WalletFeePolicyNotifier.new,
+    );
+
+class WalletFeePolicyNotifier
+    extends AsyncNotifier<rust_sync.WalletFeePolicy?> {
+  WalletFeePolicyNotifier({
+    Future<String?> Function() resolveExistingDbPath = getExistingWalletDbPath,
+  }) : _resolveExistingDbPath = resolveExistingDbPath;
+
+  final Future<String?> Function() _resolveExistingDbPath;
+
+  /// A read from an earlier network does not land after a rebuild.
+  int _generation = 0;
+  Future<void>? _reading;
+  bool _readAgain = false;
+
+  @override
+  Future<rust_sync.WalletFeePolicy?> build() async {
+    final network = ref.watch(
+      rpcEndpointFailoverProvider.select((state) => state.current.networkName),
+    );
+    final generation = ++_generation;
+    _reading = null;
+    // Every move counts, not only the target's: a sync scans up to a tip the
+    // poller already reported, after recording it in the DB.
+    ref.listen(
+      syncProvider.select((state) {
+        final sync = state.value;
+        return (
+          tip: sync?.chainTipHeight ?? 0,
+          scanned: sync?.scannedHeight ?? 0,
+          completed: sync?.lastSyncCompletedAt,
+        );
+      }),
+      (_, sync) {
+        final activation = ref.read(blockSpacingProvider).nu7ActivationHeight;
+        final target = _tipTarget(sync.tip, sync.scanned);
+        final read = state.value;
+        if (activation == null ||
+            (read != null &&
+                (read.targetHeight >= activation) == (target >= activation))) {
+          return;
+        }
+        unawaited(_readAgainFor(network, generation));
+      },
+    );
+    try {
+      return await _read(network);
+    } catch (error) {
+      // A wallet that has not synced has no target to price at yet.
+      log('WalletFeePolicy: unavailable: $error');
+      return null;
+    }
+  }
+
+  Future<void> _readAgainFor(String network, int generation) {
+    final reading = _reading;
+    if (reading != null) {
+      _readAgain = true;
+      return reading;
+    }
+    return _reading = () async {
+      try {
+        do {
+          _readAgain = false;
+          final policy = await _read(network);
+          if (!ref.mounted || generation != _generation) return;
+          state = AsyncData(policy);
+        } while (_readAgain);
+      } catch (error) {
+        // The policy last read stands, so the polled tip cannot flip the
+        // epoch ahead of the DB; the next move of the tip or the scan reads
+        // again.
+        log('WalletFeePolicy: read again failed: $error');
+      } finally {
+        if (generation == _generation) _reading = null;
+      }
+    }();
+  }
+
+  Future<rust_sync.WalletFeePolicy?> _read(String network) async {
+    final dbPath = await _resolveExistingDbPath();
+    if (dbPath == null) return null;
+    return ref.read(walletFeePolicyGetterProvider)(
+      dbPath: dbPath,
+      network: network,
+    );
+  }
+}
+
 /// UI invalidation key only. Transaction fees themselves are quoted by Rust
-/// from the wallet DB's authoritative target, not from this display snapshot.
+/// from the wallet DB's authoritative target, which this follows once read
+/// ([walletFeePolicyProvider]); until then the polled tip stands in for it.
 typedef WalletFeePolicyEpoch = ({String network, bool nu7});
 final walletFeePolicyEpochProvider = Provider<WalletFeePolicyEpoch>((ref) {
   final network = ref.watch(
@@ -64,16 +194,11 @@ final walletFeePolicyEpochProvider = Provider<WalletFeePolicyEpoch>((ref) {
   final activation = ref.watch(
     blockSpacingProvider.select((spacing) => spacing.nu7ActivationHeight),
   );
-  final tip = ref.watch(
-    syncProvider.select((state) {
-      final sync = state.value;
-      return sync == null
-          ? 0
-          : math.max(sync.chainTipHeight, sync.scannedHeight);
-    }),
-  );
+  final int target =
+      ref.watch(walletFeePolicyProvider).value?.targetHeight ??
+      ref.watch(_walletTipTargetProvider);
   return (
     network: network,
-    nu7: activation != null && tip > 0 && tip + 1 >= activation,
+    nu7: activation != null && target > 0 && target >= activation,
   );
 });
