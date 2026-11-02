@@ -3189,9 +3189,13 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  SizedBox(
+                  // The rows grow with the system text size, so the design's
+                  // height is only the least they take.
+                  ConstrainedBox(
                     key: const ValueKey('mobile_send_review_info'),
-                    height: _kMobileSendReviewInfoHeight,
+                    constraints: const BoxConstraints(
+                      minHeight: _kMobileSendReviewInfoHeight,
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                         vertical: AppSpacing.md,

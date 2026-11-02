@@ -4235,6 +4235,24 @@ void main() {
     expect(find.text('shielded memo'), findsOneWidget);
   });
 
+  testWidgets('review rows grow with the system text size', (tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    await _toReviewStep(tester);
+
+    final info = tester.getRect(
+      find.byKey(const ValueKey('mobile_send_review_info')),
+    );
+    expect(info.height, greaterThan(268));
+    final fullAddress = tester.getRect(find.text('Full address'));
+    expect(
+      info.top <= fullAddress.top && fullAddress.bottom <= info.bottom,
+      isTrue,
+    );
+  });
+
   testWidgets('review shows the receipt and the shielded memo entry', (
     tester,
   ) async {
