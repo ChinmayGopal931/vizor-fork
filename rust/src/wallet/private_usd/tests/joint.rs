@@ -18,7 +18,7 @@ use zcash_address::unified::{self, Encoding};
 use zcash_client_backend::data_api::{
     anchor_retention::AnchorRetentionInterval,
     chain::{error::Error as ChainError, scan_cached_blocks, BlockSource, ChainState},
-    TransactionStatus, WalletWrite,
+    TransactionStatus, WalletRead, WalletWrite,
 };
 use zcash_client_backend::proto::compact_formats::{
     ChainMetadata, CompactBlock, CompactOrchardAction, CompactTx,
@@ -648,4 +648,24 @@ fn forgetting_a_joint_account_migrates_its_db_before_reading_it() {
 
     joint::forget_joint_account(&path, NETWORK, &missing).unwrap();
     assert!(has_spend_journal(&path));
+}
+
+/// The cleanup deletes an account `joint.db` still holds, and finds nothing
+/// to do once it is gone.
+#[test]
+fn forgetting_a_held_joint_account_deletes_it_once() {
+    let chain = Chain::new();
+    let wallet = joint_wallet(&chain, &joint_account(0));
+    let held = || {
+        sync::open_wallet_db_for_read(&wallet.path, NETWORK)
+            .unwrap()
+            .get_account(keys::parse_account_uuid(&wallet.account).unwrap())
+            .unwrap()
+            .is_some()
+    };
+    assert!(held());
+
+    joint::forget_joint_account(&wallet.path, NETWORK, &wallet.account).unwrap();
+    assert!(!held());
+    joint::forget_joint_account(&wallet.path, NETWORK, &wallet.account).unwrap();
 }

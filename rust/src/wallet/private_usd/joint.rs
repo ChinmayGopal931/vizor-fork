@@ -148,17 +148,20 @@ pub(crate) fn forget_joint_account(
     }
     let account = keys::parse_account_uuid(joint_uuid)
         .map_err(|error| PrivateUsdError::new(ErrorCode::Other, error))?;
-    // Read with the current schema, as the delete below writes with it.
-    with_operations(|| keys::ensure_db_migrated_once(joint_db, network).map_err(wallet_error))?;
-    let held = sync::open_wallet_db_for_read(joint_db, network)
-        .map_err(wallet_error)?
-        .get_account(account)
-        .map_err(|error| wallet_error(error.to_string()))?
-        .is_some();
-    if !held {
-        return Ok(());
-    }
-    delete_joint_account(joint_db, network, joint_uuid)
+    // One writer from the read to the delete, so no register or delete runs
+    // between them. The read uses the current schema, as the delete does.
+    with_operations(|| {
+        keys::ensure_db_migrated_once(joint_db, network).map_err(wallet_error)?;
+        let held = sync::open_wallet_db_for_read(joint_db, network)
+            .map_err(wallet_error)?
+            .get_account(account)
+            .map_err(|error| wallet_error(error.to_string()))?
+            .is_some();
+        if held {
+            keys::delete_account(joint_db, network, joint_uuid).map_err(wallet_error)?;
+        }
+        Ok(())
+    })
 }
 
 /// The `joint.db` paths a scan is running on.
