@@ -3812,12 +3812,19 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
       ++_authoritativeBalanceVersion;
     }
     final syncComplete = current.isSyncedToTip;
+    // The shield status follows the transparent balance: while that is
+    // unchanged the last status stands until the read below replaces it, and
+    // a superseded or failed read leaves it as it was.
+    final shieldStatusStale =
+        balance != null &&
+        !(current.hasBalanceData &&
+            balance.transparent == current.transparentBalance);
     state = AsyncData(
       current.withFetchedAccountData(
         balance: balance,
-        canShieldTransparentBalance: balance == null ? null : false,
-        shieldTransparentFee: balance == null ? null : BigInt.zero,
-        shieldTransparentAmount: balance == null ? null : BigInt.zero,
+        canShieldTransparentBalance: shieldStatusStale ? false : null,
+        shieldTransparentFee: shieldStatusStale ? BigInt.zero : null,
+        shieldTransparentAmount: shieldStatusStale ? BigInt.zero : null,
         syncComplete: syncComplete,
         releaseSnapshotOnAuthoritativeBalance:
             releaseSnapshotOnAuthoritativeBalance,

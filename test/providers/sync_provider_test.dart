@@ -140,6 +140,52 @@ void main() {
     },
   );
 
+  for (final changed in [false, true]) {
+    test('a refresh keeps Shield only while the transparent balance holds '
+        '(changed=$changed)', () async {
+      final transparent = BigInt.from(50000);
+      final notifier =
+          _BalanceRefreshTestSyncNotifier(
+              () async => 'wallet.db',
+              initialState: SyncState(
+                accountUuid: _accountUuid,
+                hasBalanceData: true,
+                transparentBalance: transparent,
+                canShieldTransparentBalance: true,
+                shieldTransparentFee: BigInt.from(10000),
+                shieldTransparentAmount: BigInt.from(40000),
+              ),
+            )
+            // No Rust here, so the shield status read fails, as a busy
+            // wallet DB's does.
+            ..balance = _availableBalance(
+              BigInt.from(100),
+              transparent: changed ? transparent * BigInt.two : transparent,
+            );
+      final container = ProviderContainer(
+        overrides: [
+          appBootstrapProvider.overrideWithValue(AppBootstrapState.empty),
+          accountProvider.overrideWith(_ExistingAccountNotifier.new),
+          syncProvider.overrideWith(() => notifier),
+          walletBalanceCacheProvider.overrideWithValue(
+            _TestBalanceCacheStore(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(accountProvider.future);
+      await container.read(syncProvider.future);
+      await notifier.refreshAfterSend();
+
+      final current = container.read(syncProvider).requireValue;
+      expect(current.canShieldTransparentBalance, !changed);
+      expect(
+        current.shieldTransparentAmount,
+        changed ? BigInt.zero : BigInt.from(40000),
+      );
+    });
+  }
+
   for (final trigger in ['send', 'proposal release', 'account switch']) {
     test('cached snapshot honors explicit $trigger refresh', () async {
       final cached = SyncState(accountUuid: _accountUuid, isSyncing: true)
@@ -1826,11 +1872,12 @@ class _ExistingAccountNotifier extends AccountNotifier {
 rust_sync.WalletBalance _availableBalance(
   BigInt amount, {
   BigInt? orchardPending,
+  BigInt? transparent,
 }) => rust_sync.WalletBalance(
   availability: rust_sync.WalletBalanceAvailability.available,
   transparentAuthority: rust_sync.TransparentBalanceAuthority.current,
   transparentPrivate: false,
-  transparent: BigInt.zero,
+  transparent: transparent ?? BigInt.zero,
   sapling: BigInt.zero,
   orchard: amount,
   ironwood: BigInt.zero,
