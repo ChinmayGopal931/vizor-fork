@@ -8,6 +8,7 @@ import '../core/storage/app_secure_store.dart';
 import '../rust/api/pir_config.dart' as rust;
 import '../services/wallet_pir/wallet_pir_config.dart';
 import 'account_provider.dart';
+import 'enhance_pir_provider.dart';
 import 'sync_provider.dart';
 
 const kWalletPirConfigCacheKeyPrefix = 'zcash_wallet_pir_config_v1_';
@@ -281,6 +282,16 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
         }
       },
     );
+    // The config is fetched only for the private queries that use it.
+    ref.listen(privateQueriesControlEnabledProvider, (_, enabled) {
+      if (enabled) {
+        _startAutomaticRefresh();
+        unawaited(refreshAutomatically());
+      } else {
+        _refreshTimer?.cancel();
+        _refreshTimer = null;
+      }
+    });
     ref.onDispose(() {
       _lifecycleGeneration++;
       _refreshGeneration++;
@@ -304,7 +315,10 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
   }
 
   void _startAutomaticRefresh() {
-    if (ref.read(walletPirConfigSourceProvider) == null) return;
+    if (ref.read(walletPirConfigSourceProvider) == null ||
+        !ref.read(privateQueriesControlEnabledProvider)) {
+      return;
+    }
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
     _refreshTimer?.cancel();
@@ -315,9 +329,11 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
   }
 
   /// Automatic triggers keep the active fetch running instead of repeatedly
-  /// superseding it while a slow mirror is still responding.
+  /// superseding it while a slow mirror is still responding, and fetch
+  /// nothing while private queries are off.
   Future<void> refreshAutomatically() async {
     if (state.value?.refreshing ?? true) return;
+    if (!ref.read(privateQueriesControlEnabledProvider)) return;
     await refresh();
   }
 

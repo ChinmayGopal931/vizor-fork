@@ -204,6 +204,21 @@ class _Resolver implements WalletPirConfigResolver {
   }
 }
 
+class _PrivateQueries extends Notifier<bool> {
+  _PrivateQueries(this.initial);
+
+  final bool initial;
+
+  @override
+  bool build() => initial;
+
+  void turn(bool on) => state = on;
+}
+
+final _privateQueriesProvider = NotifierProvider<_PrivateQueries, bool>(
+  () => _PrivateQueries(true),
+);
+
 class _Harness {
   _Harness({String? source = _sourceA, bool privateQueriesOn = true}) {
     container = ProviderContainer(
@@ -224,8 +239,11 @@ class _Harness {
           return true;
         }),
         enhancePirAvailableProvider.overrideWithValue(true),
-        privateQueriesControlEnabledProvider.overrideWithValue(
-          privateQueriesOn,
+        _privateQueriesProvider.overrideWith(
+          () => _PrivateQueries(privateQueriesOn),
+        ),
+        privateQueriesControlEnabledProvider.overrideWith(
+          (ref) => ref.watch(_privateQueriesProvider),
         ),
         walletPirServerApplierProvider.overrideWithValue((base) async {
           applying++;
@@ -334,6 +352,42 @@ void main() {
       expect(h.fetcher.requests, 6);
     },
   );
+
+  testWidgets('the list is fetched only while private queries are on', (
+    tester,
+  ) async {
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    final h = _Harness(privateQueriesOn: false);
+    h.fetcher.servers[_sourceA] = [_a];
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: h.container,
+        child: Consumer(
+          builder: (_, ref, _) {
+            ref.watch(walletPirServerProvider);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.pump(kWalletPirConfigRefreshInterval);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(h.fetcher.requests, 0);
+
+    h.container.read(_privateQueriesProvider.notifier).turn(true);
+    await tester.pumpAndSettle();
+    expect(h.fetcher.requests, 2);
+
+    h.container.read(_privateQueriesProvider.notifier).turn(false);
+    await tester.pump(kWalletPirConfigRefreshInterval);
+    await tester.pumpAndSettle();
+    expect(h.fetcher.requests, 2);
+    h.dispose();
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   test('automatic triggers do not replace an in-flight config fetch', () async {
     final h = _Harness();
