@@ -610,3 +610,25 @@ fn a_joint_sweep_over_its_fee_limit_is_refused_and_locks_nothing() {
     sync::discard_proposal(sweep.proposal_id, "sweep").unwrap();
     assert_eq!(proposal_locks(&wallet.path), 0);
 }
+
+/// A delete clears tables only a newer schema has, so a `joint.db` no
+/// register or scan has opened since an update is migrated first. An empty
+/// file stands in for the older schema.
+#[test]
+fn deleting_a_joint_account_migrates_its_db_first() {
+    let (_dir, path) = temp_db("joint.db");
+    rusqlite::Connection::open(&path).unwrap();
+    let missing = uuid::Uuid::new_v4().to_string();
+
+    let error = joint::delete_joint_account(&path, NETWORK, &missing).unwrap_err();
+    assert!(error.message.contains("Account not found"), "{error:?}");
+    let journal: i64 = rusqlite::Connection::open(&path)
+        .unwrap()
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'ironwood_spend_journal'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(journal, 1);
+}

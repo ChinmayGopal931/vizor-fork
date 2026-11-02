@@ -10,6 +10,7 @@ import '../../../../providers/privacy_mode_provider.dart';
 import '../../models/private_usd_record_key.dart';
 import '../../models/private_usd_reverse_presentation.dart';
 import '../../providers/private_usd_available_provider.dart';
+import '../../providers/private_usd_least_fee_provider.dart';
 import '../../providers/private_usd_reverse_conversion_provider.dart';
 import '../../widgets/mobile/private_usd_confirm_sheets.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
@@ -82,6 +83,7 @@ class _MobilePrivateUsdReverseConversionScreenState
             privacyModeEnabled: ref.watch(privacyModeProvider),
             explorerTxPrefix: deployment?.explorerTxPrefix,
             bridgeAvailable: bridge,
+            sweepFeeFloorZat: ref.watch(privateUsdLeastFeeZatProvider),
           );
     if (presentation != null) noteBridged(presentation.bridged);
     final notifier = ref.read(

@@ -14,6 +14,7 @@ import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engin
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_banner.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_scramble_text.dart';
+import 'package:zcash_wallet/src/core/zcash/block_spacing.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_convert_views.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_progress_views.dart';
 import 'package:zcash_wallet/src/features/settings/widgets/mobile/mobile_tor_control.dart';
@@ -314,6 +315,7 @@ void main() {
       bool relayerClaims = false,
       bool keepScreenOn = true,
       ValueChanged<bool>? onKeepScreenOnChanged,
+      BlockTimeEstimate blockTimes = BlockTimeEstimate.preNu7,
     }) async {
       await pump(
         tester,
@@ -326,6 +328,7 @@ void main() {
             balance: balance,
             bridgeAvailable: bridgeAvailable,
             relayerClaims: relayerClaims,
+            blockTimes: blockTimes,
           ),
           keepScreenOn: keepScreenOn,
           onKeepScreenOnChanged: onKeepScreenOnChanged,
@@ -362,6 +365,26 @@ void main() {
         findsNothing,
       );
       expect(find.text(PrivateUsdCopy.convertCallOff), findsNothing);
+    });
+
+    testWidgets('the confirmations estimate follows the block time', (
+      tester,
+    ) async {
+      final status = PrivateUsdConversionStatus(
+        record: previewPrivateUsdRecord(depositConfirmations: 0),
+        wait: ApiForwardWait.confirming,
+      );
+      await pumpProgress(tester, status);
+      expect(find.text('0 of 2 · about 2 min'), findsOneWidget);
+
+      // From NU7 a block takes 25 s, so two take under a minute.
+      const nu7 = BlockSpacing(
+        preNu7BlockSeconds: 75,
+        nu7BlockSeconds: 25,
+        nu7ActivationHeight: 100,
+      );
+      await pumpProgress(tester, status, blockTimes: nu7.fromTip(200));
+      expect(find.text('0 of 2 · about 1 min'), findsOneWidget);
     });
 
     testWidgets('once the relayer holds the claim, the user can leave', (

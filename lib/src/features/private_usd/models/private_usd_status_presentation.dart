@@ -3,6 +3,7 @@ import '../../../core/formatting/address_display.dart';
 import '../../../core/formatting/date_format.dart';
 import '../../../core/formatting/zec_amount.dart';
 import '../../../core/privacy/privacy_mask.dart';
+import '../../../core/zcash/block_spacing.dart';
 import '../../../rust/api/private_usd.dart';
 import '../../swap/domain/swap_asset.dart';
 import '../../swap/models/swap_activity_status_mapper.dart';
@@ -16,9 +17,6 @@ import 'private_usd_messages.dart';
 
 /// What the forward progress screen offers once a conversion ended.
 enum PrivateUsdProgressAction { viewBalance, tryAgain }
-
-/// A Zcash block every 75 s, for the confirmations estimate.
-const _zcashBlock = Duration(seconds: 75);
 
 /// An opening that takes longer than this offers "Call it off".
 const kPrivateUsdSlowOpening = Duration(seconds: 90);
@@ -92,6 +90,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
   String? explorerTxPrefix,
   bool bridgeAvailable = true,
   bool relayerClaims = false,
+  BlockTimeEstimate blockTimes = BlockTimeEstimate.preNu7,
 }) {
   final record = status.record;
   final totalZat = record.maxTotalZat ?? record.depositZat;
@@ -234,6 +233,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
               2 => _confirmationsDetail(
                 record.depositConfirmations,
                 zcashConfirmations,
+                blockTimes,
               ),
               _ => null,
             },
@@ -453,14 +453,18 @@ SwapActivityStatusPresentation privateUsdSwapStatus({
   showTabs: steps.isNotEmpty,
 );
 
-String _confirmationsDetail(int? confirmations, int needed) {
+String _confirmationsDetail(
+  int? confirmations,
+  int needed,
+  BlockTimeEstimate blockTimes,
+) {
   final count = (confirmations ?? 0).clamp(0, needed);
   final left = needed - count;
   final countText = PrivateUsdCopy.convertStepConfirmCount(count, needed);
   if (left <= 0) return countText;
   return PrivateUsdCopy.activityDetail(
     countText,
-    PrivateUsdCopy.about(_zcashBlock * left),
+    PrivateUsdCopy.about(Duration(seconds: blockTimes.secondsForBlocks(left))),
   );
 }
 

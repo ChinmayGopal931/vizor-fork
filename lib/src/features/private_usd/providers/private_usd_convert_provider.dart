@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/private_usd_feature_config.dart';
 import '../../../core/formatting/zec_amount.dart';
+import '../../../core/zcash/network_upgrade_hold.dart';
 import '../../../providers/account_provider.dart';
+import '../../../providers/network_upgrade_window_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../../rust/api/private_usd.dart' as rust;
 import '../../migration/providers/ironwood_migration_announcement_provider.dart';
@@ -18,6 +20,7 @@ import '../services/private_usd_pause.dart';
 import '../services/private_usd_zec_quote_search.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_engine_provider.dart';
+import 'private_usd_least_fee_provider.dart';
 import 'private_usd_relayer_claims_provider.dart';
 import 'private_usd_tokens_provider.dart';
 
@@ -541,6 +544,7 @@ class PrivateUsdConvertNotifier
       (units) =>
           ref.read(privateUsdEngineProvider).quote(this.account!, units: units),
       nowSeconds: () => clock().millisecondsSinceEpoch ~/ 1000,
+      leastFeeZat: () => ref.read(privateUsdLeastFeeZatProvider),
     );
     final account = this.account;
     var holdings = const PrivateUsdZecHoldings();
@@ -611,6 +615,12 @@ class PrivateUsdConvertNotifier
     final account = this.account;
     final quote = state.quote!;
     if (account == null) return null;
+    // The maker would open a swap for a deposit Rust then refuses. Nothing is
+    // sent, so the quote stands for a try once the upgrade is through.
+    if (ref.read(networkUpgradeWindowProvider).holdsTransactions) {
+      state = state.copyWith(startError: kNetworkUpgradeHoldMessage);
+      return null;
+    }
     state = state.copyWith(
       step: PrivateUsdConvertStep.confirming,
       clearStartError: true,

@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/feedback/app_haptics.dart';
 import '../../../../providers/account_provider.dart';
+import '../../../../providers/block_spacing_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
+import '../../../../providers/sync_provider.dart';
 import '../../../../rust/api/private_usd.dart' show ApiForwardOutcome;
 import '../../models/private_usd_record_key.dart';
 import '../../models/private_usd_status_presentation.dart';
@@ -107,6 +109,15 @@ class _MobilePrivateUsdConversionScreenState
             bridgeAvailable: bridge,
             relayerClaims:
                 ref.watch(privateUsdRelayerClaimsProvider).value ?? true,
+            blockTimes: ref
+                .watch(blockSpacingProvider)
+                .fromTip(
+                  ref.watch(
+                    syncProvider.select(
+                      (sync) => sync.value?.chainTipHeight ?? 0,
+                    ),
+                  ),
+                ),
           );
     if (presentation != null) noteBridged(presentation.bridged);
     final notifier = ref.read(privateUsdConversionProvider(key).notifier);

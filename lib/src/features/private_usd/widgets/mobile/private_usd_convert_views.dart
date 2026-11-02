@@ -9,6 +9,7 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_loading_icon.dart';
 import '../../../../core/widgets/mobile/mobile_warning_notice.dart';
+import '../../../../core/zcash/block_spacing.dart';
 import '../../../../providers/zec_price_change_provider.dart'
     show fiatTextForZatoshi;
 import '../../../swap/domain/swap_asset.dart';
@@ -23,8 +24,11 @@ import 'private_usd_flow_widgets.dart';
 import 'private_usd_info_sheets.dart';
 import 'private_usd_logo.dart';
 
-/// How long a forward conversion usually takes, for the info sheet.
-const _forwardTakes = Duration(minutes: 8);
+/// How long a forward conversion usually takes, for the info sheet: about
+/// five and a half minutes, and the deposit's two confirmations at the
+/// chain's block time.
+Duration _forwardTakes(BlockTimeEstimate blockTimes) =>
+    Duration(seconds: 330 + blockTimes.secondsForBlocks(2));
 
 String _masked(String text, bool privacyModeEnabled) => hideAmountIfPrivacyMode(
   text,
@@ -62,6 +66,7 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
     this.zecUsdPrice,
     this.autofocus = true,
     this.onSwitchDirection,
+    this.blockTimes = BlockTimeEstimate.preNu7,
     super.key,
   });
 
@@ -87,6 +92,9 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
   /// Null keeps the direction switch dimmed.
   final VoidCallback? onSwitchDirection;
 
+  /// The chain's block times, for how long a conversion takes.
+  final BlockTimeEstimate blockTimes;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -99,7 +107,7 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
       onBack: onBack,
       onInfo: () => showPrivateUsdConvertInfoSheet(
         context,
-        takes: _forwardTakes,
+        takes: _forwardTakes(blockTimes),
         relayerClaims: relayerClaims,
       ),
       pay: PrivateUsdAmountPanel(
@@ -179,6 +187,7 @@ class MobilePrivateUsdReverseConvertView extends StatelessWidget {
     this.privacyModeEnabled = false,
     this.zecUsdPrice,
     this.autofocus = true,
+    this.sweepFeeFloorZat,
     super.key,
   });
 
@@ -186,6 +195,9 @@ class MobilePrivateUsdReverseConvertView extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode? focusNode;
   final bool privacyModeEnabled;
+
+  /// As [privateUsdReverseReceivedZat]'s.
+  final BigInt? sweepFeeFloorZat;
 
   /// ZEC's market price (Home's), for the estimate's worth; null hides it.
   final double? zecUsdPrice;
@@ -228,13 +240,21 @@ class MobilePrivateUsdReverseConvertView extends StatelessWidget {
         quoting: state.quoting,
         estimate: priced && !state.quoting
             ? _masked(
-                _zec(privateUsdReverseReceivedZat(draft)),
+                _zec(
+                  privateUsdReverseReceivedZat(
+                    draft,
+                    sweepFeeFloorZat: sweepFeeFloorZat,
+                  ),
+                ),
                 privacyModeEnabled,
               )
             : null,
         marketValue: priced && !state.quoting
             ? _marketValue(
-                privateUsdReverseReceivedZat(draft),
+                privateUsdReverseReceivedZat(
+                  draft,
+                  sweepFeeFloorZat: sweepFeeFloorZat,
+                ),
                 zecUsdPrice,
                 privacyModeEnabled,
               )
@@ -247,6 +267,7 @@ class MobilePrivateUsdReverseConvertView extends StatelessWidget {
           ? PrivateUsdReverseLedger(
               record: draft,
               privacyModeEnabled: privacyModeEnabled,
+              sweepFeeFloorZat: sweepFeeFloorZat,
             )
           : null,
       expired: state.isExpired,
@@ -454,11 +475,15 @@ class MobilePrivateUsdReverseReviewView extends StatelessWidget {
     required this.onConfirm,
     required this.onRefreshQuote,
     this.torOffDisclosure = false,
+    this.sweepFeeFloorZat,
     super.key,
   });
 
   final PrivateUsdReverseConvertState state;
   final bool privacyModeEnabled;
+
+  /// As [privateUsdReverseReceivedZat]'s.
+  final BigInt? sweepFeeFloorZat;
 
   /// As [MobilePrivateUsdConvertReviewView.torOffDisclosure].
   final bool torOffDisclosure;
@@ -489,7 +514,12 @@ class MobilePrivateUsdReverseReviewView extends StatelessWidget {
           : MobileSwapReviewHeaderRow(
               label: PrivateUsdCopy.convertYouReceive,
               amountText: _masked(
-                _zec(privateUsdReverseReceivedZat(draft)),
+                _zec(
+                  privateUsdReverseReceivedZat(
+                    draft,
+                    sweepFeeFloorZat: sweepFeeFloorZat,
+                  ),
+                ),
                 privacyModeEnabled,
               ),
               asset: SwapAsset.zec,
@@ -500,6 +530,7 @@ class MobilePrivateUsdReverseReviewView extends StatelessWidget {
           : PrivateUsdReverseLedger(
               record: draft,
               privacyModeEnabled: privacyModeEnabled,
+              sweepFeeFloorZat: sweepFeeFloorZat,
             ),
       note: draft == null
           ? null

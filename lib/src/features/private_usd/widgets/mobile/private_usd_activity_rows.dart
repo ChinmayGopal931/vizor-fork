@@ -289,16 +289,36 @@ ActivityRowData buildPrivateUsdSendActivityRow({
   );
 }
 
+String _receivedStableId(RailgunReceipt receipt, int copy) =>
+    'private-usd:received:${receipt.txid}:${receipt.token}:${receipt.amount}'
+    '${copy == 0 ? '' : ':$copy'}';
+
+/// [receipts] each with how many equal receipts come before it.
+Iterable<(RailgunReceipt, int)> _receiptCopies(
+  List<RailgunReceipt> receipts,
+) sync* {
+  final seen = <String, int>{};
+  for (final receipt in receipts) {
+    final id = _receivedStableId(receipt, 0);
+    final copy = seen[id] ?? 0;
+    seen[id] = copy + 1;
+    yield (receipt, copy);
+  }
+}
+
 /// When a send's row sorts: when it was kept.
 DateTime privateUsdSendActivityTime(ApiSendRecord record) =>
     DateTime.fromMillisecondsSinceEpoch(record.sentAt * 1000);
 
 /// A private send this wallet received: in once screened (spendable, or spent
 /// since), from its sender's truncated address where the sender showed it;
-/// it unfolds into its [details].
+/// it unfolds into its [details]. [copy] counts the equal receipts listed
+/// before it (one transaction's notes of the same token and amount), which
+/// keeps their rows apart.
 ActivityRowData buildPrivateUsdReceivedActivityRow({
   required BuildContext context,
   required RailgunReceipt receipt,
+  int copy = 0,
   bool privacyModeEnabled = false,
   bool dateOnlyTimestamp = false,
   PrivateUsdActivityDetailsConfig? details,
@@ -311,9 +331,7 @@ ActivityRowData buildPrivateUsdReceivedActivityRow({
     privacyModeEnabled: privacyModeEnabled,
     denomination: '',
   );
-  final stableId =
-      'private-usd:received:${receipt.txid}:${receipt.token}:'
-      '${receipt.amount}';
+  final stableId = _receivedStableId(receipt, copy);
   final unfold = _unfold(
     details,
     stableId,
@@ -492,12 +510,13 @@ List<ActivityEntry> privateUsdFeedEntries({
           details: details,
         ),
       ),
-    for (final receipt in activity.receipts)
+    for (final (receipt, copy) in _receiptCopies(activity.receipts))
       ActivityEntry(
         timestamp: privateUsdReceivedActivityTime(receipt),
         row: buildPrivateUsdReceivedActivityRow(
           context: context,
           receipt: receipt,
+          copy: copy,
           privacyModeEnabled: privacyModeEnabled,
           dateOnlyTimestamp: dateOnlyTimestamp,
           details: details,

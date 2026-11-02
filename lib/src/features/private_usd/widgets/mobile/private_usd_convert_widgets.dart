@@ -560,11 +560,15 @@ class PrivateUsdReverseLedger extends StatelessWidget {
   const PrivateUsdReverseLedger({
     required this.record,
     required this.privacyModeEnabled,
+    this.sweepFeeFloorZat,
     super.key,
   });
 
   final ApiReverseRecord record;
   final bool privacyModeEnabled;
+
+  /// As [privateUsdReverseReceivedZat]'s.
+  final BigInt? sweepFeeFloorZat;
 
   String _masked(String text) => hideAmountIfPrivacyMode(
     text,
@@ -597,7 +601,10 @@ class PrivateUsdReverseLedger extends StatelessWidget {
         PrivateUsdCopy.reverseReceiveEstimate,
         _masked(
           ZecAmount.fromZatoshi(
-            privateUsdReverseReceivedZat(record),
+            privateUsdReverseReceivedZat(
+              record,
+              sweepFeeFloorZat: sweepFeeFloorZat,
+            ),
           ).activity.toString(),
         ),
       ),
