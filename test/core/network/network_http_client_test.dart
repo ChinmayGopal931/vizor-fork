@@ -553,6 +553,51 @@ void main() {
     expect(await destination.readAsBytes(), [0, 1, 2, 3]);
   });
 
+  test('direct redirects reject HTTPS to HTTP downgrade', () async {
+    final directClient = _ScriptedHttpClient([
+      (302, {'location': 'http://example.com/final'}),
+      (200, const {}),
+    ]);
+    final client = NetworkHttpClient(
+      directClient: directClient,
+      torDesired: () => false,
+    );
+    addTearDown(() => client.close());
+
+    await expectLater(
+      client.request('GET', Uri.parse('https://example.com/start')),
+      throwsA(isA<HttpException>()),
+    );
+    expect(directClient.requested, [Uri.parse('https://example.com/start')]);
+  });
+
+  test(
+    'direct redirects follow HTTPS and strip credentials across origins',
+    () async {
+      final directClient = _ScriptedHttpClient([
+        (301, {'location': 'https://other.example.com/final'}),
+        (200, const {}),
+      ]);
+      final client = NetworkHttpClient(
+        directClient: directClient,
+        torDesired: () => false,
+      );
+      addTearDown(() => client.close());
+
+      final response = await client.request(
+        'GET',
+        Uri.parse('https://example.com/start'),
+        headers: const {'authorization': 'secret', 'accept': 'json'},
+      );
+      expect(response.statusCode, 200);
+      expect(directClient.requested, [
+        Uri.parse('https://example.com/start'),
+        Uri.parse('https://other.example.com/final'),
+      ]);
+      expect(directClient.sentHeaders.last, {'accept': 'json'});
+    },
+  );
+
   test('direct timeout aborts transport and drains its request slot', () async {
     final requestReceived = Completer<void>();
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -715,6 +760,105 @@ class _StallingHttpClient implements HttpClient {
 
   void failPendingOpen() {
     _pendingOpen.completeError(StateError('direct client closed'));
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+/// Answers each request with the next scripted status and headers, and an
+/// empty body. Redirects are the caller's to follow.
+class _ScriptedHttpClient implements HttpClient {
+  _ScriptedHttpClient(this.responses);
+
+  final List<(int, Map<String, String>)> responses;
+  final requested = <Uri>[];
+  final sentHeaders = <Map<String, String>>[];
+
+  @override
+  Future<HttpClientRequest> openUrl(String method, Uri url) async {
+    requested.add(url);
+    final headers = <String, String>{};
+    sentHeaders.add(headers);
+    final (status, responseHeaders) = responses.removeAt(0);
+    return _ScriptedRequest(
+      _ScriptedHeaders(headers),
+      _ScriptedResponse(status, _ScriptedHeaders(Map.of(responseHeaders))),
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ScriptedRequest implements HttpClientRequest {
+  _ScriptedRequest(this.headers, this._response);
+
+  @override
+  final HttpHeaders headers;
+  final HttpClientResponse _response;
+
+  @override
+  bool followRedirects = true;
+
+  @override
+  void add(List<int> data) {}
+
+  @override
+  void abort([Object? exception, StackTrace? stackTrace]) {}
+
+  @override
+  Future<HttpClientResponse> close() async {
+    expect(followRedirects, isFalse);
+    return _response;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ScriptedResponse extends Stream<List<int>>
+    implements HttpClientResponse {
+  _ScriptedResponse(this.statusCode, this.headers);
+
+  @override
+  final int statusCode;
+  @override
+  final HttpHeaders headers;
+
+  @override
+  StreamSubscription<List<int>> listen(
+    void Function(List<int> event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) => const Stream<List<int>>.empty().listen(
+    onData,
+    onError: onError,
+    onDone: onDone,
+    cancelOnError: cancelOnError,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ScriptedHeaders implements HttpHeaders {
+  _ScriptedHeaders(this.values);
+
+  final Map<String, String> values;
+
+  @override
+  void set(String name, Object value, {bool preserveHeaderCase = false}) {
+    values[name.toLowerCase()] = '$value';
+  }
+
+  @override
+  void forEach(void Function(String name, List<String> values) action) {
+    values.forEach((name, value) => action(name, [value]));
   }
 
   @override
