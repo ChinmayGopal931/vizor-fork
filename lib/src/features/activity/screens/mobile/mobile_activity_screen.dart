@@ -426,7 +426,8 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen>
     final sections = buildActivityFeedSections(
       entries,
       // Private USD rows are all loaded, so only the pager's rows fill its
-      // page, and once it has nothing more to load every row shows.
+      // page; one older than its last row waits for the next page, and once
+      // there is nothing more to load every row shows.
       limit: pager != null && !pager.hasMore
           ? null
           : pager?.visibleCount ?? activityPageSize,

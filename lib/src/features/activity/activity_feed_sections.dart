@@ -47,7 +47,9 @@ DateTime? transactionActivityTimestamp(
 
 /// Sorts [entries] newest-first and groups consecutive entries that
 /// share a section title. A [limit] ends the feed at its [limit]th entry
-/// that [countsTowardLimit] accepts (every entry when null).
+/// that [countsTowardLimit] accepts (every entry when null), or at the last
+/// one when there are fewer: entries it does not count show only between
+/// counted ones.
 List<ActivityFeedSectionData> buildActivityFeedSections(
   List<ActivityEntry> entries, {
   int? limit,
@@ -87,10 +89,13 @@ int _limitEnd(
 ) {
   if (counts == null || limit <= 0) return limit;
   var counted = 0;
+  var end = 0;
   for (var i = 0; i < sorted.length; i++) {
-    if (counts(sorted[i].$2) && ++counted == limit) return i + 1;
+    if (!counts(sorted[i].$2)) continue;
+    end = i + 1;
+    if (++counted == limit) break;
   }
-  return sorted.length;
+  return end;
 }
 
 String _activitySectionTitle(DateTime? timestamp) {

@@ -53,6 +53,26 @@ void main() {
     ]);
   });
 
+  test('with fewer counted rows than the limit, the last one ends it', () {
+    // A page whose transactions some uncounted rows stand in for.
+    final paged = List.generate(
+      2,
+      (i) => entry(i, DateTime.utc(2026, 1, 10).subtract(Duration(days: i))),
+    );
+    final within = entry(10, DateTime.utc(2026, 1, 9, 12));
+    final older = entry(11, DateTime.utc(2025, 12, 1));
+    final sections = buildActivityFeedSections(
+      [...paged, within, older],
+      limit: 3,
+      countsTowardLimit: (e) => !identical(e, within) && !identical(e, older),
+    );
+    expect(sections.expand((s) => s.rows).map((r) => r.stableId), [
+      'row-0',
+      'row-10',
+      'row-1',
+    ]);
+  });
+
   test('page limit applies after timestamp ordering and date grouping', () {
     final sections = buildActivityFeedSections(
       List.generate(
