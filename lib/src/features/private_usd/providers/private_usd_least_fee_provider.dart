@@ -4,24 +4,25 @@ import '../../../core/storage/wallet_paths.dart';
 import '../../../providers/block_spacing_provider.dart';
 import '../../../providers/rpc_endpoint_failover_provider.dart';
 import '../../../providers/sync_provider.dart';
-import '../../../rust/api/sync.dart' as rust_sync;
+import '../../payment_links/services/payment_link_service.dart'
+    show walletFeePolicyGetterProvider;
 import '../models/private_usd_fees.dart';
 
 /// ZIP 317's least fee at the wallet's target on `network`, from the local
 /// wallet DB; null with no wallet.
 typedef PrivateUsdLeastFeeReader = Future<BigInt?> Function(String network);
 
-final privateUsdLeastFeeReaderProvider = Provider<PrivateUsdLeastFeeReader>(
-  (_) => (network) async {
+final privateUsdLeastFeeReaderProvider = Provider<PrivateUsdLeastFeeReader>((
+  ref,
+) {
+  final readPolicy = ref.watch(walletFeePolicyGetterProvider);
+  return (network) async {
     final dbPath = await getExistingWalletDbPath();
     if (dbPath == null) return null;
-    final policy = await rust_sync.getWalletFeePolicy(
-      dbPath: dbPath,
-      network: network,
-    );
+    final policy = await readPolicy(dbPath: dbPath, network: network);
     return policy.minimumFeeZatoshi;
-  },
-);
+  };
+});
 
 /// What the least fee is read again for: the network, and whether the
 /// wallet's scan is past NU7. Rust prices at the wallet DB's own target,
