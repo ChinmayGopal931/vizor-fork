@@ -522,8 +522,9 @@ class NetworkHttpClient {
   }
 
   /// The direct route's redirects, followed here rather than by `dart:io`,
-  /// which would follow one from HTTPS to plain HTTP. Each hop is a direct
-  /// request of its own, so a route change between hops stops the chain.
+  /// which would follow one from HTTPS to plain HTTP. Which requests follow
+  /// stays `dart:io`'s ([_directFollows]). Each hop is a direct request of its
+  /// own, so a route change between hops stops the chain.
   Future<NetworkHttpResponse> _requestDirectWithRedirects(
     String method,
     Uri uri, {
@@ -554,6 +555,9 @@ class NetworkHttpClient {
           maxBodyBytes: maxBodyBytes,
         ),
       );
+      if (!_directFollows(current.method, response.statusCode)) {
+        return response;
+      }
       final next = _redirectFrom(
         response,
         current,
@@ -564,6 +568,14 @@ class NetworkHttpClient {
       hop = next;
     }
   }
+
+  /// Which direct requests follow a redirect, as `dart:io` decided before the
+  /// route followed them itself: GET and HEAD any, a POST only a 303, as a
+  /// GET. Every other answer goes back to the caller.
+  static bool _directFollows(String method, int statusCode) =>
+      method == 'GET' ||
+      method == 'HEAD' ||
+      (method == 'POST' && statusCode == HttpStatus.seeOther);
 
   _DirectRequestOperation<NetworkHttpResponse> _requestDirect(
     String method,
@@ -703,12 +715,19 @@ class NetworkHttpClient {
         bodyBytes: Uint8List(0),
         headers: Map.unmodifiable(responseHeaders),
       );
-      final next = _redirectFrom(
-        answer,
-        hop,
-        redirectCount: redirectCount,
-        maxRedirects: _defaultMaxRedirects,
-      );
+      final _RedirectHop? next;
+      try {
+        next = _redirectFrom(
+          answer,
+          hop,
+          redirectCount: redirectCount,
+          maxRedirects: _defaultMaxRedirects,
+        );
+      } catch (_) {
+        // A refused redirect still releases its connection.
+        await response.drain<void>();
+        rethrow;
+      }
       if (next == null) {
         await response.pipe(destination.openWrite());
         return answer;
@@ -739,7 +758,7 @@ class NetworkHttpClient {
   /// The hop [response] redirects [hop] to, or null when it is the answer.
   /// Both routes follow the same rules: HTTPS never downgrades, credentials
   /// stay with their origin, and a POST answered 301, 302 or 303 goes on as
-  /// a GET.
+  /// a GET without its body or the headers that described it.
   static _RedirectHop? _redirectFrom(
     NetworkHttpResponse response,
     _RedirectHop hop, {
@@ -767,13 +786,26 @@ class NetworkHttpClient {
         (response.statusCode == HttpStatus.movedPermanently ||
             response.statusCode == HttpStatus.found ||
             response.statusCode == HttpStatus.seeOther);
+    final headers = _headersForRedirect(hop.uri, nextUri, hop.headers);
     return _RedirectHop(
       method: asGet ? 'GET' : hop.method,
       uri: nextUri,
-      headers: _headersForRedirect(hop.uri, nextUri, hop.headers),
+      headers: asGet
+          ? {
+              for (final entry in headers.entries)
+                if (!_bodyHeaders.contains(entry.key.toLowerCase()))
+                  entry.key: entry.value,
+            }
+          : headers,
       bodyBytes: asGet ? const [] : hop.bodyBytes,
     );
   }
+
+  static const _bodyHeaders = {
+    HttpHeaders.contentTypeHeader,
+    HttpHeaders.contentLengthHeader,
+    HttpHeaders.contentEncodingHeader,
+  };
 
   static Map<String, String> _headersForRedirect(
     Uri from,

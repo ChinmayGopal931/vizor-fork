@@ -598,6 +598,50 @@ void main() {
     },
   );
 
+  test('a direct POST hands back a 307, as dart:io did', () async {
+    final directClient = _ScriptedHttpClient([
+      (307, {'location': 'https://other.example.com/final'}),
+    ]);
+    final client = NetworkHttpClient(
+      directClient: directClient,
+      torDesired: () => false,
+    );
+    addTearDown(() => client.close());
+
+    final response = await client.request(
+      'POST',
+      Uri.parse('https://example.com/start'),
+      bodyBytes: utf8.encode('{}'),
+    );
+    expect(response.statusCode, 307);
+    expect(directClient.requested, [Uri.parse('https://example.com/start')]);
+  });
+
+  test(
+    'a direct POST answered 303 goes on as a GET without its body',
+    () async {
+      final directClient = _ScriptedHttpClient([
+        (303, {'location': '/result'}),
+        (200, const {}),
+      ]);
+      final client = NetworkHttpClient(
+        directClient: directClient,
+        torDesired: () => false,
+      );
+      addTearDown(() => client.close());
+
+      final response = await client.request(
+        'POST',
+        Uri.parse('https://example.com/start'),
+        headers: const {'content-type': 'application/json', 'accept': 'json'},
+        bodyBytes: utf8.encode('{}'),
+      );
+      expect(response.statusCode, 200);
+      expect(directClient.methods, ['POST', 'GET']);
+      expect(directClient.sentHeaders.last, {'accept': 'json'});
+    },
+  );
+
   test('direct timeout aborts transport and drains its request slot', () async {
     final requestReceived = Completer<void>();
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -773,11 +817,13 @@ class _ScriptedHttpClient implements HttpClient {
 
   final List<(int, Map<String, String>)> responses;
   final requested = <Uri>[];
+  final methods = <String>[];
   final sentHeaders = <Map<String, String>>[];
 
   @override
   Future<HttpClientRequest> openUrl(String method, Uri url) async {
     requested.add(url);
+    methods.add(method);
     final headers = <String, String>{};
     sentHeaders.add(headers);
     final (status, responseHeaders) = responses.removeAt(0);
