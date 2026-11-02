@@ -148,6 +148,8 @@ pub(crate) fn forget_joint_account(
     }
     let account = keys::parse_account_uuid(joint_uuid)
         .map_err(|error| PrivateUsdError::new(ErrorCode::Other, error))?;
+    // Read with the current schema, as the delete below writes with it.
+    with_operations(|| keys::ensure_db_migrated_once(joint_db, network).map_err(wallet_error))?;
     let held = sync::open_wallet_db_for_read(joint_db, network)
         .map_err(wallet_error)?
         .get_account(account)

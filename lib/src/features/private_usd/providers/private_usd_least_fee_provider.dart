@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/storage/wallet_paths.dart';
 import '../../../providers/block_spacing_provider.dart';
+import '../../../providers/rpc_endpoint_failover_provider.dart';
+import '../../../providers/sync_provider.dart';
 import '../../../rust/api/sync.dart' as rust_sync;
 import '../models/private_usd_fees.dart';
 
@@ -21,12 +23,31 @@ final privateUsdLeastFeeReaderProvider = Provider<PrivateUsdLeastFeeReader>(
   },
 );
 
+/// What the least fee is read again for: the network, and whether the
+/// wallet's scan is past NU7. Rust prices at the wallet DB's own target,
+/// which can trail the chain tip [walletFeePolicyEpochProvider] follows.
+typedef PrivateUsdLeastFeeKey = ({String network, bool nu7});
+
+final privateUsdLeastFeeKeyProvider = Provider<PrivateUsdLeastFeeKey>((ref) {
+  final activation = ref.watch(
+    blockSpacingProvider.select((spacing) => spacing.nu7ActivationHeight),
+  );
+  final scanned = ref.watch(
+    syncProvider.select((sync) => sync.value?.scannedHeight ?? 0),
+  );
+  return (
+    network: ref.watch(
+      rpcEndpointFailoverProvider.select((state) => state.current.networkName),
+    ),
+    nu7: activation != null && scanned > 0 && scanned + 1 >= activation,
+  );
+});
+
 /// ZIP 317's least fee at the wallet's target, which NU7 lowers: a quote's
 /// deposit fee and the sweep home's floor while their own are not known.
-/// Read from Rust again only when the fee policy epoch moves.
 final privateUsdLeastFeeProvider = FutureProvider<BigInt?>(
   (ref) => ref.watch(privateUsdLeastFeeReaderProvider)(
-    ref.watch(walletFeePolicyEpochProvider).network,
+    ref.watch(privateUsdLeastFeeKeyProvider).network,
   ),
 );
 

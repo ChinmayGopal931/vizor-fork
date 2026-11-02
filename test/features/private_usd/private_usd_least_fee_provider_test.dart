@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_fees.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_presentation.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_least_fee_provider.dart';
-import 'package:zcash_wallet/src/providers/block_spacing_provider.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 
@@ -13,7 +12,7 @@ void main() {
   ProviderContainer container({required bool nu7, BigInt? leastFee}) {
     final container = ProviderContainer(
       overrides: [
-        walletFeePolicyEpochProvider.overrideWithValue((
+        privateUsdLeastFeeKeyProvider.overrideWithValue((
           network: 'mainnet',
           nu7: nu7,
         )),

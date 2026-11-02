@@ -611,6 +611,19 @@ fn a_joint_sweep_over_its_fee_limit_is_refused_and_locks_nothing() {
     assert_eq!(proposal_locks(&wallet.path), 0);
 }
 
+/// Whether `path` has the table only a newer schema adds.
+fn has_spend_journal(path: &str) -> bool {
+    rusqlite::Connection::open(path)
+        .unwrap()
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'ironwood_spend_journal'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap()
+        == 1
+}
+
 /// A delete clears tables only a newer schema has, so a `joint.db` no
 /// register or scan has opened since an update is migrated first. An empty
 /// file stands in for the older schema.
@@ -622,13 +635,17 @@ fn deleting_a_joint_account_migrates_its_db_first() {
 
     let error = joint::delete_joint_account(&path, NETWORK, &missing).unwrap_err();
     assert!(error.message.contains("Account not found"), "{error:?}");
-    let journal: i64 = rusqlite::Connection::open(&path)
-        .unwrap()
-        .query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'ironwood_spend_journal'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
-    assert_eq!(journal, 1);
+    assert!(has_spend_journal(&path));
+}
+
+/// The cleanup reads the account before deleting it, so it migrates before
+/// that read too.
+#[test]
+fn forgetting_a_joint_account_migrates_its_db_before_reading_it() {
+    let (_dir, path) = temp_db("joint.db");
+    rusqlite::Connection::open(&path).unwrap();
+    let missing = uuid::Uuid::new_v4().to_string();
+
+    joint::forget_joint_account(&path, NETWORK, &missing).unwrap();
+    assert!(has_spend_journal(&path));
 }
