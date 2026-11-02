@@ -3143,16 +3143,6 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
         balanceReadIsCurrent;
     final useFetchedRecentTxs =
         useFetchedAccountData && didFetchRecentTxs && balanceReadIsCurrent;
-    if (useFetchedBalance && canShieldTransparentBalance == null) {
-      _retryShieldStatus(
-        dbPath: dbPath,
-        network: network,
-        accountUuid: accountUuid,
-        epoch: epoch,
-        balanceReadVersion: balanceReadVersion!,
-        transparentBalance: transparent!,
-      );
-    }
     // A stream error can be recorded while this handler awaits DB reads. Its
     // stopped failure state must win over this older progress event.
     final currentState = state.value;
@@ -3397,6 +3387,15 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
       _startPolling();
       if (!useFetchedBalance) {
         unawaited(_ensureAuthoritativeBalanceRecovery());
+      } else if (canShieldTransparentBalance == null) {
+        _retryShieldStatus(
+          dbPath: dbPath,
+          network: network,
+          accountUuid: accountUuid,
+          epoch: epoch,
+          balanceReadVersion: balanceReadVersion!,
+          transparentBalance: transparent!,
+        );
       }
     }
   }
@@ -3993,7 +3992,8 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
 
   /// Reads the shield status again after a failed read, usually a busy wallet
   /// DB, so the last status stands for seconds rather than until the next
-  /// sync. A newer balance read makes its own status read and drops this one.
+  /// sync. A running sync reads it as it completes, and a newer balance read
+  /// makes its own read, so either drops this one.
   void _retryShieldStatus({
     required String dbPath,
     required String network,
@@ -4005,11 +4005,12 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
   }) {
     _shieldStatusRetry?.cancel();
     _shieldStatusRetry = null;
-    if (attempt > _kShieldStatusRetries) return;
+    if (attempt > _kShieldStatusRetries || _isSyncing) return;
     _shieldStatusRetry = Timer(
       _shieldStatusRetryDelay * (1 << (attempt - 1)),
       () {
-        if (!_acceptsAccountRead(accountUuid, epoch, balanceReadVersion)) {
+        if (_isSyncing ||
+            !_acceptsAccountRead(accountUuid, epoch, balanceReadVersion)) {
           return;
         }
         unawaited(

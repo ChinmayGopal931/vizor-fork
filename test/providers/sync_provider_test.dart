@@ -257,6 +257,45 @@ void main() {
       expect(current.shieldTransparentAmount, BigInt.from(48000));
     });
 
+    test('during a sync is left to the read at its completion', () async {
+      final (container, notifier) = await start([
+        // A batch's read and the completion's, on the sync's busy DB.
+        null,
+        null,
+        rust_sync.ShieldTransparentStatus(
+          canShield: true,
+          feeZatoshi: BigInt.from(2000),
+          shieldedZatoshi: BigInt.from(48000),
+          reason: '',
+        ),
+      ]);
+      SyncProgressEvent event({required bool complete}) => SyncProgressEvent(
+        scannedHeight: complete ? 20 : 10,
+        chainTipHeight: 20,
+        percentage: complete ? 1 : 0.5,
+        displayTargetPercentage: complete ? 1 : 0.5,
+        displayTargetBlocks: 0,
+        isSyncing: !complete,
+        isComplete: complete,
+        hasNewTx: true,
+      );
+
+      await notifier.handleSyncProgressForTesting(event(complete: false));
+      await pumpEventQueue();
+      expect(notifier.shieldStatusReadCount, 1);
+
+      final published = Completer<void>();
+      container.listen(syncProvider, (_, next) {
+        if (next.value?.shieldTransparentFee == BigInt.from(2000) &&
+            !published.isCompleted) {
+          published.complete();
+        }
+      });
+      await notifier.handleSyncProgressForTesting(event(complete: true));
+      await published.future.timeout(const Duration(seconds: 5));
+      expect(notifier.shieldStatusReadCount, 3);
+    });
+
     test('is read again three times at most', () async {
       final (container, notifier) = await start(const []);
 
