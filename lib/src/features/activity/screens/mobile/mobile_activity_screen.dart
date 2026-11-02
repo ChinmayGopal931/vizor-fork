@@ -375,6 +375,15 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen>
         ? PrivateUsdActivity.empty
         : ref.watch(privateUsdActivityProvider(accountUuid));
 
+    final privateUsdEntries = privateUsdFeedEntries(
+      context: context,
+      activity: privateUsd,
+      privacyModeEnabled: privacyModeEnabled,
+      onOpenConversion: (path) => context.push(path.location),
+      details: privateUsdActivityDetails(),
+      onOpenRefunds: () => context.push('/private-usd/refunds'),
+    ).toSet();
+
     final activityNow = DateTime.now();
     final entries = <ActivityEntry>[
       for (final tx in giftCardActivityIndex.withPendingClaims(transactions))
@@ -411,18 +420,17 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen>
             },
           ),
         ),
-      ...privateUsdFeedEntries(
-        context: context,
-        activity: privateUsd,
-        privacyModeEnabled: privacyModeEnabled,
-        onOpenConversion: (path) => context.push(path.location),
-        details: privateUsdActivityDetails(),
-        onOpenRefunds: () => context.push('/private-usd/refunds'),
-      ),
+      ...privateUsdEntries,
     ];
+    final pager = _pager;
     final sections = buildActivityFeedSections(
       entries,
-      limit: _pager?.visibleCount ?? activityPageSize,
+      // Private USD rows are all loaded, so only the pager's rows fill its
+      // page, and once it has nothing more to load every row shows.
+      limit: pager != null && !pager.hasMore
+          ? null
+          : pager?.visibleCount ?? activityPageSize,
+      countsTowardLimit: (entry) => !privateUsdEntries.contains(entry),
     );
 
     final content = SwapActivityStatusAutoRefresh(

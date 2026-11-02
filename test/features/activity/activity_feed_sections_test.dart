@@ -32,6 +32,27 @@ void main() {
     }
   });
 
+  test('rows that do not count toward the limit show within its span', () {
+    final paged = List.generate(
+      4,
+      (i) => entry(i, DateTime.utc(2026, 1, 10).subtract(Duration(days: i))),
+    );
+    // Loaded in full: one between the paged rows, one older than the page.
+    final within = entry(10, DateTime.utc(2026, 1, 9, 12));
+    final older = entry(11, DateTime.utc(2025, 12, 1));
+    final sections = buildActivityFeedSections(
+      [...paged, within, older],
+      limit: 3,
+      countsTowardLimit: (e) => !identical(e, within) && !identical(e, older),
+    );
+    expect(sections.expand((s) => s.rows).map((r) => r.stableId), [
+      'row-0',
+      'row-10',
+      'row-1',
+      'row-2',
+    ]);
+  });
+
   test('page limit applies after timestamp ordering and date grouping', () {
     final sections = buildActivityFeedSections(
       List.generate(

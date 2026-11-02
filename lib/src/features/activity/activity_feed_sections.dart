@@ -46,10 +46,12 @@ DateTime? transactionActivityTimestamp(
 }
 
 /// Sorts [entries] newest-first and groups consecutive entries that
-/// share a section title.
+/// share a section title. A [limit] ends the feed at its [limit]th entry
+/// that [countsTowardLimit] accepts (every entry when null).
 List<ActivityFeedSectionData> buildActivityFeedSections(
   List<ActivityEntry> entries, {
   int? limit,
+  bool Function(ActivityEntry entry)? countsTowardLimit,
 }) {
   // Dart List.sort is not stable. Preserve native/source order at equal
   // timestamps so a later page cannot reshuffle rows already on screen.
@@ -58,7 +60,9 @@ List<ActivityFeedSectionData> buildActivityFeedSections(
       final order = compareActivityEntries(a.$2, b.$2);
       return order != 0 ? order : a.$1.compareTo(b.$1);
     });
-  final visible = limit == null ? sorted : sorted.take(limit);
+  final visible = limit == null
+      ? sorted
+      : sorted.take(_limitEnd(sorted, limit, countsTowardLimit));
   final sections = <ActivityFeedSectionData>[];
   List<ActivityRowData>? currentRows;
   String? currentTitle;
@@ -74,6 +78,19 @@ List<ActivityFeedSectionData> buildActivityFeedSections(
   }
 
   return sections;
+}
+
+int _limitEnd(
+  List<(int, ActivityEntry)> sorted,
+  int limit,
+  bool Function(ActivityEntry entry)? counts,
+) {
+  if (counts == null || limit <= 0) return limit;
+  var counted = 0;
+  for (var i = 0; i < sorted.length; i++) {
+    if (counts(sorted[i].$2) && ++counted == limit) return i + 1;
+  }
+  return sorted.length;
 }
 
 String _activitySectionTitle(DateTime? timestamp) {
