@@ -295,9 +295,11 @@ class NetworkHttpClient {
 
   /// Sends one request on the process's selected route.
   ///
-  /// Up to [maxRedirects] redirects are followed (HTTPS never downgrades).
-  /// With `0`, a redirect response is returned as is, for callers whose
-  /// policy refuses redirects.
+  /// Up to [maxRedirects] redirects are followed (HTTPS never downgrades),
+  /// by one rule on both routes: a POST goes on only after a 303, as a GET,
+  /// or after a 307 or 308 within its origin, and any other redirect of a
+  /// POST comes back as its answer. With `0`, a redirect response is
+  /// returned as is, for callers whose policy refuses redirects.
   Future<NetworkHttpResponse> request(
     String method,
     Uri uri, {
@@ -522,8 +524,8 @@ class NetworkHttpClient {
   }
 
   /// The direct route's redirects, followed here rather than by `dart:io`,
-  /// which would follow one from HTTPS to plain HTTP, by the rules the Tor
-  /// route follows ([_redirectFrom]). Each hop is a direct request of its
+  /// which would follow one from HTTPS to plain HTTP, by the rules both
+  /// routes follow ([_redirectFrom]). Each hop is a direct request of its
   /// own, so a route change between hops stops the chain.
   Future<NetworkHttpResponse> _requestDirectWithRedirects(
     String method,
