@@ -624,22 +624,9 @@ fn has_spend_journal(path: &str) -> bool {
         == 1
 }
 
-/// A delete clears tables only a newer schema has, so a `joint.db` no
-/// register or scan has opened since an update is migrated first. An empty
-/// file stands in for the older schema.
-#[test]
-fn deleting_a_joint_account_migrates_its_db_first() {
-    let (_dir, path) = temp_db("joint.db");
-    rusqlite::Connection::open(&path).unwrap();
-    let missing = uuid::Uuid::new_v4().to_string();
-
-    let error = joint::delete_joint_account(&path, NETWORK, &missing).unwrap_err();
-    assert!(error.message.contains("Account not found"), "{error:?}");
-    assert!(has_spend_journal(&path));
-}
-
-/// The cleanup reads the account before deleting it, so it migrates before
-/// that read too.
+/// A delete clears tables only a newer schema has, so the cleanup migrates a
+/// `joint.db` no register or scan has opened since an update before it reads
+/// the account. An empty file stands in for the older schema.
 #[test]
 fn forgetting_a_joint_account_migrates_its_db_before_reading_it() {
     let (_dir, path) = temp_db("joint.db");
