@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:zcash_wallet/src/core/navigation/mobile_exit_back_guard.dart';
 import 'package:flutter/services.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/mobile_keyboard_toolbar.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/neon_motion.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
@@ -636,10 +637,14 @@ void main() {
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(container: container, child: _themedApp()),
+      UncontrolledProviderScope(
+        container: container,
+        // Outlasts the CRT switch-off, so the idle lock cannot return first.
+        child: _themedApp(idleTimeout: const Duration(seconds: 1)),
+      ),
     );
     await _settleInitialSync(tester);
-    await tester.pump(const Duration(milliseconds: 60));
+    await tester.pump(const Duration(seconds: 1));
     await tester.pump();
 
     expect(container.read(syncKeepAwakePrivacyLockProvider).isLocked, isTrue);
@@ -657,8 +662,12 @@ void main() {
     await _enterPasscode(tester, '123456');
 
     expect(security.confirmedWith, ['123456']);
-    expect(find.text('WELCOME BACK'), findsNothing);
     expect(container.read(syncKeepAwakePrivacyLockProvider).isLocked, isFalse);
+    // The lock switches off as a CRT before it leaves the screen.
+    await tester.pump();
+    await tester.pump(NeonMotion.crtOff + const Duration(milliseconds: 16));
+    await tester.pump();
+    expect(find.text('WELCOME BACK'), findsNothing);
   });
 
   testWidgets(
