@@ -3992,8 +3992,9 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
 
   /// Reads the shield status again after a failed read, usually a busy wallet
   /// DB, so the last status stands for seconds rather than until the next
-  /// sync. A running sync reads it as it completes, and a newer balance read
-  /// makes its own read, so either drops this one.
+  /// sync. While a sync runs it waits without reading: the sync's completion
+  /// reads the status with a newer balance read, which drops this one, and a
+  /// sync that fails or ends early leaves it to run.
   void _retryShieldStatus({
     required String dbPath,
     required String network,
@@ -4005,12 +4006,23 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
   }) {
     _shieldStatusRetry?.cancel();
     _shieldStatusRetry = null;
-    if (attempt > _kShieldStatusRetries || _isSyncing) return;
+    if (attempt > _kShieldStatusRetries) return;
     _shieldStatusRetry = Timer(
       _shieldStatusRetryDelay * (1 << (attempt - 1)),
       () {
-        if (_isSyncing ||
-            !_acceptsAccountRead(accountUuid, epoch, balanceReadVersion)) {
+        if (!_acceptsAccountRead(accountUuid, epoch, balanceReadVersion)) {
+          return;
+        }
+        if (_isSyncing) {
+          _retryShieldStatus(
+            dbPath: dbPath,
+            network: network,
+            accountUuid: accountUuid,
+            epoch: epoch,
+            balanceReadVersion: balanceReadVersion,
+            transparentBalance: transparentBalance,
+            attempt: attempt,
+          );
           return;
         }
         unawaited(
@@ -4182,6 +4194,9 @@ class SyncNotifier extends AsyncNotifier<SyncState> {
   @visibleForTesting
   Future<void> handleSyncProgressForTesting(SyncProgressEvent event) =>
       _onSyncProgress(event);
+
+  @visibleForTesting
+  void setSyncRunningForTesting(bool running) => _isSyncing = running;
 
   @visibleForTesting
   void handleAccountSwitchForTesting(String? accountUuid) =>

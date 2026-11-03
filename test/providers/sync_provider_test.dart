@@ -296,6 +296,36 @@ void main() {
       expect(notifier.shieldStatusReadCount, 3);
     });
 
+    test('during a sync waits for it, and runs once it fails', () async {
+      final (container, notifier) = await start([
+        null,
+        rust_sync.ShieldTransparentStatus(
+          canShield: true,
+          feeZatoshi: BigInt.from(2000),
+          shieldedZatoshi: BigInt.from(48000),
+          reason: '',
+        ),
+      ]);
+      final published = Completer<void>();
+      container.listen(syncProvider, (_, next) {
+        if (next.value?.shieldTransparentFee == BigInt.from(2000) &&
+            !published.isCompleted) {
+          published.complete();
+        }
+      });
+
+      // A send's refresh finds the running sync's DB busy.
+      notifier.setSyncRunningForTesting(true);
+      await notifier.refreshAfterSend();
+      await pumpEventQueue();
+      expect(notifier.shieldStatusReadCount, 1);
+
+      // The sync fails before its completion could read the status.
+      notifier.setSyncRunningForTesting(false);
+      await published.future.timeout(const Duration(seconds: 5));
+      expect(notifier.shieldStatusReadCount, 2);
+    });
+
     test('is read again three times at most', () async {
       final (container, notifier) = await start(const []);
 
