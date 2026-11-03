@@ -46,6 +46,15 @@ require(vizorDegoogledValue == "true" || vizorDegoogledValue == "false") {
 }
 val vizorDegoogled = vizorDegoogledValue == "true"
 
+// The package the build ships as. Google Play lists Veylor as `com.veylor.app`;
+// without the define a build keeps the development id. One knob, the
+// dart-define, as `VIZOR_DEGOOGLED` and the deep-link host are, so the id
+// can't be edited in place for a release and forgotten.
+val vizorApplicationId = dartDefines["VIZOR_APPLICATION_ID"]?.takeIf { it.isNotBlank() } ?: "com.keplr.vizor"
+require(Regex("^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$").matches(vizorApplicationId)) {
+    "VIZOR_APPLICATION_ID must be a package name such as com.veylor.app."
+}
+
 val defaultVizorDeeplinkBaseUrl = "https://link.vizor.cash"
 val vizorDeeplinkBaseUrl = (
     dartDefines["VIZOR_DEEPLINK_BASE_URL"] ?: defaultVizorDeeplinkBaseUrl
@@ -133,8 +142,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.keplr.vizor"
+        applicationId = vizorApplicationId
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         // Ledger Mobile DMK 0.0.4 publishes an Android AAR with minSdk 30.
