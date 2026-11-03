@@ -161,6 +161,8 @@ class PasscodeNumpad extends StatelessWidget {
     this.canDelete = false,
     this.onHelp,
     this.enabled = true,
+    this.keySize = kPasscodeKeySize,
+    this.spacing = AppSpacing.sm,
     super.key,
   });
 
@@ -174,6 +176,8 @@ class PasscodeNumpad extends StatelessWidget {
   final VoidCallback? onHelp;
 
   final bool enabled;
+  final double keySize;
+  final double spacing;
 
   @override
   Widget build(BuildContext context) {
@@ -196,7 +200,7 @@ class PasscodeNumpad extends StatelessWidget {
                   effectiveTap();
                 },
           child: SizedBox.square(
-            dimension: kPasscodeKeySize,
+            dimension: keySize,
             child: Center(child: child),
           ),
         ),
@@ -204,7 +208,7 @@ class PasscodeNumpad extends StatelessWidget {
     }
 
     Widget digitKey(int digit) => keySlot(
-      _PasscodeDigitKey(digit: digit, enabled: enabled),
+      _PasscodeDigitKey(digit: digit, enabled: enabled, fontSize: keySize / 2),
       onTap: () {
         unawaited(AppHaptics.digit());
         onDigit(digit);
@@ -248,12 +252,17 @@ class PasscodeNumpad extends StatelessWidget {
               ? constraints.maxWidth
               : kPasscodeKeypadWidth;
           return SizedBox(
-            width: math.min(kPasscodeKeypadWidth, maxWidth),
+            width: math.min(
+              keySize == kPasscodeKeySize && spacing == AppSpacing.sm
+                  ? kPasscodeKeypadWidth
+                  : keySize * 3 + spacing * 2,
+              maxWidth,
+            ),
             child: Wrap(
               alignment: WrapAlignment.center,
               runAlignment: WrapAlignment.center,
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
+              spacing: spacing,
+              runSpacing: spacing,
               children: [
                 digitKey(1),
                 digitKey(2),
@@ -537,10 +546,15 @@ class PasscodeBiometricButton extends StatelessWidget {
 /// A digit key: a cut-corner glass plate (80 px, as Figma's circular
 /// `_Passcode Button`) that lights up red under the finger.
 class _PasscodeDigitKey extends StatefulWidget {
-  const _PasscodeDigitKey({required this.digit, required this.enabled});
+  const _PasscodeDigitKey({
+    required this.digit,
+    required this.enabled,
+    required this.fontSize,
+  });
 
   final int digit;
   final bool enabled;
+  final double fontSize;
 
   @override
   State<_PasscodeDigitKey> createState() => _PasscodeDigitKeyState();
@@ -587,7 +601,7 @@ class _PasscodeDigitKeyState extends State<_PasscodeDigitKey> {
               child: Text(
                 '${widget.digit}',
                 style: AppTypography.headlineLarge.copyWith(
-                  fontSize: 40,
+                  fontSize: widget.fontSize,
                   height: 33 / 40,
                   color: widget.enabled
                       ? Color.lerp(colors.text.accent, colors.neon.core, light)

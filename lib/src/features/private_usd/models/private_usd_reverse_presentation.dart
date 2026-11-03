@@ -11,6 +11,7 @@ import '../services/private_usd_engine.dart';
 import '../services/private_usd_reverse_funding.dart';
 import 'private_usd_balances.dart';
 import 'private_usd_explorer.dart';
+import 'private_usd_fees.dart';
 import 'private_usd_messages.dart';
 import 'private_usd_status_presentation.dart';
 
@@ -20,9 +21,6 @@ enum PrivateUsdReverseAction { pay, authorizeSettlement, newConversion }
 /// A signed `ready` holds for 120 s, so "Authorize settlement" stops being
 /// offered this long before the ready deadline.
 const kPrivateUsdReadyMargin = Duration(seconds: 120);
-
-/// The sweep home's fee before the maker's ZEC is in: the estimate's floor.
-final _sweepFeeFloor = BigInt.from(10000);
 
 DateTime _at(int seconds) =>
     DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
@@ -44,12 +42,17 @@ BigInt privateUsdReverseDebit(ApiReverseRecord record) =>
     BigInt.parse(record.cost?.debit ?? record.amount);
 
 /// The ZEC figure: the sweep's own, else the reviewed estimate, else the
-/// deposit less the sweep fee's floor.
-BigInt privateUsdReverseReceivedZat(ApiReverseRecord record) {
+/// deposit less the sweep fee's floor before the maker's ZEC is in: ZIP 317's
+/// least fee, [sweepFeeFloorZat] (`privateUsdLeastFeeZatProvider`), which NU7
+/// lowers.
+BigInt privateUsdReverseReceivedZat(
+  ApiReverseRecord record, {
+  BigInt? sweepFeeFloorZat,
+}) {
   final estimate =
       record.receivedZat ??
       record.receiveEstimateZat ??
-      record.depositZat - _sweepFeeFloor;
+      record.depositZat - (sweepFeeFloorZat ?? kPrivateUsdPreNu7LeastFeeZat);
   return estimate.isNegative ? BigInt.zero : estimate;
 }
 
@@ -160,10 +163,14 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
   bool privacyModeEnabled = false,
   String? explorerTxPrefix,
   bool bridgeAvailable = true,
+  BigInt? sweepFeeFloorZat,
 }) {
   final record = status.record;
   final debit = privateUsdReverseDebit(record);
-  final zat = privateUsdReverseReceivedZat(record);
+  final zat = privateUsdReverseReceivedZat(
+    record,
+    sweepFeeFloorZat: sweepFeeFloorZat,
+  );
   final usdText = privacyModeEnabled
       ? fixedPrivacyMask()
       : formatPrivateUsdNearest(debit);

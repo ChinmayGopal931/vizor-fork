@@ -9,6 +9,63 @@ import 'package:zcash_wallet/src/rust/api/network_privacy.dart'
     as rust_network_privacy;
 
 void main() {
+  test('direct body budget aborts a chunked reply before EOF', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final client = NetworkHttpClient(torDesired: () => false);
+    addTearDown(() async {
+      client.close();
+      await server.close(force: true);
+    });
+    final headers = Completer<void>();
+    final finish = Completer<void>();
+    final serving = Completer<void>();
+    server.listen((request) async {
+      request.response.bufferOutput = false;
+      request.response.add(List.filled(33, 1));
+      await request.response.flush();
+      headers.complete();
+      await finish.future;
+      try {
+        await request.response.close();
+      } catch (_) {}
+      serving.complete();
+    });
+    final request = client.request(
+      'GET',
+      Uri.parse('http://127.0.0.1:${server.port}/'),
+      maxBodyBytes: 32,
+    );
+    final rejected = expectLater(request, throwsA(isA<HttpException>()));
+    await headers.future;
+    try {
+      await rejected.timeout(const Duration(seconds: 2));
+    } finally {
+      finish.complete();
+      await serving.future;
+    }
+  });
+
+  test('Tor body budget reaches both ordinary requests', () async {
+    final bridge = _RecordingTorBridge([
+      NetworkHttpResponse(statusCode: 200, bodyBytes: Uint8List(0)),
+      NetworkHttpResponse(statusCode: 200, bodyBytes: Uint8List(0)),
+    ]);
+    final client = NetworkHttpClient(
+      torDesired: () => true,
+      torBootstrapping: () => false,
+      torBridge: bridge,
+    );
+    addTearDown(client.close);
+    for (final method in ['GET', 'POST']) {
+      await client.request(
+        method,
+        Uri.parse('https://example.com'),
+        maxBodyBytes: 32,
+      );
+    }
+    expect(bridge.bodyLimits, [32, 32]);
+  });
+
   test('Tor mode routes GET through the Rust bridge', () async {
     final bridge = _RecordingTorBridge([
       NetworkHttpResponse(
@@ -496,6 +553,151 @@ void main() {
     expect(await destination.readAsBytes(), [0, 1, 2, 3]);
   });
 
+  test('direct redirects reject HTTPS to HTTP downgrade', () async {
+    final directClient = _ScriptedHttpClient([
+      (302, {'location': 'http://example.com/final'}),
+      (200, const {}),
+    ]);
+    final client = NetworkHttpClient(
+      directClient: directClient,
+      torDesired: () => false,
+    );
+    addTearDown(() => client.close());
+
+    await expectLater(
+      client.request('GET', Uri.parse('https://example.com/start')),
+      throwsA(isA<HttpException>()),
+    );
+    expect(directClient.requested, [Uri.parse('https://example.com/start')]);
+  });
+
+  test(
+    'direct redirects follow HTTPS and strip credentials across origins',
+    () async {
+      final directClient = _ScriptedHttpClient([
+        (301, {'location': 'https://other.example.com/final'}),
+        (200, const {}),
+      ]);
+      final client = NetworkHttpClient(
+        directClient: directClient,
+        torDesired: () => false,
+      );
+      addTearDown(() => client.close());
+
+      final response = await client.request(
+        'GET',
+        Uri.parse('https://example.com/start'),
+        headers: const {'authorization': 'secret', 'accept': 'json'},
+      );
+      expect(response.statusCode, 200);
+      expect(directClient.requested, [
+        Uri.parse('https://example.com/start'),
+        Uri.parse('https://other.example.com/final'),
+      ]);
+      expect(directClient.sentHeaders.last, {'accept': 'json'});
+    },
+  );
+
+  test('a direct POST hands back a 307 to another origin', () async {
+    final directClient = _ScriptedHttpClient([
+      (307, {'location': 'https://other.example.com/final'}),
+    ]);
+    final client = NetworkHttpClient(
+      directClient: directClient,
+      torDesired: () => false,
+    );
+    addTearDown(() => client.close());
+
+    final response = await client.request(
+      'POST',
+      Uri.parse('https://example.com/start'),
+      bodyBytes: utf8.encode('{}'),
+    );
+    expect(response.statusCode, 307);
+    expect(directClient.requested, [Uri.parse('https://example.com/start')]);
+  });
+
+  test(
+    'a direct POST answered 303 goes on as a GET without its body',
+    () async {
+      final directClient = _ScriptedHttpClient([
+        (303, {'location': '/result'}),
+        (200, const {}),
+      ]);
+      final client = NetworkHttpClient(
+        directClient: directClient,
+        torDesired: () => false,
+      );
+      addTearDown(() => client.close());
+
+      final response = await client.request(
+        'POST',
+        Uri.parse('https://example.com/start'),
+        headers: const {'content-type': 'application/json', 'accept': 'json'},
+        bodyBytes: utf8.encode('{}'),
+      );
+      expect(response.statusCode, 200);
+      expect(directClient.methods, ['POST', 'GET']);
+      expect(directClient.sentHeaders.last, {'accept': 'json'});
+    },
+  );
+
+  // Both routes follow the same rules: a POST goes on only after a 303, as a
+  // GET, or after a 307 or 308 within its origin, with its body.
+  for (final tor in [false, true]) {
+    for (final (status, location, follows) in [
+      (301, '/next', false),
+      (302, '/next', false),
+      (303, 'https://other.example.com/next', true),
+      (307, '/next', true),
+      (308, '/next', true),
+      (307, 'https://other.example.com/next', false),
+      (308, 'https://other.example.com/next', false),
+    ]) {
+      test('a POST answered $status to $location '
+          '${follows ? 'goes on' : 'goes back'} (tor=$tor)', () async {
+        final payload = utf8.encode('{}');
+        final bridge = _RecordingTorBridge([
+          NetworkHttpResponse(
+            statusCode: status,
+            bodyBytes: Uint8List(0),
+            headers: {
+              'location': [location],
+            },
+          ),
+          NetworkHttpResponse(statusCode: 200, bodyBytes: utf8.encode('done')),
+        ]);
+        final directClient = _ScriptedHttpClient([
+          (status, {'location': location}),
+          (200, const {}),
+        ]);
+        final client = NetworkHttpClient(
+          directClient: directClient,
+          torDesired: () => tor,
+          torBootstrapping: () => false,
+          torBridge: bridge,
+        );
+        addTearDown(() => client.close());
+
+        final response = await client.request(
+          'POST',
+          Uri.parse('https://example.com/start'),
+          bodyBytes: payload,
+        );
+
+        expect(response.statusCode, follows ? 200 : status);
+        final methods = tor
+            ? [for (final request in bridge.requests) request.method]
+            : directClient.methods;
+        final next = status == 303 ? 'GET' : 'POST';
+        expect(methods, follows ? ['POST', next] : ['POST']);
+        if (tor && follows) {
+          expect(bridge.requests[1].bodyBytes, status == 303 ? [] : payload);
+        }
+      });
+    }
+  }
+
   test('direct timeout aborts transport and drains its request slot', () async {
     final requestReceived = Completer<void>();
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -664,12 +866,114 @@ class _StallingHttpClient implements HttpClient {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+/// Answers each request with the next scripted status and headers, and an
+/// empty body. Redirects are the caller's to follow.
+class _ScriptedHttpClient implements HttpClient {
+  _ScriptedHttpClient(this.responses);
+
+  final List<(int, Map<String, String>)> responses;
+  final requested = <Uri>[];
+  final methods = <String>[];
+  final sentHeaders = <Map<String, String>>[];
+
+  @override
+  Future<HttpClientRequest> openUrl(String method, Uri url) async {
+    requested.add(url);
+    methods.add(method);
+    final headers = <String, String>{};
+    sentHeaders.add(headers);
+    final (status, responseHeaders) = responses.removeAt(0);
+    return _ScriptedRequest(
+      _ScriptedHeaders(headers),
+      _ScriptedResponse(status, _ScriptedHeaders(Map.of(responseHeaders))),
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ScriptedRequest implements HttpClientRequest {
+  _ScriptedRequest(this.headers, this._response);
+
+  @override
+  final HttpHeaders headers;
+  final HttpClientResponse _response;
+
+  @override
+  bool followRedirects = true;
+
+  @override
+  void add(List<int> data) {}
+
+  @override
+  void abort([Object? exception, StackTrace? stackTrace]) {}
+
+  @override
+  Future<HttpClientResponse> close() async {
+    expect(followRedirects, isFalse);
+    return _response;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ScriptedResponse extends Stream<List<int>>
+    implements HttpClientResponse {
+  _ScriptedResponse(this.statusCode, this.headers);
+
+  @override
+  final int statusCode;
+  @override
+  final HttpHeaders headers;
+
+  @override
+  StreamSubscription<List<int>> listen(
+    void Function(List<int> event)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) => const Stream<List<int>>.empty().listen(
+    onData,
+    onError: onError,
+    onDone: onDone,
+    cancelOnError: cancelOnError,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _ScriptedHeaders implements HttpHeaders {
+  _ScriptedHeaders(this.values);
+
+  final Map<String, String> values;
+
+  @override
+  void set(String name, Object value, {bool preserveHeaderCase = false}) {
+    values[name.toLowerCase()] = '$value';
+  }
+
+  @override
+  void forEach(void Function(String name, List<String> values) action) {
+    values.forEach((name, value) => action(name, [value]));
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class _RecordingTorBridge implements TorHttpBridge {
   _RecordingTorBridge(this.responses);
 
   final List<Object> responses;
   final requests = <_RecordedRequest>[];
   final timeouts = <Duration?>[];
+  final bodyLimits = <int?>[];
 
   @override
   Future<NetworkHttpResponse> download(
@@ -699,8 +1003,10 @@ class _RecordingTorBridge implements TorHttpBridge {
     required Map<String, String> headers,
     required Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
   }) async {
     timeouts.add(timeout);
+    bodyLimits.add(maxBodyBytes);
     requests.add(
       _RecordedRequest(
         method: 'GET',
@@ -718,8 +1024,10 @@ class _RecordingTorBridge implements TorHttpBridge {
     required List<int> bodyBytes,
     required Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
   }) async {
     timeouts.add(timeout);
+    bodyLimits.add(maxBodyBytes);
     requests.add(
       _RecordedRequest(
         method: 'POST',
@@ -752,6 +1060,7 @@ class _HeldFirstResponseTorBridge extends _RecordingTorBridge {
     required Map<String, String> headers,
     required Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
   }) async {
     if (requests.isEmpty) await _firstResponse.future;
     return super.get(
@@ -779,6 +1088,7 @@ class _FailingTorBridge implements TorHttpBridge {
     required Map<String, String> headers,
     required Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
   }) => throw StateError('Tor is not ready');
 
   @override
@@ -788,6 +1098,7 @@ class _FailingTorBridge implements TorHttpBridge {
     required List<int> bodyBytes,
     required Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
   }) => throw StateError('Tor is not ready');
 }
 

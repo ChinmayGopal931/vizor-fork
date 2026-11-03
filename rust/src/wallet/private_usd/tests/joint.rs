@@ -18,7 +18,7 @@ use zcash_address::unified::{self, Encoding};
 use zcash_client_backend::data_api::{
     anchor_retention::AnchorRetentionInterval,
     chain::{error::Error as ChainError, scan_cached_blocks, BlockSource, ChainState},
-    TransactionStatus, WalletWrite,
+    TransactionStatus, WalletRead, WalletWrite,
 };
 use zcash_client_backend::proto::compact_formats::{
     ChainMetadata, CompactBlock, CompactOrchardAction, CompactTx,
@@ -609,4 +609,50 @@ fn a_joint_sweep_over_its_fee_limit_is_refused_and_locks_nothing() {
     assert_eq!(sweep.amount_zatoshi + sweep.fee_zatoshi, FUNDS);
     sync::discard_proposal(sweep.proposal_id, "sweep").unwrap();
     assert_eq!(proposal_locks(&wallet.path), 0);
+}
+
+/// Whether `path` has the table only a newer schema adds.
+fn has_spend_journal(path: &str) -> bool {
+    rusqlite::Connection::open(path)
+        .unwrap()
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'ironwood_spend_journal'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .unwrap()
+        == 1
+}
+
+/// A delete clears tables only a newer schema has, so the cleanup migrates a
+/// `joint.db` no register or scan has opened since an update before it reads
+/// the account. An empty file stands in for the older schema.
+#[test]
+fn forgetting_a_joint_account_migrates_its_db_before_reading_it() {
+    let (_dir, path) = temp_db("joint.db");
+    rusqlite::Connection::open(&path).unwrap();
+    let missing = uuid::Uuid::new_v4().to_string();
+
+    joint::forget_joint_account(&path, NETWORK, &missing).unwrap();
+    assert!(has_spend_journal(&path));
+}
+
+/// The cleanup deletes an account `joint.db` still holds, and finds nothing
+/// to do once it is gone.
+#[test]
+fn forgetting_a_held_joint_account_deletes_it_once() {
+    let chain = Chain::new();
+    let wallet = joint_wallet(&chain, &joint_account(0));
+    let held = || {
+        sync::open_wallet_db_for_read(&wallet.path, NETWORK)
+            .unwrap()
+            .get_account(keys::parse_account_uuid(&wallet.account).unwrap())
+            .unwrap()
+            .is_some()
+    };
+    assert!(held());
+
+    joint::forget_joint_account(&wallet.path, NETWORK, &wallet.account).unwrap();
+    assert!(!held());
+    joint::forget_joint_account(&wallet.path, NETWORK, &wallet.account).unwrap();
 }

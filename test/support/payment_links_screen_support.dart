@@ -1,4 +1,7 @@
+import 'package:zcash_wallet/src/providers/block_spacing_provider.dart';
+import 'package:zcash_wallet/src/core/zcash/block_spacing.dart';
 import 'dart:async';
+import 'package:zcash_wallet/src/core/layout/app_form_factor.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -36,17 +39,17 @@ import 'package:zcash_wallet/src/providers/privacy_mode_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
 import 'package:zcash_wallet/src/rust/frb_generated.dart';
-import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 import '../fakes/fake_gift_link_rust_api.dart';
+import 'app_test_fonts.dart';
+import 'widget_test_viewport.dart';
 import '../fakes/fake_sync_notifier.dart';
 import '../fakes/fake_zec_market_data_cache.dart';
+import 'package:zcash_wallet/src/providers/network_upgrade_window_provider.dart';
 
 /// Harness shared by the desktop and mobile Gift Card screen suites, which are
 /// separate files because only the mobile one runs in the mobile token lane.
-Future<void> loadPaymentLinksTestFonts() async {
-  await loadGothamFonts();
-}
+Future<void> loadPaymentLinksTestFonts() => loadAppTestFonts();
 
 Future<void> pumpPaymentLinksScreen(
   WidgetTester tester, {
@@ -72,18 +75,22 @@ Future<void> pumpPaymentLinksScreen(
   bool? pricingEnabled,
   PrivacyModeNotifier? privacyNotifier,
   Map<String, GiftCardUsage>? giftCardUsages,
-  Size logicalSize = const Size(1080, 720),
+  Size? logicalSize,
   GlobalKey? captureBoundaryKey,
+  NetworkUpgradeWindowState? upgradeWindow,
+  BlockSpacing? feeSchedule,
 }) async {
   if (!RustLib.instance.initialized) {
     RustLib.initMock(api: FakeGiftLinkRustApi());
     addTearDown(RustLib.dispose);
   }
-  // Size the view, not only the render surface: the mobile shell chooses its
-  // layout from MediaQuery, which follows the view.
-  tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = logicalSize;
-  addTearDown(tester.view.reset);
+  await setWidgetTestViewport(
+    tester,
+    logicalSize ??
+        (kAppFormFactor == AppFormFactor.mobile
+            ? const Size(390, 844)
+            : const Size(1080, 720)),
+  );
   final paymentLinkOperations = operations ?? FakePaymentLinkOperations();
   final paymentLinkClipboard = clipboard ?? FakePaymentLinkClipboard();
   final appBootstrap = bootstrap ?? paymentLinksBootstrap;
@@ -93,6 +100,10 @@ Future<void> pumpPaymentLinksScreen(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        if (feeSchedule != null)
+          blockSpacingProvider.overrideWithValue(feeSchedule),
+        if (upgradeWindow != null)
+          networkUpgradeWindowProvider.overrideWithValue(upgradeWindow),
         if (privacyNotifier != null)
           privacyModeProvider.overrideWith(() => privacyNotifier),
         // These tests exercise funding and navigation with fake operations.
@@ -565,6 +576,8 @@ class FakePaymentLinkOperations implements PaymentLinkOperations {
   final List<bool> allowLongSyncCalls = [];
   final List<VizorPaymentLink> preparedLinks = [];
   int createdLoadCalls = 0;
+  int localCreatedLoadCalls = 0;
+  Completer<void>? createdRecoveryGate;
   int receivedLoadCalls = 0;
   int fundingMetadataRetries = 0;
 
@@ -620,6 +633,7 @@ class FakePaymentLinkOperations implements PaymentLinkOperations {
     required BigInt amountZatoshi,
     required String sourceAccountUuid,
     PaymentLinkPresentation? presentation,
+    PaymentLinkFundingQuote? expectedQuote,
   }) async {
     createdAmounts.add(amountZatoshi);
     createdFromAccounts.add(sourceAccountUuid);
@@ -674,9 +688,20 @@ class FakePaymentLinkOperations implements PaymentLinkOperations {
   }
 
   @override
+  Future<List<PaymentLinkRecoveryRecord>> recoverCreatedLinks() =>
+      loadCreatedLinkRecoveries();
+
+  @override
+  Future<List<PaymentLinkRecoveryRecord>> loadCreatedLinks() async {
+    localCreatedLoadCalls += 1;
+    await createdLoadGate?.future;
+    return List.unmodifiable(records);
+  }
+
+  @override
   Future<List<PaymentLinkRecoveryRecord>> loadCreatedLinkRecoveries() async {
     createdLoadCalls += 1;
-    await createdLoadGate?.future;
+    await createdRecoveryGate?.future;
     return List.unmodifiable(records);
   }
 
@@ -1048,6 +1073,7 @@ class FakePaymentLinkHardwareSigningService
     required BigInt amountZatoshi,
     required String sourceAccountUuid,
     PaymentLinkPresentation? presentation,
+    PaymentLinkFundingQuote? expectedQuote,
   }) async {
     createdAmounts.add(amountZatoshi);
     createdFromAccounts.add(sourceAccountUuid);

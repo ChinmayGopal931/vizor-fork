@@ -414,7 +414,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[] as &[TestTransparentInput],
             &[] as &[TxOut],
             &(
@@ -464,7 +467,10 @@ mod tests {
                         .unwrap()
                         .into(),
                     BlockHeight::from_u32(1),
-                    &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+                    &PoolMigrationParams::new(
+                        zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                        AnchorRetentionInterval::ZIP_318,
+                    ),
                     &[] as &[TestTransparentInput],
                     &[] as &[TxOut],
                     &(
@@ -519,7 +525,10 @@ mod tests {
                     .unwrap()
                     .into(),
                 BlockHeight::from_u32(1),
-                &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+                &PoolMigrationParams::new(
+                    zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                    AnchorRetentionInterval::ZIP_318,
+                ),
                 &[] as &[TestTransparentInput],
                 &[] as &[TxOut],
                 &(
@@ -565,7 +574,10 @@ mod tests {
                     .unwrap()
                     .into(),
                 BlockHeight::from_u32(1),
-                &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+                &PoolMigrationParams::new(
+                    zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                    AnchorRetentionInterval::ZIP_318,
+                ),
                 &[] as &[TestTransparentInput],
                 &[] as &[TxOut],
                 &(
@@ -606,7 +618,10 @@ mod tests {
                     .unwrap()
                     .into(),
                 BlockHeight::from_u32(1),
-                &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+                &PoolMigrationParams::new(
+                    zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                    AnchorRetentionInterval::ZIP_318,
+                ),
                 &[] as &[TestTransparentInput],
                 &[] as &[TxOut],
                 &(
@@ -652,7 +667,10 @@ mod tests {
                     .unwrap()
                     .into(),
                 BlockHeight::from_u32(1),
-                &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+                &PoolMigrationParams::new(
+                    zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                    AnchorRetentionInterval::ZIP_318,
+                ),
                 &[] as &[TestTransparentInput],
                 &[] as &[TxOut],
                 &(
@@ -706,7 +724,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[] as &[TestTransparentInput],
             &[] as &[TxOut],
             &(
@@ -756,7 +777,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[] as &[TestTransparentInput],
             &[] as &[TxOut],
             &sapling_fees::EmptyBundleView,
@@ -765,6 +789,7 @@ mod tests {
                 &[TestOrchardInput {
                     note_id: 0,
                     value: Zatoshis::const_from_u64(80000),
+                    one_time: false,
                 }][..],
                 &[OrchardPayment::new(Zatoshis::const_from_u64(30000))][..],
             ),
@@ -858,7 +883,10 @@ mod tests {
             &Network::TestNetwork,
             pre_nu6_3_height,
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &transparent_inputs,
             &transparent_outputs,
             &sapling_view,
@@ -885,7 +913,10 @@ mod tests {
             &Network::TestNetwork,
             post_nu6_3_height,
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &transparent_inputs,
             &transparent_outputs,
             &sapling_view,
@@ -915,11 +946,18 @@ mod tests {
             ShieldedPool::Orchard,
             DustOutputPolicy::default(),
         );
-        let zip318 = PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318);
+        let zip318 = PoolMigrationParams::new(
+            zcash_protocol::zip318::BlockSpacing::UNIFORM,
+            AnchorRetentionInterval::ZIP_318,
+        );
         let interval = AnchorBucketInterval::ZIP_318;
 
         // An anchor ON the grid, as a canonical crossing requires.
-        let anchor = interval.boundary_at_or_below(BlockHeight::from_u32(2_000_000));
+        let anchor = zcash_protocol::zip318::AnchorGrid::new(
+            interval,
+            zcash_protocol::zip318::BlockSpacing::UNIFORM,
+        )
+        .boundary_at_or_below(BlockHeight::from_u32(2_000_000));
         let height = TargetHeight::from(BlockHeight::from_u32(u32::from(anchor) + 10));
 
         // One Orchard input, large enough that its change stays in Orchard rather than being
@@ -927,6 +965,7 @@ mod tests {
         let orchard_inputs = [TestOrchardInput {
             note_id: 0,
             value: Zatoshis::const_from_u64(10_000_000),
+            one_time: false,
         }];
         let orchard_view = (
             ::orchard::bundle::BundleVersion::orchard_v3(),
@@ -1012,7 +1051,10 @@ mod tests {
                 &Network::TestNetwork,
                 height,
                 BlockHeight::from_u32(1),
-                &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+                &PoolMigrationParams::new(
+                    zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                    AnchorRetentionInterval::ZIP_318,
+                ),
                 &[] as &[TestTransparentInput],
                 &[] as &[TxOut],
                 &sapling_view,
@@ -1028,7 +1070,10 @@ mod tests {
                 &Network::TestNetwork,
                 height,
                 BlockHeight::from_u32(1),
-                &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+                &PoolMigrationParams::new(
+                    zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                    AnchorRetentionInterval::ZIP_318,
+                ),
                 &[] as &[TestTransparentInput],
                 &[] as &[TxOut],
                 &sapling_view,
@@ -1086,7 +1131,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[] as &[TestTransparentInput],
             &[TxOut::new(
                 Zatoshis::const_from_u64(40000),
@@ -1134,7 +1182,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[TestTransparentInput {
                 outpoint: OutPoint::fake(),
                 coin: TxOut::new(
@@ -1181,7 +1232,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[TestTransparentInput {
                 outpoint: OutPoint::fake(),
                 coin: TxOut::new(
@@ -1234,7 +1288,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[TestTransparentInput {
                 outpoint: OutPoint::fake(),
                 coin: TxOut::new(
@@ -1285,7 +1342,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[TestTransparentInput {
                 outpoint: OutPoint::fake(),
                 coin: TxOut::new(
@@ -1334,7 +1394,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[TestTransparentInput {
                 outpoint: OutPoint::fake(),
                 coin: TxOut::new(
@@ -1383,7 +1446,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[] as &[TestTransparentInput],
             &[] as &[TxOut],
             &(
@@ -1435,7 +1501,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[TestTransparentInput {
                 outpoint: OutPoint::fake(),
                 coin: TxOut::new(
@@ -1486,7 +1555,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[TestTransparentInput {
                 outpoint: OutPoint::fake(),
                 coin: TxOut::new(
@@ -1539,7 +1611,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[TestTransparentInput {
                 outpoint: OutPoint::fake(),
                 coin: TxOut::new(
@@ -1589,7 +1664,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[TestTransparentInput {
                 outpoint: OutPoint::fake(),
                 coin: TxOut::new(
@@ -1650,7 +1728,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[] as &[TestTransparentInput],
             &[] as &[TxOut],
             &(
@@ -1701,7 +1782,10 @@ mod tests {
                 .unwrap()
                 .into(),
             BlockHeight::from_u32(1),
-            &PoolMigrationParams::new(AnchorRetentionInterval::ZIP_318),
+            &PoolMigrationParams::new(
+                zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                AnchorRetentionInterval::ZIP_318,
+            ),
             &[] as &[TestTransparentInput],
             &[] as &[TxOut],
             &(
@@ -1735,6 +1819,109 @@ mod tests {
         assert_matches!(
             result,
             Err(ChangeError::DustInputs { sapling, .. }) if sapling == vec![2]
+        );
+    }
+
+    /// Computes the balance of a transaction spending `orchard` and `ironwood` notes into
+    /// a Sapling payment of `payment` zatoshis, after NU6.3, with Orchard as the fallback
+    /// change pool.
+    #[cfg(feature = "orchard")]
+    fn one_time_balance(
+        dust: DustOutputPolicy,
+        orchard: &[TestOrchardInput],
+        ironwood: &[TestOrchardInput],
+        payment: u64,
+    ) -> crate::fees::TransactionBalance {
+        let change_strategy = SingleOutputChangeStrategy::<_, MockWalletDb>::new(
+            Zip317FeeRule::standard(),
+            None,
+            ShieldedPool::Orchard,
+            dust,
+        );
+        let sapling_outputs = [SaplingPayment::new(Zatoshis::const_from_u64(payment))];
+        let height: TargetHeight = Network::TestNetwork
+            .activation_height(NetworkUpgrade::Nu6_3)
+            .unwrap()
+            .into();
+        change_strategy
+            .compute_balance::<_, u32>(
+                &Network::TestNetwork,
+                height,
+                BlockHeight::from_u32(1),
+                &PoolMigrationParams::new(
+                    zcash_protocol::zip318::BlockSpacing::UNIFORM,
+                    AnchorRetentionInterval::ZIP_318,
+                ),
+                &[] as &[TestTransparentInput],
+                &[] as &[TxOut],
+                &(
+                    sapling::builder::BundleType::DEFAULT,
+                    &[] as &[Infallible],
+                    &sapling_outputs[..],
+                ),
+                &(
+                    ::orchard::bundle::BundleVersion::orchard_v3(),
+                    orchard,
+                    &[] as &[Infallible],
+                ),
+                &(
+                    ::orchard::bundle::BundleVersion::ironwood_v3(),
+                    ironwood,
+                    &[] as &[Infallible],
+                ),
+                None,
+                &(),
+            )
+            .expect("the inputs cover the payment and its fee")
+    }
+
+    /// An Ironwood input worth `value`, one-time if `one_time`.
+    #[cfg(feature = "orchard")]
+    fn ironwood_input(value: u64, one_time: bool) -> TestOrchardInput {
+        TestOrchardInput {
+            note_id: 1,
+            value: Zatoshis::const_from_u64(value),
+            one_time,
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "orchard")]
+    fn one_time_spend_keeps_zero_value_change_when_dust_is_added_to_the_fee() {
+        let dust = DustOutputPolicy::new(DustAction::AddDustToFee, None);
+        // 100 zatoshis of dust are left after the 20000 zatoshi fee.
+        let payment = 1_000_000 - 20_100;
+        let ordinary = one_time_balance(dust, &[], &[ironwood_input(1_000_000, false)], payment);
+        assert!(ordinary.proposed_change().is_empty());
+
+        // The one-time spend adds the dust to the fee too, but keeps the marker.
+        let one_time = one_time_balance(dust, &[], &[ironwood_input(1_000_000, true)], payment);
+        assert_eq!(
+            one_time.proposed_change(),
+            [ChangeValue::ironwood(Zatoshis::ZERO, None)]
+        );
+        assert_eq!(one_time.fee_required(), ordinary.fee_required());
+    }
+
+    #[test]
+    #[cfg(feature = "orchard")]
+    fn one_time_spend_with_orchard_inputs_takes_ironwood_change() {
+        let orchard = [TestOrchardInput {
+            note_id: 0,
+            value: Zatoshis::const_from_u64(500_000),
+            one_time: false,
+        }];
+        let dust = DustOutputPolicy::default();
+        let ordinary = one_time_balance(dust, &orchard, &[ironwood_input(500_000, false)], 600_000);
+        assert_matches!(
+            ordinary.proposed_change(),
+            [change] if change.output_pool() == zcash_protocol::PoolType::ORCHARD
+        );
+
+        let one_time = one_time_balance(dust, &orchard, &[ironwood_input(500_000, true)], 600_000);
+        assert_matches!(
+            one_time.proposed_change(),
+            [change] if change.output_pool() == zcash_protocol::PoolType::IRONWOOD
         );
     }
 }

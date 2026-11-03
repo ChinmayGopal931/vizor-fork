@@ -187,6 +187,8 @@ pub struct WalletTx<AccountId> {
     ironwood_outputs: Vec<WalletIronwoodOutput<AccountId>>,
     #[cfg(feature = "orchard")]
     ironwood_enhancement_plan: IronwoodEnhancementPlan<AccountId>,
+    #[cfg(feature = "orchard")]
+    ironwood_nullifiers: Option<Vec<orchard::note::Nullifier>>,
 }
 
 /// Provisional private-enhancement plan from a complete compact transaction.
@@ -302,7 +304,24 @@ impl<AccountId> WalletTx<AccountId> {
             ironwood_outputs,
             #[cfg(feature = "orchard")]
             ironwood_enhancement_plan: IronwoodEnhancementPlan::Ineligible,
+            #[cfg(feature = "orchard")]
+            ironwood_nullifiers: None,
         }
+    }
+
+    /// Attaches every Ironwood nullifier the transaction reveals, matched to a wallet note
+    /// or not, as a block scan read them.
+    #[cfg(feature = "orchard")]
+    pub fn with_ironwood_nullifiers(mut self, nullifiers: Vec<orchard::note::Nullifier>) -> Self {
+        self.ironwood_nullifiers = Some(nullifiers);
+        self
+    }
+
+    /// Returns every Ironwood nullifier the transaction reveals when a block scan produced
+    /// this record, so that a store can journal them.
+    #[cfg(feature = "orchard")]
+    pub fn ironwood_nullifiers(&self) -> Option<&[orchard::note::Nullifier]> {
+        self.ironwood_nullifiers.as_deref()
     }
 
     /// Attaches provisional eligibility and outgoing candidates from the complete compact
@@ -630,7 +649,8 @@ pub type WalletOrchardSpend<AccountId> = WalletSpend<orchard::note::Nullifier, A
 #[cfg(feature = "orchard")]
 pub type WalletIronwoodSpend<AccountId> = WalletSpend<orchard::note::Nullifier, AccountId>;
 
-/// An output that was successfully decrypted in the process of wallet scanning.
+/// An output that wallet scanning decrypted, or that targeted PIR admission authenticated
+/// with a one-time key.
 #[derive(Clone)]
 pub struct WalletOutput<Note, Nullifier, AccountId> {
     index: usize,
@@ -646,7 +666,8 @@ pub struct WalletOutput<Note, Nullifier, AccountId> {
     one_time_key_id: Option<zakura_one_time_ivk::KeyId>,
 }
 
-/// Compact action encryption fields retained from scanning for later enhancement.
+/// Compact action encryption fields retained from a compact scan or a PIR-returned payment
+/// for later enhancement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CompactEncryptionFields {
     pub ephemeral_key: [u8; 32],
@@ -694,13 +715,13 @@ impl<Note, Nullifier, AccountId> WalletOutput<Note, Nullifier, AccountId> {
         self.one_time_key_id
     }
 
-    /// Attaches the compact encryption prefix retained by scanning.
+    /// Attaches the compact encryption prefix a compact scan or PIR admission retained.
     pub fn with_compact_ciphertext(mut self, ciphertext: [u8; 52]) -> Self {
         self.compact_ciphertext = Some(ciphertext);
         self
     }
 
-    /// Compact ciphertext when this output came from a compact scan.
+    /// Compact ciphertext when this output came from a compact scan or PIR admission.
     pub fn compact_ciphertext(&self) -> Option<&[u8; 52]> {
         self.compact_ciphertext.as_ref()
     }
@@ -747,14 +768,16 @@ impl<Note, Nullifier, AccountId> WalletOutput<Note, Nullifier, AccountId> {
 pub type WalletSaplingOutput<AccountId> =
     WalletOutput<sapling::Note, sapling::Nullifier, AccountId>;
 
-/// The output part of an Orchard [`Action`] that was decrypted in the process of scanning.
+/// The output part of an Orchard-shaped [`Action`] that scanning decrypted, or that PIR
+/// admission authenticated with a one-time key.
 ///
 /// [`Action`]: orchard::Action
 #[cfg(feature = "orchard")]
 pub type WalletOrchardOutput<AccountId> =
     WalletOutput<(orchard::note::Note, orchard::ValuePool), orchard::note::Nullifier, AccountId>;
 
-/// The output part of an Ironwood [`Action`] that was decrypted in the process of scanning.
+/// The output part of an Ironwood [`Action`] that scanning decrypted, or that PIR admission
+/// authenticated with a one-time key.
 ///
 /// [`Action`]: orchard::Action
 #[cfg(feature = "orchard")]
@@ -1020,6 +1043,26 @@ impl<NoteRef> orchard_fees::InputView<NoteRef> for (NoteRef, orchard::value::Not
     }
 }
 
+/// An Ironwood input as input selection hands it to fee and change calculation: its ID,
+/// its value, and whether it is a one-time-key note.
+#[cfg(feature = "orchard")]
+impl<NoteRef> orchard_fees::InputView<NoteRef> for (NoteRef, orchard::value::NoteValue, bool) {
+    fn note_id(&self) -> &NoteRef {
+        &self.0
+    }
+
+    fn value(&self) -> Zatoshis {
+        self.1
+            .inner()
+            .try_into()
+            .expect("Orchard note values are indirectly checked by consensus.")
+    }
+
+    fn is_one_time(&self) -> bool {
+        self.2
+    }
+}
+
 #[cfg(feature = "orchard")]
 impl<NoteRef> orchard_fees::InputView<NoteRef> for ReceivedNote<NoteRef, orchard::Note> {
     fn note_id(&self) -> &NoteRef {
@@ -1032,6 +1075,10 @@ impl<NoteRef> orchard_fees::InputView<NoteRef> for ReceivedNote<NoteRef, orchard
             .inner()
             .try_into()
             .expect("Orchard note values are indirectly checked by consensus.")
+    }
+
+    fn is_one_time(&self) -> bool {
+        self.one_time_key_id.is_some()
     }
 }
 

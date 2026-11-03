@@ -32,6 +32,7 @@ mod pczt;
 pub(crate) use pczt::{check_orchard_spend_auth_signatures, SpendAuthSignatureError};
 pub(crate) mod proposal_locks;
 mod send;
+pub(crate) use send::fee_policy_target;
 mod transactions;
 pub(crate) use transactions::has_recovered_status_work;
 #[cfg(test)]
@@ -57,9 +58,9 @@ pub(crate) use migration::{
     configure_fast_testnet_migration, delete_account_migration_rows_with_tx,
     denomination_confirmations_required, migration_preparation_snapshot_read_only,
     migration_status, observable_denomination_transaction_ids, proof_retry_height,
-    reconcile_wallet_locks_after_sync, MigrationPartState, MigrationPreparationOutputKind,
-    MigrationPreparationTransactionState, MigrationScheduleEntry, MigrationStatus,
-    PreparationTimingPolicy,
+    reconcile_wallet_locks_after_sync, zip318_blocks_at, zip318_canonical_migration_expiry_height,
+    MigrationPartState, MigrationPreparationOutputKind, MigrationPreparationTransactionState,
+    MigrationScheduleEntry, MigrationStatus, PreparationTimingPolicy,
 };
 pub use pczt::{
     add_proofs_to_pczt, create_pczt_from_proposal, create_tex_pczts_from_proposal,
@@ -136,12 +137,14 @@ pub use transactions::{
 };
 #[allow(unused_imports)] // ditto
 pub(crate) use transactions::{
-    get_export_birthday_anchor, get_local_block_time, get_oldest_mined_transaction_anchor,
-    get_transaction_data_requests, get_transaction_detail, get_transaction_history,
+    get_balance_deltas, get_export_birthday_anchor, get_local_block_time,
+    get_oldest_mined_transaction_anchor, get_transaction_data_requests, get_transaction_detail,
+    get_transaction_history, get_transaction_rows, get_transaction_rows_for_txids,
     get_unmined_txids_with_mined_output_evidence, get_wallet_balance, get_wallet_balances,
-    ExportBirthdayAnchor, TransactionDetail, TransactionDetailOutput, TransactionFeeState,
-    TransactionInfo, TransparentBalanceAuthority, TransparentDetailsView, TransparentRecipientRow,
-    TransparentStopReason, TxDataRequest, WalletBalance, WalletBalanceAvailability,
+    history_pages, BalanceDelta, ExportBirthdayAnchor, TransactionDetail, TransactionDetailOutput,
+    TransactionFeeState, TransactionInfo, TransparentBalanceAuthority, TransparentDetailsView,
+    TransparentRecipientRow, TransparentStopReason, TxDataRequest, WalletBalance,
+    WalletBalanceAvailability,
 };
 
 pub(super) fn open_wallet_db(

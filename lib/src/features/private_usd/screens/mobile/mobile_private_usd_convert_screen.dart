@@ -7,11 +7,14 @@ import 'package:go_router/go_router.dart';
 import '../../../../providers/zec_price_change_provider.dart'
     show zecHomeUsdUnitPriceProvider;
 import '../../../../providers/account_provider.dart';
+import '../../../../providers/block_spacing_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
+import '../../../../providers/sync_provider.dart';
 import '../../models/private_usd_record_key.dart';
 import '../../providers/private_usd_balance_provider.dart';
 import '../../providers/private_usd_convert_provider.dart';
 import '../../providers/private_usd_engine_provider.dart';
+import '../../providers/private_usd_least_fee_provider.dart';
 import '../../providers/private_usd_relayer_claims_provider.dart';
 import '../../providers/private_usd_reverse_convert_provider.dart';
 import '../../widgets/mobile/private_usd_convert_views.dart';
@@ -167,6 +170,7 @@ class _MobilePrivateUsdConvertScreenState
         onBack: () => context.pop(),
         onSwitchDirection: _directionSwitch(state),
         onViewRefunds: () => context.push('/private-usd/refunds'),
+        sweepFeeFloorZat: ref.watch(privateUsdLeastFeeZatProvider),
       );
     }
     ref.listen(privateUsdConvertProvider.select((s) => s.underWay), (_, path) {
@@ -195,6 +199,13 @@ class _MobilePrivateUsdConvertScreenState
       onReview: () => _review(notifier),
       onBack: () => context.pop(),
       onSwitchDirection: _directionSwitch(state),
+      blockTimes: ref
+          .watch(blockSpacingProvider)
+          .fromTip(
+            ref.watch(
+              syncProvider.select((sync) => sync.value?.chainTipHeight ?? 0),
+            ),
+          ),
     );
   }
 }

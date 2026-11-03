@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../models/private_usd_record_key.dart';
 import '../../providers/private_usd_convert_provider.dart';
+import '../../providers/private_usd_least_fee_provider.dart';
 import '../../providers/private_usd_relayer_claims_provider.dart';
 import '../../providers/private_usd_tokens_provider.dart';
 import '../../providers/private_usd_reverse_convert_provider.dart';
@@ -38,6 +39,7 @@ class MobilePrivateUsdConvertReviewScreen extends ConsumerWidget {
           onBack: onBack,
           onConfirm: () => _confirm(context, notifier.confirm),
           onRefreshQuote: notifier.refreshQuote,
+          sweepFeeFloorZat: ref.watch(privateUsdLeastFeeZatProvider),
         ),
       );
     }

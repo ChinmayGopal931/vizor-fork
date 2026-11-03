@@ -7,29 +7,37 @@ import '../../home/services/transparent_balance_display.dart';
 /// confirmations.
 typedef ShieldedPoolHoldings = ({BigInt total, BigInt pending});
 
-/// The active account's ZEC by pool, from the fields the Home sign reads.
-///
-/// Not the `display*` snapshot desktop Home and the migration surfaces read:
-/// it has none for Sapling or transparent funds, and mixing the two could
-/// leave the rows disagreeing with their own total and with the sign.
+/// The active account's ZEC by pool, from the `display*` snapshot the Home
+/// sign reads, so the rows add up to the sign while a catch-up sync holds
+/// it. The snapshot has no Sapling total: Sapling is what its shielded total
+/// leaves.
 @immutable
 class ZecPoolHoldings {
   ZecPoolHoldings.of(SyncState sync)
-    : hasBalance = sync.hasBalanceData,
+    : hasBalance = sync.hasDisplayBalance,
       ironwood = (
-        total: sync.ironwoodBalance + sync.ironwoodPendingBalance,
-        pending: sync.ironwoodPendingBalance,
+        total: sync.displayIronwoodBalance + sync.displayIronwoodPendingBalance,
+        pending: sync.displayIronwoodPendingBalance,
       ),
       orchard = (
-        total: sync.orchardBalance + sync.orchardPendingBalance,
-        pending: sync.orchardPendingBalance,
+        total: sync.displayOrchardBalance + sync.displayOrchardPendingBalance,
+        pending: sync.displayOrchardPendingBalance,
       ),
-      sapling = (
-        total: sync.saplingBalance + sync.saplingPendingBalance,
-        pending: sync.saplingPendingBalance,
-      ),
+      sapling = _sapling(sync),
       transparent = TransparentBalanceDisplay.of(sync),
       transparentPending = sync.transparentPendingBalance;
+
+  static ShieldedPoolHoldings _sapling(SyncState sync) {
+    final rest =
+        sync.displayShieldedBalance -
+        sync.displayIronwoodBalance -
+        sync.displayIronwoodPendingBalance -
+        sync.displayOrchardBalance -
+        sync.displayOrchardPendingBalance;
+    final total = rest.isNegative ? BigInt.zero : rest;
+    final pending = sync.displaySaplingPendingBalance;
+    return (total: total, pending: pending > total ? total : pending);
+  }
 
   /// Whether the account's balances have been read. Until then every amount
   /// is unknown, never zero.

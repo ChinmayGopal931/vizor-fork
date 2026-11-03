@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
+import 'package:zcash_wallet/src/features/activity/activity_feed_sections.dart';
 import 'package:zcash_wallet/src/features/activity/models/activity_row_data.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_activity_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_activity_details.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_activity_rows.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
@@ -90,6 +92,45 @@ void main() {
 
     expect(named.subtitle, startsWith('from 0zk1'));
     expect(named.subtitle, isNot(contains(sender)));
+  });
+
+  testWidgets('equal receipts in one transaction keep rows of their own', (
+    tester,
+  ) async {
+    late List<ActivityEntry> entries;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppTheme(
+          data: AppThemeData.dark,
+          child: Builder(
+            builder: (context) {
+              entries = privateUsdFeedEntries(
+                context: context,
+                activity: PrivateUsdActivity(
+                  receipts: [
+                    previewPrivateUsdReceipt(),
+                    previewPrivateUsdReceipt(),
+                    previewPrivateUsdReceipt(dollars: 5),
+                  ],
+                ),
+                privacyModeEnabled: false,
+                onOpenConversion: (_) {},
+                details: PrivateUsdActivityDetailsConfig(
+                  open: const {},
+                  onToggle: (_) {},
+                  onOpenTransaction: (_, _) {},
+                ),
+              );
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      ),
+    );
+
+    final ids = [for (final entry in entries) entry.row.stableId];
+    expect(ids, hasLength(3));
+    expect(ids.toSet(), hasLength(3));
   });
 
   testWidgets('privacy mode hides the amount', (tester) async {

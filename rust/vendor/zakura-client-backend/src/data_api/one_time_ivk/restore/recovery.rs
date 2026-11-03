@@ -1,5 +1,6 @@
-//! Authentication of the notes a restore sweep retrieves, before wallet accounting.
-//! Chain roots and spend-history coverage must come from the wallet independently.
+//! Authentication of the payments discovery looks up, such as late candidates, before
+//! wallet accounting. Chain roots and journal coverage must come from the wallet
+//! independently.
 
 use orchard::{
     keys::{FullViewingKey, Scope},
@@ -43,7 +44,7 @@ impl EncryptedNote {
         &self.0
     }
 
-    /// Public commitment bytes used to request the matching common witness.
+    /// Public commitment bytes, which name a witness request with its position.
     pub fn commitment(&self) -> [u8; 32] {
         self.0[32..64].try_into().unwrap()
     }

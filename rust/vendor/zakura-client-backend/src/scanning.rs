@@ -37,8 +37,6 @@ use orchard::note_encryption::OrchardDomain;
 
 pub(crate) mod compact;
 pub mod full;
-#[cfg(feature = "orchard")]
-pub mod one_time_ivk;
 
 /// A key that can be used to perform trial decryption and nullifier
 /// computation for a [`CompactSaplingOutput`] or [`CompactOrchardAction`].
@@ -67,12 +65,6 @@ pub trait ScanningKeyOps<D: Domain, AccountId, Nf> {
     /// Returns the [`zip32::Scope`] for which this key was derived, if known.
     fn key_scope(&self) -> Option<Scope>;
 
-    /// The one-time key that decrypted this output, relative to its account.
-    #[cfg(feature = "orchard")]
-    fn one_time_key_id(&self) -> Option<zakura_one_time_ivk::KeyId> {
-        None
-    }
-
     /// Produces the nullifier for the specified note and witness, if possible.
     ///
     /// IVK-based implementations of this trait cannot successfully derive
@@ -95,11 +87,6 @@ impl<D: Domain, AccountId, Nf, K: ScanningKeyOps<D, AccountId, Nf>> ScanningKeyO
         (*self).key_scope()
     }
 
-    #[cfg(feature = "orchard")]
-    fn one_time_key_id(&self) -> Option<zakura_one_time_ivk::KeyId> {
-        (*self).one_time_key_id()
-    }
-
     fn nf(&self, note: &D::Note, note_position: Position) -> Option<Nf> {
         (*self).nf(note, note_position)
     }
@@ -120,11 +107,6 @@ impl<D: Domain, AccountId, Nf> ScanningKeyOps<D, AccountId, Nf>
         self.as_ref().key_scope()
     }
 
-    #[cfg(feature = "orchard")]
-    fn one_time_key_id(&self) -> Option<zakura_one_time_ivk::KeyId> {
-        self.as_ref().one_time_key_id()
-    }
-
     fn nf(&self, note: &D::Note, note_position: Position) -> Option<Nf> {
         self.as_ref().nf(note, note_position)
     }
@@ -143,11 +125,6 @@ impl<D: Domain, AccountId: Send + Sync, Nf> ScanningKeyOps<D, AccountId, Nf>
 
     fn key_scope(&self) -> Option<Scope> {
         self.as_ref().key_scope()
-    }
-
-    #[cfg(feature = "orchard")]
-    fn one_time_key_id(&self) -> Option<zakura_one_time_ivk::KeyId> {
-        self.as_ref().one_time_key_id()
     }
 
     fn nf(&self, note: &D::Note, note_position: Position) -> Option<Nf> {
@@ -377,6 +354,25 @@ impl<AccountId, IvkTag> ScanningKeys<AccountId, IvkTag> {
         Box<dyn ScanningKeyOps<IronwoodDomain, AccountId, IronwoodNullifier> + Send + Sync>,
     > {
         &self.ironwood
+    }
+}
+
+#[cfg(feature = "orchard")]
+impl<AccountId: Copy + PartialEq, IvkTag> ScanningKeys<AccountId, IvkTag> {
+    /// Returns each account that has an internal-scope Ironwood key,
+    /// once. A block scan records them as [`ScannedBlock::scanned_accounts`]. Only that key
+    /// decrypts the marker output every one-time spend sends to the account's internal
+    /// address, so a scan without it does not cover the account.
+    ///
+    /// [`ScannedBlock::scanned_accounts`]: crate::data_api::ScannedBlock::scanned_accounts
+    pub(crate) fn ordinary_ironwood_accounts(&self) -> Vec<AccountId> {
+        let mut accounts: Vec<AccountId> = vec![];
+        for key in self.ironwood.values() {
+            if key.key_scope() == Some(Scope::Internal) && !accounts.contains(key.account_id()) {
+                accounts.push(*key.account_id());
+            }
+        }
+        accounts
     }
 }
 
@@ -1001,10 +997,6 @@ fn find_received<
             // - Notes created by consolidation transactions.
             // - Notes sent from one account to itself.
             let is_change = spent_from_accounts.contains(key.account_id());
-            // A one-time-key payment is incoming even when its account funded it, as in
-            // `decrypt_transaction_with_one_time_ivks`. The store never lowers the flag.
-            #[cfg(feature = "orchard")]
-            let is_change = is_change && key.one_time_key_id().is_none();
             let note_commitment_tree_position = note_position(output_idx);
             let nf = key.nf(&note, note_commitment_tree_position);
 
@@ -1023,8 +1015,6 @@ fn find_received<
                     .try_into()
                     .expect("compact ciphertext prefix"),
             );
-            #[cfg(feature = "orchard")]
-            let output = output.with_one_time_key_id(key.one_time_key_id());
             shielded_outputs.push(output);
         }
 
@@ -1199,5 +1189,44 @@ mod tests {
         spawn(move || {
             let _ = keys.sapling().get(&());
         });
+    }
+    /// A scan covers an account only with its ordinary internal-scope Ironwood key.
+    #[cfg(feature = "orchard")]
+    #[test]
+    fn only_an_internal_ironwood_key_covers_an_account() {
+        use std::collections::HashMap;
+
+        use orchard::keys::{FullViewingKey, SpendingKey};
+        use zip32::Scope;
+
+        use super::{IronwoodDomain, IronwoodNullifier, ScanningKey, ScanningKeyOps};
+
+        let fvk = FullViewingKey::from(&SpendingKey::from_bytes([7; 32]).unwrap());
+        let keys = |scopes: &[Scope]| {
+            let ironwood = scopes
+                .iter()
+                .map(|&scope| {
+                    let key: Box<
+                        dyn ScanningKeyOps<IronwoodDomain, u32, IronwoodNullifier> + Send + Sync,
+                    > = Box::new(ScanningKey {
+                        ivk: fvk.to_ivk(scope),
+                        nk: Some(fvk.clone()),
+                        account_id: 0u32,
+                        key_scope: Some(scope),
+                    });
+                    ((0u32, scope), key)
+                })
+                .collect::<HashMap<_, _>>();
+            ScanningKeys::new(HashMap::new(), HashMap::new(), ironwood)
+        };
+        assert!(
+            keys(&[Scope::External])
+                .ordinary_ironwood_accounts()
+                .is_empty()
+        );
+        assert_eq!(
+            keys(&[Scope::External, Scope::Internal]).ordinary_ironwood_accounts(),
+            [0]
+        );
     }
 }

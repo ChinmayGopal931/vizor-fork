@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/formatting/zec_amount.dart';
+import 'package:zcash_wallet/src/core/zcash/network_upgrade_hold.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_record_key.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
@@ -20,6 +21,7 @@ import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engin
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_reverse_funding.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_swap_backend.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
+import 'package:zcash_wallet/src/providers/network_upgrade_window_provider.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 
 import 'support/fake_private_usd_backend.dart';
@@ -43,6 +45,7 @@ void main() {
   Completer<void>? quoteGate;
   late int? nextFee;
   var allowed = true;
+  var upgradeWindow = NetworkUpgradeWindowState.none;
   late _UnavailableReversePage reversePage;
   late MemoryRelayerClaimsStore relayerClaims;
   late _FakeAttester attester;
@@ -64,6 +67,7 @@ void main() {
     nextFee = feeZat;
     quoteGate = null;
     allowed = true;
+    upgradeWindow = NetworkUpgradeWindowState.none;
     reversePage = _UnavailableReversePage();
     relayerClaims = MemoryRelayerClaimsStore();
     DateTime now() => tester.binding.clock.now();
@@ -93,6 +97,7 @@ void main() {
     container = ProviderContainer(
       overrides: [
         accountProvider.overrideWith(_OneAccount.new),
+        networkUpgradeWindowProvider.overrideWith((_) => upgradeWindow),
         privateUsdEngineProvider.overrideWithValue(engine),
         privateUsdCurrentDeploymentProvider.overrideWithValue(null),
         privateUsdReversePageProvider.overrideWithValue(reversePage),
@@ -406,6 +411,22 @@ void main() {
     expect(notifier().openReview(), isTrue);
     expect(await notifier().confirm(), isNotNull);
     expect(backend.acceptedRelayerClaims, [false]);
+  });
+
+  convertTest('the upgrade hold opens no swap and keeps the quote', (
+    tester,
+  ) async {
+    await start(tester, holdings: spendable(oneZec));
+    await type(tester, '0.5');
+    expect(notifier().openReview(), isTrue);
+    upgradeWindow = const NetworkUpgradeWindowState(
+      nextActivationHeight: 3543405,
+      holdsTransactions: true,
+    );
+    expect(await notifier().confirm(), isNull);
+    expect(state().startError, kNetworkUpgradeHoldMessage);
+    expect(backend.acceptedRelayerClaims, isEmpty);
+    expect(state().quoteSpent, isFalse);
   });
 
   convertTest('a relayer-claims setting that cannot be read starts nothing', (

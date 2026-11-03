@@ -8,6 +8,7 @@ import '../../../../main.dart' show log;
 import '../../../core/layout/app_layout.dart';
 import '../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../core/widgets/app_pane_modal_overlay.dart';
+import '../../../core/zcash/network_upgrade_hold.dart';
 import '../../../providers/rpc_endpoint_failover_provider.dart';
 import '../../../providers/rpc_endpoint_provider.dart';
 import '../../../providers/sync_provider.dart';
@@ -21,6 +22,7 @@ import '../../ledger/services/ledger_signed_operation_service.dart';
 import '../../ledger/widgets/ledger_device_app_prompt.dart';
 import '../../ledger/widgets/ledger_signing_modal.dart';
 import '../../ledger/widgets/mobile/mobile_ledger_sheet_content.dart';
+import '../../ledger/widgets/mobile/mobile_ledger_help_navigation.dart';
 import '../../../core/navigation/external_action_guard_hold.dart';
 import '../../../core/formatting/zec_amount.dart';
 import '../../../providers/account_provider.dart';
@@ -68,6 +70,7 @@ class LedgerShieldSigningOverlay extends ConsumerStatefulWidget {
 class _LedgerShieldSigningOverlayState
     extends ConsumerState<LedgerShieldSigningOverlay> {
   final LedgerConnectionScope _connectionScope = LedgerConnectionScope();
+  final _helpNavigation = MobileLedgerHelpNavigation();
   LedgerSigningModalPhase _phase = LedgerSigningModalPhase.preparing;
   bool _showSaplingParamsPrompt = false;
   bool _cancelled = false;
@@ -168,9 +171,10 @@ class _LedgerShieldSigningOverlayState
           setState(() {
             _phase = LedgerSigningModalPhase.failed;
             _canRetry = false;
-            _error =
-                existingOperation.message ??
-                'The shield transaction status is uncertain. Check activity before trying again.';
+            _error = _broadcastStatusMessage(
+              status: existingOperation.status ?? '',
+              message: existingOperation.message,
+            );
           });
           return;
         }
@@ -614,6 +618,8 @@ class _LedgerShieldSigningOverlayState
     required String status,
     required String? message,
   }) {
+    final upgradeHold = networkUpgradeHoldMessage(message ?? '');
+    if (upgradeHold != null) return upgradeHold;
     if (status == 'broadcast_unknown') {
       return message ??
           'The shield transaction may have reached the network. Check activity before trying again.';
@@ -648,6 +654,8 @@ class _LedgerShieldSigningOverlayState
       requestKind: LedgerRequestKind.shield,
     );
     _deviceGuidance = guidance;
+    final upgradeHold = networkUpgradeHoldMessage(error);
+    if (upgradeHold != null) return upgradeHold;
     // Retrying the same request fails the same way on the device.
     if (guidance?.retryable == false) _canRetry = false;
     final failure = LedgerRequestFailure.fromError(error);
@@ -713,6 +721,7 @@ class _LedgerShieldSigningOverlayState
   Widget build(BuildContext context) {
     final canLeave = !_cancelled && (_momentComplete || !_isBroadcasting);
     final broadcasting = _phase == LedgerSigningModalPhase.broadcasting;
+    final upgradeHold = _error == kNetworkUpgradeHoldMessage;
     final modal = LedgerSigningModal(
       cancelling: _cancelled,
       resumingApproval: _resumingApproval,
@@ -733,12 +742,15 @@ class _LedgerShieldSigningOverlayState
               isError: !_pausedEarly,
               title: _pausedEarly
                   ? 'Shielding paused'
+                  : upgradeHold
+                  ? kNetworkUpgradeHoldActionLabel
                   : 'Ledger signing failed',
               statusLabel: _pausedEarly ? 'Inputs remaining' : 'Action needed',
               message: _error ?? 'Ledger shielding could not be completed.',
               showDeviceAppPrompt:
                   !_pausedEarly &&
                   (_deviceGuidance?.showDeviceAppPrompt ?? false),
+              showConnectionPicker: !upgradeHold,
               actionLabel: _canRetry ? 'Try again' : null,
             )
           : null,
@@ -755,48 +767,59 @@ class _LedgerShieldSigningOverlayState
           key: const ValueKey('mobile_ledger_shield_signing_surface'),
           fit: StackFit.expand,
           children: [
-            MobileShieldScene(
-              backdrop: widget.mobileBackdrop,
-              animateHardware: true,
-              phase: !_momentStarted
-                  ? MobileShieldPhase.review
-                  : _momentComplete
-                  ? MobileShieldPhase.succeeded
-                  : _phase == LedgerSigningModalPhase.failed
-                  ? MobileShieldPhase.failed
-                  : broadcasting
-                  ? MobileShieldPhase.working
-                  : MobileShieldPhase.hardware,
-              amount: formatZecAmount(_initialAmount),
-              resultAmount: _shieldedTotal > BigInt.zero
-                  ? formatZecAmount(_shieldedTotal)
-                  : null,
-              showResultAmount: _shieldedTotalKnown,
-              title: !_momentStarted
-                  ? 'Transparent balance'
-                  : _momentComplete
-                  ? 'Shielded successfully'
-                  : broadcasting
-                  ? 'Shielding your balance…'
-                  : 'Shield with Ledger',
-              focusChild: _momentStarted && !_momentComplete && !broadcasting
-                  ? LedgerInlinePresentation(
-                      closeLabel: _phase == LedgerSigningModalPhase.failed
-                          ? 'Close'
-                          : 'Cancel shielding',
-                      child: modal,
-                    )
-                  : null,
-              canLeave: canLeave,
-              onCommit: () {
-                if (_momentStarted) return;
-                setState(() => _momentStarted = true);
-                unawaited(_prepareAndSign());
-              },
-              onClose: _momentComplete
-                  ? widget.onComplete
-                  : () => unawaited(_cancelToHome()),
-              onComplete: widget.onComplete,
+            MobileLedgerHelpScope(
+              navigation: _helpNavigation,
+              child: MobileShieldScene(
+                backdrop: widget.mobileBackdrop,
+                animateHardware: true,
+                phase: !_momentStarted
+                    ? MobileShieldPhase.review
+                    : _momentComplete
+                    ? MobileShieldPhase.succeeded
+                    : _phase == LedgerSigningModalPhase.failed
+                    ? MobileShieldPhase.failed
+                    : broadcasting
+                    ? MobileShieldPhase.working
+                    : MobileShieldPhase.hardware,
+                amount: formatZecAmount(_initialAmount),
+                resultAmount: _shieldedTotal > BigInt.zero
+                    ? formatZecAmount(_shieldedTotal)
+                    : null,
+                showResultAmount: _shieldedTotalKnown,
+                title: !_momentStarted
+                    ? 'Transparent balance'
+                    : _momentComplete
+                    ? 'Shielded successfully'
+                    : broadcasting
+                    ? 'Shielding your balance…'
+                    : 'Shield with Ledger',
+                focusChild: _momentStarted && !_momentComplete && !broadcasting
+                    ? LedgerInlinePresentation(
+                        closeLabel: _phase == LedgerSigningModalPhase.failed
+                            ? 'Close'
+                            : 'Cancel shielding',
+                        child: modal,
+                      )
+                    : null,
+                canLeave: canLeave,
+                onCommit: () {
+                  if (_momentStarted) return;
+                  setState(() => _momentStarted = true);
+                  unawaited(_prepareAndSign());
+                },
+                onClose: _momentComplete
+                    ? widget.onComplete
+                    : () => unawaited(_cancelToHome()),
+                onPrevious: () {
+                  if (_helpNavigation.previous()) return;
+                  if (_momentComplete) {
+                    widget.onComplete();
+                  } else {
+                    unawaited(_cancelToHome());
+                  }
+                },
+                onComplete: widget.onComplete,
+              ),
             ),
             if (_showSaplingParamsPrompt)
               Positioned.fill(

@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
+import 'package:zcash_wallet/src/core/config/swap_feature_config.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_top_nav.dart';
 import 'package:zcash_wallet/src/core/profile_pictures.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
@@ -121,9 +122,12 @@ Widget _app(
   SwapActivityStore? swapActivityStore,
   GiftCardActivityIndex giftCardActivityIndex = GiftCardActivityIndex.empty,
   GoRouter? router,
+  bool? swapEnabled,
 }) {
   return ProviderScope(
     overrides: [
+      if (swapEnabled != null)
+        swapFeatureEnabledProvider.overrideWithValue(swapEnabled),
       if (etaLabels != null)
         activityEtaLabelsProvider.overrideWithValue(etaLabels),
       appBootstrapProvider.overrideWithValue(_bootstrap()),
@@ -181,6 +185,26 @@ class _FakeSwapActivityStore implements SwapActivityStore {
 }
 
 void main() {
+  testWidgets('disabled swaps leave normal Activity visible', (
+    tester,
+  ) async {
+    final store = _FakeSwapActivityStore([
+      _payActivityRecord(id: 'disabled-pay', depositTxHash: 'deposit'),
+    ]);
+    await tester.pumpWidget(
+      _app(
+        (_) async => [
+          _tx(txidHex: 'received', blockTime: BigInt.from(1800000000)),
+        ],
+        swapActivityStore: store,
+        swapEnabled: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Payment in progress'), findsNothing);
+    expect(find.text('Received'), findsOneWidget);
+  });
+
   testWidgets(
     'same-epoch failed history refresh withholds ETA until recovery',
     (tester) async {
@@ -396,7 +420,7 @@ void main() {
             suppliedArgs = state.extra as MobileTransactionStatusArgs;
             return MobileTransactionStatusScreen(
               args: suppliedArgs!,
-              historyLoader: (_) => history.future,
+              historyLoader: (_, _) => history.future,
               detailLoader: (_, _) async => null,
             );
           },
@@ -455,7 +479,12 @@ void main() {
       findsNothing,
     );
     expect(
-      tester.getTopLeft(find.byKey(const ValueKey('mobile_activity_feed'))).dy,
+      MatrixUtils.transformPoint(
+        tester
+            .renderObject(find.byKey(const ValueKey('mobile_activity_feed')))
+            .getTransformTo(null),
+        Offset.zero,
+      ).dy,
       moreOrLessEquals(kMobileTopNavHeight + AppSpacing.s),
     );
     expect(find.text('THIS WEEK'), findsOneWidget);
@@ -548,7 +577,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      tester.getTopLeft(find.byKey(const ValueKey('mobile_activity_feed'))).dy,
+      MatrixUtils.transformPoint(
+        tester
+            .renderObject(find.byKey(const ValueKey('mobile_activity_feed')))
+            .getTransformTo(null),
+        Offset.zero,
+      ).dy,
       moreOrLessEquals(kMobileTopNavHeight + AppSpacing.s),
     );
     expect(find.text('No activity yet'), findsOneWidget);

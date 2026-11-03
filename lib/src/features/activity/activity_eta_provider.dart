@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/storage/wallet_paths.dart';
 import '../../providers/account_provider.dart';
+import '../../providers/block_spacing_provider.dart';
 import '../../providers/pending_activity_evidence_provider.dart';
 import '../../providers/rpc_endpoint_provider.dart';
 import '../../providers/sync_provider.dart';
@@ -9,6 +9,7 @@ import '../../providers/sync_failure.dart';
 import '../../rust/api/sync.dart' as rust_sync;
 import '../swap/providers/swap_activity_store.dart';
 import 'gift_card_activity_index.dart';
+import 'activity_history_pager.dart';
 import 'transaction_completeness.dart';
 import '../swap/models/swap_chain_txid.dart';
 
@@ -48,15 +49,16 @@ typedef ActivityEtaClaimHistoryLoader =
     Future<List<rust_sync.TransactionInfo>> Function(
       String accountUuid,
       String network,
+      List<String> txids,
     );
 
 final activityEtaClaimHistoryLoaderProvider =
     Provider<ActivityEtaClaimHistoryLoader>(
       (ref) =>
-          (accountUuid, network) async => rust_sync.getTransactionHistory(
-            dbPath: await getWalletDbPath(),
+          (accountUuid, network, txids) => loadActivityClaimRows(
             network: network,
             accountUuid: accountUuid,
+            txids: txids,
           ),
     );
 
@@ -117,6 +119,11 @@ final activityEtaClaimHistoryProvider =
       return ref.watch(activityEtaClaimHistoryLoaderProvider)(
         account,
         endpoint.networkName,
+        {
+          for (final claim in index!.pendingClaims)
+            for (final txid in claim.claimTxids!.split(','))
+              if (txid.trim().isNotEmpty) txid.trim(),
+        }.toList(),
       );
     });
 
@@ -141,16 +148,25 @@ final activityEtaLabelsProvider = Provider<Map<String, String>>((ref) {
     return const {};
   }
   final excluded = ref.watch(activityEtaExcludedTxidsProvider);
+  final blocksPerReferenceBlock = ref
+      .watch(blockSpacingProvider)
+      .blocksPerReferenceBlock(sync.scannedHeight + 1);
   final labels = <String, String>{};
   for (final entry in evidence.observedAt.entries) {
     final id = entry.key.$2;
     if (entry.key.$1 != account || excluded.contains(id)) continue;
-    final ordinary = evidence.labelFor(account, id, sync.scannedHeight);
+    final ordinary = evidence.labelFor(
+      account,
+      id,
+      sync.scannedHeight,
+      blocksPerReferenceBlock: blocksPerReferenceBlock,
+    );
     final funding = evidence.labelFor(
       account,
       id,
       sync.scannedHeight,
       waitingForFunding: true,
+      blocksPerReferenceBlock: blocksPerReferenceBlock,
     );
     if (ordinary != null) labels[id] = ordinary;
     if (funding != null) labels[_fundingKey(id)] = funding;
@@ -229,5 +245,7 @@ String? giftCardClaimEtaLabel({
     remaining.add(label);
   }
   if (remaining.isEmpty) return null;
-  return remaining.contains('Taking longer') ? 'Taking longer' : 'Est. 1–3 min';
+  return remaining.contains(kActivityTakingLongerLabel)
+      ? kActivityTakingLongerLabel
+      : remaining.first;
 }

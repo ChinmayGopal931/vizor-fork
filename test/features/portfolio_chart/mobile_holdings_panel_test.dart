@@ -101,6 +101,64 @@ void main() {
     expect(text(tester, 'mobile_holdings_shielded_total_usd'), r'$60.00');
   });
 
+  test('the rows add up to the snapshot the Home sign shows', () {
+    // A 1 ZEC Orchard receipt mined during a catch-up sync: the sign keeps
+    // the last completed 5 ZEC until the sync finishes.
+    final catchingUp = ZecPoolHoldings.of(
+      SyncState(
+        hasBalanceData: true,
+        orchardBalance: BigInt.from(300000000),
+        orchardPendingBalance: BigInt.from(100000000),
+        saplingBalance: BigInt.from(100000000),
+        ironwoodBalance: BigInt.from(100000000),
+        displayOrchardBalance: BigInt.from(300000000),
+        displayOrchardPendingBalance: BigInt.zero,
+        displayIronwoodBalance: BigInt.from(100000000),
+        displayIronwoodPendingBalance: BigInt.zero,
+        displayShieldedBalance: BigInt.from(500000000),
+      ),
+    );
+
+    expect(catchingUp.shielded.total, BigInt.from(500000000));
+    expect(catchingUp.orchard, (
+      total: BigInt.from(300000000),
+      pending: BigInt.zero,
+    ));
+    expect(catchingUp.sapling, (
+      total: BigInt.from(100000000),
+      pending: BigInt.zero,
+    ));
+  });
+
+  test("Sapling's pending part comes from the snapshot its total does", () {
+    // A launch on the saved snapshot, before the first live read: 1 ZEC of
+    // Sapling, a quarter of it pending.
+    final launch = ZecPoolHoldings.of(
+      SyncState(
+        hasCachedBalance: true,
+        displayShieldedBalance: BigInt.from(100000000),
+        displaySaplingPendingBalance: BigInt.from(25000000),
+      ),
+    );
+    expect(launch.sapling, (
+      total: BigInt.from(100000000),
+      pending: BigInt.from(25000000),
+    ));
+    expect(launch.shielded.pending, BigInt.from(25000000));
+
+    // A catch-up sync's live reads leave the held row as it was.
+    final catchingUp = ZecPoolHoldings.of(
+      SyncState(
+        hasBalanceData: true,
+        saplingBalance: BigInt.from(100000000),
+        saplingPendingBalance: BigInt.from(50000000),
+        displayShieldedBalance: BigInt.from(100000000),
+        displaySaplingPendingBalance: BigInt.from(25000000),
+      ),
+    );
+    expect(catchingUp.sapling.pending, BigInt.from(25000000));
+  });
+
   testWidgets('privacy mode masks the total', (tester) async {
     await pump(
       tester,

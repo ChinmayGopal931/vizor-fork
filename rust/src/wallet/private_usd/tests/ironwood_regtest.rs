@@ -339,7 +339,7 @@ fn joint_account_round_trip(deposit_before_activation: bool) {
         "the sweep came home"
     );
 
-    joint::delete_joint_account(&joint_db, NETWORK, &joint_uuid).expect("forget the account");
+    joint::forget_joint_account(&joint_db, NETWORK, &joint_uuid).expect("forget the account");
     let accounts: i64 = rusqlite::Connection::open(&joint_db)
         .expect("joint db")
         .query_row("SELECT COUNT(*) FROM accounts", [], |row| row.get(0))

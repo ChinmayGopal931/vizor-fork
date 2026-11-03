@@ -24,19 +24,18 @@ import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
+import '../../support/widget_test_viewport.dart';
+import '../../support/app_test_fonts.dart';
 import '../../fakes/fake_zec_market_data_cache.dart';
 import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
 
 import 'package:zcash_wallet/src/features/ledger/services/ledger_signing_service.dart';
 import 'package:zcash_wallet/src/features/payment_links/services/payment_link_ledger_funding_service.dart';
 import 'package:zcash_wallet/src/features/payment_links/widgets/payment_link_ledger_signing_overlay.dart';
-import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 import '../../support/ledger_gift_card_support.dart';
 
 void main() {
-  setUpAll(() async {
-    await loadGothamFonts();
-  });
+  setUpAll(loadAppTestFonts);
 
   testWidgets(
     'Ledger Gift Card uses device approval instead of Keystone QR on mobile',
@@ -254,9 +253,7 @@ Future<void> _pumpMobilePaymentLinks(
   LedgerGiftHarness? ledger,
   LedgerPcztSigner? signer,
 }) async {
-  tester.view.devicePixelRatio = 1;
-  tester.view.physicalSize = const Size(393, 852);
-  addTearDown(tester.view.reset);
+  await setWidgetTestViewport(tester, const Size(393, 852));
 
   await tester.pumpWidget(
     ProviderScope(
@@ -452,6 +449,7 @@ class _FakePaymentLinkOperations implements PaymentLinkOperations {
     required BigInt amountZatoshi,
     required String sourceAccountUuid,
     PaymentLinkPresentation? presentation,
+    PaymentLinkFundingQuote? expectedQuote,
   }) async {
     createdAmounts.add(amountZatoshi);
     throw StateError('Keystone payment links require the hardware flow.');
@@ -462,6 +460,13 @@ class _FakePaymentLinkOperations implements PaymentLinkOperations {
     required String address,
     required String fundingTxids,
   }) async {}
+
+  @override
+  Future<List<PaymentLinkRecoveryRecord>> recoverCreatedLinks() =>
+      loadCreatedLinkRecoveries();
+
+  @override
+  Future<List<PaymentLinkRecoveryRecord>> loadCreatedLinks() async => const [];
 
   @override
   Future<List<PaymentLinkRecoveryRecord>> loadCreatedLinkRecoveries() async =>
@@ -550,6 +555,7 @@ class _FakePaymentLinkHardwareSigningService
     required BigInt amountZatoshi,
     required String sourceAccountUuid,
     PaymentLinkPresentation? presentation,
+    PaymentLinkFundingQuote? expectedQuote,
   }) async {
     createdAmounts.add(amountZatoshi);
     createdFromAccounts.add(sourceAccountUuid);

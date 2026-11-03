@@ -59,16 +59,33 @@ class _DirectRequestOperation<T> {
   final Future<void> drained;
 }
 
+/// One request of a redirect chain.
+class _RedirectHop {
+  const _RedirectHop({
+    required this.method,
+    required this.uri,
+    required this.headers,
+    required this.bodyBytes,
+  });
+
+  final String method;
+  final Uri uri;
+  final Map<String, String> headers;
+  final List<int> bodyBytes;
+}
+
 /// Tor transport boundary used after the process-wide route selects Tor.
 ///
 /// Implementations must apply each timeout to the underlying transport
-/// operation, not only to the Future returned to Dart.
+/// operation, not only to the Future returned to Dart. A supplied `maxBodyBytes`
+/// must stop reception before buffering more than the requested body budget.
 abstract interface class TorHttpBridge {
   Future<NetworkHttpResponse> get(
     Uri uri, {
     required Map<String, String> headers,
     required Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
   });
 
   Future<NetworkHttpResponse> post(
@@ -77,6 +94,7 @@ abstract interface class TorHttpBridge {
     required List<int> bodyBytes,
     required Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
   });
 
   Future<NetworkHttpResponse> download(
@@ -97,6 +115,7 @@ class RustTorHttpBridge implements TorHttpBridge {
     required Map<String, String> headers,
     required Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
   }) {
     return _request(
       timeout,
@@ -106,6 +125,7 @@ class RustTorHttpBridge implements TorHttpBridge {
         headers: _rustHeaders(headers),
         timeoutMilliseconds: _timeoutMilliseconds(timeout),
         requestId: requestId,
+        maxBodyBytes: maxBodyBytes == null ? null : BigInt.from(maxBodyBytes),
       ),
     );
   }
@@ -117,6 +137,7 @@ class RustTorHttpBridge implements TorHttpBridge {
     required List<int> bodyBytes,
     required Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
   }) {
     return _request(
       timeout,
@@ -127,6 +148,7 @@ class RustTorHttpBridge implements TorHttpBridge {
         body: bodyBytes,
         timeoutMilliseconds: _timeoutMilliseconds(timeout),
         requestId: requestId,
+        maxBodyBytes: maxBodyBytes == null ? null : BigInt.from(maxBodyBytes),
       ),
     );
   }
@@ -271,6 +293,13 @@ class NetworkHttpClient {
     _directRequestsBlocked = false;
   }
 
+  /// Sends one request on the process's selected route.
+  ///
+  /// Up to [maxRedirects] redirects are followed (HTTPS never downgrades),
+  /// by one rule on both routes: a POST goes on only after a 303, as a GET,
+  /// or after a 307 or 308 within its origin, and any other redirect of a
+  /// POST comes back as its answer. With `0`, a redirect response is
+  /// returned as is, for callers whose policy refuses redirects.
   Future<NetworkHttpResponse> request(
     String method,
     Uri uri, {
@@ -278,8 +307,17 @@ class NetworkHttpClient {
     List<int> bodyBytes = const [],
     Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
+    int maxRedirects = _defaultMaxRedirects,
   }) {
     _requirePositiveTimeout(timeout);
+    if (maxBodyBytes != null && maxBodyBytes < 0) {
+      throw ArgumentError.value(
+        maxBodyBytes,
+        'maxBodyBytes',
+        'must be nonnegative',
+      );
+    }
     final normalizedMethod = method.toUpperCase();
     return _torDesired()
         ? _requestViaTorWithTimeoutRetry(
@@ -289,16 +327,18 @@ class NetworkHttpClient {
             bodyBytes: bodyBytes,
             timeout: timeout,
             cancelSignal: cancelSignal,
+            maxBodyBytes: maxBodyBytes,
+            maxRedirects: maxRedirects,
           )
-        : _runDirectRequest(
-            () => _requestDirect(
-              normalizedMethod,
-              uri,
-              headers: headers,
-              bodyBytes: bodyBytes,
-              timeout: timeout,
-              cancelSignal: cancelSignal,
-            ),
+        : _requestDirectWithRedirects(
+            normalizedMethod,
+            uri,
+            headers: headers,
+            bodyBytes: bodyBytes,
+            timeout: timeout,
+            cancelSignal: cancelSignal,
+            maxBodyBytes: maxBodyBytes,
+            maxRedirects: maxRedirects,
           );
   }
 
@@ -309,6 +349,8 @@ class NetworkHttpClient {
     required List<int> bodyBytes,
     required Duration? timeout,
     required Future<void>? cancelSignal,
+    int? maxBodyBytes,
+    required int maxRedirects,
   }) async {
     try {
       return await _requestViaTorWithRedirects(
@@ -318,6 +360,8 @@ class NetworkHttpClient {
         bodyBytes: bodyBytes,
         timeout: timeout,
         cancelSignal: cancelSignal,
+        maxBodyBytes: maxBodyBytes,
+        maxRedirects: maxRedirects,
       );
     } on TimeoutException {
       if (method != 'GET') rethrow;
@@ -330,6 +374,8 @@ class NetworkHttpClient {
         bodyBytes: bodyBytes,
         timeout: timeout,
         cancelSignal: cancelSignal,
+        maxBodyBytes: maxBodyBytes,
+        maxRedirects: maxRedirects,
       );
     }
   }
@@ -416,15 +462,19 @@ class NetworkHttpClient {
     String? destinationPath,
     required Duration? timeout,
     required Future<void>? cancelSignal,
+    int? maxBodyBytes,
+    int maxRedirects = _defaultMaxRedirects,
   }) async {
     if (method != 'GET' && method != 'POST') {
       throw TorUnsupportedHttpMethodException(method);
     }
 
-    var currentMethod = method;
-    var currentUri = initialUri;
-    var currentHeaders = Map<String, String>.of(headers);
-    var currentBody = bodyBytes;
+    var hop = _RedirectHop(
+      method: method,
+      uri: initialUri,
+      headers: Map<String, String>.of(headers),
+      bodyBytes: bodyBytes,
+    );
     // Every hop is charged to the redirect budget, except a first hop that
     // is about to park inside Rust waiting for a Tor bootstrap: that wait is
     // outside the per-request timeout too, and billing it would leave a
@@ -432,54 +482,90 @@ class NetworkHttpClient {
     // then starts at the first response.
     final stopwatch = Stopwatch();
     if (!_torBootstrapping()) stopwatch.start();
-    for (var redirectCount = 0; redirectCount <= 5; redirectCount++) {
+    for (
+      var redirectCount = 0;
+      redirectCount <= maxRedirects;
+      redirectCount++
+    ) {
       final remainingTimeout = _remainingTimeout(timeout, stopwatch);
       final response = destinationPath != null
           ? await _torBridge.download(
-              currentUri,
-              headers: currentHeaders,
+              hop.uri,
+              headers: hop.headers,
               destinationPath: destinationPath,
             )
-          : currentMethod == 'GET'
+          : hop.method == 'GET'
           ? await _torBridge.get(
-              currentUri,
-              headers: currentHeaders,
+              hop.uri,
+              headers: hop.headers,
               timeout: remainingTimeout,
               cancelSignal: cancelSignal,
+              maxBodyBytes: maxBodyBytes,
             )
           : await _torBridge.post(
-              currentUri,
-              headers: currentHeaders,
-              bodyBytes: currentBody,
+              hop.uri,
+              headers: hop.headers,
+              bodyBytes: hop.bodyBytes,
               timeout: remainingTimeout,
               cancelSignal: cancelSignal,
+              maxBodyBytes: maxBodyBytes,
             );
       if (!stopwatch.isRunning) stopwatch.start();
-      final location = response.header(HttpHeaders.locationHeader);
-      if (!_isRedirect(response.statusCode) || location == null) {
-        return response;
-      }
-      if (redirectCount == 5) {
-        throw const HttpException('Too many HTTP redirects');
-      }
-      final nextUri = currentUri.resolve(location);
-      if (currentUri.scheme == 'https' && nextUri.scheme != 'https') {
-        throw HttpException(
-          'Refusing HTTPS redirect to ${nextUri.scheme}',
-          uri: nextUri,
-        );
-      }
-      currentHeaders = _headersForRedirect(currentUri, nextUri, currentHeaders);
-      if (currentMethod == 'POST' &&
-          (response.statusCode == HttpStatus.movedPermanently ||
-              response.statusCode == HttpStatus.found ||
-              response.statusCode == HttpStatus.seeOther)) {
-        currentMethod = 'GET';
-        currentBody = const [];
-      }
-      currentUri = nextUri;
+      final next = _redirectFrom(
+        response,
+        hop,
+        redirectCount: redirectCount,
+        maxRedirects: maxRedirects,
+      );
+      if (next == null) return response;
+      hop = next;
     }
     throw const HttpException('Too many HTTP redirects');
+  }
+
+  /// The direct route's redirects, followed here rather than by `dart:io`,
+  /// which would follow one from HTTPS to plain HTTP, by the rules both
+  /// routes follow ([_redirectFrom]). Each hop is a direct request of its
+  /// own, so a route change between hops stops the chain.
+  Future<NetworkHttpResponse> _requestDirectWithRedirects(
+    String method,
+    Uri uri, {
+    required Map<String, String> headers,
+    required List<int> bodyBytes,
+    required Duration? timeout,
+    required Future<void>? cancelSignal,
+    int? maxBodyBytes,
+    required int maxRedirects,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    var hop = _RedirectHop(
+      method: method,
+      uri: uri,
+      headers: headers,
+      bodyBytes: bodyBytes,
+    );
+    for (var redirectCount = 0; ; redirectCount++) {
+      final current = hop;
+      final response = await _runDirectRequest(
+        () => _requestDirect(
+          current.method,
+          current.uri,
+          headers: current.headers,
+          bodyBytes: current.bodyBytes,
+          timeout: _remainingTimeout(timeout, stopwatch),
+          cancelSignal: cancelSignal,
+          maxBodyBytes: maxBodyBytes,
+        ),
+      );
+      final next = _redirectFrom(
+        response,
+        current,
+        redirectCount: redirectCount,
+        maxRedirects: maxRedirects,
+      );
+      if (next == null) return response;
+      hop = next;
+    }
   }
 
   _DirectRequestOperation<NetworkHttpResponse> _requestDirect(
@@ -489,6 +575,7 @@ class NetworkHttpClient {
     required List<int> bodyBytes,
     required Duration? timeout,
     required Future<void>? cancelSignal,
+    int? maxBodyBytes,
   }) {
     HttpClientRequest? activeRequest;
     StreamSubscription<List<int>>? responseSubscription;
@@ -512,7 +599,8 @@ class NetworkHttpClient {
 
     final request = () async {
       try {
-        final request = await _directClient.openUrl(method, uri);
+        final request = await _directClient.openUrl(method, uri)
+          ..followRedirects = false;
         activeRequest = request;
         final pendingError = terminationError;
         if (pendingError != null) {
@@ -526,7 +614,19 @@ class NetworkHttpClient {
         final body = responseBody = Completer<Uint8List>();
         final bytes = BytesBuilder();
         responseSubscription = response.listen(
-          bytes.add,
+          (chunk) {
+            if (body.isCompleted) return;
+            if (maxBodyBytes != null &&
+                bytes.length + chunk.length > maxBodyBytes) {
+              final error = const HttpException(
+                'HTTP response exceeds byte limit',
+              );
+              body.completeError(error);
+              unawaited(abort(error));
+              return;
+            }
+            bytes.add(chunk);
+          },
           onError: (Object error, StackTrace stackTrace) {
             if (!body.isCompleted) body.completeError(error, stackTrace);
           },
@@ -586,20 +686,49 @@ class NetworkHttpClient {
     File destination, {
     required Map<String, String> headers,
   }) async {
-    final request = await _directClient.getUrl(uri);
-    headers.forEach(request.headers.set);
-    final response = await request.close();
-    await response.pipe(destination.openWrite());
-    final responseHeaders = <String, List<String>>{};
-    response.headers.forEach((name, values) {
-      responseHeaders[name.toLowerCase()] = List.unmodifiable(values);
-    });
-    return NetworkHttpResponse(
-      statusCode: response.statusCode,
-      bodyBytes: Uint8List(0),
-      headers: Map.unmodifiable(responseHeaders),
+    var hop = _RedirectHop(
+      method: 'GET',
+      uri: uri,
+      headers: headers,
+      bodyBytes: const [],
     );
+    for (var redirectCount = 0; ; redirectCount++) {
+      final request = await _directClient.getUrl(hop.uri)
+        ..followRedirects = false;
+      hop.headers.forEach(request.headers.set);
+      final response = await request.close();
+      final responseHeaders = <String, List<String>>{};
+      response.headers.forEach((name, values) {
+        responseHeaders[name.toLowerCase()] = List.unmodifiable(values);
+      });
+      final answer = NetworkHttpResponse(
+        statusCode: response.statusCode,
+        bodyBytes: Uint8List(0),
+        headers: Map.unmodifiable(responseHeaders),
+      );
+      final _RedirectHop? next;
+      try {
+        next = _redirectFrom(
+          answer,
+          hop,
+          redirectCount: redirectCount,
+          maxRedirects: _defaultMaxRedirects,
+        );
+      } catch (_) {
+        // A refused redirect still releases its connection.
+        await response.drain<void>();
+        rethrow;
+      }
+      if (next == null) {
+        await response.pipe(destination.openWrite());
+        return answer;
+      }
+      await response.drain<void>();
+      hop = next;
+    }
   }
+
+  static const _defaultMaxRedirects = 5;
 
   static Duration? _remainingTimeout(Duration? timeout, Stopwatch stopwatch) {
     if (timeout == null) return null;
@@ -616,6 +745,73 @@ class NetworkHttpClient {
 
   static TimeoutException _timeoutException(Duration timeout) =>
       TimeoutException('Network HTTP request timed out', timeout);
+
+  /// The hop [response] redirects [hop] to, or null when it is the answer.
+  /// Both routes follow the same rules ([_follows]): HTTPS never downgrades,
+  /// credentials stay with their origin, and a POST answered 303 goes on as a
+  /// GET without its body or the headers that described it.
+  static _RedirectHop? _redirectFrom(
+    NetworkHttpResponse response,
+    _RedirectHop hop, {
+    required int redirectCount,
+    required int maxRedirects,
+  }) {
+    final location = response.header(HttpHeaders.locationHeader);
+    if (!_isRedirect(response.statusCode) ||
+        location == null ||
+        maxRedirects == 0) {
+      return null;
+    }
+    final nextUri = hop.uri.resolve(location);
+    if (!_follows(hop.method, response.statusCode, hop.uri, nextUri)) {
+      return null;
+    }
+    if (redirectCount == maxRedirects) {
+      throw const HttpException('Too many HTTP redirects');
+    }
+    if (hop.uri.scheme == 'https' && nextUri.scheme != 'https') {
+      throw HttpException(
+        'Refusing HTTPS redirect to ${nextUri.scheme}',
+        uri: nextUri,
+      );
+    }
+    final asGet =
+        hop.method == 'POST' && response.statusCode == HttpStatus.seeOther;
+    final headers = _headersForRedirect(hop.uri, nextUri, hop.headers);
+    return _RedirectHop(
+      method: asGet ? 'GET' : hop.method,
+      uri: nextUri,
+      headers: asGet
+          ? {
+              for (final entry in headers.entries)
+                if (!_bodyHeaders.contains(entry.key.toLowerCase()))
+                  entry.key: entry.value,
+            }
+          : headers,
+      bodyBytes: asGet ? const [] : hop.bodyBytes,
+    );
+  }
+
+  /// Which requests follow a redirect: GET and HEAD any; a POST a 303, as a
+  /// GET, and a 307 or 308 with its body only within its origin. Every other
+  /// answer goes back to the caller, so a body never reaches another origin
+  /// and a POST never turns into a GET whose answer reads as its own.
+  static bool _follows(String method, int statusCode, Uri from, Uri to) =>
+      switch (method) {
+        'GET' || 'HEAD' => true,
+        'POST' =>
+          statusCode == HttpStatus.seeOther ||
+              ((statusCode == HttpStatus.temporaryRedirect ||
+                      statusCode == HttpStatus.permanentRedirect) &&
+                  _sameOrigin(from, to)),
+        _ => false,
+      };
+
+  static const _bodyHeaders = {
+    HttpHeaders.contentTypeHeader,
+    HttpHeaders.contentLengthHeader,
+    HttpHeaders.contentEncodingHeader,
+  };
 
   static Map<String, String> _headersForRedirect(
     Uri from,

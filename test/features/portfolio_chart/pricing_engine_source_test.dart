@@ -657,6 +657,7 @@ class _FakePricingServer implements TorHttpBridge {
     required Map<String, String> headers,
     required Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
   }) async {
     requests.add(uri);
     this.headers.add(Map.of(headers));
@@ -732,6 +733,7 @@ class _FakePricingServer implements TorHttpBridge {
     required List<int> bodyBytes,
     required Duration? timeout,
     Future<void>? cancelSignal,
+    int? maxBodyBytes,
   }) => throw UnimplementedError('the pricing engine is only read');
 
   @override

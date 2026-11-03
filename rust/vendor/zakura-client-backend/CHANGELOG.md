@@ -7,6 +7,157 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+## [0.1.0-rc9.4] - 2026-10-23
+
+### Changed
+
+- The receiver record and witness payload codec re-exported by `one_time_ivk::restore` comes from `zakura-pir-protocol`'s `receiver::wire`, which replaces `zakura-receiver-crypto`. The `orchard` feature enables `zakura-pir-protocol/receiver`.
+- Replace the one-time-key restore traits and broad block/transaction scanning APIs with bounded PIR queue records and cancellation tokens. Ordinary sync uses account keys. Private payment recovery retains targeted note authentication, identity and spending support.
+- `sync::SyncWallet` is now `WalletWrite` in every build, implemented for every `WalletWrite` store. With `orchard` it no longer requires one-time IVK storage, which ordinary sync no longer uses.
+- `one_time_ivk::restore::RecoveryPublication` identifies a captured shard inventory. `LookupWork` carries the first unchecked height and a `LookupCursor` (inventory, shard, segment, last page), and `LookupPage` reports the segment read, the height checked through and the next cursor.
+- `one_time_ivk::restore::RecoveryStatus::upgrade_required` reports that the receiver service needs a newer client; no work is exposed until recovery begins again with a supported publication.
+- `one_time_ivk::restore::WitnessRequest` names the payment session, its companion witness session and the witness ordinal a candidate was read under, and `WitnessAnswer` carries one companion witness payload with its revision and construction tree. The common witness file is gone.
+- Use PIR protocol `0.0.1-rc3` and one-time IVK `0.0.1-rc4`.
+
+### Removed
+
+- `data_api::one_time_ivk::{OneTimeIvkRead, OneTimeIvkWrite}`, `data_api::one_time_ivk::restore::{OneTimeIvkRestoreRead, OneTimeIvkRestoreWrite, DirectoryPayment, DiscoveryStatus, EnumerationCursor, FilterCheck}`, `data_api::chain::scan_cached_blocks_with_one_time_ivks`, `data_api::wallet::decrypt_and_store_transaction_with_one_time_ivks`, `decrypt::decrypt_transaction_with_one_time_ivks`, `data_api::DecryptedTransaction::one_time_ivks_applied`, `decrypt::DecryptedOutput::one_time_key_id`, `scanning::ScanningKeyOps::one_time_key_id`, the `scanning::one_time_ivk` module, and the `TestState` helpers that scanned with one-time keys.
+
+## [0.1.0-rc9.3] - 2026-10-20
+
+### Changed
+
+- Use the stable Common `4.0.0` dependency family, with compatible requirements
+  for downstream consumers.
+- Use PIR protocol `0.0.1-rc2`, one-time IVK `0.0.1-rc3` and PCZT `0.1.0-rc9`.
+
+## [0.1.0-rc9.2] - 2026-10-20
+
+### Fixed
+
+- `data_api::ll::wallet::update_tree` (and so `put_blocks`) keeps a tree it
+  inserts no note commitments into to `max_checkpoints` unretained checkpoints.
+  Only inserting a subtree pruned, so such a tree kept every checkpoint added
+  for it: an empty tree one at each frontier height, with or without the
+  `orchard` feature, and Ironwood's tree before its activation one at every
+  height another pool checkpointed. Only checkpoints of an empty tree state are
+  removed this way.
+
+### Added
+
+- `data_api::wallet::validate_transaction_for_target` checks whether a finished transaction
+  may be sent at a candidate height: it must commit to the branch active there, use a version
+  valid in that branch, not have a nonzero expiry below the height, and fit the padded NU7
+  shielded budgets. `validate_pczt_for_target` (with `pczt`) applies the same rules to a PCZT
+  before its proofs and signatures are finalized. Neither checks network freshness, proofs,
+  signatures, input availability or other consensus rules. A refusal is a typed
+  `data_api::error::AcceptanceError`, wrapped by the new `Error::Acceptance`.
+
+- `Proposal::validate_for_current_target` refuses saved proposals from a different
+  consensus branch, and `Proposal::validate_shielded_budget` checks padded NU7
+  per-pool and combined limits before inputs are locked. Refusals use the new
+  `ProposalError::ObsoleteConsensusBranch` and `ProposalError::ShieldedBudget`.
+
+- `data_api::ll::wallet::stored_root_mismatches`, the number of shards whose
+  computed root differed from the stored one since the process started.
+
+- `data_api::chain::decrypt_cached_blocks` starts trial decryption of a range of cached
+  blocks and returns a `BlockDecryption` while the work still runs on the current rayon
+  pool; `data_api::chain::scan_decrypted_blocks` then scans and stores the range as
+  `scan_cached_blocks` does. A caller can decrypt the next range while it stores the
+  previous one. The decryption is used only if it covers the same range, blocks, viewing
+  keys and ZIP 212 enforcement, and the range is decrypted again otherwise.
+  `testing::TestState::decrypt_cached_blocks` and `scan_decrypted_blocks` call them.
+
+### Changed
+
+- Update public cryptography and protocol types to the compatible Common
+  `4.0.0-rc3` dependency family.
+- `create_proposed_transactions` and `create_pczt_from_proposal` refuse a saved proposal with
+  `Error::Acceptance` before building when the transaction's expiry (the override, the
+  canonical crossing expiry, or the default from the proposal's target height) is nonzero and
+  below the current candidate height. The proposal's target and a canonical expiry are not
+  moved; rebuild the proposal instead. `extract_and_store_transaction_from_pczt` applies
+  `validate_pczt_for_target` at the current candidate height before finalizing.
+- `data_api::ll::wallet::put_blocks` inserts a range's note commitments without
+  block checkpoints when every pool's tree would prune those checkpoints in the
+  same call: the tree already holds `max_checkpoints` newer checkpoints that are
+  not retained, and none of the range's heights is retained. This is the case
+  for history scanned after the chain tip. The trees end in the same state, and
+  the update no longer adds and then prunes a checkpoint for every block.
+- Without those checkpoints, `put_blocks` also leaves out of the tree update
+  each shard that lies wholly inside the range, holds no wallet note, and is
+  already stored as its root alone, as `put_*_subtree_roots` stores a completed
+  shard. Inserting such a shard would collapse it back to that root, so the
+  trees end in the same state without hashing its note commitments. Inserting
+  a shard never checked the computed root against the stored one, so this
+  trusts the stored root no more than before.
+  Tree updates with no subtrees still prune obsolete checkpoints, including
+  pools receiving no commitments and batches whose shards are all left out,
+  preserving rewind behavior. Explicitly retained checkpoints remain pinned.
+- `put_blocks` now checks stored roots where it builds a shard that has one: a
+  random sample of about one in 16 of the shards it could leave out, and every
+  shard holding a wallet note. A mismatch is logged and counted, without failing
+  the scan or replacing the stored root, and stops shards being left out for
+  the rest of the process.
+
+## [0.1.0-rc9.1] - 2026-10-19
+
+### Added
+
+- One-time IVK discovery (with `orchard`): `data_api::one_time_ivk::restore` replaces restore
+  sweeps with discovery. `one_time_discovery` reports the work due, `one_time_receivers`
+  derives an account's receivers without registering them, and
+  `record_one_time_filter_checks`, `record_one_time_lookup`, `defer_one_time_lookup` and
+  `record_one_time_witness` record it. Payments ahead of the scan become scan hints.
+  `OneTimeIvkRead::get_one_time_scanning_keys_for_range` gives one batch's keys, hints
+  included, and `chain::scan_cached_blocks_with_one_time_ivks` uses it.
+- `WalletTx::ironwood_nullifiers` (with `orchard`) gives every Ironwood nullifier a
+  transaction a block scan recognized reveals, matched to a wallet note or not.
+  `ScannedBlock::scanned_accounts` names the accounts whose ordinary internal keys scanned
+  the block. A store uses them to journal spends.
+- `fees::orchard::InputView::is_one_time` (with `orchard`) marks a one-time-key input. It
+  defaults to false. `data_api::error::Error::OneTimeSpendWithoutMarker` reports a one-time
+  spend that lacks its marker output.
+
+### Changed
+
+- Every transaction that spends a one-time-key note now includes an Ironwood output to the
+  spending account's internal address, zero-valued when there is no other change. A restore
+  can then recognize the spend with the account's ordinary keys. The change strategies and
+  `propose_send_max_transfer` add this output, and `create_proposed_transactions`,
+  `create_pczt_from_proposal` and `extract_and_store_transaction_from_pczt` reject a
+  transaction without it. A PCZT that spends a one-time-key note says so under the
+  proprietary global key `zcash_client_backend:spends_one_time`, which the signer views
+  redact. Other PCZTs are encoded as before.
+- Common dependencies use the published `4.0.0-rc2` family,
+  with the Halo 2 backend selected explicitly for transaction proving.
+- ZIP 318 anchor retention, canonical crossing fees, and rolling expiry now follow
+  the network's NU7 block spacing. `AnchorRetention::new` and `union`, and
+  `PoolMigrationParams::new`, require a `BlockSpacing` argument; the implicit
+  conversion from `AnchorRetentionInterval` is removed.
+
+### Removed
+
+- One-time IVK restore sweeps and nullifier retention: `MAX_PUBLICATION_LAG`, `SweepDeferral`,
+  `PaymentApplication`, and the `OneTimeIvkRestoreRead` and `OneTimeIvkRestoreWrite` methods
+  `directory_publication_anchor`, `one_time_history_pending`, `one_time_keys_to_recheck`,
+  `maintain_one_time_ivks`, `prepare_one_time_sweeps`, `begin_one_time_sweep_attempt`,
+  `queue_directory_lookup`, `apply_one_time_sweep`, `record_paid_filter_check` and
+  `finish_one_time_nullifier_recovery`.
+- `ll::wallet::put_blocks_with_nullifier_retention` and
+  `put_blocks_rows_with_nullifier_retention`: Ironwood nullifiers are tracked like the other
+  pools' again.
+- `EnhancePirWork::Waiting`: newly queued private payload work is eligible through
+  the ordinary recovery schedule without a randomized first-query delay.
+  Consumers must remove waiting-state handling.
+
+### Fixed
+
+- Extract partially signed transactions created by older wallet releases without
+  changing their saved proposal metadata. One-time-key spends use a separate
+  marker, which is removed from the views sent to signers.
+
 ## [0.1.0-rc9] - 2026-10-14
 
 ### Added

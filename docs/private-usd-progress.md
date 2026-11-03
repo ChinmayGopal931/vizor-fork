@@ -179,6 +179,26 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   `railgun-sepolia-list`, which repairs the chain and logs nothing. Checked
   live against the screening node; not yet seen on a phone.
 
+- **Zakura Common v4 and NU7 (2026-11-01, branch `sync/upstream-2026-11`).**
+  Upstream `main` at `a546cd3ec` merged: the Common 4.0.0 crates, which carry
+  mainnet NU7 at 3,543,405 (v3 had none, so every mainnet transaction after
+  activation would commit to the old branch). Both stand-ins moved: E1 to
+  `~/dev/zapp/zecSwap-zakura-v4-windows` (pins only), E4 to rc9.4 with the
+  pinned wallet-libraries sources. Deposits and joint sweeps take upstream's
+  NU7 expiry cap and hold. The mainnet maker's `zcash_protocol`
+  0.11.0-pre.0 has no mainnet NU7 either; 0.11.0 does. Not yet run on a
+  phone.
+  - **Review fixes on the same branch.** A ZEC → USD bridge stops at
+    "Bridge" while the upgrade holds transactions, before the maker opens a
+    swap, and keeps its quote. The joint sweep's fee estimate, cap and floor
+    follow the marginal fee at the joint account's target (1,000 zatoshis
+    from NU7), and so do the app's stand-ins for a fee not yet known (the
+    reverse estimate's floor, the quote search's least fee:
+    `privateUsdLeastFeeZatProvider`, from Rust's fee policy). The deposit's
+    confirmations estimate takes the chain's block time. Deleting a joint
+    account migrates `joint.db` first: the newer schema's delete clears a
+    table an older one lacks. Equal receipts in one Ethereum transaction keep
+    rows of their own.
 - **Zakura Common v3 (2026-10-20, D-136).** The branch builds on upstream
   `main` at `75d3fae57` and the published Common 3.0.0 crates. Both
   stand-ins moved (B-6). Not yet run on the A35.

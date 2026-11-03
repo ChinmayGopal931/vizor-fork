@@ -13,6 +13,7 @@ import 'src/core/feedback/app_review.dart';
 import 'src/core/feedback/app_review_host.dart';
 import 'src/core/input/app_password_input_source.dart';
 import 'src/app_bootstrap.dart';
+import 'src/providers/wallet_pir_server_provider.dart';
 import 'src/providers/account_provider.dart';
 import 'src/core/lifecycle/signing_shutdown_host.dart';
 import 'src/core/lifecycle/app_shutdown_signal.dart';
@@ -150,6 +151,7 @@ import 'src/features/voting/screens/voting_status_screen.dart';
 import 'src/features/voting/screens/voting_submission_confirmation_screen.dart';
 import 'src/providers/theme_mode_provider.dart';
 import 'src/providers/app_security_provider.dart';
+import 'src/providers/sync_keep_awake_provider.dart';
 import 'src/providers/enhance_pir_provider.dart';
 import 'src/core/storage/enhance_pir_preference_store.dart';
 import 'src/providers/linux_update_provider.dart';
@@ -162,6 +164,7 @@ import 'src/providers/payment_uri_prefill_provider.dart';
 import 'src/providers/voting/voting_share_tracking_restorer_provider.dart';
 import 'src/providers/wallet_provider.dart';
 import 'src/providers/windows_update_provider.dart';
+import 'src/core/logging/log_redaction.dart';
 import 'src/core/storage/secure_storage_diagnostics.dart';
 import 'src/core/storage/wallet_paths.dart';
 import 'src/core/widgets/linux_keyring_gate.dart';
@@ -174,7 +177,9 @@ import 'src/rust/api/simple.dart' as rust_simple;
 import 'src/services/incoming_uri_service.dart';
 import 'src/providers/payment_request_flow_provider.dart';
 
-void log(String message) => debugPrint('[zcash] $message');
+/// Prints an app log line. Identifier-shaped values are masked in every build
+/// mode; see [redactLogText] for what that does and does not catch.
+void log(String message) => printRedactedLog('[zcash] $message');
 
 StreamSubscription<rust_voting.ApiVotingObservability>?
 _votingObservabilitySubscription;
@@ -237,6 +242,11 @@ Future<void> initializeZcashWalletRuntime() async {
     await rust_simple.configureRegtestIronwoodActivationHeight(
       height: kZcashRegtestIronwoodActivationHeight,
     );
+    if (kZcashRegtestNu7ActivationHeight != 0xFFFFFFFF) {
+      await rust_simple.configureRegtestNu7ActivationHeight(
+        height: kZcashRegtestNu7ActivationHeight,
+      );
+    }
   }
 
   // Order matters: window_manager creates and shows the NSWindow inside
@@ -528,6 +538,7 @@ class _BootstrappedZcashWalletAppState
 }
 
 Future<void> runZcashWalletApp() async {
+  installLogRedaction();
   log('runtime: starting');
   await initializeZcashWalletRuntime();
   final Widget app = Platform.isLinux
@@ -592,6 +603,9 @@ final _routerProvider = Provider<_AppRouter>((ref) {
     // to reach the card here or it would navigate — and on the second press
     // exit the app — underneath a modal the user is still looking at.
     handleBackAboveRouter: () {
+      if (ref.read(syncKeepAwakePrivacyLockBackProvider).handleBack()) {
+        return true;
+      }
       if (ref.read(paymentRequestFlowProvider) == null) return false;
       ref.read(paymentRequestFlowProvider.notifier).dismiss();
       return true;
@@ -1877,6 +1891,7 @@ class ZcashWalletApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(votingShareTrackingRestorerProvider);
     ref.watch(paymentLinkClaimCoordinatorProvider);
+    ref.watch(walletPirServerActivatorProvider);
     final appRouter = ref.watch(_routerProvider);
     final router = appRouter.router;
     final themeMode = ref.watch(themeModeProvider);

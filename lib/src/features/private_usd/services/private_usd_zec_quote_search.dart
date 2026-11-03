@@ -1,4 +1,5 @@
 import '../../../rust/api/private_usd.dart' as rust;
+import '../models/private_usd_fees.dart';
 
 /// An offer the wallet can pay now: the maker's quote for [requestedUnits],
 /// its deposit, and the network fee on it.
@@ -49,21 +50,25 @@ class PrivateUsdNoQuoteFitsException implements Exception {
 /// a one-dollar price probe and [maxQuotes] quotes. Amounts are integers
 /// throughout: zatoshi and USDC base units, never a `double`.
 class PrivateUsdZecQuoteSearch {
-  PrivateUsdZecQuoteSearch(this._quote, {int Function()? nowSeconds})
-    : _nowSeconds =
-          nowSeconds ?? (() => DateTime.now().millisecondsSinceEpoch ~/ 1000);
+  PrivateUsdZecQuoteSearch(
+    this._quote, {
+    int Function()? nowSeconds,
+    BigInt Function()? leastFeeZat,
+  }) : _nowSeconds =
+           nowSeconds ?? (() => DateTime.now().millisecondsSinceEpoch ~/ 1000),
+       _leastFeeZat = leastFeeZat ?? (() => kPrivateUsdPreNu7LeastFeeZat);
 
   final Future<rust.ApiForwardQuote> Function(int units) _quote;
   final int Function() _nowSeconds;
+
+  /// ZIP 317's least fee, assumed while a quote's own fee is not known.
+  final BigInt Function() _leastFeeZat;
   rust.ApiForwardQuote? _latest;
 
   /// Quoted for the maker's price while no quote holds: a dollar's deposit
   /// prices the next to the zatoshi.
   static const priceProbeUnits = 1000000;
   static const maxQuotes = 3;
-
-  /// The fee assumed while a quote's own fee is not known (ZIP 317's least).
-  static final zip317MinFeeZat = BigInt.from(10000);
 
   /// `units` crosses FRB as a `u32`; nothing larger can be quoted.
   static const maxUnits = 0xFFFFFFFF;
@@ -74,13 +79,14 @@ class PrivateUsdZecQuoteSearch {
     BigInt totalZat, {
     int? requestedUnits,
   }) async {
-    var units = requestedUnits ?? _unitsFor(totalZat, await _basis());
+    var units =
+        requestedUnits ?? _unitsFor(totalZat, await _basis(), _leastFeeZat());
     for (var attempt = 0; attempt < maxQuotes; attempt++) {
       final quote = await _quote(units);
       _latest = quote;
       final payable = _payable(quote, units);
       if (payable.totalZat <= totalZat) return payable;
-      units = _unitsFor(totalZat, quote, lessThan: units);
+      units = _unitsFor(totalZat, quote, _leastFeeZat(), lessThan: units);
     }
     throw const PrivateUsdNoQuoteFitsException();
   }
@@ -97,10 +103,11 @@ class PrivateUsdZecQuoteSearch {
   // the amount, at the same price.
   static int _unitsFor(
     BigInt totalZat,
-    rust.ApiForwardQuote basis, {
+    rust.ApiForwardQuote basis,
+    BigInt leastFeeZat, {
     int? lessThan,
   }) {
-    var depositZat = totalZat - (basis.depositFeeZat ?? zip317MinFeeZat);
+    var depositZat = totalZat - (basis.depositFeeZat ?? leastFeeZat);
     if (depositZat < BigInt.zero) depositZat = BigInt.zero;
     final amount = BigInt.parse(basis.amount);
     final cost = basis.networkCost == null

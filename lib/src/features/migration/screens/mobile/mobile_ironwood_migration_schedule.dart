@@ -185,12 +185,18 @@ class _MobileMigrationScheduleLoaderState
                     ? _MobilePreparationScheduleContent(
                         status: status,
                         currentHeight: currentHeight,
+                        blockTimes: ref
+                            .watch(blockSpacingProvider)
+                            .fromTip(currentHeight),
                         onReturn: returnToStatus,
                         onManage: onManage,
                       )
                     : _MobileMigrationScheduleContent(
                         status: status,
                         currentHeight: currentHeight,
+                        blockTimes: ref
+                            .watch(blockSpacingProvider)
+                            .fromTip(currentHeight),
                         onReturn: returnToStatus,
                         onManage: onManage,
                       ),
@@ -207,12 +213,14 @@ class _MobileMigrationScheduleContent extends StatelessWidget {
   const _MobileMigrationScheduleContent({
     required this.status,
     required this.currentHeight,
+    required this.blockTimes,
     required this.onReturn,
     this.onManage,
   });
 
   final rust_sync.MigrationStatus status;
   final int currentHeight;
+  final BlockTimeEstimate blockTimes;
   final VoidCallback onReturn;
   final VoidCallback? onManage;
 
@@ -244,6 +252,7 @@ class _MobileMigrationScheduleContent extends StatelessWidget {
         ? 'Calculating'
         : migrationHeightRemainingDurationLabel(
             estimatedCompletionHeight,
+            blockTimes: blockTimes,
             currentHeight: currentHeight,
           );
 
@@ -285,6 +294,7 @@ class _MobileMigrationScheduleContent extends StatelessWidget {
                         part: part,
                         total: total,
                         currentHeight: currentHeight,
+                        blockSpacing: blockTimes.spacing,
                         projectedHeight: projectedHeights[part.partIndex],
                         waitingWindowHeight: migrationPartWaitingWindowHeight(
                           status: status,
@@ -316,6 +326,7 @@ class _MobileMigrationPartScheduleRow extends StatelessWidget {
     required this.part,
     required this.total,
     required this.currentHeight,
+    required this.blockSpacing,
     this.projectedHeight,
     this.waitingWindowHeight,
     super.key,
@@ -325,6 +336,7 @@ class _MobileMigrationPartScheduleRow extends StatelessWidget {
   final rust_sync.MigrationPartStatus part;
   final BigInt total;
   final int currentHeight;
+  final BlockSpacing blockSpacing;
 
   /// Derived expected height for a part Rust has not assigned one to yet.
   final int? projectedHeight;
@@ -338,6 +350,7 @@ class _MobileMigrationPartScheduleRow extends StatelessWidget {
       context,
       part,
       currentHeight: currentHeight,
+      blockSpacing: blockSpacing,
       projectedHeight: projectedHeight,
       waitingWindowHeight: waitingWindowHeight,
     );
@@ -410,12 +423,14 @@ class _MobilePreparationScheduleContent extends StatelessWidget {
   const _MobilePreparationScheduleContent({
     required this.status,
     required this.currentHeight,
+    required this.blockTimes,
     required this.onReturn,
     this.onManage,
   });
 
   final rust_sync.MigrationStatus status;
   final int currentHeight;
+  final BlockTimeEstimate blockTimes;
   final VoidCallback onReturn;
   final VoidCallback? onManage;
 
@@ -433,6 +448,7 @@ class _MobilePreparationScheduleContent extends StatelessWidget {
         ? 'Calculating'
         : migrationHeightRemainingDurationLabel(
             finalHeight,
+            blockTimes: blockTimes,
             currentHeight: currentHeight,
           );
 
@@ -994,6 +1010,7 @@ String _mobileSchedulePercentage(BigInt value, BigInt total) {
   BuildContext context,
   rust_sync.MigrationPartStatus part, {
   required int currentHeight,
+  required BlockSpacing blockSpacing,
   int? projectedHeight,
   int? waitingWindowHeight,
 }) {
@@ -1050,6 +1067,7 @@ String _mobileSchedulePercentage(BigInt value, BigInt total) {
           : _migrationScheduledPartIsOverdue(
               scheduledHeight,
               currentHeight: currentHeight,
+              blockSpacing: blockSpacing,
             )
           ? 'Overdue'
           : 'Due now',
@@ -1070,9 +1088,11 @@ String _mobileSchedulePercentage(BigInt value, BigInt total) {
 bool _migrationScheduledPartIsOverdue(
   int scheduledHeight, {
   required int currentHeight,
+  required BlockSpacing blockSpacing,
 }) {
   if (currentHeight <= 0 || scheduledHeight <= 0) return false;
-  return currentHeight >= scheduledHeight + kIronwoodMigrationLateGraceBlocks;
+  return currentHeight >=
+      ironwoodMigrationLateHeight(scheduledHeight, blockSpacing);
 }
 
 List<(int, List<rust_sync.MigrationPreparationTransactionStatus>)>

@@ -5,6 +5,8 @@ import '../../core/layout/app_form_factor.dart';
 import '../../core/privacy/privacy_mask.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_icon.dart';
+import '../../providers/pending_activity_evidence_provider.dart'
+    show kActivityEtaLabels;
 import '../../rust/api/sync.dart' as rust_sync;
 import 'activity_amount_text.dart';
 import 'gift_card_activity_index.dart';
@@ -84,9 +86,7 @@ ActivityRowData buildTransactionActivityRow({
       isPending && (isInbound || isSent || isMigration || isShielded);
 
   return ActivityRowData(
-    stableId:
-        giftCardStableId ??
-        'tx:${transaction.txidHex}:${_stableTransactionRole(kind)}',
+    stableId: giftCardStableId ?? activityStableTransactionId(transaction),
     title: giftCardKind != null
         ? giftCardActivityTitle(
             giftCardKind,
@@ -118,11 +118,7 @@ ActivityRowData buildTransactionActivityRow({
     leadingIconColor: colors.icon.regular,
     subtitle: subtitle,
     subtitleIconName: replacesPool
-        ? (subtitle == 'Est. 1–3 min' ||
-                  subtitle == 'Est. 2–6 min' ||
-                  subtitle == 'Taking longer'
-              ? AppIcons.time
-              : null)
+        ? (kActivityEtaLabels.contains(subtitle) ? AppIcons.time : null)
         : isNetChange
         ? null
         : _poolIcon(normalizeActivityPool(displayPool), ordinary: isPayment),
@@ -218,6 +214,9 @@ String transactionActivityPool(rust_sync.TransactionInfo transaction) {
 
 String normalizeActivityPool(String pool) =>
     pool == 'ironwood' ? 'shielded' : pool;
+
+String activityStableTransactionId(rust_sync.TransactionInfo transaction) =>
+    'tx:${transaction.txidHex}:${_stableTransactionRole(transaction.txKind)}';
 
 String _stableTransactionRole(String kind) {
   return switch (kind) {

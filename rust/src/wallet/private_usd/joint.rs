@@ -22,7 +22,7 @@ use rusqlite::OptionalExtension;
 use zcash_client_backend::data_api::{Account as _, AccountPurpose, WalletRead, WalletWrite};
 use zcash_keys::keys::UnifiedFullViewingKey;
 use zcash_primitives::transaction::{fees::zip317, TxId};
-use zcash_protocol::consensus::Parameters;
+use zcash_protocol::consensus::{BlockHeight, Parameters};
 use zecswap_core::{JointAccount, SpendKey, SweepIntent};
 
 use super::forward::ForwardZcash;
@@ -50,8 +50,8 @@ const JOINT_DB_FILE: &str = "joint.db";
 /// The name and key source a joint account is imported under.
 const JOINT_ACCOUNT_NAME: &str = "Private USD joint";
 const JOINT_KEY_SOURCE: &str = "vizor-private-usd-joint";
-/// A forward refund's sweep pays at most this fee: 64 ZIP 317 marginal fees.
-const MAX_SWEEP_FEE_ZATOSHI: u64 = 320_000;
+/// A forward refund's sweep pays at most 64 ZIP 317 marginal fees.
+const MAX_SWEEP_FEE_ACTIONS: u64 = 64;
 
 fn wallet_error(message: impl Into<String>) -> PrivateUsdError {
     PrivateUsdError::new(ErrorCode::ZcashWallet, message)
@@ -122,17 +122,8 @@ pub(crate) fn register_joint_account(
 }
 
 /// Forgets a joint account, once its sweep is confirmed or its swap no longer
-/// needs it.
-pub(crate) fn delete_joint_account(
-    joint_db: &str,
-    network: WalletNetwork,
-    joint_uuid: &str,
-) -> Result<()> {
-    with_operations(|| keys::delete_account(joint_db, network, joint_uuid).map_err(wallet_error))
-}
-
-/// Forgets a joint account if `joint_db` still holds it: a cleanup that ran
-/// before, or a `joint.db` that is gone, leaves nothing to do.
+/// needs it, if `joint_db` still holds it: a cleanup that ran before, or a
+/// `joint.db` that is gone, leaves nothing to do.
 pub(crate) fn forget_joint_account(
     joint_db: &str,
     network: WalletNetwork,
@@ -143,15 +134,22 @@ pub(crate) fn forget_joint_account(
     }
     let account = keys::parse_account_uuid(joint_uuid)
         .map_err(|error| PrivateUsdError::new(ErrorCode::Other, error))?;
-    let held = sync::open_wallet_db_for_read(joint_db, network)
-        .map_err(wallet_error)?
-        .get_account(account)
-        .map_err(|error| wallet_error(error.to_string()))?
-        .is_some();
-    if !held {
-        return Ok(());
-    }
-    delete_joint_account(joint_db, network, joint_uuid)
+    // One writer from the read to the delete, so no register or delete runs
+    // between them. The delete clears tables a newer schema adds, so a
+    // `joint.db` no register or scan has opened since an update migrates
+    // before either.
+    with_operations(|| {
+        keys::ensure_db_migrated_once(joint_db, network).map_err(wallet_error)?;
+        let held = sync::open_wallet_db_for_read(joint_db, network)
+            .map_err(wallet_error)?
+            .get_account(account)
+            .map_err(|error| wallet_error(error.to_string()))?
+            .is_some();
+        if held {
+            keys::delete_account(joint_db, network, joint_uuid).map_err(wallet_error)?;
+        }
+        Ok(())
+    })
 }
 
 /// The `joint.db` paths a scan is running on.
@@ -858,10 +856,11 @@ impl WalletZcash<'_> {
         if receipts.spendable_zatoshi == 0 || receipts.pending_zatoshi > 0 {
             return Ok(None);
         }
+        let marginal_fee = sweep_marginal_fee(&joint_db, self.network)?;
         let fee_limit = max_fee_zatoshi
-            .unwrap_or(MAX_SWEEP_FEE_ZATOSHI)
+            .unwrap_or(MAX_SWEEP_FEE_ACTIONS * marginal_fee)
             .min(receipts.spendable_zatoshi - 1);
-        if fee_limit < u64::from(zip317::MINIMUM_FEE) {
+        if fee_limit < marginal_fee * zip317::GRACE_ACTIONS as u64 {
             return fail(
                 ErrorCode::ZcashWallet,
                 "the joint account does not cover a sweep's fee",
@@ -1094,10 +1093,14 @@ impl ReverseZcash for WalletZcash<'_> {
         let joint_uuid = self
             .synced_joint(Direction::Reverse, index, joint, birthday)
             .await?;
-        let receipts = joint_receipts(&self.joint_db(), self.network, &joint_uuid, confirmations)?;
+        let joint_db = self.joint_db();
+        let receipts = joint_receipts(&joint_db, self.network, &joint_uuid, confirmations)?;
         Ok(ReverseReceiveEstimate {
             available_zat: receipts.confirmed_zatoshi,
-            fee_zat: sweep_fee_estimate(receipts.confirmed_notes),
+            fee_zat: sweep_fee_estimate(
+                sweep_marginal_fee(&joint_db, self.network)?,
+                receipts.confirmed_notes,
+            ),
         })
     }
 
@@ -1154,11 +1157,21 @@ impl ReverseZcash for WalletZcash<'_> {
     }
 }
 
+/// ZIP 317's marginal fee at the target a sweep from `joint_db` is built
+/// for, which NU7 lowers.
+fn sweep_marginal_fee(joint_db: &str, network: WalletNetwork) -> Result<u64> {
+    let target = sync::fee_policy_target(joint_db, network).map_err(wallet_error)?;
+    Ok(crate::wallet::fees::marginal_fee(
+        &network,
+        BlockHeight::from_u32(target),
+    ))
+}
+
 /// ZIP 317's fee for sweeping `notes` notes home in one transaction, the
 /// least charge included: an action a note, and one for the output.
-fn sweep_fee_estimate(notes: u32) -> u64 {
+fn sweep_fee_estimate(marginal_fee: u64, notes: u32) -> u64 {
     let actions = u64::from(notes) + 1;
-    u64::from(zip317::MARGINAL_FEE) * actions.max(zip317::GRACE_ACTIONS as u64)
+    marginal_fee * actions.max(zip317::GRACE_ACTIONS as u64)
 }
 
 /// `joint.db` in a wallet's Private USD directory.

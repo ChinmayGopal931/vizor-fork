@@ -668,8 +668,11 @@ List<RouteBase> _walletRoutes() {
     ),
     GoRoute(
       path: '/receive',
-      pageBuilder: (context, state) =>
-          _mobilePage(key: state.pageKey, child: const MobileReceiveScreen()),
+      pageBuilder: (context, state) => _mobilePage(
+        key: state.pageKey,
+        maxContentWidth: MobileReceiveScreen.maximumWideWidth,
+        child: const MobileReceiveScreen(),
+      ),
     ),
     GoRoute(
       path: '/migration',
@@ -867,9 +870,14 @@ CupertinoPage<dynamic> _mobilePage({
   required LocalKey key,
   required Widget child,
   bool constrainContent = true,
+  double? maxContentWidth,
 }) => CupertinoPage(
   key: key,
-  child: MobilePageViewport(constrainContent: constrainContent, child: child),
+  child: MobilePageViewport(
+    constrainContent: constrainContent,
+    maxContentWidth: maxContentWidth,
+    child: child,
+  ),
 );
 
 String? _redirectUnsupportedPrivateMigration(

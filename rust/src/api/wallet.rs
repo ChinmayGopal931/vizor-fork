@@ -96,7 +96,6 @@ pub struct SoftwareWalletImportAccount {
 pub struct AccountInfo {
     pub uuid: String,
     pub name: String,
-    pub unified_address: String,
     pub birthday_height: u32,
     pub zip32_account_index: Option<u32>,
     pub is_seed_anchor: bool,
@@ -140,8 +139,23 @@ pub struct ChainUpgradeActivationStatus {
     pub ironwood_active_at_tip: bool,
 }
 
+/// Target block spacing before and from NU7, for time estimates in the UI.
+pub struct BlockSpacingSchedule {
+    pub nu7_activation_height: Option<u64>,
+    pub pre_nu7_block_seconds: u32,
+    pub nu7_block_seconds: u32,
+}
+
+/// The next network upgrade after a chain tip and the tip from which the
+/// wallet refuses transactions before it. The refusal holds while the next
+/// block is still before the upgrade.
+pub struct NetworkUpgradeWindow {
+    pub next_activation_height: u64,
+    pub send_hold_from_tip: u64,
+}
+
 /// Catches panics and converts them to Result<T, String>.
-fn catch<T>(f: impl FnOnce() -> Result<T, String> + panic::UnwindSafe) -> Result<T, String> {
+pub(super) fn catch<T>(f: impl FnOnce() -> Result<T, String> + panic::UnwindSafe) -> Result<T, String> {
     match panic::catch_unwind(f) {
         Ok(result) => result,
         Err(e) => {
@@ -211,6 +225,19 @@ pub fn get_latest_block_height(lightwalletd_url: String, network: String) -> Res
 
 /// Get the lightwalletd chain name ("main" or "test") for endpoint validation.
 pub fn get_lightwalletd_chain_name(lightwalletd_url: String) -> Result<String, String> {
+    probe_lightwalletd_endpoint(lightwalletd_url).map(|probe| probe.chain_name)
+}
+
+/// A chain-info response timed inside Rust, excluding bridge execution queues.
+pub struct LightwalletdEndpointProbe {
+    pub chain_name: String,
+    pub latency_ms: u32,
+}
+
+/// Time connection establishment and the chain-info RPC on the selected route.
+pub fn probe_lightwalletd_endpoint(
+    lightwalletd_url: String,
+) -> Result<LightwalletdEndpointProbe, String> {
     catch(|| {
         let rt = tokio::runtime::Runtime::new().map_err(|e| format!("tokio: {e}"))?;
         rt.block_on(async {
@@ -220,6 +247,7 @@ pub fn get_lightwalletd_chain_name(lightwalletd_url: String) -> Result<String, S
             tokio::time::timeout(std::time::Duration::from_secs(30), async {
                 use zcash_client_backend::proto::service::Empty;
 
+                let started_at = std::time::Instant::now();
                 let mut client = crate::wallet::sync_engine::open_lwd_channel(&lightwalletd_url)
                     .await
                     .map_err(|e| e.to_string())?;
@@ -232,7 +260,11 @@ pub fn get_lightwalletd_chain_name(lightwalletd_url: String) -> Result<String, S
                 .map_err(|e| format!("get_lightd_info: {e}"))?
                 .into_inner();
 
-                Ok(info.chain_name)
+                Ok(LightwalletdEndpointProbe {
+                    chain_name: info.chain_name,
+                    // The request is bounded by the 30-second outer timeout.
+                    latency_ms: started_at.elapsed().as_millis() as u32,
+                })
             })
             .await
             .map_err(|_| "endpoint verification: timed out".to_string())?
@@ -302,6 +334,38 @@ pub fn get_chain_upgrade_status_at_height(
             ironwood_active_at_tip: is_ironwood_active_at_height(network, tip_height)?,
         })
     })
+}
+
+/// Target block spacing for `network`; the NU7 height is absent until scheduled.
+#[flutter_rust_bridge::frb(sync)]
+pub fn get_block_spacing_schedule(network: String) -> Result<BlockSpacingSchedule, String> {
+    let network = keys::parse_network(&network)?;
+    Ok(BlockSpacingSchedule {
+        nu7_activation_height: network
+            .activation_height(NetworkUpgrade::Nu7)
+            .map(|height| u64::from(u32::from(height))),
+        pre_nu7_block_seconds: crate::wallet::block_times::PRE_NU7_BLOCK_SECONDS,
+        nu7_block_seconds: crate::wallet::block_times::NU7_BLOCK_SECONDS,
+    })
+}
+
+/// The upgrade window after `tip_height` on `network`, or none when no
+/// upgrade is scheduled after it.
+#[flutter_rust_bridge::frb(sync)]
+pub fn get_network_upgrade_window(
+    network: String,
+    tip_height: u64,
+) -> Result<Option<NetworkUpgradeWindow>, String> {
+    let network = keys::parse_network(&network)?;
+    let tip = u32::try_from(tip_height).map_err(|_| "Chain tip exceeds u32".to_string())?;
+    Ok(
+        crate::wallet::network_upgrade::hold_heights(&network, tip).map(|heights| {
+            NetworkUpgradeWindow {
+                next_activation_height: heights.next_activation_height.into(),
+                send_hold_from_tip: heights.send_hold_from_tip.into(),
+            }
+        }),
+    )
 }
 
 /// Create a new Zcash wallet with a fresh mnemonic.
@@ -1123,9 +1187,9 @@ async fn discover_software_account_at_index(
 }
 
 /// Birthday stored for a restored account. On mainnet it is rounded down to
-/// just past a 10,000-block grid point (see
-/// [`crate::wallet::tree_states::restore_birthday`]), so lightwalletd learns
-/// only the bucket and never the exact requested height.
+/// just past a grid point, every 10,000 blocks before NU7 and 30,000 from it
+/// (see [`crate::wallet::tree_states::restore_birthday`]), so lightwalletd
+/// learns only the bucket and never the exact requested height.
 fn restored_birthday(network: WalletNetwork, birthday_height: Option<u64>) -> Option<u64> {
     birthday_height.map(|height| crate::wallet::tree_states::restore_birthday(network, height))
 }
@@ -1247,7 +1311,6 @@ pub fn list_accounts(db_path: String, network: String) -> Result<Vec<AccountInfo
             .map(|a| AccountInfo {
                 uuid: a.uuid,
                 name: a.name,
-                unified_address: a.unified_address,
                 birthday_height: a.birthday_height,
                 zip32_account_index: a.zip32_account_index,
                 is_seed_anchor: a.is_seed_anchor,
@@ -1297,6 +1360,7 @@ pub fn delete_account(
 /// Drop process-local wallet summary data after the wallet DB is deleted.
 pub fn evict_wallet_summary_cache(db_path: String) {
     crate::wallet::wallet_summary_cache::evict_db(&db_path);
+    crate::wallet::sync::history_pages::evict_db(&db_path);
 }
 
 /// Current and legacy receive representations owned by a local account.
@@ -1343,16 +1407,31 @@ pub fn find_software_account_for_mnemonic(
     })
 }
 
-/// Export a single account's Unified Full Viewing Key (UFVK). Works for both
-/// software and hardware (Keystone) accounts.
+/// The full and incoming viewing keys for the same account and network.
+pub struct AccountViewingKeys {
+    pub ufvk: String,
+    pub uivk: String,
+}
+
+/// Export a single account's Unified Full Viewing Key (UFVK).
 pub fn get_account_ufvk(
     db_path: String,
     network: String,
     account_uuid: String,
 ) -> Result<String, String> {
+    get_account_viewing_keys(db_path, network, account_uuid).map(|keys| keys.ufvk)
+}
+
+/// Export full and incoming viewing keys for a software or hardware account.
+pub fn get_account_viewing_keys(
+    db_path: String,
+    network: String,
+    account_uuid: String,
+) -> Result<AccountViewingKeys, String> {
     catch(|| {
         let network = parse_network_and_migrate(&db_path, &network)?;
-        keys::get_account_ufvk(&db_path, network, &account_uuid)
+        let (ufvk, uivk) = keys::get_account_viewing_keys(&db_path, network, &account_uuid)?;
+        Ok(AccountViewingKeys { ufvk, uivk })
     })
 }
 
@@ -1481,6 +1560,57 @@ pub fn get_recent_transparent_receive_addresses(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn endpoint_probe_excludes_caller_wait_and_includes_rpc_wait() {
+        use crate::wallet::sync_engine::test_lwd::CapturingLwd;
+        use std::time::{Duration, Instant};
+
+        let _route = crate::network_privacy::test_route_policy::lock_route_policy();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let lwd = CapturingLwd::start(Vec::new()).await;
+            let gate = lwd.hold_responses("/GetLightdInfo");
+            let url = lwd.url.clone();
+            let caller_started_at = Instant::now();
+            let task = tokio::task::spawn_blocking(move || {
+                // Simulate time queued before the API starts executing.
+                std::thread::sleep(Duration::from_millis(250));
+                super::probe_lightwalletd_endpoint(url).unwrap()
+            });
+            tokio::time::timeout(Duration::from_secs(5), async {
+                while !lwd
+                    .requests()
+                    .iter()
+                    .any(|path| path.ends_with("/GetLightdInfo"))
+                {
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                }
+            })
+            .await
+            .expect("probe must reach lightwalletd");
+            // Delay the real RPC response, which must count towards latency.
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            gate.notify_one();
+            let probe = task.await.unwrap();
+            assert_eq!(probe.chain_name, "main");
+            assert!(probe.latency_ms >= 50, "RPC response wait must be counted");
+            assert!(
+                caller_started_at.elapsed().as_millis() >= u128::from(probe.latency_ms) + 250,
+                "caller-side wait must not be counted"
+            );
+            gate.notify_one();
+            let url = lwd.url.clone();
+            assert_eq!(
+                tokio::task::spawn_blocking(move || super::get_lightwalletd_chain_name(url))
+                    .await
+                    .unwrap()
+                    .unwrap(),
+                "main",
+                "the existing validation API must retain its result"
+            );
+        });
+    }
 
     #[cfg(not(ironwood_masquerade))]
     #[test]
@@ -1902,6 +2032,19 @@ mod tests {
             get_chain_upgrade_status_at_height("main".to_string(), activation).unwrap();
         assert_eq!(at_activation.tip_height, activation);
         assert!(at_activation.ironwood_active_at_tip);
+    }
+
+    #[test]
+    fn block_spacing_schedule_reports_nu7_heights_and_spacing() {
+        let main = get_block_spacing_schedule("main".to_string()).unwrap();
+        assert_eq!(main.nu7_activation_height, Some(3_543_405));
+        assert_eq!(
+            (main.pre_nu7_block_seconds, main.nu7_block_seconds),
+            (75, 25)
+        );
+
+        let test = get_block_spacing_schedule("test".to_string()).unwrap();
+        assert_eq!(test.nu7_activation_height, Some(4_465_026));
     }
 
     #[test]
