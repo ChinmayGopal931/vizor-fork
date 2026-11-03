@@ -122,22 +122,8 @@ pub(crate) fn register_joint_account(
 }
 
 /// Forgets a joint account, once its sweep is confirmed or its swap no longer
-/// needs it.
-pub(crate) fn delete_joint_account(
-    joint_db: &str,
-    network: WalletNetwork,
-    joint_uuid: &str,
-) -> Result<()> {
-    with_operations(|| {
-        // The delete clears tables a newer schema adds, so a `joint.db` no
-        // register or scan has opened since an update migrates first.
-        keys::ensure_db_migrated_once(joint_db, network).map_err(wallet_error)?;
-        keys::delete_account(joint_db, network, joint_uuid).map_err(wallet_error)
-    })
-}
-
-/// Forgets a joint account if `joint_db` still holds it: a cleanup that ran
-/// before, or a `joint.db` that is gone, leaves nothing to do.
+/// needs it, if `joint_db` still holds it: a cleanup that ran before, or a
+/// `joint.db` that is gone, leaves nothing to do.
 pub(crate) fn forget_joint_account(
     joint_db: &str,
     network: WalletNetwork,
@@ -149,7 +135,9 @@ pub(crate) fn forget_joint_account(
     let account = keys::parse_account_uuid(joint_uuid)
         .map_err(|error| PrivateUsdError::new(ErrorCode::Other, error))?;
     // One writer from the read to the delete, so no register or delete runs
-    // between them. The read uses the current schema, as the delete does.
+    // between them. The delete clears tables a newer schema adds, so a
+    // `joint.db` no register or scan has opened since an update migrates
+    // before either.
     with_operations(|| {
         keys::ensure_db_migrated_once(joint_db, network).map_err(wallet_error)?;
         let held = sync::open_wallet_db_for_read(joint_db, network)

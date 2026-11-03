@@ -598,7 +598,7 @@ void main() {
     },
   );
 
-  test('a direct POST hands back a 307, as dart:io did', () async {
+  test('a direct POST hands back a 307 to another origin', () async {
     final directClient = _ScriptedHttpClient([
       (307, {'location': 'https://other.example.com/final'}),
     ]);

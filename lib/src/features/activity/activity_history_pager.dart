@@ -206,6 +206,26 @@ class ActivityHistoryPager extends ChangeNotifier {
   List<rust_sync.ActivityHistorySummary>? _candidates;
   rust_sync.ActivityHistoryIndex? _index;
   Map<String, List<rust_sync.TransactionInfo>> _loaded = {};
+  Set<String> _pageIds = const {};
+  ActivityPageOrder? _pageEnd;
+
+  /// Whether the row [id] is on the page: every loaded row is once nothing is
+  /// left to load, and none is before the first page.
+  bool showsRow(String? id) => !hasMore || _pageIds.contains(id);
+
+  /// Whether a row this pager does not page, dated [timestamp], belongs on
+  /// the page: only one above the page's last row can have no unloaded row
+  /// sort before it, so a tie with that row waits for the next page.
+  bool showsUnpagedRow(DateTime? timestamp) {
+    if (!hasMore) return true;
+    final end = _pageEnd;
+    return end != null &&
+        compareActivityPageOrder(
+              ActivityPageOrder(timestamp, false, end.order + 1),
+              end,
+            ) <
+            0;
+  }
 
   @override
   void dispose() {
@@ -356,6 +376,8 @@ class ActivityHistoryPager extends ChangeNotifier {
             transactions = current;
             visibleCount = target;
             hasMore = first != null || orders.length > target;
+            _pageIds = orders.take(target).map((o) => o.id).nonNulls.toSet();
+            _pageEnd = hasMore ? orders[target - 1] : null;
             fresh = !_refreshPending && !_reprojectPending;
             break;
           }
