@@ -423,26 +423,17 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen>
       ...privateUsdEntries,
     ];
     final pager = _pager;
-    final sections = buildActivityFeedSections(
-      entries,
-      // Private USD rows are all loaded, so only the pager's rows fill its
-      // page, the transactions they stand in for among them; one older than
-      // its last row waits for the next page, and once there is nothing more
-      // to load every row shows.
-      limit: pager != null && !pager.hasMore
-          ? null
-          : pager?.visibleCount ?? activityPageSize,
-      countsTowardLimit: (entry) => !privateUsdEntries.contains(entry),
-      unshownPagedTimes: [
-        for (final tx in giftCardActivityIndex.withPendingClaims(transactions))
-          if (!absorption.absorbs(tx) &&
-              privateUsd.txids.contains(tx.txidHex.toLowerCase()))
-            giftCardActivityIndex
-                    .metadataFor(tx, transactions: transactions)
-                    ?.activityTimestamp ??
-                transactionActivityTimestamp(tx, now: activityNow),
-      ],
-    );
+    // The pager's page holds the wallet's rows, the transactions Private USD
+    // rows stand in for among them. Private USD rows are all loaded, so one
+    // shows only above the page's last row.
+    final sections = buildActivityFeedSections([
+      for (final entry in entries)
+        if (pager == null ||
+            (privateUsdEntries.contains(entry)
+                ? pager.showsUnpagedRow(entry.timestamp)
+                : pager.showsRow(entry.row.stableId)))
+          entry,
+    ]);
 
     final content = SwapActivityStatusAutoRefresh(
       child: SafeArea(

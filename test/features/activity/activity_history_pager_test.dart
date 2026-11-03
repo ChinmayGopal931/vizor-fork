@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/features/activity/activity_history_pager.dart';
+import 'package:zcash_wallet/src/features/activity/activity_row_mapper.dart';
 import 'package:zcash_wallet/src/features/activity/gift_card_activity_index.dart';
 import 'package:zcash_wallet/src/rust/api/sync.dart' as rust;
 
@@ -123,6 +124,70 @@ void main() {
       },
     );
   }
+
+  test('rows it does not page show only above its last row', () async {
+    // Thirty transactions a minute apart, newest first.
+    final source = Source(0)
+      ..transactions = [
+        for (var i = 0; i < 30; i++)
+          rust.TransactionInfo(
+            txidHex: (i + 1).toRadixString(16).padLeft(64, '0'),
+            minedHeight: BigInt.from(100),
+            expiredUnmined: false,
+            accountBalanceDelta: 100,
+            fee: BigInt.zero,
+            feeState: rust.TransactionFeeState.notApplicable,
+            detailsComplete: true,
+            provisional: false,
+            amountIncludesFee: false,
+            blockTime: BigInt.from(100000 - 60 * i),
+            createdTime: BigInt.zero,
+            isTransparent: false,
+            txKind: 'received',
+            displayAmount: BigInt.from(100),
+            displayPool: 'shielded',
+          ),
+      ];
+    final p = pager(source, mobile: true);
+    addTearDown(p.dispose);
+    String id(int i) => activityStableTransactionId(source.transactions[i]);
+    DateTime at(int seconds) =>
+        DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+    const lastShown = 100000 - 60 * 19;
+
+    // Before the first page nothing is on it, so nothing shows and then
+    // leaves when the page arrives.
+    expect(p.showsRow(id(0)), isFalse);
+    expect(p.showsUnpagedRow(at(100000)), isFalse);
+
+    await p.load();
+    expect(p.showsRow(id(19)), isTrue);
+    expect(p.showsRow(id(20)), isFalse);
+    expect(p.showsUnpagedRow(at(lastShown + 1)), isTrue);
+    // An unloaded row may still come between a tie and the page's end.
+    expect(p.showsUnpagedRow(at(lastShown)), isFalse);
+    expect(p.showsUnpagedRow(at(lastShown - 1)), isFalse);
+    expect(p.showsUnpagedRow(null), isFalse);
+
+    await p.load(more: true);
+    expect(p.hasMore, isFalse);
+    expect(p.showsRow(id(29)), isTrue);
+    expect(p.showsUnpagedRow(at(1)), isTrue);
+    expect(p.showsUnpagedRow(null), isTrue);
+  });
+
+  test('a failed first page puts no row on it', () async {
+    final source = Source(30)..failIndex = true;
+    final p = pager(source, mobile: true);
+    addTearDown(p.dispose);
+    await p.load();
+    expect(p.error, isNotNull);
+    expect(
+      p.showsRow(activityStableTransactionId(source.transactions[0])),
+      isFalse,
+    );
+    expect(p.showsUnpagedRow(DateTime(2100)), isFalse);
+  });
 
   test('large account ordering runs through the background planner', () async {
     final source = Source(1200);
