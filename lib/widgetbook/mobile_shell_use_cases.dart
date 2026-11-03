@@ -160,8 +160,7 @@ Widget buildMobileSurfaceCardUseCase(BuildContext context) {
               onTap: () {},
             ),
             const MobileListRow(
-              label: 'Password',
-              value: 'Change',
+              label: 'Change passcode',
               showChevron: true,
               enabled: false,
             ),

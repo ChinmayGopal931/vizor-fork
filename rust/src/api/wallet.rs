@@ -155,19 +155,12 @@ pub struct NetworkUpgradeWindow {
 }
 
 /// Catches panics and converts them to Result<T, String>.
-pub(super) fn catch<T>(f: impl FnOnce() -> Result<T, String> + panic::UnwindSafe) -> Result<T, String> {
+pub(super) fn catch<T>(
+    f: impl FnOnce() -> Result<T, String> + panic::UnwindSafe,
+) -> Result<T, String> {
     match panic::catch_unwind(f) {
         Ok(result) => result,
-        Err(e) => {
-            let msg = if let Some(s) = e.downcast_ref::<&str>() {
-                s.to_string()
-            } else if let Some(s) = e.downcast_ref::<String>() {
-                s.clone()
-            } else {
-                "Unknown panic".to_string()
-            };
-            Err(format!("Rust panic: {msg}"))
-        }
+        Err(e) => Err(super::panic_message(e.as_ref())),
     }
 }
 
@@ -1612,7 +1605,6 @@ mod tests {
         });
     }
 
-    #[cfg(not(ironwood_masquerade))]
     #[test]
     fn discovery_reads_history_from_the_rounded_birthday() {
         assert_eq!(
@@ -1638,7 +1630,6 @@ mod tests {
         dir.path().join(name).to_str().unwrap().to_string()
     }
 
-    #[cfg(not(ironwood_masquerade))]
     #[test]
     fn mainnet_created_accounts_and_claims_keep_their_birthday() {
         let dir = tempfile::tempdir().unwrap();
@@ -1678,7 +1669,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(ironwood_masquerade))]
     #[test]
     fn mainnet_software_restores_round_their_birthday() {
         let dir = tempfile::tempdir().unwrap();
@@ -1730,7 +1720,6 @@ mod tests {
         assert_eq!(birthdays[&linked.account_uuid], 2_340_001);
     }
 
-    #[cfg(not(ironwood_masquerade))]
     #[test]
     fn mainnet_hardware_imports_round_their_birthday() {
         use secrecy::ExposeSecret;

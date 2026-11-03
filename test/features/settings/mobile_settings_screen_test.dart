@@ -1473,6 +1473,12 @@ void main() {
 
     expect(find.text('Turn off Face ID unlock?'), findsOneWidget);
     expect(find.textContaining('You will use your passcode'), findsOneWidget);
+    // The sheet's buttons keep their 14px Light label.
+    for (final label in ['Turn off', 'Cancel']) {
+      final style = tester.widget<Text>(find.text(label)).style;
+      expect(style?.fontSize, 14);
+      expect(style?.fontWeight, FontWeight.w300);
+    }
     expect(biometricNotifier.disableCount, 0);
 
     await tester.tap(

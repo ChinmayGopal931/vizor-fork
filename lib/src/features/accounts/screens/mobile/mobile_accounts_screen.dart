@@ -1,5 +1,6 @@
 import '../../../../core/navigation/mobile_sidebar_exit.dart';
 import '../../../../core/layout/mobile/mobile_navigation_scope.dart';
+
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -10,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../main.dart' show log;
+import '../../../../core/feedback/app_haptics.dart';
 import '../../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../../core/layout/mobile/app_mobile_tab_bar.dart';
 import '../../../../core/layout/mobile/mobile_top_nav.dart';
@@ -160,15 +162,10 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
       overlaySize.height - bottomNavClearance - menuHeight,
     );
     final menuTop = (anchorRect.top + 34).clamp(AppSpacing.sm, menuMaxTop);
-    final menuRight =
-        (overlaySize.width - anchorRect.right).clamp(
-              AppSpacing.sm,
-              math.max(
-                AppSpacing.sm,
-                overlaySize.width - menuWidth - AppSpacing.sm,
-              ),
-            )
-            as double;
+    final menuRight = (overlaySize.width - anchorRect.right).clamp(
+      AppSpacing.sm,
+      math.max(AppSpacing.sm, overlaySize.width - menuWidth - AppSpacing.sm),
+    ) as double;
 
     void select(_AccountAction action) {
       _hideRowMenu();
@@ -403,6 +400,7 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
       return;
     }
     await Clipboard.setData(ClipboardData(text: address));
+    unawaited(AppHaptics.copy());
     if (mounted) showAppToast(context, 'Shielded address copied');
   }
 

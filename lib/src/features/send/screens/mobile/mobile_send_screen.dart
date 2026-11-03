@@ -1,4 +1,5 @@
 import '../../../../core/navigation/mobile_sidebar_exit.dart';
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -13,6 +14,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../../main.dart' show log;
 import '../../../../core/formatting/zec_amount.dart';
 import '../../../../core/layout/mobile/app_mobile_sheet.dart';
+import '../../../../core/layout/mobile/mobile_bottom_scroll_fade.dart';
+import '../../../../core/layout/mobile/mobile_top_scroll_fade.dart';
 import '../../../../core/layout/mobile/mobile_top_nav.dart';
 import '../../../../core/navigation/external_action_guard_provider.dart';
 import '../../../../core/storage/wallet_paths.dart';
@@ -37,14 +40,17 @@ import '../../../../providers/zec_price_change_provider.dart';
 import '../../../../rust/api/sync.dart' as rust_sync;
 import '../../../address_book/models/address_book_contact.dart';
 import '../../../address_scan/widgets/mobile_scan_address_row.dart';
+import '../../../address_book/models/recipient_suggestions.dart';
 import '../../../address_book/providers/address_book_provider.dart';
 import '../../../address_book/widgets/contact_name_inline.dart';
+import '../../../address_book/widgets/mobile_recipient_list.dart';
 import '../../../../providers/payment_request_flow_provider.dart';
 import '../../../migration/providers/ironwood_migration_announcement_provider.dart';
 import '../../models/send_prefill_args.dart';
 import '../../models/send_scan_result.dart';
 import '../../services/send_flow.dart';
 import '../../services/send_amount_conversion.dart';
+import '../../services/recent_send_recipients.dart';
 import '../../services/send_proving_key_warmup.dart';
 import '../../widgets/send_recipient_resolver.dart';
 import '../../widgets/send_review_layout.dart' show SendReviewContactRecipient;
@@ -1887,6 +1893,7 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
         addressType: _addressType,
         amountZatoshi: amountZatoshi,
         memo: memo.isNotEmpty ? memo : null,
+        isPaymentRequest: _isAnsweringPaymentRequest,
       );
     } catch (e) {
       log('MobileSend: propose error: $e');
@@ -2323,126 +2330,184 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
 
   // ── Step bodies ────────────────────────────────────────────────────
 
+  /// Null until both lists first resolve, so Recents never arrives late and
+  /// pushes Contacts down. A failed Recents load still shows Contacts.
+  RecipientSuggestions<SendRecentRecipient>? _recipientSuggestions() {
+    final accountUuid = ref.watch(
+      accountProvider.select((state) => state.value?.activeAccountUuid),
+    );
+    final recents = accountUuid == null
+        ? null
+        : ref.watch(recentSendRecipientsProvider(accountUuid));
+    final addressBook = ref.watch(addressBookProvider);
+    bool pending(AsyncValue<Object?>? value) =>
+        value != null && !value.hasValue && !value.hasError;
+    if (pending(recents) || pending(addressBook)) return null;
+    final allContacts =
+        addressBook.value?.contacts ?? const <AddressBookContact>[];
+    final ownAccounts =
+        ref.watch(ownAccountAddressesProvider).value ??
+        const <String, AccountInfo>{};
+    return matchRecipientSuggestions(
+      query: _addressController.text,
+      network: AddressBookNetwork.zcash,
+      recents: accountUuid == null
+          ? const <SendRecentRecipient>[]
+          : visibleSendRecentRecipients(
+              stored: recents?.value ?? const [],
+              accountUuid: accountUuid,
+              ownAccounts: ownAccounts,
+            ),
+      recentAddress: (recent) => recent.address,
+      // A recent sent to another account shows, and is found by, its name.
+      recentLabel: (recent) => switch (sendReviewRecipientFor(
+        contacts: allContacts,
+        address: recent.address,
+        ownAccounts: ownAccounts,
+      )) {
+        SendReviewContactRecipient(:final name) => name,
+        _ => null,
+      },
+      contacts: filterAddressBookContacts(
+        allContacts,
+        query: '',
+        networks: const {AddressBookNetwork.zcash},
+      ),
+    );
+  }
+
+  /// Field text that names a contact is a search, so the step keeps the
+  /// matches instead of calling it an invalid address. The error also waits
+  /// for the lists to load, so it does not flash before a match arrives.
+  bool get _showAddressError {
+    if (_addressType != 'invalid' && _addressType != 'error') return false;
+    final suggestions = _recipientSuggestions();
+    return suggestions != null && !suggestions.isSearch;
+  }
+
+  void _selectRecent(SendRecentRecipient recent) {
+    final address = recent.address.trim();
+    final recipient = sendReviewRecipientFor(
+      contacts: ref.read(addressBookProvider).value?.contacts ?? const [],
+      address: address,
+      ownAccounts: ref.read(ownAccountAddressesProvider).value ?? const {},
+    );
+    _addressController.value = TextEditingValue(
+      text: address,
+      selection: TextSelection.collapsed(offset: address.length),
+    );
+    // A named recent keeps its name, as picking it under Contacts does.
+    final named = switch (recipient) {
+      SendReviewContactRecipient(:final name) when name.isNotEmpty => recipient,
+      _ => null,
+    };
+    setState(() {
+      _contactLabel = named?.name;
+      _contactPictureId = named?.profilePictureId;
+    });
+    _handleAddressChanged(clearContact: false);
+  }
+
   Widget _buildRecipientStep(
     BuildContext context, {
     required bool hasFocusedRecipient,
   }) {
     final colors = context.colors;
-    final contacts = filterAddressBookContacts(
-      ref.watch(addressBookProvider).value?.contacts ??
-          const <AddressBookContact>[],
-      query: _addressController.text,
-      networks: const {AddressBookNetwork.zcash},
-    );
+    final suggestions = _recipientSuggestions();
+    final allContacts =
+        ref.watch(addressBookProvider).value?.contacts ??
+        const <AddressBookContact>[];
+    final ownAccounts =
+        ref.watch(ownAccountAddressesProvider).value ??
+        const <String, AccountInfo>{};
+
+    Widget buildRecentRow(SendRecentRecipient recent) {
+      final recipient = sendReviewRecipientFor(
+        contacts: allContacts,
+        address: recent.address,
+        ownAccounts: ownAccounts,
+      );
+      final named = recipient is SendReviewContactRecipient ? recipient : null;
+      return MobileRecipientRow(
+        key: ValueKey('mobile_send_recent_${recent.address}'),
+        name: named?.name,
+        profilePictureId: named?.profilePictureId,
+        addressText: _truncateAddress(recent.address),
+        detail: recent.isShielded ? 'Shielded' : 'Transparent',
+        detailColor: recent.isShielded
+            ? colors.text.brandCrimson
+            : colors.text.secondary,
+        onTap: () => _selectRecent(recent),
+      );
+    }
 
     return Column(
       children: [
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.sm,
-              AppSpacing.s +
-                  _kMobileSendAddressFieldGroupHeight +
-                  AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
+          // The viewport starts below the pinned field layer, so scrolled
+          // rows fade out there instead of showing around the field.
+          child: Padding(
+            padding: const EdgeInsets.only(
+              top: AppSpacing.s + _kMobileSendAddressFieldGroupHeight,
             ),
-            children: [
-              MobileScanAddressRow(
-                key: const ValueKey('mobile_send_scan_row'),
-                iconFrameKey: const ValueKey('mobile_send_scan_icon_frame'),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppAssetSize.padding,
-                ),
-                scalesText: false,
-                subtitle: 'Scan an address or payment request',
-                onTap: () => unawaited(_openScanner()),
-              ),
-              if (contacts.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.md),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.s),
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(AppSpacing.xxs),
-                        child: Row(
-                          children: [
-                            AppIcon(
-                              AppIcons.users,
-                              size: 20,
-                              color: colors.icon.muted,
-                            ),
-                            const SizedBox(width: AppSpacing.xxs),
-                            Text(
-                              '${contacts.length} '
-                              'contact${contacts.length == 1 ? '' : 's'}',
-                              style: AppTypography.labelLarge.copyWith(
-                                color: colors.text.secondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      for (var i = 0; i < contacts.length; i++) ...[
-                        Semantics(
-                          button: true,
-                          child: GestureDetector(
-                            key: ValueKey(
-                              'mobile_send_contact_${contacts[i].id}',
-                            ),
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () => _selectContact(contacts[i]),
-                            child: SizedBox(
-                              height: 44,
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    width: 40,
-                                    height: 32,
-                                    child: Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: AppProfilePicture(
-                                        profilePictureId:
-                                            contacts[i].profilePictureId,
-                                        size: AppProfilePictureSize.large,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.s),
-                                  Expanded(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _RecipientLineText(
-                                          contacts[i].label,
-                                          color: colors.text.accent,
-                                        ),
-                                        const SizedBox(height: AppSpacing.xxs),
-                                        _RecipientLineText(
-                                          _truncateAddress(contacts[i].address),
-                                          color: colors.text.secondary,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (i != contacts.length - 1)
-                          const SizedBox(height: AppSpacing.sm),
-                      ],
-                    ],
+            child: MobileTopScrollFade(
+              child: MobileBottomScrollFade(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.sm,
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                    AppSpacing.md,
                   ),
+                  children: [
+                    MobileScanAddressRow(
+                      key: const ValueKey('mobile_send_scan_row'),
+                      iconFrameKey: const ValueKey(
+                        'mobile_send_scan_icon_frame',
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppAssetSize.padding,
+                      ),
+                      scalesText: false,
+                      subtitle: 'Scan an address or payment request',
+                      onTap: () => unawaited(_openScanner()),
+                    ),
+                    if (suggestions != null &&
+                        suggestions.recents.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      MobileRecipientSection(
+                        key: const ValueKey('mobile_send_recents_section'),
+                        title: 'Recents',
+                        children: [
+                          for (final recent in suggestions.recents)
+                            buildRecentRow(recent),
+                        ],
+                      ),
+                    ],
+                    if (suggestions != null &&
+                        suggestions.contacts.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      MobileRecipientSection(
+                        key: const ValueKey('mobile_send_contacts_section'),
+                        title: 'Contacts',
+                        children: [
+                          for (final contact in suggestions.contacts)
+                            MobileRecipientRow(
+                              key: ValueKey(
+                                'mobile_send_contact_${contact.id}',
+                              ),
+                              name: contact.label,
+                              profilePictureId: contact.profilePictureId,
+                              addressText: _truncateAddress(contact.address),
+                              onTap: () => _selectContact(contact),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
-              ],
-            ],
+              ),
+            ),
           ),
         ),
         if (_showRecipientContinue && !hasFocusedRecipient)
@@ -2471,8 +2536,7 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
   Widget _buildAddressField(BuildContext context) {
     final colors = context.colors;
     final showAction = _addressFocus.hasFocus;
-    final hasAddressError =
-        _addressType == 'invalid' || _addressType == 'error';
+    final hasAddressError = _showAddressError;
     return MobileTextField(
       key: const ValueKey('mobile_send_address_field'),
       fieldKey: const ValueKey('mobile_send_address_input'),
@@ -2533,7 +2597,7 @@ class _MobileSendScreenState extends ConsumerState<MobileSendScreen> {
 
   Widget _buildAddressErrorSpace(BuildContext context) {
     final colors = context.colors;
-    final showError = _addressType == 'invalid' || _addressType == 'error';
+    final showError = _showAddressError;
     // The reserved line shows the validation error, or — when the address is
     // valid and matches a saved contact / own account — the resolved name so
     // the user knows the pasted/typed address is the intended one.
