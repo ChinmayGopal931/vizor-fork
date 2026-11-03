@@ -89,8 +89,9 @@ final _walletTipTargetProvider = Provider<int>(
 ///
 /// The DB records a new chain tip only once a sync starts, after the polled
 /// tip has moved, so a read can predate it: while the polled tip puts NU7 on
-/// the other side of the last target read, each move of the tip or the scan
-/// reads it again.
+/// the other side of the last target read, moves of the tip or the scan read
+/// it again, one read at a time and at most one per
+/// [WalletFeePolicyNotifier.readAgainInterval].
 final walletFeePolicyProvider =
     AsyncNotifierProvider<WalletFeePolicyNotifier, rust_sync.WalletFeePolicy?>(
       WalletFeePolicyNotifier.new,
@@ -100,22 +101,37 @@ class WalletFeePolicyNotifier
     extends AsyncNotifier<rust_sync.WalletFeePolicy?> {
   WalletFeePolicyNotifier({
     Future<String?> Function() resolveExistingDbPath = getExistingWalletDbPath,
+    this.readAgainInterval = const Duration(seconds: 5),
   }) : _resolveExistingDbPath = resolveExistingDbPath;
 
   final Future<String?> Function() _resolveExistingDbPath;
 
-  /// A read from an earlier network does not land after a rebuild.
+  /// The least time between the end of one read and the next: a scan
+  /// reports every batch, and each read opens the wallet DB.
+  final Duration readAgainInterval;
+
+  /// A read from an earlier network or wallet does not land after a rebuild.
   int _generation = 0;
-  Future<void>? _reading;
+  bool _reading = false;
   bool _readAgain = false;
+  Timer? _pause;
 
   @override
   Future<rust_sync.WalletFeePolicy?> build() async {
     final network = ref.watch(
       rpcEndpointFailoverProvider.select((state) => state.current.networkName),
     );
+    // A reset leaves no active account and a new wallet brings its own DB,
+    // so the policy last read is dropped with them.
+    ref.watch(syncProvider.select((state) => state.value?.accountUuid));
     final generation = ++_generation;
-    _reading = null;
+    _pause?.cancel();
+    _pause = null;
+    _readAgain = false;
+    // A move while this first read runs asks for another after it, never
+    // one beside it: the older of two reads could land last.
+    _reading = true;
+    ref.onDispose(() => _pause?.cancel());
     // Every move counts, not only the target's: a sync scans up to a tip the
     // poller already reported, after recording it in the DB.
     ref.listen(
@@ -130,13 +146,15 @@ class WalletFeePolicyNotifier
       (_, sync) {
         final activation = ref.read(blockSpacingProvider).nu7ActivationHeight;
         final target = _tipTarget(sync.tip, sync.scanned);
+        // Before the first poll, and once a lock clears the sync state, the
+        // polled tip says nothing about the DB.
+        if (activation == null || target == 0) return;
         final read = state.value;
-        if (activation == null ||
-            (read != null &&
-                (read.targetHeight >= activation) == (target >= activation))) {
+        if (read != null &&
+            (read.targetHeight >= activation) == (target >= activation)) {
           return;
         }
-        unawaited(_readAgainFor(network, generation));
+        _readAgainFor(network, generation);
       },
     );
     try {
@@ -145,32 +163,48 @@ class WalletFeePolicyNotifier
       // A wallet that has not synced has no target to price at yet.
       log('WalletFeePolicy: unavailable: $error');
       return null;
+    } finally {
+      if (ref.mounted && generation == _generation) {
+        _pauseAfterRead(network, generation);
+      }
     }
   }
 
-  Future<void> _readAgainFor(String network, int generation) {
-    final reading = _reading;
-    if (reading != null) {
+  void _readAgainFor(String network, int generation) {
+    if (_reading || _pause != null) {
       _readAgain = true;
-      return reading;
+      return;
     }
-    return _reading = () async {
+    _reading = true;
+    _readAgain = false;
+    unawaited(() async {
       try {
-        do {
-          _readAgain = false;
-          final policy = await _read(network);
-          if (!ref.mounted || generation != _generation) return;
-          state = AsyncData(policy);
-        } while (_readAgain);
+        final policy = await _read(network);
+        if (!ref.mounted || generation != _generation) return;
+        state = AsyncData(policy);
       } catch (error) {
         // The policy last read stands, so the polled tip cannot flip the
-        // epoch ahead of the DB; the next move of the tip or the scan reads
+        // epoch ahead of the DB; a later move of the tip or the scan reads
         // again.
         log('WalletFeePolicy: read again failed: $error');
       } finally {
-        if (generation == _generation) _reading = null;
+        if (ref.mounted && generation == _generation) {
+          _pauseAfterRead(network, generation);
+        }
       }
-    }();
+    }());
+  }
+
+  /// Holds the next read for [readAgainInterval], then makes the one a move
+  /// asked for meanwhile, so the last move is never lost.
+  void _pauseAfterRead(String network, int generation) {
+    _reading = false;
+    _pause = Timer(readAgainInterval, () {
+      _pause = null;
+      if (_readAgain && ref.mounted && generation == _generation) {
+        _readAgainFor(network, generation);
+      }
+    });
   }
 
   Future<rust_sync.WalletFeePolicy?> _read(String network) async {
