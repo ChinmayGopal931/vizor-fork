@@ -1,6 +1,7 @@
 import '../../providers/home_activity_state.dart';
 import '../../widgets/home_activity_skeleton.dart';
 import '../../../activity/widgets/deferred_gift_card_recovery.dart';
+
 import 'dart:async';
 
 import '../../../../providers/app_security_provider.dart';
@@ -447,9 +448,9 @@ class _IronwoodMigrationAttentionHostState
           return MobileIronwoodMigrationAttentionSheetBody(
             kind: attention.kind,
             count: attention.count,
-            onOpenMigration: () => Navigator.of(
-              sheetContext,
-            ).pop(_IronwoodAttentionAction.openMigration),
+            onOpenMigration: () =>
+                Navigator.of(sheetContext)
+                    .pop(_IronwoodAttentionAction.openMigration),
             onLater: () =>
                 Navigator.of(sheetContext).pop(_IronwoodAttentionAction.later),
           );
@@ -523,9 +524,9 @@ class _IronwoodMigrationAnnouncementHostState
       final action = await showAppMobileSheet<_IronwoodAnnouncementAction>(
         context: context,
         builder: (sheetContext) => MobileIronwoodMigrationAnnouncementSheet(
-          onStartMigration: () => Navigator.of(
-            sheetContext,
-          ).pop(_IronwoodAnnouncementAction.startMigration),
+          onStartMigration: () =>
+              Navigator.of(sheetContext)
+                  .pop(_IronwoodAnnouncementAction.startMigration),
           onOpenReleaseNotes: () => unawaited(_openReleaseNotes()),
         ),
       );
@@ -1208,9 +1209,9 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                     ? '—'
                     : privacyModeEnabled
                     ? fixedPrivacyMask()
-                    : ZecAmount.fromZatoshi(
-                        shieldedBalance,
-                      ).compactBalance.amountText,
+                    : ZecAmount.fromZatoshi(shieldedBalance)
+                          .compactBalance
+                          .amountText,
                 fiatBalanceText: shieldedFiatBalanceText,
                 priceChange24hPct: priceChange24hPct,
                 transparentBalanceText: transparentBalance.text(
@@ -1265,7 +1266,10 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                         constrainContent: true,
                         onPressed: sendDisabled
                             ? null
-                            : () => _pushUsedScreen('/send'),
+                            : () {
+                                unawaited(AppHaptics.action());
+                                _pushUsedScreen('/send');
+                              },
                         leading: const _ButtonIcon(AppIcons.plane),
                         height: _mobileHomeActionButtonHeight,
                         child: const Text(
@@ -1282,7 +1286,10 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                         expand: true,
                         constrainContent: true,
                         variant: AppButtonVariant.secondary,
-                        onPressed: () => _pushUsedScreen('/receive'),
+                        onPressed: () {
+                          unawaited(AppHaptics.action());
+                          _pushUsedScreen('/receive');
+                        },
                         leading: const _ButtonIcon(AppIcons.arrowDownCircle),
                         height: _mobileHomeActionButtonHeight,
                         child: const Text(
@@ -1303,7 +1310,10 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                   key: const ValueKey('mobile_home_receive'),
                   expand: true,
                   constrainContent: true,
-                  onPressed: () => _pushUsedScreen('/receive'),
+                  onPressed: () {
+                    unawaited(AppHaptics.action());
+                    _pushUsedScreen('/receive');
+                  },
                   leading: const _ButtonIcon(AppIcons.addNew),
                   height: _mobileHomeActionButtonHeight,
                   child: const Text(
@@ -1321,7 +1331,10 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                   expand: true,
                   constrainContent: true,
                   variant: AppButtonVariant.secondary,
-                  onPressed: () => _pushUsedScreen('/swap'),
+                  onPressed: () {
+                    unawaited(AppHaptics.action());
+                    _pushUsedScreen('/swap');
+                  },
                   leading: const _ButtonIcon(AppIcons.swapArrows),
                   height: _mobileHomeActionButtonHeight,
                   child: const Text(

@@ -39,6 +39,7 @@ class ReceiveTabs extends StatelessWidget {
     this.labelStyle,
     this.labelFontWeight = FontWeight.w400,
     this.alwaysDarkSelected = false,
+    this.position,
     super.key,
   });
 
@@ -60,16 +61,29 @@ class ReceiveTabs extends StatelessWidget {
   /// the same plate on both, so it ignores this.
   final bool alwaysDarkSelected;
 
+  /// Pager page to track mid-swipe; see [AppSegmentedControl.position].
+  final double? position;
+
   @override
   Widget build(BuildContext context) {
     if (_mobile) return _buildNeon(context);
     final colors = context.colors;
-    final shieldedActive = selectedType == ReceiveAddressType.shielded;
-    final darkSelected = alwaysDarkSelected || shieldedActive;
-    final activeBg = darkSelected
-        ? colors.background.inverse
-        : colors.background.ground;
-    final activeText = darkSelected ? colors.text.inverse : colors.text.accent;
+    // 0 is the dark shielded chip, 1 the light transparent one; a tracked
+    // position blends them mid-slide instead of flipping halfway.
+    final lightness = alwaysDarkSelected
+        ? 0.0
+        : position?.clamp(0.0, 1.0) ??
+              (selectedType == ReceiveAddressType.shielded ? 0.0 : 1.0);
+    final activeBg = Color.lerp(
+      colors.background.inverse,
+      colors.background.ground,
+      lightness,
+    )!;
+    final activeText = Color.lerp(
+      colors.text.inverse,
+      colors.text.accent,
+      lightness,
+    )!;
 
     return AppSegmentedControl<ReceiveAddressType>(
       key: const ValueKey('receive_address_type_tabs'),
@@ -84,6 +98,7 @@ class ReceiveTabs extends StatelessWidget {
       iconGap: iconGap,
       labelStyle: labelStyle,
       labelFontWeight: labelFontWeight,
+      position: position,
       segments: const [
         AppSegment(
           value: ReceiveAddressType.shielded,
@@ -113,6 +128,7 @@ class ReceiveTabs extends StatelessWidget {
     width: width,
     height: height,
     labelStyle: labelStyle,
+    position: position,
     indicatorKey: const ValueKey('receive_address_type_tabs_indicator'),
     tabKeys: (
       const ValueKey('receive_address_type_tab_shielded'),
@@ -901,8 +917,7 @@ List<ReceiveAddressInfoItem> receiveAddressInfoItems(
       ),
       const ReceiveAddressInfoItem(
         iconName: AppIcons.wallet,
-        text:
-            'Each new address is a diversified address derived from the same key. They all receive to the same wallet.',
+        text: 'Each new address is a diversified address derived from the same key. They all receive to the same wallet.',
       ),
     ];
   }
@@ -915,13 +930,11 @@ List<ReceiveAddressInfoItem> receiveAddressInfoItems(
     ),
     const ReceiveAddressInfoItem(
       iconName: AppIcons.dragon,
-      text:
-          'Commonly used by exchanges that require transparency or regulatory clarity. Also the default for compatibility across many wallets.',
+      text: 'Commonly used by exchanges that require transparency or regulatory clarity. Also the default for compatibility across many wallets.',
     ),
     const ReceiveAddressInfoItem(
       iconName: AppIcons.renew,
-      text:
-          'After this address receives ZEC and Veylor syncs, your next transparent address will automatically change. Previous addresses still belong to this wallet.',
+      text: 'After this address receives ZEC and Veylor syncs, your next transparent address will automatically change. Previous addresses still belong to this wallet.',
     ),
     ReceiveAddressInfoItem(
       iconName: touchUi ? AppIcons.shieldKeyholeOutline : AppIcons.shieldAsset,

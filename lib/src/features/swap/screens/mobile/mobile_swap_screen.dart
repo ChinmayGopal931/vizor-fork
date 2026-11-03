@@ -1,4 +1,5 @@
 import '../../../../core/navigation/mobile_sidebar_exit.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart' show Scaffold;
@@ -6,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/feedback/app_haptics.dart';
 import '../../../../core/formatting/zec_amount.dart';
 import '../../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../../core/layout/mobile/mobile_bottom_safe_area.dart';
@@ -343,9 +345,9 @@ class _MobileSwapScreenState extends ConsumerState<MobileSwapScreen> {
     final migrationSpendable = ref.watch(
       ironwoodMigrationAwareDisplaySpendableProvider(activeAccountUuid),
     );
-    final zecAvailableText = ZecAmount.fromZatoshi(
-      migrationSpendable,
-    ).pretty(denomStyle: ZecDenomStyle.upper).toString();
+    final zecAvailableText = ZecAmount.fromZatoshi(migrationSpendable)
+        .pretty(denomStyle: ZecDenomStyle.upper)
+        .toString();
 
     void openReview() {
       final generation = _sidebarExitGeneration;
@@ -403,7 +405,10 @@ class _MobileSwapScreenState extends ConsumerState<MobileSwapScreen> {
                                 swapNotifier.updateReceiveAmountFiat,
                             onToggleFiatInputMode:
                                 swapNotifier.toggleFiatInputMode,
-                            onToggleDirection: swapNotifier.toggleDirection,
+                            onToggleDirection: () {
+                              unawaited(AppHaptics.selection());
+                              swapNotifier.toggleDirection();
+                            },
                             onOpenExternalAssetPicker: () =>
                                 _openModal(_SwapModalSurface.assetSelector),
                             onOpenDestinationAddress: _openAddressEditor,

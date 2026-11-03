@@ -836,8 +836,7 @@ void main() {
         destinationAccountUuid: 'a',
         count: 1,
       ),
-      message:
-          'Wait for incoming gift cards to finish before deleting this account.',
+      message: 'Wait for incoming gift cards to finish before deleting this account.',
     ),
   ]) {
     testWidgets('removal explains ${testCase.name} blockers', (tester) async {
@@ -1367,9 +1366,8 @@ void main() {
         builder: (context, child) => AppTheme(
           data: AppThemeData.light,
           child: MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(textScaler: const TextScaler.linear(1.5)),
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: const TextScaler.linear(1.5)),
             child: child!,
           ),
         ),

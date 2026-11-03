@@ -165,6 +165,12 @@ void main() {
               findsOneWidget,
             );
             expect(tester.takeException(), isNull);
+            // Every layout slides the codes through the fixed frame,
+            // which clips them.
+            expect(
+              tester.widget<PageView>(find.byType(PageView)).clipBehavior,
+              Clip.hardEdge,
+            );
             final surface = tester.widget<ReceiveQrSurface>(
               find.byType(ReceiveQrSurface),
             );
@@ -220,11 +226,7 @@ void main() {
         );
         expect(tester.state(find.byType(PageView)), same(pagerState));
         expect(
-          find.text(
-            size.width > size.height
-                ? 'Copy address'
-                : 'Copy transparent address',
-          ),
+          find.bySemanticsLabel('Copy transparent address'),
           findsOneWidget,
         );
         expect(

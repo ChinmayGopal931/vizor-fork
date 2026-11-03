@@ -32,6 +32,7 @@ import '../features/private_usd/services/private_usd_account_data.dart';
 import '../features/private_usd/services/railgun_engine.dart'
     show RailgunWalletDeletion;
 import '../features/swap/providers/swap_activity_store.dart';
+import '../features/send/services/recent_send_recipients.dart';
 import '../features/migration/services/ironwood_migration_background_credential_store.dart';
 import '../features/migration/services/ironwood_migration_operation_registry.dart';
 import '../features/payment_links/providers/payment_link_claim_lifecycle_registry_provider.dart';
@@ -1858,6 +1859,13 @@ class AccountNotifier extends AsyncNotifier<AccountState> {
         'removeAccount: failed to delete Private USD conversions for '
         '$uuid: $e\n$st',
       );
+    }
+    try {
+      await ref
+          .read(sendRecentRecipientStoreProvider)
+          .deleteForAccount(accountUuid: uuid);
+    } catch (e, st) {
+      log('removeAccount: failed to delete send recents for $uuid: $e\n$st');
     }
     // Only after the Rust delete, which also drops this account's Ledger
     // outbox: a checkpointed draft must never lose its secret while its
