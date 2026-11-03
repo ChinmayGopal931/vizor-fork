@@ -4,6 +4,7 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
+
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_token_status`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `token_store`

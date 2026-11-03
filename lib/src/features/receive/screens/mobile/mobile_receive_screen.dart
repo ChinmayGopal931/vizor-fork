@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../../main.dart' show log;
+import '../../../../core/feedback/app_haptics.dart';
 import '../../../../core/config/network_config.dart'
     show kZcashDefaultCurrencyTicker;
 import '../../../../core/layout/mobile/mobile_top_nav.dart';
@@ -156,16 +157,43 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
   void _selectType(ReceiveAddressType type) {
     if (_selectedType == type) return;
     setState(() => _selectedType = type);
-    if (_pageController.hasClients) {
+    if (!_pageController.hasClients) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _pageController.jumpToPage(type.index);
+    } else {
       unawaited(
         _pageController.animateToPage(
           type.index,
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut,
+          duration: const Duration(milliseconds: 420),
+          curve: Curves.easeInOutCubic,
         ),
       );
     }
   }
+
+  double get _page {
+    final attached = _pageController.hasClients;
+    return attached && _pageController.position.haveDimensions
+        ? _pageController.page!
+        : _selectedType.index.toDouble();
+  }
+
+  // The chip follows the pager, so a swipe moves both together.
+  Widget _buildTabs({required double width}) => AnimatedBuilder(
+    animation: _pageController,
+    builder: (context, _) => ReceiveTabs(
+      width: width,
+      height: _MobileReceiveMetrics.tabsHeight,
+      iconSize: _MobileReceiveMetrics.tabsIconSize,
+      iconGap: AppSpacing.xs,
+      labelStyle: AppTypography.labelLarge,
+      labelFontWeight: FontWeight.w500,
+      alwaysDarkSelected: true,
+      selectedType: _selectedType,
+      position: _page,
+      onChanged: _selectType,
+    ),
+  );
 
   void _handlePageChanged(int page) {
     final type = ReceiveAddressType.values[page];
@@ -197,6 +225,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
     final address = _selectedAddress;
     if (address.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: address));
+    unawaited(AppHaptics.copy());
     if (!mounted) return;
     showAppToast(context, 'Address copied');
   }
@@ -266,17 +295,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                   children: [
                     const SizedBox(height: _MobileReceiveMetrics.topGap),
                     Center(
-                      child: ReceiveTabs(
-                        width: _MobileReceiveMetrics.tabsWidth,
-                        height: _MobileReceiveMetrics.tabsHeight,
-                        iconSize: _MobileReceiveMetrics.tabsIconSize,
-                        iconGap: AppSpacing.xs,
-                        labelStyle: AppTypography.labelLarge,
-                        labelFontWeight: FontWeight.w500,
-                        alwaysDarkSelected: true,
-                        selectedType: _selectedType,
-                        onChanged: _selectType,
-                      ),
+                      child: _buildTabs(width: _MobileReceiveMetrics.tabsWidth),
                     ),
                     const SizedBox(height: _MobileReceiveMetrics.tabsToQrGap),
                     Center(
@@ -322,7 +341,8 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                                           _MobileReceiveMetrics.buttonIconSize,
                                     ),
                                     child: Text(
-                                      'Copy $poolLabel address',
+                                      'Copy address',
+                                      semanticsLabel: 'Copy $poolLabel address',
                                       style: AppTypography.labelMedium,
                                     ),
                                   ),
@@ -405,6 +425,8 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
           child: PageView(
             key: const ValueKey('mobile_receive_qr_pager'),
             controller: _pageController,
+            // Builds the other pool's code ahead so a switch never waits on it.
+            allowImplicitScrolling: true,
             onPageChanged: _handlePageChanged,
             children: [
               for (final type in ReceiveAddressType.values)
@@ -476,19 +498,11 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                     onBack: () => context.pop(),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  ReceiveTabs(
+                  _buildTabs(
                     width: math.min(
                       _MobileReceiveMetrics.tabsWidth,
                       constraints.maxWidth - horizontalPadding * 2,
                     ),
-                    height: _MobileReceiveMetrics.tabsHeight,
-                    iconSize: _MobileReceiveMetrics.tabsIconSize,
-                    iconGap: AppSpacing.xs,
-                    labelStyle: AppTypography.labelLarge,
-                    labelFontWeight: FontWeight.w500,
-                    alwaysDarkSelected: true,
-                    selectedType: _selectedType,
-                    onChanged: _selectType,
                   ),
                   const SizedBox(height: AppSpacing.md),
                   if (split)

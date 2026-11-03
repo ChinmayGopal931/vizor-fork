@@ -56,6 +56,7 @@ import '../widgetbook/address_book_use_cases.dart';
 import '../widgetbook/address_verify_use_cases.dart';
 import 'zip321_prefill_use_cases.dart';
 import 'gift_card_usage_use_cases.dart';
+import 'gift_card_artwork_capture.dart';
 import 'mobile_method_selection_capture.dart';
 import 'mobile_hardware_selection_capture.dart';
 import 'mobile_onboarding_intro_capture.dart';
@@ -712,6 +713,18 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     mobile: true,
   ),
   FigmaCompareScenario(
+    id: 'gift-card-rogue-cat-amount',
+    description: 'Rogue cat gift card amount and artwork selector',
+    builder: buildRogueCatGiftCardAmountCapture,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'gift-card-rogue-cat-qr',
+    description: 'Rogue cat gift card QR share artwork',
+    builder: buildRogueCatGiftCardQrCapture,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
     id: 'gift-card-amount-usd',
     description: 'Gift card amount in USD with its canonical ZEC value',
     builder: buildGiftCardUsdAmountUseCase,
@@ -1357,6 +1370,13 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     id: 'mobile-gift-card-usage-ready',
     description: 'Gift Card sender usage preview',
     builder: buildGiftCardUsageReadyCapture,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
+    id: 'mobile-send-recipient-recents',
+    description: 'Mobile recipient step with recents and contacts',
+    builder: buildMobileSendRecipientRecentsUseCase,
     desktop: false,
     mobile: true,
   ),
@@ -4195,6 +4215,13 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     mobile: true,
   ),
   FigmaCompareScenario(
+    id: 'mobile-receive-transparent',
+    description: 'Mobile receive screen on the transparent pool',
+    builder: buildReceiveMobileTransparentUseCase,
+    desktop: false,
+    mobile: true,
+  ),
+  FigmaCompareScenario(
     id: 'mobile-receive-wide',
     description:
         'Adaptive receive with safe pane geometry and a deterministic wallet',
@@ -4251,6 +4278,14 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
     id: 'receive-desktop-shielded',
     description: 'Desktop receive pane with copy/share and a labelled request',
     builder: buildReceiveDesktopRequestEntryUseCase,
+    desktop: true,
+    mobile: false,
+  ),
+  FigmaCompareScenario(
+    id: 'receive-desktop-transparent',
+    description:
+        'Desktop transparent receive with copy/share and a text request',
+    builder: buildReceiveDesktopTransparentRequestEntryUseCase,
     desktop: true,
     mobile: false,
   ),

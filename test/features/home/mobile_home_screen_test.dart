@@ -2,8 +2,10 @@
 library;
 
 import 'dart:async';
+
 import 'package:zcash_wallet/src/features/home/widgets/home_activity_skeleton.dart';
 import 'package:zcash_wallet/src/features/activity/swap_activity_row_items_provider.dart';
+
 import 'dart:convert';
 
 import 'package:zcash_wallet/src/providers/voting/voting_home_cache_provider.dart';
@@ -308,6 +310,7 @@ Widget _app(
       ),
       GoRoute(path: '/send', builder: (_, _) => const Text('send route')),
       GoRoute(path: '/receive', builder: (_, _) => const Text('receive route')),
+      GoRoute(path: '/swap', builder: (_, _) => const Text('swap route')),
       GoRoute(
         path: '/settings',
         builder: (_, _) => const Text(
@@ -741,6 +744,27 @@ class _DeferredVotingStore implements VotingHomeCacheStore {
 
 void main() {
   setUpAll(loadAppTestFonts);
+
+  List<Object?> recordHaptics(WidgetTester tester) {
+    final feedback = <Object?>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'HapticFeedback.vibrate') {
+          feedback.add(call.arguments);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    return feedback;
+  }
+
   testWidgets('Home displays ETA in place of the pool subtitle', (
     tester,
   ) async {
@@ -765,9 +789,8 @@ void main() {
     );
     await tester.pumpWidget(
       _app(
-        _syncedState(
-          orchardBalance: BigInt.from(100000000),
-        ).copyWith(recentTransactions: [pending]),
+        _syncedState(orchardBalance: BigInt.from(100000000))
+            .copyWith(recentTransactions: [pending]),
         showVoting: false,
         etaLabels: const {'pending-receive': 'Est. 1–3 min'},
       ),
@@ -898,9 +921,8 @@ void main() {
               'config',
               'account',
               round,
-            ): const VotingHomeFact(
-              decision: VotingHomeDecision.show,
-            ).toJson(),
+            ): const VotingHomeFact(decision: VotingHomeDecision.show)
+                .toJson(),
           },
         }),
       );
@@ -1301,9 +1323,8 @@ void main() {
     ) async {
       await tester.binding.setSurfaceSize(Size(width, 852));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final initial = _syncedState(
-        orchardBalance: BigInt.from(250000000),
-      ).copyWith(hasRecentTransactionsData: false);
+      final initial = _syncedState(orchardBalance: BigInt.from(250000000))
+          .copyWith(hasRecentTransactionsData: false);
       final sync = FakeSyncNotifier(initial);
       await tester.pumpWidget(
         _app(initial, syncNotifier: sync, showVoting: false),
@@ -1751,9 +1772,8 @@ void main() {
 
     // Leaving the completion screen unmounts the host. Returning home must not
     // route back into a completion the user was already shown.
-    GoRouter.of(
-      tester.element(find.text('migration complete route')),
-    ).go('/home');
+    GoRouter.of(tester.element(find.text('migration complete route')))
+        .go('/home');
     await tester.pumpAndSettle();
 
     expect(find.text('migration complete route'), findsNothing);
@@ -1776,9 +1796,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    GoRouter.of(
-      tester.element(find.byType(MobileHomeScreen)),
-    ).go('/shell-activity');
+    GoRouter.of(tester.element(find.byType(MobileHomeScreen)))
+        .go('/shell-activity');
     await tester.pumpAndSettle();
     expect(find.text('shell activity route'), findsOneWidget);
 
@@ -1834,6 +1853,7 @@ void main() {
   testWidgets('keeps wallet actions available while migration is required', (
     tester,
   ) async {
+    final feedback = recordHaptics(tester);
     const requiredCta = IronwoodHomeMigrationCtaState.start(
       network: 'main',
       accountUuid: 'account-1',
@@ -1858,6 +1878,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_home_send')));
     await tester.pumpAndSettle();
     expect(find.text('send route'), findsOneWidget);
+    expect(feedback, ['HapticFeedbackType.lightImpact']);
   });
 
   testWidgets('shows total balance and remaining amount while migrating', (
@@ -2943,9 +2964,8 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _app(
-        _syncedState(
-          orchardBalance: BigInt.from(14312000000),
-        ).copyWith(transparentLockedBalance: BigInt.from(242000000)),
+        _syncedState(orchardBalance: BigInt.from(14312000000))
+            .copyWith(transparentLockedBalance: BigInt.from(242000000)),
       ),
     );
     await tester.pump();
@@ -3179,6 +3199,7 @@ void main() {
   });
 
   testWidgets('zero balance offers the first-receive action', (tester) async {
+    final feedback = recordHaptics(tester);
     await tester.pumpWidget(_app(_syncedState()));
     await tester.pump();
 
@@ -3188,6 +3209,24 @@ void main() {
     await tester.tap(find.text('Receive your first ZEC'));
     await tester.pumpAndSettle();
     expect(find.text('receive route'), findsOneWidget);
+    expect(feedback, ['HapticFeedbackType.lightImpact']);
+  });
+
+  testWidgets('swap action opens the swap route with a tap haptic', (
+    tester,
+  ) async {
+    final feedback = recordHaptics(tester);
+    await tester.pumpWidget(
+      _app(_syncedState(orchardBalance: BigInt.from(14312000000))),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('mobile_home_swap')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('swap route'), findsOneWidget);
+    expect(feedback, ['HapticFeedbackType.lightImpact']);
   });
 
   testWidgets('hides the swap entry when swap is disabled', (tester) async {
@@ -3329,9 +3368,8 @@ void main() {
     );
     await tester.pumpWidget(
       _app(
-        _syncedState(
-          orchardBalance: BigInt.from(100000000),
-        ).copyWith(recentTransactions: []),
+        _syncedState(orchardBalance: BigInt.from(100000000))
+            .copyWith(recentTransactions: []),
         giftCardActivityIndex: GiftCardActivityIndex.forAccount(
           accountUuid: 'account-1',
           createdRecords: [],
@@ -3373,9 +3411,8 @@ void main() {
         receivedRecords: [record],
       );
       final syncNotifier = FakeSyncNotifier(
-        _syncedState(
-          orchardBalance: BigInt.from(100000000),
-        ).copyWith(recentTransactions: [_tx(1)]),
+        _syncedState(orchardBalance: BigInt.from(100000000))
+            .copyWith(recentTransactions: [_tx(1)]),
       );
       rust_sync.TransactionInfo receive({required BigInt height}) {
         return rust_sync.TransactionInfo(
@@ -3659,9 +3696,8 @@ void main() {
 
     await tester.pumpWidget(
       _app(
-        _syncedState(
-          orchardBalance: BigInt.from(100000000),
-        ).copyWith(recentTransactions: [_tx(1)]),
+        _syncedState(orchardBalance: BigInt.from(100000000))
+            .copyWith(recentTransactions: [_tx(1)]),
       ),
     );
     await tester.pump();
@@ -3710,9 +3746,8 @@ void main() {
   testWidgets('display progress ticks do not rebuild mobile Home content', (
     tester,
   ) async {
-    final initial = _syncedState(
-      orchardBalance: BigInt.from(100000000),
-    ).copyWith(recentTransactions: [_tx(1)]);
+    final initial = _syncedState(orchardBalance: BigInt.from(100000000))
+        .copyWith(recentTransactions: [_tx(1)]);
     final notifier = FakeSyncNotifier(initial);
 
     await tester.pumpWidget(_app(initial, syncNotifier: notifier));

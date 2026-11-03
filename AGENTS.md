@@ -346,7 +346,7 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   with thin type and a thin red progress line; nothing starts them yet
   (`DynamicIslandManager` has no callers). The launch screen paints the
   `LaunchBackground` colour (black in dark mode, steel in light), and the
-  numeric keyboard's Done check is neon red. Sheets keep 4 px top corners
+  keyboard toolbar's Done check is neon red. Sheets keep 4 px top corners
   and, on iOS, bottom corners that follow the display's curve, which would
   clip square ones.
 
@@ -1114,8 +1114,11 @@ A hardware TEX request's ZIP 320 ephemeral address follows the same boundary:
 releasing the request before that boundary returns the address, so cancelled
 approvals cannot exhaust the ephemeral gap limit; after it the address stays
 reserved.
-Normal app exit closes the proposal gate, requests sync cancellation, and hides
-its desktop window before awaiting reservation cleanup. Rust allows 250ms to
+Normal app exit closes the proposal gate and requests sync cancellation.
+Desktop exits hide the window before awaiting reservation cleanup, except on
+Linux. Linux keeps the window visible during the same bounded cleanup, then
+calls `exit(0)` instead of GTK hide/destroy teardown to avoid the compositor
+shutdown crash. Rust allows 250ms to
 acquire the wallet write lock and drain accepted DB creators, then releases only
 unsubmitted reservations without waiting on SQLite contention. Once the budget
 expires, it starts no further cleanup; unfinished work is left for startup
@@ -1288,7 +1291,7 @@ Restores are the discovery import
 (`import_hardware_account`). Newly created accounts (`create_wallet`,
 `add_account`, and `import_wallet` from onboarding's reveal-then-confirm
 flow), payment-link claims (`import_wallet`), and Gift Card observers keep the
-exact height; testnet, regtest, and masquerade builds are unchanged. Code that queries lightwalletd from a restored birthday must use the
+exact height; testnet and regtest are unchanged. Code that queries lightwalletd from a restored birthday must use the
 rounded value, never the exact requested height. The weekly
 `update-mainnet-chain-tables.yml` workflow appends checkpoints.
 

@@ -15,6 +15,7 @@ class NeonSwitchTabs extends StatelessWidget {
     this.labelStyle,
     this.indicatorKey,
     this.tabKeys = (null, null),
+    this.position,
     super.key,
   });
 
@@ -29,6 +30,10 @@ class NeonSwitchTabs extends StatelessWidget {
   final TextStyle? labelStyle;
   final Key? indicatorKey;
   final (Key?, Key?) tabKeys;
+
+  /// A pager's page (0 to 1) for the plate to follow mid-swipe; null slides
+  /// it to [selected].
+  final double? position;
 
   @override
   Widget build(BuildContext context) {
@@ -46,11 +51,15 @@ class NeonSwitchTabs extends StatelessWidget {
       child: Stack(
         children: [
           AnimatedAlign(
-            duration: const Duration(milliseconds: 160),
+            // A tracked position already moves with the finger.
+            duration: position == null
+                ? const Duration(milliseconds: 160)
+                : Duration.zero,
             curve: Curves.easeOut,
-            alignment: selected == 0
-                ? Alignment.centerLeft
-                : Alignment.centerRight,
+            alignment: Alignment(
+              (position?.clamp(0.0, 1.0) ?? selected.toDouble()) * 2 - 1,
+              0,
+            ),
             child: Padding(
               padding: const EdgeInsets.all(2),
               child: Container(

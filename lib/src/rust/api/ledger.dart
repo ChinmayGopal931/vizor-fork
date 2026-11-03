@@ -4,7 +4,6 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
-
 import '../wallet/ledger.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
@@ -70,6 +69,18 @@ Future<LedgerAccountExport> ledgerParseMobileUfvkResponses({
   accountIndex: accountIndex,
   network: network,
   responses: responses,
+);
+
+/// Verify a Ledger export against a stored account, allowing only a stored-only
+/// Sapling component. Does not access the device or change either viewing key.
+Future<bool> ledgerAccountViewingKeysMatch({
+  required String expectedUfvk,
+  required String exportedUfvk,
+  required String network,
+}) => RustLib.instance.api.crateApiLedgerLedgerAccountViewingKeysMatch(
+  expectedUfvk: expectedUfvk,
+  exportedUfvk: exportedUfvk,
+  network: network,
 );
 
 /// Build the transport-neutral compact shielded PCZT signing exchange.
