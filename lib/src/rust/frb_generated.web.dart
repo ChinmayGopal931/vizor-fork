@@ -19,15 +19,11 @@ import 'api/sync.dart';
 import 'api/voting.dart';
 import 'api/voting_session.dart';
 import 'api/wallet.dart';
-
 import 'dart:async';
 import 'dart:convert';
-
 import 'frb_generated.dart';
 import 'network_privacy.dart';
-
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
-
 import 'third_party/zcash_voting/config.dart';
 import 'third_party/zcash_voting/delegate.dart';
 import 'third_party/zcash_voting/share_policy.dart';
@@ -484,6 +480,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_box_autoadd_bool(dynamic raw);
 
   @protected
+  BroadcastRouteInfo dco_decode_box_autoadd_broadcast_route_info(dynamic raw);
+
+  @protected
   ChainConfirmationSourceView
   dco_decode_box_autoadd_chain_confirmation_source_view(dynamic raw);
 
@@ -641,6 +640,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   VoteCommitStageKind dco_decode_box_autoadd_vote_commit_stage_kind(
     dynamic raw,
   );
+
+  @protected
+  BroadcastRouteInfo dco_decode_broadcast_route_info(dynamic raw);
 
   @protected
   ChainConfirmationSourceView dco_decode_chain_confirmation_source_view(
@@ -1261,6 +1263,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   bool? dco_decode_opt_box_autoadd_bool(dynamic raw);
+
+  @protected
+  BroadcastRouteInfo? dco_decode_opt_box_autoadd_broadcast_route_info(
+    dynamic raw,
+  );
 
   @protected
   ChainConfirmationSourceView?
@@ -2291,6 +2298,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_box_autoadd_bool(SseDeserializer deserializer);
 
   @protected
+  BroadcastRouteInfo sse_decode_box_autoadd_broadcast_route_info(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ChainConfirmationSourceView
   sse_decode_box_autoadd_chain_confirmation_source_view(
     SseDeserializer deserializer,
@@ -2482,6 +2494,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   VoteCommitStageKind sse_decode_box_autoadd_vote_commit_stage_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  BroadcastRouteInfo sse_decode_broadcast_route_info(
     SseDeserializer deserializer,
   );
 
@@ -3292,6 +3309,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer);
+
+  @protected
+  BroadcastRouteInfo? sse_decode_opt_box_autoadd_broadcast_route_info(
+    SseDeserializer deserializer,
+  );
 
   @protected
   ChainConfirmationSourceView?
@@ -4624,6 +4646,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_broadcast_route_info(
+    BroadcastRouteInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_chain_confirmation_source_view(
     ChainConfirmationSourceView self,
     SseSerializer serializer,
@@ -4845,6 +4873,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_vote_commit_stage_kind(
     VoteCommitStageKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_broadcast_route_info(
+    BroadcastRouteInfo self,
     SseSerializer serializer,
   );
 
@@ -5840,6 +5874,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_broadcast_route_info(
+    BroadcastRouteInfo? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_chain_confirmation_source_view(

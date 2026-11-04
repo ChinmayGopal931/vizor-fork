@@ -14,6 +14,7 @@ import 'private_usd_explorer.dart';
 import 'private_usd_fees.dart';
 import 'private_usd_messages.dart';
 import 'private_usd_status_presentation.dart';
+import 'private_usd_broadcast_route_rows.dart';
 
 /// The reverse progress screen's main button.
 enum PrivateUsdReverseAction { pay, authorizeSettlement, newConversion }
@@ -418,6 +419,11 @@ List<SwapStatusDetailRowData> _details(
         value: truncatedTxid(privateUsdDisplayTxid(receive)),
         copyable: true,
         copyText: privateUsdDisplayTxid(receive),
+      ),
+    if (receive != null)
+      ...privateUsdBroadcastRouteRows(
+        privateUsdDisplayTxid(receive),
+        showUnrecorded: false,
       ),
     if (acceptedAt != null)
       SwapStatusDetailRowData(

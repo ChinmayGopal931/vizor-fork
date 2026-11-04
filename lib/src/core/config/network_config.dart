@@ -47,13 +47,13 @@ enum ZcashNetwork {
 
   String get lightwalletdHost => switch (this) {
     mainnet => 'us.zec.stardust.rest',
-    testnet => 'lightwalletd.testnet.electriccoin.co',
+    testnet => 'testnet.zec.rocks',
     regtest => '127.0.0.1',
   };
 
   int get lightwalletdPort => switch (this) {
     mainnet => 443,
-    testnet => 9067,
+    testnet => 443,
     regtest => 9067,
   };
 

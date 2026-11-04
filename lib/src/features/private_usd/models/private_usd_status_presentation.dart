@@ -14,6 +14,7 @@ import '../services/private_usd_engine.dart';
 import 'private_usd_balances.dart';
 import 'private_usd_explorer.dart';
 import 'private_usd_messages.dart';
+import 'private_usd_broadcast_route_rows.dart';
 
 /// What the forward progress screen offers once a conversion ended.
 enum PrivateUsdProgressAction { viewBalance, tryAgain }
@@ -489,6 +490,8 @@ List<SwapStatusDetailRowData> _details(
         copyable: true,
         copyText: privateUsdDisplayTxid(deposit),
       ),
+    if (deposit != null)
+      ...privateUsdBroadcastRouteRows(privateUsdDisplayTxid(deposit)),
     if (payout != null)
       SwapStatusDetailRowData(
         label: PrivateUsdCopy.detailPayout,
@@ -504,6 +507,8 @@ List<SwapStatusDetailRowData> _details(
         copyable: true,
         copyText: privateUsdDisplayTxid(sweep),
       ),
+    if (sweep != null)
+      ...privateUsdBroadcastRouteRows(privateUsdDisplayTxid(sweep)),
     SwapStatusDetailRowData(
       label: PrivateUsdCopy.detailStarted,
       value: formatDayMonthTime(

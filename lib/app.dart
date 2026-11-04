@@ -156,6 +156,7 @@ import 'src/providers/enhance_pir_provider.dart';
 import 'src/core/storage/enhance_pir_preference_store.dart';
 import 'src/providers/linux_update_provider.dart';
 import 'src/providers/network_privacy_provider.dart';
+import 'src/providers/nym_broadcast_provider.dart';
 import 'src/providers/rpc_endpoint_failover_provider.dart';
 import 'src/providers/rpc_endpoint_provider.dart';
 import 'src/providers/router_refresh_provider.dart';
@@ -233,6 +234,9 @@ Future<void> initializeZcashWalletRuntime() async {
   await RustLib.init();
   _startVotingObservabilityLogging();
   log('runtime: applying network privacy policy');
+  // The Nym broadcast route first: nothing may broadcast on a laxer route
+  // than the saved one.
+  await initializeNymBroadcastRoute();
   await initializeNetworkPrivacyRuntime();
   await rust_simple.configureFastTestnetMigration(
     enabled: kZcashFastTestnetMigration,

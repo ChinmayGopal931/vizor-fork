@@ -75,9 +75,14 @@ use enhancement::{queue_stored_transactions, EnhancementPolicy, EnhancementSessi
 pub(crate) use error::SyncError;
 use error::{RecoveryStrategy, MAX_REWINDS_PER_RUN};
 pub(crate) use lwd::{
+    broadcast_route::{
+        is_nym_broadcast, latest_route as latest_broadcast_route,
+        open_broadcast_lwd_transport, route_for_txid as broadcast_route_for_txid,
+        set_nym_broadcast, BroadcastRoute,
+    },
     dispatch_signal::Dispatched, get_compact_block_hash, get_latest_block, next_stream_message,
     open_background_direct_lwd_channel, open_background_direct_lwd_transport,
-    open_isolated_lwd_channel, open_isolated_lwd_transport, open_lwd_channel,
+    open_lwd_channel,
     open_lwd_channel_with_cancel, open_lwd_transport, open_lwd_transport_with_cancel,
     send_transaction, send_transaction_signalling, send_transaction_with_status,
     transparent_lookup::TransparentLookupGate,
