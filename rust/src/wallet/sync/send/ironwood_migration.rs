@@ -878,8 +878,11 @@ pub(crate) async fn complete_orchard_migration_immediate_pczt(
         }
     };
     let mut client =
-        match crate::wallet::sync_engine::open_isolated_lwd_channel(lightwalletd_url).await {
-            Ok(client) => client,
+        match crate::wallet::sync_engine::open_broadcast_lwd_transport(lightwalletd_url).await {
+            Ok((transport, route)) => {
+                route.record(&extracted.raw_tx);
+                zcash_client_backend::proto::service::compact_tx_streamer_client::CompactTxStreamerClient::new(transport)
+            }
             Err(error) => {
                 if let Ok(mut store) = keystone_immediate_migration_requests().lock() {
                     store.insert(request_id.to_string(), stored);

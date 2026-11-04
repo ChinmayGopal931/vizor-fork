@@ -2817,9 +2817,12 @@ pub(crate) async fn migrate_orchard_to_ironwood_immediately(
     {
         return Err(network_upgrade::START_HOLD_MESSAGE.to_string());
     }
-    let mut client = crate::wallet::sync_engine::open_isolated_lwd_channel(lightwalletd_url)
-        .await
-        .map_err(|e| format!("Connect to lightwalletd for Immediate migration failed: {e}"))?;
+    let (transport, route) =
+        crate::wallet::sync_engine::open_broadcast_lwd_transport(lightwalletd_url)
+            .await
+            .map_err(|e| format!("Connect to lightwalletd for Immediate migration failed: {e}"))?;
+    route.record(&extracted.raw_tx);
+    let mut client = zcash_client_backend::proto::service::compact_tx_streamer_client::CompactTxStreamerClient::new(transport);
     // From this point a cancelled future or terminated process cannot prove
     // that lightwalletd rejected the transaction. Persist the conservative
     // restart policy before starting SendTransaction.
@@ -7549,9 +7552,12 @@ async fn broadcast_raw_transaction_isolated(
     lightwalletd_url: &str,
     raw_tx: &[u8],
 ) -> Result<(), String> {
-    let mut client = crate::wallet::sync_engine::open_isolated_lwd_channel(lightwalletd_url)
-        .await
-        .map_err(|e| format!("Open isolated broadcast route: {e}"))?;
+    let (transport, route) =
+        crate::wallet::sync_engine::open_broadcast_lwd_transport(lightwalletd_url)
+            .await
+            .map_err(|e| format!("Open isolated broadcast route: {e}"))?;
+    route.record(raw_tx);
+    let mut client = zcash_client_backend::proto::service::compact_tx_streamer_client::CompactTxStreamerClient::new(transport);
     broadcast_raw_transaction(&mut client, raw_tx).await
 }
 
@@ -7718,7 +7724,9 @@ where
         }
 
         let txid_hex = hex::encode(&tx.txid_bytes);
-        let first_attempt = if crate::network_privacy::is_tor_desired() {
+        let first_attempt = if crate::network_privacy::is_tor_desired()
+            || crate::wallet::sync_engine::is_nym_broadcast()
+        {
             broadcast_raw_transaction_isolated(lightwalletd_url, &tx.raw_tx).await
         } else {
             broadcast_raw_transaction(client, &tx.raw_tx).await
@@ -7749,7 +7757,9 @@ where
                     stats.failed += 1;
                     break;
                 }
-                let retry = if crate::network_privacy::is_tor_desired() {
+                let retry = if crate::network_privacy::is_tor_desired()
+                    || crate::wallet::sync_engine::is_nym_broadcast()
+                {
                     broadcast_raw_transaction_isolated(lightwalletd_url, &tx.raw_tx).await
                 } else {
                     broadcast_raw_transaction(client, &tx.raw_tx).await

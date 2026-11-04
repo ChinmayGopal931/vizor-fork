@@ -5,10 +5,9 @@
 
 import '../frb_generated.dart';
 import '../network_privacy.dart';
-
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `apply_headers`, `binary_search_birthday_height`, `block_at_height`, `classify_mainnet_tip_reply`, `collect_body`, `collect_limited_body`, `is_mainnet`, `mainnet_tip`, `network_http_response`, `normalize_tor_http_error`, `timed_birthday_request`, `validate_mainnet_tip`, `with_api_response_body_timeout`, `with_tor_http_request_cancellation`, `with_tor_http_request_timeout`, `write_body_to_file`
+// These functions are ignored because they are not marked as `pub`: `apply_headers`, `binary_search_birthday_height`, `block_at_height`, `broadcast_route_info`, `classify_mainnet_tip_reply`, `collect_body`, `collect_limited_body`, `is_mainnet`, `mainnet_tip`, `network_http_response`, `normalize_tor_http_error`, `timed_birthday_request`, `validate_mainnet_tip`, `with_api_response_body_timeout`, `with_tor_http_request_cancellation`, `with_tor_http_request_timeout`, `write_body_to_file`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `MainnetTipReply`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `eq`, `fmt`
 
@@ -49,6 +48,29 @@ NetworkPrivacyStatus getNetworkPrivacyStatus() =>
 
 bool isTorEnabled() =>
     RustLib.instance.api.crateApiNetworkPrivacyIsTorEnabled();
+
+/// Turns the Nym broadcast route on or off (Free Society Hack, Nov 2026).
+///
+/// While on, every transaction broadcast goes over a fresh Nym mixnet tunnel
+/// and fails closed when none opens; sync and other requests keep the route
+/// [configure_network_privacy] chose. Dart applies the saved choice at
+/// startup before anything can broadcast, and orders writes so the saved
+/// choice is never laxer than this one.
+void setNymBroadcastEnabled({required bool enabled}) => RustLib.instance.api
+    .crateApiNetworkPrivacySetNymBroadcastEnabled(enabled: enabled);
+
+bool isNymBroadcastEnabled() =>
+    RustLib.instance.api.crateApiNetworkPrivacyIsNymBroadcastEnabled();
+
+/// The route `txid` (display hex) was broadcast over, if this process sent it.
+BroadcastRouteInfo? broadcastRouteForTxid({required String txid}) => RustLib
+    .instance
+    .api
+    .crateApiNetworkPrivacyBroadcastRouteForTxid(txid: txid);
+
+/// The most recent broadcast's route in this process.
+BroadcastRouteInfo? latestBroadcastRoute() =>
+    RustLib.instance.api.crateApiNetworkPrivacyLatestBroadcastRoute();
 
 /// Suspends or resumes Tor's circuit maintenance alongside the app lifecycle.
 ///
@@ -176,6 +198,66 @@ Future<BigInt> estimateImportBirthdayHeight({
   tipHeight: tipHeight,
   tipTime: tipTime,
 );
+
+/// The route a transaction was broadcast over in this process, as far as the
+/// app knows it. Kept in memory only.
+class BroadcastRouteInfo {
+  final String txid;
+
+  /// `nym`, `tor` or `direct`.
+  final String route;
+
+  /// The Nym exit's address: the address the light-wallet server saw.
+  /// Only set for `nym`; the app never looks up the user's own IP.
+  final String? exitIp;
+
+  /// Two-letter country of the exit, as Cloudflare's trace gave it.
+  final String? exitCountry;
+
+  /// The light-wallet server's address, as resolved through the tunnel.
+  final String? serverAddress;
+  final BigInt setupMillis;
+
+  /// Which Nym tunnel carried it (1 is the first); 0 off Nym.
+  final int tunnelAttempt;
+  final BigInt broadcastAtUnix;
+
+  const BroadcastRouteInfo({
+    required this.txid,
+    required this.route,
+    this.exitIp,
+    this.exitCountry,
+    this.serverAddress,
+    required this.setupMillis,
+    required this.tunnelAttempt,
+    required this.broadcastAtUnix,
+  });
+
+  @override
+  int get hashCode =>
+      txid.hashCode ^
+      route.hashCode ^
+      exitIp.hashCode ^
+      exitCountry.hashCode ^
+      serverAddress.hashCode ^
+      setupMillis.hashCode ^
+      tunnelAttempt.hashCode ^
+      broadcastAtUnix.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BroadcastRouteInfo &&
+          runtimeType == other.runtimeType &&
+          txid == other.txid &&
+          route == other.route &&
+          exitIp == other.exitIp &&
+          exitCountry == other.exitCountry &&
+          serverAddress == other.serverAddress &&
+          setupMillis == other.setupMillis &&
+          tunnelAttempt == other.tunnelAttempt &&
+          broadcastAtUnix == other.broadcastAtUnix;
+}
 
 class ImportBirthdayMetadata {
   final BigInt saplingActivationHeight;

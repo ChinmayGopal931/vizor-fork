@@ -1823,9 +1823,9 @@ async fn store_and_broadcast_pczts_inner(
 
     // Only unmined rounds need a live tip and expiry checks. Mined evidence is
     // already a completed submission, even after the original expiry height.
-    let expiry_transport =
-        match crate::wallet::sync_engine::open_isolated_lwd_transport(lightwalletd_url).await {
-            Ok(transport) => transport,
+    let (expiry_transport, expiry_route) =
+        match crate::wallet::sync_engine::open_broadcast_lwd_transport(lightwalletd_url).await {
+            Ok(opened) => opened,
             Err(error) => {
                 return rpc_failure(format!("Failed to open the broadcast route: {error}"));
             }
@@ -1886,7 +1886,7 @@ async fn store_and_broadcast_pczts_inner(
     }) {
         return refuse_expired(error);
     }
-    let mut first_transport = Some(expiry_transport);
+    let mut first_transport = Some((expiry_transport, expiry_route));
     let mut newly_broadcasted = 0;
     let broadcast_plan = 'broadcast: loop {
         for (index, item) in prepared.iter().enumerate() {
@@ -1900,13 +1900,16 @@ async fn store_and_broadcast_pczts_inner(
                     PcztBroadcastStep::Fail(_) => unreachable!(),
                 }
             }
-            let transport = if let Some(transport) = first_transport.take() {
-                Ok(transport)
+            let transport = if let Some(opened) = first_transport.take() {
+                Ok(opened)
             } else {
-                crate::wallet::sync_engine::open_isolated_lwd_transport(lightwalletd_url).await
+                crate::wallet::sync_engine::open_broadcast_lwd_transport(lightwalletd_url).await
             };
             let transport = match transport {
-                Ok(transport) => transport,
+                Ok((transport, route)) => {
+                    route.record(&item.extracted.raw_tx);
+                    transport
+                }
                 Err(error) => {
                     match pczt_broadcast_step(
                         index,
@@ -2551,9 +2554,11 @@ pub async fn extract_and_broadcast_pczt(
     // but a response deadline is ambiguous: lightwalletd may already
     // have relayed the transaction, so we store locally and let the
     // normal pending/resubmit path reconcile it.
-    let transport = crate::wallet::sync_engine::open_isolated_lwd_transport(lightwalletd_url)
-        .await
-        .map_err(|e| e.to_string())?;
+    let (transport, route) =
+        crate::wallet::sync_engine::open_broadcast_lwd_transport(lightwalletd_url)
+            .await
+            .map_err(|e| e.to_string())?;
+    route.record(&tx_bytes);
     let latest = crate::wallet::sync_engine::latest_block_for_transaction_with_client(
         &mut CompactTxStreamerClient::new(transport.clone()),
         lightwalletd_url,

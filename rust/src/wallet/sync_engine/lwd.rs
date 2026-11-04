@@ -41,6 +41,7 @@ use crate::wallet::{db::with_wallet_db_write_lock, network::WalletNetwork};
 use super::block_source::MemoryBlockSource;
 use super::{elapsed, SyncError, WalletDatabase};
 
+pub(super) mod broadcast_route;
 pub(super) mod dispatch_signal;
 pub(super) mod transparent_lookup;
 
@@ -194,6 +195,9 @@ pub(crate) async fn open_lwd_transport_with_cancel(
 /// Opens an isolated Tor circuit when Tor is enabled. Direct mode retains its
 /// normal direct transport. Use this for transaction broadcasts that must not
 /// share a Tor circuit with other wallet activity.
+// Broadcasts open their route with broadcast_route::open_broadcast_lwd_transport,
+// which keeps this route unless the Nym route is on.
+#[allow(dead_code)]
 pub(crate) async fn open_isolated_lwd_channel(
     lightwalletd_url: &str,
 ) -> Result<CompactTxStreamerClient<Channel>, SyncError> {

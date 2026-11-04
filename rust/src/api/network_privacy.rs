@@ -87,6 +87,72 @@ pub fn is_tor_enabled() -> bool {
     crate::network_privacy::is_tor_desired()
 }
 
+/// Turns the Nym broadcast route on or off (Free Society Hack, Nov 2026).
+///
+/// While on, every transaction broadcast goes over a fresh Nym mixnet tunnel
+/// and fails closed when none opens; sync and other requests keep the route
+/// [configure_network_privacy] chose. Dart applies the saved choice at
+/// startup before anything can broadcast, and orders writes so the saved
+/// choice is never laxer than this one.
+#[flutter_rust_bridge::frb(sync)]
+pub fn set_nym_broadcast_enabled(enabled: bool) {
+    crate::wallet::sync_engine::set_nym_broadcast(enabled);
+}
+
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_nym_broadcast_enabled() -> bool {
+    crate::wallet::sync_engine::is_nym_broadcast()
+}
+
+/// The route a transaction was broadcast over in this process, as far as the
+/// app knows it. Kept in memory only.
+pub struct BroadcastRouteInfo {
+    pub txid: String,
+    /// `nym`, `tor` or `direct`.
+    pub route: String,
+    /// The Nym exit's address: the address the light-wallet server saw.
+    /// Only set for `nym`; the app never looks up the user's own IP.
+    pub exit_ip: Option<String>,
+    /// Two-letter country of the exit, as Cloudflare's trace gave it.
+    pub exit_country: Option<String>,
+    /// The light-wallet server's address, as resolved through the tunnel.
+    pub server_address: Option<String>,
+    pub setup_millis: u64,
+    /// Which Nym tunnel carried it (1 is the first); 0 off Nym.
+    pub tunnel_attempt: u32,
+    pub broadcast_at_unix: u64,
+}
+
+fn broadcast_route_info(
+    txid: String,
+    route: crate::wallet::sync_engine::BroadcastRoute,
+) -> BroadcastRouteInfo {
+    BroadcastRouteInfo {
+        txid,
+        route: route.kind.as_str().to_owned(),
+        exit_ip: route.exit_ip.map(|ip| ip.to_string()),
+        exit_country: route.exit_country,
+        server_address: route.server.map(|addr| addr.to_string()),
+        setup_millis: route.setup.as_millis() as u64,
+        tunnel_attempt: route.tunnel_attempt,
+        broadcast_at_unix: route.at_unix,
+    }
+}
+
+/// The route `txid` (display hex) was broadcast over, if this process sent it.
+#[flutter_rust_bridge::frb(sync)]
+pub fn broadcast_route_for_txid(txid: String) -> Option<BroadcastRouteInfo> {
+    crate::wallet::sync_engine::broadcast_route_for_txid(&txid)
+        .map(|route| broadcast_route_info(txid.trim().to_ascii_lowercase(), route))
+}
+
+/// The most recent broadcast's route in this process.
+#[flutter_rust_bridge::frb(sync)]
+pub fn latest_broadcast_route() -> Option<BroadcastRouteInfo> {
+    crate::wallet::sync_engine::latest_broadcast_route()
+        .map(|(txid, route)| broadcast_route_info(txid, route))
+}
+
 /// Suspends or resumes Tor's circuit maintenance alongside the app lifecycle.
 ///
 /// A bootstrapped client otherwise keeps guard connections and directory tasks
