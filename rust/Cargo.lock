@@ -5416,11 +5416,13 @@ dependencies = [
  "log",
  "nym-http-api-client",
  "nym-smolmix",
+ "prost 0.14.4",
  "rustls 0.23.46",
  "thiserror 2.0.21",
  "tokio",
  "tokio-rustls 0.26.6",
  "tonic",
+ "tonic-prost",
  "tower",
  "webpki-roots 1.0.11",
 ]
