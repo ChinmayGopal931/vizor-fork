@@ -650,6 +650,7 @@ Skip unit tests for the delegates' glue and the window placement; the device rou
 | UI14 | The issuer accepts App Attest | MI7, EI6 | None needed while makers don't require tokens |
 | UI15 | The first mainnet sync time on an iPhone (about 40 min on the A35) | MI3, on mainnet | A resumable sync; keep the screen on |
 | UI16 | iOS reclaims a suspended app's listening socket (Apple TN2277), so the bridge may be dead after the background | MI0.6 | XI14: restart the bridge on return, then update the proxy or reload the page |
+| UI17 | **Anonymous RPC is Android-only for now** (`docs/anon-rpc-plan.md`, D10). The Kotlin host runs a second hidden page, the anon-rpc harness, on `com.zcash.wallet/anon_rpc`, and the Railgun page's CSP and route table admit the loopback relay (`http://127.0.0.1:*`). The Swift host has neither: no `AnonRpcHostHandler`, no second page kind, and `RailgunContentRules` blocks the loopback. Dart keeps the mode off where the handler does not answer `supported` (`anonRpcHostSupportedProvider`), so iOS keeps today's direct providers | After MI2: a second page kind in the Swift host, the loopback allowance in the content rules and the handler | None needed: the mode is off on iOS until the host exists |
 
 **Accepted risks.** Those of A-plan §11 apply. On iOS, also:
 

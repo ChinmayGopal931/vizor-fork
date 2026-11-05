@@ -28,11 +28,41 @@ confirms Mumbai has the track (its CROPS Upgrade prize is Continuity-only).
 ## 1. Status
 
 - M0 plan: this file, 2026-11-05.
-- M1 Rust: not started.
-- M2 page and native host: not started.
-- M3 Dart: not started.
-- M4 device bring-up: not started.
+- M1 Rust: written 2026-11-05 (`rust/src/anon_rpc.rs`, `rust/src/api/anon_rpc.rs`,
+  `RpcTransport` at every `EvmRpc` site, the union allowlist, the pins).
+  `cargo check --tests` is clean and the ten new tests pass (the relay
+  test's client needed a fix, see Deviations). The FRB bindings are
+  regenerated.
+- M2 page and native host: done 2026-11-05. `android/anon-rpc-web/` builds a
+  61 KiB `anon.js` plus the sandbox page and `iframe-boot.js` into
+  `assets/anon/`; the Kotlin host runs one page per kind, the anon handler
+  is registered, the Railgun page's CSP and route admit the loopback relay
+  (the rebuilt bundle changed only the three `index.html` copies), and the
+  Kotlin unit tests pass (`AnonRpcBoundaryTest` added).
+- M3 Dart: written 2026-11-05 (`lib/src/features/anon_rpc/`, the Settings
+  row and sheet, the relay plumbing in `railgun_engine_provider.dart`).
+  `fvm flutter analyze` is clean; the Private USD and Settings tests pass.
+  Not yet run on a device.
+- M4 device bring-up: blocked on the Galaxy A35 being attached (`adb
+  devices` lists none).
 - M5 submission: not started.
+
+**Deviations.**
+
+- D10 refined: the mode is also gated on the platform hosting the page.
+  `anonRpcHostSupportedProvider` asks the anon handler `supported`; where
+  nothing answers (iOS, desktop) Rust's mode is set off whatever is saved,
+  the Settings row is hidden, and the Railgun page keeps direct providers.
+  Without this an iOS build would fail every Ethereum request closed.
+- The anon-rpc tests run on a multi-threaded tokio runtime: they block on a
+  std channel while the relay task must keep running.
+- hyper's HTTP/1 server treats a client half-close mid-request as the
+  connection ending (`half_close` defaults to false), so the relay test's
+  client sends `Connection: close` and reads to EOF instead of shutting
+  down its write side. Chromium never half-closes first.
+- `/android/anon-rpc-web/node_modules/` is ignored like the Railgun page's.
+- `docs/private-usd-ios-plan.md` gained UI17: what the Swift host must add
+  before the mode can be on there.
 
 ## 2. How to work
 
