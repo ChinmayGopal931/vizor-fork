@@ -45,7 +45,10 @@ confirms Mumbai has the track (its CROPS Upgrade prize is Continuity-only).
   Not yet run on a device.
 - M4 device bring-up: blocked on the Galaxy A35 being attached (`adb
   devices` lists none).
-- M5 submission: not started.
+- M5 submission: the README's "Anonymous RPC" and "CROPS" sections are
+  drafted (5b5f4e2bd); they state the zecSwap stand-in honestly (O3) and
+  must be re-read against what M4 shows. The video, the gateway and the
+  logging proxy wait for the owner (O2, O4).
 
 **Deviations.**
 
