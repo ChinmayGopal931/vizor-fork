@@ -131,6 +131,74 @@ Identifier=com.keplr.vizor.testnet
 TeamIdentifier=SZTB68DXM4
 ```
 
+## Anonymous RPC (ETHGlobal Mumbai, November 2026)
+
+Veylor's Shielded USD feature reads Ethereum: the swap engine checks the
+windows and Deposits contracts, and the Railgun page syncs its notes through an
+Ethereum RPC. **Before the hackathon** those requests went straight to the RPC
+provider (the build's keyed Alchemy or Infura URL, else publicnode), over Tor
+only when the user had turned Tor on in Settings. The provider saw the phone's
+IP address together with every deposit address, swap index and contract read.
+Privacy was a setting, off by default.
+
+**New during the hackathon:** every Ethereum JSON-RPC request goes through an
+[anon-rpc](https://ethereum.github.io/anon-rpc/) worker by default, on
+Android. Rust is the one gateway (`rust/src/anon_rpc.rs`): the engine's reads
+go through it directly, and the Railgun page's providers point at a loopback
+relay it serves, so neither has a direct path left. The worker is a bundle
+whose keccak hash is pinned in a specifier contract on Ethereum; a second
+hidden page runs the official browser harness, which checks the bundle against
+that hash before running a byte of it in a null-origin sandbox. The default
+network is tor-js (Arti compiled to WebAssembly, circuits built on the phone,
+reaching Tor through a KPS gateway). The mode fails closed: while the page is
+down or the worker is not ready, requests are refused, never sent directly.
+Each account's reads carry their own isolation key, so two accounts' reads
+leave through independent circuits. Settings has an "Anonymous RPC" row to pick
+Tor, Nox (testnet) or Off.
+
+Traffic that stays on its previous route, on purpose: the Zcash sync to
+lightwalletd, the Railgun screening nodes, indexer and proving artifacts, the
+swap maker, relayer and token issuer, the one-time check of an RPC URL the
+user types in Settings, and the Home price. None of it is Ethereum JSON-RPC,
+and all of it still follows the Tor switch. iOS keeps direct providers until
+its host gains the page.
+
+The plan, decisions and status are in `docs/anon-rpc-plan.md`. To build the
+anon-rpc page: `cd android/anon-rpc-web && npm ci --ignore-scripts && npm run
+build`. A build may name its own KPS gateways with
+`--dart-define=VIZOR_ANON_RPC_TOR_GATEWAYS=ip:port:certhash,…`; without the
+define it uses the Ethereum Foundation's demonstration gateway.
+
+## CROPS
+
+- **C.** What we run that the user depends on: nothing for the Zcash wallet
+  (any lightwalletd), and for Shielded USD the swap maker and relayer, which
+  bridging needs and sends use. If they disappear or refuse, balances, deposits
+  and the on-chain refund paths of the windows contract remain; an open swap
+  unwinds on chain. The KPS gateway for tor-js is the Ethereum Foundation's
+  demonstration gateway unless a build names its own; if it goes away,
+  Anonymous RPC fails closed and the user can switch to Nox or turn it off.
+- **O.** Apache-2.0 (the Railgun page bundle ships GPL and AGPL code with its
+  notices). A clean clone does not yet build on its own: `rust/Cargo.toml`
+  patches the zecSwap crates to a checkout outside the repository until that
+  revision is published; everything else, the anon-rpc page included, builds
+  from the repo.
+- **P.** The RPC provider sees Ethereum requests arriving from Tor exits (or
+  mixnet exits), grouped by a per-account isolation key, never the phone's
+  address. The KPS gateway sees the phone's address and encrypted Tor cells,
+  never destinations or content. publicnode sees one public `eth_call` that
+  reads the worker's hash. lightwalletd, the screening nodes, the indexer, the
+  maker and the relayer see what they saw before, over Tor when Tor is on. The
+  client has no analytics or trackers; Play builds carry Google's review SDK,
+  which the degoogled build excludes.
+- **S.** Seeds live in the platform's secure storage and never reach the
+  anon-rpc page, whose worker runs in a null-origin sandbox with no access to
+  keys, cookies or the app's storage. The worker's integrity rests on the hash
+  in its specifier contract, whose owner (the network, published by the
+  Ethereum Foundation and its adopters) can publish a new version; the
+  gateway is a blind relay; Tor's own assumptions apply. Rust refuses to fall
+  back to a direct connection.
+
 ## Notes
 
 - Back up your mnemonic. Veylor cannot recover funds if you lose it.
