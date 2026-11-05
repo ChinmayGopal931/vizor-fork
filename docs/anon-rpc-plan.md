@@ -95,7 +95,7 @@ confirms Mumbai has the track (its CROPS Upgrade prize is Continuity-only).
 | Dart | `fvm flutter analyze`; `fvm flutter test` |
 | Anon page bundle | `cd android/anon-rpc-web && npm ci --ignore-scripts && npm run build` |
 | Kotlin tests | `cd android && ./gradlew :app:testDebugUnitTest --tests 'com.keplr.vizor.railgun.*'` |
-| Device (Galaxy A35) | `fvm flutter run -d RZCX40721QZ --dart-define=VIZOR_FORM_FACTOR=mobile --dart-define=VIZOR_PRIVATE_USD_ENABLED=true` |
+| Device (Galaxy A35) | `CARGOKIT_SKIP_EMULATOR_ABIS=true fvm flutter run -d RZCX40721QZ --dart-define=VIZOR_FORM_FACTOR=mobile --dart-define=VIZOR_PRIVATE_USD_ENABLED=true`. The env var makes the debug variant build Rust for the device's ABI alone: without it cargokit adds x86 and x86_64, about 20 GB of debug artifacts each under `build/rust_lib_zcash_wallet/build/`, which filled the disk twice on 2026-11-05. Debug APK the same way with `build apk --debug --target-platform android-arm64`; the output is `build/app/outputs/flutter-apk/app-debug.apk` |
 | Worker logs on device | `log` events of the anon page in a debug build (`AnonRpcService` prints redacted status lines) |
 
 ## 3. What exists (before)
