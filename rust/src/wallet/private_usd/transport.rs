@@ -9,6 +9,8 @@
 //! the code and status, never on the service's text.
 
 use std::fmt;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -27,6 +29,46 @@ pub(crate) trait HttpTransport {
 impl HttpTransport for RoutedHttp {
     async fn send(&self, request: RoutedRequest) -> Result<RoutedResponse, RoutedError> {
         RoutedHttp::send(self, request).await
+    }
+}
+
+/// The Ethereum RPC's transport, which `swap::rpc_transport` picks by the
+/// anon-rpc mode: the anon-rpc worker while it is on (failing closed while
+/// nothing carries a request), routed HTTP otherwise. The maker, relayer and
+/// issuer clients stay on [`RoutedHttp`] whatever the mode.
+pub(crate) enum RpcTransport {
+    Routed(RoutedHttp),
+    Anon(AnonRpcTransport),
+}
+
+impl HttpTransport for RpcTransport {
+    async fn send(&self, request: RoutedRequest) -> Result<RoutedResponse, RoutedError> {
+        match self {
+            Self::Routed(routed) => routed.send(request).await,
+            Self::Anon(anon) => anon.send(request).await,
+        }
+    }
+}
+
+/// Sends through the anon-rpc worker (`crate::anon_rpc::relay`) under one
+/// isolation key: an account's reads share circuits with no other's.
+pub(crate) struct AnonRpcTransport {
+    cancel: Option<Arc<AtomicBool>>,
+    isolation_key: String,
+}
+
+impl AnonRpcTransport {
+    pub(crate) fn new(cancel: Option<Arc<AtomicBool>>, isolation_key: String) -> Self {
+        Self {
+            cancel,
+            isolation_key,
+        }
+    }
+}
+
+impl HttpTransport for AnonRpcTransport {
+    async fn send(&self, request: RoutedRequest) -> Result<RoutedResponse, RoutedError> {
+        crate::anon_rpc::relay(request, &self.isolation_key, self.cancel.as_ref()).await
     }
 }
 

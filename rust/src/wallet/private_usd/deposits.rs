@@ -45,7 +45,7 @@ use super::models::{
 use super::relayer_client::{retry_after, RelayerClient};
 use super::store::{DepositRow, SwapStore};
 use super::swap;
-use super::transport::{HttpTransport, SwapHttpError};
+use super::transport::{HttpTransport, RpcTransport, SwapHttpError};
 use super::{fail, lock, with_operations, ErrorCode, PrivateUsdError, Result};
 use crate::wallet::routed_http::RoutedHttp;
 
@@ -1759,7 +1759,7 @@ impl<'a, T: HttpTransport, C: DepositChain, K: Clock> Deposits<'a, T, C, K> {
 
 /// An account's deposits over routed HTTP, the pinned contracts and the
 /// keyed or keyless RPC.
-pub(crate) type WalletDeposits<'a> = Deposits<'a, RoutedHttp, EvmRpc<'a, RoutedHttp>, SystemClock>;
+pub(crate) type WalletDeposits<'a> = Deposits<'a, RoutedHttp, EvmRpc<'a, RpcTransport>, SystemClock>;
 
 /// Runs `step` on the account's deposits and `swaps.db`; cancelling `op`
 /// stops its requests and the pass. The caller holds the account's deposit
@@ -1773,8 +1773,9 @@ pub(crate) async fn run<R>(
     step: impl AsyncFnOnce(&WalletDeposits<'_>, &mut SwapStore) -> Result<R>,
 ) -> Result<R> {
     let transport = swap::transport(op);
+    let rpc = swap::rpc_transport(op, account);
     let pins = deployment::deployment(keys.network());
-    let chain = EvmRpc::new(&transport, pins, eth_rpc_url)?;
+    let chain = EvmRpc::new(&rpc, pins, eth_rpc_url)?;
     let clock = SystemClock;
     let deposits = Deposits::new(pins, account, keys, &transport, &chain, &clock, op)?;
     let mut store = SwapStore::open(store_dir)?;

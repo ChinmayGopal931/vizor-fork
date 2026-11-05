@@ -134,16 +134,17 @@ class RailgunHostHandler(
             }
     }
 
-    /** The process-level host, built once with the application context. */
-    private object Pages {
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+}
 
-        @Volatile
-        private var shared: RailgunWebViewHost? = null
+/** The process-level host of every hidden page, built once with the application context; both handlers share it. */
+internal object Pages {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-        fun host(context: Context): RailgunWebViewHost =
-            shared ?: synchronized(this) {
-                shared ?: RailgunWebViewHost(context.applicationContext).also { shared = it }
-            }
-    }
+    @Volatile
+    private var shared: RailgunWebViewHost? = null
+
+    fun host(context: Context): RailgunWebViewHost =
+        shared ?: synchronized(this) {
+            shared ?: RailgunWebViewHost(context.applicationContext).also { shared = it }
+        }
 }

@@ -22,6 +22,7 @@ import androidx.webkit.ProxyConfig
 import androidx.webkit.ProxyController
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewFeature
+import java.util.EnumMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.BufferOverflow
@@ -36,80 +37,137 @@ import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 import kotlin.time.Duration.Companion.seconds
 
+/** The hidden pages the host runs: the Railgun page, and the anon-rpc page whose `fetch` Rust relays through. */
+internal enum class PageKind { RAILGUN, ANON }
+
+/** Where one page's requests may go, and how it is addressed. */
+internal class PageSite(
+    val kind: PageKind,
+    /** The asset loader's domain: one origin per page, so neither page reads the other's storage. */
+    val host: String,
+    /** The page's directory under the APK's assets. */
+    val assetsDir: String,
+    /** The page's hello on the port it is handed. */
+    val init: String,
+    /**
+     * Whether the page's traffic must go through the bridge: the process-wide proxy override is set before such a
+     * page loads and lifted when it closes. A page without it still rides an override another page set.
+     */
+    val needsProxy: Boolean,
+    val route: (scheme: String?, host: String?, port: Int) -> RailgunRequests.Route,
+) {
+    val origin = "https://$host"
+    val assetsPath = "/assets/$assetsDir"
+    val url = "$origin${assetsPath}index.html"
+}
+
+internal fun PageKind.site(): PageSite =
+    when (this) {
+        PageKind.RAILGUN -> RailgunRequests.SITE
+        PageKind.ANON -> AnonRpcRequests.SITE
+    }
+
 /**
- * Hidden WebViews that load only the page's own assets, one page at a time, each over a port of its own. Every
- * request the page makes to the network goes through the Rust bridge's loopback SOCKS5 port, so it follows the
- * wallet's route (Tor or direct).
+ * Hidden WebViews that load only a page's own assets, one page of each kind at a time. Every request the Railgun
+ * page makes to the network goes through the Rust bridge's loopback SOCKS5 port, so it follows the wallet's route
+ * (Tor or direct); the anon-rpc page needs no proxy of its own.
  *
- * One instance per process, built with the application context: the page outlives Activity recreation.
+ * One instance per process, built with the application context: the pages outlive Activity recreation.
  */
 internal class RailgunWebViewHost(
     private val context: Context,
 ) {
     // With no collector an event is dropped, where iOS buffers it: Dart listens before it loads a page.
-    private val mutableEvents =
-        MutableSharedFlow<String>(
-            extraBufferCapacity = EVENT_BUFFER,
-            onBufferOverflow = BufferOverflow.DROP_OLDEST,
-        )
+    private val flows: Map<PageKind, MutableSharedFlow<String>> =
+        PageKind.entries.associateWith {
+            MutableSharedFlow(extraBufferCapacity = EVENT_BUFFER, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+        }
 
-    /** Raw event messages, `{"event": …, "data": …}`. */
-    val events: SharedFlow<String> = mutableEvents.asSharedFlow()
+    /** The Railgun page's raw event messages, `{"event": …, "data": …}`. */
+    val events: SharedFlow<String> get() = events(PageKind.RAILGUN)
 
-    // The page's messages are decoded here, off the main thread.
-    private val messages by lazy { Handler(HandlerThread("railgun-page").apply { start() }.looper) }
+    /** A page's raw event messages, `{"event": …, "data": …}`. */
+    fun events(kind: PageKind): SharedFlow<String> = flows.getValue(kind).asSharedFlow()
 
-    // Main thread only.
-    private var current: Page? = null
+    // The pages' messages are decoded here, off the main thread.
+    private val messages by lazy { Handler(HandlerThread("hidden-pages").apply { start() }.looper) }
+
+    // Main thread only: the open page of each kind.
+    private val pages = EnumMap<PageKind, Page>(PageKind::class.java)
 
     // Main thread only. Whether a proxy override this host set may still be in force. The override is
     // process-wide and outlives the page, so it is lifted on every close; tracking it spares a close that has
     // nothing to lift from loading the WebView package.
     private var proxied = false
 
-    /** A loaded page that is still open. */
+    /** A loaded Railgun page that is still open. */
     val isOpen: Boolean
-        @MainThread get() = current?.let { it.isLoaded && it.isOpen } == true
+        @MainThread get() = isOpen(PageKind.RAILGUN)
 
-    /**
-     * Loads a fresh page, closing the one before it. Its traffic goes through the bridge at [proxyPort]. [debug]
-     * enables content debugging and forwards the page's `log` events.
-     */
+    @MainThread
+    fun isOpen(kind: PageKind): Boolean = pages[kind]?.let { it.isLoaded && it.isOpen } == true
+
+    /** Loads a fresh Railgun page whose traffic goes through the bridge at [proxyPort]. */
     suspend fun load(
         proxyPort: Int,
         debug: Boolean,
-    ) =
-        withContext(Dispatchers.Main) {
-            current?.close(RailgunException.Disconnected("a new page replaced it"))
-            val page = Page(createWebView(debug), debug)
-            current = page
-            page.load(proxyPort)
-        }
+    ) = load(PageKind.RAILGUN, proxyPort, debug)
 
-    /** Calls [method] on the loaded page; one that times out closes it. */
+    /**
+     * Loads a fresh [kind] page, closing the one before it. A page that needs the bridge goes through [proxyPort].
+     * [debug] enables content debugging and forwards the page's `log` events.
+     */
+    suspend fun load(
+        kind: PageKind,
+        proxyPort: Int?,
+        debug: Boolean,
+    ) = withContext(Dispatchers.Main) {
+        val site = kind.site()
+        if (site.needsProxy && proxyPort == null) throw RailgunException.Protocol("the ${kind.name} page needs a bridge")
+        pages[kind]?.close(RailgunException.Disconnected("a new page replaced it"))
+        val page = Page(site, createWebView(debug), debug)
+        pages[kind] = page
+        page.load(proxyPort)
+    }
+
+    /** Calls [method] on the loaded Railgun page; one that times out closes it. */
     suspend fun call(
         method: RailgunMethod,
         paramsJson: String,
+    ): String = call(PageKind.RAILGUN, method, paramsJson)
+
+    /** Calls [method] on the loaded [kind] page; one that times out closes it. */
+    suspend fun call(
+        kind: PageKind,
+        method: PageMethod,
+        paramsJson: String,
     ): String {
         val page =
-            withContext(Dispatchers.Main) { current?.takeIf { it.isLoaded && it.isOpen } }
+            withContext(Dispatchers.Main) { pages[kind]?.takeIf { it.isLoaded && it.isOpen } }
                 ?: throw RailgunException.Disconnected("no page")
         return page.call(method, paramsJson)
     }
 
-    /** Closes the page, if any, and lifts the proxy override. Idempotent. */
-    suspend fun close() =
+    /** Closes the Railgun page, if any, and lifts the proxy override. Idempotent. */
+    suspend fun close() = close(PageKind.RAILGUN)
+
+    /** Closes the [kind] page, if any; a page that set the proxy override lifts it. Idempotent. */
+    suspend fun close(kind: PageKind) =
         withContext(Dispatchers.Main) {
-            current?.close(RailgunException.Disconnected("closed"))
-            clearProxy()
+            pages[kind]?.close(RailgunException.Disconnected("closed"))
+            if (kind.site().needsProxy) clearProxy()
         }
 
-    /** Closes the page and deletes everything it stored. */
-    suspend fun wipe() =
+    /** Closes the Railgun page and deletes everything it stored. */
+    suspend fun wipe() = wipe(PageKind.RAILGUN)
+
+    /** Closes the [kind] page and deletes everything its origin stored. */
+    suspend fun wipe(kind: PageKind) =
         withContext(Dispatchers.Main) {
-            current?.close(RailgunException.Disconnected("wiped"))
-            clearProxy()
-            forget(RailgunRequests.PAGE_ORIGIN)
+            val site = kind.site()
+            pages[kind]?.close(RailgunException.Disconnected("wiped"))
+            if (site.needsProxy) clearProxy()
+            forget(site.origin)
         }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -123,7 +181,6 @@ internal class RailgunWebViewHost(
             settings.domStorageEnabled = true
             settings.allowFileAccess = false
             settings.allowContentAccess = false
-            webChromeClient = Chrome(debug)
         }
 
     @MainThread
@@ -152,12 +209,13 @@ internal class RailgunWebViewHost(
     }
 
     private inner class Page(
+        private val site: PageSite,
         private val view: WebView,
         private val debug: Boolean,
     ) {
         private val channel =
             RailgunChannel(::post) { event ->
-                if (debug || event.name != RailgunProtocol.LOG) mutableEvents.tryEmit(event.raw)
+                if (debug || event.name != RailgunProtocol.LOG) flows.getValue(site.kind).tryEmit(event.raw)
             }
 
         // Main thread only.
@@ -168,14 +226,15 @@ internal class RailgunWebViewHost(
         val isOpen: Boolean get() = channel.isOpen
 
         @MainThread
-        suspend fun load(proxyPort: Int) {
-            view.webViewClient = Client(this)
+        suspend fun load(proxyPort: Int?) {
+            view.webChromeClient = Chrome(site.kind, debug)
+            view.webViewClient = Client(this, site)
             try {
                 // Nothing may load before the override is in place: it is process-wide and asynchronous.
-                overrideProxy(proxyPort)
+                if (site.needsProxy) overrideProxy(checkNotNull(proxyPort))
                 // A close, or a newer load, while the override was pending has already torn this page down.
                 if (!isOpen) throw RailgunException.Disconnected("closed while loading")
-                view.loadUrl(RailgunRequests.PAGE_URL)
+                view.loadUrl(site.url)
                 channel.awaitReady(LOAD_TIMEOUT)
                 isLoaded = true
             } finally {
@@ -184,7 +243,7 @@ internal class RailgunWebViewHost(
         }
 
         suspend fun call(
-            method: RailgunMethod,
+            method: PageMethod,
             paramsJson: String,
         ): String =
             try {
@@ -208,20 +267,20 @@ internal class RailgunWebViewHost(
                 },
                 messages,
             )
-            val hello = WebMessage(RailgunProtocol.INIT, arrayOf(pagePort))
-            view.postWebMessage(hello, Uri.parse(RailgunRequests.PAGE_ORIGIN))
+            val hello = WebMessage(site.init, arrayOf(pagePort))
+            view.postWebMessage(hello, Uri.parse(site.origin))
         }
 
-        /** Only the current page is ever open, so lifting the process-wide override here can't strand another. */
+        /** Only the current page of its kind is ever open, and only the Railgun page owns the process-wide override. */
         @MainThread
         fun close(reason: RailgunException) {
-            if (current === this) current = null
+            if (pages[site.kind] === this) pages.remove(site.kind)
             if (!isOpen) return
             channel.close(reason)
             port?.close()
             port = null
             view.destroy()
-            clearProxy()
+            if (site.needsProxy) clearProxy()
         }
 
         private suspend fun post(message: String) =
@@ -236,12 +295,13 @@ internal class RailgunWebViewHost(
 
     private inner class Client(
         private val page: Page,
+        private val site: PageSite,
     ) : WebViewClient() {
         private val assets =
             WebViewAssetLoader
                 .Builder()
-                .setDomain(RailgunRequests.PAGE_HOST)
-                .addPathHandler(RailgunRequests.ASSETS_PATH, OwnAssets(context))
+                .setDomain(site.host)
+                .addPathHandler(site.assetsPath, OwnAssets(context, site.assetsDir))
                 .build()
 
         override fun shouldInterceptRequest(
@@ -249,7 +309,7 @@ internal class RailgunWebViewHost(
             request: WebResourceRequest,
         ): WebResourceResponse? {
             val url = request.url
-            return when (RailgunRequests.route(url.scheme, url.host, url.port)) {
+            return when (site.route(url.scheme, url.host, url.port)) {
                 RailgunRequests.Route.OWN_ASSET -> assets.shouldInterceptRequest(url) ?: refusal(NOT_FOUND)
                 RailgunRequests.Route.ALLOWED -> null
                 RailgunRequests.Route.BLOCKED -> refusal(FORBIDDEN)
@@ -265,7 +325,7 @@ internal class RailgunWebViewHost(
             view: WebView,
             url: String,
         ) {
-            if (url == RailgunRequests.PAGE_URL) page.handshake()
+            if (url == site.url) page.handshake()
         }
 
         override fun onReceivedError(
@@ -292,8 +352,7 @@ internal class RailgunWebViewHost(
         // Without its own files the page never answers, so don't wait out the load for it.
         private fun failLoading(request: WebResourceRequest) {
             val url = request.url
-            val isOwnFile =
-                url.host == RailgunRequests.PAGE_HOST && url.path?.startsWith(RailgunRequests.ASSETS_PATH) == true
+            val isOwnFile = url.host == site.host && url.path?.startsWith(site.assetsPath) == true
             if (!page.isLoaded && isOwnFile) {
                 page.close(RailgunException.Disconnected("the page's ${url.path} did not load"))
             }
@@ -301,25 +360,29 @@ internal class RailgunWebViewHost(
     }
 
     private inner class Chrome(
+        private val kind: PageKind,
         private val debug: Boolean,
     ) : WebChromeClient() {
-        // Consumed either way, so nothing the page prints reaches logcat.
+        // Consumed either way, so nothing a page prints reaches logcat.
         override fun onConsoleMessage(message: ConsoleMessage): Boolean {
             if (debug) {
                 val line = "console ${message.messageLevel()}: ${message.message()}"
-                mutableEvents.tryEmit(JSONObject().put("event", RailgunProtocol.LOG).put("data", line).toString())
+                flows
+                    .getValue(kind)
+                    .tryEmit(JSONObject().put("event", RailgunProtocol.LOG).put("data", line).toString())
             }
             return true
         }
     }
 
-    // The page's own directory, and nothing else of the APK's assets.
+    // A page's own directory, and nothing else of the APK's assets.
     private class OwnAssets(
         context: Context,
+        private val assetsDir: String,
     ) : WebViewAssetLoader.PathHandler {
         private val assets = WebViewAssetLoader.AssetsPathHandler(context)
 
-        override fun handle(path: String): WebResourceResponse? = assets.handle(RailgunRequests.ASSETS_DIR + path)
+        override fun handle(path: String): WebResourceResponse? = assets.handle(assetsDir + path)
     }
 
     private companion object {
@@ -343,7 +406,10 @@ internal class RailgunWebViewHost(
     }
 }
 
-/** Where the page's requests go: its own assets, the allowed hosts over https, and nowhere else. */
+/**
+ * Where the Railgun page's requests go: its own assets, the allowed hosts over https, the anon-rpc loopback relay,
+ * and nowhere else.
+ */
 internal object RailgunRequests {
     const val PAGE_HOST = "railgun.appassets.androidplatform.net"
     const val PAGE_ORIGIN = "https://$PAGE_HOST"
@@ -351,7 +417,16 @@ internal object RailgunRequests {
     const val ASSETS_PATH = "/assets/$ASSETS_DIR"
     const val PAGE_URL = "$PAGE_ORIGIN${ASSETS_PATH}index.html"
     private const val HTTPS = "https"
+    private const val HTTP = "http"
     private const val DEFAULT_PORT = -1
+
+    /**
+     * The anon-rpc loopback relay (Rust `anon_rpc::LOOPBACK_RELAY_SOURCE`): the page's providers point at
+     * `http://127.0.0.1:<port>/` while the anonymous RPC mode is on, and Rust relays each request through the
+     * anon-rpc worker. The WebView reaches the loopback directly, never through the bridge, so it is admitted here
+     * on any port: the port is the relay's choice at each start.
+     */
+    private const val LOOPBACK = "127.0.0.1"
 
     // Never leave the WebView; the CSP governs them.
     private val LOCAL_SCHEMES = setOf("blob", "data")
@@ -367,8 +442,41 @@ internal object RailgunRequests {
         return when {
             isHttps && host == PAGE_HOST -> Route.OWN_ASSET
             isHttps && host != null && RailgunEndpoints.allows(host) -> Route.ALLOWED
+            scheme == HTTP && host == LOOPBACK -> Route.ALLOWED
             scheme in LOCAL_SCHEMES -> Route.ALLOWED
             else -> Route.BLOCKED
         }
     }
+
+    val SITE = PageSite(PageKind.RAILGUN, PAGE_HOST, ASSETS_DIR, RailgunProtocol.INIT, needsProxy = true, ::route)
+}
+
+/** Where the anon-rpc page's requests go: its own assets, [AnonRpcEndpoints] over https, and nowhere else. */
+internal object AnonRpcRequests {
+    const val PAGE_HOST = "anon.appassets.androidplatform.net"
+    const val PAGE_ORIGIN = "https://$PAGE_HOST"
+    const val ASSETS_DIR = "anon/"
+    const val ASSETS_PATH = "/assets/$ASSETS_DIR"
+    const val PAGE_URL = "$PAGE_ORIGIN${ASSETS_PATH}index.html"
+    private const val HTTPS = "https"
+    private const val DEFAULT_PORT = -1
+
+    // The harness's worker runs from a `blob:` URL inside its null-origin frame.
+    private val LOCAL_SCHEMES = setOf("blob", "data")
+
+    fun route(
+        scheme: String?,
+        host: String?,
+        port: Int,
+    ): RailgunRequests.Route {
+        val isHttps = scheme == HTTPS && port == DEFAULT_PORT
+        return when {
+            isHttps && host == PAGE_HOST -> RailgunRequests.Route.OWN_ASSET
+            isHttps && host != null && AnonRpcEndpoints.allows(host) -> RailgunRequests.Route.ALLOWED
+            scheme in LOCAL_SCHEMES -> RailgunRequests.Route.ALLOWED
+            else -> RailgunRequests.Route.BLOCKED
+        }
+    }
+
+    val SITE = PageSite(PageKind.ANON, PAGE_HOST, ASSETS_DIR, RailgunProtocol.ANON_INIT, needsProxy = false, ::route)
 }

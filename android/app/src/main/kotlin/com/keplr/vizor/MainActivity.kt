@@ -18,6 +18,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.security.MessageDigest
 import io.flutter.plugin.common.EventChannel
 import com.keplr.vizor.privateusd.PrivateUsdAttestationHandler
+import com.keplr.vizor.railgun.AnonRpcHostHandler
 import com.keplr.vizor.railgun.RailgunHostHandler
 
 // FlutterFragmentActivity: BiometricPrompt requires a FragmentActivity host.
@@ -101,6 +102,7 @@ class MainActivity : FlutterFragmentActivity() {
     }
     private lateinit var ledgerMobileHandler: LedgerMobileHandler
     private lateinit var railgunHostHandler: RailgunHostHandler
+    private lateinit var anonRpcHostHandler: AnonRpcHostHandler
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -189,6 +191,18 @@ class MainActivity : FlutterFragmentActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             RailgunHostHandler.EVENT_CHANNEL
         ).setStreamHandler(railgunHostHandler)
+        // Private USD: the anon-rpc page, through which Rust relays every Ethereum RPC request.
+        anonRpcHostHandler = AnonRpcHostHandler(this, BuildConfig.DEBUG)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            AnonRpcHostHandler.METHOD_CHANNEL
+        ).setMethodCallHandler { call, result ->
+            anonRpcHostHandler.handle(call, result)
+        }
+        EventChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            AnonRpcHostHandler.EVENT_CHANNEL
+        ).setStreamHandler(anonRpcHostHandler)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             CAMERA_PERMISSION_CHANNEL
@@ -407,6 +421,7 @@ class MainActivity : FlutterFragmentActivity() {
         if (::ledgerMobileHandler.isInitialized) ledgerMobileHandler.close()
         // The page survives recreation; only a finishing Activity closes it.
         if (::railgunHostHandler.isInitialized) railgunHostHandler.dispose(isFinishing)
+        if (::anonRpcHostHandler.isInitialized) anonRpcHostHandler.dispose(isFinishing)
         super.onDestroy()
     }
 

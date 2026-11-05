@@ -63,7 +63,7 @@ use super::swap::{
     PostError, SwapCall, WindowView,
 };
 use super::tokens::{self, AcceptError, Payment, TokenStore};
-use super::transport::{HttpTransport, Refusal, SwapErrorCode, SwapHttpError};
+use super::transport::{HttpTransport, Refusal, RpcTransport, SwapErrorCode, SwapHttpError};
 use super::{fail, indices, terms, ErrorCode, PrivateUsdError, PrivateUsdNetwork, Result};
 use crate::wallet::routed_http::RoutedHttp;
 
@@ -1930,11 +1930,11 @@ fn active(store: &SwapStore, account: &str, index: u32) -> Result<ReverseRecord>
 
 /// A reverse driver over the real seams.
 pub(crate) type WalletReverse<'a> =
-    Reverse<'a, EvmRpc<'a, RoutedHttp>, RoutedHttp, WalletZcash<'a>, SystemClock>;
+    Reverse<'a, EvmRpc<'a, RpcTransport>, RoutedHttp, WalletZcash<'a>, SystemClock>;
 
 /// The keyless steps over the real seams.
 pub(crate) type WalletReverseView<'a> =
-    ReverseView<'a, EvmRpc<'a, RoutedHttp>, RoutedHttp, SystemClock>;
+    ReverseView<'a, EvmRpc<'a, RpcTransport>, RoutedHttp, SystemClock>;
 
 impl SwapCall<'_> {
     /// Runs `step` on a reverse driver over routed HTTP (one transport per
@@ -1946,7 +1946,8 @@ impl SwapCall<'_> {
         step: impl AsyncFnOnce(&WalletReverse<'_>, &mut SwapStore) -> Result<R>,
     ) -> Result<R> {
         let transport = swap::transport(op);
-        let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url)?;
+        let rpc = swap::rpc_transport(op, self.account);
+        let chain = EvmRpc::new(&rpc, self.pins(), self.eth_rpc_url)?;
         let zcash = self.zcash(op);
         let tokens = self.tokens();
         let reverse = Reverse::new(
@@ -1979,7 +1980,8 @@ pub(crate) async fn run_view<R>(
         return Ok(None);
     };
     let transport = RoutedHttp::new();
-    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url)?;
+    let rpc = swap::rpc_transport(None, account);
+    let chain = EvmRpc::new(&rpc, deployment::deployment(network), eth_rpc_url)?;
     let view = ReverseView::new(network, account, &chain, &transport, &SystemClock, None);
     step(&view, &mut store).await.map(Some)
 }

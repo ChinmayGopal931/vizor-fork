@@ -31,6 +31,9 @@ class RailgunBoundaryTest {
         ).forEach { assertEquals(it, Route.ALLOWED, route(it)) }
         assertEquals(Route.ALLOWED, route("blob:https://railgun.appassets.androidplatform.net/0f1e"))
         assertEquals(Route.ALLOWED, route("data:application/wasm;base64,AGFzbQ=="))
+        // The anon-rpc loopback relay, on whichever port Rust bound.
+        assertEquals(Route.ALLOWED, route("http://127.0.0.1:41931/"))
+        assertEquals(Route.ALLOWED, route("http://127.0.0.1/"))
     }
 
     @Test
@@ -38,6 +41,10 @@ class RailgunBoundaryTest {
         listOf(
             "https://example.com/",
             "http://ethereum-sepolia-rpc.publicnode.com/",
+            // Only the loopback relay is reached over http, and only at 127.0.0.1.
+            "http://localhost:41931/",
+            "http://127.0.0.2:41931/",
+            "https://127.0.0.1:41931/",
             "https://ethereum-sepolia-rpc.publicnode.com:8443/",
             "https://evil.ipfs-lb.com/",
             // A `*.` entry never takes the domain itself, or a lookalike.
@@ -64,7 +71,8 @@ class RailgunBoundaryTest {
     fun theCspListsTheSameHosts() {
         val csp = csp(File(ASSET).readText())
 
-        val hosts = RailgunEndpoints.hosts.map { "https://$it" }.sorted()
+        // 'self' first; the rest sorted, which puts the anon-rpc loopback relay (http) before the https hosts.
+        val hosts = (RailgunEndpoints.hosts.map { "https://$it" } + "http://127.0.0.1:*").sorted()
         assertEquals(listOf("'self'") + hosts, csp.getValue("connect-src"))
         assertEquals(listOf("'none'"), csp.getValue("default-src"))
         assertEquals(listOf("'none'"), csp.getValue("base-uri"))

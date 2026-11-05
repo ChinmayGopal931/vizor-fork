@@ -23,7 +23,7 @@ use super::models::{
 use super::relayer_client::RelayerClient;
 use super::store::SwapStore;
 use super::tokens::{TokenPins, TokenStore};
-use super::transport::{HttpTransport, Refusal, SwapErrorCode, SwapHttpError};
+use super::transport::{AnonRpcTransport, HttpTransport, Refusal, RpcTransport, SwapErrorCode, SwapHttpError};
 use super::{fail, terms, with_operations, ErrorCode, PrivateUsdError, Result};
 use crate::wallet::network::WalletNetwork;
 use crate::wallet::routed_http::RoutedHttp;
@@ -550,11 +550,30 @@ pub(crate) fn loop_outcome<T>(
     }
 }
 
-/// One call's transport: with `op`, its cancel flag stops the requests.
+/// One call's transport for the swap services (maker, relayer, issuer):
+/// with `op`, its cancel flag stops the requests.
 pub(crate) fn transport(op: Option<&OpHandle>) -> RoutedHttp {
     match op {
         Some(op) => RoutedHttp::cancellable(op.cancel_flag()),
         None => RoutedHttp::new(),
+    }
+}
+
+/// One call's Ethereum RPC transport: through the anon-rpc worker while the
+/// mode is on, under `account`'s isolation key (the page's reads use their
+/// own), else routed HTTP. With `op`, its cancel flag stops the requests.
+pub(crate) fn rpc_transport(op: Option<&OpHandle>, account: &str) -> RpcTransport {
+    let cancel = op.map(OpHandle::cancel_flag);
+    if crate::anon_rpc::enabled() {
+        RpcTransport::Anon(AnonRpcTransport::new(
+            cancel,
+            crate::anon_rpc::isolation_key_for(account),
+        ))
+    } else {
+        RpcTransport::Routed(match cancel {
+            Some(cancel) => RoutedHttp::cancellable(cancel),
+            None => RoutedHttp::new(),
+        })
     }
 }
 

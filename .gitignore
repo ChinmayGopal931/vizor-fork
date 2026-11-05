@@ -85,3 +85,4 @@ app.*.map.json
 
 # Railgun bundle build
 /android/railgun-web/node_modules/
+/android/anon-rpc-web/node_modules/

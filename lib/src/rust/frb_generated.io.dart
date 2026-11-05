@@ -3,6 +3,7 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
+import 'api/anon_rpc.dart';
 import 'api/balance_cache.dart';
 import 'api/gift_card_tracking.dart';
 import 'api/keystone.dart';
@@ -16,16 +17,12 @@ import 'api/sync.dart';
 import 'api/voting.dart';
 import 'api/voting_session.dart';
 import 'api/wallet.dart';
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi' as ffi;
-
 import 'frb_generated.dart';
 import 'network_privacy.dart';
-
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
-
 import 'third_party/zcash_voting/config.dart';
 import 'third_party/zcash_voting/delegate.dart';
 import 'third_party/zcash_voting/share_policy.dart';
@@ -66,6 +63,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVotingRoundSession(
     dynamic raw,
   );
+
+  @protected
+  RustStreamSink<ApiAnonRpcRequest>
+  dco_decode_StreamSink_api_anon_rpc_request_Sse(dynamic raw);
 
   @protected
   RustStreamSink<ApiGiftCardCheckProgress>
@@ -133,6 +134,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiActivity dco_decode_api_activity(dynamic raw);
+
+  @protected
+  ApiAnonRpcHeader dco_decode_api_anon_rpc_header(dynamic raw);
+
+  @protected
+  ApiAnonRpcRequest dco_decode_api_anon_rpc_request(dynamic raw);
+
+  @protected
+  ApiAnonRpcStats dco_decode_api_anon_rpc_stats(dynamic raw);
 
   @protected
   ApiAppliedTransparentPolicy dco_decode_api_applied_transparent_policy(
@@ -844,6 +854,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ActivityHistorySummary> dco_decode_list_activity_history_summary(
     dynamic raw,
   );
+
+  @protected
+  List<ApiAnonRpcHeader> dco_decode_list_api_anon_rpc_header(dynamic raw);
 
   @protected
   List<ApiBallotIntent> dco_decode_list_api_ballot_intent(dynamic raw);
@@ -1739,6 +1752,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<ApiAnonRpcRequest>
+  sse_decode_StreamSink_api_anon_rpc_request_Sse(SseDeserializer deserializer);
+
+  @protected
   RustStreamSink<ApiGiftCardCheckProgress>
   sse_decode_StreamSink_api_gift_card_check_progress_Sse(
     SseDeserializer deserializer,
@@ -1828,6 +1845,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiActivity sse_decode_api_activity(SseDeserializer deserializer);
+
+  @protected
+  ApiAnonRpcHeader sse_decode_api_anon_rpc_header(SseDeserializer deserializer);
+
+  @protected
+  ApiAnonRpcRequest sse_decode_api_anon_rpc_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiAnonRpcStats sse_decode_api_anon_rpc_stats(SseDeserializer deserializer);
 
   @protected
   ApiAppliedTransparentPolicy sse_decode_api_applied_transparent_policy(
@@ -2757,6 +2785,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ActivityHistorySummary> sse_decode_list_activity_history_summary(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ApiAnonRpcHeader> sse_decode_list_api_anon_rpc_header(
     SseDeserializer deserializer,
   );
 
@@ -3908,6 +3941,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_StreamSink_api_anon_rpc_request_Sse(
+    RustStreamSink<ApiAnonRpcRequest> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_StreamSink_api_gift_card_check_progress_Sse(
     RustStreamSink<ApiGiftCardCheckProgress> self,
     SseSerializer serializer,
@@ -4014,6 +4053,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_api_activity(ApiActivity self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_api_anon_rpc_header(
+    ApiAnonRpcHeader self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_anon_rpc_request(
+    ApiAnonRpcRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_api_anon_rpc_stats(
+    ApiAnonRpcStats self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_api_applied_transparent_policy(
@@ -5191,6 +5248,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_activity_history_summary(
     List<ActivityHistorySummary> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_api_anon_rpc_header(
+    List<ApiAnonRpcHeader> self,
     SseSerializer serializer,
   );
 

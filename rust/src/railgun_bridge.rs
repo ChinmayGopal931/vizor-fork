@@ -42,7 +42,7 @@ use tower_service::Service;
 use zcash_client_backend::tor::Client as TorClient;
 
 use crate::network_privacy::{self, DirectRouteLease};
-use crate::wallet::private_usd::deployment::{host_allowed, RAILGUN_PAGE_HOSTS};
+use crate::wallet::private_usd::deployment::{host_allowed, ANON_RPC_PAGE_HOSTS, RAILGUN_PAGE_HOSTS};
 
 const HTTPS_PORT: u16 = 443;
 /// A client that has not finished its handshake by then is dropped.
@@ -101,11 +101,24 @@ enum Session {
     Offline,
 }
 
+/// Every page's hosts: the proxy override is process-wide, so the anon-rpc
+/// page's traffic comes through the same bridge as the Railgun page's.
+static BRIDGE_HOSTS: std::sync::LazyLock<Vec<&'static str>> = std::sync::LazyLock::new(|| {
+    let mut hosts: Vec<&'static str> = RAILGUN_PAGE_HOSTS
+        .iter()
+        .chain(ANON_RPC_PAGE_HOSTS.iter())
+        .copied()
+        .collect();
+    hosts.sort_unstable();
+    hosts.dedup();
+    hosts
+});
+
 impl Session {
     /// The hosts a client may ask for: none on an offline bridge.
     fn allowed(&self) -> &'static [&'static str] {
         match self {
-            Self::Direct | Self::Tor(_) => &RAILGUN_PAGE_HOSTS,
+            Self::Direct | Self::Tor(_) => BRIDGE_HOSTS.as_slice(),
             Self::Offline => &[],
         }
     }
@@ -868,6 +881,39 @@ mod tests {
         }
     }
 
+    /// The anon-rpc page's hosts have the same copies, in Kotlin's
+    /// `AnonRpcEndpoints.hosts` and the page's CSP (the source and the built
+    /// page); the bridge admits them with the Railgun page's.
+    #[test]
+    fn the_anon_page_hosts_match_its_host_filter_and_its_csp() {
+        let mut expected = ANON_RPC_PAGE_HOSTS.map(str::to_owned).to_vec();
+        expected.sort();
+        expected.dedup();
+        assert_eq!(expected.len(), 5, "the anon allowlist has duplicates");
+        for host in ANON_RPC_PAGE_HOSTS {
+            assert!(BRIDGE_HOSTS.contains(&host), "{host} is not on the bridge");
+        }
+        for host in RAILGUN_PAGE_HOSTS {
+            assert!(BRIDGE_HOSTS.contains(&host), "{host} is not on the bridge");
+        }
+
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let read = |path: &str| {
+            std::fs::read_to_string(repo.join(path))
+                .unwrap_or_else(|error| panic!("read {path}: {error}"))
+        };
+        let kotlin = kotlin_hosts(&read(
+            "android/app/src/main/kotlin/com/keplr/vizor/railgun/AnonRpcEndpoints.kt",
+        ));
+        assert_eq!(kotlin, expected, "AnonRpcEndpoints.hosts");
+        for page in [
+            "android/anon-rpc-web/src/index.html",
+            "android/app/src/main/assets/anon/index.html",
+        ] {
+            assert_eq!(csp_connect_hosts(&read(page)), expected, "{page}");
+        }
+    }
+
     /// The string literals inside `val hosts = setOf(…)`, sorted.
     fn kotlin_hosts(source: &str) -> Vec<String> {
         let start = source
@@ -904,9 +950,10 @@ mod tests {
         hosts
     }
 
-    /// The hosts of the CSP's `connect-src` sources other than `'self'`, each
-    /// of which must be a bare `https://` origin (a `*.` host for a wildcard
-    /// entry); sorted.
+    /// The hosts of the CSP's `connect-src` sources other than `'self'` and
+    /// the loopback relay (`anon_rpc::LOOPBACK_RELAY_SOURCE`, the one `http:`
+    /// source a page may name), each of which must be a bare `https://` origin
+    /// (a `*.` host for a wildcard entry); sorted.
     fn csp_connect_hosts(html: &str) -> Vec<String> {
         let start = html.find("connect-src").expect("a connect-src directive");
         let directive = &html[start..];
@@ -914,7 +961,7 @@ mod tests {
         let mut hosts: Vec<String> = directive
             .split_whitespace()
             .skip(1)
-            .filter(|source| *source != "'self'")
+            .filter(|source| *source != "'self'" && *source != crate::anon_rpc::LOOPBACK_RELAY_SOURCE)
             .map(|source| {
                 let host = source
                     .strip_prefix("https://")

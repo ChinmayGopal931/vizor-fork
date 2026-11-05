@@ -8,11 +8,17 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
-/** Every call the page answers, its wire name, and how long it may take; the page's side is `index.js`. */
+/** A call a hidden page answers: its wire name, and how long it may take. */
+internal interface PageMethod {
+    val wire: String
+    val timeout: Duration
+}
+
+/** Every call the Railgun page answers, its wire name, and how long it may take; the page's side is `index.js`. */
 internal enum class RailgunMethod(
-    val wire: String,
-    val timeout: Duration,
-) {
+    override val wire: String,
+    override val timeout: Duration,
+) : PageMethod {
     START("start", 2.minutes),
     OPEN_WALLET("openWallet", 1.minutes),
 
@@ -34,15 +40,44 @@ internal enum class RailgunMethod(
     }
 }
 
+/**
+ * Every call the anon-rpc page answers (`android/anon-rpc-web/src/index.js`): the page runs the anon-rpc browser
+ * harness, and every Ethereum JSON-RPC request Rust relays goes through its `fetch`.
+ */
+internal enum class AnonRpcMethod(
+    override val wire: String,
+    override val timeout: Duration,
+) : PageMethod {
+    // One unanonymized read of the worker's specifier, then the bundle (up to 64 MiB) from a resolver.
+    START("start", 2.minutes),
+
+    // A Tor client bootstrapping through a gateway, or a mixnet client joining its network.
+    AWAIT_READY("awaitReady", 5.minutes),
+
+    // Each request carries its own timeout in its params; this is the backstop behind it.
+    FETCH("fetch", 3.minutes),
+    STATUS("status", 10.seconds),
+    STOP("stop", 30.seconds),
+    ;
+
+    companion object {
+        fun fromWire(wire: String): AnonRpcMethod? = entries.firstOrNull { it.wire == wire }
+    }
+}
+
 /** The page's wire format. Params, results and events stay raw JSON text; Dart owns the typed models. */
 internal object RailgunProtocol {
-    /** The page's hello on the port it was handed; it must equal `INIT` in `index.js`. */
+    /** The Railgun page's hello on the port it was handed; it must equal `INIT` in `index.js`. */
     const val INIT = "vizor-railgun-init"
+
+    /** The anon-rpc page's hello; it must equal `INIT` in `anon-rpc-web/src/index.js`. */
+    const val ANON_INIT = "vizor-anon-rpc-init"
 
     /** Engine and console lines; forwarded only from a page loaded with `debug`. */
     const val LOG = "log"
 
-    private val EVENTS = setOf(LOG, "scan", "proof", "screening", "refresh")
+    // The Railgun page's events, and the anon-rpc page's `status`.
+    private val EVENTS = setOf(LOG, "scan", "proof", "screening", "refresh", "status")
 
     sealed interface Message {
         data object Ready : Message
@@ -67,7 +102,7 @@ internal object RailgunProtocol {
     /** `paramsJson` must be exactly one JSON object, so it can't add keys to the envelope around it. */
     fun request(
         id: Long,
-        method: RailgunMethod,
+        method: PageMethod,
         paramsJson: String,
     ): String {
         val single =

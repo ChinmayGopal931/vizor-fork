@@ -52,13 +52,22 @@ internal object RailgunEndpoints {
             "railgun-artifacts.pepeman931.workers.dev",
         )
 
+    /** Whether [host] is one of [hosts] ([HostPatterns.allows]). */
+    fun allows(host: String): Boolean = HostPatterns.allows(hosts, host)
+}
+
+/** How a page's allowlist is matched, the same for every page. */
+internal object HostPatterns {
     /**
-     * Whether [host] is one of [hosts], a `*.` entry taking any subdomain: one label or more of letters, digits and
-     * inner hyphens, never the domain. The iOS content rules match a regex (`RailgunContentRules.pattern`), so this
-     * keeps to its grammar and a URL one platform accepts is reachable on the other.
+     * Whether [host] is one of [patterns], a `*.` entry taking any subdomain: one label or more of letters, digits
+     * and inner hyphens, never the domain. The iOS content rules match a regex (`RailgunContentRules.pattern`), so
+     * this keeps to its grammar and a URL one platform accepts is reachable on the other.
      */
-    fun allows(host: String): Boolean =
-        hosts.any { pattern ->
+    fun allows(
+        patterns: Set<String>,
+        host: String,
+    ): Boolean =
+        patterns.any { pattern ->
             if (pattern.startsWith("*.")) {
                 val suffix = pattern.substring(1)
                 host.length > suffix.length &&

@@ -30,7 +30,7 @@ internal class RailgunChannel(
     }
 
     suspend fun call(
-        method: RailgunMethod,
+        method: PageMethod,
         paramsJson: String,
     ): String {
         val id = ids.incrementAndGet()

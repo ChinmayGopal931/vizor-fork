@@ -60,7 +60,7 @@ use super::swap::{
     require_pays_out, save, serves, update, ClaimWindow, PostError, SwapCall, WindowView,
 };
 use super::tokens::{self, AcceptError, Payment, TokenStore};
-use super::transport::{HttpTransport, Refusal, SwapErrorCode, SwapHttpError};
+use super::transport::{HttpTransport, Refusal, RpcTransport, SwapErrorCode, SwapHttpError};
 use super::{fail, indices, terms, ErrorCode, PrivateUsdError, Result};
 use crate::wallet::routed_http::RoutedHttp;
 
@@ -1736,7 +1736,7 @@ fn end(
 
 /// A forward driver over the real seams.
 pub(crate) type WalletForward<'a> =
-    Forward<'a, EvmRpc<'a, RoutedHttp>, RoutedHttp, WalletZcash<'a>, SystemClock>;
+    Forward<'a, EvmRpc<'a, RpcTransport>, RoutedHttp, WalletZcash<'a>, SystemClock>;
 
 impl SwapCall<'_> {
     /// Runs `step` on a forward driver over routed HTTP (one transport per
@@ -1748,7 +1748,8 @@ impl SwapCall<'_> {
         step: impl AsyncFnOnce(&WalletForward<'_>, &mut SwapStore) -> Result<R>,
     ) -> Result<R> {
         let transport = swap::transport(op);
-        let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url)?;
+        let rpc = swap::rpc_transport(op, self.account);
+        let chain = EvmRpc::new(&rpc, self.pins(), self.eth_rpc_url)?;
         let zcash = self.zcash(op);
         let tokens = self.tokens();
         let forward = Forward::new(
@@ -1768,7 +1769,7 @@ impl SwapCall<'_> {
 }
 
 /// A forward view over the real seams.
-pub(crate) type WalletForwardView<'a> = ForwardView<'a, EvmRpc<'a, RoutedHttp>, RoutedHttp>;
+pub(crate) type WalletForwardView<'a> = ForwardView<'a, EvmRpc<'a, RpcTransport>, RoutedHttp>;
 
 /// Runs `step` on a forward view over routed HTTP and the pinned contract;
 /// no key is needed. `None` when the wallet never converted.
@@ -1783,7 +1784,8 @@ pub(crate) async fn run_view<R>(
         return Ok(None);
     };
     let transport = RoutedHttp::new();
-    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url)?;
+    let rpc = swap::rpc_transport(None, account);
+    let chain = EvmRpc::new(&rpc, deployment::deployment(network), eth_rpc_url)?;
     let view = ForwardView::new(network, account, &chain, &transport);
     step(&view, &store).await.map(Some)
 }
@@ -1797,8 +1799,8 @@ pub(crate) async fn abandon_with(
     account: &str,
     index: u32,
 ) -> Result<ForwardRecord> {
-    let transport = RoutedHttp::new();
-    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url)?;
+    let rpc = swap::rpc_transport(None, account);
+    let chain = EvmRpc::new(&rpc, deployment::deployment(network), eth_rpc_url)?;
     let mut store = SwapStore::open(store_dir)?;
     abandon(&mut store, &chain, &SystemClock, account, index).await
 }

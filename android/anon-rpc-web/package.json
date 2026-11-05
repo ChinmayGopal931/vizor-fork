@@ -1,0 +1,17 @@
+{
+  "name": "anon-rpc-web",
+  "private": true,
+  "description": "The anon-rpc browser harness, bundled for the app's hidden anon-rpc page",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test dev/*.test.mjs"
+  },
+  "dependencies": {
+    "@anon-rpc/browser-harness": "0.4.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

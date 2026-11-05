@@ -1792,7 +1792,8 @@ pub fn private_usd_send_settle_all(
         };
         let pins = deployment::deployment(network);
         let transport = RoutedHttp::new();
-        let chain = EvmRpc::new(&transport, pins, &eth_rpc_url)?;
+        let rpc = crate::wallet::private_usd::swap::rpc_transport(None, &account_uuid);
+        let chain = EvmRpc::new(&rpc, pins, &eth_rpc_url)?;
         let clock = SystemClock;
         let relay = Sends::new(&transport, pins.relayer_url, &clock, &account_uuid);
         Ok(block_on(relay.settle_all(&mut store, &chain))?

@@ -111,6 +111,22 @@ pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 35] = [
     "railgun-artifacts.pepeman931.workers.dev",
 ];
 
+/// What the anon-rpc page may reach: publicnode on both networks for the one
+/// bootstrap read of a worker's specifier (`workerHash()`,
+/// `workerResolvers()`), and the resolvers the specifiers name for the worker
+/// bundles (the bundle is checked against its on-chain hash, so the resolver
+/// is trusted with nothing). The bridge's allowlist is the union of this and
+/// `RAILGUN_PAGE_HOSTS`, since the proxy override covers every page; Kotlin's
+/// `AnonRpcEndpoints.hosts` and the anon page's CSP repeat this list, and a
+/// Rust test (`railgun_bridge.rs`) pins the copies together.
+pub(crate) const ANON_RPC_PAGE_HOSTS: [&str; 5] = [
+    "ethereum-rpc.publicnode.com",
+    "ethereum-sepolia-rpc.publicnode.com",
+    "cdn.jsdelivr.net",
+    "unpkg.com",
+    "raw.githubusercontent.com",
+];
+
 pub(crate) const POI_NODE_URL: &str = "https://ppoi.fdi.network/";
 
 /// Whether `host` is one of `allowed`, where a `*.` entry stands for any
