@@ -43,8 +43,11 @@ confirms Mumbai has the track (its CROPS Upgrade prize is Continuity-only).
   row and sheet, the relay plumbing in `railgun_engine_provider.dart`).
   `fvm flutter analyze` is clean; the Private USD and Settings tests pass.
   Not yet run on a device.
-- M4 device bring-up: blocked on the Galaxy A35 being attached (`adb
-  devices` lists none).
+- M4 device bring-up: the arm64 debug APK is built
+  (`build/app/outputs/flutter-apk/app-debug.apk`, 2026-11-05 14:28, Private
+  USD on, mobile form factor); it packages the anon page under `assets/anon/`.
+  Blocked on the Galaxy A35 being attached (`adb devices` lists none):
+  install with `adb -s RZCX40721QZ install -r` and run M4.1 to M4.6.
 - M5 submission: the README's "Anonymous RPC" and "CROPS" sections are
   drafted (5b5f4e2bd); they state the zecSwap stand-in honestly (O3) and
   must be re-read against what M4 shows. The video, the gateway and the
