@@ -939,7 +939,7 @@ abstract final class PrivateUsdCopy {
       'Network and MEV Blocker.';
   static const rpcSees =
       "The RPC sees the app's Ethereum requests, and your IP address unless "
-      'Tor is on.';
+      'Anonymous RPC or Tor is on.';
   static const rpcHint = 'https://';
   static const rpcCheckAndSave = 'Check and save';
   static const rpcChecking = 'Checking…';

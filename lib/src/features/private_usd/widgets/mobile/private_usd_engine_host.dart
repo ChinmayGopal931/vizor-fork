@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_send_provider.dart';
 import '../../providers/private_usd_settlement_reminder_provider.dart';
+import '../../../anon_rpc/providers/anon_rpc_service_provider.dart';
 
 /// Keeps the Private USD engine alive for the app's lifetime, with the
 /// sender, which settles the sends a crash or a kill left unconfirmed, and
@@ -21,6 +22,8 @@ class PrivateUsdEngineHost extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (ref.watch(privateUsdEngineEnabledProvider)) {
       ref.watch(privateUsdEngineProvider);
+      // Answers Rust's anonymous RPC requests through the anon-rpc page.
+      ref.watch(anonRpcServiceProvider);
       ref.watch(privateUsdSenderProvider);
       ref.watch(privateUsdSettlementReminderProvider);
     }

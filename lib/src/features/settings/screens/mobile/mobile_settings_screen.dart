@@ -13,6 +13,11 @@ import '../../../private_usd/private_usd_copy.dart';
 import '../../../private_usd/providers/private_usd_custom_rpc_provider.dart';
 import '../../../private_usd/providers/private_usd_relayer_claims_provider.dart';
 import '../../../private_usd/widgets/mobile/private_usd_rpc_sheet.dart';
+import '../../../anon_rpc/anon_rpc_copy.dart';
+import '../../../anon_rpc/anon_rpc_network.dart';
+import '../../../anon_rpc/providers/anon_rpc_network_provider.dart';
+import '../../../anon_rpc/providers/anon_rpc_service_provider.dart';
+import '../../../anon_rpc/widgets/mobile/anon_rpc_sheet.dart';
 import '../../../../app_bootstrap.dart';
 import '../../../../core/feedback/app_haptics.dart';
 import '../../../../core/config/app_version_config.dart';
@@ -74,6 +79,9 @@ class MobileSettingsScreen extends ConsumerWidget {
     final seedPhraseEnabled = account != null && !account.isHardware;
     final viewingKeyEnabled = account != null;
     final showEthereumRpc = ref.watch(privateUsdRpcSettingVisibleProvider);
+    final showAnonRpc =
+        showEthereumRpc &&
+        (ref.watch(anonRpcHostSupportedProvider).value ?? false);
 
     return SafeArea(
       bottom: false,
@@ -278,6 +286,12 @@ class MobileSettingsScreen extends ConsumerWidget {
                         valueColor: settingsValueColor,
                         chevronColor: settingsChevronColor,
                       ),
+                      if (showAnonRpc)
+                        _AnonRpcRow(
+                          textStyle: settingsRowStyle,
+                          valueColor: settingsValueColor,
+                          chevronColor: settingsChevronColor,
+                        ),
                       _RelayerClaimsRow(textStyle: settingsRowStyle),
                     ],
                     if (!kThemeLockedToDark)
@@ -812,6 +826,47 @@ class _EthereumRpcRow extends ConsumerWidget {
 
   Future<void> _open(BuildContext context) async {
     final done = await showPrivateUsdRpcSheet(context);
+    if (done != null && context.mounted) showAppToast(context, done);
+  }
+}
+
+/// Shielded USD's anonymous RPC: the network its Ethereum requests go
+/// through and whether the worker is up, or "Off".
+class _AnonRpcRow extends ConsumerWidget {
+  const _AnonRpcRow({
+    required this.textStyle,
+    required this.valueColor,
+    required this.chevronColor,
+  });
+
+  final TextStyle textStyle;
+  final Color valueColor;
+  final Color chevronColor;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final network =
+        ref.watch(anonRpcNetworkProvider).value ?? AnonRpcNetwork.defaultNetwork;
+    final status = ref.watch(anonRpcStatusProvider);
+    return MobileListRow(
+      key: const ValueKey('mobile_settings_anon_rpc_row'),
+      leading: const _RowIcon(AppIcons.eyeClosed),
+      label: AnonRpcCopy.title,
+      value: network.anonymizes
+          ? AnonRpcCopy.rowValue(network.label, anonRpcStatusLabel(status.phase))
+          : network.label,
+      minRowHeight: _settingsRowHeight,
+      textStyle: textStyle,
+      valueTextStyle: textStyle,
+      valueColor: valueColor,
+      chevronColor: chevronColor,
+      showChevron: true,
+      onTap: () => unawaited(_open(context)),
+    );
+  }
+
+  Future<void> _open(BuildContext context) async {
+    final done = await showAnonRpcSheet(context);
     if (done != null && context.mounted) showAppToast(context, done);
   }
 }

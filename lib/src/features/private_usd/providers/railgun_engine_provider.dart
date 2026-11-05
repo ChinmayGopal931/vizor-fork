@@ -12,6 +12,7 @@ import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/network_privacy_provider.dart';
 import '../../../providers/private_usd_lifecycle_provider.dart';
+import '../../../rust/api/anon_rpc.dart' as rust_anon_rpc;
 import '../../../rust/api/network_privacy.dart' as rust_network_privacy;
 import '../../../rust/api/private_usd.dart' as rust_private_usd;
 import '../models/railgun_models.dart';
@@ -19,6 +20,7 @@ import '../services/private_usd_swap_backend.dart' show startWithPrivateUsdSeed;
 import '../services/railgun_engine.dart';
 import '../services/railgun_engine_key_store.dart';
 import '../services/railgun_host_channel.dart';
+import '../../anon_rpc/providers/anon_rpc_network_provider.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_custom_rpc_provider.dart';
 
@@ -72,7 +74,12 @@ final railgunEngineProvider = Provider<RailgunEngine>((ref) {
     host: ref.watch(railgunHostProvider),
     wallets: ref.watch(railgunWalletSourceProvider),
     startBridge: bridge.start,
-    stopBridge: bridge.stop,
+    // The anonymous RPC relay the page's providers point at stops with the
+    // page's bridge: both belong to the page that just closed.
+    stopBridge: () async {
+      await bridge.stop();
+      await rust_anon_rpc.anonRpcProxyStop();
+    },
     startOfflineBridge: bridge.startOffline,
     debugPage: kDebugMode,
   );
@@ -109,6 +116,13 @@ final railgunEngineProvider = Provider<RailgunEngine>((ref) {
       if (previous.value != next.value) unawaited(engine.close());
     },
   );
+  // The anonymous RPC network changed, or the mode did: the page's `start`
+  // took the old `rpcUrls`, so close as for a route change; the next use
+  // starts with the new ones. The first read is no change.
+  ref.listen(anonRpcNetworkProvider, (previous, next) {
+    if (previous == null || !previous.hasValue || !next.hasValue) return;
+    if (previous.value != next.value) unawaited(engine.close());
+  });
   // iOS may reclaim a suspended app's listening socket, so back from the
   // background the bridge is checked. An OS behaviour, not a layout choice;
   // Android's bridge is never reclaimed.
@@ -225,12 +239,31 @@ class RustRailgunWalletSource implements RailgunWalletSource {
             deployment.railgunNetwork,
             rpcHosts: deployment.rpcHosts,
           );
+    // The saved anonymous RPC preference is applied to Rust as it loads;
+    // Rust's mode then decides, so the page and the engine never disagree.
+    try {
+      await _ref.read(anonRpcNetworkProvider.future);
+    } catch (_) {
+      // An unreadable preference leaves Rust's default: on.
+    }
+    final List<String> rpcUrls;
+    if (rust_anon_rpc.anonRpcEnabled()) {
+      // Anonymous RPC: the page's providers point at Rust's loopback relay,
+      // which forwards each request through the anon-rpc worker to the URL
+      // the page would have used first.
+      final port = await rust_anon_rpc.anonRpcProxyStart(
+        targetUrl: custom ?? keyed ?? deployment.keylessRpcUrl,
+      );
+      rpcUrls = ['http://127.0.0.1:$port/'];
+    } else {
+      // The user's own RPC (Settings) alone, with no fallback. Else the
+      // keyed endpoint first; publicnode keeps the page going without.
+      rpcUrls = custom != null ? [custom] : [?keyed, deployment.keylessRpcUrl];
+    }
     return RailgunWalletOpening(
       start: RailgunStartParams(
         network: deployment.railgunNetwork,
-        // The user's own RPC (Settings) alone, with no fallback. Else the
-        // keyed endpoint first; publicnode keeps the page going without.
-        rpcUrls: custom != null ? [custom] : [?keyed, deployment.keylessRpcUrl],
+        rpcUrls: rpcUrls,
         poiNodeUrls: [deployment.poiNodeUrl],
       ),
       wallet: RailgunOpenWalletParams(
