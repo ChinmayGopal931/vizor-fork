@@ -94,7 +94,18 @@ confirms Mumbai has the track (its CROPS Upgrade prize is Continuity-only).
   closed works: with no route up, the Railgun page cannot read and its sync
   holds at 0 % while the balance shows its last cached value, which reads as
   "broken" though it is the privacy invariant holding. M4.1 to M4.6 still to
-  pass, and depend on a working gateway.
+  pass, and depend on a working gateway. Fourth run, 2026-11-06 on joined
+  Wi-Fi (WIFI the validated default), settles the gateway question: tor-js
+  still cannot bootstrap. Arti starts cleanly (`TorClient created
+  (unbootstrapped)`, `Bootstrapping Tor client...`) then loops on `Looking
+  for a consensus` -> `Reached circuit build retry limit` -> `Problem
+  downloading directory object` -> `All tunnel attempts failed due to
+  timeout`. The WebRTC/KPS tunnel to the demo gateway never establishes, so
+  the worker never reaches the Tor network, on Wi-Fi exactly as on cellular.
+  The gateway host answers ICMP from the build machine but the KPS tunnel
+  does not come up. Conclusion is firm: the EF demo gateway is not usable for
+  us, and the demo of the anonymized path is blocked until we run our own
+  `tor-js-gateway` (O2). Everything up to the tunnel is proven on-device.
 - M5 submission: the README's "Anonymous RPC" and "CROPS" sections are
   drafted (5b5f4e2bd); they state the zecSwap stand-in honestly (O3) and
   must be re-read against what M4 shows. The video, the gateway and the
