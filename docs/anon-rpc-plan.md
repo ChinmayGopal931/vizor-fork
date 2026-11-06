@@ -106,6 +106,23 @@ confirms Mumbai has the track (its CROPS Upgrade prize is Continuity-only).
   does not come up. Conclusion is firm: the EF demo gateway is not usable for
   us, and the demo of the anonymized path is blocked until we run our own
   `tor-js-gateway` (O2). Everything up to the tunnel is proven on-device.
+  **Working end to end, 2026-11-06.** A teammate stood up a `tor-js-gateway`
+  (`159.89.167.167:12298:uEiA-...`, passed as `VIZOR_ANON_RPC_TOR_GATEWAYS`).
+  With it, Tor bootstraps in ~5 s and both the engine's reads and the Railgun
+  page's reads flow through Tor (relay received POST, answered 200, repeatedly,
+  no start failures; Settings shows "Default · Tor", Tor "Connected"). Three
+  WebView barriers on the page -> loopback-relay path had to come down first,
+  all committed: (1) a network-security config permitting cleartext http to
+  127.0.0.1 only (targetSdk 36 blocks all cleartext by default, which silently
+  dropped every read before it left the app, the real wall); (2) mixed-content
+  allow, so the https page may reach the http loopback; (3) a loopback bypass
+  on the page's SOCKS proxy, so its reads reach the relay directly instead of
+  the bridge. Also the FallbackProvider `stallTimeout` is raised for the
+  loopback URL so loadNetwork does not give up before the slow first Tor read.
+  **Nym and Nox remain CORS-blocked** (their mixnet workers fetch a remote
+  gateway from the null-origin sandbox); Tor is the only viable route in this
+  WebView, as expected. M4 passes for Tor; a dependable own gateway (O2)
+  replaces the demo one for a stable demo.
 - M5 submission: the README's "Anonymous RPC" and "CROPS" sections are
   drafted (5b5f4e2bd); they state the zecSwap stand-in honestly (O3) and
   must be re-read against what M4 shows. The video, the gateway and the
