@@ -56,7 +56,17 @@ confirms Mumbai has the track (its CROPS Upgrade prize is Continuity-only).
   waits for the worker (`AnonRpcService.ensureReady()`) before it opens the
   page, so the override is never set during the bootstrap. The phone's own
   network was failing too (lightwalletd gRPC transport errors every 30 s on
-  mobile data), so the next run wants Wi-Fi. M4.1 to M4.6 still to pass.
+  mobile data), so the next run wants Wi-Fi. Second run, same day, with the
+  engine waiting for the worker: the Tor worker's page loaded in 0.5 s and
+  its bootstrap was 21 s in when the owner switched routes; the Nym worker
+  failed at once on a bug of ours (the harness wants a `config` object, and
+  Dart sent null for every worker but tor-js; fixed, `{}`); the passthrough
+  worker, hash-checked, was ready in 1.3 s, which proves the page, the
+  sandbox and the specifier read. With it ready, the Railgun page's `start`
+  still failed within half a second of the relay starting: the loopback
+  path is the open question, and the relay now logs each answer's status
+  (never a URL) and the page's start failure text, redacted, to answer it.
+  M4.1 to M4.6 still to pass.
 - M5 submission: the README's "Anonymous RPC" and "CROPS" sections are
   drafted (5b5f4e2bd); they state the zecSwap stand-in honestly (O3) and
   must be re-read against what M4 shows. The video, the gateway and the
