@@ -119,10 +119,17 @@ confirms Mumbai has the track (its CROPS Upgrade prize is Continuity-only).
   on the page's SOCKS proxy, so its reads reach the relay directly instead of
   the bridge. Also the FallbackProvider `stallTimeout` is raised for the
   loopback URL so loadNetwork does not give up before the slow first Tor read.
-  **Nym and Nox remain CORS-blocked** (their mixnet workers fetch a remote
-  gateway from the null-origin sandbox); Tor is the only viable route in this
-  WebView, as expected. M4 passes for Tor; a dependable own gateway (O2)
-  replaces the demo one for a stable demo.
+  **Nox also works** (verified 2026-11-06, same session): the Sphinx-mixnet
+  worker reached ready in ~3 s, dialled a mixnode over KPS (`kps.dial.ok`),
+  and the balance refreshed with "RAILGUN SYNCED" on screen, reads flowing
+  (relay answered 200). The earlier "gateway selection" CORS error on Nox is
+  non-fatal: like tor-js it reaches its nodes over KPS/WebRTC, not a browser
+  fetch, so the sandbox's null origin does not block the data path. So two
+  anonymizing routes work on-device: Tor and Nox. **Nym** timed out its
+  awaitReady this session (unverified; likely the ~18 MB first download or a
+  slow mixnet join, not necessarily CORS). **Passthrough** stays CORS-blocked
+  and is debug-only anyway (no privacy). M4 passes for Tor and Nox; a
+  dependable own gateway (O2) still replaces the demo one for a stable demo.
 - M5 submission: the README's "Anonymous RPC" and "CROPS" sections are
   drafted (5b5f4e2bd); they state the zecSwap stand-in honestly (O3) and
   must be re-read against what M4 shows. The video, the gateway and the
