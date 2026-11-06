@@ -39,21 +39,38 @@ confirms Mumbai has the track (its CROPS Upgrade prize is Continuity-only).
   is registered, the Railgun page's CSP and route admit the loopback relay
   (the rebuilt bundle changed only the three `index.html` copies), and the
   Kotlin unit tests pass (`AnonRpcBoundaryTest` added).
-- M3 Dart: written 2026-11-05 (`lib/src/features/anon_rpc/`, the Settings
-  row and sheet, the relay plumbing in `railgun_engine_provider.dart`).
+- M3 Dart: written 2026-11-05 (`lib/src/features/anon_rpc/`, the Route
+  section of Settings' Ethereum RPC sheet, the relay plumbing in
+  `railgun_engine_provider.dart`).
   `fvm flutter analyze` is clean; the Private USD and Settings tests pass.
   Not yet run on a device.
-- M4 device bring-up: the arm64 debug APK is built
-  (`build/app/outputs/flutter-apk/app-debug.apk`, 2026-11-05 14:28, Private
-  USD on, mobile form factor); it packages the anon page under `assets/anon/`.
-  Blocked on the Galaxy A35 being attached (`adb devices` lists none):
-  install with `adb -s RZCX40721QZ install -r` and run M4.1 to M4.6.
+- M4 device bring-up: first run 2026-11-05 on the OnePlus 15's side-by-side
+  testnet build (`com.keplr.vizor.testnet`, the branch rebuilt with
+  `--dart-define=VIZOR_APPLICATION_ID=com.keplr.vizor.testnet` and
+  `ZCASH_DEFAULT_NETWORK=test`; the Galaxy A35 was away). Rust reported the
+  mode on and the page connected; the worker's first start failed within a
+  second with the page's "Failed to fetch" while the Railgun page was loading
+  beside it and setting the process-wide proxy override, after which the
+  page's first read failed closed and its bridge went down. The likely cause
+  is the override landing on the worker's bootstrap fetch: the engine now
+  waits for the worker (`AnonRpcService.ensureReady()`) before it opens the
+  page, so the override is never set during the bootstrap. The phone's own
+  network was failing too (lightwalletd gRPC transport errors every 30 s on
+  mobile data), so the next run wants Wi-Fi. M4.1 to M4.6 still to pass.
 - M5 submission: the README's "Anonymous RPC" and "CROPS" sections are
   drafted (5b5f4e2bd); they state the zecSwap stand-in honestly (O3) and
   must be re-read against what M4 shows. The video, the gateway and the
   logging proxy wait for the owner (O2, O4).
 
 **Deviations.**
+
+- The Settings row and sheet of M3.6 became a Route section of the Ethereum
+  RPC sheet (owner, 2026-11-05): one place to choose the provider and the
+  route, applied on the tap, no separate row.
+- `prepare()` awaits `AnonRpcService.ensureReady()` before the relay and the
+  page start (M4's first finding, above): the worker's bootstrap never runs
+  under the Railgun page's proxy override, and the page's first reads never
+  meet a worker still starting.
 
 - D10 refined: the mode is also gated on the platform hosting the page.
   `anonRpcHostSupportedProvider` asks the anon handler `supported`; where
@@ -333,10 +350,13 @@ pattern), `mobile_settings_screen.dart` (`_EthereumRpcRow`, `_showThemeSheet`),
    else publicnode) and `anonRpcProxyStop()` with the page's close; the
    secrets list keeps the target. `railgunEngineProvider` closes the page
    on a mode change as it does for a route change.
-6. Settings: an "Anonymous RPC" row in the Private USD group showing the
-   network and the status ("Tor · ready", "Tor · connecting", "Off"), and a
-   sheet with the options and a one-line description each; copy in
-   `AnonRpcCopy`. Debug-only options (passthrough) appear in debug builds.
+6. Settings: the Ethereum RPC sheet gains a Route section above its
+   provider section (`AnonRpcRoutePicker`): a card per network with a
+   one-line description, and Direct, applied on the tap, with the worker's
+   status and the relayed count under the cards; the Ethereum RPC row reads
+   "Default · Tor". Copy in `AnonRpcCopy`. Debug-only options (passthrough,
+   Nym) appear in debug builds. First built as a row and a sheet of its own,
+   merged at the owner's request on 2026-11-05.
 7. `fvm flutter analyze`; `fvm flutter test`.
 
 Done when: a debug build on the phone shows the row, and toggling it closes

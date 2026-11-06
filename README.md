@@ -153,8 +153,8 @@ network is tor-js (Arti compiled to WebAssembly, circuits built on the phone,
 reaching Tor through a KPS gateway). The mode fails closed: while the page is
 down or the worker is not ready, requests are refused, never sent directly.
 Each account's reads carry their own isolation key, so two accounts' reads
-leave through independent circuits. Settings has an "Anonymous RPC" row to pick
-Tor, Nox (testnet) or Off.
+leave through independent circuits. The route is chosen in Settings' Ethereum
+RPC sheet, beside the provider: Tor, Nox (testnet) or Direct.
 
 Traffic that stays on its previous route, on purpose: the Zcash sync to
 lightwalletd, the Railgun screening nodes, indexer and proving artifacts, the
