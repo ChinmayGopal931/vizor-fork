@@ -9,6 +9,8 @@ import '../../../../core/config/private_usd_feature_config.dart';
 import '../../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/app_icon.dart';
+import '../../../../core/widgets/mobile/mobile_choice_card.dart';
 import '../../../../core/widgets/mobile_text_field.dart';
 import '../../../anon_rpc/anon_rpc_copy.dart';
 import '../../../anon_rpc/anon_rpc_network.dart';
@@ -23,12 +25,13 @@ import 'private_usd_paste_button.dart';
 
 /// Settings' Ethereum RPC sheet. Its route section (where the host runs the
 /// anon-rpc page) picks the network Shielded USD's Ethereum requests go
-/// through, or Direct, applied on the tap. Its provider section takes a URL
-/// of the user's own on one of the network's RPC providers (all of which the
-/// Railgun page reaches), checked with `eth_chainId` and over the engine's
-/// log window before it is saved, or the default again. Pops the toast to
-/// show, or null when nothing changed. The field starts empty and the sheet
-/// shows only the saved URL's host: the URL can hold a key.
+/// through, or Direct, applied on the tap. Its provider section is two
+/// cards: Veylor's default, or a URL of the user's own on one of the
+/// network's RPC providers (all of which the Railgun page reaches), checked
+/// with `eth_chainId` and over the engine's log window before it is saved.
+/// Pops the toast to show once a URL is saved, else null. The field starts
+/// empty and the sheet shows only the saved URL's host: the URL can hold a
+/// key.
 Future<String?> showPrivateUsdRpcSheet(BuildContext context) =>
     showAppMobileSheet<String>(
       context: context,
@@ -46,6 +49,9 @@ class _PrivateUsdRpcSheet extends ConsumerStatefulWidget {
 class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
   final _controller = TextEditingController();
   final _focus = FocusNode();
+
+  // "Your own URL" chosen before one is saved: the field shows.
+  var _ownUrl = false;
   var _busy = false;
   var _checking = false;
   String? _error;
@@ -108,21 +114,8 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
       });
       return;
     }
-    await _change(() => _setting.save(url), PrivateUsdCopy.rpcSaved);
-  }
-
-  Future<void> _useDefault() async {
-    if (_busy) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    await _change(_setting.clear, PrivateUsdCopy.rpcCleared);
-  }
-
-  Future<void> _change(Future<void> Function() change, String done) async {
     try {
-      await change();
+      await _setting.save(url);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -131,7 +124,25 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
       });
       return;
     }
-    if (mounted) Navigator.of(context).pop(done);
+    if (mounted) Navigator.of(context).pop(PrivateUsdCopy.rpcSaved);
+  }
+
+  /// Back to Veylor's provider: a saved URL is cleared at once.
+  Future<void> _chooseDefault(String? custom) async {
+    if (_busy) return;
+    setState(() {
+      _ownUrl = false;
+      _error = null;
+    });
+    if (custom == null) return;
+    setState(() => _busy = true);
+    try {
+      await _setting.clear();
+    } catch (_) {
+      if (mounted) setState(() => _error = PrivateUsdCopy.rpcErrorSave);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -148,6 +159,12 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
     final route =
         ref.watch(anonRpcNetworkProvider).value ??
         AnonRpcNetwork.defaultNetwork;
+    final ownChosen = custom != null || _ownUrl;
+    final canSave =
+        ownChosen &&
+        !_busy &&
+        deployment != null &&
+        _controller.text.trim().isNotEmpty;
     final secondary = AppTypography.bodyMedium.copyWith(
       color: colors.text.secondary,
     );
@@ -158,7 +175,7 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
     return MobileModalScaffold(
       title: PrivateUsdCopy.rpcTitle,
       onClose: () => Navigator.of(context).pop(),
-      // The text scrolls above the keyboard; the actions stay below it.
+      // The cards scroll above the keyboard; the action stays below it.
       constrainBody: true,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -178,103 +195,104 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
                       key: const ValueKey('private_usd_rpc_route_body'),
                       style: secondary,
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(AnonRpcCopy.excluded, style: small),
                     const SizedBox(height: AppSpacing.sm),
                     const AnonRpcRoutePicker(),
-                    const SizedBox(height: AppSpacing.md),
-                    const _SectionCaption(PrivateUsdCopy.rpcProviderHeading),
-                    const SizedBox(height: AppSpacing.xs),
-                  ],
-                  Text(PrivateUsdCopy.rpcBody(chain), style: secondary),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    PrivateUsdCopy.rpcSees(
-                      anonymized: routeSupported && route.anonymizes,
-                    ),
-                    key: const ValueKey('private_usd_rpc_sees'),
-                    style: small,
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    PrivateUsdCopy.rpcProviders,
-                    key: const ValueKey('private_usd_rpc_providers'),
-                    style: AppTypography.bodySmall.copyWith(
-                      color: colors.text.secondary,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    PrivateUsdCopy.rpcCurrent(
-                      custom == null
-                          ? PrivateUsdCopy.rpcDefault
-                          : privateUsdCustomRpcHost(custom),
-                    ),
-                    key: const ValueKey('private_usd_rpc_current'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.labelMedium.copyWith(
-                      color: colors.text.accent,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  MobileTextField(
-                    fieldKey: const ValueKey('private_usd_rpc_field'),
-                    controller: _controller,
-                    focusNode: _focus,
-                    enabled: !_busy,
-                    hintText: PrivateUsdCopy.rpcHint,
-                    // No suggestions: the keyboard would learn the key.
-                    keyboardType: TextInputType.visiblePassword,
-                    textInputAction: TextInputAction.done,
-                    onChanged: (_) {
-                      if (_error != null) setState(() => _error = null);
-                    },
-                    onSubmitted: (_) => unawaited(_checkAndSave()),
-                    trailing: PrivateUsdPasteButton(
-                      key: const ValueKey('private_usd_rpc_paste'),
-                      controller: _controller,
-                      enabled: !_busy,
-                      onPasted: (_) => setState(() => _error = null),
-                    ),
-                  ),
-                  if (error != null) ...[
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      error,
-                      key: const ValueKey('private_usd_rpc_error'),
-                      style: AppTypography.bodySmall.copyWith(
-                        color: colors.text.destructive,
+                      PrivateUsdCopy.rpcSees(anonymized: route.anonymizes),
+                      key: const ValueKey('private_usd_rpc_sees'),
+                      style: small,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    const _SectionCaption(PrivateUsdCopy.rpcProviderHeading),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                  MobileChoiceCard(
+                    key: const ValueKey('private_usd_rpc_default'),
+                    icon: AppIcons.link,
+                    label: PrivateUsdCopy.rpcDefault,
+                    description: PrivateUsdCopy.rpcDefaultDescription(chain),
+                    selected: !ownChosen,
+                    enabled: !_busy,
+                    onTap: () => unawaited(_chooseDefault(custom)),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  MobileChoiceCard(
+                    key: const ValueKey('private_usd_rpc_own'),
+                    icon: AppIcons.edit,
+                    label: PrivateUsdCopy.rpcOwn,
+                    description: custom == null
+                        ? PrivateUsdCopy.rpcOwnDescription
+                        : PrivateUsdCopy.rpcCurrent(
+                            privateUsdCustomRpcHost(custom),
+                          ),
+                    selected: ownChosen,
+                    enabled: !_busy,
+                    onTap: () => setState(() {
+                      _ownUrl = true;
+                      _error = null;
+                    }),
+                  ),
+                  if (ownChosen) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    MobileTextField(
+                      fieldKey: const ValueKey('private_usd_rpc_field'),
+                      controller: _controller,
+                      focusNode: _focus,
+                      enabled: !_busy,
+                      hintText: PrivateUsdCopy.rpcHint,
+                      // No suggestions: the keyboard would learn the key.
+                      keyboardType: TextInputType.visiblePassword,
+                      textInputAction: TextInputAction.done,
+                      onChanged: (_) => setState(() => _error = null),
+                      onSubmitted: (_) => unawaited(_checkAndSave()),
+                      trailing: PrivateUsdPasteButton(
+                        key: const ValueKey('private_usd_rpc_paste'),
+                        controller: _controller,
+                        enabled: !_busy,
+                        onPasted: (_) => setState(() => _error = null),
                       ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      PrivateUsdCopy.rpcProviders,
+                      key: const ValueKey('private_usd_rpc_providers'),
+                      style: small,
+                    ),
+                  ],
+                  if (!routeSupported) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      PrivateUsdCopy.rpcSees(anonymized: false),
+                      key: const ValueKey('private_usd_rpc_sees'),
+                      style: small,
                     ),
                   ],
                 ],
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          AppButton(
-            key: const ValueKey('private_usd_rpc_save'),
-            expand: true,
-            onPressed: _busy || deployment == null
-                ? null
-                : () => unawaited(_checkAndSave()),
-            child: Text(
-              _checking
-                  ? PrivateUsdCopy.rpcChecking
-                  : PrivateUsdCopy.rpcCheckAndSave,
+          if (error != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              error,
+              key: const ValueKey('private_usd_rpc_error'),
+              style: small.copyWith(color: colors.text.destructive),
             ),
-          ),
-          const SizedBox(height: AppSpacing.s),
-          AppButton(
-            key: const ValueKey('private_usd_rpc_default'),
-            variant: AppButtonVariant.secondary,
-            expand: true,
-            onPressed: _busy || custom == null
-                ? null
-                : () => unawaited(_useDefault()),
-            child: const Text(PrivateUsdCopy.rpcUseDefault),
-          ),
+          ],
+          if (ownChosen) ...[
+            const SizedBox(height: AppSpacing.md),
+            AppButton(
+              key: const ValueKey('private_usd_rpc_save'),
+              expand: true,
+              onPressed: canSave ? () => unawaited(_checkAndSave()) : null,
+              child: Text(
+                _checking
+                    ? PrivateUsdCopy.rpcChecking
+                    : PrivateUsdCopy.rpcCheckAndSave,
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -106,7 +106,8 @@ enum AnonRpcNetwork {
   /// takes its gateways and a log level; the others take none.
   Object? get config => switch (this) {
     tor => {'gateways': kAnonRpcTorGateways, 'logLevel': 'info'},
-    _ => null,
+    off => null,
+    _ => const <String, Object?>{},
   };
 }
 

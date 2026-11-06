@@ -228,9 +228,16 @@ class AnonRpcService {
           headers: headers,
           body: base64Decode(answer['bodyBase64'] as String),
         );
+        if (debug) {
+          privateUsdLog('anon rpc: fetch answered ${answer['status']}');
+        }
         return;
       }
       final code = answer['code'] as String? ?? 'FETCH_FAILED';
+      // The page redacts URLs from the worker's text before it answers.
+      if (debug) {
+        privateUsdLog('anon rpc: fetch failed ($code): ${answer['message']}');
+      }
       // The worker itself failed, or never started: the path is down until
       // the next start, and Rust waits it out as a route problem.
       final blocked = code == 'NOT_STARTED' || code == 'WORKER_FAILED';
@@ -292,7 +299,7 @@ class AnonRpcService {
         }),
       );
       _ensureCurrent(epoch);
-      _step(network, 'worker verified and started', started);
+      _step(network, 'worker created', started);
       await _host.call('awaitReady', '{}');
       _ensureCurrent(epoch);
       _workerReady = true;

@@ -48,7 +48,8 @@ class Host {
     this.failures = 0;
     this.worker = new AnonRpcWorker({
       address: specifier,
-      config,
+      // The harness wants an object even from a worker that takes no settings.
+      config: config ?? {},
       preExisting: { rpcProvider: bootstrapProvider(bootstrapRpcUrl) },
       // The page's CSP has no 'unsafe-inline', so the harness cannot build its null-origin frame from `srcdoc`.
       iframeUrl: new URL('sandbox.html', location.href).href,

@@ -414,6 +414,7 @@ async fn forward(request: Request<Incoming>, target: &str, key: &str) -> Respons
         .header("content-type", content_type);
     match relay(routed, key, None).await {
         Ok(answer) => {
+            log::info!("anon rpc: loopback relay answered {}", answer.status);
             let content_type = answer
                 .header("content-type")
                 .unwrap_or("application/json")
@@ -427,9 +428,23 @@ async fn forward(request: Request<Incoming>, target: &str, key: &str) -> Respons
         }
         // The text names no URL and no cause; the page only needs to fail.
         Err(error) if error.route_blocked => {
+            log::info!("anon rpc: loopback relay refused: {}", loggable(&error.message));
             plain(StatusCode::SERVICE_UNAVAILABLE, "anonymous RPC unavailable")
         }
-        Err(_) => plain(StatusCode::BAD_GATEWAY, "anonymous RPC failed"),
+        Err(error) => {
+            log::info!("anon rpc: loopback relay failed: {}", loggable(&error.message));
+            plain(StatusCode::BAD_GATEWAY, "anonymous RPC failed")
+        }
+    }
+}
+
+/// A failure's text for the log: the codes Dart and this module write, never
+/// anything that could carry a URL.
+fn loggable(message: &str) -> &str {
+    if message.contains("://") {
+        "(redacted)"
+    } else {
+        message
     }
 }
 

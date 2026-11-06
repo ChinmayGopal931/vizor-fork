@@ -515,9 +515,18 @@ class RailgunEngine {
       _ensureCurrent(epoch);
       await _host.load(proxyPort: port, debug: debugPage);
       _ensureCurrent(epoch);
-      final started = RailgunStartResult.parse(
-        _decode(await _host.call('start', opening.start.toJson())),
-      );
+      final RailgunStartResult started;
+      try {
+        started = RailgunStartResult.parse(
+          _decode(await _host.call('start', opening.start.toJson())),
+        );
+      } on RailgunHostException catch (e) {
+        // Debug builds only, with the keyed RPC URLs redacted.
+        privateUsdLog(
+          'start failed (${e.code.name}): ${e.debugMessage(secrets: secrets)}',
+        );
+        rethrow;
+      }
       _ensureCurrent(epoch);
       // The mnemonic is a Dart string, which cannot be zeroed: hold it no
       // longer than the call.

@@ -5,9 +5,9 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app_bootstrap.dart';
-import '../../../../core/feedback/app_haptics.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_icon.dart';
+import '../../../../core/widgets/mobile/mobile_choice_card.dart';
 import '../../../../rust/api/anon_rpc.dart' as rust_anon_rpc;
 import '../../anon_rpc_copy.dart';
 import '../../anon_rpc_network.dart';
@@ -94,9 +94,11 @@ class _AnonRpcRoutePickerState extends ConsumerState<AnonRpcRoutePicker> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final network in options) ...[
-          _AnonRpcOptionCard(
+          MobileChoiceCard(
             key: ValueKey('mobile_anon_rpc_option_${network.name}'),
-            network: network,
+            icon: network.anonymizes ? AppIcons.eyeClosed : AppIcons.eye,
+            label: network.label,
+            description: network.description,
             selected: network == current,
             enabled: !_busy,
             onTap: () => unawaited(_select(network)),
@@ -118,109 +120,6 @@ class _AnonRpcRoutePickerState extends ConsumerState<AnonRpcRoutePicker> {
           ),
         ],
       ],
-    );
-  }
-}
-
-class _AnonRpcOptionCard extends StatelessWidget {
-  const _AnonRpcOptionCard({
-    required this.network,
-    required this.selected,
-    required this.enabled,
-    required this.onTap,
-    super.key,
-  });
-
-  final AnonRpcNetwork network;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    return Semantics(
-      button: true,
-      selected: selected,
-      enabled: enabled,
-      label: '${network.label}. ${network.description}',
-      excludeSemantics: true,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          if (!enabled || selected) return;
-          unawaited(AppHaptics.selection());
-          onTap();
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.sm,
-          ),
-          decoration: BoxDecoration(
-            color: colors.background.ground,
-            borderRadius: BorderRadius.circular(AppRadii.medium),
-            border: Border.all(
-              color: selected ? colors.border.strong : colors.border.subtle,
-              width: selected ? 1.5 : 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Opacity(
-                opacity: selected ? 1 : 0.5,
-                child: AppIcon(
-                  network.anonymizes ? AppIcons.eyeClosed : AppIcons.eye,
-                  size: 20,
-                  color: colors.icon.accent,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.s),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      network.label,
-                      style: AppTypography.bodyMediumStrong.copyWith(
-                        color: colors.text.accent,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Opacity(
-                      opacity: 0.7,
-                      child: Text(
-                        network.description,
-                        style: AppTypography.bodySmall.copyWith(
-                          color: colors.text.accent,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (selected) ...[
-                const SizedBox(width: AppSpacing.s),
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: colors.background.inverse,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: AppIcon(
-                      AppIcons.check,
-                      size: 14,
-                      color: colors.text.inverse,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
