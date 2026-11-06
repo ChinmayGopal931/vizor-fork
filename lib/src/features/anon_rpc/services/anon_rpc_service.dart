@@ -169,6 +169,21 @@ class AnonRpcService {
   /// The network changed: the next request starts the new worker.
   Future<void> restart() => _closeWorker();
 
+  /// Starts the worker if none is ready, and waits for it. The Railgun page
+  /// opens only once its requests have a path, so its proxy override never
+  /// lands on the worker's own bootstrap. Fails as the page host does, so
+  /// the engine reports it like any other failure to open.
+  Future<void> ensureReady() async {
+    try {
+      await _ensureWorker();
+    } on _WorkerUnavailable catch (e) {
+      throw RailgunHostException(
+        RailgunHostErrorCode.failed,
+        message: 'anonymous RPC: ${e.reason}',
+      );
+    }
+  }
+
   /// Stops listening; the page closes. [status] stays readable.
   Future<void> dispose() async {
     _disposed = true;
@@ -246,7 +261,9 @@ class AnonRpcService {
     if (_workerReady) return Future.value();
     final retryAt = _retryAt;
     if (retryAt != null && _now().isBefore(retryAt)) {
-      return Future.error(const _WorkerUnavailable('the worker failed; retrying soon'));
+      return Future.error(
+        const _WorkerUnavailable('the worker failed; retrying soon'),
+      );
     }
     return _opening ??= _open().whenComplete(() => _opening = null);
   }
@@ -259,13 +276,12 @@ class AnonRpcService {
     if (!network.anonymizes || specifier == null || bootstrapRpcUrl == null) {
       throw const _WorkerUnavailable('anonymous RPC is off');
     }
-    _publish(
-      AnonRpcStatus(phase: AnonRpcPhase.starting, network: network),
-    );
+    _publish(AnonRpcStatus(phase: AnonRpcPhase.starting, network: network));
     final started = _now();
     try {
       await _host.load(debug: debug);
       _ensureCurrent(epoch);
+      _step(network, 'page loaded', started);
       await _host.call(
         'start',
         jsonEncode({
@@ -276,6 +292,7 @@ class AnonRpcService {
         }),
       );
       _ensureCurrent(epoch);
+      _step(network, 'worker verified and started', started);
       await _host.call('awaitReady', '{}');
       _ensureCurrent(epoch);
       _workerReady = true;
@@ -308,6 +325,15 @@ class AnonRpcService {
       }
       throw _WorkerUnavailable(e.code.name);
     }
+  }
+
+  // Debug builds only: a start's progress, with no URL in it.
+  void _step(AnonRpcNetwork network, String what, DateTime started) {
+    if (!debug) return;
+    privateUsdLog(
+      'anon rpc: ${network.name} $what in '
+      '${_now().difference(started).inMilliseconds} ms',
+    );
   }
 
   void _ensureCurrent(int epoch) {

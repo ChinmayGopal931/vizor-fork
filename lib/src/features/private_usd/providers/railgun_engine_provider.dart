@@ -21,6 +21,7 @@ import '../services/railgun_engine.dart';
 import '../services/railgun_engine_key_store.dart';
 import '../services/railgun_host_channel.dart';
 import '../../anon_rpc/providers/anon_rpc_network_provider.dart';
+import '../../anon_rpc/providers/anon_rpc_service_provider.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_custom_rpc_provider.dart';
 
@@ -250,7 +251,11 @@ class RustRailgunWalletSource implements RailgunWalletSource {
     if (rust_anon_rpc.anonRpcEnabled()) {
       // Anonymous RPC: the page's providers point at Rust's loopback relay,
       // which forwards each request through the anon-rpc worker to the URL
-      // the page would have used first.
+      // the page would have used first. The worker comes up first, so the
+      // page's process-wide proxy override never lands on the worker's own
+      // bootstrap, and the page's first reads have a path; a worker that
+      // cannot start fails the open like any page failure.
+      await _ref.read(anonRpcServiceProvider).ensureReady();
       final port = await rust_anon_rpc.anonRpcProxyStart(
         targetUrl: custom ?? keyed ?? deployment.keylessRpcUrl,
       );

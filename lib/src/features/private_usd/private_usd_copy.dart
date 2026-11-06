@@ -930,16 +930,21 @@ abstract final class PrivateUsdCopy {
   static String rpcCurrent(String value) => 'Current: $value';
   static const rpcNetworkSepolia = 'Sepolia';
   static const rpcNetworkMainnet = 'Ethereum mainnet';
+  static const rpcProviderHeading = 'Provider';
   static String rpcBody(String network) =>
-      'Use your own Ethereum RPC URL for $network from a supported provider. '
-      'Shielded USD then uses only it.';
+      'The default provider, or your own Ethereum RPC URL for $network from '
+      'a supported provider. Shielded USD then uses only it.';
   static const rpcProviders =
       'Supported: Alchemy, Infura, QuickNode, Chainstack, Ankr, dRPC, '
       'BlockPI, Tenderly, NodeReal, GetBlock, OnFinality, publicnode, Pocket '
       'Network and MEV Blocker.';
-  static const rpcSees =
-      "The RPC sees the app's Ethereum requests, and your IP address unless "
-      'Anonymous RPC or Tor is on.';
+
+  /// What the provider learns, under the route in effect.
+  static String rpcSees({required bool anonymized}) => anonymized
+      ? "The provider sees the app's Ethereum requests arriving from the "
+            'anonymizing network, never your IP address.'
+      : "The provider sees the app's Ethereum requests, and your IP address "
+            'unless Tor is on.';
   static const rpcHint = 'https://';
   static const rpcCheckAndSave = 'Check and save';
   static const rpcChecking = 'Checking…';

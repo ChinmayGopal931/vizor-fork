@@ -6,27 +6,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app_bootstrap.dart';
 import '../../../../core/feedback/app_haptics.dart';
-import '../../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../rust/api/anon_rpc.dart' as rust_anon_rpc;
-import '../../../accounts/widgets/mobile/account_edit_sheets.dart'
-    show MobileSheetCancel;
 import '../../anon_rpc_copy.dart';
 import '../../anon_rpc_network.dart';
 import '../../providers/anon_rpc_network_provider.dart';
 import '../../providers/anon_rpc_service_provider.dart';
 import '../../services/anon_rpc_service.dart';
 
-/// Settings' Anonymous RPC sheet: the network Shielded USD's Ethereum
-/// requests go through, or off. Pops the toast to show, or null when nothing
-/// changed.
-Future<String?> showAnonRpcSheet(BuildContext context) =>
-    showAppMobileSheet<String>(
-      context: context,
-      builder: (_) => const _AnonRpcSheet(),
-    );
+/// The worker's status, after the network's name.
+String anonRpcStatusLabel(AnonRpcPhase phase) => switch (phase) {
+  AnonRpcPhase.idle => AnonRpcCopy.statusIdle,
+  AnonRpcPhase.starting => AnonRpcCopy.statusConnecting,
+  AnonRpcPhase.ready => AnonRpcCopy.statusOn,
+  AnonRpcPhase.failed => AnonRpcCopy.statusFailed,
+};
 
 /// How many requests Rust has relayed through the worker; 0 where Rust is
 /// not loaded (widget tests).
@@ -38,43 +33,33 @@ int _relayedCount() {
   }
 }
 
-/// The row's status, after the network's name.
-String anonRpcStatusLabel(AnonRpcPhase phase) => switch (phase) {
-  AnonRpcPhase.idle => AnonRpcCopy.statusIdle,
-  AnonRpcPhase.starting => AnonRpcCopy.statusConnecting,
-  AnonRpcPhase.ready => AnonRpcCopy.statusOn,
-  AnonRpcPhase.failed => AnonRpcCopy.statusFailed,
-};
-
-class _AnonRpcSheet extends ConsumerStatefulWidget {
-  const _AnonRpcSheet();
+/// The route section of Settings' Ethereum RPC sheet: a card for each
+/// network Shielded USD's Ethereum requests can go through, and Direct. A
+/// tap applies at once (the Railgun page reopens on the new route), and the
+/// line under the cards says where the worker stands.
+class AnonRpcRoutePicker extends ConsumerStatefulWidget {
+  const AnonRpcRoutePicker({super.key});
 
   @override
-  ConsumerState<_AnonRpcSheet> createState() => _AnonRpcSheetState();
+  ConsumerState<AnonRpcRoutePicker> createState() => _AnonRpcRoutePickerState();
 }
 
-class _AnonRpcSheetState extends ConsumerState<_AnonRpcSheet> {
-  AnonRpcNetwork? _selected;
+class _AnonRpcRoutePickerState extends ConsumerState<AnonRpcRoutePicker> {
   var _busy = false;
+  String? _error;
 
-  Future<void> _save(AnonRpcNetwork current) async {
-    final selected = _selected ?? current;
-    if (selected == current) {
-      Navigator.of(context).pop();
-      return;
-    }
-    setState(() => _busy = true);
+  Future<void> _select(AnonRpcNetwork network) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
-      await ref.read(anonRpcNetworkProvider.notifier).set(selected);
-      if (!mounted) return;
-      Navigator.of(context).pop(
-        selected.anonymizes
-            ? AnonRpcCopy.saved(selected.label)
-            : AnonRpcCopy.savedOff,
-      );
+      await ref.read(anonRpcNetworkProvider.notifier).set(network);
     } catch (_) {
-      if (!mounted) return;
-      Navigator.of(context).pop(AnonRpcCopy.saveFailed);
+      if (mounted) setState(() => _error = AnonRpcCopy.saveFailed);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -82,65 +67,57 @@ class _AnonRpcSheetState extends ConsumerState<_AnonRpcSheet> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final current =
-        ref.watch(anonRpcNetworkProvider).value ?? AnonRpcNetwork.defaultNetwork;
-    final selected = _selected ?? current;
+        ref.watch(anonRpcNetworkProvider).value ??
+        AnonRpcNetwork.defaultNetwork;
     final status = ref.watch(anonRpcStatusProvider);
     final walletNetwork = ref.watch(appBootstrapProvider).network;
     final options = [
       for (final network in AnonRpcNetwork.values)
-        if (network.availableFor(walletNetwork: walletNetwork, debug: kDebugMode))
+        if (network.availableFor(
+          walletNetwork: walletNetwork,
+          debug: kDebugMode,
+        ))
           network,
     ];
-    final relayed = _relayedCount();
     final statusLine = current.anonymizes
-        ? '${AnonRpcCopy.rowValue(current.label, anonRpcStatusLabel(status.phase))}'
-              ' · ${AnonRpcCopy.relayed(relayed)}'
-        : AnonRpcCopy.rowValue(current.label, AnonRpcCopy.statusOff);
-    final bodyStyle = AppTypography.bodyMedium.copyWith(
-      color: colors.text.accent,
+        ? AnonRpcCopy.joined(
+            AnonRpcCopy.joined(current.label, anonRpcStatusLabel(status.phase)),
+            AnonRpcCopy.relayed(_relayedCount()),
+          )
+        : null;
+    final error = _error;
+    final small = AppTypography.bodySmall.copyWith(
+      color: colors.text.secondary,
     );
-    return MobileModalScaffold(
-      title: AnonRpcCopy.title,
-      onClose: () => Navigator.of(context).pop(),
-      bodyGap: AppSpacing.md,
-      bottomPadding: AppSpacing.base,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(AnonRpcCopy.body, style: bodyStyle),
-          const SizedBox(height: AppSpacing.xs),
-          Opacity(
-            opacity: 0.7,
-            child: Text(AnonRpcCopy.excluded, style: bodyStyle),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            key: const ValueKey('mobile_anon_rpc_status'),
-            statusLine,
-            style: bodyStyle,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          for (final network in options) ...[
-            _AnonRpcOptionCard(
-              key: ValueKey('mobile_anon_rpc_option_${network.name}'),
-              network: network,
-              selected: network == selected,
-              onTap: () => setState(() => _selected = network),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-          ],
-          const SizedBox(height: AppSpacing.sm),
-          AppButton(
-            key: const ValueKey('mobile_anon_rpc_update'),
-            expand: true,
-            onPressed: _busy ? null : () => unawaited(_save(current)),
-            child: Text(AnonRpcCopy.update),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final network in options) ...[
+          _AnonRpcOptionCard(
+            key: ValueKey('mobile_anon_rpc_option_${network.name}'),
+            network: network,
+            selected: network == current,
+            enabled: !_busy,
+            onTap: () => unawaited(_select(network)),
           ),
           const SizedBox(height: AppSpacing.xs),
-          MobileSheetCancel(onTap: () => Navigator.of(context).pop()),
         ],
-      ),
+        if (statusLine != null)
+          Text(
+            statusLine,
+            key: const ValueKey('mobile_anon_rpc_status'),
+            style: small,
+          ),
+        if (error != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            error,
+            key: const ValueKey('mobile_anon_rpc_error'),
+            style: small.copyWith(color: colors.text.destructive),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -149,12 +126,14 @@ class _AnonRpcOptionCard extends StatelessWidget {
   const _AnonRpcOptionCard({
     required this.network,
     required this.selected,
+    required this.enabled,
     required this.onTap,
     super.key,
   });
 
   final AnonRpcNetwork network;
   final bool selected;
+  final bool enabled;
   final VoidCallback onTap;
 
   @override
@@ -163,12 +142,14 @@ class _AnonRpcOptionCard extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
+      enabled: enabled,
       label: '${network.label}. ${network.description}',
       excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
-          if (!selected) unawaited(AppHaptics.selection());
+          if (!enabled || selected) return;
+          unawaited(AppHaptics.selection());
           onTap();
         },
         child: Container(

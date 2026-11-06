@@ -10,6 +10,10 @@ import '../../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/mobile_text_field.dart';
+import '../../../anon_rpc/anon_rpc_copy.dart';
+import '../../../anon_rpc/anon_rpc_network.dart';
+import '../../../anon_rpc/providers/anon_rpc_network_provider.dart';
+import '../../../anon_rpc/widgets/mobile/anon_rpc_route_picker.dart';
 import '../../models/private_usd_messages.dart';
 import '../../private_usd_copy.dart';
 import '../../providers/private_usd_available_provider.dart';
@@ -17,12 +21,14 @@ import '../../providers/private_usd_custom_rpc_provider.dart';
 import '../../services/private_usd_rpc_check.dart';
 import 'private_usd_paste_button.dart';
 
-/// Settings' Ethereum RPC sheet: a URL of the user's own on one of the
-/// network's RPC providers (all of which the Railgun page reaches), checked
-/// with `eth_chainId` and over the engine's log window before it is saved,
-/// or the default again. Pops the toast to show, or null when nothing
-/// changed. The field starts empty and the sheet shows only the saved URL's
-/// host: the URL can hold a key.
+/// Settings' Ethereum RPC sheet. Its route section (where the host runs the
+/// anon-rpc page) picks the network Shielded USD's Ethereum requests go
+/// through, or Direct, applied on the tap. Its provider section takes a URL
+/// of the user's own on one of the network's RPC providers (all of which the
+/// Railgun page reaches), checked with `eth_chainId` and over the engine's
+/// log window before it is saved, or the default again. Pops the toast to
+/// show, or null when nothing changed. The field starts empty and the sheet
+/// shows only the saved URL's host: the URL can hold a key.
 Future<String?> showPrivateUsdRpcSheet(BuildContext context) =>
     showAppMobileSheet<String>(
       context: context,
@@ -137,6 +143,17 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
     final chain = privateUsdRpcNetworkName(
       deployment?.railgunNetwork ?? 'mainnet',
     );
+    final routeSupported =
+        ref.watch(anonRpcHostSupportedProvider).value ?? false;
+    final route =
+        ref.watch(anonRpcNetworkProvider).value ??
+        AnonRpcNetwork.defaultNetwork;
+    final secondary = AppTypography.bodyMedium.copyWith(
+      color: colors.text.secondary,
+    );
+    final small = AppTypography.bodySmall.copyWith(
+      color: colors.text.secondary,
+    );
     final error = _error;
     return MobileModalScaffold(
       title: PrivateUsdCopy.rpcTitle,
@@ -153,19 +170,30 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    PrivateUsdCopy.rpcBody(chain),
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: colors.text.secondary,
+                  if (routeSupported) ...[
+                    const _SectionCaption(AnonRpcCopy.routeHeading),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      AnonRpcCopy.routeBody,
+                      key: const ValueKey('private_usd_rpc_route_body'),
+                      style: secondary,
                     ),
-                  ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(AnonRpcCopy.excluded, style: small),
+                    const SizedBox(height: AppSpacing.sm),
+                    const AnonRpcRoutePicker(),
+                    const SizedBox(height: AppSpacing.md),
+                    const _SectionCaption(PrivateUsdCopy.rpcProviderHeading),
+                    const SizedBox(height: AppSpacing.xs),
+                  ],
+                  Text(PrivateUsdCopy.rpcBody(chain), style: secondary),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    PrivateUsdCopy.rpcSees,
-                    key: const ValueKey('private_usd_rpc_sees'),
-                    style: AppTypography.bodySmall.copyWith(
-                      color: colors.text.secondary,
+                    PrivateUsdCopy.rpcSees(
+                      anonymized: routeSupported && route.anonymizes,
                     ),
+                    key: const ValueKey('private_usd_rpc_sees'),
+                    style: small,
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
@@ -248,6 +276,25 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
             child: const Text(PrivateUsdCopy.rpcUseDefault),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A section's name, as Settings heads its groups: an uppercase red caption.
+class _SectionCaption extends StatelessWidget {
+  const _SectionCaption(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final glow = context.colors.neon.glow;
+    return Text(
+      text.toUpperCase(),
+      style: kNeonHudCaptionStyle.copyWith(
+        color: glow,
+        shadows: Neon.textGlow(glow, intensity: 0.3),
       ),
     );
   }

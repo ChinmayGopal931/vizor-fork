@@ -10,7 +10,8 @@ enum AnonRpcNetwork {
   tor(
     label: 'Tor',
     description:
-        'Tor circuits built on your phone. The RPC provider sees a Tor exit.',
+        'Tor circuits built on your phone. The provider sees a Tor exit, '
+        'never your IP address.',
     specifier: '0x700dA3193D35fA54Cd3fBf29B66f2a2A0385659e',
     specifierChainId: 1,
   ),
@@ -21,7 +22,7 @@ enum AnonRpcNetwork {
   nox(
     label: 'Nox',
     description:
-        'A Sphinx mixnet. Slower, and each hop adds delay; testnet nodes.',
+        'A Sphinx mixnet on testnet nodes. Slower: each hop adds delay.',
     specifier: '0x35133267A8F7EC35046a83DCA0f4Ca8A6e1b7A9A',
     specifierChainId: 11155111,
   ),
@@ -47,10 +48,10 @@ enum AnonRpcNetwork {
 
   /// Direct connections, as before: over Tor when Tor is on.
   off(
-    label: 'Off',
+    label: 'Direct',
     description:
-        'Direct connections. The RPC provider sees your IP address unless '
-        'Tor is on.',
+        'Straight to the provider, which sees your IP address unless Tor '
+        'is on.',
   );
 
   const AnonRpcNetwork({
