@@ -14,6 +14,7 @@ import android.webkit.WebMessagePort
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
 import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -181,6 +182,12 @@ internal class RailgunWebViewHost(
             settings.domStorageEnabled = true
             settings.allowFileAccess = false
             settings.allowContentAccess = false
+            // The page is served over https (asset loader) but its RPC providers,
+            // under anonymous RPC, point at the http loopback relay. The default
+            // never-allow mixed-content mode blocks that request before it leaves
+            // the WebView. The request interceptor still blocks every host but the
+            // allowlist and http only for 127.0.0.1, so this does not widen reach.
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         }
 
     @MainThread
@@ -192,7 +199,19 @@ internal class RailgunWebViewHost(
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
             throw RailgunException.Unavailable(UnsupportedOperationException("this WebView can't take a proxy"))
         }
-        val config = ProxyConfig.Builder().addProxyRule("socks://127.0.0.1:$port").build()
+        // The anon-rpc loopback relay (http://127.0.0.1:<relayPort>) that the page's RPC
+        // providers point at must be reached directly. Without a loopback bypass the
+        // page's reads to it are themselves sent through this SOCKS proxy and never
+        // arrive, so Railgun never gets a block number and the page fails to start.
+        // Everything else (POI nodes, the indexer, screening, artifacts) still goes
+        // through the bridge.
+        val config =
+            ProxyConfig
+                .Builder()
+                .addProxyRule("socks://127.0.0.1:$port")
+                .addBypassRule("127.0.0.1")
+                .addBypassRule("localhost")
+                .build()
         proxied = true
         withTimeoutOrNull(PROXY_TIMEOUT) {
             suspendCancellableCoroutine<Unit> { applied ->

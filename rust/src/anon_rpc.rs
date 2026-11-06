@@ -388,6 +388,7 @@ async fn handle(
     target: Arc<str>,
     key: Arc<str>,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
+    log::info!("anon rpc: loopback relay received {}", request.method());
     Ok(match *request.method() {
         // The page is another origin: its browser asks first. Chromium also
         // asks before reaching a loopback address from a public page.

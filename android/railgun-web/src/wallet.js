@@ -153,7 +153,17 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, debug, e
     }
     activity.proving(null);
   });
-  const providers = rpcUrls.map((url, index) => ({ provider: url, priority: index + 1, weight: 2 }));
+  // Reads through the anon-rpc loopback relay (http://127.0.0.1) go over Tor,
+  // which takes ~1-3s cold, far past ethers' 400ms FallbackProvider stall
+  // timeout. Without a longer stall the engine's loadNetwork getBlockNumber
+  // rejects before Tor answers and the page never starts. Direct URLs keep
+  // the default.
+  const providers = rpcUrls.map((url, index) => ({
+    provider: url,
+    priority: index + 1,
+    weight: 2,
+    ...(url.startsWith('http://127.0.0.1') ? { stallTimeout: 30_000 } : {}),
+  }));
   const config = { chainId: NETWORK_CONFIG[networkName].chain.id, providers };
   const { feesSerialized } = await loadProvider(config, networkName, POLLING_INTERVAL_MS);
   fees = { shield: Number(feesSerialized.shieldFeeV2), unshield: Number(feesSerialized.unshieldFeeV2) };

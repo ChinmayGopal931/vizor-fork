@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext HTTP stays blocked by default (targetSdk 28+), except to the
+  loopback interface. The anon-rpc loopback relay the Private USD page reads
+  through runs at http://127.0.0.1:<port>; without this the WebView's request
+  is dropped by the platform's cleartext policy before it reaches Rust.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>
