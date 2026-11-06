@@ -66,7 +66,35 @@ confirms Mumbai has the track (its CROPS Upgrade prize is Continuity-only).
   still failed within half a second of the relay starting: the loopback
   path is the open question, and the relay now logs each answer's status
   (never a URL) and the page's start failure text, redacted, to answer it.
-  M4.1 to M4.6 still to pass.
+  Third run, 2026-11-06, on validated Wi-Fi, with the relay and page logs:
+  the finding is a **CORS wall**. Every worker that does a browser `fetch`
+  from the harness's null-origin sandbox is refused by the target's
+  preflight: passthrough's fetch to the RPC, and the Nym and Nox (`smolmix`)
+  fetch for gateway selection, all log `blocked by CORS policy: Response to
+  preflight request doesn't pass access control` from `origin 'null'`, then
+  fail closed. Only **tor-js** avoids it: its transport is WebRTC (KPS) and
+  its TLS and HTTP run inside the Tor circuit in WASM, so there is no browser
+  fetch and no CORS. But tor-js never finished a bootstrap: on cellular it
+  could not build circuits at all (carrier NAT blocks the WebRTC UDP), and on
+  Wi-Fi the owner did not leave it the ~2 min uninterrupted that a bootstrap
+  needs. The gateway string, specifier and config were checked against the
+  EF's live `wallets/` guide on 2026-11-06 and match exactly
+  (`152.236.3.22:12298:uEiCH0VdbhryzJcMtCfB0vLA4sOvHdQ4hq5w7CopcwU59bQ`,
+  specifier `0x700dA3193D35fA54Cd3fBf29B66f2a2A0385659e`), so nothing on our
+  side is misconfigured; the EF's page calls that gateway "demonstration
+  only: limited capacity, and it may disappear at any time, run your own for
+  anything real." **Conclusions.** (1) The integration is correct: page,
+  sandbox, hash-pinned verification and specifier read all work on the phone
+  (passthrough ready in 0.8-2 s). (2) In this WebView only tor-js is viable;
+  the browser-fetch workers (passthrough, Nym, Nox) cannot clear CORS, so the
+  testnet-only Nox option does not work here either. (3) A reliable demo
+  needs our own `tor-js-gateway` on a VPS with WebRTC-friendly connectivity
+  (O2), reached behind `VIZOR_ANON_RPC_TOR_GATEWAYS`; the EF demo gateway is
+  not dependable and WebRTC may not traverse the venue network. (4) Fail
+  closed works: with no route up, the Railgun page cannot read and its sync
+  holds at 0 % while the balance shows its last cached value, which reads as
+  "broken" though it is the privacy invariant holding. M4.1 to M4.6 still to
+  pass, and depend on a working gateway.
 - M5 submission: the README's "Anonymous RPC" and "CROPS" sections are
   drafted (5b5f4e2bd); they state the zecSwap stand-in honestly (O3) and
   must be re-read against what M4 shows. The video, the gateway and the
