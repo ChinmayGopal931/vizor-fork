@@ -49,12 +49,16 @@ class PrivateUsdRpcChecker {
     NetworkHttpClient? networkClient,
     this.timeout = const Duration(seconds: 20),
     this.deadline = const Duration(seconds: 90),
-    this.maxBodyBytes = 16 * 1024,
+    this.maxBodyBytes = 1024 * 1024,
   }) : _client = networkClient ?? NetworkHttpClient();
 
   final NetworkHttpClient _client;
   final Duration timeout;
   final Duration deadline;
+
+  /// Sized for the head: `eth_getBlockByNumber` lists every transaction
+  /// hash, about 69 bytes each, and a mainnet block often holds a few
+  /// hundred (20 to 30 KiB) and can hold a few thousand.
   final int maxBodyBytes;
 
   /// A topic no log carries, so the window's answer is empty: the range is
