@@ -82,6 +82,10 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
   Future<void>? _refreshing;
   RailgunSync? _shown;
 
+  // The running refresh gave up waiting and shows as failed, while the page
+  // may still answer it.
+  var _overdue = false;
+
   // The first sync this notifier started, while it runs.
   PrivateUsdFirstSync? _runningFirstSync;
 
@@ -139,20 +143,63 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
   /// Refreshes unless the balance is younger than [maxAge]. An explicit
   /// refresh ([maxAge] zero) ignores the back-off after failures. One the
   /// user waits on ([showProgress]) climbs the sync line with its progress;
-  /// asked for while another runs, it shows that one's instead.
+  /// asked for while another runs, it shows that one's instead, or, once
+  /// that one gave up waiting on a page that is still opening or syncing,
+  /// closes the page and starts again.
   void refresh({Duration maxAge = Duration.zero, bool showProgress = false}) {
     if (!_allowed) return;
-    if (_refreshing != null) {
-      if (showProgress) _showRefreshProgress();
+    final running = _refreshing;
+    if (running != null) {
+      if (!showProgress) return;
+      if (_overdue && _pageStuck) {
+        _restart(running);
+      } else {
+        _showRefreshProgress();
+      }
       return;
     }
     final updatedAt = state.updatedAt;
     final isFresh = updatedAt != null && _now().difference(updatedAt) < maxAge;
     final isBackingOff = maxAge > Duration.zero && !_retries.isDue;
     if (isFresh || isBackingOff) return;
-    _refreshing = _refreshNow(
-      showProgress: showProgress,
-    ).whenComplete(() => _refreshing = null);
+    _track(_refreshNow(showProgress: showProgress));
+  }
+
+  // Only a page opening or syncing is closed: either is a read, and a page
+  // proving holds a send's work.
+  bool get _pageStuck => switch (ref.read(railgunEngineStateProvider).phase) {
+    RailgunEnginePhase.starting || RailgunEnginePhase.syncing => true,
+    _ => false,
+  };
+
+  // Closing the page fails the call it hangs on, which ends [overdue]; the
+  // new refresh starts after it, so two never run.
+  void _restart(Future<void> overdue) {
+    _overdue = false;
+    state = state.copyWith(
+      isRefreshing: true,
+      refreshFailed: false,
+      refreshPercent: 0,
+    );
+    unawaited(ref.read(railgunEngineProvider).close());
+    _track(
+      overdue.then((_) async {
+        if (!ref.mounted) return;
+        if (!_allowed) {
+          _settled();
+          return;
+        }
+        await _refreshNow(showProgress: true);
+      }),
+    );
+  }
+
+  void _track(Future<void> refresh) {
+    late final Future<void> tracked;
+    tracked = refresh.whenComplete(() {
+      if (identical(_refreshing, tracked)) _refreshing = null;
+    });
+    _refreshing = tracked;
   }
 
   bool get _allowed =>
@@ -185,10 +232,14 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       firstSync?.end();
       _failed();
       // The page keeps at it; a late result still shows, and no other
-      // refresh starts meanwhile.
+      // refresh starts meanwhile unless the user asks for one.
+      _overdue = true;
       try {
         _shownIfMounted(await sync);
-      } catch (_) {}
+      } catch (_) {
+      } finally {
+        _overdue = false;
+      }
     } on PrivateUsdPause {
       // A lock, switch or route change closed the page: not a failure.
       _settled();
