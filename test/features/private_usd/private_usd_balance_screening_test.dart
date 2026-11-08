@@ -107,6 +107,56 @@ void main() {
     expect(state().refreshFailed, isFalse);
   });
 
+  // A sync the page never answers gives up after the refresh timeout and
+  // waits on for a late answer. A tap on refresh then once did nothing at
+  // all: it closes the stuck page and syncs again.
+  testWidgets('a refresh asked for after one gave up on a stuck sync closes '
+      'the page and syncs again', (tester) async {
+    final container = containerWith();
+    final notifier = container.read(
+      privateUsdBalanceProvider(_account).notifier,
+    );
+    PrivateUsdBalanceState state() =>
+        container.read(privateUsdBalanceProvider(_account));
+    const answer = '{"balances":$_balancesJson,"screening":"ok"}';
+
+    await tester.pump();
+    notifier.refresh();
+    await tester.pump();
+    page.refreshing!.complete(answer);
+    await tester.pump();
+    expect(state().balances, isNotNull);
+    final closes = page.closes;
+
+    notifier.refresh(showProgress: true);
+    await tester.pump();
+    final stuck = page.refreshing!;
+    // Asked for again while it runs: it shows that one's progress.
+    notifier.refresh(showProgress: true);
+    await tester.pump();
+    expect(page.closes, closes);
+
+    await tester.pump(PrivateUsdBalanceTiming.refreshTimeout);
+    expect(state().refreshFailed, isTrue);
+    expect(state().isRefreshing, isFalse);
+
+    notifier.refresh(showProgress: true);
+    expect(state().isRefreshing, isTrue);
+    expect(state().refreshPercent, 0);
+    expect(state().refreshFailed, isFalse);
+    await tester.pump();
+    expect(page.closes, closes + 1);
+    expect(page.refreshing, isNot(same(stuck)));
+
+    page.refreshing!.complete(answer);
+    await tester.pump();
+    expect(state().isRefreshing, isFalse);
+    expect(state().refreshFailed, isFalse);
+
+    // The engine's idle close.
+    await tester.pump(const Duration(minutes: 11));
+  });
+
   test('a sync whose screening failed marks the balance until one goes '
       'through', () async {
     final container = containerWith();
@@ -353,8 +403,18 @@ class _Page implements RailgunHost {
     };
   }
 
+  var closes = 0;
+
+  /// Fails the call left pending, as the hosts do.
   @override
-  Future<void> close() async => _open = false;
+  Future<void> close() async {
+    closes++;
+    _open = false;
+    final pending = refreshing;
+    if (pending != null && !pending.isCompleted) {
+      pending.completeError(RailgunHostException(RailgunHostErrorCode.closed));
+    }
+  }
 
   @override
   Future<void> wipe() async => _open = false;
