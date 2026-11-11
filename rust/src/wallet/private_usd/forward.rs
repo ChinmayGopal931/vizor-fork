@@ -994,12 +994,14 @@ where
                 (built, status)
             }
         };
+        // Sent again until it is mined: by the joint wallet's scan while it
+        // holds it, else from the record.
+        if status == SwapTxStatus::Unknown {
+            self.zcash.broadcast(&sweep).await?;
+        }
         let confirmations = match status {
             SwapTxStatus::Mined { confirmations, .. } => confirmations,
-            _ => {
-                self.zcash.broadcast(&sweep).await?;
-                0
-            }
+            _ => 0,
         };
         if confirmations < self.pins.zcash_confirmations {
             return Ok(waiting(ForwardWait::Refunding));

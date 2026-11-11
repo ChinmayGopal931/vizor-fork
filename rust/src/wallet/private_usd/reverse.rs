@@ -24,9 +24,10 @@
 //!   from `t1`. It is judged on one consistent read of a fresh head, again
 //!   immediately before sending, and the refund is kept as posted before it
 //!   goes.
-//! - Once `ready` is out, the sweep home is built and proved ahead, and the
-//!   escrow is read at the newest block too: the maker's claim is swept home
-//!   from its first block, which is all it takes for `e` to be public.
+//! - Once `ready` is out, the escrow is read at the newest block too: the
+//!   maker's claim is swept home from its first block, which is all it takes
+//!   for `e` to be public. The share is kept once it opens the joint
+//!   account, so the sweep goes on should that block be undone.
 //!
 //! The driver runs over seams: [`ChainReader`], [`HttpTransport`],
 //! [`ReverseZcash`] (the wallet's side, `WalletZcash`) and [`Clock`]. The
@@ -179,25 +180,9 @@ pub(crate) trait ReverseZcash {
         birthday: u64,
         confirmations: u32,
     ) -> Result<ReverseReceiveEstimate>;
-    /// Builds and proves swap `index`'s sweep home now, paying at most
-    /// `max_fee_zatoshi`, and holds it for the maker's claim, once the joint
-    /// account is synced: then only the combined key's signatures and the
-    /// send wait for `e`. A held one that still sweeps everything stays.
-    /// Nothing is signed or sent.
-    async fn prove_receive_ahead(
-        &self,
-        index: u32,
-        joint: &JointAccount,
-        birthday: u64,
-        max_fee_zatoshi: u64,
-    ) -> Result<()>;
-    /// Drops the sweep held for swap `index`, if any, releasing its notes: no
-    /// claim is coming.
-    fn release_receive_ahead(&self, index: u32);
     /// The sweep home with the combined `key`, paying at most
-    /// `max_fee_zatoshi`: an earlier one that may still land, the one proved
-    /// ahead while it still sweeps everything, else a new one once every
-    /// note is spendable; `None` until then.
+    /// `max_fee_zatoshi`: an earlier one that may still land, else a new one
+    /// once every note is spendable; `None` until then.
     async fn prepare_receive(
         &self,
         index: u32,
@@ -772,6 +757,7 @@ where
             refund_posted: false,
             payout: None,
             rescue: None,
+            revealed_share: None,
             receive: None,
             receive_estimate: None,
             receive_confirmations: 0,
@@ -944,14 +930,12 @@ where
             return Ok(snapshot);
         }
         engine::check_cancelled(self.op)?;
-        // The token coming back, the joint account and the escrow are looked
-        // at together: none waits on another.
-        let (_, estimate, observed) = tokio::join!(
-            self.collect_return(&snapshot),
-            self.deposit_awaited(&snapshot),
-            self.observe(&snapshot),
-        );
-        let (estimate, (observed, newest)) = (estimate?, observed?);
+        // The joint account first: its scan may wait on the wallet's write
+        // lock, which would stall a read beside it past its timeout. Then the
+        // token coming back and the escrow, together.
+        let estimate = self.deposit_awaited(&snapshot).await?;
+        let (_, observed) = tokio::join!(self.collect_return(&snapshot), self.observe(&snapshot));
+        let (observed, newest) = observed?;
         let current: ReverseRecord = load(store, self.account, index)?;
         if current.under_way() {
             engine::check_cancelled(self.op)?;
@@ -1014,9 +998,7 @@ where
             self.advance(store, index).await?;
             return load(store, self.account, index);
         }
-        let (estimate, observed) =
-            tokio::join!(self.look_at_deposit(&snapshot), self.state(&snapshot));
-        let estimate = estimate?.ok_or_else(|| {
+        let estimate = self.look_at_deposit(&snapshot).await?.ok_or_else(|| {
             PrivateUsdError::new(
                 ErrorCode::DepositUnconfirmed,
                 "the maker's ZEC isn't all confirmed yet",
@@ -1024,7 +1006,7 @@ where
         })?;
         let record = active(store, self.account, index)?;
         require_going_ahead(&record)?;
-        if observed?.swap.is_none() {
+        if self.state(&record).await?.swap.is_none() {
             return fail(ErrorCode::DepositUnconfirmed, "the escrow isn't confirmed");
         }
         let view = self.windows(&record).await?;
@@ -1261,31 +1243,32 @@ where
         // The maker revealed `e`: settled, and swept home. Its claim needs no
         // confirmations for that: `e` is public once the claim is in a block,
         // and were that block undone, the maker would claim again with it.
-        // The share must open the joint account before anything is kept.
-        let claimed = [Some(&escrow), newest.as_ref()]
+        // The share must open the joint account before it is kept; once kept,
+        // the sweep goes on from it whatever a later look shows.
+        let revealed = [Some(&escrow), newest.as_ref()]
             .into_iter()
             .flatten()
-            .find(|swap| swap.stage == SwapStage::Claimed);
-        if let Some(claimed) = claimed {
+            .find(|swap| swap.stage == SwapStage::Claimed)
+            .map(|claimed| claimed.secret)
+            .or(record.revealed_share.map(|share| share.0));
+        if let Some(revealed) = revealed {
             let joint = self.joint(record)?;
-            let key = swap::joint_spend_key(self.keys, record.index, &joint, &claimed.secret)?;
+            let key = swap::joint_spend_key(self.keys, record.index, &joint, &revealed)?;
             let mut settled = record.clone();
             settled.phase = ReversePhase::Receiving;
+            settled.revealed_share = Some(Hex(revealed));
             update(store, self.account, &settled)?;
             return self.receive(store, settled, &key).await;
         }
-        // Settled on a claim this look does not show, its block not yet
-        // confirmed: the claim is looked for again, and nothing refunded.
+        // A settled conversion is never refunded.
         if record.is_settled() {
             return Ok(());
         }
         if refund_due(record, &observed, &escrow) {
-            self.zcash.release_receive_ahead(record.index);
             return self.refund(store, record, &observed, &escrow).await;
         }
         // A ready escrow is the maker's to claim until `t1`, as soon as the
-        // `ready` is in a block: one landing just before its deadline never
-        // reads as lapsed, which would offer a refund that cannot land.
+        // `ready` is in a block.
         let readied = [Some(&escrow), newest.as_ref()]
             .into_iter()
             .flatten()
@@ -1293,23 +1276,17 @@ where
         if readied {
             let mut settling = record.clone();
             settling.phase = ReversePhase::Settling;
-            update(store, self.account, &settling)?;
-            return self.prove_ahead(&settling).await;
+            return update(store, self.account, &settling);
         }
         if let Some(ready) = record.ready.clone() {
+            if observed.head.timestamp > ready.deadline {
+                return self.lapse(store, record, &ready).await;
+            }
             // A `ready` the user signed is sent again while it holds, never
             // once a refund was posted, and never signed again after.
-            let lapsed = observed.head.timestamp > ready.deadline;
-            let mut current = record.clone();
-            current.phase = if lapsed {
-                ReversePhase::RefundWait
-            } else {
-                ReversePhase::Settling
-            };
-            update(store, self.account, &current)?;
-            if lapsed {
-                return Ok(());
-            }
+            let mut settling = record.clone();
+            settling.phase = ReversePhase::Settling;
+            update(store, self.account, &settling)?;
             if !record.refund_posted {
                 engine::check_cancelled(self.op)?;
                 engine::set_activity(self.op, Activity::Readying);
@@ -1318,7 +1295,7 @@ where
                     .ready(&ready, &reverse_terms(record)?, record.ticket.as_ref())
                     .await?;
             }
-            return self.prove_ahead(&current).await;
+            return Ok(());
         }
         let estimate = match estimate {
             Some(estimate) => estimate,
@@ -1327,32 +1304,29 @@ where
         self.set_deposit_phase(store, record, &observed, &escrow, estimate)
     }
 
-    /// With the user's `ready` out and the maker's claim to come, the sweep
-    /// home is built and proved now under the reviewed fee, so that once `e`
-    /// is revealed only signing and sending it remain. Best effort: without
-    /// it the sweep is built once the claim is seen.
-    async fn prove_ahead(&self, record: &ReverseRecord) -> Result<()> {
-        let Some(estimate) = &record.receive_estimate else {
+    /// `record`'s `ready`, past its deadline by a look that showed it
+    /// nowhere: lapsed, the refund the user's to request, only once one
+    /// consistent read of a fresh head past that deadline shows the escrow
+    /// still open, for no later block can hold it; settling while that read
+    /// shows it landed, or lags. A lapsed `ready` stays so.
+    async fn lapse(
+        &self,
+        store: &mut SwapStore,
+        record: &ReverseRecord,
+        ready: &SwapAuthorization,
+    ) -> Result<()> {
+        if record.phase == ReversePhase::RefundWait {
             return Ok(());
+        }
+        let view = self.windows(record).await?;
+        let lapsed = view.stage == Some(SwapStage::Open) && view.head > ready.deadline;
+        let mut current = record.clone();
+        current.phase = if lapsed {
+            ReversePhase::RefundWait
+        } else {
+            ReversePhase::Settling
         };
-        if record.refund_posted || record.cancel_requested {
-            return Ok(());
-        }
-        engine::check_cancelled(self.op)?;
-        let joint = self.joint(record)?;
-        let proved = self
-            .zcash
-            .prove_receive_ahead(record.index, &joint, record.birthday, estimate.fee_zat)
-            .await;
-        if let Err(error) = proved {
-            engine::check_cancelled(self.op)?;
-            log::warn!(
-                "private usd: reverse swap {}: proving its sweep ahead failed ({:?})",
-                record.index,
-                error.code
-            );
-        }
-        Ok(())
+        update(store, self.account, &current)
     }
 
     /// The maker's deposit, in the phases that wait on it.
@@ -1368,7 +1342,8 @@ where
 
     /// The escrow at its confirmation depth and, once a `ready` of ours is
     /// out, at the newest block too, where the maker's claim shows first. The
-    /// newest is best effort: without it the claim is seen once confirmed.
+    /// newest is best effort: without it the claim is seen once confirmed,
+    /// and a `ready` lapses only on a consistent read ([`Self::lapse`]).
     async fn observe(
         &self,
         record: &ReverseRecord,
@@ -1562,17 +1537,18 @@ where
                 (built, status)
             }
         };
-        let (mined, confirmations) = match status {
-            SwapTxStatus::Mined { confirmations, .. } => (true, confirmations),
-            _ => (false, 0),
+        let confirmations = match status {
+            SwapTxStatus::Mined { confirmations, .. } => confirmations,
+            _ => 0,
         };
         current.receive_confirmations = u64::from(confirmations);
         if confirmations >= self.pins.zcash_confirmations {
             return self.finish(store, current, ReversePhase::Complete).await;
         }
         update(store, self.account, &current)?;
-        // Sent again until it is mined.
-        if !mined {
+        // Sent again until it is mined: by the joint wallet's scan while it
+        // holds it, else from the record.
+        if status == SwapTxStatus::Unknown {
             self.zcash.broadcast(&receive.transaction()).await?;
         }
         Ok(())
@@ -1606,7 +1582,7 @@ where
             return Ok(());
         }
         if escrow.stage == SwapStage::Ready && now < record.quote.refund_after {
-            return self.wait_to_refund(store, record.index);
+            return self.wait_to_refund(store, record, Some(escrow.stage));
         }
         self.reveal(store, record).await
     }
@@ -1617,8 +1593,9 @@ where
     /// `ready` of ours may still land, it waits. The refund is kept as posted
     /// before it goes, and no `ready` is signed or sent after it.
     async fn reveal(&self, store: &mut SwapStore, record: &ReverseRecord) -> Result<()> {
-        if !self.refund_lands(store, record.index).await? {
-            return self.wait_to_refund(store, record.index);
+        let (lands, stage) = self.refund_lands(store, record.index).await?;
+        if !lands {
+            return self.wait_to_refund(store, record, stage);
         }
         // Signed when it goes out, and kept first.
         let payout = self
@@ -1626,8 +1603,9 @@ where
             .await?;
         engine::check_cancelled(self.op)?;
         let secret = Zeroizing::new(self.keys.user_keys(record.index)?.share.to_be_bytes());
-        if !self.refund_lands(store, record.index).await? {
-            return self.wait_to_refund(store, record.index);
+        let (lands, stage) = self.refund_lands(store, record.index).await?;
+        if !lands {
+            return self.wait_to_refund(store, record, stage);
         }
         let mut posting: ReverseRecord = load(store, self.account, record.index)?;
         posting.refund_posted = true;
@@ -1645,16 +1623,38 @@ where
     }
 
     /// Whether swap `index`'s refund lands now, past every `ready` its record
-    /// signed.
-    async fn refund_lands(&self, store: &SwapStore, index: u32) -> Result<bool> {
+    /// signed, with the escrow's stage on the read that judged it.
+    async fn refund_lands(
+        &self,
+        store: &SwapStore,
+        index: u32,
+    ) -> Result<(bool, Option<SwapStage>)> {
         let record: ReverseRecord = load(store, self.account, index)?;
         let view = self.windows(&record).await?;
-        Ok(swap::may_refund(&view, &record.ready_deadlines()))
+        Ok((
+            swap::may_refund(&view, &record.ready_deadlines()),
+            view.stage,
+        ))
     }
 
-    fn wait_to_refund(&self, store: &mut SwapStore, index: u32) -> Result<()> {
-        let mut waiting: ReverseRecord = load(store, self.account, index)?;
-        waiting.phase = ReversePhase::RefundWait;
+    /// Waits for `record`'s refund, by `stage`, the escrow's on the read that
+    /// judged it: refunding once the refund landed, its payout to follow once
+    /// confirmed; settling once the user's `ready` landed, the escrow then
+    /// the maker's to claim until `t1`, unless the user called it off; else
+    /// as `record` was, an open escrow waiting on a window.
+    fn wait_to_refund(
+        &self,
+        store: &mut SwapStore,
+        record: &ReverseRecord,
+        stage: Option<SwapStage>,
+    ) -> Result<()> {
+        let mut waiting: ReverseRecord = load(store, self.account, record.index)?;
+        waiting.phase = match stage {
+            Some(SwapStage::Refunded) => ReversePhase::Refunding,
+            Some(SwapStage::Ready) if waiting.cancel_requested => ReversePhase::RefundWait,
+            Some(SwapStage::Ready) => ReversePhase::Settling,
+            Some(SwapStage::Open | SwapStage::Claimed) | None => record.phase,
+        };
         update(store, self.account, &waiting)
     }
 

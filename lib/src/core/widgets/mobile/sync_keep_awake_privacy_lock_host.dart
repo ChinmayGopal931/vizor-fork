@@ -81,11 +81,17 @@ class _SyncKeepAwakePrivacyLockHostState
   Widget build(BuildContext context) {
     if (kAppFormFactor != AppFormFactor.mobile) return widget.child;
 
-    // A Private USD bridge that keeps the screen on is watched, and may need
-    // the user at any moment: an idle user is not locked out of it.
+    // A Private USD bridge waiting on the user's approval is not covered.
+    // Once it stops waiting, the user gets a full idle window again rather
+    // than a lock on the next frame.
+    ref.listen<bool>(privateUsdBridgeAwaitsUserProvider, (waited, waits) {
+      if (waited == true && !waits) {
+        ref.read(syncKeepAwakeInteractionProvider.notifier).markInteraction();
+      }
+    });
     final active =
         ref.watch(syncKeepAwakeActiveProvider) &&
-        !ref.watch(privateUsdBridgeKeepAwakeProvider);
+        !ref.watch(privateUsdBridgeAwaitsUserProvider);
     final interaction = ref.watch(syncKeepAwakeInteractionProvider);
     final mode = ref.watch(syncKeepAwakePrivacyLockModeProvider);
     final visible = mode != SyncKeepAwakePrivacyLockMode.hidden;
@@ -201,7 +207,7 @@ class _SyncKeepAwakePrivacyLockHostState
     if (!mounted) return;
     if (!_isInForeground) return;
     if (!ref.read(syncKeepAwakeActiveProvider)) return;
-    if (ref.read(privateUsdBridgeKeepAwakeProvider)) return;
+    if (ref.read(privateUsdBridgeAwaitsUserProvider)) return;
     if (ref.read(syncKeepAwakePrivacyLockProvider).isLocked) return;
 
     final interaction = ref.read(syncKeepAwakeInteractionProvider);

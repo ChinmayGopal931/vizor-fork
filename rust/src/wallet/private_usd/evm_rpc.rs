@@ -44,6 +44,7 @@ use super::deployment::{
     Deployment, DepositsPin, SwapContract, MAX_LOGS_BODY, MAX_SERVICE_BODY, MULTICALL3,
     QUICK_TIMEOUT,
 };
+use super::engine::{self, Clock, SystemClock};
 use super::transport::HttpTransport;
 use super::{fail, lock, ErrorCode, PrivateUsdError, Result};
 use crate::wallet::routed_http::RoutedRequest;
@@ -97,6 +98,14 @@ pub(crate) struct Head {
     pub number: u64,
     pub timestamp: u64,
     pub hash: [u8; 32],
+}
+
+/// The newest block a reader has read, and when it first read it, in Unix
+/// seconds on the device's clock.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SeenHead {
+    pub head: Head,
+    pub seen_at: u64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -173,7 +182,7 @@ pub(crate) trait ChainReader {
     async fn head(&self) -> Result<Head>;
     /// The newest block this reader has read, if any: the next one is due a
     /// slot after it.
-    fn newest_head(&self) -> Option<Head>;
+    fn newest_head(&self) -> Option<SeenHead>;
     /// `latest`, unconfirmed: never authorizes anything.
     async fn swap(&self, id: &[u8; 32]) -> Result<Option<SwapState>>;
     /// The swap at `latest`, unconfirmed, once its terms hash to `terms`. It
@@ -347,14 +356,37 @@ struct Shown {
     windows: bool,
 }
 
-/// What each endpoint showed this session, by a hash of the pinned chain and
-/// the endpoint's URL, which may carry a key. A pass is kept until the
-/// wallet locks; a failure never is.
-static SESSION_SHOWN: LazyLock<Mutex<HashMap<[u8; 32], Shown>>> = LazyLock::new(Default::default);
+/// What each endpoint showed, by a hash of the pinned chain and the
+/// endpoint's URL, which may carry a key, with the session it showed it in.
+/// A pass counts only in its session, so one a step finished after the
+/// wallet locked is never taken after the lock; a failure is never kept.
+static SESSION_SHOWN: LazyLock<Mutex<HashMap<[u8; 32], (u64, Shown)>>> =
+    LazyLock::new(Default::default);
 
 /// Forgets what the endpoints showed this session: the wallet locked.
 pub(crate) fn clear_session_checks() {
     lock(&SESSION_SHOWN).clear();
+}
+
+/// What `key`'s endpoint showed in `session`.
+fn session_shown(key: &[u8; 32], session: u64) -> Shown {
+    match lock(&SESSION_SHOWN).get(key) {
+        Some((held, shown)) if *held == session => *shown,
+        _ => Shown::default(),
+    }
+}
+
+/// Marks what `key`'s endpoint showed in `session`. An earlier session's
+/// entry is replaced; a later one's stays as it is.
+fn mark_session_shown(key: [u8; 32], session: u64, mark: impl Fn(&mut Shown)) {
+    let mut sessions = lock(&SESSION_SHOWN);
+    let held = sessions.entry(key).or_insert((session, Shown::default()));
+    if held.0 < session {
+        *held = (session, Shown::default());
+    }
+    if held.0 == session {
+        mark(&mut held.1);
+    }
 }
 
 /// One deployment's contract over JSON-RPC at `url`.
@@ -364,11 +396,11 @@ pub(crate) struct EvmRpc<'a, T: HttpTransport> {
     pins: &'static Deployment,
     /// What this reader saw the endpoint show.
     shown: Mutex<Shown>,
-    /// Where the session keeps what the endpoint showed, for a reader that
-    /// shares it.
-    session: Option<[u8; 32]>,
+    /// Where the session keeps what the endpoint showed, and the session, for
+    /// a reader that shares it.
+    session: Option<([u8; 32], u64)>,
     /// The newest block this reader read.
-    newest_head: Mutex<Option<Head>>,
+    newest_head: Mutex<Option<SeenHead>>,
     next_id: AtomicU64,
 }
 
@@ -395,10 +427,8 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
     /// This reader, sharing with the session's other readers of the endpoint
     /// what it showed: each driver step then asks for neither check again.
     pub(crate) fn sharing_session(mut self) -> Self {
-        self.session = Some(keccak(&[
-            &self.pins.chain_id.to_be_bytes(),
-            self.url.as_bytes(),
-        ]));
+        let key = keccak(&[&self.pins.chain_id.to_be_bytes(), self.url.as_bytes()]);
+        self.session = Some((key, engine::session()));
         self
     }
 
@@ -406,7 +436,7 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
         let mine = *lock(&self.shown);
         let session = self
             .session
-            .and_then(|key| lock(&SESSION_SHOWN).get(&key).copied())
+            .map(|(key, session)| session_shown(&key, session))
             .unwrap_or_default();
         Shown {
             chain: mine.chain || session.chain,
@@ -416,8 +446,8 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
 
     fn mark_shown(&self, mark: impl Fn(&mut Shown)) {
         mark(&mut lock(&self.shown));
-        if let Some(key) = self.session {
-            mark(lock(&SESSION_SHOWN).entry(key).or_default());
+        if let Some((key, session)) = self.session {
+            mark_session_shown(key, session, mark);
         }
     }
 
@@ -541,12 +571,16 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
         if self.shown().windows {
             return Ok(pinned.address);
         }
-        let (min, late, locks) = tokio::join!(
-            self.call_unless_reverted(&pinned.address, MIN_WINDOW),
-            self.call_unless_reverted(&pinned.address, LATE_WINDOW),
-            self.call_unless_reverted(&pinned.address, LOCK_DURATION),
-        );
-        self.hold_windows(pinned, min?, late?, locks?)?;
+        // One Multicall3 read, each call allowed to revert: a revert reads as
+        // `None`, which `LOCK_DURATION()` must be.
+        let calls = [MIN_WINDOW, LATE_WINDOW, LOCK_DURATION].map(|signature| Call {
+            to: pinned.address,
+            data: call_data(signature, &[]),
+        });
+        let mut answers = self.try_aggregate(&MULTICALL3, &calls).await?.into_iter();
+        let mut next = || answers.next().flatten();
+        let (min, late, locks) = (next(), next(), next());
+        self.hold_windows(pinned, min, late, locks)?;
         Ok(pinned.address)
     }
 
@@ -573,19 +607,6 @@ impl<'a, T: HttpTransport> EvmRpc<'a, T> {
         }
         self.mark_shown(|shown| shown.windows = true);
         Ok(())
-    }
-
-    /// `signature()` on `to` at `latest`; `None` where it reverts.
-    async fn call_unless_reverted(
-        &self,
-        to: &[u8; 20],
-        signature: &str,
-    ) -> Result<Option<Vec<u8>>> {
-        match self.eth_call(to, call_data(signature, &[]), "latest").await {
-            Ok(data) => Ok(Some(data)),
-            Err(RpcError::Reverted) => Ok(None),
-            Err(RpcError::Failed(error)) => Err(error),
-        }
     }
 
     async fn require_chain(&self) -> Result<()> {
@@ -688,13 +709,16 @@ impl<T: HttpTransport> ChainReader for EvmRpc<'_, T> {
         }
         let head = head_of(&block)?;
         let mut newest = lock(&self.newest_head);
-        if newest.is_none_or(|newest| newest.number < head.number) {
-            *newest = Some(head);
+        if newest.is_none_or(|newest| newest.head.number < head.number) {
+            *newest = Some(SeenHead {
+                head,
+                seen_at: SystemClock.now(),
+            });
         }
         Ok(head)
     }
 
-    fn newest_head(&self) -> Option<Head> {
+    fn newest_head(&self) -> Option<SeenHead> {
         *lock(&self.newest_head)
     }
 
@@ -1331,16 +1355,41 @@ mod tests {
         params[0]["data"].as_str().unwrap()[..10].to_owned()
     }
 
-    fn word_answer(value: u64) -> RoutedResponse {
-        rpc_result(json!(hex0x(&uint_word(value.into()))))
-    }
-
     fn block(number: u64, hash: u8) -> Value {
         json!({
             "number": format!("0x{number:x}"),
             "timestamp": "0x6ab0f200",
             "hash": hex0x(&[hash; 32]),
         })
+    }
+
+    /// Multicall3's answer to the windows check, one `aggregate3` whose calls
+    /// may each revert: `MIN_WINDOW()` and `LATE_WINDOW()` with `min` and
+    /// `late`, `LOCK_DURATION()` with `locks`, `None` reverting. `None` for
+    /// any other `aggregate3`.
+    fn windows_answer(
+        params: &Value,
+        min: Option<u64>,
+        late: Option<u64>,
+        locks: Option<u64>,
+    ) -> Option<RoutedResponse> {
+        let data = params[0]["data"].as_str().unwrap();
+        let calls = abi::test_support::decode_aggregate3_calls(&hex::decode(&data[2..]).unwrap());
+        let selectors: Vec<String> = calls
+            .iter()
+            .map(|(call, _)| hex0x(&call.data[..4]))
+            .collect();
+        if selectors != ["0x52b65c4b", "0x4d9fef3e", "0x485d3834"] {
+            return None;
+        }
+        assert!(calls.iter().all(|(_, allow_failure)| *allow_failure));
+        let answers: Vec<Option<Vec<u8>>> = [min, late, locks]
+            .into_iter()
+            .map(|value| value.map(|value| uint_word(value.into()).to_vec()))
+            .collect();
+        Some(rpc_result(json!(hex0x(
+            &abi::test_support::encode_aggregate3_answers(&answers)
+        ))))
     }
 
     /// A node on the pinned chain whose swap contract answers `min` and
@@ -1356,21 +1405,19 @@ mod tests {
         impl Fn(&RoutedRequest) -> std::result::Result<RoutedResponse, RoutedError>,
     > {
         let known = std::cell::Cell::new(0u8);
+        let aggregate3 = hex0x(&abi::selector(abi::AGGREGATE3));
         ScriptedTransport::new(move |request: &RoutedRequest| {
             let (method, params) = method(request);
-            let answer = |value: Option<u64>| {
-                value.map_or_else(|| rpc_error(3, "execution reverted"), word_answer)
-            };
             Ok::<RoutedResponse, RoutedError>(match method.as_str() {
                 "eth_chainId" => rpc_result(json!("0xaa36a7")),
                 "eth_getBlockByNumber" => {
                     known.set(known.get() + 1);
                     rpc_result(block(100, known.get()))
                 }
+                "eth_call" if selector_of(&params) == aggregate3 => {
+                    windows_answer(&params, min, late, locks).expect("the windows check")
+                }
                 "eth_call" => match selector_of(&params).as_str() {
-                    "0x52b65c4b" => answer(min),
-                    "0x4d9fef3e" => answer(late),
-                    "0x485d3834" => answer(locks),
                     "0x3da0e66e" => match params[1].get("blockHash") {
                         // The first head's block is not known yet.
                         Some(hash) if *hash == json!(hex0x(&[1; 32])) => {
@@ -1485,12 +1532,13 @@ mod tests {
             );
         }
 
-        // The pinned windows: checked once, then the swap is read.
+        // The pinned windows: checked once, in one Multicall3 read, then the
+        // swap is read.
         let windows = node(min, late, None, get_swap_answer(0));
         let rpc = EvmRpc::new(&windows, pins, "").unwrap();
         assert_eq!(rpc.swap(&[1; 32]).await.unwrap(), None);
         assert_eq!(rpc.swap(&[1; 32]).await.unwrap(), None);
-        assert_eq!(windows.sent.borrow().len(), 3 + 2);
+        assert_eq!(windows.sent.borrow().len(), 1 + 2);
     }
 
     /// A reveal's read takes the swap at the newest block's hash, with that
@@ -1545,6 +1593,23 @@ mod tests {
         );
     }
 
+    /// A pass counts only in the session it was shown in: one a step of
+    /// before the lock finishes after it is never taken by a reader after the
+    /// lock, nor undoes that reader's own.
+    #[test]
+    fn a_pass_from_before_a_lock_is_never_taken_after_it() {
+        let key = keccak(&[uuid::Uuid::new_v4().as_bytes()]);
+        mark_session_shown(key, 7, |shown| shown.windows = true);
+        assert!(session_shown(&key, 7).windows);
+        assert!(!session_shown(&key, 8).windows);
+
+        mark_session_shown(key, 8, |shown| shown.chain = true);
+        mark_session_shown(key, 7, |shown| shown.windows = true);
+        let after = session_shown(&key, 8);
+        assert!(after.chain && !after.windows);
+        assert!(!session_shown(&key, 7).chain);
+    }
+
     /// Readers sharing the session ask an endpoint for its chain id and its
     /// windows once, until the wallet locks; an escrow's funding and swap
     /// come from one Multicall3 call at the confirmed block.
@@ -1564,6 +1629,14 @@ mod tests {
                 "eth_chainId" => rpc_result(json!("0xaa36a7")),
                 "eth_getBlockByNumber" => rpc_result(block(100, 1)),
                 "eth_call" if selector_of(&params) == batch => {
+                    if let Some(windows) = windows_answer(
+                        &params,
+                        Some(swaps.min_window),
+                        Some(swaps.late_window),
+                        None,
+                    ) {
+                        return Ok(windows);
+                    }
                     // Two confirmations on testnet: the block below the head.
                     assert_eq!(params[1], json!("0x63"));
                     let data = params[0]["data"].as_str().unwrap();
@@ -1583,12 +1656,6 @@ mod tests {
                         &answers
                     ))))
                 }
-                "eth_call" => match selector_of(&params).as_str() {
-                    "0x52b65c4b" => word_answer(swaps.min_window),
-                    "0x4d9fef3e" => word_answer(swaps.late_window),
-                    "0x485d3834" => rpc_error(3, "execution reverted"),
-                    other => panic!("unexpected call {other}"),
-                },
                 other => panic!("unexpected method {other}"),
             })
         });
@@ -1619,12 +1686,11 @@ mod tests {
             assert_eq!(state.swap.map(|swap| swap.stage), Some(SwapStage::Ready));
             assert_eq!((state.refund_note, state.funding_block), (word(0x77), 95));
         };
-        let checked: [&str; 6] = [
+        // The windows check is one `aggregate3` too, at `latest`.
+        let checked: [&str; 4] = [
             "eth_chainId",
             "eth_getBlockByNumber",
-            "0x52b65c4b",
-            "0x4d9fef3e",
-            "0x485d3834",
+            &aggregate3,
             &aggregate3,
         ];
         let unchecked: [&str; 2] = ["eth_getBlockByNumber", &aggregate3];

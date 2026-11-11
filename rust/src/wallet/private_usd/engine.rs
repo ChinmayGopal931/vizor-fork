@@ -1,8 +1,7 @@
 //! The swap engine's process-wide state: one driver step per account at a
 //! time, the forward offers quoted but not accepted yet, the reverse fundings
-//! handed to the Railgun page to prove, the reverse sweeps home proved ahead
-//! of their claims, and the FRB calls in flight with their cancel flags and
-//! current activity. None of it is persisted.
+//! handed to the Railgun page to prove, and the FRB calls in flight with their
+//! cancel flags and current activity. None of it is persisted.
 //!
 //! - A driver step holds its account's guard for its whole run, network I/O
 //!   included; a second caller gets `Busy`.
@@ -12,9 +11,6 @@
 //! - A reverse funding lives from its request until its proof is submitted,
 //!   the wallet locks or the account is deleted: a proof that finishes after
 //!   a lock is never submitted.
-//! - A sweep proved ahead lives until it is sent, its conversion refunds or
-//!   ends, the wallet locks or the account is deleted; dropping it releases
-//!   the joint notes it reserves.
 //! - A call registered with [`OpHandle::begin`] can be cancelled by its id and
 //!   reports what it is doing until it returns.
 
@@ -26,7 +22,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
-use super::joint::{self, joint_db_path, SweepAhead};
+use super::joint::{self, joint_db_path};
 use super::models::{Amount, ReverseRecord, SwapQuote};
 use super::store::SwapStore;
 use super::{lock, with_operations, ErrorCode, PrivateUsdError, PrivateUsdNetwork, Result};
@@ -88,9 +84,6 @@ pub(crate) fn delete_account(
     let _deposits = super::deposits::lock_account(account)?;
     remove_account_offers(account);
     remove_account_fundings(account);
-    // Its sweeps proved ahead release their notes before the joint accounts
-    // go.
-    drop(take_account_sweeps(account));
     let Some(mut store) = SwapStore::open_existing(store_dir)? else {
         return Ok(());
     };
@@ -206,9 +199,9 @@ impl MakerChecks {
 
 pub(crate) static MAKER_CHECKS: LazyLock<MakerChecks> = LazyLock::new(Default::default);
 
-/// Forgets every offer, reverse funding, sweep proved ahead, maker check and
-/// endpoint check: the wallet locked. A quote made before the lock is never
-/// accepted after it, and a funding proved across it is never submitted.
+/// Forgets every offer, reverse funding, maker check and endpoint check: the
+/// wallet locked. A quote made before the lock is never accepted after it,
+/// and a funding proved across it is never submitted.
 pub(crate) fn clear_sessions() {
     let mut offers = lock(&OFFERS);
     SESSION.fetch_add(1, Ordering::AcqRel);
@@ -218,18 +211,6 @@ pub(crate) fn clear_sessions() {
     MAKER_CHECKS.clear();
     super::evm_rpc::clear_session_checks();
     super::tokens::clear_sessions();
-    let sweeps: Vec<SweepAhead> = lock(&SWEEPS_AHEAD)
-        .drain()
-        .map(|(_, sweep)| sweep)
-        .collect();
-    if !sweeps.is_empty() {
-        // Releasing their notes waits on the wallet's write lock, never on
-        // this thread, which may be the UI's; should no thread start, they
-        // are released here.
-        let _ = std::thread::Builder::new()
-            .name("private-usd-release".into())
-            .spawn(move || drop(sweeps));
-    }
 }
 
 // ---- reverse fundings ----
@@ -279,44 +260,6 @@ pub(crate) fn take_funding(
 /// Drops every funding of `account`, as its deletion does.
 pub(crate) fn remove_account_fundings(account: &str) {
     lock(&FUNDINGS).retain(|(held, _), _| held != account);
-}
-
-// ---- sweeps proved ahead ----
-
-static SWEEPS_AHEAD: LazyLock<Mutex<HashMap<(String, u32), SweepAhead>>> =
-    LazyLock::new(Default::default);
-
-/// Holds `sweep`, proved for `account`'s reverse swap `index` ahead of its
-/// claim, in place of any held before; one proved in an earlier `session`
-/// (the wallet locked meanwhile) is dropped instead. A sweep is dropped,
-/// releasing its notes, only outside the lock.
-pub(crate) fn hold_sweep_ahead(account: &str, index: u32, sweep: SweepAhead, session: u64) {
-    let mut sweeps = lock(&SWEEPS_AHEAD);
-    if SESSION.load(Ordering::Acquire) != session {
-        drop(sweeps);
-        drop(sweep);
-        return;
-    }
-    let replaced = sweeps.insert((account.to_owned(), index), sweep);
-    drop(sweeps);
-    drop(replaced);
-}
-
-/// Takes the sweep proved ahead for `account`'s reverse swap `index`: it is
-/// sent once, or dropped.
-pub(crate) fn take_sweep_ahead(account: &str, index: u32) -> Option<SweepAhead> {
-    lock(&SWEEPS_AHEAD).remove(&(account.to_owned(), index))
-}
-
-/// Takes every sweep proved ahead for `account`, as its deletion does.
-fn take_account_sweeps(account: &str) -> Vec<SweepAhead> {
-    let mut sweeps = lock(&SWEEPS_AHEAD);
-    let held: Vec<(String, u32)> = sweeps
-        .keys()
-        .filter(|(held, _)| held == account)
-        .cloned()
-        .collect();
-    held.iter().filter_map(|key| sweeps.remove(key)).collect()
 }
 
 // ---- calls in flight ----

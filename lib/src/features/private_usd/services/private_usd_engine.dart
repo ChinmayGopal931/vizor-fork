@@ -422,6 +422,11 @@ class PrivateUsdEngine {
   Timer? _napTimer;
   Completer<void>? _napWaker;
 
+  // When each conversion's next step is due, by the nap its last step asked
+  // for: one conversion's short naps never step the others sooner. One with
+  // none is due now; a nudge or a resume makes every one due.
+  final _dueAt = <PrivateUsdRecordKey, DateTime>{};
+
   // Deposits: a pass is due (asked for, or its time came), with the vault
   // check; the pass running now on its own lane; when the next is due.
   bool _depositDue = false;
@@ -453,6 +458,7 @@ class PrivateUsdEngine {
   void start({bool resuming = false}) {
     if (_disposed) return;
     if (resuming) {
+      _dueAt.clear();
       _markResuming();
       // Unlock, the foreground, a restart: the deposits are read again.
       _depositDue = true;
@@ -463,8 +469,12 @@ class PrivateUsdEngine {
     _kick();
   }
 
-  /// Cuts the nap short ("Try now", after accept, on opening progress).
-  void nudge() => start();
+  /// Cuts the nap short ("Try now", after accept, on opening progress):
+  /// every conversion is stepped.
+  void nudge() {
+    _dueAt.clear();
+    start();
+  }
 
   void _kick() {
     if (!_wanted || !canRun) return;
@@ -501,9 +511,9 @@ class PrivateUsdEngine {
     }
   }
 
-  /// One pass over every conversion under way, with the active account's
-  /// deposits beside it; the nap before the next, or null when nothing is
-  /// under way.
+  /// One pass over every conversion under way whose step is due, with the
+  /// active account's deposits beside it; the nap until the next is due, or
+  /// null when nothing is under way.
   Future<Duration?> _pass(int epoch) async {
     // Deposits run on a lane of their own, never awaited here: a deposit
     // pass (up to 90 s while the relayer is busy) never holds a conversion
@@ -530,7 +540,12 @@ class PrivateUsdEngine {
       if (epoch != _epoch) return null;
       for (final record in records) {
         if (record.outcome != null) continue;
-        final next = await _advanceForward(account, record, epoch);
+        final next = await _stepWhenDue(
+          _forward,
+          account,
+          record,
+          () => _advanceForward(account, record, epoch),
+        );
         if (epoch != _epoch) return null;
         if (next != null) nap = _shorter(nap, next);
       }
@@ -547,13 +562,42 @@ class PrivateUsdEngine {
       if (epoch != _epoch) return null;
       for (final record in reverse) {
         if (!privateUsdReverseUnderWay(record.phase)) continue;
-        final next = await _advanceReverse(account, record, epoch);
+        final next = await _stepWhenDue(
+          _reverse,
+          account,
+          record,
+          () => _advanceReverse(account, record, epoch),
+        );
         if (epoch != _epoch) return null;
         if (next != null) nap = _shorter(nap, next);
       }
     }
     _resumeLoaded = false;
     return nap;
+  }
+
+  /// Steps [record]'s conversion through [advance] once the nap its last
+  /// step asked for has passed; the nap until it is due again, or null once
+  /// it ended.
+  Future<Duration?> _stepWhenDue<R, S extends PrivateUsdStepStatus<R, S>>(
+    _Book<R, S> book,
+    String accountUuid,
+    R record,
+    Future<Duration?> Function() advance,
+  ) async {
+    final key = book.keyOf(accountUuid, book.fresh(record));
+    final due = _dueAt[key];
+    if (due != null) {
+      final left = due.difference(_now());
+      if (left > Duration.zero) return left;
+    }
+    final next = await advance();
+    if (next == null) {
+      _dueAt.remove(key);
+    } else {
+      _dueAt[key] = _now().add(next);
+    }
+    return next;
   }
 
   Future<Duration?> _advanceForward(
@@ -931,7 +975,7 @@ class PrivateUsdEngine {
     } catch (error) {
       privateUsdLog('reading conversions failed (${error.runtimeType})');
     }
-    start();
+    nudge();
   }
 
   PrivateUsdRecordKey _merge<R, S extends PrivateUsdStepStatus<R, S>>(

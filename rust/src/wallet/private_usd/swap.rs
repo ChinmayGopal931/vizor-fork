@@ -14,7 +14,7 @@ use super::deployment::{
     RELAYER_CLAIM_WAIT_SECONDS, REVEAL_MARGIN_SECONDS, SIGNATURE_TTL_SECONDS,
 };
 use super::engine::{self, MakerChecks, OpHandle};
-use super::evm_rpc::{Head, SwapStage, SECONDS_PER_BLOCK};
+use super::evm_rpc::{SeenHead, SwapStage, SECONDS_PER_BLOCK};
 use super::joint::{SwapTxStatus, WalletZcash};
 use super::keys::SwapKeyContext;
 use super::maker_client::MakerClient;
@@ -42,8 +42,9 @@ const WINDOWS_CONTRACT_KIND: &str = "windows";
 const LEAST_NAP: Duration = Duration::from_secs(3);
 /// A new Ethereum block shows at the node about this long after its slot.
 const BLOCK_SHOWS_AFTER_SECONDS: u64 = 2;
-/// Zcash blocks come at random: a wait on one looks this often.
-const ZCASH_NAP: Duration = Duration::from_secs(5);
+/// Zcash blocks come at random, a few times a minute: a wait on one looks
+/// this often.
+const ZCASH_NAP: Duration = Duration::from_secs(10);
 
 // ---- the windows ----
 
@@ -548,17 +549,24 @@ pub(crate) enum Wake {
 }
 
 /// How long the loop naps before it looks at a conversion waiting for
-/// `wake` again. The next Ethereum block is due one slot after `head`, the
+/// `wake` again. The next Ethereum block is due one slot after `newest`, the
 /// newest block the step read, and is looked for once it shows at the node;
-/// a slot already past is looked for at once, after the least nap.
-pub(crate) fn nap(wake: Wake, head: Option<&Head>, device_now: u64) -> Duration {
+/// a slot already past is looked for at once, after the least nap. A block
+/// more than a slot old when it was read says the device's clock is ahead of
+/// the chain's, or the node behind it: its slot is then timed from the read.
+pub(crate) fn nap(wake: Wake, newest: Option<&SeenHead>, device_now: u64) -> Duration {
     let nap = match wake {
         Wake::ZcashBlock => ZCASH_NAP,
         Wake::After(nap) => nap,
         Wake::EthereumBlock => {
             let one_slot = SECONDS_PER_BLOCK + BLOCK_SHOWS_AFTER_SECONDS;
-            let seconds = head.map_or(one_slot, |head| {
-                (head.timestamp + one_slot)
+            let seconds = newest.map_or(one_slot, |seen| {
+                let shown = if seen.seen_at > seen.head.timestamp + one_slot {
+                    seen.seen_at
+                } else {
+                    seen.head.timestamp + BLOCK_SHOWS_AFTER_SECONDS
+                };
+                (shown + SECONDS_PER_BLOCK)
                     .saturating_sub(device_now)
                     .min(one_slot)
             });
@@ -652,13 +660,17 @@ mod tests {
     use std::time::Duration;
 
     use super::{nap, Wake};
-    use crate::wallet::private_usd::evm_rpc::Head;
+    use crate::wallet::private_usd::evm_rpc::{Head, SeenHead};
 
-    fn head(timestamp: u64) -> Head {
-        Head {
-            number: 1,
-            timestamp,
-            hash: [0; 32],
+    /// A block made at `timestamp`, first read at `seen_at`.
+    fn seen(timestamp: u64, seen_at: u64) -> SeenHead {
+        SeenHead {
+            head: Head {
+                number: 1,
+                timestamp,
+                hash: [0; 32],
+            },
+            seen_at,
         }
     }
 
@@ -670,15 +682,30 @@ mod tests {
     fn a_wait_looks_again_once_what_it_waits_for_can_have_come() {
         let seconds = Duration::from_secs;
         let now = 1_000;
-        let ethereum = |head: Option<Head>| nap(Wake::EthereumBlock, head.as_ref(), now);
-        assert_eq!(ethereum(Some(head(now))), seconds(14));
-        assert_eq!(ethereum(Some(head(now - 9))), seconds(5));
-        assert_eq!(ethereum(Some(head(now - 13))), seconds(3));
-        assert_eq!(ethereum(Some(head(now - 600))), seconds(3));
-        assert_eq!(ethereum(Some(head(now + 30))), seconds(14));
+        let ethereum = |head: Option<SeenHead>| nap(Wake::EthereumBlock, head.as_ref(), now);
+        assert_eq!(ethereum(Some(seen(now, now))), seconds(14));
+        assert_eq!(ethereum(Some(seen(now - 9, now))), seconds(5));
+        assert_eq!(ethereum(Some(seen(now - 13, now))), seconds(3));
+        // Read fresh, then a long step: the next block is looked for at once.
+        assert_eq!(ethereum(Some(seen(now - 23, now - 20))), seconds(3));
+        assert_eq!(ethereum(Some(seen(now + 30, now))), seconds(14));
         assert_eq!(ethereum(None), seconds(14));
-        assert_eq!(nap(Wake::ZcashBlock, None, now), seconds(5));
+        assert_eq!(nap(Wake::ZcashBlock, None, now), seconds(10));
         assert_eq!(nap(Wake::After(seconds(15)), None, now), seconds(15));
         assert_eq!(nap(Wake::After(Duration::ZERO), None, now), seconds(3));
+    }
+
+    /// A block more than a slot old when read, as on a device clock ahead of
+    /// the chain's or from a node behind it, is timed from the read: the loop
+    /// looks once a slot, never every few seconds.
+    #[test]
+    fn a_clock_ahead_of_the_chain_never_makes_the_loop_spin() {
+        let seconds = Duration::from_secs;
+        let ethereum = |head: SeenHead, now: u64| nap(Wake::EthereumBlock, Some(&head), now);
+        // Read five seconds into its slot on a clock 20 s ahead.
+        assert_eq!(ethereum(seen(1_000, 1_025), 1_026), seconds(11));
+        assert_eq!(ethereum(seen(1_000, 1_600), 1_601), seconds(11));
+        // A slot past that read, the next block is looked for at once.
+        assert_eq!(ethereum(seen(1_000, 1_025), 1_040), seconds(3));
     }
 }

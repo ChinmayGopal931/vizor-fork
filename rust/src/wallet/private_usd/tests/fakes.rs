@@ -24,8 +24,8 @@ use super::super::abi::keccak;
 use super::super::deployment::{self, Deployment};
 use super::super::engine::{Clock, MakerChecks, OpHandle};
 use super::super::evm_rpc::{
-    ChainReader, ConfirmedSwap, Head, PaidOut, ReverseChainState, SwapRead, SwapStage, SwapState,
-    TransactionStatus,
+    ChainReader, ConfirmedSwap, Head, PaidOut, ReverseChainState, SeenHead, SwapRead, SwapStage,
+    SwapState, TransactionStatus,
 };
 use super::super::forward::{Forward, ForwardStep, ForwardView, ForwardWait, ForwardZcash, Quoted};
 use super::super::joint::SwapTxStatus;
@@ -196,8 +196,9 @@ pub(super) struct State {
     /// The stage a confirmed read shows of the escrow instead, its share
     /// unrevealed, while the newest blocks are too new to be confirmed.
     pub confirmed_escrow: Option<SwapStage>,
-    /// Reads of the swap at the newest block.
+    /// Reads of the swap at the newest block, and whether they fail.
     pub newest_reads: u32,
+    pub newest_fails: bool,
 
     // The maker.
     /// The amount every quote names, in token base units.
@@ -313,12 +314,6 @@ pub(super) struct State {
     pub sweep_pays: u64,
     /// The fee cap each reverse sweep home was asked under.
     pub receive_caps: Vec<Option<u64>>,
-    /// Reverse sweeps proved ahead of their claims, the fee cap of the one
-    /// held now, how many were released unsent, and how many were sent.
-    pub proved_ahead: u32,
-    pub ahead: Option<u64>,
-    pub released_ahead: u32,
-    pub sent_ahead: u32,
     pub imports: u32,
     /// Proofs the Railgun page made.
     pub proofs: u32,
@@ -374,6 +369,7 @@ impl State {
             reverse_reads: 0,
             confirmed_escrow: None,
             newest_reads: 0,
+            newest_fails: false,
             amount: AMOUNT,
             quote_expires_at: NOW + 300,
             quote_requests: Vec::new(),
@@ -438,10 +434,6 @@ impl State {
             sweep_fee: 10_000,
             sweep_pays: 10_000,
             receive_caps: Vec::new(),
-            proved_ahead: 0,
-            ahead: None,
-            released_ahead: 0,
-            sent_ahead: 0,
             imports: 0,
             proofs: 0,
         }
@@ -563,8 +555,13 @@ impl ChainReader for FakeChain {
         Ok(self.0.get().head())
     }
 
-    fn newest_head(&self) -> Option<Head> {
-        Some(self.0.get().head())
+    /// The head, read now by the device's clock.
+    fn newest_head(&self) -> Option<SeenHead> {
+        let state = self.0.get();
+        Some(SeenHead {
+            head: state.head(),
+            seen_at: state.clock,
+        })
     }
 
     async fn swap(&self, id: &[u8; 32]) -> Result<Option<SwapState>> {
@@ -575,6 +572,9 @@ impl ChainReader for FakeChain {
     async fn newest_swap(&self, id: &[u8; 32], terms: &Terms) -> Result<Option<SwapState>> {
         self.0.set().newest_reads += 1;
         let state = self.0.get();
+        if state.newest_fails {
+            return fail(ErrorCode::EthereumUnreachable, "the node timed out");
+        }
         verified(state.swap_at_tip(id).or_else(|| state.escrow_at(id)), terms)
     }
 
@@ -1333,7 +1333,7 @@ impl ForwardZcash for FakeZcash {
         _birthday: u64,
         sweep: &ZcashTransaction,
     ) -> Result<SwapTxStatus> {
-        Ok(self.status(sweep))
+        Ok(self.scanned(sweep))
     }
 
     async fn forget_joint_account(&self, _index: u32) -> Result<()> {
@@ -1372,39 +1372,8 @@ impl ReverseZcash for FakeZcash {
         })
     }
 
-    /// Proved once every note is spendable, as the wallet's is; one held
-    /// under the same cap stays.
-    async fn prove_receive_ahead(
-        &self,
-        _index: u32,
-        _joint: &JointAccount,
-        _birthday: u64,
-        max_fee_zatoshi: u64,
-    ) -> Result<()> {
-        let mut state = self.0.set();
-        if state.ahead == Some(max_fee_zatoshi) {
-            return Ok(());
-        }
-        if state.ahead.take().is_some() {
-            state.released_ahead += 1;
-        }
-        if state.spendable {
-            state.proved_ahead += 1;
-            state.ahead = Some(max_fee_zatoshi);
-        }
-        Ok(())
-    }
-
-    fn release_receive_ahead(&self, _index: u32) {
-        let mut state = self.0.set();
-        if state.ahead.take().is_some() {
-            state.released_ahead += 1;
-        }
-    }
-
-    /// Sends the sweep proved ahead under the same cap (`ahead{n}`), else
-    /// builds one (`receive{n}`). Refuses, as the wallet's proposal does, a
-    /// sweep whose fee is above its cap.
+    /// Refuses, as the wallet's proposal does, a sweep whose fee is above
+    /// its cap.
     async fn prepare_receive(
         &self,
         _index: u32,
@@ -1415,22 +1384,6 @@ impl ReverseZcash for FakeZcash {
     ) -> Result<Option<ReverseReceiveTransaction>> {
         let mut state = self.0.set();
         state.receive_caps.push(max_fee_zatoshi);
-        let ahead = state.ahead.take();
-        if ahead.is_some() && ahead == max_fee_zatoshi {
-            state.sent_ahead += 1;
-            let fee = state.sweep_pays;
-            let built = transaction(&format!("ahead{}", state.sent_ahead));
-            return Ok(Some(ReverseReceiveTransaction {
-                tx_id: built.tx_id,
-                raw: built.raw,
-                expiry_height: built.expiry_height,
-                received_zat: state.paid_in - fee,
-                fee_zat: fee,
-            }));
-        }
-        if ahead.is_some() {
-            state.released_ahead += 1;
-        }
         if !state.spendable {
             return Ok(None);
         }
@@ -1455,7 +1408,7 @@ impl ReverseZcash for FakeZcash {
         _birthday: u64,
         receive: &ZcashTransaction,
     ) -> Result<SwapTxStatus> {
-        Ok(self.status(receive))
+        Ok(self.scanned(receive))
     }
 
     async fn broadcast(&self, transaction: &ZcashTransaction) -> Result<()> {
@@ -1463,14 +1416,23 @@ impl ReverseZcash for FakeZcash {
         Ok(())
     }
 
-    async fn forget(&self, index: u32) -> Result<()> {
-        self.release_receive_ahead(index);
+    async fn forget(&self, _index: u32) -> Result<()> {
         self.0.set().forgotten += 1;
         Ok(())
     }
 }
 
 impl FakeZcash {
+    /// A joint transaction's status once the joint wallet scanned, which
+    /// sends one it holds unmined again, as the wallet's scan does.
+    fn scanned(&self, transaction: &ZcashTransaction) -> SwapTxStatus {
+        let status = self.status(transaction);
+        if status == SwapTxStatus::Unmined {
+            self.0.set().submitted.push(transaction.tx_id.clone());
+        }
+        status
+    }
+
     fn status(&self, transaction: &ZcashTransaction) -> SwapTxStatus {
         self.0
             .get()

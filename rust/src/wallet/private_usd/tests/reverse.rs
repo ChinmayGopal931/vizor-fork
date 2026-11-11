@@ -377,6 +377,44 @@ async fn the_claim_is_swept_home_from_its_first_block() {
     assert_eq!(h.posts("/v1/reverse/refund"), 0);
 }
 
+/// The share a claim reveals is kept once it opens the joint account: should
+/// the claim's block be undone before the sweep is built, and the claim not
+/// come again, the sweep is built from the kept share and the conversion
+/// completes, never refunded.
+#[tokio::test]
+async fn the_revealed_share_is_kept_should_the_claims_block_be_undone() {
+    let h = authorized().await;
+    {
+        let mut state = h.world.set();
+        state.spendable = false;
+        state.confirmed_escrow = Some(SwapStage::Ready);
+    }
+    h.claimed();
+    let receiving = h.advance_reverse().await.unwrap();
+    assert_eq!(receiving.phase, ReversePhase::Receiving);
+    assert_eq!(receiving.receive, None);
+    assert_eq!(
+        receiving.revealed_share,
+        Some(Hex(maker_secret().to_be_bytes()))
+    );
+
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.secret = [0; 32];
+        state.spendable = true;
+    }
+    let swept = h.advance_reverse().await.unwrap();
+    let receive = swept.receive.unwrap();
+    h.world
+        .set()
+        .statuses
+        .insert(receive.tx_id.clone(), mined(2));
+    let complete = h.advance_reverse().await.unwrap();
+    assert_eq!(complete.phase, ReversePhase::Complete);
+    assert_eq!(h.posts("/v1/reverse/refund"), 0);
+}
+
 /// A refund is offered only while calling the conversion off gets the
 /// dollars back: not once the user's `ready` is out, which leaves a ready
 /// escrow the maker's to claim until t1, nor while a `ready` landed just
@@ -411,6 +449,35 @@ async fn a_refund_is_offered_only_while_it_can_land() {
     assert_eq!(landed.phase, ReversePhase::Settling);
     assert!(!landed.cancellable());
 
+    // Landed in the last block before t0, the confirmed read still open as
+    // t0 passes: the refund the chain then seems due waits, settling.
+    let h = authorized().await;
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.confirmed_escrow = Some(SwapStage::Open);
+        let to_t0 = READY - state.chain_now;
+        state.pass(to_t0);
+    }
+    let landed = h.advance_reverse().await.unwrap();
+    assert_eq!(landed.phase, ReversePhase::Settling);
+    assert!(!landed.cancellable());
+    assert_eq!(h.posts("/v1/reverse/refund"), 0);
+
+    // The newest read failing as it lands: it lapses only on a consistent
+    // read, which shows it landed.
+    let h = authorized().await;
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.confirmed_escrow = Some(SwapStage::Open);
+        state.newest_fails = true;
+        state.pass(121);
+    }
+    let landed = h.advance_reverse().await.unwrap();
+    assert_eq!(landed.phase, ReversePhase::Settling);
+    assert!(!landed.cancellable());
+
     let h = authorized().await;
     h.world.set().pass(121);
     let lapsed = h.advance_reverse().await.unwrap();
@@ -418,41 +485,27 @@ async fn a_refund_is_offered_only_while_it_can_land() {
     assert!(lapsed.cancellable());
     h.reverse().cancel(&mut h.store(), 0).await.unwrap();
     assert_eq!(h.posts("/v1/reverse/refund"), 1);
-}
 
-/// While the maker's claim is awaited the sweep home is proved ahead under
-/// the reviewed fee, once, and at the claim it is the one sent; a refund
-/// releases it unsent.
-#[tokio::test]
-async fn the_sweep_home_is_proved_while_the_claim_is_awaited() {
+    // Lapsed and left to go by itself at t0: once posted it is never
+    // offered again, also while it is too new to be confirmed.
     let h = authorized().await;
-    let cap = h.reverse_record(0).receive_estimate.unwrap().fee_zat;
-    h.advance_reverse().await.unwrap();
-    h.advance_reverse().await.unwrap();
-    {
-        let state = h.world.get();
-        assert_eq!((state.proved_ahead, state.ahead), (1, Some(cap)));
-    }
-    h.claimed();
-    let receiving = h.advance_reverse().await.unwrap();
-    assert_eq!(receiving.receive.unwrap().tx_id, tx_id("ahead1"));
-    {
-        let state = h.world.get();
-        assert_eq!((state.sent_ahead, state.ahead), (1, None));
-        assert_eq!(state.released_ahead, 0);
-    }
-
-    let h = authorized().await;
-    h.advance_reverse().await.unwrap();
-    assert_eq!(h.world.get().ahead, Some(cap));
     h.world.set().pass(121);
-    let lapsed = h.advance_reverse().await.unwrap();
-    assert_eq!(lapsed.phase, ReversePhase::RefundWait);
-    h.reverse().cancel(&mut h.store(), 0).await.unwrap();
+    h.advance_reverse().await.unwrap();
+    {
+        let mut state = h.world.set();
+        let to_t0 = READY - state.chain_now;
+        state.pass(to_t0);
+    }
+    h.advance_reverse().await.unwrap();
     assert_eq!(h.posts("/v1/reverse/refund"), 1);
-    let state = h.world.get();
-    assert_eq!((state.ahead, state.released_ahead), (None, 1));
-    assert_eq!(state.sent_ahead, 0);
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Refunded;
+        state.confirmed_escrow = Some(SwapStage::Open);
+    }
+    let refunding = h.advance_reverse().await.unwrap();
+    assert_eq!(refunding.phase, ReversePhase::Refunding);
+    assert!(!refunding.cancellable());
 }
 
 /// The loop looks again once what a conversion waits for can have come: a
@@ -464,7 +517,7 @@ async fn the_loop_naps_by_what_a_conversion_waits_for() {
     let report = async || h.reverse().advance_report(&mut h.store(), 0).await.unwrap();
     let receiving = report().await;
     assert_eq!(receiving.record.phase, ReversePhase::ReceivingZec);
-    assert_eq!(receiving.next_poll, Duration::from_secs(5));
+    assert_eq!(receiving.next_poll, Duration::from_secs(10));
     h.world.set().paid_in = REVERSE_DEPOSIT_ZAT;
     let awaiting = report().await;
     assert_eq!(awaiting.record.phase, ReversePhase::AwaitingReady);

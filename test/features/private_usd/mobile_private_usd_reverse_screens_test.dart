@@ -241,12 +241,15 @@ void main() {
       findsOneWidget,
     );
 
-    // Too late to settle: the refund is the user's to request now.
+    // Too late to settle: the refund is the user's to request now, and the
+    // step says so rather than that it cannot proceed yet.
     final lapsed = previewPrivateUsdReverseRecord(
       phase: ApiReversePhase.refundWait,
     );
     await progress(lapsed);
     expect(find.text(PrivateUsdCopy.reverseRequestRefund), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.reverseRefundReady), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.reverseRefundWait), findsNothing);
     expect(
       find.text(
         PrivateUsdCopy.reverseRefundAvailable(

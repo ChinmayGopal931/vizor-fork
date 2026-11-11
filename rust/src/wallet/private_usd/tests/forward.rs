@@ -576,7 +576,7 @@ async fn the_loop_naps_by_what_a_swap_waits_for() {
     let report = async || h.forward().advance_report(&mut h.store(), 0).await.unwrap();
     let syncing = report().await;
     assert_eq!(syncing.wait, Some(ForwardWait::ZcashSyncing));
-    assert_eq!(syncing.next_poll, Duration::from_secs(5));
+    assert_eq!(syncing.next_poll, Duration::from_secs(10));
     h.world.set().synced = true;
     // The fake's head is a block just made: the next is due in a slot.
     let confirming = report().await;

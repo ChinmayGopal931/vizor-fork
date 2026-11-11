@@ -86,6 +86,25 @@ final privateUsdBridgeKeepAwakeProvider = Provider<bool>((ref) {
   );
 });
 
+/// A bridge waits on the user's payment or settlement approval while the
+/// wallet is unlocked and its screen is kept on: the wallet sync's idle
+/// privacy lock does not cover it. Every other phase runs on under the lock.
+final privateUsdBridgeAwaitsUserProvider = Provider<bool>((ref) {
+  if (ref.watch(appSecurityProvider.select((s) => s.requiresUnlock))) {
+    return false;
+  }
+  final maySleep = ref.watch(privateUsdScreenMaySleepProvider);
+  return ref
+      .watch(privateUsdReverseConversionsProvider)
+      .entries
+      .any(
+        (entry) =>
+            entry.value.isUnderWay &&
+            entry.value.needsYou &&
+            !maySleep.contains(entry.key),
+      );
+});
+
 /// Keeps the screen awake through a bridge that needs Veylor
 /// ([privateUsdBridgeKeepAwakeProvider]) or a Railgun first sync
 /// ([privateUsdFirstSyncKeepAwakeProvider]). OR-ed into

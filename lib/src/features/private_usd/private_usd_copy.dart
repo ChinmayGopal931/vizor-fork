@@ -638,6 +638,7 @@ abstract final class PrivateUsdCopy {
       'Zcash confirmations: $count';
   static const reverseRefundWait =
       "Waiting until a refund can proceed. Veylor retries while it's open.";
+  static const reverseRefundReady = 'Refund available';
   static const reverseRefunding = 'Securing your refund';
   static const reversePayout = 'Returning your shielded USD to Railgun';
   static const reverseComplete = 'ZEC received in your shielded wallet';

@@ -1579,9 +1579,11 @@ Code:
   until the market maker confirms the deposit), with "Keep screen on": on
   by default, and off lets
   that bridge's screen sleep (`privateUsdScreenMaySleepProvider`, in memory).
-  While a bridge keeps the screen on, the wallet sync's idle privacy lock
-  (`SyncKeepAwakePrivacyLockHost`) never covers the app: the user is
-  watching the bridge, which may need them.
+  While a bridge waits on the user's approval with its screen kept on
+  (`privateUsdBridgeAwaitsUserProvider`), the wallet sync's idle privacy
+  lock (`SyncKeepAwakePrivacyLockHost`) does not cover the app, and once it
+  stops waiting the idle minute starts again. Every other phase runs on
+  under the lock.
 - On a USD → ZEC conversion the phone buzzes when "Authorize settlement" is
   first offered (the user's turn), and again two minutes before it closes if
   still unauthorized, once when the two fall together: it holds, then fades
@@ -1672,14 +1674,19 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 - A reverse escrow's claim is swept home from its first block: `e` is
   public once the claim is in a block, and a reorg only has the maker claim
   again with it. The revealed share must open the joint account before the
-  record moves; once swept, the conversion stays settled and is never
-  refunded. The sweep is proved ahead from `ready`, and only signed once
-  `e` is known.
+  record keeps it (`revealed_share`) and moves; the sweep then goes on from
+  the kept share whatever a later look shows, and the conversion stays
+  settled, never refunded. Never build or prove the sweep before the claim:
+  a sweep held from `ready` carries that moment on chain in its anchor and
+  expiry.
 - Offer a reverse refund (`ReverseRecord::cancellable`) only while calling
   off gets the dollars back: never once the user's `ready` is out, which
   leaves a ready escrow the maker's to claim until `t1` (its refund then
-  goes by itself), unless the `ready` lapsed with the escrow still open. A
-  `ready` the newest block shows has landed, never lapsed.
+  goes by itself), unless the `ready` lapsed with the escrow still open, and
+  never once a refund was posted. A `ready` the newest block shows has
+  landed, never lapsed; it lapses only on one consistent read of a fresh
+  head past its deadline that shows the escrow still open, and a refund
+  that cannot land yet waits in the phase that read supports.
 - Never prove a second reverse funding because a response was lost. Sign
   `ready` only before `t0` (its deadline, the head plus 120 s, before it),
   keep that deadline first, and never sign or send one once a refund was
