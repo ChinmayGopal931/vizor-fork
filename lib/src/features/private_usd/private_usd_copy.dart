@@ -532,7 +532,7 @@ abstract final class PrivateUsdCopy {
 
   // ── Convert: results (forward) ────────────────────────────────────────
 
-  static const convertResultPaidTitle = 'Dollars on their way';
+  static const convertResultPaidTitle = '0zkUSDC on its way';
   static String convertResultPaidBody(String usd, String about) =>
       '$usd is in your shielded balance. Railgun screens new funds for $about '
       'before they can be spent.';
