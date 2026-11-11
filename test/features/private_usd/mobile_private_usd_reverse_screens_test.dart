@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/formatting/date_format.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_presentation.dart';
@@ -215,6 +216,46 @@ void main() {
     expect(
       button(tester, 'mobile_private_usd_progress_action').onPressed,
       isNull,
+    );
+
+    // Settlement authorized: the escrow is the maker's to claim, so no
+    // refund is offered, only when one could follow.
+    await progress(
+      previewPrivateUsdReverseRecord(phase: ApiReversePhase.settling),
+    );
+    expect(
+      find.byKey(const ValueKey('mobile_private_usd_progress_call_off')),
+      findsNothing,
+    );
+    final settling = previewPrivateUsdReverseRecord(
+      phase: ApiReversePhase.settling,
+    );
+    expect(
+      find.text(
+        PrivateUsdCopy.reverseSettlementRefundLimit(
+          formatDayMonthTime(
+            DateTime.fromMillisecondsSinceEpoch(settling.refundAfter * 1000),
+          ),
+        ),
+      ),
+      findsOneWidget,
+    );
+
+    // Too late to settle: the refund is the user's to request now.
+    final lapsed = previewPrivateUsdReverseRecord(
+      phase: ApiReversePhase.refundWait,
+    );
+    await progress(lapsed);
+    expect(find.text(PrivateUsdCopy.reverseRequestRefund), findsOneWidget);
+    expect(
+      find.text(
+        PrivateUsdCopy.reverseRefundAvailable(
+          formatDayMonthTime(
+            DateTime.fromMillisecondsSinceEpoch(lapsed.readyDeadline * 1000),
+          ),
+        ),
+      ),
+      findsOneWidget,
     );
 
     // Settled: no call-off; ended: "New bridge".

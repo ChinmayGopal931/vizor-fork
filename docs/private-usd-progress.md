@@ -2777,6 +2777,22 @@ M8 status (2026-10-14): the non-device parts are done.
   - **Not done.** Connections are not reused across steps: each step's
     runtime, and the pooled client on it, ends with the step. Over Tor each
     request keeps its own isolated circuit.
+- **D-156 (owner, 2026-11-11): a refund is offered only when it can land.**
+  On the OnePlus a USD → ZEC bridge offered "Request refund" after
+  settlement was authorized; the tap only recorded a request, the maker
+  claimed, and the bridge completed. The windows contract gives a ready
+  escrow to the maker until `t1` (`_refundable` refunds a reverse escrow
+  only while it is open, and from `t1`), so `cancellable` is now false once
+  a `ready` is out, unless it lapsed with the escrow open (`RefundWait`,
+  whose note says the refund can be requested now or goes by itself after
+  `t0`). A `ready` the newest block shows counts as landed, never lapsed.
+  The driver still takes a call-off while settling (it waits, as before).
+  Every maker failure keeps a way back: an open escrow refunds at once on
+  request and by itself from `t0`, a ready one by itself from `t1`, and a
+  forward swap the maker never readies is claimed from `t0`. Two changes
+  came with it: the wallet sync's idle privacy lock no longer covers the
+  app while a bridge keeps the screen on, and the ZEC → USD result reads
+  "0zkUSDC on its way" while Railgun screens the payout.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

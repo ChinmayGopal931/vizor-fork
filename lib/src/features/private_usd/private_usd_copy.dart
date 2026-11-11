@@ -674,6 +674,9 @@ abstract final class PrivateUsdCopy {
   static String reverseSettlementRefundLimit(String time) =>
       'Settlement is authorized. A refund can only proceed after $time if '
       "settlement hasn't completed.";
+  static String reverseRefundAvailable(String time) =>
+      'This bridge can no longer settle. Request your refund now, or Veylor '
+      "sends it after $time while it's open.";
   static const reverseRefundUnavailable =
       'This bridge has already settled and can no longer be refunded. '
       'Veylor will finish moving your ZEC to your wallet.';

@@ -1283,7 +1283,14 @@ where
             self.zcash.release_receive_ahead(record.index);
             return self.refund(store, record, &observed, &escrow).await;
         }
-        if escrow.stage == SwapStage::Ready {
+        // A ready escrow is the maker's to claim until `t1`, as soon as the
+        // `ready` is in a block: one landing just before its deadline never
+        // reads as lapsed, which would offer a refund that cannot land.
+        let readied = [Some(&escrow), newest.as_ref()]
+            .into_iter()
+            .flatten()
+            .any(|swap| swap.stage == SwapStage::Ready);
+        if readied {
             let mut settling = record.clone();
             settling.phase = ReversePhase::Settling;
             update(store, self.account, &settling)?;

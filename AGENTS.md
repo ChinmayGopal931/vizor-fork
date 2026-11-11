@@ -1675,6 +1675,11 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   record moves; once swept, the conversion stays settled and is never
   refunded. The sweep is proved ahead from `ready`, and only signed once
   `e` is known.
+- Offer a reverse refund (`ReverseRecord::cancellable`) only while calling
+  off gets the dollars back: never once the user's `ready` is out, which
+  leaves a ready escrow the maker's to claim until `t1` (its refund then
+  goes by itself), unless the `ready` lapsed with the escrow still open. A
+  `ready` the newest block shows has landed, never lapsed.
 - Never prove a second reverse funding because a response was lost. Sign
   `ready` only before `t0` (its deadline, the head plus 120 s, before it),
   keep that deadline first, and never sign or send one once a refund was

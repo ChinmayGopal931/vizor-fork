@@ -1042,8 +1042,11 @@ impl ReverseRecord {
             || self.receive.is_some()
     }
 
-    /// Whether the user may still call it off: under way, not called off
-    /// already, not settled, and no refund being paid.
+    /// Whether calling it off gets the dollars back now: under way, not
+    /// called off already, not settled, no refund being paid, and no `ready`
+    /// of the user's out. From `ready` the escrow is the maker's to claim
+    /// until `t1`, when its refund goes by itself; one that lapsed with the
+    /// escrow still open (`RefundWait`) leaves it the user's again.
     pub(crate) fn cancellable(&self) -> bool {
         self.under_way()
             && !self.cancel_requested
@@ -1052,6 +1055,7 @@ impl ReverseRecord {
                 self.phase,
                 ReversePhase::Refunding | ReversePhase::RefundPayout
             )
+            && (self.ready.is_none() || self.phase == ReversePhase::RefundWait)
     }
 
     /// Gone ahead with, and neither accepted nor funded nor called off yet.

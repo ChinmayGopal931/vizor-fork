@@ -309,6 +309,12 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     note = PrivateUsdCopy.convertResuming;
   } else if (record.cancelRequested && refundStep != null) {
     note = PrivateUsdCopy.reverseRefundRequested;
+  } else if (record.phase == ApiReversePhase.refundWait && record.cancellable) {
+    // Too late to settle: the refund is the user's to request now, and goes
+    // by itself from t0.
+    note = PrivateUsdCopy.reverseRefundAvailable(
+      formatDayMonthTime(_at(record.readyDeadline)),
+    );
   } else if (record.phase == ApiReversePhase.awaitingReady) {
     note = PrivateUsdCopy.reverseReadyExplanation;
   } else if (record.phase == ApiReversePhase.settling) {

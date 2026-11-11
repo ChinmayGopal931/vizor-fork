@@ -377,6 +377,49 @@ async fn the_claim_is_swept_home_from_its_first_block() {
     assert_eq!(h.posts("/v1/reverse/refund"), 0);
 }
 
+/// A refund is offered only while calling the conversion off gets the
+/// dollars back: not once the user's `ready` is out, which leaves a ready
+/// escrow the maker's to claim until t1, nor while a `ready` landed just
+/// before its deadline is too new to be confirmed; again once it lapsed with
+/// the escrow still open, when the refund goes at once.
+#[tokio::test]
+async fn a_refund_is_offered_only_while_it_can_land() {
+    let h = escrowed().await;
+    h.world.set().paid_in = REVERSE_DEPOSIT_ZAT;
+    let awaiting = h.advance_reverse().await.unwrap();
+    assert_eq!(awaiting.phase, ReversePhase::AwaitingReady);
+    assert!(awaiting.cancellable());
+    let settling = h
+        .reverse()
+        .authorize_ready(&mut h.store(), 0)
+        .await
+        .unwrap();
+    assert!(!settling.cancellable());
+    h.world.set().stage = SwapStage::Ready;
+    let ready = h.advance_reverse().await.unwrap();
+    assert_eq!(ready.phase, ReversePhase::Settling);
+    assert!(!ready.cancellable());
+
+    let h = authorized().await;
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.confirmed_escrow = Some(SwapStage::Open);
+        state.pass(121);
+    }
+    let landed = h.advance_reverse().await.unwrap();
+    assert_eq!(landed.phase, ReversePhase::Settling);
+    assert!(!landed.cancellable());
+
+    let h = authorized().await;
+    h.world.set().pass(121);
+    let lapsed = h.advance_reverse().await.unwrap();
+    assert_eq!(lapsed.phase, ReversePhase::RefundWait);
+    assert!(lapsed.cancellable());
+    h.reverse().cancel(&mut h.store(), 0).await.unwrap();
+    assert_eq!(h.posts("/v1/reverse/refund"), 1);
+}
+
 /// While the maker's claim is awaited the sweep home is proved ahead under
 /// the reviewed fee, once, and at the claim it is the one sent; a refund
 /// releases it unsent.

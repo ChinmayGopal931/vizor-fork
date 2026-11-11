@@ -85,10 +85,13 @@ ApiReverseRecord previewPrivateUsdReverseRecord({
         : null,
     cancelRequested: cancelRequested,
     settled: settled,
+    // Settling, the user's `ready` is out: the escrow is the maker's to
+    // claim.
     cancellable:
         underWay &&
         !cancelRequested &&
         !settled &&
+        phase != ApiReversePhase.settling &&
         phase != ApiReversePhase.refunding &&
         phase != ApiReversePhase.refundPayout,
     awaitingUser:
