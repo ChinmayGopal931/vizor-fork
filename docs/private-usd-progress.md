@@ -2802,10 +2802,12 @@ M8 status (2026-10-14): the non-device parts are done.
   request and by itself from `t0`, a ready one by itself from `t1`, and a
   forward swap the maker never readies is claimed from `t0`. Two changes
   came with it: the wallet sync's idle privacy lock no longer covers the
-  app while a bridge waits on the user's approval (every other phase runs
-  on under it, and the idle minute starts again once the bridge stops
-  waiting), and the ZEC → USD result reads "0zkUSDC on its way" while
-  Railgun screens the payout.
+  app while a USD → ZEC bridge still needs the user's approval, from its
+  accept until settlement is authorized, so the approval never shows
+  behind it (from the authorization on the bridge runs on under the lock,
+  and the idle minute starts again once it no longer needs the user), and
+  the ZEC → USD result reads "0zkUSDC on its way" while Railgun screens the
+  payout.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

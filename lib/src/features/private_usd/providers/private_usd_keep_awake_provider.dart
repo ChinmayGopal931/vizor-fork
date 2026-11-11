@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/app_security_provider.dart';
+import '../../../rust/api/private_usd.dart' show ApiReversePhase;
 import '../models/private_usd_record_key.dart';
 import 'private_usd_unfinished_provider.dart';
 
@@ -86,9 +87,22 @@ final privateUsdBridgeKeepAwakeProvider = Provider<bool>((ref) {
   );
 });
 
-/// A bridge waits on the user's payment or settlement approval while the
+/// The phases of a USD → ZEC bridge before the user authorized settlement:
+/// one of their two approvals is due now or comes next.
+const _beforeSettlement = {
+  ApiReversePhase.accepting,
+  ApiReversePhase.awaitingFunding,
+  ApiReversePhase.sendingUsdc,
+  ApiReversePhase.confirmingEscrow,
+  ApiReversePhase.receivingZec,
+  ApiReversePhase.awaitingReady,
+};
+
+/// A USD → ZEC bridge still needs the user's approval, now or next (its
+/// payment, or "Authorize settlement" once the maker's ZEC is in), while the
 /// wallet is unlocked and its screen is kept on: the wallet sync's idle
-/// privacy lock does not cover it. Every other phase runs on under the lock.
+/// privacy lock does not cover the app, so the approval never shows behind
+/// it. From the authorization on, the bridge runs on under the lock.
 final privateUsdBridgeAwaitsUserProvider = Provider<bool>((ref) {
   if (ref.watch(appSecurityProvider.select((s) => s.requiresUnlock))) {
     return false;
@@ -99,8 +113,8 @@ final privateUsdBridgeAwaitsUserProvider = Provider<bool>((ref) {
       .entries
       .any(
         (entry) =>
-            entry.value.isUnderWay &&
-            entry.value.needsYou &&
+            _beforeSettlement.contains(entry.value.record.phase) &&
+            !entry.value.record.cancelRequested &&
             !maySleep.contains(entry.key),
       );
 });

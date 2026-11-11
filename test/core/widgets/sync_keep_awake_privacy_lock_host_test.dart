@@ -538,7 +538,7 @@ void main() {
   });
 
   testWidgets(
-    'a bridge waiting on the user is never covered, and leaves a full idle window',
+    'a bridge that needs the user next is never covered, and leaves a full idle window',
     (tester) async {
       _setMobileViewport(tester);
       final container = ProviderContainer(
@@ -569,7 +569,7 @@ void main() {
           record: previewPrivateUsdReverseRecord(phase: phase),
         ),
       });
-      bridgeIn(ApiReversePhase.awaitingReady);
+      bridgeIn(ApiReversePhase.receivingZec);
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
@@ -578,7 +578,12 @@ void main() {
       );
       await _settleInitialSync(tester);
 
-      // Waiting on "Authorize settlement": an idle user is not covered.
+      // Waiting for the maker's ZEC, then on "Authorize settlement": an idle
+      // user is never covered, so the approval never shows behind the lock.
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(find.text('Veylor is syncing'), findsNothing);
+      bridgeIn(ApiReversePhase.awaitingReady);
       await tester.pump(const Duration(seconds: 2));
       await tester.pump();
       expect(find.text('Veylor is syncing'), findsNothing);

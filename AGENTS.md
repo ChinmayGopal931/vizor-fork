@@ -1579,10 +1579,12 @@ Code:
   until the market maker confirms the deposit), with "Keep screen on": on
   by default, and off lets
   that bridge's screen sleep (`privateUsdScreenMaySleepProvider`, in memory).
-  While a bridge waits on the user's approval with its screen kept on
+  While a USD → ZEC bridge still needs the user's approval, now or next
+  (from its accept until settlement is authorized), with its screen kept on
   (`privateUsdBridgeAwaitsUserProvider`), the wallet sync's idle privacy
-  lock (`SyncKeepAwakePrivacyLockHost`) does not cover the app, and once it
-  stops waiting the idle minute starts again. Every other phase runs on
+  lock (`SyncKeepAwakePrivacyLockHost`) does not cover the app, so
+  "Authorize settlement" never shows behind it; once it no longer does, the
+  idle minute starts again. From the authorization on, a bridge runs on
   under the lock.
 - On a USD → ZEC conversion the phone buzzes when "Authorize settlement" is
   first offered (the user's turn), and again two minutes before it closes if

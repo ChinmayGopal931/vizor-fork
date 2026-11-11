@@ -81,9 +81,9 @@ class _SyncKeepAwakePrivacyLockHostState
   Widget build(BuildContext context) {
     if (kAppFormFactor != AppFormFactor.mobile) return widget.child;
 
-    // A Private USD bridge waiting on the user's approval is not covered.
-    // Once it stops waiting, the user gets a full idle window again rather
-    // than a lock on the next frame.
+    // A Private USD bridge that needs the user's approval, now or next, is
+    // not covered. Once it no longer does, the user gets a full idle window
+    // again rather than a lock on the next frame.
     ref.listen<bool>(privateUsdBridgeAwaitsUserProvider, (waited, waits) {
       if (waited == true && !waits) {
         ref.read(syncKeepAwakeInteractionProvider.notifier).markInteraction();
