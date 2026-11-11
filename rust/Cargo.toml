@@ -104,11 +104,13 @@ prost13 = { package = "prost", version = "0.13" }
 tendermint = "0.40.4"
 tendermint-light-client-verifier = "0.40.4"
 
-# Private USD. One zecSwap rev for both crates.
-zecswap-core    = { git = "https://github.com/ChinmayGopal931/zecSwap", rev = "64917fc90175dc25a0f6d522f0481807d7fe78f2" }
-zecswap-railgun = { git = "https://github.com/ChinmayGopal931/zecSwap", rev = "64917fc90175dc25a0f6d522f0481807d7fe78f2" }
+# Private USD. zecswap-core comes from the branch that builds it on Zakura
+# Common v4 (`veylor/zakura-v4`); the other two crates from `main`. Neither
+# depends on zecswap-core, so the two revs never meet in the graph.
+zecswap-core    = { git = "https://github.com/ChinmayGopal931/zecSwap", rev = "d73ed7fd4ffae6db6cc25dbfaadb8a2e05d33c47" }
+zecswap-railgun = { git = "https://github.com/ChinmayGopal931/zecSwap", rev = "92f2acb76a9dccc9ebb944ee07734f9f18c6ecd0" }
 # Privacy Pass tokens for the makers' accepts (M4); its client half only.
-zecswap-tokens  = { git = "https://github.com/ChinmayGopal931/zecSwap", rev = "64917fc90175dc25a0f6d522f0481807d7fe78f2", default-features = false }
+zecswap-tokens  = { git = "https://github.com/ChinmayGopal931/zecSwap", rev = "92f2acb76a9dccc9ebb944ee07734f9f18c6ecd0", default-features = false }
 # The Railgun wallet's BIP-32 path, over the same secp256k1 as the rest of the
 # wallet: the bip32 and secp256k1 releases the Zakura transparent crates use.
 bip32  = { version = "=0.6.0", default-features = false, features = ["alloc", "secp256k1-ffi"] }
@@ -277,13 +279,6 @@ assertions_on_constants = "allow"
 
 # Wallet and voting dependencies use their coordinated published releases.
 # Voting 5.2 is an explicit opt-in; keep the exact prerelease pin during validation.
-
-# LOCAL STAND-IN: zecswap-core of the rev above (the windows contract's) on
-# Zakura Common v4, in a checkout outside this repository, so a clean clone
-# builds only where that checkout exists. Drop this once a zecSwap rev
-# carries the Zakura manifest.
-[patch."https://github.com/ChinmayGopal931/zecSwap"]
-zecswap-core = { path = "../../zapp/zecSwap-zakura-v4-windows/crates/zecswap-core" }   # relative to rust/
 
 # Flutter debug builds use Cargokit + Cargo's dev profile (`cargo build`
 # without `--release`). Rust crypto and voting flows are slow under the default
