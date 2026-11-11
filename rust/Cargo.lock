@@ -8957,6 +8957,7 @@ dependencies = [
 [[package]]
 name = "zecswap-core"
 version = "0.1.0"
+source = "git+https://github.com/ChinmayGopal931/zecSwap?rev=d73ed7fd4ffae6db6cc25dbfaadb8a2e05d33c47#d73ed7fd4ffae6db6cc25dbfaadb8a2e05d33c47"
 dependencies = [
  "bip32",
  "blake2b_simd",
@@ -8978,7 +8979,7 @@ dependencies = [
 [[package]]
 name = "zecswap-railgun"
 version = "0.1.0"
-source = "git+https://github.com/ChinmayGopal931/zecSwap?rev=64917fc90175dc25a0f6d522f0481807d7fe78f2#64917fc90175dc25a0f6d522f0481807d7fe78f2"
+source = "git+https://github.com/ChinmayGopal931/zecSwap?rev=92f2acb76a9dccc9ebb944ee07734f9f18c6ecd0#92f2acb76a9dccc9ebb944ee07734f9f18c6ecd0"
 dependencies = [
  "aes 0.8.4",
  "aes-gcm",
@@ -8998,7 +8999,7 @@ dependencies = [
 [[package]]
 name = "zecswap-tokens"
 version = "0.1.0"
-source = "git+https://github.com/ChinmayGopal931/zecSwap?rev=64917fc90175dc25a0f6d522f0481807d7fe78f2#64917fc90175dc25a0f6d522f0481807d7fe78f2"
+source = "git+https://github.com/ChinmayGopal931/zecSwap?rev=92f2acb76a9dccc9ebb944ee07734f9f18c6ecd0#92f2acb76a9dccc9ebb944ee07734f9f18c6ecd0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
