@@ -2,6 +2,7 @@
 //! and the `openReverse` calldata byte for byte.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::sync::Notify;
 use zecswap_core::{Domain, PublicShare, RescueAuthorization, ReverseOpen};
@@ -325,6 +326,114 @@ async fn ready_is_signed_only_with_its_deadline_before_t0() {
         .await
         .unwrap();
     assert_eq!(settling.ready.unwrap().deadline, READY - 1);
+}
+
+/// Once `ready` is out the escrow is read at the newest block too, and the
+/// maker's claim is swept home from its first block; its share must open the
+/// joint account before anything is kept. Before a `ready` nothing is read
+/// there.
+#[tokio::test]
+async fn the_claim_is_swept_home_from_its_first_block() {
+    let h = escrowed().await;
+    h.world.set().paid_in = REVERSE_DEPOSIT_ZAT;
+    h.advance_reverse().await.unwrap();
+    assert_eq!(h.world.get().newest_reads, 0);
+    h.reverse()
+        .authorize_ready(&mut h.store(), 0)
+        .await
+        .unwrap();
+
+    // A share in the newest block that does not open the joint account.
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Claimed;
+        state.secret = word(5);
+        state.confirmed_escrow = Some(SwapStage::Ready);
+    }
+    let refused = h.advance_reverse().await.unwrap_err();
+    assert_eq!(refused.code, ErrorCode::Mismatch);
+    let held = h.reverse_record(0);
+    assert_eq!((held.phase, held.receive), (ReversePhase::Settling, None));
+
+    // The maker's claim, one block deep and not confirmed: swept home.
+    h.claimed();
+    let receiving = h.advance_reverse().await.unwrap();
+    assert_eq!(receiving.phase, ReversePhase::Receiving);
+    assert!(receiving.receive.is_some());
+    assert!(h.world.get().newest_reads > 0);
+
+    // Its block undone, as by a reorg: still settled, and never refunded,
+    // from t1 either.
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.secret = [0; 32];
+    }
+    let to_t1 = REFUND - h.world.get().chain_now;
+    h.world.set().pass(to_t1);
+    let settled = h.advance_reverse().await.unwrap();
+    assert_eq!(settled.phase, ReversePhase::Receiving);
+    assert_eq!(settled.receive, receiving.receive);
+    assert_eq!(h.posts("/v1/reverse/refund"), 0);
+}
+
+/// While the maker's claim is awaited the sweep home is proved ahead under
+/// the reviewed fee, once, and at the claim it is the one sent; a refund
+/// releases it unsent.
+#[tokio::test]
+async fn the_sweep_home_is_proved_while_the_claim_is_awaited() {
+    let h = authorized().await;
+    let cap = h.reverse_record(0).receive_estimate.unwrap().fee_zat;
+    h.advance_reverse().await.unwrap();
+    h.advance_reverse().await.unwrap();
+    {
+        let state = h.world.get();
+        assert_eq!((state.proved_ahead, state.ahead), (1, Some(cap)));
+    }
+    h.claimed();
+    let receiving = h.advance_reverse().await.unwrap();
+    assert_eq!(receiving.receive.unwrap().tx_id, tx_id("ahead1"));
+    {
+        let state = h.world.get();
+        assert_eq!((state.sent_ahead, state.ahead), (1, None));
+        assert_eq!(state.released_ahead, 0);
+    }
+
+    let h = authorized().await;
+    h.advance_reverse().await.unwrap();
+    assert_eq!(h.world.get().ahead, Some(cap));
+    h.world.set().pass(121);
+    let lapsed = h.advance_reverse().await.unwrap();
+    assert_eq!(lapsed.phase, ReversePhase::RefundWait);
+    h.reverse().cancel(&mut h.store(), 0).await.unwrap();
+    assert_eq!(h.posts("/v1/reverse/refund"), 1);
+    let state = h.world.get();
+    assert_eq!((state.ahead, state.released_ahead), (None, 1));
+    assert_eq!(state.sent_ahead, 0);
+}
+
+/// The loop looks again once what a conversion waits for can have come: a
+/// Zcash block for the maker's ZEC, the user's settlement, an Ethereum block
+/// for the maker's claim.
+#[tokio::test]
+async fn the_loop_naps_by_what_a_conversion_waits_for() {
+    let h = escrowed().await;
+    let report = async || h.reverse().advance_report(&mut h.store(), 0).await.unwrap();
+    let receiving = report().await;
+    assert_eq!(receiving.record.phase, ReversePhase::ReceivingZec);
+    assert_eq!(receiving.next_poll, Duration::from_secs(5));
+    h.world.set().paid_in = REVERSE_DEPOSIT_ZAT;
+    let awaiting = report().await;
+    assert_eq!(awaiting.record.phase, ReversePhase::AwaitingReady);
+    assert_eq!(awaiting.next_poll, Duration::from_secs(15));
+    h.reverse()
+        .authorize_ready(&mut h.store(), 0)
+        .await
+        .unwrap();
+    // The fake's head is a block just made: the next is due in a slot.
+    let settling = report().await;
+    assert_eq!(settling.record.phase, ReversePhase::Settling);
+    assert_eq!(settling.next_poll, Duration::from_secs(14));
 }
 
 /// The sweep home pays at most the fee the user reviewed with `ready`,

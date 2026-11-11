@@ -1666,6 +1666,12 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   alone can take the deposit only by withholding the claim until the maker
   refunds from `t1`, which the owner, who runs the relayer, accepts.
 - Only confirmed reads authorize a deposit or the end.
+- A reverse escrow's claim is swept home from its first block: `e` is
+  public once the claim is in a block, and a reorg only has the maker claim
+  again with it. The revealed share must open the joint account before the
+  record moves; once swept, the conversion stays settled and is never
+  refunded. The sweep is proved ahead from `ready`, and only signed once
+  `e` is known.
 - Never prove a second reverse funding because a response was lost. Sign
   `ready` only before `t0` (its deadline, the head plus 120 s, before it),
   keep that deadline first, and never sign or send one once a refund was

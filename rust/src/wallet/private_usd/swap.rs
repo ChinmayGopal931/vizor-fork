@@ -1,9 +1,11 @@
 //! What forward and reverse swaps share: the windows that decide when a
 //! share may be revealed, the payout fee rules, the maker's and the
-//! relayer's checks against the pins, the records in `swaps.db`, and the
-//! seams of one driver call. Each direction keeps its own state machine.
+//! relayer's checks against the pins, the records in `swaps.db`, how long
+//! the engine loop naps between steps, and the seams of one driver call.
+//! Each direction keeps its own state machine.
 
 use std::path::Path;
+use std::time::Duration;
 
 use zecswap_core::{JointAccount, SecretShare, SpendKey, SwapContext};
 
@@ -12,7 +14,7 @@ use super::deployment::{
     RELAYER_CLAIM_WAIT_SECONDS, REVEAL_MARGIN_SECONDS, SIGNATURE_TTL_SECONDS,
 };
 use super::engine::{self, MakerChecks, OpHandle};
-use super::evm_rpc::SwapStage;
+use super::evm_rpc::{Head, SwapStage, SECONDS_PER_BLOCK};
 use super::joint::{SwapTxStatus, WalletZcash};
 use super::keys::SwapKeyContext;
 use super::maker_client::MakerClient;
@@ -35,6 +37,13 @@ const MAKER_API_VERSION: u32 = 1;
 const MAX_HEAD_LAG_SECONDS: u64 = 3 * 60;
 /// The only contract kind a relayer's terms may name.
 const WINDOWS_CONTRACT_KIND: &str = "windows";
+/// The loop looks again no sooner than this, so a step that keeps answering
+/// "now" never spins.
+const LEAST_NAP: Duration = Duration::from_secs(3);
+/// A new Ethereum block shows at the node about this long after its slot.
+const BLOCK_SHOWS_AFTER_SECONDS: u64 = 2;
+/// Zcash blocks come at random: a wait on one looks this often.
+const ZCASH_NAP: Duration = Duration::from_secs(5);
 
 // ---- the windows ----
 
@@ -524,6 +533,41 @@ pub(crate) fn require_none_under_way(store: &SwapStore, account: &str) -> Result
     Ok(())
 }
 
+// ---- naps ----
+
+/// What a conversion waits for next, which sets when the loop looks again.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Wake {
+    /// A new Ethereum block: a transaction's next confirmation, the other
+    /// side's move, or a window opening.
+    EthereumBlock,
+    /// A new Zcash block: a deposit's or a sweep's next confirmation.
+    ZcashBlock,
+    /// Nothing that comes soon: the user's turn, or a window hours wide.
+    After(Duration),
+}
+
+/// How long the loop naps before it looks at a conversion waiting for
+/// `wake` again. The next Ethereum block is due one slot after `head`, the
+/// newest block the step read, and is looked for once it shows at the node;
+/// a slot already past is looked for at once, after the least nap.
+pub(crate) fn nap(wake: Wake, head: Option<&Head>, device_now: u64) -> Duration {
+    let nap = match wake {
+        Wake::ZcashBlock => ZCASH_NAP,
+        Wake::After(nap) => nap,
+        Wake::EthereumBlock => {
+            let one_slot = SECONDS_PER_BLOCK + BLOCK_SHOWS_AFTER_SECONDS;
+            let seconds = head.map_or(one_slot, |head| {
+                (head.timestamp + one_slot)
+                    .saturating_sub(device_now)
+                    .min(one_slot)
+            });
+            Duration::from_secs(seconds)
+        }
+    };
+    nap.max(LEAST_NAP)
+}
+
 // ---- one driver call ----
 
 /// A step's result as the engine loop takes it. A cancelled call stops the
@@ -600,5 +644,41 @@ impl<'s> SwapCall<'s> {
             keys: self.keys,
             cancel: op.map(OpHandle::cancel_flag).unwrap_or_default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::{nap, Wake};
+    use crate::wallet::private_usd::evm_rpc::Head;
+
+    fn head(timestamp: u64) -> Head {
+        Head {
+            number: 1,
+            timestamp,
+            hash: [0; 32],
+        }
+    }
+
+    /// A wait on Ethereum looks two seconds after the slot that follows the
+    /// newest block read, at once when that is past, and never later than a
+    /// slot on a device clock behind the chain's; one on Zcash looks every
+    /// few seconds; none looks sooner than the least nap.
+    #[test]
+    fn a_wait_looks_again_once_what_it_waits_for_can_have_come() {
+        let seconds = Duration::from_secs;
+        let now = 1_000;
+        let ethereum = |head: Option<Head>| nap(Wake::EthereumBlock, head.as_ref(), now);
+        assert_eq!(ethereum(Some(head(now))), seconds(14));
+        assert_eq!(ethereum(Some(head(now - 9))), seconds(5));
+        assert_eq!(ethereum(Some(head(now - 13))), seconds(3));
+        assert_eq!(ethereum(Some(head(now - 600))), seconds(3));
+        assert_eq!(ethereum(Some(head(now + 30))), seconds(14));
+        assert_eq!(ethereum(None), seconds(14));
+        assert_eq!(nap(Wake::ZcashBlock, None, now), seconds(5));
+        assert_eq!(nap(Wake::After(seconds(15)), None, now), seconds(15));
+        assert_eq!(nap(Wake::After(Duration::ZERO), None, now), seconds(3));
     }
 }

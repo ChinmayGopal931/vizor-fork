@@ -2738,6 +2738,45 @@ M8 status (2026-10-14): the non-device parts are done.
     how the release build gets its id is not in this tree (open, owner). The dormant path, a maker whose info
     shows no return key, is the unit-tested `maker_asks = false` case;
     on the phone it is what every build does today.
+- **D-155 (owner, 2026-11-11): a conversion waits only on what it waits
+  for.** Four changes cut a conversion's time; none changes what a step
+  authorizes, and `ready` stays the user's tap.
+  - **Naps.** Each step reports what it waits for (`swap::Wake`): an
+    Ethereum block wakes the loop 2 s after the slot that follows the
+    newest head the step read, a Zcash block every 5 s, the user (reverse
+    `AwaitingFunding`, `AwaitingReady`) every 15 s, and a forward swap
+    unwinding every 30 s; nothing naps under 3 s. Before, a reverse step
+    napped 15 s whatever it waited for, and a forward one 20 s while
+    confirming.
+  - **The claim from its first block.** Once a `ready` is out, the reverse
+    step also reads the escrow at `latest` (`ChainReader::newest_swap`),
+    and a claim there is swept home at once: `e` is public once the claim
+    is in a block, and were that block undone the maker would claim again
+    with the same `e`. The share must open the joint account before the
+    record moves to `Receiving`, and a record swept that way stays settled,
+    never refunded, while a later look does not show the claim.
+    `escrow_confirmations` is unchanged: it still guards the escrow's depth,
+    the funding and the refund decisions.
+  - **The sweep proved ahead.** In `Settling`, with the reviewed fee, each
+    step syncs the joint account and, unless one is held, builds the sweep
+    home and proves it (`SweepAhead`, held in `engine`), its notes
+    reserved; after the claim only the signatures and the send remain
+    (`send_ahead`, with no scan first). It is dropped, releasing the notes,
+    once a note arrives or the scanned height comes within 10 blocks of its
+    expiry, and on a refund, the conversion's end, the account's deletion
+    and lock. `sweep_joint` runs the same pipeline in one call, proving
+    before it signs.
+  - **Fewer round trips.** The drivers' readers check an endpoint's chain id
+    and windows contract once per session (`EvmRpc::sharing_session`,
+    cleared on lock); an escrow's `reverseFunding` and `getSwap` are one
+    Multicall3 call at the confirmed block; a reverse step reads the joint
+    account and the escrow at once, and `authorize_ready` the deposit and
+    the escrow; the forward deposit reuses the confirmed read's head; and
+    the joint sync skips its tip read once it has scanned past the
+    birthday. A quote and every advance start the proving-key warm-up.
+  - **Not done.** Connections are not reused across steps: each step's
+    runtime, and the pooled client on it, ends with the step. Over Tor each
+    request keeps its own isolated circuit.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

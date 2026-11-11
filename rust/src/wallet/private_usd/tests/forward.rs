@@ -7,6 +7,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::sync::Notify;
 
@@ -562,6 +563,25 @@ async fn no_deposit_is_built_until_the_wallet_has_scanned_to_the_tip() {
     h.world.set().synced = true;
     assert_eq!(h.advance().await.unwrap(), h.confirming());
     assert_eq!(h.deposits(), 1);
+}
+
+/// The loop looks again once what a swap waits for can have come: the main
+/// wallet's scan every few seconds, the maker's ready at the next Ethereum
+/// block.
+#[tokio::test]
+async fn the_loop_naps_by_what_a_swap_waits_for() {
+    let h = Harness::new();
+    h.accepted().await;
+    h.world.set().synced = false;
+    let report = async || h.forward().advance_report(&mut h.store(), 0).await.unwrap();
+    let syncing = report().await;
+    assert_eq!(syncing.wait, Some(ForwardWait::ZcashSyncing));
+    assert_eq!(syncing.next_poll, Duration::from_secs(5));
+    h.world.set().synced = true;
+    // The fake's head is a block just made: the next is due in a slot.
+    let confirming = report().await;
+    assert_eq!(confirming.wait, Some(ForwardWait::Confirming));
+    assert_eq!(confirming.next_poll, Duration::from_secs(14));
 }
 
 #[tokio::test]

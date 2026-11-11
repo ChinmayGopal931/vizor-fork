@@ -57,7 +57,7 @@ use super::relayer_client::RelayerClient;
 use super::store::SwapStore;
 use super::swap::{
     self, find, load, payout_after_fees, pinned_relayer_terms, quote_error, require_payout_fee,
-    require_pays_out, save, serves, update, ClaimWindow, PostError, SwapCall, WindowView,
+    require_pays_out, save, serves, update, ClaimWindow, PostError, SwapCall, Wake, WindowView,
 };
 use super::tokens::{self, AcceptError, Payment, TokenStore};
 use super::transport::{HttpTransport, Refusal, SwapErrorCode, SwapHttpError};
@@ -70,6 +70,8 @@ const OPEN_GRACE_SECONDS: u64 = 5 * 60;
 /// `caught_up` polls a confirmed read this often, this many times.
 const CATCH_UP_POLLS: u32 = 30;
 const CATCH_UP_INTERVAL: Duration = Duration::from_secs(2);
+/// How long the engine loop naps while a swap unwinds.
+const UNWINDING_NAP: Duration = Duration::from_secs(30);
 
 /// Why a forward swap waits, with nothing for the user to do.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -111,15 +113,17 @@ fn waiting(wait: ForwardWait) -> ForwardStep {
     }
 }
 
-/// How long the engine loop naps after a wait.
-pub(crate) fn nap(wait: ForwardWait) -> Duration {
+/// What a swap waiting with `wait` waits for.
+fn wake(wait: ForwardWait) -> Wake {
     match wait {
-        ForwardWait::Opening => Duration::from_secs(5),
-        ForwardWait::Confirming => Duration::from_secs(20),
-        ForwardWait::DepositUnsettled | ForwardWait::Refunding | ForwardWait::Unwinding => {
-            Duration::from_secs(30)
+        // The maker's open or ready, or a window, on Ethereum.
+        ForwardWait::Opening | ForwardWait::Confirming => Wake::EthereumBlock,
+        // The deposit or the sweep home, or the main wallet's scan.
+        ForwardWait::DepositUnsettled | ForwardWait::Refunding | ForwardWait::ZcashSyncing => {
+            Wake::ZcashBlock
         }
-        ForwardWait::ZcashSyncing => engine::RETRY_DELAY,
+        // The maker's refund, any time in a window hours wide.
+        ForwardWait::Unwinding => Wake::After(UNWINDING_NAP),
     }
 }
 
@@ -649,7 +653,11 @@ where
             Ok(ForwardStep::Waiting { wait, .. }) => AdvanceReport {
                 record,
                 wait: Some(wait),
-                next_poll: nap(wait),
+                next_poll: swap::nap(
+                    wake(wait),
+                    self.chain.newest_head().as_ref(),
+                    self.clock.now(),
+                ),
                 problem: None,
             },
             Err(problem) => AdvanceReport {
@@ -706,7 +714,10 @@ where
         };
         match confirmed.swap {
             None => self.not_on_chain(store, record, true).await,
-            Some(swap) => self.on_chain(store, record, terms, &swap).await,
+            Some(swap) => {
+                self.on_chain(store, record, terms, &swap, confirmed.head.timestamp)
+                    .await
+            }
         }
     }
 
@@ -740,12 +751,14 @@ where
         }
     }
 
+    /// `chain_now` is the time of the newest block the swap was read against.
     async fn on_chain(
         &self,
         store: &mut SwapStore,
         record: &ForwardRecord,
         terms: &Terms,
         swap: &SwapState,
+        chain_now: u64,
     ) -> Result<ForwardStep> {
         match swap.stage {
             SwapStage::Refunded => self.refunded(store, record, terms, swap).await,
@@ -763,7 +776,7 @@ where
                 engine::check_cancelled(self.op)?;
                 self.claim(store, record, terms).await
             }
-            SwapStage::Open => self.open(store, record, terms).await,
+            SwapStage::Open => self.open(store, record, terms, chain_now).await,
         }
     }
 
@@ -772,8 +785,9 @@ where
         store: &mut SwapStore,
         record: &ForwardRecord,
         terms: &Terms,
+        chain_now: u64,
     ) -> Result<ForwardStep> {
-        match self.ensure_paid(store, record, terms).await? {
+        match self.ensure_paid(store, record, terms, chain_now).await? {
             Deposit::Unpayable(cause) => self.finish(
                 store,
                 record,
@@ -791,20 +805,20 @@ where
     // ---- the deposit ----
 
     /// Sends the deposit again until it is mined; pays anew only once the
-    /// last is proven expired, and in time for t0. A deposit is never paid
-    /// twice.
+    /// last is proven expired, and in time for t0 by the chain's time
+    /// `chain_now`. A deposit is never paid twice.
     async fn ensure_paid(
         &self,
         store: &mut SwapStore,
         record: &ForwardRecord,
         terms: &Terms,
+        chain_now: u64,
     ) -> Result<Deposit> {
         // From the maker share the contract confirmed, never the API's alone.
         let address = self
             .keys
             .joint(record.index, &terms.maker_share)?
             .unified_address(self.zcash_network());
-        let chain_now = self.chain.head().await?.timestamp;
         let unpayable = unpayable(self.pins, terms, chain_now)?;
         let mut current = self.with_found(store, record, &address).await?;
 
@@ -1748,7 +1762,7 @@ impl SwapCall<'_> {
         step: impl AsyncFnOnce(&WalletForward<'_>, &mut SwapStore) -> Result<R>,
     ) -> Result<R> {
         let transport = swap::transport(op);
-        let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url)?;
+        let chain = EvmRpc::new(&transport, self.pins(), self.eth_rpc_url)?.sharing_session();
         let zcash = self.zcash(op);
         let tokens = self.tokens();
         let forward = Forward::new(
@@ -1783,7 +1797,8 @@ pub(crate) async fn run_view<R>(
         return Ok(None);
     };
     let transport = RoutedHttp::new();
-    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url)?;
+    let chain =
+        EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url)?.sharing_session();
     let view = ForwardView::new(network, account, &chain, &transport);
     step(&view, &store).await.map(Some)
 }
@@ -1798,7 +1813,8 @@ pub(crate) async fn abandon_with(
     index: u32,
 ) -> Result<ForwardRecord> {
     let transport = RoutedHttp::new();
-    let chain = EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url)?;
+    let chain =
+        EvmRpc::new(&transport, deployment::deployment(network), eth_rpc_url)?.sharing_session();
     let mut store = SwapStore::open(store_dir)?;
     abandon(&mut store, &chain, &SystemClock, account, index).await
 }

@@ -193,6 +193,11 @@ pub(super) struct State {
     /// Runs before each reverse escrow read, with its number (1, 2, …).
     pub on_reverse_read: Option<Box<dyn FnMut(&mut State, u32)>>,
     pub reverse_reads: u32,
+    /// The stage a confirmed read shows of the escrow instead, its share
+    /// unrevealed, while the newest blocks are too new to be confirmed.
+    pub confirmed_escrow: Option<SwapStage>,
+    /// Reads of the swap at the newest block.
+    pub newest_reads: u32,
 
     // The maker.
     /// The amount every quote names, in token base units.
@@ -308,6 +313,12 @@ pub(super) struct State {
     pub sweep_pays: u64,
     /// The fee cap each reverse sweep home was asked under.
     pub receive_caps: Vec<Option<u64>>,
+    /// Reverse sweeps proved ahead of their claims, the fee cap of the one
+    /// held now, how many were released unsent, and how many were sent.
+    pub proved_ahead: u32,
+    pub ahead: Option<u64>,
+    pub released_ahead: u32,
+    pub sent_ahead: u32,
     pub imports: u32,
     /// Proofs the Railgun page made.
     pub proofs: u32,
@@ -361,6 +372,8 @@ impl State {
             rescue_nonce: 0,
             on_reverse_read: None,
             reverse_reads: 0,
+            confirmed_escrow: None,
+            newest_reads: 0,
             amount: AMOUNT,
             quote_expires_at: NOW + 300,
             quote_requests: Vec::new(),
@@ -425,6 +438,10 @@ impl State {
             sweep_fee: 10_000,
             sweep_pays: 10_000,
             receive_caps: Vec::new(),
+            proved_ahead: 0,
+            ahead: None,
+            released_ahead: 0,
+            sent_ahead: 0,
             imports: 0,
             proofs: 0,
         }
@@ -546,8 +563,19 @@ impl ChainReader for FakeChain {
         Ok(self.0.get().head())
     }
 
+    fn newest_head(&self) -> Option<Head> {
+        Some(self.0.get().head())
+    }
+
     async fn swap(&self, id: &[u8; 32]) -> Result<Option<SwapState>> {
         Ok(self.0.get().swap_at_tip(id))
+    }
+
+    /// The swap, or the reverse escrow, at the tip.
+    async fn newest_swap(&self, id: &[u8; 32], terms: &Terms) -> Result<Option<SwapState>> {
+        self.0.set().newest_reads += 1;
+        let state = self.0.get();
+        verified(state.swap_at_tip(id).or_else(|| state.escrow_at(id)), terms)
     }
 
     async fn confirmed_swap(&self, id: &[u8; 32], terms: &Terms) -> Result<ConfirmedSwap> {
@@ -632,7 +660,13 @@ impl ChainReader for FakeChain {
             self.0.set().on_reverse_read = Some(hook);
         }
         let state = self.0.get();
-        let swap = state.escrow_at(id);
+        let swap = state.escrow_at(id).map(|mut swap| {
+            if let Some(stage) = state.confirmed_escrow {
+                swap.stage = stage;
+                swap.secret = [0; 32];
+            }
+            swap
+        });
         if swap
             .as_ref()
             .is_some_and(|swap| swap.terms_hash != terms.hash())
@@ -1338,8 +1372,39 @@ impl ReverseZcash for FakeZcash {
         })
     }
 
-    /// Refuses, as the wallet's proposal does, a sweep whose fee is above
-    /// its cap.
+    /// Proved once every note is spendable, as the wallet's is; one held
+    /// under the same cap stays.
+    async fn prove_receive_ahead(
+        &self,
+        _index: u32,
+        _joint: &JointAccount,
+        _birthday: u64,
+        max_fee_zatoshi: u64,
+    ) -> Result<()> {
+        let mut state = self.0.set();
+        if state.ahead == Some(max_fee_zatoshi) {
+            return Ok(());
+        }
+        if state.ahead.take().is_some() {
+            state.released_ahead += 1;
+        }
+        if state.spendable {
+            state.proved_ahead += 1;
+            state.ahead = Some(max_fee_zatoshi);
+        }
+        Ok(())
+    }
+
+    fn release_receive_ahead(&self, _index: u32) {
+        let mut state = self.0.set();
+        if state.ahead.take().is_some() {
+            state.released_ahead += 1;
+        }
+    }
+
+    /// Sends the sweep proved ahead under the same cap (`ahead{n}`), else
+    /// builds one (`receive{n}`). Refuses, as the wallet's proposal does, a
+    /// sweep whose fee is above its cap.
     async fn prepare_receive(
         &self,
         _index: u32,
@@ -1350,6 +1415,22 @@ impl ReverseZcash for FakeZcash {
     ) -> Result<Option<ReverseReceiveTransaction>> {
         let mut state = self.0.set();
         state.receive_caps.push(max_fee_zatoshi);
+        let ahead = state.ahead.take();
+        if ahead.is_some() && ahead == max_fee_zatoshi {
+            state.sent_ahead += 1;
+            let fee = state.sweep_pays;
+            let built = transaction(&format!("ahead{}", state.sent_ahead));
+            return Ok(Some(ReverseReceiveTransaction {
+                tx_id: built.tx_id,
+                raw: built.raw,
+                expiry_height: built.expiry_height,
+                received_zat: state.paid_in - fee,
+                fee_zat: fee,
+            }));
+        }
+        if ahead.is_some() {
+            state.released_ahead += 1;
+        }
         if !state.spendable {
             return Ok(None);
         }
@@ -1382,7 +1463,8 @@ impl ReverseZcash for FakeZcash {
         Ok(())
     }
 
-    async fn forget(&self, _index: u32) -> Result<()> {
+    async fn forget(&self, index: u32) -> Result<()> {
+        self.release_receive_ahead(index);
         self.0.set().forgotten += 1;
         Ok(())
     }

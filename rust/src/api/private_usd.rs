@@ -754,6 +754,7 @@ pub fn private_usd_forward_quote(
     units: u32,
 ) -> Result<ApiForwardQuote, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
+    warm_proving_keys();
     catch(panic::AssertUnwindSafe(|| {
         let quoted = drive(
             &db_path,
@@ -846,6 +847,7 @@ pub fn private_usd_forward_advance(
     index: u32,
 ) -> Result<ApiForwardAdvance, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
+    warm_proving_keys();
     catch(panic::AssertUnwindSafe(|| {
         drive(
             &db_path,
@@ -1140,6 +1142,7 @@ pub fn private_usd_reverse_quote(
     unshield_basis_points: u32,
 ) -> Result<ApiReverseQuote, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
+    warm_proving_keys();
     catch(panic::AssertUnwindSafe(|| {
         drive(
             &db_path,
@@ -1396,6 +1399,7 @@ pub fn private_usd_reverse_advance(
     index: u32,
 ) -> Result<ApiReverseAdvance, ApiPrivateUsdError> {
     let secret = Zeroizing::new(mnemonic_bytes);
+    warm_proving_keys();
     catch(panic::AssertUnwindSafe(|| {
         drive(
             &db_path,
@@ -2415,6 +2419,13 @@ fn drive<T>(
         keys: &keys,
     };
     block_on(step(&call, op.as_ref()))
+}
+
+/// Starts building the proving keys a swap's deposit and sweep home prove
+/// with, in the background and once per process: a swap's proof then never
+/// waits on them.
+fn warm_proving_keys() {
+    crate::wallet::sync::start_orchard_proving_key_warmup();
 }
 
 /// Runs an engine future on a runtime of its own. Never call it from async

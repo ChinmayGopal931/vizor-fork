@@ -5,9 +5,11 @@
 //! The joint account is the Orchard-only account whose spend authorizing key
 //! is split: the maker holds `e`, the user holds `z`. The wallet imports it by
 //! its viewing key, scans it, and sweeps it home with the combined key
-//! `±(e+z)` once it knows both halves. `joint.db` is a librustzcash wallet of
-//! its own, so joint accounts never appear in the main wallet's account list,
-//! sync status, voting or migration.
+//! `±(e+z)` once it knows both halves. A reverse swap's sweep can be built
+//! and proved before then ([`SweepAhead`]): only the key's signatures and the
+//! send wait for `e`. `joint.db` is a librustzcash wallet of its own, so
+//! joint accounts never appear in the main wallet's account list, sync
+//! status, voting or migration.
 //!
 //! The local writes here (import, delete) run under `with_operations`, never
 //! across network I/O; librustzcash writes also take the process-wide wallet
@@ -25,6 +27,7 @@ use zcash_primitives::transaction::{fees::zip317, TxId};
 use zcash_protocol::consensus::{BlockHeight, Parameters};
 use zecswap_core::{JointAccount, SpendKey, SweepIntent};
 
+use super::engine;
 use super::forward::ForwardZcash;
 use super::keys::SwapKeyContext;
 use super::models::{
@@ -52,6 +55,9 @@ const JOINT_ACCOUNT_NAME: &str = "Private USD joint";
 const JOINT_KEY_SOURCE: &str = "vizor-private-usd-joint";
 /// A forward refund's sweep pays at most 64 ZIP 317 marginal fees.
 const MAX_SWEEP_FEE_ACTIONS: u64 = 64;
+/// A sweep proved ahead is built again once the scanned chain is this close
+/// to its expiry.
+const AHEAD_EXPIRY_MARGIN_BLOCKS: u32 = 10;
 
 fn wallet_error(message: impl Into<String>) -> PrivateUsdError {
     PrivateUsdError::new(ErrorCode::ZcashWallet, message)
@@ -179,7 +185,7 @@ impl Drop for ScanClaim {
 /// A `joint.db` whose accounts are all born above the tip has nothing to scan
 /// yet, and the claim scan's completion checks would fail on it: no block is
 /// stored at the tip. This returns at once until the chain reaches the
-/// birthday.
+/// birthday; once it has scanned past it, the tip is not asked for that.
 pub(crate) async fn sync_joint_db(
     joint_db: &str,
     lightwalletd_url: &str,
@@ -188,15 +194,34 @@ pub(crate) async fn sync_joint_db(
 ) -> Result<()> {
     let _scan = ScanClaim::take(joint_db)?;
     keys::ensure_db_migrated_once(joint_db, network).map_err(wallet_error)?;
-    let birthday = sync::open_wallet_db_for_read(joint_db, network)
-        .map_err(wallet_error)?
+    let wallet = sync::open_wallet_db_for_read(joint_db, network).map_err(wallet_error)?;
+    let birthday = wallet
         .get_wallet_birthday()
         .map_err(|error| wallet_error(error.to_string()))?;
     let Some(birthday) = birthday else {
         return Ok(());
     };
-    // A fresh tip, never the transaction tip cache: a tip cached up to 15 s
-    // earlier would skip the scan of the very block that reaches the birthday.
+    let reached =
+        fully_scanned_height(&wallet)?.is_some_and(|scanned| scanned >= u32::from(birthday));
+    drop(wallet);
+    if !reached
+        && u64::from(u32::from(birthday)) > fresh_tip(lightwalletd_url, network, &cancel).await?
+    {
+        return Ok(());
+    }
+    sync_engine::run_payment_link_claim_sync(joint_db, lightwalletd_url, network, cancel, true)
+        .await
+        .map_err(wallet_error)
+}
+
+/// The chain's height now, never the transaction tip cache: a tip cached up
+/// to 15 s earlier would skip the scan of the very block that reaches a
+/// birthday.
+async fn fresh_tip(
+    lightwalletd_url: &str,
+    network: WalletNetwork,
+    cancel: &AtomicBool,
+) -> Result<u64> {
     let mut client = sync_engine::open_lwd_channel_with_cancel(lightwalletd_url, || {
         cancel.load(Ordering::Relaxed)
     })
@@ -205,13 +230,7 @@ pub(crate) async fn sync_joint_db(
     let tip = sync_engine::get_latest_block_recorded(&mut client, lightwalletd_url, network)
         .await
         .map_err(|error| wallet_error(format!("read the chain tip: {error}")))?;
-    drop(client);
-    if u64::from(u32::from(birthday)) > tip.height {
-        return Ok(());
-    }
-    sync_engine::run_payment_link_claim_sync(joint_db, lightwalletd_url, network, cancel, true)
-        .await
-        .map_err(wallet_error)
+    Ok(tip.height)
 }
 
 /// What a joint account has received, and what a sweep could spend now.
@@ -333,9 +352,9 @@ pub(crate) struct JointSweep {
 }
 
 /// Sweeps everything in a joint account to `home_ua` with the combined key
-/// `key` (`±(e+z)`): propose, create the PCZT, sign the unredacted base
-/// against a `SweepIntent`, extract the compact signatures, prove, then
-/// broadcast and store through the hardware completion path.
+/// `key` (`±(e+z)`): propose, create the PCZT and prove it, sign the
+/// unredacted base against a `SweepIntent` and extract the compact
+/// signatures, then broadcast and store through the hardware completion path.
 ///
 /// - The sweep discards its OVK, pays `home_ua` the whole balance less the
 ///   fee, and pays at most `max_fee_zatoshi`.
@@ -353,6 +372,53 @@ pub(crate) async fn sweep_joint(
     max_fee_zatoshi: u64,
     key: &SpendKey,
 ) -> Result<JointSweep> {
+    let reserved = reserve_sweep(
+        joint_db,
+        network,
+        joint_uuid,
+        send_flow_id,
+        home_ua,
+        max_fee_zatoshi,
+    )?;
+    let proved = prove_sweep(joint_db, lightwalletd_url, network, &reserved).await?;
+    send_sweep(
+        joint_db,
+        lightwalletd_url,
+        network,
+        home_ua,
+        max_fee_zatoshi,
+        key,
+        &reserved,
+        &proved,
+    )
+    .await
+}
+
+/// A joint sweep's proposal: its notes stay reserved for it until it is sent,
+/// or dropped, which releases them (never once its broadcast began).
+struct ReservedSweep {
+    proposal: SwapProposal,
+    send_flow_id: String,
+}
+
+impl Drop for ReservedSweep {
+    fn drop(&mut self) {
+        if let Err(error) = sync::discard_proposal(self.proposal.proposal_id, &self.send_flow_id) {
+            log::warn!("private usd: releasing a joint sweep proposal failed: {error}");
+        }
+    }
+}
+
+/// Proposes sweeping everything in a joint account to `home_ua`, at most
+/// `max_fee_zatoshi`, and reserves its notes for it.
+fn reserve_sweep(
+    joint_db: &str,
+    network: WalletNetwork,
+    joint_uuid: &str,
+    send_flow_id: &str,
+    home_ua: &str,
+    max_fee_zatoshi: u64,
+) -> Result<ReservedSweep> {
     // The signer pays only a unified address's Orchard receiver on this
     // network: refuse anything else before proposing.
     SweepIntent::recipient(home_ua, network.network_type())
@@ -366,45 +432,67 @@ pub(crate) async fn sweep_joint(
         max_fee_zatoshi,
     )
     .map_err(wallet_error)?;
-    let swept = sweep_proposal(
-        joint_db,
-        lightwalletd_url,
-        network,
-        send_flow_id,
-        home_ua,
-        max_fee_zatoshi,
-        key,
-        &proposal,
-    )
-    .await;
-    if let Err(error) = sync::discard_proposal(proposal.proposal_id, send_flow_id) {
-        log::warn!("private usd: releasing a joint sweep proposal failed: {error}");
-    }
-    swept
+    Ok(ReservedSweep {
+        proposal,
+        send_flow_id: send_flow_id.to_owned(),
+    })
 }
 
-async fn sweep_proposal(
+/// A sweep before its signatures: the PCZT the combined key signs, the same
+/// with its proofs, and its txid and expiry. Nothing in it spends without
+/// the key.
+struct ProvedSweep {
+    base: Vec<u8>,
+    proofs: Vec<u8>,
+    txid: TxId,
+    expiry_height: u32,
+}
+
+/// Creates a reserved sweep's PCZT and proves it, which no key needs.
+async fn prove_sweep(
     joint_db: &str,
     lightwalletd_url: &str,
     network: WalletNetwork,
-    send_flow_id: &str,
-    home_ua: &str,
-    max_fee_zatoshi: u64,
-    key: &SpendKey,
-    proposal: &SwapProposal,
-) -> Result<JointSweep> {
+    reserved: &ReservedSweep,
+) -> Result<ProvedSweep> {
     let base = sync::create_pczt_from_proposal(
         joint_db,
         lightwalletd_url,
         network,
-        proposal.proposal_id,
-        send_flow_id,
+        reserved.proposal.proposal_id,
+        &reserved.send_flow_id,
     )
     .await
     .map_err(wallet_error)?;
     let txid = sync::txid_from_io_finalized_pczt(&base).map_err(wallet_error)?;
     let expiry_height = sync::expiry_height_from_io_finalized_pczt(&base).map_err(wallet_error)?;
+    let unproved = base.clone();
+    let proofs =
+        tokio::task::spawn_blocking(move || sync::add_proofs_to_pczt(&unproved, None, None))
+            .await
+            .map_err(|error| wallet_error(format!("proving the sweep stopped: {error}")))?
+            .map_err(wallet_error)?;
+    Ok(ProvedSweep {
+        base,
+        proofs,
+        txid,
+        expiry_height,
+    })
+}
 
+/// Signs a proved sweep with the combined `key`, then broadcasts and stores
+/// it through the hardware completion path.
+async fn send_sweep(
+    joint_db: &str,
+    lightwalletd_url: &str,
+    network: WalletNetwork,
+    home_ua: &str,
+    max_fee_zatoshi: u64,
+    key: &SpendKey,
+    reserved: &ReservedSweep,
+    proved: &ProvedSweep,
+) -> Result<JointSweep> {
+    let (proposal, proofs, txid) = (&reserved.proposal, &proved.proofs, proved.txid);
     // The signer checks the intent against the base's note values and
     // randomness, which the redacted signer view leaves out.
     let intent = SweepIntent::from_address(
@@ -414,13 +502,9 @@ async fn sweep_proposal(
         max_fee_zatoshi,
     )
     .map_err(|error| PrivateUsdError::new(ErrorCode::Mismatch, error.to_string()))?;
-    let signed = zecswap_core::sign_pczt_bytes(&base, std::slice::from_ref(key), &intent)
+    let signed = zecswap_core::sign_pczt_bytes(&proved.base, std::slice::from_ref(key), &intent)
         .map_err(|error| PrivateUsdError::new(ErrorCode::Mismatch, error.to_string()))?;
-    let signatures = sync::extract_required_compact_sigs_from_signed_pczt(&base, &signed)
-        .map_err(wallet_error)?;
-    let proofs = tokio::task::spawn_blocking(move || sync::add_proofs_to_pczt(&base, None, None))
-        .await
-        .map_err(|error| wallet_error(format!("proving the sweep stopped: {error}")))?
+    let signatures = sync::extract_required_compact_sigs_from_signed_pczt(&proved.base, &signed)
         .map_err(wallet_error)?;
 
     let result = sync::store_and_broadcast_pczts_with_compact_signatures_for_proposal(
@@ -428,8 +512,8 @@ async fn sweep_proposal(
         lightwalletd_url,
         network,
         proposal.proposal_id,
-        send_flow_id,
-        std::slice::from_ref(&proofs),
+        &reserved.send_flow_id,
+        std::slice::from_ref(proofs),
         std::slice::from_ref(&signatures),
         None,
         None,
@@ -454,8 +538,8 @@ async fn sweep_proposal(
     let raw = match stored_raw(joint_db, &txid) {
         Ok(Some(raw)) => raw,
         Ok(None) | Err(_) => {
-            let extracted = sync::apply_sigs_and_extract(&proofs, &signatures, None, None)
-                .map_err(|error| {
+            let extracted =
+                sync::apply_sigs_and_extract(proofs, &signatures, None, None).map_err(|error| {
                     wallet_error(format!(
                         "the sweep {txid} may be on the network, but its bytes are lost: {error}"
                     ))
@@ -473,7 +557,7 @@ async fn sweep_proposal(
         transaction: CreatedTransaction {
             txid,
             raw,
-            expiry_height,
+            expiry_height: proved.expiry_height,
         },
         amount_zatoshi: proposal.amount_zatoshi,
         fee_zatoshi: proposal.fee_zatoshi,
@@ -739,6 +823,49 @@ pub(crate) struct SweptHome {
     pub fee_zatoshi: Option<u64>,
 }
 
+/// A reverse swap's sweep home, built and proved before the maker's claim
+/// reveals `e`: once it does, only the combined key's signatures and the send
+/// remain. Its notes stay reserved for it; dropping it releases them.
+pub(crate) struct SweepAhead {
+    reserved: ReservedSweep,
+    proved: ProvedSweep,
+    joint_db: String,
+    network: WalletNetwork,
+    joint_uuid: String,
+    /// The joint account's viewing key, which names the swap's account.
+    ufvk: String,
+    home_ua: String,
+    /// The fee cap it was built under, and the limit the sweep pays.
+    fee_cap: u64,
+    fee_limit: u64,
+    /// All the joint account had received when it was built: a note that
+    /// came since would be left behind.
+    received_zatoshi: u64,
+}
+
+impl SweepAhead {
+    /// Whether it still sweeps everything `receipts` show its joint account
+    /// received, under `fee_cap`, with its expiry well past the scanned
+    /// height.
+    fn sweeps(
+        &self,
+        joint_db: &str,
+        network: WalletNetwork,
+        ufvk: &str,
+        fee_cap: Option<u64>,
+        receipts: &JointReceipts,
+    ) -> bool {
+        self.joint_db == joint_db
+            && self.network == network
+            && self.ufvk == ufvk
+            && fee_cap == Some(self.fee_cap)
+            && receipts.received_zatoshi == self.received_zatoshi
+            && receipts.fully_scanned_height.is_some_and(|scanned| {
+                scanned.saturating_add(AHEAD_EXPIRY_MARGIN_BLOCKS) < self.proved.expiry_height
+            })
+    }
+}
+
 impl WalletZcash<'_> {
     fn joint_db(&self) -> String {
         joint_db_path(self.store_dir)
@@ -846,28 +973,13 @@ impl WalletZcash<'_> {
                 fee_zatoshi,
             }));
         }
-        let receipts = joint_receipts(
-            &joint_db,
-            self.network,
-            &joint_uuid,
-            crate::wallet::JOINT_SWEEP_CONFIRMATIONS,
-        )?;
+        let receipts = sweep_receipts(&joint_db, self.network, &joint_uuid)?;
         // The whole balance at once, so no note is left behind.
         if receipts.spendable_zatoshi == 0 || receipts.pending_zatoshi > 0 {
             return Ok(None);
         }
-        let marginal_fee = sweep_marginal_fee(&joint_db, self.network)?;
-        let fee_limit = max_fee_zatoshi
-            .unwrap_or(MAX_SWEEP_FEE_ACTIONS * marginal_fee)
-            .min(receipts.spendable_zatoshi - 1);
-        if fee_limit < marginal_fee * zip317::GRACE_ACTIONS as u64 {
-            return fail(
-                ErrorCode::ZcashWallet,
-                "the joint account does not cover a sweep's fee",
-            );
-        }
-        let home = keys::get_address_from_db(self.main_db, self.network, Some(self.account_uuid))
-            .map_err(wallet_error)?;
+        let fee_limit = sweep_fee_limit(&joint_db, self.network, max_fee_zatoshi, &receipts)?;
+        let home = self.home()?;
         let swept = sweep_joint(
             &joint_db,
             self.lightwalletd_url,
@@ -879,11 +991,49 @@ impl WalletZcash<'_> {
             key,
         )
         .await?;
-        Ok(Some(SweptHome {
-            transaction: swept.transaction,
-            amount_zatoshi: swept.amount_zatoshi,
-            fee_zatoshi: Some(swept.fee_zatoshi),
-        }))
+        Ok(Some(swept.into()))
+    }
+
+    fn home(&self) -> Result<String> {
+        keys::get_address_from_db(self.main_db, self.network, Some(self.account_uuid))
+            .map_err(wallet_error)
+    }
+
+    /// The sweep proved ahead for reverse swap `index`, signed with `key` and
+    /// sent, while it still sweeps everything under `fee_cap` as `joint.db`
+    /// stands: no scan comes first, so the sweep waits on nothing else once
+    /// the claim is seen. `None` when none is held, or the held one no longer
+    /// does, which releases it.
+    async fn send_ahead(
+        &self,
+        index: u32,
+        joint: &JointAccount,
+        key: &SpendKey,
+        fee_cap: Option<u64>,
+    ) -> Result<Option<SweptHome>> {
+        let Some(ahead) = engine::take_sweep_ahead(self.account_uuid, index) else {
+            return Ok(None);
+        };
+        let joint_db = self.joint_db();
+        let ufvk = joint.ufvk(self.network.network_type());
+        let receipts = sweep_receipts(&joint_db, self.network, &ahead.joint_uuid)?;
+        if !ahead.sweeps(&joint_db, self.network, &ufvk, fee_cap, &receipts)
+            || find_sent(&joint_db, self.network, &ahead.joint_uuid, None)?.is_some()
+        {
+            return Ok(None);
+        }
+        let swept = send_sweep(
+            &joint_db,
+            self.lightwalletd_url,
+            self.network,
+            &ahead.home_ua,
+            ahead.fee_limit,
+            key,
+            &ahead.reserved,
+            &ahead.proved,
+        )
+        .await?;
+        Ok(Some(swept.into()))
     }
 
     /// Sends a kept transaction once more.
@@ -1104,6 +1254,73 @@ impl ReverseZcash for WalletZcash<'_> {
         })
     }
 
+    async fn prove_receive_ahead(
+        &self,
+        index: u32,
+        joint: &JointAccount,
+        birthday: u64,
+        max_fee_zatoshi: u64,
+    ) -> Result<()> {
+        let session = engine::session();
+        let joint_uuid = self
+            .synced_joint(Direction::Reverse, index, joint, birthday)
+            .await?;
+        let joint_db = self.joint_db();
+        let ufvk = joint.ufvk(self.network.network_type());
+        if let Some(held) = engine::take_sweep_ahead(self.account_uuid, index) {
+            let receipts = sweep_receipts(&joint_db, self.network, &joint_uuid)?;
+            if held.sweeps(
+                &joint_db,
+                self.network,
+                &ufvk,
+                Some(max_fee_zatoshi),
+                &receipts,
+            ) {
+                engine::hold_sweep_ahead(self.account_uuid, index, held, session);
+                return Ok(());
+            }
+        }
+        // Read once a stale sweep released its notes. Built as `sweep_home`
+        // builds one: never beside an earlier sweep, and only once every note
+        // is spendable.
+        let receipts = sweep_receipts(&joint_db, self.network, &joint_uuid)?;
+        if find_sent(&joint_db, self.network, &joint_uuid, None)?.is_some()
+            || receipts.spendable_zatoshi == 0
+            || receipts.pending_zatoshi > 0
+        {
+            return Ok(());
+        }
+        let fee_limit = sweep_fee_limit(&joint_db, self.network, Some(max_fee_zatoshi), &receipts)?;
+        let home_ua = self.home()?;
+        let reserved = reserve_sweep(
+            &joint_db,
+            self.network,
+            &joint_uuid,
+            &receive_flow(self.account_uuid, index),
+            &home_ua,
+            fee_limit,
+        )?;
+        let proved = prove_sweep(&joint_db, self.lightwalletd_url, self.network, &reserved).await?;
+        let ahead = SweepAhead {
+            reserved,
+            proved,
+            joint_db,
+            network: self.network,
+            joint_uuid,
+            ufvk,
+            home_ua,
+            fee_cap: max_fee_zatoshi,
+            fee_limit,
+            received_zatoshi: receipts.received_zatoshi,
+        };
+        engine::hold_sweep_ahead(self.account_uuid, index, ahead, session);
+        Ok(())
+    }
+
+    fn release_receive_ahead(&self, index: u32) {
+        drop(engine::take_sweep_ahead(self.account_uuid, index));
+    }
+
     async fn prepare_receive(
         &self,
         index: u32,
@@ -1112,20 +1329,26 @@ impl ReverseZcash for WalletZcash<'_> {
         birthday: u64,
         max_fee_zatoshi: Option<u64>,
     ) -> Result<Option<ReverseReceiveTransaction>> {
-        let send_flow_id = format!("private-usd-receive:{}:{index}", self.account_uuid);
-        let Some(swept) = self
-            .sweep_home(
-                Direction::Reverse,
-                index,
-                joint,
-                key,
-                birthday,
-                max_fee_zatoshi,
-                &send_flow_id,
-            )
-            .await?
-        else {
-            return Ok(None);
+        let ahead = self.send_ahead(index, joint, key, max_fee_zatoshi).await?;
+        let swept = match ahead {
+            Some(swept) => swept,
+            None => {
+                let swept = self
+                    .sweep_home(
+                        Direction::Reverse,
+                        index,
+                        joint,
+                        key,
+                        birthday,
+                        max_fee_zatoshi,
+                        &receive_flow(self.account_uuid, index),
+                    )
+                    .await?;
+                let Some(swept) = swept else {
+                    return Ok(None);
+                };
+                swept
+            }
         };
         let kept = kept_transaction(&swept.transaction)?;
         Ok(Some(ReverseReceiveTransaction {
@@ -1153,8 +1376,60 @@ impl ReverseZcash for WalletZcash<'_> {
     }
 
     async fn forget(&self, index: u32) -> Result<()> {
+        self.release_receive_ahead(index);
         self.forget_joint(Direction::Reverse, index)
     }
+}
+
+impl From<JointSweep> for SweptHome {
+    fn from(swept: JointSweep) -> Self {
+        Self {
+            transaction: swept.transaction,
+            amount_zatoshi: swept.amount_zatoshi,
+            fee_zatoshi: Some(swept.fee_zatoshi),
+        }
+    }
+}
+
+/// The send flow a reverse swap's sweep home is proposed under.
+fn receive_flow(account_uuid: &str, index: u32) -> String {
+    format!("private-usd-receive:{account_uuid}:{index}")
+}
+
+/// A joint account's receipts under the sweep's confirmation policy.
+fn sweep_receipts(
+    joint_db: &str,
+    network: WalletNetwork,
+    joint_uuid: &str,
+) -> Result<JointReceipts> {
+    joint_receipts(
+        joint_db,
+        network,
+        joint_uuid,
+        crate::wallet::JOINT_SWEEP_CONFIRMATIONS,
+    )
+}
+
+/// The most a sweep of a joint account holding `receipts` (some of it
+/// spendable) may pay: `max_fee_zatoshi`, or a forward refund's default, and
+/// never all of it. `ZcashWallet` when that is under ZIP 317's least fee.
+fn sweep_fee_limit(
+    joint_db: &str,
+    network: WalletNetwork,
+    max_fee_zatoshi: Option<u64>,
+    receipts: &JointReceipts,
+) -> Result<u64> {
+    let marginal_fee = sweep_marginal_fee(joint_db, network)?;
+    let fee_limit = max_fee_zatoshi
+        .unwrap_or(MAX_SWEEP_FEE_ACTIONS * marginal_fee)
+        .min(receipts.spendable_zatoshi - 1);
+    if fee_limit < marginal_fee * zip317::GRACE_ACTIONS as u64 {
+        return fail(
+            ErrorCode::ZcashWallet,
+            "the joint account does not cover a sweep's fee",
+        );
+    }
+    Ok(fee_limit)
 }
 
 /// ZIP 317's marginal fee at the target a sweep from `joint_db` is built
@@ -1208,4 +1483,122 @@ pub(crate) fn internal_txid(tx_id: &ZcashTxId) -> Result<TxId> {
     })?;
     bytes.reverse();
     Ok(TxId::from_bytes(bytes))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const NETWORK: WalletNetwork = WalletNetwork::Test;
+
+    /// A sweep proved ahead, holding no wallet's notes: dropping it releases
+    /// a proposal no store knows.
+    fn ahead() -> SweepAhead {
+        SweepAhead {
+            reserved: ReservedSweep {
+                proposal: SwapProposal {
+                    proposal_id: u64::MAX,
+                    needs_sapling_params: false,
+                    fee_zatoshi: 10_000,
+                    amount_zatoshi: 90_000,
+                },
+                send_flow_id: "private-usd-receive:test:0".into(),
+            },
+            proved: ProvedSweep {
+                base: Vec::new(),
+                proofs: Vec::new(),
+                txid: TxId::from_bytes([1; 32]),
+                expiry_height: 1_000,
+            },
+            joint_db: "joint.db".into(),
+            network: NETWORK,
+            joint_uuid: "joint".into(),
+            ufvk: "uview".into(),
+            home_ua: "home".into(),
+            fee_cap: 15_000,
+            fee_limit: 15_000,
+            received_zatoshi: 100_000,
+        }
+    }
+
+    fn receipts(received_zatoshi: u64, fully_scanned_height: Option<u32>) -> JointReceipts {
+        JointReceipts {
+            confirmed_zatoshi: received_zatoshi,
+            confirmed_notes: 1,
+            received_zatoshi,
+            spendable_zatoshi: 0,
+            pending_zatoshi: 0,
+            fully_scanned_height,
+        }
+    }
+
+    /// A sweep proved ahead is sent only for its own joint account, under
+    /// the reviewed cap, while nothing arrived since it was built and its
+    /// expiry is more than the margin past the scanned height.
+    #[test]
+    fn a_sweep_proved_ahead_goes_only_while_it_sweeps_everything() {
+        let ahead = ahead();
+        let sweeps = |db: &str, ufvk: &str, cap: Option<u64>, receipts: JointReceipts| {
+            ahead.sweeps(db, NETWORK, ufvk, cap, &receipts)
+        };
+        let scanned = 1_000 - AHEAD_EXPIRY_MARGIN_BLOCKS - 1;
+        assert!(sweeps(
+            "joint.db",
+            "uview",
+            Some(15_000),
+            receipts(100_000, Some(scanned))
+        ));
+
+        assert!(!sweeps(
+            "other.db",
+            "uview",
+            Some(15_000),
+            receipts(100_000, Some(scanned))
+        ));
+        assert!(!sweeps(
+            "joint.db",
+            "other",
+            Some(15_000),
+            receipts(100_000, Some(scanned))
+        ));
+        assert!(!sweeps(
+            "joint.db",
+            "uview",
+            Some(16_000),
+            receipts(100_000, Some(scanned))
+        ));
+        assert!(!sweeps(
+            "joint.db",
+            "uview",
+            None,
+            receipts(100_000, Some(scanned))
+        ));
+        assert!(!ahead.sweeps(
+            "joint.db",
+            WalletNetwork::Main,
+            "uview",
+            Some(15_000),
+            &receipts(100_000, Some(scanned))
+        ));
+        // A note that came since would be left behind.
+        assert!(!sweeps(
+            "joint.db",
+            "uview",
+            Some(15_000),
+            receipts(100_001, Some(scanned))
+        ));
+        // Too close to its expiry, or nothing scanned to judge it by.
+        assert!(!sweeps(
+            "joint.db",
+            "uview",
+            Some(15_000),
+            receipts(100_000, Some(scanned + 1))
+        ));
+        assert!(!sweeps(
+            "joint.db",
+            "uview",
+            Some(15_000),
+            receipts(100_000, None)
+        ));
+    }
 }
