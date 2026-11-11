@@ -149,6 +149,46 @@ void main() {
     expect(backend.advances, 2);
   });
 
+  engineTest("one conversion's short naps never step the others sooner", (
+    tester,
+  ) async {
+    final stepped = <int>[];
+    backend = FakePrivateUsdBackend(
+      records: {
+        'account-1': [forwardRecord(index: 3)],
+        'account-2': [forwardRecord(index: 5)],
+      },
+      answers: [
+        (record) {
+          stepped.add(record.index);
+          return ApiForwardAdvance(
+            record: record,
+            wait: ApiForwardWait.confirming,
+            nextPollMs: record.index == 3 ? 3000 : 30000,
+          );
+        },
+      ],
+    );
+    final engine = engineFor(tester);
+    int steps(int index) => stepped.where((step) => step == index).length;
+
+    engine.start();
+    await tester.pump();
+    expect(stepped, [3, 5]);
+
+    // 3 every 3 s; 5 only once its own 30 s are up.
+    await tester.pump(const Duration(seconds: 28));
+    expect(steps(3), 10);
+    expect(steps(5), 1);
+    await tester.pump(const Duration(seconds: 3));
+    expect(steps(5), 2);
+
+    // A nudge steps every one.
+    engine.nudge();
+    await tester.pump();
+    expect(steps(5), 3);
+  });
+
   engineTest('cancellation is never taken for a failed step', (tester) async {
     backend = FakePrivateUsdBackend(
       answers: [

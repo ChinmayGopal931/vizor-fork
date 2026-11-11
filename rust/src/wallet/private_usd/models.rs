@@ -1000,6 +1000,11 @@ pub(crate) struct ReverseRecord {
     pub payout: Option<SwapPayout>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rescue: Option<SwapRescue>,
+    /// The share the maker's claim revealed, `e`, kept once it opened the
+    /// joint account: the sweep home goes on from it should the claim's
+    /// block be undone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revealed_share: Option<Word>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receive: Option<ReverseReceiveTransaction>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1042,16 +1047,21 @@ impl ReverseRecord {
             || self.receive.is_some()
     }
 
-    /// Whether the user may still call it off: under way, not called off
-    /// already, not settled, and no refund being paid.
+    /// Whether calling it off gets the dollars back now: under way, not
+    /// called off already, not settled, no refund posted or being paid, and
+    /// no `ready` of the user's out. From `ready` the escrow is the maker's to
+    /// claim until `t1`, when its refund goes by itself; one that lapsed with
+    /// the escrow still open (`RefundWait`) leaves it the user's again.
     pub(crate) fn cancellable(&self) -> bool {
         self.under_way()
             && !self.cancel_requested
+            && !self.refund_posted
             && !self.is_settled()
             && !matches!(
                 self.phase,
                 ReversePhase::Refunding | ReversePhase::RefundPayout
             )
+            && (self.ready.is_none() || self.phase == ReversePhase::RefundWait)
     }
 
     /// Gone ahead with, and neither accepted nor funded nor called off yet.

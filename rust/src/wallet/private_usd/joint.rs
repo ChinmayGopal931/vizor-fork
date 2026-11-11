@@ -11,14 +11,16 @@
 //!
 //! The local writes here (import, delete) run under `with_operations`, never
 //! across network I/O; librustzcash writes also take the process-wide wallet
-//! write lock. One scan of a `joint.db` runs at a time.
+//! write lock. One scan of a `joint.db` runs at a time; another waits for it.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
+use std::time::Duration;
 
 use rusqlite::OptionalExtension;
+use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 use zcash_client_backend::data_api::{Account as _, AccountPurpose, WalletRead, WalletWrite};
 use zcash_keys::keys::UnifiedFullViewingKey;
 use zcash_primitives::transaction::{fees::zip317, TxId};
@@ -52,6 +54,8 @@ const JOINT_ACCOUNT_NAME: &str = "Private USD joint";
 const JOINT_KEY_SOURCE: &str = "vizor-private-usd-joint";
 /// A forward refund's sweep pays at most 64 ZIP 317 marginal fees.
 const MAX_SWEEP_FEE_ACTIONS: u64 = 64;
+/// How long a scan of a `joint.db` waits for the one running before it.
+const SCAN_WAIT: Duration = Duration::from_secs(30);
 
 fn wallet_error(message: impl Into<String>) -> PrivateUsdError {
     PrivateUsdError::new(ErrorCode::ZcashWallet, message)
@@ -152,25 +156,17 @@ pub(crate) fn forget_joint_account(
     })
 }
 
-/// The `joint.db` paths a scan is running on.
-static SCANNING: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
+/// The scan of each `joint.db`, by its path: one at a time.
+static SCANS: LazyLock<Mutex<HashMap<String, Arc<AsyncMutex<()>>>>> =
+    LazyLock::new(Default::default);
 
-/// One running scan of a `joint.db`, released when dropped.
-struct ScanClaim(String);
-
-impl ScanClaim {
-    fn take(joint_db: &str) -> Result<Self> {
-        if !lock(&SCANNING).insert(joint_db.to_string()) {
-            return fail(ErrorCode::Busy, "the joint wallet is already scanning");
-        }
-        Ok(Self(joint_db.to_string()))
-    }
-}
-
-impl Drop for ScanClaim {
-    fn drop(&mut self) {
-        lock(&SCANNING).remove(&self.0);
-    }
+/// `joint_db`'s scan, once the one running before it ended; `Busy` should
+/// that take longer than [`SCAN_WAIT`].
+async fn take_scan(joint_db: &str) -> Result<OwnedMutexGuard<()>> {
+    let scan = lock(&SCANS).entry(joint_db.to_owned()).or_default().clone();
+    tokio::time::timeout(SCAN_WAIT, scan.lock_owned())
+        .await
+        .or_else(|_| fail(ErrorCode::Busy, "the joint wallet is already scanning"))
 }
 
 /// Scans `joint_db` to the chain tip with the isolated claim scan, which also
@@ -179,24 +175,43 @@ impl Drop for ScanClaim {
 /// A `joint.db` whose accounts are all born above the tip has nothing to scan
 /// yet, and the claim scan's completion checks would fail on it: no block is
 /// stored at the tip. This returns at once until the chain reaches the
-/// birthday.
+/// birthday; once it has scanned past it, the tip is not asked for that.
 pub(crate) async fn sync_joint_db(
     joint_db: &str,
     lightwalletd_url: &str,
     network: WalletNetwork,
     cancel: Arc<AtomicBool>,
 ) -> Result<()> {
-    let _scan = ScanClaim::take(joint_db)?;
+    let _scan = take_scan(joint_db).await?;
     keys::ensure_db_migrated_once(joint_db, network).map_err(wallet_error)?;
-    let birthday = sync::open_wallet_db_for_read(joint_db, network)
-        .map_err(wallet_error)?
+    let wallet = sync::open_wallet_db_for_read(joint_db, network).map_err(wallet_error)?;
+    let birthday = wallet
         .get_wallet_birthday()
         .map_err(|error| wallet_error(error.to_string()))?;
     let Some(birthday) = birthday else {
         return Ok(());
     };
-    // A fresh tip, never the transaction tip cache: a tip cached up to 15 s
-    // earlier would skip the scan of the very block that reaches the birthday.
+    let reached =
+        fully_scanned_height(&wallet)?.is_some_and(|scanned| scanned >= u32::from(birthday));
+    drop(wallet);
+    if !reached
+        && u64::from(u32::from(birthday)) > fresh_tip(lightwalletd_url, network, &cancel).await?
+    {
+        return Ok(());
+    }
+    sync_engine::run_payment_link_claim_sync(joint_db, lightwalletd_url, network, cancel, true)
+        .await
+        .map_err(wallet_error)
+}
+
+/// The chain's height now, never the transaction tip cache: a tip cached up
+/// to 15 s earlier would skip the scan of the very block that reaches a
+/// birthday.
+async fn fresh_tip(
+    lightwalletd_url: &str,
+    network: WalletNetwork,
+    cancel: &AtomicBool,
+) -> Result<u64> {
     let mut client = sync_engine::open_lwd_channel_with_cancel(lightwalletd_url, || {
         cancel.load(Ordering::Relaxed)
     })
@@ -205,13 +220,7 @@ pub(crate) async fn sync_joint_db(
     let tip = sync_engine::get_latest_block_recorded(&mut client, lightwalletd_url, network)
         .await
         .map_err(|error| wallet_error(format!("read the chain tip: {error}")))?;
-    drop(client);
-    if u64::from(u32::from(birthday)) > tip.height {
-        return Ok(());
-    }
-    sync_engine::run_payment_link_claim_sync(joint_db, lightwalletd_url, network, cancel, true)
-        .await
-        .map_err(wallet_error)
+    Ok(tip.height)
 }
 
 /// What a joint account has received, and what a sweep could spend now.

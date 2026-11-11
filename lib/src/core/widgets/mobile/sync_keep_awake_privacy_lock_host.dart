@@ -8,6 +8,7 @@ import '../../../features/onboarding/mobile/mobile_passcode_screen.dart';
 import '../../../features/onboarding/mobile/passcode_widgets.dart';
 import '../../../features/onboarding/mobile/adaptive_passcode_layout.dart';
 import '../../../features/onboarding/shared/onboarding_welcome_art.dart';
+import '../../../features/private_usd/providers/private_usd_keep_awake_provider.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/biometric_unlock_provider.dart';
 import '../../../providers/sync_display_progress_provider.dart';
@@ -80,7 +81,17 @@ class _SyncKeepAwakePrivacyLockHostState
   Widget build(BuildContext context) {
     if (kAppFormFactor != AppFormFactor.mobile) return widget.child;
 
-    final active = ref.watch(syncKeepAwakeActiveProvider);
+    // A Private USD bridge that needs the user's approval, now or next, is
+    // not covered. Once it no longer does, the user gets a full idle window
+    // again rather than a lock on the next frame.
+    ref.listen<bool>(privateUsdBridgeAwaitsUserProvider, (waited, waits) {
+      if (waited == true && !waits) {
+        ref.read(syncKeepAwakeInteractionProvider.notifier).markInteraction();
+      }
+    });
+    final active =
+        ref.watch(syncKeepAwakeActiveProvider) &&
+        !ref.watch(privateUsdBridgeAwaitsUserProvider);
     final interaction = ref.watch(syncKeepAwakeInteractionProvider);
     final mode = ref.watch(syncKeepAwakePrivacyLockModeProvider);
     final visible = mode != SyncKeepAwakePrivacyLockMode.hidden;
@@ -196,6 +207,7 @@ class _SyncKeepAwakePrivacyLockHostState
     if (!mounted) return;
     if (!_isInForeground) return;
     if (!ref.read(syncKeepAwakeActiveProvider)) return;
+    if (ref.read(privateUsdBridgeAwaitsUserProvider)) return;
     if (ref.read(syncKeepAwakePrivacyLockProvider).isLocked) return;
 
     final interaction = ref.read(syncKeepAwakeInteractionProvider);

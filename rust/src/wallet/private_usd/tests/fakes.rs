@@ -24,8 +24,8 @@ use super::super::abi::keccak;
 use super::super::deployment::{self, Deployment};
 use super::super::engine::{Clock, MakerChecks, OpHandle};
 use super::super::evm_rpc::{
-    ChainReader, ConfirmedSwap, Head, PaidOut, ReverseChainState, SwapRead, SwapStage, SwapState,
-    TransactionStatus,
+    ChainReader, ConfirmedSwap, Head, PaidOut, ReverseChainState, SeenHead, SwapRead, SwapStage,
+    SwapState, TransactionStatus,
 };
 use super::super::forward::{Forward, ForwardStep, ForwardView, ForwardWait, ForwardZcash, Quoted};
 use super::super::joint::SwapTxStatus;
@@ -193,6 +193,12 @@ pub(super) struct State {
     /// Runs before each reverse escrow read, with its number (1, 2, …).
     pub on_reverse_read: Option<Box<dyn FnMut(&mut State, u32)>>,
     pub reverse_reads: u32,
+    /// The stage a confirmed read shows of the escrow instead, its share
+    /// unrevealed, while the newest blocks are too new to be confirmed.
+    pub confirmed_escrow: Option<SwapStage>,
+    /// Reads of the swap at the newest block, and whether they fail.
+    pub newest_reads: u32,
+    pub newest_fails: bool,
 
     // The maker.
     /// The amount every quote names, in token base units.
@@ -361,6 +367,9 @@ impl State {
             rescue_nonce: 0,
             on_reverse_read: None,
             reverse_reads: 0,
+            confirmed_escrow: None,
+            newest_reads: 0,
+            newest_fails: false,
             amount: AMOUNT,
             quote_expires_at: NOW + 300,
             quote_requests: Vec::new(),
@@ -546,8 +555,27 @@ impl ChainReader for FakeChain {
         Ok(self.0.get().head())
     }
 
+    /// The head, read now by the device's clock.
+    fn newest_head(&self) -> Option<SeenHead> {
+        let state = self.0.get();
+        Some(SeenHead {
+            head: state.head(),
+            seen_at: state.clock,
+        })
+    }
+
     async fn swap(&self, id: &[u8; 32]) -> Result<Option<SwapState>> {
         Ok(self.0.get().swap_at_tip(id))
+    }
+
+    /// The swap, or the reverse escrow, at the tip.
+    async fn newest_swap(&self, id: &[u8; 32], terms: &Terms) -> Result<Option<SwapState>> {
+        self.0.set().newest_reads += 1;
+        let state = self.0.get();
+        if state.newest_fails {
+            return fail(ErrorCode::EthereumUnreachable, "the node timed out");
+        }
+        verified(state.swap_at_tip(id).or_else(|| state.escrow_at(id)), terms)
     }
 
     async fn confirmed_swap(&self, id: &[u8; 32], terms: &Terms) -> Result<ConfirmedSwap> {
@@ -632,7 +660,13 @@ impl ChainReader for FakeChain {
             self.0.set().on_reverse_read = Some(hook);
         }
         let state = self.0.get();
-        let swap = state.escrow_at(id);
+        let swap = state.escrow_at(id).map(|mut swap| {
+            if let Some(stage) = state.confirmed_escrow {
+                swap.stage = stage;
+                swap.secret = [0; 32];
+            }
+            swap
+        });
         if swap
             .as_ref()
             .is_some_and(|swap| swap.terms_hash != terms.hash())
@@ -1299,7 +1333,7 @@ impl ForwardZcash for FakeZcash {
         _birthday: u64,
         sweep: &ZcashTransaction,
     ) -> Result<SwapTxStatus> {
-        Ok(self.status(sweep))
+        Ok(self.scanned(sweep))
     }
 
     async fn forget_joint_account(&self, _index: u32) -> Result<()> {
@@ -1374,7 +1408,7 @@ impl ReverseZcash for FakeZcash {
         _birthday: u64,
         receive: &ZcashTransaction,
     ) -> Result<SwapTxStatus> {
-        Ok(self.status(receive))
+        Ok(self.scanned(receive))
     }
 
     async fn broadcast(&self, transaction: &ZcashTransaction) -> Result<()> {
@@ -1389,6 +1423,16 @@ impl ReverseZcash for FakeZcash {
 }
 
 impl FakeZcash {
+    /// A joint transaction's status once the joint wallet scanned, which
+    /// sends one it holds unmined again, as the wallet's scan does.
+    fn scanned(&self, transaction: &ZcashTransaction) -> SwapTxStatus {
+        let status = self.status(transaction);
+        if status == SwapTxStatus::Unmined {
+            self.0.set().submitted.push(transaction.tx_id.clone());
+        }
+        status
+    }
+
     fn status(&self, transaction: &ZcashTransaction) -> SwapTxStatus {
         self.0
             .get()

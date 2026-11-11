@@ -532,7 +532,7 @@ abstract final class PrivateUsdCopy {
 
   // ── Convert: results (forward) ────────────────────────────────────────
 
-  static const convertResultPaidTitle = 'Dollars on their way';
+  static const convertResultPaidTitle = '0zkUSDC on its way';
   static String convertResultPaidBody(String usd, String about) =>
       '$usd is in your shielded balance. Railgun screens new funds for $about '
       'before they can be spent.';
@@ -638,6 +638,7 @@ abstract final class PrivateUsdCopy {
       'Zcash confirmations: $count';
   static const reverseRefundWait =
       "Waiting until a refund can proceed. Veylor retries while it's open.";
+  static const reverseRefundReady = 'Refund available';
   static const reverseRefunding = 'Securing your refund';
   static const reversePayout = 'Returning your shielded USD to Railgun';
   static const reverseComplete = 'ZEC received in your shielded wallet';
@@ -674,6 +675,9 @@ abstract final class PrivateUsdCopy {
   static String reverseSettlementRefundLimit(String time) =>
       'Settlement is authorized. A refund can only proceed after $time if '
       "settlement hasn't completed.";
+  static String reverseRefundAvailable(String time) =>
+      'This bridge can no longer settle. Request your refund now, or Veylor '
+      "sends it after $time while it's open.";
   static const reverseRefundUnavailable =
       'This bridge has already settled and can no longer be refunded. '
       'Veylor will finish moving your ZEC to your wallet.';

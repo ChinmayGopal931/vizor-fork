@@ -2,6 +2,7 @@
 //! and the `openReverse` calldata byte for byte.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::sync::Notify;
 use zecswap_core::{Domain, PublicShare, RescueAuthorization, ReverseOpen};
@@ -325,6 +326,210 @@ async fn ready_is_signed_only_with_its_deadline_before_t0() {
         .await
         .unwrap();
     assert_eq!(settling.ready.unwrap().deadline, READY - 1);
+}
+
+/// Once `ready` is out the escrow is read at the newest block too, and the
+/// maker's claim is swept home from its first block; its share must open the
+/// joint account before anything is kept. Before a `ready` nothing is read
+/// there.
+#[tokio::test]
+async fn the_claim_is_swept_home_from_its_first_block() {
+    let h = escrowed().await;
+    h.world.set().paid_in = REVERSE_DEPOSIT_ZAT;
+    h.advance_reverse().await.unwrap();
+    assert_eq!(h.world.get().newest_reads, 0);
+    h.reverse()
+        .authorize_ready(&mut h.store(), 0)
+        .await
+        .unwrap();
+
+    // A share in the newest block that does not open the joint account.
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Claimed;
+        state.secret = word(5);
+        state.confirmed_escrow = Some(SwapStage::Ready);
+    }
+    let refused = h.advance_reverse().await.unwrap_err();
+    assert_eq!(refused.code, ErrorCode::Mismatch);
+    let held = h.reverse_record(0);
+    assert_eq!((held.phase, held.receive), (ReversePhase::Settling, None));
+
+    // The maker's claim, one block deep and not confirmed: swept home.
+    h.claimed();
+    let receiving = h.advance_reverse().await.unwrap();
+    assert_eq!(receiving.phase, ReversePhase::Receiving);
+    assert!(receiving.receive.is_some());
+    assert!(h.world.get().newest_reads > 0);
+
+    // Its block undone, as by a reorg: still settled, and never refunded,
+    // from t1 either.
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.secret = [0; 32];
+    }
+    let to_t1 = REFUND - h.world.get().chain_now;
+    h.world.set().pass(to_t1);
+    let settled = h.advance_reverse().await.unwrap();
+    assert_eq!(settled.phase, ReversePhase::Receiving);
+    assert_eq!(settled.receive, receiving.receive);
+    assert_eq!(h.posts("/v1/reverse/refund"), 0);
+}
+
+/// The share a claim reveals is kept once it opens the joint account: should
+/// the claim's block be undone before the sweep is built, and the claim not
+/// come again, the sweep is built from the kept share and the conversion
+/// completes, never refunded.
+#[tokio::test]
+async fn the_revealed_share_is_kept_should_the_claims_block_be_undone() {
+    let h = authorized().await;
+    {
+        let mut state = h.world.set();
+        state.spendable = false;
+        state.confirmed_escrow = Some(SwapStage::Ready);
+    }
+    h.claimed();
+    let receiving = h.advance_reverse().await.unwrap();
+    assert_eq!(receiving.phase, ReversePhase::Receiving);
+    assert_eq!(receiving.receive, None);
+    assert_eq!(
+        receiving.revealed_share,
+        Some(Hex(maker_secret().to_be_bytes()))
+    );
+
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.secret = [0; 32];
+        state.spendable = true;
+    }
+    let swept = h.advance_reverse().await.unwrap();
+    let receive = swept.receive.unwrap();
+    h.world
+        .set()
+        .statuses
+        .insert(receive.tx_id.clone(), mined(2));
+    let complete = h.advance_reverse().await.unwrap();
+    assert_eq!(complete.phase, ReversePhase::Complete);
+    assert_eq!(h.posts("/v1/reverse/refund"), 0);
+}
+
+/// A refund is offered only while calling the conversion off gets the
+/// dollars back: not once the user's `ready` is out, which leaves a ready
+/// escrow the maker's to claim until t1, nor while a `ready` landed just
+/// before its deadline is too new to be confirmed; again once it lapsed with
+/// the escrow still open, when the refund goes at once.
+#[tokio::test]
+async fn a_refund_is_offered_only_while_it_can_land() {
+    let h = escrowed().await;
+    h.world.set().paid_in = REVERSE_DEPOSIT_ZAT;
+    let awaiting = h.advance_reverse().await.unwrap();
+    assert_eq!(awaiting.phase, ReversePhase::AwaitingReady);
+    assert!(awaiting.cancellable());
+    let settling = h
+        .reverse()
+        .authorize_ready(&mut h.store(), 0)
+        .await
+        .unwrap();
+    assert!(!settling.cancellable());
+    h.world.set().stage = SwapStage::Ready;
+    let ready = h.advance_reverse().await.unwrap();
+    assert_eq!(ready.phase, ReversePhase::Settling);
+    assert!(!ready.cancellable());
+
+    let h = authorized().await;
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.confirmed_escrow = Some(SwapStage::Open);
+        state.pass(121);
+    }
+    let landed = h.advance_reverse().await.unwrap();
+    assert_eq!(landed.phase, ReversePhase::Settling);
+    assert!(!landed.cancellable());
+
+    // Landed in the last block before t0, the confirmed read still open as
+    // t0 passes: the refund the chain then seems due waits, settling.
+    let h = authorized().await;
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.confirmed_escrow = Some(SwapStage::Open);
+        let to_t0 = READY - state.chain_now;
+        state.pass(to_t0);
+    }
+    let landed = h.advance_reverse().await.unwrap();
+    assert_eq!(landed.phase, ReversePhase::Settling);
+    assert!(!landed.cancellable());
+    assert_eq!(h.posts("/v1/reverse/refund"), 0);
+
+    // The newest read failing as it lands: it lapses only on a consistent
+    // read, which shows it landed.
+    let h = authorized().await;
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Ready;
+        state.confirmed_escrow = Some(SwapStage::Open);
+        state.newest_fails = true;
+        state.pass(121);
+    }
+    let landed = h.advance_reverse().await.unwrap();
+    assert_eq!(landed.phase, ReversePhase::Settling);
+    assert!(!landed.cancellable());
+
+    let h = authorized().await;
+    h.world.set().pass(121);
+    let lapsed = h.advance_reverse().await.unwrap();
+    assert_eq!(lapsed.phase, ReversePhase::RefundWait);
+    assert!(lapsed.cancellable());
+    h.reverse().cancel(&mut h.store(), 0).await.unwrap();
+    assert_eq!(h.posts("/v1/reverse/refund"), 1);
+
+    // Lapsed and left to go by itself at t0: once posted it is never
+    // offered again, also while it is too new to be confirmed.
+    let h = authorized().await;
+    h.world.set().pass(121);
+    h.advance_reverse().await.unwrap();
+    {
+        let mut state = h.world.set();
+        let to_t0 = READY - state.chain_now;
+        state.pass(to_t0);
+    }
+    h.advance_reverse().await.unwrap();
+    assert_eq!(h.posts("/v1/reverse/refund"), 1);
+    {
+        let mut state = h.world.set();
+        state.stage = SwapStage::Refunded;
+        state.confirmed_escrow = Some(SwapStage::Open);
+    }
+    let refunding = h.advance_reverse().await.unwrap();
+    assert_eq!(refunding.phase, ReversePhase::Refunding);
+    assert!(!refunding.cancellable());
+}
+
+/// The loop looks again once what a conversion waits for can have come: a
+/// Zcash block for the maker's ZEC, the user's settlement, an Ethereum block
+/// for the maker's claim.
+#[tokio::test]
+async fn the_loop_naps_by_what_a_conversion_waits_for() {
+    let h = escrowed().await;
+    let report = async || h.reverse().advance_report(&mut h.store(), 0).await.unwrap();
+    let receiving = report().await;
+    assert_eq!(receiving.record.phase, ReversePhase::ReceivingZec);
+    assert_eq!(receiving.next_poll, Duration::from_secs(10));
+    h.world.set().paid_in = REVERSE_DEPOSIT_ZAT;
+    let awaiting = report().await;
+    assert_eq!(awaiting.record.phase, ReversePhase::AwaitingReady);
+    assert_eq!(awaiting.next_poll, Duration::from_secs(15));
+    h.reverse()
+        .authorize_ready(&mut h.store(), 0)
+        .await
+        .unwrap();
+    // The fake's head is a block just made: the next is due in a slot.
+    let settling = report().await;
+    assert_eq!(settling.record.phase, ReversePhase::Settling);
+    assert_eq!(settling.next_poll, Duration::from_secs(14));
 }
 
 /// The sweep home pays at most the fee the user reviewed with `ready`,

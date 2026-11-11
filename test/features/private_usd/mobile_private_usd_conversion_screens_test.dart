@@ -573,7 +573,7 @@ void main() {
       expect(find.text(PrivateUsdCopy.convertResuming), findsOneWidget);
     });
 
-    testWidgets('paid: the dollars are on their way, and "View private USD"', (
+    testWidgets('paid: the 0zkUSDC is on its way, and "View private USD"', (
       tester,
     ) async {
       await pumpProgress(

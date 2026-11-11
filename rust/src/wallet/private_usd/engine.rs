@@ -199,9 +199,9 @@ impl MakerChecks {
 
 pub(crate) static MAKER_CHECKS: LazyLock<MakerChecks> = LazyLock::new(Default::default);
 
-/// Forgets every offer, reverse funding and maker check: the wallet locked.
-/// A quote made before the lock is never accepted after it, and a funding
-/// proved across it is never submitted.
+/// Forgets every offer, reverse funding, maker check and endpoint check: the
+/// wallet locked. A quote made before the lock is never accepted after it,
+/// and a funding proved across it is never submitted.
 pub(crate) fn clear_sessions() {
     let mut offers = lock(&OFFERS);
     SESSION.fetch_add(1, Ordering::AcqRel);
@@ -209,6 +209,7 @@ pub(crate) fn clear_sessions() {
     drop(offers);
     lock(&FUNDINGS).clear();
     MAKER_CHECKS.clear();
+    super::evm_rpc::clear_session_checks();
     super::tokens::clear_sessions();
 }
 

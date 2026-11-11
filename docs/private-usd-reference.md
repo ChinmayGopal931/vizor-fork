@@ -2121,7 +2121,7 @@ The **review** phase (same screen):
   - amounts: "{$} for about {ZEC} after fees", without "about" once the sweep exists. Hidden for refunded and cancelled.
   - steps and notes (§9.5)
   - a problem card (no retry button)
-  - the call-off button: "Cancel conversion" before any funding in `ACCEPTING`/`AWAITING_FUNDING`, else "Request private refund" (as built, the copy table's "Request refund", progress D-84). It is shown only while the status is `cancellable` (`!cancelRequested && !isSettled && phase ∉ {REFUNDING, REFUND_PAYOUT}`).
+  - the call-off button: "Cancel conversion" before any funding in `ACCEPTING`/`AWAITING_FUNDING`, else "Request private refund" (as built, the copy table's "Request refund", progress D-84). It is shown only while the status is `cancellable` (`!cancelRequested && !refundPosted && !isSettled && phase ∉ {REFUNDING, REFUND_PAYOUT} && (ready == null || phase == REFUND_WAIT)`: a `ready` out leaves the escrow the maker's to claim until `t1`, unless it lapsed with the escrow open, progress D-156).
   - while refunded: "View refunds"
 - **Primary button.**
   - `AWAITING_FUNDING` → "Convert"

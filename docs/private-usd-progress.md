@@ -2738,6 +2738,76 @@ M8 status (2026-10-14): the non-device parts are done.
     how the release build gets its id is not in this tree (open, owner). The dormant path, a maker whose info
     shows no return key, is the unit-tested `maker_asks = false` case;
     on the phone it is what every build does today.
+- **D-155 (owner, 2026-11-11): a conversion waits only on what it waits
+  for.** These changes cut a conversion's time; none changes what a step
+  authorizes, and `ready` stays the user's tap.
+  - **Naps.** Each step reports what it waits for (`swap::Wake`): an
+    Ethereum block wakes the loop 2 s after the slot that follows the
+    newest head the step read (timed from the read itself when that head
+    was over a slot old by the device's clock, which a clock ahead of the
+    chain's or a node behind it shows), a Zcash block every 10 s, the user
+    (reverse `AwaitingFunding`, `AwaitingReady`) every 15 s, and a forward
+    swap unwinding every 30 s; nothing naps under 3 s. The Dart loop keeps
+    each conversion's own due time, so one conversion's short naps never
+    step another sooner; a nudge or a resume steps every one. Before, a
+    reverse step napped 15 s whatever it waited for, and a forward one 20 s
+    while confirming.
+  - **The claim from its first block.** Once a `ready` is out, the reverse
+    step also reads the escrow at `latest` (`ChainReader::newest_swap`),
+    and a claim there is swept home at once: `e` is public once the claim
+    is in a block, and were that block undone the maker would claim again
+    with the same `e`. The share must open the joint account before the
+    record keeps it (`revealed_share`) and moves to `Receiving`; the sweep
+    then goes on from the kept share whatever a later look shows, and the
+    conversion is never refunded. `escrow_confirmations` is unchanged: it
+    still guards the escrow's depth, the funding and the refund decisions.
+  - **No sweep proved ahead.** A first cut built and proved the sweep home
+    in `Settling` and only signed and sent it at the claim. The review
+    dropped it: the held sweep's anchor and expiry, fixed when it was
+    proved, put the Zcash height at the user's `ready` on chain and tied the
+    sweep to its escrow. The sweep is built at the claim, as before.
+  - **Fewer round trips.** The drivers' readers check an endpoint's chain id
+    and windows contract once per session (`EvmRpc::sharing_session`, a
+    pass counting only in the session it was shown in, so a step finishing
+    after a lock never carries one past it); the windows check is one
+    Multicall3 read; an escrow's `reverseFunding` and `getSwap` are one
+    Multicall3 call at the confirmed block; the forward deposit reuses the
+    confirmed read's head; and the joint sync skips its tip read once it has
+    scanned past the birthday. A quote and every advance start the
+    proving-key warm-up. A reverse step looks at the joint account before
+    the escrow, never beside it: the joint scan can wait on the wallet's
+    write lock, which held a read beside it past its timeout. A joint scan
+    waits up to 30 s for one already running instead of failing `Busy`, and
+    a kept sweep is sent again by the joint scan while `joint.db` holds it,
+    from the record only when it does not.
+  - **Not done.** Connections are not reused across steps: each step's
+    runtime, and the pooled client on it, ends with the step. Over Tor each
+    request keeps its own isolated circuit.
+- **D-156 (owner, 2026-11-11): a refund is offered only when it can land.**
+  On the OnePlus a USD → ZEC bridge offered "Request refund" after
+  settlement was authorized; the tap only recorded a request, the maker
+  claimed, and the bridge completed. The windows contract gives a ready
+  escrow to the maker until `t1` (`_refundable` refunds a reverse escrow
+  only while it is open, and from `t1`), so `cancellable` is now false once
+  a `ready` is out, unless it lapsed with the escrow open (`RefundWait`,
+  whose step reads "Refund available" and whose note says the refund can be
+  requested now or goes by itself after `t0`), and false once a refund was
+  posted. A `ready` the newest block shows counts as landed, never lapsed;
+  one lapses only on a consistent read of a fresh head past its deadline
+  that shows the escrow still open. A refund the chain seems to owe but a
+  fresh read shows cannot land yet waits as `Settling` when that read shows
+  the `ready` landed, and as `Refunding` once the refund itself landed.
+  The driver still takes a call-off while settling (it waits, as before).
+  Every maker failure keeps a way back: an open escrow refunds at once on
+  request and by itself from `t0`, a ready one by itself from `t1`, and a
+  forward swap the maker never readies is claimed from `t0`. Two changes
+  came with it: the wallet sync's idle privacy lock no longer covers the
+  app while a USD → ZEC bridge still needs the user's approval, from its
+  accept until settlement is authorized, so the approval never shows
+  behind it (from the authorization on the bridge runs on under the lock,
+  and the idle minute starts again once it no longer needs the user), and
+  the ZEC → USD result reads "0zkUSDC on its way" while Railgun screens the
+  payout.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

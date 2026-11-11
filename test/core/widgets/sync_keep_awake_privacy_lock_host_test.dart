@@ -19,12 +19,18 @@ import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/sync_keep_awake_interaction_listener.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/sync_keep_awake_privacy_lock_host.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/passcode_widgets.dart';
+import 'package:zcash_wallet/src/features/private_usd/models/private_usd_record_key.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_unfinished_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/providers/account_models.dart';
 import 'package:zcash_wallet/src/providers/app_security_provider.dart';
 import 'package:zcash_wallet/src/providers/biometric_unlock_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_keep_awake_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
+import 'package:zcash_wallet/src/rust/api/private_usd.dart'
+    show ApiReversePhase;
 import 'package:zcash_wallet/src/services/biometric_unlock.dart';
+import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
@@ -530,6 +536,110 @@ void main() {
 
     expect(find.text('Veylor is syncing'), findsNothing);
   });
+
+  testWidgets(
+    'a bridge that needs the user next is never covered, and leaves a full idle window',
+    (tester) async {
+      _setMobileViewport(tester);
+      final container = ProviderContainer(
+        overrides: [
+          appBootstrapProvider.overrideWithValue(_bootstrap()),
+          appSecurityProvider.overrideWith(_FakeSecurityNotifier.new),
+          biometricUnlockProvider.overrideWith(
+            () => _FakeBiometricUnlockNotifier(_disabledBiometricState),
+          ),
+          syncProvider.overrideWith(
+            () => FakeSyncNotifier(
+              _sync(lastSyncStartedAt: DateTime(2026, 7, 9, 12)),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      const key = PrivateUsdRecordKey(
+        accountUuid: 'account',
+        direction: PrivateUsdDirection.reverse,
+        index: 0,
+      );
+      final bridges = container.read(
+        privateUsdReverseConversionsProvider.notifier,
+      );
+      void bridgeIn(ApiReversePhase phase) => bridges.publish({
+        key: PrivateUsdReverseStatus(
+          record: previewPrivateUsdReverseRecord(phase: phase),
+        ),
+      });
+      bridgeIn(ApiReversePhase.receivingZec);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: _themedApp(idleTimeout: const Duration(seconds: 1)),
+        ),
+      );
+      await _settleInitialSync(tester);
+
+      // Waiting for the maker's ZEC, then on "Authorize settlement": an idle
+      // user is never covered, so the approval never shows behind the lock.
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(find.text('Veylor is syncing'), findsNothing);
+      bridgeIn(ApiReversePhase.awaitingReady);
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(find.text('Veylor is syncing'), findsNothing);
+
+      // Authorized elsewhere, settling: a full idle window, then covered.
+      bridgeIn(ApiReversePhase.settling);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+      expect(find.text('Veylor is syncing'), findsNothing);
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump();
+      expect(find.text('Veylor is syncing'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a bridge that needs nothing of the user runs on under the lock',
+    (tester) async {
+      _setMobileViewport(tester);
+      final container = ProviderContainer(
+        overrides: [
+          appBootstrapProvider.overrideWithValue(_bootstrap()),
+          appSecurityProvider.overrideWith(_FakeSecurityNotifier.new),
+          biometricUnlockProvider.overrideWith(
+            () => _FakeBiometricUnlockNotifier(_disabledBiometricState),
+          ),
+          syncProvider.overrideWith(
+            () => FakeSyncNotifier(
+              _sync(lastSyncStartedAt: DateTime(2026, 7, 9, 12)),
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(privateUsdReverseConversionsProvider.notifier).publish({
+        const PrivateUsdRecordKey(
+          accountUuid: 'account',
+          direction: PrivateUsdDirection.reverse,
+          index: 0,
+        ): PrivateUsdReverseStatus(
+          record: previewPrivateUsdReverseRecord(
+            phase: ApiReversePhase.settling,
+          ),
+        ),
+      });
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: _themedApp()),
+      );
+      await _settleInitialSync(tester);
+
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.pump();
+      expect(find.text('Veylor is syncing'), findsOneWidget);
+    },
+  );
 
   testWidgets('recent interaction delays the privacy screen', (tester) async {
     _setMobileViewport(tester);
