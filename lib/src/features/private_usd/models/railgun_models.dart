@@ -332,6 +332,7 @@ class RailgunStartParams {
     required this.network,
     required this.rpcUrls,
     required this.poiNodeUrls,
+    this.archive = false,
     this.debug = false,
   });
 
@@ -339,12 +340,17 @@ class RailgunStartParams {
   final String network;
   final List<String> rpcUrls;
   final List<String> poiNodeUrls;
+
+  /// Read Railgun's history from Anon's archive before rail-squid, where the
+  /// page has one for [network].
+  final bool archive;
   final bool debug;
 
   String toJson() => jsonEncode({
     'network': network,
     'rpcUrls': rpcUrls,
     'poiNodeUrls': poiNodeUrls,
+    'archive': archive,
     'debug': debug,
   });
 

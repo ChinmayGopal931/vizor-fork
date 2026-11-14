@@ -933,6 +933,9 @@ abstract final class PrivateUsdCopy {
   /// Whether a new bridge to shielded USD hands its claim to the relayer.
   static const relayerClaimsSetting = 'Let the relayer claim for me';
 
+  /// Whether the Railgun page reads Railgun's history from Anon's archive.
+  static const archiveSyncSetting = "Sync history from Anon's archive";
+
   // ── Settings: the user's own Ethereum RPC ──────────────────────────────
 
   static const rpcTitle = 'Ethereum RPC';

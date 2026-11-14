@@ -845,7 +845,7 @@ mod tests {
         let mut expected = RAILGUN_PAGE_HOSTS.map(str::to_owned).to_vec();
         expected.sort();
         expected.dedup();
-        assert_eq!(expected.len(), 35, "the allowlist has duplicates");
+        assert_eq!(expected.len(), 36, "the allowlist has duplicates");
 
         let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let read = |path: &str| {
@@ -866,6 +866,31 @@ mod tests {
         ] {
             assert_eq!(csp_connect_hosts(&read(page)), expected, "{page}");
         }
+    }
+
+    /// The archive the page reads Railgun's history from is one place in the
+    /// page (`ARCHIVES`); the host Kotlin fetches it from for the page, and
+    /// lets through, must be that one's, and one the bridge allows.
+    #[test]
+    fn the_page_archive_is_the_host_kotlin_fetches_and_the_bridge_allows() {
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let read = |path: &str| {
+            std::fs::read_to_string(repo.join(path))
+                .unwrap_or_else(|error| panic!("read {path}: {error}"))
+        };
+        let page = read("android/railgun-web/src/archive-sync.js");
+        let base = page
+            .split("base: 'https://")
+            .nth(1)
+            .expect("an archive base in ARCHIVES");
+        let archive_host = &base[..base.find('/').expect("a path after the archive host")];
+        let kotlin = read("android/app/src/main/kotlin/com/keplr/vizor/railgun/RailgunEndpoints.kt");
+        let constant = kotlin
+            .split("const val ARCHIVE_HOST = \"")
+            .nth(1)
+            .expect("`ARCHIVE_HOST` in RailgunEndpoints.kt");
+        assert_eq!(&constant[..constant.find('"').unwrap()], archive_host);
+        assert!(RAILGUN_PAGE_HOSTS.contains(&archive_host), "{archive_host}");
     }
 
     /// The string literals inside `val hosts = setOf(…)`, sorted.

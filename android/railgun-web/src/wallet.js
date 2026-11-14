@@ -1,4 +1,4 @@
-import { RailgunWallet, setEngineTxidSyncBatchSize } from '@railgun-community/engine';
+import { RailgunWallet, getEngineTxidSyncBatchSize, setEngineTxidSyncBatchSize } from '@railgun-community/engine';
 import {
   MerkletreeScanStatus,
   NETWORK_CONFIG,
@@ -31,8 +31,12 @@ import {
 } from '@railgun-community/wallet';
 import LevelJS from 'level-js';
 import { groth16 } from 'snarkjs';
+import { archive } from './archive.js';
+import { ARCHIVES, installArchiveSync } from './archive-sync.js';
+import { installArchiveTxids } from './archive-txids.js';
 import { setArtifactProgressListener } from './artifact-mirror.js';
 import { artifactStore } from './artifacts.js';
+import { mainnetBlockTime } from './block-times.js';
 import { badRequest } from './errors.js';
 import { installQuickSync } from './quick-sync.js';
 import { hasUndatedReceipts, hasUndatedShields, pendingShields, receivedSends } from './received.js';
@@ -59,6 +63,9 @@ const NOTES_SCAN_START = 0.03;
 // that batch. The engine's default batch is the 10,000 that Railgun's subgraph hands over at once, which takes a phone
 // minutes; a wallet cut off that often never catches up, and can't prove its sends. Smaller batches keep their progress.
 const TXID_SYNC_BATCH_SIZE = 1_000;
+// A batch from Anon's archive is in within seconds, so a page cut off loses little of a larger one, and each batch
+// costs a root check at the screening node.
+const ARCHIVE_TXID_SYNC_BATCH_SIZE = 5_000;
 // The engine reads on only while the subgraph's answer is one batch long, so each of its txid syncs now reads one
 // answer of 10,000; a refresh syncs again until one adds nothing. Ethereum's whole history is about 15 answers.
 const TXID_SYNC_PASSES = 50;
@@ -103,15 +110,21 @@ export function session() {
 /** Whether the engine was started for debugging, which answers the debug-only calls too. */
 export const isDebug = () => debug;
 
-/** Starts the engine once; a start that failed may run again. */
-export function start({ network: name, rpcUrls, poiNodeUrls, debug: debugging = false }, emit) {
+/**
+ * Starts the engine once; a start that failed may run again. With `archive`, a network with an archive (`ARCHIVES`)
+ * reads Railgun's history from it before rail-squid. Only the Android host fetches the archive for the page, which
+ * can't read it itself (it sends no CORS headers).
+ */
+export function start({ network: name, rpcUrls, poiNodeUrls, archive: useArchive = false, debug: debugging = false }, emit) {
   const networkName = NETWORKS[name];
   if (networkName === undefined) throw badRequest(`unknown network ${name}`);
   if (!rpcUrls?.length) throw badRequest('no RPC URLs');
   if (deleting !== undefined) throw badRequest('this page deletes wallets');
   if (starting === undefined) {
     debug = debugging === true;
-    const promise = startEngine(networkName, `railgun-${name}`, rpcUrls, poiNodeUrls, debug, emit);
+    const onAndroid = globalThis.webkit?.messageHandlers?.railgunHost === undefined;
+    const history = useArchive === true && onAndroid ? ARCHIVES[name] : undefined;
+    const promise = startEngine(networkName, `railgun-${name}`, rpcUrls, poiNodeUrls, history, debug, emit);
     starting = { networkName, promise };
     promise.catch(() => {
       if (starting?.promise === promise) starting = undefined;
@@ -122,15 +135,32 @@ export function start({ network: name, rpcUrls, poiNodeUrls, debug: debugging = 
   return starting.promise;
 }
 
-async function startEngine(networkName, database, rpcUrls, poiNodeUrls, debug, emit) {
+async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history, debug, emit) {
   if (debug) setLoggers((message) => emit('log', String(message)), (error) => emit('log', String(error?.stack ?? error)));
-  setEngineTxidSyncBatchSize(TXID_SYNC_BATCH_SIZE);
+  setEngineTxidSyncBatchSize(history === undefined ? TXID_SYNC_BATCH_SIZE : ARCHIVE_TXID_SYNC_BATCH_SIZE);
   await startRailgunEngine(WALLET_SOURCE, new LevelJS(database), debug, artifactStore, false, false, poiNodeUrls);
   getProver().setSnarkJSGroth16(groth16);
-  installQuickSync(getEngine(), {
-    queries: squidQueries(networkName),
-    head: () => getFallbackProviderForNetwork(networkName).getBlockNumber(),
-  });
+  const engine = getEngine();
+  const queries = squidQueries(networkName);
+  installQuickSync(engine, { queries, head: () => getFallbackProviderForNetwork(networkName).getBlockNumber() });
+  if (history !== undefined) {
+    const reader = archive(history.base, history.chainId);
+    const head = async () => {
+      const block = await getFallbackProviderForNetwork(networkName).getBlock('latest');
+      return { blockNumber: block.number, timestamp: block.timestamp };
+    };
+    const log = (line) => emit('log', line);
+    installArchiveSync(engine, { reader, queries, chainId: history.chainId, time: mainnetBlockTime, head, log });
+    installArchiveTxids(engine, {
+      reader,
+      txidVersion: TXID_VERSION,
+      chain: NETWORK_CONFIG[networkName].chain,
+      batchSize: getEngineTxidSyncBatchSize,
+      time: mainnetBlockTime,
+      head,
+      log,
+    });
+  }
   setOnUTXOMerkletreeScanCallback(({ scanStatus, progress: reported }) => {
     if (scanStatus === MerkletreeScanStatus.Updated) {
       notesProgress = reported <= NOTES_SCAN_START ? reported : Math.max(notesProgress, reported);

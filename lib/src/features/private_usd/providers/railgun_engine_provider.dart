@@ -19,6 +19,7 @@ import '../services/private_usd_swap_backend.dart' show startWithPrivateUsdSeed;
 import '../services/railgun_engine.dart';
 import '../services/railgun_engine_key_store.dart';
 import '../services/railgun_host_channel.dart';
+import 'private_usd_archive_sync_provider.dart';
 import 'private_usd_available_provider.dart';
 import 'private_usd_custom_rpc_provider.dart';
 
@@ -109,6 +110,11 @@ final railgunEngineProvider = Provider<RailgunEngine>((ref) {
       if (previous.value != next.value) unawaited(engine.close());
     },
   );
+  // Reading Anon's archive turned on or off in Settings: likewise.
+  ref.listen(privateUsdArchiveSyncProvider, (previous, next) {
+    if (previous == null || !previous.hasValue || !next.hasValue) return;
+    if (previous.value != next.value) unawaited(engine.close());
+  });
   // iOS may reclaim a suspended app's listening socket, so back from the
   // background the bridge is checked. An OS behaviour, not a layout choice;
   // Android's bridge is never reclaimed.
@@ -192,6 +198,7 @@ class RustRailgunWalletSource implements RailgunWalletSource {
     final deployment = _ref.read(privateUsdDeploymentProvider(network));
     if (deployment == null) throw const RailgunEngineUnavailableException();
     final custom = await privateUsdCustomRpcUrlOf(_ref, network);
+    final archive = await privateUsdArchiveSyncOf(_ref);
     final encryptionKey = await _ref
         .read(railgunEngineKeyStoreProvider)
         .keyFor(accountUuid);
@@ -232,6 +239,7 @@ class RustRailgunWalletSource implements RailgunWalletSource {
         // keyed endpoint first; publicnode keeps the page going without.
         rpcUrls: custom != null ? [custom] : [?keyed, deployment.keylessRpcUrl],
         poiNodeUrls: [deployment.poiNodeUrl],
+        archive: archive,
       ),
       wallet: RailgunOpenWalletParams(
         encryptionKey: encryptionKey,

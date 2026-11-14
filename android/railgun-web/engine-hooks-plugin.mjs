@@ -8,6 +8,8 @@ export const ENGINE_VERSION = '9.8.0';
 
 const ENGINE_PACKAGE = fileURLToPath(new URL('node_modules/@railgun-community/engine/package.json', import.meta.url));
 const UTXO_MERKLETREE = /@railgun-community[\\/]engine[\\/]dist[\\/]merkletree[\\/]utxo-merkletree\.js$/;
+const MERKLETREE = /@railgun-community[\\/]engine[\\/]dist[\\/]merkletree[\\/]merkletree\.js$/;
+const RAILGUN_ENGINE = /@railgun-community[\\/]engine[\\/]dist[\\/]railgun-engine\.js$/;
 const pageModule = (file) => JSON.stringify(fileURLToPath(new URL(`src/${file}`, import.meta.url)));
 
 // utxo-merkletree.js: every new unshield event is looked up before it is stored (src/unshield-events.js).
@@ -53,6 +55,47 @@ export function throughUnshieldWatermark(source) {
   );
 }
 
+// merkletree.js: both callers of fillHashWriteGroup hash every parent of what they insert (src/prebuilt-trees.js).
+const FILL_CALLERS = [
+  'const hashWriteGroup = await Merkletree.fillHashWriteGroup(firstLevelHashWriteGroup, tree, startIndex, endIndex, (level, nodeIndex) => this.getNodeHash(tree, level, nodeIndex));',
+  'const hashWriteGroup = await Merkletree.fillHashWriteGroup(firstLevelHashWriteGroup, tree, startIndex, endIndex, async (level) => this.zeros[level]);',
+];
+
+/** merkletree.js with insertLeaves and rebuildAndWriteTree filling their parents through src/prebuilt-trees.js. */
+export function throughPrebuiltTrees(source) {
+  return FILL_CALLERS.reduce(
+    (rewritten, caller) =>
+      replaceOnce(
+        rewritten,
+        caller,
+        caller.replace(
+          'await Merkletree.fillHashWriteGroup(',
+          `await require(${pageModule('prebuilt-trees.js')}).fillHashWriteGroup(this, (...args) => Merkletree.fillHashWriteGroup(...args), `,
+        ),
+        'Merkletree.fillHashWriteGroup call',
+      ),
+    source,
+  );
+}
+
+// railgun-engine.js: the V2 txid sync works out each transaction's railgunTxid (src/archive-txids.js).
+const TXID_HASH = `            const railgunTransactionWithTxid = (0, railgun_txid_1.createRailgunTransactionWithHash)(railgunTransaction);
+            if (railgunTransactionWithTxid.version !== formatted_types_1.RailgunTransactionVersion.V2) {
+`;
+
+/** railgun-engine.js with the V2 txid sync hashing archive transactions through src/archive-txids.js. */
+export function throughArchiveTxids(source) {
+  return replaceOnce(
+    source,
+    TXID_HASH,
+    TXID_HASH.replace(
+      '(0, railgun_txid_1.createRailgunTransactionWithHash)(railgunTransaction)',
+      `require(${pageModule('archive-txids.js')}).withHash(railgunTransaction, railgun_txid_1.createRailgunTransactionWithHash)`,
+    ),
+    'RailgunEngine.handleNewRailgunTransactionsV2',
+  );
+}
+
 /** Throws unless the installed engine is the one the rewrites were written against. */
 export function checkEngineVersion(version) {
   if (version !== ENGINE_VERSION) {
@@ -67,14 +110,18 @@ export const engineHooks = {
     build.onStart(async () => {
       checkEngineVersion(JSON.parse(await readFile(ENGINE_PACKAGE, 'utf8')).version);
     });
-    build.onLoad({ filter: UTXO_MERKLETREE }, async (args) => {
-      const contents = throughUnshieldWatermark(await readFile(args.path, 'utf8'));
-      rewritten.add('utxo-merkletree');
-      return { contents, loader: 'js' };
-    });
+    const rewrite = (filter, name, through) =>
+      build.onLoad({ filter }, async (args) => {
+        const contents = through(await readFile(args.path, 'utf8'));
+        rewritten.add(name);
+        return { contents, loader: 'js' };
+      });
+    rewrite(UTXO_MERKLETREE, 'utxo-merkletree', throughUnshieldWatermark);
+    rewrite(MERKLETREE, 'merkletree', throughPrebuiltTrees);
+    rewrite(RAILGUN_ENGINE, 'railgun-engine', throughArchiveTxids);
     // A bundle with an engine module this didn't reach would run the engine's own code.
     build.onEnd(() =>
-      rewritten.size === 1 ? undefined : { errors: [{ text: 'the engine modules were not all bundled through the page' }] },
+      rewritten.size === 3 ? undefined : { errors: [{ text: 'the engine modules were not all bundled through the page' }] },
     );
   },
 };

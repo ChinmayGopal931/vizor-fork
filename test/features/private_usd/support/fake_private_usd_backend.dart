@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_archive_sync_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_relayer_claims_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_swap_backend.dart';
@@ -389,6 +390,23 @@ class FakePrivateUsdBackend implements PrivateUsdSwapBackend {
 /// The relayer-claims setting in memory; while [failing], it can't be read.
 class MemoryRelayerClaimsStore implements PrivateUsdRelayerClaimsStore {
   MemoryRelayerClaimsStore([this.stored]);
+
+  bool? stored;
+  bool failing = false;
+
+  @override
+  Future<bool?> read() async {
+    if (failing) throw StateError('secure storage is unavailable');
+    return stored;
+  }
+
+  @override
+  Future<void> write(bool enabled) async => stored = enabled;
+}
+
+/// The archive-sync setting in memory; while [failing], it can't be read.
+class MemoryArchiveSyncStore implements PrivateUsdArchiveSyncStore {
+  MemoryArchiveSyncStore([this.stored]);
 
   bool? stored;
   bool failing = false;

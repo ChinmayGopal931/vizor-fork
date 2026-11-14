@@ -78,8 +78,8 @@ export async function* squidPages(query, format, startingBlock, { pageSize = SQU
  * Stores a quick sync's events as they come and returns nothing more for the engine to store. `unshields`,
  * `nullifiers` and `commitments` are page lists as `squidPages` gives them. The engine resumes a quick sync from its
  * newest stored commitment's block, so the unshields and nullifiers of a page's blocks are stored before its
- * commitments, and a page's commitments go into the tree before the next page is read. `stored(block)` hears the
- * block each page of commitments reached.
+ * commitments, and a page's commitments go into the tree before the next page is read. `stored(through)` hears, after
+ * each page of commitments, the block through which all three lists are stored.
  */
 export async function storeEvents({ engine, txidVersion, chain, unshields, nullifiers, commitments, stored }) {
   const merkletree = engine.getUTXOMerkletree(txidVersion, chain);
@@ -100,13 +100,15 @@ export async function storeEvents({ engine, txidVersion, chain, unshields, nulli
       }
     }
   };
-  for await (const { events } of commitments) {
-    if (events.length === 0) continue;
-    const reached = events.reduce((highest, batch) => Math.max(highest, batch.blockNumber), -Infinity);
+  for await (const { events, through } of commitments) {
+    // A page's last block can go on in the next page, so its events reach past what it gives whole.
+    const reached = events.reduce((highest, batch) => Math.max(highest, batch.blockNumber), through);
     await storeThrough(reached);
-    await engine.commitmentListener(txidVersion, chain, events, false, false);
-    await merkletree.updateTreesFromWriteQueue(true);
-    stored?.(reached);
+    if (events.length > 0) {
+      await engine.commitmentListener(txidVersion, chain, events, false, false);
+      await merkletree.updateTreesFromWriteQueue(true);
+    }
+    stored?.(through);
   }
   await storeThrough(Infinity);
   return NO_EVENTS;
