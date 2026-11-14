@@ -103,8 +103,8 @@ export function installArchiveSync(engine, { reader, queries, chainId, time, hea
           commitments: lists.commitments,
           stored: (block) => {
             through = block;
-            report(block);
           },
+          progress: report,
         });
       } catch (error) {
         if (!(error instanceof ArchiveUnavailable)) throw error;
@@ -120,7 +120,7 @@ export function installArchiveSync(engine, { reader, queries, chainId, time, hea
       unshields: squidPages(queries.unshields, formatUnshields, through + 1, pages),
       nullifiers,
       commitments: squidPages(queries.commitments, formatCommitments, through + 1, pages),
-      stored: report,
+      progress: report,
     });
   };
 }

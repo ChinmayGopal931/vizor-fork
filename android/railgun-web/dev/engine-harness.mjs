@@ -49,11 +49,16 @@ const { RailgunEngine } = require('@railgun-community/engine');
 
 /**
  * A UTXO merkletree over `store` (a fresh memory one by default, as `memoryDatabase` makes), and an engine around it
- * with the engine's own commitment, nullifier and unshield listeners. `progress` collects the scan updates it emits.
+ * with the engine's own commitment, nullifier and unshield listeners. `progress` collects the scan updates it emits,
+ * and `rootChecks()` counts the roots the merkletree had checked, as the contract checks them on chain.
  */
 export async function engineHarness({ store = memoryDatabase() } = {}) {
   const { db, down } = store;
-  const merkletree = await UTXOMerkletree.create(db, CHAIN, V2, async () => true);
+  let roots = 0;
+  const merkletree = await UTXOMerkletree.create(db, CHAIN, V2, async () => {
+    roots += 1;
+    return true;
+  });
   const progress = [];
   const engine = {
     db,
@@ -65,7 +70,7 @@ export async function engineHarness({ store = memoryDatabase() } = {}) {
   for (const listener of ['commitmentListener', 'nullifierListener', 'unshieldListener']) {
     engine[listener] = RailgunEngine.prototype[listener].bind(engine);
   }
-  return { db, down, engine, merkletree, progress };
+  return { db, down, engine, merkletree, progress, rootChecks: () => roots };
 }
 
 const TREE_DEPTH = 16;

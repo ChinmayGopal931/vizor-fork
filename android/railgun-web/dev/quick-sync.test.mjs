@@ -103,10 +103,16 @@ async function storedWhole(lists) {
   return contents(store.down);
 }
 
-async function storedByPages(lists, { pageSize, store = memoryDatabase(), startingBlock = lists.from, harness } = {}) {
+async function storedByPages(lists, { pageSize, writeLeaves, store = memoryDatabase(), startingBlock = lists.from, harness } = {}) {
   const { engine } = harness ?? (await engineHarness({ store }));
   const options = { pageSize, gapMs: 0 };
-  const left = await storeEvents({ engine, txidVersion: V2, chain: CHAIN, ...squidLists(indexer(lists, pageSize).queries, startingBlock, options) });
+  const left = await storeEvents({
+    engine,
+    txidVersion: V2,
+    chain: CHAIN,
+    ...squidLists(indexer(lists, pageSize).queries, startingBlock, options),
+    writeLeaves,
+  });
   return { left, stored: contents(store.down) };
 }
 
@@ -115,6 +121,47 @@ test('a quick sync stored page by page stores exactly what the engine stores fro
   const { left, stored } = await storedByPages(lists, { pageSize: 40 });
   assert.deepEqual(left, NO_EVENTS);
   assert.deepEqual(stored, await storedWhole(lists));
+});
+
+test('the trees take the leaves of several pages at once, so few roots are checked on chain', async () => {
+  const lists = history();
+  const harness = await engineHarness();
+  let writes = 0;
+  const own = harness.merkletree.updateTreesFromWriteQueue.bind(harness.merkletree);
+  harness.merkletree.updateTreesFromWriteQueue = (...args) => {
+    writes += 1;
+    return own(...args);
+  };
+  const pages = Math.ceil(lists.commitments.length / 10);
+  const { stored } = await storedByPages(lists, { pageSize: 10, writeLeaves: 100, store: harness, harness });
+  assert.deepEqual(stored, await storedWhole(lists));
+  // A write each 100 leaves and one at the end, rather than one a page; one root checked per write.
+  assert.equal(writes, Math.ceil(lists.commitments.length / 100));
+  assert.ok(harness.rootChecks() <= writes, `${harness.rootChecks()} roots checked for ${pages} pages`);
+});
+
+test('a list that fails first stores the leaves the pages before it gave, and says through where', async () => {
+  const lists = history();
+  const harness = await engineHarness();
+  const ownCommitments = harness.engine.commitmentListener;
+  let calls = 0;
+  harness.engine.commitmentListener = (...args) => {
+    calls += 1;
+    if (calls === 4) throw new Error('broken page');
+    return ownCommitments(...args);
+  };
+  const stored = [];
+  const pages = squidLists(indexer(lists, 30).queries, lists.from, { pageSize: 30, gapMs: 0 });
+  await assert.rejects(
+    storeEvents({ engine: harness.engine, txidVersion: V2, chain: CHAIN, ...pages, stored: (block) => stored.push(block) }),
+    /broken page/,
+  );
+  // The default write size holds every leaf until the end, so the only write is the one the failure makes.
+  assert.equal(stored.length, 1);
+  const { tree, index } = await harness.merkletree.getLatestTreeAndIndex();
+  const newest = (await harness.merkletree.getCommitment(tree, index)).blockNumber;
+  assert.ok(newest <= stored[0] + 1, `newest stored commitment at ${newest}, stored through ${stored[0]}`);
+  assert.ok(newest > lists.from);
 });
 
 test("a page's unshields and nullifiers are stored before its commitments", async () => {
