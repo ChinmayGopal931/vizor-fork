@@ -4,7 +4,9 @@ name: Update mainnet chain tables
 # avoid asking lightwalletd about wallet-derived heights:
 # - block times every 1,000 blocks, for birthday date and height conversion;
 # - tree states every 10,000 blocks, where restored birthdays start scanning
-#   (every third one from NU7).
+#   (every third one from NU7);
+# - Ethereum block times every 1,000 blocks, which date the Railgun page's
+#   records from Anon's archive.
 # A person reviews and merges each update, since the tables ship in the binary.
 
 on:
@@ -25,6 +27,7 @@ env:
   DATA_FILES: >-
     rust/src/wallet/block_times/mainnet_data.rs
     rust/src/wallet/tree_states/mainnet_data.rs
+    android/railgun-web/src/block-times-mainnet.js
   GRPCURL_VERSION: 1.9.4
   GRPCURL_SHA256: 97e13d58d2733a0e62cd2571d1d5f0c02823f0d25282f08bddedf1ad9c5d1736
 
@@ -50,6 +53,7 @@ jobs:
         run: |
           scripts/update-mainnet-block-times.py --check
           scripts/update-mainnet-tree-states.py --check
+          scripts/update-railgun-block-times.py --check
 
       - name: Append agreed entries
         id: update
@@ -58,11 +62,15 @@ jobs:
           echo "$block_times"
           tree_states="$(scripts/update-mainnet-tree-states.py)"
           echo "$tree_states"
+          railgun_block_times="$(scripts/update-railgun-block-times.py)"
+          echo "$railgun_block_times"
           scripts/update-mainnet-block-times.py --check
           scripts/update-mainnet-tree-states.py --check
+          scripts/update-railgun-block-times.py --check
           {
             echo "block_times=$block_times"
             echo "tree_states=$tree_states"
+            echo "railgun_block_times=$railgun_block_times"
           } >> "$GITHUB_OUTPUT"
           # shellcheck disable=SC2086 # DATA_FILES is a space-separated list.
           if git diff --quiet -- $DATA_FILES; then
@@ -77,6 +85,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BLOCK_TIMES: ${{ steps.update.outputs.block_times }}
           TREE_STATES: ${{ steps.update.outputs.tree_states }}
+          RAILGUN_BLOCK_TIMES: ${{ steps.update.outputs.railgun_block_times }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -84,14 +93,16 @@ jobs:
           # shellcheck disable=SC2086 # DATA_FILES is a space-separated list.
           git add $DATA_FILES
           git commit -m "Update mainnet chain tables" \
-            -m "Block times: $BLOCK_TIMES" -m "Tree states: $TREE_STATES"
+            -m "Block times: $BLOCK_TIMES" -m "Tree states: $TREE_STATES" \
+            -m "Railgun block times: $RAILGUN_BLOCK_TIMES"
           git push --force origin "$BRANCH"
 
-          body="$(printf '%s\n\n- Block times: %s\n- Tree states: %s\n\n%s' \
-            "Weekly update from \`scripts/update-mainnet-block-times.py\` and \`scripts/update-mainnet-tree-states.py\`." \
+          body="$(printf '%s\n\n- Block times: %s\n- Tree states: %s\n- Railgun block times: %s\n\n%s' \
+            "Weekly update from \`scripts/update-mainnet-block-times.py\`, \`scripts/update-mainnet-tree-states.py\` and \`scripts/update-railgun-block-times.py\`." \
             "$BLOCK_TIMES" \
             "$TREE_STATES" \
-            "Each new entry was confirmed by two independent lightwalletd endpoints, and the last existing entries were re-verified. Review and merge to ship the entries in the next release.")"
+            "$RAILGUN_BLOCK_TIMES" \
+            "Each new entry was confirmed by two independent endpoints (lightwalletd for Zcash, Ethereum RPC for Railgun), and the last existing entries were re-verified. Review and merge to ship the entries in the next release.")"
           existing="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')"
           if [ -n "$existing" ]; then
             gh pr edit "$existing" --body "$body"
