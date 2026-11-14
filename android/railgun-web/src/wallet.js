@@ -70,6 +70,10 @@ const ARCHIVE_TXID_SYNC_BATCH_SIZE = 5_000;
 // answer of 10,000; a refresh syncs again until one adds nothing. Ethereum's whole history is about 15 answers.
 const TXID_SYNC_PASSES = 50;
 const TXID_SYNC_WAIT_MS = 1_000;
+// A txid sync that adds nothing short of the screening nodes' validated index is tried again this many times, 5 s
+// longer apart each time: a connection that drops for a moment makes the engine drop a batch.
+const TXID_SYNC_RETRIES = 3;
+const TXID_SYNC_RETRY_MS = 5_000;
 // Only a long catch-up is reported, so a refresh that finds a few new txids doesn't flash the row; it is read this often.
 const TXID_REPORT_GAP = 1_000;
 const TXID_REPORT_MS = 2_000;
@@ -358,6 +362,9 @@ async function catchUpTxidList(emit) {
       isScanning: () => tree.isScanning,
       wait: () => delay(TXID_SYNC_WAIT_MS),
       passes: TXID_SYNC_PASSES,
+      target: () => getEngine().getLatestValidatedTxidIndex(TXID_VERSION, chain()),
+      retries: TXID_SYNC_RETRIES,
+      retryWait: (attempt) => delay(TXID_SYNC_RETRY_MS * attempt),
     });
   } finally {
     reporting?.stop();

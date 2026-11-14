@@ -2,16 +2,31 @@ import { MerkletreeScanStatus } from '@railgun-community/shared-models';
 
 /**
  * Syncs txids again while the last sync added some, at most `passes` times. `before` is the latest txid index from
- * before the notes scan, whose own txid sync is the first. A sync the engine started itself, after new notes, makes
- * `sync` return at once, so each count waits for the running one to end first.
+ * before the catch-up's first sync. A sync the engine started itself, after new notes, makes `sync` return at once, so
+ * each count waits for the running one to end first.
+ *
+ * A sync that adds nothing ends the catch-up once the list has reached `target()`, the index the screening nodes have
+ * validated, or when that can't be read. Short of it, the sync failed (the engine drops a batch whose root check could
+ * not reach the screening node, and says nothing), so it is tried again after `retryWait(attempt)`, up to `retries`
+ * times, and then the catch-up fails.
  */
-export async function catchUpTxids({ before, latest, sync, isScanning, wait, passes }) {
+export async function catchUpTxids({ before, latest, sync, isScanning, wait, passes, target, retries = 0, retryWait }) {
   const settled = async () => {
     while (isScanning()) await wait();
     return latest();
   };
   let now = await settled();
-  for (let pass = 0; now !== before && pass < passes; pass += 1) {
+  let stalled = 0;
+  for (let pass = 0; pass < passes; pass += 1) {
+    if (now === before) {
+      const goal = await target?.().catch(() => undefined);
+      if (goal === undefined || !(now < goal)) return;
+      stalled += 1;
+      if (stalled > retries) throw new Error(`the txid list stopped at ${now} of ${goal}`);
+      await retryWait(stalled);
+    } else {
+      stalled = 0;
+    }
     before = now;
     await sync();
     now = await settled();
