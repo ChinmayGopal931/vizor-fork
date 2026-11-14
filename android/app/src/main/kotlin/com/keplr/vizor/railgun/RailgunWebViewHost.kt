@@ -167,8 +167,14 @@ internal class RailgunWebViewHost(
 
         val isOpen: Boolean get() = channel.isOpen
 
+        // The bridge the page goes through, which the host's archive requests go through too.
+        @Volatile
+        var bridgePort = 0
+            private set
+
         @MainThread
         suspend fun load(proxyPort: Int) {
+            bridgePort = proxyPort
             view.webViewClient = Client(this)
             try {
                 // Nothing may load before the override is in place: it is process-wide and asynchronous.
@@ -249,6 +255,9 @@ internal class RailgunWebViewHost(
             request: WebResourceRequest,
         ): WebResourceResponse? {
             val url = request.url
+            if (RailgunArchiveFetch.handles(url.scheme, url.host, url.port, request.method)) {
+                return RailgunArchiveFetch.fetch(url, page.bridgePort)
+            }
             return when (RailgunRequests.route(url.scheme, url.host, url.port)) {
                 RailgunRequests.Route.OWN_ASSET -> assets.shouldInterceptRequest(url) ?: refusal(NOT_FOUND)
                 RailgunRequests.Route.ALLOWED -> null

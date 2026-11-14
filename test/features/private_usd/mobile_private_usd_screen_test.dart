@@ -232,6 +232,38 @@ void main() {
     expect(find.text(PrivateUsdCopy.unknown), findsOneWidget);
   });
 
+  testWidgets("a long sync's balance shows at once, saying its rest runs on "
+      'and what waits on it', (tester) async {
+    const waitsKey = ValueKey('mobile_private_usd_syncing_waits');
+    await pumpScreen(
+      tester,
+      previewPrivateUsdBalance(available: 100, unproved: 12.5, syncing: true),
+      screeningActivity: const RailgunScreeningEvent(txids: 0.42),
+    );
+    expect(find.text(r'$112.50'), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.syncingRest(42)), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(waitsKey)).data,
+      PrivateUsdCopy.syncingRestWaits(r'$12.50'),
+    );
+
+    // Nothing waits on it: the line alone, before the page says how far.
+    await pumpScreen(
+      tester,
+      previewPrivateUsdBalance(available: 100, syncing: true),
+    );
+    expect(find.text(PrivateUsdCopy.syncingRest(null)), findsOneWidget);
+    expect(find.byKey(waitsKey), findsNothing);
+
+    // Once it ends, the balance says how old it is again.
+    await pumpScreen(
+      tester,
+      previewPrivateUsdBalance(available: 100, unproved: 12.5),
+    );
+    expect(find.byKey(waitsKey), findsNothing);
+    expect(find.textContaining('Updated '), findsOneWidget);
+  });
+
   testWidgets('a failed refresh keeps the last balance and says so', (
     tester,
   ) async {

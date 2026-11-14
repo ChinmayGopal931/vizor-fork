@@ -57,7 +57,7 @@ pub(crate) const MAX_LOGS_BODY: usize = 8 << 20;
 /// entry stands for any subdomain, one label or more, never the domain itself
 /// (`host_allowed`): QuickNode names each endpoint, Chainstack each dedicated
 /// node.
-pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 35] = [
+pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 36] = [
     // Ethereum RPC: publicnode (the keyless default), Alchemy, Infura,
     // QuickNode, Chainstack, Ankr, dRPC, BlockPI, Tenderly, NodeReal,
     // GetBlock, OnFinality, Pocket Network and MEV Blocker. Each keyless one
@@ -103,6 +103,9 @@ pub(crate) const RAILGUN_PAGE_HOSTS: [&str; 35] = [
     // The screening node and the SDK's own quick sync.
     "ppoi.fdi.network",
     "rail-squid.squids.live",
+    // Anon's archive of the same history, which Android's host fetches for the
+    // page through this bridge.
+    "digest.anon.inc",
     // On Sepolia, our copy of its transaction list with the hash chain repaired.
     "railgun-sepolia-list.pepeman931.workers.dev",
     // The proving artifacts: the SDK's own gateway, then our mirror when the

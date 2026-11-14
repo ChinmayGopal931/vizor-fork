@@ -178,9 +178,13 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
     final timeout = firstSync != null
         ? PrivateUsdBalanceTiming.firstSyncTimeout
         : PrivateUsdBalanceTiming.refreshTimeout;
-    final sync = ref.read(railgunEngineProvider).sync(accountUuid);
+    final engine = ref.read(railgunEngineProvider);
+    final sync = engine.sync(accountUuid);
+    var finishing = false;
     try {
-      _shownIfMounted(await sync.timeout(timeout));
+      final synced = await sync.timeout(timeout);
+      finishing = synced.syncing;
+      _shownIfMounted(synced);
     } on TimeoutException {
       firstSync?.end();
       _failed();
@@ -200,8 +204,34 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
             error.code == RailgunHostErrorCode.rpcFailed,
       );
     } finally {
-      firstSync?.end();
+      if (firstSync != null && finishing) {
+        _keepAwakeUntilFinished(engine, firstSync);
+      } else {
+        firstSync?.end();
+      }
     }
+  }
+
+  // A first sync's balances came back with the rest of it still running in
+  // the page: the screen stays on until that ends, or the page closes, even
+  // past this notifier.
+  void _keepAwakeUntilFinished(
+    RailgunEngine engine,
+    PrivateUsdFirstSync firstSync,
+  ) {
+    void check() {
+      final current = engine.state.value;
+      final finishing =
+          current.accountUuid == accountUuid &&
+          current.lastSync?.accountUuid == accountUuid &&
+          current.lastSync?.syncing == true;
+      if (finishing) return;
+      engine.state.removeListener(check);
+      firstSync.end();
+    }
+
+    engine.state.addListener(check);
+    check();
   }
 
   /// The user changed the Ethereum RPC: the last failure says nothing about
@@ -314,8 +344,10 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       // A sync that could not read the history keeps the last one's.
       shieldingSince: shieldingSince,
       clearShieldingSince: shielding != null && shieldingSince == null,
+      syncing: sync.syncing,
     );
-    _runningFirstSync?.end();
+    // A first sync whose rest runs on keeps the screen on until it ends.
+    if (!sync.syncing) _runningFirstSync?.end();
     unawaited(
       ref
           .read(privateUsdBalanceCacheProvider)
@@ -376,7 +408,7 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
     if (!ref.mounted) return;
     final percent = state.balances != null || engine.accountUuid != accountUuid
         ? null
-        : _firstSync.percent(notes: engine.utxoScan, ids: engine.txidScan);
+        : _firstSync.percent(notes: engine.utxoScan);
     if (percent != state.firstSyncPercent) {
       state = percent == null
           ? state.copyWith(clearFirstSyncPercent: true)

@@ -39,6 +39,7 @@ class PrivateUsdBalanceState {
     this.refreshPercent,
     this.received = const [],
     this.shieldingSince,
+    this.syncing = false,
   });
 
   /// Null until a sync or the cache has something to show.
@@ -78,6 +79,11 @@ class PrivateUsdBalanceState {
   /// cached.
   final DateTime? shieldingSince;
 
+  /// The rest of the last sync runs on in the page ([RailgunRefresh.syncing]):
+  /// Railgun's transaction list, which the change from the wallet's own
+  /// sends waits on. Never cached.
+  final bool syncing;
+
   /// No balance yet, and one is on its way.
   bool get isLoading => balances == null && (!refreshFailed || isRefreshing);
 
@@ -96,6 +102,7 @@ class PrivateUsdBalanceState {
     List<RailgunReceipt>? received,
     DateTime? shieldingSince,
     bool clearShieldingSince = false,
+    bool? syncing,
   }) => PrivateUsdBalanceState(
     balances: balances ?? this.balances,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -114,6 +121,7 @@ class PrivateUsdBalanceState {
     shieldingSince: clearShieldingSince
         ? null
         : (shieldingSince ?? this.shieldingSince),
+    syncing: syncing ?? this.syncing,
   );
 
   @override
@@ -129,7 +137,8 @@ class PrivateUsdBalanceState {
       other.firstSyncPercent == firstSyncPercent &&
       other.refreshPercent == refreshPercent &&
       listEquals(other.received, received) &&
-      other.shieldingSince == shieldingSince;
+      other.shieldingSince == shieldingSince &&
+      other.syncing == syncing;
 
   @override
   int get hashCode => Object.hash(
@@ -144,6 +153,7 @@ class PrivateUsdBalanceState {
     refreshPercent,
     Object.hashAll(received),
     shieldingSince,
+    syncing,
   );
 }
 
@@ -179,42 +189,28 @@ class PrivateUsdBalanceRetries {
   }
 }
 
-/// A first sync's progress, in percent of the time one takes: Railgun's
-/// notes, then the transaction ids its screening needs. The engine reports
-/// the notes at milestones that can be minutes apart, so between two the
-/// number creeps toward the next one's, slower the nearer it gets, without
-/// passing it. The ids come in batches whose progress each starts over, so
-/// every batch covers part of what is left and the number never goes back.
+/// A first sync's progress, in percent of the time one takes until its
+/// balance shows: Railgun's notes, which the quick sync reports by block as it
+/// stores their history and the decryption batch by batch. Between two
+/// reports the number creeps toward the next milestone's, slower the nearer it
+/// gets, without passing it. Railgun's transaction list comes after the
+/// balance, on the sync line.
 class PrivateUsdFirstSyncProgress {
   PrivateUsdFirstSyncProgress({Duration Function()? elapsed})
     : _elapsed = elapsed ?? _stopwatch();
 
   final Duration Function() _elapsed;
-  int _idBatches = 0;
-  double _lastIds = 0;
   double _lastNotes = -1;
   Duration _notesSince = Duration.zero;
 
   /// Whether the number can move before the engine's next report.
   bool isCreeping = false;
 
-  int? percent({RailgunScanEvent? notes, RailgunScanEvent? ids}) {
+  int? percent({RailgunScanEvent? notes}) {
     isCreeping = false;
     if (notes == null) return null;
-    if (notes.status != RailgunScanStatus.complete) {
-      _idBatches = 0;
-      _lastIds = 0;
-      return _notesPercent(notes.progress.clamp(0, 1).toDouble());
-    }
-    if (ids == null) return _notesShare;
-    if (ids.status == RailgunScanStatus.complete) return _lastPercent;
-    if (ids.progress < _lastIds) _idBatches += 1;
-    _lastIds = ids.progress;
-    final left = math.pow(
-      _idBatchLeft,
-      _idBatches + ids.progress.clamp(0, 1).toDouble(),
-    );
-    return _lastPercent - ((_lastPercent - _notesShare) * left).toInt();
+    if (notes.status == RailgunScanStatus.complete) return _lastPercent;
+    return _notesPercent(notes.progress.clamp(0, 1).toDouble());
   }
 
   int _notesPercent(double progress) {
@@ -223,7 +219,7 @@ class PrivateUsdFirstSyncProgress {
       _notesSince = _elapsed();
     }
     final next = _notesSteps.indexWhere((step) => step.at > progress);
-    if (next == -1) return _notesShare;
+    if (next == -1) return _lastPercent;
     if (next == 0) return 0;
     final from = _notesSteps[next - 1];
     final to = _notesSteps[next];
@@ -237,23 +233,17 @@ class PrivateUsdFirstSyncProgress {
     return crept.toInt();
   }
 
-  // On Ethereum the notes take about 60% of a first sync, and each of its 15
-  // or so id batches leaves 85% of the rest.
-  static const _notesShare = 60;
+  // The balance shows once the notes are in, a moment after 99.
   static const _lastPercent = 99;
-  static const _idBatchLeft = 0.85;
 
   // The engine's notes milestones, each with how long the next one took on a
-  // Galaxy A35 over Wi-Fi.
+  // OnePlus 15 over 4G.
   static final _notesSteps = _steps(const [
     (0.03, Duration(seconds: 5)), // loading the network
-    (0.10, Duration(minutes: 6)), // downloading Railgun's history
-    (0.15, Duration(minutes: 7)), // saving its unshields
-    (0.25, Duration(minutes: 4)), // and nullifiers
-    (0.30, Duration(minutes: 16)), // building its trees
-    (0.40, Duration(seconds: 5)),
-    (0.50, Duration(seconds: 5)), // catching up with the chain
-    (0.70, Duration(minutes: 6)), // finding this wallet's notes
+    (0.10, Duration(minutes: 9)), // storing Railgun's history, by block
+    (0.40, Duration(seconds: 10)),
+    (0.50, Duration(seconds: 10)), // catching up with the chain
+    (0.70, Duration(minutes: 4)), // finding this wallet's notes
     (0.97, Duration(seconds: 5)),
     (1.0, Duration.zero),
   ]);
@@ -267,7 +257,7 @@ class PrivateUsdFirstSyncProgress {
         _NotesStep(
           at: at,
           takes: takes,
-          percent: _notesShare * before.inMicroseconds / total.inMicroseconds,
+          percent: _lastPercent * before.inMicroseconds / total.inMicroseconds,
         ),
       );
       before += takes;

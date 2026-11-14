@@ -421,6 +421,10 @@ header times every 1,000 blocks. The only request left is the chain tip.
 - Bootstrap or refresh before a release cut with
   `scripts/update-mainnet-block-times.py` (needs `grpcurl`); validate offline
   with `--check`. Never edit the data file by hand.
+- The Railgun page ships an Ethereum mainnet table the same way
+  (`android/railgun-web/src/block-times-mainnet.js`, from
+  `scripts/update-railgun-block-times.py`, in the same workflow). It dates
+  the records the page reads from Anon's archive.
 
 ## Image Assets
 
@@ -1798,6 +1802,40 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
 - **Route.** Issuer requests go through `routed_http` like every other,
   over Tor when Tor is on; with Tor off the review screens disclose that
   the issuer and the maker see one connection.
+
+**Railgun's sync (the page).**
+
+- A refresh answers once the notes are scanned and checked. Railgun's
+  transaction list and the proofs of the wallet's own sends then finish in
+  the page (`sync-finish.js`) and end with a `synced` event; `syncing` in
+  the refresh says that rest is long. The screen shows the balance with a
+  line naming the change that waits, the idle close counts the page's
+  events as use meanwhile, and a first sync keeps the screen on until the
+  rest ends. A send's own proofs never need that list.
+- The page answers the engine's quick sync (`quick-sync.js`): rail-squid's
+  pages through the SDK's own client and formatters, each stored as it
+  comes, a page's unshields and nullifiers before its commitments (the
+  engine resumes from its newest stored commitment).
+- `engine-hooks-plugin.mjs` holds every rewrite of the engine's code (the
+  unshield watermark in `unshield-events.js`, the prebuilt-tree fill, the
+  archive's leaf hashing). Each names the exact source of the pinned engine
+  and fails the build against any other: re-check them when bumping it.
+- **Anon's archive** (Android, mainnet, Settings, on by default;
+  `archive*.js`, `prebuilt-trees.js`):
+  - Every file must match its published SHA-256, and the manifest is read
+    again before the tip.
+  - A prebuilt tree is used only once Railgun's contract or the screening
+    node accepts its root.
+  - Nullifiers always come from rail-squid: the archive drops a nullifier
+    spent again in another tree.
+  - Times come from the shipped block table, never the archive. Commitments
+    and unshields carry no archive railgunTxid.
+  - On anything unexpected the sync goes on from rail-squid where the
+    archive left off. A sync within a day of the newest block never asks the
+    archive.
+  - Android's host fetches the archive for the page through the page's
+    bridge (`RailgunArchiveFetch`); iOS starts the page without it. Every
+    archive request depends on the chain's state alone.
 
 **Network: Tor and the Railgun page.**
 

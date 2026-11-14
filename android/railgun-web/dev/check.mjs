@@ -104,13 +104,19 @@ async function connect(page, url, onEvent) {
   };
 }
 
-/** Prints events once each; `notesScans` counts the notes scans that started, which report 3% first. */
+/**
+ * Prints events once each; `notesScans` counts the notes scans that started, which report 3% first, and `next(event)`
+ * resolves with the next such event's data.
+ */
 function eventPrinter() {
   let last = '';
+  let waiting = [];
   const print = (event, data) => {
     if (event === 'scan' && data.tree === 'utxo' && data.status === 'Updated' && data.progress <= 0.03) {
       print.notesScans += 1;
     }
+    for (const waiter of waiting.filter(({ name }) => name === event)) waiter.resolve(data);
+    waiting = waiting.filter(({ name }) => name !== event);
     let line;
     if (event === 'scan') line = `scan ${data.tree} ${data.status} ${Math.floor(data.progress * 10) * 10}%`;
     else if (event === 'proof') line = `proof ${Math.floor(data.progress * 10) * 10}% ${data.status}`;
@@ -120,6 +126,7 @@ function eventPrinter() {
     last = line ?? last;
   };
   print.notesScans = 0;
+  print.next = (name) => new Promise((resolve) => waiting.push({ name, resolve }));
   return print;
 }
 
@@ -149,8 +156,12 @@ async function syncCheck(page, url, onEvent) {
     const { address } = await call('openNewWallet', { encryptionKey, mnemonic, creationBlock: fromBlock });
     if (address !== expected) throw new Error(`the browser opened ${address}, Node derives ${expected}`);
     console.log(`  address matches Node's derivation: ${address.slice(0, 16)}…`);
-    const { balances, screening } = await call('refresh', {});
-    console.log(`  balances ${JSON.stringify(balances)}, screening ${screening}`);
+    // The refresh answers once the notes are in; the rest of the sync ends with a `synced` event.
+    const synced = onEvent.next('synced');
+    const { balances, screening, syncing } = await call('refresh', {});
+    console.log(`  balances ${JSON.stringify(balances)}, screening ${screening}, syncing ${syncing}`);
+    const finished = await synced;
+    console.log(`  the rest of the sync ended, screening ${finished.screening}`);
     // The engine skips a scan while another runs; each sync must still get one of its own.
     const before = onEvent.notesScans;
     await Promise.all([call('refresh', {}), call('refresh', {})]);

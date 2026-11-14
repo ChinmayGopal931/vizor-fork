@@ -123,6 +123,7 @@ class RailgunSync {
     required this.at,
     this.received,
     this.shielding,
+    this.syncing = false,
   });
 
   final String accountUuid;
@@ -137,6 +138,21 @@ class RailgunSync {
   /// The shields screening still holds; null when the page could not read
   /// its history.
   final List<RailgunPendingShield>? shielding;
+
+  /// The rest of this sync runs on in the page ([RailgunRefresh.syncing]):
+  /// the change from the wallet's own sends waits on it.
+  final bool syncing;
+
+  /// This sync with its rest over, or cut off with the page.
+  RailgunSync finished() => RailgunSync(
+    accountUuid: accountUuid,
+    address: address,
+    balances: balances,
+    screening: screening,
+    at: at,
+    received: received,
+    shielding: shielding,
+  );
 }
 
 /// What the engine is doing, for progress lines. It carries no messages: an
@@ -271,6 +287,17 @@ class RailgunEngine {
   RailgunSession? _session;
   Timer? _idleTimer;
 
+  // A use runs now (uses run one at a time).
+  bool _using = false;
+
+  // The rest of a sync runs on in the page after its refresh answered
+  // (`RailgunRefresh.syncing`). Meanwhile the page's events count as use for
+  // the idle close, which then closes only a page quiet for [idleClose].
+  bool _finishing = false;
+
+  // How many `synced` events the page has sent.
+  int _syncsFinished = 0;
+
   // The port of the bridge the open page goes through; null once it stopped.
   int? _bridgePort;
 
@@ -304,6 +331,7 @@ class RailgunEngine {
         throw const RailgunEngineUnavailableException();
       }
       _idleTimer?.cancel();
+      _using = true;
       final epoch = _epoch;
       try {
         final session = await _sessionFor(accountUuid);
@@ -323,15 +351,21 @@ class RailgunEngine {
         _fail(null);
         rethrow;
       } finally {
+        _using = false;
         _armIdleClose();
       }
     });
   }
 
   /// Syncs [accountUuid]'s wallet to the chain's tip and reads its balances.
+  /// The rest of a long sync runs on in the page ([RailgunSync.syncing]);
+  /// its end replaces [RailgunEngineState.lastSync].
   Future<RailgunSync> sync(String accountUuid) =>
       withSession(accountUuid, (session) async {
+        final ends = _syncsFinished;
         final refreshed = await session.refresh();
+        // A rest that ended while the answer was on its way is over.
+        final syncing = refreshed.syncing && ends == _syncsFinished;
         final sync = RailgunSync(
           accountUuid: accountUuid,
           address: session.address,
@@ -340,7 +374,9 @@ class RailgunEngine {
           at: _now(),
           received: refreshed.received,
           shielding: refreshed.shielding,
+          syncing: syncing,
         );
+        _finishing = syncing;
         _publish(state.value.copyWith(lastSync: sync));
         return sync;
       });
@@ -584,11 +620,13 @@ class RailgunEngine {
     _session = null;
     _idleTimer?.cancel();
     _idleTimer = null;
+    _finishing = false;
     if (_disposed) return;
+    // The rest of a sync ends with its page.
     _publish(
       forget
           ? const RailgunEngineState()
-          : RailgunEngineState(lastSync: state.value.lastSync),
+          : RailgunEngineState(lastSync: state.value.lastSync?.finished()),
     );
   }
 
@@ -596,8 +634,15 @@ class RailgunEngine {
   Future<void> _settleCloses() => Future.wait(_closing.toList());
 
   // The page is gone or about to be: drop the session and stop its bridge.
+  // The rest of a sync goes with it.
   Future<void> _forget() async {
     _session = null;
+    if (_finishing) {
+      _finishing = false;
+      _publish(
+        state.value.copyWith(lastSync: state.value.lastSync?.finished()),
+      );
+    }
     await _shutdown();
   }
 
@@ -650,10 +695,35 @@ class RailgunEngine {
         _publish(state.value.copyWith(proof: proof));
       case final RailgunScreeningEvent screening:
         _publish(state.value.copyWith(screening: screening));
+      case RailgunSyncedEvent(:final refresh):
+        _onSynced(refresh);
       // Page lines can quote anything the engine saw: never printed here.
       case RailgunLogEvent() || null:
         break;
     }
+    if (_finishing && !_using) _armIdleClose();
+  }
+
+  // The rest of a sync ended: the open wallet's state, read again.
+  void _onSynced(RailgunRefresh refresh) {
+    _syncsFinished++;
+    _finishing = false;
+    final session = _session;
+    if (session == null) return;
+    _publish(
+      state.value.copyWith(
+        lastSync: RailgunSync(
+          accountUuid: session.accountUuid,
+          address: session.address,
+          balances: refresh.balances,
+          screening: refresh.screening,
+          at: _now(),
+          received: refresh.received,
+          shielding: refresh.shielding,
+        ),
+      ),
+    );
+    if (!_using) _armIdleClose();
   }
 
   void _fail(RailgunHostErrorCode? code) {

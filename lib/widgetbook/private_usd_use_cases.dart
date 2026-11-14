@@ -74,9 +74,11 @@ PrivateUsdBalanceState previewPrivateUsdBalance({
   double arriving = 0,
   double blocked = 0,
   double processing = 0,
+  double unproved = 0,
   bool isRefreshing = false,
   bool refreshFailed = false,
   int? refreshPercent,
+  bool syncing = false,
 }) {
   BigInt units(double dollars) => BigInt.from((dollars * 1e6).round());
   final buckets = <RailgunBalanceBucket, List<RailgunTokenAmount>>{
@@ -84,6 +86,7 @@ PrivateUsdBalanceState previewPrivateUsdBalance({
     RailgunBalanceBucket.shieldPending: [_held(units(arriving))],
     RailgunBalanceBucket.shieldBlocked: [_held(units(blocked))],
     RailgunBalanceBucket.missingExternalPoi: [_held(units(processing))],
+    RailgunBalanceBucket.missingInternalPoi: [_held(units(unproved))],
   };
   return PrivateUsdBalanceState(
     balances: PrivateUsdBalances.of(RailgunBalances(buckets), const [
@@ -94,6 +97,7 @@ PrivateUsdBalanceState previewPrivateUsdBalance({
     isRefreshing: isRefreshing || refreshPercent != null,
     refreshFailed: refreshFailed,
     refreshPercent: refreshPercent,
+    syncing: syncing,
   );
 }
 
@@ -223,6 +227,18 @@ Widget buildMobilePrivateUsdFirstLoadUseCase(BuildContext context) =>
       state: PrivateUsdBalanceState(isRefreshing: true, firstSyncPercent: 42),
     );
 
+/// A first sync whose balance shows while Railgun's transaction list is
+/// still on its way, with a send's change waiting on it.
+Widget buildMobilePrivateUsdSyncingRestUseCase(BuildContext context) =>
+    _PrivateUsdScreenPreview(
+      state: previewPrivateUsdBalance(
+        available: 1210.4,
+        unproved: 12.5,
+        syncing: true,
+      ),
+      screeningActivity: const RailgunScreeningEvent(txids: 0.42),
+    );
+
 /// A refresh the user asked for, two thirds of the way: the line climbs with
 /// it.
 Widget buildMobilePrivateUsdRefreshingUseCase(BuildContext context) =>
@@ -297,6 +313,7 @@ class _PrivateUsdScreenPreview extends StatefulWidget {
     this.bridgeAvailable = true,
     this.spendNote,
     this.unfoldFirstRow = false,
+    this.screeningActivity,
   });
 
   final PrivateUsdBalanceState state;
@@ -311,6 +328,9 @@ class _PrivateUsdScreenPreview extends StatefulWidget {
 
   /// The first activity row starts unfolded into its details.
   final bool unfoldFirstRow;
+
+  /// What the page's screening work is doing, as it last said.
+  final RailgunScreeningEvent? screeningActivity;
 
   @override
   State<_PrivateUsdScreenPreview> createState() =>
@@ -370,6 +390,7 @@ class _PrivateUsdScreenPreviewState extends State<_PrivateUsdScreenPreview> {
           };
           return MobilePrivateUsdView(
             state: widget.state,
+            screeningActivity: widget.screeningActivity,
             zecUsdPrice: 70,
             privacyModeEnabled: widget.privacyModeEnabled,
             screening: const Duration(hours: 1),
