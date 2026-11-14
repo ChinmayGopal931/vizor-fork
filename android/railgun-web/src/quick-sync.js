@@ -1,5 +1,5 @@
 // The engine's quick sync reads Railgun's whole history before storing any of it: the SDK holds every page of every
-// list in memory, joining each page onto the ones before (1.65 GB of JavaScript heap on a mainnet first sync), and
+// list in memory, joining each page onto the ones before (over a gigabyte of heap on a mainnet first sync), and
 // hands the engine one array of each. Here the engine's `quickSyncEvents` stores each page as it comes and hands the
 // engine nothing more to store.
 import { TXIDVersion } from '@railgun-community/shared-models';
@@ -20,8 +20,8 @@ export const SQUID_PAGE_SIZE = 10_000;
 export const PAGE_TIMEOUT_MS = 20_000;
 const PAGE_GAP_MS = 250;
 // How many leaves wait in the engine's write queue before they go into the trees. The engine has Railgun's contract
-// check the root of every insert, one call at a time, so a write per page or archive chunk cost a round trip each:
-// some 230 on a mainnet first sync, 89 s of waiting on a OnePlus 15. This keeps them to a handful, and the queue small.
+// check the root of every insert, one call at a time, so a write per page or archive chunk cost a round trip each,
+// hundreds on a mainnet first sync. This keeps them to a handful, and the queue small.
 export const TREE_WRITE_LEAVES = 20_000;
 // Where the engine's notes scan puts its quick sync: from a fifth to four fifths of its first half.
 const PROGRESS_FROM = 0.1;
@@ -51,7 +51,12 @@ function withTimeout(promise, ms) {
  * next page is asked for while this one is stored. The indexer pages by block, starting each page at the block the
  * last one ended on, so a page's events that the last page gave are left out.
  */
-export async function* squidPages(query, format, startingBlock, { pageSize = SQUID_PAGE_SIZE, gapMs = PAGE_GAP_MS } = {}) {
+export async function* squidPages(
+  query,
+  format,
+  startingBlock,
+  { pageSize = SQUID_PAGE_SIZE, gapMs = PAGE_GAP_MS } = {},
+) {
   const ask = (block, wait) => {
     const answer = (wait ? delay(wait) : Promise.resolve()).then(() => withTimeout(query(block), PAGE_TIMEOUT_MS));
     answer.catch(() => {});

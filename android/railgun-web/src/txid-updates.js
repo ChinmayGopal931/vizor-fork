@@ -1,9 +1,9 @@
-// The engine's V2 txid sync gives each transaction's commitments and unshield event their railgunTxid one record at
-// a time: a read, then a write behind the UTXO merkletree's lock that reads the record again. A first sync's records
-// have none yet, so that is some 250,000 commitments and 90,000 unshield events in IndexedDB transactions of their own,
-// most of the txid sync's time. The build (engine-hooks-plugin.mjs) has the sync hold them here; they go into the store
-// in one batch before each group of transactions is committed to the txid tree, so a transaction there has its
-// records updated, as before.
+// The engine's V2 txid sync gives each transaction's commitments and unshield event their railgunTxid one record at a
+// time: a read, then a write behind the UTXO merkletree's lock that reads the record again. A first sync's records have
+// none yet, so that is every transact commitment and unshield event of Railgun's history, each in an IndexedDB
+// transaction of its own: most of the txid sync's time. The build (engine-hooks-plugin.mjs) has the sync hold them
+// here; they go into the store in one batch before each group of transactions is committed to the txid tree, so a
+// transaction there has its records updated, as before.
 
 /** The updates the engine's txid sync makes to `merkletree` (the UTXO merkletree), held until `write()`. */
 export function txidUpdates(merkletree) {

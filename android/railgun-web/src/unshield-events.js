@@ -1,6 +1,6 @@
 // The engine never overwrites an unshield event it has, since a stored one carries what later syncs added to it (its
 // railgunTxid, its screening results). So it looks every new event up first, one IndexedDB transaction each: on a
-// first sync that is some 111,000 lookups that all find nothing, about ten minutes on a phone. An event can only be
+// first sync that is over a hundred thousand lookups that all find nothing, minutes on a phone. An event can only be
 // stored already if its block is at or below the highest block of the stored events, so that block is kept beside
 // them, written in the same batch as every event. Events above it skip the lookup; the rest are looked up as before.
 // The build (engine-hooks-plugin.mjs) has the engine's `addUnshieldEvents` call `addUnshieldEvents` here.

@@ -1812,14 +1812,22 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
   line naming the change that waits, the idle close counts the page's
   events as use meanwhile, and a first sync keeps the screen on until the
   rest ends. A send's own proofs never need that list.
+- The list's catch-up ends at a sync that adds nothing only once it has
+  reached the screening nodes' validated index (`txid-catch-up.js`): the
+  engine drops a batch whose root check failed without saying so, so short
+  of that index the sync is tried again, and then the catch-up fails.
 - The page answers the engine's quick sync (`quick-sync.js`): rail-squid's
   pages through the SDK's own client and formatters, each stored as it
   comes, a page's unshields and nullifiers before its commitments (the
-  engine resumes from its newest stored commitment).
+  engine resumes from its newest stored commitment). The commitments go into
+  the trees 20,000 leaves at a time: the engine has the contract check every
+  insert's root, one call at a time.
 - `engine-hooks-plugin.mjs` holds every rewrite of the engine's code (the
   unshield watermark in `unshield-events.js`, the prebuilt-tree fill, the
-  archive's leaf hashing). Each names the exact source of the pinned engine
-  and fails the build against any other: re-check them when bumping it.
+  archive's leaf hashing, and the txid sync's railgunTxid updates written in
+  batches by `txid-updates.js`). Each names the exact source of the pinned
+  engine and fails the build against any other: re-check them when bumping
+  it.
 - **Anon's archive** (Android, mainnet, Settings, on by default;
   `archive*.js`, `prebuilt-trees.js`):
   - Every file must match its published SHA-256, and the manifest is read
