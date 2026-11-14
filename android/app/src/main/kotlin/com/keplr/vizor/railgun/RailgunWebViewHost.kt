@@ -255,7 +255,9 @@ internal class RailgunWebViewHost(
             request: WebResourceRequest,
         ): WebResourceResponse? {
             val url = request.url
-            if (RailgunArchiveFetch.handles(url, request.method)) return RailgunArchiveFetch.fetch(url, page.bridgePort)
+            if (RailgunArchiveFetch.handles(url.scheme, url.host, url.port, request.method)) {
+                return RailgunArchiveFetch.fetch(url, page.bridgePort)
+            }
             return when (RailgunRequests.route(url.scheme, url.host, url.port)) {
                 RailgunRequests.Route.OWN_ASSET -> assets.shouldInterceptRequest(url) ?: refusal(NOT_FOUND)
                 RailgunRequests.Route.ALLOWED -> null

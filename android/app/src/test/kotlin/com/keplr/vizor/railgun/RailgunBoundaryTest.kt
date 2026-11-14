@@ -72,11 +72,33 @@ class RailgunBoundaryTest {
     }
 
     @Test
+    fun theHostFetchesTheArchiveAndNothingElse() {
+        assertTrue(RailgunEndpoints.ARCHIVE_HOST in RailgunEndpoints.hosts)
+        listOf("https://digest.anon.inc/v4/1/meta.json", "https://digest.anon.inc/v4/1/tip/meta.json?v=0a1b")
+            .forEach { assertTrue(it, archive(it)) }
+        listOf(
+            "http://digest.anon.inc/v4/1/meta.json",
+            "https://digest.anon.inc:8443/v4/1/meta.json",
+            "https://evil.digest.anon.inc/v4/1/meta.json",
+            "https://rail-squid.squids.live/v4/1/meta.json",
+        ).forEach { assertFalse(it, archive(it)) }
+        assertFalse(archive("https://digest.anon.inc/v4/1/meta.json", method = "POST"))
+        // The framework throws on a redirect, or on no status at all: the page is answered a failure instead.
+        listOf(200, 404, 503).forEach { assertTrue("$it", RailgunArchiveFetch.servable(it)) }
+        listOf(-1, 101, 301, 304).forEach { assertFalse("$it", RailgunArchiveFetch.servable(it)) }
+    }
+
+    @Test
     fun theBuiltPageIsItsSource() {
         assertEquals(File(SOURCE).readText(), File(ASSET).readText())
     }
 
     private fun route(url: String): Route = URI(url).let { RailgunRequests.route(it.scheme, it.host, it.port) }
+
+    private fun archive(
+        url: String,
+        method: String = "GET",
+    ): Boolean = URI(url).let { RailgunArchiveFetch.handles(it.scheme, it.host, it.port, method) }
 
     private fun csp(html: String): Map<String, List<String>> =
         Regex("""http-equiv="Content-Security-Policy" content="([^"]*)"""")

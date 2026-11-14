@@ -18,13 +18,18 @@ internal object RailgunArchiveFetch {
     private const val CONNECT_TIMEOUT_MS = 20_000
     private const val READ_TIMEOUT_MS = 60_000
 
-    /** Whether the host answers [url] itself: a GET of the archive, on the default https port. */
+    /** Whether the host answers a request itself: a GET of the archive, on the default https port. */
     fun handles(
-        url: Uri,
+        scheme: String?,
+        host: String?,
+        port: Int,
         method: String,
-    ): Boolean = url.scheme == "https" && url.port == -1 && url.host == RailgunEndpoints.ARCHIVE_HOST && method == "GET"
+    ): Boolean = scheme == "https" && port == -1 && host == RailgunEndpoints.ARCHIVE_HOST && method == "GET"
 
-    /** [url] fetched through the bridge at [bridgePort]; a failure answers 502, which the page takes as the archive's. */
+    /** Whether the framework takes [status] as an answer: it throws on a redirect, or anything that isn't a status. */
+    fun servable(status: Int): Boolean = status in 200..299 || status in 400..599
+
+    /** [url] fetched through the bridge at [bridgePort]; a failure is a 502, which the page takes as the archive's. */
     fun fetch(
         url: Uri,
         bridgePort: Int,
@@ -45,9 +50,12 @@ internal object RailgunArchiveFetch {
             // The files are gzip, checked against the archive's checksums as served: never unzipped on the way.
             connection.setRequestProperty("Accept-Encoding", "identity")
             val status = connection.responseCode
-            val body = (if (status in 200..299) connection.inputStream else connection.errorStream)?.use { it.readBytes() }
+            if (!servable(status)) return empty(BAD_GATEWAY, headers)
+            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            val body = stream?.use { it.readBytes() }
             val type = connection.contentType?.substringBefore(';') ?: "application/octet-stream"
-            val reason = connection.responseMessage?.takeIf { it.isNotBlank() } ?: "OK"
+            // The page reads no reason; the framework throws on an empty or non-ASCII one, so none is passed on.
+            val reason = if (status in 200..299) "OK" else "Error"
             WebResourceResponse(type, null, status, reason, headers, (body ?: ByteArray(0)).inputStream())
         } catch (_: IOException) {
             empty(BAD_GATEWAY, headers)
