@@ -96,6 +96,63 @@ export function throughArchiveTxids(source) {
   );
 }
 
+// railgun-engine.js: the V2 txid sync writes each record's railgunTxid on its own (src/txid-updates.js).
+const TXID_QUEUE = `        let toQueue = [];
+`;
+const TXID_FLUSH = `        const flushQueue = async () => {
+            if (toQueue.length === 0)
+                return;
+`;
+const TXID_UNSHIELD_UPDATE = `                            matchingUnshieldEvent.railgunTxid = railgunTxid;
+                            // eslint-disable-next-line no-await-in-loop
+                            await utxoMerkletree.updateUnshieldEvent(matchingUnshieldEvent);
+                            this.invalidateTXOsCacheAllWallets(chain);
+`;
+const TXID_COMMITMENT_UPDATE = `                        commitment.railgunTxid = railgunTxid;
+                        // eslint-disable-next-line no-await-in-loop
+                        await utxoMerkletree.updateData(tree, position, commitment);
+`;
+
+/**
+ * railgun-engine.js with the V2 txid sync holding its commitment and unshield updates in src/txid-updates.js, and
+ * writing them in one batch before each group of transactions goes into the txid tree.
+ */
+export function throughBatchedTxidUpdates(source) {
+  const what = 'RailgunEngine.handleNewRailgunTransactionsV2';
+  let rewritten = replaceOnce(
+    source,
+    TXID_QUEUE,
+    `${TXID_QUEUE}        const txidUpdates = require(${pageModule('txid-updates.js')}).txidUpdates(utxoMerkletree);
+`,
+    what,
+  );
+  rewritten = replaceOnce(
+    rewritten,
+    TXID_FLUSH,
+    TXID_FLUSH.replace(
+      '            if (toQueue.length === 0)\n',
+      '            if (await txidUpdates.write())\n                this.invalidateTXOsCacheAllWallets(chain);\n            if (toQueue.length === 0)\n',
+    ),
+    what,
+  );
+  rewritten = replaceOnce(
+    rewritten,
+    TXID_UNSHIELD_UPDATE,
+    `                            matchingUnshieldEvent.railgunTxid = railgunTxid;
+                            txidUpdates.unshield(matchingUnshieldEvent);
+`,
+    what,
+  );
+  return replaceOnce(
+    rewritten,
+    TXID_COMMITMENT_UPDATE,
+    `                        commitment.railgunTxid = railgunTxid;
+                        txidUpdates.commitment(tree, position, commitment);
+`,
+    what,
+  );
+}
+
 /** Throws unless the installed engine is the one the rewrites were written against. */
 export function checkEngineVersion(version) {
   if (version !== ENGINE_VERSION) {
@@ -118,7 +175,7 @@ export const engineHooks = {
       });
     rewrite(UTXO_MERKLETREE, 'utxo-merkletree', throughUnshieldWatermark);
     rewrite(MERKLETREE, 'merkletree', throughPrebuiltTrees);
-    rewrite(RAILGUN_ENGINE, 'railgun-engine', throughArchiveTxids);
+    rewrite(RAILGUN_ENGINE, 'railgun-engine', (source) => throughBatchedTxidUpdates(throughArchiveTxids(source)));
     // A bundle with an engine module this didn't reach would run the engine's own code.
     build.onEnd(() =>
       rewritten.size === 3 ? undefined : { errors: [{ text: 'the engine modules were not all bundled through the page' }] },
