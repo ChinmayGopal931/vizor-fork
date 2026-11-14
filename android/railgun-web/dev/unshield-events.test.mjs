@@ -1,41 +1,18 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import vm from 'node:vm';
-import { TXIDVersion } from '@railgun-community/shared-models';
 import { ENGINE_VERSION, checkEngineVersion, throughUnshieldWatermark } from '../engine-hooks-plugin.mjs';
-import * as unshieldEvents from '../src/unshield-events.js';
+import { CHAIN, ENGINE, UTXOMerkletree, V2 } from './engine-harness.mjs';
 import { memoryDatabase } from './memory-store.mjs';
 
-const require = createRequire(import.meta.url);
-const ENGINE = path.dirname(require.resolve('@railgun-community/engine'));
 const UTXO_MERKLETREE = path.join(ENGINE, 'merkletree/utxo-merkletree.js');
 const UNSHIELD_EVENTS = fileURLToPath(new URL('../src/unshield-events.js', import.meta.url));
-const CHAIN = { type: 0, id: 1 };
-
-await require(path.join(ENGINE, 'utils/poseidon')).initPoseidonPromise;
-
-/** The engine's UTXOMerkletree as the build bundles it. */
-function builtUTXOMerkletree() {
-  const engineRequire = createRequire(UTXO_MERKLETREE);
-  const module = { exports: {} };
-  const source = throughUnshieldWatermark(readFileSync(UTXO_MERKLETREE, 'utf8'));
-  const load = vm.compileFunction(source, ['exports', 'require', 'module', '__filename', '__dirname'], {
-    filename: UTXO_MERKLETREE,
-  });
-  const resolve = (id) => (id === UNSHIELD_EVENTS ? unshieldEvents : engineRequire(id));
-  load(module.exports, resolve, module, UTXO_MERKLETREE, path.dirname(UTXO_MERKLETREE));
-  return module.exports.UTXOMerkletree;
-}
-
-const UTXOMerkletree = builtUTXOMerkletree();
 
 /** A page's merkletree over `db`, and the blocks of the events it looked up before storing. */
 async function page(db) {
-  const merkletree = await UTXOMerkletree.create(db, CHAIN, TXIDVersion.V2_PoseidonMerkle, async () => true);
+  const merkletree = await UTXOMerkletree.create(db, CHAIN, V2, async () => true);
   const lookedUp = [];
   const lookUp = merkletree.hasExistingUnshieldEvent.bind(merkletree);
   merkletree.hasExistingUnshieldEvent = (unshield) => {

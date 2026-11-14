@@ -35,10 +35,12 @@ import { groth16 } from 'snarkjs';
 import { setArtifactProgressListener } from './artifact-mirror.js';
 import { artifactStore } from './artifacts.js';
 import { badRequest } from './errors.js';
+import { installQuickSync } from './quick-sync.js';
 import { hasUndatedReceipts, hasUndatedShields, pendingShields, receivedSends } from './received.js';
 import { refreshProgress } from './refresh-progress.js';
 import { syncFailure } from './rpc-probe.js';
 import { screeningActivity } from './screening-activity.js';
+import { squidQueries } from './squid.js';
 import { catchUpTxids, txidCompleteHold } from './txid-catch-up.js';
 import { walletNamespaces } from './wallet-namespaces.js';
 
@@ -77,6 +79,9 @@ let screeningUrls;
 let debug = false;
 let notesScan;
 let notesScans = Promise.resolve();
+// The notes scan's progress as reported. The quick sync reports its own through the engine's scan updates, and the
+// engine's milestones after it are lower, so within a scan it never goes back.
+let notesProgress = 0;
 // Whether the proofs the open wallet's sends need failed when the engine last sent them. The engine screens by itself
 // after every scan, outside any call, and reports how that went only through its callback.
 let proofsFailed = false;
@@ -119,7 +124,15 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, debug, e
   setEngineTxidSyncBatchSize(TXID_SYNC_BATCH_SIZE);
   await startRailgunEngine(WALLET_SOURCE, new LevelJS(database), debug, artifactStore, false, false, poiNodeUrls);
   getProver().setSnarkJSGroth16(groth16);
-  setOnUTXOMerkletreeScanCallback(({ scanStatus, progress }) => {
+  installQuickSync(getEngine(), {
+    queries: squidQueries(networkName),
+    head: () => getFallbackProviderForNetwork(networkName).getBlockNumber(),
+  });
+  setOnUTXOMerkletreeScanCallback(({ scanStatus, progress: reported }) => {
+    if (scanStatus === MerkletreeScanStatus.Updated) {
+      notesProgress = reported <= NOTES_SCAN_START ? reported : Math.max(notesProgress, reported);
+    }
+    const progress = scanStatus === MerkletreeScanStatus.Updated ? notesProgress : reported;
     if (notesScan !== undefined) {
       if (scanStatus === MerkletreeScanStatus.Updated && progress <= NOTES_SCAN_START) notesScan.started = true;
       if (scanStatus === MerkletreeScanStatus.Incomplete) notesScan.incomplete = true;
