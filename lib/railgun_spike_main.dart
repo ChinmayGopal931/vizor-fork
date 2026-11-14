@@ -265,6 +265,8 @@ void _onEvent(String raw) {
         'screening txids ${screening.txids} downloading '
         '${screening.downloading} proving ${screening.proving?.index}',
       );
+    case RailgunSyncedEvent(:final refresh):
+      _log('synced, screening ${refresh.screening.wireName}');
     case final RailgunLogEvent line:
       debugPrint(
         '[spike][page] ${redactRailgunMessage(line.message, secrets: _secrets)}',

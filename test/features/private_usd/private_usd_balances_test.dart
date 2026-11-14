@@ -25,6 +25,9 @@ void main() {
     expect(balances.arriving, BigInt.from(200000));
     expect(balances.blocked, BigInt.from(30000));
     expect(balances.processing, BigInt.from(4560));
+    // Of it, the change the wallet has yet to prove itself.
+    expect(balances.unproved, BigInt.from(500));
+    expect(balances.submitted, BigInt.from(4000));
     expect(balances.spendable, BigInt.from(1004560));
     expect(balances.total, BigInt.from(1234560));
     expect(balances.isBlocked, isTrue);

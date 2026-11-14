@@ -33,10 +33,9 @@ test('a refresh starts at 0, and each step starts where its part of the bar does
   const { progress, sent } = tracker();
   progress.begin();
   progress.step('notes');
-  progress.step('txids');
   progress.step('checks');
   progress.step('finishing');
-  assert.deepEqual(sent, [0, 0.05, 0.6, 0.8, 0.95]);
+  assert.deepEqual(sent, [0, 0.05, 0.85, 0.95]);
 });
 
 test("a step's share runs over its part of the bar, and only the running step's counts", () => {
@@ -48,7 +47,7 @@ test("a step's share runs over its part of the bar, and only the running step's 
   progress.update('notes', 0.5);
   tick(PUBLISH_MS);
   progress.update('checks', 0.5);
-  assert.deepEqual(sent, [0, 0.05, 0.325]);
+  assert.deepEqual(sent, [0, 0.05, 0.45]);
 });
 
 test('the bar never goes back: not for a smaller share, nor for a step it passed', () => {
@@ -60,9 +59,9 @@ test('the bar never goes back: not for a smaller share, nor for a step it passed
   tick(PUBLISH_MS);
   progress.update('notes', 0.03);
   progress.step('start');
-  progress.step('txids');
+  progress.step('checks');
   progress.step('notes');
-  assert.deepEqual(sent, [0, 0.05, 0.6]);
+  assert.deepEqual(sent, [0, 0.05, 0.85]);
 });
 
 test('a finished step starts the next one, and only while it runs', () => {
@@ -72,8 +71,8 @@ test('a finished step starts the next one, and only while it runs', () => {
   assert.deepEqual(sent, [0], 'notes was not running yet');
   progress.step('notes');
   progress.done('notes');
-  progress.step('txids');
-  assert.deepEqual(sent, [0, 0.05, 0.6]);
+  progress.step('checks');
+  assert.deepEqual(sent, [0, 0.05, 0.85]);
 });
 
 test('shares go out at most every PUBLISH_MS, the latest one when the wait ends', () => {
@@ -82,9 +81,9 @@ test('shares go out at most every PUBLISH_MS, the latest one when the wait ends'
   progress.step('checks');
   progress.update('checks', 0.2);
   progress.update('checks', 0.4);
-  assert.deepEqual(sent, [0, 0.8]);
+  assert.deepEqual(sent, [0, 0.85]);
   tick(PUBLISH_MS);
-  assert.deepEqual(sent, [0, 0.8, 0.86]);
+  assert.deepEqual(sent, [0, 0.85, 0.89]);
 });
 
 test('nothing goes out once the refresh ends, a share it was waiting to send included', () => {
@@ -95,7 +94,7 @@ test('nothing goes out once the refresh ends, a share it was waiting to send inc
   progress.end();
   tick(PUBLISH_MS);
   progress.update('notes', 1);
-  progress.step('txids');
+  progress.step('checks');
   assert.deepEqual(sent, [0, 0.05]);
   assert.equal(timers.size, 0);
 });
@@ -105,11 +104,11 @@ test('overlapping refreshes share the bar until the last one ends, and the next 
   progress.begin();
   progress.step('notes');
   progress.begin();
-  progress.step('txids');
-  progress.end();
   progress.step('checks');
   progress.end();
   progress.step('finishing');
+  progress.end();
+  progress.step('finishing');
   progress.begin();
-  assert.deepEqual(sent, [0, 0.05, 0.6, 0.8, 0]);
+  assert.deepEqual(sent, [0, 0.05, 0.85, 0.95, 0]);
 });

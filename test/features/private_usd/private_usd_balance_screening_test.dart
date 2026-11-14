@@ -7,6 +7,7 @@ import 'package:zcash_wallet/src/core/storage/app_secure_store.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_balance_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_keep_awake_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/railgun_engine_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_cache.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
@@ -240,6 +241,78 @@ void main() {
     );
     expect(since(), isNull);
   });
+
+  test('a long sync shows its balance at once and says its rest runs on, '
+      'until the page says it ended', () async {
+    final container = containerWith(deployment: _sepolia);
+    PrivateUsdBalanceState state() =>
+        container.read(privateUsdBalanceProvider(_account));
+
+    await syncAnswering(
+      container,
+      '{"balances":$_balancesJson,"screening":"ok","syncing":true}',
+    );
+    expect(state().syncing, isTrue);
+    expect(state().balances!.unproved, BigInt.from(5));
+
+    page.pageEvents.add(
+      '{"event":"synced","data":{"balances":{"ProofSubmitted":[{"token":'
+      '"$_dollars","amount":"5"}]},"received":[],"shielding":[],'
+      '"screening":"ok"}}',
+    );
+    await pumpEventQueue();
+    expect(state().syncing, isFalse);
+    expect(state().balances!.unproved, BigInt.zero);
+    expect(state().balances!.submitted, BigInt.from(5));
+  });
+
+  test(
+    'a first sync whose rest runs on keeps the screen on until it ends',
+    () async {
+      final container = containerWith(deployment: _sepolia);
+      bool awake() => container.read(privateUsdFirstSyncsProvider).isNotEmpty;
+
+      await syncAnswering(
+        container,
+        '{"balances":{},"screening":"ok","syncing":true}',
+      );
+      expect(
+        awake(),
+        isTrue,
+        reason: 'Railgun\'s transaction list is still on its way',
+      );
+
+      page.pageEvents.add(
+        '{"event":"synced","data":{"balances":{},"screening":"ok"}}',
+      );
+      await pumpEventQueue();
+      expect(awake(), isFalse);
+    },
+  );
+
+  test('a first sync whose rest runs on lets the screen sleep once the page '
+      'closes', () async {
+    final container = containerWith(deployment: _sepolia);
+    bool awake() => container.read(privateUsdFirstSyncsProvider).isNotEmpty;
+
+    await syncAnswering(
+      container,
+      '{"balances":{},"screening":"ok","syncing":true}',
+    );
+    expect(awake(), isTrue);
+    await container.read(railgunEngineProvider).close();
+    await pumpEventQueue();
+    expect(awake(), isFalse);
+  });
+
+  test(
+    'a first sync that ends with its refresh lets the screen sleep at once',
+    () async {
+      final container = containerWith(deployment: _sepolia);
+      await syncAnswering(container, '{"balances":{},"screening":"ok"}');
+      expect(container.read(privateUsdFirstSyncsProvider), isEmpty);
+    },
+  );
 
   test('a cached balance shows without it', () async {
     final container = containerWith(

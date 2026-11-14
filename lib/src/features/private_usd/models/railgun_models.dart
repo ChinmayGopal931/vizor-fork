@@ -89,13 +89,16 @@ enum RailgunScreening {
 }
 
 /// What `refresh` answers: the balances, the private sends received, the
-/// shields screening still holds, and how the screening last went.
+/// shields screening still holds, and how the screening last went. The page
+/// answers once the notes are scanned and checked; the rest of the sync runs
+/// on in the page ([syncing]) and ends with a [RailgunSyncedEvent].
 class RailgunRefresh {
   const RailgunRefresh({
     required this.balances,
     required this.screening,
     this.received,
     this.shielding,
+    this.syncing = false,
   });
 
   final RailgunBalances balances;
@@ -106,6 +109,11 @@ class RailgunRefresh {
 
   /// Null when the page could not read its history.
   final List<RailgunPendingShield>? shielding;
+
+  /// The rest of the sync is far behind, as on a first sync: Railgun's
+  /// transaction list, then the proofs the wallet's own sends need. Their
+  /// change waits on it; every other note is spendable meanwhile.
+  final bool syncing;
 
   static RailgunRefresh parse(Object? json) {
     final map = _object(json, 'refresh');
@@ -118,6 +126,7 @@ class RailgunRefresh {
       screening: screening,
       received: RailgunReceipt.parseAll(map['received']),
       shielding: RailgunPendingShield.parseAll(map['shielding']),
+      syncing: map['syncing'] == true,
     );
   }
 }
@@ -775,6 +784,12 @@ sealed class RailgunEvent {
         return RailgunRefreshEvent(
           progress.toDouble().clamp(0.0, 1.0).toDouble(),
         );
+      case 'synced':
+        try {
+          return RailgunSyncedEvent(RailgunRefresh.parse(data));
+        } on RailgunProtocolException {
+          return null;
+        }
       case 'log':
         return data is String ? RailgunLogEvent(data) : null;
       default:
@@ -804,6 +819,14 @@ class RailgunScanEvent extends RailgunEvent {
 
   @override
   int get hashCode => Object.hash(tree, status, progress);
+}
+
+/// The rest of a sync ended in the page, after its `refresh` answered: the
+/// wallet's state read again, its own sends proved where they could be.
+class RailgunSyncedEvent extends RailgunEvent {
+  const RailgunSyncedEvent(this.refresh);
+
+  final RailgunRefresh refresh;
 }
 
 /// How far the page's `refresh` has come, [progress] 0 to 1 and never going

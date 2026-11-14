@@ -9,7 +9,6 @@ import {
 import {
   createRailgunWallet,
   deleteWalletByID,
-  generatePOIsForWallet,
   getEngine,
   getFallbackProviderForNetwork,
   getLatestRailgunTxidData,
@@ -19,8 +18,8 @@ import {
   hasEngine,
   loadProvider,
   loadWalletByID,
-  refreshBalances,
   refreshReceivePOIsForWallet,
+  refreshSpentPOIsForWallet,
   setBatchListCallback,
   setLoggers,
   setOnTXIDMerkletreeScanCallback,
@@ -41,6 +40,7 @@ import { refreshProgress } from './refresh-progress.js';
 import { syncFailure } from './rpc-probe.js';
 import { screeningActivity } from './screening-activity.js';
 import { squidQueries } from './squid.js';
+import { syncFinisher } from './sync-finish.js';
 import { catchUpTxids, txidCompleteHold } from './txid-catch-up.js';
 import { walletNamespaces } from './wallet-namespaces.js';
 
@@ -66,6 +66,9 @@ const TXID_SYNC_WAIT_MS = 1_000;
 // Only a long catch-up is reported, so a refresh that finds a few new txids doesn't flash the row; it is read this often.
 const TXID_REPORT_GAP = 1_000;
 const TXID_REPORT_MS = 2_000;
+// How long the rest of a sync waits for a screening refresh the engine runs by itself, and how often it looks.
+const POI_REFRESH_WAIT_MS = 10 * 60_000;
+const POI_REFRESH_POLL_MS = 1_000;
 
 let starting;
 // The engine a page opened to delete wallets: its database alone, with no provider. Such a page is never started.
@@ -232,11 +235,16 @@ export async function deleteWallet({ network: name, mnemonic }) {
 }
 
 /**
- * Scans to the chain's tip, catches up on txids, then has the screening nodes check the notes. Returns the balances,
- * the private sends received (`received`), the shields screening still holds (`shielding`), and `screening`: `failed`
- * when that check, or the proofs the engine last sent for this wallet's sends, failed. How far it has come goes out
- * meanwhile as `refresh` events (`refresh-progress.js`). A sync that fails while the RPC does not answer, or turns
- * requests away, fails as `RPC_FAILED` (`rpc-probe.js`), so the host can offer another RPC.
+ * Scans to the chain's tip and has the screening nodes check the notes. Returns the balances, the private sends
+ * received (`received`), the shields screening still holds (`shielding`), `screening`: `failed` when that check, or the
+ * proofs the engine last sent for this wallet's sends, failed, and `syncing`: whether the rest of the sync, which runs
+ * on in the page, is long enough to tell the user about. How far the refresh has come goes out meanwhile as `refresh`
+ * events (`refresh-progress.js`). A sync that fails while the RPC does not answer, or turns requests away, fails as
+ * `RPC_FAILED` (`rpc-probe.js`), so the host can offer another RPC.
+ *
+ * The rest of the sync is Railgun's transaction list, then the proofs this wallet's sends need (`sync-finish.js`); a
+ * send's change waits on them, and nothing else does. It ends with a `synced` event: the state the refresh returns,
+ * read again.
  */
 export async function refresh(_params, emit) {
   const { walletId } = session();
@@ -249,59 +257,89 @@ export async function refresh(_params, emit) {
 }
 
 async function refreshWallet(walletId, emit) {
-  txidHold.begin();
-  let reporting;
   try {
-    reporting = await reportTxids();
-    const before = await latestTxidIndex();
     syncProgress.step('notes');
     await scanNotes(walletId);
-    syncProgress.step('txids');
-    await reporting.report();
-    const tree = getEngine().getTXIDMerkletree(TXID_VERSION, chain());
-    await catchUpTxids({
-      before,
-      latest: latestTxidIndex,
-      sync: () => syncRailgunTransactionsV2(network),
-      isScanning: () => tree.isScanning,
-      wait: () => new Promise((resolve) => setTimeout(resolve, TXID_SYNC_WAIT_MS)),
-      passes: TXID_SYNC_PASSES,
-    });
   } catch (error) {
     throw await syncFailure(error, { rpcUrls: providerUrls, poiNodeUrls: screeningUrls });
-  } finally {
-    reporting?.stop();
-    const complete = txidHold.end();
-    if (complete !== undefined) emit('scan', complete);
   }
   syncProgress.step('checks');
   let checkFailed = false;
   try {
     await refreshReceivePOIsForWallet(TXID_VERSION, network, walletId);
-    // Only starts the engine's own screening: how its proofs went comes through the callback, by a later refresh.
-    await generatePOIsForWallet(network, walletId);
   } catch (error) {
     checkFailed = true;
     // The balances stand; their screening statuses catch up on a later sync.
     emit('log', `screening not refreshed: ${error?.message ?? error}`);
   }
   syncProgress.step('finishing');
+  const state = await walletState(emit, checkFailed);
+  const syncing = await finisher(walletId, emit).start(checkFailed);
+  return { ...state, syncing };
+}
+
+/** The balances and history a refresh returns, `failed` when its screening did. */
+async function walletState(emit, failed) {
   const amounts = await balances();
   const history = await walletHistory(emit);
   return {
     balances: amounts,
     received: history?.received ?? null,
     shielding: history?.shielding ?? null,
-    screening: checkFailed || proofsFailed ? 'failed' : 'ok',
+    screening: failed || proofsFailed ? 'failed' : 'ok',
   };
 }
 
 const latestTxidIndex = async () => (await getLatestRailgunTxidData(TXID_VERSION, network)).txidIndex;
 
+// The open wallet's: one per page, as the wallet is.
+let finishing;
+function finisher(walletId, emit) {
+  finishing ??= syncFinisher({
+    behind: async () => (await txidsBehind()) >= TXID_REPORT_GAP,
+    catchUp: () => catchUpTxidList(emit),
+    prove: () => proveSends(walletId),
+    state: (failed) => walletState(emit, failed),
+    emit,
+    log: (line) => emit('log', line),
+  });
+  return finishing;
+}
+
+/** How far the stored txid list is behind the one the screening nodes have validated; 0 when that can't be read. */
+async function txidsBehind() {
+  const target = await getEngine().getLatestValidatedTxidIndex(TXID_VERSION, chain());
+  return target === undefined ? 0 : target - (await latestTxidIndex());
+}
+
+/** Syncs Railgun's transaction list until a sync adds nothing, the way a notes scan used to finish. */
+async function catchUpTxidList(emit) {
+  txidHold.begin();
+  let reporting;
+  try {
+    reporting = await reportTxids();
+    const before = await latestTxidIndex();
+    await getEngine().scanTXIDHistoryV2(chain());
+    const tree = getEngine().getTXIDMerkletree(TXID_VERSION, chain());
+    await catchUpTxids({
+      before,
+      latest: latestTxidIndex,
+      sync: () => syncRailgunTransactionsV2(network),
+      isScanning: () => tree.isScanning,
+      wait: () => delay(TXID_SYNC_WAIT_MS),
+      passes: TXID_SYNC_PASSES,
+    });
+  } finally {
+    reporting?.stop();
+    const complete = txidHold.end();
+    if (complete !== undefined) emit('scan', complete);
+  }
+}
+
 /**
- * Reports how far the txid catch-up has come, from the txids the screening nodes have validated (which bound it) and
- * the ones stored, until `stop`: to the refresh's progress, and to the Processing row only for a long one. `report`
- * reads it now. One whose bound can't be read isn't reported.
+ * Reports how far the txid catch-up has come to the Processing row, from the txids the screening nodes have validated
+ * (which bound it) and the ones stored, until `stop`: only a long one, so a few new txids don't flash the row. One
+ * whose bound can't be read isn't reported.
  */
 async function reportTxids() {
   const start = await latestTxidIndex();
@@ -311,28 +349,41 @@ async function reportTxids() {
   } catch {
     // The catch-up runs as before; it just goes unreported.
   }
-  if (target === undefined) return { report: async () => {}, stop() {} };
-  const long = target - start >= TXID_REPORT_GAP;
+  if (target === undefined || target - start < TXID_REPORT_GAP) return { stop() {} };
   const report = async () => {
     try {
-      const done = target > start ? ((await latestTxidIndex()) - start) / (target - start) : 1;
-      const share = Math.min(1, Math.max(0, done));
-      syncProgress?.update('txids', share);
-      if (long) activity?.txids(share);
+      const done = ((await latestTxidIndex()) - start) / (target - start);
+      activity?.txids(Math.min(1, Math.max(0, done)));
     } catch {
       // The next read reports it.
     }
   };
-  if (long) await report();
+  await report();
   const timer = setInterval(report, TXID_REPORT_MS);
   return {
-    report,
     stop() {
       clearInterval(timer);
-      if (long) activity?.txids(null);
+      activity?.txids(null);
     },
   };
 }
+
+/**
+ * Has the wallet prove its own sends and waits until it has. The engine refreshes a wallet's screening by itself after
+ * every scan, outside any call, and a refresh asked for while one runs does nothing; so this waits for one running to
+ * end, runs its own, then reads back what the screening nodes made of the proofs.
+ */
+async function proveSends(walletId) {
+  const railgunWallet = walletForID(walletId);
+  const busy = () => railgunWallet.isRefreshingPOIs.get(TXID_VERSION, chain()) === true;
+  for (let waited = 0; busy() && waited < POI_REFRESH_WAIT_MS; waited += POI_REFRESH_POLL_MS) {
+    await delay(POI_REFRESH_POLL_MS);
+  }
+  await railgunWallet.refreshPOIsForTXIDVersion(chain(), TXID_VERSION, busy());
+  await refreshSpentPOIsForWallet(TXID_VERSION, network, walletId);
+}
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** One notes scan at a time, so each can tell whether the engine ran it. */
 function scanNotes(walletId) {
@@ -341,19 +392,20 @@ function scanNotes(walletId) {
   return scan;
 }
 
-// The engine skips a notes scan while another runs or before the network loads, so try until one starts.
+// The engine skips a notes scan while another runs or before the network loads, so try until one starts. Only the
+// notes: the txid list is the rest of the sync's.
 async function scanNotesNow(walletId) {
   for (let attempt = 0; attempt < NOTES_SCAN_ATTEMPTS; attempt += 1) {
     const scan = { started: false, incomplete: false };
     notesScan = scan;
     try {
-      await refreshBalances(chain(), [walletId]);
+      await getEngine().scanUTXOHistory(TXID_VERSION, chain(), [walletId]);
     } finally {
       notesScan = undefined;
     }
     if (scan.incomplete) throw new Error('the notes scan broke off, so the balances may be stale');
     if (scan.started) return;
-    await new Promise((resolve) => setTimeout(resolve, NOTES_SCAN_RETRY_MS));
+    await delay(NOTES_SCAN_RETRY_MS);
   }
   throw new Error('no notes scan started for a minute: one may be stuck');
 }

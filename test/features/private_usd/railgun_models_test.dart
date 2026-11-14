@@ -46,6 +46,44 @@ void main() {
     }
   });
 
+  test('a refresh says whether the rest of the sync runs on in the page', () {
+    expect(
+      RailgunRefresh.parse(
+        jsonDecode('{"balances":{},"screening":"ok","syncing":true}'),
+      ).syncing,
+      isTrue,
+    );
+    for (final body in [
+      '{"balances":{},"screening":"ok"}',
+      '{"balances":{},"screening":"ok","syncing":"yes"}',
+    ]) {
+      expect(RailgunRefresh.parse(jsonDecode(body)).syncing, isFalse);
+    }
+  });
+
+  test("the end of a sync's rest carries the wallet's state, read again", () {
+    final event = RailgunEvent.decode(
+      '{"event":"synced","data":{"balances":{"ProofSubmitted":[{"token":'
+      '"$_token","amount":"7"}]},"received":[],"shielding":[],'
+      '"screening":"failed"}}',
+    );
+
+    expect(event, isA<RailgunSyncedEvent>());
+    final refresh = (event! as RailgunSyncedEvent).refresh;
+    expect(refresh.screening, RailgunScreening.failed);
+    expect(
+      refresh.balances.byBucket[RailgunBalanceBucket.proofSubmitted]!.single,
+      RailgunTokenAmount(token: _token, amount: BigInt.from(7)),
+    );
+    expect(refresh.syncing, isFalse);
+    for (final raw in [
+      '{"event":"synced","data":{"balances":{}}}',
+      '{"event":"synced","data":null}',
+    ]) {
+      expect(RailgunEvent.decode(raw), isNull, reason: raw);
+    }
+  });
+
   test('a refresh carries its balances and how the screening went', () {
     final failed = RailgunRefresh.parse(
       jsonDecode(
