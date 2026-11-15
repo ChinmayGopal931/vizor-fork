@@ -329,6 +329,30 @@ test('a manifest that is not JSON leaves the whole sync to rail-squid', async ()
   assert.deepEqual(stored, await storedBySquid());
 });
 
+/** The fixture's archive, its first `times` requests for `name` failing on the way. */
+function failingFirst(name, times) {
+  const server = archiveServer(fixture, { sealedAt });
+  let failures = times;
+  return {
+    fetch: (url) => {
+      if (url.replace(/^https:\/\/digest\.test\/v4\/1\//, '').replace(/\?v=.*$/, '') === name && failures > 0) {
+        failures -= 1;
+        return Promise.reject(new TypeError('Failed to fetch'));
+      }
+      return server.fetch(url);
+    },
+  };
+}
+
+test('a request is sent five times before the archive is left, as a phone can lose DNS for seconds', async () => {
+  const kept = await storedByArchive(failingFirst('chunk-index.json', 4));
+  assert.deepEqual(kept.left, []);
+  assert.deepEqual(kept.stored, await storedBySquid());
+  const left = await storedByArchive(failingFirst('chunk-index.json', 5));
+  assert.match(left.left[0], /did not answer for chunk-index\.json/);
+  assert.deepEqual(left.stored, await storedBySquid());
+});
+
 test('a request that fails on the way is sent again, and the archive is kept', async () => {
   const server = archiveServer(fixture, { sealedAt });
   const failing = new Set(['chunks/1/commitments.json.gz', 'chunk-index.json']);

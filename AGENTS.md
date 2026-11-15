@@ -1863,8 +1863,9 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
   - Never copy a tree's nodes from a file: a root check vouches only for
     what was hashed. (The archive's prebuilt trees were dropped for this.)
   - On anything unexpected the sync goes on from rail-squid where the
-    archive left off. A request that fails on the way is sent twice more,
-    and a txid batch the engine kept nothing of is given three times. A sync
+    archive left off. A request that fails on the way is sent four more
+    times over 15 s (a phone's DNS can drop lookups for seconds), and a txid
+    batch the engine kept nothing of is given three times. A sync
     within a day of the newest block (from the clock and the block table
     when the RPC can't say) never asks the archive.
   - Android's host fetches the archive for the page through the page's
