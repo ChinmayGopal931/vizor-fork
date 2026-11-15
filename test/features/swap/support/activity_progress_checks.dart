@@ -21,9 +21,12 @@ const _uri = 'https://explorer.near-intents.org/transactions/$_address';
 const _footer = ValueKey('swap_progress_explorer_link');
 
 void runActivityProgressChecks({required bool mobile}) {
+  // Veylor's mobile status tabs draw their labels as uppercase captions.
+  String tab(String label) => mobile ? label.toUpperCase() : label;
+  final detailsLabel = tab('Transaction details');
   for (final pay in [false, true]) {
     final flow = pay ? 'Pay' : 'Swap';
-    final progressLabel = pay ? 'Payment progress' : 'Swap progress';
+    final progressLabel = tab(pay ? 'Payment progress' : 'Swap progress');
 
     testWidgets('$flow progress and details open the same external lookup', (
       tester,
@@ -60,8 +63,8 @@ void runActivityProgressChecks({required bool mobile}) {
       expect(launched.single['url'], _uri);
       expect(launched.single['useWebView'], isFalse);
 
-      await tester.ensureVisible(find.text('Transaction details'));
-      await tester.tap(find.text('Transaction details'));
+      await tester.ensureVisible(find.text(detailsLabel));
+      await tester.tap(find.text(detailsLabel));
       await tester.pumpAndSettle();
       expect(find.byKey(_footer), findsNothing);
       expect(find.text('Tx ID'), findsOneWidget);
@@ -90,7 +93,7 @@ void runActivityProgressChecks({required bool mobile}) {
       );
       await tester.pumpAndSettle();
       expect(find.byKey(_footer), findsOneWidget);
-      await tester.tap(find.text('Transaction details'));
+      await tester.tap(find.text(detailsLabel));
       await tester.pumpAndSettle();
       notifier.setIntent(_intent(pay: pay));
       await tester.pumpAndSettle();

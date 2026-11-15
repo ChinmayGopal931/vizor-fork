@@ -752,8 +752,9 @@ void main() {
       showVoting: false,
     ),
     home: () => find.byType(MobileHomeScreen),
-    importing: () =>
-        find.byKey(const ValueKey('mobile_home_importing_background')),
+    // Veylor's Home has no importing illustration; the importing view itself
+    // marks the state.
+    importing: () => find.byKey(const ValueKey('mobile_home_importing')),
   );
 
   setUpAll(loadAppTestFonts);

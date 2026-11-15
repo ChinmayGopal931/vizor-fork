@@ -901,7 +901,10 @@ class _MobileHomeImportingProgress extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return _ImportingView(progress: ref.watch(syncDisplayPercentageProvider));
+    return _ImportingView(
+      key: const ValueKey('mobile_home_importing'),
+      progress: ref.watch(syncDisplayPercentageProvider),
+    );
   }
 }
 
@@ -2593,7 +2596,7 @@ class _MobileRestImage extends StatelessWidget {
 
 /// Full-tab importing state — Figma `Importing` (4394:88886).
 class _ImportingView extends StatelessWidget {
-  const _ImportingView({required this.progress});
+  const _ImportingView({required this.progress, super.key});
 
   static const _horizontalPadding = AppSpacing.sm;
   static const _topGap = AppSpacing.sm;

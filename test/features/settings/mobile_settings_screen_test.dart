@@ -486,9 +486,10 @@ void main() {
               tester.getTopLeft(footer).dy -
                   tester
                       .getBottomLeft(
-                        // Mainnet's support group is the last card.
+                        // The privacy card is the last card above the
+                        // footer.
                         find.ancestor(
-                          of: find.text('Misc'),
+                          of: find.text('Privacy'),
                           matching: find.byType(MobileSurfaceCard),
                         ),
                       )
