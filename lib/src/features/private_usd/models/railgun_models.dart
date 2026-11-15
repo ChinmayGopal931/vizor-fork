@@ -382,20 +382,30 @@ class RailgunStartResult {
   }
 }
 
-/// `openWallet`'s params: the wallet's mnemonic and its storage key. Drop the
-/// object once the call is made; never log it.
+/// `openWallet`'s params: the wallet's mnemonic and its storage key, and when
+/// its seed was made, if this app made it. Drop the object once the call is
+/// made; never log it.
 class RailgunOpenWalletParams {
   const RailgunOpenWalletParams({
     required this.encryptionKey,
     required this.mnemonic,
+    this.createdAt,
   });
 
   /// 64 hex characters.
   final String encryptionKey;
   final String mnemonic;
 
-  String toJson() =>
-      jsonEncode({'encryptionKey': encryptionKey, 'mnemonic': mnemonic});
+  /// A Unix time no later than this app generated the seed, for a seed it
+  /// generated: a wallet the page stores for the first time decrypts nothing
+  /// from before it. Null for any other seed.
+  final int? createdAt;
+
+  String toJson() => jsonEncode({
+    'encryptionKey': encryptionKey,
+    'mnemonic': mnemonic,
+    'createdAt': ?createdAt,
+  });
 
   @override
   String toString() => 'RailgunOpenWalletParams(<redacted>)';

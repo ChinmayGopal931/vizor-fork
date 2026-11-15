@@ -7,11 +7,17 @@ import '../models/railgun_models.dart';
 
 /// How often a watched balance is looked at, and how stale it may get.
 abstract final class PrivateUsdBalanceTiming {
-  /// The polling tick, and the freshness wanted while funds arrive.
-  static const arrivingPoll = Duration(seconds: 30);
+  /// How often a watched balance reads Railgun's head
+  /// ([PrivateUsdHeadWatch]): one rate for every wallet, whatever it
+  /// expects.
+  static const headPoll = Duration(seconds: 30);
 
-  /// The freshness wanted otherwise.
-  static const staleAfter = Duration(minutes: 5);
+  /// A watched balance refreshes at least this often, so a head that stops
+  /// moving hides nothing and screening's verdicts still come in.
+  static const backstop = Duration(minutes: 10);
+
+  /// Opening the Private USD screen refreshes a balance older than this.
+  static const openedAge = Duration(seconds: 30);
 
   /// A refresh gives up after this...
   static const refreshTimeout = Duration(minutes: 5);
@@ -157,10 +163,32 @@ class PrivateUsdBalanceState {
   );
 }
 
-/// Something is in screening (a payout or a deposit that just landed), so
-/// the balance is worth looking at often.
-bool isPrivateUsdArriving(PrivateUsdBalanceState state) =>
-    (state.balances?.arriving ?? BigInt.zero) > BigInt.zero;
+/// When a watched balance refreshes: once Railgun's head, as its indexer
+/// lists it, has moved past the one the last refresh began at, and at the
+/// latest [PrivateUsdBalanceTiming.backstop] after the last one. Every wallet
+/// reads the same head at the same rate, so its refreshes follow Railgun's
+/// history, never what the wallet expects.
+class PrivateUsdHeadWatch {
+  String? _refreshedAt;
+
+  /// Whether a balance [age] old (null for none shown) refreshes, Railgun's
+  /// head being [head] (null when it could not be read). Before the first
+  /// refresh it saw, a head counts as moved unless the balance is younger
+  /// than [PrivateUsdBalanceTiming.headPoll], when it is taken as that
+  /// balance's.
+  bool shouldRefresh(String? head, {required Duration? age}) {
+    if (age == null || age >= PrivateUsdBalanceTiming.backstop) return true;
+    if (head == null || head == _refreshedAt) return false;
+    if (_refreshedAt == null && age < PrivateUsdBalanceTiming.headPoll) {
+      _refreshedAt = head;
+      return false;
+    }
+    return true;
+  }
+
+  /// A refresh began with Railgun's head at [head].
+  void refreshing(String? head) => _refreshedAt = head ?? _refreshedAt;
+}
 
 /// Automatic refreshes wait longer after each failure in a row: 30 s, then
 /// doubling up to 32 times that. A refresh asked for outright ignores it.

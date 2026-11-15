@@ -150,6 +150,34 @@ void main() {
     },
   );
 
+  test('bootstrap keeps whether this app generated the seed', () {
+    const rustAccount = AccountInfo(uuid: 'seed', name: 'Rust', order: 0);
+    for (final generated in [false, true]) {
+      final stored = AccountInfo(
+        uuid: 'seed',
+        name: 'Stored',
+        order: 0,
+        generatedSeed: generated,
+      );
+      final merged = mergeBootstrappedAccountInfo(
+        rustAccount: rustAccount,
+        storedAccount: AccountInfo.fromJson(stored.toJson()),
+        order: 0,
+      );
+      expect(merged.generatedSeed, generated);
+      expect(merged.copyWith(name: 'Renamed').generatedSeed, generated);
+    }
+    expect(
+      mergeBootstrappedAccountInfo(
+        rustAccount: rustAccount,
+        storedAccount: null,
+        order: 0,
+      ).generatedSeed,
+      isFalse,
+    );
+    expect(rustAccount.toJson(), isNot(contains('generatedSeed')));
+  });
+
   test(
     'mergeBootstrappedAccountInfo normalizes legacy profile picture ids',
     () {
