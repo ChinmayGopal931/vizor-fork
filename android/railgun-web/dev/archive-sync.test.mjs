@@ -31,7 +31,10 @@ async function storedBySquid(lists = fixture.squid) {
  * A quick sync from `server` (archive.js over its fetch) and rail-squid (`lists`), from `startingBlock`; what it stored,
  * what it asked rail-squid, and why it left the archive.
  */
-async function storedByArchive(server, { lists = fixture.squid, store = memoryDatabase(), startingBlock = fixture.from, head = FAR, harness } = {}) {
+async function storedByArchive(
+  server,
+  { lists = fixture.squid, store = memoryDatabase(), startingBlock = fixture.from, head = FAR, harness, useArchive } = {},
+) {
   const { engine, merkletree } = harness ?? (await engineHarness({ store }));
   const squid = indexer(lists, PAGE);
   const left = [];
@@ -43,6 +46,7 @@ async function storedByArchive(server, { lists = fixture.squid, store = memoryDa
     time: (block) => blockTime(block),
     head: async () => head ?? undefined,
     log: (line) => left.push(line),
+    useArchive,
     pages,
     writeRetryMs: 0,
   });
@@ -221,6 +225,14 @@ test('a store that ends inside a batch goes on from the archive, which gives tha
 
   const resumed = await engineHarness({ store });
   const { stored, left } = await storedByArchive(archiveServer(fixture, { sealedAt }), { store, startingBlock: block, harness: resumed });
+  assert.deepEqual(left, []);
+  assert.deepEqual(stored, await storedBySquid());
+});
+
+test('after the trees were rebuilt, a sync far behind leaves the archive alone', async () => {
+  const server = archiveServer(fixture, { sealedAt });
+  const { stored, left } = await storedByArchive(server, { useArchive: () => false });
+  assert.deepEqual(server.asked, []);
   assert.deepEqual(left, []);
   assert.deepEqual(stored, await storedBySquid());
 });

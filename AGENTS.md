@@ -1864,9 +1864,18 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
     each verification hash continuing the chain.
   - Times come from the shipped block table, never the archive. Records
     carry no archive railgunTxid; a transaction's leaf is hashed from the
-    archive's, which the screening node's root check then vouches for.
+    archive's, which the screening node's root check then vouches for. That
+    root binds only the railgunTxid, so a transaction spending one of the
+    open wallet's notes, whose proofs rebuild the railgunTxid from its
+    fields, is worked out on the device and must match.
   - Never copy a tree's nodes from a file: a root check vouches only for
     what was hashed. (The archive's prebuilt trees were dropped for this.)
+  - A notes tree whose root the contract has never had (a leaf stored
+    wrong) fails every scan. Once the same tree's root has failed three
+    checks after broken scans, ten minutes or more apart in all, the page
+    rebuilds every tree from the start with the archive off for a week, at
+    most once a day (`tree-recovery.js`); a root an RPC hasn't caught up to
+    passes by then.
   - On anything unexpected the sync goes on from rail-squid where the
     archive left off. A request that fails on the way is sent four more
     times over 15 s (a phone's DNS can drop lookups for seconds), and a txid

@@ -1,4 +1,4 @@
-import { ByteLength, ByteUtils, RailgunWallet, setEngineTxidSyncBatchSize } from '@railgun-community/engine';
+import { ByteLength, ByteUtils, RailgunEngine, RailgunWallet, setEngineTxidSyncBatchSize } from '@railgun-community/engine';
 import {
   MerkletreeScanStatus,
   NETWORK_CONFIG,
@@ -20,6 +20,7 @@ import {
   loadWalletByID,
   refreshReceivePOIsForWallet,
   refreshSpentPOIsForWallet,
+  rescanFullUTXOMerkletreesAndWallets,
   setBatchListCallback,
   setLoggers,
   setOnUTXOMerkletreeScanCallback,
@@ -44,6 +45,7 @@ import { syncFailure } from './rpc-probe.js';
 import { screeningActivity } from './screening-activity.js';
 import { squidQueries } from './squid.js';
 import { syncFinisher } from './sync-finish.js';
+import { archiveOff, localStore, treeRecovery } from './tree-recovery.js';
 import { catchUpTxids } from './txid-catch-up.js';
 import { walletNamespaces } from './wallet-namespaces.js';
 
@@ -100,6 +102,8 @@ let notesProgress = 0;
 let proofsFailed = false;
 let activity;
 let syncProgress;
+// What tree-recovery.js learned of the notes trees' roots, and when it last rebuilt them, for the network started.
+let recoveryStore;
 
 const chain = () => NETWORK_CONFIG[network].chain;
 
@@ -114,6 +118,28 @@ async function ownNullifiers() {
   if (wallet === undefined) return new Set();
   const notes = await walletForID(wallet.walletId).TXOs(TXID_VERSION, chain());
   return new Set(notes.map(({ nullifier }) => ByteUtils.formatToByteLength(nullifier, ByteLength.UINT_256, false).toLowerCase()));
+}
+
+/** The first notes tree whose root the contract has never had, as the engine checks them at the end of a scan. */
+export async function firstInvalidTree() {
+  const merkletree = getEngine().getUTXOMerkletree(TXID_VERSION, chain());
+  const { tree: latest } = await merkletree.getLatestTreeAndIndex();
+  for (let tree = 0; tree <= latest; tree += 1) {
+    const index = await merkletree.getLatestIndexForTree(tree);
+    const root = await merkletree.getRoot(tree);
+    if (!(await RailgunEngine.validateMerkleroot(TXID_VERSION, chain(), tree, index, root))) return { tree, root };
+  }
+  return null;
+}
+
+/** After a notes scan broke off: whether the trees were rebuilt for `walletId`'s scans (tree-recovery.js). */
+function recoverTrees(walletId) {
+  if (recoveryStore === undefined) return false;
+  return treeRecovery({
+    firstInvalidTree,
+    rebuild: () => rescanFullUTXOMerkletreesAndWallets(chain(), [walletId]),
+    store: recoveryStore,
+  })();
 }
 
 /** Whether the engine was started for debugging, which answers the debug-only calls too. */
@@ -163,8 +189,11 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
       return { blockNumber: mainnetBlockAt(now), timestamp: now };
     }
   };
+  recoveryStore = localStore(`railgun-tree-recovery:${networkName}`);
+  // A week after the trees were rebuilt, syncs leave the archive alone.
+  const useArchive = () => !archiveOff(recoveryStore);
   if (reader !== undefined) {
-    installArchiveSync(engine, { reader, queries, chainId: history.chainId, time: mainnetBlockTime, head, log });
+    installArchiveSync(engine, { reader, queries, chainId: history.chainId, time: mainnetBlockTime, head, log, useArchive });
   }
   // Without the archive too: a list an archive sync left goes on from rail-squid.
   installArchiveTxids(engine, {
@@ -176,6 +205,7 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
     time: mainnetBlockTime,
     head,
     ownNullifiers,
+    useArchive,
     log,
   });
   setOnUTXOMerkletreeScanCallback(({ scanStatus, progress: reported }) => {
@@ -451,7 +481,12 @@ async function scanNotesNow(walletId) {
     } finally {
       notesScan = undefined;
     }
-    if (scan.incomplete) throw new Error('the notes scan broke off, so the balances may be stale');
+    if (scan.incomplete) {
+      // A tree whose root the contract has never had fails every scan until it is rebuilt (tree-recovery.js); after a
+      // rebuild, a scan shows whether it took.
+      if (await recoverTrees(walletId)) continue;
+      throw new Error('the notes scan broke off, so the balances may be stale');
+    }
     if (scan.started) return;
     await delay(NOTES_SCAN_RETRY_MS);
   }

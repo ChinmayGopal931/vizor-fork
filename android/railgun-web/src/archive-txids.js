@@ -52,7 +52,7 @@ export function withHash(railgunTransaction, own) {
  * engine's txid batch (`setBatchSize`) to `batchSizes.archive` for a batch of the archive's and `batchSizes.squid` for
  * one of rail-squid's. `time` dates records (`time(blockNumber, head)`), `head()` is the chain's newest block,
  * `ownNullifiers()` the open wallet's notes' nullifiers (unprefixed hex), and `log` hears why the archive was left.
- * Without a `reader`, a list an archive sync left goes on from rail-squid.
+ * Without a `reader`, or while `useArchive()` says no, a list an archive sync left goes on from rail-squid.
  *
  * - The archive gives transactions by sequence, which must run on from the last one stored without a gap, each
  *   verification hash continuing the chain as the engine checks it; the engine reads on only after a full batch, so
@@ -72,6 +72,7 @@ export function installArchiveTxids(
     time,
     head = async () => undefined,
     ownNullifiers = async () => new Set(),
+    useArchive = () => true,
     log = () => {},
   },
 ) {
@@ -187,6 +188,11 @@ export function installArchiveTxids(
     }
     // The newest transaction stored, which the engine asks after.
     const kept = latestGraphID === undefined ? undefined : await merkletree().getLatestRailgunTransaction();
+    if (reading && !useArchive()) {
+      reset();
+      handed = undefined;
+      return fromSquid(txChain, kept);
+    }
     if (reading) judge(sequenceAfter(latestGraphID));
     if (!reading) return fromSquid(txChain, kept);
     if (Date.now() - newestAt > HEAD_MAX_AGE_MS) {

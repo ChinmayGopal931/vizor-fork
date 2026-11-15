@@ -163,6 +163,10 @@ async function syncCheck(page, url, onEvent) {
     const finished = await synced;
     if (finished.rest !== rest) throw new Error(`rest ${finished.rest} ended, not the refresh's ${rest}`);
     console.log(`  the rest of the sync ended, screening ${finished.screening}`);
+    // What tree recovery checks after a broken scan, over the trees this sync built: every root one the contract has had.
+    const invalid = await call('firstInvalidTree', {});
+    if (invalid !== null) throw new Error(`notes tree ${invalid.tree}'s root isn't one the contract has had`);
+    console.log('  every notes tree root is one the contract has had');
     // The engine skips a scan while another runs; each sync must still get one of its own.
     const before = onEvent.notesScans;
     await Promise.all([call('refresh', {}), call('refresh', {})]);

@@ -65,6 +65,7 @@ function txidSync({
   kept = [],
   reading = true,
   mine = new Set(),
+  useArchive = () => true,
 }) {
   const lastBlock = Math.max(...listed.map(({ blockNumber }) => blockNumber), ...archived.map(({ blockNumber }) => blockNumber));
   const server = archiveServer(
@@ -91,6 +92,7 @@ function txidSync({
     time: (block) => blockTime(block),
     head: async () => head,
     ownNullifiers: async () => mine,
+    useArchive,
     log: (line) => left.push(line),
   });
   return {
@@ -231,6 +233,15 @@ test("the wallet's own transaction from the archive must hash to its railgunTxid
   assert.match(ours.left[0], /doesn't hash to its railgunTxid/);
   assert.deepEqual(second.slice(0, 8).map(({ graphID }) => sequenceOf(graphID)), [25, 26, 27, 28, 29, 30, 31, 32]);
   assert.deepEqual(verifications(ours.kept), verifications(listed.slice(0, 50)));
+});
+
+test('after the trees were rebuilt, the list leaves the archive alone and comes from rail-squid', async () => {
+  const { archived, listed } = transactions(60);
+  const sync = txidSync({ archived, listed, useArchive: () => false });
+  await sync.next();
+  assert.deepEqual(sync.server.asked, []);
+  assert.deepEqual(sync.left, []);
+  assert.deepEqual(verifications(sync.kept), verifications(listed));
 });
 
 test("the engine's txid batch is the archive's for a batch from it, and rail-squid's otherwise", async () => {

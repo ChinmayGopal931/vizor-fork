@@ -72,10 +72,14 @@ export async function* archiveCommitments(reader, since, next, { time, chainId }
 /**
  * Has `engine`'s quick sync read the archive (`reader`, archive.js) before rail-squid (`queries`, squid.js). `time` is
  * how records are dated (`time(blockNumber, head)`), `head()` the chain's newest block (`{blockNumber, timestamp}`),
- * read once a sync, and `log` hears why the archive was left. `pages` are `squidPages`'s options, `writeRetryMs`
+ * read once a sync, and `log` hears why the archive was left. While `useArchive()` says no (after the trees were
+ * rebuilt, tree-recovery.js), syncs read rail-squid alone. `pages` are `squidPages`'s options, `writeRetryMs`
  * `storeEvents`'s.
  */
-export function installArchiveSync(engine, { reader, queries, chainId, time, head, log = () => {}, pages, writeRetryMs }) {
+export function installArchiveSync(
+  engine,
+  { reader, queries, chainId, time, head, log = () => {}, useArchive = () => true, pages, writeRetryMs },
+) {
   const own = engine.quickSyncEvents;
   engine.quickSyncEvents = async (txidVersion, chain, startingBlock) => {
     if (txidVersion !== TXIDVersion.V2_PoseidonMerkle) return own(txidVersion, chain, startingBlock);
@@ -87,7 +91,7 @@ export function installArchiveSync(engine, { reader, queries, chainId, time, hea
             engine.emitUTXOMerkletreeScanUpdateEvent(txidVersion, chain, quickSyncProgress(startingBlock, newest.blockNumber, block));
     // Every list is stored through this block.
     let through = startingBlock - 1;
-    if (newest !== undefined && farBehind(startingBlock, newest.blockNumber)) {
+    if (newest !== undefined && farBehind(startingBlock, newest.blockNumber) && useArchive()) {
       try {
         const latest = await engine.getUTXOMerkletree(txidVersion, chain).getLatestTreeAndIndex();
         await storeEvents({
