@@ -15,7 +15,11 @@ import {
 import { CHAIN, V2, contents, engineHarness } from './engine-harness.mjs';
 import { memoryDatabase } from './memory-store.mjs';
 
-const word = (seed, bytes = 32) => createHash('sha256').update(String(seed)).digest('hex').slice(0, bytes * 2);
+const word = (seed, bytes = 32) =>
+  createHash('sha256')
+    .update(String(seed))
+    .digest('hex')
+    .slice(0, bytes * 2);
 const timestamp = (block) => String(1_650_000_000 + block * 12);
 
 /**
@@ -45,7 +49,11 @@ function history({ from = 14_700_000, blocks = 120 } = {}) {
           commitmentType: 'TransactCommitment',
           hash: BigInt(`0x${word(`leaf-${position}`, 31)}`).toString(),
           ciphertext: {
-            ciphertext: { iv: word(`iv-${position}`, 16), tag: word(`tag-${position}`, 16), data: [word(`d0-${position}`), word(`d1-${position}`)] },
+            ciphertext: {
+              iv: word(`iv-${position}`, 16),
+              tag: word(`tag-${position}`, 16),
+              data: [word(`d0-${position}`), word(`d1-${position}`)],
+            },
             blindedReceiverViewingKey: word(`r-${position}`),
             blindedSenderViewingKey: word(`s-${position}`),
             memo: '0x',
@@ -89,7 +97,10 @@ function indexer(lists, pageSize) {
     asked.push([name, block]);
     return lists[name].filter(({ blockNumber }) => Number(blockNumber) >= block).slice(0, pageSize);
   };
-  return { asked, queries: { nullifiers: answer('nullifiers'), unshields: answer('unshields'), commitments: answer('commitments') } };
+  return {
+    asked,
+    queries: { nullifiers: answer('nullifiers'), unshields: answer('unshields'), commitments: answer('commitments') },
+  };
 }
 
 /** The store as the engine's own quick sync leaves it: every list read whole, then stored in one go. */
@@ -103,7 +114,10 @@ async function storedWhole(lists) {
   return contents(store.down);
 }
 
-async function storedByPages(lists, { pageSize, writeLeaves, store = memoryDatabase(), startingBlock = lists.from, harness } = {}) {
+async function storedByPages(
+  lists,
+  { pageSize, writeLeaves, store = memoryDatabase(), startingBlock = lists.from, harness } = {},
+) {
   const { engine } = harness ?? (await engineHarness({ store }));
   const options = { pageSize, gapMs: 0 };
   const left = await storeEvents({
@@ -194,7 +208,13 @@ test('a list that fails first stores the leaves the pages before it gave, and sa
   const stored = [];
   const pages = squidLists(indexer(lists, 30).queries, lists.from, { pageSize: 30, gapMs: 0 });
   await assert.rejects(
-    storeEvents({ engine: harness.engine, txidVersion: V2, chain: CHAIN, ...pages, stored: (block) => stored.push(block) }),
+    storeEvents({
+      engine: harness.engine,
+      txidVersion: V2,
+      chain: CHAIN,
+      ...pages,
+      stored: (block) => stored.push(block),
+    }),
     /broken page/,
   );
   // The default write size holds every leaf until the end, so the only write is the one the failure makes.
@@ -231,7 +251,12 @@ test("a page's unshields and nullifiers are stored before its commitments", asyn
     checked += 1;
     return ownCommitments(txidVersion, chain, batches, ...rest);
   };
-  await storeEvents({ engine, txidVersion: V2, chain: CHAIN, ...squidLists(indexer(lists, 25).queries, lists.from, { pageSize: 25, gapMs: 0 }) });
+  await storeEvents({
+    engine,
+    txidVersion: V2,
+    chain: CHAIN,
+    ...squidLists(indexer(lists, 25).queries, lists.from, { pageSize: 25, gapMs: 0 }),
+  });
   assert.ok(checked > 5, `${checked} pages of commitments`);
 });
 
@@ -270,7 +295,10 @@ test('each list asks for its next page while the last one is stored', async () =
 test('a page repeats the block the last one ended on, and its events there are given once', async () => {
   const lists = history();
   const given = [];
-  for await (const { events } of squidPages(indexer(lists, 7).queries.nullifiers, formatNullifiers, lists.from, { pageSize: 7, gapMs: 0 })) {
+  for await (const { events } of squidPages(indexer(lists, 7).queries.nullifiers, formatNullifiers, lists.from, {
+    pageSize: 7,
+    gapMs: 0,
+  })) {
     given.push(...events);
   }
   assert.deepEqual(given, formatNullifiers(lists.nullifiers));
@@ -279,7 +307,10 @@ test('a page repeats the block the last one ended on, and its events there are g
 test('a list says how far it has given every event, and that it ended', async () => {
   const lists = history();
   const throughs = [];
-  for await (const { through } of squidPages(indexer(lists, 50).queries.commitments, formatCommitments, lists.from, { pageSize: 50, gapMs: 0 })) {
+  for await (const { through } of squidPages(indexer(lists, 50).queries.commitments, formatCommitments, lists.from, {
+    pageSize: 50,
+    gapMs: 0,
+  })) {
     throughs.push(through);
   }
   assert.equal(throughs.at(-1), Infinity);
@@ -295,10 +326,15 @@ test('an indexer with more than a page in one block fails the quick sync rather 
     blockTimestamp: timestamp(100),
     treeNumber: 0,
   }));
-  const pages = squidPages(async (block) => crowded.filter(({ blockNumber }) => Number(blockNumber) >= block).slice(0, 5), formatNullifiers, 100, {
-    pageSize: 5,
-    gapMs: 0,
-  });
+  const pages = squidPages(
+    async (block) => crowded.filter(({ blockNumber }) => Number(blockNumber) >= block).slice(0, 5),
+    formatNullifiers,
+    100,
+    {
+      pageSize: 5,
+      gapMs: 0,
+    },
+  );
   await pages.next();
   await assert.rejects(pages.next(), /more than a page/);
 });
@@ -314,13 +350,16 @@ test('the quick sync reports its progress as the engine scan updates between a t
   // A quick sync through the engine's own hook.
   await engine.quickSyncEvents(V2, CHAIN, lists.from);
   assert.ok(progress.length > 3);
-  assert.deepEqual([...progress].sort((a, b) => a - b), progress);
+  assert.deepEqual(
+    [...progress].sort((a, b) => a - b),
+    progress,
+  );
   assert.ok(progress[0] >= 0.1 && progress.at(-1) <= 0.4);
   assert.equal(quickSyncProgress(100, 300, 200), 0.25);
   assert.equal(quickSyncProgress(100, 300, 400), 0.4);
 });
 
-test('another TXID version keeps the engine\'s own quick sync', async () => {
+test("another TXID version keeps the engine's own quick sync", async () => {
   const { engine } = await engineHarness();
   engine.quickSyncEvents = async (txidVersion) => ({ own: txidVersion });
   installQuickSync(engine, { queries: indexer(history(), 40).queries, head: async () => 0 });
@@ -341,10 +380,19 @@ test('a list that ended before a page of commitments was asked for is read on, s
     if (name === 'nullifiers' && page.length < pageSize) indexed = true;
     return page;
   };
-  const queries = { nullifiers: answer('nullifiers'), unshields: answer('unshields'), commitments: answer('commitments') };
+  const queries = {
+    nullifiers: answer('nullifiers'),
+    unshields: answer('unshields'),
+    commitments: answer('commitments'),
+  };
   const store = memoryDatabase();
   const { engine } = await engineHarness({ store });
-  await storeEvents({ engine, txidVersion: V2, chain: CHAIN, ...squidLists(queries, lists.from, { pageSize, gapMs: 0 }) });
+  await storeEvents({
+    engine,
+    txidVersion: V2,
+    chain: CHAIN,
+    ...squidLists(queries, lists.from, { pageSize, gapMs: 0 }),
+  });
   assert.deepEqual(contents(store.down), await storedWhole(lists));
   // The nullifiers' last page was asked for again, from the block it started at.
   const nullifierBlocks = asked.filter(([name]) => name === 'nullifiers').map(([, block]) => block);
@@ -365,7 +413,10 @@ test("another source's commitments are stored only as far as the indexer's lists
   const lists = history();
   const behind = lists.from + 90;
   const known = (list) => list.filter(({ blockNumber }) => Number(blockNumber) <= behind);
-  const lagging = indexer({ nullifiers: known(lists.nullifiers), unshields: known(lists.unshields), commitments: [] }, 25);
+  const lagging = indexer(
+    { nullifiers: known(lists.nullifiers), unshields: known(lists.unshields), commitments: [] },
+    25,
+  );
   const store = memoryDatabase();
   const { engine, merkletree } = await engineHarness({ store });
   const stored = [];
@@ -381,14 +432,21 @@ test("another source's commitments are stored only as far as the indexer's lists
   });
   // The lists showed blocks through the newest unshield or nullifier they had, the older of the two.
   const shown = Math.min(
-    ...[known(lists.unshields), known(lists.nullifiers)].map((list) => Math.max(...list.map(({ blockNumber }) => Number(blockNumber)))),
+    ...[known(lists.unshields), known(lists.nullifiers)].map((list) =>
+      Math.max(...list.map(({ blockNumber }) => Number(blockNumber))),
+    ),
   );
   assert.equal(stored.at(-1), shown);
   const { tree, index } = await merkletree.getLatestTreeAndIndex();
   assert.ok((await merkletree.getCommitment(tree, index)).blockNumber <= shown);
   // The engine's next quick sync, from its newest stored commitment's block, with the indexer caught up.
   const startingBlock = (await merkletree.getCommitment(tree, index)).blockNumber;
-  await storeEvents({ engine, txidVersion: V2, chain: CHAIN, ...squidLists(indexer(lists, 25).queries, startingBlock, options) });
+  await storeEvents({
+    engine,
+    txidVersion: V2,
+    chain: CHAIN,
+    ...squidLists(indexer(lists, 25).queries, startingBlock, options),
+  });
   assert.deepEqual(contents(store.down), await storedWhole(lists));
 });
 
@@ -410,5 +468,8 @@ test('a store that says how far it came fails when a missing batch leaves leaves
     }),
     /stopped short/,
   );
-  assert.ok(stored.every((block) => block < dropped.blockNumber), `stored through ${stored.at(-1)}, the gap at ${dropped.blockNumber}`);
+  assert.ok(
+    stored.every((block) => block < dropped.blockNumber),
+    `stored through ${stored.at(-1)}, the gap at ${dropped.blockNumber}`,
+  );
 });

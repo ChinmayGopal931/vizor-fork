@@ -100,7 +100,9 @@ class RailgunBoundaryTest {
         val max = RailgunArchiveFetch.MAX_BYTES
         // An endless body, and one that says it is too large before it starts.
         assertThrows(IOException::class.java) { RailgunArchiveFetch.read(endless(), -1, 60_000, clock) }
-        assertThrows(IOException::class.java) { RailgunArchiveFetch.read(ByteArray(1).inputStream(), max + 1L, 60_000, clock) }
+        assertThrows(IOException::class.java) {
+            RailgunArchiveFetch.read(ByteArray(1).inputStream(), max + 1L, 60_000, clock)
+        }
         // A server that trickles: a byte a read, the clock 20 s on each time.
         var now = 0L
         val trickle = { now += 20_000; now }

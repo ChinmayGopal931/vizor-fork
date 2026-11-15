@@ -27,7 +27,11 @@ export async function catchUpTxids({ before, latest, sync, isScanning, wait, pas
       if (error === undefined && (index === undefined || !(now < index))) return;
       stalled += 1;
       if (stalled > retries) {
-        throw new Error(error === undefined ? `the txid list stopped at ${now} of ${index}` : `the validated txid index can't be read: ${error?.message ?? error}`);
+        throw new Error(
+          error === undefined
+            ? `the txid list stopped at ${now} of ${index}`
+            : `the validated txid index can't be read: ${error?.message ?? error}`,
+        );
       }
       await retryWait(stalled);
     } else {
@@ -38,5 +42,6 @@ export async function catchUpTxids({ before, latest, sync, isScanning, wait, pas
     now = await settled();
   }
   const { index } = await goal();
-  if (index !== undefined && now < index) throw new Error(`the txid list stopped at ${now} of ${index} after ${passes} syncs`);
+  if (index !== undefined && now < index)
+    throw new Error(`the txid list stopped at ${now} of ${index} after ${passes} syncs`);
 }

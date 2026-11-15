@@ -30,7 +30,9 @@ const retried = (status) => status === 408 || status === 425 || status === 429 |
 const hex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 export const sha256 = async (bytes) => hex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)));
 const gunzip = async (bytes) =>
-  new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+  new Uint8Array(
+    await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer(),
+  );
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function decode(bytes, path) {
@@ -62,11 +64,17 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
     try {
       const response = await fetch(`${base}/${path}`, { cache: 'no-store', signal: abort.signal });
       if (!response.ok) {
-        return { failure: new ArchiveUnavailable(`the archive answered ${response.status} for ${path}`), again: retried(response.status) };
+        return {
+          failure: new ArchiveUnavailable(`the archive answered ${response.status} for ${path}`),
+          again: retried(response.status),
+        };
       }
       return { bytes: new Uint8Array(await response.arrayBuffer()) };
     } catch (error) {
-      return { failure: new ArchiveUnavailable(`the archive did not answer for ${path}: ${error?.message ?? error}`), again: true };
+      return {
+        failure: new ArchiveUnavailable(`the archive did not answer for ${path}: ${error?.message ?? error}`),
+        again: true,
+      };
     } finally {
       clearTimeout(timer);
     }
@@ -138,7 +146,12 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
     /** Sealed chunk `chunk`'s event files of `kinds`. */
     async chunk({ id, startBlock, endBlock }, kinds) {
       const meta = decode(await get(`chunks/${id}/meta.json`), `chunks/${id}/meta.json`);
-      if (meta.formatVersion !== KNOWN.chunkFormat || meta.chunkId !== id || meta.startBlock !== startBlock || meta.endBlock !== endBlock) {
+      if (
+        meta.formatVersion !== KNOWN.chunkFormat ||
+        meta.chunkId !== id ||
+        meta.startBlock !== startBlock ||
+        meta.endBlock !== endBlock
+      ) {
         throw new ArchiveUnavailable(`chunk ${id} is not the one the index names`);
       }
       return { startBlock, endBlock, ...(await files(`chunks/${id}`, meta, kinds)) };
@@ -153,7 +166,11 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
       const bytes = await get(`tip/meta.json${query}`);
       if ((await sha256(bytes)) !== manifest.tipChecksum) throw new TipMoved('the tip moved');
       const meta = decode(bytes, 'tip/meta.json');
-      if (meta.formatVersion !== KNOWN.tipFormat || meta.startBlock !== after + 1 || !(meta.endBlock >= meta.startBlock - 1)) {
+      if (
+        meta.formatVersion !== KNOWN.tipFormat ||
+        meta.startBlock !== after + 1 ||
+        !(meta.endBlock >= meta.startBlock - 1)
+      ) {
         throw new ArchiveUnavailable(`the tip does not follow block ${after}`);
       }
       try {

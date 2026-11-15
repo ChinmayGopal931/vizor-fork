@@ -884,7 +884,8 @@ mod tests {
             .nth(1)
             .expect("an archive base in ARCHIVES");
         let archive_host = &base[..base.find('/').expect("a path after the archive host")];
-        let kotlin = read("android/app/src/main/kotlin/com/keplr/vizor/railgun/RailgunEndpoints.kt");
+        let kotlin =
+            read("android/app/src/main/kotlin/com/keplr/vizor/railgun/RailgunEndpoints.kt");
         let constant = kotlin
             .split("const val ARCHIVE_HOST = \"")
             .nth(1)

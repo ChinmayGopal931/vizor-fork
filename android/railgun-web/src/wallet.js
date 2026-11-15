@@ -118,7 +118,8 @@ const rebuildFor = (walletId, started) =>
   rebuildTrees(getEngine(), { txidVersion: TXID_VERSION, chain: chain(), walletIds: [walletId], started });
 
 /** What the page does after each of `walletId`'s notes scans (tree-recovery.js). */
-const recovery = (walletId) => treeRecovery({ rebuild: (started) => rebuildFor(walletId, started), store: recoveryStore });
+const recovery = (walletId) =>
+  treeRecovery({ rebuild: (started) => rebuildFor(walletId, started), store: recoveryStore });
 
 /**
  * Rebuilds the open wallet's notes trees now, as tree recovery does, for dev/check.mjs: whether it began, and the
@@ -143,7 +144,10 @@ export const isDebug = () => debug;
  * reads Railgun's history from it before rail-squid. Only the Android host fetches the archive for the page, which
  * can't read it itself (it sends no CORS headers).
  */
-export function start({ network: name, rpcUrls, poiNodeUrls, archive: useArchive = false, debug: debugging = false }, emit) {
+export function start(
+  { network: name, rpcUrls, poiNodeUrls, archive: useArchive = false, debug: debugging = false },
+  emit,
+) {
   const networkName = NETWORKS[name];
   if (networkName === undefined) throw badRequest(`unknown network ${name}`);
   if (!rpcUrls?.length) throw badRequest('no RPC URLs');
@@ -186,7 +190,15 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
   // For a week after the trees were rebuilt, or the archive listed one of a wallet's sends wrong, syncs leave it alone.
   const useArchive = () => !archiveOff(recoveryStore);
   if (reader !== undefined) {
-    installArchiveSync(engine, { reader, queries, chainId: history.chainId, time: mainnetBlockTime, head, log, useArchive });
+    installArchiveSync(engine, {
+      reader,
+      queries,
+      chainId: history.chainId,
+      time: mainnetBlockTime,
+      head,
+      log,
+      useArchive,
+    });
   }
   // Without the archive too: a list an archive sync left goes on from rail-squid.
   installArchiveTxids(engine, {
@@ -445,7 +457,8 @@ async function reportTxids() {
 async function proveSends(walletId) {
   const railgunWallet = walletForID(walletId);
   const busy = () =>
-    railgunWallet.isRefreshingPOIs.get(TXID_VERSION, chain()) === true || railgunWallet.generatingPOIsForChain.get(null, chain()) === true;
+    railgunWallet.isRefreshingPOIs.get(TXID_VERSION, chain()) === true ||
+    railgunWallet.generatingPOIsForChain.get(null, chain()) === true;
   for (let waited = 0; busy(); waited += POI_REFRESH_POLL_MS) {
     if (waited >= POI_REFRESH_WAIT_MS) throw new Error('the engine is still proving');
     await delay(POI_REFRESH_POLL_MS);
@@ -453,7 +466,9 @@ async function proveSends(walletId) {
   await relistIfMisrecorded({
     misrecorded: async () => {
       const needed = await railgunWallet.getSentCommitmentsAndUnshieldEventsNeedPOIs(TXID_VERSION, chain());
-      const sends = [...needed.sentCommitmentsNeedPOIs, ...needed.unshieldEventsNeedPOIs].flatMap(({ railgunTxid }) => railgunTxid ?? []);
+      const sends = [...needed.sentCommitmentsNeedPOIs, ...needed.unshieldEventsNeedPOIs].flatMap(
+        ({ railgunTxid }) => railgunTxid ?? [],
+      );
       return (await misrecordedTransaction(getEngine().getTXIDMerkletree(TXID_VERSION, chain()), sends)) !== undefined;
     },
     clear: () => getEngine().clearTXIDMerkletreeData(TXID_VERSION, chain()),

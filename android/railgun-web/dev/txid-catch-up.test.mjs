@@ -46,14 +46,24 @@ test('it stops after its passes, and fails if they ran out short of the validate
   await catchUpTxids({ ...txids, before: 0, passes: 3 });
   assert.deepEqual(txids.log, ['sync', 'sync', 'sync']);
   const short = tree({ at: 10_000, adds: Array(10).fill(10_000) });
-  await assert.rejects(catchUpTxids({ ...short, before: 0, passes: 3, target: async () => 151_000 }), /stopped at 40000 of 151000 after 3/);
+  await assert.rejects(
+    catchUpTxids({ ...short, before: 0, passes: 3, target: async () => 151_000 }),
+    /stopped at 40000 of 151000 after 3/,
+  );
 });
 
 test('a sync that adds nothing short of the validated index is tried again, and the catch-up goes on', async () => {
   // A dropped connection failed the sync after 40,000: the next attempts reach the screening nodes again.
   const txids = tree({ at: 40_000, adds: [0, 5_000, 5_000, 0] });
   const waits = [];
-  await catchUpTxids({ ...txids, before: 35_000, passes: 50, target: async () => 50_000, retries: 3, retryWait: async (n) => waits.push(n) });
+  await catchUpTxids({
+    ...txids,
+    before: 35_000,
+    passes: 50,
+    target: async () => 50_000,
+    retries: 3,
+    retryWait: async (n) => waits.push(n),
+  });
   assert.equal(await txids.latest(), 50_000);
   assert.deepEqual(waits, [1]);
 });
@@ -62,7 +72,14 @@ test('a list that never moves though more is validated fails the catch-up after 
   const txids = tree({ at: 40_000, adds: [0, 0, 0, 0, 0] });
   const waits = [];
   await assert.rejects(
-    catchUpTxids({ ...txids, before: 35_000, passes: 50, target: async () => 151_000, retries: 3, retryWait: async (n) => waits.push(n) }),
+    catchUpTxids({
+      ...txids,
+      before: 35_000,
+      passes: 50,
+      target: async () => 151_000,
+      retries: 3,
+      retryWait: async (n) => waits.push(n),
+    }),
     /stopped at 40000 of 151000/,
   );
   assert.deepEqual(waits, [1, 2, 3]);
@@ -72,7 +89,14 @@ test('a list that never moves though more is validated fails the catch-up after 
 test('a validated index reached, or none validated, ends the catch-up at the first sync that adds none', async () => {
   for (const goal of [async () => 40_000, async () => undefined]) {
     const txids = tree({ at: 40_000, adds: [0] });
-    await catchUpTxids({ ...txids, before: 35_000, passes: 50, target: goal, retries: 3, retryWait: async () => assert.fail('no retry') });
+    await catchUpTxids({
+      ...txids,
+      before: 35_000,
+      passes: 50,
+      target: goal,
+      retries: 3,
+      retryWait: async () => assert.fail('no retry'),
+    });
     assert.deepEqual(txids.log, ['sync']);
   }
 });
@@ -87,17 +111,31 @@ test("a validated index that can't be read, the connection down, is tried again 
   };
   const txids = tree({ at: 40_000, adds: [0, 0, 10_000, 0] });
   const waits = [];
-  await catchUpTxids({ ...txids, before: 35_000, passes: 50, target: flaky, retries: 3, retryWait: async (n) => waits.push(n) });
+  await catchUpTxids({
+    ...txids,
+    before: 35_000,
+    passes: 50,
+    target: flaky,
+    retries: 3,
+    retryWait: async (n) => waits.push(n),
+  });
   assert.equal(await txids.latest(), 50_000);
   assert.deepEqual(waits, [1, 2]);
   const down = tree({ at: 40_000, adds: [0, 0, 0, 0] });
   await assert.rejects(
-    catchUpTxids({ ...down, before: 35_000, passes: 50, target: async () => Promise.reject(new Error('offline')), retries: 3, retryWait: async () => {} }),
+    catchUpTxids({
+      ...down,
+      before: 35_000,
+      passes: 50,
+      target: async () => Promise.reject(new Error('offline')),
+      retries: 3,
+      retryWait: async () => {},
+    }),
     /can't be read: offline/,
   );
 });
 
-test("it waits out a sync the engine started itself before counting, and never syncs beside it", async () => {
+test('it waits out a sync the engine started itself before counting, and never syncs beside it', async () => {
   const txids = tree({ at: 10_000, adds: [0], busy: 2 });
   await catchUpTxids({ ...txids, before: 0, passes: 50 });
   assert.deepEqual(txids.log, ['wait', 'wait', 'sync']);

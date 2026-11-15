@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { EngineEvent, MerkletreeScanStatus, RailgunEngine, createRailgunTransactionWithHash } from '@railgun-community/engine';
+import {
+  EngineEvent,
+  MerkletreeScanStatus,
+  RailgunEngine,
+  createRailgunTransactionWithHash,
+} from '@railgun-community/engine';
 import { throughRailgunEngineHooks, throughRootRefusals, withoutRescanTxidReset } from '../engine-hooks-plugin.mjs';
 import { formatCommitments, installQuickSync } from '../src/quick-sync.js';
 import {
@@ -32,7 +37,10 @@ function recovery({ busy = () => false } = {}) {
       assert.equal(store.read().rebuilding, undefined, 'nothing is kept before the rebuild begins');
       started();
       assert.equal(store.read().rebuilding, clock, 'kept unfinished as the clearing begins');
-      assert.ok(archiveOff(store, () => clock), 'the archive is off as the clearing begins');
+      assert.ok(
+        archiveOff(store, () => clock),
+        'the archive is off as the clearing begins',
+      );
       rebuilds.push(clock);
       return true;
     },
@@ -125,52 +133,58 @@ test('the trees are rebuilt at most once a day', async () => {
   assert.equal(r.rebuilds.length, 2);
 });
 
-test('a rebuild a closed page left goes on when the page reopens, before anything else, and the day counts from when '
-  + 'it completed', async () => {
-  let clock = 1_000_000;
-  const store = localStore(`tree-recovery-test-${(stores += 1)}`);
-  const closed = treeRecovery({
-    rebuild: async (started) => {
-      started();
-      throw new Error('the page closed while clearing the transaction list');
-    },
-    store,
-    now: () => clock,
-  });
-  for (const minutes of [0, 5]) {
-    clock += minutes * MINUTE;
-    assert.equal(await closed.broke(wrong), false);
-  }
-  clock += 5 * MINUTE;
-  await assert.rejects(closed.broke(wrong), /page closed/);
-  assert.equal(store.read().rebuilding, clock);
-  assert.equal(store.read().rebuiltAt, undefined);
-  assert.ok(archiveOff(store, () => clock), 'the reopened page goes on without the archive');
+test(
+  'a rebuild a closed page left goes on when the page reopens, before anything else, and the day counts from when ' +
+    'it completed',
+  async () => {
+    let clock = 1_000_000;
+    const store = localStore(`tree-recovery-test-${(stores += 1)}`);
+    const closed = treeRecovery({
+      rebuild: async (started) => {
+        started();
+        throw new Error('the page closed while clearing the transaction list');
+      },
+      store,
+      now: () => clock,
+    });
+    for (const minutes of [0, 5]) {
+      clock += minutes * MINUTE;
+      assert.equal(await closed.broke(wrong), false);
+    }
+    clock += 5 * MINUTE;
+    await assert.rejects(closed.broke(wrong), /page closed/);
+    assert.equal(store.read().rebuilding, clock);
+    assert.equal(store.read().rebuiltAt, undefined);
+    assert.ok(
+      archiveOff(store, () => clock),
+      'the reopened page goes on without the archive',
+    );
 
-  // The page reopens an hour later: the rebuild goes on before its first scan, no refusal needed.
-  clock += 60 * MINUTE;
-  const rebuilds = [];
-  const reopened = treeRecovery({
-    rebuild: async (started) => {
-      started();
-      rebuilds.push(clock);
-      return true;
-    },
-    store,
-    now: () => clock,
-  });
-  assert.equal(await reopened.resume(), true);
-  assert.deepEqual(rebuilds, [clock]);
-  assert.equal(store.read().rebuilding, undefined);
-  assert.equal(store.read().rebuiltAt, clock);
-  assert.equal(await reopened.resume(), false);
-  // The day counts from then.
-  for (const minutes of [10, 10, 10]) {
-    clock += minutes * MINUTE;
-    assert.equal(await reopened.broke(wrong), false);
-  }
-  assert.equal(rebuilds.length, 1);
-});
+    // The page reopens an hour later: the rebuild goes on before its first scan, no refusal needed.
+    clock += 60 * MINUTE;
+    const rebuilds = [];
+    const reopened = treeRecovery({
+      rebuild: async (started) => {
+        started();
+        rebuilds.push(clock);
+        return true;
+      },
+      store,
+      now: () => clock,
+    });
+    assert.equal(await reopened.resume(), true);
+    assert.deepEqual(rebuilds, [clock]);
+    assert.equal(store.read().rebuilding, undefined);
+    assert.equal(store.read().rebuiltAt, clock);
+    assert.equal(await reopened.resume(), false);
+    // The day counts from then.
+    for (const minutes of [10, 10, 10]) {
+      clock += minutes * MINUTE;
+      assert.equal(await reopened.broke(wrong), false);
+    }
+    assert.equal(rebuilds.length, 1);
+  },
+);
 
 test('a rebuild left unfinished goes on at the next refusal too, whatever the count', async () => {
   const clock = 1_000_000;
@@ -421,7 +435,10 @@ test('the build rewrites the end-of-scan check and the full rescan, and refuses 
   assert.ok(rewritten.includes('.rootRefused(treeIndex, root, new Error(`Invalid merkleroot: ${root}.'));
   assert.ok(!rewritten.includes('await this.fullResetTXIDMerkletreesV2(chain);'));
   assert.ok(rewritten.includes('async fullResetTXIDMerkletreesV2(chain) {'), "the engine's reset itself stays");
-  assert.throws(() => throughRootRefusals(source.replace('Invalid merkleroot: ${root}', 'Invalid merkleroot ${root}')), /no longer applies/);
+  assert.throws(
+    () => throughRootRefusals(source.replace('Invalid merkleroot: ${root}', 'Invalid merkleroot ${root}')),
+    /no longer applies/,
+  );
   assert.throws(
     () => withoutRescanTxidReset(source.replace('Must reset txid merkletree', 'Must reset the txid merkletree')),
     /no longer applies/,

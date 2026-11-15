@@ -34,7 +34,11 @@ function subID(decimal) {
 }
 
 const preImage = ({ npk, token, value }) =>
-  serializePreImage(npk, serializeTokenData(token.tokenAddress, token.tokenType, subID(token.tokenSubID)), BigInt(value));
+  serializePreImage(
+    npk,
+    serializeTokenData(token.tokenAddress, token.tokenType, subID(token.tokenSubID)),
+    BigInt(value),
+  );
 
 const ciphertext = ({ iv, tag, data }) => ({
   iv: f16(iv, false),
@@ -46,7 +50,8 @@ function commitment(c, time, chainId) {
   const common = { txid: f32(c.txid, false), timestamp: time(c.blockNumber) };
   switch (c.commitmentType) {
     case 'ShieldCommitment': {
-      const fee = c.fee != null ? String(c.fee) : c.blockNumber >= (SHIELD_FEE_FROM_BLOCK[chainId] ?? Infinity) ? '0' : undefined;
+      const fee =
+        c.fee != null ? String(c.fee) : c.blockNumber >= (SHIELD_FEE_FROM_BLOCK[chainId] ?? Infinity) ? '0' : undefined;
       const shield = {
         ...common,
         commitmentType: CommitmentType.ShieldCommitment,

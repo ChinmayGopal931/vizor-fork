@@ -10,7 +10,13 @@ import {
 } from '@railgun-community/engine';
 import { archive } from '../src/archive.js';
 import { sequenceOf, transaction } from '../src/archive-records.js';
-import { ARCHIVE_TRIES, installArchiveTxids, misrecordedTransaction, relistIfMisrecorded, withHash } from '../src/archive-txids.js';
+import {
+  ARCHIVE_TRIES,
+  installArchiveTxids,
+  misrecordedTransaction,
+  relistIfMisrecorded,
+  withHash,
+} from '../src/archive-txids.js';
 import { ARCHIVE_OFF_MS, archiveOff, localStore } from '../src/tree-recovery.js';
 import { CHAIN, TXIDMerkletree, V2 } from './engine-harness.mjs';
 import { ARCHIVE_BASE, archiveServer, blockTime, word } from './history-fixture.mjs';
@@ -68,7 +74,10 @@ function txidSync({
   reading = true,
   useArchive = () => true,
 }) {
-  const lastBlock = Math.max(...listed.map(({ blockNumber }) => blockNumber), ...archived.map(({ blockNumber }) => blockNumber));
+  const lastBlock = Math.max(
+    ...listed.map(({ blockNumber }) => blockNumber),
+    ...archived.map(({ blockNumber }) => blockNumber),
+  );
   const server = archiveServer(
     { from: FROM, to: lastBlock, archive: { commitments: [], nullifiers: [], unshields: [] } },
     { sealedAt, transactions: archived },
@@ -81,7 +90,10 @@ function txidSync({
       asked.push(idLow);
       return listed.filter(({ graphID }) => idLow === undefined || graphID > idLow);
     },
-    getTXIDMerkletree: () => ({ getLatestRailgunTransaction: async () => kept.at(-1), getTreeLength: async () => kept.length }),
+    getTXIDMerkletree: () => ({
+      getLatestRailgunTransaction: async () => kept.at(-1),
+      getTreeLength: async () => kept.length,
+    }),
     validateRailgunTxidMerkleroot: async () => true,
   };
   installArchiveTxids(engine, {
@@ -112,7 +124,7 @@ function txidSync({
 
 const verifications = (list) => list.map(({ verificationHash }) => verificationHash);
 
-test("the archive gives its transactions in sequence, across chunks whose index lists none", async () => {
+test('the archive gives its transactions in sequence, across chunks whose index lists none', async () => {
   const { archived, listed } = transactions(60);
   const sync = txidSync({ archived, listed: listed.slice(0, 60) });
   const first = await sync.next();
@@ -186,32 +198,44 @@ test('a batch refused once, its root check cut off with the connection, stays on
   await sync.next();
   const third = await sync.next();
   assert.deepEqual(sync.left, []);
-  assert.deepEqual(third.map(({ graphID }) => sequenceOf(graphID)), Array.from({ length: 25 }, (_, i) => 50 + i));
+  assert.deepEqual(
+    third.map(({ graphID }) => sequenceOf(graphID)),
+    Array.from({ length: 25 }, (_, i) => 50 + i),
+  );
   assert.deepEqual(sync.asked, []);
 });
 
 test("a record the page can't read keeps the ones before it, and rail-squid gives the rest without a gap", async () => {
   const { archived, listed } = transactions(60);
   // An unshield without its recipient, say.
-  archived[30] = { ...archived[30], unshield: { tokenData: { tokenType: 0, tokenAddress: `0x${word('t', 20)}`, tokenSubID: '0' }, value: '5' } };
+  archived[30] = {
+    ...archived[30],
+    unshield: { tokenData: { tokenType: 0, tokenAddress: `0x${word('t', 20)}`, tokenSubID: '0' }, value: '5' },
+  };
   const sync = txidSync({ archived, listed });
   await sync.next();
   const second = await sync.next();
   await sync.next();
   assert.equal(sync.left.length, 1);
-  assert.deepEqual(second.slice(0, 5).map(({ graphID }) => sequenceOf(graphID)), [25, 26, 27, 28, 29]);
+  assert.deepEqual(
+    second.slice(0, 5).map(({ graphID }) => sequenceOf(graphID)),
+    [25, 26, 27, 28, 29],
+  );
   assert.equal(sequenceOf(second[5].graphID), undefined);
   assert.deepEqual(verifications(sync.kept), verifications(listed));
 });
 
-test("a record that breaks the verification hashes is never handed to the engine: rail-squid gives it", async () => {
+test('a record that breaks the verification hashes is never handed to the engine: rail-squid gives it', async () => {
   const { archived, listed } = transactions(60);
   archived[33] = { ...archived[33], verificationHash: word('not the chain') };
   const sync = txidSync({ archived, listed });
   await sync.next();
   const second = await sync.next();
   assert.match(sync.left[0], /verification hashes/);
-  assert.deepEqual(second.slice(0, 8).map(({ graphID }) => sequenceOf(graphID)), [25, 26, 27, 28, 29, 30, 31, 32]);
+  assert.deepEqual(
+    second.slice(0, 8).map(({ graphID }) => sequenceOf(graphID)),
+    [25, 26, 27, 28, 29, 30, 31, 32],
+  );
   assert.deepEqual(verifications(sync.kept), verifications(listed.slice(0, 50)));
 });
 
@@ -248,7 +272,12 @@ test("the engine's txid batch is the archive's for a batch from it, and rail-squ
 
 test('with the archive off, a list an archive sync left goes on from rail-squid without skipping a transaction', async () => {
   const { archived, listed } = transactions(30);
-  const sync = txidSync({ archived, listed, reading: false, kept: archived.slice(0, 5).map((record) => transaction(record, blockTime)) });
+  const sync = txidSync({
+    archived,
+    listed,
+    reading: false,
+    kept: archived.slice(0, 5).map((record) => transaction(record, blockTime)),
+  });
   await sync.next();
   assert.deepEqual(sync.server.asked, []);
   assert.deepEqual(verifications(sync.kept), verifications(listed));
@@ -268,7 +297,7 @@ test('a page reopened after a kill goes on in the archive from where its list st
   assert.deepEqual(reopened.asked, []);
 });
 
-test("a list rail-squid gave goes on from rail-squid", async () => {
+test('a list rail-squid gave goes on from rail-squid', async () => {
   const { archived, listed } = transactions(30);
   const sync = txidSync({ archived, listed, kept: listed.slice(0, 5) });
   await sync.next();
@@ -288,7 +317,10 @@ test("a list within the archive tip's reach of the newest block goes on from rai
 test("a leaf hashed from the archive's railgunTxid is the engine's own", () => {
   const { archived } = transactions(3);
   const tx = transaction(archived[2], blockTime);
-  assert.deepEqual(withHash(tx, () => assert.fail('worked out again')), createRailgunTransactionWithHash(tx));
+  assert.deepEqual(
+    withHash(tx, () => assert.fail('worked out again')),
+    createRailgunTransactionWithHash(tx),
+  );
   assert.equal(Object.keys(tx).includes('railgunTxid'), false, 'kept out of what the engine stores');
 });
 
@@ -300,7 +332,11 @@ test('an unshield from before V2 has its railgunTxid worked out, whatever the ar
       ...archived[0],
       blockNumber: 15_000_000,
       railgunTxid: word('wrong'),
-      unshield: { tokenData: { tokenType: 0, tokenAddress: `0x${word('t', 20)}`, tokenSubID: '0' }, toAddress: `0x${word('to', 20)}`, value: '5' },
+      unshield: {
+        tokenData: { tokenType: 0, tokenAddress: `0x${word('t', 20)}`, tokenSubID: '0' },
+        toAddress: `0x${word('to', 20)}`,
+        value: '5',
+      },
     },
     blockTime,
   );
@@ -327,7 +363,10 @@ test("a send whose record doesn't hash to its railgunTxid is found before provin
   const railgunTxidOf = (tx) => ByteUtils.nToHex(getRailgunTransactionID(tx), ByteLength.UINT_256);
   assert.equal(misrecorded.railgunTxid, railgunTxidOf(wrong));
   assert.equal(await misrecordedTransaction(list, [railgunTxidOf(right), fromArchive.railgunTxid]), undefined);
-  assert.equal(await misrecordedTransaction(list, [railgunTxidOf(right), misrecorded.railgunTxid]), misrecorded.railgunTxid);
+  assert.equal(
+    await misrecordedTransaction(list, [railgunTxidOf(right), misrecorded.railgunTxid]),
+    misrecorded.railgunTxid,
+  );
   assert.equal(await misrecordedTransaction(list, [word('never listed')]), undefined);
 });
 
@@ -380,7 +419,10 @@ test("a list that can't be cleared yet is cleared at the next proving, without t
   const r = relist({ misrecorded: true, clearFails: 1 });
   await assert.rejects(r.run(), /the list is syncing/);
   assert.equal(r.store.read().relist, true);
-  assert.ok(archiveOff(r.store, () => NOW), 'off before the list is cleared, so no sync takes it from the archive again');
+  assert.ok(
+    archiveOff(r.store, () => NOW),
+    'off before the list is cleared, so no sync takes it from the archive again',
+  );
   assert.equal(await r.run(), true);
   assert.deepEqual(r.done, ['checked', 'cleared', 'caught up']);
 });

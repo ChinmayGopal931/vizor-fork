@@ -724,7 +724,9 @@ class RailgunEngine {
       _finishingRest = null;
     }
     final last = state.value.lastSync;
-    if (_session != null && last != null && last.accountUuid == _session!.accountUuid) {
+    if (_session != null &&
+        last != null &&
+        last.accountUuid == _session!.accountUuid) {
       final syncing = _finishingRest != null;
       if (synced.refresh != null || last.syncing != syncing) {
         _publish(

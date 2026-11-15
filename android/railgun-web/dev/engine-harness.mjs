@@ -35,10 +35,20 @@ export function builtEngineModule(file, rewrite, built = {}) {
   const filename = path.join(ENGINE, file);
   const engineRequire = createRequire(filename);
   const module = { exports: {} };
-  const load = vm.compileFunction(rewrite(readFileSync(filename, 'utf8')), ['exports', 'require', 'module', '__filename', '__dirname'], {
+  const load = vm.compileFunction(
+    rewrite(readFileSync(filename, 'utf8')),
+    ['exports', 'require', 'module', '__filename', '__dirname'],
+    {
+      filename,
+    },
+  );
+  load(
+    module.exports,
+    (id) => PAGE_MODULES.get(id) ?? built[id] ?? engineRequire(id),
+    module,
     filename,
-  });
-  load(module.exports, (id) => PAGE_MODULES.get(id) ?? built[id] ?? engineRequire(id), module, filename, path.dirname(filename));
+    path.dirname(filename),
+  );
   return module.exports;
 }
 
@@ -92,7 +102,18 @@ export const { RailgunEngine: BuiltEngine } = builtEngineModule('railgun-engine.
  * of an empty store starts at `deploymentBlock`.
  */
 export async function wholeEngine({ Engine = BuiltEngine, store = memoryDatabase(), contract, deploymentBlock }) {
-  const engine = new Engine('test', store.down, undefined, undefined, undefined, undefined, undefined, undefined, false, false);
+  const engine = new Engine(
+    'test',
+    store.down,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    false,
+    false,
+  );
   const utxo = await UTXOMerkletree.create(engine.db, CHAIN, V2, (txidVersion, chain, tree, index, root) =>
     Engine.validateMerkleroot(txidVersion, chain, tree, index, root),
   );
@@ -117,7 +138,9 @@ export function contents(down) {
   const number = (hex) => Number.parseInt(hex, 16);
   const nodes = (key) => {
     const [, , , tree, level, index] = parts(key);
-    return parts(key).length === 6 && number(level) <= TREE_DEPTH ? { tree, level: number(level), index: number(index) } : undefined;
+    return parts(key).length === 6 && number(level) <= TREE_DEPTH
+      ? { tree, level: number(level), index: number(index) }
+      : undefined;
   };
   // Each tree's leaves are its level-0 nodes.
   const lengths = new Map();

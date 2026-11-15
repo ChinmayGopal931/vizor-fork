@@ -56,10 +56,20 @@ void main() {
     final progress = PrivateUsdFirstSyncProgress(elapsed: () => elapsed);
     var shown = progress.percent(notes: notes(0.1))!;
     // Nothing for three minutes, then the quick sync's first blocks.
-    for (final (minutes, share) in [(3, 0.1), (3, 0.101), (5, 0.101), (5, 0.12), (6, 0.2)]) {
+    for (final (minutes, share) in [
+      (3, 0.1),
+      (3, 0.101),
+      (5, 0.101),
+      (5, 0.12),
+      (6, 0.2),
+    ]) {
       elapsed = Duration(minutes: minutes);
       final next = progress.percent(notes: notes(share))!;
-      expect(next, greaterThanOrEqualTo(shown), reason: 'at $share after $minutes min');
+      expect(
+        next,
+        greaterThanOrEqualTo(shown),
+        reason: 'at $share after $minutes min',
+      );
       shown = next;
     }
   });

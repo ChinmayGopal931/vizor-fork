@@ -92,7 +92,10 @@ export function treeRecovery({ rebuild, store, now = Date.now }) {
  * keep failing never has. The page syncs the list again after the next scan that completes.
  */
 export async function rebuildTrees(engine, { txidVersion, chain, walletIds, started }) {
-  if (engine.getUTXOMerkletree(txidVersion, chain).isScanning || engine.getTXIDMerkletree(txidVersion, chain).isScanning) {
+  if (
+    engine.getUTXOMerkletree(txidVersion, chain).isScanning ||
+    engine.getTXIDMerkletree(txidVersion, chain).isScanning
+  ) {
     return false;
   }
   started();

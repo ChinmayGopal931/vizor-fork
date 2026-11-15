@@ -331,27 +331,30 @@ void main() {
     },
   );
 
-  test('a first sync whose rest runs on lets the screen sleep once the page '
-      'closes, and keeps it on again for the rest a later refresh starts', () async {
-    final container = containerWith(deployment: _sepolia, engineRuns: true);
-    bool awake() => container.read(privateUsdFirstSyncKeepAwakeProvider);
+  test(
+    'a first sync whose rest runs on lets the screen sleep once the page '
+    'closes, and keeps it on again for the rest a later refresh starts',
+    () async {
+      final container = containerWith(deployment: _sepolia, engineRuns: true);
+      bool awake() => container.read(privateUsdFirstSyncKeepAwakeProvider);
 
-    await syncAnswering(
-      container,
-      '{"balances":{},"screening":"ok","syncing":true,"rest":1}',
-    );
-    expect(awake(), isTrue);
-    await container.read(railgunEngineProvider).close();
-    await pumpEventQueue();
-    expect(awake(), isFalse);
+      await syncAnswering(
+        container,
+        '{"balances":{},"screening":"ok","syncing":true,"rest":1}',
+      );
+      expect(awake(), isTrue);
+      await container.read(railgunEngineProvider).close();
+      await pumpEventQueue();
+      expect(awake(), isFalse);
 
-    // The next refresh, on a new page, goes on with the transaction list.
-    await syncAnswering(
-      container,
-      '{"balances":{},"screening":"ok","syncing":true,"rest":1}',
-    );
-    expect(awake(), isTrue);
-  });
+      // The next refresh, on a new page, goes on with the transaction list.
+      await syncAnswering(
+        container,
+        '{"balances":{},"screening":"ok","syncing":true,"rest":1}',
+      );
+      expect(awake(), isTrue);
+    },
+  );
 
   test(
     'a first sync that ends with its refresh lets the screen sleep at once',

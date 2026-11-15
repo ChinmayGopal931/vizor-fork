@@ -10,7 +10,11 @@ const require = createRequire(import.meta.url);
 const { poseidonHex } = require(path.join(ENGINE, 'utils/poseidon'));
 const { MERKLE_ZERO_VALUE } = require(path.join(ENGINE, 'models/merkletree-types'));
 
-export const word = (seed, bytes = 32) => createHash('sha256').update(String(seed)).digest('hex').slice(0, bytes * 2);
+export const word = (seed, bytes = 32) =>
+  createHash('sha256')
+    .update(String(seed))
+    .digest('hex')
+    .slice(0, bytes * 2);
 /** The time the fixture's rail-squid gives a block; tests date archive records the same way. */
 export const blockTime = (block) => 1_650_000_000 + block * 12;
 const TOKEN = `0x${word('token', 20)}`;
@@ -32,7 +36,11 @@ export function history({ from = 14_760_000, blocks = 120 } = {}) {
       for (let i = 0; i < 1 + ((block + batch) % 4); i += 1) {
         const hash = word(`leaf-${position}`, 31);
         const ciphertext = {
-          ciphertext: { iv: word(`iv-${position}`, 16), tag: word(`tag-${position}`, 16), data: [word(`d0-${position}`), word(`d1-${position}`)] },
+          ciphertext: {
+            iv: word(`iv-${position}`, 16),
+            tag: word(`tag-${position}`, 16),
+            data: [word(`d0-${position}`), word(`d1-${position}`)],
+          },
           blindedReceiverViewingKey: word(`r-${position}`),
           blindedSenderViewingKey: word(`s-${position}`),
           memo: '0x',
@@ -68,7 +76,14 @@ export function history({ from = 14_760_000, blocks = 120 } = {}) {
     }
     for (let i = 0; i < block % 3; i += 1) {
       const nullifier = word(`nullifier-${block}-${i}`);
-      squid.nullifiers.push({ id: `n-${block}-${i}`, blockNumber: String(block), nullifier, transactionHash: word(`tx-${block}-0`), blockTimestamp: String(time), treeNumber: 0 });
+      squid.nullifiers.push({
+        id: `n-${block}-${i}`,
+        blockNumber: String(block),
+        nullifier,
+        transactionHash: word(`tx-${block}-0`),
+        blockTimestamp: String(time),
+        treeNumber: 0,
+      });
       archive.nullifiers.push({ nullifier, treeNumber: 0, txid: word(`tx-${block}-0`), blockNumber: block });
     }
     if (block % 5 === 0) {
@@ -110,7 +125,10 @@ export function indexer(lists, pageSize) {
     asked.push([name, block]);
     return lists[name].filter(({ blockNumber }) => Number(blockNumber) >= block).slice(0, pageSize);
   };
-  return { asked, queries: { nullifiers: answer('nullifiers'), unshields: answer('unshields'), commitments: answer('commitments') } };
+  return {
+    asked,
+    queries: { nullifiers: answer('nullifiers'), unshields: answer('unshields'), commitments: answer('commitments') },
+  };
 }
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -156,7 +174,10 @@ export function archiveServer(fixture, { sealedAt, transactions = [], trees = {}
     start = boundary;
   }
   const tipRange = ranges.pop();
-  const inRange = ([from, to]) => ({ blockNumber }) => blockNumber >= from && blockNumber <= to;
+  const inRange =
+    ([from, to]) =>
+    ({ blockNumber }) =>
+      blockNumber >= from && blockNumber <= to;
   const kinds = { ...fixture.archive, transactions };
   const publish = (dir, range) => {
     const meta = { files: {}, counts: {} };
@@ -170,12 +191,20 @@ export function archiveServer(fixture, { sealedAt, transactions = [], trees = {}
   };
   const chunks = ranges.map(([from, to], id) => {
     const meta = publish(`chunks/${id}`, [from, to]);
-    files.set(`chunks/${id}/meta.json`, json({ chunkId: id, formatVersion: 3, startBlock: from, endBlock: to, ...meta }));
+    files.set(
+      `chunks/${id}/meta.json`,
+      json({ chunkId: id, formatVersion: 3, startBlock: from, endBlock: to, ...meta }),
+    );
     // The archive's index leaves early chunks' sequences unset though they hold transactions.
     return { id, startBlock: from, endBlock: to, firstSeq: -1, lastSeq: -1 };
   });
   files.set(`chunk-index.json`, json({ chainId: 1, chunks }));
-  const tipMeta = json({ formatVersion: 3, startBlock: tipRange[0], endBlock: tipRange[1], ...publish('tip', tipRange) });
+  const tipMeta = json({
+    formatVersion: 3,
+    startBlock: tipRange[0],
+    endBlock: tipRange[1],
+    ...publish('tip', tipRange),
+  });
   files.set('tip/meta.json', tipMeta);
   const manifest = {
     version: 5,

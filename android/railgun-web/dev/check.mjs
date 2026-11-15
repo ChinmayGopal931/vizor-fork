@@ -191,11 +191,14 @@ async function rebuildCheck(call, onEvent, balances) {
   const synced = onEvent.next('synced');
   const refreshed = await call('refresh', {});
   if (JSON.stringify(refreshed.balances) !== JSON.stringify(balances)) {
-    throw new Error(`balances ${JSON.stringify(refreshed.balances)} after the rebuild, ${JSON.stringify(balances)} before`);
+    throw new Error(
+      `balances ${JSON.stringify(refreshed.balances)} after the rebuild, ${JSON.stringify(balances)} before`,
+    );
   }
   await synced;
   const { stored, validated } = await call('txidIndexes', {});
-  if (validated === null || stored < validated) throw new Error(`the transaction list came back to ${stored} of ${validated}`);
+  if (validated === null || stored < validated)
+    throw new Error(`the transaction list came back to ${stored} of ${validated}`);
   console.log(`  the next refresh gave the same balances and synced the list again, to ${stored} of ${validated}`);
 }
 

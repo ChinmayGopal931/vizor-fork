@@ -101,7 +101,11 @@ test("rail-squid behind the archive leaves no nullifier out: the archive's commi
   // Rail-squid has indexed only to block 14,760,100, the archive to the fixture's end.
   const behind = 14_760_100;
   const known = (list) => list.filter(({ blockNumber }) => Number(blockNumber) <= behind);
-  const lagging = { commitments: known(fixture.squid.commitments), nullifiers: known(fixture.squid.nullifiers), unshields: known(fixture.squid.unshields) };
+  const lagging = {
+    commitments: known(fixture.squid.commitments),
+    nullifiers: known(fixture.squid.nullifiers),
+    unshields: known(fixture.squid.unshields),
+  };
   const store = memoryDatabase();
   const first = await storedByArchive(archiveServer(fixture, { sealedAt }), { lists: lagging, store });
   assert.deepEqual(first.left, []);
@@ -136,10 +140,19 @@ test('nullifiers come from rail-squid alone: a nullifier spent in two trees keep
     blockTimestamp: String(blockTime(block)),
     treeNumber,
   }));
-  const lists = { ...fixture.squid, nullifiers: [...fixture.squid.nullifiers, ...spends].sort((a, b) => a.blockNumber - b.blockNumber) };
+  const lists = {
+    ...fixture.squid,
+    nullifiers: [...fixture.squid.nullifiers, ...spends].sort((a, b) => a.blockNumber - b.blockNumber),
+  };
   const archived = {
     ...fixture,
-    archive: { ...fixture.archive, nullifiers: [...fixture.archive.nullifiers, { nullifier, treeNumber: 1, txid: word('dup-1'), blockNumber: 14_760_011 }] },
+    archive: {
+      ...fixture.archive,
+      nullifiers: [
+        ...fixture.archive.nullifiers,
+        { nullifier, treeNumber: 1, txid: word('dup-1'), blockNumber: 14_760_011 },
+      ],
+    },
   };
   const { merkletree } = await storedByArchive(archiveServer(archived, { sealedAt }), { lists });
   assert.equal(await merkletree.getNullifierTxid(nullifier, 1), word('dup-1'));
@@ -240,7 +253,10 @@ test('a quick sync killed partway through the archive resumes from its newest st
 test('a store that ends inside a batch goes on from the archive, which gives that batch whole', async () => {
   // As a rail-squid page, or a write cut off with the connection, leaves a store: one leaf into a batch of several.
   const list = fixture.squid.commitments;
-  const first = list.findIndex((c, i) => c.treePosition === c.batchStartTreePosition && list[i + 1]?.batchStartTreePosition === c.batchStartTreePosition);
+  const first = list.findIndex(
+    (c, i) =>
+      c.treePosition === c.batchStartTreePosition && list[i + 1]?.batchStartTreePosition === c.batchStartTreePosition,
+  );
   const block = Number(list[first].blockNumber);
   const upTo = (rows) => rows.filter(({ blockNumber }) => Number(blockNumber) <= block);
   const store = memoryDatabase();
@@ -251,7 +267,11 @@ test('a store that ends inside a batch goes on from the archive, which gives tha
   await earlier.merkletree.updateTreesFromWriteQueue(true);
 
   const resumed = await engineHarness({ store });
-  const { stored, left } = await storedByArchive(archiveServer(fixture, { sealedAt }), { store, startingBlock: block, harness: resumed });
+  const { stored, left } = await storedByArchive(archiveServer(fixture, { sealedAt }), {
+    store,
+    startingBlock: block,
+    harness: resumed,
+  });
   assert.deepEqual(left, []);
   assert.deepEqual(stored, await storedBySquid());
 });
@@ -301,7 +321,7 @@ function editedChunk(id, edit) {
   return server;
 }
 
-test("a batch missing from a chunk, its checksum and all, hands the rest to rail-squid before the gap", async () => {
+test('a batch missing from a chunk, its checksum and all, hands the rest to rail-squid before the gap', async () => {
   const server = editedChunk(1, (commitments) => commitments.filter((_, i) => i !== 5));
   const { stored, asked, left } = await storedByArchive(server);
   assert.match(left[0], /skip/);
@@ -351,7 +371,11 @@ test("the archive's note numbered one past a full tree's last goes on in the nex
   const end = TREE_LEAVES - na;
   // As rail-squid and the archive number the start of mainnet's tree 1: its first batch at tree 0's leaf 65,536.
   const reader = oneChunk([numbered(a, 0, end), numbered(b, 0, TREE_LEAVES), numbered(c, 1, nb)]);
-  assert.deepEqual(await placed(reader, { tree: 0, position: end }), [notes(0, end, na), notes(1, 0, nb), notes(1, nb, nc)]);
+  assert.deepEqual(await placed(reader, { tree: 0, position: end }), [
+    notes(0, end, na),
+    notes(1, 0, nb),
+    notes(1, nb, nc),
+  ]);
 });
 
 test('an archive batch that runs past the end of its tree hands the rest to rail-squid', async () => {
@@ -371,7 +395,11 @@ test('an archive batch whose notes are numbered apart from it hands the rest to 
 });
 
 test("a commitment the page can't read hands the rest to rail-squid, as anything unexpected does", async () => {
-  const server = editedChunk(2, (commitments) => commitments.map((batch, i) => (i === 0 ? { ...batch, commitments: [{ ...batch.commitments[0], commitmentType: 'Unheard' }] } : batch)));
+  const server = editedChunk(2, (commitments) =>
+    commitments.map((batch, i) =>
+      i === 0 ? { ...batch, commitments: [{ ...batch.commitments[0], commitmentType: 'Unheard' }] } : batch,
+    ),
+  );
   const { stored, asked, left } = await storedByArchive(server);
   assert.match(left[0], /unknown archive commitment type/);
   assert.equal(squidFrom(asked, 'commitments'), sealedAt[1]);
@@ -402,16 +430,22 @@ function failingFirst(name, times) {
   };
 }
 
-test('a request is sent five times a round, as a phone can lose DNS for seconds, and the archive out of reach '
-  + 'every round is left', async () => {
-  const kept = await storedByArchive(failingFirst('chunk-index.json', 4));
-  assert.deepEqual(kept.left, []);
-  assert.deepEqual(kept.stored, await storedBySquid());
-  const left = await storedByArchive(failingFirst('chunk-index.json', 5 * ARCHIVE_ROUNDS));
-  assert.equal(left.left.length, ARCHIVE_ROUNDS);
-  assert.match(left.left.at(-1), /^the archive was left at block \d+: the archive did not answer for chunk-index\.json/);
-  assert.deepEqual(left.stored, await storedBySquid());
-});
+test(
+  'a request is sent five times a round, as a phone can lose DNS for seconds, and the archive out of reach ' +
+    'every round is left',
+  async () => {
+    const kept = await storedByArchive(failingFirst('chunk-index.json', 4));
+    assert.deepEqual(kept.left, []);
+    assert.deepEqual(kept.stored, await storedBySquid());
+    const left = await storedByArchive(failingFirst('chunk-index.json', 5 * ARCHIVE_ROUNDS));
+    assert.equal(left.left.length, ARCHIVE_ROUNDS);
+    assert.match(
+      left.left.at(-1),
+      /^the archive was left at block \d+: the archive did not answer for chunk-index\.json/,
+    );
+    assert.deepEqual(left.stored, await storedBySquid());
+  },
+);
 
 test('a request that fails on the way is sent again, and the archive is kept', async () => {
   const server = archiveServer(fixture, { sealedAt });
@@ -419,7 +453,10 @@ test('a request that fails on the way is sent again, and the archive is kept', a
   const flaky = {
     fetch: (url) => {
       const name = url.replace(/^https:\/\/digest\.test\/v4\/1\//, '').replace(/\?v=.*$/, '');
-      if (failing.delete(name)) return name === 'chunk-index.json' ? Promise.reject(new TypeError('Failed to fetch')) : new Response('', { status: 502 });
+      if (failing.delete(name))
+        return name === 'chunk-index.json'
+          ? Promise.reject(new TypeError('Failed to fetch'))
+          : new Response('', { status: 502 });
       return server.fetch(url);
     },
   };
@@ -434,7 +471,9 @@ const PAGE_TRIES = 5;
 
 test("rail-squid's list failing beside the archive is asked again from where it was stored, and the archive is kept", async () => {
   const server = archiveServer(fixture, { sealedAt });
-  const { stored, asked, left } = await storedByArchive(server, { squidQueries: squidFailing('nullifiers', PAGE_TRIES) });
+  const { stored, asked, left } = await storedByArchive(server, {
+    squidQueries: squidFailing('nullifiers', PAGE_TRIES),
+  });
   assert.equal(left.length, 1);
   assert.match(left[0], /^rail-squid failed at block \d+, asked again: Failed to fetch$/);
   assert.deepEqual(stored, await storedBySquid());
@@ -453,27 +492,25 @@ test(`rail-squid failing beside the archive ${ARCHIVE_ROUNDS} times leaves the a
   assert.deepEqual(stored, await storedBySquid());
 });
 
-test('an archive out of reach for a round, as a phone that lost its network for a minute, is asked again and kept',
-  async () => {
-    // The host answers 502 for a fetch of its own that failed.
-    const server = archiveServer(fixture, { sealedAt });
-    let failures = PAGE_TRIES;
-    const unreachable = {
-      fetch: (url) => {
-        if (url.endsWith('/meta.json') && !url.includes('/chunks/') && failures > 0) {
-          failures -= 1;
-          return Promise.resolve(new Response('', { status: 502 }));
-        }
-        return server.fetch(url);
-      },
-    };
-    const { stored, asked, left } = await storedByArchive(unreachable);
-    assert.equal(left.length, 1);
-    assert.match(left[0], /^the archive failed at block \d+, asked again: the archive answered 502 for meta\.json$/);
-    assert.deepEqual(stored, await storedBySquid());
-    assert.equal(squidFrom(asked, 'commitments'), newestBlockOf(fixture.squid.unshields) + 1);
-  },
-);
+test('an archive out of reach for a round, as a phone that lost its network for a minute, is asked again and kept', async () => {
+  // The host answers 502 for a fetch of its own that failed.
+  const server = archiveServer(fixture, { sealedAt });
+  let failures = PAGE_TRIES;
+  const unreachable = {
+    fetch: (url) => {
+      if (url.endsWith('/meta.json') && !url.includes('/chunks/') && failures > 0) {
+        failures -= 1;
+        return Promise.resolve(new Response('', { status: 502 }));
+      }
+      return server.fetch(url);
+    },
+  };
+  const { stored, asked, left } = await storedByArchive(unreachable);
+  assert.equal(left.length, 1);
+  assert.match(left[0], /^the archive failed at block \d+, asked again: the archive answered 502 for meta\.json$/);
+  assert.deepEqual(stored, await storedBySquid());
+  assert.equal(squidFrom(asked, 'commitments'), newestBlockOf(fixture.squid.unshields) + 1);
+});
 
 test("the archive's own data failing leaves it at once, never asked again", async () => {
   const server = archiveServer(fixture, { sealedAt });

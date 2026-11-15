@@ -10,7 +10,12 @@ const asStored = (data) => (Buffer.isBuffer(data) ? data.toString('binary') : St
 const asRead = (stored, asBuffer) => (asBuffer ? Buffer.from(stored, 'binary') : stored);
 
 function inRange(key, { gt, gte, lt, lte }) {
-  return (gt === undefined || key > gt) && (gte === undefined || key >= gte) && (lt === undefined || key < lt) && (lte === undefined || key <= lte);
+  return (
+    (gt === undefined || key > gt) &&
+    (gte === undefined || key >= gte) &&
+    (lt === undefined || key < lt) &&
+    (lte === undefined || key <= lte)
+  );
 }
 
 class MemoryIterator extends AbstractIterator {

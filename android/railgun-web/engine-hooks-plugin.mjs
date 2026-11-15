@@ -158,7 +158,10 @@ export function throughBatchedTxidUpdates(source) {
 `,
     ],
   ];
-  return rewrites.reduce((rewritten, [original, replacement]) => replaceOnce(rewritten, original, replacement, what), source);
+  return rewrites.reduce(
+    (rewritten, [original, replacement]) => replaceOnce(rewritten, original, replacement, what),
+    source,
+  );
 }
 
 // railgun-engine.js: the root check at the end of a notes scan says which root it refused (src/tree-recovery.js).
@@ -226,7 +229,9 @@ export const engineHooks = {
     rewrite(RAILGUN_ENGINE, 'railgun-engine', throughRailgunEngineHooks);
     // A bundle with an engine module this didn't reach would run the engine's own code.
     build.onEnd(() =>
-      rewritten.size === 3 ? undefined : { errors: [{ text: 'the engine modules were not all bundled through the page' }] },
+      rewritten.size === 3
+        ? undefined
+        : { errors: [{ text: 'the engine modules were not all bundled through the page' }] },
     );
   },
 };

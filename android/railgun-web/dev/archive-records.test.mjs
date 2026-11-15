@@ -23,13 +23,21 @@ test("archive commitments come out as rail-squid's do, key order and all, dated 
 
 test('commitments from before the sync starts are left out', () => {
   const since = fixture.from + 20;
-  assert.ok(commitmentBatches(fixture.archive.commitments, { ...options, since }).every(({ blockNumber }) => blockNumber >= since));
+  assert.ok(
+    commitmentBatches(fixture.archive.commitments, { ...options, since }).every(
+      ({ blockNumber }) => blockNumber >= since,
+    ),
+  );
 });
 
 /** A shield commitment as rail-squid lists it and as the archive records it, with `fee` as each gives it. */
 function shield(block, { squidFee, archiveFee }) {
   const common = { treeNumber: 0, blockNumber: block, utxoIndex: 7 };
-  const preimage = { npk: word('npk'), value: '1000', token: { tokenType: 'ERC20', tokenSubID: '0x00', tokenAddress: TOKEN } };
+  const preimage = {
+    npk: word('npk'),
+    value: '1000',
+    token: { tokenType: 'ERC20', tokenSubID: '0x00', tokenAddress: TOKEN },
+  };
   return {
     squid: {
       id: 'c-7',
@@ -91,7 +99,10 @@ test("a note numbered past its tree's last leaf comes out as rail-squid lists it
   const { squid, archive } = shield(21_332_254, { squidFee: '0', archiveFee: undefined });
   const listed = { ...squid, batchStartTreePosition: 65_536, treePosition: 65_536 };
   const filed = { ...archive, startPosition: 65_536, commitments: [{ ...archive.commitments[0], utxoIndex: 65_536 }] };
-  assert.equal(JSON.stringify(commitmentBatches([filed], { ...options, since: 0 })), JSON.stringify(formatCommitments([listed])));
+  assert.equal(
+    JSON.stringify(commitmentBatches([filed], { ...options, since: 0 })),
+    JSON.stringify(formatCommitments([listed])),
+  );
 });
 
 test("a legacy commitment from before V2 comes out as rail-squid's", () => {
@@ -169,7 +180,11 @@ test("an archive transaction comes out as rail-squid's but for its id, the archi
     timestamp: 1,
     verificationHash: squid.verificationHash,
     railgunTxid: word('rt'),
-    unshield: { tokenData: { tokenType: 0, tokenAddress: TOKEN, tokenSubID: '0' }, toAddress: squid.unshieldToAddress, value: '1000' },
+    unshield: {
+      tokenData: { tokenType: 0, tokenAddress: TOKEN, tokenSubID: '0' },
+      toAddress: squid.unshieldToAddress,
+      value: '1000',
+    },
   };
   const ours = transaction(record, blockTime);
   const [theirs] = formatRailgunTransactions([squid]);

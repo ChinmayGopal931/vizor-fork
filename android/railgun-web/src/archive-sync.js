@@ -11,7 +11,14 @@ import { Merkletree } from '@railgun-community/engine';
 import { TXIDVersion } from '@railgun-community/shared-models';
 import { ArchiveUnavailable, ArchiveUnreachable, archiveRange } from './archive.js';
 import { commitmentBatches } from './archive-records.js';
-import { formatNullifiers, formatUnshields, quickSyncProgress, squidLists, squidPages, storeEvents } from './quick-sync.js';
+import {
+  formatNullifiers,
+  formatUnshields,
+  quickSyncProgress,
+  squidLists,
+  squidPages,
+  storeEvents,
+} from './quick-sync.js';
 
 /** The archives the page reads, by network: only Ethereum's is kept up. */
 export const ARCHIVES = { mainnet: { base: 'https://digest.anon.inc/v4/1', chainId: 1 } };
@@ -57,7 +64,8 @@ async function* fromArchive(pages) {
  * Where the engine puts a note numbered `tree`:`index`: at its global tree position (tree × 65,536 + index), so one
  * numbered past a tree's last leaf goes into the next tree.
  */
-const placement = (tree, index) => Merkletree.getTreeAndIndexFromGlobalPosition(Merkletree.getGlobalPosition(tree, index));
+const placement = (tree, index) =>
+  Merkletree.getTreeAndIndexFromGlobalPosition(Merkletree.getGlobalPosition(tree, index));
 
 /**
  * The archive's commitment batches from `since` on, as `storeEvents` takes them (`{events, through}`, a chunk at a
@@ -78,7 +86,9 @@ export async function* archiveCommitments(reader, since, next, { time, chainId }
       if (start.tree < tree || (start.tree === tree && end <= position)) continue;
       const follows = start.tree === tree ? start.index <= position : start.tree === tree + 1 && start.index === 0;
       if (!follows) {
-        throw new ArchiveUnavailable(`the archive's commitments skip from ${tree}:${position} to ${start.tree}:${start.index}`);
+        throw new ArchiveUnavailable(
+          `the archive's commitments skip from ${tree}:${position} to ${start.tree}:${start.index}`,
+        );
       }
       // The engine places each note by its own number.
       batch.commitments.forEach(({ utxoTree, utxoIndex }, i) => {
@@ -87,7 +97,9 @@ export async function* archiveCommitments(reader, since, next, { time, chainId }
           throw new ArchiveUnavailable(`the archive's batch at ${start.tree}:${start.index} runs past its tree`);
         }
         if (note.index !== start.index + i) {
-          throw new ArchiveUnavailable(`the archive's batch at ${start.tree}:${start.index} numbers its notes apart from it`);
+          throw new ArchiveUnavailable(
+            `the archive's batch at ${start.tree}:${start.index} numbers its notes apart from it`,
+          );
         }
       });
       events.push(batch);
@@ -128,7 +140,11 @@ export function installArchiveSync(
       newest === undefined
         ? undefined
         : (block) =>
-            engine.emitUTXOMerkletreeScanUpdateEvent(txidVersion, chain, quickSyncProgress(startingBlock, newest.blockNumber, block));
+            engine.emitUTXOMerkletreeScanUpdateEvent(
+              txidVersion,
+              chain,
+              quickSyncProgress(startingBlock, newest.blockNumber, block),
+            );
     // Every list is stored through this block.
     let through = startingBlock - 1;
     if (newest !== undefined && farBehind(startingBlock, newest.blockNumber) && useArchive()) {
@@ -170,6 +186,13 @@ export function installArchiveSync(
       }
     }
     // Rail-squid's lists anew from there: one that failed beside the archive is never read on.
-    return storeEvents({ engine, txidVersion, chain, ...squidLists(queries, through + 1, pages), progress: report, writeRetryMs });
+    return storeEvents({
+      engine,
+      txidVersion,
+      chain,
+      ...squidLists(queries, through + 1, pages),
+      progress: report,
+      writeRetryMs,
+    });
   };
 }

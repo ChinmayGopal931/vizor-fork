@@ -87,7 +87,9 @@ class RailgunProtocolTest {
         val emitted =
             File(SOURCES)
                 .listFiles { file -> file.extension == "js" }!!
-                .flatMap { file -> Regex("""emit\('([a-z]+)'""").findAll(file.readText()).map { it.groupValues[1] }.toList() }
+                .flatMap { file ->
+                    Regex("""emit\('([a-z]+)'""").findAll(file.readText()).map { it.groupValues[1] }.toList()
+                }
                 .toSortedSet()
         // The hello is the host's own; every other event is Dart's.
         assertTrue(emitted.containsAll(listOf("ready", "synced")))

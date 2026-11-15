@@ -67,7 +67,10 @@ test('events at or below the highest stored block are looked up, and a stored on
 
   // The next sync starts again at block 7: 7 to 10 are stored already, 11 and 12 are new.
   await merkletree.addUnshieldEvents(blocks(7, 12));
-  assert.deepEqual(lookedUp.sort((a, b) => a - b), [7, 8, 9, 10]);
+  assert.deepEqual(
+    lookedUp.sort((a, b) => a - b),
+    [7, 8, 9, 10],
+  );
   assert.equal((await stored(merkletree, 7)).railgunTxid, 'aa'.repeat(32));
   assert.equal((await stored(merkletree, 12)).blockNumber, 12);
 });
@@ -138,7 +141,10 @@ test('events stored before the watermark existed are read through once, then kep
   await merkletree.addUnshieldEvents(blocks(19, 22));
   await merkletree.addUnshieldEvents(blocks(23, 25));
   assert.equal(reads, 1);
-  assert.deepEqual(lookedUp.sort((a, b) => a - b), [19, 20]);
+  assert.deepEqual(
+    lookedUp.sort((a, b) => a - b),
+    [19, 20],
+  );
 });
 
 test("the engine's own replacements are written as before, without lookups", async () => {

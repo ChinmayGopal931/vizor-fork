@@ -81,7 +81,10 @@ internal object RailgunArchiveFetch {
         }
     }
 
-    /** [stream] read whole: refused past [MAX_BYTES] (or a [declared] length past it), or once [deadline] has passed. */
+    /**
+     * [stream] read whole: refused past [MAX_BYTES] (or a [declared] length past it), or once [deadline] has
+     * passed.
+     */
     fun read(
         stream: InputStream,
         declared: Long,

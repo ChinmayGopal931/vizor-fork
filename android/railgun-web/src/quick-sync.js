@@ -71,7 +71,12 @@ export function squidPages(
   startingBlock,
   { pageSize = SQUID_PAGE_SIZE, gapMs = PAGE_GAP_MS, retryMs = PAGE_RETRY_MS } = {},
 ) {
-  return pagesFrom(query, format, { from: startingBlock, given: new Set(), newest: startingBlock - 1 }, { pageSize, gapMs, retryMs });
+  return pagesFrom(
+    query,
+    format,
+    { from: startingBlock, given: new Set(), newest: startingBlock - 1 },
+    { pageSize, gapMs, retryMs },
+  );
 }
 
 async function* pagesFrom(query, format, at, options) {
@@ -106,7 +111,13 @@ async function* pagesFrom(query, format, at, options) {
     if (!full) {
       // Read on from the same block, with what this page gave left out.
       const read = { from, given: new Set([...given, ...page.map(({ id }) => id)]), newest };
-      yield { events: format(events), through: Infinity, asked, newest, again: () => pagesFrom(query, format, read, options) };
+      yield {
+        events: format(events),
+        through: Infinity,
+        asked,
+        newest,
+        again: () => pagesFrom(query, format, read, options),
+      };
       return;
     }
     given = new Set(page.filter(({ blockNumber }) => Number(blockNumber) === last).map(({ id }) => id));

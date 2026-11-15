@@ -135,7 +135,10 @@ void main() {
       expect(last.accountUuid, 'account');
       expect(last.address, _address);
       expect(
-        last.balances.byBucket[RailgunBalanceBucket.proofSubmitted]!.single
+        last
+            .balances
+            .byBucket[RailgunBalanceBucket.proofSubmitted]!
+            .single
             .amount,
         BigInt.from(9),
       );

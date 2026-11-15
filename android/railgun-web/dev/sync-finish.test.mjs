@@ -43,11 +43,17 @@ test("a refresh starts the rest of the sync and answers whether it's long, and w
   assert.deepEqual(log, ['catchUp', 'prove', ['synced', 1, 'ok']]);
 });
 
-test("a refresh while one runs joins it, and one joining partway sends the rest round again, for its sends", async () => {
+test('a refresh while one runs joins it, and one joining partway sends the rest round again, for its sends', async () => {
   const { finish, log, release } = finisher();
   // Two at once share the round they start.
   const [first, second] = await Promise.all([finish.start(false), finish.start(false)]);
-  assert.deepEqual([first, second], [{ syncing: true, rest: 1 }, { syncing: true, rest: 1 }]);
+  assert.deepEqual(
+    [first, second],
+    [
+      { syncing: true, rest: 1 },
+      { syncing: true, rest: 1 },
+    ],
+  );
   await release('catchUp');
   // A third joins while the round proves: its sends may be past what the round's catch-up reached.
   assert.deepEqual(await finish.start(true), { syncing: true, rest: 1 });

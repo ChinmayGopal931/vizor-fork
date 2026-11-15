@@ -28,7 +28,11 @@ const { RailgunEngine: BatchedEngine } = builtEngineModule(
 const own = RailgunEngine.prototype.handleNewRailgunTransactionsV2;
 const batched = BatchedEngine.prototype.handleNewRailgunTransactionsV2;
 
-const word = (seed, bytes = 32) => createHash('sha256').update(String(seed)).digest('hex').slice(0, bytes * 2);
+const word = (seed, bytes = 32) =>
+  createHash('sha256')
+    .update(String(seed))
+    .digest('hex')
+    .slice(0, bytes * 2);
 const hex32 = (value) => `0x${BigInt(value).toString(16).padStart(64, '0')}`;
 
 /**
@@ -72,7 +76,11 @@ function history({ from = 16_100_000, blocks = 60 } = {}) {
           commitmentType: 'TransactCommitment',
           hash,
           ciphertext: {
-            ciphertext: { iv: word(`iv-${position}`, 16), tag: word(`tag-${position}`, 16), data: [word(`d0-${position}`)] },
+            ciphertext: {
+              iv: word(`iv-${position}`, 16),
+              tag: word(`tag-${position}`, 16),
+              data: [word(`d0-${position}`)],
+            },
             blindedReceiverViewingKey: word(`r-${position}`),
             blindedSenderViewingKey: word(`s-${position}`),
             memo: '0x',
@@ -239,7 +247,10 @@ test('a broken verification hash stops the sync and clears the tree as the engin
     assert.ok((await ownStore.merkletree.getCommitment(0, broken)).railgunTxid);
     assert.equal((await batchedStore.merkletree.getCommitment(0, broken)).railgunTxid, undefined);
     const before = transactions[29].utxoBatchStartPositionOut;
-    assert.deepEqual(await batchedStore.merkletree.getCommitment(0, before), await ownStore.merkletree.getCommitment(0, before));
+    assert.deepEqual(
+      await batchedStore.merkletree.getCommitment(0, before),
+      await ownStore.merkletree.getCommitment(0, before),
+    );
   });
 });
 
@@ -249,9 +260,16 @@ test("a group whose root the screening node refuses leaves its records as they w
   const { ownStore, batchedStore, batchedRun } = await bothSynced(lists, lists.transactions, { accepted: () => false });
   assert.equal(await batchedRun.txidMerkletree.getTreeLength(0), 0);
   const [first] = lists.transactions;
-  assert.ok((await ownStore.merkletree.getCommitment(0, first.utxoBatchStartPositionOut)).railgunTxid, 'the engine wrote it anyway');
+  assert.ok(
+    (await ownStore.merkletree.getCommitment(0, first.utxoBatchStartPositionOut)).railgunTxid,
+    'the engine wrote it anyway',
+  );
   for (let position = 0; position < lists.commitments.length; position += 1) {
-    assert.equal((await batchedStore.merkletree.getCommitment(0, position)).railgunTxid, undefined, `commitment ${position}`);
+    assert.equal(
+      (await batchedStore.merkletree.getCommitment(0, position)).railgunTxid,
+      undefined,
+      `commitment ${position}`,
+    );
   }
   const withUnshield = lists.transactions.find(({ unshield }) => unshield !== undefined);
   const [event] = await batchedStore.merkletree.getAllUnshieldEventsForTxid(withUnshield.txid);
@@ -277,7 +295,9 @@ test('records go in before their transactions do: a sync cut off between the two
 });
 
 test('the rewrite applies to the pinned engine only, and keeps its txid hashing', async () => {
-  const source = await import('node:fs').then(({ readFileSync }) => readFileSync(path.join(ENGINE, 'railgun-engine.js'), 'utf8'));
+  const source = await import('node:fs').then(({ readFileSync }) =>
+    readFileSync(path.join(ENGINE, 'railgun-engine.js'), 'utf8'),
+  );
   const rewritten = throughBatchedTxidUpdates(throughArchiveTxids(source));
   const handler = /async handleNewRailgunTransactionsV2[\s\S]*?async handleNewRailgunTransactionsV3/.exec(rewritten)[0];
   assert.ok(!handler.includes('utxoMerkletree.updateData('));
@@ -285,5 +305,8 @@ test('the rewrite applies to the pinned engine only, and keeps its txid hashing'
   assert.ok(!handler.includes('utxoMerkletree.addUnshieldEvents('));
   assert.ok(handler.includes('txidUpdates.settle()'));
   assert.ok(handler.includes('archive-txids.js'));
-  assert.throws(() => throughBatchedTxidUpdates(source.replace('let toQueue = [];', 'let toQueue = [] ;')), /no longer applies/);
+  assert.throws(
+    () => throughBatchedTxidUpdates(source.replace('let toQueue = [];', 'let toQueue = [] ;')),
+    /no longer applies/,
+  );
 });

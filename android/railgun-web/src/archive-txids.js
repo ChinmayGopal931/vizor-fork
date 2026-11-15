@@ -28,7 +28,8 @@ const HEAD_MAX_AGE_MS = 10 * 60_000;
 // check fails with the connection, which may be back by the next sync.
 export const ARCHIVE_TRIES = 3;
 
-const preV2Unshield = (railgunTransaction) => railgunTransaction.unshield && railgunTransaction.blockNumber < v2StartBlock;
+const preV2Unshield = (railgunTransaction) =>
+  railgunTransaction.unshield && railgunTransaction.blockNumber < v2StartBlock;
 
 /**
  * The engine's `createRailgunTransactionWithHash(transaction)` (`own`), for the transactions the archive gave: their
@@ -43,7 +44,11 @@ export function withHash(railgunTransaction, own) {
   return {
     ...railgunTransaction,
     railgunTxid: ByteUtils.nToHex(railgunTxid, ByteLength.UINT_256),
-    hash: getRailgunTxidLeafHash(railgunTxid, BigInt(utxoTreeIn), getGlobalTreePosition(utxoTreeOut, utxoBatchStartPositionOut)),
+    hash: getRailgunTxidLeafHash(
+      railgunTxid,
+      BigInt(utxoTreeIn),
+      getGlobalTreePosition(utxoTreeOut, utxoBatchStartPositionOut),
+    ),
   };
 }
 
@@ -123,10 +128,14 @@ export function installArchiveTxids(
         }
         const next = walk.left[0];
         if (next.sequence > walk.last) {
-          if (next.sequence !== walk.last + 1) throw new Error(`the archive's transaction ${next.sequence} follows ${walk.last}`);
+          if (next.sequence !== walk.last + 1)
+            throw new Error(`the archive's transaction ${next.sequence} follows ${walk.last}`);
           // Read before the walk moves on: a record that can't be read leaves it where it was.
           const read = transaction(next, (block) => time(block, newest));
-          if (calculateRailgunTransactionVerificationHash(walk.verificationHash, read.nullifiers[0]) !== read.verificationHash) {
+          if (
+            calculateRailgunTransactionVerificationHash(walk.verificationHash, read.nullifiers[0]) !==
+            read.verificationHash
+          ) {
             throw new Error(`the archive's transaction ${next.sequence} breaks the verification hashes`);
           }
           out.push(read);
@@ -191,7 +200,10 @@ export function installArchiveTxids(
       newestAt = Date.now();
     }
     // A list near the newest block reads rail-squid, as it would without the archive.
-    if (latestGraphID !== undefined && !(newest !== undefined && farBehind(blockOf(latestGraphID), newest.blockNumber))) {
+    if (
+      latestGraphID !== undefined &&
+      !(newest !== undefined && farBehind(blockOf(latestGraphID), newest.blockNumber))
+    ) {
       reset();
       return fromSquid(txChain, kept);
     }
@@ -217,7 +229,8 @@ export function installArchiveTxids(
 export async function misrecordedTransaction(txidMerkletree, railgunTxids) {
   for (const railgunTxid of railgunTxids) {
     const record = await txidMerkletree.getRailgunTransactionByTxid(railgunTxid);
-    if (record !== undefined && getRailgunTransactionID(record) !== ByteUtils.hexToBigInt(railgunTxid)) return railgunTxid;
+    if (record !== undefined && getRailgunTransactionID(record) !== ByteUtils.hexToBigInt(railgunTxid))
+      return railgunTxid;
   }
   return undefined;
 }
