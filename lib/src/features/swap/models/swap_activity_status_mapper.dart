@@ -10,6 +10,7 @@ import 'swap_deposit_broadcast_result.dart';
 import 'swap_detail_tooltips.dart';
 import 'swap_fiat_value_formatting.dart';
 import 'swap_models.dart';
+import 'swap_privacy_mask.dart';
 import 'swap_status_presentation.dart';
 import 'swap_token_amount_formatting.dart';
 
@@ -27,8 +28,8 @@ enum PayActivityStatusPhase { inProgress, completed, failed, refunded }
 String payActivityStatusAmountLabel(PayActivityStatusPhase phase) =>
     switch (phase) {
       PayActivityStatusPhase.completed => 'You paid',
-      PayActivityStatusPhase.failed || PayActivityStatusPhase.refunded =>
-        'Amount',
+      PayActivityStatusPhase.failed ||
+      PayActivityStatusPhase.refunded => 'Amount',
       PayActivityStatusPhase.inProgress => "You're paying",
     };
 
@@ -97,6 +98,7 @@ class SwapActivityStatusPresentation {
     this.progressTabLabel = 'Swap progress',
     this.paymentMode = false,
     this.payStatus,
+    this.explorerUri,
     required this.showTabs,
     this.allDetailsInProgress = false,
   });
@@ -136,6 +138,7 @@ class SwapActivityStatusPresentation {
   final String progressTabLabel;
   final bool paymentMode;
   final PayActivityStatusPresentation? payStatus;
+  final Uri? explorerUri;
   final bool showTabs;
 
   /// Whether the mobile progress screen's "Transaction details" tab lists
@@ -151,6 +154,7 @@ SwapActivityStatusPresentation swapActivityStatusPresentationForIntent(
   SwapActivityAccountDetail? accountDetail,
   Iterable<AddressBookContact> addressBookContacts = const [],
   BigInt? confirmedDepositFeeZatoshi,
+  bool privacyModeEnabled = false,
 }) {
   final sellAsset = swapActivitySellAsset(intent) ?? SwapAsset.zec;
   final receiveAsset = swapActivityReceiveAsset(intent) ?? SwapAsset.usdc;
@@ -160,19 +164,26 @@ SwapActivityStatusPresentation swapActivityStatusPresentationForIntent(
       ? _payActivityStatusPresentation(
           intent,
           confirmedDepositFeeZatoshi: confirmedDepositFeeZatoshi,
+          privacyModeEnabled: privacyModeEnabled,
         )
       : null;
   final recipientAddress = intent.oneClickRecipient?.trim();
   final refundAddress = intent.oneClickRefundTo?.trim();
-  final payFiatText = _swapActivityFiatTextForAsset(
-    intent: intent,
-    side: _SwapActivityAmountSide.sell,
-    amountText: intent.sellAmount,
+  final payFiatText = swapFiatTextForPrivacy(
+    _swapActivityFiatTextForAsset(
+      intent: intent,
+      side: _SwapActivityAmountSide.sell,
+      amountText: intent.sellAmount,
+    ),
+    privacyModeEnabled: privacyModeEnabled,
   );
-  final receiveFiatText = _swapActivityFiatTextForAsset(
-    intent: intent,
-    side: _SwapActivityAmountSide.receive,
-    amountText: intent.receiveEstimate,
+  final receiveFiatText = swapFiatTextForPrivacy(
+    _swapActivityFiatTextForAsset(
+      intent: intent,
+      side: _SwapActivityAmountSide.receive,
+      amountText: intent.receiveEstimate,
+    ),
+    privacyModeEnabled: privacyModeEnabled,
   );
 
   // The summary's bottom lines: fiat on the ZEC side, the counterparty
@@ -208,8 +219,14 @@ SwapActivityStatusPresentation swapActivityStatusPresentationForIntent(
     receiveAsset: receiveAsset,
     payFiatText: payFiatText,
     receiveFiatText: receiveFiatText,
-    payAmountText: intent.sellAmount,
-    receiveAmountText: intent.receiveEstimate,
+    payAmountText: swapAmountTextForPrivacy(
+      intent.sellAmount,
+      privacyModeEnabled: privacyModeEnabled,
+    ),
+    receiveAmountText: swapAmountTextForPrivacy(
+      intent.receiveEstimate,
+      privacyModeEnabled: privacyModeEnabled,
+    ),
     payLabel: payMode
         ? _payIntentShowsPaidCopy(intent)
               ? 'You paid'
@@ -244,10 +261,12 @@ SwapActivityStatusPresentation swapActivityStatusPresentationForIntent(
     details: _swapActivityStatusDetails(
       intent,
       addressBookContacts: addressBookContacts,
+      privacyModeEnabled: privacyModeEnabled,
     ),
     progressTabLabel: payMode ? 'Payment progress' : 'Swap progress',
     paymentMode: payMode,
     payStatus: payStatus,
+    explorerUri: swapActivityExplorerUri(intent),
     // Mobile keeps the shared progress tabs while reading its detail values
     // from [payStatus]; desktop renders its dedicated Pay status content.
     showTabs: !intent.status.isTerminal,
@@ -267,51 +286,63 @@ bool _payIntentShowsPaidCopy(SwapIntent intent) {
 PayActivityStatusPresentation? _payActivityStatusPresentation(
   SwapIntent intent, {
   BigInt? confirmedDepositFeeZatoshi,
+  required bool privacyModeEnabled,
 }) {
   final phase = payActivityStatusPhaseFor(intent.status);
   if (phase == null) return null;
+  String amount(String text) =>
+      swapAmountTextForPrivacy(text, privacyModeEnabled: privacyModeEnabled);
+  final refundedAmountText =
+      phase == PayActivityStatusPhase.refunded &&
+          intent.providerRefundInfo?.hasRecordedRefund == true
+      ? intent.providerRefundInfo!.refundedAmountText
+      : null;
+  final refundFeeText = phase == PayActivityStatusPhase.refunded
+      ? intent.providerRefundInfo?.recordedRefundFeeText
+      : null;
 
   final timestamp = phase != PayActivityStatusPhase.inProgress
       ? intent.completedAt ?? intent.updatedAt ?? intent.createdAt
       : intent.createdAt ?? intent.updatedAt;
-  final depositAddress = _firstNonEmpty([intent.depositAddress]);
+  final explorerId = _firstNonEmpty([
+    intent.depositAddress,
+    intent.nearIntentHash,
+    intent.depositTxHash,
+    intent.originChainTxHash,
+  ]);
 
   return PayActivityStatusPresentation(
     phase: phase,
     timestampText: timestamp == null
         ? 'Not reported'
         : formatDayMonthTime(timestamp),
-    txIdText: depositAddress == null
+    txIdText: explorerId == null
         ? 'Not reported'
         : compactSwapAddress(
-            depositAddress,
+            explorerId,
             maxLength: 19,
             prefixLength: 8,
             suffixLength: 8,
             separator: '...',
           ),
-    txIdUri: depositAddress == null
-        ? null
-        : nearIntentsExplorerTransactionUri(depositAddress),
-    convertedFromText: intent.sellAmount,
+    txIdUri: swapActivityExplorerUri(intent),
+    convertedFromText: amount(intent.sellAmount),
     transactionFeeText:
         confirmedDepositFeeZatoshi != null &&
             confirmedDepositFeeZatoshi > BigInt.zero
-        ? ZecAmount.fromZatoshi(confirmedDepositFeeZatoshi).fee.toString()
+        ? amount(
+            ZecAmount.fromZatoshi(confirmedDepositFeeZatoshi).fee.toString(),
+          )
         : 'Not reported',
     refundAddress:
         phase == PayActivityStatusPhase.failed ||
             phase == PayActivityStatusPhase.refunded
         ? intent.oneClickRefundTo?.trim()
         : null,
-    refundedAmountText:
-        phase == PayActivityStatusPhase.refunded &&
-            intent.providerRefundInfo?.hasRecordedRefund == true
-        ? intent.providerRefundInfo!.refundedAmountText
-        : null,
-    refundFeeText: phase == PayActivityStatusPhase.refunded
-        ? intent.providerRefundInfo?.recordedRefundFeeText
-        : null,
+    refundedAmountText: refundedAmountText == null
+        ? null
+        : amount(refundedAmountText),
+    refundFeeText: refundFeeText == null ? null : amount(refundFeeText),
   );
 }
 
@@ -474,7 +505,10 @@ List<SwapStatusStepData> _swapActivityProgressSteps(SwapIntent intent) {
 List<SwapStatusDetailRowData> _swapActivityStatusDetails(
   SwapIntent intent, {
   required Iterable<AddressBookContact> addressBookContacts,
+  required bool privacyModeEnabled,
 }) {
+  String amount(String text) =>
+      swapAmountTextForPrivacy(text, privacyModeEnabled: privacyModeEnabled);
   final sourceSymbol = swapActivityPairSymbol(intent.pair, 0);
   final receiveSymbol = swapActivityPairSymbol(intent.pair, 1);
   final sourceAsset = swapActivitySellAsset(intent);
@@ -486,15 +520,8 @@ List<SwapStatusDetailRowData> _swapActivityStatusDetails(
   final originChainTxHash = intent.originChainTxHash?.trim();
   final destinationChainTxHash = intent.destinationChainTxHash?.trim();
   final depositTxHash = _firstNonEmpty([localDepositTxHash, originChainTxHash]);
-  // The Tx ID detail row is a mobile-only addition; desktop keeps the
-  // original detail set (the standalone "<symbol> deposit tx" row).
-  final txIdRow = kAppFormFactor == AppFormFactor.mobile
-      ? _swapActivityTxIdRow(
-          intent: intent,
-          depositTxHash: depositTxHash,
-          depositAddress: depositAddress,
-        )
-      : null;
+  // Keep the provider lookup separate from the copyable source-chain tx hash.
+  final txIdRow = _swapActivityTxIdRow(intent);
   final terminal = intent.status.isTerminal;
   final failed =
       intent.status == SwapIntentStatus.failed ||
@@ -523,6 +550,7 @@ List<SwapStatusDetailRowData> _swapActivityStatusDetails(
       refundAddress: refundAddress,
       sourceAsset: sourceAsset,
       addressBookContacts: addressBookContacts,
+      privacyModeEnabled: privacyModeEnabled,
     );
   }
 
@@ -532,11 +560,7 @@ List<SwapStatusDetailRowData> _swapActivityStatusDetails(
     final timestamp = _swapActivityTimestampLabel(
       intent.completedAt ?? intent.createdAt,
     );
-    final explorerUri = nearIntentsExplorerUri(
-      nearIntentHash: intent.nearIntentHash,
-      depositTxHash: depositTxHash,
-      depositAddress: depositAddress,
-    );
+    final explorerUri = swapActivityExplorerUri(intent);
     return [
       if (!failed && !payMode)
         SwapStatusDetailRowData(
@@ -583,18 +607,22 @@ List<SwapStatusDetailRowData> _swapActivityStatusDetails(
       if (failed && intent.providerRefundInfo?.hasRecordedRefund == true)
         SwapStatusDetailRowData(
           label: 'Refunded amount',
-          value: intent.providerRefundInfo!.refundedAmountText!,
+          value: amount(intent.providerRefundInfo!.refundedAmountText!),
         ),
       if (failed && recordedRefundFee != null)
-        SwapStatusDetailRowData(label: 'Refund fee', value: recordedRefundFee),
+        SwapStatusDetailRowData(
+          label: 'Refund fee',
+          value: amount(recordedRefundFee),
+        ),
       if (!failed)
         SwapStatusDetailRowData(
           label: feesLabel,
-          value:
-              intent.totalFeesText ??
-              intent.swapFeeText ??
-              intent.providerRefundInfo?.refundFeeText ??
-              'Included',
+          value: amount(
+            intent.totalFeesText ??
+                intent.swapFeeText ??
+                intent.providerRefundInfo?.refundFeeText ??
+                'Included',
+          ),
           help: true,
           helpTooltip: swapTotalFeesTooltip,
         ),
@@ -614,6 +642,7 @@ List<SwapStatusDetailRowData> _swapActivityStatusDetails(
       sendsZec: sendsZec,
       userExternalContactId: intent.userExternalContactId,
       addressBookContacts: addressBookContacts,
+      privacyModeEnabled: privacyModeEnabled,
     );
   }
 
@@ -663,7 +692,7 @@ List<SwapStatusDetailRowData> _swapActivityStatusDetails(
     if (!payMode)
       SwapStatusDetailRowData(
         label: 'Guaranteed minimum',
-        value: intent.minimumReceiveText ?? intent.receiveEstimate,
+        value: amount(intent.minimumReceiveText ?? intent.receiveEstimate),
         help: true,
         helpTooltip: swapMinimumReceiveTooltip(receiveSymbol),
       ),
@@ -702,7 +731,7 @@ List<SwapStatusDetailRowData> _swapActivityStatusDetails(
       ),
     SwapStatusDetailRowData(
       label: 'Swap fee',
-      value: intent.swapFeeText ?? 'Included in shown rate',
+      value: amount(intent.swapFeeText ?? 'Included in shown rate'),
       help: true,
       helpTooltip: swapFeeTooltip,
     ),
@@ -720,7 +749,10 @@ List<SwapStatusDetailRowData> _swapActivityPayDetails(
   required String? refundAddress,
   required SwapAsset? sourceAsset,
   required Iterable<AddressBookContact> addressBookContacts,
+  required bool privacyModeEnabled,
 }) {
+  String amount(String text) =>
+      swapAmountTextForPrivacy(text, privacyModeEnabled: privacyModeEnabled);
   final terminal = intent.status.isTerminal;
   final paid = _payIntentShowsPaidCopy(intent);
   final feeText = _firstNonEmpty([
@@ -733,24 +765,28 @@ List<SwapStatusDetailRowData> _swapActivityPayDetails(
     if (!failed)
       SwapStatusDetailRowData(
         label: paid ? 'You paid' : 'You pay',
-        value: intent.sellAmount,
+        value: amount(intent.sellAmount),
       ),
     if (!failed && payRateText != null)
       SwapStatusDetailRowData(label: 'Rate', value: payRateText),
     if (!failed && feeText != null)
       SwapStatusDetailRowData(
         label: terminal ? 'Fees' : 'Network + conversion fees',
-        value: feeText,
+        value: amount(feeText),
         help: true,
         helpTooltip: terminal ? swapTotalFeesTooltip : swapFeeTooltip,
       ),
     if (failed && intent.providerRefundInfo?.hasRecordedRefund == true)
       SwapStatusDetailRowData(
         label: 'Refunded amount',
-        value: intent.providerRefundInfo!.refundedAmountText!,
+        value: amount(intent.providerRefundInfo!.refundedAmountText!),
       ),
     if (failed && recordedRefundFee != null)
-      SwapStatusDetailRowData(label: 'Refund fee', value: recordedRefundFee),
+      SwapStatusDetailRowData(
+        label: 'Refund fee',
+        value: amount(recordedRefundFee),
+      ),
+    ?_swapActivityTxIdRow(intent),
     if (depositTxHash != null && depositTxHash.isNotEmpty)
       SwapStatusDetailRowData(
         label: '$sourceSymbol tx (shielded)',
@@ -780,28 +816,25 @@ String? _recordedRefundFeeText(SwapProviderRefundInfo? info) {
   return _firstNonEmpty([info?.recordedRefundFeeText]);
 }
 
-SwapStatusDetailRowData? _swapActivityTxIdRow({
-  required SwapIntent intent,
-  required String? depositTxHash,
-  required String? depositAddress,
-}) {
-  final hasExplorerSource =
-      (intent.nearIntentHash?.trim().isNotEmpty ?? false) ||
-      (depositTxHash?.trim().isNotEmpty ?? false);
-  if (!hasExplorerSource) return null;
+Uri? swapActivityExplorerUri(SwapIntent intent) => nearIntentsExplorerUri(
+  depositAddress: intent.depositAddress,
+  nearIntentHash: intent.nearIntentHash,
+  depositTxHash: _firstNonEmpty([
+    intent.depositTxHash,
+    intent.originChainTxHash,
+  ]),
+);
 
+SwapStatusDetailRowData? _swapActivityTxIdRow(SwapIntent intent) {
   final txId = _firstNonEmpty([
-    depositAddress,
-    intent.nearIntentHash?.trim(),
-    depositTxHash,
+    intent.depositAddress,
+    intent.nearIntentHash,
+    intent.depositTxHash,
+    intent.originChainTxHash,
   ]);
   if (txId == null || txId.isEmpty) return null;
 
-  final linkUri = nearIntentsExplorerUri(
-    nearIntentHash: intent.nearIntentHash,
-    depositTxHash: depositTxHash,
-    depositAddress: depositAddress,
-  );
+  final linkUri = swapActivityExplorerUri(intent);
   if (linkUri == null) return null;
 
   return SwapStatusDetailRowData(
@@ -823,7 +856,10 @@ List<SwapStatusDetailRowData> _swapActivityIncompleteDepositDetails(
   required bool sendsZec,
   required String? userExternalContactId,
   required Iterable<AddressBookContact> addressBookContacts,
+  required bool privacyModeEnabled,
 }) {
+  String amount(String text) =>
+      swapAmountTextForPrivacy(text, privacyModeEnabled: privacyModeEnabled);
   final sourceAsset = swapActivitySellAsset(intent);
   final receiveAsset = swapActivityReceiveAsset(intent);
   final providerInfo = intent.providerRefundInfo;
@@ -843,7 +879,7 @@ List<SwapStatusDetailRowData> _swapActivityIncompleteDepositDetails(
     if (missingDepositText != null)
       SwapStatusDetailRowData(
         label: 'Missing deposit',
-        value: missingDepositText,
+        value: amount(missingDepositText),
       ),
     if (depositMemo != null && depositMemo.isNotEmpty)
       SwapStatusDetailRowData(
@@ -861,19 +897,19 @@ List<SwapStatusDetailRowData> _swapActivityIncompleteDepositDetails(
       ),
     SwapStatusDetailRowData(
       label: 'Required deposit',
-      value: requiredDepositText,
+      value: amount(requiredDepositText),
     ),
     if (providerInfo?.depositedAmountText != null)
       SwapStatusDetailRowData(
         label: 'Detected deposit',
-        value: providerInfo!.depositedAmountText!,
+        value: amount(providerInfo!.depositedAmountText!),
       ),
     if (deadlineText != null)
       SwapStatusDetailRowData(label: 'Deposit deadline', value: deadlineText),
     if (providerInfo?.refundFeeText != null)
       SwapStatusDetailRowData(
         label: 'Refund fee',
-        value: providerInfo!.refundFeeText!,
+        value: amount(providerInfo!.refundFeeText!),
       ),
     if (refundAddress != null && refundAddress.isNotEmpty)
       ..._addressDetailRows(
@@ -897,6 +933,7 @@ List<SwapStatusDetailRowData> _swapActivityIncompleteDepositDetails(
         copyable: true,
         copyText: depositTxHash,
       ),
+    ?_swapActivityTxIdRow(intent),
   ];
 }
 

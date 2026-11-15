@@ -13,7 +13,7 @@
 edition = "2024"
 rust-version = "1.97"
 name = "zakura-client-backend"
-version = "0.1.0-rc9.4"
+version = "0.1.0-rc9.6"
 authors = [
     "Jack Grigg <jack@z.cash>",
     "Kris Nuttycombe <kris@electriccoin.co>",
@@ -31,7 +31,6 @@ readme = "README.md"
 categories = ["cryptography::cryptocurrencies"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/zakura-core/wallet-libraries"
-resolver = "2"
 
 [package.metadata.cargo-udeps.ignore]
 development = ["zcash_proofs"]
@@ -92,6 +91,7 @@ sync = [
     "dep:futures-util",
 ]
 sync-decryptor = [
+    "flume/async",
     "dep:tokio",
     "tokio?/macros",
     "tokio?/rt",
@@ -100,7 +100,6 @@ sync-decryptor = [
     "tokio?/tracing",
 ]
 test-dependencies = [
-    "dep:ambassador",
     "dep:assert_matches",
     "dep:proptest",
     "dep:jubjub",
@@ -114,22 +113,24 @@ test-dependencies = [
     "incrementalmerkletree/test-dependencies",
 ]
 tor = [
+    "tor-client",
+    "dep:rust_decimal",
+]
+tor-client = [
     "dep:arti-client",
     "arti-client/onion-service-client",
-    "dep:dynosaur",
     "dep:fs-mistrust",
     "dep:futures-util",
+    "futures-util/async-await-macro",
     "dep:http-body-util",
     "dep:hyper",
     "dep:hyper-util",
-    "dep:rust_decimal",
     "dep:serde",
     "dep:serde_json",
     "dep:tokio",
     "tokio?/time",
     "dep:tokio-rustls",
     "dep:tor-rtcompat",
-    "dep:trait-variant",
     "dep:tower",
     "dep:webpki-roots",
 ]
@@ -158,24 +159,23 @@ bench = false
 [[example]]
 name = "diversify-address"
 path = "examples/diversify-address.rs"
+test = true
 
 [[test]]
 name = "enhance_pir_storage"
 path = "tests/enhance_pir_storage.rs"
 
-[dependencies.ambassador]
-version = "0.4"
-optional = true
-
 [dependencies.arti-client]
-version = "0.35"
+version = "=0.47.0-zakura.1"
+git = "https://github.com/zakura-core/arti.git"
+rev = "df38730dc93c5823c7eb9fe68fd5ec925a907c18"
 features = [
-    "compression",
     "rustls",
     "tokio",
 ]
 optional = true
 default-features = false
+package = "zakura-arti-client"
 
 [dependencies.assert_matches]
 version = "1.5"
@@ -184,14 +184,6 @@ optional = true
 [dependencies.async-trait]
 version = "0.1"
 optional = true
-
-[dependencies.base64]
-version = "0.22"
-
-[dependencies.bech32]
-version = "0.11"
-features = ["alloc"]
-default-features = false
 
 [dependencies.bip32]
 version = "0.6"
@@ -203,35 +195,33 @@ default-features = false
 version = "4.0.0"
 package = "zakura-bls12-381"
 
-[dependencies.bs58]
-version = "0.5"
-features = [
-    "alloc",
-    "check",
-]
-default-features = false
-
 [dependencies.byteorder]
 version = "1"
 optional = true
 
 [dependencies.document-features]
 version = "0.2"
-
-[dependencies.dynosaur]
-version = "0.3"
 optional = true
 
 [dependencies.flume]
 version = "0.11"
+default-features = false
 
 [dependencies.fs-mistrust]
-version = "0.12"
+version = "=0.16.0-zakura.1"
+git = "https://github.com/zakura-core/arti.git"
+rev = "df38730dc93c5823c7eb9fe68fd5ec925a907c18"
 optional = true
+package = "zakura-fs-mistrust"
 
 [dependencies.futures-util]
 version = "0.3"
+features = [
+    "std",
+    "async-await",
+]
 optional = true
+default-features = false
 
 [dependencies.getset]
 version = "0.1"
@@ -294,9 +284,6 @@ package = "zakura-pasta-curves"
 version = "0.1.0-rc9"
 optional = true
 package = "zakura-pczt"
-
-[dependencies.percent-encoding]
-version = "2.1.0"
 
 [dependencies.postcard]
 version = "1"
@@ -384,6 +371,7 @@ optional = true
 
 [dependencies.tokio-rustls]
 version = "0.26"
+features = ["ring"]
 optional = true
 default-features = false
 
@@ -399,8 +387,11 @@ optional = true
 default-features = false
 
 [dependencies.tor-rtcompat]
-version = "0.35"
+version = "=0.47.0-zakura.1"
+git = "https://github.com/zakura-core/arti.git"
+rev = "df38730dc93c5823c7eb9fe68fd5ec925a907c18"
 optional = true
+package = "zakura-tor-rtcompat"
 
 [dependencies.tower]
 version = "0.5"
@@ -409,10 +400,6 @@ optional = true
 [dependencies.tracing]
 version = "0.1"
 default-features = false
-
-[dependencies.trait-variant]
-version = "0.1"
-optional = true
 
 [dependencies.transparent]
 version = "4.0.0"
@@ -428,7 +415,7 @@ version = "=0.0.1-rc4"
 optional = true
 
 [dependencies.zakura-pir-protocol]
-version = "=0.0.1-rc3"
+version = "=0.0.1-rc5"
 features = [
     "enhance",
     "recovery",
@@ -440,7 +427,7 @@ default-features = false
 package = "zakura-address"
 
 [dependencies.zcash_encoding]
-version = "0.4"
+version = "0.5"
 default-features = false
 
 [dependencies.zcash_keys]
@@ -490,14 +477,11 @@ default-features = false
 version = "4.0.0"
 package = "zakura-zip321"
 
-[dev-dependencies.ambassador]
-version = "0.4"
+[dev-dependencies]
+tempfile = "3.5.0"
 
 [dev-dependencies.assert_matches]
 version = "1.5"
-
-[dev-dependencies.gumdrop]
-version = "0.8"
 
 [dev-dependencies.incrementalmerkletree]
 version = "0.8.2"
@@ -521,9 +505,6 @@ version = "0.3"
 [dev-dependencies.shardtree]
 version = "0.7"
 features = ["test-dependencies"]
-
-[dev-dependencies.tempfile]
-version = "3.5.0"
 
 [dev-dependencies.tokio]
 version = "1.21.0"

@@ -144,6 +144,7 @@ class _MobileMigrationScheduleLoaderState
     final VoidCallback? onManage = canManage && !_managing
         ? () => _manage(request, status!.activeRunId!)
         : null;
+    final privacyModeEnabled = ref.watch(privacyModeProvider);
     void returnToStatus() {
       if (context.canPop()) {
         context.pop();
@@ -184,6 +185,7 @@ class _MobileMigrationScheduleLoaderState
                     : widget.preparation
                     ? _MobilePreparationScheduleContent(
                         status: status,
+                        privacyModeEnabled: privacyModeEnabled,
                         currentHeight: currentHeight,
                         blockTimes: ref
                             .watch(blockSpacingProvider)
@@ -193,6 +195,7 @@ class _MobileMigrationScheduleLoaderState
                       )
                     : _MobileMigrationScheduleContent(
                         status: status,
+                        privacyModeEnabled: privacyModeEnabled,
                         currentHeight: currentHeight,
                         blockTimes: ref
                             .watch(blockSpacingProvider)
@@ -212,6 +215,7 @@ class _MobileMigrationScheduleLoaderState
 class _MobileMigrationScheduleContent extends StatelessWidget {
   const _MobileMigrationScheduleContent({
     required this.status,
+    required this.privacyModeEnabled,
     required this.currentHeight,
     required this.blockTimes,
     required this.onReturn,
@@ -219,6 +223,7 @@ class _MobileMigrationScheduleContent extends StatelessWidget {
   });
 
   final rust_sync.MigrationStatus status;
+  final bool privacyModeEnabled;
   final int currentHeight;
   final BlockTimeEstimate blockTimes;
   final VoidCallback onReturn;
@@ -293,6 +298,7 @@ class _MobileMigrationScheduleContent extends StatelessWidget {
                         number: index + 1,
                         part: part,
                         total: total,
+                        privacyModeEnabled: privacyModeEnabled,
                         currentHeight: currentHeight,
                         blockSpacing: blockTimes.spacing,
                         projectedHeight: projectedHeights[part.partIndex],
@@ -307,7 +313,8 @@ class _MobileMigrationScheduleContent extends StatelessWidget {
           _MobileMigrationScheduleFooter(
             primaryIcon: AppIcons.wallet,
             title: 'Ironwood spendable',
-            value: '${_migrationDisplayZec(completed)} ZEC',
+            value:
+                '${hideIfPrivacyMode(_migrationDisplayZec(completed), privacyModeEnabled: privacyModeEnabled)} ZEC',
             secondaryIcon: AppIcons.migrationTimer,
             secondaryLabel: 'Duration',
             secondaryValue: duration,
@@ -325,6 +332,7 @@ class _MobileMigrationPartScheduleRow extends StatelessWidget {
     required this.number,
     required this.part,
     required this.total,
+    required this.privacyModeEnabled,
     required this.currentHeight,
     required this.blockSpacing,
     this.projectedHeight,
@@ -335,6 +343,7 @@ class _MobileMigrationPartScheduleRow extends StatelessWidget {
   final int number;
   final rust_sync.MigrationPartStatus part;
   final BigInt total;
+  final bool privacyModeEnabled;
   final int currentHeight;
   final BlockSpacing blockSpacing;
 
@@ -369,7 +378,7 @@ class _MobileMigrationPartScheduleRow extends StatelessWidget {
                 child: Text.rich(
                   TextSpan(
                     text:
-                        '$number. ${_migrationDisplayZec(part.valueZatoshi)} ZEC ',
+                        '$number. ${hideIfPrivacyMode(_migrationDisplayZec(part.valueZatoshi), privacyModeEnabled: privacyModeEnabled)} ZEC ',
                     style: AppTypography.labelLarge.copyWith(
                       color: context.colors.text.accent,
                     ),
@@ -422,6 +431,7 @@ class _MobileMigrationPartScheduleRow extends StatelessWidget {
 class _MobilePreparationScheduleContent extends StatelessWidget {
   const _MobilePreparationScheduleContent({
     required this.status,
+    required this.privacyModeEnabled,
     required this.currentHeight,
     required this.blockTimes,
     required this.onReturn,
@@ -429,6 +439,7 @@ class _MobilePreparationScheduleContent extends StatelessWidget {
   });
 
   final rust_sync.MigrationStatus status;
+  final bool privacyModeEnabled;
   final int currentHeight;
   final BlockTimeEstimate blockTimes;
   final VoidCallback onReturn;
@@ -491,6 +502,7 @@ class _MobilePreparationScheduleContent extends StatelessWidget {
                         _MobilePreparationRoundSection(
                           round: rounds[index].$1,
                           transactions: rounds[index].$2,
+                          privacyModeEnabled: privacyModeEnabled,
                         ),
                   ),
           ),
@@ -516,10 +528,12 @@ class _MobilePreparationRoundSection extends StatelessWidget {
   const _MobilePreparationRoundSection({
     required this.round,
     required this.transactions,
+    required this.privacyModeEnabled,
   });
 
   final int round;
   final List<rust_sync.MigrationPreparationTransactionStatus> transactions;
+  final bool privacyModeEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -541,6 +555,7 @@ class _MobilePreparationRoundSection extends StatelessWidget {
           _MobilePreparationTransactionCard(
             transaction: transactions[index],
             roundTotal: total,
+            privacyModeEnabled: privacyModeEnabled,
           ),
           if (index != transactions.length - 1)
             const SizedBox(height: AppSpacing.xs),
@@ -554,10 +569,12 @@ class _MobilePreparationTransactionCard extends StatelessWidget {
   const _MobilePreparationTransactionCard({
     required this.transaction,
     required this.roundTotal,
+    required this.privacyModeEnabled,
   });
 
   final rust_sync.MigrationPreparationTransactionStatus transaction;
   final BigInt roundTotal;
+  final bool privacyModeEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -600,7 +617,7 @@ class _MobilePreparationTransactionCard extends StatelessWidget {
                         'mobile_ironwood_preparation_value_'
                         '${transaction.stageIndex}',
                       ),
-                      '${_migrationDisplayZec(transaction.approximateValueZatoshi)} ZEC '
+                      '${hideIfPrivacyMode(_migrationDisplayZec(transaction.approximateValueZatoshi), privacyModeEnabled: privacyModeEnabled)} ZEC '
                       '${_mobileSchedulePercentage(transaction.approximateValueZatoshi, roundTotal)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -671,6 +688,7 @@ class _MobilePreparationTransactionCard extends StatelessWidget {
                 ) ...[
                   _MobilePreparationOutputRow(
                     output: transaction.outputs[index],
+                    privacyModeEnabled: privacyModeEnabled,
                   ),
                   if (index != transaction.outputs.length - 1)
                     const SizedBox(height: AppSpacing.xs),
@@ -685,9 +703,13 @@ class _MobilePreparationTransactionCard extends StatelessWidget {
 }
 
 class _MobilePreparationOutputRow extends StatelessWidget {
-  const _MobilePreparationOutputRow({required this.output});
+  const _MobilePreparationOutputRow({
+    required this.output,
+    required this.privacyModeEnabled,
+  });
 
   final rust_sync.MigrationPreparationOutputStatus output;
+  final bool privacyModeEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -713,7 +735,7 @@ class _MobilePreparationOutputRow extends StatelessWidget {
           const SizedBox(width: AppSpacing.xxs),
           Expanded(
             child: Text(
-              '${_migrationDisplayZec(value)} ZEC',
+              '${hideIfPrivacyMode(_migrationDisplayZec(value), privacyModeEnabled: privacyModeEnabled)} ZEC',
               style: AppTypography.bodyMedium.copyWith(
                 color: context.colors.text.accent,
               ),

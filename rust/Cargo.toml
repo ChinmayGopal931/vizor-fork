@@ -8,10 +8,10 @@ rust-version = "1.97"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-zakura-pir-protocol = { version = "=0.0.1-rc3", default-features = false, features = ["http-endpoint"] }
-zakura-pir-config = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "bed478f1ec48814197f2c5aa386c14d046c7e52f" }
-zakura-service-config = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "bed478f1ec48814197f2c5aa386c14d046c7e52f" }
-zakura-pir-client = { version = "=0.0.1-rc3", default-features = false, features = ["enhance", "status", "transparent", "wallet", "sqlite", "lightwalletd"] }
+zakura-pir-protocol = { version = "=0.0.1-rc5", default-features = false, features = ["http-endpoint"] }
+zakura-pir-config = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "0074b990a635a3e53258c298ad976043a8d42c3e" }
+zakura-service-config = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "0074b990a635a3e53258c298ad976043a8d42c3e" }
+zakura-pir-client = { version = "=0.0.1-rc5", default-features = false, features = ["enhance", "status", "transparent", "wallet", "sqlite", "lightwalletd"] }
 zcash_note_encryption = { package = "zakura-note-encryption", version = "=4.0.0" }
 # The app installs its own redacting logger and panic hook.
 # Supported targets provide the atomic widths used by FRB.
@@ -59,6 +59,8 @@ sha2 = "0.10"
 
 # Random number generation
 rand = "0.8"
+# Preserve the existing entropy and browser backends after trimming Flume.
+getrandom = { version = "0.2", default-features = false, features = ["js", "rdrand"] }
 
 # Async runtime & gRPC
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "net", "io-util", "time"] }
@@ -148,20 +150,20 @@ version = "=4.0.0"
 
 [dependencies.zcash_client_backend]
 package = "zakura-client-backend"
-version = "=0.1.0-rc9.4"
+version = "=0.1.0-rc9.6"
 features = [
     "orchard",
     "transparent-inputs",
     "lightwalletd-tonic",
     "lightwalletd-tonic-tls-webpki-roots",
-    "tor",
+    "tor-client",
     "sync",
     "pczt",
 ]
 
 [dependencies.zcash_client_sqlite]
 package = "zakura-client-sqlite"
-version = "=0.1.0-rc9.4"
+version = "=0.1.0-rc9.6"
 features = ["orchard", "transparent-inputs", "unstable", "serde"]
 
 [dependencies.zcash_voting]
@@ -233,12 +235,12 @@ regex = "1"
 # Builds wallets through real private recovery for the history mapping tests.
 [dev-dependencies.zcash_client_sqlite]
 package = "zakura-client-sqlite"
-version = "=0.1.0-rc9.4"
+version = "=0.1.0-rc9.6"
 features = ["test-dependencies"]
 
 [dev-dependencies.zcash_client_backend]
 package = "zakura-client-backend"
-version = "=0.1.0-rc9.4"
+version = "=0.1.0-rc9.6"
 features = ["test-dependencies"]
 
 [dev-dependencies.zcash_voting]
@@ -249,7 +251,7 @@ features = ["test-fixtures"]
 # display publication the loop-4 tests serve, and a real shard service in
 # process. Keep the version aligned with the runtime dependency above.
 [dev-dependencies.zakura-pir-client]
-version = "=0.0.1-rc3"
+version = "=0.0.1-rc5"
 default-features = false
 features = ["testing"]
 
@@ -293,28 +295,28 @@ opt-level = 3
 
 # Shared PIR configuration and product routes are not released yet.
 #
-# `zakura-client-backend` is the published 0.1.0-rc9.4 (crates.io checksum
-# 7f29d97e137b6ab0fdb28d88f4c27b11017777cfd3fa41f6cb333513f3c715d5) with the
-# sources of the wallet-libraries rev below, which differ only in
-# `src/data_api/chain.rs` and its test, vendored with one change:
-# `tor::Client::connect_stream`, the raw Tor stream the Railgun bridge tunnels
-# through (`vendor/zakura-client-backend.patch`). Both the crates.io package
-# and the wallet-libraries source are patched to it, which keeps one backend in
-# the graph: the SQLite, PIR and voting crates reach it through both. Drop this
-# and the vendored copy once a release carries `connect_stream`.
+# `zakura-client-backend` is the wallet-libraries rev below's 0.1.0-rc9.6 as
+# `cargo vendor` writes it (the published rc9.6 predates its `tor-client`
+# feature), with its workspace paths left to the patches here, vendored with
+# one change: `tor::Client::connect_stream`, the raw Tor stream the Railgun
+# bridge tunnels through (`vendor/zakura-client-backend.patch`). Both the
+# crates.io package and the wallet-libraries source are patched to it, which
+# keeps one backend in the graph: the SQLite, PIR and voting crates reach it
+# through both. Drop this and the vendored copy once a release carries
+# `connect_stream`.
 [patch.crates-io]
 zakura-client-backend = { path = "vendor/zakura-client-backend" }
 # The vendored backend names this crates.io crate where the rev's backend has
 # it by path. Keep one copy, the rev's.
-zakura-one-time-ivk = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "bed478f1ec48814197f2c5aa386c14d046c7e52f" }
-zakura-client-sqlite = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "bed478f1ec48814197f2c5aa386c14d046c7e52f" }
-zakura-pczt = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "bed478f1ec48814197f2c5aa386c14d046c7e52f" }
-zakura-filters = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "bed478f1ec48814197f2c5aa386c14d046c7e52f" }
-zakura-pir-client = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "bed478f1ec48814197f2c5aa386c14d046c7e52f" }
-zakura-pir-protocol = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "bed478f1ec48814197f2c5aa386c14d046c7e52f" }
-zakura-pir-publisher = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "bed478f1ec48814197f2c5aa386c14d046c7e52f" }
-zakura-pir-query-server = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "bed478f1ec48814197f2c5aa386c14d046c7e52f" }
-zakura-pir-server-core = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "bed478f1ec48814197f2c5aa386c14d046c7e52f" }
+zakura-one-time-ivk = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "0074b990a635a3e53258c298ad976043a8d42c3e" }
+zakura-client-sqlite = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "0074b990a635a3e53258c298ad976043a8d42c3e" }
+zakura-pczt = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "0074b990a635a3e53258c298ad976043a8d42c3e" }
+zakura-filters = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "0074b990a635a3e53258c298ad976043a8d42c3e" }
+zakura-pir-client = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "0074b990a635a3e53258c298ad976043a8d42c3e" }
+zakura-pir-protocol = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "0074b990a635a3e53258c298ad976043a8d42c3e" }
+zakura-pir-publisher = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "0074b990a635a3e53258c298ad976043a8d42c3e" }
+zakura-pir-query-server = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "0074b990a635a3e53258c298ad976043a8d42c3e" }
+zakura-pir-server-core = { git = "https://github.com/zakura-core/wallet-libraries.git", rev = "0074b990a635a3e53258c298ad976043a8d42c3e" }
 # The library above takes `ipir-sp` from git. Keep the app's test evaluator on that source.
 ipir-sp = { git = "https://github.com/valargroup/ipir-sp", rev = "5ea080a3281a01c5459f585e0a1bbbde50ec2bd2" }
 
