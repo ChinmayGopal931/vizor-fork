@@ -33,6 +33,7 @@ import '../../features/private_usd/models/private_usd_send.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_conversion_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_convert_review_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_convert_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_receive_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_refunds_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_reverse_conversion_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_screen.dart';
@@ -452,6 +453,13 @@ List<RouteBase> _walletRoutes() {
               : const MobilePrivateUsdScreen(),
         );
       },
+    ),
+    GoRoute(
+      path: '/private-usd/receive',
+      pageBuilder: (context, state) => _mobilePage(
+        key: state.pageKey,
+        child: const MobilePrivateUsdReceiveScreen(),
+      ),
     ),
     GoRoute(
       path: '/private-usd/refunds',

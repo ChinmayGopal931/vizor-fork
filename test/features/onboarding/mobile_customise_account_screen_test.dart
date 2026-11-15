@@ -406,8 +406,8 @@ void main() {
     );
     await tester.pump();
     expect(submittedName, 'Resolute Herald');
-    // The third draw (8) picks among the seven portraits: 8 % 7 = 1.
-    expect(submittedProfilePictureId, 'pfp-02');
+    // The third draw (8) picks among the ten portraits: the ninth.
+    expect(submittedProfilePictureId, 'pfp-17');
   });
 
   testWidgets('keeps the randomise action at the logical end in RTL', (

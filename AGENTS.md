@@ -298,12 +298,14 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
 - **Art.** The medieval illustrations are gone from mobile: empty states use
   `NeonHorizon` (a striped 80s sun over a grid floor), hero and status
   spots `NeonGlyphBadge`, and painted backgrounds are dropped. The account
-  pictures are the seven neon portraits in `assets/profile_pictures/`
-  (`pfp-01` to `pfp-07`, lossless WebP); ids of the retired knights
-  (`pfp-08` to `pfp-15`) map onto them. Payment-link gift card designs are
-  unchanged. `VizorWordmark` draws a VEYLOR wordmark in tube strokes on
-  mobile (`VeylorWordmarkPainter`: lit red, or plain lines where a caller
-  sets a colour); desktop keeps `vizor_logo.svg`.
+  pictures are the ten neon portraits in `assets/profile_pictures/`
+  (`pfp-01` to `pfp-07` and `pfp-16` to `pfp-18`, 224 px lossless WebP);
+  ids of the retired knights (`pfp-08` to `pfp-15`) map onto the first
+  seven, so a new portrait takes the next number from `pfp-19`.
+  Payment-link gift card designs are unchanged. `VizorWordmark` draws a
+  VEYLOR wordmark in tube strokes on mobile (`VeylorWordmarkPainter`: lit
+  red, or plain lines where a caller sets a colour); desktop keeps
+  `vizor_logo.svg`.
 - **Keys and money flows.** The passcode keys are cut-corner glass plates
   that light red under the finger. Private USD calls a conversion a bridge
   in every user-facing string (owner, 2026-10-19: "Bridge", "Bridging",
@@ -1733,17 +1735,19 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 addresses (`m/44'/60'|1'/(1000 + zip32)'/0/index`, from the seed) is
 shielded into its private balance by an EIP-3009 authorization the relayer
 sends (`rust/src/wallet/private_usd/deposits.rs`, zecSwap's
-`docs/deposits.md`). The Receive sheet (`private_usd_receive_sheet.dart`)
-switches, as ZEC's Receive does its pools (`NeonSwitchTabs`), between public
-USDC at the deposit address (the default) and 0zkUSDC at the account's 0zk
-address, for another Railgun wallet; it replaced the screen's 0zk card
-(owner, 2026-10-19). Only a network with a Deposits pin shows the USDC side:
-testnet and, since 2026-10-19, mainnet; elsewhere the sheet shows the 0zk
-address alone. Send and Withdraw scan their recipient as ZEC Send does (the
-shared `MobileScanAddressRow` and `MobileAddressScanCard`): Send takes a 0zk
-address and Withdraw a 0x one (`privateUsdScanOutcome`); an `ethereum:`
-request gives up its recipient, never its token, and one for another chain
-is refused.
+`docs/deposits.md`). The Receive screen (`/private-usd/receive`,
+`mobile_private_usd_receive_screen.dart`) switches, as ZEC's Receive does its
+pools (`NeonSwitchTabs`), between public USDC at the deposit address (the
+default) and 0zkUSDC at the account's 0zk address, for another Railgun
+wallet; it replaced the screen's 0zk card (owner, 2026-10-19). It is a page
+like the other Private USD screens, not a sheet, so the iOS edge swipe goes
+back from it (owner, 2026-11-15). Only a network with a Deposits pin shows
+the USDC side: testnet and, since 2026-10-19, mainnet; elsewhere the screen
+shows the 0zk address alone. Send and Withdraw scan their recipient as ZEC
+Send does (the shared `MobileScanAddressRow` and `MobileAddressScanCard`):
+Send takes a 0zk address and Withdraw a 0x one (`privateUsdScanOutcome`); an
+`ethereum:` request gives up its recipient, never its token, and one for
+another chain is refused.
 
 - Pin the Deposits contract, the relayer's deposits account (not the
   top-level relayer) and the token; refuse terms that differ, never follow

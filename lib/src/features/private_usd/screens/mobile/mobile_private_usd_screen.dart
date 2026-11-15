@@ -50,7 +50,7 @@ import '../../widgets/mobile/private_usd_flow_widgets.dart';
 import '../../widgets/mobile/private_usd_home_strip.dart';
 import '../../widgets/mobile/private_usd_activity_rows.dart';
 import '../../widgets/mobile/private_usd_banner.dart';
-import '../../widgets/mobile/private_usd_receive_sheet.dart';
+import '../../widgets/mobile/private_usd_deposit_line.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
 import '../../widgets/mobile/private_usd_pending_payment_line.dart';
 import '../../widgets/mobile/private_usd_sync_line.dart';
@@ -183,13 +183,9 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
       ),
       depositPass: depositPass,
       // Public USDC where the network pins deposits, and the 0zk address
-      // for another Railgun wallet: one sheet, as ZEC's Receive.
+      // for another Railgun wallet: one screen, as ZEC's Receive.
       onReceive: deposits || address.value != null
-          ? () => showPrivateUsdReceiveSheet(
-              context,
-              accountUuid: uuid,
-              deposits: deposits,
-            )
+          ? () => context.push('/private-usd/receive')
           : null,
       banner: ref.watch(privateUsdConversionBannerProvider(uuid)),
       activityRows: activity,
