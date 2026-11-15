@@ -19,6 +19,10 @@ export const SQUID_PAGE_SIZE = 10_000;
 /** As the SDK waits on each page, and between two of one list. */
 export const PAGE_TIMEOUT_MS = 20_000;
 const PAGE_GAP_MS = 250;
+// A page the indexer didn't answer is asked again after 1, 2, 4 and 8 s: a phone's DNS can fail every lookup for
+// seconds at a time, and a list that fails takes the archive beside it out of the sync.
+const PAGE_ATTEMPTS = 5;
+const PAGE_RETRY_MS = 1_000;
 // How many leaves wait in the engine's write queue before they go into the trees. The engine has Railgun's contract
 // check the root of every insert, one call at a time, so a write per page or archive chunk cost a round trip each,
 // hundreds on a mainnet first sync. This keeps them to a handful, and the queue small.
@@ -56,18 +60,32 @@ let asks = 0;
  * page reaches the indexer's newest block, the list's last), when the page was asked for (`asked`, counted across
  * lists), and the newest block the indexer has shown it has (`newest`). The next page is asked for while this one is
  * stored. The indexer pages by block, starting each page at the block the last one ended on, so a page's events that
- * the last page gave are left out. The last page's `again()` reads the list on from there, asked anew.
+ * the last page gave are left out. The last page's `again()` reads the list on from there, asked anew. `retryMs`
+ * spaces the tries at a page.
  */
-export function squidPages(query, format, startingBlock, { pageSize = SQUID_PAGE_SIZE, gapMs = PAGE_GAP_MS } = {}) {
-  return pagesFrom(query, format, { from: startingBlock, given: new Set(), newest: startingBlock - 1 }, { pageSize, gapMs });
+export function squidPages(
+  query,
+  format,
+  startingBlock,
+  { pageSize = SQUID_PAGE_SIZE, gapMs = PAGE_GAP_MS, retryMs = PAGE_RETRY_MS } = {},
+) {
+  return pagesFrom(query, format, { from: startingBlock, given: new Set(), newest: startingBlock - 1 }, { pageSize, gapMs, retryMs });
 }
 
 async function* pagesFrom(query, format, at, options) {
-  const { pageSize, gapMs } = options;
+  const { pageSize, gapMs, retryMs } = options;
   const ask = (block, wait) => {
-    const answer = (wait ? delay(wait) : Promise.resolve()).then(() => {
-      const asked = ++asks;
-      return withTimeout(query(block), PAGE_TIMEOUT_MS).then((page) => ({ page, asked }));
+    const answer = (wait ? delay(wait) : Promise.resolve()).then(async () => {
+      for (let attempt = 1; ; attempt += 1) {
+        // Counted at each try: a page answers as of the try it came from.
+        const asked = ++asks;
+        try {
+          return { page: await withTimeout(query(block), PAGE_TIMEOUT_MS), asked };
+        } catch (error) {
+          if (attempt >= PAGE_ATTEMPTS) throw error;
+          await delay(retryMs * 2 ** (attempt - 1));
+        }
+      }
     });
     answer.catch(() => {});
     return answer;

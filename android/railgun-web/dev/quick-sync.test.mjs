@@ -123,6 +123,47 @@ test('a quick sync stored page by page stores exactly what the engine stores fro
   assert.deepEqual(stored, await storedWhole(lists));
 });
 
+/** `queries` with `name`'s query failing on the way `times` times, from its second page on. */
+function failing(queries, name, times) {
+  let calls = 0;
+  let failures = times;
+  const own = queries[name];
+  return {
+    ...queries,
+    [name]: (block) => {
+      calls += 1;
+      if (calls < 2 || failures === 0) return own(block);
+      failures -= 1;
+      return Promise.reject(new TypeError('Failed to fetch'));
+    },
+  };
+}
+
+test('a page the indexer fails to answer is asked up to five times, as a phone can lose DNS for seconds', async () => {
+  const lists = history();
+  const store = memoryDatabase();
+  const { engine } = await engineHarness({ store });
+  const options = { pageSize: 30, gapMs: 0, retryMs: 0 };
+  const left = await storeEvents({
+    engine,
+    txidVersion: V2,
+    chain: CHAIN,
+    ...squidLists(failing(indexer(lists, 30).queries, 'nullifiers', 4), lists.from, options),
+  });
+  assert.deepEqual(left, NO_EVENTS);
+  assert.deepEqual(contents(store.down), await storedWhole(lists));
+  const broken = await engineHarness();
+  await assert.rejects(
+    storeEvents({
+      engine: broken.engine,
+      txidVersion: V2,
+      chain: CHAIN,
+      ...squidLists(failing(indexer(lists, 30).queries, 'nullifiers', 5), lists.from, options),
+    }),
+    /Failed to fetch/,
+  );
+});
+
 test('the trees take the leaves of several pages at once, so few roots are checked on chain', async () => {
   const lists = history();
   const harness = await engineHarness();

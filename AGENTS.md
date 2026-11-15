@@ -1832,9 +1832,10 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
   comes, a page's unshields and nullifiers before its commitments (the
   engine resumes from its newest stored commitment). Rail-squid's lists are
   whole only up to its newest block when asked: one that ended before a
-  page of commitments was asked for is read on first. The commitments go
-  into the trees 20,000 leaves at a time: the engine has the contract check
-  every insert's root, one call at a time.
+  page of commitments was asked for is read on first. A page it didn't
+  answer is asked four more times over 15 s, as an archive request is. The
+  commitments go into the trees 20,000 leaves at a time: the engine has the
+  contract check every insert's root, one call at a time.
 - `engine-hooks-plugin.mjs` holds every rewrite of the engine's code: the
   unshield watermark (`unshield-events.js`), the archive's leaf hashing
   (`archive-txids.js`), and the txid sync's record updates
