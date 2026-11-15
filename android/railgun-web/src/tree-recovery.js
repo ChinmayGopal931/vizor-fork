@@ -3,10 +3,10 @@
 // leaves, on by default, so once the engine has refused one tree's root for a while the page rebuilds the trees from
 // the start with the archive off.
 
-/** How long, and over how many refusals, one tree's root must fail before the trees are rebuilt. */
+/** How long, and over how many refusals in a row, one tree's root must fail before the trees are rebuilt. */
 export const REBUILD_AFTER_MS = 10 * 60_000;
 export const REBUILD_AFTER_CHECKS = 3;
-/** At most one rebuild this often: a root that fails again so soon after one isn't down to the archive. */
+/** At most one rebuild this often, from when the last completed: a root that fails again so soon isn't the archive's. */
 export const REBUILD_EVERY_MS = 24 * 60 * 60_000;
 /** How long the archive stays off after a rebuild, or after it listed one of a wallet's sends wrong. */
 export const ARCHIVE_OFF_MS = 7 * 24 * 60 * 60_000;
@@ -31,16 +31,35 @@ export function takeRefusedRoot() {
 }
 
 /**
- * What the page does after each notes scan: `passed()` after one that completed, and `broke(refusedRoot)` after one
- * that broke off, answering whether it rebuilt the trees. Only a root the engine's end-of-scan check refused counts
- * (`refusedRoot`, from `takeRefusedRoot()`): a scan that broke before that check, its lists failing or a write cut
- * off, may have left a tree partway through an on-chain batch, at a root the contract never had. A root an RPC
- * hasn't caught up to is refused for a moment, a wrong one for good. `rebuild(started)` rebuilds every tree from the
- * start, calling `started()` as it begins clearing them, and answers false when it can't begin. `store` keeps what
- * was learned across page starts.
+ * What the page does around each notes scan: `resume()` before it, `passed()` after one that completed, and
+ * `broke(refusedRoot)` after one that broke off, the last two answering whether they rebuilt the trees.
+ *
+ * - Only a root the engine's end-of-scan check refused counts (`refusedRoot`, from `takeRefusedRoot()`): a scan that
+ *   broke before that check, its lists failing or a write cut off, may have left a tree partway through an on-chain
+ *   batch, at a root the contract never had.
+ * - Refusals count for the tree, whatever its root: new notes move a tree's root on with the leaf stored wrong still
+ *   under it. A root an RPC hasn't caught up to is refused for a moment, and the scan that completes after it starts
+ *   the count again.
+ * - `rebuild(started)` rebuilds every tree from the start, calling `started()` as it begins clearing them, and answers
+ *   false when it can't begin. The rebuild is kept unfinished from then until it completes, so a page closed during it
+ *   goes on with it when it reopens (`resume()`, or the next refusal), and the day between two rebuilds counts from
+ *   when one completed.
+ *
+ * `store` keeps what was learned across page starts.
  */
 export function treeRecovery({ rebuild, store, now = Date.now }) {
+  async function rebuildNow() {
+    const rebuilt = await rebuild(() =>
+      store.write({ ...store.read(), rebuilding: now(), archiveOffUntil: now() + ARCHIVE_OFF_MS }),
+    );
+    if (rebuilt) store.write({ ...store.read(), rebuilding: undefined, failing: undefined, rebuiltAt: now() });
+    return rebuilt;
+  }
+
   return {
+    async resume() {
+      return store.read().rebuilding !== undefined && rebuildNow();
+    },
     passed() {
       const state = store.read();
       if (state.failing !== undefined) store.write({ ...state, failing: undefined });
@@ -48,16 +67,17 @@ export function treeRecovery({ rebuild, store, now = Date.now }) {
     async broke(refusedRoot) {
       if (refusedRoot === undefined) return false;
       const state = store.read();
-      const same = state.failing?.tree === refusedRoot.tree && state.failing?.root === refusedRoot.root;
-      const failing = same ? { ...state.failing, checks: state.failing.checks + 1 } : { ...refusedRoot, since: now(), checks: 1 };
+      const failing =
+        state.failing?.tree === refusedRoot.tree
+          ? { ...state.failing, root: refusedRoot.root, checks: state.failing.checks + 1 }
+          : { ...refusedRoot, since: now(), checks: 1 };
       store.write({ ...state, failing });
       const due =
-        failing.checks >= REBUILD_AFTER_CHECKS &&
-        now() - failing.since >= REBUILD_AFTER_MS &&
-        !(now() - (state.rebuiltAt ?? -Infinity) < REBUILD_EVERY_MS);
-      if (!due) return false;
-      // Kept as the clearing begins, so a page closed during the rebuild goes on without the archive.
-      return rebuild(() => store.write({ rebuiltAt: now(), archiveOffUntil: now() + ARCHIVE_OFF_MS }));
+        state.rebuilding !== undefined ||
+        (failing.checks >= REBUILD_AFTER_CHECKS &&
+          now() - failing.since >= REBUILD_AFTER_MS &&
+          !(now() - (state.rebuiltAt ?? -Infinity) < REBUILD_EVERY_MS));
+      return due && rebuildNow();
     },
   };
 }

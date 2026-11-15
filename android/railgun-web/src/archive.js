@@ -6,6 +6,12 @@
 /** The archive can't be used from here on: the sync goes on from rail-squid. */
 export class ArchiveUnavailable extends Error {}
 
+/**
+ * The archive didn't answer a request, or turned it away as a busy or failing server does, through every try: this
+ * says nothing against what it holds (archive-sync.js asks it again later).
+ */
+export class ArchiveUnreachable extends ArchiveUnavailable {}
+
 // The tip was replaced between two reads; read the manifest again.
 class TipMoved extends ArchiveUnavailable {}
 
@@ -44,7 +50,8 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
     for (let attempt = 1; ; attempt += 1) {
       const { bytes, failure, again } = await getOnce(path);
       if (bytes !== undefined) return bytes;
-      if (!again || attempt >= ATTEMPTS) throw failure;
+      if (!again) throw failure;
+      if (attempt >= ATTEMPTS) throw new ArchiveUnreachable(failure.message);
       await delay(retryMs * 2 ** (attempt - 1));
     }
   }

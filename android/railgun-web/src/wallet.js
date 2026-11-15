@@ -477,6 +477,8 @@ function scanNotes(walletId) {
 // notes: the txid list is the rest of the sync's.
 async function scanNotesNow(walletId) {
   for (let attempt = 0; attempt < NOTES_SCAN_ATTEMPTS; attempt += 1) {
+    // A rebuild a closed page left unfinished goes on before anything else (tree-recovery.js).
+    if (await recovery(walletId).resume()) continue;
     const scan = { started: false, incomplete: false };
     notesScan = scan;
     // A root the last rebuild's own scan refused is left out: this scan shows whether the rebuild took.

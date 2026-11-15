@@ -4,11 +4,12 @@
 // trees, which would count that note unspent; and an unshield missing from the store stops the txid sync at its
 // transaction for good. The archive's commitments must run on from those stored, and are stored only as far as
 // rail-squid's lists have shown it has come. On anything unexpected the quick sync goes on from rail-squid at the block
-// after the archive's last good one; what the archive gave stays stored. A failure of rail-squid's own lists says
-// nothing against the archive: the lists are asked again beside it, a few times, from where they were stored.
+// after the archive's last good one; what the archive gave stays stored. A failure of rail-squid's own lists, or the
+// archive out of reach, says nothing against the archive's data: the lists and the archive are asked again, a few
+// times, from where they were stored.
 import { Merkletree } from '@railgun-community/engine';
 import { TXIDVersion } from '@railgun-community/shared-models';
-import { ArchiveUnavailable, archiveRange } from './archive.js';
+import { ArchiveUnavailable, ArchiveUnreachable, archiveRange } from './archive.js';
 import { commitmentBatches } from './archive-records.js';
 import { formatNullifiers, formatUnshields, quickSyncProgress, squidLists, squidPages, storeEvents } from './quick-sync.js';
 
@@ -26,11 +27,15 @@ export const ARCHIVE_MIN_BLOCKS = 28_800;
 export const farBehind = (block, head) => head - block > ARCHIVE_MIN_BLOCKS;
 
 /**
- * How many times the archive is read beside rail-squid's lists while those lists fail. An HTTP/2 connection that stops
- * answering fails every try at a page sent on it until the browser gives the connection up, which took a phone about
- * two minutes, as long as a page's tries.
+ * How many times the archive is read beside rail-squid's lists while those lists fail, or the archive is out of reach,
+ * and how long the first wait between two such rounds is (each next one twice as long). An HTTP/2 connection that
+ * stops answering fails every try at a page sent on it until the browser gives the connection up, which took a phone
+ * about two minutes, and a phone's network dropped every connection for a minute at a time.
  */
 export const ARCHIVE_ROUNDS = 3;
+export const ARCHIVE_ROUND_WAIT_MS = 20_000;
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** A failure of the archive's own, not of rail-squid's lists beside it. */
 class ArchiveFailed extends Error {
@@ -102,7 +107,18 @@ export async function* archiveCommitments(reader, since, next, { time, chainId }
  */
 export function installArchiveSync(
   engine,
-  { reader, queries, chainId, time, head, log = () => {}, useArchive = () => true, pages, writeRetryMs },
+  {
+    reader,
+    queries,
+    chainId,
+    time,
+    head,
+    log = () => {},
+    useArchive = () => true,
+    pages,
+    writeRetryMs,
+    roundWaitMs = ARCHIVE_ROUND_WAIT_MS,
+  },
 ) {
   const own = engine.quickSyncEvents;
   engine.quickSyncEvents = async (txidVersion, chain, startingBlock) => {
@@ -142,8 +158,10 @@ export function installArchiveSync(
           break;
         } catch (error) {
           const message = error?.message ?? error;
-          if (!(error instanceof ArchiveFailed) && round < ARCHIVE_ROUNDS) {
-            log(`rail-squid failed beside the archive at block ${through}, asked again: ${message}`);
+          const archives = error instanceof ArchiveFailed;
+          if ((!archives || error.cause instanceof ArchiveUnreachable) && round < ARCHIVE_ROUNDS) {
+            log(`${archives ? 'the archive' : 'rail-squid'} failed at block ${through}, asked again: ${message}`);
+            await delay(roundWaitMs * 2 ** (round - 1));
             continue;
           }
           log(`the archive was left at block ${through}: ${message}`);

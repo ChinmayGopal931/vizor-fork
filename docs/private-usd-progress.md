@@ -2826,9 +2826,10 @@ M8 status (2026-10-14): the non-device parts are done.
   reads positions as the engine places notes. A quick sync's per-insert
   root checks are asked and ignored (a write can end inside an on-chain
   batch), so the engine's end-of-scan check of every tree's root is what
-  holds the trees to the chain; a tree whose root it refuses three times
-  over ten minutes is rebuilt without the archive, the txid list cleared
-  first (`tree-recovery.js`). The root binds a txid record's railgunTxid,
+  holds the trees to the chain; a tree it refuses three times over ten
+  minutes, whatever its root, is rebuilt without the archive, the txid
+  list cleared first, and a rebuild a closed page left goes on when it
+  reopens (`tree-recovery.js`). The root binds a txid record's railgunTxid,
   not its fields: a send whose record doesn't hash to its railgunTxid has
   the whole list synced again from rail-squid before it is proved, never
   from that send, which would show which transaction is the wallet's.
@@ -2836,8 +2837,12 @@ M8 status (2026-10-14): the non-device parts are done.
   Wi-Fi, the default RPC: the OnePlus 15's first balance at 10.7 min and
   the whole sync at 20.1 min (main: 42.5 min both), its store identical to
   main's but for record times; the Nord CE 3 Lite's at 24.7 and
-  63.3 min (27.1 and 74.0 before the review's fixes). Follow-ups are in
-  #20.
+  63.3 min (27.1 and 74.0 before the review's fixes). On the Nord a
+  two-minute rail-squid stall, and in another run a minute without a
+  network, took the archive out of a whole first sync (29.1 and 77.0 min,
+  the store still identical): a failing rail-squid list or an unreachable
+  archive is now asked again, three rounds 20 and 40 s apart, before the
+  archive is left. Follow-ups are in #20.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

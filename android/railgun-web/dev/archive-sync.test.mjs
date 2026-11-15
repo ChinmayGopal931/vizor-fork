@@ -58,6 +58,7 @@ async function storedByArchive(
     useArchive,
     pages,
     writeRetryMs: 0,
+    roundWaitMs: 0,
   });
   await engine.quickSyncEvents(V2, CHAIN, startingBlock);
   return { stored: contents(store.down), asked: squid.asked, left, merkletree };
@@ -401,12 +402,14 @@ function failingFirst(name, times) {
   };
 }
 
-test('a request is sent five times before the archive is left, as a phone can lose DNS for seconds', async () => {
+test('a request is sent five times a round, as a phone can lose DNS for seconds, and the archive out of reach '
+  + 'every round is left', async () => {
   const kept = await storedByArchive(failingFirst('chunk-index.json', 4));
   assert.deepEqual(kept.left, []);
   assert.deepEqual(kept.stored, await storedBySquid());
-  const left = await storedByArchive(failingFirst('chunk-index.json', 5));
-  assert.match(left.left[0], /did not answer for chunk-index\.json/);
+  const left = await storedByArchive(failingFirst('chunk-index.json', 5 * ARCHIVE_ROUNDS));
+  assert.equal(left.left.length, ARCHIVE_ROUNDS);
+  assert.match(left.left.at(-1), /^the archive was left at block \d+: the archive did not answer for chunk-index\.json/);
   assert.deepEqual(left.stored, await storedBySquid());
 });
 
@@ -433,7 +436,7 @@ test("rail-squid's list failing beside the archive is asked again from where it 
   const server = archiveServer(fixture, { sealedAt });
   const { stored, asked, left } = await storedByArchive(server, { squidQueries: squidFailing('nullifiers', PAGE_TRIES) });
   assert.equal(left.length, 1);
-  assert.match(left[0], /^rail-squid failed beside the archive at block \d+, asked again: Failed to fetch$/);
+  assert.match(left[0], /^rail-squid failed at block \d+, asked again: Failed to fetch$/);
   assert.deepEqual(stored, await storedBySquid());
   // The commitments still came from the archive: rail-squid was asked for them only past its lists' newest block.
   assert.equal(squidFrom(asked, 'commitments'), newestBlockOf(fixture.squid.unshields) + 1);
@@ -445,14 +448,38 @@ test(`rail-squid failing beside the archive ${ARCHIVE_ROUNDS} times leaves the a
     squidQueries: squidFailing('nullifiers', PAGE_TRIES * ARCHIVE_ROUNDS),
   });
   assert.equal(left.length, ARCHIVE_ROUNDS);
-  for (const line of left.slice(0, -1)) assert.match(line, /^rail-squid failed beside the archive at block \d+, asked again/);
+  for (const line of left.slice(0, -1)) assert.match(line, /^rail-squid failed at block \d+, asked again/);
   assert.match(left.at(-1), /^the archive was left at block \d+: Failed to fetch$/);
   assert.deepEqual(stored, await storedBySquid());
 });
 
-test("the archive's own failure leaves it at once, rail-squid's lists or not", async () => {
-  const { stored, left } = await storedByArchive(failingFirst('chunk-index.json', 5));
+test('an archive out of reach for a round, as a phone that lost its network for a minute, is asked again and kept',
+  async () => {
+    // The host answers 502 for a fetch of its own that failed.
+    const server = archiveServer(fixture, { sealedAt });
+    let failures = PAGE_TRIES;
+    const unreachable = {
+      fetch: (url) => {
+        if (url.endsWith('/meta.json') && !url.includes('/chunks/') && failures > 0) {
+          failures -= 1;
+          return Promise.resolve(new Response('', { status: 502 }));
+        }
+        return server.fetch(url);
+      },
+    };
+    const { stored, asked, left } = await storedByArchive(unreachable);
+    assert.equal(left.length, 1);
+    assert.match(left[0], /^the archive failed at block \d+, asked again: the archive answered 502 for meta\.json$/);
+    assert.deepEqual(stored, await storedBySquid());
+    assert.equal(squidFrom(asked, 'commitments'), newestBlockOf(fixture.squid.unshields) + 1);
+  },
+);
+
+test("the archive's own data failing leaves it at once, never asked again", async () => {
+  const server = archiveServer(fixture, { sealedAt });
+  server.files.set('meta.json', Buffer.from('<html>busy</html>'));
+  const { stored, left } = await storedByArchive(server);
   assert.equal(left.length, 1);
-  assert.match(left[0], /^the archive was left at block \d+: .*did not answer for chunk-index\.json/);
+  assert.match(left[0], /^the archive was left at block \d+: meta\.json is not JSON$/);
   assert.deepEqual(stored, await storedBySquid());
 });

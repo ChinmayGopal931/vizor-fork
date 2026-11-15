@@ -1878,24 +1878,31 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
     what was hashed. (The archive's prebuilt trees were dropped for this.)
   - A notes tree whose root the contract has never had (a leaf stored
     wrong) fails every scan at the engine's end-of-scan root check, which
-    reports the root it refuses. Once it has refused the same tree's root
-    three times, ten minutes or more apart in all, with no scan completing
-    between, the page rebuilds every tree from the start with the archive
-    off for a week, at most once a day (`tree-recovery.js`); a root an RPC
-    hasn't caught up to passes by then. A scan that broke before that check
-    counts for nothing: its store can end inside an on-chain batch, at a
-    root the contract never had. The rebuild clears the transaction list
-    first (rebuilt notes lack the railgunTxids its sync gave them, which
-    proofs need), never begins while the engine syncs either, and the list
-    syncs again after the next scan that completes.
+    reports the root it refuses. Once it has refused the same tree three
+    times, whatever its root (new notes move a tree's root on with the bad
+    leaf still under it), ten minutes or more apart in all, with no scan
+    completing between, the page rebuilds every tree from the start with
+    the archive off for a week, at most once a day from when the last
+    rebuild completed (`tree-recovery.js`); a root an RPC hasn't caught up
+    to passes by then. A scan that broke before that check counts for
+    nothing: its store can end inside an on-chain batch, at a root the
+    contract never had. The rebuild clears the transaction list first
+    (rebuilt notes lack the railgunTxids its sync gave them, which proofs
+    need), never begins while the engine syncs either, and the list syncs
+    again after the next scan that completes. It is kept unfinished from
+    when its clearing begins until it completes, so a page closed during it
+    goes on with it, before its first scan, when it reopens.
   - On anything unexpected the sync goes on from rail-squid where the
     archive left off. A request that fails on the way is sent four more
     times over 15 s (a phone's DNS can drop lookups for seconds), and a txid
-    batch the engine kept nothing of is given three times. Rail-squid's own
-    list failing beside the archive is asked again from where the lists
-    were stored, three rounds in all, before the archive is left: an HTTP/2
-    connection that stops answering fails every try sent on it until the
-    browser gives it up, two minutes on a phone. A sync
+    batch the engine kept nothing of is given three times. Rail-squid's
+    lists failing beside the archive, or the archive out of reach (every
+    try at a request failed or turned away), have the lists and the archive
+    asked again from where they were stored, three rounds in all, 20 and
+    40 s apart, before the archive is left: an HTTP/2 connection that stops
+    answering fails every try sent on it until the browser gives it up, two
+    minutes on a phone, and a phone's network can drop every connection for
+    a minute. The archive's own data failing leaves it at once. A sync
     within four days of the newest block (the most the archive's tip holds;
     from the clock and the block table when the RPC can't say) never asks
     the archive.
