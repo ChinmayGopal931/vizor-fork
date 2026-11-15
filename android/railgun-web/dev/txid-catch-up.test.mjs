@@ -52,6 +52,23 @@ test('it stops after its passes, and fails if they ran out short of the validate
   );
 });
 
+test("passes that run out with the validated index unread fail the catch-up: it can't say it caught up", async () => {
+  // Each sync adds txids to the last pass, and the screening node is down for the final look.
+  const txids = tree({ at: 1_000, adds: Array(3).fill(1_000) });
+  await assert.rejects(
+    catchUpTxids({
+      ...txids,
+      before: 0,
+      passes: 3,
+      target: async () => {
+        throw new Error('the screening node is offline');
+      },
+    }),
+    /the validated txid index can't be read: the screening node is offline/,
+  );
+  assert.equal(txids.log.length, 3);
+});
+
 test('a sync that adds nothing short of the validated index is tried again, and the catch-up goes on', async () => {
   // A dropped connection failed the sync after 40,000: the next attempts reach the screening nodes again.
   const txids = tree({ at: 40_000, adds: [0, 5_000, 5_000, 0] });

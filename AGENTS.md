@@ -1861,8 +1861,9 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
     show it has come. Positions are read as the engine places notes, by
     global tree position (tree × 65,536 + index): rail-squid and the archive
     both number the first leaf of mainnet's tree 1 as tree 0's leaf 65,536,
-    and records keep that number. Transactions must run on by sequence,
-    each verification hash continuing the chain.
+    and records keep that number. Transactions come in sequence, each
+    verification hash continuing the chain: the chain, not the sequence,
+    shows none is missing, so a sequence that skips a number is kept.
   - Times come from the shipped block table, never the archive. Records
     carry no archive railgunTxid; a transaction's leaf is hashed from the
     archive's, which the screening node's root check then vouches for. That

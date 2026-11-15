@@ -7,7 +7,7 @@
  * validated, or when they have validated none. Short of it, or when it can't be read, the sync failed (the engine drops
  * a batch whose root check could not reach the screening node, and says nothing, and the read goes the same way), so it
  * is tried again after `retryWait(attempt)`, up to `retries` times, and then the catch-up fails. So does one whose
- * passes run out short of the target.
+ * passes run out short of the target, or with it unread.
  */
 export async function catchUpTxids({ before, latest, sync, isScanning, wait, passes, target, retries = 0, retryWait }) {
   const settled = async () => {
@@ -19,6 +19,7 @@ export async function catchUpTxids({ before, latest, sync, isScanning, wait, pas
       (index) => ({ index }),
       (error) => ({ error }),
     );
+  const unread = (error) => new Error(`the validated txid index can't be read: ${error?.message ?? error}`);
   let now = await settled();
   let stalled = 0;
   for (let pass = 0; pass < passes; pass += 1) {
@@ -26,13 +27,8 @@ export async function catchUpTxids({ before, latest, sync, isScanning, wait, pas
       const { index, error } = await goal();
       if (error === undefined && (index === undefined || !(now < index))) return;
       stalled += 1;
-      if (stalled > retries) {
-        throw new Error(
-          error === undefined
-            ? `the txid list stopped at ${now} of ${index}`
-            : `the validated txid index can't be read: ${error?.message ?? error}`,
-        );
-      }
+      if (stalled > retries)
+        throw error === undefined ? new Error(`the txid list stopped at ${now} of ${index}`) : unread(error);
       await retryWait(stalled);
     } else {
       stalled = 0;
@@ -41,7 +37,8 @@ export async function catchUpTxids({ before, latest, sync, isScanning, wait, pas
     await sync();
     now = await settled();
   }
-  const { index } = await goal();
+  const { index, error } = await goal();
+  if (error !== undefined) throw unread(error);
   if (index !== undefined && now < index)
     throw new Error(`the txid list stopped at ${now} of ${index} after ${passes} syncs`);
 }

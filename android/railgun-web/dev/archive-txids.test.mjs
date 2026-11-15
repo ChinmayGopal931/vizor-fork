@@ -150,20 +150,35 @@ test('when the archive runs out partway through a batch, rail-squid fills the re
   assert.equal(sequenceOf(third[10].graphID), undefined, "rail-squid's own ids from there");
 });
 
-test("a gap in the archive's sequence keeps what came before it, and rail-squid gives the rest", async () => {
+test(
+  'a transaction missing from the archive breaks the verification hashes: what came before stays, and rail-squid ' +
+    'gives the rest',
+  async () => {
+    const { archived, listed } = transactions(60);
+    const sync = txidSync({ archived: archived.filter(({ sequence }) => sequence !== 31), listed });
+    await sync.next();
+    const second = await sync.next();
+    await sync.next();
+    assert.match(sync.left[0], /transaction 32 breaks the verification hashes/);
+    // 25 to 30 from the archive, mid-block, then rail-squid from 31.
+    assert.deepEqual(
+      second.slice(0, 6).map(({ graphID }) => sequenceOf(graphID)),
+      [25, 26, 27, 28, 29, 30],
+    );
+    assert.equal(sequenceOf(second[6].graphID), undefined);
+    assert.deepEqual(verifications(sync.kept), verifications(listed));
+  },
+);
+
+test("a gap in the archive's sequence alone, every transaction there and the chain whole, stays on the archive", async () => {
   const { archived, listed } = transactions(60);
-  const sync = txidSync({ archived: archived.filter(({ sequence }) => sequence !== 31), listed });
+  const skipping = archived.map((tx) => (tx.sequence >= 31 ? { ...tx, sequence: tx.sequence + 1 } : tx));
+  const sync = txidSync({ archived: skipping, listed });
   await sync.next();
-  const second = await sync.next();
   await sync.next();
-  assert.match(sync.left[0], /follows/);
-  // 25 to 30 from the archive, mid-block, then rail-squid from 31.
-  assert.deepEqual(
-    second.slice(0, 6).map(({ graphID }) => sequenceOf(graphID)),
-    [25, 26, 27, 28, 29, 30],
-  );
-  assert.equal(sequenceOf(second[6].graphID), undefined);
-  assert.deepEqual(verifications(sync.kept), verifications(listed));
+  assert.deepEqual(sync.left, []);
+  assert.deepEqual(sync.asked, [], 'rail-squid not asked while the archive has more');
+  assert.deepEqual(verifications(sync.kept), verifications(listed.slice(0, 50)));
 });
 
 test("rail-squid not yet at the archive's last transaction answers nothing, rather than fail the sync", async () => {

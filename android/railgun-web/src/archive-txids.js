@@ -59,9 +59,9 @@ export function withHash(railgunTransaction, own) {
  * `log` hears why the archive was left. Without a `reader`, or while `useArchive()` says no, a list an archive sync
  * left goes on from rail-squid.
  *
- * - The archive gives transactions by sequence, which must run on from the last one stored without a gap, each
- *   verification hash continuing the chain as the engine checks it; the engine reads on only after a full batch, so
- *   one the archive ends partway through is filled from rail-squid.
+ * - The archive gives transactions in sequence, each verification hash continuing the chain from the last one stored
+ *   as the engine checks it. The chain, not the sequence, shows that none is missing: the archive's sequence may skip.
+ *   The engine reads on only after a full batch, so one the archive ends partway through is filled from rail-squid.
  * - The engine refuses a batch without saying so. Asked again from where it was asked last, having kept nothing of
  *   the archive's batch, this gives the batch again, `ARCHIVE_TRIES` times in all; asked from before, the engine having
  *   rolled back on a verification hash the archive's transactions broke, it leaves the archive at once.
@@ -128,8 +128,6 @@ export function installArchiveTxids(
         }
         const next = walk.left[0];
         if (next.sequence > walk.last) {
-          if (next.sequence !== walk.last + 1)
-            throw new Error(`the archive's transaction ${next.sequence} follows ${walk.last}`);
           // Read before the walk moves on: a record that can't be read leaves it where it was.
           const read = transaction(next, (block) => time(block, newest));
           if (
