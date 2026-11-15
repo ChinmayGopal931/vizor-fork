@@ -2872,7 +2872,13 @@ M8 status (2026-10-14): the non-device parts are done.
   a 10-minute backstop, not a 30 s cadence while funds arrive. A refresh
   that went through, the user's too, counts the newest head read when it
   began; one that failed counts none. The conversion screen's own refresh at
-  a payout's time is gone.
+  a payout's time is gone. Device runs, cold, the OnePlus 15 on Wi-Fi with
+  the archive on, as #19's last: its account at the first balance in 7.3 min
+  and the whole sync in 13.5 (10.7 and 20.1 at #19), notes found in 1.8 min
+  rather than about 4 and the txid list in 6.2 rather than about 9.4; a
+  newly created account at 6.0 and 12.4, its notes found in seconds. Both
+  stores identical to `main`'s but for record times and the same five newer
+  unshields. The Nord was not run.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
