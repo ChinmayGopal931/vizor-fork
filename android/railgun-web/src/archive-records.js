@@ -1,6 +1,8 @@
 // Anon's archive records as the SDK's rail-squid formatters make them (quick-sync/V2 and railgun-txids), key order
-// included, so the engine stores the same bytes whichever source fed it. Two things never come from the archive:
-// - Times. The archive's are wrong in long stretches, so each record is dated from its block (`time`).
+// included, so the engine stores the same bytes whichever source fed it but for times. Two things never come from the
+// archive:
+// - Times. The archive's are wrong in long stretches, so each record is dated from its block by the block table
+//   (`time`), within a minute or so of rail-squid's.
 // - A commitment's railgunTxid, which rail-squid leaves to the txid sync as well: the wallet keeps the value a note had
 //   when it was decrypted, before the archive's could be checked.
 import {

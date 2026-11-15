@@ -1871,8 +1871,9 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
     archive left off. A request that fails on the way is sent four more
     times over 15 s (a phone's DNS can drop lookups for seconds), and a txid
     batch the engine kept nothing of is given three times. A sync
-    within a day of the newest block (from the clock and the block table
-    when the RPC can't say) never asks the archive.
+    within four days of the newest block (the most the archive's tip holds;
+    from the clock and the block table when the RPC can't say) never asks
+    the archive.
   - Android's host fetches the archive for the page through the page's
     bridge (`RailgunArchiveFetch`: 16 MB and a minute an answer at most, a
     fixed User-Agent); iOS starts the page without it. Every archive request

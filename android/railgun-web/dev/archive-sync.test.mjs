@@ -206,7 +206,26 @@ test('a quick sync killed partway through the archive resumes from its newest st
   assert.deepEqual(stored, await storedBySquid());
 });
 
-test('a sync within a day of the newest block never asks the archive', async () => {
+test('a store that ends inside a batch goes on from the archive, which gives that batch whole', async () => {
+  // As a rail-squid page, or a write cut off with the connection, leaves a store: one leaf into a batch of several.
+  const list = fixture.squid.commitments;
+  const first = list.findIndex((c, i) => c.treePosition === c.batchStartTreePosition && list[i + 1]?.batchStartTreePosition === c.batchStartTreePosition);
+  const block = Number(list[first].blockNumber);
+  const upTo = (rows) => rows.filter(({ blockNumber }) => Number(blockNumber) <= block);
+  const store = memoryDatabase();
+  const earlier = await engineHarness({ store });
+  await earlier.engine.unshieldListener(V2, CHAIN, formatUnshields(upTo(fixture.squid.unshields)));
+  await earlier.engine.nullifierListener(V2, CHAIN, formatNullifiers(upTo(fixture.squid.nullifiers)));
+  await earlier.engine.commitmentListener(V2, CHAIN, formatCommitments(list.slice(0, first + 1)), false, false);
+  await earlier.merkletree.updateTreesFromWriteQueue(true);
+
+  const resumed = await engineHarness({ store });
+  const { stored, left } = await storedByArchive(archiveServer(fixture, { sealedAt }), { store, startingBlock: block, harness: resumed });
+  assert.deepEqual(left, []);
+  assert.deepEqual(stored, await storedBySquid());
+});
+
+test("a sync within the archive tip's reach of the newest block never asks the archive", async () => {
   const server = archiveServer(fixture, { sealedAt });
   const head = { blockNumber: fixture.to + 100, timestamp: blockTime(fixture.to + 100) };
   const { stored } = await storedByArchive(server, { head });

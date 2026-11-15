@@ -56,7 +56,16 @@ function transactions(count) {
  * keeps what `keep` lets through of each batch. Answers `next()`, the batch for the engine's next ask, what was kept,
  * what rail-squid was asked, and why the archive was left.
  */
-function txidSync({ archived, listed, sealedAt = [FROM + 10, FROM + 20], batch = 25, head = FAR, kept = [], reading = true }) {
+function txidSync({
+  archived,
+  listed,
+  sealedAt = [FROM + 10, FROM + 20],
+  batch = 25,
+  head = FAR,
+  kept = [],
+  reading = true,
+  mine = new Set(),
+}) {
   const lastBlock = Math.max(...listed.map(({ blockNumber }) => blockNumber), ...archived.map(({ blockNumber }) => blockNumber));
   const server = archiveServer(
     { from: FROM, to: lastBlock, archive: { commitments: [], nullifiers: [], unshields: [] } },
@@ -81,6 +90,7 @@ function txidSync({ archived, listed, sealedAt = [FROM + 10, FROM + 20], batch =
     setBatchSize: (size) => batches.push(size),
     time: (block) => blockTime(block),
     head: async () => head,
+    ownNullifiers: async () => mine,
     log: (line) => left.push(line),
   });
   return {
@@ -203,6 +213,26 @@ test("a record that breaks the verification hashes is never handed to the engine
   assert.deepEqual(verifications(sync.kept), verifications(listed.slice(0, 50)));
 });
 
+test("the wallet's own transaction from the archive must hash to its railgunTxid, else rail-squid gives it", async () => {
+  // The archive got transaction 33's commitments wrong but kept its railgunTxid, which the root check binds: only its
+  // fields, which the wallet's proofs for its own send rebuild the railgunTxid from, are off.
+  const { archived, listed } = transactions(60);
+  archived[33] = { ...archived[33], commitments: [`0x${word('not its output', 31).padStart(64, '0')}`] };
+  const spent = archived[33].nullifiers[0].slice(2);
+
+  const theirs = txidSync({ archived, listed });
+  await theirs.next();
+  await theirs.next();
+  assert.deepEqual(theirs.left, [], "another wallet's transaction is the root check's to judge");
+
+  const ours = txidSync({ archived, listed, mine: new Set([spent]) });
+  await ours.next();
+  const second = await ours.next();
+  assert.match(ours.left[0], /doesn't hash to its railgunTxid/);
+  assert.deepEqual(second.slice(0, 8).map(({ graphID }) => sequenceOf(graphID)), [25, 26, 27, 28, 29, 30, 31, 32]);
+  assert.deepEqual(verifications(ours.kept), verifications(listed.slice(0, 50)));
+});
+
 test("the engine's txid batch is the archive's for a batch from it, and rail-squid's otherwise", async () => {
   const { archived, listed } = transactions(60);
   const sync = txidSync({ archived: archived.slice(0, 40), listed });
@@ -242,7 +272,7 @@ test("a list rail-squid gave goes on from rail-squid", async () => {
   assert.deepEqual(sync.server.asked, []);
 });
 
-test('a list within a day of the newest block goes on from rail-squid', async () => {
+test("a list within the archive tip's reach of the newest block goes on from rail-squid", async () => {
   const { archived, listed } = transactions(30);
   const head = { blockNumber: FROM + 100, timestamp: blockTime(FROM + 100) };
   const sync = txidSync({ archived, listed, head, kept: [transaction(archived[4], blockTime)] });

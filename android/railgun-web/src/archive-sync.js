@@ -15,10 +15,11 @@ import { formatNullifiers, formatUnshields, quickSyncProgress, squidLists, squid
 export const ARCHIVES = { mainnet: { base: 'https://digest.anon.inc/v4/1', chainId: 1 } };
 
 /**
- * About a day of blocks, which the archive's tip holds. A sync that starts closer to the newest block than this has only
- * the tip to read, which rail-squid serves for a fraction of the bytes, so it never asks the archive.
+ * About four days of blocks, the most the archive's tip has held: it holds what came after the newest sealed chunk, and
+ * sealed chunks span 7,000 to 27,000 blocks. A sync that starts closer to the newest block than this has only the tip
+ * to read, which rail-squid serves for a fraction of the bytes, so it never asks the archive.
  */
-export const ARCHIVE_MIN_BLOCKS = 7_200;
+export const ARCHIVE_MIN_BLOCKS = 28_800;
 
 /** Whether a sync from `block` is far enough behind `head` (the newest block number) to read the archive. */
 export const farBehind = (block, head) => head - block > ARCHIVE_MIN_BLOCKS;
@@ -33,8 +34,9 @@ const placement = (tree, index) => Merkletree.getTreeAndIndexFromGlobalPosition(
  * The archive's commitment batches from `since` on, as `storeEvents` takes them (`{events, through}`, a chunk at a
  * time). Their notes must start at `next`, the tree and position the next leaf takes, and run on without a gap where
  * the engine places them: a batch starts where the last one ended, or at the start of the next tree, and its notes
- * follow its start within one tree. Rail-squid and the archive both number the first leaf of mainnet's tree 1 as tree
- * 0's leaf 65,536.
+ * follow its start within one tree. A batch the store ends inside goes on from it too: a cut-off write or a rail-squid
+ * page can end a store partway through a batch, and the engine queues only the leaves it doesn't have. Rail-squid and
+ * the archive both number the first leaf of mainnet's tree 1 as tree 0's leaf 65,536.
  */
 export async function* archiveCommitments(reader, since, next, { time, chainId }) {
   let { tree, position } = next;
@@ -42,9 +44,10 @@ export async function* archiveCommitments(reader, since, next, { time, chainId }
     const events = [];
     for (const batch of commitmentBatches(chunk.commitments, { since, time, chainId })) {
       const start = placement(batch.treeNumber, batch.startPosition);
-      // The starting block's batches the store already has.
-      if (start.tree < tree || (start.tree === tree && start.index < position)) continue;
-      const follows = start.tree === tree ? start.index === position : start.tree === tree + 1 && start.index === 0;
+      const end = start.index + batch.commitments.length;
+      // The starting block's batches the store already has whole.
+      if (start.tree < tree || (start.tree === tree && end <= position)) continue;
+      const follows = start.tree === tree ? start.index <= position : start.tree === tree + 1 && start.index === 0;
       if (!follows) {
         throw new ArchiveUnavailable(`the archive's commitments skip from ${tree}:${position} to ${start.tree}:${start.index}`);
       }
@@ -60,7 +63,7 @@ export async function* archiveCommitments(reader, since, next, { time, chainId }
       });
       events.push(batch);
       tree = start.tree;
-      position = start.index + batch.commitments.length;
+      position = end;
     }
     yield { events, through: chunk.endBlock };
   }

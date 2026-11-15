@@ -1,4 +1,4 @@
-import { RailgunWallet, setEngineTxidSyncBatchSize } from '@railgun-community/engine';
+import { ByteLength, ByteUtils, RailgunWallet, setEngineTxidSyncBatchSize } from '@railgun-community/engine';
 import {
   MerkletreeScanStatus,
   NETWORK_CONFIG,
@@ -109,6 +109,13 @@ export function session() {
   return { network, fees, ...wallet };
 }
 
+/** The nullifiers of the open wallet's notes, which only its own transactions spend; none while no wallet is open. */
+async function ownNullifiers() {
+  if (wallet === undefined) return new Set();
+  const notes = await walletForID(wallet.walletId).TXOs(TXID_VERSION, chain());
+  return new Set(notes.map(({ nullifier }) => ByteUtils.formatToByteLength(nullifier, ByteLength.UINT_256, false).toLowerCase()));
+}
+
 /** Whether the engine was started for debugging, which answers the debug-only calls too. */
 export const isDebug = () => debug;
 
@@ -168,6 +175,7 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
     setBatchSize: setEngineTxidSyncBatchSize,
     time: mainnetBlockTime,
     head,
+    ownNullifiers,
     log,
   });
   setOnUTXOMerkletreeScanCallback(({ scanStatus, progress: reported }) => {

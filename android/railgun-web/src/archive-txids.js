@@ -2,13 +2,17 @@
 // as it does rail-squid's: each one's verification hash continues the chain, and each batch's root must be one the
 // screening node validated. It also hashes each leaf from the archive's railgunTxid (`withHash`) rather than working
 // that out, which was most of the list's Poseidon: a wrong railgunTxid changes the batch's root, which the node then
-// refuses, and the records the sync gives railgunTxids are written only once it accepts one (txid-updates.js). Where
-// the archive can't go on, the list goes on from rail-squid after the last transaction the archive gave.
+// refuses, and the records the sync gives railgunTxids are written only once it accepts one (txid-updates.js). The
+// root binds only the railgunTxid, not the nullifiers, commitments and bound params it is worked out from, which the
+// wallet's proofs for its own sends rebuild it from: a transaction spending one of the open wallet's notes is worked
+// out after all, and one that doesn't match leaves the archive. Where the archive can't go on, the list goes on from
+// rail-squid after the last transaction the archive gave.
 import {
   ByteLength,
   ByteUtils,
   calculateRailgunTransactionVerificationHash,
   getGlobalTreePosition,
+  getRailgunTransactionID,
   getRailgunTxidLeafHash,
 } from '@railgun-community/engine';
 import { ENGINE_V2_START_BLOCK_NUMBERS_EVM } from '../node_modules/@railgun-community/engine/dist/utils/constants.js';
@@ -23,6 +27,9 @@ const HEAD_MAX_AGE_MS = 10 * 60_000;
 // check fails with the connection, which may be back by the next sync.
 export const ARCHIVE_TRIES = 3;
 
+const preV2Unshield = (railgunTransaction) => railgunTransaction.unshield && railgunTransaction.blockNumber < v2StartBlock;
+const unprefixed = (hex) => ByteUtils.formatToByteLength(hex, ByteLength.UINT_256, false).toLowerCase();
+
 /**
  * The engine's `createRailgunTransactionWithHash(transaction)` (`own`), for the transactions the archive gave: their
  * leaf hashed from the archive's railgunTxid. The build (engine-hooks-plugin.mjs) has the engine's txid sync call it.
@@ -30,9 +37,7 @@ export const ARCHIVE_TRIES = 3;
  */
 export function withHash(railgunTransaction, own) {
   const archived = railgunTransaction[ARCHIVE_RAILGUN_TXID];
-  if (archived === undefined || (railgunTransaction.unshield && railgunTransaction.blockNumber < v2StartBlock)) {
-    return own(railgunTransaction);
-  }
+  if (archived === undefined || preV2Unshield(railgunTransaction)) return own(railgunTransaction);
   const railgunTxid = BigInt(`0x${archived}`);
   const { utxoTreeIn, utxoTreeOut, utxoBatchStartPositionOut } = railgunTransaction;
   return {
@@ -45,8 +50,9 @@ export function withHash(railgunTransaction, own) {
 /**
  * Has `engine`'s txid sync read the archive (`reader`) before rail-squid (the engine's own source), and set the
  * engine's txid batch (`setBatchSize`) to `batchSizes.archive` for a batch of the archive's and `batchSizes.squid` for
- * one of rail-squid's. `time` dates records (`time(blockNumber, head)`), `head()` is the chain's newest block, and
- * `log` hears why the archive was left. Without a `reader`, a list an archive sync left goes on from rail-squid.
+ * one of rail-squid's. `time` dates records (`time(blockNumber, head)`), `head()` is the chain's newest block,
+ * `ownNullifiers()` the open wallet's notes' nullifiers (unprefixed hex), and `log` hears why the archive was left.
+ * Without a `reader`, a list an archive sync left goes on from rail-squid.
  *
  * - The archive gives transactions by sequence, which must run on from the last one stored without a gap, each
  *   verification hash continuing the chain as the engine checks it; the engine reads on only after a full batch, so
@@ -57,7 +63,17 @@ export function withHash(railgunTransaction, own) {
  */
 export function installArchiveTxids(
   engine,
-  { reader, txidVersion, chain, batchSizes, setBatchSize, time, head = async () => undefined, log = () => {} },
+  {
+    reader,
+    txidVersion,
+    chain,
+    batchSizes,
+    setBatchSize,
+    time,
+    head = async () => undefined,
+    ownNullifiers = async () => new Set(),
+    log = () => {},
+  },
 ) {
   const own = engine.quickSyncRailgunTransactionsV2;
   v2StartBlock = ENGINE_V2_START_BLOCK_NUMBERS_EVM[chain.id] ?? 0;
@@ -87,9 +103,9 @@ export function installArchiveTxids(
 
   /**
    * Up to `count` archive transactions after `cursor` (the stored transaction `kept`), and the error the walk stopped
-   * on, if it did.
+   * on, if it did. Those spending one of `mine` (the open wallet's nullifiers) must hash to their railgunTxid.
    */
-  async function transactionsAfter(cursor, kept, count) {
+  async function transactionsAfter(cursor, kept, count, mine) {
     if (walk === undefined || walk.cursor !== cursor) {
       reset();
       const from = cursor === undefined ? 0 : blockOf(cursor);
@@ -112,6 +128,14 @@ export function installArchiveTxids(
           const read = transaction(next, (block) => time(block, newest));
           if (calculateRailgunTransactionVerificationHash(walk.verificationHash, read.nullifiers[0]) !== read.verificationHash) {
             throw new Error(`the archive's transaction ${next.sequence} breaks the verification hashes`);
+          }
+          if (
+            read[ARCHIVE_RAILGUN_TXID] !== undefined &&
+            !preV2Unshield(read) &&
+            read.nullifiers.some((nullifier) => mine.has(unprefixed(nullifier))) &&
+            getRailgunTransactionID(read) !== BigInt(`0x${read[ARCHIVE_RAILGUN_TXID]}`)
+          ) {
+            throw new Error("an archive transaction doesn't hash to its railgunTxid");
           }
           out.push(read);
           walk.last = next.sequence;
@@ -175,7 +199,8 @@ export function installArchiveTxids(
       return fromSquid(txChain, kept);
     }
     const size = batchSizes.archive;
-    const read = await transactionsAfter(latestGraphID, kept, size);
+    const mine = await ownNullifiers().catch(() => new Set());
+    const read = await transactionsAfter(latestGraphID, kept, size, mine);
     if (read.error !== undefined) leave(read.error?.message ?? String(read.error));
     if (read.out.length > 0) handed = sequenceAfter(latestGraphID);
     if (read.out.length === size) {
