@@ -7,7 +7,7 @@
 // after the archive's last good one; what the archive gave stays stored.
 import { TXIDVersion } from '@railgun-community/shared-models';
 import { ArchiveUnavailable, archiveRange } from './archive.js';
-import { commitmentBatches } from './archive-records.js';
+import { TREE_LEAVES, commitmentBatches } from './archive-records.js';
 import { formatNullifiers, formatUnshields, quickSyncProgress, squidLists, squidPages, storeEvents } from './quick-sync.js';
 
 /** The archives the page reads, by network: only Ethereum's is kept up. */
@@ -25,7 +25,7 @@ export const farBehind = (block, head) => head - block > ARCHIVE_MIN_BLOCKS;
 /**
  * The archive's commitment batches from `since` on, as `storeEvents` takes them (`{events, through}`, a chunk at a
  * time). They must start at `next`, the tree and position the next leaf takes, and run on without a gap: a batch
- * starts where the last one ended, or at the start of the next tree.
+ * starts where the last one ended, or at the start of the next tree, and ends within its tree.
  */
 export async function* archiveCommitments(reader, since, next, { time, chainId }) {
   let { tree, position } = next;
@@ -38,6 +38,9 @@ export async function* archiveCommitments(reader, since, next, { time, chainId }
         batch.treeNumber === tree ? batch.startPosition === position : batch.treeNumber === tree + 1 && batch.startPosition === 0;
       if (!follows) {
         throw new ArchiveUnavailable(`the archive's commitments skip from ${tree}:${position} to ${batch.treeNumber}:${batch.startPosition}`);
+      }
+      if (batch.startPosition + batch.commitments.length > TREE_LEAVES) {
+        throw new ArchiveUnavailable(`the archive's batch at ${batch.treeNumber}:${batch.startPosition} runs past its tree`);
       }
       events.push(batch);
       tree = batch.treeNumber;
