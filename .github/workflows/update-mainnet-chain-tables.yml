@@ -6,7 +6,8 @@ name: Update mainnet chain tables
 # - tree states every 10,000 blocks, where restored birthdays start scanning
 #   (every third one from NU7);
 # - Ethereum block times every 1,000 blocks, which date the Railgun page's
-#   records from Anon's archive.
+#   records from Anon's archive. The page ships as its built bundle, so the
+#   update rebuilds it; a failure there leaves the Zcash tables to go alone.
 # A person reviews and merges each update, since the tables ship in the binary.
 
 on:
@@ -28,6 +29,12 @@ env:
     rust/src/wallet/block_times/mainnet_data.rs
     rust/src/wallet/tree_states/mainnet_data.rs
     android/railgun-web/src/block-times-mainnet.js
+    android/app/src/main/assets/railgun
+    ios/Runner/Railgun/railgun
+  RAILGUN_FILES: >-
+    android/railgun-web/src/block-times-mainnet.js
+    android/app/src/main/assets/railgun
+    ios/Runner/Railgun/railgun
   GRPCURL_VERSION: 1.9.4
   GRPCURL_SHA256: 97e13d58d2733a0e62cd2571d1d5f0c02823f0d25282f08bddedf1ad9c5d1736
 
@@ -55,23 +62,49 @@ jobs:
           scripts/update-mainnet-tree-states.py --check
           scripts/update-railgun-block-times.py --check
 
-      - name: Append agreed entries
-        id: update
+      - name: Append agreed Zcash entries
+        id: zcash
         run: |
           block_times="$(scripts/update-mainnet-block-times.py)"
           echo "$block_times"
           tree_states="$(scripts/update-mainnet-tree-states.py)"
           echo "$tree_states"
-          railgun_block_times="$(scripts/update-railgun-block-times.py)"
-          echo "$railgun_block_times"
           scripts/update-mainnet-block-times.py --check
           scripts/update-mainnet-tree-states.py --check
-          scripts/update-railgun-block-times.py --check
           {
             echo "block_times=$block_times"
             echo "tree_states=$tree_states"
-            echo "railgun_block_times=$railgun_block_times"
           } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Public RPCs rate-limit: a failure here leaves the Zcash entries to go
+      # on alone, and the Railgun files as they were.
+      - name: Append agreed Railgun entries and rebuild the page
+        id: railgun
+        continue-on-error: true
+        run: |
+          railgun_block_times="$(scripts/update-railgun-block-times.py)"
+          echo "$railgun_block_times"
+          scripts/update-railgun-block-times.py --check
+          if ! git diff --quiet -- android/railgun-web/src/block-times-mainnet.js; then
+            (cd android/railgun-web && npm ci --ignore-scripts && npm run build)
+          fi
+          echo "railgun_block_times=$railgun_block_times" >> "$GITHUB_OUTPUT"
+
+      - name: Put the Railgun files back
+        if: steps.railgun.outcome == 'failure'
+        run: |
+          # shellcheck disable=SC2086 # RAILGUN_FILES is a space-separated list.
+          git checkout -- $RAILGUN_FILES
+          # shellcheck disable=SC2086
+          git clean -fdq -- $RAILGUN_FILES
+
+      - name: See what changed
+        id: update
+        run: |
           # shellcheck disable=SC2086 # DATA_FILES is a space-separated list.
           if git diff --quiet -- $DATA_FILES; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -83,15 +116,15 @@ jobs:
         if: steps.update.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          BLOCK_TIMES: ${{ steps.update.outputs.block_times }}
-          TREE_STATES: ${{ steps.update.outputs.tree_states }}
-          RAILGUN_BLOCK_TIMES: ${{ steps.update.outputs.railgun_block_times }}
+          BLOCK_TIMES: ${{ steps.zcash.outputs.block_times }}
+          TREE_STATES: ${{ steps.zcash.outputs.tree_states }}
+          RAILGUN_BLOCK_TIMES: "${{ steps.railgun.outputs.railgun_block_times || 'not updated this week, see the workflow run' }}"
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -C "$BRANCH"
           # shellcheck disable=SC2086 # DATA_FILES is a space-separated list.
-          git add $DATA_FILES
+          git add -A -- $DATA_FILES
           git commit -m "Update mainnet chain tables" \
             -m "Block times: $BLOCK_TIMES" -m "Tree states: $TREE_STATES" \
             -m "Railgun block times: $RAILGUN_BLOCK_TIMES"
@@ -102,7 +135,7 @@ jobs:
             "$BLOCK_TIMES" \
             "$TREE_STATES" \
             "$RAILGUN_BLOCK_TIMES" \
-            "Each new entry was confirmed by two independent endpoints (lightwalletd for Zcash, Ethereum RPC for Railgun), and the last existing entries were re-verified. Review and merge to ship the entries in the next release.")"
+            "Each new entry was confirmed by two independent endpoints (lightwalletd for Zcash, Ethereum RPC for Railgun), and the last existing entries were re-verified; the Railgun page's bundle is rebuilt with its table. Review and merge to ship the entries in the next release.")"
           existing="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')"
           if [ -n "$existing" ]; then
             gh pr edit "$existing" --body "$body"

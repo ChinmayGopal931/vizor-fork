@@ -1,8 +1,9 @@
 """Shared helpers for the compiled-in mainnet table generators.
 
 The wallet ships tables of mainnet chain data so it can answer questions about
-wallet-derived heights without asking lightwalletd. Each generator appends
-entries fetched from two independent endpoints and requires them to agree.
+wallet-derived heights without asking lightwalletd, and the Railgun page one of
+Ethereum block times. Each generator appends entries fetched from two
+independent endpoints and requires them to agree.
 """
 
 from __future__ import annotations
@@ -82,20 +83,36 @@ def agreed(
         }
         for future in concurrent.futures.as_completed(futures):
             results[futures[future]] = future.result()
-    values = {}
-    for height in heights:
-        first, second = (results[(endpoint, height)] for endpoint in endpoints)
-        if first != second:
+    return require_agreement(
+        endpoints,
+        heights,
+        {height: results[(endpoints[0], height)] for height in heights},
+        {height: results[(endpoints[1], height)] for height in heights},
+        "height",
+    )
+
+
+def require_agreement(
+    endpoints: tuple[str, str],
+    keys: list[int],
+    first: dict[int, T],
+    second: dict[int, T],
+    what: str,
+) -> dict[int, T]:
+    """The value both endpoints gave for each key, which must be identical."""
+    for key in keys:
+        if first[key] != second[key]:
             raise UpdateError(
-                f"endpoints disagree at height {height}: "
-                f"{endpoints[0]}={first} {endpoints[1]}={second}"
+                f"endpoints disagree at {what} {key}: "
+                f"{endpoints[0]}={first[key]} {endpoints[1]}={second[key]}"
             )
-        values[height] = first
-    return values
+    return {key: first[key] for key in keys}
 
 
-def endpoints_from_args(values: list[str] | None) -> tuple[str, str]:
-    endpoints = tuple(values or DEFAULT_ENDPOINTS)
+def endpoints_from_args(
+    values: list[str] | None, defaults: tuple[str, str] = DEFAULT_ENDPOINTS
+) -> tuple[str, str]:
+    endpoints = tuple(values or defaults)
     if len(endpoints) != 2 or endpoints[0] == endpoints[1]:
         raise UpdateError("exactly two distinct endpoints are required")
     return endpoints  # type: ignore[return-value]

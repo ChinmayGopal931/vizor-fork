@@ -29,9 +29,9 @@ import sys
 import time
 import urllib.parse
 import urllib.request
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from mainnet_tables import REPO_ROOT, UpdateError, endpoints_from_args, require_agreement
+
 DATA_FILE = REPO_ROOT / "android/railgun-web/src/block-times-mainnet.js"
 
 # Just before Railgun's first mainnet event, at block 14,751,290.
@@ -67,10 +67,6 @@ HEADER = """\
 
 TIMES_PATTERN = re.compile(r"export const TIMES = \[(?P<body>[^\]]*)\];", re.S)
 CONST_PATTERN = re.compile(r"export const (START|STEP) = ([0-9_]+);")
-
-
-class UpdateError(Exception):
-    pass
 
 
 def read_table() -> list[int]:
@@ -178,12 +174,8 @@ def agreed_times(endpoints: tuple[str, str], indices: list[int]) -> dict[int, in
     blocks = [block_at(index) for index in indices]
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(endpoints)) as pool:
         first, second = pool.map(lambda endpoint: block_times(endpoint, blocks), endpoints)
-    for block in blocks:
-        if first[block] != second[block]:
-            raise UpdateError(
-                f"endpoints disagree at block {block}: {endpoints[0]}={first[block]} {endpoints[1]}={second[block]}"
-            )
-    return {index: first[block_at(index)] for index in indices}
+    times = require_agreement(endpoints, blocks, first, second, "block")
+    return {index: times[block_at(index)] for index in indices}
 
 
 def update(endpoints: tuple[str, str]) -> None:
@@ -235,10 +227,7 @@ def main() -> int:
                 raise UpdateError(f"{DATA_FILE} is not in canonical generated form")
             print(f"ok: {len(times)} entries through block {block_at(len(times) - 1)}")
             return 0
-        endpoints = tuple(args.endpoint or DEFAULT_ENDPOINTS)
-        if len(endpoints) != 2 or endpoints[0] == endpoints[1]:
-            raise UpdateError("exactly two distinct endpoints are required")
-        update(endpoints)  # type: ignore[arg-type]
+        update(endpoints_from_args(args.endpoint, DEFAULT_ENDPOINTS))
         return 0
     except UpdateError as error:
         print(f"error: {error}", file=sys.stderr)
