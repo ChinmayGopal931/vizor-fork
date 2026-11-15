@@ -26,6 +26,7 @@ import 'package:zcash_wallet/src/core/widgets/mobile/mobile_surface_card.dart';
 import 'package:zcash_wallet/src/features/onboarding/shared/onboarding_welcome_art.dart';
 import 'package:zcash_wallet/src/features/payment_links/providers/payment_link_cards_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_archive_sync_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_custom_rpc_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_relayer_claims_provider.dart';
@@ -41,7 +42,7 @@ import 'package:zcash_wallet/src/services/biometric_unlock.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 import '../private_usd/support/fake_private_usd_backend.dart'
-    show MemoryRelayerClaimsStore;
+    show MemoryArchiveSyncStore, MemoryRelayerClaimsStore;
 import '../../figma_compare/figma_compare_font_loader.dart';
 
 const _accountState = AccountState(
@@ -172,6 +173,7 @@ Widget _app({
   EnhancePirNotifier Function()? enhancePir,
   bool walletTransparentPrivate = false,
   PrivateUsdRelayerClaimsStore? privateUsdSettings,
+  PrivateUsdArchiveSyncStore? archiveSync,
 }) {
   Widget themedBuilder(BuildContext context, Widget? child) => AppTheme(
     data: themeData ?? AppThemeData.dark,
@@ -234,6 +236,11 @@ Widget _app({
         privateUsdRelayerClaimsStoreProvider.overrideWithValue(
           privateUsdSettings,
         ),
+      ],
+      // Where the page can read Anon's archive: Android, mainnet.
+      if (archiveSync != null) ...[
+        privateUsdArchiveAvailableProvider.overrideWithValue(true),
+        privateUsdArchiveSyncStoreProvider.overrideWithValue(archiveSync),
       ],
       if (biometricNotifier != null)
         biometricUnlockProvider.overrideWith(biometricNotifier)
@@ -1315,6 +1322,50 @@ void main() {
     await tester.tap(row);
     await tester.pumpAndSettle();
     expect(store.stored, isTrue);
+  });
+
+  testWidgets('archive sync sits after relayer claims, on by default, and '
+      'the toggle keeps the choice', (tester) async {
+    await _useTallSurface(tester);
+    final store = MemoryArchiveSyncStore();
+    await tester.pumpWidget(
+      _app(privateUsdSettings: MemoryRelayerClaimsStore(), archiveSync: store),
+    );
+    await tester.pumpAndSettle();
+
+    final rows = tester
+        .widgetList<MobileListRow>(find.byType(MobileListRow))
+        .map((row) => row.label)
+        .toList();
+    expect(
+      rows.indexOf(PrivateUsdCopy.archiveSyncSetting),
+      rows.indexOf(PrivateUsdCopy.relayerClaimsSetting) + 1,
+    );
+    final row = find.byKey(const ValueKey('mobile_settings_archive_sync_row'));
+    final thumb = find.byKey(
+      const ValueKey('mobile_settings_archive_sync_toggle_thumb'),
+    );
+    final track = find.byKey(
+      const ValueKey('mobile_settings_archive_sync_toggle'),
+    );
+    expect(tester.getCenter(thumb).dx, greaterThan(tester.getCenter(track).dx));
+
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    expect(store.stored, isFalse);
+    expect(tester.getCenter(thumb).dx, lessThan(tester.getCenter(track).dx));
+  });
+
+  testWidgets('archive sync shows only where the page can read an archive', (
+    tester,
+  ) async {
+    await _useTallSurface(tester);
+    await tester.pumpWidget(
+      _app(privateUsdSettings: MemoryRelayerClaimsStore()),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(PrivateUsdCopy.relayerClaimsSetting), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.archiveSyncSetting), findsNothing);
   });
 
   testWidgets('relayer claims hide with the Ethereum RPC row', (tester) async {

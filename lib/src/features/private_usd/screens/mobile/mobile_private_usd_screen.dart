@@ -418,6 +418,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                               onRefresh: onRefresh,
                               onUseDefaultRpc: onUseDefaultRpc,
                               onChangeRpc: onChangeRpc,
+                              txidCatchUp: screeningActivity?.txids,
                             ),
                           ),
                           if ((onSend != null && onWithdraw != null) ||
@@ -637,6 +638,7 @@ class _TotalCard extends StatelessWidget {
     required this.onRefresh,
     required this.onUseDefaultRpc,
     required this.onChangeRpc,
+    required this.txidCatchUp,
   });
 
   final PrivateUsdBalanceState state;
@@ -645,6 +647,10 @@ class _TotalCard extends StatelessWidget {
   final VoidCallback onRefresh;
   final VoidCallback? onUseDefaultRpc;
   final VoidCallback? onChangeRpc;
+
+  /// How far the rest of a sync has caught up on Railgun's transaction list
+  /// ([RailgunScreeningEvent.txids]), while it says.
+  final double? txidCatchUp;
 
   @override
   Widget build(BuildContext context) {
@@ -664,12 +670,25 @@ class _TotalCard extends StatelessWidget {
     final onChangeRpc = this.onChangeRpc;
     // The sync's progress is the sync line's: its percentage, and an
     // automatic refresh as the floor flowing. What stays here is what to
-    // expect of a first sync, and how old the balance is.
+    // expect of a first sync, that the rest of a long one runs on, and how
+    // old the balance is.
+    final syncing = balances != null && state.syncing;
+    final txidCatchUp = this.txidCatchUp;
     final status = balances == null
         ? (state.isLoading ? PrivateUsdCopy.firstLoad : null)
+        : syncing
+        ? PrivateUsdCopy.syncingRest(
+            txidCatchUp == null
+                ? null
+                : privateUsdScreeningPercent(txidCatchUp),
+          )
         : updatedAt == null
         ? null
         : PrivateUsdCopy.updated(formatDayMonthTime(updatedAt));
+    // The change from the wallet's own sends waits on that list.
+    final unproved = syncing && balances.unproved > BigInt.zero
+        ? _masked(formatPrivateUsd(balances.unproved), privacyModeEnabled)
+        : null;
     final error = !state.refreshFailed
         ? null
         : balances == null
@@ -719,6 +738,16 @@ class _TotalCard extends StatelessWidget {
                 style: AppTypography.bodySmall.copyWith(
                   color: colors.text.secondary,
                 ),
+              ),
+            ),
+          ],
+          if (unproved != null) ...[
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              PrivateUsdCopy.syncingRestWaits(unproved),
+              key: const ValueKey('mobile_private_usd_syncing_waits'),
+              style: AppTypography.bodySmall.copyWith(
+                color: colors.text.secondary,
               ),
             ),
           ],

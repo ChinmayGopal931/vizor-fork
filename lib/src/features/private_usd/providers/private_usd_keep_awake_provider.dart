@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../rust/api/private_usd.dart' show ApiReversePhase;
 import '../models/private_usd_record_key.dart';
+import 'private_usd_engine_provider.dart';
 import 'private_usd_unfinished_provider.dart';
+import 'railgun_engine_provider.dart';
 
 /// The bridges whose screen may sleep: the user turned "Keep screen on" off
 /// on their progress. Every other bridge keeps the screen on while it needs
@@ -59,12 +61,23 @@ class PrivateUsdFirstSyncsNotifier extends Notifier<Set<PrivateUsdFirstSync>> {
 }
 
 /// Keeps the screen awake while a Railgun first sync runs and the wallet is
-/// unlocked. One can take an hour, and screen-off means background, where
-/// Android may throttle the page and iOS suspends it. Locked, the page
-/// closes and the sync with it.
+/// unlocked: until its balance shows, then while the rest of a sync, Railgun's
+/// transaction list, runs long in the page (`RailgunSync.syncing`), however
+/// many refreshes it takes. One can take an hour, and screen-off means
+/// background, where Android may throttle the page and iOS suspends it.
+/// Locked, the page closes and the sync with it.
 final privateUsdFirstSyncKeepAwakeProvider = Provider<bool>((ref) {
-  if (ref.watch(privateUsdFirstSyncsProvider).isEmpty) return false;
-  return !ref.watch(appSecurityProvider.select((s) => s.requiresUnlock));
+  if (ref.watch(appSecurityProvider.select((s) => s.requiresUnlock))) {
+    return false;
+  }
+  if (ref.watch(privateUsdFirstSyncsProvider).isNotEmpty) return true;
+  // Only where the engine runs, which its sender keeps alive anyway.
+  if (!ref.watch(privateUsdEngineEnabledProvider)) return false;
+  return ref.watch(
+    railgunEngineStateProvider.select(
+      (state) => state.lastSync?.syncing ?? false,
+    ),
+  );
 });
 
 /// Keeps the screen awake while a bridge needs Veylor and the wallet is

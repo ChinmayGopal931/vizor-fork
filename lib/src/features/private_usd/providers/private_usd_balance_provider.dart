@@ -200,6 +200,8 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
             error.code == RailgunHostErrorCode.rpcFailed,
       );
     } finally {
+      // The rest of it keeps the screen on while it runs in the page
+      // ([privateUsdFirstSyncKeepAwakeProvider]).
       firstSync?.end();
     }
   }
@@ -302,19 +304,24 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
     if (balances.total > BigInt.zero) _inUse = true;
     final shielding = sync.shielding;
     final shieldingSince = shielding == null ? null : _newestShield(shielding);
+    // A sync restated, as its rest read the wallet again or its page closed,
+    // scanned nothing: a refresh that failed since still stands.
     state = state.copyWith(
       balances: balances,
-      updatedAt: sync.at,
+      updatedAt: sync.scanned ? sync.at : null,
       address: sync.address,
-      refreshFailed: false,
-      rpcFailed: false,
+      refreshFailed: sync.scanned ? false : null,
+      rpcFailed: sync.scanned ? false : null,
       screeningFailed: sync.screening == RailgunScreening.failed,
       clearFirstSyncPercent: true,
       received: _receipts(sync),
       // A sync that could not read the history keeps the last one's.
       shieldingSince: shieldingSince,
       clearShieldingSince: shielding != null && shieldingSince == null,
+      syncing: sync.syncing,
     );
+    // The balance shows: the rest of a first sync keeps the screen on by
+    // itself ([privateUsdFirstSyncKeepAwakeProvider]).
     _runningFirstSync?.end();
     unawaited(
       ref
@@ -376,7 +383,7 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
     if (!ref.mounted) return;
     final percent = state.balances != null || engine.accountUuid != accountUuid
         ? null
-        : _firstSync.percent(notes: engine.utxoScan, ids: engine.txidScan);
+        : _firstSync.percent(notes: engine.utxoScan);
     if (percent != state.firstSyncPercent) {
       state = percent == null
           ? state.copyWith(clearFirstSyncPercent: true)

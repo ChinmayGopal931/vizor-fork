@@ -46,6 +46,55 @@ void main() {
     }
   });
 
+  test('a refresh says whether the rest of the sync runs on in the page, and '
+      'which rest', () {
+    final long = RailgunRefresh.parse(
+      jsonDecode('{"balances":{},"screening":"ok","syncing":true,"rest":3}'),
+    );
+    expect(long.syncing, isTrue);
+    expect(long.rest, 3);
+    for (final body in [
+      '{"balances":{},"screening":"ok"}',
+      '{"balances":{},"screening":"ok","syncing":"yes","rest":0}',
+      '{"balances":{},"screening":"ok","rest":"3"}',
+    ]) {
+      final refresh = RailgunRefresh.parse(jsonDecode(body));
+      expect(refresh.syncing, isFalse, reason: body);
+      expect(refresh.rest, isNull, reason: body);
+    }
+  });
+
+  test("the end of a sync's rest carries its number and the wallet's state, "
+      'read again', () {
+    final event = RailgunEvent.decode(
+      '{"event":"synced","data":{"rest":2,"balances":{"ProofSubmitted":[{'
+      '"token":"$_token","amount":"7"}]},"received":[],"shielding":[],'
+      '"screening":"failed"}}',
+    );
+
+    expect(event, isA<RailgunSyncedEvent>());
+    final synced = event! as RailgunSyncedEvent;
+    expect(synced.rest, 2);
+    final refresh = synced.refresh!;
+    expect(refresh.screening, RailgunScreening.failed);
+    expect(
+      refresh.balances.byBucket[RailgunBalanceBucket.proofSubmitted]!.single,
+      RailgunTokenAmount(token: _token, amount: BigInt.from(7)),
+    );
+    expect(refresh.syncing, isFalse);
+    // A rest whose state the page could not read, or sent unreadable, still
+    // ended.
+    for (final raw in [
+      '{"event":"synced","data":{"rest":2}}',
+      '{"event":"synced","data":{"rest":2,"balances":{}}}',
+    ]) {
+      final ended = RailgunEvent.decode(raw)! as RailgunSyncedEvent;
+      expect(ended.rest, 2, reason: raw);
+      expect(ended.refresh, isNull, reason: raw);
+    }
+    expect(RailgunEvent.decode('{"event":"synced","data":null}'), isNull);
+  });
+
   test('a refresh carries its balances and how the screening went', () {
     final failed = RailgunRefresh.parse(
       jsonDecode(

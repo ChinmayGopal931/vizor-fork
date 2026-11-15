@@ -125,6 +125,15 @@ abstract final class PrivateUsdCopy {
   static String firstLoadProgress(int percent) =>
       'Loading your shielded balance: $percent%. The first time reads '
       "Railgun's history and can take a while. Keep Veylor open.";
+
+  /// The rest of a long sync, once the balance shows: Railgun's transaction
+  /// list, which the change from the wallet's own sends waits on.
+  static String syncingRest(int? percent) => percent == null
+      ? "Still syncing Railgun's transaction list. Keep Veylor open."
+      : "Still syncing Railgun's transaction list: $percent%. Keep Veylor "
+            'open.';
+  static String syncingRestWaits(String usd) =>
+      '$usd of change from your sends waits on it. The rest can be sent now.';
   static const refreshFailed =
       "Couldn't update the balance. Showing the last known amounts.";
   static const loadFailed = "Couldn't load the balance. Try again in a moment.";
@@ -923,6 +932,9 @@ abstract final class PrivateUsdCopy {
 
   /// Whether a new bridge to shielded USD hands its claim to the relayer.
   static const relayerClaimsSetting = 'Let the relayer claim for me';
+
+  /// Whether the Railgun page reads Railgun's history from Anon's archive.
+  static const archiveSyncSetting = "Sync history from Anon's archive";
 
   // ── Settings: the user's own Ethereum RPC ──────────────────────────────
 

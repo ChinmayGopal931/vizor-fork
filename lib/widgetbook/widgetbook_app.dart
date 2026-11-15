@@ -680,6 +680,10 @@ class WidgetbookApp extends StatelessWidget {
                       builder: buildMobilePrivateUsdFirstLoadUseCase,
                     ),
                     WidgetbookUseCase(
+                      name: 'Syncing the rest',
+                      builder: buildMobilePrivateUsdSyncingRestUseCase,
+                    ),
+                    WidgetbookUseCase(
                       name: 'Refreshing',
                       builder: buildMobilePrivateUsdRefreshingUseCase,
                     ),

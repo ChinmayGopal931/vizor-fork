@@ -104,13 +104,19 @@ async function connect(page, url, onEvent) {
   };
 }
 
-/** Prints events once each; `notesScans` counts the notes scans that started, which report 3% first. */
+/**
+ * Prints events once each; `notesScans` counts the notes scans that started, which report 3% first, and `next(event)`
+ * resolves with the next such event's data.
+ */
 function eventPrinter() {
   let last = '';
+  let waiting = [];
   const print = (event, data) => {
     if (event === 'scan' && data.tree === 'utxo' && data.status === 'Updated' && data.progress <= 0.03) {
       print.notesScans += 1;
     }
+    for (const waiter of waiting.filter(({ name }) => name === event)) waiter.resolve(data);
+    waiting = waiting.filter(({ name }) => name !== event);
     let line;
     if (event === 'scan') line = `scan ${data.tree} ${data.status} ${Math.floor(data.progress * 10) * 10}%`;
     else if (event === 'proof') line = `proof ${Math.floor(data.progress * 10) * 10}% ${data.status}`;
@@ -120,6 +126,7 @@ function eventPrinter() {
     last = line ?? last;
   };
   print.notesScans = 0;
+  print.next = (name) => new Promise((resolve) => waiting.push({ name, resolve }));
   return print;
 }
 
@@ -149,8 +156,14 @@ async function syncCheck(page, url, onEvent) {
     const { address } = await call('openNewWallet', { encryptionKey, mnemonic, creationBlock: fromBlock });
     if (address !== expected) throw new Error(`the browser opened ${address}, Node derives ${expected}`);
     console.log(`  address matches Node's derivation: ${address.slice(0, 16)}…`);
-    const { balances, screening } = await call('refresh', {});
-    console.log(`  balances ${JSON.stringify(balances)}, screening ${screening}`);
+    // The refresh answers once the notes are in; the rest of the sync ends with a `synced` event.
+    const synced = onEvent.next('synced');
+    const { balances, screening, syncing, rest } = await call('refresh', {});
+    console.log(`  balances ${JSON.stringify(balances)}, screening ${screening}, syncing ${syncing}, rest ${rest}`);
+    const finished = await synced;
+    if (finished.rest !== rest) throw new Error(`rest ${finished.rest} ended, not the refresh's ${rest}`);
+    console.log(`  the rest of the sync ended, screening ${finished.screening}`);
+    if (pass === 'first open') await rebuildCheck(call, onEvent, balances);
     // The engine skips a scan while another runs; each sync must still get one of its own.
     const before = onEvent.notesScans;
     await Promise.all([call('refresh', {}), call('refresh', {})]);
@@ -159,6 +172,34 @@ async function syncCheck(page, url, onEvent) {
     console.log('  two syncs at once each started a notes scan');
   }
   await deleteCheck(page, url, onEvent, mnemonic);
+}
+
+/**
+ * Tree recovery's rebuild, run for real over the trees the sync built: it clears the transaction list and rebuilds the
+ * notes trees from the start, and the next refresh gives the same balances, its rest syncing the list again to the
+ * screening nodes' validated index. A rebuild doesn't begin while the engine syncs the list by itself.
+ */
+async function rebuildCheck(call, onEvent, balances) {
+  let rebuild;
+  for (let attempt = 1; attempt <= 3 && !rebuild?.rebuilt; attempt += 1) {
+    if (attempt > 1) await new Promise((resolve) => setTimeout(resolve, 5_000));
+    rebuild = await call('rebuildTrees', {});
+  }
+  if (!rebuild.rebuilt) throw new Error("the trees' rebuild never began");
+  if (rebuild.txids >= 0) throw new Error(`the rebuild left the transaction list at ${rebuild.txids}`);
+  console.log('  the notes trees were rebuilt from the start, the transaction list cleared first');
+  const synced = onEvent.next('synced');
+  const refreshed = await call('refresh', {});
+  if (JSON.stringify(refreshed.balances) !== JSON.stringify(balances)) {
+    throw new Error(
+      `balances ${JSON.stringify(refreshed.balances)} after the rebuild, ${JSON.stringify(balances)} before`,
+    );
+  }
+  await synced;
+  const { stored, validated } = await call('txidIndexes', {});
+  if (validated === null || stored < validated)
+    throw new Error(`the transaction list came back to ${stored} of ${validated}`);
+  console.log(`  the next refresh gave the same balances and synced the list again, to ${stored} of ${validated}`);
 }
 
 /**

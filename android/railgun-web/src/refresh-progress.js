@@ -1,13 +1,12 @@
 import { PUBLISH_MS } from './screening-activity.js';
 
-// Each step's part of the bar, in the order a refresh runs them: reading how far the txid list is behind, the notes
-// scan, the txid catch-up (the notes scan's own txid sync included), the screening nodes' check of the notes, then the
-// balances and the history.
+// Each step's part of the bar, in the order a refresh runs them: before the notes scan starts, the notes scan, the
+// screening nodes' check of the notes, then the balances and the history. The txid catch-up comes after the refresh
+// (sync-finish.js), on the Processing row's line.
 const STEPS = {
   start: [0, 0.05],
-  notes: [0.05, 0.6],
-  txids: [0.6, 0.8],
-  checks: [0.8, 0.95],
+  notes: [0.05, 0.85],
+  checks: [0.85, 0.95],
   finishing: [0.95, 1],
 };
 const ORDER = Object.keys(STEPS);

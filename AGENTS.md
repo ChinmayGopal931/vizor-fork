@@ -421,6 +421,12 @@ header times every 1,000 blocks. The only request left is the chain tip.
 - Bootstrap or refresh before a release cut with
   `scripts/update-mainnet-block-times.py` (needs `grpcurl`); validate offline
   with `--check`. Never edit the data file by hand.
+- The Railgun page ships an Ethereum mainnet table the same way
+  (`android/railgun-web/src/block-times-mainnet.js`, from
+  `scripts/update-railgun-block-times.py`, in the same workflow). It dates
+  the records the page reads from Anon's archive. The page ships as its
+  built bundle, so an update to the table rebuilds it (the workflow does);
+  that step may fail on its own without holding back the Zcash tables.
 
 ## Image Assets
 
@@ -1798,6 +1804,120 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
 - **Route.** Issuer requests go through `routed_http` like every other,
   over Tor when Tor is on; with Tor off the review screens disclose that
   the issuer and the maker see one connection.
+
+**Railgun's sync (the page).**
+
+- A refresh answers once the notes are scanned and checked. Railgun's
+  transaction list and the proofs of the wallet's own sends then finish in
+  the page (`sync-finish.js`), and end with a `synced` event. The refresh's
+  `syncing` says that rest is long (or that its length can't be read), and
+  `rest` numbers it within the page; `synced` carries the number, and Dart
+  matches the two (`RailgunEngine`), never a count. A refresh while a rest
+  runs joins it and sends it round again. The screen shows the balance with
+  a line naming the change that waits, the idle close counts the page's
+  events as use meanwhile, and the screen stays on through a first sync
+  and any long rest after it. A rest's end restates the sync it followed:
+  same time, and a refresh that failed since still stands. A send's own
+  proofs never need that list.
+- Every event the page emits must be in the hosts' lists (Kotlin's
+  `RailgunProtocol.EVENTS`, Swift's beside it), or Dart never hears it; a
+  Kotlin test reads the page's sources for them.
+- The list's catch-up ends at a sync that adds nothing only once it has
+  reached the screening nodes' validated index (`txid-catch-up.js`): the
+  engine drops a batch whose root check failed without saying so, so short
+  of that index, or while it can't be read, the sync is tried again, and
+  then the catch-up fails.
+- The page answers the engine's quick sync (`quick-sync.js`): rail-squid's
+  pages through the SDK's own client and formatters, each stored as it
+  comes, a page's unshields and nullifiers before its commitments (the
+  engine resumes from its newest stored commitment). Rail-squid's lists are
+  whole only up to its newest block when asked: one that ended before a
+  page of commitments was asked for is read on first. A page it didn't
+  answer is asked four more times over 15 s, as an archive request is. The
+  commitments go into the trees 20,000 leaves at a time: the engine asks the
+  contract about every insert's root, one call at a time, and a quick sync
+  ignores the answer (a write can end inside an on-chain batch, at a root
+  the contract never recorded), though a call that fails stops the write.
+  What holds the trees to the chain is the check of every tree's root at
+  the end of each scan: a wrong one fails the scan, never a balance.
+- `engine-hooks-plugin.mjs` holds every rewrite of the engine's code: the
+  unshield watermark (`unshield-events.js`), the archive's leaf hashing
+  (`archive-txids.js`), the txid sync's record updates
+  (`txid-updates.js`), held until the txid tree has a group's root accepted
+  and written in one batch just before the group, through a hook in
+  `Merkletree.insertLeaves`, and, for `tree-recovery.js`, the end-of-scan
+  root check reporting the root it refuses and a full rescan without its
+  txid list reset (the page's rebuild runs the rescan's steps itself; the
+  SDK's rescan still calls it). Each names the exact source of the pinned
+  engine and fails the build against any other: re-check them when
+  bumping it.
+- **Anon's archive** (Android, mainnet, Settings, on by default;
+  `archive*.js`):
+  - It gives commitments and the transaction list only. Unshields and
+    nullifiers come from rail-squid: the archive drops a nullifier spent
+    again in another tree, and a missing unshield stops the txid sync at its
+    transaction for good.
+  - Every file must match its published SHA-256, and the manifest is read
+    again before the tip. Commitments must run on by tree position, each
+    batch within its tree, and are stored only as far as rail-squid's lists
+    show it has come. Positions are read as the engine places notes, by
+    global tree position (tree × 65,536 + index): rail-squid and the archive
+    both number the first leaf of mainnet's tree 1 as tree 0's leaf 65,536,
+    and records keep that number. Transactions come in sequence, each
+    verification hash continuing the chain: the chain, not the sequence,
+    shows none is missing, so a sequence that skips a number is kept.
+  - Times come from the shipped block table, never the archive. Records
+    carry no archive railgunTxid; a transaction's leaf is hashed from the
+    archive's, which the screening node's root check then vouches for. That
+    root binds only the railgunTxid, and a wallet proves its sends from the
+    record's fields: before proving, the page works out the railgunTxid of
+    each send it is to prove, and when one doesn't match it clears the list
+    and syncs all of it again from rail-squid, with the archive off for a
+    week. Never react to a wallet's own transaction during a sync, or go
+    back only as far as it: where the sync left the archive, or what it
+    asked rail-squid for, would show them which transaction is the
+    wallet's.
+  - Never copy a tree's nodes from a file: a root check vouches only for
+    what was hashed. (The archive's prebuilt trees were dropped for this.)
+  - A notes tree whose root the contract has never had (a leaf stored
+    wrong) fails every scan at the engine's end-of-scan root check, which
+    reports the root it refuses. Once it has refused the same tree three
+    times, whatever its root (new notes move a tree's root on with the bad
+    leaf still under it), ten minutes or more apart in all, with no scan
+    completing between, the page rebuilds every tree from the start with
+    the archive off for a week, at most once a day from when the last
+    rebuild completed (`tree-recovery.js`); a root an RPC hasn't caught up
+    to passes by then. A scan that broke before that check counts for
+    nothing: its store can end inside an on-chain batch, at a root the
+    contract never had. The rebuild clears the transaction list first
+    (rebuilt notes lack the railgunTxids its sync gave them, which proofs
+    need), never begins while the engine syncs either or while the rest
+    of a sync runs (which would read and hand on the balances it clears),
+    and the list syncs again after the next scan that completes. It is
+    kept unfinished from when its clearing begins until it ends: a page
+    closed while clearing clears again, before its first scan, when it
+    reopens, and one closed while the trees were built again goes on
+    building them at its next scan, never clearing them again.
+  - On anything unexpected the sync goes on from rail-squid where the
+    archive left off. A request that fails on the way is sent four more
+    times over 15 s (a phone's DNS can drop lookups for seconds), and a txid
+    batch the engine kept nothing of is given three times. Rail-squid's
+    lists failing beside the archive, or the archive out of reach (every
+    try at a request failed or turned away), have the lists and the archive
+    asked again from where they were stored, three rounds in all, 20 and
+    40 s apart, before the archive is left: an HTTP/2 connection that stops
+    answering fails every try sent on it until the browser gives it up, two
+    minutes on a phone, and a phone's network can drop every connection for
+    a minute. The archive's own data failing leaves it at once. A txid
+    batch the archive ends partway through is handed over whole as far as
+    the archive went when rail-squid fails to fill it. A sync
+    within four days of the newest block (the most the archive's tip holds;
+    from the clock and the block table when the RPC can't say) never asks
+    the archive.
+  - Android's host fetches the archive for the page through the page's
+    bridge (`RailgunArchiveFetch`: 16 MB and a minute an answer at most, a
+    fixed User-Agent); iOS starts the page without it. Every archive request
+    depends on the chain's state alone.
 
 **Network: Tor and the Railgun page.**
 

@@ -8,11 +8,14 @@ package com.keplr.vizor.railgun
  * them literal.
  */
 internal object RailgunEndpoints {
+    /** Anon's archive of Railgun's history, which the host fetches for the page ([RailgunArchiveFetch]). */
+    const val ARCHIVE_HOST = "digest.anon.inc"
+
     // Ethereum RPC (keyless publicnode, then the providers a user's own URL may name: Alchemy, Infura, QuickNode,
     // Chainstack, Ankr, dRPC, BlockPI, Tenderly, NodeReal, GetBlock, OnFinality, Pocket Network and MEV Blocker),
-    // the screening node, the SDK's own quick sync and, on Sepolia, our copy of its transaction list with the hash
-    // chain repaired, and where the proving artifacts come from: the SDK's own gateway, then our mirror when the
-    // gateway fails.
+    // the screening node, the SDK's own quick sync, Anon's archive of the same history and, on Sepolia, our copy of
+    // its transaction list with the hash chain repaired, and where the proving artifacts come from: the SDK's own
+    // gateway, then our mirror when the gateway fails.
     val hosts =
         setOf(
             "ethereum-rpc.publicnode.com",
@@ -47,6 +50,7 @@ internal object RailgunEndpoints {
             "rpc.mevblocker.io",
             "ppoi.fdi.network",
             "rail-squid.squids.live",
+            "digest.anon.inc",
             "railgun-sepolia-list.pepeman931.workers.dev",
             "ipfs-lb.com",
             "railgun-artifacts.pepeman931.workers.dev",

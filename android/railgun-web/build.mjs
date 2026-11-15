@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { artifactMirror } from './artifact-mirror-plugin.mjs';
+import { engineHooks } from './engine-hooks-plugin.mjs';
 import { sepoliaList } from './sepolia-list-plugin.mjs';
 
 const require = createRequire(import.meta.url);
@@ -64,8 +65,8 @@ const result = await build({
     stream: 'stream-browserify',
   },
   // The SDK's circuit artifacts come from its own gateway, and from our mirror when that fails; Sepolia's transaction
-  // list comes from our repaired copy.
-  plugins: [browserBuilds, artifactMirror, sepoliaList],
+  // list comes from our repaired copy; parts of the engine's sync run the page's code (engine-hooks-plugin.mjs).
+  plugins: [browserBuilds, artifactMirror, sepoliaList, engineHooks],
   logLevel: 'warning',
 });
 

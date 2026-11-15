@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../payment_links/providers/payment_link_cards_provider.dart';
 import '../../../private_usd/private_usd_copy.dart';
+import '../../../private_usd/providers/private_usd_archive_sync_provider.dart';
 import '../../../private_usd/providers/private_usd_custom_rpc_provider.dart';
 import '../../../private_usd/providers/private_usd_relayer_claims_provider.dart';
 import '../../../private_usd/widgets/mobile/private_usd_rpc_sheet.dart';
@@ -74,6 +75,8 @@ class MobileSettingsScreen extends ConsumerWidget {
     final seedPhraseEnabled = account != null && !account.isHardware;
     final viewingKeyEnabled = account != null;
     final showEthereumRpc = ref.watch(privateUsdRpcSettingVisibleProvider);
+    final showArchiveSync =
+        showEthereumRpc && ref.watch(privateUsdArchiveAvailableProvider);
 
     return SafeArea(
       bottom: false,
@@ -279,6 +282,8 @@ class MobileSettingsScreen extends ConsumerWidget {
                         chevronColor: settingsChevronColor,
                       ),
                       _RelayerClaimsRow(textStyle: settingsRowStyle),
+                      if (showArchiveSync)
+                        _ArchiveSyncRow(textStyle: settingsRowStyle),
                     ],
                     if (!kThemeLockedToDark)
                       MobileListRow(
@@ -855,6 +860,51 @@ class _RelayerClaimsRow extends ConsumerWidget {
   Future<void> _set(BuildContext context, WidgetRef ref, bool enabled) async {
     try {
       await ref.read(privateUsdRelayerClaimsProvider.notifier).set(enabled);
+    } catch (_) {
+      if (context.mounted) {
+        showAppToast(context, PrivateUsdCopy.settingSaveFailed);
+      }
+    }
+  }
+}
+
+/// Private USD's archive sync: whether the Railgun page reads Railgun's
+/// history from Anon's archive before rail-squid.
+class _ArchiveSyncRow extends ConsumerWidget {
+  const _ArchiveSyncRow({required this.textStyle});
+
+  final TextStyle textStyle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(privateUsdArchiveSyncProvider).value ?? true;
+    void toggle() => unawaited(_set(context, ref, !enabled));
+    return Semantics(
+      button: true,
+      toggled: enabled,
+      label: PrivateUsdCopy.archiveSyncSetting,
+      onTap: toggle,
+      excludeSemantics: true,
+      child: MobileListRow(
+        key: const ValueKey('mobile_settings_archive_sync_row'),
+        leading: const _RowIcon(AppIcons.history),
+        label: PrivateUsdCopy.archiveSyncSetting,
+        minRowHeight: _settingsRowHeight,
+        textStyle: textStyle,
+        trailing: MobilePrivacyToggle(
+          key: const ValueKey('mobile_settings_archive_sync_toggle'),
+          enabled: enabled,
+          interactive: true,
+          thumbKey: const ValueKey('mobile_settings_archive_sync_toggle_thumb'),
+        ),
+        onTap: toggle,
+      ),
+    );
+  }
+
+  Future<void> _set(BuildContext context, WidgetRef ref, bool enabled) async {
+    try {
+      await ref.read(privateUsdArchiveSyncProvider.notifier).set(enabled);
     } catch (_) {
       if (context.mounted) {
         showAppToast(context, PrivateUsdCopy.settingSaveFailed);

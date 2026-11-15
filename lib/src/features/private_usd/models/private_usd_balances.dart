@@ -50,11 +50,13 @@ class PrivateUsdAsset {
     BigInt? blocked,
     BigInt? processing,
     BigInt? submitted,
+    BigInt? unproved,
   }) : available = available ?? BigInt.zero,
        arriving = arriving ?? BigInt.zero,
        blocked = blocked ?? BigInt.zero,
        processing = processing ?? BigInt.zero,
-       submitted = submitted ?? BigInt.zero;
+       submitted = submitted ?? BigInt.zero,
+       unproved = unproved ?? BigInt.zero;
 
   final PrivateUsdToken token;
 
@@ -75,6 +77,11 @@ class PrivateUsdAsset {
   /// not yet validated (`ProofSubmitted`).
   final BigInt submitted;
 
+  /// The part of [processing] the wallet has yet to prove
+  /// (`MissingInternalPOI`): change from its own sends, which it proves once
+  /// it has Railgun's transaction list.
+  final BigInt unproved;
+
   BigInt get total => available + arriving + blocked + processing;
 
   PrivateUsdAsset _plus(RailgunBalanceBucket bucket, BigInt amount) =>
@@ -88,7 +95,10 @@ class PrivateUsdAsset {
           processing: processing + amount,
           submitted: submitted + amount,
         ),
-        RailgunBalanceBucket.missingInternalPoi ||
+        RailgunBalanceBucket.missingInternalPoi => _copy(
+          processing: processing + amount,
+          unproved: unproved + amount,
+        ),
         RailgunBalanceBucket.missingExternalPoi => _copy(
           processing: processing + amount,
         ),
@@ -101,6 +111,7 @@ class PrivateUsdAsset {
     BigInt? blocked,
     BigInt? processing,
     BigInt? submitted,
+    BigInt? unproved,
   }) => PrivateUsdAsset(
     token,
     available: available ?? this.available,
@@ -108,6 +119,7 @@ class PrivateUsdAsset {
     blocked: blocked ?? this.blocked,
     processing: processing ?? this.processing,
     submitted: submitted ?? this.submitted,
+    unproved: unproved ?? this.unproved,
   );
 
   @override
@@ -118,11 +130,19 @@ class PrivateUsdAsset {
       other.arriving == arriving &&
       other.blocked == blocked &&
       other.processing == processing &&
-      other.submitted == submitted;
+      other.submitted == submitted &&
+      other.unproved == unproved;
 
   @override
-  int get hashCode =>
-      Object.hash(token, available, arriving, blocked, processing, submitted);
+  int get hashCode => Object.hash(
+    token,
+    available,
+    arriving,
+    blocked,
+    processing,
+    submitted,
+    unproved,
+  );
 }
 
 /// The Railgun balance as private USD. Dollar sums are in micro-dollars
@@ -142,6 +162,7 @@ class PrivateUsdBalances {
   BigInt get blocked => _sum((a) => a.blocked);
   BigInt get processing => _sum((a) => a.processing);
   BigInt get submitted => _sum((a) => a.submitted);
+  BigInt get unproved => _sum((a) => a.unproved);
   BigInt get total => available + arriving + blocked + processing;
 
   /// The headline: what can be spent, plus a send's change still in flight.

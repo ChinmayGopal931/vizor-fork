@@ -2,9 +2,13 @@ package com.keplr.vizor.railgun
 
 import com.keplr.vizor.railgun.RailgunRequests.Route
 import java.io.File
+import java.io.IOException
+import java.io.InputStream
 import java.net.URI
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -72,11 +76,61 @@ class RailgunBoundaryTest {
     }
 
     @Test
+    fun theHostFetchesTheArchiveAndNothingElse() {
+        assertTrue(RailgunEndpoints.ARCHIVE_HOST in RailgunEndpoints.hosts)
+        listOf("https://digest.anon.inc/v4/1/meta.json", "https://digest.anon.inc/v4/1/tip/meta.json?v=0a1b")
+            .forEach { assertTrue(it, archive(it)) }
+        listOf(
+            "http://digest.anon.inc/v4/1/meta.json",
+            "https://digest.anon.inc:8443/v4/1/meta.json",
+            "https://evil.digest.anon.inc/v4/1/meta.json",
+            "https://rail-squid.squids.live/v4/1/meta.json",
+        ).forEach { assertFalse(it, archive(it)) }
+        assertFalse(archive("https://digest.anon.inc/v4/1/meta.json", method = "POST"))
+        // The framework throws on a redirect, or on no status at all: the page is answered a failure instead.
+        listOf(200, 404, 503).forEach { assertTrue("$it", RailgunArchiveFetch.servable(it)) }
+        listOf(-1, 101, 301, 304).forEach { assertFalse("$it", RailgunArchiveFetch.servable(it)) }
+    }
+
+    @Test
+    fun theArchiveAnswerIsReadWholeOnlyWithinItsSizeAndTime() {
+        val clock = { 0L }
+        val body = ByteArray(200_000) { it.toByte() }
+        assertArrayEquals(body, RailgunArchiveFetch.read(body.inputStream(), -1, 60_000, clock))
+        val max = RailgunArchiveFetch.MAX_BYTES
+        // An endless body, and one that says it is too large before it starts.
+        assertThrows(IOException::class.java) { RailgunArchiveFetch.read(endless(), -1, 60_000, clock) }
+        assertThrows(IOException::class.java) {
+            RailgunArchiveFetch.read(ByteArray(1).inputStream(), max + 1L, 60_000, clock)
+        }
+        // A server that trickles: a byte a read, the clock 20 s on each time.
+        var now = 0L
+        val trickle = { now += 20_000; now }
+        assertThrows(IOException::class.java) { RailgunArchiveFetch.read(endless(chunk = 1), -1, 60_000, trickle) }
+    }
+
+    @Test
     fun theBuiltPageIsItsSource() {
         assertEquals(File(SOURCE).readText(), File(ASSET).readText())
     }
 
     private fun route(url: String): Route = URI(url).let { RailgunRequests.route(it.scheme, it.host, it.port) }
+
+    private fun endless(chunk: Int = 64 * 1024): InputStream =
+        object : InputStream() {
+            override fun read(): Int = 0
+
+            override fun read(
+                buffer: ByteArray,
+                offset: Int,
+                length: Int,
+            ): Int = minOf(length, chunk)
+        }
+
+    private fun archive(
+        url: String,
+        method: String = "GET",
+    ): Boolean = URI(url).let { RailgunArchiveFetch.handles(it.scheme, it.host, it.port, method) }
 
     private fun csp(html: String): Map<String, List<String>> =
         Regex("""http-equiv="Content-Security-Policy" content="([^"]*)"""")

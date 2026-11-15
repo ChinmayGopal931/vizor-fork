@@ -7,6 +7,8 @@ import 'package:zcash_wallet/src/core/storage/app_secure_store.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_balance_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_engine_provider.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_keep_awake_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/railgun_engine_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_cache.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
@@ -28,6 +30,7 @@ void main() {
   ProviderContainer containerWith({
     CachedPrivateUsdBalances? cached,
     ApiDeployment? deployment,
+    bool engineRuns = false,
   }) {
     page = _Page();
     final engine = RailgunEngine(
@@ -43,6 +46,7 @@ void main() {
         railgunEngineProvider.overrideWithValue(engine),
         privateUsdBalanceCacheProvider.overrideWithValue(_Cache(cached)),
         privateUsdCurrentDeploymentProvider.overrideWithValue(deployment),
+        if (engineRuns) privateUsdEngineEnabledProvider.overrideWithValue(true),
       ],
     );
     addTearDown(() async {
@@ -240,6 +244,126 @@ void main() {
     );
     expect(since(), isNull);
   });
+
+  test('a long sync shows its balance at once and says its rest runs on, '
+      'until the page says it ended', () async {
+    final container = containerWith(deployment: _sepolia);
+    PrivateUsdBalanceState state() =>
+        container.read(privateUsdBalanceProvider(_account));
+
+    await syncAnswering(
+      container,
+      '{"balances":$_balancesJson,"screening":"ok","syncing":true,"rest":1}',
+    );
+    expect(state().syncing, isTrue);
+    expect(state().balances!.unproved, BigInt.from(5));
+
+    page.pageEvents.add(
+      '{"event":"synced","data":{"rest":1,"balances":{"ProofSubmitted":[{'
+      '"token":"$_dollars","amount":"5"}]},"received":[],"shielding":[],'
+      '"screening":"ok"}}',
+    );
+    await pumpEventQueue();
+    expect(state().syncing, isFalse);
+    expect(state().balances!.unproved, BigInt.zero);
+    expect(state().balances!.submitted, BigInt.from(5));
+  });
+
+  test("a rest's end updates the balance but not a failure since, nor when "
+      'the chain was last read', () async {
+    final container = containerWith(deployment: _sepolia);
+    PrivateUsdBalanceState state() =>
+        container.read(privateUsdBalanceProvider(_account));
+
+    await syncAnswering(
+      container,
+      '{"balances":$_balancesJson,"screening":"ok","syncing":true,"rest":1}',
+    );
+    final updatedAt = state().updatedAt;
+    // A refresh joins the rest and fails on the RPC.
+    clock = clock.add(const Duration(minutes: 5));
+    container.read(privateUsdBalanceProvider(_account).notifier).refresh();
+    await pumpEventQueue();
+    page.refreshing!.completeError(
+      RailgunHostException(RailgunHostErrorCode.rpcFailed),
+    );
+    await pumpEventQueue();
+    expect(state().rpcFailed, isTrue);
+
+    page.pageEvents.add(
+      '{"event":"synced","data":{"rest":1,"balances":{"ProofSubmitted":[{'
+      '"token":"$_dollars","amount":"5"}]},"received":[],"shielding":[],'
+      '"screening":"ok"}}',
+    );
+    await pumpEventQueue();
+    expect(state().balances!.submitted, BigInt.from(5));
+    expect(state().rpcFailed, isTrue);
+    expect(state().refreshFailed, isTrue);
+    expect(state().updatedAt, updatedAt);
+
+    // Nor does the page closing.
+    await container.read(railgunEngineProvider).close();
+    await pumpEventQueue();
+    expect(state().rpcFailed, isTrue);
+  });
+
+  test(
+    'a first sync whose rest runs on keeps the screen on until it ends',
+    () async {
+      final container = containerWith(deployment: _sepolia, engineRuns: true);
+      bool awake() => container.read(privateUsdFirstSyncKeepAwakeProvider);
+
+      await syncAnswering(
+        container,
+        '{"balances":{},"screening":"ok","syncing":true,"rest":1}',
+      );
+      expect(
+        awake(),
+        isTrue,
+        reason: 'Railgun\'s transaction list is still on its way',
+      );
+
+      page.pageEvents.add(
+        '{"event":"synced","data":{"rest":1,"balances":{},"screening":"ok"}}',
+      );
+      await pumpEventQueue();
+      expect(awake(), isFalse);
+    },
+  );
+
+  test(
+    'a first sync whose rest runs on lets the screen sleep once the page '
+    'closes, and keeps it on again for the rest a later refresh starts',
+    () async {
+      final container = containerWith(deployment: _sepolia, engineRuns: true);
+      bool awake() => container.read(privateUsdFirstSyncKeepAwakeProvider);
+
+      await syncAnswering(
+        container,
+        '{"balances":{},"screening":"ok","syncing":true,"rest":1}',
+      );
+      expect(awake(), isTrue);
+      await container.read(railgunEngineProvider).close();
+      await pumpEventQueue();
+      expect(awake(), isFalse);
+
+      // The next refresh, on a new page, goes on with the transaction list.
+      await syncAnswering(
+        container,
+        '{"balances":{},"screening":"ok","syncing":true,"rest":1}',
+      );
+      expect(awake(), isTrue);
+    },
+  );
+
+  test(
+    'a first sync that ends with its refresh lets the screen sleep at once',
+    () async {
+      final container = containerWith(deployment: _sepolia);
+      await syncAnswering(container, '{"balances":{},"screening":"ok"}');
+      expect(container.read(privateUsdFirstSyncsProvider), isEmpty);
+    },
+  );
 
   test('a cached balance shows without it', () async {
     final container = containerWith(

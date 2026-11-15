@@ -107,6 +107,164 @@ void main() {
     await engine.dispose();
   });
 
+  group("the rest of a long sync", () {
+    String synced([int rest = 1]) =>
+        '{"event":"synced","data":{"rest":$rest,"balances":{"ProofSubmitted":'
+        '[{"token":"0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c",'
+        '"amount":"9"}]},"received":[],"shielding":[],"screening":"ok"}}';
+    String long([int rest = 1]) =>
+        '{"balances":{},"screening":"ok","syncing":true,"rest":$rest}';
+
+    test('runs on after the sync answers, and its end replaces the last '
+        'sync', () async {
+      final log = <String>[];
+      final refresh = Completer<String>();
+      final host = _FakeHost(log, pageAddress: _address, refresh: refresh);
+      final engine = _engineWith(host, log);
+
+      final sync = engine.sync('account');
+      await _until(() => log.contains('call refresh'));
+      refresh.complete(long());
+      expect((await sync).syncing, isTrue);
+      expect(engine.state.value.lastSync?.syncing, isTrue);
+
+      host.pageEvents.add(synced());
+      await pumpEventQueue();
+      final last = engine.state.value.lastSync!;
+      expect(last.syncing, isFalse);
+      expect(last.accountUuid, 'account');
+      expect(last.address, _address);
+      expect(
+        last
+            .balances
+            .byBucket[RailgunBalanceBucket.proofSubmitted]!
+            .single
+            .amount,
+        BigInt.from(9),
+      );
+      // Read again from the page's store: no scan of the chain since the sync.
+      expect(last.at, (await sync).at);
+      expect(last.scanned, isFalse);
+      await engine.dispose();
+    });
+
+    test('that ended while a refresh started the next one leaves that one '
+        'running', () async {
+      final log = <String>[];
+      final refresh = Completer<String>();
+      final host = _FakeHost(log, pageAddress: _address, refresh: refresh);
+      final engine = _engineWith(host, log);
+
+      final sync = engine.sync('account');
+      await _until(() => log.contains('call refresh'));
+      // Rest 1 ends while this refresh scans; its own rest is the second.
+      host.pageEvents.add(synced());
+      await pumpEventQueue();
+      refresh.complete(long(2));
+      expect((await sync).syncing, isTrue);
+      host.pageEvents.add(synced(2));
+      await pumpEventQueue();
+      expect(engine.state.value.lastSync?.syncing, isFalse);
+      await engine.dispose();
+    });
+
+    test('that ended while the answer was on its way is over', () async {
+      final log = <String>[];
+      final refresh = Completer<String>();
+      final host = _FakeHost(log, pageAddress: _address, refresh: refresh);
+      final engine = _engineWith(host, log);
+
+      final sync = engine.sync('account');
+      await _until(() => log.contains('call refresh'));
+      host.pageEvents.add(synced());
+      await pumpEventQueue();
+      refresh.complete(long());
+      expect((await sync).syncing, isFalse);
+      await engine.dispose();
+    });
+
+    test('keeps the page open while the page reports it, and the idle close '
+        'takes a page that went quiet', () async {
+      final log = <String>[];
+      final refresh = Completer<String>();
+      final host = _FakeHost(log, pageAddress: _address, refresh: refresh);
+      final engine = _engineWith(
+        host,
+        log,
+        idleClose: const Duration(milliseconds: 300),
+      );
+
+      final sync = engine.sync('account');
+      await _until(() => log.contains('call refresh'));
+      refresh.complete(long());
+      await sync;
+      final closes = log.where((line) => line == 'close').length;
+      for (var i = 0; i < 8; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        host.pageEvents.add(
+          '{"event":"screening","data":{"txids":{"progress":${i / 10}}}}',
+        );
+      }
+      await pumpEventQueue();
+      expect(log.where((line) => line == 'close').length, closes);
+      expect(await host.isOpen(), isTrue);
+
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      expect(await host.isOpen(), isFalse);
+      expect(
+        engine.state.value.lastSync?.syncing,
+        isFalse,
+        reason: 'it ended with the page',
+      );
+      await engine.dispose();
+    });
+
+    test('without one, page events leave the idle close as it was', () async {
+      final log = <String>[];
+      final host = _FakeHost(log, pageAddress: _address);
+      final engine = _engineWith(
+        host,
+        log,
+        idleClose: const Duration(milliseconds: 300),
+      );
+
+      await engine.sync('account');
+      for (var i = 0; i < 6; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        host.pageEvents.add('{"event":"refresh","data":{"progress":0.5}}');
+      }
+      await pumpEventQueue();
+      expect(await host.isOpen(), isFalse);
+      await engine.dispose();
+    });
+
+    test('of a sync that had none leaves a close the same sync', () async {
+      final log = <String>[];
+      final host = _FakeHost(log, pageAddress: _address);
+      final engine = _engineWith(host, log);
+
+      final sync = await engine.sync('account');
+      await engine.close();
+      expect(identical(engine.state.value.lastSync, sync), isTrue);
+      await engine.dispose();
+    });
+
+    test('ends with a close', () async {
+      final log = <String>[];
+      final refresh = Completer<String>();
+      final host = _FakeHost(log, pageAddress: _address, refresh: refresh);
+      final engine = _engineWith(host, log);
+
+      final sync = engine.sync('account');
+      await _until(() => log.contains('call refresh'));
+      refresh.complete(long());
+      await sync;
+      await engine.close();
+      expect(engine.state.value.lastSync?.syncing, isFalse);
+      await engine.dispose();
+    });
+  });
+
   test('a page that opens another wallet is refused and closed', () async {
     final log = <String>[];
     final engine = _engine(log, pageAddress: '0zk1someoneelse');
@@ -435,7 +593,9 @@ RailgunEngine _engineWith(
   _FakeHost host,
   List<String> log, {
   Future<bool> Function(int port)? bridgeAccepts,
+  Duration idleClose = const Duration(minutes: 10),
 }) => RailgunEngine(
+  idleClose: idleClose,
   host: host,
   wallets: _FakeWallets(),
   startBridge: () async {
