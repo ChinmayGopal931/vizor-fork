@@ -113,20 +113,19 @@ export function session() {
   return { network, fees, ...wallet };
 }
 
-/** Rebuilds the notes trees from the start for `walletId` (tree-recovery.js), calling `started()` as it begins. */
-const rebuildFor = (walletId, started) =>
-  rebuildTrees(getEngine(), { txidVersion: TXID_VERSION, chain: chain(), walletIds: [walletId], started });
+/** Rebuilds the notes trees from the start for `walletId` (tree-recovery.js), calling `marks` as it goes. */
+const rebuildFor = (walletId, marks) =>
+  rebuildTrees(getEngine(), { txidVersion: TXID_VERSION, chain: chain(), walletIds: [walletId], ...marks });
 
 /** What the page does after each of `walletId`'s notes scans (tree-recovery.js). */
-const recovery = (walletId) =>
-  treeRecovery({ rebuild: (started) => rebuildFor(walletId, started), store: recoveryStore });
+const recovery = (walletId) => treeRecovery({ rebuild: (marks) => rebuildFor(walletId, marks), store: recoveryStore });
 
 /**
  * Rebuilds the open wallet's notes trees now, as tree recovery does, for dev/check.mjs: whether it began, and the
  * index of the last txid stored after it (-1 for none).
  */
 export async function rebuildTreesNow() {
-  const rebuilt = await rebuildFor(session().walletId, () => {});
+  const rebuilt = await rebuildFor(session().walletId, {});
   return { rebuilt, txids: await latestTxidIndex() };
 }
 

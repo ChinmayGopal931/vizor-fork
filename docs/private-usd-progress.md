@@ -2828,8 +2828,8 @@ M8 status (2026-10-14): the non-device parts are done.
   batch), so the engine's end-of-scan check of every tree's root is what
   holds the trees to the chain; a tree it refuses three times over ten
   minutes, whatever its root, is rebuilt without the archive, the txid
-  list cleared first, and a rebuild a closed page left goes on when it
-  reopens (`tree-recovery.js`). The root binds a txid record's railgunTxid,
+  list cleared first, and a rebuild a closed page left goes on where it
+  stopped when it reopens (`tree-recovery.js`). The root binds a txid record's railgunTxid,
   not its fields: a send whose record doesn't hash to its railgunTxid has
   the whole list synced again from rail-squid before it is proved, never
   from that send, which would show which transaction is the wallet's.

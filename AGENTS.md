@@ -1847,8 +1847,10 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
   and written in one batch just before the group, through a hook in
   `Merkletree.insertLeaves`, and, for `tree-recovery.js`, the end-of-scan
   root check reporting the root it refuses and a full rescan without its
-  txid list reset. Each names the exact source of the pinned engine and
-  fails the build against any other: re-check them when bumping it.
+  txid list reset (the page's rebuild runs the rescan's steps itself; the
+  SDK's rescan still calls it). Each names the exact source of the pinned
+  engine and fails the build against any other: re-check them when
+  bumping it.
 - **Anon's archive** (Android, mainnet, Settings, on by default;
   `archive*.js`):
   - It gives commitments and the transaction list only. Unshields and
@@ -1891,8 +1893,10 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
     (rebuilt notes lack the railgunTxids its sync gave them, which proofs
     need), never begins while the engine syncs either, and the list syncs
     again after the next scan that completes. It is kept unfinished from
-    when its clearing begins until it completes, so a page closed during it
-    goes on with it, before its first scan, when it reopens.
+    when its clearing begins until it ends: a page closed while clearing
+    clears again, before its first scan, when it reopens, and one closed
+    while the trees were built again goes on building them at its next
+    scan, never clearing them again.
   - On anything unexpected the sync goes on from rail-squid where the
     archive left off. A request that fails on the way is sent four more
     times over 15 s (a phone's DNS can drop lookups for seconds), and a txid
@@ -1903,7 +1907,9 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
     40 s apart, before the archive is left: an HTTP/2 connection that stops
     answering fails every try sent on it until the browser gives it up, two
     minutes on a phone, and a phone's network can drop every connection for
-    a minute. The archive's own data failing leaves it at once. A sync
+    a minute. The archive's own data failing leaves it at once. A txid
+    batch the archive ends partway through is handed over whole as far as
+    the archive went when rail-squid fails to fill it. A sync
     within four days of the newest block (the most the archive's tip holds;
     from the clock and the block table when the RPC can't say) never asks
     the archive.

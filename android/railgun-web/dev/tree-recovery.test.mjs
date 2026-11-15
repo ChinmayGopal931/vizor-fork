@@ -32,15 +32,17 @@ function recovery({ busy = () => false } = {}) {
   const store = localStore(`tree-recovery-test-${(stores += 1)}`);
   const rebuilds = [];
   const recovered = treeRecovery({
-    rebuild: async (started) => {
+    rebuild: async ({ started, cleared }) => {
       if (busy()) return false;
       assert.equal(store.read().rebuilding, undefined, 'nothing is kept before the rebuild begins');
       started();
-      assert.equal(store.read().rebuilding, clock, 'kept unfinished as the clearing begins');
+      assert.deepEqual(store.read().rebuilding, { since: clock, cleared: false }, 'kept unfinished as clearing begins');
       assert.ok(
         archiveOff(store, () => clock),
         'the archive is off as the clearing begins',
       );
+      cleared();
+      assert.equal(store.read().rebuilding.cleared, true);
       rebuilds.push(clock);
       return true;
     },
@@ -133,67 +135,15 @@ test('the trees are rebuilt at most once a day', async () => {
   assert.equal(r.rebuilds.length, 2);
 });
 
-test(
-  'a rebuild a closed page left goes on when the page reopens, before anything else, and the day counts from when ' +
-    'it completed',
-  async () => {
-    let clock = 1_000_000;
-    const store = localStore(`tree-recovery-test-${(stores += 1)}`);
-    const closed = treeRecovery({
-      rebuild: async (started) => {
-        started();
-        throw new Error('the page closed while clearing the transaction list');
-      },
-      store,
-      now: () => clock,
-    });
-    for (const minutes of [0, 5]) {
-      clock += minutes * MINUTE;
-      assert.equal(await closed.broke(wrong), false);
-    }
-    clock += 5 * MINUTE;
-    await assert.rejects(closed.broke(wrong), /page closed/);
-    assert.equal(store.read().rebuilding, clock);
-    assert.equal(store.read().rebuiltAt, undefined);
-    assert.ok(
-      archiveOff(store, () => clock),
-      'the reopened page goes on without the archive',
-    );
-
-    // The page reopens an hour later: the rebuild goes on before its first scan, no refusal needed.
-    clock += 60 * MINUTE;
-    const rebuilds = [];
-    const reopened = treeRecovery({
-      rebuild: async (started) => {
-        started();
-        rebuilds.push(clock);
-        return true;
-      },
-      store,
-      now: () => clock,
-    });
-    assert.equal(await reopened.resume(), true);
-    assert.deepEqual(rebuilds, [clock]);
-    assert.equal(store.read().rebuilding, undefined);
-    assert.equal(store.read().rebuiltAt, clock);
-    assert.equal(await reopened.resume(), false);
-    // The day counts from then.
-    for (const minutes of [10, 10, 10]) {
-      clock += minutes * MINUTE;
-      assert.equal(await reopened.broke(wrong), false);
-    }
-    assert.equal(rebuilds.length, 1);
-  },
-);
-
-test('a rebuild left unfinished goes on at the next refusal too, whatever the count', async () => {
+test('a clearing left unfinished goes on at the next refusal too, whatever the count', async () => {
   const clock = 1_000_000;
   const store = localStore(`tree-recovery-test-${(stores += 1)}`);
-  store.write({ rebuilding: clock - MINUTE, archiveOffUntil: clock + ARCHIVE_OFF_MS });
+  store.write({ rebuilding: { since: clock - MINUTE, cleared: false }, archiveOffUntil: clock + ARCHIVE_OFF_MS });
   let rebuilds = 0;
   const reopened = treeRecovery({
-    rebuild: async (started) => {
+    rebuild: async ({ started, cleared }) => {
       started();
+      cleared();
       rebuilds += 1;
       return true;
     },
@@ -203,6 +153,53 @@ test('a rebuild left unfinished goes on at the next refusal too, whatever the co
   assert.equal(await reopened.broke(wrong), true);
   assert.equal(rebuilds, 1);
   assert.equal(store.read().rebuiltAt, clock);
+});
+
+test('trees a closed page was building again go on building at the next scan, never cleared again, and the scan that completes ends the rebuild', async () => {
+  let clock = 1_000_000;
+  const store = localStore(`tree-recovery-test-${(stores += 1)}`);
+  let clears = 0;
+  const recovered = treeRecovery({
+    rebuild: async ({ started, cleared }) => {
+      started();
+      clears += 1;
+      cleared();
+      throw new Error('the page closed while the trees were built again');
+    },
+    store,
+    now: () => clock,
+  });
+  for (const minutes of [0, 5]) {
+    clock += minutes * MINUTE;
+    await recovered.broke(wrong);
+  }
+  clock += 5 * MINUTE;
+  await assert.rejects(recovered.broke(wrong), /page closed/);
+  assert.deepEqual(store.read().rebuilding, { since: clock, cleared: true });
+
+  // Reopened, the page scans on from what it built; a scan cut off before its check changes nothing.
+  clock += 60 * MINUTE;
+  assert.equal(await recovered.resume(), false);
+  assert.equal(await recovered.broke(undefined), false);
+  assert.equal(clears, 1);
+  recovered.passed();
+  assert.equal(store.read().rebuilding, undefined);
+  assert.equal(store.read().rebuiltAt, clock);
+  assert.ok(
+    archiveOff(store, () => clock),
+    'the archive stays off for its week',
+  );
+});
+
+test('trees built again that the end-of-scan check refuses all the same end the rebuild; the count starts there', async () => {
+  const clock = 1_000_000;
+  const store = localStore(`tree-recovery-test-${(stores += 1)}`);
+  store.write({ rebuilding: { since: clock - MINUTE, cleared: true }, archiveOffUntil: clock + ARCHIVE_OFF_MS });
+  const recovered = treeRecovery({ rebuild: assert.fail, store, now: () => clock });
+  assert.equal(await recovered.broke(wrong), false);
+  assert.equal(store.read().rebuilding, undefined);
+  assert.equal(store.read().rebuiltAt, clock);
+  assert.deepEqual(store.read().failing, { ...wrong, since: clock, checks: 1 });
 });
 
 test('with no rebuild left unfinished, resuming does nothing', async () => {
@@ -299,8 +296,9 @@ test('a tree the engine keeps refusing as new notes move its root on is rebuilt 
   let clock = 1_000_000;
   let rebuilds = 0;
   const recovered = treeRecovery({
-    rebuild: async (started) => {
+    rebuild: async ({ started, cleared }) => {
       started();
+      cleared();
       rebuilds += 1;
       return true;
     },
@@ -394,16 +392,22 @@ test('a rebuild clears the transaction list, then the trees, and builds them as 
   await fresh.scan();
   const { engine, txids, down, ends } = await synced();
   const order = [];
-  for (const step of ['clearTXIDMerkletreeData', 'clearUTXOMerkletreeAndLoadedWalletsAllTXIDVersions']) {
+  const steps = [
+    'clearTXIDMerkletreeData',
+    'clearUTXOMerkletreeAndLoadedWalletsAllTXIDVersions',
+    'clearSyncedUnshieldEvents',
+    'scanUTXOHistory',
+  ];
+  for (const step of steps) {
     const own = engine[step].bind(engine);
     engine[step] = (...args) => {
       order.push(step);
       return own(...args);
     };
   }
-  const started = () => order.push('started');
-  assert.equal(await rebuildTrees(engine, { txidVersion: V2, chain: CHAIN, walletIds: undefined, started }), true);
-  assert.deepEqual(order, ['started', 'clearTXIDMerkletreeData', 'clearUTXOMerkletreeAndLoadedWalletsAllTXIDVersions']);
+  const marks = { started: () => order.push('started'), cleared: () => order.push('cleared') };
+  assert.equal(await rebuildTrees(engine, { txidVersion: V2, chain: CHAIN, walletIds: undefined, ...marks }), true);
+  assert.deepEqual(order, ['started', ...steps.slice(0, 3), 'cleared', 'scanUTXOHistory']);
   assert.deepEqual(ends, ['complete', 'complete']);
   assert.equal(await txids.getLatestRailgunTransaction(), undefined);
   assert.deepEqual(contents(down), contents(fresh.down));

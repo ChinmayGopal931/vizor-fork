@@ -193,8 +193,8 @@ const RESCAN_TXID_RESET = `            if (txidVersion === poi_types_1.TXIDVersi
 
 /**
  * railgun-engine.js with a full rescan leaving the V2 txid list alone. The engine's reset refuses to run before the
- * page has synced the list, and otherwise syncs all of it there and then; the page clears the list before the rescan
- * and syncs it after the next scan that completes (src/tree-recovery.js).
+ * page has synced the list, and otherwise syncs all of it there and then. The page's own rebuild runs the rescan's
+ * steps itself, clearing the list first (src/tree-recovery.js); the SDK's rescan still calls this one.
  */
 export function withoutRescanTxidReset(source) {
   return replaceOnce(source, RESCAN_TXID_RESET, '', 'RailgunEngine.fullRescanUTXOMerkletreesAndWallets');

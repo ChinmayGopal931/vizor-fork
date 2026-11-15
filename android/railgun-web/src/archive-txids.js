@@ -213,9 +213,14 @@ export function installArchiveTxids(
       setBatchSize(batchSizes.archive);
       return read.out;
     }
-    // The archive has nothing more: the rest comes from rail-squid, after the last transaction there is.
+    // The archive has nothing more: the rest comes from rail-squid, after the last transaction there is. What the
+    // archive gave stands if rail-squid fails, and the next sync asks rail-squid again from there.
     reset();
-    const more = await fromSquid(txChain, read.out.at(-1) ?? kept);
+    const more = await fromSquid(txChain, read.out.at(-1) ?? kept).catch((error) => {
+      if (read.out.length === 0) throw error;
+      log(`rail-squid failed after the archive's last transaction: ${error?.message ?? error}`);
+      return [];
+    });
     return read.out.concat(more.slice(0, size - read.out.length));
   };
 }

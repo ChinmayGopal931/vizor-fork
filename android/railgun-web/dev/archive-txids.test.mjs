@@ -73,6 +73,7 @@ function txidSync({
   kept = [],
   reading = true,
   useArchive = () => true,
+  squidDown = false,
 }) {
   const lastBlock = Math.max(
     ...listed.map(({ blockNumber }) => blockNumber),
@@ -88,6 +89,7 @@ function txidSync({
   const engine = {
     quickSyncRailgunTransactionsV2: async (_chain, idLow) => {
       asked.push(idLow);
+      if (squidDown) throw new TypeError('Failed to fetch');
       return listed.filter(({ graphID }) => idLow === undefined || graphID > idLow);
     },
     getTXIDMerkletree: () => ({
@@ -179,6 +181,20 @@ test("a gap in the archive's sequence alone, every transaction there and the cha
   assert.deepEqual(sync.left, []);
   assert.deepEqual(sync.asked, [], 'rail-squid not asked while the archive has more');
   assert.deepEqual(verifications(sync.kept), verifications(listed.slice(0, 50)));
+});
+
+test("rail-squid down after the archive's last transaction keeps what the archive gave, and fails nothing", async () => {
+  const { archived, listed } = transactions(60);
+  const sync = txidSync({ archived, listed, squidDown: true });
+  await sync.next();
+  await sync.next();
+  // 50 stored; the archive has 10 more, a batch short, and rail-squid can't give the rest.
+  const tail = await sync.next();
+  assert.equal(tail.length, 10);
+  assert.deepEqual(verifications(sync.kept), verifications(listed));
+  assert.match(sync.left[0], /^rail-squid failed after the archive's last transaction: Failed to fetch$/);
+  // With nothing from the archive, rail-squid's failure is the sync's.
+  await assert.rejects(sync.next(), /Failed to fetch/);
 });
 
 test("rail-squid not yet at the archive's last transaction answers nothing, rather than fail the sync", async () => {
