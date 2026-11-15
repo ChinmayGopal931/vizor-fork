@@ -162,6 +162,17 @@ fn height_for_time(
     }
 }
 
+/// The header time of the newest table entry at or below mainnet block
+/// `height`: a time that block came no earlier than. Past the table that is
+/// the last entry's, never an estimate; `None` below the table.
+pub(crate) fn mainnet_time_at_or_before(height: u64) -> Option<u32> {
+    let index = height.checked_sub(START_HEIGHT)? / STEP;
+    let index = usize::try_from(index)
+        .unwrap_or(usize::MAX)
+        .min(TIMES.len() - 1);
+    Some(TIMES[index])
+}
+
 /// Estimates the header time of mainnet block `height`.
 ///
 /// Heights at or before Sapling activation return the activation time. Past
@@ -395,6 +406,27 @@ mod tests {
             let point = table_point(index);
             assert_eq!(pre_nu7_time(point.height, None), point.time);
         }
+    }
+
+    #[test]
+    fn a_time_at_or_before_a_block_never_comes_after_it() {
+        assert_eq!(mainnet_time_at_or_before(START_HEIGHT - 1), None);
+        for index in [0, 1, TIMES.len() / 2, TIMES.len() - 1] {
+            let point = table_point(index);
+            assert_eq!(mainnet_time_at_or_before(point.height), Some(point.time));
+            assert_eq!(
+                mainnet_time_at_or_before(point.height + STEP - 1),
+                Some(point.time)
+            );
+            let middle = point.height + STEP / 2;
+            assert!(mainnet_time_at_or_before(middle).unwrap() <= pre_nu7_time(middle, None));
+        }
+        let last = last_table_point();
+        assert_eq!(
+            mainnet_time_at_or_before(last.height + 1_000_000),
+            Some(last.time)
+        );
+        assert_eq!(mainnet_time_at_or_before(u64::MAX), Some(last.time));
     }
 
     #[test]

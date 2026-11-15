@@ -209,6 +209,7 @@ class RustRailgunWalletSource implements RailgunWalletSource {
     if (mnemonicBytes == null || mnemonicBytes.isEmpty) {
       throw const RailgunEngineKeyLockedException();
     }
+    final createdAt = await _seedCreatedAt(dbPath, network, accountUuid);
     final [mnemonic, address] = await startWithPrivateUsdSeed(
       mnemonicBytes,
       (seed) => Future.wait([
@@ -244,10 +245,38 @@ class RustRailgunWalletSource implements RailgunWalletSource {
       wallet: RailgunOpenWalletParams(
         encryptionKey: encryptionKey,
         mnemonic: mnemonic,
+        createdAt: createdAt,
       ),
       expectedAddress: address,
       secrets: [?custom, ?keyed],
     );
+  }
+
+  /// When this app generated the account's seed, for a seed it generated:
+  /// null for any other, and when it can't be read, which only costs the
+  /// wallet's first sync the leaves it could have skipped.
+  Future<int?> _seedCreatedAt(
+    String dbPath,
+    String network,
+    String accountUuid,
+  ) async {
+    final account = _ref
+        .read(accountProvider)
+        .value
+        ?.accounts
+        .where((account) => account.uuid == accountUuid)
+        .firstOrNull;
+    if (account?.generatedSeed != true) return null;
+    try {
+      return await rust_private_usd.privateUsdSeedCreatedAt(
+        dbPath: dbPath,
+        network: network,
+        accountUuid: accountUuid,
+      );
+    } catch (error) {
+      privateUsdLog('seed creation time unread (${error.runtimeType})');
+      return null;
+    }
   }
 
   @override

@@ -50,6 +50,11 @@ class AccountInfo {
   /// Whether the deferred Zcash introduction is still offered on Home.
   final bool giftEducationPending;
 
+  /// Whether this app generated the account's seed at its birthday, so
+  /// nothing could use the seed before then. False for a restored, imported
+  /// or claimed seed.
+  final bool generatedSeed;
+
   /// Keeps the Home backup prompt hidden until this UTC instant. The backup
   /// itself remains incomplete while this is set.
   final DateTime? backupReminderSnoozedUntilUtc;
@@ -75,6 +80,7 @@ class AccountInfo {
     this.walletLinkSourceAccountUuid,
     this.setupPending = false,
     this.giftEducationPending = false,
+    this.generatedSeed = false,
     this.backupReminderSnoozedUntilUtc,
     this.backupReminderSnoozeCount = 0,
   }) : hardwareSignerKind =
@@ -123,6 +129,7 @@ class AccountInfo {
         walletLinkSourceAccountUuid ?? this.walletLinkSourceAccountUuid,
     setupPending: setupPending ?? this.setupPending,
     giftEducationPending: giftEducationPending ?? this.giftEducationPending,
+    generatedSeed: generatedSeed,
     backupReminderSnoozedUntilUtc: clearBackupReminderSnooze
         ? null
         : backupReminderSnoozedUntilUtc ?? this.backupReminderSnoozedUntilUtc,
@@ -148,6 +155,7 @@ class AccountInfo {
     'walletLinkSourceAccountUuid': walletLinkSourceAccountUuid,
     if (setupPending) 'setupPending': true,
     if (giftEducationPending) 'giftEducationPending': true,
+    if (generatedSeed) 'generatedSeed': true,
     if (backupReminderSnoozedUntilUtc case final snoozedUntil?)
       'backupReminderSnoozedUntilUtc': snoozedUntil.toUtc().toIso8601String(),
     if (backupReminderSnoozeCount > 0)
@@ -187,6 +195,7 @@ class AccountInfo {
       ),
       setupPending: json['setupPending'] == true,
       giftEducationPending: json['giftEducationPending'] == true,
+      generatedSeed: json['generatedSeed'] == true,
       backupReminderSnoozedUntilUtc: _dateTimeUtcFromJson(
         json['backupReminderSnoozedUntilUtc'],
       ),

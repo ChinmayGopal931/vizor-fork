@@ -207,6 +207,9 @@ pub(crate) struct Deployment {
     /// URL or the user's own: this network's among `RAILGUN_PAGE_HOSTS`.
     pub rpc_hosts: &'static [&'static str],
     pub poi_node_url: &'static str,
+    /// Railgun's indexer, as the Railgun page reads it: where a wallet asks
+    /// whether Railgun has new events (`railgun_head`).
+    pub railgun_indexer_url: &'static str,
     /// Where public USDC is shielded into the private balance; `None` where no
     /// Deposits contract is pinned, and deposits are hidden.
     pub deposits: Option<DepositsPin>,
@@ -323,6 +326,7 @@ const MAINNET: Deployment = Deployment {
         "rpc.mevblocker.io",
     ],
     poi_node_url: POI_NODE_URL,
+    railgun_indexer_url: "https://rail-squid.squids.live/squid-railgun-ethereum-v2/graphql",
     deposits: Some(DepositsPin {
         contract: address("0xebc7508e20bd4467491ee7e7589d5c7d4c5e8cb6"),
         relayer: address("0x6ae40b34c32d3feaa0eef53d7e4724160b7a2135"),
@@ -391,6 +395,8 @@ const TESTNET: Deployment = Deployment {
         "eth-sepolia.api.onfinality.io",
     ],
     poi_node_url: POI_NODE_URL,
+    // The page's copy of Sepolia's indexer, which mends its transaction list.
+    railgun_indexer_url: "https://railgun-sepolia-list.pepeman931.workers.dev/graphql",
     deposits: Some(DepositsPin {
         contract: address("0x58324e9a866c9690aca08169d3c67630e84c9019"),
         relayer: address("0xedc4c88a3f6ae8130a2c18babbabd8100cc1a446"),

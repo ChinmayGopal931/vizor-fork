@@ -620,6 +620,7 @@ AccountInfo mergeBootstrappedAccountInfo({
     ledgerDeviceModel: storedAccount?.ledgerDeviceModel,
     setupPending: storedAccount?.setupPending ?? false,
     giftEducationPending: storedAccount?.giftEducationPending ?? false,
+    generatedSeed: storedAccount?.generatedSeed ?? false,
     backupReminderSnoozedUntilUtc: storedAccount?.backupReminderSnoozedUntilUtc,
     backupReminderSnoozeCount: storedAccount?.backupReminderSnoozeCount ?? 0,
   );

@@ -89,7 +89,7 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
       ref
           .read(privateUsdBalanceProvider(uuid).notifier)
           .refresh(
-            maxAge: PrivateUsdBalanceTiming.arrivingPoll,
+            maxAge: PrivateUsdBalanceTiming.openedAge,
             showProgress: true,
           );
     });

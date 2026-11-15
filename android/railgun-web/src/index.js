@@ -2,8 +2,10 @@
 // Android hands the page a MessagePort. WebKit has no way to hand a page a port, so Veylor's iOS host registers the
 // `railgunHost` script message handler instead, and delivers with `__railgunHostDeliver`.
 import { RailgunError, errorCode } from './errors.js';
+import { noteKeysCounts } from './note-keys.js';
 import { prepareReverse, reverseCost } from './reverse.js';
 import * as transact from './transact.js';
+import { txidReadsCounts } from './txid-reads.js';
 import * as wallet from './wallet.js';
 
 const INIT = 'vizor-railgun-init';
@@ -23,6 +25,8 @@ const debugHandlers = {
   openNewWallet: wallet.openNewWallet,
   rebuildTrees: wallet.rebuildTreesNow,
   txidIndexes: wallet.txidIndexes,
+  noteKeys: noteKeysCounts,
+  txidReads: txidReadsCounts,
 };
 
 // Set once, when the host's transport is found; nothing is posted before.

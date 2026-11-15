@@ -16,7 +16,6 @@ import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_balance_provider.dart';
 import '../../providers/private_usd_conversion_provider.dart';
 import '../../providers/private_usd_relayer_claims_provider.dart';
-import '../../services/private_usd_balance_repository.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
 import '../../widgets/mobile/private_usd_progress_views.dart';
 
@@ -69,32 +68,16 @@ class _MobilePrivateUsdConversionScreenState
     final screening = Duration(seconds: deployment?.screeningSeconds ?? 0);
     final paid = status?.record.outcome == ApiForwardOutcome.paid;
     final balance = paid ? ref.watch(privateUsdBalanceProvider(account)) : null;
-    final endedAt = status?.record.endedAt;
     if (paid) {
-      // A payout arrives in the private balance: keep it fresh meanwhile,
-      // and read it once the payout had time to land.
+      // A payout arrives in the private balance: keep it fresh meanwhile. It
+      // shows once Railgun's head moves past it, as every wallet's refresh
+      // follows, never at a time set by this conversion.
       ref.watch(
         privateUsdBalanceKeepFreshProvider((
           accountUuid: account,
           ifUsed: false,
         )),
       );
-      final updatedAt = balance?.updatedAt;
-      final landed = endedAt == null
-          ? null
-          : DateTime.fromMillisecondsSinceEpoch(
-              endedAt * 1000,
-            ).add(PrivateUsdBalanceTiming.arrivingPoll);
-      if (landed != null &&
-          !state.now.isBefore(landed) &&
-          (updatedAt == null || updatedAt.isBefore(landed))) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          ref
-              .read(privateUsdBalanceProvider(account).notifier)
-              .refresh(maxAge: PrivateUsdBalanceTiming.arrivingPoll);
-        });
-      }
     }
     final presentation = status == null || deployment == null
         ? null

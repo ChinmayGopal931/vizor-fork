@@ -7,11 +7,17 @@ import '../models/railgun_models.dart';
 
 /// How often a watched balance is looked at, and how stale it may get.
 abstract final class PrivateUsdBalanceTiming {
-  /// The polling tick, and the freshness wanted while funds arrive.
-  static const arrivingPoll = Duration(seconds: 30);
+  /// How often a watched balance asks for Railgun's head
+  /// ([PrivateUsdRailgunHeads]): one rate for every wallet, whatever it
+  /// expects.
+  static const headPoll = Duration(seconds: 30);
 
-  /// The freshness wanted otherwise.
-  static const staleAfter = Duration(minutes: 5);
+  /// A watched balance refreshes at least this often, so a head that stops
+  /// moving hides nothing and screening's verdicts still come in.
+  static const backstop = Duration(minutes: 10);
+
+  /// Opening the Private USD screen refreshes a balance older than this.
+  static const openedAge = Duration(seconds: 30);
 
   /// A refresh gives up after this...
   static const refreshTimeout = Duration(minutes: 5);
@@ -157,10 +163,71 @@ class PrivateUsdBalanceState {
   );
 }
 
-/// Something is in screening (a payout or a deposit that just landed), so
-/// the balance is worth looking at often.
-bool isPrivateUsdArriving(PrivateUsdBalanceState state) =>
-    (state.balances?.arriving ?? BigInt.zero) > BigInt.zero;
+/// Railgun's head as its indexer lists it, shared by every watched balance:
+/// asked for at one rate whatever the wallets expect, once however many
+/// balances ask together. A balance refreshes once the head has moved past
+/// the one its last successful refresh began with, and at the latest
+/// [PrivateUsdBalanceTiming.backstop] after it, so its refreshes follow
+/// Railgun's history, never what the wallet expects.
+class PrivateUsdRailgunHeads {
+  PrivateUsdRailgunHeads({
+    required Future<String?> Function() read,
+    required DateTime Function() now,
+  }) : _read = read,
+       _now = now;
+
+  final Future<String?> Function() _read;
+  final DateTime Function() _now;
+  final _refreshedWith = <String, String>{};
+  Future<String?>? _reading;
+  String? _answer;
+  DateTime? _answeredAt;
+  String? _latest;
+
+  // Balances that ask within this of each other share one request.
+  static const _shared = Duration(seconds: 25);
+
+  /// The newest head read; null before one was.
+  String? get latest => _latest;
+
+  /// Railgun's head now: null when it could not be read.
+  Future<String?> read() {
+    final at = _answeredAt;
+    if (at != null && _now().difference(at) < _shared) {
+      return Future.value(_answer);
+    }
+    return _reading ??= _read()
+        .then((head) {
+          _answer = head;
+          _answeredAt = _now();
+          if (head != null) _latest = head;
+          return head;
+        })
+        .whenComplete(() => _reading = null);
+  }
+
+  /// Whether [account]'s balance, [age] old (null for none shown), refreshes
+  /// now, Railgun's head being [head] (null when it could not be read).
+  /// Before [account]'s first refresh, a head counts as moved unless the
+  /// balance is younger than [PrivateUsdBalanceTiming.headPoll], when it is
+  /// taken as that balance's.
+  bool shouldRefresh(String account, String? head, {required Duration? age}) {
+    if (age == null || age >= PrivateUsdBalanceTiming.backstop) return true;
+    final refreshedWith = _refreshedWith[account];
+    if (head == null || head == refreshedWith) return false;
+    if (refreshedWith == null && age < PrivateUsdBalanceTiming.headPoll) {
+      _refreshedWith[account] = head;
+      return false;
+    }
+    return true;
+  }
+
+  /// [account]'s refresh that began with [head] the newest head read went
+  /// through.
+  void refreshed(String account, String? head) {
+    if (head != null) _refreshedWith[account] = head;
+  }
+}
 
 /// Automatic refreshes wait longer after each failure in a row: 30 s, then
 /// doubling up to 32 times that. A refresh asked for outright ignores it.

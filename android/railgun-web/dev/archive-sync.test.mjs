@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gunzipSync } from 'node:zlib';
 import { ArchiveUnavailable, archive } from '../src/archive.js';
+import { notePause } from '../src/page-clock.js';
 import { ARCHIVE_ROUNDS, archiveCommitments, installArchiveSync } from '../src/archive-sync.js';
 import { formatCommitments, formatNullifiers, formatUnshields, installQuickSync } from '../src/quick-sync.js';
 import { CHAIN, V2, contents, engineHarness } from './engine-harness.mjs';
@@ -166,6 +167,58 @@ test('a chunk that fails its checksum hands the rest to rail-squid after the chu
   assert.match(left[0], /checksum/);
   assert.equal(squidFrom(asked, 'commitments'), sealedAt[1]);
   assert.deepEqual(stored, await storedBySquid());
+});
+
+/** `server` behind a cache that answers a path asked for without a query from `stale` (path → bytes) where it has it. */
+function behindStaleCache(server, stale) {
+  const urls = [];
+  return {
+    ...server,
+    urls,
+    fetch: async (url, init) => {
+      const path = url.slice(ARCHIVE_BASE.length + 1);
+      urls.push(path);
+      return stale.has(path) ? new Response(stale.get(path)) : server.fetch(url, init);
+    },
+  };
+}
+
+const checksumOf = (server, id, kind) => JSON.parse(server.files.get(`chunks/${id}/meta.json`)).files[kind].checksum;
+
+test('a chunk file a cache kept an older copy of is asked for past it, and the archive is kept', async () => {
+  const server = archiveServer(fixture, { sealedAt });
+  const cached = behindStaleCache(server, new Map([['chunks/1/commitments.json.gz', gz(Buffer.from('[]'))]]));
+  const { stored, left } = await storedByArchive(cached);
+  assert.deepEqual(left, []);
+  const checksum = checksumOf(server, 1, 'commitments');
+  assert.ok(cached.urls.includes(`chunks/1/meta.json?v=${checksum}`));
+  assert.ok(cached.urls.includes(`chunks/1/commitments.json.gz?v=${checksum}`));
+  assert.deepEqual(stored, await storedBySquid());
+});
+
+test('a chunk meta a cache kept an older copy of is asked for past it, then the file it names', async () => {
+  const server = archiveServer(fixture, { sealedAt });
+  const meta = JSON.parse(server.files.get('chunks/1/meta.json'));
+  const older = hashOf(Buffer.from('an older copy of the file'));
+  meta.files.commitments.checksum = older;
+  const cached = behindStaleCache(server, new Map([['chunks/1/meta.json', Buffer.from(JSON.stringify(meta))]]));
+  const { stored, left } = await storedByArchive(cached);
+  assert.deepEqual(left, []);
+  assert.ok(cached.urls.includes(`chunks/1/meta.json?v=${older}`));
+  assert.ok(cached.urls.includes(`chunks/1/commitments.json.gz?v=${checksumOf(server, 1, 'commitments')}`));
+  assert.deepEqual(stored, await storedBySquid());
+});
+
+test('the archive hears the same requests past a stale cache whichever wallet syncs', async () => {
+  const urls = async () => {
+    const cached = behindStaleCache(
+      archiveServer(fixture, { sealedAt }),
+      new Map([['chunks/2/commitments.json.gz', gz(Buffer.from('[]'))]]),
+    );
+    await storedByArchive(cached);
+    return cached.urls;
+  };
+  assert.deepEqual(await urls(), await urls());
 });
 
 test('a missing chunk hands the rest to rail-squid after the chunk before it', async () => {
@@ -415,20 +468,97 @@ test('a manifest that is not JSON leaves the whole sync to rail-squid', async ()
   assert.deepEqual(stored, await storedBySquid());
 });
 
-/** The fixture's archive, its first `times` requests for `name` failing on the way. */
-function failingFirst(name, times) {
+/**
+ * The fixture's archive with its format numbers changed: `manifest`, `chunk` (chunk 1's meta) and `tip` each answer
+ * what their object is published as.
+ */
+function archiveWithFormats({ manifest = (meta) => meta, chunk = (meta) => meta, tip = (meta) => meta }) {
+  const server = archiveServer(fixture, { sealedAt });
+  const edited = (name, edit) => {
+    const bytes = Buffer.from(JSON.stringify(edit(JSON.parse(server.files.get(name)))));
+    server.files.set(name, bytes);
+    return bytes;
+  };
+  edited('chunks/1/meta.json', chunk);
+  const tipChecksum = hashOf(edited('tip/meta.json', tip));
+  server.setManifest((meta) => manifest({ ...meta, tipChecksum }));
+  return server;
+}
+
+test('a format the archive raised where it is, without moving to a new path, is read as the one known', async () => {
+  const server = archiveWithFormats({
+    manifest: (meta) => ({ ...meta, version: meta.version + 1, formatVersion: meta.formatVersion + 2 }),
+    chunk: (meta) => ({ ...meta, formatVersion: meta.formatVersion + 1 }),
+    tip: (meta) => ({ ...meta, formatVersion: meta.formatVersion + 1 }),
+  });
+  const { stored, left } = await storedByArchive(server);
+  assert.deepEqual(left, []);
+  assert.ok(server.asked.includes('chunks/1/commitments.json.gz'));
+  assert.ok(server.asked.includes('tip/commitments.json.gz'));
+  assert.deepEqual(stored, await storedBySquid());
+});
+
+test('a manifest format older than the one known, or that is no whole number, leaves the sync to rail-squid', async () => {
+  const without = (field) => (meta) => Object.fromEntries(Object.entries(meta).filter(([name]) => name !== field));
+  const manifests = [
+    (meta) => ({ ...meta, version: meta.version - 1 }),
+    (meta) => ({ ...meta, formatVersion: meta.formatVersion - 1 }),
+    (meta) => ({ ...meta, version: String(meta.version) }),
+    (meta) => ({ ...meta, formatVersion: meta.formatVersion + 0.5 }),
+    without('version'),
+    without('formatVersion'),
+    // The chain and the txid version stay the ones this page reads, whatever the formats.
+    (meta) => ({ ...meta, version: meta.version + 1, chainId: 137 }),
+    (meta) => ({ ...meta, version: meta.version + 1, txidVersion: 'V3_PoseidonMerkle' }),
+  ];
+  for (const manifest of manifests) {
+    const { stored, asked, left } = await storedByArchive(archiveWithFormats({ manifest }));
+    assert.match(left[0], /manifest is not one this page reads/);
+    assert.equal(squidFrom(asked, 'commitments'), fixture.from);
+    assert.deepEqual(stored, await storedBySquid());
+  }
+});
+
+test('a chunk or a tip of an older format hands the rest to rail-squid after the chunk before it', async () => {
+  const older = (meta) => ({ ...meta, formatVersion: meta.formatVersion - 1 });
+  const chunk = await storedByArchive(archiveWithFormats({ chunk: older }));
+  assert.match(chunk.left[0], /chunk 1 is not the one the index names/);
+  assert.equal(squidFrom(chunk.asked, 'commitments'), sealedAt[0]);
+  assert.deepEqual(chunk.stored, await storedBySquid());
+  const tip = await storedByArchive(archiveWithFormats({ tip: older }));
+  assert.match(tip.left[0], /tip does not follow/);
+  assert.equal(squidFrom(tip.asked, 'commitments'), sealedAt[2]);
+  assert.deepEqual(tip.stored, await storedBySquid());
+});
+
+/**
+ * The fixture's archive, its first `times` requests for `name` failing on the way, the first `paused` of those across a
+ * pause of the page.
+ */
+function failingFirst(name, times, paused = 0) {
   const server = archiveServer(fixture, { sealedAt });
   let failures = times;
+  let pauses = paused;
   return {
     fetch: (url) => {
       if (url.replace(/^https:\/\/digest\.test\/v4\/1\//, '').replace(/\?v=.*$/, '') === name && failures > 0) {
         failures -= 1;
+        if (pauses > 0) {
+          pauses -= 1;
+          notePause();
+        }
         return Promise.reject(new TypeError('Failed to fetch'));
       }
       return server.fetch(url);
     },
   };
 }
+
+test('an archive request a pause of the page cut through is sent again at once, and not counted', async () => {
+  const kept = await storedByArchive(failingFirst('chunk-index.json', 9, 5));
+  assert.deepEqual(kept.left, []);
+  assert.deepEqual(kept.stored, await storedBySquid());
+});
 
 test(
   'a request is sent five times a round, as a phone can lose DNS for seconds, and the archive out of reach ' +

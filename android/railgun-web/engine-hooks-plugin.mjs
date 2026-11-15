@@ -9,7 +9,11 @@ export const ENGINE_VERSION = '9.8.0';
 const ENGINE_PACKAGE = fileURLToPath(new URL('node_modules/@railgun-community/engine/package.json', import.meta.url));
 const UTXO_MERKLETREE = /@railgun-community[\\/]engine[\\/]dist[\\/]merkletree[\\/]utxo-merkletree\.js$/;
 const MERKLETREE = /@railgun-community[\\/]engine[\\/]dist[\\/]merkletree[\\/]merkletree\.js$/;
+const TXID_MERKLETREE = /@railgun-community[\\/]engine[\\/]dist[\\/]merkletree[\\/]txid-merkletree\.js$/;
 const RAILGUN_ENGINE = /@railgun-community[\\/]engine[\\/]dist[\\/]railgun-engine\.js$/;
+const ABSTRACT_WALLET = /@railgun-community[\\/]engine[\\/]dist[\\/]wallet[\\/]abstract-wallet\.js$/;
+const KEYS_UTILS = /@railgun-community[\\/]engine[\\/]dist[\\/]utils[\\/]keys-utils\.js$/;
+const KEYS_UTILS_LEGACY = /@railgun-community[\\/]engine[\\/]dist[\\/]utils[\\/]keys-utils-legacy\.js$/;
 const pageModule = (file) => JSON.stringify(fileURLToPath(new URL(`src/${file}`, import.meta.url)));
 
 // Each original must occur once; the replacement is taken as it is, `$` and all.
@@ -71,6 +75,29 @@ export function throughAcceptedLeaves(source) {
         await this.writeTreeToDB(tree, hashWriteGroup, dataWriteGroup);
 `,
     'Merkletree.insertLeaves',
+  );
+}
+
+// txid-merkletree.js: the screening node refusing a root the txid list would take says so (src/txid-repair.js). A
+// root check that fails with the connection throws before it, and isn't a refusal.
+const TXID_ROOT_REFUSED = `    // eslint-disable-next-line class-methods-use-this
+    invalidRootCallback() {
+        // Unused for Txid merkletree
+        return Promise.resolve();
+    }
+`;
+
+/** txid-merkletree.js with the screening node's refusals reported to src/txid-repair.js. */
+export function throughTxidRootRefusals(source) {
+  return replaceOnce(
+    source,
+    TXID_ROOT_REFUSED,
+    `    invalidRootCallback() {
+        require(${pageModule('txid-repair.js')}).listStopped('root', undefined);
+        return Promise.resolve();
+    }
+`,
+    'TXIDMerkletree.invalidRootCallback',
   );
 }
 
@@ -164,6 +191,89 @@ export function throughBatchedTxidUpdates(source) {
   );
 }
 
+// railgun-engine.js: the V2 txid sync reads commitments and unshield events in batches (src/txid-reads.js).
+const TXID_READS = `        const v2BlockNumber = railgun_smart_wallet_1.RailgunSmartWalletContract.getEngineV2StartBlockNumber(chain);
+`;
+const TXID_UNSHIELD_READ = `                    const unshieldEventsForTxid = await utxoMerkletree.getAllUnshieldEventsForTxid(txid);
+`;
+const TXID_COMMITMENT_READ = `                const commitment = await utxoMerkletree.getCommitmentSafe(tree, position);
+`;
+
+/** railgun-engine.js with the V2 txid sync reading its commitments and unshield events through src/txid-reads.js. */
+export function throughBatchedTxidReads(source) {
+  const rewrites = [
+    [
+      TXID_READS,
+      `${TXID_READS}        const txidReads = require(${pageModule('txid-reads.js')}).txidReads(utxoMerkletree, railgunTransactions);
+`,
+    ],
+    [
+      TXID_UNSHIELD_READ,
+      `                    const unshieldEventsForTxid = await txidReads.unshieldEvents(txid);
+`,
+    ],
+    [
+      TXID_COMMITMENT_READ,
+      `                const commitment = await txidReads.commitment(tree, position);
+`,
+    ],
+  ];
+  return rewrites.reduce(
+    (rewritten, [original, replacement]) =>
+      replaceOnce(rewritten, original, replacement, 'RailgunEngine.handleNewRailgunTransactionsV2'),
+    source,
+  );
+}
+
+// railgun-engine.js: the V2 txid sync stopping at a transaction says why (src/txid-repair.js).
+const TXID_MISSING_UNSHIELD = `                        missingAnyCommitments = true;
+                    }
+                }
+            }
+`;
+const TXID_MISSING_COMMITMENT = `                else {
+                    missingAnyCommitments = true;
+`;
+const TXID_BROKEN_CHAIN = `            if (expectedVerificationHash !== verificationHash) {
+                debugger_1.default.error(`;
+
+/**
+ * railgun-engine.js with the V2 txid sync reporting each stop to src/txid-repair.js: an unshield or a commitment the
+ * notes trees lack, or a transaction that breaks the verification hashes, and the transaction's block.
+ */
+export function throughTxidStops(source) {
+  const stopped = (reason) => `require(${pageModule('txid-repair.js')}).listStopped('${reason}', blockNumber);`;
+  const rewrites = [
+    [
+      TXID_MISSING_UNSHIELD,
+      `                        missingAnyCommitments = true;
+                        ${stopped('unshield')}
+                    }
+                }
+            }
+`,
+    ],
+    [
+      TXID_MISSING_COMMITMENT,
+      `                else {
+                    missingAnyCommitments = true;
+                    ${stopped('commitment')}
+`,
+    ],
+    [
+      TXID_BROKEN_CHAIN,
+      `            if (expectedVerificationHash !== verificationHash) {
+                ${stopped('verification')}
+                debugger_1.default.error(`,
+    ],
+  ];
+  return rewrites.reduce(
+    (rewritten, [original, replacement]) =>
+      replaceOnce(rewritten, original, replacement, 'RailgunEngine.handleNewRailgunTransactionsV2'),
+    source,
+  );
+}
+
 // railgun-engine.js: the root check at the end of a notes scan says which root it refused (src/tree-recovery.js).
 const END_OF_SCAN_ROOT_CHECK = `                if (!isValid) {
                     throw new Error(\`Invalid merkleroot: \${root}. Tree: \${treeIndex}. Index: \${index}.\`);
@@ -200,9 +310,75 @@ export function withoutRescanTxidReset(source) {
   return replaceOnce(source, RESCAN_TXID_RESET, '', 'RailgunEngine.fullRescanUTXOMerkletreesAndWallets');
 }
 
+// abstract-wallet.js: a notes scan has each batch's keys worked out ahead (src/note-keys.js).
+const SCAN_LEAVES_KEY = `        const vpk = this.getViewingKeyPair().privateKey;
+        const leafSyncPromises = [];
+`;
+const SCAN_LEAVES_WRITE = `        const writeBatch = (await Promise.all(leafSyncPromises)).flat();
+`;
+
+/** abstract-wallet.js with `scanLeaves` preparing each batch's keys in src/note-keys.js, and releasing them after. */
+export function throughNoteKeyBatches(source) {
+  const what = 'AbstractWallet.scanLeaves';
+  const prepared = replaceOnce(
+    source,
+    SCAN_LEAVES_KEY,
+    `        const vpk = this.getViewingKeyPair().privateKey;
+        const preparedKeys = await require(${pageModule('note-keys.js')}).prepareKeys(vpk, leaves, AbstractWallet.getCommitmentType);
+        const leafSyncPromises = [];
+`,
+    what,
+  );
+  return replaceOnce(
+    prepared,
+    SCAN_LEAVES_WRITE,
+    `        let writeBatch;
+        try {
+            writeBatch = (await Promise.all(leafSyncPromises)).flat();
+        }
+        finally {
+            preparedKeys.release();
+        }
+`,
+    what,
+  );
+}
+
+// keys-utils.js and keys-utils-legacy.js: a key a scan prepared is taken as it is (src/note-keys.js).
+const SHARED_KEY = `async function getSharedSymmetricKey(privateKeyPairA, blindedPublicKeyPairB) {
+    try {
+`;
+const LEGACY_SHARED_KEY = `async function getSharedSymmetricKeyLegacy(privateKeyPairA, blindedPublicKeyPairB) {
+    try {
+`;
+const takePrepared = (name, lookup) => `async function ${name}(privateKeyPairA, blindedPublicKeyPairB) {
+    const prepared = require(${pageModule('note-keys.js')}).${lookup}(privateKeyPairA, blindedPublicKeyPairB);
+    if (prepared !== undefined) {
+        return prepared;
+    }
+    try {
+`;
+
+/** keys-utils.js with `getSharedSymmetricKey` answering a key src/note-keys.js prepared, if it did. */
+export const throughPreparedKeys = (source) =>
+  replaceOnce(source, SHARED_KEY, takePrepared('getSharedSymmetricKey', 'preparedKey'), 'getSharedSymmetricKey');
+
+/** keys-utils-legacy.js with `getSharedSymmetricKeyLegacy` answering a key src/note-keys.js prepared, if it did. */
+export const throughPreparedLegacyKeys = (source) =>
+  replaceOnce(
+    source,
+    LEGACY_SHARED_KEY,
+    takePrepared('getSharedSymmetricKeyLegacy', 'preparedLegacyKey'),
+    'getSharedSymmetricKeyLegacy',
+  );
+
 /** railgun-engine.js as the build has it. */
 export const throughRailgunEngineHooks = (source) =>
-  withoutRescanTxidReset(throughRootRefusals(throughBatchedTxidUpdates(throughArchiveTxids(source))));
+  withoutRescanTxidReset(
+    throughRootRefusals(
+      throughTxidStops(throughBatchedTxidReads(throughBatchedTxidUpdates(throughArchiveTxids(source)))),
+    ),
+  );
 
 /** Throws unless the installed engine is the one the rewrites were written against. */
 export function checkEngineVersion(version) {
@@ -226,10 +402,14 @@ export const engineHooks = {
       });
     rewrite(UTXO_MERKLETREE, 'utxo-merkletree', throughUnshieldWatermark);
     rewrite(MERKLETREE, 'merkletree', throughAcceptedLeaves);
+    rewrite(TXID_MERKLETREE, 'txid-merkletree', throughTxidRootRefusals);
     rewrite(RAILGUN_ENGINE, 'railgun-engine', throughRailgunEngineHooks);
+    rewrite(ABSTRACT_WALLET, 'abstract-wallet', throughNoteKeyBatches);
+    rewrite(KEYS_UTILS, 'keys-utils', throughPreparedKeys);
+    rewrite(KEYS_UTILS_LEGACY, 'keys-utils-legacy', throughPreparedLegacyKeys);
     // A bundle with an engine module this didn't reach would run the engine's own code.
     build.onEnd(() =>
-      rewritten.size === 3
+      rewritten.size === 7
         ? undefined
         : { errors: [{ text: 'the engine modules were not all bundled through the page' }] },
     );

@@ -252,8 +252,9 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   refresh the user waits on (the refresh button, the screen's own on
   opening, a new RPC: `refresh(showProgress: true)`), with the page's
   `refresh` events (`refresh-progress.js`: a bar split over its steps, never
-  going back). The automatic ones (every 30 s while funds arrive, else every
-  5 min) keep a wallet that synced before at `RAILGUN SYNCED` while the floor
+  going back). The automatic ones (once Railgun's head has moved, read every
+  30 s, and at least every 10 min) keep a wallet that synced before at
+  `RAILGUN SYNCED` while the floor
   flows, unless the page reports a long catch-up on Railgun's transaction
   list (1,000 or more behind): that climbs as `RAILGUN SYNC n%`, since
   screening a send's change waits on the list. The refresh arrow never spins
@@ -1711,6 +1712,16 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
   at a time per wallet (the spend guard).
 - The chain is the only evidence; the maker's status API never is.
 - Never quote per keystroke. Every quote spends a swap index.
+- A Railgun wallet decrypts from a creation block only when Veylor generated
+  its seed (`AccountInfo.generatedSeed`): the seed's birthday, rounded down
+  on both chains' block tables, a day early. Its mnemonic is the standard
+  BIP-85 child, which any BIP-85 tool derives, so a restored, imported or
+  claimed seed may have notes from before. The floor changes decryption
+  only; every request a sync makes stays the same.
+- Automatic balance refreshes follow Railgun's head (rail-squid's newest
+  events, read every 30 s with the same request by every wallet) and a
+  10-minute backstop, never what the wallet expects: a faster cadence while
+  funds arrive told rail-squid, the RPC and the screening nodes when.
 - Derive keys only after the seed-fingerprint check, and refuse a Railgun
   session whose address differs from Rust's.
 - Deleting an account, or resetting, with a conversion under way warns with

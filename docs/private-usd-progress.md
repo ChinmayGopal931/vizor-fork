@@ -2844,6 +2844,42 @@ M8 status (2026-10-14): the non-device parts are done.
   archive is now asked again, three rounds 20 and 40 s apart, before the
   archive is left. Follow-ups are in #20.
 
+- **D-158 (owner, 2026-11-15): #20's follow-ups, in one PR.** A wallet
+  whose seed Veylor generated (`AccountInfo.generatedSeed`, set by the two
+  create flows only) decrypts from a creation block: the account's exact
+  birthday read from the wallet DB, the Zcash table's entry at or below it,
+  the Ethereum table's at or below that a day earlier (never a block counted
+  from the clock past either table, which runs ahead). The Railgun mnemonic
+  is the standard BIP-85 child, so restored, imported and claimed seeds get
+  no floor. Note keys are worked out ahead in Web Workers running the
+  engine's own WebAssembly: a custom kernel was measured first (Anon's batch
+  kernel, run isolated with the owner's leave: 0 mismatches in 4,052 cases
+  and 1.19× the engine's per-key speed), too little to be worth a WASM build
+  of our own. A change note's two blinded keys are one point, so a batch
+  works each point out once (46% fewer on Sepolia). The txid sync reads its
+  commitments a 2,000-leaf window at a time and a batch's unshield events in
+  one IndexedDB transaction (desktop Chrome: 74 µs a read on its own, 4.5 in
+  a window). A chunk whose checksum fails is asked for once more, with its
+  meta, past a cache (`?v=<checksum>`); a try a pause of the page cut
+  through is made again at once, uncounted. A transaction list stopped at one
+  transaction for one reason three times over ten minutes is repaired by the
+  reason the engine reports (a refused root: rewind to a 10,000 boundary,
+  then a capped clear; a missing unshield: rail-squid's unshields again from
+  a 100,000-block boundary; a broken hash chain: the archive off), only for
+  a reason the list's last sync gave. Balance refreshes follow Railgun's head
+  on rail-squid, asked for every 30 s, once for every watched balance
+  together (it moved about every 3.5 min over half an hour on mainnet), and
+  a 10-minute backstop, not a 30 s cadence while funds arrive. A refresh
+  that went through, the user's too, counts the newest head read when it
+  began; one that failed counts none. The conversion screen's own refresh at
+  a payout's time is gone. Device runs, cold, the OnePlus 15 on Wi-Fi with
+  the archive on, as #19's last: its account at the first balance in 7.3 min
+  and the whole sync in 13.5 (10.7 and 20.1 at #19), notes found in 1.8 min
+  rather than about 4 and the txid list in 6.2 rather than about 9.4; a
+  newly created account at 6.0 and 12.4, its notes found in seconds. Both
+  stores identical to `main`'s but for record times and the same five newer
+  unshields. The Nord was not run.
+
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's
   `zakura-client-backend` pins `digest =0.11.0-pre.9` (through

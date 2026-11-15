@@ -431,6 +431,20 @@ void main() {
     expect(RailgunEvent.decode('{"event":"screening","data":7}'), isNull);
   });
 
+  test('openWallet params carry when the seed was made, only when known', () {
+    const params = RailgunOpenWalletParams(
+      encryptionKey: 'ab',
+      mnemonic: 'secret words',
+      createdAt: 1760000000,
+    );
+    expect(params.toString(), isNot(contains('secret')));
+    expect(jsonDecode(params.toJson()), {
+      'encryptionKey': 'ab',
+      'mnemonic': 'secret words',
+      'createdAt': 1760000000,
+    });
+  });
+
   test('openWallet params never print the mnemonic', () {
     const params = RailgunOpenWalletParams(
       encryptionKey: 'ab',
