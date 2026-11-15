@@ -2,9 +2,13 @@ package com.keplr.vizor.railgun
 
 import com.keplr.vizor.railgun.RailgunRequests.Route
 import java.io.File
+import java.io.IOException
+import java.io.InputStream
 import java.net.URI
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -89,11 +93,37 @@ class RailgunBoundaryTest {
     }
 
     @Test
+    fun theArchiveAnswerIsReadWholeOnlyWithinItsSizeAndTime() {
+        val clock = { 0L }
+        val body = ByteArray(200_000) { it.toByte() }
+        assertArrayEquals(body, RailgunArchiveFetch.read(body.inputStream(), -1, 60_000, clock))
+        val max = RailgunArchiveFetch.MAX_BYTES
+        // An endless body, and one that says it is too large before it starts.
+        assertThrows(IOException::class.java) { RailgunArchiveFetch.read(endless(), -1, 60_000, clock) }
+        assertThrows(IOException::class.java) { RailgunArchiveFetch.read(ByteArray(1).inputStream(), max + 1L, 60_000, clock) }
+        // A server that trickles: a byte a read, the clock 20 s on each time.
+        var now = 0L
+        val trickle = { now += 20_000; now }
+        assertThrows(IOException::class.java) { RailgunArchiveFetch.read(endless(chunk = 1), -1, 60_000, trickle) }
+    }
+
+    @Test
     fun theBuiltPageIsItsSource() {
         assertEquals(File(SOURCE).readText(), File(ASSET).readText())
     }
 
     private fun route(url: String): Route = URI(url).let { RailgunRequests.route(it.scheme, it.host, it.port) }
+
+    private fun endless(chunk: Int = 64 * 1024): InputStream =
+        object : InputStream() {
+            override fun read(): Int = 0
+
+            override fun read(
+                buffer: ByteArray,
+                offset: Int,
+                length: Int,
+            ): Int = minOf(length, chunk)
+        }
 
     private fun archive(
         url: String,
