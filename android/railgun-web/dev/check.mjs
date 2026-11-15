@@ -163,10 +163,7 @@ async function syncCheck(page, url, onEvent) {
     const finished = await synced;
     if (finished.rest !== rest) throw new Error(`rest ${finished.rest} ended, not the refresh's ${rest}`);
     console.log(`  the rest of the sync ended, screening ${finished.screening}`);
-    // What tree recovery checks after a broken scan, over the trees this sync built: every root one the contract has had.
-    const invalid = await call('firstInvalidTree', {});
-    if (invalid !== null) throw new Error(`notes tree ${invalid.tree}'s root isn't one the contract has had`);
-    console.log('  every notes tree root is one the contract has had');
+    if (pass === 'first open') await rebuildCheck(call, onEvent, balances);
     // The engine skips a scan while another runs; each sync must still get one of its own.
     const before = onEvent.notesScans;
     await Promise.all([call('refresh', {}), call('refresh', {})]);
@@ -175,6 +172,31 @@ async function syncCheck(page, url, onEvent) {
     console.log('  two syncs at once each started a notes scan');
   }
   await deleteCheck(page, url, onEvent, mnemonic);
+}
+
+/**
+ * Tree recovery's rebuild, run for real over the trees the sync built: it clears the transaction list and rebuilds the
+ * notes trees from the start, and the next refresh gives the same balances, its rest syncing the list again to the
+ * screening nodes' validated index. A rebuild doesn't begin while the engine syncs the list by itself.
+ */
+async function rebuildCheck(call, onEvent, balances) {
+  let rebuild;
+  for (let attempt = 1; attempt <= 3 && !rebuild?.rebuilt; attempt += 1) {
+    if (attempt > 1) await new Promise((resolve) => setTimeout(resolve, 5_000));
+    rebuild = await call('rebuildTrees', {});
+  }
+  if (!rebuild.rebuilt) throw new Error("the trees' rebuild never began");
+  if (rebuild.txids >= 0) throw new Error(`the rebuild left the transaction list at ${rebuild.txids}`);
+  console.log('  the notes trees were rebuilt from the start, the transaction list cleared first');
+  const synced = onEvent.next('synced');
+  const refreshed = await call('refresh', {});
+  if (JSON.stringify(refreshed.balances) !== JSON.stringify(balances)) {
+    throw new Error(`balances ${JSON.stringify(refreshed.balances)} after the rebuild, ${JSON.stringify(balances)} before`);
+  }
+  await synced;
+  const { stored, validated } = await call('txidIndexes', {});
+  if (validated === null || stored < validated) throw new Error(`the transaction list came back to ${stored} of ${validated}`);
+  console.log(`  the next refresh gave the same balances and synced the list again, to ${stored} of ${validated}`);
 }
 
 /**

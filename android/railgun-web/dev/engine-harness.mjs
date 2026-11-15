@@ -6,7 +6,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { TXIDVersion } from '@railgun-community/shared-models';
-import { throughAcceptedLeaves, throughUnshieldWatermark } from '../engine-hooks-plugin.mjs';
+import { throughAcceptedLeaves, throughRailgunEngineHooks, throughUnshieldWatermark } from '../engine-hooks-plugin.mjs';
+import * as archiveTxids from '../src/archive-txids.js';
+import * as treeRecovery from '../src/tree-recovery.js';
 import * as txidUpdates from '../src/txid-updates.js';
 import * as unshieldEvents from '../src/unshield-events.js';
 import { memoryDatabase } from './memory-store.mjs';
@@ -19,6 +21,8 @@ export const V2 = TXIDVersion.V2_PoseidonMerkle;
 const PAGE_MODULES = new Map([
   [fileURLToPath(new URL('../src/unshield-events.js', import.meta.url)), unshieldEvents],
   [fileURLToPath(new URL('../src/txid-updates.js', import.meta.url)), txidUpdates],
+  [fileURLToPath(new URL('../src/archive-txids.js', import.meta.url)), archiveTxids],
+  [fileURLToPath(new URL('../src/tree-recovery.js', import.meta.url)), treeRecovery],
 ]);
 
 await require(path.join(ENGINE, 'utils/poseidon')).initPoseidonPromise;
@@ -74,6 +78,31 @@ export async function engineHarness({ store = memoryDatabase() } = {}) {
     engine[listener] = RailgunEngine.prototype[listener].bind(engine);
   }
   return { db, down, engine, merkletree, progress, rootChecks: () => roots };
+}
+
+const { ContractStore } = require(path.join(ENGINE, 'contracts/contract-store'));
+const { CURRENT_UTXO_MERKLETREE_HISTORY_VERSION } = require(path.join(ENGINE, 'utils/constants'));
+/** The engine's own class as the build bundles it, every rewrite applied. */
+export const { RailgunEngine: BuiltEngine } = builtEngineModule('railgun-engine.js', throughRailgunEngineHooks);
+
+/**
+ * A whole engine (`Engine`, the build's by default) over `store`, with its UTXO and txid merkletrees for `CHAIN`
+ * loaded, and `contract` in the engine's contract store standing in for the RailgunSmartWallet contract its scans read:
+ * `validateMerkleroot(tree, root)`, `getHistoricalEvents(...)` and `contract.runner.provider.getBlockNumber()`. A scan
+ * of an empty store starts at `deploymentBlock`.
+ */
+export async function wholeEngine({ Engine = BuiltEngine, store = memoryDatabase(), contract, deploymentBlock }) {
+  const engine = new Engine('test', store.down, undefined, undefined, undefined, undefined, undefined, undefined, false, false);
+  const utxo = await UTXOMerkletree.create(engine.db, CHAIN, V2, (txidVersion, chain, tree, index, root) =>
+    Engine.validateMerkleroot(txidVersion, chain, tree, index, root),
+  );
+  const txids = await TXIDMerkletree.createForWallet(engine.db, CHAIN, V2, async () => true);
+  engine.utxoMerkletrees.set(V2, CHAIN, utxo);
+  engine.txidMerkletrees.set(V2, CHAIN, txids);
+  engine.deploymentBlocks.set(V2, CHAIN, deploymentBlock);
+  await engine.setUTXOMerkletreeHistoryVersion(CHAIN, CURRENT_UTXO_MERKLETREE_HISTORY_VERSION);
+  ContractStore.railgunSmartWalletContracts.set(null, CHAIN, contract);
+  return { engine, utxo, txids, down: store.down };
 }
 
 const TREE_DEPTH = 16;

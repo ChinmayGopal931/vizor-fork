@@ -1842,12 +1842,13 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
   the end of each scan: a wrong one fails the scan, never a balance.
 - `engine-hooks-plugin.mjs` holds every rewrite of the engine's code: the
   unshield watermark (`unshield-events.js`), the archive's leaf hashing
-  (`archive-txids.js`), and the txid sync's record updates
+  (`archive-txids.js`), the txid sync's record updates
   (`txid-updates.js`), held until the txid tree has a group's root accepted
   and written in one batch just before the group, through a hook in
-  `Merkletree.insertLeaves`. Each names the exact source of the pinned
-  engine and fails the build against any other: re-check them when bumping
-  it.
+  `Merkletree.insertLeaves`, and, for `tree-recovery.js`, the end-of-scan
+  root check reporting the root it refuses and a full rescan without its
+  txid list reset. Each names the exact source of the pinned engine and
+  fails the build against any other: re-check them when bumping it.
 - **Anon's archive** (Android, mainnet, Settings, on by default;
   `archive*.js`):
   - It gives commitments and the transaction list only. Unshields and
@@ -1865,17 +1866,28 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
   - Times come from the shipped block table, never the archive. Records
     carry no archive railgunTxid; a transaction's leaf is hashed from the
     archive's, which the screening node's root check then vouches for. That
-    root binds only the railgunTxid, so a transaction spending one of the
-    open wallet's notes, whose proofs rebuild the railgunTxid from its
-    fields, is worked out on the device and must match.
+    root binds only the railgunTxid, and a wallet proves its sends from the
+    record's fields: before proving, the page works out the railgunTxid of
+    each send it is to prove, and when one doesn't match it clears the list
+    and syncs all of it again from rail-squid, with the archive off for a
+    week. Never react to a wallet's own transaction during a sync, or go
+    back only as far as it: where the sync left the archive, or what it
+    asked rail-squid for, would show them which transaction is the
+    wallet's.
   - Never copy a tree's nodes from a file: a root check vouches only for
     what was hashed. (The archive's prebuilt trees were dropped for this.)
   - A notes tree whose root the contract has never had (a leaf stored
-    wrong) fails every scan. Once the same tree's root has failed three
-    checks after broken scans, ten minutes or more apart in all, the page
-    rebuilds every tree from the start with the archive off for a week, at
-    most once a day (`tree-recovery.js`); a root an RPC hasn't caught up to
-    passes by then.
+    wrong) fails every scan at the engine's end-of-scan root check, which
+    reports the root it refuses. Once it has refused the same tree's root
+    three times, ten minutes or more apart in all, with no scan completing
+    between, the page rebuilds every tree from the start with the archive
+    off for a week, at most once a day (`tree-recovery.js`); a root an RPC
+    hasn't caught up to passes by then. A scan that broke before that check
+    counts for nothing: its store can end inside an on-chain batch, at a
+    root the contract never had. The rebuild clears the transaction list
+    first (rebuilt notes lack the railgunTxids its sync gave them, which
+    proofs need), never begins while the engine syncs either, and the list
+    syncs again after the next scan that completes.
   - On anything unexpected the sync goes on from rail-squid where the
     archive left off. A request that fails on the way is sent four more
     times over 15 s (a phone's DNS can drop lookups for seconds), and a txid

@@ -10,9 +10,11 @@ import {
 } from '@railgun-community/engine';
 import { archive } from '../src/archive.js';
 import { sequenceOf, transaction } from '../src/archive-records.js';
-import { ARCHIVE_TRIES, installArchiveTxids, withHash } from '../src/archive-txids.js';
-import { CHAIN, V2 } from './engine-harness.mjs';
+import { ARCHIVE_TRIES, installArchiveTxids, misrecordedTransaction, relistIfMisrecorded, withHash } from '../src/archive-txids.js';
+import { ARCHIVE_OFF_MS, archiveOff, localStore } from '../src/tree-recovery.js';
+import { CHAIN, TXIDMerkletree, V2 } from './engine-harness.mjs';
 import { ARCHIVE_BASE, archiveServer, blockTime, word } from './history-fixture.mjs';
+import { memoryDatabase } from './memory-store.mjs';
 
 const FROM = 14_760_000;
 // Far past the fixture, so a list from its start reads the archive.
@@ -64,7 +66,6 @@ function txidSync({
   head = FAR,
   kept = [],
   reading = true,
-  mine = new Set(),
   useArchive = () => true,
 }) {
   const lastBlock = Math.max(...listed.map(({ blockNumber }) => blockNumber), ...archived.map(({ blockNumber }) => blockNumber));
@@ -91,7 +92,6 @@ function txidSync({
     setBatchSize: (size) => batches.push(size),
     time: (block) => blockTime(block),
     head: async () => head,
-    ownNullifiers: async () => mine,
     useArchive,
     log: (line) => left.push(line),
   });
@@ -215,24 +215,17 @@ test("a record that breaks the verification hashes is never handed to the engine
   assert.deepEqual(verifications(sync.kept), verifications(listed.slice(0, 50)));
 });
 
-test("the wallet's own transaction from the archive must hash to its railgunTxid, else rail-squid gives it", async () => {
-  // The archive got transaction 33's commitments wrong but kept its railgunTxid, which the root check binds: only its
-  // fields, which the wallet's proofs for its own send rebuild the railgunTxid from, are off.
+test('a record whose fields the archive got wrong, its railgunTxid right, is synced as any other', async () => {
+  // Transaction 33's commitments are off but its railgunTxid, which the root check binds, is right. Whose it is shows
+  // only when a wallet proves it (relistIfMisrecorded): a sync that left the archive there would tell it and rail-squid.
   const { archived, listed } = transactions(60);
   archived[33] = { ...archived[33], commitments: [`0x${word('not its output', 31).padStart(64, '0')}`] };
-  const spent = archived[33].nullifiers[0].slice(2);
-
-  const theirs = txidSync({ archived, listed });
-  await theirs.next();
-  await theirs.next();
-  assert.deepEqual(theirs.left, [], "another wallet's transaction is the root check's to judge");
-
-  const ours = txidSync({ archived, listed, mine: new Set([spent]) });
-  await ours.next();
-  const second = await ours.next();
-  assert.match(ours.left[0], /doesn't hash to its railgunTxid/);
-  assert.deepEqual(second.slice(0, 8).map(({ graphID }) => sequenceOf(graphID)), [25, 26, 27, 28, 29, 30, 31, 32]);
-  assert.deepEqual(verifications(ours.kept), verifications(listed.slice(0, 50)));
+  const sync = txidSync({ archived, listed });
+  await sync.next();
+  await sync.next();
+  assert.deepEqual(sync.left, []);
+  assert.deepEqual(sync.asked, []);
+  assert.deepEqual(sync.kept[33].commitments, archived[33].commitments);
 });
 
 test('after the trees were rebuilt, the list leaves the archive alone and comes from rail-squid', async () => {
@@ -313,4 +306,89 @@ test('an unshield from before V2 has its railgunTxid worked out, whatever the ar
   );
   assert.equal(tx.version, RailgunTransactionVersion.V2);
   assert.deepEqual(withHash(tx, createRailgunTransactionWithHash), createRailgunTransactionWithHash(tx));
+});
+
+/** A txid list holding `records`, as the engine stores them. */
+async function txidList(records) {
+  const list = await TXIDMerkletree.createForWallet(memoryDatabase().db, CHAIN, V2, async () => true);
+  await list.queueRailgunTransactions(records, undefined);
+  await list.updateTreesFromWriteQueue();
+  return list;
+}
+
+test("a send whose record doesn't hash to its railgunTxid is found before proving; one listed right, or not listed, isn't", async () => {
+  const { archived } = transactions(3);
+  const [right, wrong, archivedRight] = archived.map((record) => transaction(record, blockTime));
+  // The archive lists the second with another output, under its right railgunTxid.
+  const offRecord = { ...archived[1], commitments: [`0x${word('not its output', 31).padStart(64, '0')}`] };
+  const misrecorded = withHash(transaction(offRecord, blockTime), assert.fail);
+  const fromArchive = withHash(archivedRight, assert.fail);
+  const list = await txidList([createRailgunTransactionWithHash(right), misrecorded, fromArchive]);
+  const railgunTxidOf = (tx) => ByteUtils.nToHex(getRailgunTransactionID(tx), ByteLength.UINT_256);
+  assert.equal(misrecorded.railgunTxid, railgunTxidOf(wrong));
+  assert.equal(await misrecordedTransaction(list, [railgunTxidOf(right), fromArchive.railgunTxid]), undefined);
+  assert.equal(await misrecordedTransaction(list, [railgunTxidOf(right), misrecorded.railgunTxid]), misrecorded.railgunTxid);
+  assert.equal(await misrecordedTransaction(list, [word('never listed')]), undefined);
+});
+
+const NOW = 1_000_000;
+let relists = 0;
+
+/** relistIfMisrecorded over stand-ins, with the list's clear failing `clearFails` times: what it did, in order. */
+function relist({ misrecorded, clearFails = 0, store = localStore(`relist-test-${(relists += 1)}`) }) {
+  const done = [];
+  let fails = clearFails;
+  const run = () =>
+    relistIfMisrecorded({
+      misrecorded: async () => {
+        done.push('checked');
+        return misrecorded;
+      },
+      clear: async () => {
+        if (fails > 0) {
+          fails -= 1;
+          throw new Error('the list is syncing');
+        }
+        done.push('cleared');
+      },
+      catchUp: async () => {
+        done.push('caught up');
+      },
+      store,
+      now: () => NOW,
+    });
+  return { run, done, store };
+}
+
+test('a list with every send to prove listed right is left as it is', async () => {
+  const r = relist({ misrecorded: false });
+  assert.equal(await r.run(), false);
+  assert.deepEqual(r.done, ['checked']);
+  assert.ok(!archiveOff(r.store, () => NOW));
+});
+
+test('a send listed wrong has the whole list synced again from rail-squid, with the archive off for a week', async () => {
+  const r = relist({ misrecorded: true });
+  assert.equal(await r.run(), true);
+  assert.deepEqual(r.done, ['checked', 'cleared', 'caught up']);
+  assert.ok(archiveOff(r.store, () => NOW));
+  assert.ok(!archiveOff(r.store, () => NOW + ARCHIVE_OFF_MS));
+  assert.equal(r.store.read().relist, undefined);
+});
+
+test("a list that can't be cleared yet is cleared at the next proving, without the archive", async () => {
+  const r = relist({ misrecorded: true, clearFails: 1 });
+  await assert.rejects(r.run(), /the list is syncing/);
+  assert.equal(r.store.read().relist, true);
+  assert.ok(archiveOff(r.store, () => NOW), 'off before the list is cleared, so no sync takes it from the archive again');
+  assert.equal(await r.run(), true);
+  assert.deepEqual(r.done, ['checked', 'cleared', 'caught up']);
+});
+
+test("with the archive off, a send listed wrong isn't the archive's to blame: the list is left as it is", async () => {
+  const store = localStore(`relist-test-${(relists += 1)}`);
+  store.write({ archiveOffUntil: NOW + 1 });
+  const r = relist({ misrecorded: true, store });
+  await assert.rejects(r.run(), /doesn't hash to its railgunTxid/);
+  assert.deepEqual(r.done, ['checked']);
 });

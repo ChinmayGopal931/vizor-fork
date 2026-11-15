@@ -21,7 +21,8 @@ const handlers = {
 // Only an engine started with `debug` answers these, for dev/check.mjs.
 const debugHandlers = {
   openNewWallet: wallet.openNewWallet,
-  firstInvalidTree: wallet.firstInvalidTree,
+  rebuildTrees: wallet.rebuildTreesNow,
+  txidIndexes: wallet.txidIndexes,
 };
 
 // Set once, when the host's transport is found; nothing is posted before.

@@ -3,10 +3,10 @@
 // screening node validated. It also hashes each leaf from the archive's railgunTxid (`withHash`) rather than working
 // that out, which was most of the list's Poseidon: a wrong railgunTxid changes the batch's root, which the node then
 // refuses, and the records the sync gives railgunTxids are written only once it accepts one (txid-updates.js). The
-// root binds only the railgunTxid, not the nullifiers, commitments and bound params it is worked out from, which the
-// wallet's proofs for its own sends rebuild it from: a transaction spending one of the open wallet's notes is worked
-// out after all, and one that doesn't match leaves the archive. Where the archive can't go on, the list goes on from
-// rail-squid after the last transaction the archive gave.
+// root binds only the railgunTxid, not the nullifiers, commitments and bound params it is worked out from, which a
+// wallet's proofs for its own sends rebuild it from: before it proves them, the wallet works their railgunTxids out
+// (`relistIfMisrecorded`). Where the archive can't go on, the list goes on from rail-squid after the last
+// transaction the archive gave.
 import {
   ByteLength,
   ByteUtils,
@@ -19,6 +19,7 @@ import { ENGINE_V2_START_BLOCK_NUMBERS_EVM } from '../node_modules/@railgun-comm
 import { archiveRange } from './archive.js';
 import { ARCHIVE_RAILGUN_TXID, beforeBlock, blockOf, sequenceOf, transaction } from './archive-records.js';
 import { farBehind } from './archive-sync.js';
+import { ARCHIVE_OFF_MS, archiveOff } from './tree-recovery.js';
 
 let v2StartBlock = 0;
 // How long the newest block dates records past the block-time table.
@@ -28,7 +29,6 @@ const HEAD_MAX_AGE_MS = 10 * 60_000;
 export const ARCHIVE_TRIES = 3;
 
 const preV2Unshield = (railgunTransaction) => railgunTransaction.unshield && railgunTransaction.blockNumber < v2StartBlock;
-const unprefixed = (hex) => ByteUtils.formatToByteLength(hex, ByteLength.UINT_256, false).toLowerCase();
 
 /**
  * The engine's `createRailgunTransactionWithHash(transaction)` (`own`), for the transactions the archive gave: their
@@ -50,9 +50,9 @@ export function withHash(railgunTransaction, own) {
 /**
  * Has `engine`'s txid sync read the archive (`reader`) before rail-squid (the engine's own source), and set the
  * engine's txid batch (`setBatchSize`) to `batchSizes.archive` for a batch of the archive's and `batchSizes.squid` for
- * one of rail-squid's. `time` dates records (`time(blockNumber, head)`), `head()` is the chain's newest block,
- * `ownNullifiers()` the open wallet's notes' nullifiers (unprefixed hex), and `log` hears why the archive was left.
- * Without a `reader`, or while `useArchive()` says no, a list an archive sync left goes on from rail-squid.
+ * one of rail-squid's. `time` dates records (`time(blockNumber, head)`), `head()` is the chain's newest block, and
+ * `log` hears why the archive was left. Without a `reader`, or while `useArchive()` says no, a list an archive sync
+ * left goes on from rail-squid.
  *
  * - The archive gives transactions by sequence, which must run on from the last one stored without a gap, each
  *   verification hash continuing the chain as the engine checks it; the engine reads on only after a full batch, so
@@ -71,7 +71,6 @@ export function installArchiveTxids(
     setBatchSize,
     time,
     head = async () => undefined,
-    ownNullifiers = async () => new Set(),
     useArchive = () => true,
     log = () => {},
   },
@@ -104,9 +103,9 @@ export function installArchiveTxids(
 
   /**
    * Up to `count` archive transactions after `cursor` (the stored transaction `kept`), and the error the walk stopped
-   * on, if it did. Those spending one of `mine` (the open wallet's nullifiers) must hash to their railgunTxid.
+   * on, if it did.
    */
-  async function transactionsAfter(cursor, kept, count, mine) {
+  async function transactionsAfter(cursor, kept, count) {
     if (walk === undefined || walk.cursor !== cursor) {
       reset();
       const from = cursor === undefined ? 0 : blockOf(cursor);
@@ -129,14 +128,6 @@ export function installArchiveTxids(
           const read = transaction(next, (block) => time(block, newest));
           if (calculateRailgunTransactionVerificationHash(walk.verificationHash, read.nullifiers[0]) !== read.verificationHash) {
             throw new Error(`the archive's transaction ${next.sequence} breaks the verification hashes`);
-          }
-          if (
-            read[ARCHIVE_RAILGUN_TXID] !== undefined &&
-            !preV2Unshield(read) &&
-            read.nullifiers.some((nullifier) => mine.has(unprefixed(nullifier))) &&
-            getRailgunTransactionID(read) !== BigInt(`0x${read[ARCHIVE_RAILGUN_TXID]}`)
-          ) {
-            throw new Error("an archive transaction doesn't hash to its railgunTxid");
           }
           out.push(read);
           walk.last = next.sequence;
@@ -205,8 +196,7 @@ export function installArchiveTxids(
       return fromSquid(txChain, kept);
     }
     const size = batchSizes.archive;
-    const mine = await ownNullifiers().catch(() => new Set());
-    const read = await transactionsAfter(latestGraphID, kept, size, mine);
+    const read = await transactionsAfter(latestGraphID, kept, size);
     if (read.error !== undefined) leave(read.error?.message ?? String(read.error));
     if (read.out.length > 0) handed = sequenceAfter(latestGraphID);
     if (read.out.length === size) {
@@ -218,4 +208,37 @@ export function installArchiveTxids(
     const more = await fromSquid(txChain, read.out.at(-1) ?? kept);
     return read.out.concat(more.slice(0, size - read.out.length));
   };
+}
+
+/**
+ * The first of `railgunTxids` (the sends a wallet is to prove) whose record in `txidMerkletree` doesn't hash to it, if
+ * any. Only a record the archive gave can: the engine works out every other one's railgunTxid from its fields.
+ */
+export async function misrecordedTransaction(txidMerkletree, railgunTxids) {
+  for (const railgunTxid of railgunTxids) {
+    const record = await txidMerkletree.getRailgunTransactionByTxid(railgunTxid);
+    if (record !== undefined && getRailgunTransactionID(record) !== ByteUtils.hexToBigInt(railgunTxid)) return railgunTxid;
+  }
+  return undefined;
+}
+
+/**
+ * Before a wallet proves its sends: when the list's record of one doesn't hash to its railgunTxid (`misrecorded()`),
+ * clears the list (`clear()`) and has it synced again (`catchUp()`) from rail-squid alone, from the start, as any sync
+ * without the archive is. Going back only as far as that send would show rail-squid and the archive which transaction
+ * is the wallet's. `store` (tree-recovery.js) turns the archive off, and keeps that the list is to be cleared until it
+ * is. Answers whether the list was synced again.
+ */
+export async function relistIfMisrecorded({ misrecorded, clear, catchUp, store, now = Date.now }) {
+  if (store.read().relist !== true) {
+    if (!(await misrecorded())) return false;
+    // A list synced with the archive off came from rail-squid, which can't have.
+    if (archiveOff(store, now)) throw new Error("a send's record doesn't hash to its railgunTxid");
+    // The archive goes off first, so no sync takes the list from it again.
+    store.write({ ...store.read(), relist: true, archiveOffUntil: now() + ARCHIVE_OFF_MS });
+  }
+  await clear();
+  store.write({ ...store.read(), relist: undefined });
+  await catchUp();
+  return true;
 }

@@ -161,6 +161,46 @@ export function throughBatchedTxidUpdates(source) {
   return rewrites.reduce((rewritten, [original, replacement]) => replaceOnce(rewritten, original, replacement, what), source);
 }
 
+// railgun-engine.js: the root check at the end of a notes scan says which root it refused (src/tree-recovery.js).
+const END_OF_SCAN_ROOT_CHECK = `                if (!isValid) {
+                    throw new Error(\`Invalid merkleroot: \${root}. Tree: \${treeIndex}. Index: \${index}.\`);
+                }
+`;
+
+/** railgun-engine.js with the end-of-scan root check reporting the root it refuses to src/tree-recovery.js. */
+export function throughRootRefusals(source) {
+  return replaceOnce(
+    source,
+    END_OF_SCAN_ROOT_CHECK,
+    `                if (!isValid) {
+                    throw require(${pageModule('tree-recovery.js')}).rootRefused(treeIndex, root, new Error(\`Invalid merkleroot: \${root}. Tree: \${treeIndex}. Index: \${index}.\`));
+                }
+`,
+    'RailgunEngine.scanUTXOHistory',
+  );
+}
+
+// railgun-engine.js: a full rescan ends by resetting the V2 txid list, which src/tree-recovery.js does instead.
+const RESCAN_TXID_RESET = `            if (txidVersion === poi_types_1.TXIDVersion.V2_PoseidonMerkle) {
+                // Must reset txid merkletree which is mapped to UTXO commitments in V2.
+                // eslint-disable-next-line no-await-in-loop
+                await this.fullResetTXIDMerkletreesV2(chain);
+            }
+`;
+
+/**
+ * railgun-engine.js with a full rescan leaving the V2 txid list alone. The engine's reset refuses to run before the
+ * page has synced the list, and otherwise syncs all of it there and then; the page clears the list before the rescan
+ * and syncs it after the next scan that completes (src/tree-recovery.js).
+ */
+export function withoutRescanTxidReset(source) {
+  return replaceOnce(source, RESCAN_TXID_RESET, '', 'RailgunEngine.fullRescanUTXOMerkletreesAndWallets');
+}
+
+/** railgun-engine.js as the build has it. */
+export const throughRailgunEngineHooks = (source) =>
+  withoutRescanTxidReset(throughRootRefusals(throughBatchedTxidUpdates(throughArchiveTxids(source))));
+
 /** Throws unless the installed engine is the one the rewrites were written against. */
 export function checkEngineVersion(version) {
   if (version !== ENGINE_VERSION) {
@@ -183,7 +223,7 @@ export const engineHooks = {
       });
     rewrite(UTXO_MERKLETREE, 'utxo-merkletree', throughUnshieldWatermark);
     rewrite(MERKLETREE, 'merkletree', throughAcceptedLeaves);
-    rewrite(RAILGUN_ENGINE, 'railgun-engine', (source) => throughBatchedTxidUpdates(throughArchiveTxids(source)));
+    rewrite(RAILGUN_ENGINE, 'railgun-engine', throughRailgunEngineHooks);
     // A bundle with an engine module this didn't reach would run the engine's own code.
     build.onEnd(() =>
       rewritten.size === 3 ? undefined : { errors: [{ text: 'the engine modules were not all bundled through the page' }] },

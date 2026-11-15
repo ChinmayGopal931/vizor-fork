@@ -1,4 +1,4 @@
-import { ByteLength, ByteUtils, RailgunEngine, RailgunWallet, setEngineTxidSyncBatchSize } from '@railgun-community/engine';
+import { RailgunWallet, setEngineTxidSyncBatchSize } from '@railgun-community/engine';
 import {
   MerkletreeScanStatus,
   NETWORK_CONFIG,
@@ -20,7 +20,6 @@ import {
   loadWalletByID,
   refreshReceivePOIsForWallet,
   refreshSpentPOIsForWallet,
-  rescanFullUTXOMerkletreesAndWallets,
   setBatchListCallback,
   setLoggers,
   setOnUTXOMerkletreeScanCallback,
@@ -33,7 +32,7 @@ import LevelJS from 'level-js';
 import { groth16 } from 'snarkjs';
 import { archive } from './archive.js';
 import { ARCHIVES, installArchiveSync } from './archive-sync.js';
-import { installArchiveTxids } from './archive-txids.js';
+import { installArchiveTxids, misrecordedTransaction, relistIfMisrecorded } from './archive-txids.js';
 import { setArtifactProgressListener } from './artifact-mirror.js';
 import { artifactStore } from './artifacts.js';
 import { mainnetBlockAt, mainnetBlockTime } from './block-times.js';
@@ -45,7 +44,7 @@ import { syncFailure } from './rpc-probe.js';
 import { screeningActivity } from './screening-activity.js';
 import { squidQueries } from './squid.js';
 import { syncFinisher } from './sync-finish.js';
-import { archiveOff, localStore, treeRecovery } from './tree-recovery.js';
+import { archiveOff, localStore, rebuildTrees, takeRefusedRoot, treeRecovery } from './tree-recovery.js';
 import { catchUpTxids } from './txid-catch-up.js';
 import { walletNamespaces } from './wallet-namespaces.js';
 
@@ -102,7 +101,8 @@ let notesProgress = 0;
 let proofsFailed = false;
 let activity;
 let syncProgress;
-// What tree-recovery.js learned of the notes trees' roots, and when it last rebuilt them, for the network started.
+// What tree-recovery.js learned of the notes trees' roots, when it last rebuilt them, and whether the archive is off,
+// for the network started.
 let recoveryStore;
 
 const chain = () => NETWORK_CONFIG[network].chain;
@@ -113,33 +113,26 @@ export function session() {
   return { network, fees, ...wallet };
 }
 
-/** The nullifiers of the open wallet's notes, which only its own transactions spend; none while no wallet is open. */
-async function ownNullifiers() {
-  if (wallet === undefined) return new Set();
-  const notes = await walletForID(wallet.walletId).TXOs(TXID_VERSION, chain());
-  return new Set(notes.map(({ nullifier }) => ByteUtils.formatToByteLength(nullifier, ByteLength.UINT_256, false).toLowerCase()));
+/** Rebuilds the notes trees from the start for `walletId` (tree-recovery.js), calling `started()` as it begins. */
+const rebuildFor = (walletId, started) =>
+  rebuildTrees(getEngine(), { txidVersion: TXID_VERSION, chain: chain(), walletIds: [walletId], started });
+
+/** What the page does after each of `walletId`'s notes scans (tree-recovery.js). */
+const recovery = (walletId) => treeRecovery({ rebuild: (started) => rebuildFor(walletId, started), store: recoveryStore });
+
+/**
+ * Rebuilds the open wallet's notes trees now, as tree recovery does, for dev/check.mjs: whether it began, and the
+ * index of the last txid stored after it (-1 for none).
+ */
+export async function rebuildTreesNow() {
+  const rebuilt = await rebuildFor(session().walletId, () => {});
+  return { rebuilt, txids: await latestTxidIndex() };
 }
 
-/** The first notes tree whose root the contract has never had, as the engine checks them at the end of a scan. */
-export async function firstInvalidTree() {
-  const merkletree = getEngine().getUTXOMerkletree(TXID_VERSION, chain());
-  const { tree: latest } = await merkletree.getLatestTreeAndIndex();
-  for (let tree = 0; tree <= latest; tree += 1) {
-    const index = await merkletree.getLatestIndexForTree(tree);
-    const root = await merkletree.getRoot(tree);
-    if (!(await RailgunEngine.validateMerkleroot(TXID_VERSION, chain(), tree, index, root))) return { tree, root };
-  }
-  return null;
-}
-
-/** After a notes scan broke off: whether the trees were rebuilt for `walletId`'s scans (tree-recovery.js). */
-function recoverTrees(walletId) {
-  if (recoveryStore === undefined) return false;
-  return treeRecovery({
-    firstInvalidTree,
-    rebuild: () => rescanFullUTXOMerkletreesAndWallets(chain(), [walletId]),
-    store: recoveryStore,
-  })();
+/** The index of the last txid stored (-1 for none), and of the last the screening nodes validated: for dev/check.mjs. */
+export async function txidIndexes() {
+  const validated = await getEngine().getLatestValidatedTxidIndex(TXID_VERSION, chain());
+  return { stored: await latestTxidIndex(), validated: validated ?? null };
 }
 
 /** Whether the engine was started for debugging, which answers the debug-only calls too. */
@@ -190,7 +183,7 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
     }
   };
   recoveryStore = localStore(`railgun-tree-recovery:${networkName}`);
-  // A week after the trees were rebuilt, syncs leave the archive alone.
+  // For a week after the trees were rebuilt, or the archive listed one of a wallet's sends wrong, syncs leave it alone.
   const useArchive = () => !archiveOff(recoveryStore);
   if (reader !== undefined) {
     installArchiveSync(engine, { reader, queries, chainId: history.chainId, time: mainnetBlockTime, head, log, useArchive });
@@ -204,7 +197,6 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
     setBatchSize: setEngineTxidSyncBatchSize,
     time: mainnetBlockTime,
     head,
-    ownNullifiers,
     useArchive,
     log,
   });
@@ -447,7 +439,8 @@ async function reportTxids() {
  * Has the wallet prove its own sends and waits until it has. The engine refreshes a wallet's screening and proves its
  * sends by itself after every scan, outside any call, and a refresh or proof asked for while one runs does nothing but
  * report itself done; so this waits for the engine's to end, runs its own, then reads back what the screening nodes
- * made of the proofs.
+ * made of the proofs. A send is proved from the transaction list's record of it: one the archive listed wrong has the
+ * list synced again from rail-squid first (archive-txids.js).
  */
 async function proveSends(walletId) {
   const railgunWallet = walletForID(walletId);
@@ -457,6 +450,16 @@ async function proveSends(walletId) {
     if (waited >= POI_REFRESH_WAIT_MS) throw new Error('the engine is still proving');
     await delay(POI_REFRESH_POLL_MS);
   }
+  await relistIfMisrecorded({
+    misrecorded: async () => {
+      const needed = await railgunWallet.getSentCommitmentsAndUnshieldEventsNeedPOIs(TXID_VERSION, chain());
+      const sends = [...needed.sentCommitmentsNeedPOIs, ...needed.unshieldEventsNeedPOIs].flatMap(({ railgunTxid }) => railgunTxid ?? []);
+      return (await misrecordedTransaction(getEngine().getTXIDMerkletree(TXID_VERSION, chain()), sends)) !== undefined;
+    },
+    clear: () => getEngine().clearTXIDMerkletreeData(TXID_VERSION, chain()),
+    catchUp: catchUpTxidList,
+    store: recoveryStore,
+  });
   await railgunWallet.refreshPOIsForTXIDVersion(chain(), TXID_VERSION, false);
   await refreshSpentPOIsForWallet(TXID_VERSION, network, walletId);
 }
@@ -476,18 +479,22 @@ async function scanNotesNow(walletId) {
   for (let attempt = 0; attempt < NOTES_SCAN_ATTEMPTS; attempt += 1) {
     const scan = { started: false, incomplete: false };
     notesScan = scan;
+    // A root the last rebuild's own scan refused is left out: this scan shows whether the rebuild took.
+    takeRefusedRoot();
     try {
       await getEngine().scanUTXOHistory(TXID_VERSION, chain(), [walletId]);
     } finally {
       notesScan = undefined;
     }
     if (scan.incomplete) {
-      // A tree whose root the contract has never had fails every scan until it is rebuilt (tree-recovery.js); after a
-      // rebuild, a scan shows whether it took.
-      if (await recoverTrees(walletId)) continue;
+      // A tree whose root the contract has never had fails every scan until it is rebuilt (tree-recovery.js).
+      if (await recovery(walletId).broke(takeRefusedRoot())) continue;
       throw new Error('the notes scan broke off, so the balances may be stale');
     }
-    if (scan.started) return;
+    if (scan.started) {
+      recovery(walletId).passed();
+      return;
+    }
     await delay(NOTES_SCAN_RETRY_MS);
   }
   throw new Error('no notes scan started for a minute: one may be stuck');

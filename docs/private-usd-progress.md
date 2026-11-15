@@ -2826,8 +2826,13 @@ M8 status (2026-10-14): the non-device parts are done.
   reads positions as the engine places notes. A quick sync's per-insert
   root checks are asked and ignored (a write can end inside an on-chain
   batch), so the engine's end-of-scan check of every tree's root is what
-  holds the trees to the chain, and a tree that fails it for ten minutes
-  is rebuilt without the archive (`tree-recovery.js`). Device runs, cold,
+  holds the trees to the chain; a tree whose root it refuses three times
+  over ten minutes is rebuilt without the archive, the txid list cleared
+  first (`tree-recovery.js`). The root binds a txid record's railgunTxid,
+  not its fields: a send whose record doesn't hash to its railgunTxid has
+  the whole list synced again from rail-squid before it is proved, never
+  from that send, which would show which transaction is the wallet's.
+  Device runs, cold,
   Wi-Fi, the default RPC: the OnePlus 15's first balance at 10.7 min and
   the whole sync at 20.1 min (main: 42.5 min both), its store identical to
   main's but for record times; the Nord CE 3 Lite's at 24.7 and
