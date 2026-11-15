@@ -5,9 +5,10 @@
 // transaction for good. The archive's commitments must run on from those stored, and are stored only as far as
 // rail-squid's lists have shown it has come. On anything unexpected the quick sync goes on from rail-squid at the block
 // after the archive's last good one; what the archive gave stays stored.
+import { Merkletree } from '@railgun-community/engine';
 import { TXIDVersion } from '@railgun-community/shared-models';
 import { ArchiveUnavailable, archiveRange } from './archive.js';
-import { TREE_LEAVES, commitmentBatches } from './archive-records.js';
+import { commitmentBatches } from './archive-records.js';
 import { formatNullifiers, formatUnshields, quickSyncProgress, squidLists, squidPages, storeEvents } from './quick-sync.js';
 
 /** The archives the page reads, by network: only Ethereum's is kept up. */
@@ -23,28 +24,43 @@ export const ARCHIVE_MIN_BLOCKS = 7_200;
 export const farBehind = (block, head) => head - block > ARCHIVE_MIN_BLOCKS;
 
 /**
+ * Where the engine puts a note numbered `tree`:`index`: at its global tree position (tree × 65,536 + index), so one
+ * numbered past a tree's last leaf goes into the next tree.
+ */
+const placement = (tree, index) => Merkletree.getTreeAndIndexFromGlobalPosition(Merkletree.getGlobalPosition(tree, index));
+
+/**
  * The archive's commitment batches from `since` on, as `storeEvents` takes them (`{events, through}`, a chunk at a
- * time). They must start at `next`, the tree and position the next leaf takes, and run on without a gap: a batch
- * starts where the last one ended, or at the start of the next tree, and ends within its tree.
+ * time). Their notes must start at `next`, the tree and position the next leaf takes, and run on without a gap where
+ * the engine places them: a batch starts where the last one ended, or at the start of the next tree, and its notes
+ * follow its start within one tree. Rail-squid and the archive both number the first leaf of mainnet's tree 1 as tree
+ * 0's leaf 65,536.
  */
 export async function* archiveCommitments(reader, since, next, { time, chainId }) {
   let { tree, position } = next;
   for await (const chunk of archiveRange(reader, since, ['commitments'])) {
     const events = [];
     for (const batch of commitmentBatches(chunk.commitments, { since, time, chainId })) {
+      const start = placement(batch.treeNumber, batch.startPosition);
       // The starting block's batches the store already has.
-      if (batch.treeNumber < tree || (batch.treeNumber === tree && batch.startPosition < position)) continue;
-      const follows =
-        batch.treeNumber === tree ? batch.startPosition === position : batch.treeNumber === tree + 1 && batch.startPosition === 0;
+      if (start.tree < tree || (start.tree === tree && start.index < position)) continue;
+      const follows = start.tree === tree ? start.index === position : start.tree === tree + 1 && start.index === 0;
       if (!follows) {
-        throw new ArchiveUnavailable(`the archive's commitments skip from ${tree}:${position} to ${batch.treeNumber}:${batch.startPosition}`);
+        throw new ArchiveUnavailable(`the archive's commitments skip from ${tree}:${position} to ${start.tree}:${start.index}`);
       }
-      if (batch.startPosition + batch.commitments.length > TREE_LEAVES) {
-        throw new ArchiveUnavailable(`the archive's batch at ${batch.treeNumber}:${batch.startPosition} runs past its tree`);
-      }
+      // The engine places each note by its own number.
+      batch.commitments.forEach(({ utxoTree, utxoIndex }, i) => {
+        const note = placement(utxoTree, utxoIndex);
+        if (note.tree !== start.tree) {
+          throw new ArchiveUnavailable(`the archive's batch at ${start.tree}:${start.index} runs past its tree`);
+        }
+        if (note.index !== start.index + i) {
+          throw new ArchiveUnavailable(`the archive's batch at ${start.tree}:${start.index} numbers its notes apart from it`);
+        }
+      });
       events.push(batch);
-      tree = batch.treeNumber;
-      position = batch.startPosition + batch.commitments.length;
+      tree = start.tree;
+      position = start.index + batch.commitments.length;
     }
     yield { events, through: chunk.endBlock };
   }

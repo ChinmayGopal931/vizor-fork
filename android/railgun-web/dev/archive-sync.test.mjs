@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gunzipSync } from 'node:zlib';
 import { ArchiveUnavailable, archive } from '../src/archive.js';
-import { TREE_LEAVES } from '../src/archive-records.js';
 import { archiveCommitments, installArchiveSync } from '../src/archive-sync.js';
 import { formatCommitments, formatNullifiers, formatUnshields, installQuickSync } from '../src/quick-sync.js';
 import { CHAIN, V2, contents, engineHarness } from './engine-harness.mjs';
@@ -272,36 +271,44 @@ const numbered = (batch, tree, start) => ({
   commitments: batch.commitments.map((c, i) => ({ ...c, utxoTree: tree, utxoIndex: start + i })),
 });
 
-/** Where `archiveCommitments` puts each batch it gives from `reader`, `next` on, and each of its notes. */
+const TREE_LEAVES = 2 ** 16;
+// Where the engine's commitment listener queues a note.
+const queuedAt = ({ utxoTree, utxoIndex }) => `${utxoTree + (utxoIndex >> 16)}:${utxoIndex % TREE_LEAVES}`;
+
+/** Where the engine queues the notes of each batch `archiveCommitments` gives from `reader`, `next` on. */
 async function placed(reader, next) {
   const out = [];
   for await (const { events } of archiveCommitments(reader, fixture.from, next, { time: blockTime, chainId: 1 })) {
-    out.push(...events.map((b) => [b.treeNumber, b.startPosition, b.commitments.map((c) => `${c.utxoTree}:${c.utxoIndex}`)]));
+    out.push(...events.map((batch) => batch.commitments.map(queuedAt)));
   }
   return out;
 }
 
 const notes = (tree, start, count) => Array.from({ length: count }, (_, i) => `${tree}:${start + i}`);
+const several = fixture.archive.commitments.find(({ commitments }) => commitments.length > 1);
 
-test("the archive's leaf one past a full tree's last is the next tree's first, the same global tree position", async () => {
+test("the archive's note numbered one past a full tree's last goes on in the next tree, where the engine puts it", async () => {
   const [a, b, c] = fixture.archive.commitments;
   const [na, nb, nc] = [a, b, c].map(({ commitments }) => commitments.length);
   const end = TREE_LEAVES - na;
-  // As mainnet's archive numbers the start of tree 1: its first batch at tree 0's leaf 65,536, the next at 1:nb.
+  // As rail-squid and the archive number the start of mainnet's tree 1: its first batch at tree 0's leaf 65,536.
   const reader = oneChunk([numbered(a, 0, end), numbered(b, 0, TREE_LEAVES), numbered(c, 1, nb)]);
-  assert.deepEqual(await placed(reader, { tree: 0, position: end }), [
-    [0, end, notes(0, end, na)],
-    [1, 0, notes(1, 0, nb)],
-    [1, nb, notes(1, nb, nc)],
-  ]);
+  assert.deepEqual(await placed(reader, { tree: 0, position: end }), [notes(0, end, na), notes(1, 0, nb), notes(1, nb, nc)]);
 });
 
 test('an archive batch that runs past the end of its tree hands the rest to rail-squid', async () => {
-  const batch = fixture.archive.commitments.find(({ commitments }) => commitments.length > 1);
-  const reader = oneChunk([numbered(batch, 0, TREE_LEAVES - 1)]);
+  const reader = oneChunk([numbered(several, 0, TREE_LEAVES - 1)]);
   await assert.rejects(
     placed(reader, { tree: 0, position: TREE_LEAVES - 1 }),
     (error) => error instanceof ArchiveUnavailable && /runs past its tree/.test(error.message),
+  );
+});
+
+test('an archive batch whose notes are numbered apart from it hands the rest to rail-squid', async () => {
+  const reader = oneChunk([{ ...numbered(several, 0, 11), startPosition: 10 }]);
+  await assert.rejects(
+    placed(reader, { tree: 0, position: 10 }),
+    (error) => error instanceof ArchiveUnavailable && /apart from it/.test(error.message),
   );
 });
 

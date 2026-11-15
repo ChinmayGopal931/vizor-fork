@@ -85,12 +85,13 @@ test("a shield's fee comes out as rail-squid's: none before Railgun's fee upgrad
   }
 });
 
-test("a note the archive numbers one past its tree's last leaf comes out as rail-squid lists it, the next tree's first", () => {
-  // Mainnet's first leaf of tree 1, a shield, which the archive files as tree 0's leaf 65,536.
+test("a note numbered past its tree's last leaf comes out as rail-squid lists it, number and all", () => {
+  // Mainnet's first leaf of tree 1, a shield, which rail-squid and the archive both number tree 0's leaf 65,536: the
+  // engine places it by that number, in tree 1, and keeps the number in the record.
   const { squid, archive } = shield(21_332_254, { squidFee: '0', archiveFee: undefined });
-  const first = { ...squid, treeNumber: 1, batchStartTreePosition: 0, treePosition: 0 };
-  const past = { ...archive, startPosition: 65_536, commitments: [{ ...archive.commitments[0], utxoTree: 0, utxoIndex: 65_536 }] };
-  assert.equal(JSON.stringify(commitmentBatches([past], { ...options, since: 0 })), JSON.stringify(formatCommitments([first])));
+  const listed = { ...squid, batchStartTreePosition: 65_536, treePosition: 65_536 };
+  const filed = { ...archive, startPosition: 65_536, commitments: [{ ...archive.commitments[0], utxoIndex: 65_536 }] };
+  assert.equal(JSON.stringify(commitmentBatches([filed], { ...options, since: 0 })), JSON.stringify(formatCommitments([listed])));
 });
 
 test("a legacy commitment from before V2 comes out as rail-squid's", () => {

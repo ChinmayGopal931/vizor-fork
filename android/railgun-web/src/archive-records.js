@@ -3,13 +3,10 @@
 // - Times. The archive's are wrong in long stretches, so each record is dated from its block (`time`).
 // - A commitment's railgunTxid, which rail-squid leaves to the txid sync as well: the wallet keeps the value a note had
 //   when it was decrypted, before the archive's could be checked.
-// A commitment's tree and index are its batch's, read through Railgun's global tree position (tree × 65,536 + index):
-// the archive numbers the first leaf of mainnet's tree 1 as tree 0's leaf 65,536, the same global position.
 import {
   ByteLength,
   ByteUtils,
   CommitmentType,
-  Merkletree,
   RailgunTransactionVersion,
   serializePreImage,
   serializeTokenData,
@@ -43,11 +40,7 @@ const ciphertext = ({ iv, tag, data }) => ({
   data: data.map((word) => f32(word, false)),
 });
 
-/** The leaves a tree holds: where tree 1 starts in Railgun's global tree positions. */
-export const TREE_LEAVES = Merkletree.getGlobalPosition(1, 0);
-
-/** Archive commitment `c` as rail-squid's formatter makes it, at `at` (`{tree, index}`). */
-function commitment(c, time, chainId, at) {
+function commitment(c, time, chainId) {
   const common = { txid: f32(c.txid, false), timestamp: time(c.blockNumber) };
   switch (c.commitmentType) {
     case 'ShieldCommitment': {
@@ -61,8 +54,8 @@ function commitment(c, time, chainId, at) {
         encryptedBundle: c.encryptedBundle.map(raw0x),
         shieldKey: raw0x(c.shieldKey),
         fee,
-        utxoTree: at.tree,
-        utxoIndex: at.index,
+        utxoTree: c.utxoTree,
+        utxoIndex: c.utxoIndex,
         from: undefined,
       };
       if (fee === undefined) delete shield.fee;
@@ -82,8 +75,8 @@ function commitment(c, time, chainId, at) {
           annotationData: raw0x(c.ciphertext.annotationData ?? ''),
         },
         blockNumber: Number(c.blockNumber),
-        utxoTree: at.tree,
-        utxoIndex: at.index,
+        utxoTree: c.utxoTree,
+        utxoIndex: c.utxoIndex,
         railgunTxid: undefined,
       };
     case 'LegacyGeneratedCommitment':
@@ -94,8 +87,8 @@ function commitment(c, time, chainId, at) {
         preImage: preImage(c.preImage),
         encryptedRandom: [f32(c.encryptedRandom[0], false), f16(c.encryptedRandom[1], false)],
         blockNumber: Number(c.blockNumber),
-        utxoTree: at.tree,
-        utxoIndex: at.index,
+        utxoTree: c.utxoTree,
+        utxoIndex: c.utxoIndex,
       };
     case 'LegacyEncryptedCommitment':
       return {
@@ -108,8 +101,8 @@ function commitment(c, time, chainId, at) {
           memo: c.ciphertext.memo.map((word) => f32(word, false)),
         },
         blockNumber: Number(c.blockNumber),
-        utxoTree: at.tree,
-        utxoIndex: at.index,
+        utxoTree: c.utxoTree,
+        utxoIndex: c.utxoIndex,
         railgunTxid: undefined,
       };
     default:
@@ -117,23 +110,17 @@ function commitment(c, time, chainId, at) {
   }
 }
 
-/**
- * A chunk's commitment batches from `since` on, as the engine's commitment listener takes them, each at its global tree
- * position's tree and index.
- */
+/** A chunk's commitment batches from `since` on, as the engine's commitment listener takes them. */
 export function commitmentBatches(batches, { since, time, chainId }) {
   return batches
     .filter(({ blockNumber }) => blockNumber >= since)
-    .map((b) => {
-      const { tree, index } = Merkletree.getTreeAndIndexFromGlobalPosition(Merkletree.getGlobalPosition(b.treeNumber, b.startPosition));
-      return {
-        txid: f32(b.txid, false),
-        commitments: b.commitments.map((c, i) => commitment(c, time, chainId, { tree, index: index + i })),
-        treeNumber: tree,
-        startPosition: index,
-        blockNumber: b.blockNumber,
-      };
-    })
+    .map((b) => ({
+      txid: f32(b.txid, false),
+      commitments: b.commitments.map((c) => commitment(c, time, chainId)),
+      treeNumber: b.treeNumber,
+      startPosition: b.startPosition,
+      blockNumber: b.blockNumber,
+    }))
     .sort((a, b) => a.treeNumber - b.treeNumber || a.startPosition - b.startPosition);
 }
 

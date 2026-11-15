@@ -1852,9 +1852,10 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
   - Every file must match its published SHA-256, and the manifest is read
     again before the tip. Commitments must run on by tree position, each
     batch within its tree, and are stored only as far as rail-squid's lists
-    show it has come. Positions are read as Railgun's global tree positions
-    (tree × 65,536 + index): the archive files the first leaf of mainnet's
-    tree 1 as tree 0's leaf 65,536. Transactions must run on by sequence,
+    show it has come. Positions are read as the engine places notes, by
+    global tree position (tree × 65,536 + index): rail-squid and the archive
+    both number the first leaf of mainnet's tree 1 as tree 0's leaf 65,536,
+    and records keep that number. Transactions must run on by sequence,
     each verification hash continuing the chain.
   - Times come from the shipped block table, never the archive. Records
     carry no archive railgunTxid; a transaction's leaf is hashed from the
