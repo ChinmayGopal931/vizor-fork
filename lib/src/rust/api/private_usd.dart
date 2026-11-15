@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_token_status`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `token_store`
+// These functions are ignored because they are not marked as `pub`: `api_advance`, `api_cause`, `api_code`, `api_cost_request`, `api_deposit_pass`, `api_deposit_record`, `api_deposit_terms`, `api_funding_request`, `api_quote`, `api_record`, `api_reverse_advance`, `api_reverse_phase`, `api_reverse_record`, `api_send_record`, `api_token_status`, `api_transact`, `block_on`, `catch`, `deposit_confirmations`, `drive`, `internal_hex`, `late_claim_at`, `no_such_conversion`, `open_context`, `parse_amount`, `parse_network_and_migrate`, `seconds`, `swap_network`, `token_store`, `warm_proving_keys`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `from`, `from`
 
 /// The deployment for the wallet network `"main"` or `"test"`; `None` on
@@ -36,6 +36,29 @@ Future<bool> privateUsdAccountEligible({
   network: network,
   accountUuid: accountUuid,
 );
+
+/// When the account's seed was made, as a Unix time no later than that: the
+/// Zcash header time of the newest block-table entry at or below the account's
+/// birthday, for a seed this app generated, whose birthday is the tip it was
+/// made at. `None` where the table doesn't reach: off mainnet, or a birthday
+/// before the table.
+Future<PlatformInt64?> privateUsdSeedCreatedAt({
+  required String dbPath,
+  required String network,
+  required String accountUuid,
+}) => RustLib.instance.api.crateApiPrivateUsdPrivateUsdSeedCreatedAt(
+  dbPath: dbPath,
+  network: network,
+  accountUuid: accountUuid,
+);
+
+/// Railgun's head as its indexer lists it: a string that changes whenever
+/// Railgun has new events, asked for with the same request by every wallet.
+/// A wallet refreshes when it moves; a failure says nothing of the head.
+Future<String> privateUsdRailgunHead({required String network}) => RustLib
+    .instance
+    .api
+    .crateApiPrivateUsdPrivateUsdRailgunHead(network: network);
 
 /// The account's Railgun mnemonic, for the Railgun page's `openWallet`.
 /// Checks the seed against the account first: `Mismatch` for another seed,

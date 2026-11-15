@@ -13,6 +13,7 @@ use std::path::Path;
 use flutter_rust_bridge::frb;
 use zeroize::Zeroizing;
 
+use crate::wallet::block_times;
 use crate::wallet::keys;
 use crate::wallet::network::WalletNetwork;
 use crate::wallet::private_usd::{
@@ -28,7 +29,7 @@ use crate::wallet::private_usd::{
         Address, Amount, ClaimHold, Direction, ForwardOutcome, ForwardPhase, ForwardRecord,
         NothingSentCause, RefundCause, ReversePhase, ReverseRecord, ZcashTxId,
     },
-    railgun_keys,
+    railgun_head, railgun_keys,
     relayer_client::{RailgunBroadcast, RelayerClient},
     reverse::{self, FundingPrice, FundingRequest, ProvedFunding, ReverseAccept, ReverseReport},
     sends::{self, ProvedSend, SendRecord, Sends},
@@ -38,6 +39,7 @@ use crate::wallet::private_usd::{
     ErrorCode, PrivateUsdError, PrivateUsdNetwork,
 };
 use crate::wallet::routed_http::RoutedHttp;
+use crate::wallet::sync;
 
 /// Why a Private USD call failed. Copy follows the code, never the message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -298,6 +300,42 @@ pub fn private_usd_account_eligible(
             return Ok(false);
         }
         Ok(account_derivation(&db_path, network, &account_uuid)?.is_some())
+    })
+}
+
+/// When the account's seed was made, as a Unix time no later than that: the
+/// Zcash header time of the newest block-table entry at or below the account's
+/// birthday, for a seed this app generated, whose birthday is the tip it was
+/// made at. `None` where the table doesn't reach: off mainnet, or a birthday
+/// before the table.
+pub fn private_usd_seed_created_at(
+    db_path: String,
+    network: String,
+    account_uuid: String,
+) -> Result<Option<i64>, ApiPrivateUsdError> {
+    catch(|| {
+        let network = parse_network_and_migrate(&db_path, &network)?;
+        if !block_times::table_covers(network) {
+            return Ok(None);
+        }
+        let birthday = sync::get_account_birthday_height(&db_path, &account_uuid)?;
+        Ok(birthday
+            .and_then(block_times::mainnet_time_at_or_before)
+            .map(i64::from))
+    })
+}
+
+/// Railgun's head as its indexer lists it: a string that changes whenever
+/// Railgun has new events, asked for with the same request by every wallet.
+/// A wallet refreshes when it moves; a failure says nothing of the head.
+pub fn private_usd_railgun_head(network: String) -> Result<String, ApiPrivateUsdError> {
+    catch(|| {
+        let network = swap_network(&network)?;
+        let transport = RoutedHttp::new();
+        block_on(railgun_head::railgun_head(
+            &transport,
+            deployment::deployment(network),
+        ))
     })
 }
 

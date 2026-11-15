@@ -28,6 +28,7 @@ pub(crate) mod joint;
 pub(crate) mod keys;
 pub(crate) mod maker_client;
 pub(crate) mod models;
+pub(crate) mod railgun_head;
 pub(crate) mod railgun_keys;
 pub(crate) mod relayer_client;
 pub(crate) mod reverse;

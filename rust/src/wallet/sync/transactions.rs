@@ -1505,7 +1505,10 @@ pub(crate) fn get_local_block_time(
     ))))
 }
 
-fn get_account_birthday_height(db_path: &str, account_uuid: &str) -> Result<Option<u64>, String> {
+pub(crate) fn get_account_birthday_height(
+    db_path: &str,
+    account_uuid: &str,
+) -> Result<Option<u64>, String> {
     let account_id = parse_account_uuid(account_uuid)?;
     let conn = open_readonly_conn(db_path)?;
     let mut stmt = conn
