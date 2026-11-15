@@ -346,7 +346,7 @@ Future<void> _useTallSurface(WidgetTester tester) async {
 
 void main() {
   for (final network in ['main', 'test', 'regtest']) {
-    testWidgets('Support Vizor is exposed only on mainnet: $network', (
+    testWidgets('Settings offers no Support Vizor row: $network', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -358,10 +358,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.drag(find.byType(ListView).first, const Offset(0, -2000));
       await tester.pumpAndSettle();
-      expect(
-        find.text('Support Vizor'),
-        network == 'main' ? findsOneWidget : findsNothing,
-      );
+      expect(find.text('Support Vizor'), findsNothing);
     });
   }
   testWidgets('mobile private recovery is labelled experimental', (
