@@ -1733,17 +1733,19 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 addresses (`m/44'/60'|1'/(1000 + zip32)'/0/index`, from the seed) is
 shielded into its private balance by an EIP-3009 authorization the relayer
 sends (`rust/src/wallet/private_usd/deposits.rs`, zecSwap's
-`docs/deposits.md`). The Receive sheet (`private_usd_receive_sheet.dart`)
-switches, as ZEC's Receive does its pools (`NeonSwitchTabs`), between public
-USDC at the deposit address (the default) and 0zkUSDC at the account's 0zk
-address, for another Railgun wallet; it replaced the screen's 0zk card
-(owner, 2026-10-19). Only a network with a Deposits pin shows the USDC side:
-testnet and, since 2026-10-19, mainnet; elsewhere the sheet shows the 0zk
-address alone. Send and Withdraw scan their recipient as ZEC Send does (the
-shared `MobileScanAddressRow` and `MobileAddressScanCard`): Send takes a 0zk
-address and Withdraw a 0x one (`privateUsdScanOutcome`); an `ethereum:`
-request gives up its recipient, never its token, and one for another chain
-is refused.
+`docs/deposits.md`). The Receive screen (`/private-usd/receive`,
+`mobile_private_usd_receive_screen.dart`) switches, as ZEC's Receive does its
+pools (`NeonSwitchTabs`), between public USDC at the deposit address (the
+default) and 0zkUSDC at the account's 0zk address, for another Railgun
+wallet; it replaced the screen's 0zk card (owner, 2026-10-19). It is a page
+like the other Private USD screens, not a sheet, so the iOS edge swipe goes
+back from it (owner, 2026-11-15). Only a network with a Deposits pin shows
+the USDC side: testnet and, since 2026-10-19, mainnet; elsewhere the screen
+shows the 0zk address alone. Send and Withdraw scan their recipient as ZEC
+Send does (the shared `MobileScanAddressRow` and `MobileAddressScanCard`):
+Send takes a 0zk address and Withdraw a 0x one (`privateUsdScanOutcome`); an
+`ethereum:` request gives up its recipient, never its token, and one for
+another chain is refused.
 
 - Pin the Deposits contract, the relayer's deposits account (not the
   top-level relayer) and the token; refuse terms that differ, never follow

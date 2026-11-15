@@ -2922,14 +2922,14 @@ const figmaCompareScenarios = <FigmaCompareScenario>[
   ),
   FigmaCompareScenario(
     id: 'mobile-private-usd-receive',
-    description: 'Private USD Receive sheet on public USDC (the default)',
+    description: 'Private USD Receive screen on public USDC (the default)',
     builder: buildMobilePrivateUsdReceiveUseCase,
     desktop: false,
     mobile: true,
   ),
   FigmaCompareScenario(
     id: 'mobile-private-usd-receive-shielded',
-    description: 'Private USD Receive sheet switched to 0zkUSDC',
+    description: 'Private USD Receive screen switched to 0zkUSDC',
     builder: buildMobilePrivateUsdReceiveShieldedUseCase,
     desktop: false,
     mobile: true,

@@ -766,8 +766,6 @@ abstract final class PrivateUsdCopy {
   static String depositRelayerFee(String fixed, String percent) =>
       'Relayer fee: $fixed + $percent%';
   static String depositRailgunFee(String percent) => "Railgun's fee: $percent%";
-  static String depositExample(String sent, String arrives) =>
-      'Sending $sent brings $arrives after both fees.';
   static const depositFeesLoading = 'Loading the fees…';
   static const depositFeesFailed =
       "Couldn't load the fees. Money sent here waits safely at this address.";

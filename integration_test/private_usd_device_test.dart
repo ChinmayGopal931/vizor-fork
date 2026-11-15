@@ -882,8 +882,8 @@ class _Round {
   /// The address shown is Rust's derivation for the account, and the page
   /// opened the same wallet (the engine refuses a mismatch, too).
   Future<void> _checkAddress() async {
-    // The 0zk address shows in the Receive sheet, switched to 0zkUSDC (the
-    // screen's card went on 2026-10-19).
+    // The 0zk address shows on the Receive screen, switched to 0zkUSDC (the
+    // Private USD screen's card went on 2026-10-19).
     await _waitUntil(
       'the Receive button',
       () => tester.any(find.byKey(_receiveKey)),
@@ -899,7 +899,7 @@ class _Round {
       () => textForKey(tester, _addressKey) != null,
     );
     final shown = textForKey(tester, _addressKey)!;
-    await tester.tap(find.text(PrivateUsdCopy.close));
+    GoRouter.of(tester.element(find.byKey(_addressKey))).pop();
     await _pumpFor(const Duration(seconds: 1));
     final engine = _container.read(railgunEngineStateProvider);
     final derived = await _rustAddress();

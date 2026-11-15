@@ -38,6 +38,7 @@ void main() {
         '/voting',
         '/voting/poll/round/results',
         '/private-usd',
+        '/private-usd/receive',
         '/portfolio-chart',
       ]) {
         expect(requiresMobileSidebarExitPolicy(path), isFalse, reason: path);
