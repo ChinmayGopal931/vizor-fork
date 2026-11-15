@@ -1834,8 +1834,12 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
   whole only up to its newest block when asked: one that ended before a
   page of commitments was asked for is read on first. A page it didn't
   answer is asked four more times over 15 s, as an archive request is. The
-  commitments go into the trees 20,000 leaves at a time: the engine has the
-  contract check every insert's root, one call at a time.
+  commitments go into the trees 20,000 leaves at a time: the engine asks the
+  contract about every insert's root, one call at a time, and a quick sync
+  ignores the answer (a write can end inside an on-chain batch, at a root
+  the contract never recorded), though a call that fails stops the write.
+  What holds the trees to the chain is the check of every tree's root at
+  the end of each scan: a wrong one fails the scan, never a balance.
 - `engine-hooks-plugin.mjs` holds every rewrite of the engine's code: the
   unshield watermark (`unshield-events.js`), the archive's leaf hashing
   (`archive-txids.js`), and the txid sync's record updates

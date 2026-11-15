@@ -23,9 +23,11 @@ const PAGE_GAP_MS = 250;
 // seconds at a time, and a list that fails takes the archive beside it out of the sync.
 const PAGE_ATTEMPTS = 5;
 const PAGE_RETRY_MS = 1_000;
-// How many leaves wait in the engine's write queue before they go into the trees. The engine has Railgun's contract
-// check the root of every insert, one call at a time, so a write per page or archive chunk cost a round trip each,
-// hundreds on a mainnet first sync. This keeps them to a handful, and the queue small.
+// How many leaves wait in the engine's write queue before they go into the trees. The engine asks Railgun's contract
+// about the root of every insert, one call at a time, so a write per page or archive chunk cost a round trip each,
+// hundreds on a mainnet first sync. This keeps them to a handful, and the queue small. A quick sync writes whatever
+// the contract answers, since a write can end inside an on-chain batch, at a root the contract never recorded; the
+// engine checks every tree's root at the end of the scan.
 export const TREE_WRITE_LEAVES = 20_000;
 // A write that leaves leaves in the queue is tried once more after this: the root check can fail with the connection.
 const WRITE_RETRY_MS = 2_000;
