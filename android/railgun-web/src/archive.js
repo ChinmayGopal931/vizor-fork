@@ -158,8 +158,8 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
     },
 
     /**
-     * The tip of `manifest`, starting the block after `after` (the last sealed chunk's end): its event files of `kinds`.
-     * A tip replaced since the manifest was read fails as `TipMoved`.
+     * The tip of `manifest`, starting the block after `after` (the last sealed chunk's end): its event files of
+     * `kinds`. A tip replaced since the manifest was read fails as `TipMoved`.
      */
     async tip(manifest, after, kinds) {
       const query = `?v=${manifest.tipChecksum}`;

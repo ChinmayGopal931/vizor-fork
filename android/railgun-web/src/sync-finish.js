@@ -8,7 +8,8 @@
  * (`behind()`, or when that can't be read) as on a first sync, and which rest it is, numbered from 1 up. A rest catches
  * up (`catchUp()`) and has the wallet prove its sends (`prove()`), again while refreshes join it, since their sends
  * need proving too. It ends with `synced`: its number, and the wallet's state as `state(failed)` reads it, `failed`
- * when the last refresh's own check (`checkFailed`), catch-up or proofs failed; just the number when that can't be read.
+ * when the last refresh's own check (`checkFailed`), catch-up or proofs failed; just the number when that can't be
+ * read.
  */
 export function syncFinisher({ behind, catchUp, prove, state, emit, log = () => {} }) {
   let rests = 0;

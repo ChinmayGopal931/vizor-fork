@@ -130,7 +130,7 @@ export async function rebuildTreesNow() {
   return { rebuilt, txids: await latestTxidIndex() };
 }
 
-/** The index of the last txid stored (-1 for none), and of the last the screening nodes validated: for dev/check.mjs. */
+/** The index of the last txid stored (-1 for none) and of the last the screening nodes validated, for dev/check.mjs. */
 export async function txidIndexes() {
   const validated = await getEngine().getLatestValidatedTxidIndex(TXID_VERSION, chain());
   return { stored: await latestTxidIndex(), validated: validated ?? null };

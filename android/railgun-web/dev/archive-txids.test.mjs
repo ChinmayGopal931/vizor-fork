@@ -256,7 +256,8 @@ test('a record that breaks the verification hashes is never handed to the engine
 
 test('a record whose fields the archive got wrong, its railgunTxid right, is synced as any other', async () => {
   // Transaction 33's commitments are off but its railgunTxid, which the root check binds, is right. Whose it is shows
-  // only when a wallet proves it (relistIfMisrecorded): a sync that left the archive there would tell it and rail-squid.
+  // only when a wallet proves it (relistIfMisrecorded): a sync that left the archive there would tell it and
+  // rail-squid.
   const { archived, listed } = transactions(60);
   archived[33] = { ...archived[33], commitments: [`0x${word('not its output', 31).padStart(64, '0')}`] };
   const sync = txidSync({ archived, listed });

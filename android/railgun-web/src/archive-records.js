@@ -132,8 +132,8 @@ export function commitmentBatches(batches, { since, time, chainId }) {
 }
 
 // rail-squid's transaction id is three 32-byte words: the block, an index the archive doesn't carry, and a sub-index.
-// An archive transaction gets (block, ff…ff, sequence): ordered by block like rail-squid's, and, as a cursor, past every
-// rail-squid id of its block.
+// An archive transaction gets (block, ff…ff, sequence): ordered by block like rail-squid's, and, as a cursor, past
+// every rail-squid id of its block.
 const FF = 'f'.repeat(64);
 const word = (value) => BigInt(value).toString(16).padStart(64, '0');
 export const archiveGraphID = (blockNumber, sequence) => `0x${word(blockNumber)}${FF}${word(sequence)}`;

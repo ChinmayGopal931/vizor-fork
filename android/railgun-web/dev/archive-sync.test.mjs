@@ -28,8 +28,8 @@ async function storedBySquid(lists = fixture.squid) {
 }
 
 /**
- * A quick sync from `server` (archive.js over its fetch) and rail-squid (`lists`), from `startingBlock`; what it stored,
- * what it asked rail-squid, and why it left the archive.
+ * A quick sync from `server` (archive.js over its fetch) and rail-squid (`lists`), from `startingBlock`; what it
+ * stored, what it asked rail-squid, and why it left the archive.
  */
 async function storedByArchive(
   server,
