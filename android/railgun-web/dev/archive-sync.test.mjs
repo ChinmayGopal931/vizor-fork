@@ -1,17 +1,20 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { RailgunEngine } from '@railgun-community/engine';
+import { gunzipSync } from 'node:zlib';
 import { archive } from '../src/archive.js';
 import { installArchiveSync } from '../src/archive-sync.js';
 import { formatCommitments, formatNullifiers, formatUnshields, installQuickSync } from '../src/quick-sync.js';
-import { CHAIN, V2, contents, engineHarness, poseidon } from './engine-harness.mjs';
-import { ARCHIVE_BASE, archiveServer, blockTime, gz, hashOf, history, indexer, treeFile, treeLevels, word } from './history-fixture.mjs';
+import { CHAIN, V2, contents, engineHarness } from './engine-harness.mjs';
+import { ARCHIVE_BASE, archiveServer, blockTime, gz, hashOf, history, indexer, word } from './history-fixture.mjs';
 import { memoryDatabase } from './memory-store.mjs';
 
 const PAGE = 40;
 const pages = { pageSize: PAGE, gapMs: 0 };
 const fixture = history();
 const sealedAt = [14_760_030, 14_760_060, 14_760_090];
+// Far past the fixture, so a sync from its start reads the archive.
+const FAR = { blockNumber: fixture.to + 100_000, timestamp: blockTime(fixture.to + 100_000) };
+const newestBlockOf = (list) => Math.max(...list.map(({ blockNumber }) => Number(blockNumber)));
 
 /** The store rail-squid alone leaves: the engine's own quick sync over whole lists. */
 async function storedBySquid(lists = fixture.squid) {
@@ -28,19 +31,20 @@ async function storedBySquid(lists = fixture.squid) {
  * A quick sync from `server` (archive.js over its fetch) and rail-squid (`lists`), from `startingBlock`; what it stored,
  * what it asked rail-squid, and why it left the archive.
  */
-async function storedByArchive(server, { lists = fixture.squid, store = memoryDatabase(), startingBlock = fixture.from, head, harness } = {}) {
+async function storedByArchive(server, { lists = fixture.squid, store = memoryDatabase(), startingBlock = fixture.from, head = FAR, harness } = {}) {
   const { engine, merkletree } = harness ?? (await engineHarness({ store }));
   const squid = indexer(lists, PAGE);
   const left = [];
   installQuickSync(engine, { queries: squid.queries, head: async () => head?.blockNumber, pages });
   installArchiveSync(engine, {
-    reader: archive(ARCHIVE_BASE, 1, { fetch: server.fetch }),
+    reader: archive(ARCHIVE_BASE, 1, { fetch: server.fetch, retryMs: 0 }),
     queries: squid.queries,
     chainId: 1,
     time: (block) => blockTime(block),
-    head: async () => head,
+    head: async () => head ?? undefined,
     log: (line) => left.push(line),
     pages,
+    writeRetryMs: 0,
   });
   await engine.quickSyncEvents(V2, CHAIN, startingBlock);
   return { stored: contents(store.down), asked: squid.asked, left, merkletree };
@@ -53,10 +57,29 @@ test('a first sync from the archive stores exactly what rail-squid alone stores'
   const { stored, asked, left } = await storedByArchive(server);
   assert.deepEqual(left, []);
   assert.deepEqual(stored, await storedBySquid());
-  // Rail-squid gave the nullifiers from the start, and the rest only after the archive's tip.
+  // Rail-squid gave the unshields and nullifiers from the start, and commitments only past the blocks its lists showed
+  // it has: the newest unshield's, older than the newest nullifier's.
   assert.equal(squidFrom(asked, 'nullifiers'), fixture.from);
-  assert.equal(squidFrom(asked, 'commitments'), fixture.to + 1);
+  assert.equal(squidFrom(asked, 'unshields'), fixture.from);
+  assert.equal(squidFrom(asked, 'commitments'), newestBlockOf(fixture.squid.unshields) + 1);
   assert.ok(server.asked.includes('tip/meta.json'));
+  assert.ok(!server.asked.some((path) => path.includes('unshields')), 'the archive is never asked for unshields');
+});
+
+test("rail-squid behind the archive leaves no nullifier out: the archive's commitments stop where its lists do", async () => {
+  // Rail-squid has indexed only to block 14,760,100, the archive to the fixture's end.
+  const behind = 14_760_100;
+  const known = (list) => list.filter(({ blockNumber }) => Number(blockNumber) <= behind);
+  const lagging = { commitments: known(fixture.squid.commitments), nullifiers: known(fixture.squid.nullifiers), unshields: known(fixture.squid.unshields) };
+  const store = memoryDatabase();
+  const first = await storedByArchive(archiveServer(fixture, { sealedAt }), { lists: lagging, store });
+  assert.deepEqual(first.left, []);
+  const { tree, index } = await first.merkletree.getLatestTreeAndIndex();
+  const newest = (await first.merkletree.getCommitment(tree, index)).blockNumber;
+  assert.ok(newest <= behind, `a commitment from block ${newest} is stored, past rail-squid's ${behind}`);
+  // The engine's next quick sync starts at its newest stored commitment's block, rail-squid caught up by then.
+  const { stored } = await storedByArchive(archiveServer(fixture, { sealedAt }), { store, startingBlock: newest });
+  assert.deepEqual(stored, await storedBySquid());
 });
 
 test("the archive's times are never stored: each record is dated from its block", async () => {
@@ -169,8 +192,9 @@ test('a quick sync killed partway through the archive resumes from its newest st
   const killed = await engineHarness({ store });
   const own = killed.engine.commitmentListener;
   let pages = 0;
+  // From its third page on, as a page closed then would.
   killed.engine.commitmentListener = (...args) => {
-    if (++pages === 3) throw new Error('killed');
+    if (++pages >= 3) throw new Error('killed');
     return own(...args);
   };
   await assert.rejects(storedByArchive(server, { store, harness: killed }), /killed/);
@@ -190,6 +214,13 @@ test('a sync within a day of the newest block never asks the archive', async () 
   assert.deepEqual(stored, await storedBySquid());
 });
 
+test('a sync that knows no newest block never asks the archive', async () => {
+  const server = archiveServer(fixture, { sealedAt });
+  const { stored } = await storedByArchive(server, { head: null });
+  assert.deepEqual(server.asked, []);
+  assert.deepEqual(stored, await storedBySquid());
+});
+
 test('the archive and rail-squid hear the same requests whichever wallet syncs', async () => {
   const requests = async () => {
     const server = archiveServer(fixture, { sealedAt });
@@ -200,57 +231,54 @@ test('the archive and rail-squid hear the same requests whichever wallet syncs',
   assert.deepEqual(await requests(), await requests());
 });
 
-/** The archive with a prebuilt tree 0 of every fixture leaf, published as the active tree. */
-function serverWithTree() {
-  const leaves = fixture.archive.commitments.flatMap(({ commitments }) => commitments.map(({ hash }) => hash.padStart(64, '0')));
-  const file = gz(treeFile(leaves));
-  const root = treeLevels(leaves)[16][0];
-  return archiveServer(fixture, {
-    sealedAt,
-    trees: {
-      snapshot: { active: { utxo: { tree: 0, leafCount: leaves.length, root, checksum: hashOf(file), bytes: file.length } } },
-      files: { 'tip/tree-utxo-active.bin.gz': file },
-    },
-  });
+/** The fixture's archive with chunk `id`'s commitments replaced by `edit(commitments)`, its checksum to match. */
+function editedChunk(id, edit) {
+  const server = archiveServer(fixture, { sealedAt });
+  const path = `chunks/${id}/commitments.json.gz`;
+  const body = Buffer.from(JSON.stringify(edit(JSON.parse(gunzipSync(server.files.get(path))))));
+  server.files.set(path, gz(body));
+  const meta = JSON.parse(server.files.get(`chunks/${id}/meta.json`));
+  meta.files.commitments.checksum = hashOf(body);
+  server.files.set(`chunks/${id}/meta.json`, Buffer.from(JSON.stringify(meta)));
+  return server;
 }
 
-async function withRootCheck(accepted, run) {
-  const validate = RailgunEngine.validateMerkleroot;
-  const hash = poseidon.poseidonHex;
-  let hashed = 0;
-  RailgunEngine.validateMerkleroot = async () => accepted;
-  poseidon.poseidonHex = (inputs) => {
-    hashed += 1;
-    return hash(inputs);
-  };
-  try {
-    return { ...(await run()), hashed };
-  } finally {
-    RailgunEngine.validateMerkleroot = validate;
-    poseidon.poseidonHex = hash;
-  }
-}
-
-test("a prebuilt tree whose root Railgun's contract accepts stands in for hashing, to the same tree", async () => {
-  const hashing = await withRootCheck(false, () => storedByArchive(serverWithTree()));
-  const copied = await withRootCheck(true, () => storedByArchive(serverWithTree()));
-  assert.deepEqual(copied.stored, hashing.stored);
-  assert.deepEqual(copied.stored, await storedBySquid());
-  assert.ok(copied.hashed < hashing.hashed / 4, `${copied.hashed} hashes with the tree, ${hashing.hashed} without`);
+test("a batch missing from a chunk, its checksum and all, hands the rest to rail-squid before the gap", async () => {
+  const server = editedChunk(1, (commitments) => commitments.filter((_, i) => i !== 5));
+  const { stored, asked, left } = await storedByArchive(server);
+  assert.match(left[0], /skip/);
+  assert.equal(squidFrom(asked, 'commitments'), sealedAt[0]);
+  assert.deepEqual(stored, await storedBySquid());
 });
 
-test('a prebuilt tree that is not the one the manifest names is never used', async () => {
-  const server = serverWithTree();
-  const leaves = fixture.archive.commitments.flatMap(({ commitments }) => commitments.map(({ hash }) => hash));
-  leaves[3] = word('not a leaf', 31);
-  const file = gz(treeFile(leaves));
-  server.files.set('tip/tree-utxo-active.bin.gz', file);
-  server.setManifest((manifest) => ({
-    ...manifest,
-    treeSnapshot: { ...manifest.treeSnapshot, active: { utxo: { ...manifest.treeSnapshot.active.utxo, checksum: hashOf(file) } } },
-  }));
-  const hashing = await withRootCheck(false, () => storedByArchive(serverWithTree()));
-  const refused = await withRootCheck(true, () => storedByArchive(server));
-  assert.equal(refused.hashed, hashing.hashed);
-  assert.deepEqual(refused.stored, await storedBySquid());
+test("a commitment the page can't read hands the rest to rail-squid, as anything unexpected does", async () => {
+  const server = editedChunk(2, (commitments) => commitments.map((batch, i) => (i === 0 ? { ...batch, commitments: [{ ...batch.commitments[0], commitmentType: 'Unheard' }] } : batch)));
+  const { stored, asked, left } = await storedByArchive(server);
+  assert.match(left[0], /unknown archive commitment type/);
+  assert.equal(squidFrom(asked, 'commitments'), sealedAt[1]);
+  assert.deepEqual(stored, await storedBySquid());
+});
+
+test('a manifest that is not JSON leaves the whole sync to rail-squid', async () => {
+  const server = archiveServer(fixture, { sealedAt });
+  server.files.set('meta.json', Buffer.from('<html>busy</html>'));
+  const { stored, asked, left } = await storedByArchive(server);
+  assert.match(left[0], /not JSON/);
+  assert.equal(squidFrom(asked, 'commitments'), fixture.from);
+  assert.deepEqual(stored, await storedBySquid());
+});
+
+test('a request that fails on the way is sent again, and the archive is kept', async () => {
+  const server = archiveServer(fixture, { sealedAt });
+  const failing = new Set(['chunks/1/commitments.json.gz', 'chunk-index.json']);
+  const flaky = {
+    fetch: (url) => {
+      const name = url.replace(/^https:\/\/digest\.test\/v4\/1\//, '').replace(/\?v=.*$/, '');
+      if (failing.delete(name)) return name === 'chunk-index.json' ? Promise.reject(new TypeError('Failed to fetch')) : new Response('', { status: 502 });
+      return server.fetch(url);
+    },
+  };
+  const { stored, left } = await storedByArchive(flaky);
+  assert.deepEqual(left, []);
+  assert.deepEqual(stored, await storedBySquid());
 });

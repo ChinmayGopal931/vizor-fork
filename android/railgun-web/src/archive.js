@@ -1,7 +1,7 @@
-// Anon's archive of Railgun's history (https://docs.anon.inc/advanced/digest-sync): sealed chunks of events, a tip
-// that is replaced every few seconds, and the merkle trees prebuilt. Every path depends on the chain alone. Every file
-// is checked against the SHA-256 the archive publishes for it before it is used, and anything unexpected is an
-// `ArchiveUnavailable`, on which the sync turns to rail-squid.
+// Anon's archive of Railgun's history (https://docs.anon.inc/advanced/digest-sync): sealed chunks of events, and a tip
+// that is replaced every few seconds. Every path depends on the chain alone. Every event file is checked against the
+// SHA-256 the archive publishes for it before it is used, and anything unexpected is an `ArchiveUnavailable`, on which
+// the sync turns to rail-squid.
 
 /** The archive can't be used from here on: the sync goes on from rail-squid. */
 export class ArchiveUnavailable extends Error {}
@@ -11,32 +11,54 @@ class TipMoved extends ArchiveUnavailable {}
 
 // The formats this reader knows. The root manifest, the chunk metas, the tip meta and the tree files each count their
 // own versions.
-const KNOWN = { version: 5, rootFormat: 2, chunkFormat: 3, tipFormat: 3, treeFormat: 1, txidVersion: 'V2_PoseidonMerkle' };
+const KNOWN = { version: 5, rootFormat: 2, chunkFormat: 3, tipFormat: 3, txidVersion: 'V2_PoseidonMerkle' };
 const TIP_ATTEMPTS = 3;
 const TIMEOUT_MS = 60_000;
+// A request that failed on the way, or that a busy or failing server turned away (the host answers 502 for a fetch of
+// its own that failed), is sent again, after 1 s and then 2 s.
+const ATTEMPTS = 3;
+const RETRY_MS = 1_000;
+const retried = (status) => status === 408 || status === 425 || status === 429 || status >= 500;
 
 const hex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 export const sha256 = async (bytes) => hex(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)));
 const gunzip = async (bytes) =>
   new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
-const decode = (bytes) => JSON.parse(new TextDecoder().decode(bytes));
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function decode(bytes, path) {
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    throw new ArchiveUnavailable(`${path} is not JSON`);
+  }
+}
 
 /**
  * The archive at `base` (`https://digest.anon.inc/v4/<chain id>`) for `chainId`. `fetch` is the page's, which the host
- * answers for the archive's host itself, through the page's own route.
+ * answers for the archive's host itself, through the page's own route; `retryMs` spaces the attempts at a request.
  */
-export function archive(base, chainId, { fetch = globalThis.fetch } = {}) {
+export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RETRY_MS } = {}) {
   async function get(path) {
+    for (let attempt = 1; ; attempt += 1) {
+      const { bytes, failure, again } = await getOnce(path);
+      if (bytes !== undefined) return bytes;
+      if (!again || attempt >= ATTEMPTS) throw failure;
+      await delay(retryMs * attempt);
+    }
+  }
+
+  async function getOnce(path) {
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), TIMEOUT_MS);
-    let response;
     try {
-      response = await fetch(`${base}/${path}`, { cache: 'no-store', signal: abort.signal });
-      if (!response.ok) throw new ArchiveUnavailable(`the archive answered ${response.status} for ${path}`);
-      return new Uint8Array(await response.arrayBuffer());
+      const response = await fetch(`${base}/${path}`, { cache: 'no-store', signal: abort.signal });
+      if (!response.ok) {
+        return { failure: new ArchiveUnavailable(`the archive answered ${response.status} for ${path}`), again: retried(response.status) };
+      }
+      return { bytes: new Uint8Array(await response.arrayBuffer()) };
     } catch (error) {
-      if (error instanceof ArchiveUnavailable) throw error;
-      throw new ArchiveUnavailable(`the archive did not answer for ${path}: ${error?.message ?? error}`);
+      return { failure: new ArchiveUnavailable(`the archive did not answer for ${path}: ${error?.message ?? error}`), again: true };
     } finally {
       clearTimeout(timer);
     }
@@ -54,7 +76,7 @@ export function archive(base, chainId, { fetch = globalThis.fetch } = {}) {
     if (typeof published?.checksum !== 'string' || (await sha256(json)) !== published.checksum) {
       throw new ArchiveUnavailable(`${path} does not match its checksum`);
     }
-    const parsed = decode(json);
+    const parsed = decode(json, path);
     if (!Array.isArray(parsed)) throw new ArchiveUnavailable(`${path} is not a list`);
     return parsed;
   }
@@ -72,7 +94,7 @@ export function archive(base, chainId, { fetch = globalThis.fetch } = {}) {
   return {
     /** The root manifest, its formats and chain checked. */
     async manifest() {
-      const manifest = decode(await get('meta.json'));
+      const manifest = decode(await get('meta.json'), 'meta.json');
       if (
         manifest.version !== KNOWN.version ||
         manifest.formatVersion !== KNOWN.rootFormat ||
@@ -91,7 +113,7 @@ export function archive(base, chainId, { fetch = globalThis.fetch } = {}) {
      * transaction sequences are left out: early chunks list none though they hold transactions.
      */
     async chunks(manifest) {
-      const index = decode(await get(`chunk-index.json?v=${manifest.latestSealedChunk}`));
+      const index = decode(await get(`chunk-index.json?v=${manifest.latestSealedChunk}`), 'chunk-index.json');
       const chunks = Array.isArray(index?.chunks) && index.chainId === chainId ? index.chunks : undefined;
       if (chunks === undefined || chunks.length !== manifest.latestSealedChunk + 1) {
         throw new ArchiveUnavailable('the chunk index does not match the manifest');
@@ -107,7 +129,7 @@ export function archive(base, chainId, { fetch = globalThis.fetch } = {}) {
 
     /** Sealed chunk `chunk`'s event files of `kinds`. */
     async chunk({ id, startBlock, endBlock }, kinds) {
-      const meta = decode(await get(`chunks/${id}/meta.json`));
+      const meta = decode(await get(`chunks/${id}/meta.json`), `chunks/${id}/meta.json`);
       if (meta.formatVersion !== KNOWN.chunkFormat || meta.chunkId !== id || meta.startBlock !== startBlock || meta.endBlock !== endBlock) {
         throw new ArchiveUnavailable(`chunk ${id} is not the one the index names`);
       }
@@ -122,7 +144,7 @@ export function archive(base, chainId, { fetch = globalThis.fetch } = {}) {
       const query = `?v=${manifest.tipChecksum}`;
       const bytes = await get(`tip/meta.json${query}`);
       if ((await sha256(bytes)) !== manifest.tipChecksum) throw new TipMoved('the tip moved');
-      const meta = decode(bytes);
+      const meta = decode(bytes, 'tip/meta.json');
       if (meta.formatVersion !== KNOWN.tipFormat || meta.startBlock !== after + 1 || !(meta.endBlock >= meta.startBlock - 1)) {
         throw new ArchiveUnavailable(`the tip does not follow block ${after}`);
       }
@@ -131,19 +153,6 @@ export function archive(base, chainId, { fetch = globalThis.fetch } = {}) {
       } catch (error) {
         // Its files replaced under it.
         throw error instanceof ArchiveUnavailable ? new TipMoved(error.message) : error;
-      }
-    },
-
-    /** A prebuilt tree file, checked against `checksum` (the SHA-256 of the gzip as served) when given. */
-    async tree(path, checksum) {
-      const gz = await get(path);
-      if (checksum !== undefined && (await sha256(gz)) !== checksum) {
-        throw new ArchiveUnavailable(`${path} does not match its checksum`);
-      }
-      try {
-        return await gunzip(gz);
-      } catch {
-        throw new ArchiveUnavailable(`${path} is not gzip`);
       }
     },
   };

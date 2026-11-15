@@ -23,6 +23,8 @@ const PAGE_GAP_MS = 250;
 // check the root of every insert, one call at a time, so a write per page or archive chunk cost a round trip each,
 // hundreds on a mainnet first sync. This keeps them to a handful, and the queue small.
 export const TREE_WRITE_LEAVES = 20_000;
+// A write that leaves leaves in the queue is tried once more after this: the root check can fail with the connection.
+const WRITE_RETRY_MS = 2_000;
 // Where the engine's notes scan puts its quick sync: from a fifth to four fifths of its first half.
 const PROGRESS_FROM = 0.1;
 const PROGRESS_TO = 0.4;
@@ -45,51 +47,72 @@ function withTimeout(promise, ms) {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+// Every query sent to the indexer, counted across lists: which of two pages was asked for first.
+let asks = 0;
+
 /**
- * One of the indexer's event lists from `startingBlock` on, a page at a time: `{events, through}`, the page's events
- * as `format` makes them, and the block through which the list has now given every event (Infinity at its end). The
- * next page is asked for while this one is stored. The indexer pages by block, starting each page at the block the
- * last one ended on, so a page's events that the last page gave are left out.
+ * One of the indexer's event lists from `startingBlock` on, a page at a time: `{events, through, asked, newest}`, the
+ * page's events as `format` makes them, the block through which the list has now given every event (Infinity once a
+ * page reaches the indexer's newest block, the list's last), when the page was asked for (`asked`, counted across
+ * lists), and the newest block the indexer has shown it has (`newest`). The next page is asked for while this one is
+ * stored. The indexer pages by block, starting each page at the block the last one ended on, so a page's events that
+ * the last page gave are left out. The last page's `again()` reads the list on from there, asked anew.
  */
-export async function* squidPages(
-  query,
-  format,
-  startingBlock,
-  { pageSize = SQUID_PAGE_SIZE, gapMs = PAGE_GAP_MS } = {},
-) {
+export function squidPages(query, format, startingBlock, { pageSize = SQUID_PAGE_SIZE, gapMs = PAGE_GAP_MS } = {}) {
+  return pagesFrom(query, format, { from: startingBlock, given: new Set(), newest: startingBlock - 1 }, { pageSize, gapMs });
+}
+
+async function* pagesFrom(query, format, at, options) {
+  const { pageSize, gapMs } = options;
   const ask = (block, wait) => {
-    const answer = (wait ? delay(wait) : Promise.resolve()).then(() => withTimeout(query(block), PAGE_TIMEOUT_MS));
+    const answer = (wait ? delay(wait) : Promise.resolve()).then(() => {
+      const asked = ++asks;
+      return withTimeout(query(block), PAGE_TIMEOUT_MS).then((page) => ({ page, asked }));
+    });
     answer.catch(() => {});
     return answer;
   };
-  let from = startingBlock;
-  let given = new Set();
+  let { from, given, newest } = at;
   let next = ask(from, 0);
   for (;;) {
-    const page = await next;
+    const { page, asked } = await next;
     const full = page.length >= pageSize;
     const last = page.length === 0 ? from : Number(page[page.length - 1].blockNumber);
     const events = page.filter(({ id }) => !given.has(id));
     if (full && last === from && events.length === 0) {
       throw new Error(`the indexer has more than a page of events in block ${from}`);
     }
-    if (full) {
-      given = new Set(page.filter(({ blockNumber }) => Number(blockNumber) === last).map(({ id }) => id));
-      from = last;
-      next = ask(from, gapMs);
+    if (page.length > 0) newest = Math.max(newest, last);
+    if (!full) {
+      // Read on from the same block, with what this page gave left out.
+      const read = { from, given: new Set([...given, ...page.map(({ id }) => id)]), newest };
+      yield { events: format(events), through: Infinity, asked, newest, again: () => pagesFrom(query, format, read, options) };
+      return;
     }
-    yield { events: format(events), through: full ? last - 1 : Infinity };
-    if (!full) return;
+    given = new Set(page.filter(({ blockNumber }) => Number(blockNumber) === last).map(({ id }) => id));
+    from = last;
+    next = ask(from, gapMs);
+    yield { events: format(events), through: last - 1, asked, newest };
   }
 }
 
+/** Whether `merkletree`'s write queue holds leaves its trees didn't take. */
+const leavesLeft = (merkletree) => merkletree.writeQueue.some((queue) => queue?.some((group) => group !== undefined));
+
 /**
  * Stores a quick sync's events as they come and returns nothing more for the engine to store. `unshields`,
- * `nullifiers` and `commitments` are page lists as `squidPages` gives them. The engine resumes a quick sync from its
- * newest stored commitment's block, so the unshields and nullifiers of a page's blocks are stored before its
- * commitments, which go into the trees `writeLeaves` at a time, and at the end. `progress(through)` hears, after each
- * page of commitments, the block through which all three lists have come; `stored(through)`, the block through which
- * they are stored. A list that fails stores what the pages before it gave first.
+ * `nullifiers` and `commitments` are page lists as `squidPages` gives them; `commitments` can come from elsewhere, as
+ * `{events, through}` pages. The engine resumes a quick sync from its newest stored commitment's block, so the
+ * unshields and nullifiers of a page's blocks are stored before its commitments, which go into the trees `writeLeaves`
+ * at a time, and at the end.
+ *
+ * The indexer's lists are whole up to its newest block when they were asked, and a later answer can reach further: a
+ * list that ended before a page of the indexer's commitments was asked for is read on first. Commitments from
+ * elsewhere are stored only as far as the lists show the indexer has come, where the quick sync ends.
+ *
+ * `progress(through)` hears, after each page of commitments, the block through which all three lists have come;
+ * `stored(through)`, the block through which they are stored, once the trees have taken every leaf (or it throws).
+ * A list that fails stores what the pages before it gave first.
  */
 export async function storeEvents({
   engine,
@@ -101,45 +124,73 @@ export async function storeEvents({
   stored,
   progress,
   writeLeaves = TREE_WRITE_LEAVES,
+  writeRetryMs = WRITE_RETRY_MS,
 }) {
   const merkletree = engine.getUTXOMerkletree(txidVersion, chain);
   const before = [
-    { pages: unshields, through: -Infinity, store: (events) => engine.unshieldListener(txidVersion, chain, events) },
-    { pages: nullifiers, through: -Infinity, store: (events) => engine.nullifierListener(txidVersion, chain, events) },
-  ];
-  const storeThrough = async (block) => {
+    { pages: unshields, store: (events) => engine.unshieldListener(txidVersion, chain, events) },
+    { pages: nullifiers, store: (events) => engine.nullifierListener(txidVersion, chain, events) },
+  ].map((list) => ({ ...list, through: -Infinity, newest: -Infinity, asked: 0, again: undefined }));
+  const pull = async (list) => {
+    const { value, done } = await list.pages.next();
+    if (done) throw new Error('an event list ended before its last page');
+    if (value.events.length > 0) await list.store(value.events);
+    Object.assign(list, { through: value.through, newest: value.newest, asked: value.asked, again: value.again });
+  };
+  // Stores both lists through `block`, and read on for a page of the indexer's commitments asked for after a list
+  // ended (`asked`). Answers the block through which the lists have shown every event.
+  const storeThrough = async (block, asked) => {
     for (const list of before) {
-      while (list.through < block) {
-        const { value, done } = await list.pages.next();
-        if (done) {
-          list.through = Infinity;
+      for (;;) {
+        if (list.through < block) {
+          await pull(list);
+        } else if (asked !== undefined && list.through === Infinity && list.asked < asked) {
+          list.pages = list.again();
+          await pull(list);
+        } else {
           break;
         }
-        if (value.events.length > 0) await list.store(value.events);
-        list.through = value.through;
       }
     }
+    return Math.min(...before.map((list) => (list.through === Infinity ? list.newest : list.through)));
   };
   // The leaves waiting in the write queue, and the block through which the pages that gave them are whole.
   let queued = 0;
   let queuedThrough;
   const write = async () => {
-    if (queued > 0) await merkletree.updateTreesFromWriteQueue(true);
+    if (queued > 0) {
+      await merkletree.updateTreesFromWriteQueue(true);
+      // A missing leaf, or a root check that failed, stops the trees short and leaves the rest queued, which a store
+      // that says how far it came can't have.
+      if (stored !== undefined && leavesLeft(merkletree)) {
+        await delay(writeRetryMs);
+        await merkletree.updateTreesFromWriteQueue(true);
+        if (leavesLeft(merkletree)) throw new Error('the trees stopped short of the leaves they were given');
+      }
+    }
     queued = 0;
     if (queuedThrough !== undefined) stored?.(queuedThrough);
     queuedThrough = undefined;
   };
+  let ended = false;
   try {
-    for await (const { events, through } of commitments) {
+    for await (const { events, through, asked } of commitments) {
       // A page's last block can go on in the next page, so its events reach past what it gives whole.
       const reached = events.reduce((highest, batch) => Math.max(highest, batch.blockNumber), through);
-      await storeThrough(reached);
-      if (events.length > 0) {
-        await engine.commitmentListener(txidVersion, chain, events, false, false);
-        queued += events.reduce((leaves, batch) => leaves + batch.commitments.length, 0);
+      const shown = await storeThrough(reached, asked);
+      // The indexer's own commitments come no further than its lists; another source's can.
+      const whole = asked === undefined ? Math.min(shown, reached) : reached;
+      const kept = whole < reached ? events.filter(({ blockNumber }) => blockNumber <= whole) : events;
+      if (kept.length > 0) {
+        await engine.commitmentListener(txidVersion, chain, kept, false, false);
+        queued += kept.reduce((leaves, batch) => leaves + batch.commitments.length, 0);
       }
-      queuedThrough = through;
-      progress?.(through);
+      queuedThrough = Math.min(through, whole);
+      progress?.(queuedThrough);
+      if (whole < reached) {
+        ended = true;
+        break;
+      }
       if (queued === 0 || queued >= writeLeaves) await write();
     }
   } catch (error) {
@@ -148,7 +199,7 @@ export async function storeEvents({
     throw error;
   }
   await write();
-  await storeThrough(Infinity);
+  if (!ended) await storeThrough(Infinity);
   return NO_EVENTS;
 }
 
@@ -161,19 +212,20 @@ export function quickSyncProgress(startingBlock, head, block) {
 
 /**
  * Has `engine` quick sync from the indexer (`queries`, `squidQueries`), a page at a time. `head()` is the chain's
- * newest block, for the progress it reports; without it the quick sync reports none of its own. `pages` are
+ * newest block number, for the progress it reports; without it the quick sync reports none of its own. `pages` are
  * `squidPages`'s options.
  */
 export function installQuickSync(engine, { queries, head, pages }) {
   const own = engine.quickSyncEvents;
   engine.quickSyncEvents = async (txidVersion, chain, startingBlock) => {
     if (txidVersion !== TXIDVersion.V2_PoseidonMerkle) return own(txidVersion, chain, startingBlock);
+    const newest = await head().catch(() => undefined);
     return storeEvents({
       engine,
       txidVersion,
       chain,
       ...squidLists(queries, startingBlock, pages),
-      progress: await progressReporter(engine, txidVersion, chain, startingBlock, head),
+      progress: progressReporter(engine, txidVersion, chain, startingBlock, newest),
     });
   };
 }
@@ -185,14 +237,12 @@ export const squidLists = (queries, startingBlock, options) => ({
   commitments: squidPages(queries.commitments, formatCommitments, startingBlock, options),
 });
 
-/** Reports a quick sync's progress through the engine's own scan updates, so the page hears it as the engine's. */
-export async function progressReporter(engine, txidVersion, chain, startingBlock, head) {
-  let newest;
-  try {
-    newest = await head();
-  } catch {
-    return undefined;
-  }
+/**
+ * Reports a quick sync's progress toward `head` (the newest block number) through the engine's own scan updates, so
+ * the page hears it as the engine's; none without a head.
+ */
+export function progressReporter(engine, txidVersion, chain, startingBlock, head) {
+  if (head === undefined) return undefined;
   return (block) =>
-    engine.emitUTXOMerkletreeScanUpdateEvent(txidVersion, chain, quickSyncProgress(startingBlock, newest, block));
+    engine.emitUTXOMerkletreeScanUpdateEvent(txidVersion, chain, quickSyncProgress(startingBlock, head, block));
 }

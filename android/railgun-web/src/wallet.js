@@ -1,4 +1,4 @@
-import { RailgunWallet, getEngineTxidSyncBatchSize, setEngineTxidSyncBatchSize } from '@railgun-community/engine';
+import { RailgunWallet, setEngineTxidSyncBatchSize } from '@railgun-community/engine';
 import {
   MerkletreeScanStatus,
   NETWORK_CONFIG,
@@ -22,7 +22,6 @@ import {
   refreshSpentPOIsForWallet,
   setBatchListCallback,
   setLoggers,
-  setOnTXIDMerkletreeScanCallback,
   setOnUTXOMerkletreeScanCallback,
   setOnWalletPOIProofProgressCallback,
   startRailgunEngine,
@@ -36,7 +35,7 @@ import { ARCHIVES, installArchiveSync } from './archive-sync.js';
 import { installArchiveTxids } from './archive-txids.js';
 import { setArtifactProgressListener } from './artifact-mirror.js';
 import { artifactStore } from './artifacts.js';
-import { mainnetBlockTime } from './block-times.js';
+import { mainnetBlockAt, mainnetBlockTime } from './block-times.js';
 import { badRequest } from './errors.js';
 import { installQuickSync } from './quick-sync.js';
 import { hasUndatedReceipts, hasUndatedShields, pendingShields, receivedSends } from './received.js';
@@ -45,7 +44,7 @@ import { syncFailure } from './rpc-probe.js';
 import { screeningActivity } from './screening-activity.js';
 import { squidQueries } from './squid.js';
 import { syncFinisher } from './sync-finish.js';
-import { catchUpTxids, txidCompleteHold } from './txid-catch-up.js';
+import { catchUpTxids } from './txid-catch-up.js';
 import { walletNamespaces } from './wallet-namespaces.js';
 
 export const TXID_VERSION = TXIDVersion.V2_PoseidonMerkle;
@@ -62,10 +61,9 @@ const NOTES_SCAN_START = 0.03;
 // The engine keeps the txids it syncs a batch at a time, and a page closed or paused before a batch ends keeps none of
 // that batch. The engine's default batch is the 10,000 that Railgun's subgraph hands over at once, which takes a phone
 // minutes; a wallet cut off that often never catches up, and can't prove its sends. Smaller batches keep their progress.
-const TXID_SYNC_BATCH_SIZE = 1_000;
 // A batch from Anon's archive is in within seconds, so a page cut off loses little of a larger one, and each batch
 // costs a root check at the screening node.
-const ARCHIVE_TXID_SYNC_BATCH_SIZE = 5_000;
+const TXID_SYNC_BATCH_SIZES = { squid: 1_000, archive: 5_000 };
 // The engine reads on only while the subgraph's answer is one batch long, so each of its txid syncs now reads one
 // answer of 10,000; a refresh syncs again until one adds nothing. Ethereum's whole history is about 15 answers.
 const TXID_SYNC_PASSES = 50;
@@ -77,8 +75,9 @@ const TXID_SYNC_RETRY_MS = 5_000;
 // Only a long catch-up is reported, so a refresh that finds a few new txids doesn't flash the row; it is read this often.
 const TXID_REPORT_GAP = 1_000;
 const TXID_REPORT_MS = 2_000;
-// How long the rest of a sync waits for a screening refresh the engine runs by itself, and how often it looks.
-const POI_REFRESH_WAIT_MS = 10 * 60_000;
+// How long the rest of a sync waits for the screening refresh and proofs the engine runs by itself, and how often it
+// looks. A restored wallet with many sends to prove can take this long.
+const POI_REFRESH_WAIT_MS = 30 * 60_000;
 const POI_REFRESH_POLL_MS = 1_000;
 
 let starting;
@@ -99,7 +98,6 @@ let notesProgress = 0;
 // Whether the proofs the open wallet's sends need failed when the engine last sent them. The engine screens by itself
 // after every scan, outside any call, and reports how that went only through its callback.
 let proofsFailed = false;
-const txidHold = txidCompleteHold();
 let activity;
 let syncProgress;
 
@@ -141,30 +139,37 @@ export function start({ network: name, rpcUrls, poiNodeUrls, archive: useArchive
 
 async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history, debug, emit) {
   if (debug) setLoggers((message) => emit('log', String(message)), (error) => emit('log', String(error?.stack ?? error)));
-  setEngineTxidSyncBatchSize(history === undefined ? TXID_SYNC_BATCH_SIZE : ARCHIVE_TXID_SYNC_BATCH_SIZE);
+  setEngineTxidSyncBatchSize(TXID_SYNC_BATCH_SIZES.squid);
   await startRailgunEngine(WALLET_SOURCE, new LevelJS(database), debug, artifactStore, false, false, poiNodeUrls);
   getProver().setSnarkJSGroth16(groth16);
   const engine = getEngine();
   const queries = squidQueries(networkName);
-  installQuickSync(engine, { queries, head: () => getFallbackProviderForNetwork(networkName).getBlockNumber() });
-  if (history !== undefined) {
-    const reader = archive(history.base, history.chainId);
-    const head = async () => {
-      const block = await getFallbackProviderForNetwork(networkName).getBlock('latest');
-      return { blockNumber: block.number, timestamp: block.timestamp };
-    };
-    const log = (line) => emit('log', line);
+  installQuickSync(engine, { queries, head: async () => (await readNewestBlock(networkName)).blockNumber });
+  const log = (line) => emit('log', line);
+  const reader = history === undefined ? undefined : archive(history.base, history.chainId);
+  // The archive is for syncs far behind: without the newest block, the clock and the shipped table tell how far.
+  const head = async () => {
+    try {
+      return await readNewestBlock(networkName);
+    } catch {
+      const now = Math.floor(Date.now() / 1000);
+      return { blockNumber: mainnetBlockAt(now), timestamp: now };
+    }
+  };
+  if (reader !== undefined) {
     installArchiveSync(engine, { reader, queries, chainId: history.chainId, time: mainnetBlockTime, head, log });
-    installArchiveTxids(engine, {
-      reader,
-      txidVersion: TXID_VERSION,
-      chain: NETWORK_CONFIG[networkName].chain,
-      batchSize: getEngineTxidSyncBatchSize,
-      time: mainnetBlockTime,
-      head,
-      log,
-    });
   }
+  // Without the archive too: a list an archive sync left goes on from rail-squid.
+  installArchiveTxids(engine, {
+    reader,
+    txidVersion: TXID_VERSION,
+    chain: NETWORK_CONFIG[networkName].chain,
+    batchSizes: TXID_SYNC_BATCH_SIZES,
+    setBatchSize: setEngineTxidSyncBatchSize,
+    time: mainnetBlockTime,
+    head,
+    log,
+  });
   setOnUTXOMerkletreeScanCallback(({ scanStatus, progress: reported }) => {
     if (scanStatus === MerkletreeScanStatus.Updated) {
       notesProgress = reported <= NOTES_SCAN_START ? reported : Math.max(notesProgress, reported);
@@ -174,14 +179,10 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
       if (scanStatus === MerkletreeScanStatus.Updated && progress <= NOTES_SCAN_START) notesScan.started = true;
       if (scanStatus === MerkletreeScanStatus.Incomplete) notesScan.incomplete = true;
     }
-    // The notes scan goes on to its own txid sync, which the catch-up's share already counts.
+    // The notes step ends with the scan: Railgun's transaction list is the rest of the sync's (sync-finish.js).
     if (scanStatus === MerkletreeScanStatus.Complete) syncProgress?.done('notes');
     else syncProgress?.update('notes', progress);
     emit('scan', { tree: 'utxo', status: scanStatus, progress });
-  });
-  setOnTXIDMerkletreeScanCallback(({ scanStatus, progress }) => {
-    const event = { tree: 'txid', status: scanStatus, progress };
-    if (txidHold.pass(event)) emit('scan', event);
   });
   activity = screeningActivity((state) => emit('screening', state));
   syncProgress = refreshProgress((progress) => emit('refresh', { progress }));
@@ -271,14 +272,14 @@ export async function deleteWallet({ network: name, mnemonic }) {
 /**
  * Scans to the chain's tip and has the screening nodes check the notes. Returns the balances, the private sends
  * received (`received`), the shields screening still holds (`shielding`), `screening`: `failed` when that check, or the
- * proofs the engine last sent for this wallet's sends, failed, and `syncing`: whether the rest of the sync, which runs
- * on in the page, is long enough to tell the user about. How far the refresh has come goes out meanwhile as `refresh`
- * events (`refresh-progress.js`). A sync that fails while the RPC does not answer, or turns requests away, fails as
- * `RPC_FAILED` (`rpc-probe.js`), so the host can offer another RPC.
+ * proofs the engine last sent for this wallet's sends, failed, `syncing`: whether the rest of the sync, which runs on
+ * in the page, is long enough to tell the user about, and `rest`: which rest that is. How far the refresh has come goes
+ * out meanwhile as `refresh` events (`refresh-progress.js`). A sync that fails while the RPC does not answer, or turns
+ * requests away, fails as `RPC_FAILED` (`rpc-probe.js`), so the host can offer another RPC.
  *
  * The rest of the sync is Railgun's transaction list, then the proofs this wallet's sends need (`sync-finish.js`); a
- * send's change waits on them, and nothing else does. It ends with a `synced` event: the state the refresh returns,
- * read again.
+ * send's change waits on them, and nothing else does. A refresh while one runs joins it. It ends with a `synced`
+ * event: its `rest`, and the state the refresh returns, read again.
  */
 export async function refresh(_params, emit) {
   const { walletId } = session();
@@ -308,8 +309,8 @@ async function refreshWallet(walletId, emit) {
   }
   syncProgress.step('finishing');
   const state = await walletState(emit, checkFailed);
-  const syncing = await finisher(walletId, emit).start(checkFailed);
-  return { ...state, syncing };
+  const { syncing, rest } = await finisher(walletId, emit).start(checkFailed);
+  return { ...state, syncing, rest };
 }
 
 /** The balances and history a refresh returns, `failed` when its screening did. */
@@ -331,7 +332,7 @@ let finishing;
 function finisher(walletId, emit) {
   finishing ??= syncFinisher({
     behind: async () => (await txidsBehind()) >= TXID_REPORT_GAP,
-    catchUp: () => catchUpTxidList(emit),
+    catchUp: catchUpTxidList,
     prove: () => proveSends(walletId),
     state: (failed) => walletState(emit, failed),
     emit,
@@ -340,15 +341,16 @@ function finisher(walletId, emit) {
   return finishing;
 }
 
-/** How far the stored txid list is behind the one the screening nodes have validated; 0 when that can't be read. */
+/** How far the stored txid list is behind the one the screening nodes have validated: all of it when that's unknown. */
 async function txidsBehind() {
-  const target = await getEngine().getLatestValidatedTxidIndex(TXID_VERSION, chain());
-  return target === undefined ? 0 : target - (await latestTxidIndex());
+  const target = await getEngine()
+    .getLatestValidatedTxidIndex(TXID_VERSION, chain())
+    .catch(() => undefined);
+  return target === undefined ? Infinity : target - ((await latestTxidIndex()) ?? -1);
 }
 
 /** Syncs Railgun's transaction list until a sync adds nothing, the way a notes scan used to finish. */
-async function catchUpTxidList(emit) {
-  txidHold.begin();
+async function catchUpTxidList() {
   let reporting;
   try {
     reporting = await reportTxids();
@@ -368,8 +370,6 @@ async function catchUpTxidList(emit) {
     });
   } finally {
     reporting?.stop();
-    const complete = txidHold.end();
-    if (complete !== undefined) emit('scan', complete);
   }
 }
 
@@ -406,17 +406,20 @@ async function reportTxids() {
 }
 
 /**
- * Has the wallet prove its own sends and waits until it has. The engine refreshes a wallet's screening by itself after
- * every scan, outside any call, and a refresh asked for while one runs does nothing; so this waits for one running to
- * end, runs its own, then reads back what the screening nodes made of the proofs.
+ * Has the wallet prove its own sends and waits until it has. The engine refreshes a wallet's screening and proves its
+ * sends by itself after every scan, outside any call, and a refresh or proof asked for while one runs does nothing but
+ * report itself done; so this waits for the engine's to end, runs its own, then reads back what the screening nodes
+ * made of the proofs.
  */
 async function proveSends(walletId) {
   const railgunWallet = walletForID(walletId);
-  const busy = () => railgunWallet.isRefreshingPOIs.get(TXID_VERSION, chain()) === true;
-  for (let waited = 0; busy() && waited < POI_REFRESH_WAIT_MS; waited += POI_REFRESH_POLL_MS) {
+  const busy = () =>
+    railgunWallet.isRefreshingPOIs.get(TXID_VERSION, chain()) === true || railgunWallet.generatingPOIsForChain.get(null, chain()) === true;
+  for (let waited = 0; busy(); waited += POI_REFRESH_POLL_MS) {
+    if (waited >= POI_REFRESH_WAIT_MS) throw new Error('the engine is still proving');
     await delay(POI_REFRESH_POLL_MS);
   }
-  await railgunWallet.refreshPOIsForTXIDVersion(chain(), TXID_VERSION, busy());
+  await railgunWallet.refreshPOIsForTXIDVersion(chain(), TXID_VERSION, false);
   await refreshSpentPOIsForWallet(TXID_VERSION, network, walletId);
 }
 
@@ -467,12 +470,18 @@ async function walletHistory(emit) {
 /** The newest block's number and time; undefined when it can't be read, and the sends it would date go undated. */
 async function newestBlock(emit) {
   try {
-    const block = await getFallbackProviderForNetwork(network).getBlock('latest');
-    return block ? { blockNumber: block.number, timestamp: block.timestamp } : undefined;
+    return await readNewestBlock(network);
   } catch (error) {
     emit('log', `newest block not read: ${error?.message ?? error}`);
     return undefined;
   }
+}
+
+/** The newest block of `networkName`, `{blockNumber, timestamp}`, from its RPC: the same request for every wallet. */
+async function readNewestBlock(networkName) {
+  const block = await getFallbackProviderForNetwork(networkName).getBlock('latest');
+  if (!block) throw new Error('the RPC has no newest block');
+  return { blockNumber: block.number, timestamp: block.timestamp };
 }
 
 /** Balances by screening status: `Spendable`, `ShieldPending`, `ShieldBlocked`, … */

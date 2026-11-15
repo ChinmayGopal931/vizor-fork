@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { blockTimes, mainnetBlockTime } from '../src/block-times.js';
+import { blockAt, blockTimes, mainnetBlockAt, mainnetBlockTime } from '../src/block-times.js';
 import { START, STEP, TIMES } from '../src/block-times-mainnet.js';
 
 const table = { start: 1_000, step: 1_000, times: [10_000, 22_000, 36_000] };
@@ -38,4 +38,12 @@ test("the shipped table starts before Railgun's first mainnet block and only goe
   // The Merge, at block 15,537,394, after which a block comes every 12 s slot that isn't missed.
   const merge = mainnetBlockTime(15_601_000) - mainnetBlockTime(15_600_000);
   assert.ok(merge >= 12_000 && merge < 12_500, `${merge} s across 1,000 blocks after the Merge`);
+});
+
+test('the newest block is told from the clock past the table, at 12 s a block', () => {
+  assert.equal(blockAt(table, 36_000), 3_000);
+  assert.equal(blockAt(table, 36_000 + 12 * 50 + 11), 3_050);
+  assert.equal(blockAt(table, 30_000), 3_000, 'never before the table ends');
+  const end = START + (TIMES.length - 1) * STEP;
+  assert.equal(mainnetBlockAt(TIMES.at(-1) + 12 * 7_200), end + 7_200);
 });

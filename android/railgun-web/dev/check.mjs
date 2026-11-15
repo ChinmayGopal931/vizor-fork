@@ -158,9 +158,10 @@ async function syncCheck(page, url, onEvent) {
     console.log(`  address matches Node's derivation: ${address.slice(0, 16)}…`);
     // The refresh answers once the notes are in; the rest of the sync ends with a `synced` event.
     const synced = onEvent.next('synced');
-    const { balances, screening, syncing } = await call('refresh', {});
-    console.log(`  balances ${JSON.stringify(balances)}, screening ${screening}, syncing ${syncing}`);
+    const { balances, screening, syncing, rest } = await call('refresh', {});
+    console.log(`  balances ${JSON.stringify(balances)}, screening ${screening}, syncing ${syncing}, rest ${rest}`);
     const finished = await synced;
+    if (finished.rest !== rest) throw new Error(`rest ${finished.rest} ended, not the refresh's ${rest}`);
     console.log(`  the rest of the sync ended, screening ${finished.screening}`);
     // The engine skips a scan while another runs; each sync must still get one of its own.
     const before = onEvent.notesScans;

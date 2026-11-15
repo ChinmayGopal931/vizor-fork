@@ -285,3 +285,89 @@ test('another TXID version keeps the engine\'s own quick sync', async () => {
   installQuickSync(engine, { queries: indexer(history(), 40).queries, head: async () => 0 });
   assert.deepEqual(await engine.quickSyncEvents('V3_PoseidonMerkle', CHAIN, 0), { own: 'V3_PoseidonMerkle' });
 });
+
+test('a list that ended before a page of commitments was asked for is read on, so the blocks indexed since keep theirs', async () => {
+  const lists = history();
+  const pageSize = 25;
+  // Rail-squid indexes the last 20 blocks while the quick sync runs, right after answering the nullifiers' last page.
+  const cut = lists.from + 100;
+  let indexed = false;
+  const asked = [];
+  const answer = (name) => async (block) => {
+    asked.push([name, block]);
+    const known = indexed ? lists[name] : lists[name].filter(({ blockNumber }) => Number(blockNumber) < cut);
+    const page = known.filter(({ blockNumber }) => Number(blockNumber) >= block).slice(0, pageSize);
+    if (name === 'nullifiers' && page.length < pageSize) indexed = true;
+    return page;
+  };
+  const queries = { nullifiers: answer('nullifiers'), unshields: answer('unshields'), commitments: answer('commitments') };
+  const store = memoryDatabase();
+  const { engine } = await engineHarness({ store });
+  await storeEvents({ engine, txidVersion: V2, chain: CHAIN, ...squidLists(queries, lists.from, { pageSize, gapMs: 0 }) });
+  assert.deepEqual(contents(store.down), await storedWhole(lists));
+  // The nullifiers' last page was asked for again, from the block it started at.
+  const nullifierBlocks = asked.filter(([name]) => name === 'nullifiers').map(([, block]) => block);
+  assert.equal(nullifierBlocks.at(-1), nullifierBlocks.at(-2));
+});
+
+/** `lists`' commitments as another source gives them: a page of whole blocks at a time, with no `asked`. */
+async function* elsewhere(lists, blocksPerPage, skip = () => false) {
+  const batches = formatCommitments(lists.commitments).filter((batch) => !skip(batch));
+  const last = Math.max(...lists.commitments.map(({ blockNumber }) => Number(blockNumber)));
+  for (let from = lists.from; from <= last; from += blocksPerPage) {
+    const through = Math.min(last, from + blocksPerPage - 1);
+    yield { events: batches.filter(({ blockNumber }) => blockNumber >= from && blockNumber <= through), through };
+  }
+}
+
+test("another source's commitments are stored only as far as the indexer's lists show it has come", async () => {
+  const lists = history();
+  const behind = lists.from + 90;
+  const known = (list) => list.filter(({ blockNumber }) => Number(blockNumber) <= behind);
+  const lagging = indexer({ nullifiers: known(lists.nullifiers), unshields: known(lists.unshields), commitments: [] }, 25);
+  const store = memoryDatabase();
+  const { engine, merkletree } = await engineHarness({ store });
+  const stored = [];
+  const options = { pageSize: 25, gapMs: 0 };
+  await storeEvents({
+    engine,
+    txidVersion: V2,
+    chain: CHAIN,
+    unshields: squidPages(lagging.queries.unshields, formatUnshields, lists.from, options),
+    nullifiers: squidPages(lagging.queries.nullifiers, formatNullifiers, lists.from, options),
+    commitments: elsewhere(lists, 10),
+    stored: (block) => stored.push(block),
+  });
+  // The lists showed blocks through the newest unshield or nullifier they had, the older of the two.
+  const shown = Math.min(
+    ...[known(lists.unshields), known(lists.nullifiers)].map((list) => Math.max(...list.map(({ blockNumber }) => Number(blockNumber)))),
+  );
+  assert.equal(stored.at(-1), shown);
+  const { tree, index } = await merkletree.getLatestTreeAndIndex();
+  assert.ok((await merkletree.getCommitment(tree, index)).blockNumber <= shown);
+  // The engine's next quick sync, from its newest stored commitment's block, with the indexer caught up.
+  const startingBlock = (await merkletree.getCommitment(tree, index)).blockNumber;
+  await storeEvents({ engine, txidVersion: V2, chain: CHAIN, ...squidLists(indexer(lists, 25).queries, startingBlock, options) });
+  assert.deepEqual(contents(store.down), await storedWhole(lists));
+});
+
+test('a store that says how far it came fails when a missing batch leaves leaves the trees could not take', async () => {
+  const lists = history();
+  const dropped = formatCommitments(lists.commitments)[40];
+  const { engine } = await engineHarness();
+  const stored = [];
+  await assert.rejects(
+    storeEvents({
+      engine,
+      txidVersion: V2,
+      chain: CHAIN,
+      ...squidLists(indexer(lists, 25).queries, lists.from, { pageSize: 25, gapMs: 0 }),
+      commitments: elsewhere(lists, 10, (batch) => batch === dropped || batch.startPosition === dropped.startPosition),
+      stored: (block) => stored.push(block),
+      writeLeaves: 1,
+      writeRetryMs: 0,
+    }),
+    /stopped short/,
+  );
+  assert.ok(stored.every((block) => block < dropped.blockNumber), `stored through ${stored.at(-1)}, the gap at ${dropped.blockNumber}`);
+});

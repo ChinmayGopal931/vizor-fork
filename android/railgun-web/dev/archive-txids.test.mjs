@@ -1,19 +1,32 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ByteLength, ByteUtils, RailgunTransactionVersion, createRailgunTransactionWithHash, getRailgunTransactionID } from '@railgun-community/engine';
+import {
+  ByteLength,
+  ByteUtils,
+  RailgunTransactionVersion,
+  calculateRailgunTransactionVerificationHash,
+  createRailgunTransactionWithHash,
+  getRailgunTransactionID,
+} from '@railgun-community/engine';
 import { archive } from '../src/archive.js';
 import { sequenceOf, transaction } from '../src/archive-records.js';
-import { installArchiveTxids, withHash } from '../src/archive-txids.js';
+import { ARCHIVE_TRIES, installArchiveTxids, withHash } from '../src/archive-txids.js';
 import { CHAIN, V2 } from './engine-harness.mjs';
 import { ARCHIVE_BASE, archiveServer, blockTime, word } from './history-fixture.mjs';
 
 const FROM = 14_760_000;
+// Far past the fixture, so a list from its start reads the archive.
+const FAR = { blockNumber: FROM + 100_000, timestamp: blockTime(FROM + 100_000) };
 const hex = (value) => BigInt(value).toString(16).padStart(64, '0');
 
-/** `count` transactions, three to a block: as the archive records them, and as rail-squid lists them. */
+/**
+ * `count` transactions, three to a block, each verification hash continuing the chain: as the archive records them,
+ * and as rail-squid lists them.
+ */
 function transactions(count) {
   const archived = [];
   const listed = [];
+  let previous;
   for (let sequence = 0; sequence < count; sequence += 1) {
     const blockNumber = FROM + Math.floor(sequence / 3);
     const record = {
@@ -28,8 +41,9 @@ function transactions(count) {
       utxoTreeOut: 0,
       utxoBatchStartPositionOut: sequence,
       timestamp: blockTime(blockNumber) + 86_400,
-      verificationHash: word(`vh-${sequence}`),
     };
+    record.verificationHash = calculateRailgunTransactionVerificationHash(previous, record.nullifiers[0]);
+    previous = record.verificationHash;
     record.railgunTxid = ByteUtils.nToHex(getRailgunTransactionID(record), ByteLength.UINT_256);
     archived.push(record);
     listed.push({ ...transaction(record, blockTime), graphID: `0x${hex(blockNumber)}${hex(sequence % 3)}${hex(0)}` });
@@ -42,7 +56,7 @@ function transactions(count) {
  * keeps what `keep` lets through of each batch. Answers `next()`, the batch for the engine's next ask, what was kept,
  * what rail-squid was asked, and why the archive was left.
  */
-function txidSync({ archived, listed, sealedAt = [FROM + 10, FROM + 20], batch = 25, head, kept = [] }) {
+function txidSync({ archived, listed, sealedAt = [FROM + 10, FROM + 20], batch = 25, head = FAR, kept = [], reading = true }) {
   const lastBlock = Math.max(...listed.map(({ blockNumber }) => blockNumber), ...archived.map(({ blockNumber }) => blockNumber));
   const server = archiveServer(
     { from: FROM, to: lastBlock, archive: { commitments: [], nullifiers: [], unshields: [] } },
@@ -50,6 +64,7 @@ function txidSync({ archived, listed, sealedAt = [FROM + 10, FROM + 20], batch =
   );
   const asked = [];
   const left = [];
+  const batches = [];
   const engine = {
     quickSyncRailgunTransactionsV2: async (_chain, idLow) => {
       asked.push(idLow);
@@ -59,10 +74,11 @@ function txidSync({ archived, listed, sealedAt = [FROM + 10, FROM + 20], batch =
     validateRailgunTxidMerkleroot: async () => true,
   };
   installArchiveTxids(engine, {
-    reader: archive(ARCHIVE_BASE, 1, { fetch: server.fetch }),
+    reader: reading ? archive(ARCHIVE_BASE, 1, { fetch: server.fetch, retryMs: 0 }) : undefined,
     txidVersion: V2,
     chain: CHAIN,
-    batchSize: () => batch,
+    batchSizes: { archive: batch, squid: 1_000 },
+    setBatchSize: (size) => batches.push(size),
     time: (block) => blockTime(block),
     head: async () => head,
     log: (line) => left.push(line),
@@ -72,6 +88,7 @@ function txidSync({ archived, listed, sealedAt = [FROM + 10, FROM + 20], batch =
     asked,
     left,
     server,
+    batches,
     /** The engine asks after what it kept, and keeps `take` of the answer (all of it by default). */
     async next(take = Infinity) {
       const answer = await engine.quickSyncRailgunTransactionsV2(CHAIN, kept.at(-1)?.graphID);
@@ -134,16 +151,73 @@ test("rail-squid not yet at the archive's last transaction answers nothing, rath
   assert.equal(sync.kept.length, 30);
 });
 
-test('a batch the engine kept nothing of sends the list to rail-squid from the last one it kept', async () => {
+test(`a batch the engine kept nothing of is given again, and after ${ARCHIVE_TRIES} times the list goes on from rail-squid`, async () => {
   const { archived, listed } = transactions(60);
   const sync = txidSync({ archived, listed });
   await sync.next();
-  // The engine refuses the next batch (a root it can't check, say) and keeps nothing of it.
-  await sync.next(0);
+  // The engine refuses the next batch each time (a root it can't check, say) and keeps nothing of it.
+  for (let time = 0; time < ARCHIVE_TRIES; time += 1) {
+    const again = await sync.next(0);
+    assert.equal(sequenceOf(again[0].graphID), 25, 'the archive gives the batch again');
+  }
   const after = await sync.next();
   assert.match(sync.left[0], /kept nothing/);
   assert.equal(sequenceOf(after[0].graphID), undefined, "rail-squid's");
   assert.deepEqual(verifications(after.slice(0, 5)), verifications(listed.slice(25, 30)));
+});
+
+test('a batch refused once, its root check cut off with the connection, stays on the archive when kept next time', async () => {
+  const { archived, listed } = transactions(80);
+  const sync = txidSync({ archived, listed });
+  await sync.next();
+  await sync.next(0);
+  await sync.next();
+  const third = await sync.next();
+  assert.deepEqual(sync.left, []);
+  assert.deepEqual(third.map(({ graphID }) => sequenceOf(graphID)), Array.from({ length: 25 }, (_, i) => 50 + i));
+  assert.deepEqual(sync.asked, []);
+});
+
+test("a record the page can't read keeps the ones before it, and rail-squid gives the rest without a gap", async () => {
+  const { archived, listed } = transactions(60);
+  // An unshield without its recipient, say.
+  archived[30] = { ...archived[30], unshield: { tokenData: { tokenType: 0, tokenAddress: `0x${word('t', 20)}`, tokenSubID: '0' }, value: '5' } };
+  const sync = txidSync({ archived, listed });
+  await sync.next();
+  const second = await sync.next();
+  await sync.next();
+  assert.equal(sync.left.length, 1);
+  assert.deepEqual(second.slice(0, 5).map(({ graphID }) => sequenceOf(graphID)), [25, 26, 27, 28, 29]);
+  assert.equal(sequenceOf(second[5].graphID), undefined);
+  assert.deepEqual(verifications(sync.kept), verifications(listed));
+});
+
+test("a record that breaks the verification hashes is never handed to the engine: rail-squid gives it", async () => {
+  const { archived, listed } = transactions(60);
+  archived[33] = { ...archived[33], verificationHash: word('not the chain') };
+  const sync = txidSync({ archived, listed });
+  await sync.next();
+  const second = await sync.next();
+  assert.match(sync.left[0], /verification hashes/);
+  assert.deepEqual(second.slice(0, 8).map(({ graphID }) => sequenceOf(graphID)), [25, 26, 27, 28, 29, 30, 31, 32]);
+  assert.deepEqual(verifications(sync.kept), verifications(listed.slice(0, 50)));
+});
+
+test("the engine's txid batch is the archive's for a batch from it, and rail-squid's otherwise", async () => {
+  const { archived, listed } = transactions(60);
+  const sync = txidSync({ archived: archived.slice(0, 40), listed });
+  await sync.next();
+  await sync.next();
+  // The archive's full batch, then the one rail-squid finished.
+  assert.deepEqual(sync.batches, [25, 1_000]);
+});
+
+test('with the archive off, a list an archive sync left goes on from rail-squid without skipping a transaction', async () => {
+  const { archived, listed } = transactions(30);
+  const sync = txidSync({ archived, listed, reading: false, kept: archived.slice(0, 5).map((record) => transaction(record, blockTime)) });
+  await sync.next();
+  assert.deepEqual(sync.server.asked, []);
+  assert.deepEqual(verifications(sync.kept), verifications(listed));
 });
 
 test('a page reopened after a kill goes on in the archive from where its list stopped', async () => {

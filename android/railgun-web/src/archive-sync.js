@@ -1,21 +1,14 @@
-// Railgun's history from Anon's archive (archive.js) rather than rail-squid: commitments and unshields from its chunks
-// and tip, and its prebuilt notes trees, streamed chunk by chunk. Nullifiers always come from rail-squid's whole list:
-// the archive keeps one event per nullifier, where Railgun keys them by tree and nullifier, and so drops the second
-// when one nullifier is spent in two trees, which would count that note unspent. On anything unexpected the quick
-// sync goes on from rail-squid at the block after the archive's last good one; what the archive gave stays stored.
-import { RailgunEngine } from '@railgun-community/engine';
+// Railgun's notes from Anon's archive (archive.js) rather than rail-squid: their commitments, from its chunks and tip,
+// streamed chunk by chunk. Unshields and nullifiers come from rail-squid's whole lists. The archive keeps one event per
+// nullifier, where Railgun keys them by tree and nullifier, and so drops the second when one nullifier is spent in two
+// trees, which would count that note unspent; and an unshield missing from the store stops the txid sync at its
+// transaction for good. The archive's commitments must run on from those stored, and are stored only as far as
+// rail-squid's lists have shown it has come. On anything unexpected the quick sync goes on from rail-squid at the block
+// after the archive's last good one; what the archive gave stays stored.
 import { TXIDVersion } from '@railgun-community/shared-models';
 import { ArchiveUnavailable, archiveRange } from './archive.js';
-import { commitmentBatches, unshieldEvents } from './archive-records.js';
-import { forgetPrebuiltTrees, usePrebuiltTrees } from './prebuilt-trees.js';
-import {
-  formatCommitments,
-  formatNullifiers,
-  formatUnshields,
-  quickSyncProgress,
-  squidPages,
-  storeEvents,
-} from './quick-sync.js';
+import { commitmentBatches } from './archive-records.js';
+import { formatNullifiers, formatUnshields, quickSyncProgress, squidLists, squidPages, storeEvents } from './quick-sync.js';
 
 /** The archives the page reads, by network: only Ethereum's is kept up. */
 export const ARCHIVES = { mainnet: { base: 'https://digest.anon.inc/v4/1', chainId: 1 } };
@@ -26,101 +19,78 @@ export const ARCHIVES = { mainnet: { base: 'https://digest.anon.inc/v4/1', chain
  */
 export const ARCHIVE_MIN_BLOCKS = 7_200;
 
-/** Whether a sync from `block` is far enough behind `head` (the newest block, if known) to read the archive. */
-export const farBehind = (block, head) => head === undefined || head.blockNumber - block > ARCHIVE_MIN_BLOCKS;
+/** Whether a sync from `block` is far enough behind `head` (the newest block number) to read the archive. */
+export const farBehind = (block, head) => head - block > ARCHIVE_MIN_BLOCKS;
 
 /**
- * Two page lists over one walk of the archive, which downloads each chunk once: `unshields` and `commitments`, each
- * `{events, through}` as `storeEvents` takes them. A chunk is let go once both have given it.
+ * The archive's commitment batches from `since` on, as `storeEvents` takes them (`{events, through}`, a chunk at a
+ * time). They must start at `next`, the tree and position the next leaf takes, and run on without a gap: a batch
+ * starts where the last one ended, or at the start of the next tree.
  */
-export function archiveLists(range, { since, time, chainId }) {
-  const held = [];
-  let first = 0;
-  const given = [0, 0];
-  async function chunkAt(position) {
-    while (first + held.length <= position) {
-      const { value, done } = await range.next();
-      if (done) return undefined;
-      held.push(value);
-    }
-    return held[position - first];
-  }
-  async function* list(which, events) {
-    for (;;) {
-      const chunk = await chunkAt(given[which]);
-      if (chunk === undefined) return;
-      given[which] += 1;
-      while (first < Math.min(...given)) {
-        held.shift();
-        first += 1;
+export async function* archiveCommitments(reader, since, next, { time, chainId }) {
+  let { tree, position } = next;
+  for await (const chunk of archiveRange(reader, since, ['commitments'])) {
+    const events = [];
+    for (const batch of commitmentBatches(chunk.commitments, { since, time, chainId })) {
+      // The starting block's batches the store already has.
+      if (batch.treeNumber < tree || (batch.treeNumber === tree && batch.startPosition < position)) continue;
+      const follows =
+        batch.treeNumber === tree ? batch.startPosition === position : batch.treeNumber === tree + 1 && batch.startPosition === 0;
+      if (!follows) {
+        throw new ArchiveUnavailable(`the archive's commitments skip from ${tree}:${position} to ${batch.treeNumber}:${batch.startPosition}`);
       }
-      yield { events: events(chunk), through: chunk.endBlock };
+      events.push(batch);
+      tree = batch.treeNumber;
+      position = batch.startPosition + batch.commitments.length;
     }
+    yield { events, through: chunk.endBlock };
   }
-  return {
-    unshields: list(0, (chunk) => unshieldEvents(chunk.unshields, { since, time })),
-    commitments: list(1, (chunk) => commitmentBatches(chunk.commitments, { since, time, chainId })),
-  };
 }
 
 /**
  * Has `engine`'s quick sync read the archive (`reader`, archive.js) before rail-squid (`queries`, squid.js). `time` is
  * how records are dated (`time(blockNumber, head)`), `head()` the chain's newest block (`{blockNumber, timestamp}`),
- * read once a sync, and `log` hears why the archive was left. `pages` are `squidPages`'s options.
+ * read once a sync, and `log` hears why the archive was left. `pages` are `squidPages`'s options, `writeRetryMs`
+ * `storeEvents`'s.
  */
-export function installArchiveSync(engine, { reader, queries, chainId, time, head, log = () => {}, pages }) {
+export function installArchiveSync(engine, { reader, queries, chainId, time, head, log = () => {}, pages, writeRetryMs }) {
   const own = engine.quickSyncEvents;
   engine.quickSyncEvents = async (txidVersion, chain, startingBlock) => {
     if (txidVersion !== TXIDVersion.V2_PoseidonMerkle) return own(txidVersion, chain, startingBlock);
     const newest = await head().catch(() => undefined);
-    const report = (block) =>
-      newest !== undefined &&
-      engine.emitUTXOMerkletreeScanUpdateEvent(txidVersion, chain, quickSyncProgress(startingBlock, newest.blockNumber, block));
-    // Rail-squid's whole list, read alongside the archive, and on past it.
-    const nullifiers = squidPages(queries.nullifiers, formatNullifiers, startingBlock, pages);
+    const report =
+      newest === undefined
+        ? undefined
+        : (block) =>
+            engine.emitUTXOMerkletreeScanUpdateEvent(txidVersion, chain, quickSyncProgress(startingBlock, newest.blockNumber, block));
     // Every list is stored through this block.
     let through = startingBlock - 1;
-    if (farBehind(startingBlock, newest)) {
+    if (newest !== undefined && farBehind(startingBlock, newest.blockNumber)) {
       try {
-        await usePrebuiltTrees({
-          reader,
-          manifest: await reader.manifest(),
-          type: 'utxo',
-          merkletree: engine.getUTXOMerkletree(txidVersion, chain),
-          rootAccepted: (tree, index, root) => RailgunEngine.validateMerkleroot(txidVersion, chain, tree, index, root),
-        });
-        const lists = archiveLists(archiveRange(reader, startingBlock, ['commitments', 'unshields']), {
-          since: startingBlock,
-          time: (block) => time(block, newest),
-          chainId,
-        });
+        const latest = await engine.getUTXOMerkletree(txidVersion, chain).getLatestTreeAndIndex();
         await storeEvents({
           engine,
           txidVersion,
           chain,
-          unshields: lists.unshields,
-          nullifiers,
-          commitments: lists.commitments,
+          unshields: squidPages(queries.unshields, formatUnshields, startingBlock, pages),
+          nullifiers: squidPages(queries.nullifiers, formatNullifiers, startingBlock, pages),
+          commitments: archiveCommitments(
+            reader,
+            startingBlock,
+            { tree: latest.tree, position: latest.index + 1 },
+            { time: (block) => time(block, newest), chainId },
+          ),
           stored: (block) => {
             through = block;
           },
           progress: report,
+          writeRetryMs,
         });
       } catch (error) {
-        if (!(error instanceof ArchiveUnavailable)) throw error;
-        log(`the archive was left at block ${through}: ${error.message}`);
-      } finally {
-        forgetPrebuiltTrees('UTXO');
+        log(`the archive was left at block ${through}: ${error?.message ?? error}`);
       }
     }
-    return storeEvents({
-      engine,
-      txidVersion,
-      chain,
-      unshields: squidPages(queries.unshields, formatUnshields, through + 1, pages),
-      nullifiers,
-      commitments: squidPages(queries.commitments, formatCommitments, through + 1, pages),
-      progress: report,
-    });
+    // Rail-squid's lists anew from there: one that failed beside the archive is never read on.
+    return storeEvents({ engine, txidVersion, chain, ...squidLists(queries, through + 1, pages), progress: report, writeRetryMs });
   };
 }

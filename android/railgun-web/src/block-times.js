@@ -31,5 +31,19 @@ export function blockTimes({ start, step, times }) {
   };
 }
 
+/**
+ * The block of a table (`start`, `step`, `times`) at `seconds`, a Unix time past its end, at 12 s a block: the newest
+ * block from the clock alone, a little ahead by the slots missed since the table ends.
+ */
+export function blockAt({ start, step, times }, seconds) {
+  const last = start + (times.length - 1) * step;
+  return last + Math.max(0, Math.floor((seconds - times[times.length - 1]) / SECONDS_PER_BLOCK));
+}
+
+const MAINNET = { start: START, step: STEP, times: TIMES };
+
 /** A mainnet block's time, as `blockTimes` reads the shipped table. */
-export const mainnetBlockTime = blockTimes({ start: START, step: STEP, times: TIMES });
+export const mainnetBlockTime = blockTimes(MAINNET);
+
+/** The mainnet block at `seconds`, as `blockAt` reads the shipped table. */
+export const mainnetBlockAt = (seconds) => blockAt(MAINNET, seconds);

@@ -1,8 +1,8 @@
 // Anon's archive records as the SDK's rail-squid formatters make them (quick-sync/V2 and railgun-txids), key order
 // included, so the engine stores the same bytes whichever source fed it. Two things never come from the archive:
 // - Times. The archive's are wrong in long stretches, so each record is dated from its block (`time`).
-// - A commitment's or unshield's railgunTxid, which rail-squid leaves to the txid sync as well: the wallet keeps the
-//   value a note had when it was decrypted, before the archive's could be checked.
+// - A commitment's railgunTxid, which rail-squid leaves to the txid sync as well: the wallet keeps the value a note had
+//   when it was decrypted, before the archive's could be checked.
 import {
   ByteLength,
   ByteUtils,
@@ -18,7 +18,6 @@ const f16 = (value, prefix) => ByteUtils.formatToByteLength(value, ByteLength.UI
 const strip = (text) => (text.startsWith('0x') || text.startsWith('0X') ? text.slice(2) : text);
 // rail-squid hands these over as 0x-prefixed lowercase hex, which the SDK passes through.
 const raw0x = (text) => `0x${strip(text).toLowerCase()}`;
-const bigIntStringToHex = (value) => `0x${BigInt(value).toString(16)}`;
 
 // rail-squid gives a shield's fee as null before Railgun's fee upgrade and as a string ("0" included) after; the
 // archive leaves out zero and null alike. On mainnet the last null fee is at block 16,788,910.
@@ -123,30 +122,6 @@ export function commitmentBatches(batches, { since, time, chainId }) {
       blockNumber: b.blockNumber,
     }))
     .sort((a, b) => a.treeNumber - b.treeNumber || a.startPosition - b.startPosition);
-}
-
-/**
- * A chunk's unshield events from `since` on, as the engine's unshield listener takes them. Those from before Railgun's
- * V2 have no event index, and rail-squid doesn't list them: the txid sync adds them from their transactions.
- */
-export function unshieldEvents(unshields, { since, time }) {
-  return unshields
-    .filter(({ blockNumber, eventLogIndex }) => blockNumber >= since && eventLogIndex != null)
-    .map((u) => ({
-      txid: f32(u.txid, false),
-      timestamp: time(u.blockNumber),
-      eventLogIndex: Number(u.eventLogIndex),
-      toAddress: getAddress(u.toAddress),
-      tokenType: u.tokenType,
-      tokenAddress: getAddress(u.tokenAddress),
-      tokenSubID: subID(u.tokenSubID),
-      amount: bigIntStringToHex(u.amount),
-      fee: bigIntStringToHex(u.fee),
-      blockNumber: Number(u.blockNumber),
-      railgunTxid: undefined,
-      poisPerList: undefined,
-      blindedCommitment: undefined,
-    }));
 }
 
 // rail-squid's transaction id is three 32-byte words: the block, an index the archive doesn't carry, and a sub-index.

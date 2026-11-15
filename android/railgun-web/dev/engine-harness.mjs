@@ -6,8 +6,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { TXIDVersion } from '@railgun-community/shared-models';
-import { throughPrebuiltTrees, throughUnshieldWatermark } from '../engine-hooks-plugin.mjs';
-import * as prebuiltTrees from '../src/prebuilt-trees.js';
+import { throughAcceptedLeaves, throughUnshieldWatermark } from '../engine-hooks-plugin.mjs';
+import * as txidUpdates from '../src/txid-updates.js';
 import * as unshieldEvents from '../src/unshield-events.js';
 import { memoryDatabase } from './memory-store.mjs';
 
@@ -18,7 +18,7 @@ export const V2 = TXIDVersion.V2_PoseidonMerkle;
 
 const PAGE_MODULES = new Map([
   [fileURLToPath(new URL('../src/unshield-events.js', import.meta.url)), unshieldEvents],
-  [fileURLToPath(new URL('../src/prebuilt-trees.js', import.meta.url)), prebuiltTrees],
+  [fileURLToPath(new URL('../src/txid-updates.js', import.meta.url)), txidUpdates],
 ]);
 
 await require(path.join(ENGINE, 'utils/poseidon')).initPoseidonPromise;
@@ -38,8 +38,11 @@ export function builtEngineModule(file, rewrite, built = {}) {
   return module.exports;
 }
 
-const merkletree = builtEngineModule('merkletree/merkletree.js', throughPrebuiltTrees);
+const merkletree = builtEngineModule('merkletree/merkletree.js', throughAcceptedLeaves);
 export const { UTXOMerkletree } = builtEngineModule('merkletree/utxo-merkletree.js', throughUnshieldWatermark, {
+  './merkletree': merkletree,
+});
+export const { TXIDMerkletree } = builtEngineModule('merkletree/txid-merkletree.js', (source) => source, {
   './merkletree': merkletree,
 });
 

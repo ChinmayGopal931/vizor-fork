@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { test } from 'node:test';
-import { commitmentBatches, transaction, unshieldEvents } from '../src/archive-records.js';
-import { formatCommitments, formatUnshields } from '../src/quick-sync.js';
+import { commitmentBatches, transaction } from '../src/archive-records.js';
+import { formatCommitments } from '../src/quick-sync.js';
 import { blockTime, history, word } from './history-fixture.mjs';
 
 const require = createRequire(import.meta.url);
@@ -21,16 +21,9 @@ test("archive commitments come out as rail-squid's do, key order and all, dated 
   assert.equal(JSON.stringify(ours), JSON.stringify(squid));
 });
 
-test("archive unshields come out as rail-squid's do", () => {
-  const ours = unshieldEvents(fixture.archive.unshields, options);
-  assert.equal(JSON.stringify(ours), JSON.stringify(formatUnshields(fixture.squid.unshields)));
-});
-
-test('records from before the sync starts are left out, and so are unshields without an event index', () => {
+test('commitments from before the sync starts are left out', () => {
   const since = fixture.from + 20;
   assert.ok(commitmentBatches(fixture.archive.commitments, { ...options, since }).every(({ blockNumber }) => blockNumber >= since));
-  const preV2 = { ...fixture.archive.unshields[0], eventLogIndex: null };
-  assert.deepEqual(unshieldEvents([preV2], options), []);
 });
 
 /** A shield commitment as rail-squid lists it and as the archive records it, with `fee` as each gives it. */
