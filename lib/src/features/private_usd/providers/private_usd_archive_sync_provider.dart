@@ -4,24 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app_bootstrap.dart';
 import '../../../core/storage/app_secure_store.dart';
 import 'private_usd_available_provider.dart';
+import 'private_usd_switch_setting.dart';
 
-/// Where the archive-sync setting is kept: one secure-storage key for the
-/// app, which a full reset's wipe takes with the rest.
-class PrivateUsdArchiveSyncStore {
-  const PrivateUsdArchiveSyncStore(this._storage);
-
-  final AppSecureStore _storage;
-
-  static const _storageKey = 'vizor_private_usd_archive_sync_v1';
-
-  /// The user's choice, or null while it is the default.
-  Future<bool?> read() async {
-    final stored = await _storage.readString(_storageKey);
-    return stored == null ? null : stored == 'true';
-  }
-
-  Future<void> write(bool enabled) =>
-      _storage.writeString(_storageKey, enabled ? 'true' : 'false');
+/// Where the archive-sync setting is kept.
+class PrivateUsdArchiveSyncStore extends PrivateUsdSwitchStore {
+  const PrivateUsdArchiveSyncStore(AppSecureStore storage)
+    : super(storage, 'vizor_private_usd_archive_sync_v1');
 }
 
 final privateUsdArchiveSyncStoreProvider = Provider<PrivateUsdArchiveSyncStore>(
@@ -46,25 +34,10 @@ final privateUsdArchiveSyncProvider =
       PrivateUsdArchiveSyncNotifier.new,
     );
 
-class PrivateUsdArchiveSyncNotifier extends AsyncNotifier<bool> {
+class PrivateUsdArchiveSyncNotifier extends PrivateUsdSwitchNotifier {
   @override
-  Future<bool> build() async =>
-      await ref.read(privateUsdArchiveSyncStoreProvider).read() ?? true;
-
-  Future<void> set(bool enabled) async {
-    await _settled();
-    await ref.read(privateUsdArchiveSyncStoreProvider).write(enabled);
-    state = AsyncData(enabled);
-  }
-
-  // A build still reading would otherwise land after a change and undo it.
-  Future<void> _settled() async {
-    try {
-      await future;
-    } catch (_) {
-      // Unreadable: the change replaces it.
-    }
-  }
+  PrivateUsdSwitchStore get store =>
+      ref.read(privateUsdArchiveSyncStoreProvider);
 }
 
 /// Whether a page starting now reads the archive. A setting that can't be

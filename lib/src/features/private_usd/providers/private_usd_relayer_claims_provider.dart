@@ -1,24 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/storage/app_secure_store.dart';
+import 'private_usd_switch_setting.dart';
 
-/// Where the relayer-claims setting is kept: one secure-storage key for the
-/// app, which a full reset's wipe takes with the rest.
-class PrivateUsdRelayerClaimsStore {
-  const PrivateUsdRelayerClaimsStore(this._storage);
-
-  final AppSecureStore _storage;
-
-  static const _storageKey = 'vizor_private_usd_relayer_claims_v1';
-
-  /// The user's choice, or null while it is the default.
-  Future<bool?> read() async {
-    final stored = await _storage.readString(_storageKey);
-    return stored == null ? null : stored == 'true';
-  }
-
-  Future<void> write(bool enabled) =>
-      _storage.writeString(_storageKey, enabled ? 'true' : 'false');
+/// Where the relayer-claims setting is kept.
+class PrivateUsdRelayerClaimsStore extends PrivateUsdSwitchStore {
+  const PrivateUsdRelayerClaimsStore(AppSecureStore storage)
+    : super(storage, 'vizor_private_usd_relayer_claims_v1');
 }
 
 final privateUsdRelayerClaimsStoreProvider =
@@ -34,25 +22,10 @@ final privateUsdRelayerClaimsProvider =
       PrivateUsdRelayerClaimsNotifier.new,
     );
 
-class PrivateUsdRelayerClaimsNotifier extends AsyncNotifier<bool> {
+class PrivateUsdRelayerClaimsNotifier extends PrivateUsdSwitchNotifier {
   @override
-  Future<bool> build() async =>
-      await ref.read(privateUsdRelayerClaimsStoreProvider).read() ?? true;
-
-  Future<void> set(bool enabled) async {
-    await _settled();
-    await ref.read(privateUsdRelayerClaimsStoreProvider).write(enabled);
-    state = AsyncData(enabled);
-  }
-
-  // A build still reading would otherwise land after a change and undo it.
-  Future<void> _settled() async {
-    try {
-      await future;
-    } catch (_) {
-      // Unreadable: the change replaces it.
-    }
-  }
+  PrivateUsdSwitchStore get store =>
+      ref.read(privateUsdRelayerClaimsStoreProvider);
 }
 
 /// The relayer-claims setting, once read. One that can't be read fails the
