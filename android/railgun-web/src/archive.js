@@ -27,6 +27,10 @@ class ChecksumMismatch extends ArchiveUnavailable {
 // The formats this reader knows. The root manifest, the chunk metas, the tip meta and the tree files each count their
 // own versions.
 const KNOWN = { version: 5, rootFormat: 2, chunkFormat: 3, tipFormat: 3, txidVersion: 'V2_PoseidonMerkle' };
+// A format this reader takes: the one it knows (`least`), or a later one. The archive moves to a new path for a format
+// that breaks its readers (`v4` today) and raises a number where it is, as it has the tip's, for one that doesn't.
+// Nothing rests on the number: what a file holds is checked against the chain and the screening nodes whatever it says.
+const reads = (format, least) => Number.isSafeInteger(format) && format >= least;
 const TIP_ATTEMPTS = 3;
 const TIMEOUT_MS = 60_000;
 // A request that failed on the way, or that a busy or failing server turned away (the host answers 502 for a fetch of
@@ -131,7 +135,7 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
     const path = `chunks/${id}/meta.json`;
     const meta = decode(await get(`${path}${query}`), path);
     if (
-      meta.formatVersion !== KNOWN.chunkFormat ||
+      !reads(meta.formatVersion, KNOWN.chunkFormat) ||
       meta.chunkId !== id ||
       meta.startBlock !== startBlock ||
       meta.endBlock !== endBlock
@@ -146,8 +150,8 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
     async manifest() {
       const manifest = decode(await get('meta.json'), 'meta.json');
       if (
-        manifest.version !== KNOWN.version ||
-        manifest.formatVersion !== KNOWN.rootFormat ||
+        !reads(manifest.version, KNOWN.version) ||
+        !reads(manifest.formatVersion, KNOWN.rootFormat) ||
         manifest.chainId !== chainId ||
         manifest.txidVersion !== KNOWN.txidVersion ||
         !Number.isSafeInteger(manifest.latestSealedChunk) ||
@@ -204,7 +208,7 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
       if ((await sha256(bytes)) !== manifest.tipChecksum) throw new TipMoved('the tip moved');
       const meta = decode(bytes, 'tip/meta.json');
       if (
-        meta.formatVersion !== KNOWN.tipFormat ||
+        !reads(meta.formatVersion, KNOWN.tipFormat) ||
         meta.startBlock !== after + 1 ||
         !(meta.endBlock >= meta.startBlock - 1)
       ) {

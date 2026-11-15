@@ -469,6 +469,69 @@ test('a manifest that is not JSON leaves the whole sync to rail-squid', async ()
 });
 
 /**
+ * The fixture's archive with its format numbers changed: `manifest`, `chunk` (chunk 1's meta) and `tip` each answer
+ * what their object is published as.
+ */
+function archiveWithFormats({ manifest = (meta) => meta, chunk = (meta) => meta, tip = (meta) => meta }) {
+  const server = archiveServer(fixture, { sealedAt });
+  const edited = (name, edit) => {
+    const bytes = Buffer.from(JSON.stringify(edit(JSON.parse(server.files.get(name)))));
+    server.files.set(name, bytes);
+    return bytes;
+  };
+  edited('chunks/1/meta.json', chunk);
+  const tipChecksum = hashOf(edited('tip/meta.json', tip));
+  server.setManifest((meta) => manifest({ ...meta, tipChecksum }));
+  return server;
+}
+
+test('a format the archive raised where it is, without moving to a new path, is read as the one known', async () => {
+  const server = archiveWithFormats({
+    manifest: (meta) => ({ ...meta, version: meta.version + 1, formatVersion: meta.formatVersion + 2 }),
+    chunk: (meta) => ({ ...meta, formatVersion: meta.formatVersion + 1 }),
+    tip: (meta) => ({ ...meta, formatVersion: meta.formatVersion + 1 }),
+  });
+  const { stored, left } = await storedByArchive(server);
+  assert.deepEqual(left, []);
+  assert.ok(server.asked.includes('chunks/1/commitments.json.gz'));
+  assert.ok(server.asked.includes('tip/commitments.json.gz'));
+  assert.deepEqual(stored, await storedBySquid());
+});
+
+test('a manifest format older than the one known, or that is no whole number, leaves the sync to rail-squid', async () => {
+  const without = (field) => (meta) => Object.fromEntries(Object.entries(meta).filter(([name]) => name !== field));
+  const manifests = [
+    (meta) => ({ ...meta, version: meta.version - 1 }),
+    (meta) => ({ ...meta, formatVersion: meta.formatVersion - 1 }),
+    (meta) => ({ ...meta, version: String(meta.version) }),
+    (meta) => ({ ...meta, formatVersion: meta.formatVersion + 0.5 }),
+    without('version'),
+    without('formatVersion'),
+    // The chain and the txid version stay the ones this page reads, whatever the formats.
+    (meta) => ({ ...meta, version: meta.version + 1, chainId: 137 }),
+    (meta) => ({ ...meta, version: meta.version + 1, txidVersion: 'V3_PoseidonMerkle' }),
+  ];
+  for (const manifest of manifests) {
+    const { stored, asked, left } = await storedByArchive(archiveWithFormats({ manifest }));
+    assert.match(left[0], /manifest is not one this page reads/);
+    assert.equal(squidFrom(asked, 'commitments'), fixture.from);
+    assert.deepEqual(stored, await storedBySquid());
+  }
+});
+
+test('a chunk or a tip of an older format hands the rest to rail-squid after the chunk before it', async () => {
+  const older = (meta) => ({ ...meta, formatVersion: meta.formatVersion - 1 });
+  const chunk = await storedByArchive(archiveWithFormats({ chunk: older }));
+  assert.match(chunk.left[0], /chunk 1 is not the one the index names/);
+  assert.equal(squidFrom(chunk.asked, 'commitments'), sealedAt[0]);
+  assert.deepEqual(chunk.stored, await storedBySquid());
+  const tip = await storedByArchive(archiveWithFormats({ tip: older }));
+  assert.match(tip.left[0], /tip does not follow/);
+  assert.equal(squidFrom(tip.asked, 'commitments'), sealedAt[2]);
+  assert.deepEqual(tip.stored, await storedBySquid());
+});
+
+/**
  * The fixture's archive, its first `times` requests for `name` failing on the way, the first `paused` of those across a
  * pause of the page.
  */
