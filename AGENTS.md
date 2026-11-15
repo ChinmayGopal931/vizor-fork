@@ -2010,29 +2010,30 @@ only when asked. The checklist maps each flag to what it checks. The iOS
 rounds use `scripts/private-usd/ios/run_device_round.sh` (the M3 round so
 far), per `docs/private-usd-ios-device-checklist.md`.
 
-**Local stand-ins.** `rust/Cargo.toml` carries two stand-ins for releases
-that do not exist yet:
+**Pinned zecSwap and a local stand-in.** `zecswap-core` comes from
+`ChinmayGopal931/zecSwap`'s `veylor/zakura-v4` branch, its build on Zakura
+Common v4 (E1), and `zecswap-railgun` and `zecswap-tokens` from its `main`
+(PR #18). A zecswap-core rev that changes its Zcash crates needs a matching
+build on that branch first. `rust/Cargo.toml` still carries one stand-in for
+a release that does not exist yet:
 
-- `~/dev/zapp/zecSwap-zakura-v4-windows`, a zecSwap `[patch]` outside the
-  repository: `zecswap-core` of the pinned rev (the windows contract's) on
-  Zakura Common v4 (E1), branch `zakura-v4-windows`. A clean clone builds
-  only where that checkout exists.
-- `rust/vendor/zakura-client-backend`, the published 0.1.0-rc9.4 with the
-  sources of the wallet-libraries rev the `[patch]` pins (only
-  `src/data_api/chain.rs` and its test differ from the published crate) and
-  the `connect_stream` patch the Railgun bridge needs
+- `rust/vendor/zakura-client-backend`, the 0.1.0-rc9.6 of the
+  wallet-libraries rev the `[patch]` pins, as `cargo vendor` writes it (the
+  published rc9.6 predates the rev's `tor-client` feature), with the
+  `connect_stream` patch the Railgun bridge needs
   (`rust/vendor/zakura-client-backend.patch`, E4). The crates.io package and
   the wallet-libraries source are both patched to it, so one backend stays
   in the graph. Before every push, `diff -r` its `src` against that rev's
   `librustzcash/zcash_client_backend/src`: only `src/tor.rs` may differ.
   Never run `cargo fmt --all`, which reformats it, and vendor it again
-  whenever the rev moves.
+  whenever the rev moves: `cargo vendor` a scratch crate that depends on the
+  backend at the new rev with the app's features, take its
+  `zakura-client-backend-*` directory without `.cargo-checksum.json`, drop
+  the `path` keys of the dependencies the `[patch]` entries supply (`pczt`,
+  `zakura-one-time-ivk`, `zakura-pir-protocol`), and apply the patch.
 
-The owner merged Private USD into the fork's `main` with the zecSwap
-stand-in in place (2026-10-20). Replace it with a pushed zecSwap rev once E1
-lands (progress B-6). Push to the owner's fork (`origin`) only when the owner
-asks; never merge into `main` or open a PR unprompted, and never against
-upstream.
+Push to the owner's fork (`origin`) only when the owner asks; never merge
+into `main` or open a PR unprompted, and never against upstream.
 
 ## Testing
 
