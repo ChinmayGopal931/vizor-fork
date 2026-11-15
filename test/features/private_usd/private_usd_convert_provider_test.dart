@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/formatting/zec_amount.dart';
-import 'package:zcash_wallet/src/core/zcash/network_upgrade_hold.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_record_key.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
@@ -424,7 +423,7 @@ void main() {
       holdsTransactions: true,
     );
     expect(await notifier().confirm(), isNull);
-    expect(state().startError, kNetworkUpgradeHoldMessage);
+    expect(state().startError, PrivateUsdCopy.networkUpgradeHold);
     expect(backend.acceptedRelayerClaims, isEmpty);
     expect(state().quoteSpent, isFalse);
   });

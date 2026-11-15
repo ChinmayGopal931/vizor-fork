@@ -1,3 +1,4 @@
+import '../../../core/l10n/l10n.dart';
 import '../../../core/formatting/address_display.dart';
 import '../../../core/formatting/date_format.dart';
 import '../../../core/formatting/zec_amount.dart';
@@ -55,6 +56,7 @@ class PrivateUsdDetailTransaction extends PrivateUsdActivityDetail {
 
 /// A send's or a withdrawal's details.
 List<PrivateUsdActivityDetail> privateUsdSendDetails(
+  AppLocalizations l10n,
   ApiSendRecord record, {
   bool privacyModeEnabled = false,
 }) {
@@ -81,7 +83,10 @@ List<PrivateUsdActivityDetail> privateUsdSendDetails(
           ? PrivateUsdCopy.detailsConfirmed
           : PrivateUsdCopy.detailsUnconfirmed,
     ),
-    PrivateUsdDetailValue(PrivateUsdCopy.detailsSent, _time(record.sentAt)),
+    PrivateUsdDetailValue(
+      PrivateUsdCopy.detailsSent,
+      _time(l10n, record.sentAt),
+    ),
     if (txHash != null)
       PrivateUsdDetailTransaction.ethereum(
         PrivateUsdCopy.detailsTransaction,
@@ -92,6 +97,7 @@ List<PrivateUsdActivityDetail> privateUsdSendDetails(
 
 /// A received private send's details.
 List<PrivateUsdActivityDetail> privateUsdReceivedDetails(
+  AppLocalizations l10n,
   RailgunReceipt receipt, {
   bool privacyModeEnabled = false,
 }) {
@@ -121,7 +127,7 @@ List<PrivateUsdActivityDetail> privateUsdReceivedDetails(
     if (at != null)
       PrivateUsdDetailValue(
         PrivateUsdCopy.detailsReceived,
-        formatDayMonthTime(at),
+        formatDayMonthTime(at, l10n.localeName),
       ),
     PrivateUsdDetailTransaction.ethereum(
       PrivateUsdCopy.detailsTransaction,
@@ -133,6 +139,7 @@ List<PrivateUsdActivityDetail> privateUsdReceivedDetails(
 /// A deposit's details: where it was sent, what it moved, the relayer's fee
 /// and what reaches the private balance.
 List<PrivateUsdActivityDetail> privateUsdDepositDetails(
+  AppLocalizations l10n,
   ApiDepositRecord record, {
   bool privacyModeEnabled = false,
 }) {
@@ -159,7 +166,7 @@ List<PrivateUsdActivityDetail> privateUsdDepositDetails(
     ),
     PrivateUsdDetailValue(
       PrivateUsdCopy.detailStarted,
-      _time(record.createdAt),
+      _time(l10n, record.createdAt),
     ),
     if (txHash != null)
       PrivateUsdDetailTransaction.ethereum(
@@ -172,6 +179,7 @@ List<PrivateUsdActivityDetail> privateUsdDepositDetails(
 /// An ended forward conversion's details: paid, its amounts and fee;
 /// refunded, why. Then its swap and transactions.
 List<PrivateUsdActivityDetail> privateUsdForwardDetails(
+  AppLocalizations l10n,
   ApiForwardRecord record, {
   bool privacyModeEnabled = false,
 }) {
@@ -209,16 +217,17 @@ List<PrivateUsdActivityDetail> privateUsdForwardDetails(
       PrivateUsdDetailTransaction.zcash(PrivateUsdCopy.detailRefund, sweep),
     PrivateUsdDetailValue(
       PrivateUsdCopy.detailStarted,
-      _time(record.acceptedAt),
+      _time(l10n, record.acceptedAt),
     ),
     if (endedAt != null)
-      PrivateUsdDetailValue(PrivateUsdCopy.detailsEnded, _time(endedAt)),
+      PrivateUsdDetailValue(PrivateUsdCopy.detailsEnded, _time(l10n, endedAt)),
   ];
 }
 
 /// A completed reverse conversion's details: its amounts and fees, its swap
 /// and its transactions.
 List<PrivateUsdActivityDetail> privateUsdReverseDetails(
+  AppLocalizations l10n,
   ApiReverseRecord record, {
   bool privacyModeEnabled = false,
 }) {
@@ -261,7 +270,10 @@ List<PrivateUsdActivityDetail> privateUsdReverseDetails(
         receive,
       ),
     if (acceptedAt != null)
-      PrivateUsdDetailValue(PrivateUsdCopy.detailStarted, _time(acceptedAt)),
+      PrivateUsdDetailValue(
+        PrivateUsdCopy.detailStarted,
+        _time(l10n, acceptedAt),
+      ),
   ];
 }
 
@@ -293,5 +305,7 @@ String _zec(BigInt zatoshi, bool privacyModeEnabled) => privacyModeEnabled
     ? fixedPrivacyMask()
     : ZecAmount.fromZatoshi(zatoshi).activity.toString();
 
-String _time(int seconds) =>
-    formatDayMonthTime(DateTime.fromMillisecondsSinceEpoch(seconds * 1000));
+String _time(AppLocalizations l10n, int seconds) => formatDayMonthTime(
+  DateTime.fromMillisecondsSinceEpoch(seconds * 1000),
+  l10n.localeName,
+);

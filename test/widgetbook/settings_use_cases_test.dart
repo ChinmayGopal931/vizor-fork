@@ -4,9 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/layout/app_pane_scroll_scaffold.dart';
 import 'package:zcash_wallet/src/features/settings/widgets/viewing_key_content.dart';
-import 'package:zcash_wallet/src/features/settings/viewing_key_copy.dart';
 import 'package:zcash_wallet/widgetbook/screen_use_cases.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
+import 'package:zcash_wallet/l10n/app_localizations.dart';
+
+final _en = lookupAppLocalizations(const Locale('en'));
 
 void main() {
   // Render with the real app fonts instead of the square-glyph test font.
@@ -107,8 +110,8 @@ void main() {
     _expectNoCrash(errors);
     expect(find.text('Viewing key'), findsOneWidget);
     expect(find.text('Full viewing key'), findsOneWidget);
-    expect(find.text(viewingKeyExplanation), findsOneWidget);
-    expect(find.text(viewingKeyWarningTitle), findsOneWidget);
+    expect(find.text(_en.settingsViewingKeyExplanation), findsOneWidget);
+    expect(find.text(_en.settingsViewingKeyWarningTitle), findsOneWidget);
   });
 
   testWidgets('viewing key choice shows scope before revealing a key', (
@@ -120,7 +123,10 @@ void main() {
       viewport: const Size(1080, 720),
     );
     _expectNoCrash(errors);
-    expect(find.text(viewingKeyChoiceSharingWarning), findsOneWidget);
+    expect(
+      find.text(_en.settingsViewingKeyChoiceSharingWarning),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('viewing_key_choose_incoming')),
       findsOneWidget,
@@ -200,7 +206,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Uninstall Vizor'), findsWidgets);
+    expect(find.text('Uninstall Veylor'), findsWidgets);
     expect(find.text('This cannot be undone.'), findsOneWidget);
   });
 
@@ -228,7 +234,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Link Vizor Mobile'), findsOneWidget);
+    expect(find.text('Link Veylor Mobile'), findsOneWidget);
     expect(find.text('Start linking'), findsOneWidget);
   });
 
@@ -242,7 +248,7 @@ void main() {
 
     _expectNoCrash(errors);
     expect(find.text('Confirm access'), findsOneWidget);
-    expect(find.text('To link Vizor Mobile.'), findsOneWidget);
+    expect(find.text('To link Veylor Mobile.'), findsOneWidget);
   });
 
   testWidgets('settings wallet link QR use case renders the timer', (
@@ -254,9 +260,9 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Scan with Vizor mobile'), findsOneWidget);
+    expect(find.text('Scan with Veylor mobile'), findsOneWidget);
     expect(
-      find.text('Open Vizor on your phone → Add a wallet → Link Vizor Desktop'),
+      find.text('Open Veylor on your phone → Add a wallet → Link Veylor Desktop'),
       findsOneWidget,
     );
     expect(find.text('Expires in 0:59'), findsOneWidget);
@@ -271,7 +277,7 @@ void main() {
     );
 
     _expectNoCrash(errors);
-    expect(find.text('Vizor Mobile linked successfully'), findsOneWidget);
+    expect(find.text('Veylor Mobile linked successfully'), findsOneWidget);
     expect(
       find.text('6 accounts and 20 contacts were imported on mobile.'),
       findsOneWidget,
@@ -327,6 +333,7 @@ Future<List<FlutterErrorDetails>> _pumpSettingsUseCase(
 
   await tester.pumpWidget(
     MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
       key: UniqueKey(),
       home: AppTheme(
         data: AppThemeData.light,

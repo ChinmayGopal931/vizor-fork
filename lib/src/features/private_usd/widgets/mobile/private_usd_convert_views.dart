@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../../../../core/formatting/countdown_format.dart';
 import '../../../../core/formatting/date_format.dart';
 import '../../../../core/formatting/zec_amount.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/privacy/privacy_mask.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
@@ -536,7 +537,10 @@ class MobilePrivateUsdReverseReviewView extends StatelessWidget {
           ? null
           : privateUsdReviewNote(
               PrivateUsdCopy.reverseKeepOpen(
-                formatDayMonthTime(privateUsdReadyBy(draft)),
+                formatDayMonthTime(
+                  privateUsdReadyBy(draft),
+                  context.l10n.localeName,
+                ),
               ),
               torOffDisclosure: torOffDisclosure,
             ),

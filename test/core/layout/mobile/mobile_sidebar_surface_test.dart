@@ -11,6 +11,7 @@ import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/mobile_surface_card.dart';
 import 'package:zcash_wallet/src/services/native_modal_corners.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 void main() {
   final calls = <MethodCall>[];
@@ -36,6 +37,7 @@ void main() {
     tester.view.physicalSize = const Size(982, 654);
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         builder: (_, child) => AppTheme(data: theme, child: child!),
         home: Stack(
           children: [

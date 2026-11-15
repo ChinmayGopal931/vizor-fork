@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/formatting/date_format.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/privacy/privacy_mask.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
@@ -294,7 +295,7 @@ class _RefundCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            formatDayMonthTime(date),
+            formatDayMonthTime(date, context.l10n.localeName),
             style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
           ),
           const SizedBox(height: AppSpacing.xs),

@@ -20,6 +20,7 @@ import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
 import 'package:zcash_wallet/src/rust/api/sync.dart' as rust_sync;
 
 import '../../fakes/fake_sync_notifier.dart';
+import '../../support/test_l10n.dart';
 
 const _zec = 100000000;
 final _now = DateTime.utc(2026, 10, 15, 12);
@@ -390,6 +391,7 @@ void main() {
     () {
       expect(
         formatPortfolioPointTime(
+          testL10n,
           DateTime.utc(2026, 10, 14),
           PortfolioChartRange.week,
           PortfolioChartMode.usd,
@@ -399,6 +401,7 @@ void main() {
       // Midnight UTC of a block time is not a daily price.
       expect(
         formatPortfolioPointTime(
+          testL10n,
           DateTime.utc(2026, 10, 14),
           PortfolioChartRange.week,
           PortfolioChartMode.zec,
@@ -408,6 +411,7 @@ void main() {
       // A receipt placed between two prices, or now, has a time of day.
       expect(
         formatPortfolioPointTime(
+          testL10n,
           DateTime.utc(2026, 10, 12, 12, 30),
           PortfolioChartRange.week,
           PortfolioChartMode.usd,

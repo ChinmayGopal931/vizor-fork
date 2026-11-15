@@ -12,6 +12,7 @@ import '../../../providers/sync_display_progress_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../../services/native_mobile_navigation_geometry.dart';
 import '../../config/swap_feature_config.dart';
+import '../../l10n/l10n.dart';
 import '../../navigation/external_action_guard_provider.dart';
 import '../../navigation/mobile_destinations.dart';
 import '../../navigation/mobile_sidebar_route_observer.dart';
@@ -133,6 +134,7 @@ class _MobileAdaptiveFrameState extends ConsumerState<MobileAdaptiveFrame>
   NeonSyncLine _sidebarSyncLine() {
     final whole = ref.watch(syncDisplayWholePercentageProvider);
     return NeonSyncLine.wallet(
+      context.l10n,
       ref.watch(syncProvider).value ?? SyncState(),
       whole: whole,
       networkPrivacy: ref.watch(networkPrivacyProvider),
@@ -207,10 +209,7 @@ class _MobileAdaptiveFrameState extends ConsumerState<MobileAdaptiveFrame>
               if (context.mounted &&
                   mobileVisiblePath(widget.router) == path &&
                   navigationUnblocked()) {
-                showAppToast(
-                  context,
-                  'Could not finish cancellation. Try again.',
-                );
+                showAppToast(context, context.l10n.commonCancellationFailed);
               }
               return;
             }
@@ -229,7 +228,7 @@ class _MobileAdaptiveFrameState extends ConsumerState<MobileAdaptiveFrame>
         );
       } catch (_) {
         if (context.mounted) {
-          showAppToast(context, 'Could not finish cancellation. Try again.');
+          showAppToast(context, context.l10n.commonCancellationFailed);
         }
       } finally {
         _pendingSidebarPermissions = null;

@@ -1,3 +1,4 @@
+import '../../../core/l10n/l10n.dart';
 import '../../../core/formatting/address_display.dart';
 import '../../../core/formatting/date_format.dart';
 import '../../../core/formatting/zec_amount.dart';
@@ -156,7 +157,8 @@ class PrivateUsdReverseProgressPresentation {
 /// state and [proofProgress] the page's proof (0..1) while it proves;
 /// [busy] disables the actions while one of them runs. With
 /// [bridgeAvailable] off, an ended conversion offers no new one.
-PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
+PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation(
+  AppLocalizations l10n, {
   required PrivateUsdReverseStatus status,
   required DateTime now,
   PrivateUsdFundingState? funding,
@@ -179,7 +181,7 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
   final zecText = privacyModeEnabled
       ? fixedPrivacyMask()
       : ZecAmount.fromZatoshi(zat).activity.toString();
-  final details = _details(record, explorerTxPrefix: explorerTxPrefix);
+  final details = _details(l10n, record, explorerTxPrefix: explorerTxPrefix);
 
   SwapActivityStatusPresentation presentation({
     required List<SwapStatusStepData> steps,
@@ -317,13 +319,13 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
   } else if (record.phase == ApiReversePhase.refundWait && record.cancellable) {
     // It goes by itself from t0.
     note = PrivateUsdCopy.reverseRefundAvailable(
-      formatDayMonthTime(_at(record.readyDeadline)),
+      formatDayMonthTime(_at(record.readyDeadline), l10n.localeName),
     );
   } else if (record.phase == ApiReversePhase.awaitingReady) {
     note = PrivateUsdCopy.reverseReadyExplanation;
   } else if (record.phase == ApiReversePhase.settling) {
     note = PrivateUsdCopy.reverseSettlementRefundLimit(
-      formatDayMonthTime(_at(record.refundAfter)),
+      formatDayMonthTime(_at(record.refundAfter), l10n.localeName),
     );
   } else {
     note = null;
@@ -401,6 +403,7 @@ List<SwapStatusStepData> _reverseSteps({
 );
 
 List<SwapStatusDetailRowData> _details(
+  AppLocalizations l10n,
   ApiReverseRecord record, {
   String? explorerTxPrefix,
 }) {
@@ -432,7 +435,7 @@ List<SwapStatusDetailRowData> _details(
     if (acceptedAt != null)
       SwapStatusDetailRowData(
         label: PrivateUsdCopy.detailStarted,
-        value: formatDayMonthTime(_at(acceptedAt)),
+        value: formatDayMonthTime(_at(acceptedAt), l10n.localeName),
       ),
   ];
 }

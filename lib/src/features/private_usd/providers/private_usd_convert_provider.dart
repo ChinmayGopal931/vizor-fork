@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/private_usd_feature_config.dart';
 import '../../../core/formatting/zec_amount.dart';
-import '../../../core/zcash/network_upgrade_hold.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/network_upgrade_window_provider.dart';
 import '../../../providers/sync_provider.dart';
@@ -618,7 +617,7 @@ class PrivateUsdConvertNotifier
     // The maker would open a swap for a deposit Rust then refuses. Nothing is
     // sent, so the quote stands for a try once the upgrade is through.
     if (ref.read(networkUpgradeWindowProvider).holdsTransactions) {
-      state = state.copyWith(startError: kNetworkUpgradeHoldMessage);
+      state = state.copyWith(startError: PrivateUsdCopy.networkUpgradeHold);
       return null;
     }
     state = state.copyWith(

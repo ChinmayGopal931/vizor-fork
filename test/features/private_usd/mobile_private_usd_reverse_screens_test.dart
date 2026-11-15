@@ -19,6 +19,7 @@ import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
+import '../../support/test_l10n.dart';
 
 // The reverse conversion's screens, built from the Widgetbook fixtures.
 void main() {
@@ -165,6 +166,7 @@ void main() {
       DateTime? now,
     }) async {
       final presentation = privateUsdReverseProgressPresentation(
+        testL10n,
         status: PrivateUsdReverseStatus(record: record),
         now: now ?? previewPrivateUsdNow,
       );
@@ -234,7 +236,7 @@ void main() {
       find.text(
         PrivateUsdCopy.reverseSettlementRefundLimit(
           formatDayMonthTime(
-            DateTime.fromMillisecondsSinceEpoch(settling.refundAfter * 1000),
+            DateTime.fromMillisecondsSinceEpoch(settling.refundAfter * 1000), testL10n.localeName,
           ),
         ),
       ),
@@ -254,7 +256,7 @@ void main() {
       find.text(
         PrivateUsdCopy.reverseRefundAvailable(
           formatDayMonthTime(
-            DateTime.fromMillisecondsSinceEpoch(lapsed.readyDeadline * 1000),
+            DateTime.fromMillisecondsSinceEpoch(lapsed.readyDeadline * 1000), testL10n.localeName,
           ),
         ),
       ),
@@ -288,6 +290,7 @@ void main() {
       tester,
       MobilePrivateUsdReverseConversionView(
         presentation: privateUsdReverseProgressPresentation(
+          testL10n,
           status: PrivateUsdReverseStatus(
             record: previewPrivateUsdReverseRecord(phase: phase),
           ),
@@ -352,6 +355,7 @@ void main() {
       tester,
       MobilePrivateUsdReverseConversionView(
         presentation: privateUsdReverseProgressPresentation(
+          testL10n,
           status: PrivateUsdReverseStatus(record: unpaid),
           now: previewPrivateUsdNow,
           funding: funding,
@@ -404,6 +408,7 @@ void main() {
       tester,
       MobilePrivateUsdReverseConversionView(
         presentation: privateUsdReverseProgressPresentation(
+          testL10n,
           status: PrivateUsdReverseStatus(
             record: previewPrivateUsdReverseRecord(
               phase: ApiReversePhase.refunded,

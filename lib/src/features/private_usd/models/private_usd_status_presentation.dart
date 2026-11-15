@@ -1,3 +1,4 @@
+import '../../../core/l10n/l10n.dart';
 import '../../../core/config/zcash_explorer.dart';
 import '../../../core/formatting/address_display.dart';
 import '../../../core/formatting/date_format.dart';
@@ -80,7 +81,8 @@ class PrivateUsdProgressPresentation {
 /// [relayerClaims] is the relayer-claims setting, which a bridge takes as it
 /// starts: until its claim is handed over, the only sign that the relayer is
 /// to claim it.
-PrivateUsdProgressPresentation privateUsdProgressPresentation({
+PrivateUsdProgressPresentation privateUsdProgressPresentation(
+  AppLocalizations l10n, {
   required PrivateUsdConversionStatus status,
   required DateTime now,
   required int zcashConfirmations,
@@ -102,7 +104,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
       ? fixedPrivacyMask()
       : formatPrivateUsd(receives);
   final amountsText = PrivateUsdCopy.convertProgressAmounts(zecText, usdText);
-  final details = _details(record, explorerTxPrefix: explorerTxPrefix);
+  final details = _details(l10n, record, explorerTxPrefix: explorerTxPrefix);
 
   SwapActivityStatusPresentation presentation({
     required List<SwapStatusStepData> steps,
@@ -281,6 +283,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
         : PrivateUsdCopy.convertUnwindingUntil(
             formatDayMonthTime(
               DateTime.fromMillisecondsSinceEpoch(lateClaimAt * 1000),
+              l10n.localeName,
             ),
           );
   } else if (status.wait == ApiForwardWait.depositUnsettled) {
@@ -291,7 +294,9 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation({
     // Handed over only once the maker made the swap ready: never silent.
     note = PrivateUsdCopy.convertRelayerClaims;
   } else if (makerSilent) {
-    note = PrivateUsdCopy.convertMakerSilent(formatDayMonthTime(t0));
+    note = PrivateUsdCopy.convertMakerSilent(
+      formatDayMonthTime(t0, l10n.localeName),
+    );
   } else if (relayerToClaim) {
     note = PrivateUsdCopy.convertRelayerReviewNote;
   } else {
@@ -469,6 +474,7 @@ String _confirmationsDetail(
 }
 
 List<SwapStatusDetailRowData> _details(
+  AppLocalizations l10n,
   ApiForwardRecord record, {
   String? explorerTxPrefix,
 }) {
@@ -508,6 +514,7 @@ List<SwapStatusDetailRowData> _details(
       label: PrivateUsdCopy.detailStarted,
       value: formatDayMonthTime(
         DateTime.fromMillisecondsSinceEpoch(record.acceptedAt * 1000),
+        l10n.localeName,
       ),
     ),
   ];

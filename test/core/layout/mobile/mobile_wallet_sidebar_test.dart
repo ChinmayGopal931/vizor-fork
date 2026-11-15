@@ -16,6 +16,7 @@ import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_sidebar_surface.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/tron_glyph.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 final status = NeonSyncLine(
   progress: 0.04,
@@ -36,6 +37,7 @@ const synced = NeonSyncLine(
 );
 Widget harness(Widget child, {double scale = 1, AppThemeData? theme}) =>
     MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
       // Like MaterialApp.router.builder in production: the sidebar is a sibling
       // of the router, outside its Scaffold/Material default text styles.
       builder: (context, navigator) => AppTheme(

@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../src/core/l10n/l10n.dart';
 import '../src/features/private_usd/models/private_usd_record_key.dart';
 import '../src/features/private_usd/models/private_usd_reverse_presentation.dart';
 import '../src/features/private_usd/private_usd_copy.dart';
@@ -167,6 +168,7 @@ Widget buildMobilePrivateUsdReviewReverseUseCase(BuildContext context) =>
     );
 
 Widget _reverseProgress(
+  BuildContext context,
   ApiReverseRecord record, {
   PrivateUsdFundingState? funding,
   double? proofProgress,
@@ -174,6 +176,7 @@ Widget _reverseProgress(
 }) => PrivateUsdPreviewFrame(
   child: MobilePrivateUsdReverseConversionView(
     presentation: privateUsdReverseProgressPresentation(
+      context.l10n,
       status: PrivateUsdReverseStatus(record: record),
       now: previewPrivateUsdNow,
       funding: funding,
@@ -193,6 +196,7 @@ Widget _reverseProgress(
 /// `awaitingFunding` after the fees changed: the new total to pay.
 Widget buildMobilePrivateUsdReverseFundingUseCase(BuildContext context) =>
     _reverseProgress(
+      context,
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.awaitingFunding),
       message: PrivateUsdCopy.reverseErrorCostChanged,
     );
@@ -200,6 +204,7 @@ Widget buildMobilePrivateUsdReverseFundingUseCase(BuildContext context) =>
 /// The payment proving in the page: its progress and keep-open note.
 Widget buildMobilePrivateUsdReverseProvingUseCase(BuildContext context) =>
     _reverseProgress(
+      context,
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.awaitingFunding),
       funding: const PrivateUsdFundingState(
         stage: PrivateUsdFundingStage.proving,
@@ -210,18 +215,21 @@ Widget buildMobilePrivateUsdReverseProvingUseCase(BuildContext context) =>
 /// The deposit is confirmed: settlement waits for the user.
 Widget buildMobilePrivateUsdReverseReadyUseCase(BuildContext context) =>
     _reverseProgress(
+      context,
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.awaitingReady),
     );
 
 /// Settlement authorized: the refundAfter note.
 Widget buildMobilePrivateUsdReverseSettlingUseCase(BuildContext context) =>
     _reverseProgress(
+      context,
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.settling),
     );
 
 /// The sweep home: its Zcash confirmations.
 Widget buildMobilePrivateUsdReverseReceivingUseCase(BuildContext context) =>
     _reverseProgress(
+      context,
       previewPrivateUsdReverseRecord(
         phase: ApiReversePhase.receiving,
         receiveConfirmations: 1,
@@ -231,6 +239,7 @@ Widget buildMobilePrivateUsdReverseReceivingUseCase(BuildContext context) =>
 /// ZEC received.
 Widget buildMobilePrivateUsdReverseCompleteUseCase(BuildContext context) =>
     _reverseProgress(
+      context,
       previewPrivateUsdReverseRecord(
         phase: ApiReversePhase.complete,
         receiveConfirmations: 2,
@@ -240,6 +249,7 @@ Widget buildMobilePrivateUsdReverseCompleteUseCase(BuildContext context) =>
 /// A refund was requested and waits for its turn.
 Widget buildMobilePrivateUsdReverseRefundWaitUseCase(BuildContext context) =>
     _reverseProgress(
+      context,
       previewPrivateUsdReverseRecord(
         phase: ApiReversePhase.refundWait,
         cancelRequested: true,
@@ -249,6 +259,7 @@ Widget buildMobilePrivateUsdReverseRefundWaitUseCase(BuildContext context) =>
 /// Refunded, with the way to the refunds.
 Widget buildMobilePrivateUsdReverseRefundedUseCase(BuildContext context) =>
     _reverseProgress(
+      context,
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.refunded),
     );
 

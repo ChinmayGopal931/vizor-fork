@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app_bootstrap.dart';
 import '../../../../core/formatting/date_format.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/layout/mobile/mobile_top_nav.dart';
 import '../../../../core/layout/mobile/neon_sync_backdrop.dart';
 import '../../../../core/privacy/privacy_mask.dart';
@@ -355,6 +356,7 @@ class MobilePrivateUsdView extends StatelessWidget {
         ? const <PrivateUsdDepositLine>[]
         : privateUsdDepositLines(depositPass, now: now(), screening: screening);
     final syncLine = privateUsdSyncLine(
+      context.l10n,
       state,
       networkPrivacy: networkPrivacy,
       txidCatchUp: screeningActivity?.txids,
@@ -684,7 +686,9 @@ class _TotalCard extends StatelessWidget {
           )
         : updatedAt == null
         ? null
-        : PrivateUsdCopy.updated(formatDayMonthTime(updatedAt));
+        : PrivateUsdCopy.updated(
+            formatDayMonthTime(updatedAt, context.l10n.localeName),
+          );
     // The change from the wallet's own sends waits on that list.
     final unproved = syncing && balances.unproved > BigInt.zero
         ? _masked(formatPrivateUsd(balances.unproved), privacyModeEnabled)

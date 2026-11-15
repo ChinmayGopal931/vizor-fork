@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
@@ -37,7 +38,7 @@ class ReceiveAddressInfoSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final glow = colors.neon.glow;
-    final items = receiveAddressInfoItems(type, touchUi: true);
+    final items = receiveAddressInfoItems(context.l10n, type, touchUi: true);
     final isShielded = type == ReceiveAddressType.shielded;
     // Figma sizes these for Geist (3/3/3 and 2/4/5/4 lines). Gotham is 9%
     // wider, so each explainer may need one more line; the sheet grows to
@@ -72,7 +73,10 @@ class ReceiveAddressInfoSheet extends StatelessWidget {
                             maxWidth: _headCaptionMaxWidth,
                           ),
                           child: Text(
-                            receiveAddressInfoTitle(type).toUpperCase(),
+                            receiveAddressInfoTitle(
+                              context.l10n,
+                              type,
+                            ).toUpperCase(),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: kNeonHudCaptionStyle.copyWith(
@@ -94,7 +98,7 @@ class ReceiveAddressInfoSheet extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xxs),
                     Text(
-                      receiveAddressInfoSubtitle(type),
+                      receiveAddressInfoSubtitle(context.l10n, type),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: AppTypography.bodyLarge.copyWith(
@@ -130,7 +134,7 @@ class ReceiveAddressInfoSheet extends StatelessWidget {
                   expand: true,
                   height: _closeButtonHeight,
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Close'),
+                  child: Text(context.l10n.commonClose),
                 ),
               ),
             ],
@@ -141,7 +145,7 @@ class ReceiveAddressInfoSheet extends StatelessWidget {
           right: 16,
           child: Semantics(
             button: true,
-            label: 'Close',
+            label: context.l10n.commonClose,
             excludeSemantics: true,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,

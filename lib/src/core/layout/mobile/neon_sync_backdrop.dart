@@ -8,6 +8,7 @@ import '../../../providers/network_privacy_provider.dart';
 import '../../../providers/sync_display_progress_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../formatting/sync_status_label.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 
 /// Which part of the sync line a layer draws.
@@ -80,12 +81,14 @@ class NeonSyncLine {
   /// only while the line climbs, so a caller may watch a per-frame progress
   /// there and nowhere else.
   factory NeonSyncLine.wallet(
+    AppLocalizations l10n,
     SyncState sync, {
     required int whole,
     required NetworkPrivacyState networkPrivacy,
     required double Function() climbProgress,
   }) {
     final status = SyncStatusLabel.from(
+      l10n,
       sync,
       displayWholePercentage: whole,
       networkPrivacy: networkPrivacy,
@@ -126,8 +129,9 @@ class NeonSyncLine {
     return NeonSyncLine(
       progress: progress.toDouble(),
       readout: readout,
+      // A wallet catching up reads as synced, so it says the same.
       semanticsLabel: catchingUp
-          ? _syncedSemanticsLabel
+          ? l10n.syncVizorSynced
           : status.semanticsLabel,
       climbing: syncing,
       failed: status.kind == SyncStatusKind.failed,
@@ -304,6 +308,7 @@ class NeonSyncBackdrop extends ConsumerWidget {
       layer: layer,
       scrolled: scrolled,
       line: NeonSyncLine.wallet(
+        context.l10n,
         ref.watch(syncProvider).value ?? SyncState(),
         whole: ref.watch(syncDisplayWholePercentageProvider),
         networkPrivacy: ref.watch(networkPrivacyProvider),
@@ -312,10 +317,6 @@ class NeonSyncBackdrop extends ConsumerWidget {
     );
   }
 }
-
-/// What [SyncStatusLabel] says once synced; a wallet catching up reads as
-/// synced, so it says the same.
-const _syncedSemanticsLabel = 'Veylor is synced';
 
 /// The drawing of one layer, free of providers.
 class _NeonSyncLineView extends StatefulWidget {

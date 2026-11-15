@@ -8,7 +8,6 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
-import 'package:zcash_wallet/src/core/widgets/review_list_row.dart';
 import 'package:zcash_wallet/src/features/activity/screens/mobile/mobile_swap_activity_detail_screen.dart';
 import 'package:zcash_wallet/src/features/address_book/models/address_book_contact.dart';
 import 'package:zcash_wallet/src/features/address_book/providers/address_book_provider.dart';
@@ -22,9 +21,11 @@ import 'package:zcash_wallet/src/features/swap/widgets/swap_activity_panel.dart'
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/rust/api/sync.dart' as rust_sync;
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 import '../../figma_compare/figma_compare_font_loader.dart';
+import '../../support/test_l10n.dart';
 
 const _recipient = '0x12351aBcDeF01234567890123456789076123';
 
@@ -36,6 +37,7 @@ Widget _harness(
   double textScale = 1,
 }) {
   return MaterialApp(
+    localizationsDelegates: appLocalizationsDelegates,
     builder: (_, navigator) => AppTheme(data: theme, child: navigator!),
     home: Directionality(
       textDirection: TextDirection.ltr,
@@ -182,7 +184,7 @@ void main() {
     expect(find.text('Tx fee'), findsOneWidget);
     expect(find.text('0.0001 ZEC'), findsOneWidget);
     expect(find.text('0.0125 ZEC'), findsNothing);
-    expect(_tooltipWithMessage(kTxFeeHelpTooltip), findsOneWidget);
+    expect(_tooltipWithMessage(testL10n.txFeeHelpTooltip), findsOneWidget);
     expect(find.text("You're receiving"), findsNothing);
 
     expect(
@@ -281,6 +283,7 @@ void main() {
       ),
     ).copyWith(oneClickRefundTo: 'u1refund-address');
     final presentation = swapActivityStatusPresentationForIntent(
+      testL10n,
       _state(),
       intent,
     );
@@ -338,6 +341,7 @@ void main() {
     tester,
   ) async {
     final presentation = swapActivityStatusPresentationForIntent(
+      testL10n,
       _state(),
       _intent(
         status: SwapIntentStatus.failed,
@@ -394,6 +398,7 @@ void main() {
     tester,
   ) async {
     final presentation = swapActivityStatusPresentationForIntent(
+      testL10n,
       _state(),
       _intent(
         status: SwapIntentStatus.refunded,
@@ -450,6 +455,7 @@ void main() {
     'mobile pay keeps the confirmed deposit fee separate from route fees',
     () {
       final presentation = swapActivityStatusPresentationForIntent(
+        testL10n,
         _state(),
         _intent(status: SwapIntentStatus.processing),
         confirmedDepositFeeZatoshi: BigInt.from(10000),
@@ -467,6 +473,7 @@ void main() {
       );
 
       final withoutConfirmedDeposit = swapActivityStatusPresentationForIntent(
+        testL10n,
         _state(),
         _intent(status: SwapIntentStatus.processing),
       );
@@ -548,7 +555,7 @@ void main() {
       await tester.pump();
       expect(find.text('0.0001 ZEC'), findsOneWidget);
       expect(find.text('0.0125 ZEC'), findsNothing);
-      expect(_tooltipWithMessage(kTxFeeHelpTooltip), findsOneWidget);
+      expect(_tooltipWithMessage(testL10n.txFeeHelpTooltip), findsOneWidget);
     },
   );
 
@@ -608,6 +615,7 @@ void main() {
   test('mobile activity titles distinguish paying and paid from swap', () {
     expect(
       mobileSwapActivityTitle(
+        testL10n,
         _state(),
         _intent(status: SwapIntentStatus.processing),
       ),
@@ -615,6 +623,7 @@ void main() {
     );
     expect(
       mobileSwapActivityTitle(
+        testL10n,
         _state(),
         _intent(status: SwapIntentStatus.complete),
       ),
@@ -622,6 +631,7 @@ void main() {
     );
     expect(
       mobileSwapActivityTitle(
+        testL10n,
         _state(),
         _intent(status: SwapIntentStatus.refunded),
       ),
@@ -629,7 +639,10 @@ void main() {
     );
 
     final swap = _intent(status: SwapIntentStatus.processing, payMode: false);
-    expect(mobileSwapActivityTitle(_state(), swap), 'Swap in progress...');
+    expect(
+      mobileSwapActivityTitle(testL10n, _state(), swap),
+      'Swap in progress...',
+    );
   });
 }
 

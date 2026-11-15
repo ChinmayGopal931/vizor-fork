@@ -13,6 +13,8 @@ import 'package:zcash_wallet/src/features/payment_links/widgets/payment_link_gif
 import 'package:zcash_wallet/src/features/activity/activity_row_mapper.dart';
 import 'package:zcash_wallet/src/features/activity/screens/mobile/mobile_transaction_status_screen.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
+import '../support/test_l10n.dart';
 
 void main() {
   setUpAll(() async {
@@ -25,6 +27,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
           home: AppTheme(
             data: AppThemeData.dark,
             child: Builder(builder: buildGiftCardClaimTransitionPreview),
@@ -96,6 +99,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
           home: AppTheme(
             data: AppThemeData.dark,
             child: Builder(builder: buildGiftCardClaimDetailTransitionPreview),
@@ -114,6 +118,7 @@ void main() {
         find.byType(MobileTransactionStatusScreen),
       );
       final claimTime = formatActivityTimestamp(
+        testL10n,
         screen.args.giftCard!.activityTimestamp,
       );
       // The receipt's title is drawn uppercase in its top bar.
@@ -186,6 +191,7 @@ void main() {
       final capture = GlobalKey();
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
           home: AppTheme(
             data: AppThemeData.dark,
             child: RepaintBoundary(

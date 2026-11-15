@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../../../main.dart' show log;
 import '../../../../core/feedback/app_haptics.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/config/network_config.dart'
     show kZcashDefaultCurrencyTicker;
 import '../../../../core/layout/mobile/mobile_top_nav.dart';
@@ -25,9 +26,6 @@ import '../../widgets/mobile/receive_address_info_sheet.dart';
 import '../../widgets/mobile/receive_qr_frame.dart';
 import '../../widgets/mobile/receive_request_sheet.dart';
 import '../../widgets/receive_address_widgets.dart';
-
-const _renewShieldedAddressErrorMessage =
-    "We couldn't refresh your shielded address. Try again, or use your current one.";
 
 bool _shouldRefreshTransparentAddressAfterSyncUpdate(
   SyncState previous,
@@ -215,7 +213,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
     } catch (e) {
       log('MobileReceive: ERROR renewing shielded address: $e');
       if (!mounted) return;
-      showAppToast(context, _renewShieldedAddressErrorMessage);
+      showAppToast(context, context.l10n.receiveRenewAddressError);
     } finally {
       if (mounted) setState(() => _renewing = false);
     }
@@ -227,7 +225,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
     await Clipboard.setData(ClipboardData(text: address));
     unawaited(AppHaptics.copy());
     if (!mounted) return;
-    showAppToast(context, 'Address copied');
+    showAppToast(context, context.l10n.commonAddressCopied);
   }
 
   void _shareAddress() {
@@ -263,7 +261,13 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
     final activeAccount = ref.watch(accountProvider).value?.activeAccount;
     final accountName = activeAccount?.name ?? '';
     final scanOptimizedQr = activeAccount?.isKeystone ?? false;
-    final poolLabel = _isShielded ? 'shielded' : 'transparent';
+    final l10n = context.l10n;
+    final copyLabel = _isShielded
+        ? l10n.commonCopyShieldedAddress
+        : l10n.receiveCopyTransparentAddress;
+    final shareLabel = _isShielded
+        ? l10n.receiveShareShieldedAddress
+        : l10n.receiveShareTransparentAddress;
 
     if (MobileWindowPolicyScope.of(context).usesWideLayout) {
       return _buildWide(
@@ -280,7 +284,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
           child: Column(
             children: [
               MobileTopNav.back(
-                title: 'Receive $kZcashDefaultCurrencyTicker',
+                title: context.l10n.receiveTitle(kZcashDefaultCurrencyTicker),
                 height: _MobileReceiveMetrics.topNavHeight,
                 onBack: () => context.pop(),
               ),
@@ -341,8 +345,8 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                                           _MobileReceiveMetrics.buttonIconSize,
                                     ),
                                     child: Text(
-                                      'Copy address',
-                                      semanticsLabel: 'Copy $poolLabel address',
+                                      l10n.commonCopyAddress,
+                                      semanticsLabel: copyLabel,
                                       style: AppTypography.labelMedium,
                                     ),
                                   ),
@@ -355,7 +359,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                                   height: _MobileReceiveMetrics.buttonHeight,
                                   child: Semantics(
                                     button: true,
-                                    label: 'Share $poolLabel address',
+                                    label: shareLabel,
                                     child: AppButton(
                                       key: const ValueKey(
                                         'mobile_receive_share',
@@ -382,7 +386,9 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                             const SizedBox(height: AppSpacing.s),
                             _RequestTextButton(
                               key: const ValueKey('mobile_receive_request'),
-                              label: 'Request $kZcashDefaultCurrencyTicker',
+                              label: context.l10n.receiveRequestButton(
+                                kZcashDefaultCurrencyTicker,
+                              ),
                               enabled: _selectedAddress.isNotEmpty,
                               onTap: _openRequest,
                             ),
@@ -493,7 +499,9 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
               child: Column(
                 children: [
                   MobileTopNav.back(
-                    title: 'Receive $kZcashDefaultCurrencyTicker',
+                    title: context.l10n.receiveTitle(
+                      kZcashDefaultCurrencyTicker,
+                    ),
                     height: _MobileReceiveMetrics.topNavHeight,
                     onBack: () => context.pop(),
                   ),
@@ -536,7 +544,13 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
   );
 
   Widget _buildWideActions() {
-    final poolLabel = _isShielded ? 'shielded' : 'transparent';
+    final l10n = context.l10n;
+    final copyLabel = _isShielded
+        ? l10n.commonCopyShieldedAddress
+        : l10n.receiveCopyTransparentAddress;
+    final shareLabel = _isShielded
+        ? l10n.receiveShareShieldedAddress
+        : l10n.receiveShareTransparentAddress;
     final enabled = _selectedAddress.isNotEmpty;
     const labelStyle = AppTypography.labelMedium;
     return Column(
@@ -558,8 +572,8 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
             size: _MobileReceiveMetrics.buttonIconSize,
           ),
           child: Text(
-            'Copy address',
-            semanticsLabel: 'Copy $poolLabel address',
+            l10n.commonCopyAddress,
+            semanticsLabel: copyLabel,
             textAlign: TextAlign.center,
             style: labelStyle,
           ),
@@ -578,8 +592,8 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
             size: _MobileReceiveMetrics.buttonIconSize,
           ),
           child: Text(
-            'Share address',
-            semanticsLabel: 'Share $poolLabel address',
+            l10n.receiveShareAddress,
+            semanticsLabel: shareLabel,
             textAlign: TextAlign.center,
             style: labelStyle,
           ),
@@ -594,7 +608,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
           variant: AppButtonVariant.ghost,
           onPressed: enabled ? _openRequest : null,
           child: Text(
-            'Request $kZcashDefaultCurrencyTicker',
+            l10n.receiveRequestButton(kZcashDefaultCurrencyTicker),
             textAlign: TextAlign.center,
             style: labelStyle,
           ),

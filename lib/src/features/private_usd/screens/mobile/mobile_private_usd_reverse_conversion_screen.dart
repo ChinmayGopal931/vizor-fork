@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/feedback/app_haptics.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../models/private_usd_record_key.dart';
@@ -75,6 +76,7 @@ class _MobilePrivateUsdReverseConversionScreenState
     final presentation = status == null
         ? null
         : privateUsdReverseProgressPresentation(
+            context.l10n,
             status: status,
             now: state.now,
             funding: state.funding,

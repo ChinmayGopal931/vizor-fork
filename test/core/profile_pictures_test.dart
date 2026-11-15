@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/profile_pictures.dart';
+import '../support/test_l10n.dart';
 
 void main() {
   test(
@@ -16,7 +17,7 @@ void main() {
         'pfp-06',
         'pfp-07',
       ]);
-      expect(kProfilePictureOptions.map((option) => option.label), [
+      expect(kProfilePictureOptions.map((option) => option.label(testL10n)), [
         'Light cycle',
         'Halo',
         'Red line',
@@ -37,7 +38,7 @@ void main() {
 
     expect(option, isNotNull);
     expect(option!.id, 'pfp-02');
-    expect(option.label, 'Halo');
+    expect(option.label(testL10n), 'Halo');
     expect(option.assetPath, 'assets/profile_pictures/profile_picture_02.webp');
   });
 

@@ -1,5 +1,6 @@
 import '../../../../core/formatting/date_format.dart';
 import '../../../../core/formatting/sync_status_label.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/layout/mobile/neon_sync_backdrop.dart';
 import '../../../../providers/network_privacy_provider.dart';
 import '../../models/private_usd_screening_status.dart';
@@ -21,6 +22,7 @@ import '../../services/private_usd_balance_repository.dart';
 /// readers hear the load's or the update's progress, the update, the last
 /// update's time, or the failure.
 NeonSyncLine privateUsdSyncLine(
+  AppLocalizations l10n,
   PrivateUsdBalanceState state, {
   NetworkPrivacyState? networkPrivacy,
   double? txidCatchUp,
@@ -48,7 +50,7 @@ NeonSyncLine privateUsdSyncLine(
   final refreshPercent = state.refreshPercent;
   if (balances != null && refreshPercent != null && state.isRefreshing) {
     if (refreshPercent == 0 && _waitsForTor(networkPrivacy)) {
-      return _torWaiting();
+      return _torWaiting(l10n);
     }
     final whole = refreshPercent.clamp(0, 99);
     return NeonSyncLine(
@@ -78,12 +80,14 @@ NeonSyncLine privateUsdSyncLine(
           ? PrivateUsdCopy.updating
           : updatedAt == null
           ? ''
-          : PrivateUsdCopy.updated(formatDayMonthTime(updatedAt)),
+          : PrivateUsdCopy.updated(
+              formatDayMonthTime(updatedAt, l10n.localeName),
+            ),
       scanning: state.isRefreshing,
       readoutStyle: _railgunReadout,
     );
   }
-  if (state.isRefreshing && _waitsForTor(networkPrivacy)) return _torWaiting();
+  if (state.isRefreshing && _waitsForTor(networkPrivacy)) return _torWaiting(l10n);
   final percent = state.firstSyncPercent;
   final whole = (percent ?? 0).clamp(0, 99);
   return NeonSyncLine(
@@ -103,10 +107,10 @@ bool _waitsForTor(NetworkPrivacyState? networkPrivacy) =>
     torIsTargetRoute(networkPrivacy) &&
     networkPrivacy.status == NetworkPrivacyConnectionStatus.connecting;
 
-NeonSyncLine _torWaiting() => NeonSyncLine(
+NeonSyncLine _torWaiting(AppLocalizations l10n) => NeonSyncLine(
   progress: _climbed(0),
   readout: NeonSyncReadout.torWaiting,
-  semanticsLabel: kSyncStatusConnectingToTorSemanticsLabel,
+  semanticsLabel: l10n.syncConnectingToTorSemantics,
   climbing: true,
   readoutStyle: _railgunReadout,
 );

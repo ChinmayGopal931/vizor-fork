@@ -3,6 +3,7 @@
 
 import 'package:flutter/widgets.dart';
 
+import '../src/core/l10n/l10n.dart';
 import '../src/core/layout/mobile/app_mobile_sheet.dart';
 import '../src/core/theme/app_theme.dart';
 import '../src/features/activity/models/activity_row_data.dart';
@@ -688,6 +689,7 @@ Widget buildMobilePrivateUsdReviewExpiredUseCase(BuildContext context) =>
     );
 
 Widget _progressPreview(
+  BuildContext context,
   PrivateUsdConversionStatus status, {
   PrivateUsdBalanceState? balance,
   bool callingOff = false,
@@ -696,6 +698,7 @@ Widget _progressPreview(
 }) => PrivateUsdPreviewFrame(
   child: MobilePrivateUsdConversionView(
     presentation: privateUsdProgressPresentation(
+      context.l10n,
       status: status,
       now: previewPrivateUsdNow,
       zcashConfirmations: _confirmations,
@@ -719,6 +722,7 @@ Widget _progressPreview(
 /// Waiting for confirmations, 1 of 2.
 Widget buildMobilePrivateUsdProgressUseCase(BuildContext context) =>
     _progressPreview(
+      context,
       PrivateUsdConversionStatus(
         record: previewPrivateUsdRecord(depositConfirmations: 1),
         wait: ApiForwardWait.confirming,
@@ -729,6 +733,7 @@ Widget buildMobilePrivateUsdProgressUseCase(BuildContext context) =>
 Widget buildMobilePrivateUsdProgressScreenMaySleepUseCase(
   BuildContext context,
 ) => _progressPreview(
+  context,
   PrivateUsdConversionStatus(
     record: previewPrivateUsdRecord(depositConfirmations: 1),
     wait: ApiForwardWait.confirming,
@@ -741,6 +746,7 @@ Widget buildMobilePrivateUsdProgressScreenMaySleepUseCase(
 Widget buildMobilePrivateUsdProgressOpeningRelayerUseCase(
   BuildContext context,
 ) => _progressPreview(
+  context,
   PrivateUsdConversionStatus(
     record: previewPrivateUsdRecord(
       phase: ApiForwardPhase.opening,
@@ -756,6 +762,7 @@ Widget buildMobilePrivateUsdProgressOpeningRelayerUseCase(
 /// can leave.
 Widget buildMobilePrivateUsdProgressRelayerUseCase(BuildContext context) =>
     _progressPreview(
+      context,
       PrivateUsdConversionStatus(
         record: previewPrivateUsdRecord(
           depositConfirmations: 1,
@@ -768,6 +775,7 @@ Widget buildMobilePrivateUsdProgressRelayerUseCase(BuildContext context) =>
 /// An opening that has taken over 90 s, so it can be called off.
 Widget buildMobilePrivateUsdProgressOpeningSlowUseCase(BuildContext context) =>
     _progressPreview(
+      context,
       PrivateUsdConversionStatus(
         record: previewPrivateUsdRecord(
           phase: ApiForwardPhase.opening,
@@ -781,6 +789,7 @@ Widget buildMobilePrivateUsdProgressOpeningSlowUseCase(BuildContext context) =>
 /// Steps failing for over a minute: the problem card.
 Widget buildMobilePrivateUsdProgressProblemUseCase(BuildContext context) =>
     _progressPreview(
+      context,
       PrivateUsdConversionStatus(
         record: previewPrivateUsdRecord(
           phase: ApiForwardPhase.claiming,
@@ -794,6 +803,7 @@ Widget buildMobilePrivateUsdProgressProblemUseCase(BuildContext context) =>
 /// Paid: arrived in the private balance, screening.
 Widget buildMobilePrivateUsdProgressPaidUseCase(BuildContext context) =>
     _progressPreview(
+      context,
       PrivateUsdConversionStatus(
         record: previewPrivateUsdRecord(
           phase: ApiForwardPhase.paid,
@@ -807,6 +817,7 @@ Widget buildMobilePrivateUsdProgressPaidUseCase(BuildContext context) =>
 /// Paid and screened: bridged.
 Widget buildMobilePrivateUsdProgressBridgedUseCase(BuildContext context) =>
     _progressPreview(
+      context,
       PrivateUsdConversionStatus(
         record: previewPrivateUsdRecord(
           phase: ApiForwardPhase.paid,
@@ -823,6 +834,7 @@ Widget buildMobilePrivateUsdProgressBridgedUseCase(BuildContext context) =>
 /// The maker called it off: bringing the ZEC back.
 Widget buildMobilePrivateUsdProgressRefundingUseCase(BuildContext context) =>
     _progressPreview(
+      context,
       PrivateUsdConversionStatus(
         record: previewPrivateUsdRecord(phase: ApiForwardPhase.refunding),
         wait: ApiForwardWait.refunding,
@@ -843,11 +855,12 @@ PrivateUsdConversionStatus previewPrivateUsdUnwinding() =>
     );
 
 Widget buildMobilePrivateUsdProgressUnwindingUseCase(BuildContext context) =>
-    _progressPreview(previewPrivateUsdUnwinding());
+    _progressPreview(context, previewPrivateUsdUnwinding());
 
 /// The ZEC came back.
 Widget buildMobilePrivateUsdProgressRefundedUseCase(BuildContext context) =>
     _progressPreview(
+      context,
       PrivateUsdConversionStatus(
         record: previewPrivateUsdRecord(
           phase: ApiForwardPhase.refunded,
@@ -860,6 +873,7 @@ Widget buildMobilePrivateUsdProgressRefundedUseCase(BuildContext context) =>
 /// Nothing was sent.
 Widget buildMobilePrivateUsdProgressNothingSentUseCase(BuildContext context) =>
     _progressPreview(
+      context,
       PrivateUsdConversionStatus(
         record: previewPrivateUsdRecord(
           phase: ApiForwardPhase.nothingSent,

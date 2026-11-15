@@ -24,6 +24,7 @@ import 'package:zcash_wallet/src/features/swap/widgets/swap_asset_icon.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 // Private USD's logo, the USDC token with its Railgun badge, wherever
 // Private USD shows an image, and ZEC's coin beside it where a conversion
@@ -255,6 +256,7 @@ void main() {
     await expectHeader(
       MobilePrivateUsdConversionView(
         presentation: privateUsdProgressPresentation(
+          testL10n,
           status: PrivateUsdConversionStatus(
             record: previewPrivateUsdRecord(depositConfirmations: 1),
             wait: ApiForwardWait.confirming,
@@ -274,6 +276,7 @@ void main() {
     await expectHeader(
       MobilePrivateUsdReverseConversionView(
         presentation: privateUsdReverseProgressPresentation(
+          testL10n,
           status: PrivateUsdReverseStatus(
             record: previewPrivateUsdReverseRecord(
               phase: ApiReversePhase.receivingZec,

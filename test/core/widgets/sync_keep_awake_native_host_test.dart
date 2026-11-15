@@ -16,6 +16,7 @@ import 'package:zcash_wallet/src/providers/account_models.dart';
 import 'package:zcash_wallet/src/providers/sync_keep_awake_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/services/native_screen_awake.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 
@@ -709,6 +710,7 @@ Widget _app({
       syncProvider.overrideWith(() => syncNotifier),
     ],
     child: MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
       home: SyncKeepAwakeNativeHost(
         retryDelays: retryDelays,
         child: const SizedBox.shrink(),

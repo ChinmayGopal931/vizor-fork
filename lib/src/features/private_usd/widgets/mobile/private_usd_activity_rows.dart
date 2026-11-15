@@ -8,6 +8,7 @@ import '../../../../core/config/zcash_explorer.dart';
 import '../../../../core/formatting/address_display.dart';
 import '../../../../core/formatting/zec_amount.dart';
 import '../../../../core/privacy/privacy_mask.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../providers/account_provider.dart';
@@ -52,6 +53,7 @@ ActivityRowData? buildPrivateUsdActivityRow({
   VoidCallback? onOpenConversion,
   PrivateUsdActivityDetailsConfig? details,
 }) {
+  final l10n = context.l10n;
   final colors = context.colors;
   final usd = hideAmountIfPrivacyMode(
     formatPrivateUsd(BigInt.parse(record.receives)),
@@ -59,6 +61,7 @@ ActivityRowData? buildPrivateUsdActivityRow({
     denomination: '',
   );
   final timestamp = formatActivityTimestamp(
+    l10n,
     privateUsdActivityTime(record),
     dateOnly: dateOnlyTimestamp,
   );
@@ -71,6 +74,7 @@ ActivityRowData? buildPrivateUsdActivityRow({
     details,
     base.stableId,
     () => privateUsdForwardDetails(
+      l10n,
       record,
       privacyModeEnabled: privacyModeEnabled,
     ),
@@ -153,6 +157,7 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
   PrivateUsdActivityDetailsConfig? details,
   VoidCallback? onOpenRefunds,
 }) {
+  final l10n = context.l10n;
   final colors = context.colors;
   final usd = hideAmountIfPrivacyMode(
     formatPrivateUsdNearest(privateUsdReverseDebit(record)),
@@ -160,6 +165,7 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
     denomination: '',
   );
   final timestamp = formatActivityTimestamp(
+    l10n,
     privateUsdReverseActivityTime(record),
     dateOnly: dateOnlyTimestamp,
   );
@@ -179,6 +185,7 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
         details,
         stableId,
         () => privateUsdReverseDetails(
+          l10n,
           record,
           privacyModeEnabled: privacyModeEnabled,
         ),
@@ -245,6 +252,7 @@ ActivityRowData buildPrivateUsdSendActivityRow({
   bool dateOnlyTimestamp = false,
   PrivateUsdActivityDetailsConfig? details,
 }) {
+  final l10n = context.l10n;
   final colors = context.colors;
   final unconfirmed = record.state == ApiSendState.unconfirmed;
   final usd = hideAmountIfPrivacyMode(
@@ -259,7 +267,7 @@ ActivityRowData buildPrivateUsdSendActivityRow({
   final unfold = _unfold(
     details,
     stableId,
-    () => privateUsdSendDetails(record, privacyModeEnabled: privacyModeEnabled),
+    () => privateUsdSendDetails(l10n, record, privacyModeEnabled: privacyModeEnabled),
   );
   return ActivityRowData(
     stableId: stableId,
@@ -281,6 +289,7 @@ ActivityRowData buildPrivateUsdSendActivityRow({
     statusIconName: unconfirmed ? AppIcons.loader : null,
     statusColor: unconfirmed ? colors.text.secondary : null,
     timestampText: formatActivityTimestamp(
+      l10n,
       privateUsdSendActivityTime(record),
       dateOnly: dateOnlyTimestamp,
     ),
@@ -323,6 +332,7 @@ ActivityRowData buildPrivateUsdReceivedActivityRow({
   bool dateOnlyTimestamp = false,
   PrivateUsdActivityDetailsConfig? details,
 }) {
+  final l10n = context.l10n;
   final colors = context.colors;
   final settled = receipt.settled;
   final sender = receipt.sender;
@@ -336,6 +346,7 @@ ActivityRowData buildPrivateUsdReceivedActivityRow({
     details,
     stableId,
     () => privateUsdReceivedDetails(
+      l10n,
       receipt,
       privacyModeEnabled: privacyModeEnabled,
     ),
@@ -360,6 +371,7 @@ ActivityRowData buildPrivateUsdReceivedActivityRow({
     statusIconName: settled ? null : AppIcons.loader,
     statusColor: settled ? null : colors.text.secondary,
     timestampText: formatActivityTimestamp(
+      l10n,
       privateUsdReceivedActivityTime(receipt),
       dateOnly: dateOnlyTimestamp,
     ),
@@ -385,6 +397,7 @@ ActivityRowData? buildPrivateUsdDepositActivityRow({
   bool dateOnlyTimestamp = false,
   PrivateUsdActivityDetailsConfig? details,
 }) {
+  final l10n = context.l10n;
   final colors = context.colors;
   final arrives = hideAmountIfPrivacyMode(
     formatPrivateUsd(BigInt.tryParse(record.arrives) ?? BigInt.zero),
@@ -421,6 +434,7 @@ ActivityRowData? buildPrivateUsdDepositActivityRow({
     details,
     stableId,
     () => privateUsdDepositDetails(
+      l10n,
       record,
       privacyModeEnabled: privacyModeEnabled,
     ),
@@ -445,6 +459,7 @@ ActivityRowData? buildPrivateUsdDepositActivityRow({
     statusIconName: landed ? null : AppIcons.loader,
     statusColor: landed ? null : colors.text.secondary,
     timestampText: formatActivityTimestamp(
+      l10n,
       privateUsdDepositActivityTime(record),
       dateOnly: dateOnlyTimestamp,
     ),
@@ -581,6 +596,7 @@ mixin PrivateUsdActivityDetailsState<W extends ConsumerStatefulWidget>
         );
       }),
       zcashExplorerLabel: explorerSettingsLabel(
+        context.l10n,
         ref.watch(zcashExplorerProvider),
         networkName: ref.watch(
           rpcEndpointProvider.select((config) => config.networkName),

@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/widgets.dart';
 
 import '../../../../core/privacy/privacy_mask.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../../core/widgets/receipt_loading_skeleton.dart';
@@ -113,7 +114,12 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
     // Top right: a note on the numbers, or the time under the finger.
     final Widget source = Text(
       data != null && selected != null
-          ? formatPortfolioPointTime(selected.time, data.range, data.mode)
+          ? formatPortfolioPointTime(
+              context.l10n,
+              selected.time,
+              data.range,
+              data.mode,
+            )
           : _sourceLabel(data),
       key: const ValueKey('mobile_home_portfolio_chart_source'),
       maxLines: 1,

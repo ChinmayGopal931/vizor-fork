@@ -21,6 +21,7 @@ import 'package:zcash_wallet/src/features/settings/widgets/mobile/mobile_tor_con
 import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 // The forward conversion's screens, and the banner and activity on
 // `/private-usd`, built from the Widgetbook fixtures.
@@ -321,6 +322,7 @@ void main() {
         tester,
         MobilePrivateUsdConversionView(
           presentation: privateUsdProgressPresentation(
+            testL10n,
             status: status,
             now: previewPrivateUsdNow,
             zcashConfirmations: 2,
@@ -419,7 +421,7 @@ void main() {
       );
       expect(find.text(PrivateUsdCopy.convertRelayerClaims), findsOneWidget);
       expect(
-        find.text(PrivateUsdCopy.convertMakerSilent(formatDayMonthTime(t0))),
+        find.text(PrivateUsdCopy.convertMakerSilent(formatDayMonthTime(t0, testL10n.localeName))),
         findsNothing,
       );
       expect(keepOpenCard, findsNothing);
@@ -702,7 +704,7 @@ void main() {
       expect(find.text(PrivateUsdCopy.convertStepClaim), findsNothing);
       expect(
         find.text(
-          PrivateUsdCopy.convertUnwindingUntil(formatDayMonthTime(lateClaimAt)),
+          PrivateUsdCopy.convertUnwindingUntil(formatDayMonthTime(lateClaimAt, testL10n.localeName)),
         ),
         findsOneWidget,
       );

@@ -7,6 +7,7 @@ import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_sync_line.dart';
 import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
+import '../../support/test_l10n.dart';
 
 // The Processing row's live line and the sync line (owner, 2026-10-19): what
 // the page's screening work is doing, and a long txid catch-up shown as one.
@@ -92,13 +93,13 @@ void main() {
       updatedAt: DateTime(2026, 10, 19),
       isRefreshing: true,
     );
-    final catchingUp = privateUsdSyncLine(state, txidCatchUp: 0.42);
+    final catchingUp = privateUsdSyncLine(testL10n, state, txidCatchUp: 0.42);
     expect(catchingUp.readout, PrivateUsdCopy.syncReadoutProgress(42));
     expect(catchingUp.climbing, isTrue);
     expect(catchingUp.progress, closeTo(0.42, 1e-9));
 
     for (final done in [null, 1.0]) {
-      final synced = privateUsdSyncLine(state, txidCatchUp: done);
+      final synced = privateUsdSyncLine(testL10n, state, txidCatchUp: done);
       expect(synced.readout, PrivateUsdCopy.syncReadoutSynced, reason: '$done');
       expect(synced.climbing, isFalse);
     }
@@ -112,7 +113,7 @@ void main() {
       isRefreshing: true,
       refreshPercent: 64,
     );
-    final climbing = privateUsdSyncLine(state, txidCatchUp: 0.2);
+    final climbing = privateUsdSyncLine(testL10n, state, txidCatchUp: 0.2);
     expect(climbing.readout, PrivateUsdCopy.syncReadoutProgress(64));
     expect(climbing.semanticsLabel, PrivateUsdCopy.updatingProgress(64));
     expect(climbing.climbing, isTrue);
@@ -124,18 +125,20 @@ void main() {
     );
     expect(
       privateUsdSyncLine(
+        testL10n,
         state.copyWith(refreshPercent: 0),
         networkPrivacy: connecting,
       ).readout,
       NeonSyncReadout.torWaiting,
     );
     expect(
-      privateUsdSyncLine(state, networkPrivacy: connecting).readout,
+      privateUsdSyncLine(testL10n, state, networkPrivacy: connecting).readout,
       PrivateUsdCopy.syncReadoutProgress(64),
       reason: 'under way, it is past Tor',
     );
 
     final automatic = privateUsdSyncLine(
+      testL10n,
       state.copyWith(clearRefreshPercent: true),
     );
     expect(automatic.readout, PrivateUsdCopy.syncReadoutSynced);

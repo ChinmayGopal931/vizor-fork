@@ -11,6 +11,7 @@ import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_priv
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
 import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 // Railgun's sync on the Private USD screen is Home's sync line, with Home's
 // layers and catch-up rule. Its readouts name Railgun; the Tor ones are
@@ -178,7 +179,7 @@ void main() {
       );
     }
     final updated = PrivateUsdCopy.updated(
-      formatDayMonthTime(previewPrivateUsdUpdatedAt),
+      formatDayMonthTime(previewPrivateUsdUpdatedAt, testL10n.localeName),
     );
     expect(find.text(updated), findsOneWidget);
     expect(find.bySemanticsLabel(updated), findsOneWidget);

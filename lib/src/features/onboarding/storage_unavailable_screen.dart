@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../main.dart' show log;
 import '../../app_bootstrap.dart';
+import '../../core/l10n/l10n.dart';
 import '../../core/layout/app_layout.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_button.dart';
@@ -23,10 +24,12 @@ class StorageUnavailableScreen extends ConsumerStatefulWidget {
       _StorageUnavailableScreenState();
 }
 
+enum _RetryFailure { walletDb, secureStorage }
+
 class _StorageUnavailableScreenState
     extends ConsumerState<StorageUnavailableScreen> {
   bool _isRetrying = false;
-  String? _retryError;
+  _RetryFailure? _retryError;
 
   @override
   void initState() {
@@ -52,8 +55,8 @@ class _StorageUnavailableScreenState
         setState(() {
           _retryError =
               failureKind == AppBootstrapFailureKind.walletDbMigrationFailed
-              ? 'The wallet database update still failed.'
-              : 'Secure storage is still unavailable.';
+              ? _RetryFailure.walletDb
+              : _RetryFailure.secureStorage;
         });
       }
     } finally {
@@ -154,7 +157,7 @@ class _StorageUnavailableContent extends ConsumerWidget {
   });
 
   final bool isRetrying;
-  final String? retryError;
+  final _RetryFailure? retryError;
   final VoidCallback onRetry;
 
   static const double _contentWidth = 360;
@@ -164,10 +167,16 @@ class _StorageUnavailableContent extends ConsumerWidget {
     final colors = context.colors;
     final bootstrap = ref.watch(appBootstrapProvider);
     final failureKind = bootstrap.failureKind;
+    final l10n = context.l10n;
     final details =
-        retryError ??
+        switch (retryError) {
+          _RetryFailure.walletDb => l10n.onboardingStorageRetryWalletDbFailed,
+          _RetryFailure.secureStorage =>
+            l10n.onboardingStorageRetrySecureStorageFailed,
+          null => null,
+        } ??
         (failureKind == AppBootstrapFailureKind.startupFailure
-            ? bootstrap.failureMessage
+            ? l10n.onboardingStorageStartupFailureDetail
             : null);
     return SizedBox(
       width: _contentWidth,
@@ -183,7 +192,7 @@ class _StorageUnavailableContent extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            _title(failureKind),
+            _title(l10n, failureKind),
             style: AppTypography.headlineLarge.copyWith(
               color: colors.text.accent,
             ),
@@ -191,7 +200,7 @@ class _StorageUnavailableContent extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            _body(failureKind),
+            _body(l10n, failureKind),
             style: AppTypography.bodyMedium.copyWith(
               color: colors.text.secondary,
             ),
@@ -213,7 +222,11 @@ class _StorageUnavailableContent extends ConsumerWidget {
               isRetrying ? AppIcons.loader : AppIcons.renew,
               animated: isRetrying,
             ),
-            child: Text(isRetrying ? 'Retrying' : 'Retry'),
+            child: Text(
+              isRetrying
+                  ? context.l10n.onboardingRetrying
+                  : context.l10n.commonRetry,
+            ),
           ),
           if (isDesktopLayoutPlatform) ...[
             const SizedBox(height: AppSpacing.xs),
@@ -224,7 +237,7 @@ class _StorageUnavailableContent extends ConsumerWidget {
               variant: AppButtonVariant.ghost,
               size: AppButtonSize.medium,
               minWidth: 96,
-              child: const Text('Quit'),
+              child: Text(context.l10n.commonQuit),
             ),
           ],
         ],
@@ -232,26 +245,28 @@ class _StorageUnavailableContent extends ConsumerWidget {
     );
   }
 
-  String _title(AppBootstrapFailureKind? failureKind) {
+  String _title(AppLocalizations l10n, AppBootstrapFailureKind? failureKind) {
     if (failureKind == AppBootstrapFailureKind.walletDbMigrationFailed) {
-      return 'Unable to update wallet database';
+      return l10n.onboardingStorageDbMigrationTitle;
     }
     if (failureKind == AppBootstrapFailureKind.startupFailure) {
-      return 'Unable to open Veylor';
-    }
-    return _isLinux ? 'Unlock your keyring' : 'Secure storage is locked';
-  }
-
-  String _body(AppBootstrapFailureKind? failureKind) {
-    if (failureKind == AppBootstrapFailureKind.walletDbMigrationFailed) {
-      return 'Veylor needs to update the local wallet database before opening this version. Try again, or quit and restart Veylor.';
-    }
-    if (failureKind == AppBootstrapFailureKind.startupFailure) {
-      return 'Veylor could not load the local startup state. Try again, or quit and restart Veylor.';
+      return l10n.appOpenFailedTitle;
     }
     return _isLinux
-        ? 'Veylor needs access to the system keyring before it can open your wallet. Unlock the keyring, then try again.'
-        : 'Veylor needs access to secure storage before it can open your wallet. Unlock secure storage, then try again.';
+        ? l10n.keyringUnlockTitle
+        : l10n.onboardingStorageSecureStorageLockedTitle;
+  }
+
+  String _body(AppLocalizations l10n, AppBootstrapFailureKind? failureKind) {
+    if (failureKind == AppBootstrapFailureKind.walletDbMigrationFailed) {
+      return l10n.onboardingStorageDbMigrationBody;
+    }
+    if (failureKind == AppBootstrapFailureKind.startupFailure) {
+      return l10n.onboardingStorageStartupFailureBody;
+    }
+    return _isLinux
+        ? l10n.onboardingStorageKeyringLockedBody
+        : l10n.onboardingStorageSecureStorageLockedBody;
   }
 
   bool get _isLinux => !kIsWeb && defaultTargetPlatform == TargetPlatform.linux;

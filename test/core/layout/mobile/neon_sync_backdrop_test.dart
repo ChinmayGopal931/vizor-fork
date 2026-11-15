@@ -8,6 +8,7 @@ import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_failure.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
+import '../../../support/test_l10n.dart';
 
 // The floor flows, and a climbing line's pulse runs, only while something
 // scans; idle, nothing moves and no frame is drawn.
@@ -217,6 +218,7 @@ void main() {
       'a scan climbs with its display progress and reads its percentage',
       () {
         final line = NeonSyncLine.wallet(
+          testL10n,
           SyncState(isSyncing: true, percentage: 0.4),
           whole: 42,
           networkPrivacy: off,
@@ -231,6 +233,7 @@ void main() {
 
     test('a synced wallet is full and never reads the climb', () {
       final line = NeonSyncLine.wallet(
+        testL10n,
         SyncState(percentage: 1),
         whole: 100,
         networkPrivacy: off,
@@ -243,6 +246,7 @@ void main() {
 
     test('a scan a few blocks behind the tip reads as synced', () {
       final line = NeonSyncLine.wallet(
+        testL10n,
         SyncState(
           isSyncing: true,
           percentage: 0.99,
@@ -262,12 +266,12 @@ void main() {
 
     test('a failed sync holds where it stopped', () {
       final line = NeonSyncLine.wallet(
+        testL10n,
         SyncState(
           percentage: 0.3,
           failure: const SyncFailure(
             kind: SyncFailureKind.network,
             rawMessage: 'offline',
-            userMessage: 'Network error',
           ),
         ),
         whole: 30,
@@ -282,6 +286,7 @@ void main() {
 
     test('Tor reads first: waiting on it, then offline', () {
       final waiting = NeonSyncLine.wallet(
+        testL10n,
         SyncState(isSyncing: true),
         whole: 1,
         networkPrivacy: const NetworkPrivacyState(
@@ -293,6 +298,7 @@ void main() {
       expect(waiting.readout, NeonSyncReadout.torWaiting);
       expect(waiting.climbing, isTrue);
       final offline = NeonSyncLine.wallet(
+        testL10n,
         SyncState(percentage: 0.5),
         whole: 50,
         networkPrivacy: const NetworkPrivacyState(

@@ -297,6 +297,10 @@ abstract final class PrivateUsdCopy {
       "Couldn't get this bridge's token, so nothing was sent. Try again "
       'in a moment.';
 
+  /// The last blocks before a network upgrade, when Rust refuses a deposit.
+  static const networkUpgradeHold =
+      'Paused for the network upgrade. Try again in a few minutes.';
+
   // The makers' Privacy Pass tokens (plan M4).
   static const tokensNoneToday =
       "This device has used today's conversions. More are available after "

@@ -10,6 +10,7 @@ import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 // A Private USD activity row unfolds into what its record already holds, and
 // its transactions open on the explorers of the deployment's chain.
@@ -31,7 +32,7 @@ void main() {
   ];
 
   String time(int seconds) =>
-      formatDayMonthTime(DateTime.fromMillisecondsSinceEpoch(seconds * 1000));
+      formatDayMonthTime(DateTime.fromMillisecondsSinceEpoch(seconds * 1000), testL10n.localeName);
 
   String zec(int zatoshi) =>
       ZecAmount.fromZatoshi(BigInt.from(zatoshi)).activity.toString();
@@ -39,7 +40,7 @@ void main() {
   test('a send: its recipient, copied whole, its amounts, status and '
       'transaction', () {
     final record = previewPrivateUsdSendRecord();
-    final lines = privateUsdSendDetails(record);
+    final lines = privateUsdSendDetails(testL10n, record);
 
     expect(read(lines), [
       '${PrivateUsdCopy.sendReviewTo}: '
@@ -57,6 +58,7 @@ void main() {
     );
 
     final pending = privateUsdSendDetails(
+      testL10n,
       previewPrivateUsdSendRecord(confirmed: false),
     );
     expect(
@@ -71,6 +73,7 @@ void main() {
   test('a received send keeps a hidden sender hidden, and says when it is '
       'still screened', () {
     final lines = privateUsdReceivedDetails(
+      testL10n,
       previewPrivateUsdReceipt(settled: false),
     );
 
@@ -94,7 +97,7 @@ void main() {
       outcome: ApiForwardOutcome.paid,
     );
 
-    expect(read(privateUsdForwardDetails(record)), [
+    expect(read(privateUsdForwardDetails(testL10n, record)), [
       '${PrivateUsdCopy.bridgedYouPaid}: ${zec(50000000)}',
       '${PrivateUsdCopy.bridgedYouReceived}: \$15.50',
       '${PrivateUsdCopy.detailsRelayerFee}: \$0.46',
@@ -113,7 +116,7 @@ void main() {
       outcome: ApiForwardOutcome.refunded,
       refundCause: ApiRefundCause.notClaimedInTime,
     );
-    final lines = read(privateUsdForwardDetails(record));
+    final lines = read(privateUsdForwardDetails(testL10n, record));
 
     expect(
       lines.first,
@@ -135,7 +138,7 @@ void main() {
       phase: ApiReversePhase.complete,
     );
 
-    expect(read(privateUsdReverseDetails(record)), [
+    expect(read(privateUsdReverseDetails(testL10n, record)), [
       '${PrivateUsdCopy.bridgedYouPaid}: \$25.31',
       '${PrivateUsdCopy.bridgedYouReceived}: ${zec(79985000)}',
       '${PrivateUsdCopy.reverseRailgunFee}: \$0.06',
@@ -163,7 +166,7 @@ void main() {
       txHash: previewPrivateUsdTxHash,
       waiting: false,
     );
-    final lines = privateUsdDepositDetails(record);
+    final lines = privateUsdDepositDetails(testL10n, record);
 
     expect(read(lines), [
       '${PrivateUsdCopy.detailsDepositAddress}: '
@@ -184,10 +187,12 @@ void main() {
   test('privacy mode hides every amount', () {
     final lines = read([
       ...privateUsdSendDetails(
+        testL10n,
         previewPrivateUsdSendRecord(),
         privacyModeEnabled: true,
       ),
       ...privateUsdForwardDetails(
+        testL10n,
         previewPrivateUsdRecord(
           phase: ApiForwardPhase.paid,
           outcome: ApiForwardOutcome.paid,

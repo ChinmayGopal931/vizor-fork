@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/config/network_config.dart';
 import '../../../../core/formatting/zec_amount.dart';
 import '../../../../core/privacy/privacy_mask.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
@@ -203,13 +204,15 @@ class MobileHoldingsPanelView extends StatelessWidget {
             icon: AppIcons.transparentBalance,
             // Home's wording: a last-known amount says so, and an unknown one
             // never reads as 0.
-            amount: holdings.hasBalance ? transparent.text(_zec) : _unknown,
+            amount: holdings.hasBalance
+                ? transparent.text(context.l10n, _zec)
+                : _unknown,
             pending: transparentCurrent
                 ? _pending(holdings.transparentPending)
                 : null,
             usd: transparentCurrent ? _usd(transparentAmount) : null,
             // Why private recovery stopped and what to do; no amount in it.
-            note: holdings.hasBalance ? transparent.hint : null,
+            note: holdings.hasBalance ? transparent.hint(context.l10n) : null,
             dimmed:
                 _amountsVisible &&
                 transparentCurrent &&

@@ -15,9 +15,10 @@ import 'package:zcash_wallet/src/features/onboarding/mobile/forgot_passcode_shee
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_unlock_screen.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/passcode_widgets.dart';
 import 'package:zcash_wallet/src/features/payment_links/services/payment_link_received_store.dart';
-import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/widgetbook/screen_use_cases.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
+import '../support/test_l10n.dart';
 
 void main() {
   setUpAll(_loadAppFonts);
@@ -36,6 +37,7 @@ void main() {
           paymentLinkClaimsInFlightProvider.overrideWith((ref) async => 1),
         ],
         child: MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
           builder: (context, child) =>
               AppTheme(data: AppThemeData.light, child: child!),
           home: Builder(
@@ -259,6 +261,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.light,
           child: Center(
@@ -292,10 +295,7 @@ void main() {
 
     // Warned, never blocked: this is the only way back into a wallet whose
     // passcode is lost, and the claim cannot finish while it stays locked.
-    expect(
-      find.text(kWalletResetInFlightGiftCardWarningMessage),
-      findsOneWidget,
-    );
+    expect(find.text(testL10n.walletResetGiftCardWarning), findsOneWidget);
     final continueButton = tester.widget<AppButton>(
       find.byKey(const ValueKey('mobile_forgot_passcode_reset')),
     );
@@ -322,7 +322,7 @@ void main() {
       contains('Unshared gift card links will be permanently lost.'),
     );
     // Nothing is arriving in this use case, so no claim warning.
-    expect(find.text(kWalletResetInFlightGiftCardWarningMessage), findsNothing);
+    expect(find.text(testL10n.walletResetGiftCardWarning), findsNothing);
     final continueButton = tester.widget<AppButton>(
       find.byKey(const ValueKey('mobile_forgot_passcode_reset')),
     );
@@ -421,6 +421,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       const MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.light,
           child: ForgotPasscodeLastWarningSheet(),
@@ -471,6 +472,7 @@ Future<void> _pumpMobileLockUseCase(
         ),
       ],
       child: MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         key: UniqueKey(),
         home: AppTheme(
           data: theme,

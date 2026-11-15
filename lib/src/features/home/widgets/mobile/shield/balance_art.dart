@@ -33,7 +33,7 @@ class BalanceArt {
        )..layout(),
        _zec = TextPainter(
          text: TextSpan(
-           text: 'ZEC',
+           text: 'ZEC', // l10n-ignore: asset ticker
            style: VText.display.copyWith(
              color: look == BalanceLook.solid ? _white : glow,
              shadows: look == BalanceLook.solid || light <= 0

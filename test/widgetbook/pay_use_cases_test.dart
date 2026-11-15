@@ -14,6 +14,7 @@ import 'package:zcash_wallet/src/features/swap/widgets/pay_activity_status_conte
 import 'package:zcash_wallet/src/features/swap/widgets/swap_asset_selector_modal.dart';
 import 'package:zcash_wallet/widgetbook/pay_use_cases.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 void main() {
   setUpAll(_loadAppFonts);
@@ -202,6 +203,7 @@ Future<void> _pumpPayUseCase(WidgetTester tester, WidgetBuilder builder) async {
 
   await tester.pumpWidget(
     MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
       home: AppTheme(
         data: AppThemeData.light,
         child: Builder(builder: builder),

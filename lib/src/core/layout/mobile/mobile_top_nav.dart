@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import '../../feedback/app_haptics.dart';
 import '../../widgets/app_icon.dart';
@@ -315,7 +316,9 @@ class _BackButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: iconName == AppIcons.cross ? 'Close' : 'Back',
+      label: iconName == AppIcons.cross
+          ? context.l10n.commonClose
+          : context.l10n.commonBack,
       button: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,

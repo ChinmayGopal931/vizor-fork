@@ -5,9 +5,11 @@ import 'package:flutter/gestures.dart' show kPrimaryButton;
 import 'package:flutter/widgets.dart';
 
 import '../../../core/feedback/app_haptics.dart';
+import '../../../core/l10n/l10n.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/mobile/tron_glyph.dart';
+import '../../../core/l10n/locale_typography.dart';
 
 /// Layout box of a single diamond dot (a rotated square → ~20 px diamond,
 /// matching the Figma index). [PasscodePromptField] uses it to centre the
@@ -213,7 +215,7 @@ class PasscodeNumpad extends StatelessWidget {
         unawaited(AppHaptics.digit());
         onDigit(digit);
       },
-      label: 'Digit $digit',
+      label: context.l10n.onboardingPasscodeDigitSemantics(digit),
     );
 
     final helpKey = onHelp == null
@@ -227,7 +229,7 @@ class PasscodeNumpad extends StatelessWidget {
               color: enabled ? colors.icon.muted : colors.icon.disabled,
             ),
             onTap: onHelp,
-            label: 'Passcode help',
+            label: context.l10n.onboardingPasscodeHelpSemantics,
           );
 
     final deleteKey = canDelete
@@ -239,7 +241,7 @@ class PasscodeNumpad extends StatelessWidget {
               unawaited(AppHaptics.auxiliaryKey());
               onBackspace();
             },
-            label: 'Delete digit',
+            label: context.l10n.onboardingPasscodeDeleteSemantics,
           )
         : keySlot(const SizedBox.shrink());
 
@@ -466,7 +468,10 @@ class PasscodeBiometricButton extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final textPainter = TextPainter(
-          text: TextSpan(text: label, style: labelStyle),
+          text: TextSpan(
+            text: label,
+            style: withLocaleFontFallback(context, labelStyle),
+          ),
           textDirection: Directionality.of(context),
           textScaler: MediaQuery.textScalerOf(context),
           maxLines: 1,
@@ -526,7 +531,12 @@ class PasscodeBiometricButton extends StatelessWidget {
                           child: Text(
                             label,
                             maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            // At its measured width the label fits; a break or
+                            // an ellipsis there would only come from rounding.
+                            softWrap: width < idealWidth,
+                            overflow: width < idealWidth
+                                ? TextOverflow.ellipsis
+                                : TextOverflow.visible,
                             style: labelStyle,
                           ),
                         ),

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/feedback/app_haptics.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/block_spacing_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
@@ -82,6 +83,7 @@ class _MobilePrivateUsdConversionScreenState
     final presentation = status == null || deployment == null
         ? null
         : privateUsdProgressPresentation(
+            context.l10n,
             status: status,
             now: state.now,
             zcashConfirmations: deployment.zcashConfirmations,
