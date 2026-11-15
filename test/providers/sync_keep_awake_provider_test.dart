@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
+import 'package:zcash_wallet/src/core/formatting/sync_status_label.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_sync_lock_provider.dart';
 import 'package:zcash_wallet/src/providers/account_models.dart';
 import 'package:zcash_wallet/src/providers/sync_keep_awake_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
@@ -718,6 +720,208 @@ void main() {
       isFalse,
     );
   });
+
+  group("Railgun's sync on the privacy lock", () {
+    final synced = _sync(
+      isSyncing: false,
+      percentage: 1,
+      scannedHeight: 200,
+      chainTipHeight: 200,
+      lastSyncStartedAt: DateTime(2026, 7, 9, 12),
+    );
+
+    Future<ProviderContainer> containerWith(
+      FakeSyncNotifier syncNotifier, {
+      bool keepAwakeEnabled = true,
+    }) async {
+      final container = ProviderContainer(
+        overrides: [
+          appBootstrapProvider.overrideWithValue(
+            _bootstrap(
+              syncKeepAwakeEnabled: keepAwakeEnabled,
+              syncKeepAwakePromptSeen: true,
+              isPasswordConfigured: true,
+              isUnlocked: true,
+            ),
+          ),
+          syncProvider.overrideWith(() => syncNotifier),
+          privateUsdSyncStatusProvider.overrideWith(
+            (ref) => ref.watch(_railgunStatusProvider),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      // The host watches the mode for the app's life.
+      container.listen(syncKeepAwakePrivacyLockModeProvider, (_, _) {});
+      await container.read(syncProvider.future);
+      return container;
+    }
+
+    void railgun(ProviderContainer container, PrivateUsdSyncStatus status) =>
+        container.read(_railgunStatusProvider.notifier).set(status);
+
+    test(
+      'a Railgun first sync arms the lock by itself, whatever the setting',
+      () async {
+        final container = await containerWith(
+          FakeSyncNotifier(synced),
+          keepAwakeEnabled: false,
+        );
+        expect(container.read(syncKeepAwakePrivacyLockActiveProvider), isFalse);
+
+        railgun(container, PrivateUsdSyncStatus.syncing);
+
+        expect(container.read(syncKeepAwakeActiveProvider), isFalse);
+        expect(container.read(syncKeepAwakePrivacyLockActiveProvider), isTrue);
+      },
+    );
+
+    test(
+      'a lock that comes on during it keeps it to the end, then done',
+      () async {
+        final container = await containerWith(FakeSyncNotifier(synced));
+        railgun(container, PrivateUsdSyncStatus.syncing);
+        container
+            .read(syncKeepAwakePrivacyLockProvider.notifier)
+            .lock(at: DateTime(2026, 7, 9, 12, 1), railgun: true);
+
+        expect(
+          container.read(syncKeepAwakePrivacyLockProvider).railgun,
+          isTrue,
+        );
+        expect(
+          container.read(syncKeepAwakePrivacyLockModeProvider),
+          SyncKeepAwakePrivacyLockMode.syncing,
+        );
+
+        railgun(container, PrivateUsdSyncStatus.synced);
+
+        expect(container.read(syncKeepAwakePrivacyLockActiveProvider), isFalse);
+        expect(
+          container.read(syncKeepAwakePrivacyLockProvider).railgun,
+          isTrue,
+        );
+        expect(
+          container.read(syncKeepAwakePrivacyLockModeProvider),
+          SyncKeepAwakePrivacyLockMode.done,
+        );
+
+        container.read(syncKeepAwakePrivacyLockProvider.notifier).unlock();
+        expect(
+          container.read(syncKeepAwakePrivacyLockProvider).railgun,
+          isFalse,
+        );
+      },
+    );
+
+    test('one starting under a lock joins it, until the lock goes', () async {
+      final container = await containerWith(
+        FakeSyncNotifier(_sync(lastSyncStartedAt: DateTime(2026, 7, 9, 12))),
+      );
+      container
+          .read(syncKeepAwakePrivacyLockProvider.notifier)
+          .lock(at: DateTime(2026, 7, 9, 12, 1));
+      expect(container.read(syncKeepAwakePrivacyLockProvider).railgun, isFalse);
+
+      container
+          .read(syncKeepAwakePrivacyLockProvider.notifier)
+          .includeRailgun();
+      expect(container.read(syncKeepAwakePrivacyLockProvider).railgun, isTrue);
+
+      container.read(syncKeepAwakePrivacyLockProvider.notifier).unlock();
+      container
+          .read(syncKeepAwakePrivacyLockProvider.notifier)
+          .includeRailgun();
+      expect(
+        container.read(syncKeepAwakePrivacyLockProvider),
+        const SyncKeepAwakePrivacyLockState.unlocked(),
+      );
+    });
+
+    test('the lock is done only once both are: the wallet still syncing '
+        'keeps it syncing', () async {
+      final syncNotifier = FakeSyncNotifier(
+        _sync(lastSyncStartedAt: DateTime(2026, 7, 9, 12)),
+      );
+      final container = await containerWith(syncNotifier);
+      railgun(container, PrivateUsdSyncStatus.syncing);
+      container
+          .read(syncKeepAwakePrivacyLockProvider.notifier)
+          .lock(at: DateTime(2026, 7, 9, 12, 1), railgun: true);
+
+      railgun(container, PrivateUsdSyncStatus.synced);
+      expect(
+        container.read(syncKeepAwakePrivacyLockModeProvider),
+        SyncKeepAwakePrivacyLockMode.syncing,
+      );
+
+      syncNotifier.emit(synced);
+      expect(
+        container.read(syncKeepAwakePrivacyLockModeProvider),
+        SyncKeepAwakePrivacyLockMode.done,
+      );
+    });
+
+    test('Railgun stopping before its balance pauses the lock', () async {
+      final container = await containerWith(FakeSyncNotifier(synced));
+      railgun(container, PrivateUsdSyncStatus.syncing);
+      container
+          .read(syncKeepAwakePrivacyLockProvider.notifier)
+          .lock(at: DateTime(2026, 7, 9, 12, 1), railgun: true);
+
+      railgun(container, PrivateUsdSyncStatus.paused);
+
+      expect(
+        container.read(syncKeepAwakePrivacyLockModeProvider),
+        SyncKeepAwakePrivacyLockMode.interrupted,
+      );
+    });
+
+    test('a wallet catching up near the tip reads as synced beside it', () {
+      final caughtUp = SyncState(
+        isSyncing: true,
+        percentage: 0,
+        scannedHeight: 1000,
+        chainTipHeight: 1000 + kSyncCatchUpBlocks,
+        lastSyncStartedAt: DateTime(2026, 7, 9, 12, 2),
+        lastSyncCompletedAt: DateTime(2026, 7, 9, 12),
+      );
+
+      expect(
+        syncKeepAwakeWalletStatus(caughtUp),
+        SyncKeepAwakeWalletStatus.synced,
+      );
+      expect(
+        syncKeepAwakeWalletStatus(
+          caughtUp.copyWith(chainTipHeight: 1001 + kSyncCatchUpBlocks),
+        ),
+        SyncKeepAwakeWalletStatus.syncing,
+      );
+      // A first sync, which never completed one, is syncing however close.
+      expect(
+        syncKeepAwakeWalletStatus(
+          SyncState(
+            isSyncing: true,
+            percentage: 0.9,
+            scannedHeight: 1000,
+            chainTipHeight: 1001,
+            lastSyncStartedAt: DateTime(2026, 7, 9, 12),
+          ),
+        ),
+        SyncKeepAwakeWalletStatus.syncing,
+      );
+      expect(
+        syncKeepAwakeWalletStatus(synced),
+        SyncKeepAwakeWalletStatus.synced,
+      );
+      expect(
+        syncKeepAwakeWalletStatus(
+          synced.copyWith(percentage: 0.5, scannedHeight: 150),
+        ),
+        SyncKeepAwakeWalletStatus.paused,
+      );
+    });
+  });
 }
 
 AppBootstrapState _bootstrap({
@@ -775,3 +979,13 @@ SyncState _sync({
     phase: phase,
   );
 }
+
+class _RailgunStatus extends Notifier<PrivateUsdSyncStatus> {
+  @override
+  PrivateUsdSyncStatus build() => PrivateUsdSyncStatus.paused;
+
+  void set(PrivateUsdSyncStatus status) => state = status;
+}
+
+final _railgunStatusProvider =
+    NotifierProvider<_RailgunStatus, PrivateUsdSyncStatus>(_RailgunStatus.new);

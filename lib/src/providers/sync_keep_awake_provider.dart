@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_bootstrap.dart';
+import '../core/formatting/sync_status_label.dart';
 import '../core/storage/app_secure_store.dart';
+import '../features/private_usd/providers/private_usd_sync_lock_provider.dart';
 import 'app_security_provider.dart';
 import 'sync_provider.dart';
 
@@ -111,25 +113,36 @@ final syncKeepAwakeInteractionProvider =
     >(SyncKeepAwakeInteractionNotifier.new);
 
 class SyncKeepAwakePrivacyLockState {
-  const SyncKeepAwakePrivacyLockState({required this.isLocked, this.lockedAt});
+  const SyncKeepAwakePrivacyLockState({
+    required this.isLocked,
+    this.lockedAt,
+    this.railgun = false,
+  });
 
   const SyncKeepAwakePrivacyLockState.unlocked()
     : isLocked = false,
-      lockedAt = null;
+      lockedAt = null,
+      railgun = false;
 
   final bool isLocked;
   final DateTime? lockedAt;
+
+  /// Railgun's sync is part of this lock: it ran as the lock came on, or
+  /// started under it. It stays part of it until the lock goes, so its ring
+  /// fills to the end rather than vanishing as it completes.
+  final bool railgun;
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is SyncKeepAwakePrivacyLockState &&
             other.isLocked == isLocked &&
-            other.lockedAt == lockedAt;
+            other.lockedAt == lockedAt &&
+            other.railgun == railgun;
   }
 
   @override
-  int get hashCode => Object.hash(isLocked, lockedAt);
+  int get hashCode => Object.hash(isLocked, lockedAt, railgun);
 }
 
 class SyncKeepAwakePrivacyLockNotifier
@@ -139,11 +152,23 @@ class SyncKeepAwakePrivacyLockNotifier
     return const SyncKeepAwakePrivacyLockState.unlocked();
   }
 
-  void lock({DateTime? at}) {
+  /// [railgun]: Railgun's sync runs as the lock comes on.
+  void lock({DateTime? at, bool railgun = false}) {
     if (state.isLocked) return;
     state = SyncKeepAwakePrivacyLockState(
       isLocked: true,
       lockedAt: at ?? DateTime.now(),
+      railgun: railgun,
+    );
+  }
+
+  /// Railgun's sync started under the lock, which now shows it too.
+  void includeRailgun() {
+    if (!state.isLocked || state.railgun) return;
+    state = SyncKeepAwakePrivacyLockState(
+      isLocked: true,
+      lockedAt: state.lockedAt,
+      railgun: true,
     );
   }
 
@@ -174,15 +199,60 @@ final syncKeepAwakeActiveProvider = Provider<bool>((ref) {
   return shouldKeepScreenAwakeForSync(settings: settings, sync: sync);
 });
 
+/// A sync keeps the screen on, so the privacy lock covers the app once it
+/// sits idle: the wallet's ([syncKeepAwakeActiveProvider]) or Railgun's,
+/// whose first sync keeps the screen on by itself.
+final syncKeepAwakePrivacyLockActiveProvider = Provider<bool>(
+  (ref) =>
+      ref.watch(syncKeepAwakeActiveProvider) ||
+      ref.watch(privateUsdSyncStatusProvider) == PrivateUsdSyncStatus.syncing,
+);
+
+/// Where the wallet's sync stands beside Railgun's on the privacy lock.
+enum SyncKeepAwakeWalletStatus { syncing, synced, paused }
+
+/// The wallet's sync as the privacy lock's ZEC ring shows it beside
+/// Railgun's. A sync that starts a few blocks behind the tip after one
+/// completed is catching up and reads as synced, as on Home's sync line, so
+/// the ring stays full through every new block.
+SyncKeepAwakeWalletStatus syncKeepAwakeWalletStatus(SyncState? sync) {
+  if (sync == null) return SyncKeepAwakeWalletStatus.paused;
+  if (isSyncKeepAwakeCompletedSync(sync)) {
+    return SyncKeepAwakeWalletStatus.synced;
+  }
+  if (!sync.isSyncing || sync.isBackgroundMode) {
+    return SyncKeepAwakeWalletStatus.paused;
+  }
+  final catchingUp =
+      sync.lastSyncCompletedAt != null &&
+      sync.chainTipHeight > 0 &&
+      sync.chainTipHeight - sync.scannedHeight <= kSyncCatchUpBlocks;
+  return catchingUp
+      ? SyncKeepAwakeWalletStatus.synced
+      : SyncKeepAwakeWalletStatus.syncing;
+}
+
 final syncKeepAwakePrivacyLockModeProvider =
     Provider<SyncKeepAwakePrivacyLockMode>((ref) {
       if (ref.watch(appSecurityProvider).requiresUnlock) {
         return SyncKeepAwakePrivacyLockMode.hidden;
       }
-      if (!ref.watch(syncKeepAwakePrivacyLockProvider).isLocked) {
-        return SyncKeepAwakePrivacyLockMode.hidden;
-      }
+      final lock = ref.watch(syncKeepAwakePrivacyLockProvider);
+      if (!lock.isLocked) return SyncKeepAwakePrivacyLockMode.hidden;
       final sync = ref.watch(syncProvider).asData?.value;
+      // With Railgun's sync part of the lock, it is done once both are.
+      if (lock.railgun) {
+        final wallet = syncKeepAwakeWalletStatus(sync);
+        final railgun = ref.watch(privateUsdSyncStatusProvider);
+        if (wallet == SyncKeepAwakeWalletStatus.syncing ||
+            railgun == PrivateUsdSyncStatus.syncing) {
+          return SyncKeepAwakePrivacyLockMode.syncing;
+        }
+        return wallet == SyncKeepAwakeWalletStatus.synced &&
+                railgun == PrivateUsdSyncStatus.synced
+            ? SyncKeepAwakePrivacyLockMode.done
+            : SyncKeepAwakePrivacyLockMode.interrupted;
+      }
       if (sync != null && isSyncKeepAwakeCompletedSync(sync)) {
         return SyncKeepAwakePrivacyLockMode.done;
       }

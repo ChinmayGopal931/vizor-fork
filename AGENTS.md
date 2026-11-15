@@ -161,7 +161,9 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   sets. The neon faces come from `NeonPrimitives` (`primitives.dart`).
   `AppNeonColors` (`colors.neon`) carries the lit elements' colours: the
   tube glow and its white-hot core on the page, the balance sign's light,
-  the grid, and the white "headlight" frame. Light mode is brushed steel
+  the grid, the white "headlight" frame, and a second tube in white light
+  beside the red one (`secondaryGlow`/`secondaryCore`, graphite on steel:
+  Railgun's ring on the sync privacy screen). Light mode is brushed steel
   with the same red; the balance sign stays black in both. For now the
   mobile app is dark only (owner, 2026-10-17): `kThemeLockedToDark` pins
   the theme and hides Settings' Theme row, and iOS sets
@@ -335,7 +337,21 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   (a `Neon.strokeTube` arc to a bright head, unlit ticks ahead of it) that
   switches on around Thin glowing numerals, done and paused as
   `NeonGlyphBadge`s, and every title, its passcode prompt's included, as
-  the page title.
+  the page title. A Railgun sync that keeps the screen on (a first sync,
+  or the rest of a long one) brings it on after the idle minute too. While
+  Railgun's sync is part of the lock (it ran as the lock came on, or
+  started under it) and runs, the screen draws its ring in white light,
+  named at the centre over its percentage, with a line under it on what
+  Railgun is doing (the whole line, measured at the reader's text size).
+  Only a sync still running has a ring: with the wallet's running too, its
+  red ring goes around Railgun's and both are named; a sync that is done
+  drops out, with no check, and once Railgun's is done the wallet's ring
+  shows as without it. A paused sync's ring dims. Railgun's ring reads as
+  the Shielded USD screen's sync line does: it climbs to the balance, then
+  climbs again as the transaction list syncs
+  (`private_usd_sync_lock_provider.dart`). The lock reads done only once
+  both are, and its passcode prompt names the one ring's percentage, none
+  while two show.
 - **Chart card.** The chart is drawn as a neon trail on a Tron grid; a
   scrub reads the line under the finger (interpolated value and time), not
   the nearest data point. Neither the card nor Settings names the price

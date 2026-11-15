@@ -8,11 +8,14 @@ import '../../../features/onboarding/mobile/mobile_passcode_screen.dart';
 import '../../../features/onboarding/mobile/passcode_widgets.dart';
 import '../../../features/onboarding/mobile/adaptive_passcode_layout.dart';
 import '../../../features/onboarding/shared/onboarding_welcome_art.dart';
+import '../../../features/private_usd/private_usd_copy.dart';
 import '../../../features/private_usd/providers/private_usd_keep_awake_provider.dart';
+import '../../../features/private_usd/providers/private_usd_sync_lock_provider.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/biometric_unlock_provider.dart';
 import '../../../providers/sync_display_progress_provider.dart';
 import '../../../providers/sync_keep_awake_provider.dart';
+import '../../../providers/sync_provider.dart';
 import '../../../services/biometric_unlock.dart';
 import '../../feedback/app_haptics.dart';
 import '../../formatting/sync_status_label.dart';
@@ -89,8 +92,14 @@ class _SyncKeepAwakePrivacyLockHostState
         ref.read(syncKeepAwakeInteractionProvider.notifier).markInteraction();
       }
     });
+    // Railgun's sync starting under the lock joins it.
+    ref.listen(privateUsdSyncStatusProvider, (_, status) {
+      if (status == PrivateUsdSyncStatus.syncing) {
+        ref.read(syncKeepAwakePrivacyLockProvider.notifier).includeRailgun();
+      }
+    });
     final active =
-        ref.watch(syncKeepAwakeActiveProvider) &&
+        ref.watch(syncKeepAwakePrivacyLockActiveProvider) &&
         !ref.watch(privateUsdBridgeAwaitsUserProvider);
     final interaction = ref.watch(syncKeepAwakeInteractionProvider);
     final mode = ref.watch(syncKeepAwakePrivacyLockModeProvider);
@@ -206,7 +215,7 @@ class _SyncKeepAwakePrivacyLockHostState
   void _lockIfStillIdle(int expectedRevision) {
     if (!mounted) return;
     if (!_isInForeground) return;
-    if (!ref.read(syncKeepAwakeActiveProvider)) return;
+    if (!ref.read(syncKeepAwakePrivacyLockActiveProvider)) return;
     if (ref.read(privateUsdBridgeAwaitsUserProvider)) return;
     if (ref.read(syncKeepAwakePrivacyLockProvider).isLocked) return;
 
@@ -219,7 +228,13 @@ class _SyncKeepAwakePrivacyLockHostState
     // The privacy overlay does not replace the underlying route. Dismiss its
     // input connection and native keyboard controls before covering the content.
     FocusManager.instance.primaryFocus?.unfocus();
-    ref.read(syncKeepAwakePrivacyLockProvider.notifier).lock();
+    ref
+        .read(syncKeepAwakePrivacyLockProvider.notifier)
+        .lock(
+          railgun:
+              ref.read(privateUsdSyncStatusProvider) ==
+              PrivateUsdSyncStatus.syncing,
+        );
   }
 
   void _clearAfterFrameIfInactive() {
@@ -230,7 +245,7 @@ class _SyncKeepAwakePrivacyLockHostState
     _clearScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _clearScheduled = false;
-      if (!mounted || ref.read(syncKeepAwakeActiveProvider)) return;
+      if (!mounted || ref.read(syncKeepAwakePrivacyLockActiveProvider)) return;
       ref.read(syncKeepAwakePrivacyLockProvider.notifier).clear();
     });
   }
@@ -259,6 +274,36 @@ class SyncKeepAwakePrivacyLockScreen extends ConsumerStatefulWidget {
   static const _doneStatusHeight = 200.0;
   static const _doneStatusToButtonGap = 147.0;
   static const _minimumDoneStatusToButtonGap = 48.0;
+
+  /// Railgun's ring, with a line under it: the gaps give the line its room.
+  static const _logoToRingsGap = 64.0;
+  static const _minimumLogoToRingsGap = 40.0;
+  static const _ringsLineGap = 20.0;
+  static const _ringsToButtonGap = 76.0;
+  static const _minimumRingsToButtonGap = 32.0;
+
+  static TextStyle _ringsLineStyle(BuildContext context) =>
+      AppTypography.bodyMedium.copyWith(color: context.colors.text.secondary);
+
+  /// [line]'s height as drawn under the rings, at the reader's text size.
+  static double _ringsLineHeightOf(BuildContext context, String line) {
+    final defaults = DefaultTextStyle.of(context);
+    final painter = TextPainter(
+      text: TextSpan(
+        text: line,
+        style: defaults.style.merge(_ringsLineStyle(context)),
+      ),
+      textAlign: TextAlign.center,
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      textHeightBehavior: defaults.textHeightBehavior,
+    )..layout(maxWidth: _doneBodyWidth);
+    final height = painter.height;
+    painter.dispose();
+    return height;
+  }
+
+  static const _syncingBody = 'Veylor is syncing';
 
   /// Wide enough to keep each body line whole.
   static const _bodyWidth = 200.0;
@@ -464,6 +509,26 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
     final biometric =
         ref.watch(biometricUnlockProvider).value ??
         BiometricUnlockState.initial;
+    // Railgun's ring while its sync runs; once it is done, the wallet's own
+    // ring, as without it.
+    final syncing =
+        mode == SyncKeepAwakePrivacyLockMode.syncing ||
+        mode == SyncKeepAwakePrivacyLockMode.hidden;
+    final railgunStage =
+        syncing &&
+            ref.watch(
+              syncKeepAwakePrivacyLockProvider.select((lock) => lock.railgun),
+            ) &&
+            ref.watch(
+              _syncKeepAwakeRingsProvider.select((rings) => rings.railgunRing),
+            )
+        ? ref.watch(
+            _syncKeepAwakeRingsProvider.select((rings) => rings.railgun.stage),
+          )
+        : null;
+    final railgunLine = railgunStage == null
+        ? null
+        : _railgunLine(railgunStage);
     final main = switch (mode) {
       SyncKeepAwakePrivacyLockMode.done => const _SyncKeepAwakeStatusLockup(
         glyph: TronGlyphKind.check,
@@ -481,13 +546,16 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
         ),
       SyncKeepAwakePrivacyLockMode.hidden ||
       SyncKeepAwakePrivacyLockMode.syncing =>
-        const _SyncKeepAwakeDisplayProgressLockup(),
+        railgunLine != null
+            ? _SyncKeepAwakeRingsLockup(line: railgunLine)
+            : const _SyncKeepAwakeDisplayProgressLockup(),
     };
     final semanticsLabel = switch (mode) {
       SyncKeepAwakePrivacyLockMode.done => 'Veylor is synced',
       SyncKeepAwakePrivacyLockMode.interrupted => 'Veylor sync is paused',
       SyncKeepAwakePrivacyLockMode.hidden ||
-      SyncKeepAwakePrivacyLockMode.syncing => 'Veylor is syncing',
+      SyncKeepAwakePrivacyLockMode.syncing =>
+        SyncKeepAwakePrivacyLockScreen._syncingBody,
     };
 
     return Material(
@@ -505,6 +573,12 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
                 availableHeight: constraints.maxHeight,
                 screenHeight: MediaQuery.sizeOf(context).height,
                 mode: mode,
+                ringsLineHeight: railgunLine == null
+                    ? null
+                    : SyncKeepAwakePrivacyLockScreen._ringsLineHeightOf(
+                        context,
+                        railgunLine,
+                      ),
               );
               return Column(
                 children: [
@@ -554,9 +628,17 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
     required double availableHeight,
     required double screenHeight,
     required SyncKeepAwakePrivacyLockMode mode,
+    double? ringsLineHeight,
   }) {
-    final spec = _SyncKeepAwakeLayoutSpec.forMode(mode);
-    if (screenHeight >= SyncKeepAwakePrivacyLockScreen._figmaReferenceHeight) {
+    final spec = _SyncKeepAwakeLayoutSpec.forMode(
+      mode,
+      ringsLineHeight: ringsLineHeight,
+    );
+    // The reference positions, where they fit: a line under Railgun's ring
+    // grows with the reader's text size.
+    if (screenHeight >= SyncKeepAwakePrivacyLockScreen._figmaReferenceHeight &&
+        SyncKeepAwakePrivacyLockScreen._logoTopGap + spec.stackHeight <=
+            availableHeight) {
       return _SyncKeepAwakeVerticalLayout(
         topGap: SyncKeepAwakePrivacyLockScreen._logoTopGap,
         logoToMainGap: spec.logoToMainGap,
@@ -641,7 +723,11 @@ class _SyncKeepAwakeLayoutSpec {
       minimumMainToButtonGap +
       AppButtonSizingMobile.largeHeight;
 
-  factory _SyncKeepAwakeLayoutSpec.forMode(SyncKeepAwakePrivacyLockMode mode) {
+  /// [ringsLineHeight]: two rings show, with a line this tall under them.
+  factory _SyncKeepAwakeLayoutSpec.forMode(
+    SyncKeepAwakePrivacyLockMode mode, {
+    double? ringsLineHeight,
+  }) {
     if (mode == SyncKeepAwakePrivacyLockMode.done ||
         mode == SyncKeepAwakePrivacyLockMode.interrupted) {
       return const _SyncKeepAwakeLayoutSpec(
@@ -652,6 +738,20 @@ class _SyncKeepAwakeLayoutSpec {
         mainToButtonGap: SyncKeepAwakePrivacyLockScreen._doneStatusToButtonGap,
         minimumMainToButtonGap:
             SyncKeepAwakePrivacyLockScreen._minimumDoneStatusToButtonGap,
+      );
+    }
+    if (ringsLineHeight != null) {
+      return _SyncKeepAwakeLayoutSpec(
+        logoToMainGap: SyncKeepAwakePrivacyLockScreen._logoToRingsGap,
+        minimumLogoToMainGap:
+            SyncKeepAwakePrivacyLockScreen._minimumLogoToRingsGap,
+        mainHeight:
+            SyncKeepAwakePrivacyLockScreen._ringSize +
+            SyncKeepAwakePrivacyLockScreen._ringsLineGap +
+            ringsLineHeight,
+        mainToButtonGap: SyncKeepAwakePrivacyLockScreen._ringsToButtonGap,
+        minimumMainToButtonGap:
+            SyncKeepAwakePrivacyLockScreen._minimumRingsToButtonGap,
       );
     }
     return const _SyncKeepAwakeLayoutSpec(
@@ -728,12 +828,7 @@ class _SyncKeepAwakePasscodeConfirmScreen extends StatelessWidget {
             children: [
               Consumer(
                 builder: (context, ref, _) => MobileTopNav.back(
-                  title: _titleForMode(
-                    mode == SyncKeepAwakePrivacyLockMode.syncing ||
-                            mode == SyncKeepAwakePrivacyLockMode.hidden
-                        ? ref.watch(syncDisplayWholePercentageProvider)
-                        : 0,
-                  ),
+                  title: _titleForMode(_syncingWhole(ref)),
                   height: _topNavHeight,
                   onBack: submitting ? null : onBack,
                 ),
@@ -826,13 +921,33 @@ class _SyncKeepAwakePasscodeConfirmScreen extends StatelessWidget {
     );
   }
 
-  String _titleForMode(int displayWholePercentage) {
+  /// The figure of the one ring the lock shows; none while it shows two.
+  int? _syncingWhole(WidgetRef ref) {
+    if (mode != SyncKeepAwakePrivacyLockMode.syncing &&
+        mode != SyncKeepAwakePrivacyLockMode.hidden) {
+      return null;
+    }
+    if (ref.watch(
+      syncKeepAwakePrivacyLockProvider.select((lock) => lock.railgun),
+    )) {
+      final rings = ref.watch(_syncKeepAwakeRingsProvider);
+      if (rings.railgunRing) {
+        if (rings.zecRing) return null;
+        return (rings.railgun.progress * 100).floor().clamp(0, 99);
+      }
+    }
+    return ref.watch(syncDisplayWholePercentageProvider);
+  }
+
+  String _titleForMode(int? displayWholePercentage) {
     return switch (mode) {
       SyncKeepAwakePrivacyLockMode.done => 'Synced',
       SyncKeepAwakePrivacyLockMode.interrupted => 'Sync paused',
       SyncKeepAwakePrivacyLockMode.hidden ||
       SyncKeepAwakePrivacyLockMode.syncing =>
-        '$displayWholePercentage% Syncing...',
+        displayWholePercentage == null
+            ? 'Syncing...'
+            : '$displayWholePercentage% Syncing...',
     };
   }
 
@@ -1050,7 +1165,7 @@ class _SyncKeepAwakeProgressLockup extends StatelessWidget {
                       SizedBox(
                         width: SyncKeepAwakePrivacyLockScreen._bodyWidth,
                         child: Text(
-                          'Veylor is syncing',
+                          SyncKeepAwakePrivacyLockScreen._syncingBody,
                           textAlign: TextAlign.center,
                           style: AppTypography.bodyMedium.copyWith(
                             color: colors.text.secondary,
@@ -1069,6 +1184,339 @@ class _SyncKeepAwakeProgressLockup extends StatelessWidget {
   }
 }
 
+/// Both syncs while Railgun's is part of the lock: the wallet's progress as
+/// its ring shows it, and Railgun's ring. Only a sync still running has a
+/// ring: one that is done drops out, as there is nothing left to show.
+@immutable
+class _SyncKeepAwakeRings {
+  const _SyncKeepAwakeRings({
+    required this.zec,
+    required this.zecStatus,
+    required this.railgun,
+  });
+
+  final double zec;
+  final SyncKeepAwakeWalletStatus zecStatus;
+  final PrivateUsdSyncLockTrack railgun;
+
+  bool get zecRing => zecStatus != SyncKeepAwakeWalletStatus.synced;
+  bool get railgunRing => railgun.stage != PrivateUsdSyncLockStage.synced;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _SyncKeepAwakeRings &&
+      other.zec == zec &&
+      other.zecStatus == zecStatus &&
+      other.railgun == railgun;
+
+  @override
+  int get hashCode => Object.hash(zec, zecStatus, railgun);
+}
+
+final _syncKeepAwakeRingsProvider = Provider.autoDispose<_SyncKeepAwakeRings>((
+  ref,
+) {
+  final sync = ref.watch(syncProvider).asData?.value;
+  final zecStatus = syncKeepAwakeWalletStatus(sync);
+  return _SyncKeepAwakeRings(
+    zec: switch (zecStatus) {
+      SyncKeepAwakeWalletStatus.synced => 1.0,
+      SyncKeepAwakeWalletStatus.syncing => ref.watch(
+        syncDisplayPercentageProvider,
+      ),
+      SyncKeepAwakeWalletStatus.paused =>
+        (sync?.percentage ?? 0).clamp(0.0, 1.0).toDouble(),
+    },
+    zecStatus: zecStatus,
+    railgun: ref.watch(privateUsdSyncLockTrackProvider),
+  );
+});
+
+/// What Railgun is doing, for the line under its ring.
+String _railgunLine(PrivateUsdSyncLockStage stage) => switch (stage) {
+  PrivateUsdSyncLockStage.balance => PrivateUsdCopy.syncLockLoadingBalance,
+  PrivateUsdSyncLockStage.transactions => PrivateUsdCopy.syncLockBalanceReady,
+  PrivateUsdSyncLockStage.paused => PrivateUsdCopy.syncLockPaused,
+  PrivateUsdSyncLockStage.synced => SyncKeepAwakePrivacyLockScreen._syncingBody,
+};
+
+/// Railgun's sync while it runs: its ring in white light, named over its
+/// percentage, and the wallet's lit red around it while that runs too. Under
+/// them, [line] says what Railgun is doing: its balance loading, or its
+/// transaction list, which the change from the wallet's sends waits on.
+class _SyncKeepAwakeRingsLockup extends ConsumerWidget {
+  const _SyncKeepAwakeRingsLockup({required this.line});
+
+  final String line;
+
+  /// How far inside the wallet's ring Railgun's runs beside it.
+  static const _ringGap = 26.0;
+
+  /// How lit a paused sync's ring and figures stay.
+  static const _pausedLight = 0.35;
+
+  /// The squares inside the innermost ring, clear of its ticks, that hold
+  /// the figures: large text scales down to stay inside.
+  static const _twoFiguresSize = 150.0;
+  static const _oneFigureSize = 180.0;
+
+  static const _zecName = 'ZEC';
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.colors;
+    final neon = colors.neon;
+    final rings = ref.watch(_syncKeepAwakeRingsProvider);
+    final railgun = rings.railgun;
+    final both = rings.zecRing;
+    final zecPaused = rings.zecStatus == SyncKeepAwakeWalletStatus.paused;
+    final railgunPaused = railgun.stage == PrivateUsdSyncLockStage.paused;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox.square(
+          dimension: SyncKeepAwakePrivacyLockScreen._ringSize,
+          child: NeonIgnition(
+            builder: (context, light) => _AnimatedSyncProgress(
+              progress: rings.zec,
+              builder: (context, zec) => _AnimatedSyncProgress(
+                // The transaction list's climb starts afresh, not wound back.
+                key: ValueKey(
+                  railgun.stage == PrivateUsdSyncLockStage.transactions,
+                ),
+                progress: railgun.progress,
+                builder: (context, railgunProgress) {
+                  final railgunReadout = _SyncKeepAwakeRingReadout(
+                    name: PrivateUsdCopy.syncLockName,
+                    progress: railgunProgress,
+                    paused: railgunPaused,
+                    large: !both,
+                    glow: neon.secondaryGlow,
+                    core: neon.secondaryCore,
+                    light: light,
+                  );
+                  return Stack(
+                    children: [
+                      if (both)
+                        Positioned.fill(
+                          child: CustomPaint(
+                            key: const ValueKey(
+                              'sync_keep_awake_privacy_zec_ring',
+                            ),
+                            painter: _SyncKeepAwakeRingPainter(
+                              progress: zec,
+                              light: zecPaused ? _pausedLight * light : light,
+                              glow: neon.glow,
+                              core: neon.core,
+                            ),
+                          ),
+                        ),
+                      Positioned.fill(
+                        child: CustomPaint(
+                          key: const ValueKey(
+                            'sync_keep_awake_privacy_railgun_ring',
+                          ),
+                          painter: _SyncKeepAwakeRingPainter(
+                            progress: railgunProgress,
+                            light: railgunPaused ? _pausedLight * light : light,
+                            glow: neon.secondaryGlow,
+                            core: neon.secondaryCore,
+                            inset: both
+                                ? _SyncKeepAwakeRingPainter.outerInset +
+                                      _ringGap
+                                : _SyncKeepAwakeRingPainter.outerInset,
+                          ),
+                        ),
+                      ),
+                      Center(
+                        child: Semantics(
+                          container: true,
+                          label: [
+                            both
+                                ? _readoutLabel(
+                                    _zecName,
+                                    zec,
+                                    paused: zecPaused,
+                                  )
+                                : '$_zecName synced',
+                            _readoutLabel(
+                              PrivateUsdCopy.syncLockName,
+                              railgunProgress,
+                              paused: railgunPaused,
+                            ),
+                          ].join('. '),
+                          child: SizedBox.square(
+                            dimension: both ? _twoFiguresSize : _oneFigureSize,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: ExcludeSemantics(
+                                child: both
+                                    ? Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _SyncKeepAwakeRingReadout(
+                                            name: _zecName,
+                                            progress: zec,
+                                            paused: zecPaused,
+                                            glow: neon.glow,
+                                            core: neon.core,
+                                            light: light,
+                                          ),
+                                          const SizedBox(height: AppSpacing.s),
+                                          Container(
+                                            width: 36,
+                                            height: 1,
+                                            color: neon.secondaryGlow
+                                                .withValues(alpha: 0.2 * light),
+                                          ),
+                                          const SizedBox(height: AppSpacing.s),
+                                          railgunReadout,
+                                        ],
+                                      )
+                                    : railgunReadout,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: SyncKeepAwakePrivacyLockScreen._ringsLineGap),
+        SizedBox(
+          width: SyncKeepAwakePrivacyLockScreen._doneBodyWidth,
+          child: Text(
+            line,
+            textAlign: TextAlign.center,
+            style: SyncKeepAwakePrivacyLockScreen._ringsLineStyle(context),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _readoutLabel(
+    String name,
+    double progress, {
+    required bool paused,
+  }) {
+    final percent = '${formatSyncStatusPercentage(progress)}%';
+    return paused ? '$name paused at $percent' : '$name $percent';
+  }
+}
+
+/// One sync at the rings' centre: its name, a HUD caption in its ring's
+/// light, over its percentage in Thin numerals lit the same way; [large]
+/// when it has the rings to itself, as the wallet's single ring's numerals
+/// are. Paused, it dims.
+class _SyncKeepAwakeRingReadout extends StatelessWidget {
+  const _SyncKeepAwakeRingReadout({
+    required this.name,
+    required this.progress,
+    required this.paused,
+    required this.glow,
+    required this.core,
+    required this.light,
+    this.large = false,
+  });
+
+  final String name;
+  final double progress;
+  final bool paused;
+  final bool large;
+  final Color glow;
+  final Color core;
+  final double light;
+
+  static const _numeralStyle = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w100,
+    fontSize: 40,
+    height: 1,
+    letterSpacing: -0.4,
+  );
+
+  static const _percentSignStyle = TextStyle(
+    fontFamily: kGothamFamily,
+    fontWeight: FontWeight.w300,
+    fontSize: 16,
+    height: 1,
+    letterSpacing: 1,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final k = paused ? _SyncKeepAwakeRingsLockup._pausedLight * light : light;
+    final numeralStyle = large
+        ? _SyncKeepAwakeProgressLockup._numeralStyle
+        : _numeralStyle;
+    final percentSignStyle = large
+        ? _SyncKeepAwakeProgressLockup._percentSignStyle
+        : _percentSignStyle;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          name.toUpperCase(),
+          style: kNeonHudCaptionStyle.copyWith(
+            color: glow.withValues(alpha: paused ? 0.5 : 1),
+            shadows: Neon.textGlow(glow, intensity: 0.5 * k),
+          ),
+        ),
+        SizedBox(height: large ? AppSpacing.s : AppSpacing.xs),
+        Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: formatSyncStatusPercentage(progress),
+                style: numeralStyle.copyWith(
+                  color: core.withValues(alpha: paused ? 0.5 : 1),
+                  shadows: Neon.textGlow(glow, intensity: k),
+                ),
+              ),
+              TextSpan(
+                text: '%',
+                style: percentSignStyle.copyWith(
+                  color: glow.withValues(alpha: paused ? 0.5 : 1),
+                  shadows: Neon.textGlow(glow, intensity: 0.6 * k),
+                ),
+              ),
+            ],
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+/// [progress], eased from what it was, as the single ring's numerals are.
+class _AnimatedSyncProgress extends StatelessWidget {
+  const _AnimatedSyncProgress({
+    required this.progress,
+    required this.builder,
+    super.key,
+  });
+
+  final double progress;
+  final Widget Function(BuildContext context, double progress) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    final target = progress.clamp(0.0, 1.0).toDouble();
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: target, end: target),
+      duration: _SyncKeepAwakeProgressLockup._progressAnimationDuration,
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) => builder(context, value),
+    );
+  }
+}
+
 /// The progress ring: the synced share is a lit tube that runs clockwise
 /// from the top to a bright head, and the rest is a scale of unlit ticks
 /// that the head burns along.
@@ -1078,6 +1526,7 @@ class _SyncKeepAwakeRingPainter extends CustomPainter {
     required this.light,
     required this.glow,
     required this.core,
+    this.inset = outerInset,
   });
 
   final double progress;
@@ -1087,19 +1536,22 @@ class _SyncKeepAwakeRingPainter extends CustomPainter {
   final Color glow;
   final Color core;
 
+  /// How far inside the square the ring runs.
+  final double inset;
+
   static const _tickCount = 96;
   static const _tickLength = 7.0;
   static const _tubeWidth = 2.2;
 
-  /// Room around the ring for its glow.
-  static const _inset = 18.0;
+  /// Room around the outer ring for its glow.
+  static const outerInset = 18.0;
 
   @override
   void paint(Canvas canvas, Size size) {
     final p = progress.clamp(0.0, 1.0).toDouble();
     final k = light.clamp(0.0, 1.0).toDouble();
     final center = size.center(Offset.zero);
-    final radius = size.shortestSide / 2 - _inset;
+    final radius = size.shortestSide / 2 - inset;
     const start = -math.pi / 2;
     final headAngle = start + math.pi * 2 * p;
 
@@ -1157,7 +1609,8 @@ class _SyncKeepAwakeRingPainter extends CustomPainter {
     return oldDelegate.progress != progress ||
         oldDelegate.light != light ||
         oldDelegate.glow != glow ||
-        oldDelegate.core != core;
+        oldDelegate.core != core ||
+        oldDelegate.inset != inset;
   }
 }
 

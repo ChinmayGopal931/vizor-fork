@@ -142,6 +142,16 @@ abstract final class PrivateUsdCopy {
   static const syncReadoutSynced = 'Railgun synced';
   static const syncReadoutFailed = 'Railgun sync failed';
 
+  /// Railgun's ring on the wallet sync's privacy lock, and the line under
+  /// it while its balance loads, its transaction list syncs, or it paused.
+  static const syncLockName = 'Railgun';
+  static const syncLockLoadingBalance =
+      'Loading your shielded balance. Keep Veylor open.';
+  static const syncLockBalanceReady =
+      "Shielded balance ready. Railgun's transaction list is still syncing.";
+  static const syncLockPaused =
+      "Railgun's sync paused. Unlock Veylor to continue.";
+
   static const emptyTitle = 'No shielded dollars yet';
   static const emptyBody =
       'Bridge ZEC into dollars nobody else can see: not your balance, and '

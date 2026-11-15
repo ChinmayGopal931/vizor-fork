@@ -15,11 +15,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
+import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/sync_keep_awake_interaction_listener.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/sync_keep_awake_privacy_lock_host.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/passcode_widgets.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/tron_glyph.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_record_key.dart';
+import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
+import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_sync_lock_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_unfinished_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/providers/account_models.dart';
@@ -1531,6 +1535,271 @@ void main() {
     expect(_findAppIcon(AppIcons.unlock), findsNothing);
     expect(_findAppIcon(AppIcons.faceId), findsNothing);
   });
+
+  group("Railgun's sync on the lock", () {
+    final zecSynced = _sync(
+      isSyncing: false,
+      percentage: 1,
+      scannedHeight: 200,
+      chainTipHeight: 200,
+      lastSyncStartedAt: DateTime(2026, 7, 9, 12),
+    );
+
+    Future<ProviderContainer> pumpLock(
+      WidgetTester tester, {
+      required SyncState zec,
+      PrivateUsdSyncStatus railgun = PrivateUsdSyncStatus.syncing,
+      PrivateUsdSyncLockTrack track = const PrivateUsdSyncLockTrack(
+        progress: 0.2,
+        stage: PrivateUsdSyncLockStage.balance,
+      ),
+      Duration idleTimeout = const Duration(milliseconds: 50),
+    }) async {
+      _setMobileViewport(tester);
+      final container = ProviderContainer(
+        overrides: [
+          appBootstrapProvider.overrideWithValue(_bootstrap()),
+          appSecurityProvider.overrideWith(_FakeSecurityNotifier.new),
+          biometricUnlockProvider.overrideWith(
+            () => _FakeBiometricUnlockNotifier(_disabledBiometricState),
+          ),
+          syncProvider.overrideWith(() => FakeSyncNotifier(zec)),
+          privateUsdSyncStatusProvider.overrideWith(
+            (ref) => ref.watch(_railgunStatusProvider),
+          ),
+          privateUsdSyncLockTrackProvider.overrideWith(_Track.new),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(_railgunStatusProvider.notifier).set(railgun);
+      container.read(_railgunTrackProvider.notifier).set(track);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: _themedApp(idleTimeout: idleTimeout),
+        ),
+      );
+      await _settleInitialSync(tester);
+      await tester.pump(idleTimeout + const Duration(milliseconds: 10));
+      await tester.pump();
+      return container;
+    }
+
+    testWidgets('a first sync is covered after the idle minute: with the '
+        "wallet synced, Railgun's ring alone, and what it is doing", (
+      tester,
+    ) async {
+      final container = await pumpLock(tester, zec: zecSynced);
+
+      expect(container.read(syncKeepAwakePrivacyLockProvider).railgun, isTrue);
+      expect(
+        find.byKey(const ValueKey('sync_keep_awake_privacy_railgun_ring')),
+        findsOneWidget,
+      );
+      // A sync that is done drops out: no ring, no check.
+      expect(
+        find.byKey(const ValueKey('sync_keep_awake_privacy_zec_ring')),
+        findsNothing,
+      );
+      expect(find.text('ZEC'), findsNothing);
+      expect(find.byType(TronGlyph), findsNothing);
+      expect(find.text('RAILGUN'), findsOneWidget);
+      expect(find.text('20%'), findsOneWidget);
+      expect(find.text(PrivateUsdCopy.syncLockLoadingBalance), findsOneWidget);
+      expect(find.bySemanticsLabel('ZEC synced. Railgun 20%'), findsOneWidget);
+      expect(find.text('Unlock Veylor'), findsOneWidget);
+    });
+
+    testWidgets('with both syncs running, two rings, each named', (
+      tester,
+    ) async {
+      await pumpLock(
+        tester,
+        zec: _sync(
+          percentage: 0.4,
+          lastSyncStartedAt: DateTime(2026, 7, 9, 12),
+        ),
+      );
+
+      expect(
+        find.byKey(const ValueKey('sync_keep_awake_privacy_zec_ring')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('sync_keep_awake_privacy_railgun_ring')),
+        findsOneWidget,
+      );
+      expect(find.text('ZEC'), findsOneWidget);
+      expect(find.text('40%'), findsOneWidget);
+      expect(find.text('RAILGUN'), findsOneWidget);
+      expect(find.text('20%'), findsOneWidget);
+      expect(find.bySemanticsLabel('ZEC 40%. Railgun 20%'), findsOneWidget);
+    });
+
+    testWidgets("once Railgun's sync is done, the wallet's own ring shows "
+        'alone', (tester) async {
+      final container = await pumpLock(
+        tester,
+        zec: _sync(lastSyncStartedAt: DateTime(2026, 7, 9, 12)),
+      );
+      container
+          .read(_railgunTrackProvider.notifier)
+          .set(
+            const PrivateUsdSyncLockTrack(
+              progress: 1,
+              stage: PrivateUsdSyncLockStage.synced,
+            ),
+          );
+      container
+          .read(_railgunStatusProvider.notifier)
+          .set(PrivateUsdSyncStatus.synced);
+      await tester.pump();
+
+      expect(
+        container.read(syncKeepAwakePrivacyLockModeProvider),
+        SyncKeepAwakePrivacyLockMode.syncing,
+      );
+      expect(find.text('RAILGUN'), findsNothing);
+      expect(find.text('25%'), findsOneWidget);
+      expect(find.text('Veylor is syncing'), findsOneWidget);
+    });
+
+    testWidgets("Railgun's transaction list follows its balance", (
+      tester,
+    ) async {
+      await pumpLock(
+        tester,
+        zec: _sync(
+          percentage: 0.4,
+          lastSyncStartedAt: DateTime(2026, 7, 9, 12),
+        ),
+        track: const PrivateUsdSyncLockTrack(
+          progress: 0.75,
+          stage: PrivateUsdSyncLockStage.transactions,
+        ),
+      );
+
+      expect(find.text('40%'), findsOneWidget);
+      expect(find.text('75%'), findsOneWidget);
+      expect(find.text(PrivateUsdCopy.syncLockBalanceReady), findsOneWidget);
+    });
+
+    testWidgets('the lock reads done only once both syncs are', (tester) async {
+      final container = await pumpLock(tester, zec: zecSynced);
+
+      container
+          .read(_railgunTrackProvider.notifier)
+          .set(
+            const PrivateUsdSyncLockTrack(
+              progress: 1,
+              stage: PrivateUsdSyncLockStage.synced,
+            ),
+          );
+      container
+          .read(_railgunStatusProvider.notifier)
+          .set(PrivateUsdSyncStatus.synced);
+      await tester.pump();
+
+      expect(
+        container.read(syncKeepAwakePrivacyLockModeProvider),
+        SyncKeepAwakePrivacyLockMode.done,
+      );
+      expect(find.text('SYNC COMPLETE'), findsOneWidget);
+      expect(find.text('RAILGUN'), findsNothing);
+    });
+
+    testWidgets('a Railgun sync starting under the lock adds its ring', (
+      tester,
+    ) async {
+      final container = await pumpLock(
+        tester,
+        zec: _sync(lastSyncStartedAt: DateTime(2026, 7, 9, 12)),
+        railgun: PrivateUsdSyncStatus.paused,
+      );
+      expect(find.text('Veylor is syncing'), findsOneWidget);
+      expect(find.text('RAILGUN'), findsNothing);
+
+      container
+          .read(_railgunStatusProvider.notifier)
+          .set(PrivateUsdSyncStatus.syncing);
+      await tester.pump();
+
+      expect(container.read(syncKeepAwakePrivacyLockProvider).railgun, isTrue);
+      expect(find.text('RAILGUN'), findsOneWidget);
+      expect(find.text('25%'), findsOneWidget);
+      expect(find.text('20%'), findsOneWidget);
+    });
+
+    testWidgets("the passcode prompt names the one ring's figure, and none "
+        'for two', (tester) async {
+      final container = await pumpLock(
+        tester,
+        zec: zecSynced,
+        // Outlasts the CRT switch-off, so the idle lock cannot return first.
+        idleTimeout: const Duration(seconds: 1),
+      );
+
+      await tester.tap(find.text('Unlock Veylor'));
+      await tester.pump();
+      expect(find.text('20% SYNCING...'), findsOneWidget);
+
+      (container.read(syncProvider.notifier) as FakeSyncNotifier).emit(
+        _sync(percentage: 0.4, lastSyncStartedAt: DateTime(2026, 7, 9, 12)),
+      );
+      await tester.pump();
+      expect(find.text('SYNCING...'), findsOneWidget);
+      expect(find.textContaining('%'), findsNothing);
+    });
+
+    testWidgets('the two rings fit a compact phone', (tester) async {
+      _setMobileViewport(tester, size: const Size(320, 568));
+      await pumpLock(tester, zec: zecSynced);
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('RAILGUN'), findsOneWidget);
+      expect(find.text('Unlock Veylor').hitTestable(), findsOneWidget);
+    });
+
+    testWidgets('the figures stay inside the rings at large text sizes', (
+      tester,
+    ) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await pumpLock(
+        tester,
+        zec: _sync(
+          percentage: 0.4,
+          lastSyncStartedAt: DateTime(2026, 7, 9, 12),
+        ),
+        track: const PrivateUsdSyncLockTrack(
+          progress: 0.75,
+          stage: PrivateUsdSyncLockStage.transactions,
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      // The line under the rings is whole, and clear of the button.
+      final line = tester.getRect(
+        find.text(PrivateUsdCopy.syncLockBalanceReady),
+      );
+      expect(line.height, greaterThan(3 * 14 * 2));
+      expect(
+        line.bottom,
+        lessThanOrEqualTo(tester.getRect(find.byType(AppButton)).top),
+      );
+      final rings = tester.getRect(
+        find.byKey(const ValueKey('sync_keep_awake_privacy_railgun_ring')),
+      );
+      for (final figure in ['ZEC', '40%', 'RAILGUN', '75%']) {
+        final rect = tester.getRect(find.text(figure));
+        expect(
+          (rect.topLeft - rings.center).distance,
+          lessThan(rings.width / 2 - 44),
+          reason: '$figure reaches past the inner ring',
+        );
+      }
+    });
+  });
 }
 
 void _setMobileViewport(
@@ -1731,4 +2000,32 @@ class _PendingSecurityNotifier extends _FakeSecurityNotifier {
   final Completer<bool> pending;
   @override
   Future<bool> confirmPassword(String password) => pending.future;
+}
+
+class _RailgunStatus extends Notifier<PrivateUsdSyncStatus> {
+  @override
+  PrivateUsdSyncStatus build() => PrivateUsdSyncStatus.paused;
+
+  void set(PrivateUsdSyncStatus status) => state = status;
+}
+
+final _railgunStatusProvider =
+    NotifierProvider<_RailgunStatus, PrivateUsdSyncStatus>(_RailgunStatus.new);
+
+class _RailgunTrack extends Notifier<PrivateUsdSyncLockTrack> {
+  @override
+  PrivateUsdSyncLockTrack build() => const PrivateUsdSyncLockTrack(
+    progress: 0,
+    stage: PrivateUsdSyncLockStage.balance,
+  );
+
+  void set(PrivateUsdSyncLockTrack track) => state = track;
+}
+
+final _railgunTrackProvider =
+    NotifierProvider<_RailgunTrack, PrivateUsdSyncLockTrack>(_RailgunTrack.new);
+
+class _Track extends PrivateUsdSyncLockTrackNotifier {
+  @override
+  PrivateUsdSyncLockTrack build() => ref.watch(_railgunTrackProvider);
 }

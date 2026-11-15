@@ -18,6 +18,11 @@ const kSyncStatusConnectingToTorSemanticsLabel = 'Connecting to Tor';
 const kSyncStatusTorFailedLabel = "Tor couldn't connect...";
 const kSyncStatusTorFailedSemanticsLabel = "Tor couldn't connect";
 
+/// How far behind the tip a scan may start, once a sync has completed, and
+/// still count as caught up: it reads as synced rather than syncing, so a
+/// sync line or ring does not drop and climb again on every new block.
+const kSyncCatchUpBlocks = 20;
+
 class SyncStatusLabel {
   const SyncStatusLabel({
     required this.kind,

@@ -14,6 +14,9 @@ const _mobile = kAppFormFactor == AppFormFactor.mobile;
 /// * [grid] — floor and chart grid lines.
 /// * [frameGlow] — white light, as a headlight: the hairline between the
 ///   balance sign and the Private USD strip under it.
+/// * [secondaryGlow] / [secondaryCore] — a second lit tube beside the red
+///   one, in white light (graphite on steel): Railgun's ring on the sync
+///   privacy lock.
 ///
 /// Desktop has no neon elements; its set mirrors the brand crimson so a
 /// stray use still reads as the brand accent.
@@ -25,6 +28,8 @@ class AppNeonColors {
     required this.signCore,
     required this.grid,
     required this.frameGlow,
+    required this.secondaryGlow,
+    required this.secondaryCore,
   });
 
   final Color glow;
@@ -33,6 +38,8 @@ class AppNeonColors {
   final Color signCore;
   final Color grid;
   final Color frameGlow;
+  final Color secondaryGlow;
+  final Color secondaryCore;
 
   static const dark = _mobile ? neonDark : figmaDark;
   static const light = _mobile ? neonLight : figmaLight;
@@ -44,6 +51,8 @@ class AppNeonColors {
     signCore: CrimsonPrimitives.p900Dark,
     grid: CrimsonPrimitives.p300Alpha15Dark,
     frameGlow: CrimsonPrimitives.p400Dark,
+    secondaryGlow: CrimsonPrimitives.p400Dark,
+    secondaryCore: CrimsonPrimitives.p900Dark,
   );
 
   static const figmaLight = AppNeonColors(
@@ -53,6 +62,8 @@ class AppNeonColors {
     signCore: CrimsonPrimitives.p900Dark,
     grid: CrimsonPrimitives.p300Alpha15Light,
     frameGlow: CrimsonPrimitives.p400Dark,
+    secondaryGlow: CrimsonPrimitives.p300Light,
+    secondaryCore: CrimsonPrimitives.p600Light,
   );
 
   static const neonDark = AppNeonColors(
@@ -62,6 +73,8 @@ class AppNeonColors {
     signCore: NeonPrimitives.redCore,
     grid: NeonPrimitives.red14,
     frameGlow: NeonPrimitives.headlight,
+    secondaryGlow: NeonPrimitives.headlight,
+    secondaryCore: NeonPrimitives.white,
   );
 
   static const neonLight = AppNeonColors(
@@ -71,5 +84,7 @@ class AppNeonColors {
     signCore: NeonPrimitives.redCore,
     grid: NeonPrimitives.redOnLight10,
     frameGlow: NeonPrimitives.headlight,
+    secondaryGlow: NeonPrimitives.n600Light,
+    secondaryCore: NeonPrimitives.n800Light,
   );
 }

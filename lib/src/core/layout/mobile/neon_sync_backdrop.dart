@@ -105,7 +105,7 @@ class NeonSyncLine {
         !waitingOnTor &&
         sync.lastSyncCompletedAt != null &&
         sync.chainTipHeight > 0 &&
-        gap <= _catchUpBlocks;
+        gap <= kSyncCatchUpBlocks;
     final syncing = status.kind == SyncStatusKind.syncing && !catchingUp;
     final progress = switch (status.kind) {
       _ when catchingUp => 1.0,
@@ -427,9 +427,6 @@ class _NeonSyncLineViewState extends State<_NeonSyncLineView>
     );
   }
 }
-
-/// How far behind the tip a scan may start and still count as caught up.
-const _catchUpBlocks = 20;
 
 /// Where the sync line stands, as a fraction of the width: in the right part
 /// of the screen, not along its edge.
