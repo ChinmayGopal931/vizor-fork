@@ -1891,12 +1891,13 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
     nothing: its store can end inside an on-chain batch, at a root the
     contract never had. The rebuild clears the transaction list first
     (rebuilt notes lack the railgunTxids its sync gave them, which proofs
-    need), never begins while the engine syncs either, and the list syncs
-    again after the next scan that completes. It is kept unfinished from
-    when its clearing begins until it ends: a page closed while clearing
-    clears again, before its first scan, when it reopens, and one closed
-    while the trees were built again goes on building them at its next
-    scan, never clearing them again.
+    need), never begins while the engine syncs either or while the rest
+    of a sync runs (which would read and hand on the balances it clears),
+    and the list syncs again after the next scan that completes. It is
+    kept unfinished from when its clearing begins until it ends: a page
+    closed while clearing clears again, before its first scan, when it
+    reopens, and one closed while the trees were built again goes on
+    building them at its next scan, never clearing them again.
   - On anything unexpected the sync goes on from rail-squid where the
     archive left off. A request that fails on the way is sent four more
     times over 15 s (a phone's DNS can drop lookups for seconds), and a txid

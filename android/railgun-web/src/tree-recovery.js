@@ -100,7 +100,8 @@ export function treeRecovery({ rebuild, store, now = Date.now }) {
 
 /**
  * Rebuilds `engine`'s notes trees on `chain` from the start, decrypting `walletIds`' notes, and answers whether it
- * began: not while the engine syncs the notes or Railgun's transaction list, which it won't clear meanwhile.
+ * began: not while the engine syncs the notes or Railgun's transaction list, which it won't clear meanwhile, nor while
+ * `busy()`, the rest of a sync, which reads the balances a rebuild clears.
  * `started()` is called just before anything is cleared, and `cleared()` once all of it is, before the scan that builds
  * the trees again.
  *
@@ -111,9 +112,12 @@ export function treeRecovery({ rebuild, store, now = Date.now }) {
  * has synced the list, which a page whose scans keep failing never has. The page syncs the list again after the next
  * scan that completes.
  */
-export async function rebuildTrees(engine, { txidVersion, chain, walletIds, started = () => {}, cleared = () => {} }) {
+export async function rebuildTrees(
+  engine,
+  { txidVersion, chain, walletIds, busy = () => false, started = () => {}, cleared = () => {} },
+) {
   const utxo = engine.getUTXOMerkletree(txidVersion, chain);
-  if (utxo.isScanning || engine.getTXIDMerkletree(txidVersion, chain).isScanning) return false;
+  if (utxo.isScanning || engine.getTXIDMerkletree(txidVersion, chain).isScanning || busy()) return false;
   started();
   engine.emitUTXOMerkletreeScanUpdateEvent(txidVersion, chain, 0.01);
   await engine.clearTXIDMerkletreeData(txidVersion, chain);

@@ -113,9 +113,18 @@ export function session() {
   return { network, fees, ...wallet };
 }
 
-/** Rebuilds the notes trees from the start for `walletId` (tree-recovery.js), calling `marks` as it goes. */
+/**
+ * Rebuilds the notes trees from the start for `walletId` (tree-recovery.js), calling `marks` as it goes: not while the
+ * rest of a sync runs, which would read the balances the rebuild clears and hand them on.
+ */
 const rebuildFor = (walletId, marks) =>
-  rebuildTrees(getEngine(), { txidVersion: TXID_VERSION, chain: chain(), walletIds: [walletId], ...marks });
+  rebuildTrees(getEngine(), {
+    txidVersion: TXID_VERSION,
+    chain: chain(),
+    walletIds: [walletId],
+    busy: () => finishing?.done !== undefined,
+    ...marks,
+  });
 
 /** What the page does after each of `walletId`'s notes scans (tree-recovery.js). */
 const recovery = (walletId) => treeRecovery({ rebuild: (marks) => rebuildFor(walletId, marks), store: recoveryStore });

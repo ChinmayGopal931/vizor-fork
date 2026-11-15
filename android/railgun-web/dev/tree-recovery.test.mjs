@@ -413,6 +413,24 @@ test('a rebuild clears the transaction list, then the trees, and builds them as 
   assert.deepEqual(contents(down), contents(fresh.down));
 });
 
+test("a rebuild doesn't begin while the rest of a sync runs, which reads the balances it would clear", async () => {
+  const built = await synced();
+  const before = contents(built.down);
+  let started = false;
+  const began = await rebuildTrees(built.engine, {
+    txidVersion: V2,
+    chain: CHAIN,
+    walletIds: undefined,
+    busy: () => true,
+    started: () => {
+      started = true;
+    },
+  });
+  assert.equal(began, false);
+  assert.equal(started, false);
+  assert.deepEqual(contents(built.down), before);
+});
+
 test("a rebuild doesn't begin while the engine syncs the notes or the list, and clears nothing", async () => {
   for (const syncing of ['utxo', 'txids']) {
     const built = await synced();
