@@ -11,6 +11,7 @@ import { Merkletree } from '@railgun-community/engine';
 import { TXIDVersion } from '@railgun-community/shared-models';
 import { ArchiveUnavailable, ArchiveUnreachable, archiveRange } from './archive.js';
 import { commitmentBatches } from './archive-records.js';
+import { pauseMark, pausedSince } from './page-clock.js';
 import {
   formatNullifiers,
   formatUnshields,
@@ -148,7 +149,9 @@ export function installArchiveSync(
     // Every list is stored through this block.
     let through = startingBlock - 1;
     if (newest !== undefined && farBehind(startingBlock, newest.blockNumber) && useArchive()) {
+      let pardoned = 0;
       for (let round = 1; ; round += 1) {
+        const mark = pauseMark();
         try {
           const latest = await engine.getUTXOMerkletree(txidVersion, chain).getLatestTreeAndIndex();
           await storeEvents({
@@ -175,8 +178,17 @@ export function installArchiveSync(
         } catch (error) {
           const message = error?.message ?? error;
           const archives = error instanceof ArchiveFailed;
-          if ((!archives || error.cause instanceof ArchiveUnreachable) && round < ARCHIVE_ROUNDS) {
-            log(`${archives ? 'the archive' : 'rail-squid'} failed at block ${through}, asked again: ${message}`);
+          const again = !archives || error.cause instanceof ArchiveUnreachable;
+          const failed = `${archives ? 'the archive' : 'rail-squid'} failed at block ${through}`;
+          // A round a pause of the page cut through goes again at once, uncounted (page-clock.js).
+          if (again && pausedSince(mark) && pardoned < ARCHIVE_ROUNDS) {
+            pardoned += 1;
+            round -= 1;
+            log(`${failed} across a pause of the page, asked again: ${message}`);
+            continue;
+          }
+          if (again && round < ARCHIVE_ROUNDS) {
+            log(`${failed}, asked again: ${message}`);
             await delay(roundWaitMs * 2 ** (round - 1));
             continue;
           }

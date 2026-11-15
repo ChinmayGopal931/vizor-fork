@@ -36,8 +36,10 @@ import { installArchiveTxids, misrecordedTransaction, relistIfMisrecorded } from
 import { setArtifactProgressListener } from './artifact-mirror.js';
 import { artifactStore } from './artifacts.js';
 import { mainnetBlockAt, mainnetBlockTime } from './block-times.js';
+import { creationBlock } from './creation-block.js';
 import { badRequest } from './errors.js';
-import { installQuickSync } from './quick-sync.js';
+import { pauseMark, pausedSince, watchPauses } from './page-clock.js';
+import { formatUnshields, installQuickSync, squidPages } from './quick-sync.js';
 import { hasUndatedReceipts, hasUndatedShields, pendingShields, receivedSends } from './received.js';
 import { refreshProgress } from './refresh-progress.js';
 import { syncFailure } from './rpc-probe.js';
@@ -45,7 +47,8 @@ import { screeningActivity } from './screening-activity.js';
 import { squidQueries } from './squid.js';
 import { syncFinisher } from './sync-finish.js';
 import { archiveOff, localStore, rebuildTrees, takeRefusedRoot, treeRecovery } from './tree-recovery.js';
-import { catchUpTxids } from './txid-catch-up.js';
+import { TxidListStopped, catchUpTxids } from './txid-catch-up.js';
+import { takeListStop, txidRepair } from './txid-repair.js';
 import { walletNamespaces } from './wallet-namespaces.js';
 
 export const TXID_VERSION = TXIDVersion.V2_PoseidonMerkle;
@@ -102,8 +105,11 @@ let proofsFailed = false;
 let activity;
 let syncProgress;
 // What tree-recovery.js learned of the notes trees' roots, when it last rebuilt them, and whether the archive is off,
-// for the network started.
+// for the network started, and what txid-repair.js learned of the transaction list.
 let recoveryStore;
+// Rail-squid's event lists, and the page's log, for the network started.
+let indexerQueries;
+let pageLog = () => {};
 
 const chain = () => NETWORK_CONFIG[network].chain;
 
@@ -128,6 +134,25 @@ const rebuildFor = (walletId, marks) =>
 
 /** What the page does after each of `walletId`'s notes scans (tree-recovery.js). */
 const recovery = (walletId) => treeRecovery({ rebuild: (marks) => rebuildFor(walletId, marks), store: recoveryStore });
+
+/** What the page does around each catch-up of the transaction list (txid-repair.js). */
+const listRepair = () => {
+  const engine = getEngine();
+  return txidRepair({
+    store: recoveryStore,
+    idle: () =>
+      !engine.getUTXOMerkletree(TXID_VERSION, chain()).isScanning &&
+      !engine.getTXIDMerkletree(TXID_VERSION, chain()).isScanning,
+    rewind: (point) => engine.resetRailgunTxidsAfterTxidIndex(TXID_VERSION, chain(), point),
+    clear: () => engine.clearTXIDMerkletreeData(TXID_VERSION, chain()),
+    reread: async (from, through) => {
+      for await (const { events, through: given } of squidPages(indexerQueries.unshields, formatUnshields, from)) {
+        if (events.length > 0) await engine.unshieldListener(TXID_VERSION, chain(), events);
+        if (given >= through) return;
+      }
+    },
+  });
+};
 
 /**
  * Rebuilds the open wallet's notes trees now, as tree recovery does, for dev/check.mjs: whether it began, and the
@@ -176,14 +201,17 @@ export function start(
 }
 
 async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history, debug, emit) {
+  watchPauses();
   if (debug) setLoggers((message) => emit('log', String(message)), (error) => emit('log', String(error?.stack ?? error)));
   setEngineTxidSyncBatchSize(TXID_SYNC_BATCH_SIZES.squid);
   await startRailgunEngine(WALLET_SOURCE, new LevelJS(database), debug, artifactStore, false, false, poiNodeUrls);
   getProver().setSnarkJSGroth16(groth16);
   const engine = getEngine();
   const queries = squidQueries(networkName);
+  indexerQueries = queries;
   installQuickSync(engine, { queries, head: async () => (await readNewestBlock(networkName)).blockNumber });
   const log = (line) => emit('log', line);
+  pageLog = log;
   const reader = history === undefined ? undefined : archive(history.base, history.chainId);
   // The archive is for syncs far behind: without the newest block, the clock and the shipped table tell how far.
   const head = async () => {
@@ -264,8 +292,13 @@ async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history,
   return { fees };
 }
 
-/** Opens the wallet `mnemonic` derives at index 0, as Railway does; one stored under another key is made again. */
-export const openWallet = ({ encryptionKey, mnemonic }) => open(encryptionKey, mnemonic, undefined);
+/**
+ * Opens the wallet `mnemonic` derives at index 0, as Railway does; one stored under another key is made again. A
+ * wallet stored for the first time whose seed was made at `createdAt` (a Unix time) decrypts only from shortly before
+ * it (creation-block.js).
+ */
+export const openWallet = ({ encryptionKey, mnemonic, createdAt }) =>
+  open(encryptionKey, mnemonic, creationBlock(network, createdAt));
 
 /** Opens a wallet first used at `creationBlock`, which a sync then scans from: dev/check.mjs's fresh wallets. */
 export const openNewWallet = ({ encryptionKey, mnemonic, creationBlock }) => open(encryptionKey, mnemonic, creationBlock);
@@ -399,8 +432,28 @@ async function txidsBehind() {
   return target === undefined ? Infinity : target - ((await latestTxidIndex()) ?? -1);
 }
 
-/** Syncs Railgun's transaction list until a sync adds nothing, the way a notes scan used to finish. */
+/**
+ * Syncs Railgun's transaction list until a sync adds nothing, the way a notes scan used to finish. One that stopped for
+ * good is repaired as its reason allows (txid-repair.js), and synced again.
+ */
 async function catchUpTxidList() {
+  const repair = listRepair();
+  await repair.resume();
+  takeListStop();
+  try {
+    await syncTxidList();
+  } catch (error) {
+    if (!(error instanceof TxidListStopped)) throw error;
+    const done = await repair.stopped(error.index, takeListStop());
+    pageLog(`${error.message}: ${done}`);
+    if (!['rewound', 'cleared', 'reread', 'archive off'].includes(done)) throw error;
+    await syncTxidList();
+  }
+  repair.passed();
+}
+
+/** Syncs Railgun's transaction list until a sync adds nothing. */
+async function syncTxidList() {
   let reporting;
   try {
     reporting = await reportTxids();
@@ -417,6 +470,8 @@ async function catchUpTxidList() {
       target: () => getEngine().getLatestValidatedTxidIndex(TXID_VERSION, chain()),
       retries: TXID_SYNC_RETRIES,
       retryWait: (attempt) => delay(TXID_SYNC_RETRY_MS * attempt),
+      pauseMark,
+      pausedSince,
     });
   } finally {
     reporting?.stop();

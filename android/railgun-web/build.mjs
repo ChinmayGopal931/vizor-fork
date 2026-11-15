@@ -40,6 +40,32 @@ const browserBuilds = {
   },
 };
 
+// Android's WebView and the iOS host's WebKit (Private USD needs iOS 17).
+const target = ['chrome100', 'safari17'];
+
+// The note keys worker (src/note-keys.js), bundled on its own and put in place of src/note-keys-worker-source.js.
+const worker = await build({
+  absWorkingDir: here,
+  entryPoints: ['src/note-keys-worker.js'],
+  bundle: true,
+  format: 'esm',
+  platform: 'browser',
+  target,
+  minify: true,
+  legalComments: 'none',
+  write: false,
+  logLevel: 'warning',
+});
+const noteKeysWorker = {
+  name: 'note-keys-worker',
+  setup(build) {
+    build.onLoad({ filter: /src[\\/]note-keys-worker-source\.js$/ }, () => ({
+      contents: `export default ${JSON.stringify(worker.outputFiles[0].text)};`,
+      loader: 'js',
+    }));
+  },
+};
+
 await rm(out, { recursive: true, force: true });
 await mkdir(out, { recursive: true });
 
@@ -50,8 +76,7 @@ const result = await build({
   bundle: true,
   format: 'esm',
   platform: 'browser',
-  // Android's WebView and the iOS host's WebKit (Private USD needs iOS 17).
-  target: ['chrome100', 'safari17'],
+  target,
   minify: true,
   legalComments: 'external',
   metafile: true,
@@ -65,8 +90,9 @@ const result = await build({
     stream: 'stream-browserify',
   },
   // The SDK's circuit artifacts come from its own gateway, and from our mirror when that fails; Sepolia's transaction
-  // list comes from our repaired copy; parts of the engine's sync run the page's code (engine-hooks-plugin.mjs).
-  plugins: [browserBuilds, artifactMirror, sepoliaList, engineHooks],
+  // list comes from our repaired copy; parts of the engine's sync run the page's code (engine-hooks-plugin.mjs), and
+  // its note keys are worked out in a worker.
+  plugins: [browserBuilds, artifactMirror, sepoliaList, engineHooks, noteKeysWorker],
   logLevel: 'warning',
 });
 

@@ -12,6 +12,7 @@ import {
   squidPages,
   storeEvents,
 } from '../src/quick-sync.js';
+import { notePause } from '../src/page-clock.js';
 import { CHAIN, V2, contents, engineHarness } from './engine-harness.mjs';
 import { memoryDatabase } from './memory-store.mjs';
 
@@ -173,6 +174,51 @@ test('a page the indexer fails to answer is asked up to five times, as a phone c
       txidVersion: V2,
       chain: CHAIN,
       ...squidLists(failing(indexer(lists, 30).queries, 'nullifiers', 5), lists.from, options),
+    }),
+    /Failed to fetch/,
+  );
+});
+
+/** `queries` with `name`'s query failing from its second page on: `paused` times across a pause of the page, then
+ * `times` times more. */
+function failingAcrossPauses(queries, name, paused, times) {
+  const pausing = failing(queries, name, paused + times);
+  let pauses = paused;
+  return {
+    ...pausing,
+    [name]: (block) => {
+      const answer = pausing[name](block);
+      answer.catch(() => {
+        if (pauses > 0) {
+          pauses -= 1;
+          notePause();
+        }
+      });
+      return answer;
+    },
+  };
+}
+
+test('a page try a pause of the page cut through is asked again at once, and not counted', async () => {
+  const lists = history();
+  const store = memoryDatabase();
+  const { engine } = await engineHarness({ store });
+  const options = { pageSize: 30, gapMs: 0, retryMs: 0 };
+  await storeEvents({
+    engine,
+    txidVersion: V2,
+    chain: CHAIN,
+    ...squidLists(failingAcrossPauses(indexer(lists, 30).queries, 'nullifiers', 5, 4), lists.from, options),
+  });
+  assert.deepEqual(contents(store.down), await storedWhole(lists));
+  // Only as many tries again as there are tries: a page that keeps pausing still fails in the end.
+  const broken = await engineHarness();
+  await assert.rejects(
+    storeEvents({
+      engine: broken.engine,
+      txidVersion: V2,
+      chain: CHAIN,
+      ...squidLists(failingAcrossPauses(indexer(lists, 30).queries, 'nullifiers', 6, 4), lists.from, options),
     }),
     /Failed to fetch/,
   );

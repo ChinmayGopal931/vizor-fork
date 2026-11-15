@@ -6,9 +6,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { TXIDVersion } from '@railgun-community/shared-models';
-import { throughAcceptedLeaves, throughRailgunEngineHooks, throughUnshieldWatermark } from '../engine-hooks-plugin.mjs';
+import {
+  throughAcceptedLeaves,
+  throughRailgunEngineHooks,
+  throughTxidRootRefusals,
+  throughUnshieldWatermark,
+} from '../engine-hooks-plugin.mjs';
 import * as archiveTxids from '../src/archive-txids.js';
+import * as noteKeys from '../src/note-keys.js';
 import * as treeRecovery from '../src/tree-recovery.js';
+import * as txidReads from '../src/txid-reads.js';
+import * as txidRepair from '../src/txid-repair.js';
 import * as txidUpdates from '../src/txid-updates.js';
 import * as unshieldEvents from '../src/unshield-events.js';
 import { memoryDatabase } from './memory-store.mjs';
@@ -22,7 +30,10 @@ const PAGE_MODULES = new Map([
   [fileURLToPath(new URL('../src/unshield-events.js', import.meta.url)), unshieldEvents],
   [fileURLToPath(new URL('../src/txid-updates.js', import.meta.url)), txidUpdates],
   [fileURLToPath(new URL('../src/archive-txids.js', import.meta.url)), archiveTxids],
+  [fileURLToPath(new URL('../src/note-keys.js', import.meta.url)), noteKeys],
   [fileURLToPath(new URL('../src/tree-recovery.js', import.meta.url)), treeRecovery],
+  [fileURLToPath(new URL('../src/txid-reads.js', import.meta.url)), txidReads],
+  [fileURLToPath(new URL('../src/txid-repair.js', import.meta.url)), txidRepair],
 ]);
 
 await require(path.join(ENGINE, 'utils/poseidon')).initPoseidonPromise;
@@ -56,7 +67,7 @@ const merkletree = builtEngineModule('merkletree/merkletree.js', throughAccepted
 export const { UTXOMerkletree } = builtEngineModule('merkletree/utxo-merkletree.js', throughUnshieldWatermark, {
   './merkletree': merkletree,
 });
-export const { TXIDMerkletree } = builtEngineModule('merkletree/txid-merkletree.js', (source) => source, {
+export const { TXIDMerkletree } = builtEngineModule('merkletree/txid-merkletree.js', throughTxidRootRefusals, {
   './merkletree': merkletree,
 });
 

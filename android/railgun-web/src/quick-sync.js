@@ -13,6 +13,7 @@ import {
   createGraphCommitmentBatches,
   sortByTreeNumberAndStartPosition,
 } from '../node_modules/@railgun-community/wallet/dist/services/railgun/quick-sync/V2/quick-sync-events-graph-v2.js';
+import { pauseMark, pausedSince } from './page-clock.js';
 
 /** The most events the indexer answers at once. */
 export const SQUID_PAGE_SIZE = 10_000;
@@ -20,7 +21,7 @@ export const SQUID_PAGE_SIZE = 10_000;
 export const PAGE_TIMEOUT_MS = 20_000;
 const PAGE_GAP_MS = 250;
 // A page the indexer didn't answer is asked again after 1, 2, 4 and 8 s: a phone's DNS can fail every lookup for
-// seconds at a time.
+// seconds at a time. A try a pause of the page cut through is asked again at once, uncounted (page-clock.js).
 const PAGE_ATTEMPTS = 5;
 const PAGE_RETRY_MS = 1_000;
 // How many leaves wait in the engine's write queue before they go into the trees. The engine asks Railgun's contract
@@ -83,12 +84,19 @@ async function* pagesFrom(query, format, at, options) {
   const { pageSize, gapMs, retryMs } = options;
   const ask = (block, wait) => {
     const answer = (wait ? delay(wait) : Promise.resolve()).then(async () => {
+      let pardoned = 0;
       for (let attempt = 1; ; attempt += 1) {
         // Counted at each try: a page answers as of the try it came from.
         const asked = ++asks;
+        const mark = pauseMark();
         try {
           return { page: await withTimeout(query(block), PAGE_TIMEOUT_MS), asked };
         } catch (error) {
+          if (pausedSince(mark) && pardoned < PAGE_ATTEMPTS) {
+            pardoned += 1;
+            attempt -= 1;
+            continue;
+          }
           if (attempt >= PAGE_ATTEMPTS) throw error;
           await delay(retryMs * 2 ** (attempt - 1));
         }

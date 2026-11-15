@@ -2,6 +2,7 @@
 // that is replaced every few seconds. Every path depends on the chain alone. Every event file is checked against the
 // SHA-256 the archive publishes for it before it is used, and anything unexpected is an `ArchiveUnavailable`, on which
 // the sync turns to rail-squid.
+import { pauseMark, pausedSince } from './page-clock.js';
 
 /** The archive can't be used from here on: the sync goes on from rail-squid. */
 export class ArchiveUnavailable extends Error {}
@@ -15,6 +16,14 @@ export class ArchiveUnreachable extends ArchiveUnavailable {}
 // The tip was replaced between two reads; read the manifest again.
 class TipMoved extends ArchiveUnavailable {}
 
+// An event file that doesn't hash to the checksum published for it (`checksum`).
+class ChecksumMismatch extends ArchiveUnavailable {
+  constructor(message, checksum) {
+    super(message);
+    this.checksum = checksum;
+  }
+}
+
 // The formats this reader knows. The root manifest, the chunk metas, the tip meta and the tree files each count their
 // own versions.
 const KNOWN = { version: 5, rootFormat: 2, chunkFormat: 3, tipFormat: 3, txidVersion: 'V2_PoseidonMerkle' };
@@ -22,7 +31,8 @@ const TIP_ATTEMPTS = 3;
 const TIMEOUT_MS = 60_000;
 // A request that failed on the way, or that a busy or failing server turned away (the host answers 502 for a fetch of
 // its own that failed), is sent again after 1, 2, 4 and 8 s: a phone's DNS can fail every lookup for seconds at a time,
-// and a sync that leaves the archive reads the rest of its history from rail-squid, far slower.
+// and a sync that leaves the archive reads the rest of its history from rail-squid, far slower. One a pause of the page
+// cut through is sent again at once, uncounted (page-clock.js).
 const ATTEMPTS = 5;
 const RETRY_MS = 1_000;
 const retried = (status) => status === 408 || status === 425 || status === 429 || status >= 500;
@@ -49,10 +59,17 @@ function decode(bytes, path) {
  */
 export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RETRY_MS } = {}) {
   async function get(path) {
+    let pardoned = 0;
     for (let attempt = 1; ; attempt += 1) {
+      const mark = pauseMark();
       const { bytes, failure, again } = await getOnce(path);
       if (bytes !== undefined) return bytes;
       if (!again) throw failure;
+      if (pausedSince(mark) && pardoned < ATTEMPTS) {
+        pardoned += 1;
+        attempt -= 1;
+        continue;
+      }
       if (attempt >= ATTEMPTS) throw new ArchiveUnreachable(failure.message);
       await delay(retryMs * 2 ** (attempt - 1));
     }
@@ -89,22 +106,39 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
       if (error instanceof ArchiveUnavailable) throw error;
       throw new ArchiveUnavailable(`${path} is not gzip`);
     }
-    if (typeof published?.checksum !== 'string' || (await sha256(json)) !== published.checksum) {
-      throw new ArchiveUnavailable(`${path} does not match its checksum`);
+    if (typeof published?.checksum !== 'string') throw new ArchiveUnavailable(`${path} has no checksum`);
+    if ((await sha256(json)) !== published.checksum) {
+      throw new ChecksumMismatch(`${path} does not match its checksum`, published.checksum);
     }
     const parsed = decode(json, path);
     if (!Array.isArray(parsed)) throw new ArchiveUnavailable(`${path} is not a list`);
     return parsed;
   }
 
-  async function files(dir, meta, kinds, query = '') {
+  // `query(kind)` is what a file's path is asked with.
+  async function files(dir, meta, kinds, query = () => '') {
     const read = {};
     await Promise.all(
       kinds.map(async (kind) => {
-        read[kind] = await events(`${dir}/${kind}.json.gz${query}`, meta.files?.[kind]);
+        read[kind] = await events(`${dir}/${kind}.json.gz${query(kind)}`, meta.files?.[kind]);
       }),
     );
     return read;
+  }
+
+  /** Sealed chunk `chunk`'s meta, as the index names the chunk; `query` asks for it past a cache. */
+  async function chunkMeta({ id, startBlock, endBlock }, query = '') {
+    const path = `chunks/${id}/meta.json`;
+    const meta = decode(await get(`${path}${query}`), path);
+    if (
+      meta.formatVersion !== KNOWN.chunkFormat ||
+      meta.chunkId !== id ||
+      meta.startBlock !== startBlock ||
+      meta.endBlock !== endBlock
+    ) {
+      throw new ArchiveUnavailable(`chunk ${id} is not the one the index names`);
+    }
+    return meta;
   }
 
   return {
@@ -143,18 +177,21 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
       });
     },
 
-    /** Sealed chunk `chunk`'s event files of `kinds`. */
-    async chunk({ id, startBlock, endBlock }, kinds) {
-      const meta = decode(await get(`chunks/${id}/meta.json`), `chunks/${id}/meta.json`);
-      if (
-        meta.formatVersion !== KNOWN.chunkFormat ||
-        meta.chunkId !== id ||
-        meta.startBlock !== startBlock ||
-        meta.endBlock !== endBlock
-      ) {
-        throw new ArchiveUnavailable(`chunk ${id} is not the one the index names`);
+    /**
+     * Sealed chunk `chunk`'s event files of `kinds`. A file that doesn't match its checksum may be a cache's older
+     * copy, of it or of the meta: the meta is asked for once more past the cache by the checksum that failed, and the
+     * files by the checksums it names, which every wallet asks the same way.
+     */
+    async chunk(chunk, kinds) {
+      const { id, startBlock, endBlock } = chunk;
+      try {
+        return { startBlock, endBlock, ...(await files(`chunks/${id}`, await chunkMeta(chunk), kinds)) };
+      } catch (error) {
+        if (!(error instanceof ChecksumMismatch)) throw error;
+        const meta = await chunkMeta(chunk, `?v=${error.checksum}`);
+        const query = (kind) => `?v=${meta.files?.[kind]?.checksum}`;
+        return { startBlock, endBlock, ...(await files(`chunks/${id}`, meta, kinds, query)) };
       }
-      return { startBlock, endBlock, ...(await files(`chunks/${id}`, meta, kinds)) };
     },
 
     /**
@@ -174,7 +211,11 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
         throw new ArchiveUnavailable(`the tip does not follow block ${after}`);
       }
       try {
-        return { startBlock: meta.startBlock, endBlock: meta.endBlock, ...(await files('tip', meta, kinds, query)) };
+        return {
+          startBlock: meta.startBlock,
+          endBlock: meta.endBlock,
+          ...(await files('tip', meta, kinds, () => query)),
+        };
       } catch (error) {
         // Its files replaced under it.
         throw error instanceof ArchiveUnavailable ? new TipMoved(error.message) : error;

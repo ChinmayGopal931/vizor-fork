@@ -30,6 +30,8 @@ const SPENDABLE_POLL_MS = 30_000;
 const SPENDABLE_TIMEOUT_MS = 30 * 60_000;
 const CONFIRM_TIMEOUT_MS = 120_000;
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.wasm': 'application/wasm' };
+// How far before the newest block the check's fresh wallet is first used: about three weeks of Sepolia.
+const CREATION_BLOCKS_BACK = 150_000;
 
 /** The address Railgun's engine derives in Node, to compare with the browser's. */
 async function expectedAddress(mnemonic) {
@@ -143,9 +145,10 @@ async function boundaryCheck(page, call) {
 
 async function syncCheck(page, url, onEvent) {
   const mnemonic = process.env.RAILGUN_CHECK_MNEMONIC ?? Mnemonic.fromEntropy(randomBytes(32)).phrase;
+  // A few weeks back, so the notes scan works out keys for some leaves in its workers.
   const fromBlock = process.env.RAILGUN_CHECK_FROM_BLOCK
     ? Number(process.env.RAILGUN_CHECK_FROM_BLOCK)
-    : await new JsonRpcProvider(RPC_URL).getBlockNumber();
+    : (await new JsonRpcProvider(RPC_URL).getBlockNumber()) - CREATION_BLOCKS_BACK;
   const encryptionKey = randomBytes(32).toString('hex');
   const expected = await expectedAddress(mnemonic);
   for (const pass of ['first open', 'reopen from IndexedDB']) {
@@ -163,6 +166,7 @@ async function syncCheck(page, url, onEvent) {
     const finished = await synced;
     if (finished.rest !== rest) throw new Error(`rest ${finished.rest} ended, not the refresh's ${rest}`);
     console.log(`  the rest of the sync ended, screening ${finished.screening}`);
+    if (pass === 'first open') await noteKeysCheck(call);
     if (pass === 'first open') await rebuildCheck(call, onEvent, balances);
     // The engine skips a scan while another runs; each sync must still get one of its own.
     const before = onEvent.notesScans;
@@ -172,6 +176,18 @@ async function syncCheck(page, url, onEvent) {
     console.log('  two syncs at once each started a notes scan');
   }
   await deleteCheck(page, url, onEvent, mnemonic);
+}
+
+/** The notes scan's keys were worked out in Web Workers, none of them failing. */
+async function noteKeysCheck(call) {
+  const keys = await call('noteKeys', {});
+  if (keys.batches === 0 || keys.prepared === 0 || keys.prepared + keys.refused !== keys.points || keys.failures > 0) {
+    throw new Error(`the note keys workers: ${JSON.stringify(keys)}`);
+  }
+  console.log(
+    `  ${keys.prepared} note keys for ${keys.points} points (${keys.refused} refused) were worked out in ` +
+      `${keys.workers} workers`,
+  );
 }
 
 /**
@@ -200,6 +216,12 @@ async function rebuildCheck(call, onEvent, balances) {
   if (validated === null || stored < validated)
     throw new Error(`the transaction list came back to ${stored} of ${validated}`);
   console.log(`  the next refresh gave the same balances and synced the list again, to ${stored} of ${validated}`);
+  const reads = await call('txidReads', {});
+  if (reads.windows === 0 || reads.unshieldBatches === 0) throw new Error(`the list's reads: ${JSON.stringify(reads)}`);
+  console.log(
+    `  the list read its commitments in ${reads.windows} windows, and ${reads.unshieldTransactions} transactions' ` +
+      `unshields in ${reads.unshieldBatches} IndexedDB transactions`,
+  );
 }
 
 /**

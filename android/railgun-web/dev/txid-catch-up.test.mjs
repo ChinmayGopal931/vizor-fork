@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { notePause, pauseMark, pausedSince } from '../src/page-clock.js';
 import { catchUpTxids } from '../src/txid-catch-up.js';
 
 // No validated index: the catch-up ends at the first sync that adds nothing.
@@ -101,6 +102,30 @@ test('a list that never moves though more is validated fails the catch-up after 
   );
   assert.deepEqual(waits, [1, 2, 3]);
   assert.equal(txids.log.filter((entry) => entry === 'sync').length, 4);
+});
+
+test('a sync a pause of the page cut through is tried again at once, and not counted', async () => {
+  const txids = tree({ at: 40_000, adds: [0, 0, 0, 0, 0, 111_000] });
+  let pauses = 3;
+  const waits = [];
+  await catchUpTxids({
+    ...txids,
+    sync: async () => {
+      await txids.sync();
+      if (pauses > 0) {
+        pauses -= 1;
+        notePause();
+      }
+    },
+    before: 35_000,
+    passes: 50,
+    target: async () => 151_000,
+    retries: 3,
+    retryWait: async (n) => waits.push(n),
+    pauseMark,
+    pausedSince,
+  });
+  assert.deepEqual(waits, [1, 2], 'three stalls across pauses, then two counted');
 });
 
 test('a validated index reached, or none validated, ends the catch-up at the first sync that adds none', async () => {

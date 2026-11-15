@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gunzipSync } from 'node:zlib';
 import { ArchiveUnavailable, archive } from '../src/archive.js';
+import { notePause } from '../src/page-clock.js';
 import { ARCHIVE_ROUNDS, archiveCommitments, installArchiveSync } from '../src/archive-sync.js';
 import { formatCommitments, formatNullifiers, formatUnshields, installQuickSync } from '../src/quick-sync.js';
 import { CHAIN, V2, contents, engineHarness } from './engine-harness.mjs';
@@ -166,6 +167,58 @@ test('a chunk that fails its checksum hands the rest to rail-squid after the chu
   assert.match(left[0], /checksum/);
   assert.equal(squidFrom(asked, 'commitments'), sealedAt[1]);
   assert.deepEqual(stored, await storedBySquid());
+});
+
+/** `server` behind a cache that answers a path asked for without a query from `stale` (path → bytes) where it has it. */
+function behindStaleCache(server, stale) {
+  const urls = [];
+  return {
+    ...server,
+    urls,
+    fetch: async (url, init) => {
+      const path = url.slice(ARCHIVE_BASE.length + 1);
+      urls.push(path);
+      return stale.has(path) ? new Response(stale.get(path)) : server.fetch(url, init);
+    },
+  };
+}
+
+const checksumOf = (server, id, kind) => JSON.parse(server.files.get(`chunks/${id}/meta.json`)).files[kind].checksum;
+
+test('a chunk file a cache kept an older copy of is asked for past it, and the archive is kept', async () => {
+  const server = archiveServer(fixture, { sealedAt });
+  const cached = behindStaleCache(server, new Map([['chunks/1/commitments.json.gz', gz(Buffer.from('[]'))]]));
+  const { stored, left } = await storedByArchive(cached);
+  assert.deepEqual(left, []);
+  const checksum = checksumOf(server, 1, 'commitments');
+  assert.ok(cached.urls.includes(`chunks/1/meta.json?v=${checksum}`));
+  assert.ok(cached.urls.includes(`chunks/1/commitments.json.gz?v=${checksum}`));
+  assert.deepEqual(stored, await storedBySquid());
+});
+
+test('a chunk meta a cache kept an older copy of is asked for past it, then the file it names', async () => {
+  const server = archiveServer(fixture, { sealedAt });
+  const meta = JSON.parse(server.files.get('chunks/1/meta.json'));
+  const older = hashOf(Buffer.from('an older copy of the file'));
+  meta.files.commitments.checksum = older;
+  const cached = behindStaleCache(server, new Map([['chunks/1/meta.json', Buffer.from(JSON.stringify(meta))]]));
+  const { stored, left } = await storedByArchive(cached);
+  assert.deepEqual(left, []);
+  assert.ok(cached.urls.includes(`chunks/1/meta.json?v=${older}`));
+  assert.ok(cached.urls.includes(`chunks/1/commitments.json.gz?v=${checksumOf(server, 1, 'commitments')}`));
+  assert.deepEqual(stored, await storedBySquid());
+});
+
+test('the archive hears the same requests past a stale cache whichever wallet syncs', async () => {
+  const urls = async () => {
+    const cached = behindStaleCache(
+      archiveServer(fixture, { sealedAt }),
+      new Map([['chunks/2/commitments.json.gz', gz(Buffer.from('[]'))]]),
+    );
+    await storedByArchive(cached);
+    return cached.urls;
+  };
+  assert.deepEqual(await urls(), await urls());
 });
 
 test('a missing chunk hands the rest to rail-squid after the chunk before it', async () => {
@@ -415,20 +468,34 @@ test('a manifest that is not JSON leaves the whole sync to rail-squid', async ()
   assert.deepEqual(stored, await storedBySquid());
 });
 
-/** The fixture's archive, its first `times` requests for `name` failing on the way. */
-function failingFirst(name, times) {
+/**
+ * The fixture's archive, its first `times` requests for `name` failing on the way, the first `paused` of those across a
+ * pause of the page.
+ */
+function failingFirst(name, times, paused = 0) {
   const server = archiveServer(fixture, { sealedAt });
   let failures = times;
+  let pauses = paused;
   return {
     fetch: (url) => {
       if (url.replace(/^https:\/\/digest\.test\/v4\/1\//, '').replace(/\?v=.*$/, '') === name && failures > 0) {
         failures -= 1;
+        if (pauses > 0) {
+          pauses -= 1;
+          notePause();
+        }
         return Promise.reject(new TypeError('Failed to fetch'));
       }
       return server.fetch(url);
     },
   };
 }
+
+test('an archive request a pause of the page cut through is sent again at once, and not counted', async () => {
+  const kept = await storedByArchive(failingFirst('chunk-index.json', 9, 5));
+  assert.deepEqual(kept.left, []);
+  assert.deepEqual(kept.stored, await storedBySquid());
+});
 
 test(
   'a request is sent five times a round, as a phone can lose DNS for seconds, and the archive out of reach ' +

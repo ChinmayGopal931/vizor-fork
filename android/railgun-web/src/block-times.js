@@ -40,6 +40,22 @@ export function blockAt({ start, step, times }, seconds) {
   return last + Math.max(0, Math.floor((seconds - times[times.length - 1]) / SECONDS_PER_BLOCK));
 }
 
+/**
+ * The newest entry of a table (`start`, `step`, `times`) made by `seconds`, a Unix time: a block known to be no later
+ * than it. Past the table's end that is the last entry, since nothing later is known; undefined before the table.
+ */
+export function blockAtOrBefore({ start, step, times }, seconds) {
+  if (!Number.isFinite(seconds) || times.length === 0 || seconds < times[0]) return undefined;
+  let low = 0;
+  let high = times.length - 1;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (times[middle] <= seconds) low = middle;
+    else high = middle - 1;
+  }
+  return start + low * step;
+}
+
 const MAINNET = { start: START, step: STEP, times: TIMES };
 
 /** A mainnet block's time, as `blockTimes` reads the shipped table. */
@@ -47,3 +63,6 @@ export const mainnetBlockTime = blockTimes(MAINNET);
 
 /** The mainnet block at `seconds`, as `blockAt` reads the shipped table. */
 export const mainnetBlockAt = (seconds) => blockAt(MAINNET, seconds);
+
+/** A mainnet block made by `seconds`, as `blockAtOrBefore` reads the shipped table. */
+export const mainnetBlockAtOrBefore = (seconds) => blockAtOrBefore(MAINNET, seconds);
