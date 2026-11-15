@@ -50,4 +50,17 @@ void main() {
     expect(later, greaterThan(at));
     expect(later, lessThanOrEqualTo(progress.percent(notes: notes(0.7))!));
   });
+
+  test('a report below what crept leaves the number where it is', () {
+    var elapsed = Duration.zero;
+    final progress = PrivateUsdFirstSyncProgress(elapsed: () => elapsed);
+    var shown = progress.percent(notes: notes(0.1))!;
+    // Nothing for three minutes, then the quick sync's first blocks.
+    for (final (minutes, share) in [(3, 0.1), (3, 0.101), (5, 0.101), (5, 0.12), (6, 0.2)]) {
+      elapsed = Duration(minutes: minutes);
+      final next = progress.percent(notes: notes(share))!;
+      expect(next, greaterThanOrEqualTo(shown), reason: 'at $share after $minutes min');
+      shown = next;
+    }
+  });
 }

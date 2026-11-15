@@ -91,7 +91,7 @@ enum RailgunScreening {
 /// What `refresh` answers: the balances, the private sends received, the
 /// shields screening still holds, and how the screening last went. The page
 /// answers once the notes are scanned and checked; the rest of the sync runs
-/// on in the page ([syncing]) and ends with a [RailgunSyncedEvent].
+/// on in the page ([syncing], [rest]) and ends with a [RailgunSyncedEvent].
 class RailgunRefresh {
   const RailgunRefresh({
     required this.balances,
@@ -99,6 +99,7 @@ class RailgunRefresh {
     this.received,
     this.shielding,
     this.syncing = false,
+    this.rest,
   });
 
   final RailgunBalances balances;
@@ -115,6 +116,10 @@ class RailgunRefresh {
   /// change waits on it; every other note is spendable meanwhile.
   final bool syncing;
 
+  /// Which rest of a sync this refresh started or joined, numbered from 1 up
+  /// within one page; its [RailgunSyncedEvent] carries the same number.
+  final int? rest;
+
   static RailgunRefresh parse(Object? json) {
     final map = _object(json, 'refresh');
     final screening = RailgunScreening.fromWire(map['screening']);
@@ -127,9 +132,12 @@ class RailgunRefresh {
       received: RailgunReceipt.parseAll(map['received']),
       shielding: RailgunPendingShield.parseAll(map['shielding']),
       syncing: map['syncing'] == true,
+      rest: _rest(map['rest']),
     );
   }
 }
+
+int? _rest(Object? wire) => wire is int && wire > 0 ? wire : null;
 
 /// A shield screening still holds ([token]'s), with when it landed ([at]),
 /// null where nothing dates it: a deposit, a bridge's payout, or a shield
@@ -791,11 +799,17 @@ sealed class RailgunEvent {
           progress.toDouble().clamp(0.0, 1.0).toDouble(),
         );
       case 'synced':
-        try {
-          return RailgunSyncedEvent(RailgunRefresh.parse(data));
-        } on RailgunProtocolException {
-          return null;
+        if (data is! Map<String, dynamic>) return null;
+        // A rest that couldn't read the wallet's state still ended.
+        RailgunRefresh? refresh;
+        if (data.containsKey('balances')) {
+          try {
+            refresh = RailgunRefresh.parse(data);
+          } on RailgunProtocolException {
+            refresh = null;
+          }
         }
+        return RailgunSyncedEvent(rest: _rest(data['rest']), refresh: refresh);
       case 'log':
         return data is String ? RailgunLogEvent(data) : null;
       default:
@@ -827,12 +841,15 @@ class RailgunScanEvent extends RailgunEvent {
   int get hashCode => Object.hash(tree, status, progress);
 }
 
-/// The rest of a sync ended in the page, after its `refresh` answered: the
-/// wallet's state read again, its own sends proved where they could be.
+/// The rest of a sync ([rest], as [RailgunRefresh.rest] numbers it) ended in
+/// the page, after its `refresh` answered: the wallet's state read again, its
+/// own sends proved where they could be; null when the page could not read
+/// it.
 class RailgunSyncedEvent extends RailgunEvent {
-  const RailgunSyncedEvent(this.refresh);
+  const RailgunSyncedEvent({this.rest, this.refresh});
 
-  final RailgunRefresh refresh;
+  final int? rest;
+  final RailgunRefresh? refresh;
 }
 
 /// How far the page's `refresh` has come, [progress] 0 to 1 and never going

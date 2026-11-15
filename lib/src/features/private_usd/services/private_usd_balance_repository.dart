@@ -193,8 +193,9 @@ class PrivateUsdBalanceRetries {
 /// balance shows: Railgun's notes, which the quick sync reports by block as it
 /// stores their history and the decryption batch by batch. Between two
 /// reports the number creeps toward the next milestone's, slower the nearer it
-/// gets, without passing it. Railgun's transaction list comes after the
-/// balance, on the sync line.
+/// gets, without passing it, and it never goes back: a report below what crept
+/// leaves it where it is. Railgun's transaction list comes after the balance,
+/// on the sync line.
 class PrivateUsdFirstSyncProgress {
   PrivateUsdFirstSyncProgress({Duration Function()? elapsed})
     : _elapsed = elapsed ?? _stopwatch();
@@ -202,6 +203,7 @@ class PrivateUsdFirstSyncProgress {
   final Duration Function() _elapsed;
   double _lastNotes = -1;
   Duration _notesSince = Duration.zero;
+  int _shown = 0;
 
   /// Whether the number can move before the engine's next report.
   bool isCreeping = false;
@@ -209,8 +211,10 @@ class PrivateUsdFirstSyncProgress {
   int? percent({RailgunScanEvent? notes}) {
     isCreeping = false;
     if (notes == null) return null;
-    if (notes.status == RailgunScanStatus.complete) return _lastPercent;
-    return _notesPercent(notes.progress.clamp(0, 1).toDouble());
+    final percent = notes.status == RailgunScanStatus.complete
+        ? _lastPercent
+        : _notesPercent(notes.progress.clamp(0, 1).toDouble());
+    return _shown = math.max(_shown, percent);
   }
 
   int _notesPercent(double progress) {

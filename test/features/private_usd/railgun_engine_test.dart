@@ -108,10 +108,12 @@ void main() {
   });
 
   group("the rest of a long sync", () {
-    const synced =
-        '{"event":"synced","data":{"balances":{"ProofSubmitted":[{"token":'
-        '"0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c","amount":"9"}]},'
-        '"received":[],"shielding":[],"screening":"ok"}}';
+    String synced([int rest = 1]) =>
+        '{"event":"synced","data":{"rest":$rest,"balances":{"ProofSubmitted":'
+        '[{"token":"0x64c4a5cb09fe0b706d4cf24dc0a45fff275d727c",'
+        '"amount":"9"}]},"received":[],"shielding":[],"screening":"ok"}}';
+    String long([int rest = 1]) =>
+        '{"balances":{},"screening":"ok","syncing":true,"rest":$rest}';
 
     test('runs on after the sync answers, and its end replaces the last '
         'sync', () async {
@@ -122,11 +124,11 @@ void main() {
 
       final sync = engine.sync('account');
       await _until(() => log.contains('call refresh'));
-      refresh.complete('{"balances":{},"screening":"ok","syncing":true}');
+      refresh.complete(long());
       expect((await sync).syncing, isTrue);
       expect(engine.state.value.lastSync?.syncing, isTrue);
 
-      host.pageEvents.add(synced);
+      host.pageEvents.add(synced());
       await pumpEventQueue();
       final last = engine.state.value.lastSync!;
       expect(last.syncing, isFalse);
@@ -137,6 +139,29 @@ void main() {
             .amount,
         BigInt.from(9),
       );
+      // Read again from the page's store: no scan of the chain since the sync.
+      expect(last.at, (await sync).at);
+      expect(last.scanned, isFalse);
+      await engine.dispose();
+    });
+
+    test('that ended while a refresh started the next one leaves that one '
+        'running', () async {
+      final log = <String>[];
+      final refresh = Completer<String>();
+      final host = _FakeHost(log, pageAddress: _address, refresh: refresh);
+      final engine = _engineWith(host, log);
+
+      final sync = engine.sync('account');
+      await _until(() => log.contains('call refresh'));
+      // Rest 1 ends while this refresh scans; its own rest is the second.
+      host.pageEvents.add(synced());
+      await pumpEventQueue();
+      refresh.complete(long(2));
+      expect((await sync).syncing, isTrue);
+      host.pageEvents.add(synced(2));
+      await pumpEventQueue();
+      expect(engine.state.value.lastSync?.syncing, isFalse);
       await engine.dispose();
     });
 
@@ -148,9 +173,9 @@ void main() {
 
       final sync = engine.sync('account');
       await _until(() => log.contains('call refresh'));
-      host.pageEvents.add(synced);
+      host.pageEvents.add(synced());
       await pumpEventQueue();
-      refresh.complete('{"balances":{},"screening":"ok","syncing":true}');
+      refresh.complete(long());
       expect((await sync).syncing, isFalse);
       await engine.dispose();
     });
@@ -168,7 +193,7 @@ void main() {
 
       final sync = engine.sync('account');
       await _until(() => log.contains('call refresh'));
-      refresh.complete('{"balances":{},"screening":"ok","syncing":true}');
+      refresh.complete(long());
       await sync;
       final closes = log.where((line) => line == 'close').length;
       for (var i = 0; i < 8; i++) {
@@ -210,6 +235,17 @@ void main() {
       await engine.dispose();
     });
 
+    test('of a sync that had none leaves a close the same sync', () async {
+      final log = <String>[];
+      final host = _FakeHost(log, pageAddress: _address);
+      final engine = _engineWith(host, log);
+
+      final sync = await engine.sync('account');
+      await engine.close();
+      expect(identical(engine.state.value.lastSync, sync), isTrue);
+      await engine.dispose();
+    });
+
     test('ends with a close', () async {
       final log = <String>[];
       final refresh = Completer<String>();
@@ -218,7 +254,7 @@ void main() {
 
       final sync = engine.sync('account');
       await _until(() => log.contains('call refresh'));
-      refresh.complete('{"balances":{},"screening":"ok","syncing":true}');
+      refresh.complete(long());
       await sync;
       await engine.close();
       expect(engine.state.value.lastSync?.syncing, isFalse);
