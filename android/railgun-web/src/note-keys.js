@@ -71,6 +71,8 @@ export async function prepareKeys(viewingPrivateKey, leaves, commitmentTypeOf) {
     const packed = new Uint8Array(points.length * 32);
     points.forEach(({ bytes }, i) => packed.set(bytes, i * 32));
     const { products, failed } = await workers.multiply(scalar, packed);
+    // Workers whose WebAssembly never started refuse every point, as the engine refuses almost none.
+    if (failed.every((refused) => refused !== 0)) throw new Error('the note keys workers refused every point');
     const modern = new Map();
     const legacy = new Map();
     points.forEach(({ key, isLegacy }, i) => {

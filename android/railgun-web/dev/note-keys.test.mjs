@@ -131,6 +131,27 @@ test('a point the workers refuse is left for the engine to work out', async () =
   release();
 });
 
+test('workers that refuse every point count as failing, as ones whose WebAssembly never started do', async () => {
+  let made = 0;
+  useKeyPool(async () => {
+    made += 1;
+    return {
+      multiply: async (_scalar, points) => ({
+        products: new Uint8Array(points.length),
+        failed: new Uint8Array(points.length / 32).fill(1),
+      }),
+      close() {},
+    };
+  });
+  const privateKey = randomBytes(32);
+  const points = Array.from({ length: 5 }, point);
+  for (let batch = 0; batch < 4; batch += 1) {
+    const { release } = await prepareKeys(privateKey, leavesOf(points), typeOf);
+    release();
+  }
+  assert.equal(made, 2);
+});
+
 test('a batch the workers fail prepares nothing, and after a second the page leaves every key to the engine', async () => {
   let made = 0;
   useKeyPool(async () => {
