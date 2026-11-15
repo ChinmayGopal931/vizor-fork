@@ -20,7 +20,7 @@ export const SQUID_PAGE_SIZE = 10_000;
 export const PAGE_TIMEOUT_MS = 20_000;
 const PAGE_GAP_MS = 250;
 // A page the indexer didn't answer is asked again after 1, 2, 4 and 8 s: a phone's DNS can fail every lookup for
-// seconds at a time, and a list that fails takes the archive beside it out of the sync.
+// seconds at a time.
 const PAGE_ATTEMPTS = 5;
 const PAGE_RETRY_MS = 1_000;
 // How many leaves wait in the engine's write queue before they go into the trees. The engine asks Railgun's contract

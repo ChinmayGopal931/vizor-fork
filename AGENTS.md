@@ -1891,7 +1891,11 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
   - On anything unexpected the sync goes on from rail-squid where the
     archive left off. A request that fails on the way is sent four more
     times over 15 s (a phone's DNS can drop lookups for seconds), and a txid
-    batch the engine kept nothing of is given three times. A sync
+    batch the engine kept nothing of is given three times. Rail-squid's own
+    list failing beside the archive is asked again from where the lists
+    were stored, three rounds in all, before the archive is left: an HTTP/2
+    connection that stops answering fails every try sent on it until the
+    browser gives it up, two minutes on a phone. A sync
     within four days of the newest block (the most the archive's tip holds;
     from the clock and the block table when the RPC can't say) never asks
     the archive.

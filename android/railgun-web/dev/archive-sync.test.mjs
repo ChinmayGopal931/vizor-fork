@@ -2,14 +2,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gunzipSync } from 'node:zlib';
 import { ArchiveUnavailable, archive } from '../src/archive.js';
-import { archiveCommitments, installArchiveSync } from '../src/archive-sync.js';
+import { ARCHIVE_ROUNDS, archiveCommitments, installArchiveSync } from '../src/archive-sync.js';
 import { formatCommitments, formatNullifiers, formatUnshields, installQuickSync } from '../src/quick-sync.js';
 import { CHAIN, V2, contents, engineHarness } from './engine-harness.mjs';
 import { ARCHIVE_BASE, archiveServer, blockTime, gz, hashOf, history, indexer, word } from './history-fixture.mjs';
 import { memoryDatabase } from './memory-store.mjs';
 
 const PAGE = 40;
-const pages = { pageSize: PAGE, gapMs: 0 };
+const pages = { pageSize: PAGE, gapMs: 0, retryMs: 0 };
 const fixture = history();
 const sealedAt = [14_760_030, 14_760_060, 14_760_090];
 // Far past the fixture, so a sync from its start reads the archive.
@@ -33,15 +33,24 @@ async function storedBySquid(lists = fixture.squid) {
  */
 async function storedByArchive(
   server,
-  { lists = fixture.squid, store = memoryDatabase(), startingBlock = fixture.from, head = FAR, harness, useArchive } = {},
+  {
+    lists = fixture.squid,
+    store = memoryDatabase(),
+    startingBlock = fixture.from,
+    head = FAR,
+    harness,
+    useArchive,
+    squidQueries = (queries) => queries,
+  } = {},
 ) {
   const { engine, merkletree } = harness ?? (await engineHarness({ store }));
   const squid = indexer(lists, PAGE);
+  const queries = squidQueries(squid.queries);
   const left = [];
-  installQuickSync(engine, { queries: squid.queries, head: async () => head?.blockNumber, pages });
+  installQuickSync(engine, { queries, head: async () => head?.blockNumber, pages });
   installArchiveSync(engine, {
     reader: archive(ARCHIVE_BASE, 1, { fetch: server.fetch, retryMs: 0 }),
-    queries: squid.queries,
+    queries,
     chainId: 1,
     time: (block) => blockTime(block),
     head: async () => head ?? undefined,
@@ -55,6 +64,23 @@ async function storedByArchive(
 }
 
 const squidFrom = (asked, list) => asked.filter(([name]) => name === list).map(([, block]) => block)[0];
+
+/** `queries` with rail-squid's `name` list failing `times` times after its first page, as a dead connection does. */
+function squidFailing(name, times) {
+  return (queries) => {
+    let calls = 0;
+    let failures = times;
+    return {
+      ...queries,
+      [name]: (block) => {
+        calls += 1;
+        if (calls < 2 || failures === 0) return queries[name](block);
+        failures -= 1;
+        return Promise.reject(new TypeError('Failed to fetch'));
+      },
+    };
+  };
+}
 
 test('a first sync from the archive stores exactly what rail-squid alone stores', async () => {
   const server = archiveServer(fixture, { sealedAt });
@@ -396,5 +422,37 @@ test('a request that fails on the way is sent again, and the archive is kept', a
   };
   const { stored, left } = await storedByArchive(flaky);
   assert.deepEqual(left, []);
+  assert.deepEqual(stored, await storedBySquid());
+});
+
+// A page is tried five times (quick-sync.js); on a phone an HTTP/2 connection to rail-squid stopped answering for about
+// two minutes, every try sent on it failing, and took the archive out of a whole first sync.
+const PAGE_TRIES = 5;
+
+test("rail-squid's list failing beside the archive is asked again from where it was stored, and the archive is kept", async () => {
+  const server = archiveServer(fixture, { sealedAt });
+  const { stored, asked, left } = await storedByArchive(server, { squidQueries: squidFailing('nullifiers', PAGE_TRIES) });
+  assert.equal(left.length, 1);
+  assert.match(left[0], /^rail-squid failed beside the archive at block \d+, asked again: Failed to fetch$/);
+  assert.deepEqual(stored, await storedBySquid());
+  // The commitments still came from the archive: rail-squid was asked for them only past its lists' newest block.
+  assert.equal(squidFrom(asked, 'commitments'), newestBlockOf(fixture.squid.unshields) + 1);
+});
+
+test(`rail-squid failing beside the archive ${ARCHIVE_ROUNDS} times leaves the archive, and goes on alone`, async () => {
+  const server = archiveServer(fixture, { sealedAt });
+  const { stored, left } = await storedByArchive(server, {
+    squidQueries: squidFailing('nullifiers', PAGE_TRIES * ARCHIVE_ROUNDS),
+  });
+  assert.equal(left.length, ARCHIVE_ROUNDS);
+  for (const line of left.slice(0, -1)) assert.match(line, /^rail-squid failed beside the archive at block \d+, asked again/);
+  assert.match(left.at(-1), /^the archive was left at block \d+: Failed to fetch$/);
+  assert.deepEqual(stored, await storedBySquid());
+});
+
+test("the archive's own failure leaves it at once, rail-squid's lists or not", async () => {
+  const { stored, left } = await storedByArchive(failingFirst('chunk-index.json', 5));
+  assert.equal(left.length, 1);
+  assert.match(left[0], /^the archive was left at block \d+: .*did not answer for chunk-index\.json/);
   assert.deepEqual(stored, await storedBySquid());
 });

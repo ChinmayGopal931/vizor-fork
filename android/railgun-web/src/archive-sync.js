@@ -4,7 +4,8 @@
 // trees, which would count that note unspent; and an unshield missing from the store stops the txid sync at its
 // transaction for good. The archive's commitments must run on from those stored, and are stored only as far as
 // rail-squid's lists have shown it has come. On anything unexpected the quick sync goes on from rail-squid at the block
-// after the archive's last good one; what the archive gave stays stored.
+// after the archive's last good one; what the archive gave stays stored. A failure of rail-squid's own lists says
+// nothing against the archive: the lists are asked again beside it, a few times, from where they were stored.
 import { Merkletree } from '@railgun-community/engine';
 import { TXIDVersion } from '@railgun-community/shared-models';
 import { ArchiveUnavailable, archiveRange } from './archive.js';
@@ -23,6 +24,29 @@ export const ARCHIVE_MIN_BLOCKS = 28_800;
 
 /** Whether a sync from `block` is far enough behind `head` (the newest block number) to read the archive. */
 export const farBehind = (block, head) => head - block > ARCHIVE_MIN_BLOCKS;
+
+/**
+ * How many times the archive is read beside rail-squid's lists while those lists fail. An HTTP/2 connection that stops
+ * answering fails every try at a page sent on it until the browser gives the connection up, which took a phone about
+ * two minutes, as long as a page's tries.
+ */
+export const ARCHIVE_ROUNDS = 3;
+
+/** A failure of the archive's own, not of rail-squid's lists beside it. */
+class ArchiveFailed extends Error {
+  constructor(cause) {
+    super(cause?.message ?? String(cause), { cause });
+  }
+}
+
+/** `pages`, with a failure of theirs marked as the archive's. */
+async function* fromArchive(pages) {
+  try {
+    yield* pages;
+  } catch (error) {
+    throw new ArchiveFailed(error);
+  }
+}
 
 /**
  * Where the engine puts a note numbered `tree`:`index`: at its global tree position (tree × 65,536 + index), so one
@@ -92,28 +116,39 @@ export function installArchiveSync(
     // Every list is stored through this block.
     let through = startingBlock - 1;
     if (newest !== undefined && farBehind(startingBlock, newest.blockNumber) && useArchive()) {
-      try {
-        const latest = await engine.getUTXOMerkletree(txidVersion, chain).getLatestTreeAndIndex();
-        await storeEvents({
-          engine,
-          txidVersion,
-          chain,
-          unshields: squidPages(queries.unshields, formatUnshields, startingBlock, pages),
-          nullifiers: squidPages(queries.nullifiers, formatNullifiers, startingBlock, pages),
-          commitments: archiveCommitments(
-            reader,
-            startingBlock,
-            { tree: latest.tree, position: latest.index + 1 },
-            { time: (block) => time(block, newest), chainId },
-          ),
-          stored: (block) => {
-            through = block;
-          },
-          progress: report,
-          writeRetryMs,
-        });
-      } catch (error) {
-        log(`the archive was left at block ${through}: ${error?.message ?? error}`);
+      for (let round = 1; ; round += 1) {
+        try {
+          const latest = await engine.getUTXOMerkletree(txidVersion, chain).getLatestTreeAndIndex();
+          await storeEvents({
+            engine,
+            txidVersion,
+            chain,
+            unshields: squidPages(queries.unshields, formatUnshields, through + 1, pages),
+            nullifiers: squidPages(queries.nullifiers, formatNullifiers, through + 1, pages),
+            commitments: fromArchive(
+              archiveCommitments(
+                reader,
+                through + 1,
+                { tree: latest.tree, position: latest.index + 1 },
+                { time: (block) => time(block, newest), chainId },
+              ),
+            ),
+            stored: (block) => {
+              through = block;
+            },
+            progress: report,
+            writeRetryMs,
+          });
+          break;
+        } catch (error) {
+          const message = error?.message ?? error;
+          if (!(error instanceof ArchiveFailed) && round < ARCHIVE_ROUNDS) {
+            log(`rail-squid failed beside the archive at block ${through}, asked again: ${message}`);
+            continue;
+          }
+          log(`the archive was left at block ${through}: ${message}`);
+          break;
+        }
       }
     }
     // Rail-squid's lists anew from there: one that failed beside the archive is never read on.
