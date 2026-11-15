@@ -424,7 +424,9 @@ header times every 1,000 blocks. The only request left is the chain tip.
 - The Railgun page ships an Ethereum mainnet table the same way
   (`android/railgun-web/src/block-times-mainnet.js`, from
   `scripts/update-railgun-block-times.py`, in the same workflow). It dates
-  the records the page reads from Anon's archive.
+  the records the page reads from Anon's archive. The page ships as its
+  built bundle, so an update to the table rebuilds it (the workflow does);
+  that step may fail on its own without holding back the Zcash tables.
 
 ## Image Assets
 
@@ -1807,43 +1809,64 @@ needed then. Code: `rust/src/wallet/private_usd/tokens.rs`, the Kotlin
 
 - A refresh answers once the notes are scanned and checked. Railgun's
   transaction list and the proofs of the wallet's own sends then finish in
-  the page (`sync-finish.js`) and end with a `synced` event; `syncing` in
-  the refresh says that rest is long. The screen shows the balance with a
-  line naming the change that waits, the idle close counts the page's
-  events as use meanwhile, and a first sync keeps the screen on until the
-  rest ends. A send's own proofs never need that list.
+  the page (`sync-finish.js`), and end with a `synced` event. The refresh's
+  `syncing` says that rest is long (or that its length can't be read), and
+  `rest` numbers it within the page; `synced` carries the number, and Dart
+  matches the two (`RailgunEngine`), never a count. A refresh while a rest
+  runs joins it and sends it round again. The screen shows the balance with
+  a line naming the change that waits, the idle close counts the page's
+  events as use meanwhile, and the screen stays on through a first sync
+  and any long rest after it. A rest's end restates the sync it followed:
+  same time, and a refresh that failed since still stands. A send's own
+  proofs never need that list.
+- Every event the page emits must be in the hosts' lists (Kotlin's
+  `RailgunProtocol.EVENTS`, Swift's beside it), or Dart never hears it; a
+  Kotlin test reads the page's sources for them.
 - The list's catch-up ends at a sync that adds nothing only once it has
   reached the screening nodes' validated index (`txid-catch-up.js`): the
   engine drops a batch whose root check failed without saying so, so short
-  of that index the sync is tried again, and then the catch-up fails.
+  of that index, or while it can't be read, the sync is tried again, and
+  then the catch-up fails.
 - The page answers the engine's quick sync (`quick-sync.js`): rail-squid's
   pages through the SDK's own client and formatters, each stored as it
   comes, a page's unshields and nullifiers before its commitments (the
-  engine resumes from its newest stored commitment). The commitments go into
-  the trees 20,000 leaves at a time: the engine has the contract check every
-  insert's root, one call at a time.
-- `engine-hooks-plugin.mjs` holds every rewrite of the engine's code (the
-  unshield watermark in `unshield-events.js`, the prebuilt-tree fill, the
-  archive's leaf hashing, and the txid sync's railgunTxid updates written in
-  batches by `txid-updates.js`). Each names the exact source of the pinned
+  engine resumes from its newest stored commitment). Rail-squid's lists are
+  whole only up to its newest block when asked: one that ended before a
+  page of commitments was asked for is read on first. The commitments go
+  into the trees 20,000 leaves at a time: the engine has the contract check
+  every insert's root, one call at a time.
+- `engine-hooks-plugin.mjs` holds every rewrite of the engine's code: the
+  unshield watermark (`unshield-events.js`), the archive's leaf hashing
+  (`archive-txids.js`), and the txid sync's record updates
+  (`txid-updates.js`), held until the txid tree has a group's root accepted
+  and written in one batch just before the group, through a hook in
+  `Merkletree.insertLeaves`. Each names the exact source of the pinned
   engine and fails the build against any other: re-check them when bumping
   it.
 - **Anon's archive** (Android, mainnet, Settings, on by default;
-  `archive*.js`, `prebuilt-trees.js`):
+  `archive*.js`):
+  - It gives commitments and the transaction list only. Unshields and
+    nullifiers come from rail-squid: the archive drops a nullifier spent
+    again in another tree, and a missing unshield stops the txid sync at its
+    transaction for good.
   - Every file must match its published SHA-256, and the manifest is read
-    again before the tip.
-  - A prebuilt tree is used only once Railgun's contract or the screening
-    node accepts its root.
-  - Nullifiers always come from rail-squid: the archive drops a nullifier
-    spent again in another tree.
-  - Times come from the shipped block table, never the archive. Commitments
-    and unshields carry no archive railgunTxid.
+    again before the tip. Commitments must run on by tree position, and are
+    stored only as far as rail-squid's lists show it has come. Transactions
+    must run on by sequence, each verification hash continuing the chain.
+  - Times come from the shipped block table, never the archive. Records
+    carry no archive railgunTxid; a transaction's leaf is hashed from the
+    archive's, which the screening node's root check then vouches for.
+  - Never copy a tree's nodes from a file: a root check vouches only for
+    what was hashed. (The archive's prebuilt trees were dropped for this.)
   - On anything unexpected the sync goes on from rail-squid where the
-    archive left off. A sync within a day of the newest block never asks the
-    archive.
+    archive left off. A request that fails on the way is sent twice more,
+    and a txid batch the engine kept nothing of is given three times. A sync
+    within a day of the newest block (from the clock and the block table
+    when the RPC can't say) never asks the archive.
   - Android's host fetches the archive for the page through the page's
-    bridge (`RailgunArchiveFetch`); iOS starts the page without it. Every
-    archive request depends on the chain's state alone.
+    bridge (`RailgunArchiveFetch`: 16 MB and a minute an answer at most, a
+    fixed User-Agent); iOS starts the page without it. Every archive request
+    depends on the chain's state alone.
 
 **Network: Tor and the Railgun page.**
 
