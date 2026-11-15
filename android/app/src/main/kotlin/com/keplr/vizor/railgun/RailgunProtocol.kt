@@ -42,7 +42,8 @@ internal object RailgunProtocol {
     /** Engine and console lines; forwarded only from a page loaded with `debug`. */
     const val LOG = "log"
 
-    private val EVENTS = setOf(LOG, "scan", "proof", "screening", "refresh")
+    /** What the page sends unasked, which goes on to Dart; RailgunProtocolTest holds it to every event the page emits. */
+    private val EVENTS = setOf(LOG, "scan", "proof", "screening", "refresh", "synced")
 
     sealed interface Message {
         data object Ready : Message

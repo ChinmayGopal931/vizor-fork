@@ -45,7 +45,8 @@ enum RailgunProtocol {
   /// Engine lines; forwarded only from a page loaded with `debug`.
   static let log = "log"
 
-  private static let events: Set<String> = [log, "scan", "proof", "screening", "refresh"]
+  /// What the page sends unasked, which goes on to Dart: Kotlin's `EVENTS`, which RailgunHostTests holds it to.
+  static let events: Set<String> = [log, "scan", "proof", "screening", "refresh", "synced"]
 
   /// `paramsJSON` must be exactly one JSON object, so it can't add keys to the envelope around it. It is spliced,
   /// not re-serialized, so large numbers keep every digit.

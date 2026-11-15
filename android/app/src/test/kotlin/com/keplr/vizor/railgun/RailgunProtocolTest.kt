@@ -77,8 +77,24 @@ class RailgunProtocolTest {
             "proof" to """{"event":"proof","data":{"progress":0.25,"status":"proving"}}""",
             "screening" to """{"event":"screening","data":{"txids":null,"download":{"progress":0.5},"proving":null}}""",
             "refresh" to """{"event":"refresh","data":{"progress":0.6}}""",
+            "synced" to """{"event":"synced","data":{"rest":1,"balances":{},"screening":"ok"}}""",
             "log" to """{"event":"log","data":"scanning"}""",
         ).forEach { (name, raw) -> assertEquals(Message.Event(name, raw), RailgunProtocol.decode(raw)) }
+    }
+
+    @Test
+    fun forwardsEveryEventThePageEmits() {
+        val emitted =
+            File(SOURCES)
+                .listFiles { file -> file.extension == "js" }!!
+                .flatMap { file -> Regex("""emit\('([a-z]+)'""").findAll(file.readText()).map { it.groupValues[1] }.toList() }
+                .toSortedSet()
+        // The hello is the host's own; every other event is Dart's.
+        assertTrue(emitted.containsAll(listOf("ready", "synced")))
+        (emitted - "ready").forEach { name ->
+            val raw = """{"event":"$name","data":null}"""
+            assertEquals(name, Message.Event(name, raw), RailgunProtocol.decode(raw))
+        }
     }
 
     @Test
@@ -125,5 +141,6 @@ class RailgunProtocolTest {
 
     private companion object {
         const val PAGE = "../railgun-web/src/index.js"
+        const val SOURCES = "../railgun-web/src"
     }
 }

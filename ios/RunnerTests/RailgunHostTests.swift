@@ -89,6 +89,7 @@ final class RailgunHostTests: XCTestCase {
       ("proof", #"{"event":"proof","data":{"progress":0.25,"status":"proving"}}"#),
       ("screening", #"{"event":"screening","data":{"txids":null,"download":{"progress":0.5},"proving":null}}"#),
       ("refresh", #"{"event":"refresh","data":{"progress":0.6}}"#),
+      ("synced", #"{"event":"synced","data":{"rest":1,"balances":{},"screening":"ok"}}"#),
       ("log", #"{"event":"log","data":"scanning"}"#),
     ] {
       XCTAssertEqual(RailgunProtocol.decode(raw), .event(name: name, rawJSON: raw))
@@ -114,6 +115,18 @@ final class RailgunHostTests: XCTestCase {
       table[text(1)] = TimeInterval(text(2))! * unit
     }
     XCTAssertEqual(table, Dictionary(uniqueKeysWithValues: RailgunMethod.allCases.map { ($0.rawValue, $0.timeout) }))
+  }
+
+  /// The events forwarded to Dart are Kotlin's, which RailgunProtocolTest holds to every event the page emits.
+  func testTheEventsMatchKotlin() throws {
+    let kotlin = try Self.repositoryFile("android/app/src/main/kotlin/com/keplr/vizor/railgun/RailgunProtocol.kt")
+    let set = try NSRegularExpression(pattern: #"val EVENTS = setOf\(([^)]*)\)"#)
+    let match = try XCTUnwrap(set.firstMatch(in: kotlin, range: NSRange(kotlin.startIndex..., in: kotlin)))
+    let names = String(kotlin[Range(match.range(at: 1), in: kotlin)!])
+      .split(separator: ",")
+      .map { $0.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "\""))) }
+      .map { $0 == "LOG" ? RailgunProtocol.log : $0 }
+    XCTAssertEqual(Set(names), RailgunProtocol.events)
   }
 
   /// Every method the page answers, and only those: the debug-only `openNewWallet` is never exposed.
