@@ -38,7 +38,7 @@ import { artifactStore } from './artifacts.js';
 import { mainnetBlockAt, mainnetBlockTime } from './block-times.js';
 import { creationBlock } from './creation-block.js';
 import { badRequest } from './errors.js';
-import { pauseMark, pausedSince, watchPauses } from './page-clock.js';
+import { pauseMark, pausedSince } from './page-clock.js';
 import { formatUnshields, installQuickSync, squidPages } from './quick-sync.js';
 import { hasUndatedReceipts, hasUndatedShields, pendingShields, receivedSends } from './received.js';
 import { refreshProgress } from './refresh-progress.js';
@@ -48,7 +48,7 @@ import { squidQueries } from './squid.js';
 import { syncFinisher } from './sync-finish.js';
 import { archiveOff, localStore, rebuildTrees, takeRefusedRoot, treeRecovery } from './tree-recovery.js';
 import { TxidListStopped, catchUpTxids } from './txid-catch-up.js';
-import { takeListStop, txidRepair } from './txid-repair.js';
+import { changeTxidList, forgettingStops, takeListStop, txidRepair } from './txid-repair.js';
 import { walletNamespaces } from './wallet-namespaces.js';
 
 export const TXID_VERSION = TXIDVersion.V2_PoseidonMerkle;
@@ -138,13 +138,15 @@ const recovery = (walletId) => treeRecovery({ rebuild: (marks) => rebuildFor(wal
 /** What the page does around each catch-up of the transaction list (txid-repair.js). */
 const listRepair = () => {
   const engine = getEngine();
+  const list = engine.getTXIDMerkletree(TXID_VERSION, chain());
   return txidRepair({
     store: recoveryStore,
     idle: () =>
       !engine.getUTXOMerkletree(TXID_VERSION, chain()).isScanning &&
       !engine.getTXIDMerkletree(TXID_VERSION, chain()).isScanning,
-    rewind: (point) => engine.resetRailgunTxidsAfterTxidIndex(TXID_VERSION, chain(), point),
-    clear: () => engine.clearTXIDMerkletreeData(TXID_VERSION, chain()),
+    rewind: (point) =>
+      changeTxidList(list, () => engine.resetRailgunTxidsAfterTxidIndex(TXID_VERSION, chain(), point)),
+    clear: () => changeTxidList(list, () => engine.clearTXIDMerkletreeData(TXID_VERSION, chain())),
     reread: async (from, through) => {
       for await (const { events, through: given } of squidPages(indexerQueries.unshields, formatUnshields, from)) {
         if (events.length > 0) await engine.unshieldListener(TXID_VERSION, chain(), events);
@@ -201,7 +203,6 @@ export function start(
 }
 
 async function startEngine(networkName, database, rpcUrls, poiNodeUrls, history, debug, emit) {
-  watchPauses();
   if (debug) setLoggers((message) => emit('log', String(message)), (error) => emit('log', String(error?.stack ?? error)));
   setEngineTxidSyncBatchSize(TXID_SYNC_BATCH_SIZES.squid);
   await startRailgunEngine(WALLET_SOURCE, new LevelJS(database), debug, artifactStore, false, false, poiNodeUrls);
@@ -463,7 +464,7 @@ async function syncTxidList() {
     await catchUpTxids({
       before,
       latest: latestTxidIndex,
-      sync: () => syncRailgunTransactionsV2(network),
+      sync: forgettingStops(() => syncRailgunTransactionsV2(network)),
       isScanning: () => tree.isScanning,
       wait: () => delay(TXID_SYNC_WAIT_MS),
       passes: TXID_SYNC_PASSES,

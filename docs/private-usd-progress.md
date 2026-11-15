@@ -2865,11 +2865,14 @@ M8 status (2026-10-14): the non-device parts are done.
   transaction for one reason three times over ten minutes is repaired by the
   reason the engine reports (a refused root: rewind to a 10,000 boundary,
   then a capped clear; a missing unshield: rail-squid's unshields again from
-  a 100,000-block boundary; a broken hash chain: the archive off). Balance
-  refreshes follow Railgun's head on rail-squid, read every 30 s (it moved
-  about every 3.5 min over half an hour on mainnet), and a 10-minute
-  backstop, not a 30 s cadence while funds arrive; the conversion screen's
-  own refresh at a payout's time is gone.
+  a 100,000-block boundary; a broken hash chain: the archive off), only for
+  a reason the list's last sync gave. Balance refreshes follow Railgun's head
+  on rail-squid, asked for every 30 s, once for every watched balance
+  together (it moved about every 3.5 min over half an hour on mainnet), and
+  a 10-minute backstop, not a 30 s cadence while funds arrive. A refresh
+  that went through, the user's too, counts the newest head read when it
+  began; one that failed counts none. The conversion screen's own refresh at
+  a payout's time is gone.
 
 - **D-1 (M0.1 step 1): `zecswap-tokens` is not in veylor's graph.** It does not
   resolve: `blind-rsa-signatures ^0.18` needs `digest ^0.11.3`, and veylor's

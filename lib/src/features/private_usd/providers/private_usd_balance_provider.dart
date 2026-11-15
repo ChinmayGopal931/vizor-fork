@@ -31,20 +31,22 @@ final privateUsdBalanceClockProvider = Provider<DateTime Function()>(
   (_) => DateTime.now,
 );
 
-/// Reads Railgun's head as its indexer lists it, the same request for every
-/// wallet: null when it could not be read.
-final privateUsdRailgunHeadProvider = Provider<Future<String?> Function()>((
-  ref,
-) {
-  final network = ref.watch(appBootstrapProvider).network;
-  return () async {
-    try {
-      return await rust_private_usd.privateUsdRailgunHead(network: network);
-    } catch (error) {
-      privateUsdLog('Railgun head unread (${error.runtimeType})');
-      return null;
-    }
-  };
+/// Railgun's head as its indexer lists it, shared by every watched balance
+/// for as long as the app runs ([PrivateUsdRailgunHeads]): the same request
+/// for every wallet.
+final privateUsdRailgunHeadsProvider = Provider<PrivateUsdRailgunHeads>((ref) {
+  return PrivateUsdRailgunHeads(
+    read: () async {
+      try {
+        final network = ref.read(appBootstrapProvider).network;
+        return await rust_private_usd.privateUsdRailgunHead(network: network);
+      } catch (error) {
+        privateUsdLog('Railgun head unread (${error.runtimeType})');
+        return null;
+      }
+    },
+    now: ref.watch(privateUsdBalanceClockProvider),
+  );
 });
 
 /// One account's private USD balance: the cached one at once, then each
@@ -61,8 +63,8 @@ final privateUsdBalanceProvider = NotifierProvider.autoDispose
 typedef PrivateUsdBalanceWatchKey = ({String accountUuid, bool ifUsed});
 
 /// Keeps a balance fresh while watched, in the foreground and unlocked only:
-/// it reads Railgun's head every 30 s, and refreshes once the head has moved,
-/// or at the latest every 10 min ([PrivateUsdHeadWatch]).
+/// it asks for Railgun's head every 30 s, and refreshes once the head has
+/// moved, or at the latest every 10 min ([PrivateUsdRailgunHeads]).
 final privateUsdBalanceKeepFreshProvider = Provider.autoDispose
     .family<void, PrivateUsdBalanceWatchKey>((ref, key) {
       final notifier = ref.watch(
@@ -90,7 +92,6 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
   late DateTime Function() _now;
   late PrivateUsdBalanceRetries _retries;
   final _firstSync = PrivateUsdFirstSyncProgress();
-  final _heads = PrivateUsdHeadWatch();
   AppLifecycleListener? _lifecycle;
   Timer? _pollTimer;
   Timer? _firstSyncTimer;
@@ -100,6 +101,8 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
   var _strictWatchers = 0;
   Future<void>? _refreshing;
   RailgunSync? _shown;
+  // The cached balance read, which the first poll waits for.
+  late Future<void> _loaded;
 
   // The first sync this notifier started, while it runs.
   PrivateUsdFirstSync? _runningFirstSync;
@@ -136,7 +139,7 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       _inUse = true;
       if (_pollTimer != null) unawaited(_poll());
     });
-    unawaited(_load());
+    _loaded = _load().catchError((Object _) {});
     return const PrivateUsdBalanceState();
   }
 
@@ -172,10 +175,16 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
     _begin(showProgress: showProgress);
   }
 
+  // A refresh that goes through has seen Railgun up to the newest head read
+  // when it began, whoever asked for it.
   void _begin({required bool showProgress}) {
-    _refreshing = _refreshNow(
-      showProgress: showProgress,
-    ).whenComplete(() => _refreshing = null);
+    final heads = ref.read(privateUsdRailgunHeadsProvider);
+    final head = heads.latest;
+    _refreshing = _refreshNow(showProgress: showProgress)
+        .then((shown) {
+          if (shown) heads.refreshed(accountUuid, head);
+        })
+        .whenComplete(() => _refreshing = null);
   }
 
   bool get _allowed =>
@@ -184,7 +193,8 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       !ref.read(appSecurityProvider).requiresUnlock &&
       !ref.read(privateUsdLifecycleProvider).isQuiesced;
 
-  Future<void> _refreshNow({required bool showProgress}) async {
+  /// Whether the sync went through, late or not.
+  Future<bool> _refreshNow({required bool showProgress}) async {
     // With nothing shown yet, this may be the wallet's first sync, which
     // keeps the screen on until it completes or fails, even past this
     // notifier: the page goes on syncing.
@@ -204,6 +214,7 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
     final sync = ref.read(railgunEngineProvider).sync(accountUuid);
     try {
       _shownIfMounted(await sync.timeout(timeout));
+      return true;
     } on TimeoutException {
       firstSync?.end();
       _failed();
@@ -211,6 +222,7 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       // refresh starts meanwhile.
       try {
         _shownIfMounted(await sync);
+        return true;
       } catch (_) {}
     } on PrivateUsdPause {
       // A lock, switch or route change closed the page: not a failure.
@@ -227,6 +239,7 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
       // ([privateUsdFirstSyncKeepAwakeProvider]).
       firstSync?.end();
     }
+    return false;
   }
 
   /// The user changed the Ethereum RPC: the last failure says nothing about
@@ -440,19 +453,24 @@ class PrivateUsdBalanceNotifier extends Notifier<PrivateUsdBalanceState> {
   Future<void> pollNow() => _poll();
 
   // Refreshes once Railgun's head moved, or at the backstop, never faster
-  // because funds are on their way ([PrivateUsdHeadWatch]); never while
-  // failures back automatic refreshes off.
+  // because funds are on their way ([PrivateUsdRailgunHeads]), and asks
+  // nothing while failures back automatic refreshes off. A refresh due
+  // anyway still asks for the head, which it then counts as seen.
   Future<void> _poll() async {
     if (_strictWatchers == 0 && !_inUse) return;
-    if (!_allowed || _refreshing != null) return;
-    final head = await ref.read(privateUsdRailgunHeadProvider)();
+    await _loaded;
+    if (!_allowed || _refreshing != null || !_retries.isDue) return;
+    final heads = ref.read(privateUsdRailgunHeadsProvider);
+    final head = await heads.read();
     if (!ref.mounted || _pollTimer == null) return;
     if (!_allowed || _refreshing != null || !_retries.isDue) return;
-    final updatedAt = state.updatedAt;
-    final age = updatedAt == null ? null : _now().difference(updatedAt);
-    if (!_heads.shouldRefresh(head, age: age)) return;
-    _heads.refreshing(head);
+    if (!heads.shouldRefresh(accountUuid, head, age: _age())) return;
     _begin(showProgress: false);
+  }
+
+  Duration? _age() {
+    final updatedAt = state.updatedAt;
+    return updatedAt == null ? null : _now().difference(updatedAt);
   }
 
   void _pausePolling() {

@@ -21,7 +21,7 @@ export const SQUID_PAGE_SIZE = 10_000;
 export const PAGE_TIMEOUT_MS = 20_000;
 const PAGE_GAP_MS = 250;
 // A page the indexer didn't answer is asked again after 1, 2, 4 and 8 s: a phone's DNS can fail every lookup for
-// seconds at a time. A try a pause of the page cut through is asked again at once, uncounted (page-clock.js).
+// seconds at a time. A try a pause of the page cut through is asked again uncounted (page-clock.js).
 const PAGE_ATTEMPTS = 5;
 const PAGE_RETRY_MS = 1_000;
 // How many leaves wait in the engine's write queue before they go into the trees. The engine asks Railgun's contract
@@ -95,10 +95,10 @@ async function* pagesFrom(query, format, at, options) {
           if (pausedSince(mark) && pardoned < PAGE_ATTEMPTS) {
             pardoned += 1;
             attempt -= 1;
-            continue;
+          } else if (attempt >= PAGE_ATTEMPTS) {
+            throw error;
           }
-          if (attempt >= PAGE_ATTEMPTS) throw error;
-          await delay(retryMs * 2 ** (attempt - 1));
+          await delay(retryMs * 2 ** Math.max(0, attempt - 1));
         }
       }
     });

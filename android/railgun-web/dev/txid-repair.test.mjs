@@ -9,6 +9,8 @@ import {
   CLEAR_EVERY_MS,
   REPAIR_AFTER_MS,
   REWIND_STEP,
+  changeTxidList,
+  forgettingStops,
   listStopped,
   rereadFrom,
   rewindPoint,
@@ -180,6 +182,31 @@ test('a catch-up that reaches the validated index ends the count and the rewind'
     ],
     'a later stop there is rewound again',
   );
+});
+
+test("why the list stopped is its last sync's to say, never an earlier one's", async () => {
+  takeListStop();
+  let stopsEachTime = true;
+  const sync = forgettingStops(async () => {
+    if (stopsEachTime) listStopped('root', undefined);
+  });
+  await sync();
+  stopsEachTime = false;
+  await sync();
+  assert.equal(takeListStop(), undefined, 'the second sync stopped for no reason it gave');
+});
+
+test('a rewind or clear that throws leaves the list unmarked, as the engine leaves it marked syncing', async () => {
+  const list = { isScanning: false };
+  await assert.rejects(
+    changeTxidList(list, async () => {
+      list.isScanning = true;
+      throw new Error('IndexedDB refused the delete');
+    }),
+    /refused/,
+  );
+  assert.equal(list.isScanning, false);
+  assert.equal(await changeTxidList(list, async () => 'done'), 'done');
 });
 
 test('every boundary is fixed: the same for each wallet a list stops for', () => {

@@ -18,7 +18,7 @@ export class TxidListStopped extends Error {
  * is tried again after `retryWait(attempt)`, up to `retries` times, and then the catch-up fails (`TxidListStopped`
  * once the index was read). So does one whose
  * passes run out short of the target, or with it unread. A sync a pause of the page cut through (`pausedSince` of a
- * `pauseMark()` taken before it, page-clock.js) is tried again at once, uncounted, up to `retries` times.
+ * `pauseMark()` taken before it, page-clock.js) is tried again uncounted, up to `retries` times.
  */
 export async function catchUpTxids({
   before,
@@ -56,8 +56,8 @@ export async function catchUpTxids({
       } else {
         stalled += 1;
         if (stalled > retries) throw error === undefined ? new TxidListStopped(now, index) : unread(error);
-        await retryWait(stalled);
       }
+      await retryWait(Math.max(1, stalled));
     } else {
       stalled = 0;
     }

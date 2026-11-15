@@ -32,7 +32,7 @@ const TIMEOUT_MS = 60_000;
 // A request that failed on the way, or that a busy or failing server turned away (the host answers 502 for a fetch of
 // its own that failed), is sent again after 1, 2, 4 and 8 s: a phone's DNS can fail every lookup for seconds at a time,
 // and a sync that leaves the archive reads the rest of its history from rail-squid, far slower. One a pause of the page
-// cut through is sent again at once, uncounted (page-clock.js).
+// cut through is sent again uncounted (page-clock.js).
 const ATTEMPTS = 5;
 const RETRY_MS = 1_000;
 const retried = (status) => status === 408 || status === 425 || status === 429 || status >= 500;
@@ -68,10 +68,10 @@ export function archive(base, chainId, { fetch = globalThis.fetch, retryMs = RET
       if (pausedSince(mark) && pardoned < ATTEMPTS) {
         pardoned += 1;
         attempt -= 1;
-        continue;
+      } else if (attempt >= ATTEMPTS) {
+        throw new ArchiveUnreachable(failure.message);
       }
-      if (attempt >= ATTEMPTS) throw new ArchiveUnreachable(failure.message);
-      await delay(retryMs * 2 ** (attempt - 1));
+      await delay(retryMs * 2 ** Math.max(0, attempt - 1));
     }
   }
 

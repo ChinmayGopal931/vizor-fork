@@ -125,7 +125,7 @@ test('a sync a pause of the page cut through is tried again at once, and not cou
     pauseMark,
     pausedSince,
   });
-  assert.deepEqual(waits, [1, 2], 'three stalls across pauses, then two counted');
+  assert.deepEqual(waits, [1, 1, 1, 1, 2], 'three stalls across pauses wait their turn uncounted, then two counted');
 });
 
 test('a validated index reached, or none validated, ends the catch-up at the first sync that adds none', async () => {

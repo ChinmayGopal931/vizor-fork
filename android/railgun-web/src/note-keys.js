@@ -14,6 +14,8 @@ const WASM_FILE = 'curve25519_scalarmult_wasm_bg.wasm';
 export const MAX_WORKERS = 6;
 /** How long a batch may take before the engine works its keys out itself. */
 export const BATCH_TIMEOUT_MS = 60_000;
+/** How long the workers may take to start before the page works its keys out on its own thread. */
+export const POOL_TIMEOUT_MS = 30_000;
 /** Workers left idle this long are stopped; the next batch starts them again. */
 export const IDLE_MS = 30_000;
 // After this many batches failed, a page works its keys out on its own thread.
@@ -21,11 +23,13 @@ const FAILURES_ALLOWED = 2;
 
 const hex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 
-// The keys of the batch each wallet's scan is on, by its viewing private key: `{modern, legacy}`, each by point.
+// The keys of the batches each wallet's scans are on, by its viewing private key: a set of `{modern, legacy}`, each a
+// map by point.
 const batches = new WeakMap();
 // The page's workers, as a promise: null where they can't run.
 let pool;
 let makePool = webWorkerPool;
+let poolTimeoutMs = POOL_TIMEOUT_MS;
 let failures = 0;
 let idle;
 // What the page's batches came to, for dev/check.mjs.
@@ -34,17 +38,53 @@ const counted = { batches: 0, points: 0, refused: 0, prepared: 0, workers: 0 };
 /** How many batches and points the workers worked keys out for, how many they refused, and how many workers ran. */
 export const noteKeysCounts = () => ({ ...counted, failures });
 
+function prepared(privateKey, kind, point) {
+  const scans = batches.get(privateKey);
+  if (scans === undefined) return undefined;
+  const key = hex(point);
+  for (const batch of scans) {
+    const found = batch[kind].get(key);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
 /** The key `getSharedSymmetricKey(privateKey, point)` answers, if a batch prepared it. */
-export const preparedKey = (privateKey, point) => batches.get(privateKey)?.modern.get(hex(point));
+export const preparedKey = (privateKey, point) => prepared(privateKey, 'modern', point);
 
 /** The key `getSharedSymmetricKeyLegacy(privateKey, point)` answers, if a batch prepared it. */
-export const preparedLegacyKey = (privateKey, point) => batches.get(privateKey)?.legacy.get(hex(point));
+export const preparedLegacyKey = (privateKey, point) => prepared(privateKey, 'legacy', point);
 
-/** Has batches use the pool `make()` answers, null for none: dev tests' stand-ins for Web Workers. */
-export function useKeyPool(make) {
+/**
+ * Has batches use the pool `make()` answers, null for none, given `timeoutMs` to start: dev tests' stand-ins for Web
+ * Workers.
+ */
+export function useKeyPool(make, { timeoutMs = POOL_TIMEOUT_MS } = {}) {
   closePool();
   makePool = make;
+  poolTimeoutMs = timeoutMs;
   failures = 0;
+}
+
+/** The pool `makePool()` answers, or none if it takes longer than the timeout to start; one that starts later stops. */
+function startPool() {
+  const making = makePool();
+  let timer;
+  const late = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(null), poolTimeoutMs);
+    timer.unref?.();
+  });
+  return Promise.race([making, late]).then(
+    (made) => {
+      clearTimeout(timer);
+      if (made === null) making.then((workers) => workers?.close()).catch(() => {});
+      return made;
+    },
+    () => {
+      clearTimeout(timer);
+      return null;
+    },
+  );
 }
 
 function closePool() {
@@ -59,11 +99,17 @@ function closePool() {
  * `commitmentTypeOf` is the engine's own reading of a leaf's type.
  */
 export async function prepareKeys(viewingPrivateKey, leaves, commitmentTypeOf) {
-  const release = () => batches.delete(viewingPrivateKey);
+  let mine;
+  // Only this batch's keys: another scan of the same wallet may be on a batch of its own.
+  const release = () => {
+    const scans = batches.get(viewingPrivateKey);
+    scans?.delete(mine);
+    if (scans?.size === 0) batches.delete(viewingPrivateKey);
+  };
   const points = pointsOf(leaves, commitmentTypeOf);
   if (points.length === 0 || failures >= FAILURES_ALLOWED) return { release };
   clearTimeout(idle);
-  pool ??= makePool().catch(() => null);
+  pool ??= startPool();
   const workers = await pool;
   if (workers === null) return { release };
   try {
@@ -81,7 +127,8 @@ export async function prepareKeys(viewingPrivateKey, leaves, commitmentTypeOf) {
       if (isLegacy) legacy.set(key, product);
       else modern.set(key, ByteUtils.hexStringToBytes(sha256(product)));
     });
-    batches.set(viewingPrivateKey, { modern, legacy });
+    mine = { modern, legacy };
+    batches.set(viewingPrivateKey, (batches.get(viewingPrivateKey) ?? new Set()).add(mine));
     counted.batches += 1;
     counted.points += points.length;
     counted.refused += failed.reduce((sum, refused) => sum + refused, 0);

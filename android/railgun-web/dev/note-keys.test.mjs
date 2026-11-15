@@ -173,6 +173,40 @@ test('a batch the workers fail prepares nothing, and after a second the page lea
   assert.equal(made, 2, 'started again once after the first failure, never after the second');
 });
 
+test('workers that never start leave every key to the engine, and no batch waits on them twice', async () => {
+  let made = 0;
+  useKeyPool(
+    () => {
+      made += 1;
+      return new Promise(() => {});
+    },
+    { timeoutMs: 20 },
+  );
+  const privateKey = randomBytes(32);
+  const points = Array.from({ length: 5 }, point);
+  for (let batch = 0; batch < 3; batch += 1) {
+    const { release } = await prepareKeys(privateKey, leavesOf(points), typeOf);
+    assert.equal(preparedKey(privateKey, points[0]), undefined);
+    release();
+  }
+  assert.equal(made, 1);
+});
+
+test("a batch's release leaves another batch of the same wallet its keys", async () => {
+  useKeyPool(async () => inProcessPool());
+  const privateKey = randomBytes(32);
+  const first = Array.from({ length: 5 }, point);
+  const second = Array.from({ length: 5 }, point);
+  const one = await prepareKeys(privateKey, leavesOf(first), typeOf);
+  const two = await prepareKeys(privateKey, leavesOf(second), typeOf);
+  assert.ok(preparedKey(privateKey, first[0]) !== undefined, "the first batch's keys stand beside the second's");
+  one.release();
+  assert.equal(preparedKey(privateKey, first[0]), undefined);
+  assert.equal(hex(preparedKey(privateKey, second[0])), hex(await getSharedSymmetricKey(privateKey, second[0])));
+  two.release();
+  assert.equal(preparedKey(privateKey, second[0]), undefined);
+});
+
 test("without workers, every key is the engine's to work out", async () => {
   useKeyPool(async () => null);
   const privateKey = randomBytes(32);

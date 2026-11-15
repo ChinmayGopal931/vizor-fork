@@ -38,6 +38,27 @@ export function takeListStop() {
   return taken;
 }
 
+/** `sync`, each call forgetting why an earlier one stopped: why the list stopped is its last sync's to say. */
+export const forgettingStops =
+  (sync) =>
+  (...args) => {
+    takeListStop();
+    return sync(...args);
+  };
+
+/**
+ * `step()`, a change to the txid list (`merkletree`). The engine marks the list as syncing while it rewinds or clears
+ * it and leaves it marked for good when the step throws, which would hold up every later sync: a throw unmarks it.
+ */
+export async function changeTxidList(merkletree, step) {
+  try {
+    return await step();
+  } catch (error) {
+    merkletree.isScanning = false;
+    throw error;
+  }
+}
+
 /** The index of the last transaction a rewind of a list stopped after `index` keeps: -1 for none. */
 export const rewindPoint = (index) => Math.max(-1, Math.floor(index / REWIND_STEP) * REWIND_STEP - 1);
 

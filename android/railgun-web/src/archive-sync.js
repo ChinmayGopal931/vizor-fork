@@ -180,16 +180,15 @@ export function installArchiveSync(
           const archives = error instanceof ArchiveFailed;
           const again = !archives || error.cause instanceof ArchiveUnreachable;
           const failed = `${archives ? 'the archive' : 'rail-squid'} failed at block ${through}`;
-          // A round a pause of the page cut through goes again at once, uncounted (page-clock.js).
-          if (again && pausedSince(mark) && pardoned < ARCHIVE_ROUNDS) {
-            pardoned += 1;
-            round -= 1;
-            log(`${failed} across a pause of the page, asked again: ${message}`);
-            continue;
-          }
-          if (again && round < ARCHIVE_ROUNDS) {
-            log(`${failed}, asked again: ${message}`);
-            await delay(roundWaitMs * 2 ** (round - 1));
+          // A round a pause of the page cut through goes again uncounted (page-clock.js).
+          const paused = again && pausedSince(mark) && pardoned < ARCHIVE_ROUNDS;
+          if (paused || (again && round < ARCHIVE_ROUNDS)) {
+            log(`${failed}${paused ? ' across a pause of the page' : ''}, asked again: ${message}`);
+            if (paused) {
+              pardoned += 1;
+              round -= 1;
+            }
+            await delay(roundWaitMs * 2 ** Math.max(0, round - 1));
             continue;
           }
           log(`the archive was left at block ${through}: ${message}`);

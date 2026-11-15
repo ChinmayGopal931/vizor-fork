@@ -21,71 +21,91 @@ import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  group('PrivateUsdHeadWatch', () {
+  group('PrivateUsdRailgunHeads', () {
     const fresh = Duration(seconds: 10);
     const older = Duration(minutes: 2);
+    PrivateUsdRailgunHeads heads() =>
+        PrivateUsdRailgunHeads(read: () async => 'h', now: DateTime.now);
 
-    test('with nothing shown yet, it refreshes', () {
-      expect(PrivateUsdHeadWatch().shouldRefresh('h1', age: null), isTrue);
-      expect(PrivateUsdHeadWatch().shouldRefresh(null, age: null), isTrue);
+    test('with nothing shown yet, a balance refreshes', () {
+      expect(heads().shouldRefresh('a', 'h1', age: null), isTrue);
+      expect(heads().shouldRefresh('a', null, age: null), isTrue);
     });
 
-    test('a head that moved past the last refresh refreshes; one that stood '
-        'still does not', () {
-      final heads = PrivateUsdHeadWatch()..refreshing('h1');
-      expect(heads.shouldRefresh('h1', age: older), isFalse);
-      expect(heads.shouldRefresh('h2', age: older), isTrue);
+    test('a head moved past the last refresh refreshes; one that stood still '
+        'does not', () {
+      final shared = heads()..refreshed('a', 'h1');
+      expect(shared.shouldRefresh('a', 'h1', age: older), isFalse);
+      expect(shared.shouldRefresh('a', 'h2', age: older), isTrue);
+      expect(shared.shouldRefresh('a', 'h2', age: fresh), isTrue);
+      shared.refreshed('a', 'h2');
+      expect(shared.shouldRefresh('a', 'h2', age: fresh), isFalse);
       expect(
-        heads.shouldRefresh('h2', age: fresh),
+        shared.shouldRefresh('b', 'h2', age: older),
         isTrue,
-        reason: 'however fresh',
+        reason: 'another account refreshed with no head yet',
       );
-      heads.refreshing('h2');
-      expect(heads.shouldRefresh('h2', age: fresh), isFalse);
     });
 
     test('a head that could not be read refreshes nothing before the '
-        'backstop, and keeps the last one', () {
-      final heads = PrivateUsdHeadWatch()..refreshing('h1');
-      expect(heads.shouldRefresh(null, age: older), isFalse);
-      heads.refreshing(null);
-      expect(heads.shouldRefresh('h1', age: older), isFalse);
+        'backstop', () {
+      final shared = heads()..refreshed('a', 'h1');
+      expect(shared.shouldRefresh('a', null, age: older), isFalse);
+      shared.refreshed('a', null);
+      expect(shared.shouldRefresh('a', 'h1', age: older), isFalse);
       expect(
-        heads.shouldRefresh(null, age: PrivateUsdBalanceTiming.backstop),
+        shared.shouldRefresh('a', null, age: PrivateUsdBalanceTiming.backstop),
         isTrue,
       );
     });
 
-    test('the backstop refreshes a head that stood still', () {
-      final heads = PrivateUsdHeadWatch()..refreshing('h1');
-      expect(
-        heads.shouldRefresh('h1', age: PrivateUsdBalanceTiming.backstop),
-        isTrue,
-      );
+    test("before an account's first refresh, a head is its balance's when "
+        'that is younger than a poll', () {
+      final shared = heads();
+      expect(shared.shouldRefresh('a', 'h1', age: fresh), isFalse);
+      expect(shared.shouldRefresh('a', 'h1', age: older), isFalse);
+      expect(shared.shouldRefresh('a', 'h2', age: fresh), isTrue);
+      expect(heads().shouldRefresh('a', 'h1', age: older), isTrue);
     });
 
-    test('before its first refresh, a head is the balance\'s when that is '
-        'younger than a poll', () {
-      final heads = PrivateUsdHeadWatch();
-      expect(heads.shouldRefresh('h1', age: fresh), isFalse);
-      expect(heads.shouldRefresh('h1', age: older), isFalse, reason: 'taken');
-      expect(heads.shouldRefresh('h2', age: fresh), isTrue);
-      expect(PrivateUsdHeadWatch().shouldRefresh('h1', age: older), isTrue);
+    test('balances that ask together share one request', () async {
+      var clock = DateTime(2026, 11, 15, 9);
+      var reads = 0;
+      final shared = PrivateUsdRailgunHeads(
+        read: () async => 'h${++reads}',
+        now: () => clock,
+      );
+      expect(await Future.wait([shared.read(), shared.read()]), ['h1', 'h1']);
+      expect(await shared.read(), 'h1');
+      clock = clock.add(PrivateUsdBalanceTiming.headPoll);
+      expect(await shared.read(), 'h2');
+      expect(shared.latest, 'h2');
+      expect(reads, 2);
     });
   });
 
   group('a watched balance', () {
     late _Page page;
     late DateTime clock;
+    late PrivateUsdRailgunHeads heads;
     String? head;
     var headReads = 0;
 
-    ({ProviderContainer container, PrivateUsdBalanceNotifier notifier})
-    watched({String? balances}) {
+    ProviderContainer containerWith({
+      String? balances,
+      CachedPrivateUsdBalances? cached,
+    }) {
       page = _Page(balances ?? _dollarsJson);
       clock = DateTime(2026, 11, 15, 9);
       head = 'h1';
       headReads = 0;
+      heads = PrivateUsdRailgunHeads(
+        read: () async {
+          headReads++;
+          return head;
+        },
+        now: () => clock,
+      );
       final engine = RailgunEngine(
         host: page,
         wallets: _Wallets(),
@@ -97,31 +117,59 @@ void main() {
         overrides: [
           appSecurityProvider.overrideWith(_Security.new),
           railgunEngineProvider.overrideWithValue(engine),
-          privateUsdBalanceCacheProvider.overrideWithValue(_Cache()),
+          privateUsdBalanceCacheProvider.overrideWithValue(_Cache(cached)),
           privateUsdCurrentDeploymentProvider.overrideWithValue(_sepolia),
           privateUsdBalanceClockProvider.overrideWithValue(() => clock),
-          privateUsdRailgunHeadProvider.overrideWithValue(() async {
-            headReads++;
-            return head;
-          }),
+          privateUsdRailgunHeadsProvider.overrideWithValue(heads),
         ],
       );
-      container.listen(privateUsdBalanceProvider(_account), (_, _) {});
-      final notifier = container.read(
-        privateUsdBalanceProvider(_account).notifier,
-      );
-      final cancel = notifier.watch(ifUsed: false);
       addTearDown(() async {
-        cancel();
         container.dispose();
         await engine.dispose();
       });
-      return (container: container, notifier: notifier);
+      return container;
     }
+
+    /// [account]'s notifier, watched until the test ends or `close()`.
+    ({PrivateUsdBalanceNotifier notifier, void Function() close}) watch(
+      ProviderContainer container, [
+      String account = _account,
+    ]) {
+      final subscription = container.listen(
+        privateUsdBalanceProvider(account),
+        (_, _) {},
+      );
+      final notifier = container.read(
+        privateUsdBalanceProvider(account).notifier,
+      );
+      final cancel = notifier.watch(ifUsed: false);
+      var closed = false;
+      void close() {
+        if (closed) return;
+        closed = true;
+        cancel();
+        subscription.close();
+      }
+
+      addTearDown(close);
+      return (notifier: notifier, close: close);
+    }
+
+    PrivateUsdBalanceNotifier watched({String? balances}) =>
+        watch(containerWith(balances: balances)).notifier;
 
     Future<void> answer() async {
       await pumpEventQueue();
       page.refreshing!.complete(page.body);
+      page.refreshing = null;
+      await pumpEventQueue();
+    }
+
+    Future<void> fail() async {
+      await pumpEventQueue();
+      page.refreshing!.completeError(
+        RailgunHostException(RailgunHostErrorCode.failed),
+      );
       page.refreshing = null;
       await pumpEventQueue();
     }
@@ -134,7 +182,7 @@ void main() {
     }
 
     test('refreshes when the head moves, and only then', () async {
-      final notifier = watched().notifier;
+      final notifier = watched();
       await answer();
       expect(page.refreshes, 1, reason: 'nothing shown yet');
       for (var i = 0; i < 5; i++) {
@@ -151,7 +199,7 @@ void main() {
     });
 
     test('refreshes at the backstop though the head stands still', () async {
-      final notifier = watched().notifier;
+      final notifier = watched();
       await answer();
       final polls =
           PrivateUsdBalanceTiming.backstop.inSeconds ~/
@@ -166,7 +214,8 @@ void main() {
     });
 
     test('never refreshes faster while funds arrive', () async {
-      final (:container, :notifier) = watched(balances: _arrivingJson);
+      final container = containerWith(balances: _arrivingJson);
+      final notifier = watch(container).notifier;
       await answer();
       expect(
         container.read(privateUsdBalanceProvider(_account)).balances?.arriving,
@@ -179,13 +228,76 @@ void main() {
     });
 
     test('a head that cannot be read waits for the backstop', () async {
-      final notifier = watched().notifier;
+      final notifier = watched();
       await answer();
       head = null;
       for (var i = 0; i < 5; i++) {
         await poll(notifier);
       }
       expect(page.refreshes, 1);
+    });
+
+    test('a refresh that failed tries the same head again, once failures '
+        'let it, and asks for no head meanwhile', () async {
+      final notifier = watched();
+      await answer();
+      head = 'h2';
+      await poll(notifier);
+      expect(page.refreshes, 2);
+      await fail();
+      final reads = headReads;
+      await notifier.pollNow();
+      await pumpEventQueue();
+      expect(page.refreshes, 2, reason: 'backing off');
+      expect(headReads, reads, reason: 'no head asked while backing off');
+      await poll(notifier);
+      expect(page.refreshes, 3, reason: 'the head the failure began at');
+      await answer();
+    });
+
+    test("a refresh the user asked for counts for the head it began at, so "
+        'the poll after it adds none', () async {
+      final notifier = watched();
+      await answer();
+      head = 'h2';
+      await poll(notifier);
+      expect(page.refreshes, 2);
+      await answer();
+      head = 'h3';
+      clock = clock.add(PrivateUsdBalanceTiming.headPoll);
+      await heads.read();
+      notifier.refresh(showProgress: true);
+      await answer();
+      expect(page.refreshes, 3);
+      await poll(notifier);
+      expect(page.refreshes, 3, reason: 'the head the user refreshed at');
+    });
+
+    test('balances watched together ask for one head, and a rebuilt balance '
+        "keeps what its head was", () async {
+      final container = containerWith(
+        cached: CachedPrivateUsdBalances(
+          address: '0zk1account',
+          updatedAt: DateTime(2026, 11, 15, 9),
+          balances: const RailgunBalances({}),
+        ),
+      );
+      final one = watch(container);
+      final other = watch(container, 'other');
+      await pumpEventQueue();
+      final reads = headReads;
+      clock = clock.add(PrivateUsdBalanceTiming.headPoll);
+      await Future.wait([one.notifier.pollNow(), other.notifier.pollNow()]);
+      await pumpEventQueue();
+      expect(headReads, reads + 1);
+      expect(page.refreshes, 0, reason: 'the cached balances are fresh');
+      // The screen left and opened again: a new notifier, the same head.
+      one.close();
+      await pumpEventQueue();
+      final again = watch(container).notifier;
+      await pumpEventQueue();
+      await poll(again);
+      expect(page.refreshes, 0);
     });
   });
 }
@@ -234,10 +346,12 @@ class _Security extends AppSecurityNotifier {
 }
 
 class _Cache extends PrivateUsdBalanceCache {
-  _Cache() : super(AppSecureStore.instance);
+  _Cache(this.cached) : super(AppSecureStore.instance);
+
+  final CachedPrivateUsdBalances? cached;
 
   @override
-  Future<CachedPrivateUsdBalances?> read(String accountUuid) async => null;
+  Future<CachedPrivateUsdBalances?> read(String accountUuid) async => cached;
 
   @override
   Future<void> write(
