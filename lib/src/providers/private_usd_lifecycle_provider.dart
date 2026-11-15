@@ -23,7 +23,7 @@ final privateUsdLifecycleProvider = Provider(
                   .read(rpcEndpointFailoverProvider)
                   .current
                   .networkName,
-              lightwalletdUrl: '',
+              lightwalletdUrl: () async => '',
             ),
           )
         : null,
