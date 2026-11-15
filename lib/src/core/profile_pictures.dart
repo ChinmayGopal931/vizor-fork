@@ -26,8 +26,20 @@ class ProfilePictureOption {
 }
 
 /// The neon portraits. Ids stay `pfp-NN` so stored accounts and contacts
-/// keep theirs.
-const _kProfilePictureSuffixes = ['01', '02', '03', '04', '05', '06', '07'];
+/// keep theirs. Later portraits number on from `16`, since the retired
+/// knights' ids (below) still land on the first seven.
+const _kProfilePictureSuffixes = [
+  '01',
+  '02',
+  '03',
+  '04',
+  '05',
+  '06',
+  '07',
+  '16',
+  '17',
+  '18',
+];
 
 const _kProfilePictureLabelsBySuffix = {
   '01': 'Light cycle',
@@ -37,6 +49,9 @@ const _kProfilePictureLabelsBySuffix = {
   '05': 'Scanner',
   '06': 'Goggles',
   '07': 'Frame',
+  '16': 'Statue',
+  '17': 'Helmet',
+  '18': 'Platinum',
 };
 
 /// The knight set had fifteen pictures; a stored id from the retired eight

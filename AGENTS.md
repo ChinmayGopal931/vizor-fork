@@ -298,12 +298,14 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
 - **Art.** The medieval illustrations are gone from mobile: empty states use
   `NeonHorizon` (a striped 80s sun over a grid floor), hero and status
   spots `NeonGlyphBadge`, and painted backgrounds are dropped. The account
-  pictures are the seven neon portraits in `assets/profile_pictures/`
-  (`pfp-01` to `pfp-07`, lossless WebP); ids of the retired knights
-  (`pfp-08` to `pfp-15`) map onto them. Payment-link gift card designs are
-  unchanged. `VizorWordmark` draws a VEYLOR wordmark in tube strokes on
-  mobile (`VeylorWordmarkPainter`: lit red, or plain lines where a caller
-  sets a colour); desktop keeps `vizor_logo.svg`.
+  pictures are the ten neon portraits in `assets/profile_pictures/`
+  (`pfp-01` to `pfp-07` and `pfp-16` to `pfp-18`, 224 px lossless WebP);
+  ids of the retired knights (`pfp-08` to `pfp-15`) map onto the first
+  seven, so a new portrait takes the next number from `pfp-19`.
+  Payment-link gift card designs are unchanged. `VizorWordmark` draws a
+  VEYLOR wordmark in tube strokes on mobile (`VeylorWordmarkPainter`: lit
+  red, or plain lines where a caller sets a colour); desktop keeps
+  `vizor_logo.svg`.
 - **Keys and money flows.** The passcode keys are cut-corner glass plates
   that light red under the finger. Private USD calls a conversion a bridge
   in every user-facing string (owner, 2026-10-19: "Bridge", "Bridging",
