@@ -1479,6 +1479,13 @@ Code:
 - The Railgun page: `android/app/src/main/assets/railgun/`, built from
   `android/railgun-web/`; the same build copies it as is to
   `ios/Runner/Railgun/railgun/`.
+- Copy: ARB messages whose keys start with `privateUsd` (the chart's
+  `portfolioChart`, the sync line's `neonSync`), in Korean and Chinese
+  too. `PrivateUsdCopy` keeps only what is never translated and the few
+  messages that choose between keys. A provider or a result keeps its
+  text as a `PrivateUsdText` that the widget resolves. The Korean and
+  Chinese are a first pass for a native reviewer; the terms they use are
+  in `docs/private-usd-reference.md` §9.6.
 
 **Defines (reference §7.3).** Each is a Dart define read once in
 `private_usd_feature_config.dart`. Gradle needs none of them.

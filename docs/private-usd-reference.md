@@ -2232,6 +2232,21 @@ The cancel-requested note: "Refund requested…" before `ready`, or "…after {r
 
 The tables give every user-facing string the veylor screens need, rewritten in sentence case with zapp's branding removed. The key is zapp's, to keep provenance. `{x}` is a placeholder.
 
+The strings now live in `lib/l10n` as messages whose keys start with `privateUsd`, with Korean and Simplified Chinese beside the English. Those translations are a first pass, written to the style guides in `docs/i18n/` and these terms, for a native reviewer to correct:
+
+| English | Korean | Chinese |
+| --- | --- | --- |
+| Shielded USD; shielded balance | 비공개 USD; 비공개 잔액 | 隐私 USD; 隐私余额 |
+| bridge; bridging; bridged to X | 브리지; 브리지 중; X로 브리지 완료 | 跨链; 跨链中; 已跨链到 X |
+| market maker; relayer | 마켓 메이커; 릴레이어 | 做市商; 中继者 |
+| claim; deposit; deposit address | 수령; 입금; 입금 주소 | 领取; 存入; 存入地址 |
+| escrow; settlement; refund | 에스크로; 정산; 환불 | 托管; 结算; 退款 |
+| swap (the contract); quote | 스왑; 견적 | 兑换; 报价 |
+| screening; zero-knowledge proof | 심사; 영지식 증명 | 筛查; 零知识证明 |
+| shield; unshield; withdraw | 비공개로 전환; 공개로 전환; 출금 | 转为隐私余额; 转为公开; 提取 |
+| token (Privacy Pass); token issuer | 토큰; 토큰 발급자 | 令牌; 令牌签发方 |
+| recover (a refund); payment | 되찾다; 송금 | 找回; 付款 |
+
 Flags:
 
 - **B**: branding changed ("Zapp" becomes "Veylor", or the sentence is rephrased)
