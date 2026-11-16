@@ -52,6 +52,7 @@ bool requiresMobileSidebarExitPolicy(String path) =>
           '/about',
           '/voting',
           '/private-usd',
+          '/private-usd/receive',
           '/portfolio-chart',
         ].contains(path) ||
         path.startsWith('/activity/') ||

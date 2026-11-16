@@ -4,8 +4,6 @@
 import 'package:flutter/widgets.dart';
 
 import '../src/core/l10n/l10n.dart';
-import '../src/core/layout/mobile/app_mobile_sheet.dart';
-import '../src/core/theme/app_theme.dart';
 import '../src/features/activity/models/activity_row_data.dart';
 import '../src/features/private_usd/models/private_usd_balances.dart';
 import '../src/features/private_usd/models/private_usd_record_key.dart';
@@ -16,6 +14,7 @@ import '../src/features/private_usd/providers/private_usd_balance_provider.dart'
 import '../src/features/private_usd/providers/private_usd_conversion_provider.dart';
 import '../src/features/private_usd/providers/private_usd_convert_provider.dart';
 import '../src/features/private_usd/providers/private_usd_unfinished_provider.dart';
+import '../src/features/private_usd/screens/mobile/mobile_private_usd_receive_screen.dart';
 import '../src/features/private_usd/screens/mobile/mobile_private_usd_screen.dart';
 import '../src/features/private_usd/services/private_usd_balance_repository.dart';
 import '../src/features/private_usd/services/private_usd_engine.dart';
@@ -24,7 +23,6 @@ import '../src/features/private_usd/widgets/mobile/private_usd_activity_details.
 import '../src/features/private_usd/widgets/mobile/private_usd_activity_rows.dart';
 import '../src/features/private_usd/widgets/mobile/private_usd_convert_views.dart';
 import '../src/features/private_usd/widgets/mobile/private_usd_progress_views.dart';
-import '../src/features/private_usd/widgets/mobile/private_usd_receive_sheet.dart';
 import '../src/rust/api/private_usd.dart';
 
 /// Deterministic Private USD fixtures: fixed balances, addresses and times;
@@ -413,41 +411,24 @@ class _PrivateUsdScreenPreviewState extends State<_PrivateUsdScreenPreview> {
   }
 }
 
-// As `showAppMobileSheet` presents it: the modal card at the bottom, the
-// sheet scrolling when it is taller than the space above the status bar.
 Widget _receivePreview(PrivateUsdReceiveKind kind) => PrivateUsdPreviewFrame(
-  child: Builder(
-    builder: (context) => ColoredBox(
-      color: context.colors.background.window,
-      child: SafeArea(
-        bottom: false,
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: MobileModalCard(child: _receiveBody(context, kind)),
-        ),
-      ),
+  child: MobilePrivateUsdReceiveView(
+    kind: kind,
+    onKindChanged: (_) {},
+    symbol: 'USDC',
+    chain: 'Ethereum',
+    address: previewPrivateUsdEthereumAddress,
+    railgunAddress: previewPrivateUsdAddress,
+    terms: const ApiDepositTerms(
+      fee: '250000',
+      feeBps: 50,
+      minValue: '10000000',
+      railgunFeeBps: 25,
     ),
+    screening: const Duration(hours: 1),
+    onBack: () {},
   ),
 );
-
-Widget _receiveBody(BuildContext context, PrivateUsdReceiveKind kind) =>
-    PrivateUsdReceiveSheetBody(
-      kind: kind,
-      onKindChanged: (_) {},
-      symbol: 'USDC',
-      chain: 'Ethereum',
-      address: previewPrivateUsdEthereumAddress,
-      railgunAddress: previewPrivateUsdAddress,
-      terms: const ApiDepositTerms(
-        fee: '250000',
-        feeBps: 50,
-        minValue: '10000000',
-        railgunFeeBps: 25,
-      ),
-      example: context.l10n.privateUsdDepositExample(r'$10.00', r'$9.68'),
-      screening: const Duration(hours: 1),
-      onClose: () {},
-    );
 
 /// Receive, public USDC (the default): the deposit address and its terms.
 Widget buildMobilePrivateUsdReceiveUseCase(BuildContext context) =>

@@ -9198,11 +9198,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get privateUsdDepositCopy => 'Copy deposit address';
 
   @override
-  String privateUsdDepositExample(String sent, String arrives) {
-    return 'Sending $sent brings $arrives after both fees.';
-  }
-
-  @override
   String get privateUsdDepositFeesFailed =>
       'Couldn\'t load the fees. Money sent here waits safely at this address.';
 
@@ -10256,6 +10251,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'p05': 'Scanner',
       'p06': 'Goggles',
       'p07': 'Frame',
+      'p16': 'Statue',
+      'p17': 'Helmet',
+      'p18': 'Platinum',
       'other': '',
     });
     return '$_temp0';

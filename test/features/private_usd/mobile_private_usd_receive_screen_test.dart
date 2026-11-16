@@ -6,11 +6,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
-import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_receive_sheet.dart';
+import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_receive_screen.dart';
+import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 import '../../support/test_l10n.dart';
 
-// The Receive sheet switches, as ZEC's Receive does its pools, between
+// The Receive screen switches, as ZEC's Receive does its pools, between
 // public USDC (the default) and 0zkUSDC from another Railgun wallet.
 void main() {
   setUp(() {
@@ -46,10 +47,12 @@ void main() {
         .setMockMethodCallHandler(SystemChannels.platform, null);
   });
 
-  Future<List<PrivateUsdReceiveKind>> pumpSheet(
+  Future<List<PrivateUsdReceiveKind>> pumpScreen(
     WidgetTester tester, {
     PrivateUsdReceiveKind kind = PrivateUsdReceiveKind.usdc,
     bool switchable = true,
+    ApiDepositTerms? terms,
+    VoidCallback? onBack,
   }) async {
     final switched = <PrivateUsdReceiveKind>[];
     await tester.pumpWidget(
@@ -57,16 +60,15 @@ void main() {
         localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
-          child: Scaffold(
-            body: PrivateUsdReceiveSheetBody(
-              kind: kind,
-              onKindChanged: switchable ? switched.add : null,
-              symbol: 'USDC',
-              chain: 'Ethereum',
-              address: previewPrivateUsdEthereumAddress,
-              railgunAddress: previewPrivateUsdAddress,
-              onClose: () {},
-            ),
+          child: MobilePrivateUsdReceiveView(
+            kind: kind,
+            onKindChanged: switchable ? switched.add : null,
+            symbol: 'USDC',
+            chain: 'Ethereum',
+            address: previewPrivateUsdEthereumAddress,
+            railgunAddress: previewPrivateUsdAddress,
+            terms: terms,
+            onBack: onBack ?? () {},
           ),
         ),
       ),
@@ -78,8 +80,13 @@ void main() {
   testWidgets('public USDC is the default, with its deposit address', (
     tester,
   ) async {
-    final switched = await pumpSheet(tester);
+    final switched = await pumpScreen(tester);
 
+    // The page title is drawn uppercase in the top bar.
+    expect(
+      find.text(testL10n.privateUsdDepositTitle('USDC').toUpperCase()),
+      findsOneWidget,
+    );
     expect(find.text('USDC'), findsOneWidget);
     expect(find.text('0zkUSDC'), findsOneWidget);
     expect(
@@ -88,6 +95,8 @@ void main() {
     );
     expect(find.text(previewPrivateUsdEthereumAddress), findsOneWidget);
     expect(find.text(previewPrivateUsdAddress), findsNothing);
+    // Back replaces the sheet's Close.
+    expect(find.text(testL10n.commonClose), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('private_usd_deposit_copy')));
     await tester.pump();
@@ -100,10 +109,48 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
   });
 
+  testWidgets('the terms end with the fees, with no worked example', (
+    tester,
+  ) async {
+    await pumpScreen(
+      tester,
+      terms: const ApiDepositTerms(
+        fee: '250000',
+        feeBps: 50,
+        minValue: '1000000',
+        railgunFeeBps: 25,
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('private_usd_deposit_minimum')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('private_usd_deposit_relayer_fee')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('private_usd_deposit_railgun_fee')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('after both fees'), findsNothing);
+    expect(find.textContaining('brings'), findsNothing);
+  });
+
+  testWidgets('Back leaves the screen', (tester) async {
+    var backs = 0;
+    await pumpScreen(tester, onBack: () => backs++);
+
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await tester.pump();
+    expect(backs, 1);
+  });
+
   testWidgets('0zkUSDC shows the 0zk address for a Railgun wallet', (
     tester,
   ) async {
-    await pumpSheet(tester, kind: PrivateUsdReceiveKind.shielded);
+    await pumpScreen(tester, kind: PrivateUsdReceiveKind.shielded);
 
     expect(find.text(testL10n.privateUsdReceiveShieldedOnly), findsOneWidget);
     expect(find.text(previewPrivateUsdAddress), findsOneWidget);
@@ -122,7 +169,7 @@ void main() {
   testWidgets('without deposits there is no switch, only the 0zk address', (
     tester,
   ) async {
-    await pumpSheet(
+    await pumpScreen(
       tester,
       kind: PrivateUsdReceiveKind.shielded,
       switchable: false,

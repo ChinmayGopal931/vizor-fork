@@ -11727,18 +11727,6 @@
   "@privateUsdDepositCopy": {
     "description": "Button under the deposit address QR code on the Receive sheet that copies the address."
   },
-  "privateUsdDepositExample": "Sending {sent} brings {arrives} after both fees.",
-  "@privateUsdDepositExample": {
-    "description": "Example under the fee lines on the Receive sheet: what a deposit of the minimum brings into the shielded balance after the relayer's and Railgun's fees; {sent} and {arrives} are dollar amounts such as $5.00 and $4.47.",
-    "placeholders": {
-      "sent": {
-        "type": "String"
-      },
-      "arrives": {
-        "type": "String"
-      }
-    }
-  },
   "privateUsdDepositFeesFailed": "Couldn't load the fees. Money sent here waits safely at this address.",
   "@privateUsdDepositFeesFailed": {
     "description": "Shown on the Receive sheet in place of the deposit fee lines when they could not be loaded; reassures that USDC sent to the address is kept there safely."
@@ -13166,7 +13154,7 @@
   "@profilePictureChange": {
     "description": "Button or label that opens the profile picture picker."
   },
-  "profilePictureName": "{id, select, p01{Light cycle} p02{Halo} p03{Red line} p04{Crosshair} p05{Scanner} p06{Goggles} p07{Frame} other{}}",
+  "profilePictureName": "{id, select, p01{Light cycle} p02{Halo} p03{Red line} p04{Crosshair} p05{Scanner} p06{Goggles} p07{Frame} p16{Statue} p17{Helmet} p18{Platinum} other{}}",
   "@profilePictureName": {
     "description": "Name of a built-in neon profile portrait, shown in the profile picture picker; {id} is the picture number such as p01.",
     "placeholders": {

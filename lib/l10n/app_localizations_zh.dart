@@ -8506,11 +8506,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privateUsdDepositCopy => '复制存入地址';
 
   @override
-  String privateUsdDepositExample(String sent, String arrives) {
-    return '发送 $sent，扣除两项手续费后到账 $arrives。';
-  }
-
-  @override
   String get privateUsdDepositFeesFailed => '无法加载手续费。发送到这里的资金会安全地留在此地址。';
 
   @override
@@ -9494,6 +9489,9 @@ class AppLocalizationsZh extends AppLocalizations {
       'p05': '扫描仪',
       'p06': '护目镜',
       'p07': '边框',
+      'p16': '雕像',
+      'p17': '头盔',
+      'p18': '铂金',
       'other': '',
     });
     return '$_temp0';

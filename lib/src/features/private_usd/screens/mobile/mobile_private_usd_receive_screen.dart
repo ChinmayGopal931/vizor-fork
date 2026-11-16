@@ -3,17 +3,16 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/feedback/app_haptics.dart';
-import '../../../../core/layout/mobile/app_mobile_sheet.dart';
-import '../../../../core/layout/mobile/mobile_bottom_safe_area.dart';
-import '../../../../core/privacy/privacy_mask.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/mobile/mobile_warning_notice.dart';
 import '../../../../core/widgets/mobile/neon_switch_tabs.dart';
+import '../../../../providers/account_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../../../rust/api/private_usd.dart' as rust;
 import '../../../receive/widgets/mobile/receive_qr_frame.dart';
@@ -25,13 +24,15 @@ import '../../private_usd_copy.dart';
 import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_deposits_provider.dart';
 import '../../providers/private_usd_receive_address_provider.dart';
+import '../../widgets/mobile/private_usd_deposit_line.dart';
+import '../../widgets/mobile/private_usd_flow_widgets.dart';
 import '../../../../core/l10n/l10n.dart';
 
-/// How often the open sheet asks for a deposit pass: it is open while money
+/// How often the open screen asks for a deposit pass: it is open while money
 /// is on its way to the address, so a deposit shows soon after it lands.
-const _sheetRefresh = Duration(seconds: 15);
+const _screenRefresh = Duration(seconds: 15);
 
-/// The Receive sheet's two ways in, as ZEC's Receive has its pools.
+/// The Receive screen's two ways in, as ZEC's Receive has its pools.
 enum PrivateUsdReceiveKind {
   /// Public USDC from an exchange or any wallet, to the deposit address,
   /// shielded on its own.
@@ -41,64 +42,40 @@ enum PrivateUsdReceiveKind {
   shielded,
 }
 
-/// The Receive sheet: a switch like ZEC's Receive between public USDC (the
-/// default) and shielded 0zkUSDC. [deposits] is false where the network
-/// pins no Deposits contract: then only the 0zk address shows.
+/// `/private-usd/receive`: a switch like ZEC's Receive between public USDC
+/// (the default) and shielded 0zkUSDC. Where the network pins no Deposits
+/// contract only the 0zk address shows.
 ///
 /// Public USDC: the account's deposit address, as a QR code of the plain
 /// EIP-55 `0x…` string (no `ethereum:` URI, which withdrawal forms refuse),
 /// with the one token and network it takes, the minimum and both fees,
 /// shown before anything is signed.
-Future<void> showPrivateUsdReceiveSheet(
-  BuildContext context, {
-  required String accountUuid,
-  required bool deposits,
-}) {
-  return showAppMobileSheet<void>(
-    context: context,
-    builder: (sheetContext) => PrivateUsdReceiveSheet(
-      accountUuid: accountUuid,
-      deposits: deposits,
-      onClose: () => Navigator.of(sheetContext).pop(),
-    ),
-  );
-}
-
-class PrivateUsdReceiveSheet extends ConsumerStatefulWidget {
-  const PrivateUsdReceiveSheet({
-    required this.accountUuid,
-    required this.deposits,
-    required this.onClose,
-    super.key,
-  });
-
-  final String accountUuid;
-  final bool deposits;
-  final VoidCallback onClose;
+class MobilePrivateUsdReceiveScreen extends ConsumerStatefulWidget {
+  const MobilePrivateUsdReceiveScreen({super.key});
 
   @override
-  ConsumerState<PrivateUsdReceiveSheet> createState() =>
-      _PrivateUsdReceiveSheetState();
+  ConsumerState<MobilePrivateUsdReceiveScreen> createState() =>
+      _MobilePrivateUsdReceiveScreenState();
 }
 
-class _PrivateUsdReceiveSheetState
-    extends ConsumerState<PrivateUsdReceiveSheet> {
+class _MobilePrivateUsdReceiveScreenState
+    extends ConsumerState<MobilePrivateUsdReceiveScreen> {
   Timer? _timer;
-  late var _kind = widget.deposits
-      ? PrivateUsdReceiveKind.usdc
-      : PrivateUsdReceiveKind.shielded;
+
+  /// The way in the user switched to; until then, public USDC where the
+  /// network takes deposits.
+  PrivateUsdReceiveKind? _chosen;
 
   @override
   void initState() {
     super.initState();
-    if (!widget.deposits) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ref.read(privateUsdDepositActionsProvider).refresh();
-    });
-    _timer = Timer.periodic(_sheetRefresh, (_) {
-      if (mounted) ref.read(privateUsdDepositActionsProvider).refresh();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshDeposits());
+    _timer = Timer.periodic(_screenRefresh, (_) => _refreshDeposits());
+  }
+
+  void _refreshDeposits() {
+    if (!mounted || !ref.read(privateUsdDepositsAvailableProvider)) return;
+    ref.read(privateUsdDepositActionsProvider).refresh();
   }
 
   @override
@@ -109,41 +86,29 @@ class _PrivateUsdReceiveSheetState
 
   @override
   Widget build(BuildContext context) {
+    final uuid = ref.watch(
+      accountProvider.select((s) => s.value?.activeAccountUuid),
+    );
+    if (uuid == null) return const SizedBox.shrink();
+    final deposits = ref.watch(privateUsdDepositsAvailableProvider);
     final deployment = ref.watch(privateUsdCurrentDeploymentProvider);
     final pin = deployment?.deposits;
-    final railgunAddress = ref.watch(
-      privateUsdReceiveAddressProvider(widget.accountUuid),
-    );
-    final pass = widget.deposits
-        ? ref.watch(privateUsdDepositPassProvider(widget.accountUuid))
+    final railgunAddress = ref.watch(privateUsdReceiveAddressProvider(uuid));
+    final pass = deposits
+        ? ref.watch(privateUsdDepositPassProvider(uuid))
         : null;
     // Before a pass has run, the address the last scan kept (no network).
-    final fallback = widget.deposits && pass == null
-        ? ref.watch(privateUsdDepositAddressProvider(widget.accountUuid))
+    final fallback = deposits && pass == null
+        ? ref.watch(privateUsdDepositAddressProvider(uuid))
         : null;
     final screening = Duration(seconds: deployment?.screeningSeconds ?? 0);
-    // What the minimum brings, from Rust's own fee and cap.
-    final terms = pass?.terms;
-    final example = terms == null
-        ? null
-        : rust.privateUsdDepositQuote(
-            fee: terms.fee,
-            feeBps: terms.feeBps,
-            value: terms.minValue,
-          );
-    return PrivateUsdReceiveSheetBody(
-      kind: _kind,
-      onKindChanged: widget.deposits
-          ? (kind) => setState(() => _kind = kind)
-          : null,
+    return MobilePrivateUsdReceiveView(
+      kind: deposits
+          ? _chosen ?? PrivateUsdReceiveKind.usdc
+          : PrivateUsdReceiveKind.shielded,
+      onKindChanged: deposits ? (kind) => setState(() => _chosen = kind) : null,
       railgunAddress: railgunAddress.value,
       railgunAddressFailed: railgunAddress.hasError,
-      example: example == null || terms == null
-          ? null
-          : context.l10n.privateUsdDepositExample(
-              formatPrivateUsd(BigInt.tryParse(terms.minValue) ?? BigInt.zero),
-              formatPrivateUsd(BigInt.tryParse(example.arrives) ?? BigInt.zero),
-            ),
       symbol: pin?.tokenSymbol ?? PrivateUsdCopy.usdcSymbol,
       chain: pin?.chainName ?? PrivateUsdCopy.ethereum,
       address: pass?.address ?? fallback?.value?.address,
@@ -159,18 +124,19 @@ class _PrivateUsdReceiveSheetState
             ),
       screening: screening,
       privacyModeEnabled: ref.watch(privacyModeProvider),
-      onClose: widget.onClose,
+      onBack: () => context.pop(),
     );
   }
 }
 
-/// The sheet's content for a given way in, addresses, terms and deposits.
-class PrivateUsdReceiveSheetBody extends StatelessWidget {
-  const PrivateUsdReceiveSheetBody({
+/// The Receive screen's content for a given way in, addresses, terms and
+/// deposits.
+class MobilePrivateUsdReceiveView extends StatelessWidget {
+  const MobilePrivateUsdReceiveView({
     required this.symbol,
     required this.chain,
     required this.address,
-    required this.onClose,
+    required this.onBack,
     this.kind = PrivateUsdReceiveKind.usdc,
     this.onKindChanged,
     this.railgunAddress,
@@ -181,7 +147,6 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
     this.lines = const [],
     this.screening = Duration.zero,
     this.privacyModeEnabled = false,
-    this.example,
     super.key,
   });
 
@@ -194,9 +159,6 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
   /// The account's 0zk address; null while it loads.
   final String? railgunAddress;
   final bool railgunAddressFailed;
-
-  /// What a deposit at the minimum brings after both fees.
-  final String? example;
 
   /// `USDC`, or `tUSD` on testnet; and `Ethereum`, or `Sepolia`.
   final String symbol;
@@ -213,7 +175,7 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
   final List<PrivateUsdDepositLine> lines;
   final Duration screening;
   final bool privacyModeEnabled;
-  final VoidCallback onClose;
+  final VoidCallback onBack;
 
   /// The relayer takes no deposits, or not the pinned ones: no address.
   bool get _unavailable =>
@@ -231,79 +193,57 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final onKindChanged = this.onKindChanged;
-    final children = <Widget>[
-      Text(
-        context.l10n.privateUsdDepositTitle(symbol),
-        style: AppTypography.headlineSmall.copyWith(color: colors.text.accent),
-      ),
-      const SizedBox(height: AppSpacing.sm),
-      if (onKindChanged != null) ...[
-        Center(
-          child: LayoutBuilder(
-            builder: (context, constraints) => NeonSwitchTabs(
-              key: const ValueKey('private_usd_receive_switch'),
-              labels: (symbol, PrivateUsdCopy.receiveShieldedTab(symbol)),
-              selected: kind == PrivateUsdReceiveKind.usdc ? 0 : 1,
-              onChanged: (index) => onKindChanged(
-                index == 0
-                    ? PrivateUsdReceiveKind.usdc
-                    : PrivateUsdReceiveKind.shielded,
-              ),
-              // As ZEC's Receive sets its pool switch.
-              width: constraints.maxWidth < _switchWidth
-                  ? constraints.maxWidth
-                  : _switchWidth,
-              height: 44,
-              labelStyle: AppTypography.labelLarge,
-              tabKeys: (
-                const ValueKey('private_usd_receive_usdc'),
-                const ValueKey('private_usd_receive_shielded'),
+    return PrivateUsdFlowScaffold(
+      title: context.l10n.privateUsdDepositTitle(symbol),
+      onBack: onBack,
+      body: PrivateUsdFlowColumn(
+        top: AppSpacing.md,
+        children: [
+          if (onKindChanged != null) ...[
+            Center(
+              child: LayoutBuilder(
+                builder: (context, constraints) => NeonSwitchTabs(
+                  key: const ValueKey('private_usd_receive_switch'),
+                  labels: (symbol, PrivateUsdCopy.receiveShieldedTab(symbol)),
+                  selected: kind == PrivateUsdReceiveKind.usdc ? 0 : 1,
+                  onChanged: (index) => onKindChanged(
+                    index == 0
+                        ? PrivateUsdReceiveKind.usdc
+                        : PrivateUsdReceiveKind.shielded,
+                  ),
+                  // As ZEC's Receive sets its pool switch.
+                  width: constraints.maxWidth < _switchWidth
+                      ? constraints.maxWidth
+                      : _switchWidth,
+                  height: 44,
+                  labelStyle: AppTypography.labelLarge,
+                  tabKeys: (
+                    const ValueKey('private_usd_receive_usdc'),
+                    const ValueKey('private_usd_receive_shielded'),
+                  ),
+                ),
               ),
             ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+          // The two ways in differ in height: the content eases between
+          // them.
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: Column(
+              key: ValueKey(kind),
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: switch (kind) {
+                PrivateUsdReceiveKind.usdc => _deposit(context),
+                PrivateUsdReceiveKind.shielded => _shielded(context),
+              },
+            ),
           ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-      ],
-      // The two ways in differ in height: the sheet eases between them.
-      AnimatedSize(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        alignment: Alignment.topCenter,
-        child: Column(
-          key: ValueKey(kind),
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: switch (kind) {
-            PrivateUsdReceiveKind.usdc => _deposit(context),
-            PrivateUsdReceiveKind.shielded => _shielded(context),
-          },
-        ),
-      ),
-      const SizedBox(height: AppSpacing.md),
-      AppButton(
-        variant: AppButtonVariant.secondary,
-        expand: true,
-        onPressed: onClose,
-        child: Text(context.l10n.commonClose),
-      ),
-    ];
-    return MobileBottomSafeArea(
-      bottomPadding: AppSpacing.base,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.sm,
-          AppSpacing.base,
-          AppSpacing.sm,
-          AppSpacing.base,
-        ),
-        child: Column(
-          key: const ValueKey('private_usd_deposit_sheet'),
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: children,
-        ),
+        ],
       ),
     );
   }
@@ -471,12 +411,9 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
           context.l10n.privateUsdDepositRailgunFee(
             privateUsdPercentText(terms.railgunFeeBps),
           ),
+          key: const ValueKey('private_usd_deposit_railgun_fee'),
           style: body,
         ),
-        if (example case final example?) ...[
-          const SizedBox(height: AppSpacing.xxs),
-          Text(example, style: note),
-        ],
       ] else
         Text(
           termsError == null
@@ -488,73 +425,5 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
       const SizedBox(height: AppSpacing.s),
       Text(context.l10n.privateUsdDepositHow, style: note),
     ];
-  }
-}
-
-/// One deposit state as a line of text (the sheet and the screen's card).
-class PrivateUsdDepositLineText extends StatelessWidget {
-  const PrivateUsdDepositLineText({
-    required this.line,
-    required this.minimum,
-    required this.screening,
-    required this.privacyModeEnabled,
-    super.key,
-  });
-
-  final PrivateUsdDepositLine line;
-  final BigInt? minimum;
-  final Duration screening;
-  final bool privacyModeEnabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final usd = hideAmountIfPrivacyMode(
-      formatPrivateUsd(line.amount),
-      privacyModeEnabled: privacyModeEnabled,
-      denomination: '',
-    );
-    final minimum = this.minimum;
-    final (text, color) = switch (line.phase) {
-      PrivateUsdDepositPhase.received => (
-        context.l10n.privateUsdDepositReceived(usd),
-        colors.text.accent,
-      ),
-      PrivateUsdDepositPhase.underMinimum => (
-        minimum == null
-            ? context.l10n.privateUsdDepositReceived(usd)
-            : context.l10n.privateUsdDepositUnderMinimum(
-                usd,
-                formatPrivateUsd(minimum),
-              ),
-        colors.text.secondary,
-      ),
-      PrivateUsdDepositPhase.waiting => (
-        context.l10n.privateUsdDepositWaitingLine(usd),
-        colors.text.secondary,
-      ),
-      PrivateUsdDepositPhase.shielding => (
-        context.l10n.privateUsdDepositShieldingLine(usd),
-        colors.text.accent,
-      ),
-      PrivateUsdDepositPhase.shielded => (
-        context.l10n.privateUsdDepositShieldedLine(
-          usd,
-          PrivateUsdCopy.about(context.l10n, screening),
-        ),
-        colors.text.positiveStrong,
-      ),
-      PrivateUsdDepositPhase.notShielding => (
-        context.l10n.privateUsdDepositNotShieldingLine(usd),
-        colors.text.secondary,
-      ),
-    };
-    return Text(
-      text,
-      key: ValueKey(
-        'private_usd_deposit_line_${line.index}_${line.phase.name}',
-      ),
-      style: AppTypography.bodySmall.copyWith(color: color),
-    );
   }
 }

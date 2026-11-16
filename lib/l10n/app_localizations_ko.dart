@@ -9052,11 +9052,6 @@ class AppLocalizationsKo extends AppLocalizations {
   String get privateUsdDepositCopy => '입‍금 주‍소 복‍사';
 
   @override
-  String privateUsdDepositExample(String sent, String arrives) {
-    return '$sent 보‍내‍면 수‍수‍료 두 가‍지‍를 빼‍고 $arrives 들‍어‍와‍요.';
-  }
-
-  @override
   String get privateUsdDepositFeesFailed =>
       '수‍수‍료‍를 불‍러‍오‍지 못‍했‍어‍요. 여‍기‍로 보‍낸 자‍금‍은 이 주‍소‍에 안‍전‍하‍게 보‍관‍돼‍요.';
 
@@ -10090,6 +10085,9 @@ class AppLocalizationsKo extends AppLocalizations {
       'p05': '스‍캐‍너',
       'p06': '고‍글',
       'p07': '프‍레‍임',
+      'p16': '조‍각‍상',
+      'p17': '헬‍멧',
+      'p18': '플‍래‍티‍넘',
       'other': '',
     });
     return '$_temp0';

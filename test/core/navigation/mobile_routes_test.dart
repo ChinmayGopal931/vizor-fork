@@ -1362,6 +1362,8 @@ void main() {
         '/private-usd/send/status',
         '/private-usd/withdraw',
         '/private-usd/withdraw/review',
+        // A page like the rest, so the iOS edge swipe goes back from it.
+        '/private-usd/receive',
         '/private-usd/refunds',
       ]),
     );

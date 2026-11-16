@@ -15026,12 +15026,6 @@ abstract class AppLocalizations {
   /// **'Copy deposit address'**
   String get privateUsdDepositCopy;
 
-  /// Example under the fee lines on the Receive sheet: what a deposit of the minimum brings into the shielded balance after the relayer's and Railgun's fees; {sent} and {arrives} are dollar amounts such as $5.00 and $4.47.
-  ///
-  /// In en, this message translates to:
-  /// **'Sending {sent} brings {arrives} after both fees.'**
-  String privateUsdDepositExample(String sent, String arrives);
-
   /// Shown on the Receive sheet in place of the deposit fee lines when they could not be loaded; reassures that USDC sent to the address is kept there safely.
   ///
   /// In en, this message translates to:
@@ -16679,7 +16673,7 @@ abstract class AppLocalizations {
   /// Name of a built-in neon profile portrait, shown in the profile picture picker; {id} is the picture number such as p01.
   ///
   /// In en, this message translates to:
-  /// **'{id, select, p01{Light cycle} p02{Halo} p03{Red line} p04{Crosshair} p05{Scanner} p06{Goggles} p07{Frame} other{}}'**
+  /// **'{id, select, p01{Light cycle} p02{Halo} p03{Red line} p04{Crosshair} p05{Scanner} p06{Goggles} p07{Frame} p16{Statue} p17{Helmet} p18{Platinum} other{}}'**
   String profilePictureName(String id);
 
   /// Title of the profile picture picker.
