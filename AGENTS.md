@@ -551,6 +551,13 @@ Ledger accounts keep the decorative dot style.
   proper-noun acronyms in their canonical form (`ZEC`, `USDC`, `USDT`, `NEAR`,
   `Veylor`, `Keystone`, `Zcash`, `Ethereum`).
 - Figma-authored display headings may keep title case.
+- **Which brand.** Mobile copy names the app Veylor. The desktop builds still
+  ship as Vizor (macOS, Linux and Windows product names), so desktop-only
+  copy keeps Vizor, and so do strings that mean upstream itself: the
+  donation's recipient and the links to upstream's GitHub and website. Strings
+  live in the ARB files (`lib/l10n`) and both forms are do-not-translate
+  glossary terms. When an upstream merge brings a string that names the app,
+  give it the brand of where it shows, in English, Korean and Chinese.
 - This applies to interpolated labels too: `'$symbol deposit tx'`, not
   `'$symbol Deposit tx'`. The asset symbol carries its own casing; the rest of
   the label is sentence case.
@@ -2005,7 +2012,7 @@ into `main` or open a PR unprompted, and never against upstream.
   Mobile-UI tests:
   `fvm flutter test --tags mobile --run-skipped --dart-define=VIZOR_FORM_FACTOR=mobile`.
   Lane rules in "Design Token Form Factor" above.
-- Fonts: Gotham is the app's only family. It is a plain asset (`assets/fonts/`),
+- Fonts: Gotham is the app's only Latin family. It is a plain asset (`assets/fonts/`),
   not a pubspec `fonts:` family: Flutter takes a face's weight from the font
   file, and these files' OS/2 weight classes are off the CSS scale, so
   `FontWeight.w400` would resolve to the Bold file. `loadGothamFonts()`
@@ -2014,7 +2021,9 @@ into `main` or open a PR unprompted, and never against upstream.
   Figma-compare entry points call it. A widget test that needs real glyphs
   instead of the square test font calls `loadGothamFonts()` too, never a
   hand-rolled `FontLoader` over the `Gotham-*.otf` files. Gotham has no
-  SemiBold (`w600` resolves to Bold) and no monospace face. The mobile serif
+  SemiBold (`w600` resolves to Bold) and no monospace face. Korean and Chinese
+  text falls back to upstream's generated subsets, the pubspec families
+  `Vizor Korean UI` and `Vizor Chinese UI` (`locale_typography.dart`). The mobile serif
   headline tokens are set below the Figma sizes for it (see `_headlineLMobile`).
 - Integration tests: `fvm flutter test integration_test/` (requires device/simulator)
 - Flutter regtest E2E notes:
