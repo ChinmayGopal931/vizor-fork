@@ -112,13 +112,14 @@ class NeonSyncLine {
     final syncing = status.kind == SyncStatusKind.syncing && !catchingUp;
     final progress = switch (status.kind) {
       _ when catchingUp => 1.0,
-      SyncStatusKind.synced => 1.0,
+      SyncStatusKind.synced || SyncStatusKind.catchingUp => 1.0,
       SyncStatusKind.syncing => climbProgress().clamp(0.03, 0.99),
       SyncStatusKind.failed => sync.percentage.clamp(0.03, 0.99),
     };
     final readout = switch (status.kind) {
       _ when catchingUp => NeonSyncReadout.synced,
-      SyncStatusKind.synced => NeonSyncReadout.synced,
+      SyncStatusKind.synced ||
+      SyncStatusKind.catchingUp => NeonSyncReadout.synced,
       SyncStatusKind.failed =>
         torFailed ? NeonSyncReadout.torOffline : NeonSyncReadout.failed,
       SyncStatusKind.syncing =>

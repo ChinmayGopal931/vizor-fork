@@ -59,6 +59,7 @@ import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 import '../../support/go_route_descendants.dart';
+import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
 
 class _NativeGeometryFixture extends NativeMobileNavigationGeometry {
   _NativeGeometryFixture(this.value);
@@ -191,6 +192,62 @@ List<({Color? fill, Color? label})> _sidebarPaints(WidgetTester tester) => [
 ];
 
 void main() {
+  testWidgets('the wide layout sidebar shows a short catch-up without a '
+      'percentage', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(900, 720);
+    addTearDown(tester.view.reset);
+    final router = GoRouter(
+      initialLocation: '/activity',
+      routes: [
+        ShellRoute(
+          builder: (context, state, child) =>
+              MobileAdaptiveFrame(router: GoRouter.of(context), child: child),
+          routes: [
+            GoRoute(
+              path: '/activity',
+              builder: (_, _) => const Scaffold(body: Text('Activity pane')),
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      _app(
+        router,
+        initialSyncState: SyncState(
+          accountUuid: 'account-1',
+          hasAccountScopedData: true,
+          isSyncing: true,
+          phase: 'scan',
+          scannedHeight: 3000000,
+          chainTipHeight: 3000003,
+          remainingScanBlocks: 3,
+          lastSyncStartedAt: DateTime.now(),
+          lastSyncCompletedAt: DateTime.now(),
+          startedFromCompletedSync: true,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final sidebar = tester.widget<MobileWalletSidebar>(
+      find.byType(MobileWalletSidebar),
+    );
+    // Veylor's sidebar readout reads a short catch-up as synced, as Home's
+    // sync line does.
+    expect(sidebar.sync.readout, NeonSyncReadout.synced);
+    expect(
+      find.descendant(
+        of: find.byType(MobileWalletSidebar),
+        matching: find.textContaining('% Syncing'),
+      ),
+      findsNothing,
+    );
+  });
+
   testWidgets(
     'account removal passcode covers the tab shell and cancels on back',
     (tester) async {

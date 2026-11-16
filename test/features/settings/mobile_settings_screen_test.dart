@@ -682,7 +682,7 @@ void main() {
           .data;
       expect(
         description,
-        'Veylor’s network requests go through Tor. Ironwood private migration '
+        'Veylor uses Tor to protect your IP address. Ironwood private migration '
         'uses a direct connection while Veylor is closed. Links opened in other '
         'apps use those apps’ network settings.',
       );
@@ -861,8 +861,8 @@ void main() {
           .data;
       expect(
         description,
-        'Veylor’s network requests go through Tor. Links opened in other apps '
-        'use those apps’ network settings.',
+        'Veylor uses Tor to protect your IP address. Links opened in other '
+        'apps use those apps’ network settings.',
       );
       expect(description, isNot(contains('migration')));
     } finally {

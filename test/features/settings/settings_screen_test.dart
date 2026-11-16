@@ -642,8 +642,8 @@ void main() {
     expect(find.text('Connected'), findsOneWidget);
     expect(
       find.text(
-        'Veylor’s network requests go through Tor. Links opened in other apps '
-        'use those apps’ network settings.',
+        'Veylor uses Tor to protect your IP address. Links opened in other '
+        'apps use those apps’ network settings.',
       ),
       findsOneWidget,
     );
@@ -709,8 +709,8 @@ void main() {
 
       expect(
         find.text(
-          'Veylor’s network requests go through Tor. Links opened in other apps '
-          'use those apps’ network settings.',
+          'Veylor uses Tor to protect your IP address. Links opened in other '
+          'apps use those apps’ network settings.',
         ),
         findsOneWidget,
       );
@@ -1012,7 +1012,7 @@ void main() {
 
     expect(
       find.text(
-        'Veylor’s network requests go through Tor, but software updates are '
+        'Veylor uses Tor to protect your IP address, but software updates are '
         'unavailable.',
       ),
       findsOneWidget,

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,12 +14,14 @@ import '../../../providers/app_security_provider.dart';
 import '../../../providers/biometric_unlock_provider.dart';
 import '../../../providers/sync_display_progress_provider.dart';
 import '../../../providers/sync_keep_awake_provider.dart';
+import '../../../providers/sync_scan_slowdown_provider.dart';
 import '../../../services/biometric_unlock.dart';
 import '../../feedback/app_haptics.dart';
 import '../../l10n/l10n.dart';
 import '../../formatting/sync_status_label.dart';
 import '../../layout/app_form_factor.dart';
 import '../../layout/mobile/mobile_top_nav.dart';
+import '../../platform/device_power.dart';
 import '../../theme/app_theme.dart';
 import '../app_button.dart';
 import '../app_icon.dart';
@@ -263,6 +266,7 @@ class SyncKeepAwakePrivacyLockScreen extends ConsumerStatefulWidget {
 
   /// Wide enough to keep each body line whole.
   static const _bodyWidth = 200.0;
+  static const _slowdownWidth = 200.0;
   static const _doneBodyWidth = 280.0;
 
   @override
@@ -467,13 +471,7 @@ class _SyncKeepAwakeStatusScreen extends ConsumerWidget {
         BiometricUnlockState.initial;
     final l10n = context.l10n;
     final main = switch (mode) {
-      SyncKeepAwakePrivacyLockMode.done => _SyncKeepAwakeStatusLockup(
-        glyph: TronGlyphKind.check,
-        glyphKey: const ValueKey('sync_keep_awake_privacy_done_check'),
-        title: l10n.lockSyncCompleteTitle,
-        body: l10n.lockUnlockToContinueBody,
-        animate: true,
-      ),
+      SyncKeepAwakePrivacyLockMode.done => const _SyncKeepAwakeDoneLockup(),
       SyncKeepAwakePrivacyLockMode.interrupted => _SyncKeepAwakeStatusLockup(
         glyph: TronGlyphKind.warning,
         glyphKey: const ValueKey('sync_keep_awake_privacy_interrupted_warning'),
@@ -609,6 +607,7 @@ class _SyncKeepAwakeDisplayProgressLockup extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return _SyncKeepAwakeProgressLockup(
       progress: ref.watch(syncDisplayPercentageProvider),
+      slowdown: ref.watch(syncScanSlowdownProvider),
     );
   }
 }
@@ -728,17 +727,21 @@ class _SyncKeepAwakePasscodeConfirmScreen extends StatelessWidget {
           child: Column(
             children: [
               Consumer(
-                builder: (context, ref, _) => MobileTopNav.back(
-                  title: _titleForMode(
+                builder: (context, ref, _) {
+                  final (title, titleSemanticsLabel) = _titleForMode(
                     context.l10n,
                     mode == SyncKeepAwakePrivacyLockMode.syncing ||
                             mode == SyncKeepAwakePrivacyLockMode.hidden
                         ? ref.watch(syncDisplayWholePercentageProvider)
                         : 0,
-                  ),
-                  height: _topNavHeight,
-                  onBack: submitting ? null : onBack,
-                ),
+                  );
+                  return MobileTopNav.back(
+                    title: title,
+                    titleSemanticsLabel: titleSemanticsLabel,
+                    height: _topNavHeight,
+                    onBack: submitting ? null : onBack,
+                  );
+                },
               ),
               Expanded(
                 child: LayoutBuilder(
@@ -828,13 +831,29 @@ class _SyncKeepAwakePasscodeConfirmScreen extends StatelessWidget {
     );
   }
 
-  String _titleForMode(AppLocalizations l10n, int displayWholePercentage) {
+  /// The title and what a screen reader announces for it.
+  (String, String?) _titleForMode(
+    AppLocalizations l10n,
+    int displayWholePercentage,
+  ) {
     return switch (mode) {
-      SyncKeepAwakePrivacyLockMode.done => l10n.syncSynced,
-      SyncKeepAwakePrivacyLockMode.interrupted => l10n.lockSyncPausedTitle,
+      SyncKeepAwakePrivacyLockMode.done => (l10n.syncSynced, null),
+      SyncKeepAwakePrivacyLockMode.interrupted => (
+        l10n.lockSyncPausedTitle,
+        null,
+      ),
       SyncKeepAwakePrivacyLockMode.hidden ||
-      SyncKeepAwakePrivacyLockMode.syncing => l10n.lockNavSyncing(
-        displayWholePercentage,
+      SyncKeepAwakePrivacyLockMode.syncing => (
+        formatSyncProgressLabel(
+          l10n,
+          displayWholePercentage,
+          isChecking: false,
+        ),
+        formatSyncProgressSemanticsLabel(
+          l10n,
+          displayWholePercentage,
+          isChecking: false,
+        ),
       ),
     };
   }
@@ -869,6 +888,31 @@ class _SyncKeepAwakeTitle extends StatelessWidget {
   }
 }
 
+/// Sync complete. While a catch-up runs beneath it (a short catch-up, or one
+/// held past the short limits), the body says new blocks are syncing, in the
+/// same slot.
+class _SyncKeepAwakeDoneLockup extends ConsumerWidget {
+  const _SyncKeepAwakeDoneLockup();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final catchingUp = ref.watch(syncKeepAwakeCompleteThroughCatchUpProvider);
+    final l10n = context.l10n;
+    return _SyncKeepAwakeStatusLockup(
+      glyph: TronGlyphKind.check,
+      glyphKey: const ValueKey('sync_keep_awake_privacy_done_check'),
+      title: l10n.lockSyncCompleteTitle,
+      body: catchingUp
+          ? l10n.lockSyncingNewBlocks
+          : l10n.lockUnlockToContinueBody,
+      bodySemanticsLabel: catchingUp
+          ? l10n.lockSyncingNewBlocksSemantics
+          : null,
+      animate: true,
+    );
+  }
+}
+
 /// Done and paused: a lit glyph on a cut-corner plate over the state's
 /// title and a line of Light body text.
 class _SyncKeepAwakeStatusLockup extends StatelessWidget {
@@ -877,6 +921,7 @@ class _SyncKeepAwakeStatusLockup extends StatelessWidget {
     required this.glyphKey,
     required this.title,
     required this.body,
+    this.bodySemanticsLabel,
     this.animate = false,
   });
 
@@ -884,6 +929,9 @@ class _SyncKeepAwakeStatusLockup extends StatelessWidget {
   final Key glyphKey;
   final String title;
   final String body;
+
+  /// What a screen reader announces for [body]; the body itself when null.
+  final String? bodySemanticsLabel;
 
   /// Switch on as a sign: a scanline, a light cycle drawing the badge, then
   /// the title decrypting in.
@@ -947,6 +995,8 @@ class _SyncKeepAwakeStatusLockup extends StatelessWidget {
                   ),
                   child: Text(
                     body,
+                    key: const ValueKey('sync_keep_awake_privacy_status_body'),
+                    semanticsLabel: bodySemanticsLabel,
                     textAlign: TextAlign.center,
                     style: AppTypography.bodyMedium.copyWith(
                       color: colors.text.secondary,
@@ -965,7 +1015,7 @@ class _SyncKeepAwakeStatusLockup extends StatelessWidget {
 /// Syncing: the progress as a lit ring around Thin numerals lit like the
 /// balance sign's. The ring and its numerals switch on as a sign does.
 class _SyncKeepAwakeProgressLockup extends StatelessWidget {
-  const _SyncKeepAwakeProgressLockup({required this.progress});
+  const _SyncKeepAwakeProgressLockup({required this.progress, this.slowdown});
 
   static const _progressAnimationDuration = Duration(milliseconds: 420);
 
@@ -988,18 +1038,22 @@ class _SyncKeepAwakeProgressLockup extends StatelessWidget {
   );
 
   final double progress;
+  final SyncScanSlowdown? slowdown;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
     final neon = colors.neon;
     final targetProgress = progress.clamp(0.0, 1.0).toDouble();
+    final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    final slowdown = this.slowdown;
     return SizedBox.square(
       dimension: SyncKeepAwakePrivacyLockScreen._ringSize,
       child: NeonIgnition(
         builder: (context, light) => TweenAnimationBuilder<double>(
           tween: Tween<double>(begin: targetProgress, end: targetProgress),
-          duration: _progressAnimationDuration,
+          // With animations reduced, the ring and number jump to each value.
+          duration: reduceMotion ? Duration.zero : _progressAnimationDuration,
           curve: Curves.easeOutCubic,
           builder: (context, animatedProgress, _) {
             return Stack(
@@ -1019,6 +1073,7 @@ class _SyncKeepAwakeProgressLockup extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text.rich(
+                        key: const ValueKey('sync_keep_awake_privacy_number'),
                         TextSpan(
                           children: [
                             TextSpan(
@@ -1058,6 +1113,22 @@ class _SyncKeepAwakeProgressLockup extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if (slowdown != null) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        SizedBox(
+                          width: SyncKeepAwakePrivacyLockScreen._slowdownWidth,
+                          child: Text(
+                            _slowdownMessage(context.l10n, slowdown),
+                            key: const ValueKey(
+                              'sync_keep_awake_privacy_slowdown',
+                            ),
+                            textAlign: TextAlign.center,
+                            style: AppTypography.bodySmall.copyWith(
+                              color: colors.text.secondary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1069,6 +1140,18 @@ class _SyncKeepAwakeProgressLockup extends StatelessWidget {
     );
   }
 }
+
+/// Why sync is slower. Power saving says how to speed up again, naming Low
+/// Power Mode on iOS and power saving in general on Android, whose setting
+/// name varies by maker (Battery Saver, Power saving).
+String _slowdownMessage(AppLocalizations l10n, SyncScanSlowdown slowdown) =>
+    switch (slowdown) {
+      SyncScanSlowdown.heat => l10n.lockSyncSlowedHeat,
+      SyncScanSlowdown.powerSaving =>
+        defaultTargetPlatform == TargetPlatform.iOS
+            ? l10n.lockSyncSlowedLowPowerMode
+            : l10n.lockSyncSlowedPowerSaving,
+    };
 
 /// The progress ring: the synced share is a lit tube that runs clockwise
 /// from the top to a bright head, and the rest is a scale of unlit ticks

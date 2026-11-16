@@ -47,7 +47,7 @@ Widget buildMobileTopNavVariantsUseCase(BuildContext context) {
         // The migration status screens add the sync label.
         MobileTopNav.account(
           accountName: 'Account1',
-          syncLabel: '20% Syncing...',
+          syncLabel: '20% Syncing…',
         ),
         MobileTopNav.steps(progress: 0.3, onBack: () {}),
         MobileTopNav.back(title: 'Activity', onBack: () {}),
