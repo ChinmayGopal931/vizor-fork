@@ -10082,7 +10082,7 @@ abstract class AppLocalizations {
   /// Body of the macOS alert shown before downloading an app update while Tor is on.
   ///
   /// In en, this message translates to:
-  /// **'Updating over Tor may take longer. Turning Tor off switches all Veylor network requests to a direct connection.'**
+  /// **'Updating over Tor may take longer. Turning Tor off switches all Vizor network requests to a direct connection.'**
   String get nativeTorUpdateBody;
 
   /// Button in the macOS update alert: skip this update.

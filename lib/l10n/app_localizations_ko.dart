@@ -6085,7 +6085,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get nativeTorUpdateBody =>
-      'Tor‍로 업‍데‍이‍트‍하‍면 시‍간‍이 더 걸‍릴 수 있‍어‍요. Tor‍를 끄‍면 Veylor‍의 모‍든 네‍트‍워‍크 요‍청‍이 직‍접 연‍결‍로 바‍뀌‍어‍요.';
+      'Tor‍로 업‍데‍이‍트‍하‍면 시‍간‍이 더 걸‍릴 수 있‍어‍요. Tor‍를 끄‍면 Vizor‍의 모‍든 네‍트‍워‍크 요‍청‍이 직‍접 연‍결‍로 바‍뀌‍어‍요.';
 
   @override
   String get nativeTorUpdateCancel => '취‍소';

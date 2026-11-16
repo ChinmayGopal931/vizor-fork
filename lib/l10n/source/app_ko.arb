@@ -1654,7 +1654,7 @@
   "nativePrepTrackingPausedBody": "마이그레이션 준비를 다시 시작하려면 Veylor를 열어 주세요.",
   "nativePrepTrackingPausedTitle": "준비 추적이 일시 중지됐어요",
   "nativePrepUpdatesTitle": "마이그레이션 준비 업데이트",
-  "nativeTorUpdateBody": "Tor로 업데이트하면 시간이 더 걸릴 수 있어요. Tor를 끄면 Veylor의 모든 네트워크 요청이 직접 연결로 바뀌어요.",
+  "nativeTorUpdateBody": "Tor로 업데이트하면 시간이 더 걸릴 수 있어요. Tor를 끄면 Vizor의 모든 네트워크 요청이 직접 연결로 바뀌어요.",
   "nativeTorUpdateCancel": "취소",
   "nativeTorUpdateClose": "닫기",
   "nativeTorUpdateContinue": "Tor로 계속",

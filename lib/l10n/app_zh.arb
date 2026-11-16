@@ -1654,7 +1654,7 @@
   "nativePrepTrackingPausedBody": "打开 Veylor 以恢复迁移准备。",
   "nativePrepTrackingPausedTitle": "准备进度跟踪已暂停",
   "nativePrepUpdatesTitle": "迁移准备动态",
-  "nativeTorUpdateBody": "通过 Tor 更新可能需要更长时间。关闭 Tor 后，Veylor 的所有网络请求都会改为直接连接。",
+  "nativeTorUpdateBody": "通过 Tor 更新可能需要更长时间。关闭 Tor 后，Vizor 的所有网络请求都会改为直接连接。",
   "nativeTorUpdateCancel": "取消",
   "nativeTorUpdateClose": "关闭",
   "nativeTorUpdateContinue": "继续使用 Tor",

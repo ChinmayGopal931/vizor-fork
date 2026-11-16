@@ -7923,7 +7923,7 @@
   "@nativePrepUpdatesTitle": {
     "description": "Title of the iOS notification shown by the OS when the preparation transactions of several accounts confirmed."
   },
-  "nativeTorUpdateBody": "Updating over Tor may take longer. Turning Tor off switches all Veylor network requests to a direct connection.",
+  "nativeTorUpdateBody": "Updating over Tor may take longer. Turning Tor off switches all Vizor network requests to a direct connection.",
   "@nativeTorUpdateBody": {
     "description": "Body of the macOS alert shown before downloading an app update while Tor is on."
   },

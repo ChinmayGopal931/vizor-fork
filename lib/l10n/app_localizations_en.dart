@@ -6174,7 +6174,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nativeTorUpdateBody =>
-      'Updating over Tor may take longer. Turning Tor off switches all Veylor network requests to a direct connection.';
+      'Updating over Tor may take longer. Turning Tor off switches all Vizor network requests to a direct connection.';
 
   @override
   String get nativeTorUpdateCancel => 'Cancel';

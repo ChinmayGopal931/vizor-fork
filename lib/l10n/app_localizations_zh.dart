@@ -5725,7 +5725,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get nativeTorUpdateBody =>
-      '通过 Tor 更新可能需要更长时间。关闭 Tor 后，Veylor 的所有网络请求都会改为直接连接。';
+      '通过 Tor 更新可能需要更长时间。关闭 Tor 后，Vizor 的所有网络请求都会改为直接连接。';
 
   @override
   String get nativeTorUpdateCancel => '取消';
