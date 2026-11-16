@@ -10,6 +10,7 @@ import 'package:zcash_wallet/src/providers/router_refresh_provider.dart';
 import 'package:zcash_wallet/src/providers/app_security_provider.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
@@ -20,6 +21,7 @@ import 'package:zcash_wallet/src/features/onboarding/create/onboarding_split_vie
 import 'package:zcash_wallet/src/features/onboarding/ledger/ledger_connect_screen.dart';
 import 'package:zcash_wallet/src/features/onboarding/shared/onboarding_flow_args.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 void main() {
   testWidgets('Ledger duplicate error preserves branding and permits retry', (
@@ -238,7 +240,12 @@ void main() {
   setUpAll(_loadAppFonts);
 
   test('customise account keeps its route and sidebar label', () {
-    expect(OnboardingStep.customiseAccount.label, 'Customise wallet');
+    expect(
+      OnboardingStep.customiseAccount.label(
+        lookupAppLocalizations(const Locale('en')),
+      ),
+      'Customise wallet',
+    );
     expect(
       OnboardingStep.customiseAccount.routePath,
       '/onboarding/customise-account',
@@ -486,8 +493,8 @@ void main() {
       );
       await tester.pump();
       expect(submittedName, 'Resolute Herald');
-      // The third draw (8) picks among the seven portraits: 8 % 7 = 1.
-      expect(submittedPicture, 'pfp-02');
+      // The third draw (8) picks among the ten portraits: the ninth.
+      expect(submittedPicture, 'pfp-17');
       expect(random.nextIntCallCount, 9);
       expect(tester.takeException(), isNull);
     });
@@ -763,6 +770,7 @@ Widget _screenHarness(Widget child, {List<Override> overrides = const []}) {
       ...overrides,
     ],
     child: MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
       home: AppTheme(
         data: AppThemeData.dark,
         child: Material(color: Colors.transparent, child: child),
@@ -777,6 +785,7 @@ Widget _routerHarness(GoRouter router) {
       appBootstrapProvider.overrideWithValue(AppBootstrapState.empty),
     ],
     child: MaterialApp.router(
+      localizationsDelegates: appLocalizationsDelegates,
       routerConfig: router,
       builder: (_, child) => AppTheme(
         data: AppThemeData.dark,

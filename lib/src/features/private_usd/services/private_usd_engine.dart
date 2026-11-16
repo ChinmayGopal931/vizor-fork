@@ -44,7 +44,7 @@ class PrivateUsdEngineUnavailableException implements PrivateUsdPause {
   const PrivateUsdEngineUnavailableException();
 
   @override
-  String toString() => 'Private USD is busy with a wallet change.';
+  String toString() => 'Private USD is busy with a wallet change.'; // l10n-ignore: exception text
 }
 
 /// The engine paused (a lock, the background or a drain) under a call, so
@@ -54,7 +54,7 @@ class PrivateUsdEngineInterruptedException implements PrivateUsdPause {
   const PrivateUsdEngineInterruptedException();
 
   @override
-  String toString() => 'The conversion step was interrupted.';
+  String toString() => 'The conversion step was interrupted.'; // l10n-ignore: exception text
 }
 
 /// What the loop knows about one conversion, in either direction: the record

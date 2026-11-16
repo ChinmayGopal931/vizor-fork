@@ -1,3 +1,5 @@
+import 'l10n/l10n.dart';
+
 const kDefaultProfilePictureId = 'pfp-01';
 const _kProfilePictureAssetRoot = 'assets/profile_pictures';
 final _legacyKnightVariantPattern = RegExp(r'^knight-(\d{2})$');
@@ -14,30 +16,31 @@ const _legacyProfilePictureIdMap = {
 };
 
 class ProfilePictureOption {
-  const ProfilePictureOption({
-    required this.id,
-    required this.label,
-    required this.assetPath,
-  });
+  const ProfilePictureOption({required this.id, required this.assetPath});
 
   final String id;
-  final String label;
   final String assetPath;
+
+  /// The character's name. The id (`pfp-01`) is what gets saved.
+  String label(AppLocalizations l10n) =>
+      l10n.profilePictureName('p${id.substring('pfp-'.length)}');
 }
 
 /// The neon portraits. Ids stay `pfp-NN` so stored accounts and contacts
-/// keep theirs.
-const _kProfilePictureSuffixes = ['01', '02', '03', '04', '05', '06', '07'];
-
-const _kProfilePictureLabelsBySuffix = {
-  '01': 'Light cycle',
-  '02': 'Halo',
-  '03': 'Red line',
-  '04': 'Crosshair',
-  '05': 'Scanner',
-  '06': 'Goggles',
-  '07': 'Frame',
-};
+/// keep theirs. Later portraits number on from `16`, since the retired
+/// knights' ids (below) still land on the first seven.
+const _kProfilePictureSuffixes = [
+  '01',
+  '02',
+  '03',
+  '04',
+  '05',
+  '06',
+  '07',
+  '16',
+  '17',
+  '18',
+];
 
 /// The knight set had fifteen pictures; a stored id from the retired eight
 /// lands on a portrait of the new set, so nobody falls back to one default.
@@ -56,7 +59,6 @@ final kProfilePictureOptions = <ProfilePictureOption>[
   for (final suffix in _kProfilePictureSuffixes)
     ProfilePictureOption(
       id: 'pfp-$suffix',
-      label: _kProfilePictureLabelsBySuffix[suffix]!,
       assetPath: '$_kProfilePictureAssetRoot/profile_picture_$suffix.webp',
     ),
 ];

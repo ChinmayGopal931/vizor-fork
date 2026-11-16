@@ -89,7 +89,7 @@ final _historyKeyProvider = Provider<_HistoryKey>((ref) {
         for (final transaction
             in state.value?.recentTransactions ??
                 const <rust_sync.TransactionInfo>[])
-          '${transaction.txidHex}:${transaction.minedHeight}:'
+          '${transaction.txidHex}:${transaction.minedHeight}:' // l10n-ignore: row identifier
               '${transaction.expiredUnmined}',
       ].join('|'),
     ),

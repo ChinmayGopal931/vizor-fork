@@ -14,6 +14,7 @@ import 'package:zcash_wallet/src/features/about/screens/about_screen.dart';
 import 'package:zcash_wallet/src/providers/account_models.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 
@@ -58,7 +59,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('About Vizor'), findsNothing);
-    expect(find.text('About Vizor Wallet'), findsOneWidget);
+    expect(find.text('About Veylor Wallet'), findsOneWidget);
     expect(find.text('Version: 0.0.0 Public Beta'), findsOneWidget);
     expect(find.text('Built by the Keplr team'), findsOneWidget);
     expect(find.text('Designed for shielded Zcash'), findsOneWidget);
@@ -105,7 +106,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('About Vizor'), findsNothing);
-    expect(find.text('About Vizor Wallet'), findsOneWidget);
+    expect(find.text('About Veylor Wallet'), findsOneWidget);
     final backLink = find.byType(AppRouteBackLink);
     expect(
       find.descendant(of: backLink, matching: find.text('Home')),
@@ -165,7 +166,7 @@ void main() {
     _expectScrollbarFillsPaneEdge(tester, const Size(1280, 900));
     _expectUtilityContentCentered(
       tester,
-      titleText: 'About Vizor Wallet',
+      titleText: 'About Veylor Wallet',
       headingText: 'Built by the Keplr team',
     );
   });
@@ -292,6 +293,7 @@ Widget _routerHarness(GoRouter router, AppBootstrapState bootstrap) {
       syncProvider.overrideWith(FakeSyncNotifier.new),
     ],
     child: MaterialApp.router(
+      localizationsDelegates: appLocalizationsDelegates,
       routerConfig: router,
       builder: (_, child) => AppTheme(data: AppThemeData.light, child: child!),
     ),

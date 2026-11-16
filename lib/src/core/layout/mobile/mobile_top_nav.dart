@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 import '../../feedback/app_haptics.dart';
 import '../../widgets/app_icon.dart';
@@ -32,6 +33,7 @@ class MobileTopNav extends StatelessWidget {
     this.height = kMobileTopNavHeight,
     this.balanceLabel,
     this.syncLabel,
+    this.syncSemanticsLabel,
     this.syncLabelColor,
     this.syncIndicatorColor,
     this.syncAnimated = false,
@@ -41,6 +43,7 @@ class MobileTopNav extends StatelessWidget {
     super.key,
   }) : _variant = _MobileTopNavVariant.account,
        title = '',
+       titleSemanticsLabel = null,
        titleStyle = null,
        titleMaxLines = 1,
        progress = 0,
@@ -64,6 +67,7 @@ class MobileTopNav extends StatelessWidget {
        accountName = '',
        balanceLabel = null,
        syncLabel = null,
+       syncSemanticsLabel = null,
        syncLabelColor = null,
        syncIndicatorColor = null,
        syncAnimated = false,
@@ -71,6 +75,7 @@ class MobileTopNav extends StatelessWidget {
        avatar = null,
        onAccountTap = null,
        title = '',
+       titleSemanticsLabel = null,
        titleStyle = null,
        titleMaxLines = 1,
        trailing = null,
@@ -79,6 +84,7 @@ class MobileTopNav extends StatelessWidget {
 
   const MobileTopNav.back({
     required this.title,
+    this.titleSemanticsLabel,
     this.onBack,
     this.trailing,
     this.backIcon = AppIcons.chevronBackward,
@@ -91,6 +97,7 @@ class MobileTopNav extends StatelessWidget {
        accountName = '',
        balanceLabel = null,
        syncLabel = null,
+       syncSemanticsLabel = null,
        syncLabelColor = null,
        syncIndicatorColor = null,
        syncAnimated = false,
@@ -111,6 +118,10 @@ class MobileTopNav extends StatelessWidget {
   final String accountName;
   final String? balanceLabel;
   final String? syncLabel;
+
+  /// What a screen reader announces for [syncLabel]; the label itself when
+  /// null.
+  final String? syncSemanticsLabel;
   final Color? syncLabelColor;
   final Color? syncIndicatorColor;
 
@@ -138,6 +149,9 @@ class MobileTopNav extends StatelessWidget {
 
   /// Back variant: centered title.
   final String title;
+
+  /// What a screen reader announces for [title]; the title itself when null.
+  final String? titleSemanticsLabel;
   final TextStyle? titleStyle;
   final int titleMaxLines;
   final Color? foregroundColor;
@@ -272,6 +286,7 @@ class MobileTopNav extends StatelessWidget {
             // its case.
             child: Text(
               titleStyle == null ? title.toUpperCase() : title,
+              semanticsLabel: titleSemanticsLabel,
               maxLines: titleMaxLines,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
@@ -315,7 +330,9 @@ class _BackButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: iconName == AppIcons.cross ? 'Close' : 'Back',
+      label: iconName == AppIcons.cross
+          ? context.l10n.commonClose
+          : context.l10n.commonBack,
       button: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,

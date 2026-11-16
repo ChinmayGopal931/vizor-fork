@@ -8,6 +8,7 @@ import '../../../providers/network_privacy_provider.dart';
 import '../../../providers/sync_display_progress_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../formatting/sync_status_label.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 
 /// Which part of the sync line a layer draws.
@@ -40,14 +41,19 @@ enum NeonSyncLayer {
 /// The readouts at the sync line's head, sentence case here and drawn
 /// uppercase (a HUD caption), for every screen that draws a sync line.
 abstract final class NeonSyncReadout {
-  static const synced = 'Synced';
-  static const failed = 'Sync failed';
-  static const torOffline = 'Tor offline';
-  static const torWaiting = 'Tor …';
+  static String synced(AppLocalizations l10n) => l10n.syncSynced;
+  static String failed(AppLocalizations l10n) => l10n.neonSyncFailed;
+  static String torOffline(AppLocalizations l10n) => l10n.neonSyncTorOffline;
+  static String torWaiting(AppLocalizations l10n) => l10n.neonSyncTorWaiting;
 
   /// A scan [percent] of the way, or a check's.
-  static String progress(int percent, {bool checking = false}) =>
-      '${checking ? 'Check' : 'Sync'} $percent%';
+  static String progress(
+    AppLocalizations l10n,
+    int percent, {
+    bool checking = false,
+  }) => checking
+      ? l10n.neonSyncChecking(percent)
+      : l10n.neonSyncProgress(percent);
 }
 
 /// Home's readout style. A screen whose first block sits close under the top
@@ -80,12 +86,14 @@ class NeonSyncLine {
   /// only while the line climbs, so a caller may watch a per-frame progress
   /// there and nowhere else.
   factory NeonSyncLine.wallet(
+    AppLocalizations l10n,
     SyncState sync, {
     required int whole,
     required NetworkPrivacyState networkPrivacy,
     required double Function() climbProgress,
   }) {
     final status = SyncStatusLabel.from(
+      l10n,
       sync,
       displayWholePercentage: whole,
       networkPrivacy: networkPrivacy,
@@ -109,26 +117,28 @@ class NeonSyncLine {
     final syncing = status.kind == SyncStatusKind.syncing && !catchingUp;
     final progress = switch (status.kind) {
       _ when catchingUp => 1.0,
-      SyncStatusKind.synced => 1.0,
+      SyncStatusKind.synced || SyncStatusKind.catchingUp => 1.0,
       SyncStatusKind.syncing => climbProgress().clamp(0.03, 0.99),
       SyncStatusKind.failed => sync.percentage.clamp(0.03, 0.99),
     };
     final readout = switch (status.kind) {
-      _ when catchingUp => NeonSyncReadout.synced,
-      SyncStatusKind.synced => NeonSyncReadout.synced,
+      _ when catchingUp => NeonSyncReadout.synced(l10n),
+      SyncStatusKind.synced ||
+      SyncStatusKind.catchingUp => NeonSyncReadout.synced(l10n),
       SyncStatusKind.failed =>
-        torFailed ? NeonSyncReadout.torOffline : NeonSyncReadout.failed,
+        torFailed
+            ? NeonSyncReadout.torOffline(l10n)
+            : NeonSyncReadout.failed(l10n),
       SyncStatusKind.syncing =>
         waitingOnTor
-            ? NeonSyncReadout.torWaiting
-            : NeonSyncReadout.progress(whole, checking: sync.isChecking),
+            ? NeonSyncReadout.torWaiting(l10n)
+            : NeonSyncReadout.progress(l10n, whole, checking: sync.isChecking),
     };
     return NeonSyncLine(
       progress: progress.toDouble(),
       readout: readout,
-      semanticsLabel: catchingUp
-          ? _syncedSemanticsLabel
-          : status.semanticsLabel,
+      // A wallet catching up reads as synced, so it says the same.
+      semanticsLabel: catchingUp ? l10n.syncVizorSynced : status.semanticsLabel,
       climbing: syncing,
       failed: status.kind == SyncStatusKind.failed,
     );
@@ -304,6 +314,7 @@ class NeonSyncBackdrop extends ConsumerWidget {
       layer: layer,
       scrolled: scrolled,
       line: NeonSyncLine.wallet(
+        context.l10n,
         ref.watch(syncProvider).value ?? SyncState(),
         whole: ref.watch(syncDisplayWholePercentageProvider),
         networkPrivacy: ref.watch(networkPrivacyProvider),
@@ -312,10 +323,6 @@ class NeonSyncBackdrop extends ConsumerWidget {
     );
   }
 }
-
-/// What [SyncStatusLabel] says once synced; a wallet catching up reads as
-/// synced, so it says the same.
-const _syncedSemanticsLabel = 'Veylor is synced';
 
 /// The drawing of one layer, free of providers.
 class _NeonSyncLineView extends StatefulWidget {

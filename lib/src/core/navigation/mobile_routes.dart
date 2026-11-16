@@ -4,8 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../feedback/app_review.dart';
+import '../../features/donation/donation_config.dart';
+import '../../features/donation/screens/donation_screen.dart';
+import '../../features/donation/screens/mobile/mobile_donation_review_screen.dart';
+import '../../providers/rpc_endpoint_provider.dart';
 
 import '../../features/accounts/screens/mobile/mobile_accounts_screen.dart';
+import '../../features/accounts/screens/mobile/mobile_account_removal_passcode_screen.dart';
 import '../../features/activity/screens/mobile/mobile_activity_screen.dart';
 import '../../features/home/screens/mobile/mobile_home_screen.dart';
 import '../../features/home/screens/mobile/mobile_software_shield_screen.dart';
@@ -33,6 +38,7 @@ import '../../features/private_usd/models/private_usd_send.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_conversion_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_convert_review_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_convert_screen.dart';
+import '../../features/private_usd/screens/mobile/mobile_private_usd_receive_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_refunds_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_reverse_conversion_screen.dart';
 import '../../features/private_usd/screens/mobile/mobile_private_usd_screen.dart';
@@ -70,6 +76,7 @@ import '../../features/settings/screens/mobile/mobile_settings_screen.dart';
 import '../../features/settings/screens/mobile/mobile_viewing_key_screen.dart';
 import '../../features/swap/screens/mobile/mobile_swap_screen.dart';
 import '../../features/voting/screens/mobile/mobile_voting_screens.dart';
+import '../l10n/l10n.dart';
 import '../layout/mobile/app_mobile_shell.dart';
 import '../layout/mobile/mobile_adaptive_frame.dart';
 import '../layout/mobile/app_mobile_tab_bar.dart';
@@ -176,6 +183,15 @@ List<RouteBase> _walletRoutes() {
       ),
     ),
     GoRoute(
+      path: '/accounts/confirm-removal',
+      pageBuilder: (context, state) => _mobilePage(
+        key: state.pageKey,
+        child: MobileAccountRemovalPasscodeScreen(
+          isLastAccount: state.extra == true,
+        ),
+      ),
+    ),
+    GoRoute(
       path: '/settings/seed-phrase',
       pageBuilder: (context, state) => _mobilePage(
         key: state.pageKey,
@@ -252,6 +268,25 @@ List<RouteBase> _walletRoutes() {
                 ? parseZecAmount(prefill?.amountText ?? '')
                 : null,
           ),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/donation',
+      redirect: (context, _) => _mobileDonationRedirect(context),
+      pageBuilder: (context, state) =>
+          _mobilePage(key: state.pageKey, child: const DonationScreen()),
+    ),
+    GoRoute(
+      path: '/donation/review',
+      redirect: (context, state) =>
+          _mobileDonationRedirect(context) ??
+          (state.extra is MobileDonationReviewArgs ? null : '/donation'),
+      pageBuilder: (context, state) {
+        final args = state.extra! as MobileDonationReviewArgs;
+        return _mobilePage(
+          key: payloadScopedPageKey(state, args.sendFlowId),
+          child: MobileDonationReviewScreen(args: args),
         );
       },
     ),
@@ -452,6 +487,13 @@ List<RouteBase> _walletRoutes() {
               : const MobilePrivateUsdScreen(),
         );
       },
+    ),
+    GoRoute(
+      path: '/private-usd/receive',
+      pageBuilder: (context, state) => _mobilePage(
+        key: state.pageKey,
+        child: const MobilePrivateUsdReceiveScreen(),
+      ),
     ),
     GoRoute(
       path: '/private-usd/refunds',
@@ -866,6 +908,16 @@ List<RouteBase> _walletRoutes() {
   ];
 }
 
+String? _mobileDonationRedirect(BuildContext context) =>
+    donationFeatureEnabledForNetwork(
+      ProviderScope.containerOf(
+        context,
+        listen: false,
+      ).read(rpcEndpointProvider).networkName,
+    )
+    ? null
+    : '/settings';
+
 CupertinoPage<dynamic> _mobilePage({
   required LocalKey key,
   required Widget child,
@@ -888,12 +940,12 @@ String? _redirectUnsupportedPrivateMigration(
 class _MobileTab {
   const _MobileTab({
     required this.path,
-    required this.item,
+    required this.iconName,
     required this.screen,
   });
 
   final String path;
-  final AppMobileTabItem item;
+  final String iconName;
   final Widget screen;
 }
 
@@ -903,7 +955,7 @@ final List<_MobileTab> _allMobileTabs = [
   for (var i = 0; i < mobileDestinations.length; i++)
     _MobileTab(
       path: mobileDestinations[i].path,
-      item: mobileDestinations[i].item,
+      iconName: mobileDestinations[i].iconName,
       screen: switch (mobileDestinations[i].path) {
         '/home' => const MobileHomeScreen(),
         '/activity' => const MobileActivityScreen(),
@@ -975,7 +1027,13 @@ class _MobileTabShellState extends ConsumerState<_MobileTabShell> {
                 MobileNavigationMode.systemSideTabs
             ? Axis.vertical
             : Axis.horizontal,
-        items: [for (final tab in tabs) tab.item],
+        items: [
+          for (final tab in tabs)
+            AppMobileTabItem(
+              iconName: tab.iconName,
+              label: mobileDestinationLabel(context.l10n, tab.path),
+            ),
+        ],
         currentIndex: tabBarCurrentIndex,
         onSelect: (index) {
           _selectPath(tabs[index].path);

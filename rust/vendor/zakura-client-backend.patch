@@ -1,16 +1,17 @@
 diff --git a/src/tor.rs b/src/tor.rs
-index 67b449d..25d4537 100644
+index aaff4f0..cb29048 100644
 --- a/src/tor.rs
 +++ b/src/tor.rs
-@@ -14,6 +14,7 @@ pub mod http;
- // Re-exported as this is currently the only `arti_client` type users would need to use
- // our minimal client API.
- pub use arti_client::DormantMode;
-+pub use arti_client::DataStream;
+@@ -15,7 +15,7 @@ mod grpc;
+ pub mod http;
+ 
+ // Re-export the client types callers need without a direct Arti dependency.
+-pub use arti_client::{DormantMode, ErrorKind, HasKind};
++pub use arti_client::{DataStream, DormantMode, ErrorKind, HasKind};
  
  /// Deadlines applied to network operations performed by a [`Client`].
  ///
-@@ -205,6 +206,16 @@ impl Client {
+@@ -207,6 +207,16 @@ impl Client {
          }
      }
  

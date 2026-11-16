@@ -3,14 +3,15 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/formatting/date_format.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_screen.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
 import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 // Railgun's sync on the Private USD screen is Home's sync line, with Home's
 // layers and catch-up rule. Its readouts name Railgun; the Tor ones are
@@ -43,6 +44,7 @@ void main() {
     refreshes = 0;
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: MobilePrivateUsdView(
@@ -111,10 +113,10 @@ void main() {
       findsWidgets,
     );
     // The percentage is the line's now; screen readers still hear it all.
-    expect(find.text(PrivateUsdCopy.firstLoadProgress(42)), findsNothing);
-    expect(find.text(PrivateUsdCopy.firstLoad), findsOneWidget);
+    expect(find.text(testL10n.privateUsdFirstLoadProgress(42)), findsNothing);
+    expect(find.text(testL10n.privateUsdFirstLoad), findsOneWidget);
     expect(
-      find.bySemanticsLabel(PrivateUsdCopy.firstLoadProgress(42)),
+      find.bySemanticsLabel(testL10n.privateUsdFirstLoadProgress(42)),
       findsOneWidget,
     );
     semantics.dispose();
@@ -177,8 +179,8 @@ void main() {
         reason: block,
       );
     }
-    final updated = PrivateUsdCopy.updated(
-      formatDayMonthTime(previewPrivateUsdUpdatedAt),
+    final updated = testL10n.privateUsdUpdated(
+      formatDayMonthTime(previewPrivateUsdUpdatedAt, testL10n.localeName),
     );
     expect(find.text(updated), findsOneWidget);
     expect(find.bySemanticsLabel(updated), findsOneWidget);
@@ -200,8 +202,8 @@ void main() {
     expect(back.line.climbing, isFalse);
     expect(back.line.scanning, isTrue);
     expect(layer(tester, NeonSyncLayer.front).linePart, NeonSyncLinePart.head);
-    expect(find.text(PrivateUsdCopy.updating), findsNothing);
-    expect(find.bySemanticsLabel(PrivateUsdCopy.updating), findsOneWidget);
+    expect(find.text(testL10n.privateUsdUpdating), findsNothing);
+    expect(find.bySemanticsLabel(testL10n.privateUsdUpdating), findsOneWidget);
     semantics.dispose();
   });
 
@@ -220,7 +222,7 @@ void main() {
     expect(front.line.climbing, isTrue);
     expect(layer(tester, NeonSyncLayer.back).line.scanning, isTrue);
     expect(
-      find.bySemanticsLabel(PrivateUsdCopy.updatingProgress(64)),
+      find.bySemanticsLabel(testL10n.privateUsdUpdatingProgress(64)),
       findsOneWidget,
     );
     semantics.dispose();
@@ -237,8 +239,11 @@ void main() {
 
     expect(readout(tester), 'RAILGUN SYNC FAILED');
     expect(layer(tester, NeonSyncLayer.back).line.failed, isTrue);
-    expect(find.text(PrivateUsdCopy.refreshFailed), findsOneWidget);
-    expect(find.bySemanticsLabel(PrivateUsdCopy.refreshFailed), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRefreshFailed), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(testL10n.privateUsdRefreshFailed),
+      findsOneWidget,
+    );
 
     await pumpView(
       tester,
@@ -256,7 +261,7 @@ void main() {
     await pumpView(tester, const PrivateUsdBalanceState(refreshFailed: true));
 
     expect(readout(tester), 'RAILGUN SYNC FAILED');
-    expect(find.text(PrivateUsdCopy.loadFailed), findsOneWidget);
+    expect(find.text(testL10n.privateUsdLoadFailed), findsOneWidget);
   });
 
   testWidgets('the climbing line takes no touches: refresh still works', (

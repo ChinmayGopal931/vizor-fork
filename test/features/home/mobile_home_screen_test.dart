@@ -2,7 +2,7 @@
 library;
 
 import 'dart:async';
-
+import '../../support/home_initialization_checks.dart';
 import 'package:zcash_wallet/src/features/home/widgets/home_activity_skeleton.dart';
 import 'package:zcash_wallet/src/features/activity/swap_activity_row_items_provider.dart';
 
@@ -58,11 +58,14 @@ import 'package:zcash_wallet/src/features/activity/activity_eta_provider.dart';
 import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
 import 'package:zcash_wallet/src/core/widgets/app_tooltip.dart';
 import 'package:zcash_wallet/src/rust/api/sync.dart' as rust_sync;
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 import '../../support/app_test_fonts.dart';
 import '../../support/wallet_path_read_blocker.dart';
 import '../../fakes/fake_zec_market_data_cache.dart';
+import 'package:zcash_wallet/src/providers/pending_activity_evidence_provider.dart';
+import '../../support/test_l10n.dart';
 
 /// Skips the secure-storage write so toggling works without a platform
 /// channel in widget tests.
@@ -236,7 +239,7 @@ class _HomeParticipationRecorder extends VotingParticipationCoordinator {
 
 Widget _app(
   SyncState syncState, {
-  Map<String, String>? etaLabels,
+  Map<String, ActivityEta>? etaLabels,
   ZecMarketData? marketData = const ZecMarketData(
     usdPrice: 70,
     change24hPct: 13.12,
@@ -467,6 +470,7 @@ Widget _app(
         ),
     ],
     child: MaterialApp.router(
+      localizationsDelegates: appLocalizationsDelegates,
       routerConfig: router,
       builder: (_, child) => AppTheme(data: theme, child: child!),
     ),
@@ -743,6 +747,20 @@ class _DeferredVotingStore implements VotingHomeCacheStore {
 }
 
 void main() {
+  registerHomeInitializationChecks(
+    mobile: true,
+    app: (state, notifier, cards) => _app(
+      state,
+      syncNotifier: notifier,
+      giftCardActivityFuture: cards,
+      showVoting: false,
+    ),
+    home: () => find.byType(MobileHomeScreen),
+    // Veylor's Home has no importing illustration; the importing view itself
+    // marks the state.
+    importing: () => find.byKey(const ValueKey('mobile_home_importing')),
+  );
+
   setUpAll(loadAppTestFonts);
 
   List<Object?> recordHaptics(WidgetTester tester) {
@@ -789,10 +807,11 @@ void main() {
     );
     await tester.pumpWidget(
       _app(
-        _syncedState(orchardBalance: BigInt.from(100000000))
-            .copyWith(recentTransactions: [pending]),
+        _syncedState(
+          orchardBalance: BigInt.from(100000000),
+        ).copyWith(recentTransactions: [pending]),
         showVoting: false,
-        etaLabels: const {'pending-receive': 'Est. 1–3 min'},
+        etaLabels: const {'pending-receive': ActivityEta.standard},
       ),
     );
     for (var i = 0; i < 10; i++) {
@@ -921,8 +940,9 @@ void main() {
               'config',
               'account',
               round,
-            ): const VotingHomeFact(decision: VotingHomeDecision.show)
-                .toJson(),
+            ): const VotingHomeFact(
+              decision: VotingHomeDecision.show,
+            ).toJson(),
           },
         }),
       );
@@ -1323,8 +1343,9 @@ void main() {
     ) async {
       await tester.binding.setSurfaceSize(Size(width, 852));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final initial = _syncedState(orchardBalance: BigInt.from(250000000))
-          .copyWith(hasRecentTransactionsData: false);
+      final initial = _syncedState(
+        orchardBalance: BigInt.from(250000000),
+      ).copyWith(hasRecentTransactionsData: false);
       final sync = FakeSyncNotifier(initial);
       await tester.pumpWidget(
         _app(initial, syncNotifier: sync, showVoting: false),
@@ -1515,6 +1536,54 @@ void main() {
     expect(find.text('Send'), findsOneWidget);
     expect(find.text('Receive'), findsOneWidget);
     expect(find.text('No activity, yet...'), findsOneWidget);
+  });
+
+  testWidgets('a short catch-up keeps the sync line synced', (tester) async {
+    // Veylor's Home has no top-bar sync label: the neon sync line stays full
+    // and reads synced through a short catch-up, and climbs only for a long
+    // one.
+    final completedAt = DateTime.now();
+    final synced = SyncState(
+      accountUuid: 'account-1',
+      hasAccountScopedData: true,
+      isSyncComplete: true,
+      percentage: 1,
+      scannedHeight: 3000000,
+      chainTipHeight: 3000000,
+      lastSyncCompletedAt: completedAt,
+    );
+    final notifier = FakeSyncNotifier(synced);
+    await tester.pumpWidget(_app(synced, syncNotifier: notifier));
+    await tester.pump();
+    await tester.pump();
+    NeonSyncLine line() => tester
+        .widget<NeonSyncLineLayer>(find.byType(NeonSyncLineLayer).first)
+        .line;
+    expect(line().readout, NeonSyncReadout.synced(testL10n));
+
+    SyncState catchUp(int remainingScanBlocks) => SyncState(
+      accountUuid: 'account-1',
+      hasAccountScopedData: true,
+      isSyncing: true,
+      phase: 'scan',
+      scannedHeight: 3000000,
+      chainTipHeight: 3000000 + remainingScanBlocks,
+      remainingScanBlocks: remainingScanBlocks,
+      lastSyncStartedAt: DateTime.now(),
+      lastSyncCompletedAt: completedAt,
+      startedFromCompletedSync: true,
+    );
+    notifier.emit(catchUp(3));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(line().readout, NeonSyncReadout.synced(testL10n));
+    expect(line().progress, 1);
+    expect(line().climbing, isFalse);
+
+    // The catch-up turns out large: the line drops and climbs as a sync.
+    notifier.emit(catchUp(5000));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(line().readout, isNot(NeonSyncReadout.synced(testL10n)));
+    expect(line().climbing, isTrue);
   });
 
   testWidgets('empty activity is centered with the original vertical spacing', (
@@ -1772,8 +1841,9 @@ void main() {
 
     // Leaving the completion screen unmounts the host. Returning home must not
     // route back into a completion the user was already shown.
-    GoRouter.of(tester.element(find.text('migration complete route')))
-        .go('/home');
+    GoRouter.of(
+      tester.element(find.text('migration complete route')),
+    ).go('/home');
     await tester.pumpAndSettle();
 
     expect(find.text('migration complete route'), findsNothing);
@@ -1796,8 +1866,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    GoRouter.of(tester.element(find.byType(MobileHomeScreen)))
-        .go('/shell-activity');
+    GoRouter.of(
+      tester.element(find.byType(MobileHomeScreen)),
+    ).go('/shell-activity');
     await tester.pumpAndSettle();
     expect(find.text('shell activity route'), findsOneWidget);
 
@@ -1981,6 +2052,54 @@ void main() {
     await tester.pump();
 
     expect(find.text('2 ZEC still migrating'), findsOneWidget);
+  });
+
+  testWidgets('privacy mode masks the migrating amount in the banner', (
+    tester,
+  ) async {
+    tester.view.physicalSize =
+        const Size(393, 852) * tester.view.devicePixelRatio;
+    addTearDown(tester.view.resetPhysicalSize);
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      _app(
+        _syncedState(
+          orchardBalance: BigInt.from(200_000_000),
+          ironwoodBalance: BigInt.from(200_000_000),
+        ),
+        migrationCta: IronwoodHomeMigrationCtaState.resume(
+          network: 'main',
+          accountUuid: 'account-1',
+          status: _migrationStatusForPhase(
+            kIronwoodMigrationBroadcastScheduledPhase,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('2 ZEC still migrating'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('2 ZEC still migrating')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.bySemanticsLabel('Hide balance'));
+    await tester.pump();
+
+    expect(find.text('****** ZEC still migrating'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp(r'\*{6} ZEC still migrating')),
+      findsOneWidget,
+    );
+    expect(find.text('2 ZEC still migrating'), findsNothing);
+    expect(
+      find.bySemanticsLabel(RegExp('2 ZEC still migrating')),
+      findsNothing,
+    );
+    expect(find.textContaining('ZEC ZEC', findRichText: true), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('ZEC ZEC')), findsNothing);
+    semantics.dispose();
   });
 
   testWidgets('waits for confirmation after Orchard holdings reach zero', (
@@ -2890,6 +3009,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         builder: (_, child) => AppTheme(data: AppThemeData.dark, child: child!),
         home: Align(
           alignment: Alignment.bottomCenter,
@@ -2964,8 +3084,9 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _app(
-        _syncedState(orchardBalance: BigInt.from(14312000000))
-            .copyWith(transparentLockedBalance: BigInt.from(242000000)),
+        _syncedState(
+          orchardBalance: BigInt.from(14312000000),
+        ).copyWith(transparentLockedBalance: BigInt.from(242000000)),
       ),
     );
     await tester.pump();
@@ -3368,8 +3489,9 @@ void main() {
     );
     await tester.pumpWidget(
       _app(
-        _syncedState(orchardBalance: BigInt.from(100000000))
-            .copyWith(recentTransactions: []),
+        _syncedState(
+          orchardBalance: BigInt.from(100000000),
+        ).copyWith(recentTransactions: []),
         giftCardActivityIndex: GiftCardActivityIndex.forAccount(
           accountUuid: 'account-1',
           createdRecords: [],
@@ -3411,8 +3533,9 @@ void main() {
         receivedRecords: [record],
       );
       final syncNotifier = FakeSyncNotifier(
-        _syncedState(orchardBalance: BigInt.from(100000000))
-            .copyWith(recentTransactions: [_tx(1)]),
+        _syncedState(
+          orchardBalance: BigInt.from(100000000),
+        ).copyWith(recentTransactions: [_tx(1)]),
       );
       rust_sync.TransactionInfo receive({required BigInt height}) {
         return rust_sync.TransactionInfo(
@@ -3696,8 +3819,9 @@ void main() {
 
     await tester.pumpWidget(
       _app(
-        _syncedState(orchardBalance: BigInt.from(100000000))
-            .copyWith(recentTransactions: [_tx(1)]),
+        _syncedState(
+          orchardBalance: BigInt.from(100000000),
+        ).copyWith(recentTransactions: [_tx(1)]),
       ),
     );
     await tester.pump();
@@ -3746,8 +3870,9 @@ void main() {
   testWidgets('display progress ticks do not rebuild mobile Home content', (
     tester,
   ) async {
-    final initial = _syncedState(orchardBalance: BigInt.from(100000000))
-        .copyWith(recentTransactions: [_tx(1)]);
+    final initial = _syncedState(
+      orchardBalance: BigInt.from(100000000),
+    ).copyWith(recentTransactions: [_tx(1)]);
     final notifier = FakeSyncNotifier(initial);
 
     await tester.pumpWidget(_app(initial, syncNotifier: notifier));

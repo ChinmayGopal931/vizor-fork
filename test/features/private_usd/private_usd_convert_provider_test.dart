@@ -4,10 +4,8 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/formatting/zec_amount.dart';
-import 'package:zcash_wallet/src/core/zcash/network_upgrade_hold.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_record_key.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_balance_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_convert_provider.dart';
@@ -25,6 +23,7 @@ import 'package:zcash_wallet/src/providers/network_upgrade_window_provider.dart'
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 
 import 'support/fake_private_usd_backend.dart';
+import '../../support/test_l10n.dart';
 
 // The forward convert flow (plan reference §9.4 S3): zapp's
 // `PrivateUsdConvertVMTest` button-enable cases, plus vizor's back and
@@ -256,8 +255,8 @@ void main() {
       await type(tester, '2');
 
       expect(
-        state().message,
-        PrivateUsdCopy.convertInsufficient(
+        state().message(testL10n),
+        testL10n.privateUsdConvertInsufficient(
           ZecAmount.fromZatoshi(BigInt.from(oneZec)).activity.toString(),
         ),
       );
@@ -277,7 +276,7 @@ void main() {
     }
 
     expect(state().isAmountInvalid, isFalse);
-    expect(state().message, isNull);
+    expect(state().message(testL10n), isNull);
     expect(asked, isEmpty);
   });
 
@@ -364,7 +363,10 @@ void main() {
       await type(tester, '0.5');
 
       expect(state().quote, isNull);
-      expect(state().message, PrivateUsdCopy.convertErrorUnpayable);
+      expect(
+        state().message(testL10n),
+        testL10n.privateUsdConvertErrorUnpayable,
+      );
       expect(state().canReview, isFalse);
     },
   );
@@ -424,7 +426,10 @@ void main() {
       holdsTransactions: true,
     );
     expect(await notifier().confirm(), isNull);
-    expect(state().startError, kNetworkUpgradeHoldMessage);
+    expect(
+      state().startError?.call(testL10n),
+      testL10n.privateUsdNetworkUpgradeHold,
+    );
     expect(backend.acceptedRelayerClaims, isEmpty);
     expect(state().quoteSpent, isFalse);
   });
@@ -437,7 +442,10 @@ void main() {
     await type(tester, '0.5');
     expect(notifier().openReview(), isTrue);
     expect(await notifier().confirm(), isNull);
-    expect(state().startError, PrivateUsdCopy.convertStartFailed);
+    expect(
+      state().startError?.call(testL10n),
+      testL10n.privateUsdConvertStartFailed,
+    );
     expect(backend.acceptedRelayerClaims, isEmpty);
   });
 
@@ -480,7 +488,7 @@ void main() {
       true,
       true,
     ], reason: 'accepted twice');
-    expect(state().startError, isNull);
+    expect(state().startError?.call(testL10n), isNull);
   });
 
   convertTest('a refusal is signed again once, over the next message', (
@@ -508,20 +516,20 @@ void main() {
       const PrivateUsdAttestationException(
         PrivateUsdAttestationErrorCode.keystore,
       ),
-      PrivateUsdCopy.tokensKeystore,
+      testL10n.privateUsdTokensKeystore,
     ),
     (
       const PrivateUsdAttestationException(
         PrivateUsdAttestationErrorCode.unavailable,
       ),
-      PrivateUsdCopy.tokensUnavailable,
+      testL10n.privateUsdTokensUnavailable,
     ),
     (
       const ApiPrivateUsdError(
         code: ApiPrivateUsdErrorCode.tokensDeviceRefused,
         message: 'refused',
       ),
-      PrivateUsdCopy.tokensDeviceRefused,
+      testL10n.privateUsdTokensDeviceRefused,
     ),
   ]) {
     convertTest('an issuance that fails ends the conversion with nothing '
@@ -537,7 +545,7 @@ void main() {
       }
 
       expect(await notifier().confirm(), isNull);
-      expect(state().startError, message);
+      expect(state().startError?.call(testL10n), message);
       expect(backend.acceptedRelayerClaims, [true], reason: 'accepted once');
     });
   }
@@ -553,7 +561,10 @@ void main() {
         ApiAcceptResult(kind: ApiAcceptKind.tokensNeeded, index: index);
 
     expect(await notifier().confirm(), isNull);
-    expect(state().startError, PrivateUsdCopy.convertErrorTokensUnavailable);
+    expect(
+      state().startError?.call(testL10n),
+      testL10n.privateUsdConvertErrorTokensUnavailable,
+    );
     expect(backend.acceptedRelayerClaims, [
       true,
       true,
@@ -598,7 +609,7 @@ void main() {
       await tester.pump(validity);
       expect(state().isExpired, isTrue);
       expect(state().canConfirm, isFalse);
-      expect(state().message, PrivateUsdCopy.convertQuoteRanOut);
+      expect(state().message(testL10n), testL10n.privateUsdConvertQuoteRanOut);
       expect(asked, hasLength(2));
 
       final requested = state().quote!.requestedUnits;

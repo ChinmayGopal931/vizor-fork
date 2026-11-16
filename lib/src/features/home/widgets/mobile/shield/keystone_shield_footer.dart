@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
+import '../../../../../core/l10n/l10n.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../core/widgets/app_button.dart';
 
@@ -62,7 +63,10 @@ class KeystoneShieldFooter extends StatelessWidget {
             availableWidth / 2,
             math.max(
               AppButtonSizing.largeHeight,
-              measure('Cancel', double.infinity).width.ceilToDouble() +
+              measure(
+                    context.l10n.commonCancel,
+                    double.infinity,
+                  ).width.ceilToDouble() +
                   labelInsets,
             ),
           );
@@ -73,10 +77,10 @@ class KeystoneShieldFooter extends StatelessWidget {
             availableWidth - cancelWidth - labelInsets - 3,
           );
           final contentHeight = math.max(
-            measure('Cancel', cancelLabelWidth).height,
+            measure(context.l10n.commonCancel, cancelLabelWidth).height,
             math.max(
-              measure('Show QR', actionLabelWidth).height,
-              measure('Next step', actionLabelWidth).height,
+              measure(context.l10n.homeShieldShowQr, actionLabelWidth).height,
+              measure(context.l10n.commonNextStep, actionLabelWidth).height,
             ),
           );
           final height = math.max(
@@ -94,7 +98,7 @@ class KeystoneShieldFooter extends StatelessWidget {
                   height: height,
                   variant: AppButtonVariant.ghost,
                   onPressed: onCancel,
-                  child: const Text('Cancel'),
+                  child: Text(context.l10n.commonCancel),
                 ),
               ),
               const SizedBox(width: AppSpacing.s),
@@ -134,7 +138,9 @@ class KeystoneShieldFooter extends StatelessWidget {
                           ],
                         ),
                         child: Text(
-                          showQr ? 'Next step' : 'Show QR',
+                          showQr
+                              ? context.l10n.commonNextStep
+                              : context.l10n.homeShieldShowQr,
                           key: ValueKey(showQr),
                           textAlign: TextAlign.center,
                         ),

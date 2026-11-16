@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/l10n.dart';
+import '../../../core/l10n/locale_typography.dart';
 import '../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
@@ -13,13 +15,9 @@ import '../../../providers/biometric_unlock_provider.dart';
 import '../../../providers/device_owner_auth_provider.dart';
 import '../../../providers/sync_provider.dart';
 import '../../../providers/wallet_mutation_guard.dart';
-import '../../private_usd/private_usd_copy.dart';
 import '../../private_usd/providers/private_usd_unfinished_provider.dart';
 
 const kForgotPasscodeLastWarningArmDelay = Duration(seconds: 3);
-const kForgotPasscodeUnbackedAccountWarning =
-    'If you haven’t backed up an account’s secret passphrase, '
-    'you can’t recover its funds after resetting Veylor.';
 const _kForgotPasscodeCountdownTick = Duration(seconds: 1);
 const double _kForgotPasscodeButtonMinWidth = 196;
 
@@ -45,7 +43,7 @@ class ForgotPasscodeSheet extends ConsumerWidget {
     final conversionsUnderWay =
         ref.watch(privateUsdUnfinishedTotalProvider).value ?? 0;
     return MobileModalScaffold(
-      title: 'Forgot Passcode?',
+      title: context.l10n.onboardingForgotPasscodeTitle,
       onClose: () => Navigator.of(context).pop(false),
       bodyGap: AppSpacing.md,
       bottomPadding: AppSpacing.base,
@@ -56,18 +54,14 @@ class ForgotPasscodeSheet extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              "If you can't remember your passcode, the only way to "
-              'recover your account is to completely reset the Veylor app, '
-              'which means deleting all accounts and requiring you to '
-              'import accounts again. Unshared gift card links will be '
-              'permanently lost.',
+              context.l10n.onboardingForgotPasscodeBody,
               style: AppTypography.bodyMedium.copyWith(
                 color: colors.text.accent,
               ),
             ),
             const SizedBox(height: AppSpacing.s),
             Text(
-              kForgotPasscodeUnbackedAccountWarning,
+              context.l10n.onboardingForgotPasscodeUnbackedWarning,
               key: const ValueKey('mobile_forgot_passcode_backup_warning'),
               style: AppTypography.bodyMediumStrong.copyWith(
                 color: colors.text.destructive,
@@ -76,7 +70,7 @@ class ForgotPasscodeSheet extends ConsumerWidget {
             if (claimsInFlight > 0) ...[
               const SizedBox(height: AppSpacing.s),
               Text(
-                kWalletResetInFlightGiftCardWarningMessage,
+                context.l10n.walletResetGiftCardWarning,
                 style: AppTypography.bodyMediumStrong.copyWith(
                   color: colors.text.destructive,
                 ),
@@ -85,7 +79,7 @@ class ForgotPasscodeSheet extends ConsumerWidget {
             if (conversionsUnderWay > 0) ...[
               const SizedBox(height: AppSpacing.s),
               Text(
-                PrivateUsdCopy.resetUnfinishedBody(conversionsUnderWay),
+                context.l10n.privateUsdResetUnfinishedBody(conversionsUnderWay),
                 key: const ValueKey('mobile_forgot_passcode_private_usd'),
                 style: AppTypography.bodyMediumStrong.copyWith(
                   color: colors.text.destructive,
@@ -99,7 +93,9 @@ class ForgotPasscodeSheet extends ConsumerWidget {
               constrainContent: true,
               minWidth: _kForgotPasscodeButtonMinWidth,
               onPressed: () => Navigator.of(context).pop(true),
-              child: const _ModalButtonLabel('Continue to reset Veylor'),
+              child: _ModalButtonLabel(
+                context.l10n.onboardingForgotPasscodeContinueToReset,
+              ),
             ),
             const SizedBox(height: AppSpacing.s),
             AppButton(
@@ -109,7 +105,7 @@ class ForgotPasscodeSheet extends ConsumerWidget {
               constrainContent: true,
               minWidth: _kForgotPasscodeButtonMinWidth,
               onPressed: () => Navigator.of(context).pop(false),
-              child: const _ModalButtonLabel('Cancel'),
+              child: _ModalButtonLabel(context.l10n.commonCancel),
             ),
           ],
         ),
@@ -171,10 +167,10 @@ class _ForgotPasscodeLastWarningContentState
   Widget build(BuildContext context) {
     final colors = context.colors;
     final resetLabel = _armed
-        ? 'Reset Veylor'
-        : 'Reset after ${_remainingSeconds}s...';
+        ? context.l10n.commonResetVizor
+        : context.l10n.onboardingLostPasswordResetCountdown(_remainingSeconds);
     return MobileModalScaffold(
-      title: 'Are you sure?',
+      title: context.l10n.onboardingForgotPasscodeAreYouSure,
       onClose: () => Navigator.of(context).pop(false),
       bodyGap: AppSpacing.md,
       bottomPadding: AppSpacing.base,
@@ -188,15 +184,21 @@ class _ForgotPasscodeLastWarningContentState
                 // Figma 4885:23490 emphasises the irreversible line in the
                 // destructive magenta; the follow-up sits in plain accent.
                 TextSpan(
-                  text: "This can't be undone.\n",
-                  style: AppTypography.bodyMediumStrong.copyWith(
-                    color: colors.text.destructive,
+                  text: context.l10n.onboardingForgotPasscodeCantBeUndone,
+                  style: withLocaleFontFallback(
+                    context,
+                    AppTypography.bodyMediumStrong.copyWith(
+                      color: colors.text.destructive,
+                    ),
                   ),
                 ),
                 TextSpan(
-                  text: 'Proceed on your responsibility.',
-                  style: AppTypography.bodyMediumStrong.copyWith(
-                    color: colors.text.accent,
+                  text: context.l10n.onboardingForgotPasscodeProceed,
+                  style: withLocaleFontFallback(
+                    context,
+                    AppTypography.bodyMediumStrong.copyWith(
+                      color: colors.text.accent,
+                    ),
                   ),
                 ),
               ],
@@ -221,7 +223,7 @@ class _ForgotPasscodeLastWarningContentState
             constrainContent: true,
             minWidth: _kForgotPasscodeButtonMinWidth,
             onPressed: () => Navigator.of(context).pop(false),
-            child: const _ModalButtonLabel('Cancel'),
+            child: _ModalButtonLabel(context.l10n.commonCancel),
           ),
         ],
       ),
@@ -247,8 +249,11 @@ class _ModalButtonLabel extends StatelessWidget {
 /// recovery without the passcode is wiping the wallet and importing
 /// again. The caller routes to `/welcome` on success and owns error
 /// presentation.
-Future<bool> resetWalletForForgottenPasscode(WidgetRef ref) async {
-  final verified = await verifyDeviceOwnerForWalletReset(ref);
+Future<bool> resetWalletForForgottenPasscode(
+  WidgetRef ref,
+  AppLocalizations l10n,
+) async {
+  final verified = await verifyDeviceOwnerForWalletReset(ref, l10n);
   if (!verified) return false;
 
   final syncNotifier = ref.read(syncProvider.notifier);

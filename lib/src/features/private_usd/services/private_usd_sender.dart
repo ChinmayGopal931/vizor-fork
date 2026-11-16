@@ -7,7 +7,6 @@ import '../../../rust/api/private_usd.dart' as rust;
 import '../models/private_usd_messages.dart';
 import '../models/private_usd_send.dart';
 import '../models/railgun_models.dart';
-import '../private_usd_copy.dart';
 import 'private_usd_engine.dart';
 import 'private_usd_spend_guard.dart';
 import 'private_usd_swap_backend.dart';
@@ -18,7 +17,7 @@ class PrivateUsdSendFeeCapException implements Exception {
   const PrivateUsdSendFeeCapException();
 
   @override
-  String toString() => "The relayer's fee is above the cap.";
+  String toString() => "The relayer's fee is above the cap."; // l10n-ignore: exception text
 }
 
 /// The Rust send calls for this wallet; tests fake them. Nothing here takes
@@ -305,7 +304,7 @@ class PrivateUsdSender {
         );
       } on PrivateUsdSpendBusyException catch (busy) {
         return busy.status == PrivateUsdSpendStatus.unreadable
-            ? const PrivateUsdSendNotSent(PrivateUsdCopy.sendErrorStore)
+            ? PrivateUsdSendNotSent((l10n) => l10n.privateUsdSendErrorStore)
             : PrivateUsdSendBusy(busy.status);
       }
     }());
@@ -379,14 +378,16 @@ class PrivateUsdSender {
     try {
       quote = await _held(accountUuid, request, confirmed);
     } on rust.ApiPrivateUsdError catch (error) {
-      return PrivateUsdSendNotSent(privateUsdSendErrorMessage(error.code));
+      return PrivateUsdSendNotSent(
+        (l10n) => privateUsdSendErrorMessage(l10n, error.code),
+      );
     } catch (error) {
       privateUsdLog('no send cost (${error.runtimeType})');
       return const PrivateUsdSendNotSent();
     }
     // Never proved above the cap, nor above the fee the user confirmed.
     if (_aboveCap(quote.fee)) {
-      return const PrivateUsdSendNotSent(PrivateUsdCopy.sendErrorFeeCap);
+      return PrivateUsdSendNotSent((l10n) => l10n.privateUsdSendErrorFeeCap);
     }
     if (quote.fee > confirmed.networkFee) {
       return PrivateUsdSendRepriced(quote.cost);
@@ -441,9 +442,13 @@ class PrivateUsdSender {
             );
           case rust.ApiPrivateUsdErrorCode.storeUnreadable:
             _guard.noteUnreadable(accountUuid);
-            return const PrivateUsdSendNotSent(PrivateUsdCopy.sendErrorStore);
+            return PrivateUsdSendNotSent(
+              (l10n) => l10n.privateUsdSendErrorStore,
+            );
           case rust.ApiPrivateUsdErrorCode.relayerFee:
-            return const PrivateUsdSendNotSent(PrivateUsdCopy.sendErrorFeeCap);
+            return PrivateUsdSendNotSent(
+              (l10n) => l10n.privateUsdSendErrorFeeCap,
+            );
           default:
             return const PrivateUsdSendNotSent();
         }
@@ -541,7 +546,7 @@ class PrivateUsdSender {
       final quote = await _quote(accountUuid, request, await broadcaster());
       if (quote.fee > proved) {
         return _aboveCap(quote.fee)
-            ? const PrivateUsdSendNotSent(PrivateUsdCopy.sendErrorFeeCap)
+            ? PrivateUsdSendNotSent((l10n) => l10n.privateUsdSendErrorFeeCap)
             : PrivateUsdSendRepriced(quote.cost);
       }
     } catch (error) {
@@ -621,7 +626,7 @@ class PrivateUsdSender {
     final hex = [
       for (final byte in bytes) byte.toRadixString(16).padLeft(2, '0'),
     ].join();
-    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-' // l10n-ignore: identifier format
         '${hex.substring(12, 16)}-${hex.substring(16, 20)}-'
         '${hex.substring(20)}';
   }

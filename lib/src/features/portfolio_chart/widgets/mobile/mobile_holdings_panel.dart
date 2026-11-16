@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/config/network_config.dart';
 import '../../../../core/formatting/zec_amount.dart';
 import '../../../../core/privacy/privacy_mask.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
@@ -14,7 +15,6 @@ import '../../../../providers/sync_provider.dart';
 import '../../../../providers/zec_price_change_provider.dart';
 import '../../../../rust/api/sync.dart' as rust_sync;
 import '../../../private_usd/models/private_usd_balances.dart';
-import '../../../private_usd/private_usd_copy.dart';
 import '../../../private_usd/providers/private_usd_available_provider.dart';
 import '../../../private_usd/providers/private_usd_balance_provider.dart';
 import '../../../private_usd/widgets/mobile/private_usd_home_strip.dart';
@@ -55,7 +55,7 @@ class MobileHoldingsPanel extends ConsumerWidget {
           : PrivateUsdHomeStrip(
               accountUuid: privateUsdAccount,
               privacyModeEnabled: privacyModeEnabled,
-              caption: PrivateUsdCopy.holdingsShieldedOnEthereum,
+              caption: context.l10n.privateUsdHoldingsShieldedOnEthereum,
               onTap: () => context.push('/private-usd'),
             ),
       privateUsdDollars: privateUsdAccount == null
@@ -105,7 +105,7 @@ class MobileHoldingsPanelView extends StatelessWidget {
 
   /// `1.2345 ZEC` as the Home balance formats it, masked in privacy mode.
   String _zec(BigInt zatoshi) => hideAmountIfPrivacyMode(
-    '${ZecAmount.fromZatoshi(zatoshi).compactBalance.amountText} '
+    '${ZecAmount.fromZatoshi(zatoshi).compactBalance.amountText} ' // l10n-ignore: amount format
     '$kZcashDefaultCurrencyTicker',
     privacyModeEnabled: privacyModeEnabled,
   );
@@ -113,8 +113,9 @@ class MobileHoldingsPanelView extends StatelessWidget {
   String _amount(BigInt zatoshi) =>
       holdings.hasBalance ? _zec(zatoshi) : _unknown;
 
-  String? _pending(BigInt zatoshi) => _amountsVisible && zatoshi > BigInt.zero
-      ? 'Includes ${_zec(zatoshi)} pending'
+  String? _pending(AppLocalizations l10n, BigInt zatoshi) =>
+      _amountsVisible && zatoshi > BigInt.zero
+      ? l10n.portfolioChartIncludesPending(_zec(zatoshi))
       : null;
 
   /// The USD worth as Home's balance line writes it: in full, or compact from
@@ -152,14 +153,19 @@ class MobileHoldingsPanelView extends StatelessWidget {
     return _dollars(zecDollars + dollars);
   }
 
-  Widget _poolRow(String id, String name, ShieldedPoolHoldings pool) {
+  Widget _poolRow(
+    AppLocalizations l10n,
+    String id,
+    String name,
+    ShieldedPoolHoldings pool,
+  ) {
     return _HoldingsRow(
       id: id,
       label: name,
       icon: AppIcons.shieldKeyhole,
       shielded: true,
       amount: _amount(pool.total),
-      pending: _pending(pool.pending),
+      pending: _pending(l10n, pool.pending),
       usd: _usd(pool.total),
       dimmed: _amountsVisible && pool.total == BigInt.zero,
     );
@@ -181,17 +187,32 @@ class MobileHoldingsPanelView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _HudHead('Holdings'),
-          _poolRow('ironwood', 'Ironwood', holdings.ironwood),
-          _poolRow('orchard', 'Orchard', holdings.orchard),
-          _poolRow('sapling', 'Sapling', holdings.sapling),
+          _HudHead(context.l10n.portfolioChartHoldings),
+          _poolRow(
+            context.l10n,
+            'ironwood',
+            'Ironwood', // l10n-ignore: product name
+            holdings.ironwood,
+          ),
+          _poolRow(
+            context.l10n,
+            'orchard',
+            'Orchard', // l10n-ignore: product name
+            holdings.orchard,
+          ),
+          _poolRow(
+            context.l10n,
+            'sapling',
+            'Sapling', // l10n-ignore: product name
+            holdings.sapling,
+          ),
           ?privateUsd,
           const _Rule(),
           _HoldingsRow(
             id: 'shielded_total',
-            label: 'Total shielded',
+            label: context.l10n.portfolioChartTotalShielded,
             amount: _shieldedTotal(shielded.total),
-            pending: _pending(shielded.pending),
+            pending: _pending(context.l10n, shielded.pending),
             // A total with dollars in it already reads in dollars.
             usd: privateUsdDollars == null ? _usd(shielded.total) : null,
             emphasized: true,
@@ -199,17 +220,19 @@ class MobileHoldingsPanelView extends StatelessWidget {
           const _Rule(),
           _HoldingsRow(
             id: 'transparent',
-            label: 'Transparent',
+            label: context.l10n.poolTransparent,
             icon: AppIcons.transparentBalance,
             // Home's wording: a last-known amount says so, and an unknown one
             // never reads as 0.
-            amount: holdings.hasBalance ? transparent.text(_zec) : _unknown,
+            amount: holdings.hasBalance
+                ? transparent.text(context.l10n, _zec)
+                : _unknown,
             pending: transparentCurrent
-                ? _pending(holdings.transparentPending)
+                ? _pending(context.l10n, holdings.transparentPending)
                 : null,
             usd: transparentCurrent ? _usd(transparentAmount) : null,
             // Why private recovery stopped and what to do; no amount in it.
-            note: holdings.hasBalance ? transparent.hint : null,
+            note: holdings.hasBalance ? transparent.hint(context.l10n) : null,
             dimmed:
                 _amountsVisible &&
                 transparentCurrent &&

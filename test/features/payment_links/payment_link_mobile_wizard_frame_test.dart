@@ -9,6 +9,7 @@ import 'package:zcash_wallet/src/features/payment_links/widgets/payment_link_car
 import 'package:zcash_wallet/src/features/payment_links/widgets/payment_link_gift_card.dart';
 import 'package:zcash_wallet/src/features/payment_links/widgets/mobile/payment_link_mobile_views.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 // An iPhone SE class viewport: the shortest phone the wizard has to stay
 // usable on once the software keyboard takes its share of the body.
@@ -113,6 +114,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         builder: (context, child) => ValueListenableBuilder<double>(
           valueListenable: keyboardInset,
           builder: (context, inset, _) => MediaQuery(
@@ -233,6 +235,7 @@ Future<void> _pumpMobileView(WidgetTester tester, Widget view) async {
 
   await tester.pumpWidget(
     MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(disableAnimations: true),
         child: AppTheme(data: AppThemeData.dark, child: child!),
@@ -255,6 +258,7 @@ Future<void> _pumpAmountStep(
 
   await tester.pumpWidget(
     MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(
           disableAnimations: true,

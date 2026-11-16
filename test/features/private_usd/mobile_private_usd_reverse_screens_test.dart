@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/formatting/date_format.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
@@ -19,6 +20,7 @@ import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
+import '../../support/test_l10n.dart';
 
 // The reverse conversion's screens, built from the Widgetbook fixtures.
 void main() {
@@ -44,6 +46,7 @@ void main() {
   Future<void> pump(WidgetTester tester, Widget child) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(data: AppThemeData.dark, child: child),
       ),
     );
@@ -89,7 +92,7 @@ void main() {
       ),
     );
     // On the right of the line under the estimate.
-    final label = find.text(PrivateUsdCopy.convertEstimatedAmount);
+    final label = find.text(testL10n.privateUsdConvertEstimatedAmount);
     expect(tester.getTopLeft(marketValue).dy, tester.getTopLeft(label).dy);
     expect(
       tester.getTopLeft(marketValue).dx,
@@ -125,10 +128,10 @@ void main() {
     final priced = previewPrivateUsdReverseConvertState();
     await amount(priced);
     for (final label in [
-      PrivateUsdCopy.reverseEscrow,
-      PrivateUsdCopy.reverseRailgunFee,
-      PrivateUsdCopy.reverseBroadcasterFee,
-      PrivateUsdCopy.reverseReceiveEstimate,
+      testL10n.privateUsdReverseEscrow,
+      testL10n.privateUsdReverseRailgunFee,
+      testL10n.privateUsdReverseBroadcasterFee,
+      testL10n.privateUsdReverseReceiveEstimate,
     ]) {
       expect(find.text(label), findsOneWidget, reason: label);
     }
@@ -136,7 +139,7 @@ void main() {
     expect(find.text('Total paid'), findsNothing);
     expect(find.text(r'$25.00'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(PrivateUsdCopy.convertSwapDirection),
+      find.bySemanticsLabel(testL10n.privateUsdConvertSwapDirection),
       findsOneWidget,
     );
     expect(
@@ -151,7 +154,7 @@ void main() {
         available: BigInt.from(1250400000),
       ),
     );
-    expect(find.text(PrivateUsdCopy.reverseAmountCents), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseAmountCents), findsOneWidget);
     expect(
       button(tester, 'mobile_private_usd_convert_review').onPressed,
       isNull,
@@ -165,6 +168,7 @@ void main() {
       DateTime? now,
     }) async {
       final presentation = privateUsdReverseProgressPresentation(
+        testL10n,
         status: PrivateUsdReverseStatus(record: record),
         now: now ?? previewPrivateUsdNow,
       );
@@ -186,20 +190,23 @@ void main() {
     await progress(
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.awaitingFunding),
     );
-    expect(find.text(PrivateUsdCopy.reversePay(r'$25.31')), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReversePay(r'$25.31')), findsOneWidget);
     expect(
       button(tester, 'mobile_private_usd_progress_action').onPressed,
       isNotNull,
     );
-    expect(find.text(PrivateUsdCopy.reverseCancel), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseCancel), findsOneWidget);
 
     // Paid and confirmed: "Authorize settlement", "Request refund".
     final ready = previewPrivateUsdReverseRecord(
       phase: ApiReversePhase.awaitingReady,
     );
     await progress(ready);
-    expect(find.text(PrivateUsdCopy.reverseReadyExplanation), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.reverseRequestRefund), findsOneWidget);
+    expect(
+      find.text(testL10n.privateUsdReverseReadyExplanation),
+      findsOneWidget,
+    );
+    expect(find.text(testL10n.privateUsdReverseRequestRefund), findsOneWidget);
     expect(
       button(tester, 'mobile_private_usd_progress_action').onPressed,
       isNotNull,
@@ -212,7 +219,7 @@ void main() {
         ready.readyDeadline * 1000,
       ).subtract(const Duration(seconds: 100)),
     );
-    expect(find.text(PrivateUsdCopy.reverseReady), findsWidgets);
+    expect(find.text(testL10n.privateUsdReverseReady), findsWidgets);
     expect(
       button(tester, 'mobile_private_usd_progress_action').onPressed,
       isNull,
@@ -232,9 +239,10 @@ void main() {
     );
     expect(
       find.text(
-        PrivateUsdCopy.reverseSettlementRefundLimit(
+        testL10n.privateUsdReverseSettlementRefundLimit(
           formatDayMonthTime(
             DateTime.fromMillisecondsSinceEpoch(settling.refundAfter * 1000),
+            testL10n.localeName,
           ),
         ),
       ),
@@ -247,14 +255,15 @@ void main() {
       phase: ApiReversePhase.refundWait,
     );
     await progress(lapsed);
-    expect(find.text(PrivateUsdCopy.reverseRequestRefund), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.reverseRefundReady), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.reverseRefundWait), findsNothing);
+    expect(find.text(testL10n.privateUsdReverseRequestRefund), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseRefundReady), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseRefundWait), findsNothing);
     expect(
       find.text(
-        PrivateUsdCopy.reverseRefundAvailable(
+        testL10n.privateUsdReverseRefundAvailable(
           formatDayMonthTime(
             DateTime.fromMillisecondsSinceEpoch(lapsed.readyDeadline * 1000),
+            testL10n.localeName,
           ),
         ),
       ),
@@ -272,9 +281,9 @@ void main() {
     await progress(
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.refunded),
     );
-    expect(find.text(PrivateUsdCopy.reverseResultRefunded), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.reverseNew), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.refundsView), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseResultRefunded), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseNew), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRefundsView), findsOneWidget);
   });
 
   // The timeline once capped a finished bridge's current step at its last
@@ -288,6 +297,7 @@ void main() {
       tester,
       MobilePrivateUsdReverseConversionView(
         presentation: privateUsdReverseProgressPresentation(
+          testL10n,
           status: PrivateUsdReverseStatus(
             record: previewPrivateUsdReverseRecord(phase: phase),
           ),
@@ -309,7 +319,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.text(PrivateUsdCopy.convertProgressTitle.toUpperCase()),
+      find.text(testL10n.privateUsdConvertProgressTitle.toUpperCase()),
       findsOneWidget,
     );
 
@@ -320,22 +330,22 @@ void main() {
       find.byKey(const ValueKey('swap_status_active_step_loader')),
       findsNothing,
     );
-    expect(find.text(PrivateUsdCopy.reverseSweeping), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseSweeping), findsOneWidget);
     expect(
       find.byKey(const ValueKey('mobile_private_usd_bridged')),
       findsOneWidget,
     );
     expect(
-      find.text(PrivateUsdCopy.bridgedTitle.toUpperCase()),
+      find.text(testL10n.privateUsdBridgedTitle.toUpperCase()),
       findsOneWidget,
     );
     expect(
-      find.text(PrivateUsdCopy.actionConvert.toUpperCase()),
+      find.text(testL10n.privateUsdActionConvert.toUpperCase()),
       findsOneWidget,
     );
-    expect(find.text(PrivateUsdCopy.bridgedYouPaid), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.bridgedYouReceived), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.reverseNew), findsOneWidget);
+    expect(find.text(testL10n.privateUsdBridgedYouPaid), findsOneWidget);
+    expect(find.text(testL10n.privateUsdBridgedYouReceived), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseNew), findsOneWidget);
   });
 
   testWidgets('the Pay step reads as the user\'s to take until Pay is tapped, '
@@ -352,6 +362,7 @@ void main() {
       tester,
       MobilePrivateUsdReverseConversionView(
         presentation: privateUsdReverseProgressPresentation(
+          testL10n,
           status: PrivateUsdReverseStatus(record: unpaid),
           now: previewPrivateUsdNow,
           funding: funding,
@@ -367,12 +378,12 @@ void main() {
 
     // Waiting for the tap: nothing is being sent yet.
     await show();
-    expect(find.text(PrivateUsdCopy.reverseStepPay), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseStepPay), findsOneWidget);
     expect(
-      find.text(PrivateUsdCopy.reverseStepPayDetail(r'$25.31')),
+      find.text(testL10n.privateUsdReverseStepPayDetail(r'$25.31')),
       findsOneWidget,
     );
-    expect(find.text(PrivateUsdCopy.reverseStepFund), findsNothing);
+    expect(find.text(testL10n.privateUsdReverseStepFund), findsNothing);
 
     // Tapped: the payment is proved, then sent.
     await show(
@@ -381,18 +392,18 @@ void main() {
       ),
       proofProgress: 0.42,
     );
-    expect(find.text(PrivateUsdCopy.reverseStepFund), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.paymentProving(42)), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.reverseStepPay), findsNothing);
+    expect(find.text(testL10n.privateUsdReverseStepFund), findsOneWidget);
+    expect(find.text(testL10n.privateUsdPaymentProving(42)), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseStepPay), findsNothing);
 
     await show(
       funding: const PrivateUsdFundingState(
         stage: PrivateUsdFundingStage.submitting,
       ),
     );
-    expect(find.text(PrivateUsdCopy.reverseStepFund), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseStepFund), findsOneWidget);
     expect(
-      find.text(PrivateUsdCopy.reverseStepPayDetail(r'$25.31')),
+      find.text(testL10n.privateUsdReverseStepPayDetail(r'$25.31')),
       findsNothing,
     );
   });
@@ -404,6 +415,7 @@ void main() {
       tester,
       MobilePrivateUsdReverseConversionView(
         presentation: privateUsdReverseProgressPresentation(
+          testL10n,
           status: PrivateUsdReverseStatus(
             record: previewPrivateUsdReverseRecord(
               phase: ApiReversePhase.refunded,
@@ -419,9 +431,9 @@ void main() {
       ),
     );
 
-    expect(find.text(PrivateUsdCopy.reverseResultRefunded), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.refundsView), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.reverseNew), findsNothing);
+    expect(find.text(testL10n.privateUsdReverseResultRefunded), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRefundsView), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseNew), findsNothing);
   });
 
   testWidgets('refunds: each row says where its recovery stands, and only a '
@@ -455,10 +467,10 @@ void main() {
         onRecover: (_) {},
       ),
     );
-    expect(find.text(PrivateUsdCopy.refundsChecking), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.refundsAvailable), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.refundsNoRecovery), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.refundsCheckFailed), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRefundsChecking), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRefundsAvailable), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRefundsNoRecovery), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRefundsCheckFailed), findsOneWidget);
     expect(
       find.byKey(const ValueKey('mobile_private_usd_refund_recover')),
       findsOneWidget,
@@ -473,6 +485,6 @@ void main() {
         onRecover: (_) {},
       ),
     );
-    expect(find.text(PrivateUsdCopy.refundsEmpty), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRefundsEmpty), findsOneWidget);
   });
 }

@@ -7,6 +7,7 @@ import '../private_usd_copy.dart';
 import '../services/private_usd_spend_guard.dart';
 import 'private_usd_balances.dart';
 import 'railgun_models.dart';
+import '../../../core/l10n/l10n.dart';
 
 // Private USD sends and withdrawals: what the form asks for, what a send
 // costs, how it ended, and the form's rules. Amounts are token base units
@@ -144,11 +145,11 @@ class PrivateUsdSendUnconfirmed extends PrivateUsdSendOutcome {
 }
 
 /// Nothing left the wallet. [message] says why when it is not the usual
-/// [PrivateUsdCopy.sendNotSent].
+/// [AppLocalizations.privateUsdSendNotSent].
 class PrivateUsdSendNotSent extends PrivateUsdSendOutcome {
   const PrivateUsdSendNotSent([this.message]);
 
-  final String? message;
+  final PrivateUsdText? message;
 }
 
 /// Another payment of the account is unsettled, or a conversion is under
@@ -236,6 +237,7 @@ RailgunDestination? privateUsdSendDestination(
 
 /// What is wrong with the recipient; an empty field shows nothing.
 String? privateUsdRecipientError(
+  AppLocalizations l10n,
   PrivateUsdSendMode mode,
   String input, {
   PrivateUsdRailgunAddressCheck isRailgunAddress = privateUsdIsRailgunAddress,
@@ -251,11 +253,11 @@ String? privateUsdRecipientError(
     return null;
   }
   return switch (mode) {
-    PrivateUsdSendMode.private => PrivateUsdCopy.sendInvalid0zk,
+    PrivateUsdSendMode.private => l10n.privateUsdSendInvalid0zk,
     PrivateUsdSendMode.withdraw =>
       isZeroEvmAddress(recipient)
-          ? PrivateUsdCopy.sendZeroAddress
-          : PrivateUsdCopy.sendInvalid0x,
+          ? l10n.privateUsdSendZeroAddress
+          : l10n.privateUsdSendInvalid0x,
   };
 }
 
@@ -343,7 +345,7 @@ class PrivateUsdSendForm {
   /// The cost is being looked up, or the send runs.
   final bool isBusy;
   final PrivateUsdSendOutcome? outcome;
-  final String? error;
+  final PrivateUsdText? error;
 
   /// What a send of the fee's token leaves for the relayer.
   final PrivateUsdNetworkFee? networkFee;
@@ -412,48 +414,50 @@ class PrivateUsdSendForm {
 
   /// What is wrong with the amount; a zero still being typed is not
   /// flagged.
-  String? amountError(PrivateUsdAsset? asset) {
+  String? amountError(AppLocalizations l10n, PrivateUsdAsset? asset) {
     if (asset == null || amountText.trim().isEmpty) return null;
     final decimals = asset.token.decimals;
     if (privateUsdTooPrecise(amountText, decimals)) {
-      return PrivateUsdCopy.sendTooPrecise(decimals);
+      return l10n.privateUsdSendTooPrecise(decimals);
     }
     final amount = units(asset.token);
     if (amount == null) return null;
-    if (amount > asset.available) return PrivateUsdCopy.sendTooMuch;
+    if (amount > asset.available) return l10n.privateUsdSendTooMuch;
     final fee = networkFee;
     if (fee != null &&
         fee.token == asset.token &&
         amount > fee.sendable(asset)) {
-      return PrivateUsdCopy.sendLeaveNetworkFee(
+      return l10n.privateUsdSendLeaveNetworkFee(
         formatPrivateUsdExact(fee.reserve, fee.token.decimals),
       );
     }
     return null;
   }
 
-  String? recipientError({
+  String? recipientError(
+    AppLocalizations l10n, {
     PrivateUsdRailgunAddressCheck isRailgunAddress = privateUsdIsRailgunAddress,
   }) => privateUsdRecipientError(
+    l10n,
     mode,
     recipient,
     isRailgunAddress: isRailgunAddress,
   );
 
   /// Why a reviewed send cannot go any more: the balance fell below it.
-  String? reviewError(PrivateUsdBalances? balances) =>
+  String? reviewError(AppLocalizations l10n, PrivateUsdBalances? balances) =>
       phase == PrivateUsdSendPhase.review &&
           !isBusy &&
           !canSend(reviewed, balances)
-      ? PrivateUsdCopy.sendBalanceDropped
+      ? l10n.privateUsdSendBalanceDropped
       : null;
 
   /// Back to where it was, since nothing left the wallet.
-  PrivateUsdSendForm notSent([String? error]) => copyWith(
+  PrivateUsdSendForm notSent([PrivateUsdText? error]) => copyWith(
     phase: reviewed == null
         ? PrivateUsdSendPhase.form
         : PrivateUsdSendPhase.review,
-    error: error ?? PrivateUsdCopy.sendNotSent,
+    error: error ?? ((l10n) => l10n.privateUsdSendNotSent),
     isBusy: false,
   );
 
@@ -466,7 +470,7 @@ class PrivateUsdSendForm {
     PrivateUsdSendRequest? reviewed,
     bool? isBusy,
     PrivateUsdSendOutcome? outcome,
-    String? error,
+    PrivateUsdText? error,
     PrivateUsdNetworkFee? networkFee,
     PrivateUsdSendStep? step,
     bool clearCost = false,
@@ -494,6 +498,7 @@ class PrivateUsdSendForm {
 /// the network fee and what they receive. The address, too long for a row,
 /// shows under them.
 List<(String, String)> privateUsdSendReviewRows(
+  AppLocalizations l10n,
   PrivateUsdSendRequest request,
   PrivateUsdSendCost cost, {
   PrivateUsdToken? feeToken,
@@ -502,20 +507,17 @@ List<(String, String)> privateUsdSendReviewRows(
   String amount(BigInt units, [int? tokenDecimals]) =>
       formatPrivateUsdExact(units, tokenDecimals ?? decimals);
   return [
-    (PrivateUsdCopy.sendAsset, request.token.symbol),
-    (PrivateUsdCopy.sendAmount, amount(request.amount)),
+    (l10n.privateUsdSendAsset, request.token.symbol),
+    (l10n.commonAmount, amount(request.amount)),
     if (cost.railgunFee > BigInt.zero)
       (
-        PrivateUsdCopy.sendReviewRailgunFee(
+        l10n.privateUsdSendReviewRailgunFee(
           privateUsdPercentText(cost.feeBasisPoints),
         ),
         amount(cost.railgunFee),
       ),
     if (cost.networkFee > BigInt.zero)
-      (
-        PrivateUsdCopy.convertNetworkFee,
-        amount(cost.networkFee, feeToken?.decimals),
-      ),
-    (PrivateUsdCopy.sendReviewReceives, amount(cost.received(request.amount))),
+      (l10n.commonNetworkFee, amount(cost.networkFee, feeToken?.decimals)),
+    (l10n.privateUsdSendReviewReceives, amount(cost.received(request.amount))),
   ];
 }

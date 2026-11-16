@@ -16,16 +16,12 @@ import 'api/sync.dart';
 import 'api/voting.dart';
 import 'api/voting_session.dart';
 import 'api/wallet.dart';
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi' as ffi;
-
 import 'frb_generated.dart';
 import 'network_privacy.dart';
-
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
-
 import 'third_party/zcash_voting/config.dart';
 import 'third_party/zcash_voting/delegate.dart';
 import 'third_party/zcash_voting/share_policy.dart';
@@ -641,6 +637,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  BroadcastNotice dco_decode_broadcast_notice(dynamic raw);
+
+  @protected
   ChainConfirmationSourceView dco_decode_chain_confirmation_source_view(
     dynamic raw,
   );
@@ -829,6 +828,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LegacyHardwareAccount dco_decode_legacy_hardware_account(dynamic raw);
 
   @protected
+  LightwalletdCandidateProbe dco_decode_lightwalletd_candidate_probe(
+    dynamic raw,
+  );
+
+  @protected
   LightwalletdEndpointProbe dco_decode_lightwalletd_endpoint_probe(dynamic raw);
 
   @protected
@@ -919,6 +923,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<BlockMetaInfo> dco_decode_list_block_meta_info(dynamic raw);
 
   @protected
+  List<BroadcastNotice> dco_decode_list_broadcast_notice(dynamic raw);
+
+  @protected
   List<CompletedVoteChoiceView> dco_decode_list_completed_vote_choice_view(
     dynamic raw,
   );
@@ -976,6 +983,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<LegacyHardwareAccount> dco_decode_list_legacy_hardware_account(
+    dynamic raw,
+  );
+
+  @protected
+  List<LightwalletdCandidateProbe> dco_decode_list_lightwalletd_candidate_probe(
     dynamic raw,
   );
 
@@ -2484,6 +2496,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  BroadcastNotice sse_decode_broadcast_notice(SseDeserializer deserializer);
+
+  @protected
   ChainConfirmationSourceView sse_decode_chain_confirmation_source_view(
     SseDeserializer deserializer,
   );
@@ -2740,6 +2755,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  LightwalletdCandidateProbe sse_decode_lightwalletd_candidate_probe(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   LightwalletdEndpointProbe sse_decode_lightwalletd_endpoint_probe(
     SseDeserializer deserializer,
   );
@@ -2854,6 +2874,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<BroadcastNotice> sse_decode_list_broadcast_notice(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<CompletedVoteChoiceView> sse_decode_list_completed_vote_choice_view(
     SseDeserializer deserializer,
   );
@@ -2925,6 +2950,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<LegacyHardwareAccount> sse_decode_list_legacy_hardware_account(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<LightwalletdCandidateProbe> sse_decode_list_lightwalletd_candidate_probe(
     SseDeserializer deserializer,
   );
 
@@ -4847,6 +4877,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_broadcast_notice(
+    BroadcastNotice self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_chain_confirmation_source_view(
     ChainConfirmationSourceView self,
     SseSerializer serializer,
@@ -5168,6 +5204,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_lightwalletd_candidate_probe(
+    LightwalletdCandidateProbe self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_lightwalletd_endpoint_probe(
     LightwalletdEndpointProbe self,
     SseSerializer serializer,
@@ -5309,6 +5351,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_broadcast_notice(
+    List<BroadcastNotice> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_completed_vote_choice_view(
     List<CompletedVoteChoiceView> self,
     SseSerializer serializer,
@@ -5395,6 +5443,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_legacy_hardware_account(
     List<LegacyHardwareAccount> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_lightwalletd_candidate_probe(
+    List<LightwalletdCandidateProbe> self,
     SseSerializer serializer,
   );
 

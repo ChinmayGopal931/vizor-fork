@@ -19,6 +19,7 @@ class ActivityRowData {
     this.amountSubtitleIconName,
     this.amountSubtitleIconColor,
     required this.statusText,
+    this.statusIsRoutine = false,
     required this.timestampText,
     this.statusIconName,
     this.statusColor,
@@ -49,6 +50,10 @@ class ActivityRowData {
   final String? amountSubtitleIconName;
   final Color? amountSubtitleIconColor;
   final String statusText;
+
+  /// Whether [statusText] is a routine state (completed or in progress), so
+  /// the feed shows the timestamp under the amount instead of the status.
+  final bool statusIsRoutine;
   final String timestampText;
   final String? statusIconName;
   final Color? statusColor;

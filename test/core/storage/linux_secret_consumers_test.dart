@@ -10,6 +10,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
+import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
+import 'package:zcash_wallet/src/providers/rpc_endpoint_provider.dart';
 import 'package:zcash_wallet/src/core/security/software_wallet_secret.dart';
 import 'package:zcash_wallet/src/core/storage/app_secure_store.dart';
 import 'package:zcash_wallet/src/core/storage/linux_secret_operation_guard.dart';
@@ -27,6 +29,7 @@ import 'package:zcash_wallet/src/rust/api/sync.dart';
 import 'package:zcash_wallet/src/rust/api/wallet.dart'
     show AccountExportMetadata;
 import 'package:zcash_wallet/src/rust/frb_generated.dart';
+import '../../support/test_l10n.dart';
 
 const _accountUuid = 'account-1';
 const _accounts = AccountState(
@@ -58,6 +61,7 @@ void main() {
     container = ProviderContainer(
       overrides: [
         appBootstrapProvider.overrideWithValue(AppBootstrapState.empty),
+        rpcEndpointProvider.overrideWith(_FixedEndpoint.new),
         linuxSecretOperationStoreProvider.overrideWithValue(store),
         linuxKeyringCoordinatorProvider.overrideWithValue(coordinator),
         accountProvider.overrideWith(() => accounts),
@@ -109,6 +113,7 @@ void main() {
           final operation = switch (flow) {
             'send' => runSendBroadcast(
               ref: ref,
+              l10n: testL10n,
               args: _sendArgs(),
               confirmSaplingParamsDownload: () async => false,
               shouldAbort: () async => !ref.context.mounted,
@@ -176,6 +181,7 @@ void main() {
           final operation = switch (flow) {
             'send' => runSendBroadcast(
               ref: ref,
+              l10n: testL10n,
               args: _sendArgs(),
               confirmSaplingParamsDownload: () async => false,
             ),
@@ -302,6 +308,58 @@ void main() {
       },
     );
   }
+
+  for (final ending in ['linked', 'dispose']) {
+    test('Wallet link revokes its package on $ending', () async {
+      final client = _RecordingLinkClient()..completed = ending == 'linked';
+      final linkContainer = ProviderContainer(
+        overrides: [
+          appBootstrapProvider.overrideWithValue(AppBootstrapState.empty),
+          linuxSecretOperationStoreProvider.overrideWithValue(store),
+          linuxKeyringCoordinatorProvider.overrideWithValue(coordinator),
+          accountProvider.overrideWith(
+            () => accounts = _DelayedAccountNotifier(),
+          ),
+          walletLinkApiClientProvider.overrideWithValue(client),
+        ],
+      );
+      var disposed = false;
+      addTearDown(() {
+        if (!disposed) linkContainer.dispose();
+      });
+      addTearDown(() => client.close(force: true));
+      await linkContainer.read(accountProvider.future);
+      final subscription = linkContainer.listen(
+        walletLinkControllerProvider,
+        (_, _) {},
+      );
+      final controller = linkContainer.read(
+        walletLinkControllerProvider.notifier,
+      );
+      final operation = controller.start();
+      await accounts.started.future.timeout(const Duration(seconds: 3));
+      accounts.release();
+      await operation;
+      await pumpEventQueue();
+
+      if (ending == 'linked') {
+        final state = linkContainer.read(walletLinkControllerProvider);
+        expect(state.phase, WalletLinkPhase.linked);
+        expect(client.revoked, hasLength(1));
+        subscription.close();
+      } else {
+        final packageId = linkContainer
+            .read(walletLinkControllerProvider)
+            .packageId;
+        expect(client.revoked, isEmpty);
+        subscription.close();
+        linkContainer.dispose();
+        disposed = true;
+        await pumpEventQueue();
+        expect(client.revoked, [packageId]);
+      }
+    });
+  }
 }
 
 SendReviewArgs _sendArgs() => SendReviewArgs(
@@ -408,6 +466,7 @@ class _ConsumerRustFake implements RustLibApi {
         executeCalls++;
         return Future.value(
           const ExecuteProposalResult(
+            notices: [],
             txids: 'test-txid',
             status: 'broadcasted',
             broadcastedCount: 1,
@@ -454,6 +513,8 @@ class _RecordingLinkClient extends WalletLinkApiClient {
   final uploadStarted = Completer<void>();
   final Completer<void>? uploadRelease;
   int uploads = 0;
+  bool completed = false;
+  final revoked = <String>[];
 
   @override
   Future<WalletLinkCreatePackageResponse> createPackage(
@@ -473,10 +534,26 @@ class _RecordingLinkClient extends WalletLinkApiClient {
   Future<WalletLinkPackageStatus> getPackageStatus(String packageId) async =>
       WalletLinkPackageStatus(
         id: packageId,
-        status: WalletLinkPackageCompletionStatus.pending,
+        status: completed
+            ? WalletLinkPackageCompletionStatus.completed
+            : WalletLinkPackageCompletionStatus.pending,
         expiresAt: 9999999999,
       );
 
   @override
-  Future<void> revokePackage(String packageId) async {}
+  Future<void> revokePackage(String packageId) async {
+    revoked.add(packageId);
+  }
+}
+
+// Credential lifecycle tests use one deterministic endpoint; automatic endpoint
+// discovery has its own transport tests and must not delay mnemonic reads here.
+class _FixedEndpoint extends RpcEndpointNotifier {
+  @override
+  RpcEndpointConfig build() {
+    final endpoint = defaultRpcEndpointConfig(kZcashDefaultNetworkName);
+    return endpoint.network == ZcashNetwork.mainnet
+        ? endpoint.copyWith(presetId: kManualUsRpcEndpointPresetId)
+        : endpoint;
+  }
 }

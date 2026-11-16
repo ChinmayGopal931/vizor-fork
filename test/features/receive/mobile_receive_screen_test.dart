@@ -19,12 +19,13 @@ import 'package:zcash_wallet/src/features/receive/screens/mobile/mobile_receive_
 import 'package:zcash_wallet/src/features/receive/services/request_qr_export.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/mobile/receive_qr_frame.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/receive_address_widgets.dart';
-import 'package:zcash_wallet/src/features/receive/widgets/request/request_amount_model.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/request/request_qr_surface.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/receive_address_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
+import '../../support/test_l10n.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 import '../../fixtures/orchard_receive_address.dart';
@@ -142,6 +143,7 @@ Widget _app(
       ...extraOverrides,
     ],
     child: MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
       builder: (_, child) => AppTheme(data: AppThemeData.dark, child: child!),
       home: const MobileReceiveScreen(),
     ),
@@ -1024,7 +1026,7 @@ void main() {
     );
     expect(toast.tone, AppToastTone.destructive);
     expect(toast.iconName, AppIcons.cancel);
-    expect(find.text(kRequestLinkCopiedToast), findsNothing);
+    expect(find.text(testL10n.receiveRequestLinkCopied), findsNothing);
   });
 
   testWidgets('a USD request keeps the ZEC it was created with when the price '

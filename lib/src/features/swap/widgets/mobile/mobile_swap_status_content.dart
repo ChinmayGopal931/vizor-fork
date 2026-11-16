@@ -13,16 +13,16 @@ import '../../../../core/widgets/mobile/mobile_address_verify_sheet.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../../core/widgets/mobile/tron_glyph.dart';
 import '../../../../core/widgets/review_info_row.dart';
-import '../../../../core/widgets/review_list_row.dart' show kTxFeeHelpTooltip;
 import '../../domain/swap_contract.dart';
 import '../../models/swap_address_formatting.dart';
 import '../../models/swap_activity_status_mapper.dart'
     show PayActivityStatusPhase, SwapActivityStatusPresentation;
-import '../../models/swap_detail_tooltips.dart';
 import '../../models/swap_status_presentation.dart';
 import '../swap_asset_icon.dart';
 import '../swap_status_page_content.dart' show SwapAnimatedProgressRoute;
+import '../swap_progress_explorer_footer.dart';
 import 'mobile_swap_review_header.dart';
+import '../../../../core/l10n/l10n.dart';
 
 const _mobileStatusDetailIconSize = 16.0;
 const _mobileStatusHeaderToBodyGap = AppSpacing.sm + AppSpacing.s;
@@ -86,12 +86,23 @@ class MobileSwapStatusContent extends StatelessWidget {
           const SizedBox(height: AppSpacing.sm),
           _StatusCard(
             key: const ValueKey('mobile_swap_status_card'),
+            hasExplorerFooter:
+                activeTab == SwapStatusTab.progress &&
+                presentation.explorerUri != null,
             child: activeTab == SwapStatusTab.progress
-                ? SwapAnimatedProgressRoute(
-                    steps: presentation.steps,
-                    progressIndex: presentation.progressIndex,
-                    badgeKind: presentation.badgeKind,
-                    builder: (_, steps) => _NeonProgressRoute(steps: steps),
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SwapAnimatedProgressRoute(
+                        steps: presentation.steps,
+                        progressIndex: presentation.progressIndex,
+                        badgeKind: presentation.badgeKind,
+                        builder: (_, steps) => _NeonProgressRoute(steps: steps),
+                      ),
+                      if (presentation.explorerUri case final uri?)
+                        SwapProgressExplorerFooter(uri: uri),
+                    ],
                   )
                 : presentation.paymentMode && presentation.payStatus != null
                 ? _MobilePaymentDetails(presentation: presentation)
@@ -121,8 +132,6 @@ class MobileSwapStatusContent extends StatelessWidget {
                   ),
           ),
         ],
-        // No global "View on Near Intents" link on mobile. Figma keeps the
-        // external route on the Tx ID row inside transaction details.
       ],
     );
   }
@@ -137,7 +146,7 @@ class MobilePayStatusHeader extends StatelessWidget {
     required this.amountText,
     required this.fiatText,
     required this.recipientAddress,
-    this.label = "You're paying",
+    this.label,
     this.recipientName,
     this.recipientProfilePictureId,
     super.key,
@@ -147,7 +156,7 @@ class MobilePayStatusHeader extends StatelessWidget {
   final String amountText;
   final String fiatText;
   final String recipientAddress;
-  final String label;
+  final String? label;
   final String? recipientName;
   final String? recipientProfilePictureId;
 
@@ -177,7 +186,7 @@ class MobilePayStatusHeader extends StatelessWidget {
                 size: 40,
                 showChainBadge: !asset.isNativeZec,
               ),
-              label: label,
+              label: label ?? context.l10n.commonYourePaying,
               value: amountText,
               valueFit: BoxFit.scaleDown,
               bottomLeftText: fiatText,
@@ -190,18 +199,18 @@ class MobilePayStatusHeader extends StatelessWidget {
                       size: AppProfilePictureSize.navLarge,
                     )
                   : _MobilePayRecipientPlaceholder(),
-              label: 'To',
+              label: context.l10n.commonTo,
               value: name == null || name.isEmpty ? compactAddress : name,
               bottomLeftText: name == null || name.isEmpty
                   ? null
                   : compactAddress,
-              trailingActionLabel: 'Full address',
+              trailingActionLabel: context.l10n.commonFullAddress,
               trailingActionKey: const ValueKey(
                 'mobile_pay_status_full_address',
               ),
               onTrailingAction: () => showMobileAddressVerifySheet(
                 context,
-                title: '${asset.chainLabel} address',
+                title: context.l10n.commonAddressForChain(asset.chainLabel),
                 address: recipientAddress,
                 leading: SwapAssetIcon(
                   asset: asset,
@@ -239,16 +248,23 @@ class _MobilePayRecipientPlaceholder extends StatelessWidget {
 }
 
 class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.child, super.key});
+  const _StatusCard({
+    required this.child,
+    this.hasExplorerFooter = false,
+    super.key,
+  });
 
   final Widget child;
+  final bool hasExplorerFooter;
 
   @override
   Widget build(BuildContext context) {
     return MobileSurfaceCard(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.base,
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.sm,
+        AppSpacing.base,
+        AppSpacing.sm,
+        hasExplorerFooter ? AppSpacing.sm : AppSpacing.base,
       ),
       child: child,
     );
@@ -287,7 +303,7 @@ class _MobileStatusTabs extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
             _MobileStatusTabLabel(
               key: const ValueKey('mobile_swap_status_tab_details'),
-              label: 'Transaction details',
+              label: context.l10n.swapStatusDetailsTab,
               selected: activeTab == SwapStatusTab.details,
               onTap: () => onChanged(SwapStatusTab.details),
             ),
@@ -1030,7 +1046,7 @@ class _MobileStatusChipRow extends StatelessWidget {
           color: colors.text.positiveStrong,
           size: _glyphSize,
         ),
-        'Completed',
+        context.l10n.commonCompleted,
         colors.text.positiveStrong,
       ),
       SwapStatusBadgeKind.refunded => (
@@ -1038,7 +1054,7 @@ class _MobileStatusChipRow extends StatelessWidget {
           size: const Size.square(_glyphSize),
           painter: _RefundGlyphPainter(color: colors.text.positiveStrong),
         ),
-        'Refunded',
+        context.l10n.commonRefunded,
         colors.text.positiveStrong,
       ),
       SwapStatusBadgeKind.failed => (
@@ -1047,7 +1063,7 @@ class _MobileStatusChipRow extends StatelessWidget {
           color: colors.text.destructive,
           size: _glyphSize,
         ),
-        'Failed',
+        context.l10n.commonFailed,
         colors.text.destructive,
       ),
       SwapStatusBadgeKind.warning => (
@@ -1056,12 +1072,12 @@ class _MobileStatusChipRow extends StatelessWidget {
           color: colors.text.warning,
           size: _glyphSize,
         ),
-        'Needs attention',
+        context.l10n.swapStatusBadgeNeedsAttention,
         colors.text.warning,
       ),
       SwapStatusBadgeKind.liveQuote => (
         AppIcon(AppIcons.loader, size: 20, color: colors.neon.glow),
-        'In progress',
+        context.l10n.commonInProgress,
         colors.text.secondary,
       ),
     };
@@ -1079,7 +1095,7 @@ class _MobileStatusChipRow extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(AppSpacing.xxs),
             child: Text(
-              'Status',
+              context.l10n.swapStatusRowLabel,
               style: labelStyle.copyWith(
                 color: badgeKind == SwapStatusBadgeKind.failed
                     ? colors.text.destructive
@@ -1184,29 +1200,35 @@ class _MobilePaymentDetails extends StatelessWidget {
   Widget build(BuildContext context) {
     final payStatus = presentation.payStatus;
     final timestamp = payStatus == null
-        ? _paymentDetailRow(presentation.details, 'Timestamp')
+        ? _paymentDetailRow(
+            presentation.details,
+            SwapStatusDetailKind.timestamp,
+          )
         : SwapStatusDetailRowData(
-            label: 'Timestamp',
+            label: context.l10n.commonTimestamp,
+            kind: SwapStatusDetailKind.timestamp,
             value: payStatus.timestampText,
           );
     final txId = payStatus == null
-        ? _paymentDetailRow(presentation.details, 'Tx ID')
+        ? _paymentDetailRow(presentation.details, SwapStatusDetailKind.txId)
         : SwapStatusDetailRowData(
-            label: 'Tx ID',
+            label: context.l10n.commonTxId,
+            kind: SwapStatusDetailKind.txId,
             value: payStatus.txIdText,
             linkUri: payStatus.txIdUri,
           );
     final convertedFrom = SwapStatusDetailRowData(
-      label: 'Converted from',
+      label: context.l10n.swapPayStatusConvertedFrom,
       value: payStatus?.convertedFromText ?? presentation.payAmountText,
     );
     final displayFee = payStatus == null
         ? null
         : SwapStatusDetailRowData(
-            label: 'Tx fee',
+            label: context.l10n.txFeeInfoTitle,
+            kind: SwapStatusDetailKind.txFee,
             value: payStatus.transactionFeeText,
             help: true,
-            helpTooltip: kTxFeeHelpTooltip,
+            helpTooltip: context.l10n.txFeeHelpTooltip,
           );
     final terminalOutcome =
         payStatus?.phase == PayActivityStatusPhase.failed ||
@@ -1214,18 +1236,20 @@ class _MobilePaymentDetails extends StatelessWidget {
     final outcomeRows = <SwapStatusDetailRowData>[
       if (payStatus?.phase == PayActivityStatusPhase.failed)
         SwapStatusDetailRowData(
-          label: 'Source amount',
+          label: context.l10n.swapPayStatusSourceAmount,
           value: payStatus!.convertedFromText,
         ),
       if (payStatus?.phase == PayActivityStatusPhase.refunded &&
           payStatus?.refundedAmountText?.isNotEmpty == true)
         SwapStatusDetailRowData(
-          label: 'Refunded amount',
+          label: context.l10n.commonRefundedAmount,
+          kind: SwapStatusDetailKind.refundedAmount,
           value: payStatus!.refundedAmountText!,
         ),
       if (terminalOutcome && payStatus?.refundAddress?.isNotEmpty == true)
         SwapStatusDetailRowData(
-          label: 'Refund to',
+          label: context.l10n.commonRefundTo,
+          kind: SwapStatusDetailKind.refundTo,
           value: compactSwapAddress(payStatus!.refundAddress!),
           copyable: true,
           copyText: payStatus.refundAddress,
@@ -1233,7 +1257,8 @@ class _MobilePaymentDetails extends StatelessWidget {
       if (payStatus?.phase == PayActivityStatusPhase.refunded &&
           payStatus?.refundFeeText?.isNotEmpty == true)
         SwapStatusDetailRowData(
-          label: 'Refund fee',
+          label: context.l10n.commonRefundFee,
+          kind: SwapStatusDetailKind.refundFee,
           value: payStatus!.refundFeeText!,
         ),
     ];
@@ -1288,10 +1313,10 @@ class _MobilePaymentDetails extends StatelessWidget {
 
 SwapStatusDetailRowData? _paymentDetailRow(
   Iterable<SwapStatusDetailRowData> rows,
-  String label,
+  SwapStatusDetailKind kind,
 ) {
   for (final row in rows) {
-    if (row.label == label) return row;
+    if (row.kind == kind) return row;
   }
   return null;
 }
@@ -1356,7 +1381,7 @@ class _MobileDetailRows extends StatelessWidget {
     // Like desktop, a recorded refund starts the outcome group so its amount
     // and fee stay together below the transaction metadata.
     final refundIndex = visibleRows.indexWhere(
-      (row) => row.label == 'Refunded amount',
+      (row) => row.kind == SwapStatusDetailKind.refundedAmount,
     );
     final dividerIndex = refundIndex > 0
         ? refundIndex
@@ -1389,8 +1414,7 @@ List<SwapStatusDetailRowData> _mobileVisibleDetailRows(
             !_isMobileProgressTransactionDetailRow(row)) {
           return false;
         }
-        return row.label != 'Price protection' &&
-            row.label != 'Account' &&
+        return !row.kind.hiddenOnMobile &&
             (!hideSuccessAddressRows || !_isMobileSuccessAddressDetailRow(row));
       })
       .toList(growable: false);
@@ -1401,39 +1425,13 @@ List<SwapStatusDetailRowData> _mobileVisibleDetailRows(
   return [...nonFeeRows, ...feeRows];
 }
 
-bool _isMobileProgressTransactionDetailRow(SwapStatusDetailRowData row) {
-  final label = row.label.toLowerCase();
-  return _isMobileDepositAddressDetailRow(row) ||
-      label == 'slippage tolerance' ||
-      label == 'guaranteed minimum' ||
-      label == 'memo' ||
-      label == 'missing deposit' ||
-      label == 'required deposit' ||
-      label == 'detected deposit' ||
-      label == 'deposit deadline' ||
-      label == 'refund fee' ||
-      label == 'timestamp' ||
-      label == 'tx id';
-}
+bool _isMobileProgressTransactionDetailRow(SwapStatusDetailRowData row) =>
+    row.kind.inMobileProgressTransactionDetails;
 
-bool _isMobileDepositAddressDetailRow(SwapStatusDetailRowData row) {
-  final label = row.label.toLowerCase();
-  return label.contains(' deposit to') ||
-      (label.startsWith('deposit ') && label.endsWith(' to'));
-}
+bool _isMobileSuccessAddressDetailRow(SwapStatusDetailRowData row) =>
+    row.kind.isSuccessAddress;
 
-bool _isMobileSuccessAddressDetailRow(SwapStatusDetailRowData row) {
-  final label = row.label.toLowerCase();
-  return label.contains('recipient') || _isMobileDepositAddressDetailRow(row);
-}
-
-bool _isMobileFeeDetailRow(SwapStatusDetailRowData row) {
-  final label = row.label.toLowerCase();
-  return label == 'swap fee' ||
-      label == 'total fees' ||
-      label == 'tx fee' ||
-      label == 'refund fee';
-}
+bool _isMobileFeeDetailRow(SwapStatusDetailRowData row) => row.kind.isFee;
 
 /// A detail line: the label in quiet grey, the value right-aligned in the
 /// primary text, both Gotham Light. The value shrinks to stay on one line.
@@ -1455,7 +1453,7 @@ class _MobileFinalDetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final displayLabel = _mobileStatusDetailLabel(row);
+    final displayLabel = _mobileStatusDetailLabel(context.l10n, row);
     final displayValue = _mobileStatusDetailDisplayValue(row);
     final linkUri = row.linkUri;
     final canTap = linkUri != null || row.copyable;
@@ -1476,7 +1474,7 @@ class _MobileFinalDetailRow extends StatelessWidget {
                   copyTextWithToast(
                     context,
                     text: row.copyText ?? row.value,
-                    toastMessage: 'Copied',
+                    toastMessage: context.l10n.commonCopied,
                   );
                 }
               }
@@ -1530,7 +1528,7 @@ class _MobileFinalDetailRow extends StatelessWidget {
                             color: actionIconColor,
                             tooltipMessage: row.help
                                 ? row.helpTooltip ??
-                                      _mobileStatusHelpTooltip(row.label)
+                                      row.kind.helpTooltipFor(context.l10n)
                                 : null,
                           ),
                         ],
@@ -1580,10 +1578,14 @@ Future<void> _launchExternalUri(Uri uri) async {
   }
 }
 
-String _mobileStatusDetailLabel(SwapStatusDetailRowData row) {
-  final label = row.label;
-  if (label == 'Total fees') return 'Swap fee';
-  return label;
+String _mobileStatusDetailLabel(
+  AppLocalizations l10n,
+  SwapStatusDetailRowData row,
+) {
+  if (row.kind == SwapStatusDetailKind.totalFees) {
+    return l10n.commonSwapFee;
+  }
+  return row.label;
 }
 
 String _mobileStatusDetailDisplayValue(SwapStatusDetailRowData row) {
@@ -1604,13 +1606,7 @@ bool _shouldCompactMobileStatusDetailValue(
   String source,
 ) {
   if (source.length <= 18) return false;
-  final label = row.label.toLowerCase();
-  return label.contains('address') ||
-      label.contains('recipient') ||
-      label.contains('refund') ||
-      label == 'tx id' ||
-      label.contains(' tx') ||
-      (label.startsWith('deposit ') && label.endsWith(' to'));
+  return row.kind.compactsValue;
 }
 
 class _MobileStatusDetailActionIcon extends StatelessWidget {
@@ -1647,13 +1643,4 @@ class _MobileStatusDetailActionIcon extends StatelessWidget {
     }
     return AppTooltip(message: message, tapToShow: true, child: child);
   }
-}
-
-String _mobileStatusHelpTooltip(String label) {
-  return switch (label) {
-    'Swap fee' => swapFeeTooltip,
-    'Guaranteed minimum' => swapGenericMinimumReceiveTooltip,
-    'Total fees' => swapTotalFeesTooltip,
-    _ => swapStatusDetailTooltip,
-  };
 }

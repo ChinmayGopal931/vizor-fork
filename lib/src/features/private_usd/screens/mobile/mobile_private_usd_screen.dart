@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app_bootstrap.dart';
 import '../../../../core/formatting/date_format.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/layout/mobile/mobile_top_nav.dart';
 import '../../../../core/layout/mobile/neon_sync_backdrop.dart';
 import '../../../../core/privacy/privacy_mask.dart';
@@ -50,7 +51,7 @@ import '../../widgets/mobile/private_usd_flow_widgets.dart';
 import '../../widgets/mobile/private_usd_home_strip.dart';
 import '../../widgets/mobile/private_usd_activity_rows.dart';
 import '../../widgets/mobile/private_usd_banner.dart';
-import '../../widgets/mobile/private_usd_receive_sheet.dart';
+import '../../widgets/mobile/private_usd_deposit_line.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
 import '../../widgets/mobile/private_usd_pending_payment_line.dart';
 import '../../widgets/mobile/private_usd_sync_line.dart';
@@ -183,13 +184,9 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
       ),
       depositPass: depositPass,
       // Public USDC where the network pins deposits, and the 0zk address
-      // for another Railgun wallet: one sheet, as ZEC's Receive.
+      // for another Railgun wallet: one screen, as ZEC's Receive.
       onReceive: deposits || address.value != null
-          ? () => showPrivateUsdReceiveSheet(
-              context,
-              accountUuid: uuid,
-              deposits: deposits,
-            )
+          ? () => context.push('/private-usd/receive')
           : null,
       banner: ref.watch(privateUsdConversionBannerProvider(uuid)),
       activityRows: activity,
@@ -208,7 +205,7 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
       onSend: sends ? () => context.push('/private-usd/send') : null,
       onWithdraw: sends ? () => context.push('/private-usd/withdraw') : null,
       canSend: spending.canSend && hasDollars,
-      spendNote: privateUsdSpendMessage(spending),
+      spendNote: privateUsdSpendMessage(context.l10n, spending),
       pendingPayment: ref.watch(privateUsdPendingPaymentProvider(uuid)),
     );
   }
@@ -219,11 +216,13 @@ class _MobilePrivateUsdScreenState extends ConsumerState<MobilePrivateUsdScreen>
     try {
       await ref.read(privateUsdCustomRpcProvider(network).notifier).clear();
     } catch (_) {
-      if (mounted) showAppToast(context, PrivateUsdCopy.rpcErrorSave);
+      if (mounted) {
+        showAppToast(context, context.l10n.privateUsdSettingSaveFailed);
+      }
       return;
     }
     if (!mounted) return;
-    showAppToast(context, PrivateUsdCopy.rpcCleared);
+    showAppToast(context, context.l10n.privateUsdRpcCleared);
     ref.read(privateUsdBalanceProvider(uuid).notifier)
       ..clearRpcFailed()
       ..refresh(showProgress: true);
@@ -355,6 +354,7 @@ class MobilePrivateUsdView extends StatelessWidget {
         ? const <PrivateUsdDepositLine>[]
         : privateUsdDepositLines(depositPass, now: now(), screening: screening);
     final syncLine = privateUsdSyncLine(
+      context.l10n,
       state,
       networkPrivacy: networkPrivacy,
       txidCatchUp: screeningActivity?.txids,
@@ -381,7 +381,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     MobileTopNav.back(
-                      title: PrivateUsdCopy.title,
+                      title: context.l10n.privateUsdTitle,
                       onBack: onBack,
                       trailing: PrivateUsdInfoButton(
                         onTap: () => showPrivateUsdInfoSheet(
@@ -403,7 +403,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                         children: [
                           NeonSyncOcclude(
                             child: Text(
-                              PrivateUsdCopy.subtitle,
+                              context.l10n.privateUsdSubtitle,
                               style: AppTypography.bodyMedium.copyWith(
                                 color: colors.text.secondary,
                               ),
@@ -433,7 +433,8 @@ class MobilePrivateUsdView extends StatelessWidget {
                                         buttonKey: const ValueKey(
                                           'mobile_private_usd_send',
                                         ),
-                                        label: PrivateUsdCopy.actionSend,
+                                        label:
+                                            context.l10n.privateUsdActionSend,
                                         onPressed: canSend ? onSend : null,
                                       ),
                                     ),
@@ -443,7 +444,9 @@ class MobilePrivateUsdView extends StatelessWidget {
                                         buttonKey: const ValueKey(
                                           'mobile_private_usd_withdraw',
                                         ),
-                                        label: PrivateUsdCopy.actionWithdraw,
+                                        label: context
+                                            .l10n
+                                            .privateUsdActionWithdraw,
                                         onPressed: canSend ? onWithdraw : null,
                                       ),
                                     ),
@@ -458,7 +461,9 @@ class MobilePrivateUsdView extends StatelessWidget {
                                         buttonKey: const ValueKey(
                                           'mobile_private_usd_receive_usdc',
                                         ),
-                                        label: PrivateUsdCopy.actionReceive,
+                                        label: context
+                                            .l10n
+                                            .privateUsdActionReceive,
                                         onPressed: onReceive,
                                       ),
                                     ),
@@ -531,6 +536,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                                 screening: screening,
                                 processingStalled: state.screeningFailed,
                                 processingStatus: privateUsdScreeningStatus(
+                                  context.l10n,
                                   activity: screeningActivity,
                                   balances: balances,
                                 ),
@@ -569,7 +575,7 @@ class MobilePrivateUsdView extends StatelessWidget {
                             key: const ValueKey('mobile_private_usd_convert'),
                             expand: true,
                             onPressed: canConvert ? onConvert : null,
-                            child: const Text(PrivateUsdCopy.actionConvert),
+                            child: Text(context.l10n.privateUsdActionConvert),
                           ),
                         ),
                       ),
@@ -675,16 +681,19 @@ class _TotalCard extends StatelessWidget {
     final syncing = balances != null && state.syncing;
     final txidCatchUp = this.txidCatchUp;
     final status = balances == null
-        ? (state.isLoading ? PrivateUsdCopy.firstLoad : null)
+        ? (state.isLoading ? context.l10n.privateUsdFirstLoad : null)
         : syncing
         ? PrivateUsdCopy.syncingRest(
+            context.l10n,
             txidCatchUp == null
                 ? null
                 : privateUsdScreeningPercent(txidCatchUp),
           )
         : updatedAt == null
         ? null
-        : PrivateUsdCopy.updated(formatDayMonthTime(updatedAt));
+        : context.l10n.privateUsdUpdated(
+            formatDayMonthTime(updatedAt, context.l10n.localeName),
+          );
     // The change from the wallet's own sends waits on that list.
     final unproved = syncing && balances.unproved > BigInt.zero
         ? _masked(formatPrivateUsd(balances.unproved), privacyModeEnabled)
@@ -692,8 +701,8 @@ class _TotalCard extends StatelessWidget {
     final error = !state.refreshFailed
         ? null
         : balances == null
-        ? PrivateUsdCopy.loadFailed
-        : PrivateUsdCopy.refreshFailed;
+        ? context.l10n.privateUsdLoadFailed
+        : context.l10n.privateUsdRefreshFailed;
     return MobileSurfaceCard(
       key: const ValueKey('mobile_private_usd_total'),
       child: Column(
@@ -744,7 +753,7 @@ class _TotalCard extends StatelessWidget {
           if (unproved != null) ...[
             const SizedBox(height: AppSpacing.xxs),
             Text(
-              PrivateUsdCopy.syncingRestWaits(unproved),
+              context.l10n.privateUsdSyncingRestWaits(unproved),
               key: const ValueKey('mobile_private_usd_syncing_waits'),
               style: AppTypography.bodySmall.copyWith(
                 color: colors.text.secondary,
@@ -755,7 +764,7 @@ class _TotalCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
             // Read out: the sync line says only that the sync failed.
             Text(
-              PrivateUsdCopy.rpcNotAnswering,
+              context.l10n.privateUsdRpcNotAnswering,
               key: const ValueKey('mobile_private_usd_rpc_error'),
               style: AppTypography.bodySmall.copyWith(
                 color: colors.text.destructive,
@@ -767,12 +776,12 @@ class _TotalCard extends StatelessWidget {
               variant: AppButtonVariant.secondary,
               size: AppButtonSize.small,
               onPressed: onUseDefaultRpc,
-              child: const Text(PrivateUsdCopy.rpcUseDefault),
+              child: Text(context.l10n.privateUsdRpcUseDefault),
             ),
           ] else if (onChangeRpc != null) ...[
             const SizedBox(height: AppSpacing.xs),
             Text(
-              PrivateUsdCopy.rpcDefaultNotAnswering,
+              context.l10n.privateUsdRpcDefaultNotAnswering,
               key: const ValueKey('mobile_private_usd_rpc_error'),
               style: AppTypography.bodySmall.copyWith(
                 color: colors.text.destructive,
@@ -784,7 +793,7 @@ class _TotalCard extends StatelessWidget {
               variant: AppButtonVariant.secondary,
               size: AppButtonSize.small,
               onPressed: onChangeRpc,
-              child: const Text(PrivateUsdCopy.rpcChange),
+              child: Text(context.l10n.privateUsdRpcChange),
             ),
           ] else if (error != null) ...[
             const SizedBox(height: AppSpacing.xs),
@@ -818,7 +827,7 @@ class _RefreshButton extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: true,
-      label: PrivateUsdCopy.refresh,
+      label: context.l10n.privateUsdRefresh,
       excludeSemantics: true,
       child: GestureDetector(
         key: const ValueKey('mobile_private_usd_refresh'),
@@ -868,7 +877,7 @@ class _BucketsCard extends StatelessWidget {
     final rows = <Widget>[
       _BucketRow(
         key: const ValueKey('mobile_private_usd_row_available'),
-        label: PrivateUsdCopy.rowAvailable,
+        label: context.l10n.privateUsdRowAvailable,
         amount: _masked(
           formatPrivateUsd(balances.available),
           privacyModeEnabled,
@@ -878,16 +887,16 @@ class _BucketsCard extends StatelessWidget {
         _BucketRow(
           key: const ValueKey('mobile_private_usd_row_processing'),
           label: processingStalled
-              ? PrivateUsdCopy.rowProcessingStalled
-              : PrivateUsdCopy.rowProcessing,
+              ? context.l10n.privateUsdRowProcessingStalled
+              : context.l10n.privateUsdRowProcessing,
           amount: _masked(
             formatPrivateUsd(balances.processing),
             privacyModeEnabled,
           ),
           status: processingStatus,
           info: processingStalled
-              ? PrivateUsdCopy.rowProcessingStalledInfo
-              : PrivateUsdCopy.rowProcessingInfo,
+              ? context.l10n.privateUsdRowProcessingStalledInfo
+              : context.l10n.privateUsdRowProcessingInfo,
         ),
       if (balances.arriving > BigInt.zero)
         _ArrivingRow(
@@ -903,12 +912,12 @@ class _BucketsCard extends StatelessWidget {
       if (balances.blocked > BigInt.zero)
         _BucketRow(
           key: const ValueKey('mobile_private_usd_row_blocked'),
-          label: PrivateUsdCopy.rowBlocked,
+          label: context.l10n.privateUsdRowBlocked,
           amount: _masked(
             formatPrivateUsd(balances.blocked),
             privacyModeEnabled,
           ),
-          info: PrivateUsdCopy.rowBlockedInfo,
+          info: context.l10n.privateUsdRowBlockedInfo,
           danger: true,
         ),
     ];
@@ -1048,13 +1057,14 @@ class _ArrivingRowState extends State<_ArrivingRow> {
   @override
   Widget build(BuildContext context) => _BucketRow(
     label: privateUsdArrivingLabel(
+      context.l10n,
       since: widget.since,
       screening: widget.screening,
       now: widget.now(),
     ),
     amount: widget.amount,
-    info: PrivateUsdCopy.rowArrivingInfo(
-      PrivateUsdCopy.about(widget.screening),
+    info: context.l10n.privateUsdRowArrivingInfo(
+      PrivateUsdCopy.about(context.l10n, widget.screening),
     ),
   );
 }
@@ -1074,7 +1084,7 @@ class _AssetsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            PrivateUsdCopy.assetsTitle,
+            context.l10n.privateUsdAssetsTitle,
             style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
           ),
           for (final asset in balances.held) ...[
@@ -1083,7 +1093,7 @@ class _AssetsCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    privateUsdTokenName(asset.token.symbol),
+                    privateUsdTokenName(context.l10n, asset.token.symbol),
                     style: AppTypography.bodyMedium.copyWith(
                       color: colors.text.primary,
                     ),
@@ -1122,14 +1132,14 @@ class _EmptyCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            PrivateUsdCopy.emptyTitle,
+            context.l10n.privateUsdEmptyTitle,
             style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             bridgeAvailable
-                ? PrivateUsdCopy.emptyBody
-                : PrivateUsdCopy.emptyBodyReceive,
+                ? context.l10n.privateUsdEmptyBody
+                : context.l10n.privateUsdEmptyBodyReceive,
             style: AppTypography.bodySmall.copyWith(
               color: colors.text.secondary,
             ),
@@ -1169,7 +1179,7 @@ class _DepositsCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              PrivateUsdCopy.depositsTitle,
+              context.l10n.privateUsdDepositsTitle,
               style: AppTypography.labelLarge.copyWith(
                 color: colors.text.accent,
               ),
@@ -1214,7 +1224,7 @@ class _ActivitySection extends StatelessWidget {
                   alignment: AlignmentDirectional.centerStart,
                   child: NeonSyncOcclude(
                     child: Text(
-                      PrivateUsdCopy.activityTitle.toUpperCase(),
+                      context.l10n.privateUsdActivityTitle.toUpperCase(),
                       style: kNeonHudCaptionStyle.copyWith(
                         color: colors.neon.glow,
                       ),
@@ -1229,7 +1239,7 @@ class _ActivitySection extends StatelessWidget {
                     variant: AppButtonVariant.secondary,
                     size: AppButtonSize.small,
                     onPressed: onRefunds,
-                    child: const Text(PrivateUsdCopy.refundsTitle),
+                    child: Text(context.l10n.privateUsdRefundsTitle),
                   ),
                 ),
             ],
@@ -1238,7 +1248,7 @@ class _ActivitySection extends StatelessWidget {
           if (rows.isEmpty)
             NeonSyncOcclude(
               child: Text(
-                PrivateUsdCopy.activityEmpty,
+                context.l10n.privateUsdActivityEmpty,
                 key: const ValueKey('mobile_private_usd_activity_empty'),
                 style: AppTypography.bodySmall.copyWith(
                   color: colors.text.secondary,

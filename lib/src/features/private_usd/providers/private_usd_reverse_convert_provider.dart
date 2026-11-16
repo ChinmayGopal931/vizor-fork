@@ -18,6 +18,7 @@ import 'private_usd_balance_provider.dart';
 import 'private_usd_convert_provider.dart';
 import 'private_usd_engine_provider.dart';
 import 'private_usd_unfinished_provider.dart';
+import '../../../core/l10n/l10n.dart';
 
 DateTime _at(int seconds) =>
     DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
@@ -115,11 +116,11 @@ class PrivateUsdReverseConvertState
   bool get showsRefunds => hasRefunds && step == PrivateUsdConvertStep.amount;
 
   /// The line under the amount, or on the review.
-  String? get message {
-    if (step != PrivateUsdConvertStep.amount) return reviewMessage;
-    if (isTooPrecise) return PrivateUsdCopy.reverseAmountCents;
-    if (isShort) return PrivateUsdCopy.reverseInsufficient;
-    return quoteError;
+  String? message(AppLocalizations l10n) {
+    if (step != PrivateUsdConvertStep.amount) return reviewMessage(l10n);
+    if (isTooPrecise) return l10n.privateUsdReverseAmountCents;
+    if (isShort) return l10n.privateUsdReverseInsufficient;
+    return quoteError?.call(l10n);
   }
 
   @override
@@ -130,9 +131,9 @@ class PrivateUsdReverseConvertState
     BigInt? draftTotal,
     bool clearDraft = false,
     bool? quoting,
-    String? quoteError,
+    PrivateUsdText? quoteError,
     bool clearQuoteError = false,
-    String? startError,
+    PrivateUsdText? startError,
     bool clearStartError = false,
     PrivateUsdConvertStep? step,
     bool? quoteSpent,
@@ -289,20 +290,21 @@ class PrivateUsdReverseConvertNotifier
           await _repriced(account, index);
         case rust.ApiPrivateUsdErrorCode.quoteExpired ||
             rust.ApiPrivateUsdErrorCode.tooLate:
-          startFailed(PrivateUsdCopy.convertQuoteRanOut);
+          startFailed((l10n) => l10n.privateUsdConvertQuoteRanOut);
         case rust.ApiPrivateUsdErrorCode.busy:
           return backToReview();
         default:
           startFailed(
-            privateUsdReverseQuoteMessage(error.code) ??
-                PrivateUsdCopy.convertStartFailed,
+            (l10n) =>
+                privateUsdReverseQuoteMessage(l10n, error.code) ??
+                l10n.privateUsdConvertStartFailed,
           );
       }
       return null;
     } on PrivateUsdPause {
       return backToReview();
     } catch (_) {
-      if (ref.mounted) startFailed(PrivateUsdCopy.convertStartFailed);
+      if (ref.mounted) startFailed((l10n) => l10n.privateUsdConvertStartFailed);
       return null;
     }
     // Gone ahead: the conversion is under way from here, whatever follows.
@@ -321,7 +323,9 @@ class PrivateUsdReverseConvertNotifier
         }
         if (failure != null || result.kind == rust.ApiAcceptKind.tokensNeeded) {
           unawaited(_cancelQuietly(engine, account, index));
-          startFailed(failure ?? PrivateUsdCopy.convertErrorTokensUnavailable);
+          startFailed(
+            failure ?? ((l10n) => l10n.privateUsdConvertErrorTokensUnavailable),
+          );
           return null;
         }
       }
@@ -332,7 +336,9 @@ class PrivateUsdReverseConvertNotifier
           // Handled above.
           return null;
         case rust.ApiAcceptKind.nothingSent:
-          startFailed(privateUsdReverseNothingSentMessage(result.cause));
+          startFailed(
+            (l10n) => privateUsdReverseNothingSentMessage(l10n, result.cause),
+          );
           return null;
       }
     } on PrivateUsdPause {
@@ -341,7 +347,7 @@ class PrivateUsdReverseConvertNotifier
       privateUsdLog('accept failed (${error.runtimeType})');
       // The loop accepts again (idempotent); its progress shows it.
       if (await _isUnderWay(engine, account, index)) return path;
-      if (ref.mounted) startFailed(PrivateUsdCopy.convertStartFailed);
+      if (ref.mounted) startFailed((l10n) => l10n.privateUsdConvertStartFailed);
       return null;
     }
     // The payment the review showed. It outlives this screen; its proof and
@@ -402,10 +408,10 @@ class PrivateUsdReverseConvertNotifier
       state = state.copyWith(
         draft: record,
         step: PrivateUsdConvertStep.review,
-        startError: PrivateUsdCopy.reverseErrorCostChanged,
+        startError: (l10n) => l10n.privateUsdReverseErrorCostChanged,
       );
     } catch (_) {
-      if (ref.mounted) startFailed(PrivateUsdCopy.convertStartFailed);
+      if (ref.mounted) startFailed((l10n) => l10n.privateUsdConvertStartFailed);
     }
   }
 
@@ -461,7 +467,7 @@ class PrivateUsdReverseConvertNotifier
       state = state.copyWith(
         quoting: false,
         clearDraft: !onReview,
-        quoteError: PrivateUsdCopy.convertQuoteClockAhead,
+        quoteError: (l10n) => l10n.privateUsdConvertQuoteClockAhead,
         stale: next.units,
       );
       return;
@@ -471,12 +477,10 @@ class PrivateUsdReverseConvertNotifier
 
   void _quoteFailed(Object error, BigInt total) {
     if (showsUnderWay(error)) return;
-    final message = switch (error) {
-      rust.ApiPrivateUsdError(:final code) => privateUsdReverseQuoteMessage(
-        code,
-      ),
+    final PrivateUsdText? message = switch (error) {
+      rust.ApiPrivateUsdError(:final code) => privateUsdReverseQuoteText(code),
       PrivateUsdPause() => null,
-      _ => PrivateUsdCopy.convertErrorGeneric,
+      _ => (l10n) => l10n.privateUsdConvertErrorGeneric,
     };
     state = state.copyWith(
       quoting: false,

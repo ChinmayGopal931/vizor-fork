@@ -1,4 +1,6 @@
+import '../../../../core/l10n/l10n.dart';
 import '../../providers/home_activity_state.dart';
+import '../../providers/home_initialization_provider.dart';
 import '../../widgets/home_activity_skeleton.dart';
 import '../../../activity/widgets/deferred_gift_card_recovery.dart';
 
@@ -106,7 +108,9 @@ class MobileHomeScreen extends ConsumerWidget {
     );
     final isCurrentHomeRoute = GoRouterState.of(context).uri.path == '/home';
 
-    final isImporting = activeAccountUuid != null && sync.isImportingAccount;
+    final isImporting = ref
+        .watch(homeInitializationPresentationProvider)
+        .showImporting;
 
     return SwapActivityStatusAutoRefresh(
       child: NeonSyncScrolled(
@@ -124,7 +128,7 @@ class MobileHomeScreen extends ConsumerWidget {
                   Builder(
                     builder: (context) =>
                         MobileNavigationScope.isSidebarOf(context)
-                        ? const MobileTopNav.back(title: 'Home')
+                        ? MobileTopNav.back(title: context.l10n.navHome)
                         : MobileTopNavAccount(
                             compact: true,
                             onAccountTap: () =>
@@ -448,9 +452,9 @@ class _IronwoodMigrationAttentionHostState
           return MobileIronwoodMigrationAttentionSheetBody(
             kind: attention.kind,
             count: attention.count,
-            onOpenMigration: () =>
-                Navigator.of(sheetContext)
-                    .pop(_IronwoodAttentionAction.openMigration),
+            onOpenMigration: () => Navigator.of(
+              sheetContext,
+            ).pop(_IronwoodAttentionAction.openMigration),
             onLater: () =>
                 Navigator.of(sheetContext).pop(_IronwoodAttentionAction.later),
           );
@@ -524,9 +528,9 @@ class _IronwoodMigrationAnnouncementHostState
       final action = await showAppMobileSheet<_IronwoodAnnouncementAction>(
         context: context,
         builder: (sheetContext) => MobileIronwoodMigrationAnnouncementSheet(
-          onStartMigration: () =>
-              Navigator.of(sheetContext)
-                  .pop(_IronwoodAnnouncementAction.startMigration),
+          onStartMigration: () => Navigator.of(
+            sheetContext,
+          ).pop(_IronwoodAnnouncementAction.startMigration),
           onOpenReleaseNotes: () => unawaited(_openReleaseNotes()),
         ),
       );
@@ -785,7 +789,7 @@ class _SyncKeepAwakePromptSheet extends StatelessWidget {
 
     return MobileModalScaffold(
       key: const ValueKey('mobile_sync_keep_awake_prompt_sheet'),
-      title: 'Stay awake to sync?',
+      title: context.l10n.homeKeepAwakeTitle,
       onClose: onMaybeLater,
       bodyGap: AppSpacing.xxs,
       bottomPadding: AppSpacing.base,
@@ -794,8 +798,7 @@ class _SyncKeepAwakePromptSheet extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Your phone pauses syncing when screen is off. This allows sync '
-            'to finish faster.',
+            context.l10n.homeKeepAwakeBody,
             style: AppTypography.bodyMedium.copyWith(
               color: colors.text.secondary,
             ),
@@ -806,15 +809,13 @@ class _SyncKeepAwakePromptSheet extends StatelessWidget {
             children: [
               _SyncKeepAwakePromptBullet(
                 iconName: AppIcons.lock,
-                text:
-                    'The app locks after 1 minute of inactivity. Syncing '
-                    'continues behind the lock.',
+                text: context.l10n.homeKeepAwakeLockNote,
                 textStyle: bodyStyle,
               ),
               const SizedBox(height: AppSpacing.xs),
               _SyncKeepAwakePromptBullet(
                 iconName: AppIcons.cog,
-                text: 'You can change this anytime in the Settings.',
+                text: context.l10n.homeKeepAwakeSettingsNote,
                 textStyle: bodyStyle,
               ),
             ],
@@ -829,8 +830,8 @@ class _SyncKeepAwakePromptSheet extends StatelessWidget {
             ),
             leading: const AppIcon(AppIcons.day),
             onPressed: onKeepAwake,
-            child: const Text(
-              'Keep screen awake',
+            child: Text(
+              context.l10n.commonKeepScreenAwake,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -845,8 +846,8 @@ class _SyncKeepAwakePromptSheet extends StatelessWidget {
               horizontal: AppSpacing.sm,
             ),
             onPressed: onMaybeLater,
-            child: const Text(
-              'Maybe later',
+            child: Text(
+              context.l10n.homeKeepAwakeLater,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -898,7 +899,10 @@ class _MobileHomeImportingProgress extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return _ImportingView(progress: ref.watch(syncDisplayPercentageProvider));
+    return _ImportingView(
+      key: const ValueKey('mobile_home_importing'),
+      progress: ref.watch(syncDisplayPercentageProvider),
+    );
   }
 }
 
@@ -976,13 +980,14 @@ class _HomeContentState extends ConsumerState<_HomeContent>
         showPendingEstimate: !ref
             .watch(activityEtaExcludedTxidsProvider)
             .contains(activityTxidKey(transaction.txidHex)),
-        pendingLabel:
-            activityEtaLabelFor(
-              transaction: transaction,
-              labels: ref.watch(activityEtaLabelsProvider),
-              giftCard: giftCard,
-            ) ??
-            ref.watch(activityPendingFallbackLabelProvider),
+        pendingEta: activityEtaFor(
+          transaction: transaction,
+          labels: ref.watch(activityEtaLabelsProvider),
+          giftCard: giftCard,
+        ),
+        pendingFallbackLabel: ref
+            .watch(activityPendingFallbackLabelProvider)
+            .text(context.l10n),
         giftCardKind: giftCard?.kind,
         giftCardAmountZatoshi: giftCard?.amountZatoshi,
         giftCardClaimInFlight: giftCard?.isClaimInFlight ?? false,
@@ -1171,12 +1176,18 @@ class _HomeContentState extends ConsumerState<_HomeContent>
         entry.row,
     ];
 
-    final activityState = homeActivityState(
-      accountUuid: activeAccountUuid,
-      sync: sync,
-      hasRows: recentRows.isNotEmpty,
-      localSources: [?giftCardSource, ?swapSource],
+    final initialPresentation = ref.watch(
+      homeInitializationPresentationProvider,
     );
+    final activityState =
+        initialPresentation.activityUnavailable && recentRows.isEmpty
+        ? HomeActivityState.unavailable
+        : homeActivityState(
+            accountUuid: activeAccountUuid,
+            sync: sync,
+            hasRows: recentRows.isNotEmpty,
+            localSources: [?giftCardSource, ?swapSource],
+          );
     final activityLoading = activityState == HomeActivityState.loading;
 
     final content = ListView(
@@ -1192,7 +1203,7 @@ class _HomeContentState extends ConsumerState<_HomeContent>
       children: [
         if (sync.failure?.kind == SyncFailureKind.privateStatusCoverage) ...[
           _PrivateStatusCoverageNotice(
-            message: sync.failure!.userMessage,
+            message: sync.failure!.userMessage(context.l10n),
             onSettings: () {
               _expectReviewVisit('/settings');
               context.go('/settings');
@@ -1209,16 +1220,17 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                     ? '—'
                     : privacyModeEnabled
                     ? fixedPrivacyMask()
-                    : ZecAmount.fromZatoshi(shieldedBalance)
-                          .compactBalance
-                          .amountText,
+                    : ZecAmount.fromZatoshi(
+                        shieldedBalance,
+                      ).compactBalance.amountText,
                 fiatBalanceText: shieldedFiatBalanceText,
                 priceChange24hPct: priceChange24hPct,
                 transparentBalanceText: transparentBalance.text(
+                  context.l10n,
                   (amount) =>
                       ZecAmount.fromZatoshi(amount).compactBalance.amountText,
                 ),
-                transparentBalanceHint: transparentBalance.hint,
+                transparentBalanceHint: transparentBalance.hint(context.l10n),
                 hasTransparentBalance: transparentBalance.visible,
                 canShieldBalance: sync.canShieldTransparentBalance,
                 isShieldingBalance: _isShieldingBalance,
@@ -1272,8 +1284,8 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                               },
                         leading: const _ButtonIcon(AppIcons.plane),
                         height: _mobileHomeActionButtonHeight,
-                        child: const Text(
-                          'Send',
+                        child: Text(
+                          context.l10n.homeSend,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1292,8 +1304,8 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                         },
                         leading: const _ButtonIcon(AppIcons.arrowDownCircle),
                         height: _mobileHomeActionButtonHeight,
-                        child: const Text(
-                          'Receive',
+                        child: Text(
+                          context.l10n.homeReceive,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1316,8 +1328,8 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                   },
                   leading: const _ButtonIcon(AppIcons.addNew),
                   height: _mobileHomeActionButtonHeight,
-                  child: const Text(
-                    'Receive your first ZEC',
+                  child: Text(
+                    context.l10n.homeReceiveFirstZec,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1337,8 +1349,8 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                   },
                   leading: const _ButtonIcon(AppIcons.swapArrows),
                   height: _mobileHomeActionButtonHeight,
-                  child: const Text(
-                    'Swap',
+                  child: Text(
+                    context.l10n.navSwap,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1367,7 +1379,10 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                     ),
                 attentionKind: migrationAttention?.kind,
                 actionNeededCount: migrationAttention?.count ?? 0,
-                remainingText: _mobileIronwoodRemainingAmountText(sync),
+                remainingText: _mobileIronwoodRemainingAmountText(
+                  sync,
+                  privacyModeEnabled: privacyModeEnabled,
+                ),
                 onTap: () {
                   final target = migrationRequired
                       ? '/migration/intro'
@@ -1403,7 +1418,9 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Semantics(
-                  label: activityLoading ? 'Loading activity' : null,
+                  label: activityLoading
+                      ? context.l10n.commonLoadingActivity
+                      : null,
                   child: Column(
                     children: [
                       for (
@@ -1489,7 +1506,7 @@ class _PrivateStatusCoverageNotice extends StatelessWidget {
             key: const ValueKey('mobile_private_status_coverage_settings'),
             variant: AppButtonVariant.secondary,
             onPressed: onSettings,
-            child: const Text('Settings'),
+            child: Text(context.l10n.navSettings),
           ),
         ],
       ),
@@ -1623,9 +1640,9 @@ class _MobileVotingEntryState extends ConsumerState<_MobileVotingEntry> {
       child: MobileHomeEntryCard(
         key: const ValueKey('mobile_home_coinholder_voting'),
         icon: AppIcons.vote,
-        title: 'Coinholder voting',
-        subtitle: 'Help to shape the network',
-        semanticsLabel: 'Open coinholder voting',
+        title: context.l10n.commonCoinholderVoting,
+        subtitle: context.l10n.homeVotingSubtitle,
+        semanticsLabel: context.l10n.homeVotingSemantics,
         onTap: () => context.push('/voting'),
       ),
     );
@@ -1648,8 +1665,8 @@ class _MobileSetupCarousel extends ConsumerWidget {
           child: MobileHomeEntryCard(
             key: const ValueKey('mobile_home_backup'),
             icon: AppIcons.shieldKeyhole,
-            title: 'Secure your wallet',
-            subtitle: 'Back up your secret passphrase\nLast step',
+            title: context.l10n.homeBackupTitle,
+            subtitle: context.l10n.homeBackupSubtitle,
             emphasized: true,
             showChevron: false,
             onTap: () => context.push(
@@ -1672,8 +1689,8 @@ class _MobileSetupCarousel extends ConsumerWidget {
           child: MobileHomeEntryCard(
             key: const ValueKey('mobile_home_zcash_education'),
             icon: AppIcons.book,
-            title: 'Learn about Zcash',
-            subtitle: 'Privacy, address types, and what to expect',
+            title: context.l10n.homeEducationTitle,
+            subtitle: context.l10n.homeEducationSubtitle,
             emphasized: true,
             showChevron: false,
             onTap: () => context.push(
@@ -1905,7 +1922,9 @@ class _BalanceCard extends StatelessWidget {
           children: [
             Semantics(
               button: onOpenChart != null,
-              label: onOpenChart == null ? null : 'Open balance chart',
+              label: onOpenChart == null
+                  ? null
+                  : context.l10n.portfolioChartOpen,
               child: GestureDetector(
                 key: const ValueKey('mobile_home_balance_sign'),
                 behavior: HitTestBehavior.opaque,
@@ -2064,10 +2083,17 @@ class _TailLightPainter extends CustomPainter {
       oldDelegate.light != light;
 }
 
-String? _mobileIronwoodRemainingAmountText(SyncState sync) {
+// Bare amount: the banner appends its own ` ZEC`.
+String? _mobileIronwoodRemainingAmountText(
+  SyncState sync, {
+  required bool privacyModeEnabled,
+}) {
   final remaining = sync.displayOrchardHoldingsBalance;
   if (remaining == BigInt.zero) return null;
-  return ZecAmount.fromZatoshi(remaining).compactBalance.amountText;
+  return hideIfPrivacyMode(
+    ZecAmount.fromZatoshi(remaining).compactBalance.amountText,
+    privacyModeEnabled: privacyModeEnabled,
+  );
 }
 
 int _mobileIronwoodSafelyObservedHeight(SyncState? sync) {
@@ -2096,7 +2122,7 @@ class _MobileIronwoodMigrationPill extends StatelessWidget {
     final contentColor = context.colors.text.homeCard;
     return Semantics(
       button: true,
-      label: 'Migration required',
+      label: context.l10n.homeMigrationRequired,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
@@ -2110,7 +2136,7 @@ class _MobileIronwoodMigrationPill extends StatelessWidget {
               const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(
-                  'Migration required',
+                  context.l10n.homeMigrationRequired,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: _mobileHomeLabelMStyle.copyWith(color: contentColor),
@@ -2306,7 +2332,7 @@ class _MobileTransparentBalanceStrip extends StatelessWidget {
       privacyModeEnabled: privacyModeEnabled,
     );
     final balanceLabel = Text(
-      'Transparent: $displayedBalance',
+      context.l10n.homeTransparentBalance(displayedBalance),
       key: const ValueKey('mobile_home_transparent_balance_text'),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
@@ -2395,7 +2421,9 @@ class _MobileShieldBalanceButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                isLoading ? 'Shielding...' : 'Shield',
+                isLoading
+                    ? context.l10n.commonShielding
+                    : context.l10n.homeShield,
                 style: _mobileHomeLabelMStyle.copyWith(color: contentColor),
               ),
               const SizedBox(width: AppSpacing.xxs),
@@ -2423,7 +2451,9 @@ class _PrivacyEyeButton extends StatelessWidget {
     // Its own button: the sign around it is one too.
     return Semantics(
       container: true,
-      label: enabled ? 'Show balance' : 'Hide balance',
+      label: enabled
+          ? context.l10n.sidebarShowBalance
+          : context.l10n.sidebarHideBalance,
       button: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -2472,7 +2502,7 @@ class _RecentActivityHeader extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            'Recent activity'.toUpperCase(),
+            context.l10n.homeRecentActivity.toUpperCase(),
             style: kNeonHudCaptionStyle.copyWith(color: colors.neon.glow),
           ),
         ),
@@ -2489,7 +2519,7 @@ class _RecentActivityHeader extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'See all'.toUpperCase(),
+                      context.l10n.homeSeeAll.toUpperCase(),
                       style: kNeonHudCaptionStyle.copyWith(
                         color: colors.text.secondary,
                       ),
@@ -2532,8 +2562,8 @@ class _EmptyActivity extends StatelessWidget {
             children: [
               Text(
                 isUnavailable
-                    ? 'Unable to load activity.'
-                    : 'No activity, yet...',
+                    ? context.l10n.homeActivityUnavailable
+                    : context.l10n.homeActivityEmpty,
                 style: AppTypography.headlineSmall.copyWith(
                   color: colors.text.accent,
                 ),
@@ -2541,7 +2571,7 @@ class _EmptyActivity extends StatelessWidget {
               if (!isUnavailable) ...[
                 const SizedBox(height: AppSpacing.xxs),
                 Text(
-                  'How about running your\nfirst ZEC tx?',
+                  context.l10n.homeActivityEmptyHintMobile,
                   textAlign: TextAlign.center,
                   style: AppTypography.bodyMedium.copyWith(
                     color: colors.text.secondary,
@@ -2574,7 +2604,7 @@ class _MobileRestImage extends StatelessWidget {
 
 /// Full-tab importing state — Figma `Importing` (4394:88886).
 class _ImportingView extends StatelessWidget {
-  const _ImportingView({required this.progress});
+  const _ImportingView({required this.progress, super.key});
 
   static const _horizontalPadding = AppSpacing.sm;
   static const _topGap = AppSpacing.sm;
@@ -2607,13 +2637,15 @@ class _ImportingView extends StatelessWidget {
       children: [
         Text(
           '${formatSyncStatusPercentage(progress)}%',
-          style: AppTypography.displayLarge.copyWith(color: colors.text.accent),
+          style: withTabularFigures(
+            AppTypography.displayLarge,
+          ).copyWith(color: colors.text.accent),
         ),
         const SizedBox(height: AppSpacing.sm),
         SizedBox(
           width: 246,
           child: Text(
-            "We're importing your wallet...",
+            context.l10n.homeImportingTitleMobile,
             textAlign: TextAlign.center,
             style: _titleStyle.copyWith(color: colors.text.accent),
           ),
@@ -2622,7 +2654,7 @@ class _ImportingView extends StatelessWidget {
         SizedBox(
           width: 247,
           child: Text(
-            'Hang tight ... It might take some time. Keep Veylor open & running.',
+            context.l10n.homeImportingBodyMobile,
             textAlign: TextAlign.center,
             style: AppTypography.bodyMedium.copyWith(
               color: colors.text.secondary,

@@ -40,7 +40,9 @@
 //!
 //!   * **Reconnect semantics match the SDK.** lightwalletd closes
 //!     the stream every time a new block is mined — normal EOF,
-//!     not an error. We treat that as "sleep 1s, reconnect". Real
+//!     not an error. We treat that as "sleep 1s, reconnect", and
+//!     pass the end on through `on_new_block` so Dart can check the
+//!     tip at once instead of at its next poll. Real
 //!     errors use a 1s / 30s backoff ladder (first failure: 1s,
 //!     subsequent consecutive failures: 30s). The counter resets
 //!     only on stream progress (a received tx or a clean EOF), not
@@ -391,15 +393,20 @@ fn average_ms(total: Duration, count: u64) -> f64 {
 /// heavy work inside `emit` blocks the next mempool tx from being
 /// processed; the Dart-facing FRB wrapper forwards to a
 /// `StreamSink` which is effectively a non-blocking push.
-pub(crate) async fn run_mempool_observer<F>(
+///
+/// `on_new_block` is called each time the server ends the stream
+/// cleanly, which lightwalletd does when a block is mined.
+pub(crate) async fn run_mempool_observer<F, B>(
     db_path: String,
     network: WalletNetwork,
     lightwalletd_url: String,
     cancel: Arc<AtomicBool>,
     emit: F,
+    on_new_block: B,
 ) -> Result<(), String>
 where
     F: Fn(MempoolTxEvent) + Send + Sync,
+    B: Fn() + Send + Sync,
 {
     let mut backoff = ReconnectBackoff::default();
     let mut seen_cache = TxidSeenCache::new(2048);
@@ -421,6 +428,7 @@ where
         // network operation returns. Without this, `restartSync`'s
         // 5s ceiling can expire before the old observer releases
         // (Codex 4th-round finding 1).
+        let tip_scope = super::TipRequestScope::capture();
         let channel_result = tokio::select! {
             biased;
             _ = watch_for_cancel(&cancel) => {
@@ -455,6 +463,8 @@ where
                 &mut client,
                 &lightwalletd_url,
                 network,
+                tip_scope,
+                || cancel.load(Ordering::Relaxed),
             ) => r,
         };
         let tip = match tip_result {
@@ -562,6 +572,7 @@ where
                                 "mempool: stream closed by server (new block?)"
                             );
                             stats.record_stream_eof();
+                            on_new_block();
                             break StreamExit::CleanEof;
                         }
                         Err(e) => {

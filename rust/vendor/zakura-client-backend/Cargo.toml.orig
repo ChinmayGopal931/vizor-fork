@@ -1,7 +1,7 @@
 [package]
 name = "zakura-client-backend"
 description = "APIs for creating shielded Zcash light clients"
-version = "0.1.0-rc9.4"
+version = "0.1.0-rc9.6"
 authors = [
     "Jack Grigg <jack@z.cash>",
     "Kris Nuttycombe <kris@electriccoin.co>"
@@ -25,7 +25,7 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-zakura-pir-protocol = { path = "../../zakura/pir-protocol", version = "=0.0.1-rc3", features = ["enhance", "recovery"] }
+zakura-pir-protocol = { path = "../../zakura/pir-protocol", version = "=0.0.1-rc5", features = ["enhance", "recovery"] }
 zakura-one-time-ivk = { version = "=0.0.1-rc4", path = "../../zakura/one-time-ivk", optional = true }
 zcash_address.workspace = true
 zcash_encoding.workspace = true
@@ -49,9 +49,6 @@ nonempty.workspace = true
 rand_core.workspace = true
 
 # - Encodings
-base64.workspace = true
-bech32.workspace = true
-bs58.workspace = true
 postcard = { workspace = true, optional = true }
 
 # - Errors
@@ -82,14 +79,14 @@ secp256k1 = { workspace = true, optional = true }
 
 # - Sync engine
 async-trait = { version = "0.1", optional = true }
-futures-util = { version = "0.3", optional = true }
+# Only Tor's exchange joins need the procedural async macros.
+futures-util = { version = "0.3", default-features = false, features = ["std", "async-await"], optional = true }
 
 # - Note commitment trees
 incrementalmerkletree.workspace = true
 shardtree.workspace = true
 
 # - Test dependencies
-ambassador = { workspace = true, optional = true }
 assert_matches = { workspace = true, optional = true }
 pasta_curves = { workspace = true, optional = true }
 proptest = { workspace = true, optional = true }
@@ -102,12 +99,12 @@ zcash_proofs = { workspace = true, optional = true }
 # -- Exposed error types: `arti_client::Error`, `arti_client::config::ConfigBuildError`,
 #    `hyper::Error`, `hyper::http::Error`, `serde_json::Error`. We could avoid this with
 #    changes to error handling.
+# Directory downloads retain mandatory deflate/identity support without the
+# optional XZ/Zstandard codecs and their native builds.
 arti-client = { workspace = true, optional = true }
-dynosaur = { workspace = true, optional = true }
 fs-mistrust = { workspace = true, optional = true }
 hyper = { workspace = true, optional = true, features = ["client", "http1"] }
 serde_json = { workspace = true, optional = true }
-trait-variant = { workspace = true, optional = true }
 
 # - Currency conversion
 rust_decimal = { workspace = true, optional = true }
@@ -115,14 +112,15 @@ rust_decimal = { workspace = true, optional = true }
 # Dependencies used internally:
 # (Breaking upgrades to these are usually backwards-compatible, but check MSRVs.)
 # - Documentation
-document-features.workspace = true
+document-features = { workspace = true, optional = true }
 
 # - Encodings
 byteorder = { workspace = true, optional = true }
-percent-encoding.workspace = true
 
 # - Scanning
-flume.workspace = true
+# Scanning uses ordinary channels; async receive is enabled by sync-decryptor.
+# Neither path uses channel selection or its randomized fairness support.
+flume = { version = "0.11", default-features = false }
 rayon.workspace = true
 
 # - Tor
@@ -136,7 +134,8 @@ hyper-util = { workspace = true, optional = true }
 rand = { workspace = true, features = ["sys_rng", "thread_rng"] }
 rand_08 = { package = "rand", version = "0.8", optional = true }
 serde = { workspace = true, optional = true }
-tokio-rustls = { workspace = true, optional = true }
+# Arti leaves provider selection to its caller; retain the wallet's Ring backend.
+tokio-rustls = { workspace = true, features = ["ring"], optional = true }
 webpki-roots = { workspace = true, optional = true }
 
 # Dependencies used internally:
@@ -145,9 +144,7 @@ webpki-roots = { workspace = true, optional = true }
 getset.workspace = true
 
 [dev-dependencies]
-ambassador.workspace = true
 assert_matches.workspace = true
-gumdrop = "0.8"
 incrementalmerkletree = { workspace = true, features = ["test-dependencies"] }
 jubjub.workspace = true
 proptest.workspace = true
@@ -162,6 +159,10 @@ zcash_keys = { workspace = true, features = ["test-dependencies"] }
 zcash_primitives = { workspace = true, features = ["test-dependencies"] }
 zcash_proofs.workspace = true
 zcash_protocol = { workspace = true, features = ["local-consensus", "test-dependencies"] }
+
+[[example]]
+name = "diversify-address"
+test = true
 
 [features]
 default = ["time/default"]
@@ -238,6 +239,7 @@ sync = [
 ## `sync` feature flag is replaced with a sync engine that makes use of the batch
 ## decryption engine.
 sync-decryptor = [
+    "flume/async",
     "dep:tokio",
     "tokio?/macros",
     "tokio?/rt",
@@ -251,22 +253,27 @@ sync-decryptor = [
 ## Exposes a Tor client for hiding a wallet's IP address while performing certain wallet
 ## operations.
 tor = [
+    "tor-client",
+    "dep:rust_decimal",
+]
+
+## Exposes the Tor client and generic HTTP APIs without exchange-rate helpers.
+## The `tor` feature additionally includes cryptocurrency exchange-rate queries.
+tor-client = [
     "dep:arti-client",
     "arti-client/onion-service-client",
-    "dep:dynosaur",
     "dep:fs-mistrust",
     "dep:futures-util",
+    "futures-util/async-await-macro",
     "dep:http-body-util",
     "dep:hyper",
     "dep:hyper-util",
-    "dep:rust_decimal",
     "dep:serde",
     "dep:serde_json",
     "dep:tokio",
     "tokio?/time",
     "dep:tokio-rustls",
     "dep:tor-rtcompat",
-    "dep:trait-variant",
     "dep:tower",
     "dep:webpki-roots",
 ]
@@ -276,7 +283,6 @@ tor = [
 ## NOTE: Semver-breaking changes to the APIs exposed by this feature may be
 ## present in any release version, including patch releases.
 test-dependencies = [
-    "dep:ambassador",
     "dep:assert_matches",
     "dep:proptest",
     "dep:jubjub",

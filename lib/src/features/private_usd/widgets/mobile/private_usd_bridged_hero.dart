@@ -6,7 +6,7 @@ import '../../../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../../../core/widgets/mobile/neon_motion.dart';
 import '../../../../core/widgets/mobile/neon_scramble_text.dart';
 import '../../../../core/widgets/mobile/tron_glyph.dart';
-import '../../private_usd_copy.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// A finished bridge as a lit sign: the done badge, the title in thin
 /// capitals, and what arrived under it.
@@ -40,7 +40,7 @@ class PrivateUsdBridgedHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final neon = colors.neon;
-    final title = PrivateUsdCopy.bridgedTitle.toUpperCase();
+    final title = context.l10n.privateUsdBridgedTitle.toUpperCase();
     final lit = _titleStyle.copyWith(
       color: neon.core,
       shadows: Neon.textGlow(neon.glow, intensity: 0.7),
@@ -68,7 +68,7 @@ class PrivateUsdBridgedHero extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           Semantics(
             header: true,
-            label: PrivateUsdCopy.bridgedTitle,
+            label: context.l10n.privateUsdBridgedTitle,
             excludeSemantics: true,
             child: celebrate
                 ? NeonIgnition(

@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../../../core/formatting/address_display.dart';
+import '../../../core/l10n/l10n.dart';
 import '../../../core/layout/app_form_factor.dart';
 import '../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../core/layout/mobile/mobile_bottom_safe_area.dart';
@@ -13,8 +14,8 @@ import '../../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../../core/widgets/mobile/tron_glyph.dart';
 import '../../../core/widgets/pool_badge.dart';
 import '../../../core/widgets/review_wrap_card.dart';
+import '../models/payment_request_check_issue.dart';
 import '../models/send_prefill_args.dart' show PaymentRequestSource;
-import 'send_review_layout.dart' show kWhitespaceOnlyMemoPlaceholder;
 export '../models/send_prefill_args.dart' show PaymentRequestSource;
 
 /// Desktop width of the payment-request modal card.
@@ -94,7 +95,7 @@ enum PaymentRequestStatus {
   syncStalled,
 
   /// The check itself could not complete; the reason always comes through
-  /// [PaymentRequestView.statusMessage].
+  /// [PaymentRequestView.statusIssue].
   failed,
 }
 
@@ -129,7 +130,7 @@ extension PaymentRequestStatusX on PaymentRequestStatus {
 /// One line each, no trailing period: the buttons under them already say
 /// what the user can do, so the message only has to name the condition.
 /// Callers may override any of these through
-/// [PaymentRequestView.statusMessage].
+/// [PaymentRequestView.statusIssue].
 ///
 /// [spendableText] is the preformatted spendable balance (`0.21 ZEC`). When
 /// the caller supplies it, the insufficient-funds message states the amount
@@ -140,6 +141,7 @@ extension PaymentRequestStatusX on PaymentRequestStatus {
 /// proposal, and "Not enough ZEC (0.5 available)" beside a 0.5 request reads
 /// as a bug in the balance rather than an instruction.
 String? defaultPaymentRequestStatusMessage(
+  AppLocalizations l10n,
   PaymentRequestStatus status, {
   String? spendableText,
 }) {
@@ -150,25 +152,22 @@ String? defaultPaymentRequestStatusMessage(
     PaymentRequestStatus.ready => null,
     PaymentRequestStatus.checking => null,
     PaymentRequestStatus.invalidAddress =>
-      "Recipient address doesn't look right",
+      l10n.sendPaymentRequestInvalidAddress,
     PaymentRequestStatus.insufficientFunds =>
       spendable == null
-          ? 'Not enough ZEC for this amount and the network fee'
-          : 'Not enough ZEC for this amount and the network fee '
-                '($spendable available)',
+          ? l10n.sendPaymentRequestInsufficientFunds
+          : l10n.sendPaymentRequestInsufficientFundsWithSpendable(spendable),
     // The card watches the sync and re-runs its check when it settles, so the
     // message promises exactly that rather than sending the user back to the
     // link they already opened.
-    PaymentRequestStatus.syncing =>
-      'Wallet is still syncing — this will update when it finishes',
+    PaymentRequestStatus.syncing => l10n.sendPaymentRequestSyncing,
     // The card has stopped promising to update itself, so the copy stops
     // saying it will: it names the same condition and hands the next move
     // to the button under it.
-    PaymentRequestStatus.syncStalled =>
-      'Still syncing — check again when the wallet is up to date',
+    PaymentRequestStatus.syncStalled => l10n.sendPaymentRequestSyncStalled,
     // Always overridden in practice: every failure the pre-check publishes
     // carries its own reason. This is the floor, not the message.
-    PaymentRequestStatus.failed => "Couldn't check this request",
+    PaymentRequestStatus.failed => l10n.sendPaymentRequestCheckFailed,
   };
 }
 
@@ -177,7 +176,8 @@ String? defaultPaymentRequestStatusMessage(
 String? _bareAmount(String? text) {
   final trimmed = text?.trim();
   if (trimmed == null || trimmed.isEmpty) return null;
-  const unit = ' ZEC';
+  const unit =
+      ' ZEC'; // l10n-ignore: currency unit stripped from a formatted balance
   if (trimmed.toUpperCase().endsWith(unit)) {
     final bare = trimmed.substring(0, trimmed.length - unit.length).trim();
     return bare.isEmpty ? null : bare;
@@ -283,7 +283,7 @@ class PaymentRequestView {
     this.spendableText,
     this.recipientIdentity,
     this.status = PaymentRequestStatus.ready,
-    this.statusMessage,
+    this.statusIssue,
     this.replacedNotice = false,
     this.linkDifferences,
   });
@@ -337,7 +337,7 @@ class PaymentRequestView {
   final PaymentRequestStatus status;
 
   /// Overrides [defaultPaymentRequestStatusMessage] for [status].
-  final String? statusMessage;
+  final PaymentRequestCheckIssue? statusIssue;
 
   /// Indicates that this request replaced one already being reviewed.
   final bool replacedNotice;
@@ -352,7 +352,7 @@ class PaymentRequestView {
   /// status line reads) change as the checks land.
   PaymentRequestView copyWithStatus(
     PaymentRequestStatus status, {
-    String? statusMessage,
+    PaymentRequestCheckIssue? statusIssue,
     String? spendableText,
   }) => PaymentRequestView(
     source: source,
@@ -365,7 +365,7 @@ class PaymentRequestView {
     spendableText: spendableText ?? this.spendableText,
     recipientIdentity: recipientIdentity,
     status: status,
-    statusMessage: statusMessage,
+    statusIssue: statusIssue,
     replacedNotice: replacedNotice,
     linkDifferences: linkDifferences,
   );
@@ -390,7 +390,7 @@ class PaymentRequestView {
       spendableText: spendableText,
       recipientIdentity: recipientIdentity,
       status: status,
-      statusMessage: statusMessage,
+      statusIssue: statusIssue,
       replacedNotice: true,
       linkDifferences: linkDifferences,
     );
@@ -416,7 +416,28 @@ class PaymentRequestView {
       spendableText: spendableText,
       recipientIdentity: recipientIdentity,
       status: status,
-      statusMessage: statusMessage,
+      statusIssue: statusIssue,
+      replacedNotice: replacedNotice,
+      linkDifferences: linkDifferences,
+    );
+  }
+
+  /// Same request, with the spendable balance replaced for display, such as
+  /// by its privacy-mode mask.
+  PaymentRequestView withSpendableText(String? spendableText) {
+    if (spendableText == this.spendableText) return this;
+    return PaymentRequestView(
+      source: source,
+      address: address,
+      amountZecText: amountZecText,
+      requesterLabel: requesterLabel,
+      fiatText: fiatText,
+      memo: memo,
+      note: note,
+      spendableText: spendableText,
+      recipientIdentity: recipientIdentity,
+      status: status,
+      statusIssue: statusIssue,
       replacedNotice: replacedNotice,
       linkDifferences: linkDifferences,
     );
@@ -441,15 +462,19 @@ class PaymentRequestView {
       spendableText: spendableText,
       recipientIdentity: identity,
       status: status,
-      statusMessage: statusMessage,
+      statusIssue: statusIssue,
       replacedNotice: replacedNotice,
       linkDifferences: linkDifferences,
     );
   }
 
-  String? get resolvedStatusMessage =>
-      statusMessage ??
-      defaultPaymentRequestStatusMessage(status, spendableText: spendableText);
+  String? resolvedStatusMessage(AppLocalizations l10n) =>
+      statusIssue?.text(l10n) ??
+      defaultPaymentRequestStatusMessage(
+        l10n,
+        status,
+        spendableText: spendableText,
+      );
 
   /// Amount text with surrounding whitespace removed, or null when the
   /// request carried no amount.
@@ -507,10 +532,6 @@ class PaymentRequestView {
 
   /// Pool of [address], for the Shielded / Transparent badge.
   ZcashAddressDisplayKind get addressKind => zcashAddressDisplayKind(address);
-
-  /// The card's serif title. Constant: the requester is never promoted into
-  /// it, because a link-supplied name is not this card's identity.
-  String get headerTitle => 'Payment request';
 
   bool get hasRequesterDetails =>
       displayRequesterLabel != null || displayNote != null;
@@ -653,9 +674,9 @@ class _PaymentRequestCardState extends State<PaymentRequestCard> {
                 SizedBox(height: gap),
               ],
               if (request.replacedNotice) ...[
-                const _QuietNotice(
-                  key: ValueKey('payment_request_replaced_notice'),
-                  message: 'Replaced an earlier link',
+                _QuietNotice(
+                  key: const ValueKey('payment_request_replaced_notice'),
+                  message: context.l10n.sendPaymentRequestReplacedNotice,
                 ),
                 SizedBox(height: gap),
               ],
@@ -701,7 +722,7 @@ class _PaymentRequestCardState extends State<PaymentRequestCard> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Transaction memo',
+                              context.l10n.sendPaymentRequestTransactionMemo,
                               style: AppTypography.bodySmall.copyWith(
                                 color: context.colors.text.secondary,
                               ),
@@ -709,7 +730,7 @@ class _PaymentRequestCardState extends State<PaymentRequestCard> {
                             const SizedBox(height: AppSpacing.xxs),
                             Text(
                               request.memoIsWhitespaceOnly
-                                  ? kWhitespaceOnlyMemoPlaceholder
+                                  ? context.l10n.sendMemoWhitespaceOnly
                                   : request.displayMemo!,
                               style: AppTypography.bodyMedium.copyWith(
                                 color: request.memoIsWhitespaceOnly
@@ -722,12 +743,12 @@ class _PaymentRequestCardState extends State<PaymentRequestCard> {
                     ],
                   ],
                 ),
-              if (request.resolvedStatusMessage != null) ...[
+              if (request.resolvedStatusMessage(context.l10n) != null) ...[
                 SizedBox(height: gap),
                 _StatusMessage(
                   key: const ValueKey('payment_request_status'),
                   status: request.status,
-                  message: request.resolvedStatusMessage!,
+                  message: request.resolvedStatusMessage(context.l10n)!,
                 ),
               ],
             ],
@@ -742,7 +763,9 @@ class _PaymentRequestCardState extends State<PaymentRequestCard> {
                 horizontal: kPaymentRequestGutter,
               ),
               child: _Header(
-                title: request.headerTitle,
+                // The title is constant: the requester is never promoted into it, because
+                // a link-supplied name is not this card's identity.
+                title: context.l10n.commonPaymentRequest,
                 isMobileLayout: widget.isMobileLayout,
                 onClose: widget.onCancel,
               ),
@@ -759,7 +782,7 @@ class _PaymentRequestCardState extends State<PaymentRequestCard> {
               ),
               child: _Actions(
                 status: request.status,
-                statusMessage: request.resolvedStatusMessage,
+                statusMessage: request.resolvedStatusMessage(context.l10n),
                 hasAmount: request.displayAmount != null,
                 isMobileLayout: widget.isMobileLayout,
                 bottomSafeArea: widget.bottomSafeArea,
@@ -806,7 +829,8 @@ class _RequestSummary extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            request.displayAmount ?? 'Amount not specified',
+            request.displayAmount ??
+                context.l10n.sendPaymentRequestAmountNotSpecified,
             style: AppTypography.bodyMediumStrong.copyWith(
               color: context.colors.text.primary,
             ),
@@ -851,11 +875,20 @@ class _RequesterDetails extends StatelessWidget {
             expanded: expanded,
             excludeSemantics: true,
             onTap: onToggle,
-            label:
-                '${expanded ? 'Hide' : 'Show'} requester information${name == null ? '' : ' for $name'}',
+            label: name == null
+                ? (expanded
+                      ? context.l10n.sendPaymentRequestHideRequesterInfo
+                      : context.l10n.sendPaymentRequestShowRequesterInfo)
+                : (expanded
+                      ? context.l10n.sendPaymentRequestHideRequesterInfoFor(
+                          name,
+                        )
+                      : context.l10n.sendPaymentRequestShowRequesterInfoFor(
+                          name,
+                        )),
             value: name == null
-                ? 'Note from requester'
-                : 'Name supplied in the request.',
+                ? context.l10n.sendPaymentRequestNoteFromRequester
+                : context.l10n.sendPaymentRequestNameSuppliedInRequest,
             child: AppButton(
               key: const ValueKey('payment_request_requester_toggle'),
               onPressed: onToggle,
@@ -874,14 +907,16 @@ class _RequesterDetails extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          name == null ? 'Note from requester' : 'Request from',
+                          name == null
+                              ? context.l10n.sendPaymentRequestNoteFromRequester
+                              : context.l10n.sendPaymentRequestRequestFrom,
                           style: AppTypography.bodySmall.copyWith(
                             color: c.text.secondary,
                           ),
                         ),
                         const SizedBox(height: AppSpacing.xxs),
                         Text(
-                          name ?? 'View note',
+                          name ?? context.l10n.sendPaymentRequestViewNote,
                           key: const ValueKey('payment_request_requester'),
                           maxLines: expanded ? null : 2,
                           overflow: expanded
@@ -921,7 +956,7 @@ class _RequesterDetails extends StatelessWidget {
                   const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
-                      "This name comes from the request. It doesn't confirm who owns the receiving address.",
+                      context.l10n.sendPaymentRequestNameDisclaimer,
                       style: AppTypography.bodySmall.copyWith(
                         color: c.text.primary,
                       ),
@@ -942,7 +977,7 @@ class _RequesterDetails extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Note from requester',
+                        context.l10n.sendPaymentRequestNoteFromRequester,
                         style: AppTypography.bodySmall.copyWith(
                           fontWeight: AppFontWeight.medium,
                           color: c.text.secondary,
@@ -990,10 +1025,10 @@ class _RecipientDetails extends StatelessWidget {
           onTap: onToggle,
           excludeSemantics: true,
           label: expanded
-              ? 'Hide full recipient address'
-              : 'Show full recipient address',
+              ? context.l10n.sendPaymentRequestHideFullAddress
+              : context.l10n.sendPaymentRequestShowFullAddress,
           value:
-              '${identity?.displayName ?? ''} ${identity?.isOwnAccount == true ? 'Your account. ' : ''}${request.address}. ${request.addressKind == ZcashAddressDisplayKind.shielded ? 'Shielded' : 'Transparent'}',
+              '${identity?.displayName ?? ''} ${identity?.isOwnAccount == true ? '${context.l10n.sendPaymentRequestYourAccount}. ' : ''}${request.address}. ${request.addressKind == ZcashAddressDisplayKind.shielded ? context.l10n.poolShielded : context.l10n.poolTransparent}',
           child: AppButton(
             key: const ValueKey('payment_request_show_full_address'),
             onPressed: onToggle,
@@ -1017,14 +1052,14 @@ class _RecipientDetails extends StatelessWidget {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
-                            'Recipient',
+                            context.l10n.sendPaymentRequestRecipient,
                             style: AppTypography.bodySmall.copyWith(
                               color: c.text.secondary,
                             ),
                           ),
                           if (identity?.isOwnAccount == true)
                             Text(
-                              'Your account',
+                              context.l10n.sendPaymentRequestYourAccount,
                               style: AppTypography.bodySmall.copyWith(
                                 color: c.text.secondary,
                               ),
@@ -1087,7 +1122,7 @@ class _RecipientDetails extends StatelessWidget {
             ),
           if (identity?.isOwnAccount == true)
             Text(
-              'Your account',
+              context.l10n.sendPaymentRequestYourAccount,
               style: AppTypography.bodySmall.copyWith(color: c.text.secondary),
             ),
           _AddressChunks(
@@ -1110,14 +1145,16 @@ class _PaymentDetailsDisclosure extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final label = expanded ? 'Hide payment details' : 'Payment details';
+    final label = expanded
+        ? context.l10n.sendPaymentRequestHidePaymentDetails
+        : context.l10n.sendPaymentRequestPaymentDetails;
     return Semantics(
       button: true,
       expanded: expanded,
       onTap: onToggle,
       excludeSemantics: true,
       label: label,
-      value: 'Memo included. View the transaction memo.',
+      value: context.l10n.sendPaymentRequestMemoIncludedHint,
       child: AppButton(
         key: const ValueKey('payment_request_memo_toggle'),
         onPressed: onToggle,
@@ -1142,7 +1179,7 @@ class _PaymentDetailsDisclosure extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Memo included',
+                    context.l10n.sendPaymentRequestMemoIncluded,
                     style: AppTypography.bodySmall.copyWith(
                       color: c.text.secondary,
                     ),
@@ -1248,7 +1285,7 @@ class _ExternalRequestIntroduction extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Payment request',
+                        context.l10n.commonPaymentRequest,
                         key: const ValueKey('payment_request_title'),
                         style: AppTypography.bodySmall.copyWith(
                           fontWeight: AppFontWeight.medium,
@@ -1258,7 +1295,7 @@ class _ExternalRequestIntroduction extends StatelessWidget {
                       if (replacedNotice) ...[
                         const SizedBox(height: AppSpacing.xxs),
                         Text(
-                          'Replaced an earlier link',
+                          context.l10n.sendPaymentRequestReplacedNotice,
                           key: const ValueKey(
                             'payment_request_replaced_notice',
                           ),
@@ -1308,7 +1345,9 @@ class _ExternalRequestIntroduction extends StatelessWidget {
                                   child: Semantics(
                                     header: true,
                                     child: Text(
-                                      'Check before you pay',
+                                      context
+                                          .l10n
+                                          .sendPaymentRequestCheckBeforePayTitle,
                                       style: AppTypography.headlineLarge
                                           .copyWith(color: colors.text.accent),
                                     ),
@@ -1318,7 +1357,7 @@ class _ExternalRequestIntroduction extends StatelessWidget {
                             ),
                             const SizedBox(height: AppSpacing.base),
                             Text(
-                              'Other apps can change the address or amount in a request link.',
+                              context.l10n.sendPaymentRequestCheckBeforePayBody,
                               style: AppTypography.bodyMedium.copyWith(
                                 color: colors.text.primary,
                               ),
@@ -1326,8 +1365,12 @@ class _ExternalRequestIntroduction extends StatelessWidget {
                             const SizedBox(height: AppSpacing.sm),
                             Text(
                               canScanOriginal
-                                  ? 'Scan the original QR code directly in Veylor.'
-                                  : 'Confirm the details with the person who sent it.',
+                                  ? context
+                                        .l10n
+                                        .sendPaymentRequestScanOriginalHint
+                                  : context
+                                        .l10n
+                                        .sendPaymentRequestConfirmWithSender,
                               style: AppTypography.bodyMedium.copyWith(
                                 color: colors.text.secondary,
                               ),
@@ -1360,7 +1403,7 @@ class _ExternalRequestIntroduction extends StatelessWidget {
             child: AppIconHoverButton(
               key: const ValueKey('payment_request_close'),
               icon: AppIcons.cross,
-              semanticLabel: 'Close payment request',
+              semanticLabel: context.l10n.sendPaymentRequestClose,
               onTap: onClose,
               idleColor: colors.button.secondary.bg,
               hoverColor: colors.button.secondary.bgHover,
@@ -1397,7 +1440,7 @@ class _ExternalScanActions extends StatelessWidget {
           growWithContent: true,
           constrainContent: true,
           leading: const AppIcon(AppIcons.qr),
-          child: const Text('Scan original QR'),
+          child: Text(context.l10n.commonScanOriginalQr),
         ),
         const SizedBox(height: AppSpacing.xs),
       ],
@@ -1410,7 +1453,7 @@ class _ExternalScanActions extends StatelessWidget {
         expand: true,
         growWithContent: true,
         constrainContent: true,
-        child: const Text('Review link details'),
+        child: Text(context.l10n.sendPaymentRequestReviewLinkDetails),
       ),
     ],
   );
@@ -1474,7 +1517,7 @@ class _Header extends StatelessWidget {
             AppIconHoverButton(
               key: const ValueKey('payment_request_close'),
               icon: AppIcons.cross,
-              semanticLabel: 'Close payment request',
+              semanticLabel: context.l10n.sendPaymentRequestClose,
               onTap: onClose,
               size: 32,
               iconColor: colors.icon.regular,
@@ -1611,7 +1654,7 @@ class _LinkMatchNotice extends StatelessWidget {
         AppIcon(AppIcons.checkCircle, size: 16, color: colors.icon.success),
         const SizedBox(width: AppSpacing.xxs),
         Text(
-          'Matches the link',
+          context.l10n.sendPaymentRequestMatchesLink,
           style: AppTypography.bodySmall.copyWith(color: colors.text.secondary),
         ),
       ],
@@ -1627,14 +1670,15 @@ class _LinkMismatchNotice extends StatelessWidget {
 
   final Set<PaymentRequestLinkDifference> differences;
 
-  String get _title => differences.length > 1
-      ? 'The link had different details'
+  String _title(AppLocalizations l10n) => differences.length > 1
+      ? l10n.sendPaymentRequestLinkDifferentDetails
       : switch (differences.single) {
           PaymentRequestLinkDifference.address =>
-            'The link had a different address',
+            l10n.sendPaymentRequestLinkDifferentAddress,
           PaymentRequestLinkDifference.amount =>
-            'The link had a different amount',
-          PaymentRequestLinkDifference.memo => 'The link had a different memo',
+            l10n.sendPaymentRequestLinkDifferentAmount,
+          PaymentRequestLinkDifference.memo =>
+            l10n.sendPaymentRequestLinkDifferentMemo,
         };
 
   @override
@@ -1664,7 +1708,7 @@ class _LinkMismatchNotice extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _title,
+                    _title(context.l10n),
                     style: AppTypography.bodySmall.copyWith(
                       fontWeight: AppFontWeight.medium,
                       color: colors.text.destructive,
@@ -1672,7 +1716,7 @@ class _LinkMismatchNotice extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.xxs),
                   Text(
-                    'Using the QR instead — the link may have been changed.',
+                    context.l10n.sendPaymentRequestUsingQrInstead,
                     style: AppTypography.bodySmall.copyWith(
                       color: colors.text.primary,
                     ),
@@ -1755,18 +1799,18 @@ class _Actions extends StatelessWidget {
   /// reaches the pre-check answers that can stall.
   bool get _recheckable => status.offersRecheck && hasAmount;
 
-  String get _primaryLabel => _checking
-      ? 'Checking…'
+  String _primaryLabel(AppLocalizations l10n) => _checking
+      ? l10n.commonCheckingEllipsis
       : _recheckable
-      ? 'Check again'
+      ? l10n.commonCheckAgain
       : hasAmount
-      ? 'Review payment'
+      ? l10n.sendPaymentRequestReviewPayment
       // A blocked amount-less request is not waiting for an amount — the
       // address or the check is the problem — so naming the button after
       // the amount would point at the wrong fix.
       : _blocked
-      ? 'Edit'
-      : 'Enter amount';
+      ? l10n.commonEdit
+      : l10n.commonEnterAmount;
 
   @override
   Widget build(BuildContext context) {
@@ -1774,8 +1818,11 @@ class _Actions extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _primaryFill(),
-        if (hasAmount) ...[const SizedBox(height: AppSpacing.xs), _editFill()],
+        _primaryFill(context.l10n),
+        if (hasAmount) ...[
+          const SizedBox(height: AppSpacing.xs),
+          _editFill(context.l10n),
+        ],
       ],
     );
 
@@ -1790,6 +1837,7 @@ class _Actions extends StatelessWidget {
   /// why it cannot be used, instead of disappearing from the accessibility
   /// tree with no explanation.
   Widget _semantics({
+    required AppLocalizations l10n,
     required Widget child,
     required bool enabled,
     required String label,
@@ -1802,9 +1850,8 @@ class _Actions extends StatelessWidget {
       button: true,
       enabled: false,
       label: reason == null
-          ? '$label, unavailable'
-          : '$label, unavailable. '
-                '$reason',
+          ? l10n.sendPaymentRequestUnavailableLabel(label)
+          : l10n.sendPaymentRequestUnavailableWithReason(label, reason),
       excludeSemantics: true,
       child: child,
     );
@@ -1822,6 +1869,7 @@ class _Actions extends StatelessWidget {
   /// review CTA uses (`ReviewButtonsStack`) and the mobile send steps'
   /// full-width primary.
   Widget _fillButton({
+    required AppLocalizations l10n,
     required Key key,
     required String label,
     required VoidCallback? onPressed,
@@ -1829,6 +1877,7 @@ class _Actions extends StatelessWidget {
     Widget? leading,
   }) {
     return _semantics(
+      l10n: l10n,
       enabled: onPressed != null,
       label: label,
       child: AppButton(
@@ -1844,9 +1893,10 @@ class _Actions extends StatelessWidget {
     );
   }
 
-  Widget _primaryFill() => _fillButton(
+  Widget _primaryFill(AppLocalizations l10n) => _fillButton(
+    l10n: l10n,
     key: const ValueKey('payment_request_continue'),
-    label: _primaryLabel,
+    label: _primaryLabel(l10n),
     // Without an amount the primary *is* the edit action, and there is no
     // second Edit under it. Blocking it too would leave the card with no
     // enabled control at all — a stated error and no way to act on it. Edit
@@ -1860,9 +1910,10 @@ class _Actions extends StatelessWidget {
     leading: _primaryLeading(),
   );
 
-  Widget _editFill() => _fillButton(
+  Widget _editFill(AppLocalizations l10n) => _fillButton(
+    l10n: l10n,
     key: const ValueKey('payment_request_edit'),
-    label: 'Edit',
+    label: l10n.commonEdit,
     onPressed: onEdit,
     variant: AppButtonVariant.ghost,
   );

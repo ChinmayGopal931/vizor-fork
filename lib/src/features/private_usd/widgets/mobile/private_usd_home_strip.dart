@@ -11,6 +11,7 @@ import '../../private_usd_copy.dart';
 import '../../providers/private_usd_balance_provider.dart';
 import '../../services/private_usd_balance_repository.dart';
 import 'private_usd_logo.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// Height of the home strip: the transparent-balance strip's, a private
 /// constant of Home's.
@@ -98,7 +99,9 @@ class PrivateUsdHomeStripView extends StatelessWidget {
     final balances = state.balances;
     final blocked = balances?.isBlocked ?? false;
     final amount = balances == null
-        ? (state.isRefreshing ? PrivateUsdCopy.loading : PrivateUsdCopy.unknown)
+        ? (state.isRefreshing
+              ? context.l10n.privateUsdLoading
+              : PrivateUsdCopy.unknown)
         : _masked(formatPrivateUsd(balances.spendable));
     final zec = caption != null || balances == null || privacyModeEnabled
         ? null
@@ -114,28 +117,28 @@ class PrivateUsdHomeStripView extends StatelessWidget {
       detail = null;
       detailSpoken = null;
     } else if (blocked) {
-      detail = PrivateUsdCopy.homeBlocked(
+      detail = context.l10n.privateUsdHomeBlocked(
         _masked(formatPrivateUsd(balances.blocked)),
       );
       detailSpoken = detail;
     } else if (balances.arriving > BigInt.zero) {
       final arriving = _masked(formatPrivateUsd(balances.arriving));
-      detail = PrivateUsdCopy.homeArriving(arriving);
-      detailSpoken = PrivateUsdCopy.homeArrivingDescription(arriving);
+      detail = context.l10n.privateUsdHomeArriving(arriving);
+      detailSpoken = context.l10n.privateUsdHomeArrivingDescription(arriving);
     } else {
       detail = null;
       detailSpoken = null;
     }
     final amountSpoken = blocked
-        ? PrivateUsdCopy.homeBlockedDescription(amount)
+        ? context.l10n.privateUsdHomeBlockedDescription(amount)
         : amount;
 
     return Semantics(
       container: true,
       button: true,
-      label: PrivateUsdCopy.homeOpen,
+      label: context.l10n.privateUsdHomeOpen,
       value: [
-        PrivateUsdCopy.homeBalanceDescription(amountSpoken),
+        context.l10n.privateUsdHomeBalanceDescription(amountSpoken),
         ?zec,
         ?detailSpoken,
       ].join(', '),
@@ -177,7 +180,7 @@ class PrivateUsdHomeStripView extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            PrivateUsdCopy.title,
+                            context.l10n.privateUsdTitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppTypography.labelMedium.copyWith(

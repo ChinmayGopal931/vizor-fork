@@ -298,12 +298,14 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
 - **Art.** The medieval illustrations are gone from mobile: empty states use
   `NeonHorizon` (a striped 80s sun over a grid floor), hero and status
   spots `NeonGlyphBadge`, and painted backgrounds are dropped. The account
-  pictures are the seven neon portraits in `assets/profile_pictures/`
-  (`pfp-01` to `pfp-07`, lossless WebP); ids of the retired knights
-  (`pfp-08` to `pfp-15`) map onto them. Payment-link gift card designs are
-  unchanged. `VizorWordmark` draws a VEYLOR wordmark in tube strokes on
-  mobile (`VeylorWordmarkPainter`: lit red, or plain lines where a caller
-  sets a colour); desktop keeps `vizor_logo.svg`.
+  pictures are the ten neon portraits in `assets/profile_pictures/`
+  (`pfp-01` to `pfp-07` and `pfp-16` to `pfp-18`, 224 px lossless WebP);
+  ids of the retired knights (`pfp-08` to `pfp-15`) map onto the first
+  seven, so a new portrait takes the next number from `pfp-19`.
+  Payment-link gift card designs are unchanged. `VizorWordmark` draws a
+  VEYLOR wordmark in tube strokes on mobile (`VeylorWordmarkPainter`: lit
+  red, or plain lines where a caller sets a colour); desktop keeps
+  `vizor_logo.svg`.
 - **Keys and money flows.** The passcode keys are cut-corner glass plates
   that light red under the finger. Private USD calls a conversion a bridge
   in every user-facing string (owner, 2026-10-19: "Bridge", "Bridging",
@@ -409,6 +411,27 @@ Android and Dart: `--dart-define=VIZOR_DEEPLINK_BASE_URL` (default
   `/payment-links/open` all open the app. Path filtering belongs to
   Dart's `classifyIncomingLink`, which drops unknown paths on the origin
   silently.
+
+## Localization (VIZOR_I18N_PREVIEW)
+
+Read [docs/i18n/developer-guide.md](docs/i18n/developer-guide.md) before adding
+or changing user-facing text, ARB files, language selection, or copy that native
+code draws. [docs/i18n/README.md](docs/i18n/README.md) indexes the translation
+rules, adding a language, and Rust-originated text.
+
+- **After editing translations or updating `intl`, run
+  `fvm dart run tool/l10n/generate.dart`. `flutter gen-l10n` alone does not
+  regenerate the bundled font subsets.** `--watch` is optional for translation
+  work; do not auto-start it with normal app runs or builds.
+- Korean bundles Pretendard's 11,172 modern Hangul syllables and supported
+  jamo; Chinese bundles Noto Sans SC's 8,105 TGH 2013 characters. New UI and
+  date/number-formatting characters are included automatically. Unsupported
+  characters retain system fallback.
+- Commit the generated `assets/fonts/Vizor*UI-VF.ttf`,
+  `tool/l10n/ui_fonts.manifest.json`, and `tool/l10n/ui_font_characters.json`
+  with translation changes; never edit these generated files by hand.
+- Check freshness with `python3 tool/l10n/ui_fonts.py --check`. Screenshot
+  tests must load the shipped subsets, not substitute external/system fonts.
 
 ## Mainnet Block-Time Table
 
@@ -530,19 +553,30 @@ Ledger accounts keep the decorative dot style.
   proper-noun acronyms in their canonical form (`ZEC`, `USDC`, `USDT`, `NEAR`,
   `Veylor`, `Keystone`, `Zcash`, `Ethereum`).
 - Figma-authored display headings may keep title case.
+- **Which brand.** Mobile copy names the app Veylor. The desktop builds still
+  ship as Vizor (macOS, Linux and Windows product names), so desktop-only
+  copy keeps Vizor, and so do strings that mean upstream itself: the
+  donation's recipient and the links to upstream's GitHub and website. Strings
+  live in the ARB files (`lib/l10n`) and both forms are do-not-translate
+  glossary terms. When an upstream merge brings a string that names the app,
+  give it the brand of where it shows, in English, Korean and Chinese.
 - This applies to interpolated labels too: `'$symbol deposit tx'`, not
   `'$symbol Deposit tx'`. The asset symbol carries its own casing; the rest of
   the label is sentence case.
 - **Exception**: sidebar entries and screen titles may use Title Case (e.g.
   onboarding step labels `Secret Passphrase`, `Wallet Birthday Height`) — do
   not sentence-case them in copy sweeps.
-- Existing rationale and full audit are in `qa-copy-review.csv` and
-  `copy-review-20260528-1554.csv` at the repo root. Reference these before
-  introducing new copy in this project.
+- English copy lives in `lib/l10n/app_en.arb`, where each key's description
+  says where it appears. Check `lib/l10n/glossary.yaml` for the shared terms
+  before introducing new copy.
 - When editing existing copy, also update widgetbook fixtures
   (`lib/widgetbook/*.dart`) and tests (`test/`) that assert on the literal
   string — `find.text(...)` matchers, `expectedNextAction` fields, and
   `_tooltipWithMessage(...)` helpers will break otherwise.
+
+## Privacy Mode
+
+Before adding or changing UI that shows an amount, read `docs/privacy-mode.md` (the hide-balance toggle).
 
 ## Release Notes
 
@@ -700,6 +734,7 @@ SyncProvider (sync_provider.dart)
   │   deleted wallet's cached path
   ├── startSyncAnyway() — unlock recovery path for cancelled-but-still-unwinding Rust sync
   ├── Polls getLatestBlockHeight every 10s after sync completes
+  ├── Checks at once when the mempool observer reports a new block
   ├── Re-syncs automatically when new blocks detected or previous sync incomplete
   ├── Duplicate sync guard: _isSyncing (Dart) + isSyncRunning() (Rust)
   ├── A start requested while its own stream still holds the Rust guard (its
@@ -710,7 +745,8 @@ SyncProvider (sync_provider.dart)
   ├── Sync itself is account-agnostic (covers all accounts)
   ├── Polling pauses on app background (onHide), resumes on foreground (onResume)
   ├── refreshAfterSend() called after account switch for immediate update
-  ├── refreshAfterUnlock() restores only the selected account's persisted display balance
+  ├── refreshAfterUnlock() restores the stored sync status, then the selected account's
+  │   persisted display balance; it reads no wallet summary or history
   └── refreshHomeInBackground() refreshes live balance/history after sync starts; each publishes independently
 
 SyncDisplayPercentageProvider (sync_display_progress_provider.dart)
@@ -746,45 +782,11 @@ until sync callback arrives" flash.
   initial address/cache hydration fails, in which case sync state falls back
   to empty and the live sync repopulates it.
 
-### Sync Engine (Rust-only)
+### Sync
 
-The entire sync loop runs in Rust (`rust/src/wallet/sync_engine.rs`). A single call from Dart (`startFullSync()`) triggers the full pipeline:
-
-1. tonic gRPC → lightwalletd (TLS via `tls-ring`)
-2. Download subtree roots (sapling + orchard, incremental with start_index optimization)
-3. Download compact blocks into memory (in-memory `MemoryBlockSource`, no file I/O)
-4. `scan_cached_blocks` from memory (100 blocks per batch)
-5. Enhancement: process each work queue separately. Status observations come
-   from `transaction_status_work()`, which routes each obligation to public
-   `GetTransaction` or private Status PIR. Payload recovery comes from
-   `transaction_enhancement_work()`. `transaction_data_requests()` feeds only
-   transparent-address history (`TransactionsInvolvingAddress`). librustzcash
-   persistently requests `GetStatus` only when compact-block scanning cannot
-   observe the transaction's mined state. During recovery, Veylor separately
-   excludes previously mined transactions from resubmission while a pending
-   scan range can still restore their mined heights.
-6. Progress streamed to Dart via FRB `StreamSink` per batch. Each event has a
-   `kind` (`SyncEventKind` in `sync_engine/mod.rs`, which replaced the old
-   `is_complete` flag): `Progress`, `Completed`, or `FollowupUpdated`.
-7. After `Completed`, two follow-up loops run under the same cancellation and
-   never fail the sync: private transparent recovery over the transparent PIR
-   service (`transparent_followup`,
-   `sync_engine/transparent_ledger.rs`, a no-op unless Private queries selects
-   it) and transparent txid details (`sync_engine/transparent_details.rs`, over
-   txid display PIR under private policy or gated `GetTransaction` otherwise).
-   Background preparation syncs (mode 2) skip both. When one changes wallet
-   data it reports `FollowupUpdated`, and Dart re-reads balances, history and
-   open receipts without counting a second completion. The stream and the
-   `SYNC_RUNNING` guard end only after the follow-ups (and the deferred
-   inactive-account UTXO refresh) finish.
-
-Single DB connection reused across entire sync (opened once, passed to all operations).
-
-Progress percentage: `initial_total` (total blocks to scan) is captured once before the scan loop from `suggest_scan_ranges()`. After each batch, `remaining` unscanned blocks are recalculated, then `pct = 1.0 - remaining / initial_total`. Note: `suggest_scan_ranges()` does not return `Scanned` ranges, so per-batch `total` cannot be used as the denominator. Each progress event includes `has_new_tx` (from `ScanSummary` received/spent note counts) to trigger transaction history refresh only when needed.
-
-Automatic retry: `run_sync_inner` wraps `run_sync_impl` with exponential backoff (3 retries, 2s/4s/8s). Cancel and mode-change are checked during retry wait. Both FRB and C FFI paths benefit.
-
-All sync log messages include `[Xs]` elapsed time from sync start (set once in `run_sync_inner`, consistent across retries). Errors are logged via `log` crate (forwarded to os_log subsystem `frb_user` by FRB `setup_default_user_utils()`). Log level set to `Info` to filter verbose rustls TLS logs. Rust logs are NOT visible in `flutter run` terminal — use `log stream --predicate 'subsystem == "frb_user"' --level info` in a separate terminal.
+The sync engine (`rust/src/wallet/sync_engine/`) and the Dart sync provider
+(`lib/src/providers/sync_provider.dart`) are described in `docs/sync.md`.
+Read it before changing either, and update it when their behaviour changes.
 
 ### Rust Module Structure
 
@@ -855,7 +857,7 @@ rust/src/
 │   │                    # MemoryBlockSource (BlockSource trait impl)
 │   │                    # Single DB connection reused across entire sync
 │   │                    # Checks cancel + mode mismatch after each download/scan/batch
-│   │                    # Progress: initial_total based (remaining / initial_total)
+│   │                    # Progress: work-unit fraction of a persisted sync job
 │   │                    # has_new_tx from ScanSummary note counts
 │   └── keystone.rs     # Keystone hardware wallet integration:
 │                        # - UR (Uniform Resources) encode/decode for animated QR:
@@ -942,8 +944,27 @@ around an upgrade, where those rules live
 Tor covers the app's foreground traffic only. The desired route lives in Rust
 process memory, applied by the Dart layer at startup and by the settings
 toggle; every foreground lightwalletd and HTTP path goes through the
-policy-aware openers and fails closed while Tor is starting or broken.
+policy-aware openers and fails closed while Tor is starting or broken. Upstream
+exempts a sync's large block download; Veylor does not (below).
 
+- **Veylor keeps large block downloads on Tor.** Upstream lets a sync with
+  Tor and Private queries on download its main-scan batches over a direct
+  connection once the estimate reaches `DIRECT_BLOCK_DOWNLOAD_MIN_BYTES`.
+  Veylor turns that route off (`DIRECT_BLOCK_DOWNLOADS` in
+  `rust/src/wallet/sync_engine/mod.rs`): the direct session shows the server
+  the device's IP address and resume height, and timing ties it to the Tor
+  session. Keep it off. Upstream's rules, should the route come back:
+  - Only the batches `batch_uses_direct_connection` allows use it. Every
+    request that carries an address, txid or transaction stays on Tor.
+  - Never dial an onion server directly (`block_download_can_go_direct`).
+  - The session opens its Tor route first and fails closed with it; a direct
+    failure sends the batch over Tor.
+  - HTTP/2 pings only on a multi-threaded runtime (`keep_alive_fits_runtime`).
+  - Settings copy says Vizor uses Tor to protect the IP address; it does not
+    promise that every request goes through Tor.
+
+  How it opens, falls back and reconnects, and what the server learns from it:
+  "Direct block connection" in `docs/sync.md`.
 - **Voting SDK network clients are constructed only in**
   `rust/src/wallet/voting/network_clients.rs`. Chain, helper, PIR, and
   vote-tree are separate transport roles; injecting a chain transport does
@@ -1223,9 +1244,15 @@ development; breaking them is a correctness or data-loss regression):
 1. **The hardware completion path must broadcast before it persists.**
    The function order is: `TransactionExtractor::extract()` (in-memory, no
    DB) → `send_transaction` gRPC → *only then* `extract_and_store_transaction_from_pczt`.
-   Store-then-broadcast leaves the wallet in an unrecoverable state if
-   lightwalletd rejects the tx: DB thinks the notes are spent, network
-   has no record of the tx, user has to manually rescue the wallet.
+   Storing first would mark notes spent by a transaction no server holds.
+   Once the server has the whole transaction, a nonzero `SendResponse` is no
+   proof it was dropped: Zebra and Zakura re-queue rejected transactions for
+   later blocks. A rejected transaction is stored like an unknown result, so
+   its inputs stay spent until its expiry height; for a TEX payment round,
+   sync keeps resubmitting it after the funding round. A transaction without
+   an expiry height still fails outright, and
+   so does a rejected TEX first round: it pays only the wallet's ephemeral
+   address, and keeping it would drop the signed payment round.
 
 2. **Local storage failure after a successful broadcast must not surface
    as a send failure.** The primary store path is
@@ -1341,60 +1368,6 @@ Seed-relevance rule:
 - **Subsequent opens**: `ensure_db_initialized` calls `init_wallet_db(None)`. Calling `init_wallet_db(Some(other_seed))` after the first account would fail the relevance check when any `Imported` account exists.
 - **Hardware-first bootstrap is allowed**: `import_hardware_account` initializes without a local seed and imports the Keystone UFVK. This can produce an `Imported`-only DB, so seed-requiring migration recovery must be handled at the product layer if such a migration appears.
 
-### Dart Sync Provider
-
-`lib/src/providers/sync_provider.dart` — Riverpod `AsyncNotifier`.
-
-**Auto-sync lifecycle:**
-- `build()` watches `accountProvider` via `ref.listen` (not `ref.watch` — avoids rebuild on switch/rename)
-- Account count increase triggers `startSync()` + `_startPolling()` (both first account and additional accounts)
-- `_checkAndSync()`: polls `getLatestBlockHeight` every 10s, re-syncs if tip > last synced height or previous sync incomplete (`percentage < 1.0`)
-- `_checkAndSync()`, `_refreshBalance()`, and `_onSyncProgress()` all bail out while
-  locked and discard late async completions via `_sensitiveStateEpoch`
-- Polling stops during `_checkAndSync` execution to prevent concurrent overlap, restarts after
-- Duplicate sync guard: `_isSyncing` (Dart-side bool) + `isSyncRunning()` (Rust AtomicBool)
-- `startSync()` / `startSyncAnyway()` called while this notifier's own stream is
-  still open (the Rust guard is held through post-sync follow-ups) queue one
-  start (`_queueSyncStart`) instead of being dropped. Repeats coalesce: a
-  forced request upgrades a plain one and the highest tip carries over. The
-  queued start runs when the stream ends, unless the app is now in the
-  background.
-
-**startSync() is fire-and-forget:**
-- Sets up FRB stream listener and returns immediately (no Completer, no await)
-- `_syncGen` generation counter: incremented by `stopSync()`, checked in `.then()` callbacks to invalidate pending operations after user-initiated stop
-- Stream `onDone` → `_onSyncDone()` (balance refresh + start polling), then any queued start
-- `FollowupUpdated` event → `_onSyncFollowupUpdated()` (re-read balances and open receipts; not a new completion)
-- Stream `onError` → sets error state + starts polling for auto-retry
-
-**Sync control:**
-- `stopSync()`: increments `_syncGen` + `cancelFullSync()` + `_stopPolling()`. Polling does not restart until next `onResume`
-- `clearSensitiveStateForLock()`: increments `_syncGen`/`_sensitiveStateEpoch`,
-  clears in-memory sync state, sends `setSyncMode(0)` + `cancelFullSync()`,
-  and waits briefly for stale Rust sync / mempool work to stop
-- `startSyncAnyway()`: unlock recovery path. If Rust is still running but already
-  cancelling, waits for teardown before starting foreground sync; if teardown
-  times out, it at least restores polling so a later retry can recover
-
-**Lifecycle:**
-- `onResume`: refreshes balance → `_checkAndSync()` (which starts polling)
-- `onHide`: stops polling (no wasted network in background)
-- `SyncState.recentTransactions`: latest 10 transactions, updated on `hasNewTx`, sync completion, and app resume
-- `hasCachedBalance` permits Home to display the persisted snapshot without setting
-  `hasBalanceData`, current pool balances, sync completion, or spendability. An
-  accepted live read updates current balances independently of history. Persisted
-  display snapshots follow the same release conditions as in-memory completed-sync
-  snapshots: a valid balance at sync completion, or an explicit send, proposal-release,
-  or account-switch refresh. Intermediate reads preserve spendable, pending, and
-  holdings displays. `hasRecentTransactionsData` and `hasRecentTransactionsError`
-  own the activity loading state.
-- Only completed-sync or explicit-release balance reads enqueue display-only
-  snapshots through `walletBalanceCacheProvider`; intermediate reads leave the
-  saved snapshot intact. Deletion/reset suspend and drain its writes.
-  `ext_vizor_balance_cache` is in the wallet DB and removed with its account;
-  writes open existing DB files only and do not invalidate the wallet-summary cache.
-- All balance/history queries pass `activeAccountUuid` from `AccountProvider`
-
 ### Desktop Window Bootstrap
 
 Desktop window appearance is managed by the external [`desktop_window_bootstrap`](https://github.com/chainapsis/desktop_window_bootstrap) package plus `window_manager`, with a strict responsibility split:
@@ -1508,6 +1481,13 @@ Code:
 - The Railgun page: `android/app/src/main/assets/railgun/`, built from
   `android/railgun-web/`; the same build copies it as is to
   `ios/Runner/Railgun/railgun/`.
+- Copy: ARB messages whose keys start with `privateUsd` (the chart's
+  `portfolioChart`, the sync line's `neonSync`), in Korean and Chinese
+  too. `PrivateUsdCopy` keeps only what is never translated and the few
+  messages that choose between keys. A provider or a result keeps its
+  text as a `PrivateUsdText` that the widget resolves. The Korean and
+  Chinese are a first pass for a native reviewer; the terms they use are
+  in `docs/private-usd-reference.md` §9.6.
 
 **Defines (reference §7.3).** Each is a Dart define read once in
 `private_usd_feature_config.dart`. Gradle needs none of them.
@@ -1733,17 +1713,19 @@ keep the tests that pin them, in `rust/src/wallet/private_usd/tests/` and
 addresses (`m/44'/60'|1'/(1000 + zip32)'/0/index`, from the seed) is
 shielded into its private balance by an EIP-3009 authorization the relayer
 sends (`rust/src/wallet/private_usd/deposits.rs`, zecSwap's
-`docs/deposits.md`). The Receive sheet (`private_usd_receive_sheet.dart`)
-switches, as ZEC's Receive does its pools (`NeonSwitchTabs`), between public
-USDC at the deposit address (the default) and 0zkUSDC at the account's 0zk
-address, for another Railgun wallet; it replaced the screen's 0zk card
-(owner, 2026-10-19). Only a network with a Deposits pin shows the USDC side:
-testnet and, since 2026-10-19, mainnet; elsewhere the sheet shows the 0zk
-address alone. Send and Withdraw scan their recipient as ZEC Send does (the
-shared `MobileScanAddressRow` and `MobileAddressScanCard`): Send takes a 0zk
-address and Withdraw a 0x one (`privateUsdScanOutcome`); an `ethereum:`
-request gives up its recipient, never its token, and one for another chain
-is refused.
+`docs/deposits.md`). The Receive screen (`/private-usd/receive`,
+`mobile_private_usd_receive_screen.dart`) switches, as ZEC's Receive does its
+pools (`NeonSwitchTabs`), between public USDC at the deposit address (the
+default) and 0zkUSDC at the account's 0zk address, for another Railgun
+wallet; it replaced the screen's 0zk card (owner, 2026-10-19). It is a page
+like the other Private USD screens, not a sheet, so the iOS edge swipe goes
+back from it (owner, 2026-11-15). Only a network with a Deposits pin shows
+the USDC side: testnet and, since 2026-10-19, mainnet; elsewhere the screen
+shows the 0zk address alone. Send and Withdraw scan their recipient as ZEC
+Send does (the shared `MobileScanAddressRow` and `MobileAddressScanCard`):
+Send takes a 0zk address and Withdraw a 0x one (`privateUsdScanOutcome`); an
+`ethereum:` request gives up its recipient, never its token, and one for
+another chain is refused.
 
 - Pin the Deposits contract, the relayer's deposits account (not the
   top-level relayer) and the token; refuse terms that differ, never follow
@@ -2006,29 +1988,30 @@ only when asked. The checklist maps each flag to what it checks. The iOS
 rounds use `scripts/private-usd/ios/run_device_round.sh` (the M3 round so
 far), per `docs/private-usd-ios-device-checklist.md`.
 
-**Local stand-ins.** `rust/Cargo.toml` carries two stand-ins for releases
-that do not exist yet:
+**Pinned zecSwap and a local stand-in.** `zecswap-core` comes from
+`ChinmayGopal931/zecSwap`'s `veylor/zakura-v4` branch, its build on Zakura
+Common v4 (E1), and `zecswap-railgun` and `zecswap-tokens` from its `main`
+(PR #18). A zecswap-core rev that changes its Zcash crates needs a matching
+build on that branch first. `rust/Cargo.toml` still carries one stand-in for
+a release that does not exist yet:
 
-- `~/dev/zapp/zecSwap-zakura-v4-windows`, a zecSwap `[patch]` outside the
-  repository: `zecswap-core` of the pinned rev (the windows contract's) on
-  Zakura Common v4 (E1), branch `zakura-v4-windows`. A clean clone builds
-  only where that checkout exists.
-- `rust/vendor/zakura-client-backend`, the published 0.1.0-rc9.4 with the
-  sources of the wallet-libraries rev the `[patch]` pins (only
-  `src/data_api/chain.rs` and its test differ from the published crate) and
-  the `connect_stream` patch the Railgun bridge needs
+- `rust/vendor/zakura-client-backend`, the 0.1.0-rc9.6 of the
+  wallet-libraries rev the `[patch]` pins, as `cargo vendor` writes it (the
+  published rc9.6 predates the rev's `tor-client` feature), with the
+  `connect_stream` patch the Railgun bridge needs
   (`rust/vendor/zakura-client-backend.patch`, E4). The crates.io package and
   the wallet-libraries source are both patched to it, so one backend stays
   in the graph. Before every push, `diff -r` its `src` against that rev's
   `librustzcash/zcash_client_backend/src`: only `src/tor.rs` may differ.
   Never run `cargo fmt --all`, which reformats it, and vendor it again
-  whenever the rev moves.
+  whenever the rev moves: `cargo vendor` a scratch crate that depends on the
+  backend at the new rev with the app's features, take its
+  `zakura-client-backend-*` directory without `.cargo-checksum.json`, drop
+  the `path` keys of the dependencies the `[patch]` entries supply (`pczt`,
+  `zakura-one-time-ivk`, `zakura-pir-protocol`), and apply the patch.
 
-The owner merged Private USD into the fork's `main` with the zecSwap
-stand-in in place (2026-10-20). Replace it with a pushed zecSwap rev once E1
-lands (progress B-6). Push to the owner's fork (`origin`) only when the owner
-asks; never merge into `main` or open a PR unprompted, and never against
-upstream.
+Push to the owner's fork (`origin`) only when the owner asks; never merge
+into `main` or open a PR unprompted, and never against upstream.
 
 ## Testing
 
@@ -2040,7 +2023,7 @@ upstream.
   Mobile-UI tests:
   `fvm flutter test --tags mobile --run-skipped --dart-define=VIZOR_FORM_FACTOR=mobile`.
   Lane rules in "Design Token Form Factor" above.
-- Fonts: Gotham is the app's only family. It is a plain asset (`assets/fonts/`),
+- Fonts: Gotham is the app's only Latin family. It is a plain asset (`assets/fonts/`),
   not a pubspec `fonts:` family: Flutter takes a face's weight from the font
   file, and these files' OS/2 weight classes are off the CSS scale, so
   `FontWeight.w400` would resolve to the Bold file. `loadGothamFonts()`
@@ -2049,7 +2032,9 @@ upstream.
   Figma-compare entry points call it. A widget test that needs real glyphs
   instead of the square test font calls `loadGothamFonts()` too, never a
   hand-rolled `FontLoader` over the `Gotham-*.otf` files. Gotham has no
-  SemiBold (`w600` resolves to Bold) and no monospace face. The mobile serif
+  SemiBold (`w600` resolves to Bold) and no monospace face. Korean and Chinese
+  text falls back to upstream's generated subsets, the pubspec families
+  `Vizor Korean UI` and `Vizor Chinese UI` (`locale_typography.dart`). The mobile serif
   headline tokens are set below the Figma sizes for it (see `_headlineLMobile`).
 - Integration tests: `fvm flutter test integration_test/` (requires device/simulator)
 - Flutter regtest E2E notes:
@@ -2096,6 +2081,8 @@ upstream.
 ## Crate Versions
 
 Constrained in `rust/Cargo.toml` and resolved in `rust/Cargo.lock`. Key crates: `zcash_client_backend` 0.22.0, `zcash_client_sqlite` 0.20.2, `orchard` 0.13.1, `sapling-crypto` 0.7.0. These must stay compatible — check librustzcash releases before bumping.
+
+The zakura wallet crates come from their crates.io releases, with no `[patch]`. A release that adds a wallet migration makes the database unreadable to builds with an older release.
 
 `tonic` 0.14 with `tls-ring` + `tls-webpki-roots` features for gRPC TLS. `rustls` 0.23+ requires explicit crypto provider — `tls-ring` provides this.
 

@@ -7,6 +7,7 @@ import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_sync_line.dart';
 import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
+import '../../support/test_l10n.dart';
 
 // The Processing row's live line and the sync line (owner, 2026-10-19): what
 // the page's screening work is doing, and a long txid catch-up shown as one.
@@ -22,11 +23,16 @@ void main() {
         proving: RailgunPoiProving(index: 2, count: 3, progress: 0.704),
       );
       expect(
-        privateUsdScreeningStatus(activity: all, balances: _processing()),
-        PrivateUsdCopy.screeningProving(2, 3, 70),
+        privateUsdScreeningStatus(
+          testL10n,
+          activity: all,
+          balances: _processing(),
+        ),
+        PrivateUsdCopy.screeningProving(testL10n, 2, 3, 70),
       );
       expect(
         privateUsdScreeningStatus(
+          testL10n,
           activity: const RailgunScreeningEvent(
             txids: 0.5,
             downloading: true,
@@ -34,10 +40,11 @@ void main() {
           ),
           balances: _processing(),
         ),
-        PrivateUsdCopy.screeningDownloading(25),
+        PrivateUsdCopy.screeningDownloading(testL10n, 25),
       );
       expect(
         privateUsdScreeningStatus(
+          testL10n,
           activity: const RailgunScreeningEvent(downloading: true),
           balances: _processing(),
         ),
@@ -45,6 +52,7 @@ void main() {
       );
       expect(
         privateUsdScreeningStatus(
+          testL10n,
           activity: const RailgunScreeningEvent(txids: 0.42, checks: _checks),
           balances: _processing(),
         ),
@@ -52,6 +60,7 @@ void main() {
       );
       expect(
         privateUsdScreeningStatus(
+          testL10n,
           activity: const RailgunScreeningEvent(checks: _checks),
           balances: _processing(submitted: true),
         ),
@@ -64,20 +73,25 @@ void main() {
       'and otherwise there is nothing to say', () {
     expect(
       privateUsdScreeningStatus(
+        testL10n,
         activity: const RailgunScreeningEvent(),
         balances: _processing(submitted: true),
       ),
-      PrivateUsdCopy.screeningWaiting,
+      testL10n.privateUsdScreeningWaiting,
     );
     expect(
-      privateUsdScreeningStatus(activity: null, balances: _processing()),
+      privateUsdScreeningStatus(
+        testL10n,
+        activity: null,
+        balances: _processing(),
+      ),
       isNull,
     );
   });
 
   test('a single proof is not counted, and a share never reads done early', () {
     expect(
-      PrivateUsdCopy.screeningProving(1, 1, 30),
+      PrivateUsdCopy.screeningProving(testL10n, 1, 1, 30),
       'Building screening proof · 30%',
     );
     expect(privateUsdScreeningPercent(0.999), 99);
@@ -92,14 +106,18 @@ void main() {
       updatedAt: DateTime(2026, 10, 19),
       isRefreshing: true,
     );
-    final catchingUp = privateUsdSyncLine(state, txidCatchUp: 0.42);
-    expect(catchingUp.readout, PrivateUsdCopy.syncReadoutProgress(42));
+    final catchingUp = privateUsdSyncLine(testL10n, state, txidCatchUp: 0.42);
+    expect(catchingUp.readout, testL10n.privateUsdSyncReadoutProgress(42));
     expect(catchingUp.climbing, isTrue);
     expect(catchingUp.progress, closeTo(0.42, 1e-9));
 
     for (final done in [null, 1.0]) {
-      final synced = privateUsdSyncLine(state, txidCatchUp: done);
-      expect(synced.readout, PrivateUsdCopy.syncReadoutSynced, reason: '$done');
+      final synced = privateUsdSyncLine(testL10n, state, txidCatchUp: done);
+      expect(
+        synced.readout,
+        testL10n.privateUsdSyncReadoutSynced,
+        reason: '$done',
+      );
       expect(synced.climbing, isFalse);
     }
   });
@@ -112,9 +130,9 @@ void main() {
       isRefreshing: true,
       refreshPercent: 64,
     );
-    final climbing = privateUsdSyncLine(state, txidCatchUp: 0.2);
-    expect(climbing.readout, PrivateUsdCopy.syncReadoutProgress(64));
-    expect(climbing.semanticsLabel, PrivateUsdCopy.updatingProgress(64));
+    final climbing = privateUsdSyncLine(testL10n, state, txidCatchUp: 0.2);
+    expect(climbing.readout, testL10n.privateUsdSyncReadoutProgress(64));
+    expect(climbing.semanticsLabel, testL10n.privateUsdUpdatingProgress(64));
     expect(climbing.climbing, isTrue);
     expect(climbing.progress, closeTo(0.64, 1e-9));
 
@@ -124,21 +142,23 @@ void main() {
     );
     expect(
       privateUsdSyncLine(
+        testL10n,
         state.copyWith(refreshPercent: 0),
         networkPrivacy: connecting,
       ).readout,
-      NeonSyncReadout.torWaiting,
+      NeonSyncReadout.torWaiting(testL10n),
     );
     expect(
-      privateUsdSyncLine(state, networkPrivacy: connecting).readout,
-      PrivateUsdCopy.syncReadoutProgress(64),
+      privateUsdSyncLine(testL10n, state, networkPrivacy: connecting).readout,
+      testL10n.privateUsdSyncReadoutProgress(64),
       reason: 'under way, it is past Tor',
     );
 
     final automatic = privateUsdSyncLine(
+      testL10n,
       state.copyWith(clearRefreshPercent: true),
     );
-    expect(automatic.readout, PrivateUsdCopy.syncReadoutSynced);
+    expect(automatic.readout, testL10n.privateUsdSyncReadoutSynced);
     expect(automatic.climbing, isFalse);
   });
 }

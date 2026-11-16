@@ -106,7 +106,7 @@ class PrivateUsdFundingState {
   final PrivateUsdFundingStage? stage;
 
   /// Why the last try paid nothing (shown in `awaitingFunding` only).
-  final String? error;
+  final PrivateUsdText? error;
 
   bool get running => stage != null;
 
@@ -206,7 +206,7 @@ class PrivateUsdReverseFunding {
       key,
       const PrivateUsdFundingState(stage: PrivateUsdFundingStage.preparing),
     );
-    String? error;
+    PrivateUsdText? error;
     var result = PrivateUsdFundingResult.failed;
     try {
       result = await _guard.startConversion(
@@ -219,24 +219,25 @@ class PrivateUsdReverseFunding {
           result = PrivateUsdFundingResult.dropped;
         case rust.ApiPrivateUsdErrorCode.fundingCostChanged:
           result = PrivateUsdFundingResult.costChanged;
-          error = PrivateUsdCopy.reverseErrorCostChanged;
+          error = (l10n) => l10n.privateUsdReverseErrorCostChanged;
           await _priceIfCleared(key);
         default:
-          error = privateUsdReverseStepMessage(failure.code);
+          error = (l10n) => privateUsdReverseStepMessage(l10n, failure.code);
       }
     } on PrivateUsdSpendBusyException catch (busy) {
       // A send not seen in a block yet holds the wallet's notes.
-      error = switch (busy.status) {
-        PrivateUsdSpendStatus.sending ||
-        PrivateUsdSpendStatus.unreadable => privateUsdSpendMessage(busy.status),
-        _ => PrivateUsdCopy.reverseError,
+      error = (l10n) => switch (busy.status) {
+        PrivateUsdSpendStatus.sending || PrivateUsdSpendStatus.unreadable =>
+          privateUsdSpendMessage(l10n, busy.status) ??
+              l10n.privateUsdReverseError,
+        _ => l10n.privateUsdReverseError,
       };
     } catch (failure) {
       if (_isDrop(failure)) {
         result = PrivateUsdFundingResult.dropped;
       } else {
         privateUsdLog('a funding failed (${failure.runtimeType})');
-        error = PrivateUsdCopy.reverseError;
+        error = (l10n) => l10n.privateUsdReverseError;
       }
     } finally {
       _set(key, PrivateUsdFundingState(error: error));

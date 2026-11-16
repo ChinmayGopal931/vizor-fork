@@ -3,12 +3,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_done_sign.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_glyph_badge.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_motion.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_bridged_hero.dart';
+import '../../support/test_l10n.dart';
 
 // A bridge that finishes in view lights its "Bridged" sign: the done badge
 // drawn by a light cycle, a shockwave, and one success haptic as the badge
@@ -22,6 +23,7 @@ void main() {
     final impacts = <int>[];
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: Builder(
@@ -31,7 +33,7 @@ void main() {
               ).copyWith(disableAnimations: disableAnimations),
               child: Scaffold(
                 body: PrivateUsdBridgedHero(
-                  body: PrivateUsdCopy.reverseProgressReceived('0.8 ZEC'),
+                  body: testL10n.privateUsdReverseProgressReceived('0.8 ZEC'),
                   celebrate: celebrate,
                   onImpact: () => impacts.add(1),
                 ),
@@ -60,7 +62,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(impacts, hasLength(1));
       expect(tester.binding.hasScheduledFrame, isFalse);
-      expect(find.text(PrivateUsdCopy.bridgedTitle.toUpperCase()), findsOne);
+      expect(
+        find.text(testL10n.privateUsdBridgedTitle.toUpperCase()),
+        findsOne,
+      );
       expect(NeonMotion.bridged, greaterThan(NeonMotion.syncDone));
     },
   );
@@ -71,7 +76,7 @@ void main() {
 
     expect(find.byType(NeonDoneSign), findsNothing);
     expect(find.byType(NeonGlyphBadge), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.bridgedTitle.toUpperCase()), findsOne);
+    expect(find.text(testL10n.privateUsdBridgedTitle.toUpperCase()), findsOne);
     expect(tester.binding.hasScheduledFrame, isFalse);
     expect(impacts, isEmpty);
   });
@@ -88,6 +93,6 @@ void main() {
 
     expect(impacts, hasLength(1));
     expect(tester.binding.hasScheduledFrame, isFalse);
-    expect(find.text(PrivateUsdCopy.bridgedTitle.toUpperCase()), findsOne);
+    expect(find.text(testL10n.privateUsdBridgedTitle.toUpperCase()), findsOne);
   });
 }

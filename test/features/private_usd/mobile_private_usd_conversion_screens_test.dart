@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/formatting/date_format.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_status_presentation.dart';
@@ -21,6 +22,7 @@ import 'package:zcash_wallet/src/features/settings/widgets/mobile/mobile_tor_con
 import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 // The forward conversion's screens, and the banner and activity on
 // `/private-usd`, built from the Widgetbook fixtures.
@@ -45,6 +47,7 @@ void main() {
   Future<void> pump(WidgetTester tester, Widget child) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(data: AppThemeData.dark, child: child),
       ),
     );
@@ -86,14 +89,17 @@ void main() {
         previewPrivateUsdConvertState(quote: previewPrivateUsdQuote()),
       );
 
-      expect(find.text(PrivateUsdCopy.convertZecIncludesFee), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertYouPay), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertNetworkFee), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertYouReceive), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertMakerCost), findsOneWidget);
+      expect(
+        find.text(testL10n.privateUsdConvertZecIncludesFee),
+        findsOneWidget,
+      );
+      expect(find.text(testL10n.privateUsdConvertYouPay), findsOneWidget);
+      expect(find.text(testL10n.commonNetworkFee), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertYouReceive), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertMakerCost), findsOneWidget);
       // The expiry is a HUD caption, drawn uppercase.
       expect(
-        find.text(PrivateUsdCopy.convertQuoteExpires('2:35').toUpperCase()),
+        find.text(testL10n.privateUsdConvertQuoteExpires('2:35').toUpperCase()),
         findsOneWidget,
       );
       // The ledger's line, and the estimate above it, which decrypts the
@@ -130,7 +136,7 @@ void main() {
           fiatTextForZatoshi(state.totalZat!, zecUsdUnitPrice: 70)!,
         ),
       );
-      final note = find.text(PrivateUsdCopy.convertZecIncludesFee);
+      final note = find.text(testL10n.privateUsdConvertZecIncludesFee);
       expect(tester.getTopLeft(marketValue).dy, tester.getTopLeft(note).dy);
       expect(
         tester.getTopLeft(marketValue).dx,
@@ -143,7 +149,7 @@ void main() {
     ) async {
       await pumpConvert(tester, previewPrivateUsdConvertState(quoting: true));
 
-      expect(find.text(PrivateUsdCopy.convertQuoteLoading), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertQuoteLoading), findsOneWidget);
       expect(
         button(tester, 'mobile_private_usd_convert_review').onPressed,
         isNull,
@@ -185,7 +191,7 @@ void main() {
       );
 
       expect(
-        find.text(PrivateUsdCopy.convertZecSyncingProgress(42)),
+        find.text(testL10n.privateUsdConvertZecSyncingProgress(42)),
         findsOneWidget,
       );
       expect(
@@ -226,14 +232,20 @@ void main() {
       );
 
       // The page title and the expiry caption are drawn uppercase.
-      expect(find.text(PrivateUsdCopy.review.toUpperCase()), findsOneWidget);
+      expect(
+        find.text(testL10n.privateUsdReview.toUpperCase()),
+        findsOneWidget,
+      );
       expect(find.text('0.5 ZEC'), findsOneWidget);
       expect(find.text(r'$15.50'), findsOneWidget);
       expect(
-        find.text(PrivateUsdCopy.convertQuoteHolds('2:35').toUpperCase()),
+        find.text(testL10n.privateUsdConvertQuoteHolds('2:35').toUpperCase()),
         findsOneWidget,
       );
-      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsOneWidget);
+      expect(
+        find.text(testL10n.privateUsdConvertBackgroundNote),
+        findsOneWidget,
+      );
       expect(
         button(tester, 'mobile_private_usd_review_convert').onPressed,
         isNotNull,
@@ -251,11 +263,11 @@ void main() {
         torOffDisclosure: true,
       );
       expect(
-        find.textContaining(PrivateUsdCopy.tokensTorOffDisclosure),
+        find.textContaining(testL10n.privateUsdTokensTorOffDisclosure),
         findsOneWidget,
       );
       expect(
-        find.textContaining(PrivateUsdCopy.convertBackgroundNote),
+        find.textContaining(testL10n.privateUsdConvertBackgroundNote),
         findsOneWidget,
       );
     });
@@ -272,10 +284,10 @@ void main() {
       );
 
       expect(
-        find.text(PrivateUsdCopy.convertRelayerReviewNote),
+        find.text(testL10n.privateUsdConvertRelayerReviewNote),
         findsOneWidget,
       );
-      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsNothing);
+      expect(find.text(testL10n.privateUsdConvertBackgroundNote), findsNothing);
     });
 
     testWidgets('an expired quote offers "Refresh quote" instead', (
@@ -290,11 +302,11 @@ void main() {
       );
 
       expect(
-        find.text(PrivateUsdCopy.quoteExpired.toUpperCase()),
+        find.text(testL10n.privateUsdQuoteExpired.toUpperCase()),
         findsOneWidget,
       );
-      expect(find.text(PrivateUsdCopy.convertQuoteRanOut), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertNewQuote), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertQuoteRanOut), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertNewQuote), findsOneWidget);
       expect(
         find.byKey(const ValueKey('mobile_private_usd_review_convert')),
         findsNothing,
@@ -321,6 +333,7 @@ void main() {
         tester,
         MobilePrivateUsdConversionView(
           presentation: privateUsdProgressPresentation(
+            testL10n,
             status: status,
             now: previewPrivateUsdNow,
             zcashConfirmations: 2,
@@ -355,16 +368,16 @@ void main() {
         ),
       );
 
-      expect(find.text(PrivateUsdCopy.convertStepConfirm), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertStepConfirm), findsOneWidget);
       expect(find.text('1 of 2 · about 1 min'), findsOneWidget);
       expect(keepOpenCard, findsOneWidget);
-      expect(find.text(PrivateUsdCopy.keepOpenBody), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertBackgroundNote), findsNothing);
+      expect(find.text(testL10n.privateUsdKeepOpenBody), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertBackgroundNote), findsNothing);
       expect(
         find.byKey(const ValueKey('mobile_private_usd_progress_action')),
         findsNothing,
       );
-      expect(find.text(PrivateUsdCopy.convertCallOff), findsNothing);
+      expect(find.text(testL10n.privateUsdConvertCallOff), findsNothing);
     });
 
     testWidgets('the confirmations estimate follows the block time', (
@@ -399,7 +412,10 @@ void main() {
       );
       await pumpProgress(tester, status);
 
-      expect(find.text(PrivateUsdCopy.convertRelayerClaims), findsOneWidget);
+      expect(
+        find.text(testL10n.privateUsdConvertRelayerClaims),
+        findsOneWidget,
+      );
       expect(keepOpenCard, findsNothing);
       expect(find.text('1 of 2 · about 1 min'), findsOneWidget);
 
@@ -417,9 +433,16 @@ void main() {
       final t0 = DateTime.fromMillisecondsSinceEpoch(
         confirmed.record.t0! * 1000,
       );
-      expect(find.text(PrivateUsdCopy.convertRelayerClaims), findsOneWidget);
       expect(
-        find.text(PrivateUsdCopy.convertMakerSilent(formatDayMonthTime(t0))),
+        find.text(testL10n.privateUsdConvertRelayerClaims),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          testL10n.privateUsdConvertMakerSilent(
+            formatDayMonthTime(t0, testL10n.localeName),
+          ),
+        ),
         findsNothing,
       );
       expect(keepOpenCard, findsNothing);
@@ -439,8 +462,8 @@ void main() {
         ),
       );
 
-      expect(find.text(PrivateUsdCopy.convertRefunding), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertRelayerClaims), findsNothing);
+      expect(find.text(testL10n.privateUsdConvertRefunding), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertRelayerClaims), findsNothing);
       expect(keepOpenCard, findsOneWidget);
     });
 
@@ -460,7 +483,7 @@ void main() {
       );
 
       await pumpProgress(tester, status, onKeepScreenOnChanged: changes.add);
-      expect(find.text(PrivateUsdCopy.keepScreenOn), findsOneWidget);
+      expect(find.text(testL10n.privateUsdKeepScreenOn), findsOneWidget);
       expect(toggleOn(), isTrue);
       await tester.tap(row);
       expect(changes, [false]);
@@ -491,7 +514,7 @@ void main() {
         relayerClaims: true,
       );
       expect(
-        find.text(PrivateUsdCopy.convertRelayerReviewNote),
+        find.text(testL10n.privateUsdConvertRelayerReviewNote),
         findsOneWidget,
       );
       expect(keepOpenCard, findsNothing);
@@ -506,7 +529,7 @@ void main() {
         relayerClaims: true,
       );
       expect(
-        find.text(PrivateUsdCopy.convertRelayerReviewNote),
+        find.text(testL10n.privateUsdConvertRelayerReviewNote),
         findsOneWidget,
       );
       expect(keepOpenCard, findsNothing);
@@ -524,7 +547,10 @@ void main() {
         ),
         relayerClaims: true,
       );
-      expect(find.text(PrivateUsdCopy.convertRelayerReviewNote), findsNothing);
+      expect(
+        find.text(testL10n.privateUsdConvertRelayerReviewNote),
+        findsNothing,
+      );
       expect(keepOpenCard, findsOneWidget);
     });
 
@@ -543,8 +569,8 @@ void main() {
         ),
       );
 
-      expect(find.text(PrivateUsdCopy.convertOpeningSlow), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertCallOff), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertOpeningSlow), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertCallOff), findsOneWidget);
     });
 
     testWidgets('a held problem shows its card and "Try now"', (tester) async {
@@ -556,9 +582,12 @@ void main() {
         ),
       );
 
-      expect(find.text(PrivateUsdCopy.convertProblemTitle), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertProblemRelayer), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertProblemRetry), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertProblemTitle), findsOneWidget);
+      expect(
+        find.text(testL10n.privateUsdConvertProblemRelayer),
+        findsOneWidget,
+      );
+      expect(find.text(testL10n.privateUsdConvertProblemRetry), findsOneWidget);
     });
 
     testWidgets('picking up after a restart says so', (tester) async {
@@ -570,7 +599,7 @@ void main() {
         ),
       );
 
-      expect(find.text(PrivateUsdCopy.convertResuming), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertResuming), findsOneWidget);
     });
 
     testWidgets('paid: the 0zkUSDC is on its way, and "View private USD"', (
@@ -588,10 +617,13 @@ void main() {
         balance: previewPrivateUsdBalance(available: 100, arriving: 15.5),
       );
 
-      expect(find.text(PrivateUsdCopy.convertResultPaidTitle), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertStepScreen), findsOneWidget);
       expect(
-        find.text(PrivateUsdCopy.convertResultViewBalance),
+        find.text(testL10n.privateUsdConvertResultPaidTitle),
+        findsOneWidget,
+      );
+      expect(find.text(testL10n.privateUsdConvertStepScreen), findsOneWidget);
+      expect(
+        find.text(testL10n.privateUsdConvertResultViewBalance),
         findsOneWidget,
       );
       expect(keepOpenCard, findsNothing);
@@ -618,12 +650,15 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text(PrivateUsdCopy.convertResultScreenedBody(r'$15.50')),
+        find.text(testL10n.privateUsdConvertResultScreenedBody(r'$15.50')),
         findsOneWidget,
       );
-      expect(find.text(PrivateUsdCopy.convertResultPaidTitle), findsNothing);
       expect(
-        find.text(PrivateUsdCopy.actionConvert.toUpperCase()),
+        find.text(testL10n.privateUsdConvertResultPaidTitle),
+        findsNothing,
+      );
+      expect(
+        find.text(testL10n.privateUsdActionConvert.toUpperCase()),
         findsOneWidget,
       );
     });
@@ -642,14 +677,14 @@ void main() {
         ),
       );
       expect(
-        find.text(PrivateUsdCopy.convertResultRefundedTitle),
+        find.text(testL10n.privateUsdConvertResultRefundedTitle),
         findsOneWidget,
       );
       expect(
-        find.text(PrivateUsdCopy.convertResultRefundedLate),
+        find.text(testL10n.privateUsdConvertResultRefundedLate),
         findsOneWidget,
       );
-      expect(find.text(PrivateUsdCopy.convertResultTryAgain), findsOneWidget);
+      expect(find.text(testL10n.commonTryAgain), findsOneWidget);
 
       await pumpProgress(
         tester,
@@ -663,14 +698,14 @@ void main() {
         ),
       );
       expect(
-        find.text(PrivateUsdCopy.convertResultNothingTitle),
+        find.text(testL10n.privateUsdConvertResultNothingTitle),
         findsOneWidget,
       );
       expect(
-        find.text(PrivateUsdCopy.convertResultMakerUnavailable),
+        find.text(testL10n.privateUsdConvertResultMakerUnavailable),
         findsOneWidget,
       );
-      expect(find.text(PrivateUsdCopy.convertResultTryAgain), findsOneWidget);
+      expect(find.text(testL10n.commonTryAgain), findsOneWidget);
     });
 
     testWidgets('a refund in progress shows its one step and note', (
@@ -684,9 +719,9 @@ void main() {
         ),
       );
 
-      expect(find.text(PrivateUsdCopy.convertStepRefund), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertRefunding), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertStepOpen), findsNothing);
+      expect(find.text(testL10n.privateUsdConvertStepRefund), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertRefunding), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertStepOpen), findsNothing);
     });
 
     testWidgets('unwinding waits on the maker\'s refund, then the ZEC home, '
@@ -697,12 +732,14 @@ void main() {
       final lateClaimAt = DateTime.fromMillisecondsSinceEpoch(
         status.record.lateClaimAt! * 1000,
       );
-      expect(find.text(PrivateUsdCopy.convertStepUnwind), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertStepRefund), findsOneWidget);
-      expect(find.text(PrivateUsdCopy.convertStepClaim), findsNothing);
+      expect(find.text(testL10n.privateUsdConvertStepUnwind), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertStepRefund), findsOneWidget);
+      expect(find.text(testL10n.privateUsdConvertStepClaim), findsNothing);
       expect(
         find.text(
-          PrivateUsdCopy.convertUnwindingUntil(formatDayMonthTime(lateClaimAt)),
+          testL10n.privateUsdConvertUnwindingUntil(
+            formatDayMonthTime(lateClaimAt, testL10n.localeName),
+          ),
         ),
         findsOneWidget,
       );
@@ -712,20 +749,21 @@ void main() {
         find.byKey(const ValueKey('mobile_private_usd_progress_action')),
         findsNothing,
       );
-      expect(find.text(PrivateUsdCopy.convertCallOff), findsNothing);
+      expect(find.text(testL10n.privateUsdConvertCallOff), findsNothing);
 
       // The banner and the activity row name the wait; a late claim running
       // reads as the claim again.
       expect(
-        privateUsdForwardStageLabel(status, zcashConfirmations: 2),
-        PrivateUsdCopy.convertStepUnwind,
+        privateUsdForwardStageLabel(testL10n, status, zcashConfirmations: 2),
+        testL10n.privateUsdConvertStepUnwind,
       );
       expect(
         privateUsdForwardStageLabel(
+          testL10n,
           status.copyWith(activity: ApiActivity.claiming),
           zcashConfirmations: 2,
         ),
-        PrivateUsdCopy.convertStepClaim,
+        testL10n.privateUsdConvertStepClaim,
       );
     });
 
@@ -741,10 +779,10 @@ void main() {
       );
       await pumpProgress(tester, refunded, bridgeAvailable: false);
       expect(
-        find.text(PrivateUsdCopy.convertResultRefundedTitle),
+        find.text(testL10n.privateUsdConvertResultRefundedTitle),
         findsOneWidget,
       );
-      expect(find.text(PrivateUsdCopy.convertResultTryAgain), findsNothing);
+      expect(find.text(testL10n.commonTryAgain), findsNothing);
       expect(
         find.byKey(const ValueKey('mobile_private_usd_progress_action')),
         findsNothing,
@@ -766,10 +804,10 @@ void main() {
       ),
     );
 
-    expect(find.text(PrivateUsdCopy.convertingToUsd), findsOneWidget);
+    expect(find.text(testL10n.privateUsdConvertingToUsd), findsOneWidget);
     expect(
       find.text(
-        'Waiting for confirmations · 1 of 2\n${PrivateUsdCopy.bannerKeepOpen}',
+        'Waiting for confirmations · 1 of 2\n${testL10n.privateUsdBannerKeepOpen}',
       ),
       findsOneWidget,
     );
@@ -795,11 +833,14 @@ void main() {
     expect(
       find.text(
         'Waiting for confirmations · 1 of 2\n'
-        '${PrivateUsdCopy.bannerRelayerClaims}',
+        '${testL10n.privateUsdBannerRelayerClaims}',
       ),
       findsOneWidget,
     );
-    expect(find.textContaining(PrivateUsdCopy.bannerKeepOpen), findsNothing);
+    expect(
+      find.textContaining(testL10n.privateUsdBannerKeepOpen),
+      findsNothing,
+    );
   });
 
   testWidgets('/private-usd shows the conversion, its activity and Convert', (
@@ -836,30 +877,30 @@ void main() {
     );
 
     // A zero balance with a conversion under way is not "empty".
-    expect(find.text(PrivateUsdCopy.emptyTitle), findsNothing);
+    expect(find.text(testL10n.privateUsdEmptyTitle), findsNothing);
     // The banner and the bridge's own row read alike, so each is found
     // where it stands.
     expect(
       find.descendant(
         of: find.byType(PrivateUsdConversionBannerView),
-        matching: find.text(PrivateUsdCopy.convertingToUsd),
+        matching: find.text(testL10n.privateUsdConvertingToUsd),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('mobile_private_usd_activity_row_0')),
-        matching: find.text(PrivateUsdCopy.convertingToUsd),
+        matching: find.text(testL10n.privateUsdConvertingToUsd),
       ),
       findsOneWidget,
     );
-    expect(find.text(PrivateUsdCopy.activityConverted), findsOneWidget);
+    expect(find.text(testL10n.privateUsdActivityConverted), findsOneWidget);
     // Nothing sent moved no money: no row.
     expect(
       find.byKey(const ValueKey('mobile_private_usd_activity_row_2')),
       findsNothing,
     );
-    expect(find.text(PrivateUsdCopy.activityEmpty), findsNothing);
+    expect(find.text(testL10n.privateUsdActivityEmpty), findsNothing);
     await tester.tap(find.byKey(const ValueKey('mobile_private_usd_convert')));
     expect(converts, 1);
   });

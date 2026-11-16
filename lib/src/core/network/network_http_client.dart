@@ -29,7 +29,7 @@ class TorUnsupportedHttpMethodException implements Exception {
 
   @override
   String toString() =>
-      'The $method request was blocked because the embedded Tor transport '
+      'The $method request was blocked because the embedded Tor transport ' // l10n-ignore: HTTP method or exception text for logs
       'does not support this method.';
 }
 
@@ -38,14 +38,14 @@ class DirectNetworkRequestsBlockedException implements Exception {
 
   @override
   String toString() =>
-      'Direct network requests are blocked while the app switches to Tor.';
+      'Direct network requests are blocked while the app switches to Tor.'; // l10n-ignore: HTTP method or exception text for logs
 }
 
 class NetworkHttpRequestCancelledException implements Exception {
   const NetworkHttpRequestCancelledException();
 
   @override
-  String toString() => 'Network HTTP request cancelled';
+  String toString() => 'Network HTTP request cancelled'; // l10n-ignore: HTTP method or exception text for logs
 }
 
 class _DirectRequestOperation<T> {
@@ -78,7 +78,9 @@ class _RedirectHop {
 ///
 /// Implementations must apply each timeout to the underlying transport
 /// operation, not only to the Future returned to Dart. A supplied `maxBodyBytes`
-/// must stop reception before buffering more than the requested body budget.
+/// must stop reception before buffering more than the requested body budget,
+/// and an omitted one must still be bounded (the Rust bridge caps every
+/// buffered reply at 16 MiB; large files belong in `download`).
 abstract interface class TorHttpBridge {
   Future<NetworkHttpResponse> get(
     Uri uri, {
@@ -107,7 +109,8 @@ abstract interface class TorHttpBridge {
 class RustTorHttpBridge implements TorHttpBridge {
   const RustTorHttpBridge();
 
-  static const _requestTimeoutError = 'Tor HTTP request timed out';
+  static const _requestTimeoutError =
+      'Tor HTTP request timed out'; // l10n-ignore: HTTP method or exception text for logs
 
   @override
   Future<NetworkHttpResponse> get(
@@ -391,7 +394,7 @@ class NetworkHttpClient {
   }) {
     final future = _torDesired()
         ? _requestViaTorWithRedirects(
-            'GET',
+            'GET', // l10n-ignore: HTTP method or exception text for logs
             uri,
             headers: headers,
             bodyBytes: const [],
@@ -619,7 +622,7 @@ class NetworkHttpClient {
             if (maxBodyBytes != null &&
                 bytes.length + chunk.length > maxBodyBytes) {
               final error = const HttpException(
-                'HTTP response exceeds byte limit',
+                'HTTP response exceeds byte limit', // l10n-ignore: HTTP method or exception text for logs
               );
               body.completeError(error);
               unawaited(abort(error));
@@ -687,7 +690,7 @@ class NetworkHttpClient {
     required Map<String, String> headers,
   }) async {
     var hop = _RedirectHop(
-      method: 'GET',
+      method: 'GET', // l10n-ignore: HTTP method or exception text for logs
       uri: uri,
       headers: headers,
       bodyBytes: const [],
@@ -743,8 +746,12 @@ class NetworkHttpClient {
     }
   }
 
-  static TimeoutException _timeoutException(Duration timeout) =>
-      TimeoutException('Network HTTP request timed out', timeout);
+  static TimeoutException _timeoutException(
+    Duration timeout,
+  ) => TimeoutException(
+    'Network HTTP request timed out', // l10n-ignore: exception text for logs
+    timeout,
+  ); // l10n-ignore: HTTP method or exception text for logs
 
   /// The hop [response] redirects [hop] to, or null when it is the answer.
   /// Both routes follow the same rules ([_follows]): HTTPS never downgrades,
@@ -779,7 +786,9 @@ class NetworkHttpClient {
         hop.method == 'POST' && response.statusCode == HttpStatus.seeOther;
     final headers = _headersForRedirect(hop.uri, nextUri, hop.headers);
     return _RedirectHop(
-      method: asGet ? 'GET' : hop.method,
+      method: asGet
+          ? 'GET' // l10n-ignore: HTTP method or exception text for logs
+          : hop.method,
       uri: nextUri,
       headers: asGet
           ? {

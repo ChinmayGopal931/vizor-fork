@@ -30,6 +30,7 @@ import 'package:zcash_wallet/src/providers/app_security_provider.dart';
 import 'package:zcash_wallet/src/providers/receive_address_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 const _validDeletePassword = 'Correct123!';
 const _invalidDeletePassword = 'Wrong123!';
@@ -1315,7 +1316,7 @@ void main() {
 
     await tester.enterText(find.byType(EditableText), _validDeletePassword);
     await tester.pump();
-    await tester.tap(find.text('Reset Vizor'));
+    await tester.tap(find.text('Reset Veylor'));
     await tester.pumpAndSettle();
 
     expect(accountNotifier.resetWalletCalled, isFalse);
@@ -1550,7 +1551,7 @@ void main() {
     );
     expect(
       find.textContaining(
-        'Removing this account will completely reset the Vizor app.',
+        'Removing this account will completely reset the Veylor app.',
       ),
       findsOneWidget,
     );
@@ -1568,7 +1569,7 @@ void main() {
       findsOneWidget,
     );
 
-    await _submitRemovePassword(tester, buttonLabel: 'Reset Vizor');
+    await _submitRemovePassword(tester, buttonLabel: 'Reset Veylor');
     await tester.pumpAndSettle();
 
     expect(events, ['pause', 'resetWallet', 'clearCachedWalletDbPath']);
@@ -1619,11 +1620,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove account'));
     await tester.pumpAndSettle();
-    await _submitRemovePassword(tester, buttonLabel: 'Reset Vizor');
+    await _submitRemovePassword(tester, buttonLabel: 'Reset Veylor');
     await tester.pumpAndSettle();
 
     expect(events, ['pause', 'resetWallet', 'clearCachedWalletDbPath']);
-    expect(find.text("Couldn't reset Vizor."), findsOneWidget);
+    expect(find.text("Couldn't reset Veylor."), findsOneWidget);
     expect(find.text("Couldn't remove account."), findsNothing);
     expect(find.text('welcome route'), findsNothing);
   });
@@ -1742,6 +1743,7 @@ Widget _accountsHarness({
         receiveAddressServiceProvider.overrideWith(receiveAddressService),
     ],
     child: MaterialApp.router(
+      localizationsDelegates: appLocalizationsDelegates,
       routerConfig: router,
       builder: (_, child) => AppTheme(
         data: AppThemeData.light,
@@ -1808,6 +1810,7 @@ Widget _sidebarHarness() {
       syncProvider.overrideWith(_FakeSyncNotifier.new),
     ],
     child: MaterialApp.router(
+      localizationsDelegates: appLocalizationsDelegates,
       routerConfig: router,
       builder: (_, child) => AppTheme(data: AppThemeData.light, child: child!),
     ),

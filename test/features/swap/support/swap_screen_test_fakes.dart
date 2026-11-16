@@ -832,11 +832,13 @@ class _FakeSwapDepositSender implements SwapDepositSender {
     this.preflightError,
     this.broadcastStatus = SwapDepositBroadcastStatus.broadcasted,
     this.broadcastMessage,
+    this.broadcastNotices = const [],
   });
 
   final Object? preflightError;
   final String broadcastStatus;
   final String? broadcastMessage;
+  final List<rust_sync.BroadcastNotice> broadcastNotices;
   final preflightRequests = <_DepositSendRequest>[];
   final requests = <_DepositSendRequest>[];
 
@@ -875,6 +877,7 @@ class _FakeSwapDepositSender implements SwapDepositSender {
       txHash: 'zec-auto-txid',
       status: broadcastStatus,
       message: broadcastMessage,
+      notices: broadcastNotices,
     );
   }
 }
@@ -996,6 +999,7 @@ class _FakeSwapHardwareSigningService implements SwapHardwareSigningService {
       ),
     );
     return rust_sync.ExtractAndBroadcastPcztResult(
+      notices: const [],
       txid: 'hardware-broadcast-txid',
       status: broadcastStatus,
       message: broadcastMessage,
@@ -1243,16 +1247,17 @@ class _DelayedComposerPreferencesStore extends _FakeSwapPersistenceStore {
   }
 }
 
-class _FailingSaveSwapPersistenceStore extends _FakeSwapPersistenceStore {
-  final failedSaves = <String>[];
+class _FailingLoadSwapPersistenceStore extends _FakeSwapPersistenceStore {
+  _FailingLoadSwapPersistenceStore({super.initialIntents});
+
+  var failLoads = true;
 
   @override
-  Future<void> saveRecords({
+  Future<List<SwapIntentRecord>> loadRecords({
     required String accountUuid,
-    required List<SwapIntentRecord> records,
   }) async {
-    failedSaves.add(accountUuid);
-    throw StateError('secure storage unavailable');
+    if (failLoads) throw StateError('secure storage unavailable');
+    return super.loadRecords(accountUuid: accountUuid);
   }
 }
 
@@ -1280,6 +1285,34 @@ class _DelayedLoadSwapPersistenceStore extends _FakeSwapPersistenceStore {
     if (!delayedAccounts.contains(accountUuid)) return records;
 
     final gate = _loadGates.putIfAbsent(accountUuid, Completer<void>.new);
+    await gate.future;
+    return records;
+  }
+}
+
+/// Holds only the next load of each account in [heldAccounts]: the restore
+/// that follows an account switch, while later reads go through.
+class _HeldRestoreSwapPersistenceStore extends _FakeSwapPersistenceStore {
+  _HeldRestoreSwapPersistenceStore({super.initialIntents});
+
+  final heldAccounts = <String>{};
+  final _gates = <String, List<Completer<void>>>{};
+
+  void completeLoad(String accountUuid) {
+    for (final gate
+        in _gates.remove(accountUuid) ?? const <Completer<void>>[]) {
+      gate.complete();
+    }
+  }
+
+  @override
+  Future<List<SwapIntentRecord>> loadRecords({
+    required String accountUuid,
+  }) async {
+    final records = await super.loadRecords(accountUuid: accountUuid);
+    if (!heldAccounts.remove(accountUuid)) return records;
+    final gate = Completer<void>();
+    _gates.putIfAbsent(accountUuid, () => []).add(gate);
     await gate.future;
     return records;
   }

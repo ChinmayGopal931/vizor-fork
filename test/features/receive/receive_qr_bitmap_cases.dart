@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/layout/app_form_factor.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/receive_address_widgets.dart';
+import '../../support/localized_test_scope.dart';
 
 /// Registered by both receive-screen suites so the normal desktop and mobile
 /// lanes exercise the same asynchronous bitmap lifecycle regressions.
@@ -184,8 +185,7 @@ const _transparentAsset = _mobile
     : 'assets/icons/receive_qr_transparent_dark.png';
 
 Widget _surface({ReceiveAddressType type = ReceiveAddressType.shielded}) =>
-    Directionality(
-      textDirection: TextDirection.ltr,
+    LocalizedTestScope(
       child: AppTheme(
         data: AppThemeData.dark,
         child: Center(

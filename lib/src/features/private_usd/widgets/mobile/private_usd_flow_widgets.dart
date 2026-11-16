@@ -5,7 +5,7 @@ import '../../../../core/layout/mobile/mobile_top_nav.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
-import '../../private_usd_copy.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// Railgun's fee for shielding or unshielding, as the screens state it
 /// before a cost names its own.
@@ -102,7 +102,7 @@ class PrivateUsdInfoButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: PrivateUsdCopy.infoButton,
+      label: context.l10n.privateUsdInfoButton,
       excludeSemantics: true,
       child: GestureDetector(
         key: const ValueKey('mobile_private_usd_info'),

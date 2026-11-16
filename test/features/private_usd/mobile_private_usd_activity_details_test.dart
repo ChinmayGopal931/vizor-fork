@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
 import 'package:zcash_wallet/src/core/formatting/address_display.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
@@ -23,6 +24,7 @@ import 'package:zcash_wallet/src/providers/zcash_explorer_provider.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 // A Private USD activity row unfolds in place into its details: a tap opens
 // it and another folds it away, its links open its explorers, and a
@@ -51,6 +53,7 @@ void main() {
   Future<void> pumpFeed(WidgetTester tester, {bool reducedMotion = false}) =>
       tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
           home: Builder(
             builder: (context) => MediaQuery(
               data: MediaQuery.of(
@@ -74,20 +77,20 @@ void main() {
   testWidgets('a tap unfolds a row into its details, and another folds it '
       'away', (tester) async {
     await pumpFeed(tester);
-    expect(find.text(PrivateUsdCopy.detailsConfirmed), findsNothing);
+    expect(find.text(testL10n.privateUsdDetailsConfirmed), findsNothing);
 
     await tester.tap(row);
     await tester.pumpAndSettle();
-    expect(find.text(PrivateUsdCopy.detailsConfirmed), findsOneWidget);
+    expect(find.text(testL10n.privateUsdDetailsConfirmed), findsOneWidget);
     expect(find.text(PrivateUsdCopy.explorerRailscan), findsOneWidget);
     expect(find.text(PrivateUsdCopy.explorerEtherscan), findsOneWidget);
 
     // The row itself: its details have a "Sent" line too.
     await tester.tap(
-      find.widgetWithText(ActivityFeedRow, PrivateUsdCopy.activitySent),
+      find.widgetWithText(ActivityFeedRow, testL10n.privateUsdActivitySent),
     );
     await tester.pumpAndSettle();
-    expect(find.text(PrivateUsdCopy.detailsConfirmed), findsNothing);
+    expect(find.text(testL10n.privateUsdDetailsConfirmed), findsNothing);
   });
 
   testWidgets('a transaction opens on the explorer tapped, nothing before', (
@@ -135,7 +138,7 @@ void main() {
     );
     await tester.pump();
     expect(copied, previewPrivateUsdRecipient);
-    expect(find.text(PrivateUsdCopy.detailsCopied), findsOneWidget);
+    expect(find.text(testL10n.commonCopied), findsOneWidget);
     // The toast's own timers.
     await tester.pumpAndSettle(const Duration(seconds: 5));
   });
@@ -164,6 +167,7 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: Builder(
@@ -211,6 +215,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
           home: AppTheme(
             data: AppThemeData.dark,
             child: const Column(
@@ -225,13 +230,13 @@ void main() {
     );
     Finder confirmedIn(String screen) => find.descendant(
       of: find.byKey(ValueKey(screen)),
-      matching: find.text(PrivateUsdCopy.detailsConfirmed),
+      matching: find.text(testL10n.privateUsdDetailsConfirmed),
     );
 
     await tester.tap(
       find.descendant(
         of: find.byKey(const ValueKey('first')),
-        matching: find.text(PrivateUsdCopy.activitySent),
+        matching: find.text(testL10n.privateUsdActivitySent),
       ),
     );
     await tester.pumpAndSettle();
@@ -243,7 +248,7 @@ void main() {
       'account-2',
     );
     await tester.pumpAndSettle();
-    expect(find.text(PrivateUsdCopy.detailsConfirmed), findsNothing);
+    expect(find.text(testL10n.privateUsdDetailsConfirmed), findsNothing);
   });
 }
 

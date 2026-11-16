@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/privacy/privacy_mask.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
@@ -10,6 +11,7 @@ import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balan
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_home_strip.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/screen_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 // The home strip's states (plan reference §9.4 S1).
 void main() {
@@ -39,6 +41,7 @@ void main() {
     var taps = 0;
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: Center(
@@ -78,7 +81,7 @@ void main() {
     );
 
     await pumpStrip(tester, previewPrivateUsdLoading);
-    expect(amount(tester), PrivateUsdCopy.loading);
+    expect(amount(tester), testL10n.privateUsdLoading);
   });
 
   testWidgets('the headline is spendable with its ZEC worth', (tester) async {
@@ -103,7 +106,7 @@ void main() {
     );
 
     final arriving = textOf(tester, 'mobile_home_private_usd_detail');
-    expect(arriving.data, PrivateUsdCopy.homeArriving(r'$5.00'));
+    expect(arriving.data, testL10n.privateUsdHomeArriving(r'$5.00'));
     expect(arriving.style!.color, AppThemeData.dark.colors.text.positiveStrong);
   });
 
@@ -119,13 +122,13 @@ void main() {
       find.byKey(const ValueKey('mobile_home_private_usd_amount')),
     );
     expect(text.style!.color, AppThemeData.dark.colors.text.destructive);
-    expect(find.bySemanticsLabel(PrivateUsdCopy.homeOpen), findsOneWidget);
+    expect(find.bySemanticsLabel(testL10n.privateUsdHomeOpen), findsOneWidget);
     final semantics = tester.getSemantics(
       find.byKey(const ValueKey('mobile_home_private_usd_strip')),
     );
     expect(
       semantics.value,
-      contains(PrivateUsdCopy.homeBlockedDescription(r'$80.00')),
+      contains(testL10n.privateUsdHomeBlockedDescription(r'$80.00')),
     );
   });
 
@@ -148,6 +151,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: Builder(builder: buildMobileHomePrivateUsdArrivingUseCase),
@@ -174,6 +178,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: Builder(builder: buildMobileHomeDefaultUseCase),

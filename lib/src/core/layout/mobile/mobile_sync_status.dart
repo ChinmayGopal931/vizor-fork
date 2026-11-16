@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 
 import '../../formatting/sync_status_label.dart';
+import '../../l10n/l10n.dart';
 import '../../theme/app_theme.dart';
 
 /// Subtle/slow motion constants for the syncing affordance. One full
@@ -80,7 +81,8 @@ class MobileSyncStatus extends StatefulWidget {
   ) {
     final colors = context.colors;
     return switch (kind) {
-      SyncStatusKind.synced => (
+      // A short catch-up keeps the synced look.
+      SyncStatusKind.synced || SyncStatusKind.catchingUp => (
         label: colors.sync.text,
         indicator: colors.sync.lightSuccess,
         highlight: colors.sync.text,
@@ -122,9 +124,17 @@ class MobileSyncStatus extends StatefulWidget {
   State<MobileSyncStatus> createState() => _SyncStatusState();
 }
 
+/// The label's style, with tabular figures so a changing percentage keeps its
+/// width.
+final _labelStyle = withTabularFigures(AppTypography.labelMedium);
+
 class _SyncStatusState extends State<MobileSyncStatus>
     with SingleTickerProviderStateMixin {
   AnimationController? _controller;
+
+  /// The synced label's width at the current text scale. The header's label
+  /// slot is at least this wide.
+  double _syncedLabelWidth = 0;
 
   AnimationController get _activeController {
     return _controller ??= AnimationController(
@@ -145,6 +155,14 @@ class _SyncStatusState extends State<MobileSyncStatus>
     super.didChangeDependencies();
     // Re-evaluate on dependency changes (e.g. the reduce-motion setting).
     _syncAnimation();
+    final painter = TextPainter(
+      text: TextSpan(text: context.l10n.syncVizorSynced, style: _labelStyle),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    _syncedLabelWidth = painter.width;
+    painter.dispose();
   }
 
   @override
@@ -178,14 +196,14 @@ class _SyncStatusState extends State<MobileSyncStatus>
 
   Widget _row(double? progress) {
     final glow = progress == null ? null : _SyncStatusMotion.glowFor(progress);
-    final label = progress == null
+    final text = progress == null
         ? Text(
             widget.label,
             textAlign: widget.leading ? TextAlign.left : null,
             maxLines: widget.wrapLabel ? null : 1,
             softWrap: widget.wrapLabel,
             overflow: widget.wrapLabel ? null : TextOverflow.ellipsis,
-            style: AppTypography.labelMedium.copyWith(color: widget.baseColor),
+            style: _labelStyle.copyWith(color: widget.baseColor),
           )
         : _ShimmerLabel(
             label: widget.label,
@@ -194,6 +212,21 @@ class _SyncStatusState extends State<MobileSyncStatus>
             leading: widget.leading,
             wrap: widget.wrapLabel,
             progress: widget.leading ? 1 - progress : progress,
+          );
+    // The header's label slot is at least as wide as the synced label, so a
+    // shorter one does not move the nav; the label sits at its trailing
+    // edge, next to the bar. The sidebar's label is left-aligned and keeps
+    // its own width.
+    final label = widget.leading
+        ? text
+        : ConstrainedBox(
+            key: const ValueKey('mobile_top_nav_sync_label_slot'),
+            constraints: BoxConstraints(minWidth: _syncedLabelWidth),
+            child: Align(
+              alignment: AlignmentDirectional.centerEnd,
+              widthFactor: 1,
+              child: text,
+            ),
           );
     final indicator = _SyncEdgeIndicator(
       size: widget.indicatorSize,
@@ -291,9 +324,7 @@ class _ShimmerLabel extends StatelessWidget {
         maxLines: wrap ? null : 1,
         softWrap: wrap,
         overflow: wrap ? null : TextOverflow.ellipsis,
-        style: AppTypography.labelMedium.copyWith(
-          color: const Color(0xFFFFFFFF),
-        ),
+        style: _labelStyle.copyWith(color: const Color(0xFFFFFFFF)),
       ),
     );
   }

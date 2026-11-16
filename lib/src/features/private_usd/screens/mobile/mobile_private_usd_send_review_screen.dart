@@ -12,13 +12,13 @@ import '../../../../providers/account_provider.dart';
 import '../../models/private_usd_balances.dart';
 import '../../models/private_usd_messages.dart';
 import '../../models/private_usd_send.dart';
-import '../../private_usd_copy.dart';
 import '../../providers/private_usd_balance_provider.dart';
 import '../../providers/private_usd_send_provider.dart';
 import '../../providers/private_usd_spend_status_provider.dart';
 import '../../services/private_usd_spend_guard.dart';
 import '../../widgets/mobile/private_usd_flow_widgets.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// `/private-usd/send/review` and `/private-usd/withdraw/review`: what goes,
 /// what it costs and where, then the button that sends, which opens the
@@ -106,13 +106,13 @@ class MobilePrivateUsdSendReviewView extends StatelessWidget {
     final request = form.reviewed;
     final cost = form.cost;
     final message =
-        form.error ??
-        form.reviewError(balances) ??
-        (form.isBusy ? null : privateUsdSpendMessage(status));
+        form.error?.call(context.l10n) ??
+        form.reviewError(context.l10n, balances) ??
+        (form.isBusy ? null : privateUsdSpendMessage(context.l10n, status));
     return PrivateUsdFlowScaffold(
       title: _private
-          ? PrivateUsdCopy.sendReviewTitlePrivate
-          : PrivateUsdCopy.sendReviewTitleWithdraw,
+          ? context.l10n.privateUsdSendReviewTitlePrivate
+          : context.l10n.privateUsdSendReviewTitleWithdraw,
       onBack: form.isBusy ? null : onBack,
       onInfo: () => _private
           ? showPrivateUsdSendInfoSheet(context)
@@ -130,13 +130,14 @@ class MobilePrivateUsdSendReviewView extends StatelessWidget {
               key: const ValueKey('mobile_private_usd_send_review_ledger'),
               rows: [
                 for (final (label, value) in privateUsdSendReviewRows(
+                  context.l10n,
                   request,
                   cost,
                   feeToken: form.networkFee?.token,
                 ))
                   PrivateUsdLedgerRow(label: label, value: value),
                 PrivateUsdLedgerAddress(
-                  label: PrivateUsdCopy.sendReviewTo,
+                  label: context.l10n.commonTo,
                   address: request.to.text,
                 ),
               ],
@@ -144,7 +145,7 @@ class MobilePrivateUsdSendReviewView extends StatelessWidget {
           if (!_private) ...[
             const SizedBox(height: AppSpacing.s),
             Text(
-              PrivateUsdCopy.sendWithdrawPublic,
+              context.l10n.privateUsdSendWithdrawPublic,
               key: const ValueKey('mobile_private_usd_send_review_public'),
               style: AppTypography.bodySmall.copyWith(
                 color: colors.text.warning,
@@ -169,10 +170,10 @@ class MobilePrivateUsdSendReviewView extends StatelessWidget {
             : null,
         child: Text(
           form.isBusy
-              ? PrivateUsdCopy.sendSending
+              ? context.l10n.privateUsdSendSending
               : _private
-              ? PrivateUsdCopy.actionSend
-              : PrivateUsdCopy.actionWithdraw,
+              ? context.l10n.privateUsdActionSend
+              : context.l10n.privateUsdActionWithdraw,
         ),
       ),
     );

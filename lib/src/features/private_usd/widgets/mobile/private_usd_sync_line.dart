@@ -1,9 +1,9 @@
 import '../../../../core/formatting/date_format.dart';
 import '../../../../core/formatting/sync_status_label.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/layout/mobile/neon_sync_backdrop.dart';
 import '../../../../providers/network_privacy_provider.dart';
 import '../../models/private_usd_screening_status.dart';
-import '../../private_usd_copy.dart';
 import '../../services/private_usd_balance_repository.dart';
 
 /// Railgun's sync drawn as Home's sync line, for the Private USD screen. It
@@ -21,6 +21,7 @@ import '../../services/private_usd_balance_repository.dart';
 /// readers hear the load's or the update's progress, the update, the last
 /// update's time, or the failure.
 NeonSyncLine privateUsdSyncLine(
+  AppLocalizations l10n,
   PrivateUsdBalanceState state, {
   NetworkPrivacyState? networkPrivacy,
   double? txidCatchUp,
@@ -36,11 +37,11 @@ NeonSyncLine privateUsdSyncLine(
           ? _climbTop
           : _climbed(state.firstSyncPercent ?? 0),
       readout: torFailed
-          ? NeonSyncReadout.torOffline
-          : PrivateUsdCopy.syncReadoutFailed,
+          ? NeonSyncReadout.torOffline(l10n)
+          : l10n.privateUsdSyncReadoutFailed,
       semanticsLabel: balances == null
-          ? PrivateUsdCopy.loadFailed
-          : PrivateUsdCopy.refreshFailed,
+          ? l10n.privateUsdLoadFailed
+          : l10n.privateUsdRefreshFailed,
       failed: true,
       readoutStyle: _railgunFailedReadout,
     );
@@ -48,13 +49,13 @@ NeonSyncLine privateUsdSyncLine(
   final refreshPercent = state.refreshPercent;
   if (balances != null && refreshPercent != null && state.isRefreshing) {
     if (refreshPercent == 0 && _waitsForTor(networkPrivacy)) {
-      return _torWaiting();
+      return _torWaiting(l10n);
     }
     final whole = refreshPercent.clamp(0, 99);
     return NeonSyncLine(
       progress: _climbed(whole),
-      readout: PrivateUsdCopy.syncReadoutProgress(whole),
-      semanticsLabel: PrivateUsdCopy.updatingProgress(whole),
+      readout: l10n.privateUsdSyncReadoutProgress(whole),
+      semanticsLabel: l10n.privateUsdUpdatingProgress(whole),
       climbing: true,
       readoutStyle: _railgunReadout,
     );
@@ -63,8 +64,8 @@ NeonSyncLine privateUsdSyncLine(
     final whole = privateUsdScreeningPercent(txidCatchUp).clamp(0, 99);
     return NeonSyncLine(
       progress: _climbed(whole),
-      readout: PrivateUsdCopy.syncReadoutProgress(whole),
-      semanticsLabel: PrivateUsdCopy.screeningSyncingList(whole),
+      readout: l10n.privateUsdSyncReadoutProgress(whole),
+      semanticsLabel: l10n.privateUsdScreeningSyncingList(whole),
       climbing: true,
       readoutStyle: _railgunReadout,
     );
@@ -73,25 +74,29 @@ NeonSyncLine privateUsdSyncLine(
     final updatedAt = state.updatedAt;
     return NeonSyncLine(
       progress: 1,
-      readout: PrivateUsdCopy.syncReadoutSynced,
+      readout: l10n.privateUsdSyncReadoutSynced,
       semanticsLabel: state.isRefreshing
-          ? PrivateUsdCopy.updating
+          ? l10n.privateUsdUpdating
           : updatedAt == null
           ? ''
-          : PrivateUsdCopy.updated(formatDayMonthTime(updatedAt)),
+          : l10n.privateUsdUpdated(
+              formatDayMonthTime(updatedAt, l10n.localeName),
+            ),
       scanning: state.isRefreshing,
       readoutStyle: _railgunReadout,
     );
   }
-  if (state.isRefreshing && _waitsForTor(networkPrivacy)) return _torWaiting();
+  if (state.isRefreshing && _waitsForTor(networkPrivacy)) {
+    return _torWaiting(l10n);
+  }
   final percent = state.firstSyncPercent;
   final whole = (percent ?? 0).clamp(0, 99);
   return NeonSyncLine(
     progress: _climbed(whole),
-    readout: PrivateUsdCopy.syncReadoutProgress(whole),
+    readout: l10n.privateUsdSyncReadoutProgress(whole),
     semanticsLabel: percent == null
-        ? PrivateUsdCopy.firstLoad
-        : PrivateUsdCopy.firstLoadProgress(whole),
+        ? l10n.privateUsdFirstLoad
+        : l10n.privateUsdFirstLoadProgress(whole),
     climbing: true,
     readoutStyle: _railgunReadout,
   );
@@ -103,10 +108,10 @@ bool _waitsForTor(NetworkPrivacyState? networkPrivacy) =>
     torIsTargetRoute(networkPrivacy) &&
     networkPrivacy.status == NetworkPrivacyConnectionStatus.connecting;
 
-NeonSyncLine _torWaiting() => NeonSyncLine(
+NeonSyncLine _torWaiting(AppLocalizations l10n) => NeonSyncLine(
   progress: _climbed(0),
-  readout: NeonSyncReadout.torWaiting,
-  semanticsLabel: kSyncStatusConnectingToTorSemanticsLabel,
+  readout: NeonSyncReadout.torWaiting(l10n),
+  semanticsLabel: l10n.syncConnectingToTorSemantics,
   climbing: true,
   readoutStyle: _railgunReadout,
 );

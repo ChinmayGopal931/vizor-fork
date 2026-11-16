@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/config/pricing_engine_config.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/providers/portfolio_chart_settings_provider.dart';
@@ -47,6 +48,7 @@ Widget _app(
       ),
     ],
     child: MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
       builder: (context, child) =>
           AppTheme(data: AppThemeData.dark, child: child!),
       home: const Scaffold(

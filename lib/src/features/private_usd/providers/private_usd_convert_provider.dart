@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/private_usd_feature_config.dart';
 import '../../../core/formatting/zec_amount.dart';
-import '../../../core/zcash/network_upgrade_hold.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/network_upgrade_window_provider.dart';
 import '../../../providers/sync_provider.dart';
@@ -23,6 +22,7 @@ import 'private_usd_engine_provider.dart';
 import 'private_usd_least_fee_provider.dart';
 import 'private_usd_relayer_claims_provider.dart';
 import 'private_usd_tokens_provider.dart';
+import '../../../core/l10n/l10n.dart';
 
 /// The convert flows' timing.
 abstract final class PrivateUsdConvertTiming {
@@ -125,10 +125,10 @@ abstract class PrivateUsdConvertFlowState<
   final bool quoting;
 
   /// Why the last quote did not come.
-  final String? quoteError;
+  final PrivateUsdText? quoteError;
 
   /// Why the last "Convert" did not start a conversion.
-  final String? startError;
+  final PrivateUsdText? startError;
   final PrivateUsdConvertStep step;
 
   /// The quote was taken by a "Convert" that did not start a conversion: it
@@ -167,10 +167,12 @@ abstract class PrivateUsdConvertFlowState<
 
   /// The line on the review: why "Convert" did not start, a refresh asked
   /// for there that did not come, or a quote that ran out.
-  String? get reviewMessage {
-    if (startError != null) return startError;
-    if (quoteError != null) return quoteError;
-    if (isExpired && !quoting) return PrivateUsdCopy.convertQuoteRanOut;
+  String? reviewMessage(AppLocalizations l10n) {
+    final startError = this.startError;
+    if (startError != null) return startError(l10n);
+    final quoteError = this.quoteError;
+    if (quoteError != null) return quoteError(l10n);
+    if (isExpired && !quoting) return l10n.privateUsdConvertQuoteRanOut;
     return null;
   }
 
@@ -178,9 +180,9 @@ abstract class PrivateUsdConvertFlowState<
     DateTime? now,
     String? amountText,
     bool? quoting,
-    String? quoteError,
+    PrivateUsdText? quoteError,
     bool clearQuoteError = false,
-    String? startError,
+    PrivateUsdText? startError,
     bool clearStartError = false,
     PrivateUsdConvertStep? step,
     bool? quoteSpent,
@@ -232,20 +234,23 @@ abstract class PrivateUsdConvertFlowNotifier<
   /// at the token gate: null once tokens are held, else what to tell the
   /// user. Nothing opened at the gate, so the accept is safe to repeat.
   @protected
-  Future<String?> issueTokens() async {
+  Future<PrivateUsdText?> issueTokens() async {
     try {
       await ref.read(privateUsdTokensServiceProvider).issue();
       return null;
     } on rust.ApiPrivateUsdError catch (error) {
       privateUsdLog('the issuance failed (${error.code.name})');
-      return privateUsdErrorMessage(error.code) ??
-          PrivateUsdCopy.convertErrorTokensUnavailable;
+      return (AppLocalizations l10n) =>
+          privateUsdErrorMessage(l10n, error.code) ??
+          l10n.privateUsdConvertErrorTokensUnavailable;
     } on PrivateUsdAttestationException catch (error) {
       privateUsdLog('the issuance failed (${error.code.name})');
-      return privateUsdAttestationMessage(error.code);
+      return (AppLocalizations l10n) =>
+          privateUsdAttestationMessage(l10n, error.code);
     } catch (error) {
       privateUsdLog('the issuance failed (${error.runtimeType})');
-      return PrivateUsdCopy.convertErrorTokensUnavailable;
+      return (AppLocalizations l10n) =>
+          l10n.privateUsdConvertErrorTokensUnavailable;
     }
   }
 
@@ -302,7 +307,7 @@ abstract class PrivateUsdConvertFlowNotifier<
   /// "Convert" did not start a conversion: [message] says why, and the
   /// quote is spent.
   @protected
-  void startFailed(String message) {
+  void startFailed(PrivateUsdText message) {
     state = state.copyWith(
       step: PrivateUsdConvertStep.review,
       startError: message,
@@ -480,16 +485,17 @@ class PrivateUsdConvertState
   }
 
   /// The line under the amount, or on the review.
-  String? get message {
-    if (step != PrivateUsdConvertStep.amount) return reviewMessage;
+  String? message(AppLocalizations l10n) {
+    if (step != PrivateUsdConvertStep.amount) return reviewMessage(l10n);
     if (isShort) {
-      return PrivateUsdCopy.convertInsufficient(
+      return l10n.privateUsdConvertInsufficient(
         ZecAmount.fromZatoshi(holdings.spendable!).activity.toString(),
       );
     }
-    if (quoteError != null) return quoteError;
+    final quoteError = this.quoteError;
+    if (quoteError != null) return quoteError(l10n);
     if (quote != null && !quoting && !paysOut) {
-      return PrivateUsdCopy.convertErrorBelowFee;
+      return l10n.privateUsdConvertErrorBelowFee;
     }
     return null;
   }
@@ -501,9 +507,9 @@ class PrivateUsdConvertState
     PrivateUsdZecQuote? quote,
     bool clearQuote = false,
     bool? quoting,
-    String? quoteError,
+    PrivateUsdText? quoteError,
     bool clearQuoteError = false,
-    String? startError,
+    PrivateUsdText? startError,
     bool clearStartError = false,
     PrivateUsdConvertStep? step,
     bool? quoteSpent,
@@ -618,7 +624,9 @@ class PrivateUsdConvertNotifier
     // The maker would open a swap for a deposit Rust then refuses. Nothing is
     // sent, so the quote stands for a try once the upgrade is through.
     if (ref.read(networkUpgradeWindowProvider).holdsTransactions) {
-      state = state.copyWith(startError: kNetworkUpgradeHoldMessage);
+      state = state.copyWith(
+        startError: (l10n) => l10n.privateUsdNetworkUpgradeHold,
+      );
       return null;
     }
     state = state.copyWith(
@@ -652,7 +660,9 @@ class PrivateUsdConvertNotifier
         }
         if (failure != null || result.kind == rust.ApiAcceptKind.tokensNeeded) {
           unawaited(_abandonQuietly(engine, account, quote.index));
-          startFailed(failure ?? PrivateUsdCopy.convertErrorTokensUnavailable);
+          startFailed(
+            failure ?? ((l10n) => l10n.privateUsdConvertErrorTokensUnavailable),
+          );
           return null;
         }
       }
@@ -663,7 +673,9 @@ class PrivateUsdConvertNotifier
           // Handled above.
           return null;
         case rust.ApiAcceptKind.nothingSent:
-          startFailed(privateUsdNothingSentMessage(result.cause));
+          startFailed(
+            (l10n) => privateUsdNothingSentMessage(l10n, result.cause),
+          );
           return null;
       }
     } on rust.ApiPrivateUsdError catch (error) {
@@ -671,17 +683,17 @@ class PrivateUsdConvertNotifier
       switch (error.code) {
         // Refused before anything was saved.
         case rust.ApiPrivateUsdErrorCode.quoteExpired:
-          startFailed(PrivateUsdCopy.convertQuoteRanOut);
+          startFailed((l10n) => l10n.privateUsdConvertQuoteRanOut);
           return null;
         case rust.ApiPrivateUsdErrorCode.relayerFee:
           startFailed(
-            _aboveCap(quote.relayerFee)
-                ? PrivateUsdCopy.convertErrorFeeCap
-                : PrivateUsdCopy.convertErrorBelowFee,
+            (l10n) => _aboveCap(quote.relayerFee)
+                ? l10n.privateUsdConvertErrorFeeCap
+                : l10n.privateUsdConvertErrorBelowFee,
           );
           return null;
         case rust.ApiPrivateUsdErrorCode.depositUnpayable:
-          startFailed(PrivateUsdCopy.convertErrorUnpayable);
+          startFailed((l10n) => l10n.privateUsdConvertErrorUnpayable);
           return null;
         default:
           break;
@@ -696,7 +708,7 @@ class PrivateUsdConvertNotifier
     // under way all the same.
     if (await _isUnderWay(engine, account, quote.index)) return path;
     if (!ref.mounted) return null;
-    startFailed(PrivateUsdCopy.convertStartFailed);
+    startFailed((l10n) => l10n.privateUsdConvertStartFailed);
     return null;
   }
 
@@ -772,7 +784,7 @@ class PrivateUsdConvertNotifier
       state = state.copyWith(
         quoting: false,
         clearQuote: !onReview,
-        quoteError: PrivateUsdCopy.convertQuoteClockAhead,
+        quoteError: (l10n) => l10n.privateUsdConvertQuoteClockAhead,
       );
       return;
     }
@@ -787,11 +799,12 @@ class PrivateUsdConvertNotifier
 
   void _quoteFailed(Object error) {
     if (showsUnderWay(error)) return;
-    final message = switch (error) {
-      PrivateUsdNoQuoteFitsException() => PrivateUsdCopy.convertZecNoQuote,
-      rust.ApiPrivateUsdError(:final code) => privateUsdErrorMessage(code),
+    final PrivateUsdText? message = switch (error) {
+      PrivateUsdNoQuoteFitsException() =>
+        (l10n) => l10n.privateUsdConvertZecNoQuote,
+      rust.ApiPrivateUsdError(:final code) => privateUsdErrorText(code),
       PrivateUsdPause() => null,
-      _ => PrivateUsdCopy.convertErrorGeneric,
+      _ => (l10n) => l10n.privateUsdConvertErrorGeneric,
     };
     state = state.copyWith(
       quoting: false,

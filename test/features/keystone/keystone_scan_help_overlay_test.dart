@@ -5,9 +5,11 @@ import 'package:zcash_wallet/src/core/layout/app_form_factor.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/keystone/widgets/keystone_scan_help_overlay.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 Widget _app({required bool visible}) {
   return MaterialApp(
+    localizationsDelegates: appLocalizationsDelegates,
     builder: (_, child) => AppTheme(data: AppThemeData.dark, child: child!),
     home: Center(
       child: KeystoneScanHelpOverlay(

@@ -1,20 +1,37 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/l10n/l10n.dart';
+
 /// The spans the portfolio chart offers.
 enum PortfolioChartRange {
-  week('1w', 'Past week', Duration(days: 7)),
-  month('1m', 'Past month', Duration(days: 30)),
-  quarter('3m', 'Past 3 months', Duration(days: 90)),
-  year('1y', 'Past year', Duration(days: 365)),
-  all('All', 'All time', null);
+  week('1w', Duration(days: 7)),
+  month('1m', Duration(days: 30)),
+  quarter('3m', Duration(days: 90)),
+  year('1y', Duration(days: 365)),
+  all('All', null); // l10n-ignore: stored value
 
-  const PortfolioChartRange(this.label, this.description, this.window);
+  const PortfolioChartRange(this.label, this.window);
 
-  /// Short label on the range chips; also the stored value.
+  /// The stored value, and the range chips' keys.
   final String label;
 
+  /// Short label on the range chips.
+  String chipLabel(AppLocalizations l10n) => switch (this) {
+    week => l10n.portfolioChartRangeWeekChip,
+    month => l10n.portfolioChartRangeMonthChip,
+    quarter => l10n.portfolioChartRangeQuarterChip,
+    year => l10n.portfolioChartRangeYearChip,
+    all => l10n.portfolioChartRangeAllChip,
+  };
+
   /// Screen-reader wording for the span.
-  final String description;
+  String description(AppLocalizations l10n) => switch (this) {
+    week => l10n.portfolioChartRangeWeek,
+    month => l10n.portfolioChartRangeMonth,
+    quarter => l10n.portfolioChartRangeQuarter,
+    year => l10n.portfolioChartRangeYear,
+    all => l10n.portfolioChartRangeAll,
+  };
 
   /// How far back the span reaches, or `null` for all of the history there is.
   final Duration? window;

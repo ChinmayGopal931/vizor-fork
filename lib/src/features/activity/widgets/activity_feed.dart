@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../../core/l10n/l10n.dart';
 import '../../../core/layout/app_form_factor.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
@@ -59,7 +60,7 @@ class ActivityFeed extends StatelessWidget {
     required this.sections,
     this.isLoading = false,
     this.errorText,
-    this.emptyText = 'No activity yet',
+    this.emptyText,
     this.rowKeyPrefix,
     this.cardWidth = 396,
     this.showHeader = true,
@@ -69,7 +70,7 @@ class ActivityFeed extends StatelessWidget {
   final List<ActivityFeedSectionData> sections;
   final bool isLoading;
   final String? errorText;
-  final String emptyText;
+  final String? emptyText;
   final String? rowKeyPrefix;
 
   /// Fixed card width. The 396px default matches the desktop pane;
@@ -102,7 +103,7 @@ class ActivityFeed extends StatelessWidget {
             sections: sections,
             isLoading: isLoading,
             errorText: errorText,
-            emptyText: emptyText,
+            emptyText: emptyText ?? context.l10n.activityFeedEmpty,
             rowKeyPrefix: rowKeyPrefix,
             cardWidth: cardWidth,
           ),
@@ -121,7 +122,7 @@ class ActivityFeedSliver extends StatelessWidget {
     this.onRetry,
     this.scrollAnchor,
     this.errorText,
-    this.emptyText = 'No activity yet',
+    this.emptyText,
     this.rowKeyPrefix,
     this.cardWidth = 396,
     this.showHeader = true,
@@ -135,7 +136,7 @@ class ActivityFeedSliver extends StatelessWidget {
   final VoidCallback? onRetry;
   final ActivityScrollAnchor? scrollAnchor;
   final String? errorText;
-  final String emptyText;
+  final String? emptyText;
   final String? rowKeyPrefix;
   final double? cardWidth;
   final bool showHeader;
@@ -146,7 +147,7 @@ class ActivityFeedSliver extends StatelessWidget {
       sections: sections,
       isLoading: isLoading,
       errorText: errorText,
-      emptyText: emptyText,
+      emptyText: emptyText ?? context.l10n.activityFeedEmpty,
       rowKeyPrefix: rowKeyPrefix,
     );
     if (!showHeader) items.removeRange(0, 2);
@@ -456,7 +457,7 @@ class _ActivityFeedSliverItemView extends StatelessWidget {
         width: cardWidth,
         position: item.segmentPosition!,
         child: Semantics(
-          label: 'Loading activity',
+          label: context.l10n.commonLoadingActivity,
           child: Padding(
             padding: EdgeInsets.fromLTRB(
               16,
@@ -478,7 +479,7 @@ class _ActivityFeedSliverItemView extends StatelessWidget {
             onPressed: onRetry,
             variant: AppButtonVariant.ghost,
             size: AppButtonSize.small,
-            child: const Text('Retry loading activity'),
+            child: Text(context.l10n.activityFeedRetry),
           ),
         ),
       ),
@@ -717,7 +718,7 @@ class _ActivityFeedTitleRow extends StatelessWidget {
         children: [
           Center(
             child: Text(
-              'Activity',
+              context.l10n.navActivity,
               style: AppTypography.headlineLarge.copyWith(
                 color: colors.text.accent,
                 letterSpacing: 0,
@@ -1196,11 +1197,7 @@ class _ActivityRowAmount extends StatelessWidget {
     if (childRow) return null;
     if (row.amountSubtitle != null) return row.amountSubtitle;
     final status = row.statusText.trim();
-    final routineStatus =
-        status == 'Completed' ||
-        status == 'In progress' ||
-        RegExp(r'^\d+/\d+ In progress$').hasMatch(status);
-    if (status.isNotEmpty && !routineStatus) return status;
+    if (status.isNotEmpty && !row.statusIsRoutine) return status;
     return row.timestampText == '--' ? null : row.timestampText;
   }
 

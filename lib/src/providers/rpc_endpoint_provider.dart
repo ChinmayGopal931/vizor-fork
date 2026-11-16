@@ -23,6 +23,10 @@ class RpcEndpointNotifier extends Notifier<RpcEndpointConfig> {
       ref.watch(appBootstrapProvider).rpcEndpointConfig;
 
   Future<void> setPreset(RpcEndpointPreset preset) async {
+    if (preset.isAutomatic) {
+      await setAutomatic();
+      return;
+    }
     final normalized = normalizeRpcEndpointUrl(
       preset.url,
       allowDefaultPort: true,
@@ -31,6 +35,14 @@ class RpcEndpointNotifier extends Notifier<RpcEndpointConfig> {
     await _persist(
       state.copyWith(lightwalletdUrl: normalized, presetId: preset.id),
     );
+  }
+
+  Future<void> setAutomatic() async {
+    final config = defaultRpcEndpointConfig(state.networkName);
+    if (!isAutomaticRpcEndpointConfig(config)) {
+      throw RpcEndpointFormatException(RpcEndpointIssue.automaticUnavailable);
+    }
+    await _persist(config);
   }
 
   Future<void> setCustom(String input) async {
@@ -66,8 +78,9 @@ class RpcEndpointNotifier extends Notifier<RpcEndpointConfig> {
   Future<void> _verifyNetwork(String lightwalletdUrl) async {
     final chainName = await getChainName(lightwalletdUrl);
     if (chainName != state.networkName) {
-      throw FormatException(
-        'Endpoint is for $chainName, but this wallet uses ${state.networkName}.',
+      throw RpcEndpointNetworkMismatch(
+        endpointNetwork: chainName,
+        walletNetwork: state.networkName,
       );
     }
   }

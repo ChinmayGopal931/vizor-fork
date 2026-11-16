@@ -5,6 +5,7 @@ import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
 import 'package:zcash_wallet/src/core/profile_pictures.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/widgetbook/screen_use_cases.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 void main() {
   testWidgets('accounts other menu use case renders account actions', (
@@ -77,7 +78,7 @@ void main() {
   ) async {
     await _pumpAccountsUseCase(tester, buildAboutUtilityUseCase);
     expect(tester.takeException(), isNull);
-    expect(find.text('About Vizor Wallet'), findsOneWidget);
+    expect(find.text('About Veylor Wallet'), findsOneWidget);
     expect(find.text('Github'), findsOneWidget);
     expect(find.text('Website'), findsOneWidget);
 
@@ -235,6 +236,7 @@ Future<void> _pumpAccountsUseCase(
 
   await tester.pumpWidget(
     MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
       key: UniqueKey(),
       home: Builder(
         builder: (context) => MediaQuery(
@@ -264,6 +266,7 @@ Future<void> _pumpMobileAccountsUseCase(
 
   await tester.pumpWidget(
     MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
       key: UniqueKey(),
       builder: (context, child) =>
           AppTheme(data: AppThemeData.light, child: child!),
@@ -284,6 +287,7 @@ Future<void> _pumpMobileHomeUseCase(
 
   await tester.pumpWidget(
     MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
       key: UniqueKey(),
       builder: (context, child) =>
           AppTheme(data: AppThemeData.dark, child: child!),

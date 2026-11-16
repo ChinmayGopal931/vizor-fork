@@ -9,6 +9,7 @@ import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/ledger/ledger_capability.dart';
 import 'package:zcash_wallet/src/features/onboarding/import/desktop_hardware_selection_screen.dart';
 import 'package:zcash_wallet/src/features/onboarding/import/desktop_import_method_selection_screen.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 void main() {
   for (final screen in [
@@ -68,7 +69,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Import Account\nto Vizor'), findsOneWidget);
+    expect(find.text('Import Account\nto Veylor'), findsOneWidget);
     expect(find.text('Select the method you want.'), findsOneWidget);
     expect(find.text('Import secret passphrase'), findsOneWidget);
     expect(find.text('Vizor or any other Zcash wallet'), findsOneWidget);
@@ -145,7 +146,7 @@ void main() {
 
     await tester.tap(find.text('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('Import Account\nto Vizor'), findsOneWidget);
+    expect(find.text('Import Account\nto Veylor'), findsOneWidget);
 
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -205,7 +206,7 @@ void main() {
 
     await tester.tap(find.text('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('Import Account\nto Vizor'), findsOneWidget);
+    expect(find.text('Import Account\nto Veylor'), findsOneWidget);
   });
 }
 
@@ -266,6 +267,7 @@ Widget _harness({
   return ProviderScope(
     overrides: [ledgerStaticCapabilityProvider.overrideWithValue(capability)],
     child: MaterialApp.router(
+      localizationsDelegates: appLocalizationsDelegates,
       routerConfig: router,
       builder: (_, child) => AppTheme(data: AppThemeData.light, child: child!),
     ),

@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/l10n/l10n.dart';
 
 /// "Scan a QR code": the row a mobile recipient picker opens the camera
 /// scanner from (ZEC send, Pay, Private USD send), the QR glyph in a round
@@ -13,7 +14,7 @@ class MobileScanAddressRow extends StatelessWidget {
     this.padding = EdgeInsets.zero,
     this.iconFrameKey,
     this.scalesText = true,
-    this.subtitle = defaultSubtitle,
+    this.subtitle,
     super.key,
   });
 
@@ -30,11 +31,9 @@ class MobileScanAddressRow extends StatelessWidget {
   final bool scalesText;
 
   /// The second line. ZEC send also opens payment requests from the scan.
-  final String subtitle;
+  final String? subtitle;
 
   static const height = 44.0;
-  static const title = 'Scan a QR code';
-  static const defaultSubtitle = 'Scan an address using camera';
 
   /// Each line's own height, at the default text size: the two fit the row.
   static const _lineHeight = 17.0;
@@ -79,13 +78,13 @@ class MobileScanAddressRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _Line(
-                        title,
+                        context.l10n.payScanQrTitle,
                         color: colors.text.accent,
                         scaled: scalesText,
                       ),
                       const SizedBox(height: AppSpacing.xxs),
                       _Line(
-                        subtitle,
+                        subtitle ?? context.l10n.payScanQrSubtitle,
                         color: colors.text.secondary,
                         scaled: scalesText,
                       ),

@@ -2,9 +2,11 @@
 library;
 
 import 'dart:async';
-import 'dart:ui' show SemanticsAction, SemanticsActionEvent;
+import 'dart:ui' show BoxHeightStyle, SemanticsAction, SemanticsActionEvent;
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:go_router/go_router.dart';
 import 'package:zcash_wallet/src/core/navigation/mobile_exit_back_guard.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
+import 'package:zcash_wallet/src/core/platform/device_power.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/sync_keep_awake_interaction_listener.dart';
@@ -29,9 +32,12 @@ import 'package:zcash_wallet/src/providers/sync_keep_awake_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart'
     show ApiReversePhase;
+import 'package:zcash_wallet/src/providers/sync_scan_slowdown_provider.dart';
+import 'package:zcash_wallet/src/providers/sync_short_catch_up_provider.dart';
 import 'package:zcash_wallet/src/services/biometric_unlock.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 
@@ -215,6 +221,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp.router(
+          localizationsDelegates: appLocalizationsDelegates,
           routeInformationProvider: router.routeInformationProvider,
           routeInformationParser: router.routeInformationParser,
           routerDelegate: router.routerDelegate,
@@ -239,7 +246,7 @@ void main() {
     }
     expect(router.canPop(), isTrue);
     expect(cardDismissals, 0);
-    expect(find.text(MobileExitBackGuard.exitHintMessage), findsNothing);
+    expect(find.text('Go back again to exit'), findsNothing);
     await tester.tap(find.text('Unlock Veylor'));
     await tester.pump();
     expect(find.text('WELCOME BACK'), findsOneWidget);
@@ -411,7 +418,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('25% SYNCING...'), findsOneWidget);
+      expect(find.text('25% SYNCING…'), findsOneWidget);
       expect(find.text('SYNCED'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
@@ -440,6 +447,7 @@ void main() {
       await tester.pumpWidget(
         _app(
           child: MaterialApp(
+            localizationsDelegates: appLocalizationsDelegates,
             builder: (_, child) => AppTheme(
               data: AppThemeData.dark,
               child: SyncKeepAwakePrivacyLockHost(
@@ -510,6 +518,248 @@ void main() {
     expect(find.text('Veylor is syncing'), findsOneWidget);
     expect(find.text('25%'), findsOneWidget);
     expect(find.text('Unlock Veylor'), findsOneWidget);
+  });
+
+  testWidgets('with animations reduced, the percentage ring jumps to each '
+      'value', (tester) async {
+    _setMobileViewport(tester);
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    await tester.pumpWidget(
+      _app(
+        syncNotifier: FakeSyncNotifier(
+          _sync(lastSyncStartedAt: DateTime(2026, 7, 9, 12)),
+        ),
+      ),
+    );
+    await _settleInitialSync(tester);
+    await tester.pump(const Duration(milliseconds: 60));
+    await tester.pump();
+
+    expect(find.text('25%'), findsOneWidget);
+    expect(
+      tester
+          .widget<TweenAnimationBuilder<double>>(
+            find.byType(TweenAnimationBuilder<double>),
+          )
+          .duration,
+      Duration.zero,
+    );
+  });
+
+  testWidgets(
+    'the body and the slowdown note stack without overlapping at the larger '
+    'default text sizes',
+    (tester) async {
+      _setMobileViewport(tester);
+      // iOS xxLarge and Android's largest non-accessibility step.
+      tester.platformDispatcher.textScaleFactorTestValue =
+          defaultTargetPlatform == TargetPlatform.iOS ? 1.235 : 1.3;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpWidget(_privacyScreenApp());
+      await _settleInitialSync(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(SyncKeepAwakePrivacyLockScreen)),
+      );
+      container.read(syncScanSlowdownProvider.notifier)
+        ..updateSyncJob('job', complete: false)
+        ..updateDevicePower(SyncScanSlowdown.powerSaving);
+      await tester.pump(kSyncScanSlowdownAfter);
+      await tester.pump(const Duration(milliseconds: 500));
+
+      final numberRect = tester.getRect(
+        find.byKey(const ValueKey('sync_keep_awake_privacy_number')),
+      );
+      final bodyRect = tester.getRect(find.text('Veylor is syncing'));
+      final noteRect = tester.getRect(
+        find.byKey(const ValueKey('sync_keep_awake_privacy_slowdown')),
+      );
+      expect(bodyRect.top, greaterThanOrEqualTo(numberRect.bottom));
+      expect(noteRect.top, greaterThanOrEqualTo(bodyRect.bottom));
+      _expectLockupTextInsideRingTicks(tester);
+      container
+          .read(syncScanSlowdownProvider.notifier)
+          .updateDevicePower(SyncScanSlowdown.heat);
+      await tester.pump();
+      _expectLockupTextInsideRingTicks(tester);
+      // One line of body copy.
+      expect(
+        bodyRect.height,
+        closeTo(
+          tester.platformDispatcher.textScaleFactor *
+              AppTypography.bodyMedium.fontSize! *
+              AppTypography.bodyMedium.height!,
+          0.5,
+        ),
+      );
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.iOS,
+      TargetPlatform.android,
+    }),
+  );
+
+  testWidgets('at iOS xxxLarge the text stays inside the ring', (
+    tester,
+  ) async {
+    _setMobileViewport(tester);
+    tester.platformDispatcher.textScaleFactorTestValue = 1.353;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(_privacyScreenApp());
+    await _settleInitialSync(tester);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SyncKeepAwakePrivacyLockScreen)),
+    );
+    container.read(syncScanSlowdownProvider.notifier)
+      ..updateSyncJob('job', complete: false)
+      ..updateDevicePower(SyncScanSlowdown.powerSaving);
+    await tester.pump(kSyncScanSlowdownAfter);
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // Veylor's lockup is centered in the ring, so the largest default size
+    // must still keep every line inside its ticks.
+    _expectLockupTextInsideRingTicks(tester);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
+
+  testWidgets('the text stays inside the ring at the default text size', (
+    tester,
+  ) async {
+    _setMobileViewport(tester);
+    await tester.pumpWidget(_privacyScreenApp());
+    await _settleInitialSync(tester);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(SyncKeepAwakePrivacyLockScreen)),
+    );
+    container.read(syncScanSlowdownProvider.notifier)
+      ..updateSyncJob('job', complete: false)
+      ..updateDevicePower(SyncScanSlowdown.powerSaving);
+    await tester.pump(kSyncScanSlowdownAfter);
+    await tester.pump(const Duration(milliseconds: 500));
+
+    _expectLockupTextInsideRingTicks(tester);
+  });
+
+  group('Sync Complete over a catch-up', () {
+    const synced = 3000000;
+    SyncState completed() => SyncState(
+      isSyncComplete: true,
+      percentage: 1,
+      scannedHeight: synced,
+      chainTipHeight: synced,
+      lastSyncStartedAt: DateTime(2026, 7, 9, 12),
+    );
+    SyncState catchUp(DateTime startedAt, {int scanned = synced}) => SyncState(
+      isSyncing: true,
+      phase: 'scan',
+      scannedHeight: scanned,
+      chainTipHeight: synced + 3,
+      remainingScanBlocks: synced + 3 - scanned,
+      lastSyncStartedAt: startedAt,
+      startedFromCompletedSync: true,
+    );
+
+    /// A locked screen on "Sync Complete" over a synced wallet.
+    Future<(ProviderContainer, FakeSyncNotifier)> lockedComplete(
+      WidgetTester tester,
+    ) async {
+      _setMobileViewport(tester);
+      final sync = FakeSyncNotifier(completed());
+      final container = ProviderContainer(
+        overrides: [
+          appBootstrapProvider.overrideWithValue(_bootstrap()),
+          appSecurityProvider.overrideWith(_FakeSecurityNotifier.new),
+          biometricUnlockProvider.overrideWith(
+            () => _FakeBiometricUnlockNotifier(_disabledBiometricState),
+          ),
+          syncProvider.overrideWith(() => sync),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: _themedApp()),
+      );
+      await _settleInitialSync(tester);
+      container.read(syncKeepAwakePrivacyLockProvider.notifier).lock();
+      await tester.pump();
+      return (container, sync);
+    }
+
+    final body = find.byKey(
+      const ValueKey('sync_keep_awake_privacy_status_body'),
+    );
+
+    testWidgets('idle Sync Complete still reads Unlock Vizor to continue', (
+      tester,
+    ) async {
+      await lockedComplete(tester);
+      expect(find.text('SYNC COMPLETE'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('sync_keep_awake_privacy_done_check')),
+        findsOneWidget,
+      );
+      expect(tester.widget<Text>(body).data, 'Unlock Veylor to continue');
+    });
+
+    testWidgets('the subtitle says new blocks are syncing during a short '
+        'catch-up and reverts when it ends', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final (container, sync) = await lockedComplete(tester);
+      final idleRect = tester.getRect(body);
+
+      sync.emit(catchUp(DateTime.now()));
+      await tester.pump();
+      expect(container.read(syncShortCatchUpProvider), isTrue);
+      expect(find.text('SYNC COMPLETE'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('sync_keep_awake_privacy_done_check')),
+        findsOneWidget,
+      );
+      expect(tester.widget<Text>(body).data, 'Syncing new blocks…');
+      expect(find.bySemanticsLabel('Syncing new blocks'), findsOneWidget);
+      // The same slot: nothing moves.
+      // Veylor's body is centered and as wide as its line, so its slot is
+      // its center and top.
+      expect(tester.getRect(body).center.dx, idleRect.center.dx);
+      expect(tester.getRect(body).top, idleRect.top);
+      expect(tester.getRect(body).height, idleRect.height);
+
+      sync.emit(completed());
+      await tester.pump();
+      expect(tester.widget<Text>(body).data, 'Unlock Veylor to continue');
+      semantics.dispose();
+    });
+
+    testWidgets('the subtitle stays on syncing new blocks through the hold '
+        'past 10 s', (tester) async {
+      final (container, sync) = await lockedComplete(tester);
+      // A catch-up just short of its 10 s limit.
+      final startedAt = DateTime.now().subtract(
+        kSyncShortCatchUpMaxDuration - const Duration(milliseconds: 200),
+      );
+      sync.emit(catchUp(startedAt));
+      await tester.pump();
+      expect(container.read(syncShortCatchUpProvider), isTrue);
+      expect(tester.widget<Text>(body).data, 'Syncing new blocks…');
+
+      // The limit passes on the wall clock the catch-up reads, then its timer
+      // fires: the catch-up is no longer short, and the hold keeps the screen.
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 400)),
+      );
+      sync.emit(catchUp(startedAt, scanned: synced + 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(container.read(syncShortCatchUpProvider), isFalse);
+      // Veylor's done sign is still switching on: it lights a second after
+      // the lock shows, then decrypts its title.
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('SYNC COMPLETE'), findsOneWidget);
+      expect(tester.widget<Text>(body).data, 'Syncing new blocks…');
+
+      sync.emit(completed());
+      await tester.pump();
+      expect(tester.widget<Text>(body).data, 'Unlock Veylor to continue');
+    });
   });
 
   testWidgets('does not show the privacy screen for near-tip catch-up', (
@@ -763,7 +1013,8 @@ void main() {
     await tester.pump();
 
     expect(find.text('WELCOME BACK'), findsOneWidget);
-    expect(find.text('25% SYNCING...'), findsOneWidget);
+    expect(find.text('25% SYNCING\u2026'), findsOneWidget);
+    expect(find.bySemanticsLabel('25% Syncing'), findsOneWidget);
     expect(find.text('Unlock to continue'), findsOneWidget);
     expect(find.byType(PasscodeNumpad), findsOneWidget);
     expect(find.bySemanticsLabel('Passcode help'), findsNothing);
@@ -1066,6 +1317,7 @@ void main() {
           UncontrolledProviderScope(
             container: container,
             child: MaterialApp(
+              localizationsDelegates: appLocalizationsDelegates,
               builder: (context, child) => AppTheme(
                 data: AppThemeData.dark,
                 child: MediaQuery(
@@ -1402,6 +1654,48 @@ void main() {
     expect(find.text('63%'), findsOneWidget);
   });
 
+  testWidgets(
+    'says why sync is slower while scans run on fewer cores',
+    (tester) async {
+      _setMobileViewport(tester);
+      await tester.pumpWidget(_privacyScreenApp());
+      await _settleInitialSync(tester);
+      final slowdown = find.byKey(
+        const ValueKey('sync_keep_awake_privacy_slowdown'),
+      );
+      expect(slowdown, findsNothing);
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(SyncKeepAwakePrivacyLockScreen)),
+      );
+      final notifier = container.read(syncScanSlowdownProvider.notifier)
+        ..updateSyncJob('job', complete: false)
+        ..updateDevicePower(SyncScanSlowdown.powerSaving);
+      await tester.pump(kSyncScanSlowdownAfter);
+      expect(
+        find.text(
+          defaultTargetPlatform == TargetPlatform.iOS
+              ? 'Turn off Low Power Mode to sync faster'
+              : 'Turn off power saving to sync faster',
+        ),
+        findsOneWidget,
+      );
+
+      notifier.updateDevicePower(SyncScanSlowdown.heat);
+      await tester.pump();
+      expect(find.text('Slowed down so your phone can cool'), findsOneWidget);
+      expect(find.text('Veylor is syncing'), findsOneWidget);
+
+      notifier.updateDevicePower(null);
+      await tester.pump();
+      expect(slowdown, findsNothing);
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.iOS,
+      TargetPlatform.android,
+    }),
+  );
+
   testWidgets('animates display sync percentage changes', (tester) async {
     _setMobileViewport(tester);
     final syncNotifier = FakeSyncNotifier(
@@ -1417,6 +1711,7 @@ void main() {
           syncProvider.overrideWith(() => syncNotifier),
         ],
         child: MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
           builder: (_, child) =>
               AppTheme(data: AppThemeData.light, child: child!),
           home: const SyncKeepAwakePrivacyLockScreen(),
@@ -1576,6 +1871,7 @@ Widget _privacyScreenApp({
       ),
     ],
     child: MaterialApp(
+      localizationsDelegates: appLocalizationsDelegates,
       builder: (_, child) => AppTheme(data: AppThemeData.light, child: child!),
       home: SyncKeepAwakePrivacyLockScreen(mode: mode),
     ),
@@ -1584,6 +1880,7 @@ Widget _privacyScreenApp({
 
 Widget _themedApp({Duration idleTimeout = const Duration(milliseconds: 50)}) {
   return MaterialApp(
+    localizationsDelegates: appLocalizationsDelegates,
     builder: (_, child) => AppTheme(data: AppThemeData.dark, child: child!),
     home: SyncKeepAwakePrivacyLockHost(
       idleTimeout: idleTimeout,
@@ -1607,6 +1904,7 @@ const _coveredBalance = 'Shielded 1.25 ZEC';
 /// navigator, so the covered screen keeps its own route.
 Widget _coveredApp({required FocusNode sendFocus}) {
   return MaterialApp(
+    localizationsDelegates: appLocalizationsDelegates,
     builder: (_, child) => AppTheme(
       data: AppThemeData.dark,
       child: SyncKeepAwakePrivacyLockHost(
@@ -1724,6 +2022,53 @@ SyncState _sync({
     pendingScanStartHeight: pendingScanStartHeight,
     lastSyncStartedAt: lastSyncStartedAt,
   );
+}
+
+Rect _ringRect(WidgetTester tester) => tester.getRect(
+  find.byWidgetPredicate(
+    (widget) =>
+        widget is CustomPaint &&
+        widget.painter.runtimeType.toString() == '_SyncKeepAwakeRingPainter',
+  ),
+);
+
+/// Every line of the lockup's body and slowdown note lies within the inner
+/// ends of the neon ring's ticks (radius 133.5 less half their 7 px length,
+/// less half their stroke), [inset] pixels inside them.
+void _expectLockupTextInsideRingTicks(WidgetTester tester, {double inset = 2}) {
+  final center = _ringRect(tester).center;
+  final limit = 130 - 0.5 - inset;
+  for (final finder in [
+    find.text('Veylor is syncing'),
+    find.descendant(
+      of: find.byKey(const ValueKey('sync_keep_awake_privacy_slowdown')),
+      matching: find.byType(RichText),
+    ),
+  ]) {
+    final paragraph = tester.renderObject<RenderParagraph>(finder);
+    final length = paragraph.text.toPlainText().length;
+    // Tight boxes span the glyphs' ascent and descent, not the line's
+    // leading.
+    final boxes = paragraph.getBoxesForSelection(
+      TextSelection(baseOffset: 0, extentOffset: length),
+      boxHeightStyle: BoxHeightStyle.tight,
+    );
+    for (final box in boxes) {
+      for (final corner in [
+        Offset(box.left, box.top),
+        Offset(box.right, box.top),
+        Offset(box.left, box.bottom),
+        Offset(box.right, box.bottom),
+      ]) {
+        final distance = (paragraph.localToGlobal(corner) - center).distance;
+        expect(
+          distance,
+          lessThanOrEqualTo(limit),
+          reason: '"${paragraph.text.toPlainText()}" reaches the ring ticks',
+        );
+      }
+    }
+  }
 }
 
 class _PendingSecurityNotifier extends _FakeSecurityNotifier {

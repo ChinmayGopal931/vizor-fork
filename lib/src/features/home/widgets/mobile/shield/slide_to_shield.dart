@@ -9,6 +9,7 @@ import '../../../../../core/theme/app_theme.dart';
 import '../../../../../core/widgets/app_icon.dart';
 import 'shield_haptics.dart';
 import 'shield_motion.dart';
+import '../../../../../core/l10n/l10n.dart';
 
 /// "Drag to shield": a cut-corner glass slab and a lit pin. The slab's edge
 /// is a tube that lights from its left end as far as the pin.
@@ -210,7 +211,7 @@ class _SlideToShieldState extends State<SlideToShield>
     final reduce = MediaQuery.disableAnimationsOf(context);
     return Semantics(
       button: true,
-      label: 'Drag to shield',
+      label: context.l10n.homeShieldDrag,
       enabled: !_committed,
       onTap: _committed ? null : () => _commit(1200),
       child: Listener(
@@ -475,7 +476,7 @@ class _Label extends StatelessWidget {
     // Clears by halfway and drifts a little with the pin.
     final opacity = (1 - progress / 0.5).clamp(0.0, 1.0);
     Widget text = Text(
-      'Drag to shield',
+      context.l10n.homeShieldDrag,
       style: AppTypography.bodyMedium.copyWith(
         color: context.colors.text.primary,
       ),

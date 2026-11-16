@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart' show Material, MaterialType;
 import 'package:flutter/widgets.dart';
+import '../../l10n/l10n.dart';
 import '../../navigation/mobile_destinations.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_button.dart';
+import 'app_mobile_tab_bar.dart';
 import 'mobile_sidebar_surface.dart';
 import 'neon_sidebar.dart';
 import 'neon_sync_backdrop.dart';
@@ -126,13 +128,22 @@ class MobileWalletSidebar extends StatelessWidget {
                   child: Row(
                     children: [
                       NeonSidebarGlyph(
-                        item: destination.item,
+                        item: AppMobileTabItem(
+                          iconName: destination.iconName,
+                          label: mobileDestinationLabel(
+                            context.l10n,
+                            destination.path,
+                          ),
+                        ),
                         selected: _selected(destination.path),
                       ),
                       const SizedBox(width: AppSpacing.s),
                       Expanded(
                         child: Text(
-                          destination.item.label,
+                          mobileDestinationLabel(
+                            context.l10n,
+                            destination.path,
+                          ),
                           style: AppTypography.bodyMediumStrong.copyWith(
                             color: fullyDisabled
                                 ? (_selected(destination.path)

@@ -13,6 +13,7 @@ import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_scramble_text.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/tron_glyph.dart';
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 void main() {
   setUpAll(() async {
@@ -89,6 +90,33 @@ void main() {
     },
   );
 
+  testWidgets('MobileTopNav.account keeps the synced label width for shorter '
+      'labels and sets figures tabular', (tester) async {
+    Future<Rect> slotFor(String label) async {
+      await tester.pumpWidget(
+        _harness(
+          MobileTopNav.account(accountName: 'Account1', syncLabel: label),
+        ),
+      );
+      return tester.getRect(
+        find.byKey(const ValueKey('mobile_top_nav_sync_label_slot')),
+      );
+    }
+
+    final synced = await slotFor('Veylor is synced');
+    expect(await slotFor('Syncing\u2026'), synced);
+    expect(await slotFor('45% Syncing\u2026'), synced);
+    // The label sits at the slot's trailing edge, next to the bar.
+    expect(tester.getTopRight(find.text('45% Syncing\u2026')).dx, synced.right);
+    expect(
+      tester.widget<Text>(find.text('45% Syncing\u2026')).style?.fontFeatures,
+      contains(const FontFeature.tabularFigures()),
+    );
+    // A longer label still gets its full width.
+    final failed = await slotFor('Syncing failed. Wallet data error...');
+    expect(failed.width, greaterThan(synced.width));
+  });
+
   testWidgets('MobileTopNav.account syncing shimmers the label', (
     tester,
   ) async {
@@ -96,7 +124,7 @@ void main() {
       _harness(
         MobileTopNav.account(
           accountName: 'Account1',
-          syncLabel: '20% Syncing...',
+          syncLabel: '20% Syncing…',
           syncLabelColor: AppThemeData.dark.colors.sync.textSyncing,
           syncIndicatorColor: AppThemeData.dark.colors.text.muted,
           syncHighlightColor: AppThemeData.dark.colors.sync.lightSuccess,
@@ -110,10 +138,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(tester.takeException(), isNull);
-    expect(find.text('20% Syncing...'), findsOneWidget);
+    expect(find.text('20% Syncing…'), findsOneWidget);
     // The label is wrapped in a shimmer ShaderMask over a solid-color Text.
     expect(find.byType(ShaderMask), findsOneWidget);
-    final label = tester.widget<Text>(find.text('20% Syncing...'));
+    final label = tester.widget<Text>(find.text('20% Syncing…'));
     expect(label.style?.color, const Color(0xFFFFFFFF));
 
     // Unmount so the active ticker is disposed cleanly.
@@ -132,7 +160,7 @@ void main() {
             data: MediaQuery.of(context).copyWith(disableAnimations: true),
             child: MobileTopNav.account(
               accountName: 'Account1',
-              syncLabel: '20% Syncing...',
+              syncLabel: '20% Syncing…',
               syncLabelColor: mutedGreen,
               syncIndicatorColor: greyBar,
               syncHighlightColor: AppThemeData.dark.colors.sync.lightSuccess,
@@ -147,7 +175,7 @@ void main() {
     // is a neutral grey. The brighter shimmer peak only appears in the
     // animated state.
     expect(find.byType(ShaderMask), findsNothing);
-    final label = tester.widget<Text>(find.text('20% Syncing...'));
+    final label = tester.widget<Text>(find.text('20% Syncing…'));
     expect(label.style?.color, mutedGreen);
 
     final greyBars = tester
@@ -363,6 +391,7 @@ void main() {
     Future<void> pumpCard(AppThemeData theme) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
           builder: (context, navigator) =>
               AppTheme(data: theme, child: navigator!),
           home: const Center(
@@ -479,6 +508,7 @@ void main() {
 
 Widget _harness(Widget child) {
   return MaterialApp(
+    localizationsDelegates: appLocalizationsDelegates,
     // AppTheme wraps the navigator (like the real app's AppThemeHost in
     // MaterialApp.builder) so root-navigator overlays — modal sheets shown
     // with useRootNavigator — can resolve it too.

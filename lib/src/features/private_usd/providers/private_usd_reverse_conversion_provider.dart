@@ -16,6 +16,7 @@ import 'private_usd_convert_provider.dart';
 import 'private_usd_engine_provider.dart';
 import 'private_usd_unfinished_provider.dart';
 import 'railgun_engine_provider.dart';
+import '../../../core/l10n/l10n.dart';
 
 /// How often the reverse progress looks at the clock: "Authorize settlement"
 /// stops being offered 120 s before the ready deadline.
@@ -53,16 +54,17 @@ class PrivateUsdReverseConversionState {
   final PrivateUsdReverseUserStep? acting;
 
   /// Why the last step the user took did not go through.
-  final String? error;
+  final PrivateUsdText? error;
 
   bool get busy => acting != null;
 
   /// The line under the actions: the user's last step, else the payment's.
-  String? get message {
-    if (error != null) return error;
+  String? message(AppLocalizations l10n) {
+    final error = this.error;
+    if (error != null) return error(l10n);
     final record = status?.record;
     if (record?.phase == rust.ApiReversePhase.awaitingFunding) {
-      return funding?.error;
+      return funding?.error?.call(l10n);
     }
     return null;
   }
@@ -77,7 +79,7 @@ class PrivateUsdReverseConversionState {
     bool clearProofProgress = false,
     PrivateUsdReverseUserStep? acting,
     bool clearActing = false,
-    String? error,
+    PrivateUsdText? error,
     bool clearError = false,
   }) => PrivateUsdReverseConversionState(
     now: now ?? this.now,
@@ -205,15 +207,17 @@ class PrivateUsdReverseConversionNotifier
       acting: PrivateUsdReverseUserStep.readying,
       clearError: true,
     );
-    String? error;
+    PrivateUsdText? error;
     try {
       await _engine.reverseAuthorizeReady(key.accountUuid, index: key.index);
     } on rust.ApiPrivateUsdError catch (failure) {
       if (failure.code != rust.ApiPrivateUsdErrorCode.cancelled) {
-        error = privateUsdReverseStepMessage(failure.code);
+        error = (l10n) => privateUsdReverseStepMessage(l10n, failure.code);
       }
     } catch (failure) {
-      if (failure is! PrivateUsdPause) error = PrivateUsdCopy.reverseError;
+      if (failure is! PrivateUsdPause) {
+        error = (l10n) => l10n.privateUsdReverseError;
+      }
     }
     if (!ref.mounted) return;
     state = state.copyWith(
@@ -230,7 +234,9 @@ class PrivateUsdReverseConversionNotifier
     final record = state.status?.record;
     if (record == null || state.busy) return;
     if (record.settled) {
-      state = state.copyWith(error: PrivateUsdCopy.reverseRefundUnavailable);
+      state = state.copyWith(
+        error: (l10n) => l10n.privateUsdReverseRefundUnavailable,
+      );
       return;
     }
     if (!record.cancellable) return;
@@ -238,7 +244,7 @@ class PrivateUsdReverseConversionNotifier
       acting: PrivateUsdReverseUserStep.cancelling,
       clearError: true,
     );
-    String? error;
+    PrivateUsdText? error;
     try {
       await _engine.reverseCancel(key.accountUuid, index: key.index);
       ref.read(privateUsdReverseFundingProvider).drop(key);
@@ -246,12 +252,12 @@ class PrivateUsdReverseConversionNotifier
       error = switch (failure.code) {
         rust.ApiPrivateUsdErrorCode.cancelled => null,
         rust.ApiPrivateUsdErrorCode.tooLate =>
-          PrivateUsdCopy.reverseRefundUnavailable,
-        _ => PrivateUsdCopy.convertCallOffFailed,
+          (l10n) => l10n.privateUsdReverseRefundUnavailable,
+        _ => (l10n) => l10n.privateUsdConvertCallOffFailed,
       };
     } catch (failure) {
       if (failure is! PrivateUsdPause) {
-        error = PrivateUsdCopy.convertCallOffFailed;
+        error = (l10n) => l10n.privateUsdConvertCallOffFailed;
       }
     }
     if (!ref.mounted) return;
@@ -284,7 +290,7 @@ class PrivateUsdReverseConversionNotifier
 
   Future<void> _price() async {
     state = state.copyWith(acting: PrivateUsdReverseUserStep.pricing);
-    String? error;
+    PrivateUsdText? error;
     try {
       final request = await _engine.reverseCostRequest(
         key.accountUuid,
@@ -294,9 +300,11 @@ class PrivateUsdReverseConversionNotifier
           .read(privateUsdReverseFundingProvider)
           .price(key.accountUuid, request);
     } on rust.ApiPrivateUsdError catch (failure) {
-      error = privateUsdReverseStepMessage(failure.code);
+      error = (l10n) => privateUsdReverseStepMessage(l10n, failure.code);
     } catch (failure) {
-      if (failure is! PrivateUsdPause) error = PrivateUsdCopy.reverseError;
+      if (failure is! PrivateUsdPause) {
+        error = (l10n) => l10n.privateUsdReverseError;
+      }
     }
     if (!ref.mounted) return;
     state = state.copyWith(

@@ -1,3 +1,4 @@
+import '../../../core/l10n/l10n.dart';
 import '../../../core/formatting/address_display.dart';
 import '../../../core/formatting/date_format.dart';
 import '../../../core/formatting/zec_amount.dart';
@@ -6,7 +7,6 @@ import '../../../rust/api/private_usd.dart';
 import '../../swap/domain/swap_asset.dart';
 import '../../swap/models/swap_activity_status_mapper.dart';
 import '../../swap/models/swap_status_presentation.dart';
-import '../private_usd_copy.dart';
 import '../services/private_usd_engine.dart';
 import '../services/private_usd_reverse_funding.dart';
 import 'private_usd_balances.dart';
@@ -71,26 +71,28 @@ int privateUsdReverseStepIndex(ApiReverseRecord record) =>
     };
 
 /// The banner's and the activity row's detail for a reverse conversion.
-String privateUsdReverseStageLabel(ApiReverseRecord record) =>
-    switch (record.phase) {
-      ApiReversePhase.quoted ||
-      ApiReversePhase.accepting => PrivateUsdCopy.reverseAccepting,
-      ApiReversePhase.awaitingFunding => PrivateUsdCopy.reverseReview,
-      ApiReversePhase.sendingUsdc => PrivateUsdCopy.reverseSending,
-      ApiReversePhase.confirmingEscrow => PrivateUsdCopy.reverseConfirming,
-      ApiReversePhase.receivingZec => PrivateUsdCopy.reverseReceiving,
-      ApiReversePhase.awaitingReady => PrivateUsdCopy.reverseReady,
-      ApiReversePhase.settling => PrivateUsdCopy.reverseSettling,
-      ApiReversePhase.receiving => PrivateUsdCopy.reverseSweeping,
-      ApiReversePhase.complete => PrivateUsdCopy.reverseComplete,
-      ApiReversePhase.refundWait when record.cancellable =>
-        PrivateUsdCopy.reverseRefundReady,
-      ApiReversePhase.refundWait => PrivateUsdCopy.reverseRefundWait,
-      ApiReversePhase.refunding => PrivateUsdCopy.reverseRefunding,
-      ApiReversePhase.refundPayout => PrivateUsdCopy.reversePayout,
-      ApiReversePhase.refunded => PrivateUsdCopy.reverseRefunded,
-      ApiReversePhase.cancelled => PrivateUsdCopy.reverseCancelled,
-    };
+String privateUsdReverseStageLabel(
+  AppLocalizations l10n,
+  ApiReverseRecord record,
+) => switch (record.phase) {
+  ApiReversePhase.quoted ||
+  ApiReversePhase.accepting => l10n.privateUsdReverseAccepting,
+  ApiReversePhase.awaitingFunding => l10n.privateUsdReverseReview,
+  ApiReversePhase.sendingUsdc => l10n.privateUsdReverseSending,
+  ApiReversePhase.confirmingEscrow => l10n.privateUsdReverseConfirming,
+  ApiReversePhase.receivingZec => l10n.privateUsdReverseReceiving,
+  ApiReversePhase.awaitingReady => l10n.privateUsdReverseReady,
+  ApiReversePhase.settling => l10n.privateUsdReverseSettling,
+  ApiReversePhase.receiving => l10n.privateUsdReverseSweeping,
+  ApiReversePhase.complete => l10n.privateUsdReverseComplete,
+  ApiReversePhase.refundWait when record.cancellable =>
+    l10n.privateUsdReverseRefundReady,
+  ApiReversePhase.refundWait => l10n.privateUsdReverseRefundWait,
+  ApiReversePhase.refunding => l10n.privateUsdReverseRefunding,
+  ApiReversePhase.refundPayout => l10n.privateUsdReversePayout,
+  ApiReversePhase.refunded => l10n.privateUsdReverseRefunded,
+  ApiReversePhase.cancelled => l10n.privateUsdReverseCancelled,
+};
 
 /// Everything the reverse progress screen shows for one conversion.
 class PrivateUsdReverseProgressPresentation {
@@ -111,7 +113,7 @@ class PrivateUsdReverseProgressPresentation {
     this.showsViewRefunds = false,
     this.showsKeepOpen = false,
     this.provingNote,
-    this.title = PrivateUsdCopy.convertProgressTitle,
+    required this.title,
     this.bridged = false,
   });
 
@@ -131,8 +133,9 @@ class PrivateUsdReverseProgressPresentation {
   final String? actionLabel;
   final bool actionEnabled;
 
-  /// [PrivateUsdCopy.reverseCancel] or [PrivateUsdCopy.reverseRequestRefund]
-  /// while it can still be called off; null hides it.
+  /// [AppLocalizations.privateUsdReverseCancel] or
+  /// [AppLocalizations.privateUsdReverseRequestRefund] while it can still be
+  /// called off; null hides it.
   final String? callOffLabel;
 
   /// Private USD was paid already: the confirmation says a refund follows.
@@ -156,7 +159,8 @@ class PrivateUsdReverseProgressPresentation {
 /// state and [proofProgress] the page's proof (0..1) while it proves;
 /// [busy] disables the actions while one of them runs. With
 /// [bridgeAvailable] off, an ended conversion offers no new one.
-PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
+PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation(
+  AppLocalizations l10n, {
   required PrivateUsdReverseStatus status,
   required DateTime now,
   PrivateUsdFundingState? funding,
@@ -179,7 +183,7 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
   final zecText = privacyModeEnabled
       ? fixedPrivacyMask()
       : ZecAmount.fromZatoshi(zat).activity.toString();
-  final details = _details(record, explorerTxPrefix: explorerTxPrefix);
+  final details = _details(l10n, record, explorerTxPrefix: explorerTxPrefix);
 
   SwapActivityStatusPresentation presentation({
     required List<SwapStatusStepData> steps,
@@ -187,6 +191,7 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     required SwapStatusBadgeKind badgeKind,
     bool bridged = false,
   }) => privateUsdSwapStatus(
+    l10n,
     payAsset: SwapAsset.usdc,
     receiveAsset: SwapAsset.zec,
     payAmountText: usdText,
@@ -220,10 +225,10 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     resultTitle: title,
     resultBody: body,
     action: bridgeAvailable ? PrivateUsdReverseAction.newConversion : null,
-    actionLabel: bridgeAvailable ? PrivateUsdCopy.reverseNew : null,
+    actionLabel: bridgeAvailable ? l10n.privateUsdReverseNew : null,
     actionEnabled: bridgeAvailable,
     showsViewRefunds: viewRefunds,
-    title: PrivateUsdCopy.actionConvert,
+    title: l10n.privateUsdActionConvert,
     bridged: bridged,
   );
 
@@ -231,25 +236,25 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     case ApiReversePhase.complete:
       return ended(
         badgeKind: SwapStatusBadgeKind.completed,
-        title: PrivateUsdCopy.reverseResultReceived,
-        body: PrivateUsdCopy.reverseProgressReceived(zecText),
-        steps: _reverseSteps(active: 6),
+        title: l10n.privateUsdReverseResultReceived,
+        body: l10n.privateUsdReverseProgressReceived(zecText),
+        steps: _reverseSteps(l10n, active: 6),
         progressIndex: 6,
-        amounts: PrivateUsdCopy.reverseProgressAmounts(usdText, zecText),
+        amounts: l10n.privateUsdReverseProgressAmounts(usdText, zecText),
         bridged: true,
       );
     case ApiReversePhase.refunded:
       return ended(
         badgeKind: SwapStatusBadgeKind.refunded,
-        title: PrivateUsdCopy.reverseResultRefunded,
-        body: PrivateUsdCopy.reverseRefunded,
+        title: l10n.privateUsdReverseResultRefunded,
+        body: l10n.privateUsdReverseRefunded,
         viewRefunds: true,
       );
     case ApiReversePhase.cancelled:
       return ended(
         badgeKind: SwapStatusBadgeKind.failed,
-        title: PrivateUsdCopy.reverseResultCancelled,
-        body: PrivateUsdCopy.reverseCancelled,
+        title: l10n.privateUsdReverseResultCancelled,
+        body: l10n.privateUsdReverseCancelled,
       );
     default:
       break;
@@ -268,10 +273,10 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
   final refundStep = switch (record.phase) {
     // Too late to settle: the refund is the user's to request now.
     ApiReversePhase.refundWait when record.cancellable =>
-      PrivateUsdCopy.reverseRefundReady,
-    ApiReversePhase.refundWait => PrivateUsdCopy.reverseRefundWait,
-    ApiReversePhase.refunding => PrivateUsdCopy.reverseRefunding,
-    ApiReversePhase.refundPayout => PrivateUsdCopy.reversePayout,
+      l10n.privateUsdReverseRefundReady,
+    ApiReversePhase.refundWait => l10n.privateUsdReverseRefundWait,
+    ApiReversePhase.refunding => l10n.privateUsdReverseRefunding,
+    ApiReversePhase.refundPayout => l10n.privateUsdReversePayout,
     _ => null,
   };
 
@@ -285,23 +290,24 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
   } else {
     active = privateUsdReverseStepIndex(record);
     steps = _reverseSteps(
+      l10n,
       active: active,
       fundTitle: awaitingPay
-          ? PrivateUsdCopy.reverseStepPay
-          : PrivateUsdCopy.reverseStepFund,
+          ? l10n.privateUsdReverseStepPay
+          : l10n.privateUsdReverseStepFund,
       description: switch (record.phase) {
         ApiReversePhase.awaitingFunding when proving =>
-          PrivateUsdCopy.paymentProving(
+          l10n.privateUsdPaymentProving(
             ((proofProgress ?? 0) * 100).floor().clamp(0, 100),
           ),
         ApiReversePhase.awaitingFunding when awaitingPay =>
-          PrivateUsdCopy.reverseStepPayDetail(usdText),
-        ApiReversePhase.sendingUsdc => PrivateUsdCopy.reverseSending,
-        ApiReversePhase.confirmingEscrow => PrivateUsdCopy.reverseConfirming,
+          l10n.privateUsdReverseStepPayDetail(usdText),
+        ApiReversePhase.sendingUsdc => l10n.privateUsdReverseSending,
+        ApiReversePhase.confirmingEscrow => l10n.privateUsdReverseConfirming,
         ApiReversePhase.awaitingReady =>
-          PrivateUsdCopy.reverseStepApprovalDetail,
-        ApiReversePhase.settling => PrivateUsdCopy.reverseSettling,
-        ApiReversePhase.receiving => PrivateUsdCopy.reverseSweepConfirmations(
+          l10n.privateUsdReverseStepApprovalDetail,
+        ApiReversePhase.settling => l10n.privateUsdReverseSettling,
+        ApiReversePhase.receiving => l10n.privateUsdReverseSweepConfirmations(
           record.receiveConfirmations,
         ),
         _ => null,
@@ -311,19 +317,19 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
 
   final String? note;
   if (status.resuming) {
-    note = PrivateUsdCopy.convertResuming;
+    note = l10n.privateUsdConvertResuming;
   } else if (record.cancelRequested && refundStep != null) {
-    note = PrivateUsdCopy.reverseRefundRequested;
+    note = l10n.privateUsdReverseRefundRequested;
   } else if (record.phase == ApiReversePhase.refundWait && record.cancellable) {
     // It goes by itself from t0.
-    note = PrivateUsdCopy.reverseRefundAvailable(
-      formatDayMonthTime(_at(record.readyDeadline)),
+    note = l10n.privateUsdReverseRefundAvailable(
+      formatDayMonthTime(_at(record.readyDeadline), l10n.localeName),
     );
   } else if (record.phase == ApiReversePhase.awaitingReady) {
-    note = PrivateUsdCopy.reverseReadyExplanation;
+    note = l10n.privateUsdReverseReadyExplanation;
   } else if (record.phase == ApiReversePhase.settling) {
-    note = PrivateUsdCopy.reverseSettlementRefundLimit(
-      formatDayMonthTime(_at(record.refundAfter)),
+    note = l10n.privateUsdReverseSettlementRefundLimit(
+      formatDayMonthTime(_at(record.refundAfter), l10n.localeName),
     );
   } else {
     note = null;
@@ -336,12 +342,12 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
       !record.cancelRequested &&
       !record.funded) {
     action = PrivateUsdReverseAction.pay;
-    actionLabel = PrivateUsdCopy.reversePay(usdText);
+    actionLabel = l10n.privateUsdReversePay(usdText);
     actionEnabled = record.cost != null && !running && !busy;
   } else if (record.phase == ApiReversePhase.awaitingReady &&
       !record.cancelRequested) {
     action = PrivateUsdReverseAction.authorizeSettlement;
-    actionLabel = PrivateUsdCopy.reverseReady;
+    actionLabel = l10n.privateUsdReverseReady;
     actionEnabled = privateUsdCanAuthorizeReady(record, now) && !busy;
   } else {
     action = null;
@@ -365,42 +371,47 @@ PrivateUsdReverseProgressPresentation privateUsdReverseProgressPresentation({
     payAmountText: usdText,
     receiveAmountText: zecText,
     amountsText: record.receivedZat == null
-        ? PrivateUsdCopy.reverseProgressEstimate(usdText, zecText)
-        : PrivateUsdCopy.reverseProgressAmounts(usdText, zecText),
+        ? l10n.privateUsdReverseProgressEstimate(usdText, zecText)
+        : l10n.privateUsdReverseProgressAmounts(usdText, zecText),
     note: note,
-    problem: problem == null ? null : privateUsdReverseProblemMessage(problem),
+    problem: problem == null
+        ? null
+        : privateUsdReverseProblemMessage(l10n, problem),
     action: action,
     actionLabel: actionLabel,
     actionEnabled: actionEnabled,
     callOffLabel: record.cancellable
         ? (unpaid
-              ? PrivateUsdCopy.reverseCancel
-              : PrivateUsdCopy.reverseRequestRefund)
+              ? l10n.privateUsdReverseCancel
+              : l10n.privateUsdReverseRequestRefund)
         : null,
     callOffPaid: !unpaid,
     showsKeepOpen: true,
-    provingNote: proving ? PrivateUsdCopy.reverseProvingNote : null,
+    provingNote: proving ? l10n.privateUsdReverseProvingNote : null,
+    title: l10n.privateUsdConvertProgressTitle,
   );
 }
 
-List<SwapStatusStepData> _reverseSteps({
+List<SwapStatusStepData> _reverseSteps(
+  AppLocalizations l10n, {
   required int active,
   String? description,
-  String fundTitle = PrivateUsdCopy.reverseStepFund,
+  String? fundTitle,
 }) => privateUsdProgressSteps(
   [
-    PrivateUsdCopy.reverseAccepting,
-    fundTitle,
-    PrivateUsdCopy.reverseReceiving,
-    PrivateUsdCopy.reverseReady,
-    PrivateUsdCopy.reverseStepSettle,
-    PrivateUsdCopy.reverseSweeping,
+    l10n.privateUsdReverseAccepting,
+    fundTitle ?? l10n.privateUsdReverseStepFund,
+    l10n.privateUsdReverseReceiving,
+    l10n.privateUsdReverseReady,
+    l10n.privateUsdReverseStepSettle,
+    l10n.privateUsdReverseSweeping,
   ],
   active: active,
   description: description,
 );
 
 List<SwapStatusDetailRowData> _details(
+  AppLocalizations l10n,
   ApiReverseRecord record, {
   String? explorerTxPrefix,
 }) {
@@ -409,14 +420,14 @@ List<SwapStatusDetailRowData> _details(
   final acceptedAt = record.acceptedAt;
   return [
     SwapStatusDetailRowData(
-      label: PrivateUsdCopy.detailSwapId,
+      label: l10n.privateUsdDetailSwapId,
       value: truncatedTxid(record.swapId),
       copyable: true,
       copyText: record.swapId,
     ),
     if (funding != null)
       SwapStatusDetailRowData(
-        label: PrivateUsdCopy.detailFunding,
+        label: l10n.privateUsdDetailFunding,
         value: truncatedTxid(funding),
         copyable: true,
         copyText: funding,
@@ -424,15 +435,15 @@ List<SwapStatusDetailRowData> _details(
       ),
     if (receive != null)
       SwapStatusDetailRowData(
-        label: PrivateUsdCopy.detailZecReceived,
+        label: l10n.privateUsdDetailZecReceived,
         value: truncatedTxid(privateUsdDisplayTxid(receive)),
         copyable: true,
         copyText: privateUsdDisplayTxid(receive),
       ),
     if (acceptedAt != null)
       SwapStatusDetailRowData(
-        label: PrivateUsdCopy.detailStarted,
-        value: formatDayMonthTime(_at(acceptedAt)),
+        label: l10n.privateUsdDetailStarted,
+        value: formatDayMonthTime(_at(acceptedAt), l10n.localeName),
       ),
   ];
 }

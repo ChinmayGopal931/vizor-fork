@@ -5,6 +5,9 @@ import 'package:flutter/material.dart' show Scaffold;
 import 'package:flutter/widgets.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import '../../../../../core/formatting/zec_amount.dart';
+import '../../../../../core/l10n/l10n.dart';
+import '../../../../../core/privacy/privacy_mask.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../core/widgets/app_button.dart';
 import '../../../../../core/widgets/mobile/neon_motion.dart';
@@ -20,6 +23,15 @@ import 'shield_hardware_motion.dart';
 import 'shield_particle_art.dart';
 import 'shield_timeline.dart';
 import 'slide_to_shield.dart';
+
+/// The scene draws `ZEC` beside the amount, so the amount stays bare.
+String mobileShieldAmountText(
+  BigInt zatoshi, {
+  required bool privacyModeEnabled,
+}) => hideIfPrivacyMode(
+  formatZecAmount(zatoshi),
+  privacyModeEnabled: privacyModeEnabled,
+);
 
 // Transaction owners supply real states. This presentation never starts a
 // transaction, guesses its progress, or treats a pending broadcast as success.
@@ -390,8 +402,8 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
     }
 
     return math.max(
-      measure('Transparent balance'),
-      measure('Shielded successfully'),
+      measure(context.l10n.homeShieldBalanceTitle),
+      measure(context.l10n.commonShieldedSuccessfully),
     );
   }
 
@@ -590,7 +602,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
                     liveRegion: true,
                     child: Text(
                       widget.phase == MobileShieldPhase.succeeded
-                          ? 'Shielding your balance…'
+                          ? context.l10n.homeShieldingBalance
                           : widget.title,
                       textAlign: TextAlign.center,
                       style: _statement.copyWith(color: _colors.text.primary),
@@ -621,7 +633,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
                     constrainContent: true,
                     disabledBackgroundColor: _colors.button.primary.bg,
                     child: Text(
-                      'Complete',
+                      context.l10n.homeShieldComplete,
                       style: TextStyle(color: _colors.button.primary.label),
                     ),
                   ),
@@ -653,13 +665,13 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
   // The label keeps its colour while the button fades out after commit.
   Widget _cancel() => Semantics(
     button: true,
-    label: 'Cancel',
+    label: context.l10n.commonCancel,
     child: AppButton(
       variant: AppButtonVariant.ghost,
       onPressed: widget.canLeave ? widget.onClose : null,
       disabledBackgroundColor: _colors.background.window.withValues(alpha: 0),
       child: Text(
-        'Cancel',
+        context.l10n.commonCancel,
         style: TextStyle(color: _colors.button.ghost.label),
       ),
     ),
@@ -740,7 +752,9 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
                                     ),
                                   ),
                                   child: Semantics(
-                                    label: 'Keystone transaction QR',
+                                    label: context
+                                        .l10n
+                                        .homeShieldKeystoneQrSemantics,
                                   ),
                                 ),
                               ),
@@ -782,7 +796,8 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
                       Text(
                         widget.phase == MobileShieldPhase.succeeded &&
                                 (_keystone?.active ?? false)
-                            ? _keystoneFocusTitle ?? 'Shielding your balance…'
+                            ? _keystoneFocusTitle ??
+                                  context.l10n.homeShieldingBalance
                             : widget.title,
                         textAlign: TextAlign.center,
                         style: _statement.copyWith(color: _colors.text.accent),
@@ -893,7 +908,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
           ),
         );
         return Semantics(
-          label: '$amount ZEC',
+          label: '$amount ZEC', // l10n-ignore: amount format
           child: ExcludeSemantics(
             child: Transform.scale(
               alignment: Alignment.topLeft,
@@ -986,7 +1001,7 @@ class _MobileShieldSceneState extends State<MobileShieldScene>
           if (!auxiliary && (_review || t < ShieldTimeline.fall.end)) ...[
             icon(header * 0.6, result: false),
             title(
-              _review ? widget.title : 'Transparent balance',
+              _review ? widget.title : context.l10n.homeShieldBalanceTitle,
               header,
               result: false,
             ),

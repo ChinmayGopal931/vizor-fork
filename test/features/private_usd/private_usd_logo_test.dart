@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/activity/widgets/activity_feed.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_presentation.dart';
@@ -24,6 +25,7 @@ import 'package:zcash_wallet/src/features/swap/widgets/swap_asset_icon.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 // Private USD's logo, the USDC token with its Railgun badge, wherever
 // Private USD shows an image, and ZEC's coin beside it where a conversion
@@ -51,6 +53,7 @@ void main() {
   Future<void> pump(WidgetTester tester, Widget child) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(data: AppThemeData.dark, child: child),
       ),
     );
@@ -137,10 +140,10 @@ void main() {
       tester,
       Center(
         child: PrivateUsdConversionBannerView(
-          banner: PrivateUsdBannerState(
+          banner: PrivateUsdBannerState.forward(
             path: banner.path,
-            title: banner.title,
-            detail: banner.detail,
+            forward: banner.forward!,
+            zcashConfirmations: banner.zcashConfirmations,
             attention: true,
           ),
           onTap: () {},
@@ -255,6 +258,7 @@ void main() {
     await expectHeader(
       MobilePrivateUsdConversionView(
         presentation: privateUsdProgressPresentation(
+          testL10n,
           status: PrivateUsdConversionStatus(
             record: previewPrivateUsdRecord(depositConfirmations: 1),
             wait: ApiForwardWait.confirming,
@@ -274,6 +278,7 @@ void main() {
     await expectHeader(
       MobilePrivateUsdReverseConversionView(
         presentation: privateUsdReverseProgressPresentation(
+          testL10n,
           status: PrivateUsdReverseStatus(
             record: previewPrivateUsdReverseRecord(
               phase: ApiReversePhase.receivingZec,

@@ -12,6 +12,7 @@ import 'package:zcash_wallet/src/core/security/software_wallet_secret.dart';
 import 'package:zcash_wallet/src/core/storage/app_secure_store.dart';
 import 'package:zcash_wallet/src/providers/voting/voting_service_providers.dart';
 import 'package:zcash_wallet/src/rust/frb_generated.dart';
+import '../../support/test_l10n.dart';
 
 const _oldPassword = 'Oldpass1!';
 const _newPassword = 'Newpass1!';
@@ -540,7 +541,10 @@ void main() {
       ),
       throwsA(isA<ArgumentError>()),
     );
-    expect(validateRequiredWalletPassword(''), kWalletPasswordMinLengthMessage);
+    expect(
+      validateRequiredWalletPassword(testL10n, ''),
+      testL10n.passwordPolicyMinLength(kWalletPasswordMinLength),
+    );
   });
 
   test('changePassword only rotates app-managed secret payloads', () async {

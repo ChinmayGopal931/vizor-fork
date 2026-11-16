@@ -4,7 +4,7 @@ import '../../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../../core/layout/mobile/mobile_bottom_safe_area.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
-import '../../private_usd_copy.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// Asks before a reverse conversion is called off: once unlocked there is
 /// no app-lock prompt, so a sheet guards it. [action] is the label of the
@@ -19,10 +19,10 @@ Future<bool> confirmPrivateUsdReverseCancel(
     context: context,
     builder: (sheetContext) => PrivateUsdConfirmSheetBody(
       sheetKey: const ValueKey('private_usd_cancel_sheet'),
-      title: PrivateUsdCopy.reverseCancelConfirmTitle,
+      title: context.l10n.privateUsdReverseCancelConfirmTitle,
       body: paid
-          ? PrivateUsdCopy.reverseCancelConfirmBody
-          : PrivateUsdCopy.reverseCancelConfirmUnpaidBody,
+          ? context.l10n.privateUsdReverseCancelConfirmBody
+          : context.l10n.privateUsdReverseCancelConfirmUnpaidBody,
       confirmLabel: action,
       destructive: true,
       onConfirm: () => Navigator.of(sheetContext).pop(true),
@@ -42,9 +42,9 @@ Future<bool> confirmPrivateUsdRefundRecovery(
     context: context,
     builder: (sheetContext) => PrivateUsdConfirmSheetBody(
       sheetKey: const ValueKey('private_usd_rescue_sheet'),
-      title: PrivateUsdCopy.refundsRecoverConfirmTitle,
-      body: PrivateUsdCopy.refundsRecoverConfirmBody(feeCap),
-      confirmLabel: PrivateUsdCopy.refundsRecover,
+      title: context.l10n.privateUsdRefundsRecoverConfirmTitle,
+      body: context.l10n.privateUsdRefundsRecoverConfirmBody(feeCap),
+      confirmLabel: context.l10n.privateUsdRefundsRecover,
       onConfirm: () => Navigator.of(sheetContext).pop(true),
       onDismiss: () => Navigator.of(sheetContext).pop(false),
     ),
@@ -62,9 +62,9 @@ Future<bool> confirmPrivateUsdDepositRescue(
     context: context,
     builder: (sheetContext) => PrivateUsdConfirmSheetBody(
       sheetKey: const ValueKey('private_usd_deposit_rescue_sheet'),
-      title: PrivateUsdCopy.refundsDepositConfirmTitle,
-      body: PrivateUsdCopy.refundsDepositConfirmBody(fee),
-      confirmLabel: PrivateUsdCopy.refundsDepositRecover,
+      title: context.l10n.privateUsdRefundsDepositConfirmTitle,
+      body: context.l10n.privateUsdRefundsDepositConfirmBody(fee),
+      confirmLabel: context.l10n.privateUsdRefundsDepositRecover,
       onConfirm: () => Navigator.of(sheetContext).pop(true),
       onDismiss: () => Navigator.of(sheetContext).pop(false),
     ),
@@ -139,7 +139,7 @@ class PrivateUsdConfirmSheetBody extends StatelessWidget {
               variant: AppButtonVariant.secondary,
               expand: true,
               onPressed: onDismiss,
-              child: const Text(PrivateUsdCopy.notNow),
+              child: Text(context.l10n.privateUsdNotNow),
             ),
           ],
         ),

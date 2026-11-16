@@ -2,6 +2,7 @@ import '../../../core/config/network_config.dart';
 import '../../../core/formatting/date_format.dart';
 import '../../../core/formatting/number_format.dart';
 import '../../../core/formatting/zec_amount.dart';
+import '../../../core/l10n/l10n.dart';
 import '../models/portfolio_chart_models.dart';
 import 'portfolio_price_history.dart';
 
@@ -70,15 +71,21 @@ PortfolioChartChange describePortfolioChange(PortfolioChartData data) {
 /// of Greenwich. Any other point is an instant (a block time, or now): to the
 /// minute for the shorter spans, the day for a year or all of it.
 String formatPortfolioPointTime(
+  AppLocalizations l10n,
   DateTime time,
   PortfolioChartRange range,
   PortfolioChartMode mode,
 ) {
   if (mode == PortfolioChartMode.usd && isUtcMidnight(time)) {
     final utc = time.toUtc();
-    return '${monthAbbreviation(utc.month)} ${utc.day}, ${utc.year}';
+    // That UTC day's own fields, so formatting them as local time keeps the
+    // day where it is.
+    return formatMonthDayYear(
+      DateTime(utc.year, utc.month, utc.day),
+      l10n.localeName,
+    );
   }
   return range == PortfolioChartRange.year || range == PortfolioChartRange.all
-      ? formatMonthDayYear(time)
-      : formatDayMonthTime(time);
+      ? formatMonthDayYear(time, l10n.localeName)
+      : formatDayMonthTime(time, l10n.localeName);
 }

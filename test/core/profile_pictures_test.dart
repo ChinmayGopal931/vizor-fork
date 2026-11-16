@@ -1,12 +1,16 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/profile_pictures.dart';
+import '../support/test_l10n.dart';
 
 void main() {
   test(
     'profile picture options use stable ids and labels in display order',
     () {
-      // The seven neon portraits; ids stay `pfp-NN` so stored picks survive.
-      expect(kProfilePictureOptions, hasLength(7));
+      // The neon portraits; ids stay `pfp-NN` so stored picks survive, and
+      // the later ones skip the retired knights' `pfp-08` to `pfp-15`.
+      expect(kProfilePictureOptions, hasLength(10));
       expect(kProfilePictureOptions.map((option) => option.id), [
         'pfp-01',
         'pfp-02',
@@ -15,8 +19,11 @@ void main() {
         'pfp-05',
         'pfp-06',
         'pfp-07',
+        'pfp-16',
+        'pfp-17',
+        'pfp-18',
       ]);
-      expect(kProfilePictureOptions.map((option) => option.label), [
+      expect(kProfilePictureOptions.map((option) => option.label(testL10n)), [
         'Light cycle',
         'Halo',
         'Red line',
@@ -24,20 +31,33 @@ void main() {
         'Scanner',
         'Goggles',
         'Frame',
+        'Statue',
+        'Helmet',
+        'Platinum',
       ]);
       expect(
         kProfilePictureOptions.first.assetPath,
         'assets/profile_pictures/profile_picture_01.webp',
       );
+      expect(
+        kProfilePictureOptions.last.assetPath,
+        'assets/profile_pictures/profile_picture_18.webp',
+      );
     },
   );
+
+  test('every portrait has its asset file', () {
+    for (final option in kProfilePictureOptions) {
+      expect(File(option.assetPath).existsSync(), isTrue, reason: option.id);
+    }
+  });
 
   test('findProfilePictureOption resolves numbered ids', () {
     final option = findProfilePictureOption('pfp-02');
 
     expect(option, isNotNull);
     expect(option!.id, 'pfp-02');
-    expect(option.label, 'Halo');
+    expect(option.label(testL10n), 'Halo');
     expect(option.assetPath, 'assets/profile_pictures/profile_picture_02.webp');
   });
 

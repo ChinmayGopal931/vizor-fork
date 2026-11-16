@@ -2,12 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/features/address_book/models/address_format_validator.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_send.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_spend_guard.dart';
 import 'package:zcash_wallet/src/features/swap/models/swap_token_amount_formatting.dart';
 import 'package:zcash_wallet/src/rust/frb_generated.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_send_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 /// Rust's `0zk` check, as the form reaches it (`private_usd_is_valid_railgun_
 /// address`, a synchronous FRB call).
@@ -46,16 +46,16 @@ void main() {
 
     final truncated = previewPrivateUsdRecipient.substring(0, 40);
     expect(
-      privateUsdRecipientError(mode, truncated),
-      PrivateUsdCopy.sendInvalid0zk,
+      privateUsdRecipientError(testL10n, mode, truncated),
+      testL10n.privateUsdSendInvalid0zk,
     );
     expect(_rust.asked.last, truncated);
     // A public address is no Railgun address; an empty field shows nothing.
     expect(
-      privateUsdRecipientError(mode, _checksummed),
-      PrivateUsdCopy.sendInvalid0zk,
+      privateUsdRecipientError(testL10n, mode, _checksummed),
+      testL10n.privateUsdSendInvalid0zk,
     );
-    expect(privateUsdRecipientError(mode, '  '), isNull);
+    expect(privateUsdRecipientError(testL10n, mode, '  '), isNull);
   });
 
   test('a 0x recipient carries its EIP-55 checksum and is never the zero '
@@ -75,16 +75,16 @@ void main() {
       isA<RailgunPublicDestination>(),
     );
     expect(
-      privateUsdRecipientError(mode, mistyped),
-      PrivateUsdCopy.sendInvalid0x,
+      privateUsdRecipientError(testL10n, mode, mistyped),
+      testL10n.privateUsdSendInvalid0x,
     );
     expect(
-      privateUsdRecipientError(mode, _zero),
-      PrivateUsdCopy.sendZeroAddress,
+      privateUsdRecipientError(testL10n, mode, _zero),
+      testL10n.privateUsdSendZeroAddress,
     );
     expect(
-      privateUsdRecipientError(mode, previewPrivateUsdRecipient),
-      PrivateUsdCopy.sendInvalid0x,
+      privateUsdRecipientError(testL10n, mode, previewPrivateUsdRecipient),
+      testL10n.privateUsdSendInvalid0x,
     );
 
     // $1,250.40 available; the relayer's floor, $0.50, stays behind.
@@ -101,16 +101,19 @@ void main() {
     );
     final asset = form('').asset(balances)!;
     expect(
-      form('1.1234567').amountError(asset),
-      PrivateUsdCopy.sendTooPrecise(6),
+      form('1.1234567').amountError(testL10n, asset),
+      testL10n.privateUsdSendTooPrecise(6),
     );
-    expect(form('1250.41').amountError(asset), PrivateUsdCopy.sendTooMuch);
     expect(
-      form('1250.4').amountError(asset),
-      PrivateUsdCopy.sendLeaveNetworkFee(r'$0.50'),
+      form('1250.41').amountError(testL10n, asset),
+      testL10n.privateUsdSendTooMuch,
+    );
+    expect(
+      form('1250.4').amountError(testL10n, asset),
+      testL10n.privateUsdSendLeaveNetworkFee(r'$0.50'),
     );
     expect(form('1250.4').request(asset), isNull);
-    expect(form('0.0').amountError(asset), isNull);
+    expect(form('0.0').amountError(testL10n, asset), isNull);
     final request = form('1249.9').request(asset);
     expect(request?.amount, BigInt.from(1249900000));
     expect(request?.isWithdrawal, isTrue);

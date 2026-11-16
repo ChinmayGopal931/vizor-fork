@@ -12,6 +12,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import '../../../../../main.dart' show log;
 import '../../../../core/layout/app_form_factor.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
@@ -132,7 +133,7 @@ class RequestQrSurface extends StatelessWidget {
           child: qrImage == null
               ? Center(
                   child: Text(
-                    'QR unavailable',
+                    context.l10n.receiveQrUnavailable,
                     style: AppTypography.bodySmall.copyWith(
                       color: _requestQrInk,
                     ),

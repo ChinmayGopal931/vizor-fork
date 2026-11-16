@@ -19,6 +19,8 @@ use std::{future::Future, time::Duration};
 use futures::{Stream, StreamExt};
 use http::Uri;
 use hyper_util::client::legacy::connect::HttpConnector;
+use incrementalmerkletree::Address;
+use shardtree::{error::ShardTreeError, store::ShardStore};
 use tonic::{
     transport::{Channel, ClientTlsConfig, Endpoint},
     Request, Response, Status,
@@ -33,6 +35,7 @@ use zcash_client_backend::{
         SendResponse, TransparentAddressBlockFilter, TreeState, TxFilter,
     },
 };
+use zcash_client_sqlite::wallet::commitment_tree;
 use zcash_primitives::{block::BlockHash, transaction::TxId};
 use zcash_protocol::consensus::{BlockHeight, NetworkUpgrade, Parameters};
 
@@ -48,6 +51,68 @@ const LIGHTWALLETD_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const LIGHTWALLETD_UNARY_RPC_TIMEOUT: Duration = Duration::from_secs(20);
 const LIGHTWALLETD_STREAM_START_TIMEOUT: Duration = Duration::from_secs(20);
 const LIGHTWALLETD_STREAM_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+/// HTTP/2 pings on a sync session's direct block connection while it has
+/// streams open. A connection that stops answering closes about the interval
+/// plus the timeout after its last frame, and the channel reconnects for the
+/// next request. Requests already in flight still end at their own deadlines;
+/// the pings spare the ones sent after that, which would otherwise each wait
+/// out a deadline on the dead connection. The timeout leaves room for an
+/// acknowledgement queued behind batch data on a slow link. Only a
+/// multi-threaded runtime pings ([`keep_alive_fits_runtime`]).
+const DIRECT_BLOCK_KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(15);
+const DIRECT_BLOCK_KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(20);
+/// The longest a direct block connection may take to open. The connect
+/// timeout covers only TCP: name resolution comes before it and the TLS
+/// handshake after it, so a network that accepts the connection and drops the
+/// handshake would otherwise hold the sync loop for as long as the OS retries.
+const DIRECT_BLOCK_OPEN_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// The shortest timeout above. A request that fails sooner did not time out.
+pub(super) const SHORTEST_LIGHTWALLETD_TIMEOUT: Duration = LIGHTWALLETD_CONNECT_TIMEOUT;
+const _: () = assert!(
+    SHORTEST_LIGHTWALLETD_TIMEOUT.as_millis() <= LIGHTWALLETD_UNARY_RPC_TIMEOUT.as_millis()
+        && SHORTEST_LIGHTWALLETD_TIMEOUT.as_millis()
+            <= LIGHTWALLETD_STREAM_START_TIMEOUT.as_millis()
+        && SHORTEST_LIGHTWALLETD_TIMEOUT.as_millis()
+            <= LIGHTWALLETD_STREAM_IDLE_TIMEOUT.as_millis()
+);
+
+const SLOW_DOWNLOAD_PREFIX: &str = "get_block_range: endpoint download too slow";
+
+/// A network-body budget independent of local scanning and DB time. The
+/// initial allowance tolerates cold connections and small batches; bytes
+/// received buy additional time so a large block is not mistaken for a stalled
+/// server. A ceiling still bounds trickling arbitrarily large responses.
+#[derive(Clone, Copy)]
+struct DownloadBudget {
+    grace: Duration,
+    min_bytes_per_second: u64,
+    ceiling: Duration,
+}
+
+impl DownloadBudget {
+    const FOREGROUND: Self = Self {
+        grace: Duration::from_secs(60),
+        min_bytes_per_second: 4 * 1024,
+        ceiling: Duration::from_secs(5 * 60),
+    };
+
+    fn allowance(self, byte_count: usize) -> Duration {
+        let transfer =
+            Duration::from_secs_f64(byte_count as f64 / self.min_bytes_per_second.max(1) as f64);
+        self.grace.saturating_add(transfer).min(self.ceiling)
+    }
+}
+
+pub(super) fn is_slow_endpoint_error(error: &SyncError) -> bool {
+    matches!(error, SyncError::Network(message) if message.starts_with(SLOW_DOWNLOAD_PREFIX))
+}
+
+fn slow_download_error() -> SyncError {
+    SyncError::net(format!(
+        "{SLOW_DOWNLOAD_PREFIX}: sustained transfer budget exceeded"
+    ))
+}
 
 fn timed_request<T>(message: T, timeout: Duration) -> Request<T> {
     let mut request = Request::new(message);
@@ -210,7 +275,8 @@ pub(crate) async fn open_isolated_lwd_transport(
 
 /// [`open_isolated_lwd_transport`] that stops waiting for the route once
 /// `cancelled` reports true, for a user-started request that a lock or a
-/// destructive wallet change must not wait out.
+/// destructive wallet change must not wait out, and for a sync attempt
+/// retrying on a fresh circuit.
 pub(crate) async fn open_isolated_lwd_transport_until(
     lightwalletd_url: &str,
     cancelled: impl Fn() -> bool,
@@ -232,7 +298,9 @@ pub(crate) async fn open_isolated_lwd_transport_until(
 ///
 /// Nothing in the foreground may use this: every foreground path goes through
 /// [`open_lwd_channel`] or [`open_isolated_lwd_channel`], which respect the
-/// user's chosen route and fail closed while Tor is starting or broken.
+/// user's chosen route and fail closed while Tor is starting or broken. The
+/// one foreground exception, a sync session's bulk block download, has its
+/// own opener, [`open_block_download_lwd_transport`].
 pub(crate) async fn open_background_direct_lwd_channel(
     lightwalletd_url: &str,
 ) -> Result<CompactTxStreamerClient<Channel>, SyncError> {
@@ -246,6 +314,70 @@ pub(crate) async fn open_background_direct_lwd_channel(
 pub(crate) async fn open_background_direct_lwd_transport(
     lightwalletd_url: &str,
 ) -> Result<Channel, SyncError> {
+    open_unleased_direct_transport(lightwalletd_url, false).await
+}
+
+/// Opens the direct transport a sync session downloads its compact blocks on
+/// while Tor is on and the session's download is large.
+///
+/// Compact blocks are public, and one Tor circuit would take hours to deliver
+/// a restore. Only main-scan batches use this transport: `GetBlockRange` and
+/// the `GetTreeState` before a batch that does not start at a compiled
+/// checkpoint, by height or by the first block's predecessor hash, with
+/// `GetBlock` for that hash when the first block does not carry it. Every
+/// other request of the session stays on the Tor route, which
+/// the session opens first, so a Tor route that is still starting or broken
+/// still stops the sync. Like the background opener it skips the direct-route
+/// lease, which exists to abort clearnet traffic once Tor is desired. It never
+/// dials an onion service ([`block_download_can_go_direct`]).
+pub(crate) async fn open_block_download_lwd_transport(
+    lightwalletd_url: &str,
+) -> Result<Channel, SyncError> {
+    if !block_download_can_go_direct(lightwalletd_url) {
+        return Err(SyncError::net(
+            "an onion lightwalletd is reachable only over Tor",
+        ));
+    }
+    tokio::time::timeout(
+        DIRECT_BLOCK_OPEN_TIMEOUT,
+        open_unleased_direct_transport(lightwalletd_url, keep_alive_fits_runtime()),
+    )
+    .await
+    .unwrap_or_else(|_| {
+        Err(SyncError::net(format!(
+            "direct block connection did not open in {}s",
+            DIRECT_BLOCK_OPEN_TIMEOUT.as_secs()
+        )))
+    })
+}
+
+/// Whether a sync session may download its blocks from `lightwalletd_url`
+/// directly. An onion service is reachable only over Tor, and dialing one
+/// directly would send its name to the system resolver. The fully qualified
+/// spelling, with a trailing dot, names the same service.
+pub(crate) fn block_download_can_go_direct(lightwalletd_url: &str) -> bool {
+    Endpoint::from_shared(lightwalletd_url.to_string()).is_ok_and(|endpoint| {
+        !endpoint.uri().host().is_some_and(|host| {
+            host.trim_end_matches('.')
+                .to_ascii_lowercase()
+                .ends_with(".onion")
+        })
+    })
+}
+
+/// Whether the direct block connection may ping on the current runtime. Its
+/// connection task runs on the runtime that opens it, and hyper checks the
+/// ping deadline before it reads the reply. The single-threaded runtime of
+/// background migration preparation scans each batch on that thread, so a
+/// scan longer than the timeout would close a healthy connection.
+fn keep_alive_fits_runtime() -> bool {
+    tokio::runtime::Handle::current().runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread
+}
+
+async fn open_unleased_direct_transport(
+    lightwalletd_url: &str,
+    keep_alive: bool,
+) -> Result<Channel, SyncError> {
     static RUSTLS_INIT: std::sync::Once = std::sync::Once::new();
     RUSTLS_INIT.call_once(|| {
         let _ = rustls::crypto::ring::default_provider().install_default();
@@ -254,6 +386,14 @@ pub(crate) async fn open_background_direct_lwd_transport(
     let endpoint = Endpoint::from_shared(lightwalletd_url.to_string())
         .map_err(|e| SyncError::net(format!("invalid URL: {e}")))?
         .connect_timeout(LIGHTWALLETD_CONNECT_TIMEOUT);
+    let endpoint = if keep_alive {
+        endpoint
+            .http2_keep_alive_interval(DIRECT_BLOCK_KEEP_ALIVE_INTERVAL)
+            .keep_alive_timeout(DIRECT_BLOCK_KEEP_ALIVE_TIMEOUT)
+            .keep_alive_while_idle(false)
+    } else {
+        endpoint
+    };
     let endpoint = if lightwalletd_url.starts_with("https://") {
         endpoint
             .tls_config(ClientTlsConfig::new().with_webpki_roots())
@@ -637,11 +777,62 @@ pub(crate) async fn next_stream_message<T>(
     await_stream_message(label, LIGHTWALLETD_STREAM_IDLE_TIMEOUT, stream.message()).await
 }
 
+/// The subtree index a root download starts from, given the stored shard
+/// roots in index order. The last shard is incomplete and the next range
+/// should overlap the last complete one, so this is the second-to-last
+/// root's index, or 0 with fewer than two roots. It is the rule
+/// `zcash_client_sqlite` uses for `WalletSummary::next_*_subtree_index`.
+fn next_subtree_index(roots: &[Address]) -> u64 {
+    roots.iter().rev().nth(1).map_or(0, |addr| addr.index())
+}
+
+/// The Sapling, Orchard and Ironwood start indices for
+/// [`download_subtree_roots`], read from the stored shard roots: the values
+/// of the wallet summary's `next_*_subtree_index` without the summary's
+/// balance and scan-progress queries. Ironwood is read only when `ironwood`
+/// is set and is 0 otherwise.
+pub(super) fn next_subtree_indices(
+    db: &mut WalletDatabase,
+    ironwood: bool,
+) -> Result<(u64, u64, u64), SyncError> {
+    type TreeError = ShardTreeError<commitment_tree::Error>;
+    let sapling = db
+        .with_sapling_tree_mut::<_, _, TreeError>(|tree| {
+            tree.store()
+                .get_shard_roots()
+                .map_err(ShardTreeError::Storage)
+        })
+        .map_err(|e| SyncError::db(format!("sapling shard roots: {e}")))?;
+    let orchard = db
+        .with_orchard_tree_mut::<_, _, TreeError>(|tree| {
+            tree.store()
+                .get_shard_roots()
+                .map_err(ShardTreeError::Storage)
+        })
+        .map_err(|e| SyncError::db(format!("orchard shard roots: {e}")))?;
+    let ironwood = if ironwood {
+        db.with_ironwood_tree_mut::<_, _, TreeError>(|tree| {
+            tree.store()
+                .get_shard_roots()
+                .map_err(ShardTreeError::Storage)
+        })
+        .map_err(|e| SyncError::db(format!("ironwood shard roots: {e}")))?
+        .map_or(0, |roots| next_subtree_index(&roots))
+    } else {
+        0
+    };
+    Ok((
+        next_subtree_index(&sapling),
+        next_subtree_index(&orchard),
+        ironwood,
+    ))
+}
+
 /// Pulls the latest shielded subtree roots from lightwalletd
 /// and writes them into `db` via `put_*_subtree_roots`. The starting
-/// index for each protocol comes from `db`'s wallet summary, so a
-/// follow-up sync only fetches roots for subtrees the wallet has not
-/// seen yet.
+/// index for each protocol comes from the shard roots already stored in
+/// `db` ([`next_subtree_indices`]), so a follow-up sync only fetches
+/// roots for subtrees the wallet has not seen yet.
 ///
 /// Every byte slice from the wire is length-checked: a subtree root
 /// is exactly 32 bytes, and a short or long payload is rejected as a
@@ -651,24 +842,11 @@ pub(crate) async fn next_stream_message<T>(
 pub(super) async fn download_subtree_roots(
     client: &mut CompactTxStreamerClient<Channel>,
     db: &mut WalletDatabase,
-    db_path: &str,
     network: WalletNetwork,
     chain_tip: BlockHeight,
 ) -> Result<(), SyncError> {
     let ironwood_enabled = ironwood_sync_enabled(network, chain_tip);
-    let (sap_start, orch_start, ironwood_start) = {
-        let summary =
-            crate::wallet::wallet_summary_cache::get_wallet_summary_cached(db_path, network)
-                .map_err(SyncError::db)?;
-        match summary {
-            Some(s) => (
-                s.next_sapling_subtree_index(),
-                s.next_orchard_subtree_index(),
-                s.next_ironwood_subtree_index(),
-            ),
-            None => (0, 0, 0),
-        }
-    };
+    let (sap_start, orch_start, ironwood_start) = next_subtree_indices(db, ironwood_enabled)?;
     if ironwood_enabled {
         log::info!(
             "[{}] sync: subtree roots start: sapling={}, orchard={}, ironwood={}",
@@ -889,16 +1067,22 @@ pub(super) async fn download_blocks(
     .await
     .map_err(|e| status_to_network_error("get_block_range", e))?;
 
-    let blocks = collect_compact_blocks_bounded(
+    // Each block is encoded as it arrives, so a queued batch never holds
+    // more than one decoded block.
+    let mut source =
+        MemoryBlockSource::with_capacity(expected_block_count(start_height, end_height)?);
+    for_each_compact_block(
         &mut stream,
         start_height,
         end_height,
         LIGHTWALLETD_STREAM_IDLE_TIMEOUT,
         None,
+        Some(DownloadBudget::FOREGROUND),
+        |block| source.push(block),
     )
     .await?;
 
-    Ok(MemoryBlockSource::new(blocks))
+    Ok(source)
 }
 
 async fn collect_compact_blocks_bounded<S>(
@@ -911,33 +1095,98 @@ async fn collect_compact_blocks_bounded<S>(
 where
     S: Stream<Item = Result<CompactBlock, Status>> + Unpin,
 {
-    let expected_count = expected_block_count(start_height, end_height)?;
+    collect_compact_blocks_with_budget(
+        stream,
+        start_height,
+        end_height,
+        idle_timeout,
+        byte_limit,
+        None,
+    )
+    .await
+}
+
+async fn collect_compact_blocks_with_budget<S>(
+    stream: &mut S,
+    start_height: u64,
+    end_height: u64,
+    idle_timeout: Duration,
+    byte_limit: Option<usize>,
+    download_budget: Option<DownloadBudget>,
+) -> Result<Vec<CompactBlock>, SyncError>
+where
+    S: Stream<Item = Result<CompactBlock, Status>> + Unpin,
+{
     let mut blocks = Vec::new();
     blocks
-        .try_reserve_exact(expected_count)
+        .try_reserve_exact(expected_block_count(start_height, end_height)?)
         .map_err(|_| SyncError::other("get_block_range request is too large"))?;
+    for_each_compact_block(
+        stream,
+        start_height,
+        end_height,
+        idle_timeout,
+        byte_limit,
+        download_budget,
+        |block| blocks.push(block),
+    )
+    .await?;
+    Ok(blocks)
+}
 
+/// Hands `keep` each block of the response for `start_height..=end_height`,
+/// in order, rejecting a response with missing, extra, out-of-order or
+/// (past `byte_limit`) oversized blocks.
+async fn for_each_compact_block<S>(
+    stream: &mut S,
+    start_height: u64,
+    end_height: u64,
+    idle_timeout: Duration,
+    byte_limit: Option<usize>,
+    download_budget: Option<DownloadBudget>,
+    mut keep: impl FnMut(CompactBlock),
+) -> Result<(), SyncError>
+where
+    S: Stream<Item = Result<CompactBlock, Status>> + Unpin,
+{
+    let expected_count = expected_block_count(start_height, end_height)?;
+    let mut received = 0usize;
     let mut byte_count = 0usize;
+    let mut network_wait = Duration::ZERO;
     loop {
-        let next = await_stream_message("get_block_range stream", idle_timeout, async {
+        let read_message = await_stream_message("get_block_range stream", idle_timeout, async {
             match stream.next().await {
                 Some(Ok(block)) => Ok(Some(block)),
                 Some(Err(status)) => Err(status),
                 None => Ok(None),
             }
-        })
-        .await?;
+        });
+        let started_waiting = tokio::time::Instant::now();
+        let next = if let Some(budget) = download_budget {
+            let remaining = budget.allowance(byte_count).saturating_sub(network_wait);
+            if remaining.is_zero() {
+                return Err(slow_download_error());
+            }
+            tokio::time::timeout(remaining, read_message)
+                .await
+                .map_err(|_| slow_download_error())??
+        } else {
+            read_message.await?
+        };
+        // Only wait time in this network collector counts. The scanner and
+        // wallet writer run after it returns and cannot consume its budget.
+        network_wait = network_wait.saturating_add(started_waiting.elapsed());
         let Some(block) = next else {
             break;
         };
 
-        if blocks.len() >= expected_count {
+        if received >= expected_count {
             return Err(SyncError::net(format!(
                 "get_block_range returned more than {expected_count} blocks for request \
                  {start_height}..={end_height}"
             )));
         }
-        let offset = u64::try_from(blocks.len())
+        let offset = u64::try_from(received)
             .map_err(|_| SyncError::other("get_block_range response is too large"))?;
         let expected_height = start_height
             .checked_add(offset)
@@ -953,18 +1202,18 @@ where
         if byte_limit.is_some_and(|limit| byte_count > limit) {
             return Err(SyncError::other("Gift Card range exceeds memory limit"));
         }
-        blocks.push(block);
+        keep(block);
+        received += 1;
     }
 
-    if blocks.len() != expected_count {
+    if received != expected_count {
         return Err(SyncError::net(format!(
-            "get_block_range returned {} of {expected_count} blocks for request \
+            "get_block_range returned {received} of {expected_count} blocks for request \
              {start_height}..={end_height}",
-            blocks.len(),
         )));
     }
 
-    Ok(blocks)
+    Ok(())
 }
 
 fn expected_block_count(start_height: u64, end_height: u64) -> Result<usize, SyncError> {
@@ -992,6 +1241,16 @@ mod tests {
             height,
             ..Default::default()
         }
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn a_single_threaded_runtime_opens_the_direct_connection_without_pings() {
+        assert!(!keep_alive_fits_runtime());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_multi_threaded_runtime_pings_the_direct_connection() {
+        assert!(keep_alive_fits_runtime());
     }
 
     async fn collect_fake_blocks(
@@ -1074,6 +1333,30 @@ mod tests {
             let endpoint = Endpoint::from_shared(url.to_string()).expect("valid endpoint");
             assert_eq!(endpoint_allows_onion_services(&endpoint), expected, "{url}");
         }
+    }
+
+    #[test]
+    fn block_downloads_never_go_direct_to_an_onion_service() {
+        for (url, expected) in [
+            ("https://zec.rocks:443", true),
+            ("https://lightwalletd.example.onion:443", false),
+            ("https://LIGHTWALLETD.EXAMPLE.ONION:443", false),
+            ("https://lightwalletd.example.onion.:443", false),
+        ] {
+            assert_eq!(block_download_can_go_direct(url), expected, "{url}");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_block_download_opener_refuses_an_onion_service_before_dialing() {
+        let error = open_block_download_lwd_transport("https://lightwalletd.example.onion:443")
+            .await
+            .expect_err("an onion service is reachable only over Tor");
+        let message = error.to_string();
+        assert!(
+            !message.contains("gRPC connect failed"),
+            "the opener dialed the onion service: {message}"
+        );
     }
 
     #[tokio::test]
@@ -1284,6 +1567,114 @@ mod tests {
         assert!(error.to_string().contains("range exceeds memory limit"));
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn foreground_compact_blocks_reject_a_trickle_that_never_hits_the_idle_timeout() {
+        let stream = futures::stream::unfold(10u64, |height| async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            Some((Ok(compact_block(height)), height + 1))
+        });
+        let mut stream = Box::pin(stream);
+        let started = tokio::time::Instant::now();
+        let error = collect_compact_blocks_with_budget(
+            &mut stream,
+            10,
+            109,
+            Duration::from_millis(30),
+            None,
+            Some(DownloadBudget {
+                grace: Duration::from_millis(60),
+                min_bytes_per_second: 4096,
+                ceiling: Duration::from_millis(200),
+            }),
+        )
+        .await
+        .unwrap_err();
+        assert!(is_slow_endpoint_error(&error), "{error}");
+        assert!(started.elapsed() < Duration::from_millis(70));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn foreground_download_budget_allows_larger_responsive_blocks_more_transfer_time() {
+        let stream = futures::stream::unfold(10u64, |height| async move {
+            match height {
+                10 => {
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+                    Some((
+                        Ok(CompactBlock {
+                            hash: vec![0; 64 * 1024],
+                            ..compact_block(height)
+                        }),
+                        height + 1,
+                    ))
+                }
+                11 => {
+                    tokio::time::sleep(Duration::from_millis(60)).await;
+                    Some((Ok(compact_block(height)), height + 1))
+                }
+                _ => None,
+            }
+        });
+        let mut stream = Box::pin(stream);
+        let blocks = collect_compact_blocks_with_budget(
+            &mut stream,
+            10,
+            11,
+            Duration::from_millis(100),
+            None,
+            Some(DownloadBudget {
+                grace: Duration::from_millis(20),
+                min_bytes_per_second: 4096,
+                ceiling: Duration::from_millis(200),
+            }),
+        )
+        .await
+        .unwrap();
+        assert_eq!(blocks.len(), 2);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn foreground_download_ceiling_bounds_a_stream_even_when_bytes_buy_more_time() {
+        let stream = futures::stream::unfold(10u64, |height| async move {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            Some((
+                Ok(CompactBlock {
+                    hash: vec![0; 64 * 1024],
+                    ..compact_block(height)
+                }),
+                height + 1,
+            ))
+        });
+        let mut stream = Box::pin(stream);
+        let started = tokio::time::Instant::now();
+        let error = collect_compact_blocks_with_budget(
+            &mut stream,
+            10,
+            109,
+            Duration::from_millis(30),
+            None,
+            Some(DownloadBudget {
+                grace: Duration::from_millis(20),
+                min_bytes_per_second: 4096,
+                ceiling: Duration::from_millis(50),
+            }),
+        )
+        .await
+        .unwrap_err();
+        assert!(is_slow_endpoint_error(&error), "{error}");
+        assert_eq!(started.elapsed(), Duration::from_millis(50));
+    }
+
+    #[test]
+    fn only_sustained_slow_download_errors_bypass_same_endpoint_retries() {
+        assert!(is_slow_endpoint_error(&slow_download_error()));
+        assert!(!is_slow_endpoint_error(&SyncError::net(
+            "get_block_range: unavailable"
+        )));
+        assert!(!is_slow_endpoint_error(&SyncError::other(
+            SLOW_DOWNLOAD_PREFIX
+        )));
+    }
+
     #[tokio::test]
     async fn compact_block_stream_propagates_status_and_idle_timeout() {
         let mut failed_stream = futures::stream::iter([
@@ -1306,6 +1697,116 @@ mod tests {
         assert!(
             matches!(timeout_error, SyncError::Network(message) if message.contains("timed out"))
         );
+    }
+
+    fn shard_roots(indices: &[u64]) -> Vec<Address> {
+        indices
+            .iter()
+            .map(|&index| Address::from_parts(incrementalmerkletree::Level::new(16), index))
+            .collect()
+    }
+
+    #[test]
+    fn next_subtree_index_is_the_second_to_last_shard_root() {
+        assert_eq!(next_subtree_index(&[]), 0);
+        assert_eq!(next_subtree_index(&shard_roots(&[0])), 0);
+        assert_eq!(next_subtree_index(&shard_roots(&[7])), 0);
+        assert_eq!(next_subtree_index(&shard_roots(&[0, 1])), 0);
+        assert_eq!(next_subtree_index(&shard_roots(&[0, 1, 2])), 1);
+        // The index is the stored address, not the position in the list.
+        assert_eq!(next_subtree_index(&shard_roots(&[4, 9, 12])), 9);
+    }
+
+    const ROOTS_BIRTHDAY: u32 = 2_000_000;
+
+    /// A wallet with one account and `counts` (Sapling, Orchard, Ironwood)
+    /// downloaded subtree roots, the last completed after the birthday.
+    fn wallet_with_roots(counts: (u32, u32, u32)) -> (tempfile::TempDir, WalletDatabase) {
+        use incrementalmerkletree::{Hashable, Level};
+        use orchard::tree::MerkleHashOrchard;
+        use zcash_client_backend::data_api::WalletWrite;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("wallet.db").to_str().unwrap().to_string();
+        let network = WalletNetwork::Main;
+        let seed = crate::wallet::keys::mnemonic_to_seed(&crate::wallet::keys::generate_mnemonic())
+            .unwrap();
+        crate::wallet::keys::init_db_and_create_account(
+            &path,
+            network,
+            &seed,
+            Some(u64::from(ROOTS_BIRTHDAY)),
+            "roots",
+        )
+        .unwrap();
+        let mut db = crate::wallet::db::open_wallet_db_with_timeout(
+            &path,
+            network,
+            crate::wallet::db::SYNC_DB_BUSY_TIMEOUT,
+        )
+        .unwrap();
+        db.update_chain_tip(BlockHeight::from_u32(ROOTS_BIRTHDAY + 100))
+            .unwrap();
+
+        // Distinct hashes (stored root hashes are unique), completed every 10
+        // blocks, the last one 5 blocks after the birthday.
+        fn roots<H: Hashable>(count: u32) -> Vec<CommitmentTreeRoot<H>> {
+            (0..count)
+                .map(|i| {
+                    let end = ROOTS_BIRTHDAY + 5 + 10 * i - 10 * (count - 1);
+                    let hash = H::empty_root(Level::new(i as u8));
+                    CommitmentTreeRoot::from_parts(BlockHeight::from_u32(end), hash)
+                })
+                .collect()
+        }
+        let (sapling, orchard, ironwood) = counts;
+        db.put_sapling_subtree_roots(0, &roots::<sapling_crypto::Node>(sapling))
+            .unwrap();
+        db.put_orchard_subtree_roots(0, &roots::<MerkleHashOrchard>(orchard))
+            .unwrap();
+        db.put_ironwood_subtree_roots(0, &roots::<MerkleHashOrchard>(ironwood))
+            .unwrap();
+        (dir, db)
+    }
+
+    #[test]
+    fn next_subtree_indices_match_the_wallet_summary() {
+        use zcash_client_backend::data_api::WalletRead;
+
+        for (counts, expected) in [
+            ((0, 0, 0), (0, 0, 0)),
+            ((1, 1, 1), (0, 0, 0)),
+            ((2, 1, 0), (0, 0, 0)),
+            ((5, 3, 4), (3, 1, 2)),
+        ] {
+            let (_dir, mut db) = wallet_with_roots(counts);
+            let summary = db
+                .get_wallet_summary(crate::wallet::confirmations_policy())
+                .unwrap();
+            // Without roots there is no progress estimate and so no summary;
+            // downloads then started from 0.
+            assert_eq!(summary.is_some(), counts != (0, 0, 0), "{counts:?}");
+            assert_eq!(
+                summary.map_or((0, 0, 0), |s| (
+                    s.next_sapling_subtree_index(),
+                    s.next_orchard_subtree_index(),
+                    s.next_ironwood_subtree_index(),
+                )),
+                expected,
+                "summary for {counts:?}",
+            );
+            assert_eq!(
+                next_subtree_indices(&mut db, true).unwrap(),
+                expected,
+                "{counts:?}"
+            );
+            // Before Ironwood activation its tree is not read.
+            assert_eq!(
+                next_subtree_indices(&mut db, false).unwrap(),
+                (expected.0, expected.1, 0),
+                "{counts:?}",
+            );
+        }
     }
 }
 

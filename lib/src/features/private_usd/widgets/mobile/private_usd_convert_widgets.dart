@@ -21,6 +21,7 @@ import '../../private_usd_copy.dart';
 import '../../services/private_usd_zec_quote_search.dart';
 import 'private_usd_flow_widgets.dart';
 import 'private_usd_logo.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// The side of an asset's logo beside a panel's caption.
 const _captionLogoSize = 20.0;
@@ -28,7 +29,7 @@ const _captionLogoSize = 20.0;
 /// A panel's caption as a red HUD caption: the asset it holds, after the
 /// asset's logo, or what the panel is about.
 class PrivateUsdPanelCaption extends StatelessWidget {
-  const PrivateUsdPanelCaption(this.text, {this.logo, super.key});
+  const PrivateUsdPanelCaption(String this.text, {this.logo, super.key});
 
   const PrivateUsdPanelCaption.zec({super.key})
     : text = PrivateUsdCopy.convertAssetZec,
@@ -39,17 +40,18 @@ class PrivateUsdPanelCaption extends StatelessWidget {
       );
 
   const PrivateUsdPanelCaption.privateUsd({super.key})
-    : text = PrivateUsdCopy.title,
+    : text = null,
       logo = const PrivateUsdLogo(size: _captionLogoSize);
 
-  final String text;
+  /// The caption; the feature's name when null.
+  final String? text;
   final Widget? logo;
 
   @override
   Widget build(BuildContext context) {
     final glow = context.colors.neon.glow;
     final caption = Text(
-      text.toUpperCase(),
+      (text ?? context.l10n.privateUsdTitle).toUpperCase(),
       style: kNeonHudCaptionStyle.copyWith(
         color: glow,
         shadows: Neon.textGlow(glow, intensity: 0.3),
@@ -172,13 +174,13 @@ class PrivateUsdAmountPanel extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  PrivateUsdCopy.availableAmount(available),
+                  context.l10n.privateUsdAvailableAmount(available),
                   key: ValueKey('${keyPrefix}_available'),
                   style: small.copyWith(color: colors.text.secondary),
                 ),
               ),
               Semantics(
-                label: PrivateUsdCopy.useAvailable,
+                label: context.l10n.privateUsdUseAvailable,
                 button: true,
                 excludeSemantics: true,
                 child: AppButton(
@@ -186,7 +188,7 @@ class PrivateUsdAmountPanel extends StatelessWidget {
                   variant: AppButtonVariant.secondary,
                   size: AppButtonSize.small,
                   onPressed: onMax,
-                  child: const Text(PrivateUsdCopy.max),
+                  child: Text(context.l10n.privateUsdMax),
                 ),
               ),
             ],
@@ -249,7 +251,7 @@ class PrivateUsdEstimatePanel extends StatelessWidget {
             NeonCipherChurn(
               key: const ValueKey('mobile_private_usd_convert_receive'),
               style: cipherStyle,
-              semanticsLabel: PrivateUsdCopy.convertQuoteLoading,
+              semanticsLabel: context.l10n.privateUsdConvertQuoteLoading,
             )
           else
             NeonScrambleText(
@@ -266,12 +268,15 @@ class PrivateUsdEstimatePanel extends StatelessWidget {
             ),
           const SizedBox(height: AppSpacing.xxs),
           _UnderAmountLine(
-            text: PrivateUsdCopy.convertEstimatedAmount,
+            text: context.l10n.privateUsdConvertEstimatedAmount,
             marketValue: marketValue,
           ),
           if (available != null) ...[
             const SizedBox(height: AppSpacing.s),
-            Text(PrivateUsdCopy.availableAmount(available), style: small),
+            Text(
+              context.l10n.privateUsdAvailableAmount(available),
+              style: small,
+            ),
           ],
         ],
       ),
@@ -384,7 +389,7 @@ class _PrivateUsdDirectionToggleState extends State<PrivateUsdDirectionToggle>
           Semantics(
             button: true,
             enabled: enabled,
-            label: PrivateUsdCopy.convertSwapDirection,
+            label: context.l10n.privateUsdConvertSwapDirection,
             excludeSemantics: true,
             child: GestureDetector(
               key: const ValueKey('mobile_private_usd_convert_direction'),
@@ -478,7 +483,8 @@ class PrivateUsdQuoteExpiry extends StatelessWidget {
           rule(toRight: true),
           const SizedBox(width: AppSpacing.s),
           Text(
-            (expired ? PrivateUsdCopy.quoteExpired : label).toUpperCase(),
+            (expired ? context.l10n.privateUsdQuoteExpired : label)
+                .toUpperCase(),
             style: kNeonHudCaptionStyle.copyWith(
               color: expired ? colors.text.destructive : colors.text.secondary,
             ),
@@ -520,27 +526,30 @@ class PrivateUsdQuoteLedger extends StatelessWidget {
     final rows = <(String, String)>[
       if (showsTotal)
         (
-          PrivateUsdCopy.convertYouPay,
+          context.l10n.privateUsdConvertYouPay,
           _masked(ZecAmount.fromZatoshi(quote.totalZat).activity.toString()),
         ),
       (
-        PrivateUsdCopy.convertNetworkFee,
+        context.l10n.commonNetworkFee,
         _masked(ZecAmount.fromZatoshi(quote.feeZat).activity.toString()),
       ),
       if (showsTotal)
         (
-          PrivateUsdCopy.convertYouReceive,
+          context.l10n.privateUsdConvertYouReceive,
           _masked(formatPrivateUsd(quote.receives)),
         ),
       (
-        PrivateUsdCopy.convertFees,
-        PrivateUsdCopy.convertFeesValue(
+        context.l10n.privateUsdConvertFees,
+        context.l10n.privateUsdConvertFeesValue(
           formatPrivateUsd(quote.relayerFee),
           kPrivateUsdRailgunFeePercent,
         ),
       ),
       if (networkCost != null && networkCost > BigInt.zero)
-        (PrivateUsdCopy.convertMakerCost, formatPrivateUsd(networkCost)),
+        (
+          context.l10n.privateUsdConvertMakerCost,
+          formatPrivateUsd(networkCost),
+        ),
     ];
     return PrivateUsdLedgerCard(
       key: const ValueKey('mobile_private_usd_quote_ledger'),
@@ -582,23 +591,26 @@ class PrivateUsdReverseLedger extends StatelessWidget {
     final networkCost = BigInt.tryParse(record.networkCost ?? '');
     final rows = <(String, String)>[
       (
-        PrivateUsdCopy.reverseEscrow,
+        context.l10n.privateUsdReverseEscrow,
         _masked(formatPrivateUsd(BigInt.parse(record.amount))),
       ),
       if (cost != null) ...[
         (
-          PrivateUsdCopy.reverseRailgunFee,
+          context.l10n.privateUsdReverseRailgunFee,
           formatPrivateUsdNearest(BigInt.parse(cost.railgunFee)),
         ),
         (
-          PrivateUsdCopy.reverseBroadcasterFee,
+          context.l10n.privateUsdReverseBroadcasterFee,
           formatPrivateUsdNearest(BigInt.parse(cost.broadcasterFee)),
         ),
       ],
       if (networkCost != null && networkCost > BigInt.zero)
-        (PrivateUsdCopy.convertMakerCost, formatPrivateUsd(networkCost)),
+        (
+          context.l10n.privateUsdConvertMakerCost,
+          formatPrivateUsd(networkCost),
+        ),
       (
-        PrivateUsdCopy.reverseReceiveEstimate,
+        context.l10n.privateUsdReverseReceiveEstimate,
         _masked(
           ZecAmount.fromZatoshi(
             privateUsdReverseReceivedZat(

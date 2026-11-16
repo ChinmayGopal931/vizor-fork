@@ -1,12 +1,12 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_messages.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_attestation.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_tokens_service.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 
 import 'support/fake_private_usd_backend.dart';
+import '../../support/test_l10n.dart';
 
 // The makers' Privacy Pass tokens (plan M4): the attestation channel's
 // answers, the two-phase issuance with its one repeat, and the copy for each
@@ -129,32 +129,44 @@ void main() {
 
   test('every way tokens can fail has its own words', () {
     expect(
-      privateUsdErrorMessage(ApiPrivateUsdErrorCode.noTokensToday),
-      PrivateUsdCopy.tokensNoneToday,
+      privateUsdErrorMessage(testL10n, ApiPrivateUsdErrorCode.noTokensToday),
+      testL10n.privateUsdTokensNoneToday,
     );
     expect(
-      privateUsdErrorMessage(ApiPrivateUsdErrorCode.tokensDeviceRefused),
-      PrivateUsdCopy.tokensDeviceRefused,
+      privateUsdErrorMessage(
+        testL10n,
+        ApiPrivateUsdErrorCode.tokensDeviceRefused,
+      ),
+      testL10n.privateUsdTokensDeviceRefused,
     );
     expect(
-      privateUsdErrorMessage(ApiPrivateUsdErrorCode.tokensUnreachable),
-      PrivateUsdCopy.tokensUnreachable,
+      privateUsdErrorMessage(
+        testL10n,
+        ApiPrivateUsdErrorCode.tokensUnreachable,
+      ),
+      testL10n.privateUsdTokensUnreachable,
     );
     expect(
-      privateUsdErrorMessage(ApiPrivateUsdErrorCode.keystore),
-      PrivateUsdCopy.tokensKeystore,
+      privateUsdErrorMessage(testL10n, ApiPrivateUsdErrorCode.keystore),
+      testL10n.privateUsdTokensKeystore,
     );
     expect(
-      privateUsdProblemMessage(ApiPrivateUsdErrorCode.tokensNeeded),
-      PrivateUsdCopy.convertProblemTokens,
+      privateUsdProblemMessage(testL10n, ApiPrivateUsdErrorCode.tokensNeeded),
+      testL10n.privateUsdConvertProblemTokens,
     );
     expect(
-      privateUsdAttestationMessage(PrivateUsdAttestationErrorCode.unavailable),
-      PrivateUsdCopy.tokensUnavailable,
+      privateUsdAttestationMessage(
+        testL10n,
+        PrivateUsdAttestationErrorCode.unavailable,
+      ),
+      testL10n.privateUsdTokensUnavailable,
     );
     expect(
-      privateUsdAttestationMessage(PrivateUsdAttestationErrorCode.keystore),
-      PrivateUsdCopy.tokensKeystore,
+      privateUsdAttestationMessage(
+        testL10n,
+        PrivateUsdAttestationErrorCode.keystore,
+      ),
+      testL10n.privateUsdTokensKeystore,
     );
   });
 }

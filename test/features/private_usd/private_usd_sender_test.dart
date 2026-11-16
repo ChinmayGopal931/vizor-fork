@@ -4,7 +4,6 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_send.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_sender.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_spend_guard.dart';
@@ -13,6 +12,7 @@ import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
 
 import 'support/fake_private_usd_backend.dart';
+import '../../support/test_l10n.dart';
 
 const _account = 'account-1';
 const _proxy = '0xfa7093cdd9ee6932b4eb2c9e1cde7ce00b1fa4b9';
@@ -221,9 +221,9 @@ void main() {
     expect(
       capped,
       isA<PrivateUsdSendNotSent>().having(
-        (o) => o.message,
+        (o) => o.message?.call(testL10n),
         'message',
-        PrivateUsdCopy.sendErrorFeeCap,
+        testL10n.privateUsdSendErrorFeeCap,
       ),
     );
     h.page.fee = BigInt.from(700000);

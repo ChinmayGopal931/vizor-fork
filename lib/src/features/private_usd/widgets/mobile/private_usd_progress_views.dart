@@ -19,7 +19,6 @@ import '../../../swap/widgets/mobile/mobile_swap_status_content.dart';
 import '../../models/private_usd_record_key.dart';
 import '../../models/private_usd_reverse_presentation.dart';
 import '../../models/private_usd_status_presentation.dart';
-import '../../private_usd_copy.dart';
 import '../../providers/private_usd_engine_provider.dart';
 import '../../providers/private_usd_keep_awake_provider.dart';
 import '../../providers/private_usd_reverse_conversion_provider.dart';
@@ -27,6 +26,7 @@ import 'private_usd_bridged_hero.dart';
 import 'private_usd_convert_widgets.dart';
 import 'private_usd_flow_widgets.dart';
 import 'private_usd_logo.dart';
+import '../../../../core/l10n/l10n.dart';
 
 const _loading = Center(
   child: AppLoadingIcon(
@@ -91,7 +91,7 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
     final action = presentation?.action;
     final error = callOffError;
     return PrivateUsdFlowScaffold(
-      title: presentation?.title ?? PrivateUsdCopy.convertProgressTitle,
+      title: presentation?.title ?? context.l10n.privateUsdConvertProgressTitle,
       onBack: onBack,
       onInfo: onInfo,
       body: presentation == null
@@ -118,7 +118,7 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
                     leading: callingOff
                         ? const AppLoadingIcon(size: AppIconSize.medium)
                         : null,
-                    child: const Text(PrivateUsdCopy.convertCallOff),
+                    child: Text(context.l10n.privateUsdConvertCallOff),
                   ),
                 if (error != null)
                   MobileWarningNotice(
@@ -145,9 +145,9 @@ class MobilePrivateUsdConversionView extends StatelessWidget {
               },
               child: Text(switch (action) {
                 PrivateUsdProgressAction.viewBalance =>
-                  PrivateUsdCopy.convertResultViewBalance,
+                  context.l10n.privateUsdConvertResultViewBalance,
                 PrivateUsdProgressAction.tryAgain =>
-                  PrivateUsdCopy.convertResultTryAgain,
+                  context.l10n.commonTryAgain,
               }),
             ),
     );
@@ -216,7 +216,7 @@ class MobilePrivateUsdReverseConversionView extends StatelessWidget {
         acting == PrivateUsdReverseUserStep.readying &&
         presentation?.action == PrivateUsdReverseAction.authorizeSettlement;
     return PrivateUsdFlowScaffold(
-      title: presentation?.title ?? PrivateUsdCopy.convertProgressTitle,
+      title: presentation?.title ?? context.l10n.privateUsdConvertProgressTitle,
       onBack: onBack,
       onInfo: onInfo,
       body: presentation == null
@@ -256,7 +256,7 @@ class MobilePrivateUsdReverseConversionView extends StatelessWidget {
                     variant: AppButtonVariant.secondary,
                     expand: true,
                     onPressed: onViewRefunds,
-                    child: const Text(PrivateUsdCopy.refundsView),
+                    child: Text(context.l10n.privateUsdRefundsView),
                   ),
               ],
               provingNote: presentation.provingNote,
@@ -423,11 +423,13 @@ class PrivateUsdProgressBody extends StatelessWidget {
         MobileSwapStatusContent(
           presentation: status,
           payHeaderRow: _headerRow(
+            context.l10n,
             status.payLabel,
             payAmountText,
             status.payAsset,
           ),
           receiveHeaderRow: _headerRow(
+            context.l10n,
             status.receiveLabel,
             receiveAmountText,
             status.receiveAsset,
@@ -453,6 +455,7 @@ class PrivateUsdProgressBody extends StatelessWidget {
   // Private USD's logo stands for USDC on Ethereum, and each amount is
   // named for the side it is on.
   static MobileSwapReviewHeaderRow _headerRow(
+    AppLocalizations l10n,
     String label,
     String amountText,
     SwapAsset asset,
@@ -462,8 +465,8 @@ class PrivateUsdProgressBody extends StatelessWidget {
     asset: asset,
     icon: privateUsdHeaderIcon(asset),
     bottomText: asset == SwapAsset.zec
-        ? PrivateUsdCopy.shieldedZec
-        : PrivateUsdCopy.title,
+        ? l10n.privateUsdShieldedZec
+        : l10n.privateUsdTitle,
   );
 }
 
@@ -497,7 +500,7 @@ class PrivateUsdProblemCard extends StatelessWidget {
               const SizedBox(width: AppSpacing.xs),
               Expanded(
                 child: Text(
-                  PrivateUsdCopy.convertProblemTitle,
+                  context.l10n.privateUsdConvertProblemTitle,
                   style: AppTypography.labelLarge.copyWith(
                     color: colors.text.accent,
                   ),
@@ -518,7 +521,7 @@ class PrivateUsdProblemCard extends StatelessWidget {
             variant: AppButtonVariant.secondary,
             size: AppButtonSize.medium,
             onPressed: onRetry,
-            child: const Text(PrivateUsdCopy.convertProblemRetry),
+            child: Text(context.l10n.privateUsdConvertProblemRetry),
           ),
         ],
       ),
@@ -553,10 +556,10 @@ class PrivateUsdKeepOpenCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const PrivateUsdPanelCaption(PrivateUsdCopy.keepOpenTitle),
+          PrivateUsdPanelCaption(context.l10n.privateUsdKeepOpenTitle),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            PrivateUsdCopy.keepOpenBody,
+            context.l10n.privateUsdKeepOpenBody,
             style: AppTypography.bodySmall.copyWith(
               color: colors.text.secondary,
             ),
@@ -565,7 +568,7 @@ class PrivateUsdKeepOpenCard extends StatelessWidget {
           Semantics(
             button: true,
             toggled: keepScreenOn,
-            label: PrivateUsdCopy.keepScreenOn,
+            label: context.l10n.privateUsdKeepScreenOn,
             onTap: toggle,
             excludeSemantics: true,
             child: GestureDetector(
@@ -584,7 +587,7 @@ class PrivateUsdKeepOpenCard extends StatelessWidget {
                     const SizedBox(width: AppSpacing.xs),
                     Expanded(
                       child: Text(
-                        PrivateUsdCopy.keepScreenOn,
+                        context.l10n.privateUsdKeepScreenOn,
                         style: AppTypography.labelLarge.copyWith(
                           color: colors.text.accent,
                         ),

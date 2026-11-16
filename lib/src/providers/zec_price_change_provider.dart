@@ -31,8 +31,8 @@ final kVizorCoinGeckoUserAgent = _dartUserAgent();
 String _dartUserAgent() {
   final version = RegExp(r'^(\d+)\.(\d+)').firstMatch(Platform.version);
   return version == null
-      ? 'Dart (dart:io)'
-      : 'Dart/${version[1]}.${version[2]} (dart:io)';
+      ? 'Dart (dart:io)' // l10n-ignore: HTTP header
+      : 'Dart/${version[1]}.${version[2]} (dart:io)'; // l10n-ignore: HTTP header
 }
 
 const zecMarketDataRefreshInterval = Duration(minutes: 3);
@@ -146,7 +146,7 @@ class CoinGeckoZecMarketDataSource implements ZecMarketDataSource {
     final endpoint = coinGeckoSimplePriceUri(_baseUri);
     try {
       final response = await _client.request(
-        'GET',
+        'GET', // l10n-ignore: API query value
         endpoint,
         headers: {
           HttpHeaders.acceptHeader: 'application/json',
@@ -173,7 +173,7 @@ Uri coinGeckoSimplePriceUri(Uri baseUri) {
     path: '$basePath/simple/price',
     queryParameters: const {
       'ids': 'zcash',
-      'names': 'Zcash',
+      'names': 'Zcash', // l10n-ignore: API query value
       'symbols': 'zec',
       'vs_currencies': 'usd',
       'include_24hr_change': 'true',

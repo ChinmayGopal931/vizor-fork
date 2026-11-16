@@ -88,7 +88,8 @@ pub(crate) fn register_joint_account(
             "a joint viewing key holds an Orchard key and nothing else",
         );
     }
-    let birthday = keys::make_birthday(network, Some(u64::from(birthday_height)));
+    let birthday = keys::make_birthday(network, Some(u64::from(birthday_height)))
+        .map_err(|error| PrivateUsdError::new(ErrorCode::Other, error))?;
 
     with_operations(|| {
         keys::ensure_db_migrated_once(joint_db, network).map_err(wallet_error)?;
@@ -212,14 +213,21 @@ async fn fresh_tip(
     network: WalletNetwork,
     cancel: &AtomicBool,
 ) -> Result<u64> {
+    let scope = sync_engine::TipRequestScope::capture();
     let mut client = sync_engine::open_lwd_channel_with_cancel(lightwalletd_url, || {
         cancel.load(Ordering::Relaxed)
     })
     .await
     .map_err(|error| wallet_error(format!("read the chain tip: {error}")))?;
-    let tip = sync_engine::get_latest_block_recorded(&mut client, lightwalletd_url, network)
-        .await
-        .map_err(|error| wallet_error(format!("read the chain tip: {error}")))?;
+    let tip = sync_engine::get_latest_block_recorded(
+        &mut client,
+        lightwalletd_url,
+        network,
+        scope,
+        || cancel.load(Ordering::Relaxed),
+    )
+    .await
+    .map_err(|error| wallet_error(format!("read the chain tip: {error}")))?;
     Ok(tip.height)
 }
 

@@ -3,9 +3,11 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/models/portfolio_chart_models.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/widgets/mobile/mobile_portfolio_chart_card.dart';
+import '../../support/test_l10n.dart';
 
 PortfolioChartData _data({
   PortfolioChartMode mode = PortfolioChartMode.usd,
@@ -24,6 +26,7 @@ PortfolioChartData _data({
 
 Widget _card(PortfolioChartViewState state) {
   return MaterialApp(
+    localizationsDelegates: appLocalizationsDelegates,
     builder: (context, child) =>
         AppTheme(data: AppThemeData.dark, child: child!),
     home: Scaffold(
@@ -90,6 +93,7 @@ void main() {
     final picked = <PortfolioChartRange>[];
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         builder: (context, child) =>
             AppTheme(data: AppThemeData.dark, child: child!),
         home: Scaffold(
@@ -108,7 +112,7 @@ void main() {
       find.byKey(const ValueKey('mobile_home_portfolio_chart_range_All')),
     );
     expect(picked, [PortfolioChartRange.all]);
-    expect(PortfolioChartRange.all.description, 'All time');
+    expect(PortfolioChartRange.all.description(testL10n), 'All time');
   });
 
   testWidgets('dragging along a daily price shows the UTC day it belongs to', (

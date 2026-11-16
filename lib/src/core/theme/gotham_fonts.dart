@@ -26,7 +26,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// The family name every `TextStyle` in the app uses.
-const kGothamFamily = 'Gotham';
+const kGothamFamily = 'Gotham'; // l10n-ignore: font family name
 
 /// The bundled faces and the CSS weight each one must resolve as.
 const gothamFaces = <({String asset, int weight})>[

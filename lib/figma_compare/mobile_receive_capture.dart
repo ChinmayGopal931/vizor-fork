@@ -15,6 +15,7 @@ import '../src/providers/account_provider.dart';
 import '../src/providers/receive_address_provider.dart';
 import '../src/providers/sync_provider.dart';
 import '../src/services/native_mobile_navigation_geometry.dart';
+import '../src/core/l10n/l10n.dart';
 
 /// Real receive widgets and pane geometry, with no storage, network or Rust.
 class MobileReceiveCapture extends StatelessWidget {
@@ -107,10 +108,10 @@ class MobileReceiveCapture extends StatelessWidget {
                           height: 40,
                           child: Center(child: Text('M')),
                         ),
-                        sync: const NeonSyncLine(
+                        sync: NeonSyncLine(
                           progress: 1,
-                          readout: NeonSyncReadout.synced,
-                          semanticsLabel: 'Veylor is synced',
+                          readout: NeonSyncReadout.synced(context.l10n),
+                          semanticsLabel: context.l10n.syncVizorSynced,
                         ),
                         currentPath: '/receive',
                         swapEnabled: true,

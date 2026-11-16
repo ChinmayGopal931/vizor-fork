@@ -7,6 +7,11 @@ import 'dart:io';
 
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
+import 'package:zcash_wallet/src/features/swap/domain/near_intents_service_status.dart';
+import 'package:zcash_wallet/src/features/swap/providers/near_intents_service_status_provider.dart';
+
+import 'support/service_status_fixture.dart';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
@@ -52,6 +57,7 @@ import 'package:zcash_wallet/src/features/activity/screens/swap_activity_detail_
 import 'package:zcash_wallet/src/features/pay/screens/pay_screen.dart';
 import 'package:zcash_wallet/src/features/ledger/services/ledger_signing_service.dart';
 import 'package:zcash_wallet/src/features/ledger/services/ledger_signed_operation_service.dart';
+import 'package:zcash_wallet/src/features/swap/screens/mobile/mobile_swap_screen.dart';
 import 'package:zcash_wallet/src/features/swap/screens/swap_review_screen.dart';
 import 'package:zcash_wallet/src/features/swap/screens/swap_screen.dart';
 import 'package:zcash_wallet/src/features/swap/widgets/swap_amount_text.dart';
@@ -70,13 +76,81 @@ import 'package:zcash_wallet/src/rust/api/sync.dart' as rust_sync;
 
 import 'support/swap_activity_fixture_intents.dart';
 
+import '../../support/localized_test_scope.dart';
+import '../../support/test_l10n.dart';
 import '../../support/leading_decimal_input.dart';
+
 import 'package:zcash_wallet/src/core/zcash/network_upgrade_hold.dart';
 import 'package:zcash_wallet/src/providers/network_upgrade_window_provider.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 
 part 'support/swap_screen_test_fakes.dart';
 
 void main() {
+  testWidgets(
+    'service notice is dismissible and does not change desktop Swap eligibility',
+    (tester) async {
+      await _setDesktopViewport(tester);
+      await tester.pumpWidget(
+        _routerHarness(
+          GoRouter(initialLocation: '/swap', routes: [_swapRoute()]),
+          serviceStatus: serviceStatusFixture(windows: 5),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Swaps may not work right now.'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('near_intents_service_notice_ok')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('near_intents_service_notice')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('swap_review_button')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'service notice is advisory and only on the desktop Pay amount step',
+    (tester) async {
+      await _setDesktopViewport(tester);
+      await tester.pumpWidget(
+        _routerHarness(
+          GoRouter(initialLocation: '/pay', routes: [_payRoute()]),
+          serviceStatus: serviceStatusFixture(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Payments may not work right now.'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey('near_intents_service_notice_ok')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('pay_amount_input')),
+        '10',
+      );
+      await tester.pumpAndSettle();
+      final button = find.byKey(const ValueKey('pay_amount_continue_button'));
+      expect(tester.widget<AppButton>(button).onPressed, isNotNull);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('pay_recipient_search_field')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('near_intents_service_notice')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   test('swapIntentProvider uses the Vizor proxy and referral', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -1191,7 +1265,7 @@ void main() {
     expect(state.externalAsset, savedBaseUsdc);
     expect(container.read(paySelectedAssetProvider), savedBaseUsdc);
     expect(
-      state.externalAssetSupportError,
+      state.externalAssetSupportError(testL10n),
       'USDC on Base is not currently supported.',
     );
     expect(find.byKey(const ValueKey('pay_amount_error')), findsOneWidget);
@@ -1417,6 +1491,7 @@ void main() {
           details: const [
             SwapStatusDetailRowData(
               label: 'USDC deposit to',
+              kind: SwapStatusDetailKind.depositAddress,
               value: '0x123kjhc ... 4x98g20',
               copyable: true,
             ),
@@ -1426,10 +1501,12 @@ void main() {
             ),
             SwapStatusDetailRowData(
               label: 'Timestamp',
+              kind: SwapStatusDetailKind.timestamp,
               value: 'May 20, 2026 13:20',
             ),
             SwapStatusDetailRowData(
               label: 'Total fees',
+              kind: SwapStatusDetailKind.totalFees,
               value: '~0.25 USDC',
               help: true,
             ),
@@ -1480,14 +1557,17 @@ void main() {
           details: const [
             SwapStatusDetailRowData(
               label: 'Refund to',
+              kind: SwapStatusDetailKind.refundTo,
               value: '0x123kjhc ... 4x98g20',
             ),
             SwapStatusDetailRowData(
               label: 'Timestamp',
+              kind: SwapStatusDetailKind.timestamp,
               value: 'May 20, 2026 13:20',
             ),
             SwapStatusDetailRowData(
               label: 'Total fees',
+              kind: SwapStatusDetailKind.totalFees,
               value: '~0.25 USDC',
               help: true,
             ),
@@ -1634,9 +1714,9 @@ void main() {
     expect(find.text('Slippage tolerance'), findsOneWidget);
     expect(find.text('Guaranteed minimum'), findsOneWidget);
     expect(find.text('Price protection'), findsNothing);
-    expect(_tooltipWithMessage(swapFeeTooltip), findsOneWidget);
+    expect(_tooltipWithMessage(swapFeeTooltip(testL10n)), findsOneWidget);
     expect(
-      _tooltipWithMessage(swapGenericMinimumReceiveTooltip),
+      _tooltipWithMessage(swapGenericMinimumReceiveTooltip(testL10n)),
       findsOneWidget,
     );
 
@@ -1716,6 +1796,12 @@ void main() {
       expect(amountAssetIcon.showChainBadge, isTrue);
       expect(find.text('New address'), findsOneWidget);
       expect(find.text('0x529084...e4169ee7'), findsOneWidget);
+      expect(find.text('Payment progress'), findsOneWidget);
+      expect(find.text('View on NEAR Intents'), findsOneWidget);
+      expect(find.text('ZEC spent'), findsOneWidget);
+      expect(find.text('Tx ID'), findsNothing);
+      await tester.tap(find.text('Transaction details'));
+      await tester.pumpAndSettle();
       expect(find.text('In progress'), findsOneWidget);
       expect(find.text('Timestamp'), findsOneWidget);
       expect(find.text('Tx ID'), findsOneWidget);
@@ -1723,16 +1809,10 @@ void main() {
       expect(find.text('2.45125 ZEC'), findsOneWidget);
       expect(find.text('Tx fee'), findsOneWidget);
       expect(find.text('Not reported'), findsOneWidget);
-      expect(find.byKey(const ValueKey('swap_status_tabs')), findsNothing);
+      expect(find.byKey(const ValueKey('swap_status_tabs')), findsOneWidget);
       expect(find.byKey(const ValueKey('swap_review_info')), findsNothing);
       expect(find.byKey(const ValueKey('pay_status_summary')), findsNothing);
 
-      expect(
-        tester.getSize(
-          find.byKey(const ValueKey('pay_activity_status_content')),
-        ),
-        const Size(396, 549),
-      );
       expect(
         tester.getSize(find.byKey(const ValueKey('pay_status_review_info'))),
         const Size(396, 204),
@@ -1841,6 +1921,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.text('Transaction details'));
+      await tester.pumpAndSettle();
       expect(find.text('0.00015 ZEC'), findsOneWidget);
 
       await tester.pumpWidget(const SizedBox.shrink());
@@ -1873,6 +1955,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(find.text('Transaction details'));
+      await tester.pumpAndSettle();
       expect(find.text('0.00015 ZEC'), findsNothing);
       final txFeeRow = tester.widget<ReviewListRow>(
         find.byWidgetPredicate(
@@ -1930,6 +2014,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('Transaction details'));
+    await tester.pumpAndSettle();
     expect(find.text('0.00015 ZEC'), findsOneWidget);
     expect(requests, [
       (accountUuid: 'account-1', walletTxid: depositWalletOrder),
@@ -2053,9 +2139,14 @@ void main() {
         _statusTestPage(
           activeTab: SwapStatusTab.details,
           details: const [
-            SwapStatusDetailRowData(label: 'Account', value: 'John'),
+            SwapStatusDetailRowData(
+              label: 'Account',
+              kind: SwapStatusDetailKind.account,
+              value: 'John',
+            ),
             SwapStatusDetailRowData(
               label: 'USDC recipient',
+              kind: SwapStatusDetailKind.recipient,
               value: '0x123kjhc ... 4x98g20',
               copyable: true,
               addressBookLabel: 'Treasury',
@@ -2063,6 +2154,7 @@ void main() {
             ),
             SwapStatusDetailRowData(
               label: 'Swap fee',
+              kind: SwapStatusDetailKind.swapFee,
               value: 'Included in shown rate',
               help: true,
             ),
@@ -2098,9 +2190,14 @@ void main() {
         _statusTestPage(
           activeTab: SwapStatusTab.details,
           details: const [
-            SwapStatusDetailRowData(label: 'Account', value: 'John'),
+            SwapStatusDetailRowData(
+              label: 'Account',
+              kind: SwapStatusDetailKind.account,
+              value: 'John',
+            ),
             SwapStatusDetailRowData(
               label: 'USDC recipient',
+              kind: SwapStatusDetailKind.recipient,
               value: '0x1234567…89abc',
               copyable: true,
               addressBookLabel: 'eth account',
@@ -2108,19 +2205,23 @@ void main() {
             ),
             SwapStatusDetailRowData(
               label: 'Deposit ZEC to',
+              kind: SwapStatusDetailKind.depositAddress,
               value: 't1V4tMBk8 ... hunXYpe',
             ),
             SwapStatusDetailRowData(
               label: 'Swap fee',
+              kind: SwapStatusDetailKind.swapFee,
               value: 'Included in shown rate',
               help: true,
             ),
             SwapStatusDetailRowData(
               label: 'Slippage tolerance',
+              kind: SwapStatusDetailKind.slippageTolerance,
               value: '0.01 USDC (1.0%)',
             ),
             SwapStatusDetailRowData(
               label: 'Guaranteed minimum',
+              kind: SwapStatusDetailKind.guaranteedMinimum,
               value: '52.00 USDC',
               help: true,
             ),
@@ -2151,15 +2252,21 @@ void main() {
         _statusTestPage(
           activeTab: SwapStatusTab.details,
           details: const [
-            SwapStatusDetailRowData(label: 'Account', value: 'John'),
+            SwapStatusDetailRowData(
+              label: 'Account',
+              kind: SwapStatusDetailKind.account,
+              value: 'John',
+            ),
             SwapStatusDetailRowData(
               label: 'Deposit USDC to',
+              kind: SwapStatusDetailKind.depositAddress,
               value: compactAddress,
               copyable: true,
               copyText: fullAddress,
             ),
             SwapStatusDetailRowData(
               label: 'Swap fee',
+              kind: SwapStatusDetailKind.swapFee,
               value: 'Included in shown rate',
               help: true,
             ),
@@ -2195,6 +2302,7 @@ void main() {
           details: [
             SwapStatusDetailRowData(
               label: 'USDC deposit tx',
+              kind: SwapStatusDetailKind.sourceTx,
               value: compactTxHash,
               copyable: true,
               copyText: fullTxHash,
@@ -2202,6 +2310,7 @@ void main() {
             ),
             const SwapStatusDetailRowData(
               label: 'Total fees',
+              kind: SwapStatusDetailKind.totalFees,
               value: 'Included',
               help: true,
             ),
@@ -2525,15 +2634,17 @@ void main() {
       VoidCallback? onRetry,
     }) async {
       await tester.pumpWidget(
-        _themeHarness(
-          Center(
-            child: AddressQrScanModalContent(
-              status: status,
-              cameraView: cameraView,
-              canChooseCamera: canChooseCamera,
-              onCameraTap: onCameraTap,
-              onRetry: onRetry,
-              onCancel: () {},
+        LocalizedTestScope(
+          child: _themeHarness(
+            Center(
+              child: AddressQrScanModalContent(
+                status: status,
+                cameraView: cameraView,
+                canChooseCamera: canChooseCamera,
+                onCameraTap: onCameraTap,
+                onRetry: onRetry,
+                onCancel: () {},
+              ),
             ),
           ),
         ),
@@ -3862,6 +3973,36 @@ void main() {
     expect(maxEstimator.requests, ['account-1']);
     expect(_fieldText(tester, 'swap_amount_field'), '1.2339');
   });
+
+  testWidgets(
+    'mobile ZEC swap composer masks the max balance in privacy mode',
+    (tester) async {
+      await _setViewport(tester, const Size(390, 844));
+
+      await tester.pumpWidget(
+        _routerHarness(
+          GoRouter(
+            initialLocation: '/swap',
+            routes: [
+              // The mobile shell supplies the Material ancestor in the app.
+              GoRoute(
+                path: '/swap',
+                builder: (_, _) => const Material(child: MobileSwapScreen()),
+              ),
+            ],
+          ),
+          bootstrap: _privacyModeBootstrap,
+          seedSwapActivityFixtures: false,
+          sessionStore: _FakeSwapPersistenceStore(),
+          spendableBalance: BigInt.from(123450000),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Max: ****** ZEC'), findsOneWidget);
+      expect(find.textContaining('1.2345'), findsNothing);
+    },
+  );
 
   testWidgets('ZEC max amount request keeps the max label spinner-free', (
     tester,
@@ -7065,7 +7206,15 @@ void main() {
     await _openSwapStatusDetails(tester);
 
     expect(swapProvider.submittedDeposits, isEmpty);
-    expect(find.text('0xstored-deposit'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is ReviewListRow &&
+            widget.label.startsWith('Deposit ') &&
+            widget.value == '0xstored-deposit',
+      ),
+      findsOneWidget,
+    );
     expect(sessionStore.savedIntents.single.depositAddress, '0xstored-deposit');
   });
 
@@ -9110,7 +9259,9 @@ void main() {
       expect(sessionStore.savedIntents.single.depositTxHash, 'zec-auto-txid');
       expect(
         sessionStore.savedIntents.single.broadcastNotice,
-        'Broadcast could not start after local creation',
+        const SwapLiteralMessage(
+          'Broadcast could not start after local creation',
+        ),
       );
       await _openSwapStatusDetails(tester, expand: true);
       expect(find.text('zec-auto-txid'), findsWidgets);
@@ -9118,6 +9269,68 @@ void main() {
         find.text('Broadcast could not start after local creation'),
         findsWidgets,
       );
+    },
+  );
+
+  testWidgets(
+    'a deposit broadcast with notices stores them and shows the English Rust wrote',
+    (tester) async {
+      await _setDesktopViewport(tester);
+      const english =
+          'Broadcast failed after 0/1 txs sent (). Error: transport error';
+      final swapProvider = _FakeSwapProvider();
+      final depositSender = _FakeSwapDepositSender(
+        broadcastStatus: SwapDepositBroadcastStatus.pendingBroadcast,
+        broadcastMessage: english,
+        broadcastNotices: const [
+          rust_sync.BroadcastNotice(
+            kind: 'broadcast_failed',
+            index: 0,
+            total: 1,
+            txid: '',
+            detail: 'transport error',
+          ),
+        ],
+      );
+      final sessionStore = _FakeSwapPersistenceStore();
+
+      await tester.pumpWidget(
+        _routerHarness(
+          GoRouter(
+            initialLocation: '/swap',
+            routes: [_swapRoute(), _swapActivityRoute()],
+          ),
+          swapProvider: swapProvider,
+          depositSender: depositSender,
+          sessionStore: sessionStore,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('swap_amount_field')),
+        '1.5',
+      );
+      await _enterDestinationText(
+        tester,
+        '0x52908400098527886e0f7030069857d2e4169ee7',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('swap_review_button')));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('swap_start_button')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('swap_start_button')));
+      await tester.pumpAndSettle();
+
+      final saved = sessionStore.savedIntents.single.broadcastNotice;
+      expect(saved, isA<SwapBroadcastMessage>());
+      expect(saved!.text(testL10n), english);
+      await _openSwapStatusDetails(tester, expand: true);
+      expect(find.text(english), findsWidgets);
     },
   );
 
@@ -9131,7 +9344,7 @@ void main() {
       broadcastMessage: 'gRPC connect failed: connection refused',
     );
     final sessionStore = _FakeSwapPersistenceStore();
-    final primary = defaultRpcEndpointConfig('main');
+    final primary = _fixedRpcEndpoint();
     final fallback = fallbackRpcEndpointCandidatesFor(primary).first;
 
     await tester.pumpWidget(
@@ -9338,7 +9551,7 @@ void main() {
     expect(depositSender.preflightRequests, isEmpty);
     expect(swapProvider.startedQuotes, isEmpty);
     expect(sessionStore.savedIntents, isEmpty);
-    expect(find.text(kNetworkUpgradeHoldMessage), findsOneWidget);
+    expect(find.text(networkUpgradeHoldText(testL10n)), findsOneWidget);
   });
 
   testWidgets('ZEC deposit preflight failure does not start a swap intent', (
@@ -10067,7 +10280,10 @@ void main() {
         expect(saved.payMode, payMode);
         expect(saved.depositTxHash, 'mined-parent,expired-child');
         expect(saved.broadcastStatus, 'partial_broadcast');
-        expect(saved.broadcastNotice, 'The remaining round expired');
+        expect(
+          saved.broadcastNotice,
+          const SwapLiteralMessage('The remaining round expired'),
+        );
         // Potential funds on the network must still protect account deletion.
         expect(saved.hasConfirmedDepositEvidence, isTrue);
         expect(saved.status, SwapIntentStatus.awaitingDeposit);
@@ -10170,7 +10386,7 @@ void main() {
       );
       expect(
         sessionStore.savedIntents.single.broadcastNotice,
-        'broadcast timed out before confirmation',
+        const SwapLiteralMessage('broadcast timed out before confirmation'),
       );
       await _openSwapStatusDetails(tester, expand: true);
       expect(find.text('hardware- ... st-txid'), findsWidgets);
@@ -10196,7 +10412,7 @@ void main() {
         broadcastMessage: 'gRPC connect failed: connection refused',
       );
       final sessionStore = _FakeSwapPersistenceStore();
-      final primary = defaultRpcEndpointConfig('main');
+      final primary = _fixedRpcEndpoint();
       final fallback = fallbackRpcEndpointCandidatesFor(primary).first;
 
       await tester.pumpWidget(
@@ -10480,15 +10696,33 @@ void main() {
     expect(sessionStore.intentsFor('account-2'), isEmpty);
   });
 
-  testWidgets('a failed activity save on account switch is not uncaught', (
-    tester,
-  ) async {
+  List<SwapIntent> savedSwapPerAccount() => [
+    _persistedIntent(
+      id: 'account-one-swap',
+      txHash: 'account-one-txid',
+      accountUuid: 'account-1',
+    ),
+    _persistedIntent(
+      id: 'account-two-swap',
+      txHash: 'account-two-txid',
+      accountUuid: 'account-2',
+    ),
+  ];
+
+  List<String> ids(List<SwapIntent> intents) => [
+    for (final intent in intents) intent.id,
+  ];
+
+  Future<ProviderContainer> pumpTwoAccountSwap(
+    WidgetTester tester,
+    _FakeSwapPersistenceStore sessionStore, {
+    SwapProvider? swapProvider,
+    SwapDepositSender? depositSender,
+  }) async {
     await _setDesktopViewport(tester);
-    final sessionStore = _FailingSaveSwapPersistenceStore();
     final accountNotifier = _FakeSwapAccountNotifier(
       _twoAccountBootstrap.initialAccountState,
     );
-
     await tester.pumpWidget(
       _routerHarness(
         GoRouter(
@@ -10497,21 +10731,299 @@ void main() {
         ),
         bootstrap: _twoAccountBootstrap,
         accountNotifier: () => accountNotifier,
+        swapProvider: swapProvider,
+        depositSender: depositSender,
         sessionStore: sessionStore,
         seedSwapActivityFixtures: false,
       ),
     );
     await tester.pumpAndSettle();
-    final container = ProviderScope.containerOf(
+    return ProviderScope.containerOf(
       tester.element(find.byType(MaterialApp)),
       listen: false,
     );
+  }
+
+  Future<void> reviewAndTapStart(WidgetTester tester) async {
+    await tester.enterText(
+      find.byKey(const ValueKey('swap_amount_field')),
+      '1.5',
+    );
+    await _enterDestinationText(
+      tester,
+      '0x52908400098527886e0f7030069857d2e4169ee7',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('swap_review_button')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('swap_start_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('swap_start_button')));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('account switch before saved swaps load keeps them', (
+    tester,
+  ) async {
+    final sessionStore = _DelayedLoadSwapPersistenceStore(
+      delayedAccounts: {'account-1'},
+      initialIntents: savedSwapPerAccount(),
+    );
+    final container = await pumpTwoAccountSwap(tester, sessionStore);
 
     await container.read(accountProvider.notifier).switchAccount('account-2');
     await tester.pumpAndSettle();
 
-    expect(sessionStore.failedSaves, ['account-1']);
-    expect(tester.takeException(), isNull);
+    expect(ids(sessionStore.intentsFor('account-1')), ['account-one-swap']);
+    expect(ids(sessionStore.intentsFor('account-2')), ['account-two-swap']);
+  });
+
+  testWidgets('switching back and away while saved swaps load keeps them', (
+    tester,
+  ) async {
+    final delayedAccounts = <String>{};
+    final sessionStore = _DelayedLoadSwapPersistenceStore(
+      delayedAccounts: delayedAccounts,
+      initialIntents: savedSwapPerAccount(),
+    );
+    final container = await pumpTwoAccountSwap(tester, sessionStore);
+    final accounts = container.read(accountProvider.notifier);
+
+    await accounts.switchAccount('account-2');
+    await tester.pumpAndSettle();
+    delayedAccounts.add('account-1');
+    await accounts.switchAccount('account-1');
+    await tester.pumpAndSettle();
+    // The screen still lists account-2's swap while account-1's load is held.
+    expect(ids(container.read(swapStateProvider).intents), [
+      'account-two-swap',
+    ]);
+    // A refresh in this window must not save that list for account-1. It
+    // waits on the held load, so it cannot be awaited here.
+    unawaited(
+      container.read(swapStateProvider.notifier).refreshOpenIntentStatuses(),
+    );
+    await tester.pump();
+    await accounts.switchAccount('account-2');
+    await tester.pumpAndSettle();
+
+    expect(ids(sessionStore.intentsFor('account-1')), ['account-one-swap']);
+    expect(ids(sessionStore.intentsFor('account-2')), ['account-two-swap']);
+  });
+
+  testWidgets('a status refresh while saved swaps load keeps them', (
+    tester,
+  ) async {
+    final sessionStore = _HeldRestoreSwapPersistenceStore(
+      initialIntents: savedSwapPerAccount(),
+    );
+    final container = await pumpTwoAccountSwap(tester, sessionStore);
+    final accounts = container.read(accountProvider.notifier);
+    await accounts.switchAccount('account-2');
+    await tester.pumpAndSettle();
+    sessionStore.heldAccounts.add('account-1');
+    await accounts.switchAccount('account-1');
+    await tester.pumpAndSettle();
+    expect(ids(container.read(swapStateProvider).intents), [
+      'account-two-swap',
+    ]);
+
+    await container
+        .read(swapStateProvider.notifier)
+        .refreshOpenIntentStatuses();
+    await tester.pumpAndSettle();
+
+    expect(ids(sessionStore.intentsFor('account-1')), ['account-one-swap']);
+  });
+
+  testWidgets('a deposit recorded before saved swaps load keeps them', (
+    tester,
+  ) async {
+    final sessionStore = _HeldRestoreSwapPersistenceStore(
+      initialIntents: [
+        ...savedSwapPerAccount(),
+        _persistedIntent(
+          id: 'account-one-other-swap',
+          txHash: 'account-one-other-txid',
+          accountUuid: 'account-1',
+        ),
+      ],
+    );
+    final container = await pumpTwoAccountSwap(tester, sessionStore);
+    final accounts = container.read(accountProvider.notifier);
+    final recorded = container
+        .read(swapStateProvider)
+        .intents
+        .firstWhere((intent) => intent.id == 'account-one-swap');
+    await accounts.switchAccount('account-2');
+    await tester.pumpAndSettle();
+    sessionStore.heldAccounts.add('account-1');
+    await accounts.switchAccount('account-1');
+    await tester.pumpAndSettle();
+
+    await container
+        .read(swapStateProvider.notifier)
+        .recordHardwareDepositBroadcast(
+          intent: recorded,
+          broadcast: const SwapDepositBroadcastResult(
+            txHash: 'recorded-deposit-txid',
+            status: SwapDepositBroadcastStatus.broadcasted,
+          ),
+        );
+    await tester.pumpAndSettle();
+
+    final saved = sessionStore.intentsFor('account-1');
+    expect(
+      ids(saved),
+      unorderedEquals(['account-one-swap', 'account-one-other-swap']),
+    );
+    expect(
+      saved
+          .firstWhere((intent) => intent.id == 'account-one-swap')
+          .depositTxHash,
+      'recorded-deposit-txid',
+    );
+
+    // The held restore read the saved swaps before the deposit was recorded.
+    sessionStore.completeLoad('account-1');
+    await tester.pumpAndSettle();
+    String? txHash(List<SwapIntent> intents) => intents
+        .firstWhere((intent) => intent.id == 'account-one-swap')
+        .depositTxHash;
+    expect(
+      txHash(container.read(swapStateProvider).intents),
+      'recorded-deposit-txid',
+    );
+    expect(
+      txHash(sessionStore.intentsFor('account-1')),
+      'recorded-deposit-txid',
+    );
+  });
+
+  testWidgets(
+    'a restore that read before a recorded deposit does not undo it',
+    (tester) async {
+      final sessionStore = _HeldRestoreSwapPersistenceStore(
+        initialIntents: [
+          ...savedSwapPerAccount(),
+          _persistedIntent(
+            id: 'account-one-other-swap',
+            txHash: 'account-one-other-txid',
+            accountUuid: 'account-1',
+          ),
+        ],
+      );
+      // Status checks stay pending, so no refresh re-reads the saved swaps.
+      final container = await pumpTwoAccountSwap(
+        tester,
+        sessionStore,
+        swapProvider: _PendingExternalDepositSwapProvider(
+          statusGate: Completer<void>(),
+        ),
+      );
+      final accounts = container.read(accountProvider.notifier);
+      final notifier = container.read(swapStateProvider.notifier);
+      final recorded = container
+          .read(swapStateProvider)
+          .intents
+          .firstWhere((intent) => intent.id == 'account-one-swap');
+      await accounts.switchAccount('account-2');
+      await tester.pumpAndSettle();
+      sessionStore.heldAccounts.add('account-1');
+      await accounts.switchAccount('account-1');
+      await tester.pumpAndSettle();
+      await notifier.recordHardwareDepositBroadcast(
+        intent: recorded,
+        broadcast: const SwapDepositBroadcastResult(
+          txHash: 'recorded-deposit-txid',
+          status: SwapDepositBroadcastStatus.broadcasted,
+        ),
+      );
+
+      // The restore's read is older than the recorded deposit. A save of the
+      // list it loads must not drop the deposit.
+      sessionStore.completeLoad('account-1');
+      await tester.pump();
+      await notifier.removeIntent('account-one-other-swap');
+      await tester.pumpAndSettle();
+
+      final saved = sessionStore.intentsFor('account-1');
+      expect(ids(saved), ['account-one-swap']);
+      expect(saved.single.depositTxHash, 'recorded-deposit-txid');
+    },
+  );
+
+  testWidgets('a failed swap load does not erase saved swaps', (tester) async {
+    final sessionStore = _FailingLoadSwapPersistenceStore(
+      initialIntents: savedSwapPerAccount(),
+    );
+    final container = await pumpTwoAccountSwap(tester, sessionStore);
+    final accounts = container.read(accountProvider.notifier);
+    expect(container.read(swapStateProvider).intents, isEmpty);
+
+    sessionStore.failLoads = false;
+    await accounts.switchAccount('account-2');
+    await tester.pumpAndSettle();
+    await accounts.switchAccount('account-1');
+    await tester.pumpAndSettle();
+
+    expect(ids(sessionStore.intentsFor('account-1')), ['account-one-swap']);
+    expect(ids(container.read(swapStateProvider).intents), [
+      'account-one-swap',
+    ]);
+  });
+
+  testWidgets('a swap started while saved swaps load is kept with them', (
+    tester,
+  ) async {
+    final swapProvider = _FakeSwapProvider();
+    final sessionStore = _HeldRestoreSwapPersistenceStore(
+      initialIntents: savedSwapPerAccount(),
+    )..heldAccounts.add('account-1');
+    final container = await pumpTwoAccountSwap(
+      tester,
+      sessionStore,
+      swapProvider: swapProvider,
+      depositSender: _FakeSwapDepositSender(),
+    );
+    expect(container.read(swapStateProvider).intents, isEmpty);
+
+    await reviewAndTapStart(tester);
+
+    expect(swapProvider.startedQuotes, hasLength(1));
+    final saved = ids(sessionStore.intentsFor('account-1'));
+    expect(saved, hasLength(2));
+    expect(saved.last, 'account-one-swap');
+
+    sessionStore.completeLoad('account-1');
+    await tester.pumpAndSettle();
+
+    expect(ids(container.read(swapStateProvider).intents), saved);
+    expect(ids(sessionStore.intentsFor('account-1')), saved);
+  });
+
+  testWidgets('a swap started after a failed load keeps saved swaps', (
+    tester,
+  ) async {
+    final swapProvider = _FakeSwapProvider();
+    final sessionStore = _FailingLoadSwapPersistenceStore(
+      initialIntents: savedSwapPerAccount(),
+    );
+    final container = await pumpTwoAccountSwap(
+      tester,
+      sessionStore,
+      swapProvider: swapProvider,
+      depositSender: _FakeSwapDepositSender(),
+    );
+    expect(container.read(swapStateProvider).intents, isEmpty);
+    sessionStore.failLoads = false;
+
+    await reviewAndTapStart(tester);
+
+    expect(swapProvider.startedQuotes, hasLength(1));
+    final saved = ids(sessionStore.intentsFor('account-1'));
+    expect(saved, hasLength(2));
+    expect(saved.last, 'account-one-swap');
   });
 }
 
@@ -10549,6 +11061,7 @@ Widget _routerHarness(
   LedgerOperationCanceller? ledgerCanceller,
   LedgerSignedOperationService? ledgerOperationService,
   NetworkUpgradeWindowState? upgradeWindow,
+  NearIntentsServiceStatus? serviceStatus,
 }) {
   final fixtureIntents = seedSwapActivityFixtures
       ? _accountScopedSwapActivityFixtureIntents()
@@ -10558,6 +11071,9 @@ Widget _routerHarness(
   return ProviderScope(
     overrides: [
       appBootstrapProvider.overrideWithValue(bootstrap ?? _bootstrap),
+      nearIntentsServiceStatusProvider.overrideWith(
+        () => FixtureServiceStatusNotifier(serviceStatus),
+      ),
       if (upgradeWindow != null)
         networkUpgradeWindowProvider.overrideWithValue(upgradeWindow),
       networkPrivacyProvider.overrideWith(
@@ -10642,6 +11158,7 @@ Widget _routerHarness(
       ),
     ],
     child: MaterialApp.router(
+      localizationsDelegates: appLocalizationsDelegates,
       routerConfig: router,
       builder: (context, child) {
         final media = MediaQuery.maybeOf(context);
@@ -10740,7 +11257,7 @@ Widget _themeHarness(Widget child) {
 Widget _themeHarnessWithTheme(AppThemeData theme, Widget child) {
   return AppTheme(
     data: theme,
-    child: Directionality(textDirection: TextDirection.ltr, child: child),
+    child: LocalizedTestScope(child: child),
   );
 }
 
@@ -10754,10 +11271,7 @@ Widget _themeHarnessWithTheme(AppThemeData theme, Widget child) {
 Widget _themeHarnessWithOverlay(Widget child) {
   return AppTheme(
     data: AppThemeData.light,
-    child: Directionality(
-      textDirection: TextDirection.ltr,
-      child: _OverlayHarness(child: child),
-    ),
+    child: LocalizedTestScope(child: _OverlayHarness(child: child)),
   );
 }
 
@@ -10951,23 +11465,28 @@ Widget _statusTestPage({
           const [
             SwapStatusDetailRowData(
               label: 'USDC refund address',
+              kind: SwapStatusDetailKind.refundAddress,
               value: '0x123kjhc ... 4x98g20',
             ),
             SwapStatusDetailRowData(
               label: 'Deposit USDC to',
+              kind: SwapStatusDetailKind.depositAddress,
               value: '0x123kjhc ... 4x98g20',
             ),
             SwapStatusDetailRowData(
               label: 'Swap fee',
+              kind: SwapStatusDetailKind.swapFee,
               value: 'Included in shown rate',
               help: true,
             ),
             SwapStatusDetailRowData(
               label: 'Slippage tolerance',
+              kind: SwapStatusDetailKind.slippageTolerance,
               value: '0.25 USDC (0.5%)',
             ),
             SwapStatusDetailRowData(
               label: 'Guaranteed minimum',
+              kind: SwapStatusDetailKind.guaranteedMinimum,
               value: '0.249 ZEC',
               help: true,
             ),
@@ -10985,7 +11504,7 @@ SwapIntent _persistedIntent({
   String? nextAction,
   String accountUuid = 'account-1',
 }) {
-  final effectiveNextAction = nextAction ?? status.label;
+  final effectiveNextAction = nextAction ?? status.name;
   return SwapIntent(
     id: id,
     pair: 'ZEC -> USDC',
@@ -11306,7 +11825,7 @@ final _bootstrap = AppBootstrapState(
   ),
   initialSyncSnapshot: AppSyncSnapshot.empty,
   network: 'main',
-  rpcEndpointConfig: defaultRpcEndpointConfig('main'),
+  rpcEndpointConfig: _fixedRpcEndpoint(),
   themeMode: ThemeMode.system,
   privacyModeEnabled: false,
   isPasswordConfigured: true,
@@ -11323,7 +11842,7 @@ final _privacyModeBootstrap = AppBootstrapState(
   ),
   initialSyncSnapshot: AppSyncSnapshot.empty,
   network: 'main',
-  rpcEndpointConfig: defaultRpcEndpointConfig('main'),
+  rpcEndpointConfig: _fixedRpcEndpoint(),
   themeMode: ThemeMode.system,
   privacyModeEnabled: true,
   isPasswordConfigured: true,
@@ -11343,7 +11862,7 @@ final _twoAccountBootstrap = AppBootstrapState(
   ),
   initialSyncSnapshot: AppSyncSnapshot.empty,
   network: 'main',
-  rpcEndpointConfig: defaultRpcEndpointConfig('main'),
+  rpcEndpointConfig: _fixedRpcEndpoint(),
   themeMode: ThemeMode.system,
   privacyModeEnabled: false,
   isPasswordConfigured: true,
@@ -11367,7 +11886,7 @@ final _hardwareBootstrap = AppBootstrapState(
   ),
   initialSyncSnapshot: AppSyncSnapshot.empty,
   network: 'main',
-  rpcEndpointConfig: defaultRpcEndpointConfig('main'),
+  rpcEndpointConfig: _fixedRpcEndpoint(),
   themeMode: ThemeMode.system,
   privacyModeEnabled: false,
   isPasswordConfigured: true,
@@ -11392,7 +11911,7 @@ final _ledgerHardwareBootstrap = AppBootstrapState(
   ),
   initialSyncSnapshot: AppSyncSnapshot.empty,
   network: 'main',
-  rpcEndpointConfig: defaultRpcEndpointConfig('main'),
+  rpcEndpointConfig: _fixedRpcEndpoint(),
   themeMode: ThemeMode.system,
   privacyModeEnabled: false,
   isPasswordConfigured: true,
@@ -11458,3 +11977,9 @@ String _fieldText(WidgetTester tester, String keyValue) {
   );
   return editable.controller.text;
 }
+
+// Swap fixtures either keep failover inert or opt in to a fixed primary and
+// fallback explicitly. Automatic selection has separate transport coverage.
+RpcEndpointConfig _fixedRpcEndpoint() => defaultRpcEndpointConfig(
+  'main',
+).copyWith(presetId: kManualUsRpcEndpointPresetId);

@@ -27,6 +27,7 @@ import '../../widgets/mobile/private_usd_flow_widgets.dart';
 import '../../widgets/mobile/private_usd_info_sheets.dart';
 import '../../widgets/mobile/private_usd_paste_button.dart';
 import '../../widgets/mobile/private_usd_scan_sheet.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// `/private-usd/send` and `/private-usd/withdraw`: the amount, the
 /// recipient and Review, which prices the send and opens its review. The
@@ -183,20 +184,22 @@ class MobilePrivateUsdSendView extends StatelessWidget {
     final colors = context.colors;
     final assets = form.assets(balances);
     final asset = form.asset(balances);
-    final amountError = form.amountError(asset);
+    final amountError = form.amountError(context.l10n, asset);
     final recipientError = form.recipientError(
+      context.l10n,
       isRailgunAddress: isRailgunAddress,
     );
     final request = asset == null
         ? null
         : form.request(asset, isRailgunAddress: isRailgunAddress);
     final message =
-        form.error ?? (form.isBusy ? null : privateUsdSpendMessage(status));
+        form.error?.call(context.l10n) ??
+        (form.isBusy ? null : privateUsdSpendMessage(context.l10n, status));
     final canReview = request != null && status.canSend && !form.isBusy;
     return PrivateUsdFlowScaffold(
       title: _private
-          ? PrivateUsdCopy.sendTitle
-          : PrivateUsdCopy.actionWithdraw,
+          ? context.l10n.privateUsdSendTitle
+          : context.l10n.privateUsdActionWithdraw,
       onBack: onBack,
       onInfo: () => _private
           ? showPrivateUsdSendInfoSheet(context)
@@ -218,9 +221,9 @@ class MobilePrivateUsdSendView extends StatelessWidget {
           ],
           PrivateUsdAmountPanel(
             key: const ValueKey('mobile_private_usd_send_amount_card'),
-            keyPrefix: 'mobile_private_usd_send',
+            keyPrefix: 'mobile_private_usd_send', // l10n-ignore: widget key
             caption: Text(
-              PrivateUsdCopy.sendAmount,
+              context.l10n.commonAmount,
               style: AppTypography.labelLarge.copyWith(
                 color: colors.text.accent,
               ),
@@ -272,7 +275,7 @@ class MobilePrivateUsdSendView extends StatelessWidget {
         leading: form.isBusy
             ? const AppLoadingIcon(size: AppIconSize.medium)
             : null,
-        child: const Text(PrivateUsdCopy.review),
+        child: Text(context.l10n.privateUsdReview),
       ),
     );
   }
@@ -298,7 +301,7 @@ class _AssetChooser extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          PrivateUsdCopy.sendAsset,
+          context.l10n.privateUsdSendAsset,
           style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -358,8 +361,8 @@ class _RecipientCard extends StatelessWidget {
         children: [
           Text(
             private
-                ? PrivateUsdCopy.sendToPrivate
-                : PrivateUsdCopy.sendToWithdraw,
+                ? context.l10n.privateUsdSendToPrivate
+                : context.l10n.privateUsdSendToWithdraw,
             style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
           ),
           const SizedBox(height: AppSpacing.xs),
