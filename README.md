@@ -181,7 +181,7 @@ a ZEC donation.
 **Zcash Unified Address**
 
 ```text
-u15kdlm6j5tp4tptue4fdra4qa50d6zfl76anf7dagzu9y0yz875qhtvxgd6dju7l7epjwwxvuzh7z67gnxfw9msqxtnjg96x77x4y3vmzfehm0p9l6q2yhuskztxl8dlrswp6nf3u2j35krarnntc85h92h64g29f73ze5tewugq8tg3y
+u18sgfmlyjukysawn8svyk5ka0e3faplel07a6g2zafe0rpymtt63cykn02erkrjyt8nerv2sd2lgswnlusd29wdexzfyuly44k5kg2kfw
 ```
 
 ## License
