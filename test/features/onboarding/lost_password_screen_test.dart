@@ -146,7 +146,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('Reset Vizor'));
+    await tester.tap(find.text('Reset Veylor'));
     await tester.pump();
 
     expect(auth.calls, 1);
@@ -181,7 +181,7 @@ void main() {
     );
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Reset Vizor'));
+    await tester.tap(find.text('Reset Veylor'));
     await tester.pump();
 
     expect(auth.calls, 1);
@@ -219,7 +219,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Reset Vizor'));
+    await tester.tap(find.text('Reset Veylor'));
     await tester.pumpAndSettle();
 
     // The OS prompt is never invoked, and the reset still proceeds.
@@ -257,7 +257,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Reset Vizor'));
+    await tester.tap(find.text('Reset Veylor'));
     await tester.pumpAndSettle();
 
     expect(auth.calls, 1);
@@ -300,7 +300,7 @@ void main() {
     expect(find.text(testL10n.walletResetGiftCardWarning), findsOneWidget);
     expect(find.text('This cannot be undone.'), findsNothing);
     final resetButton = tester.widget<AppButton>(
-      find.widgetWithText(AppButton, 'Reset Vizor'),
+      find.widgetWithText(AppButton, 'Reset Veylor'),
     );
     expect(resetButton.onPressed, isNotNull);
     expect(tester.takeException(), isNull);
@@ -370,7 +370,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Reset Vizor'));
+    await tester.tap(find.text('Reset Veylor'));
     await tester.pumpAndSettle();
 
     // Whole sentence, no ellipsis: this is the longest status the screen
@@ -487,7 +487,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Reset Vizor'));
+    await tester.tap(find.text('Reset Veylor'));
     await tester.pumpAndSettle();
 
     expect(auth.calls, 1);

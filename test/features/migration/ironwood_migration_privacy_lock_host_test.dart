@@ -211,7 +211,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Enter your password to open Vizor.'), findsNothing);
-    expect(find.text('Unlock Vizor'), findsOneWidget);
+    expect(find.text('Unlock Veylor'), findsOneWidget);
     expect(find.text('Forgot password?'), findsNothing);
     expect(find.byKey(ironwoodMigrationVirtualUnlockScreenKey), findsOneWidget);
     expect(find.byKey(ironwoodMigrationInProgressBadgeKey), findsOneWidget);
@@ -437,7 +437,7 @@ void main() {
 
       expect(find.text('Migration in progress'), findsNothing);
       expect(find.text('Welcome back'), findsOneWidget);
-      expect(find.text('Unlock Vizor'), findsOneWidget);
+      expect(find.text('Unlock Veylor'), findsOneWidget);
       expect(
         find.byKey(ironwoodMigrationVirtualUnlockScreenKey),
         findsOneWidget,
@@ -484,7 +484,7 @@ void main() {
     // A screen reader can neither read nor activate the covered app; its
     // keyboard focus is in the lock's password field.
     expect(protected, findsNothing);
-    expect(find.semantics.byLabel(RegExp('Unlock Vizor')), findsOneWidget);
+    expect(find.semantics.byLabel(RegExp('Unlock Veylor')), findsOneWidget);
     expect(
       FocusManager.instance.primaryFocus?.context
           ?.findAncestorWidgetOfExactType<

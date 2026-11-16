@@ -710,7 +710,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.textContaining('Veylor will guide you to shield the balance'),
+      find.textContaining('Vizor will guide you to shield the balance'),
       findsOneWidget,
     );
     expect(_findAppIcon(AppIcons.renew), findsOneWidget);

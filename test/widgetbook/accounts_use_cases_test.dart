@@ -78,7 +78,7 @@ void main() {
   ) async {
     await _pumpAccountsUseCase(tester, buildAboutUtilityUseCase);
     expect(tester.takeException(), isNull);
-    expect(find.text('About Vizor Wallet'), findsOneWidget);
+    expect(find.text('About Veylor Wallet'), findsOneWidget);
     expect(find.text('Github'), findsOneWidget);
     expect(find.text('Website'), findsOneWidget);
 

@@ -96,7 +96,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('Unable to open Vizor'), findsOneWidget);
+      expect(find.text('Unable to open Veylor'), findsOneWidget);
       expect(find.textContaining('Private native'), findsNothing);
       expect(find.text('Quit'), findsOneWidget);
       await tester.pump(const Duration(minutes: 5));

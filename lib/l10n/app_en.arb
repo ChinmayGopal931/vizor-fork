@@ -12778,7 +12778,7 @@
   "@settingsUninstallSwapCheckFailed": {
     "description": "Error shown when checking for in-progress swaps failed."
   },
-  "settingsUninstallTitle": "Uninstall Veylor",
+  "settingsUninstallTitle": "Uninstall Vizor",
   "@settingsUninstallTitle": {
     "description": "[security] Title and destructive button label of the screen that wipes all wallet data from this device."
   },

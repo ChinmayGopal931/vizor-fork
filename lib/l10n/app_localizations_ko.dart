@@ -9938,7 +9938,7 @@ class AppLocalizationsKo extends AppLocalizations {
       '진‍행 중‍인 스‍왑‍을 확‍인‍하‍지 못‍했‍어‍요. 삭‍제‍하‍기 전‍에 다‍시 시‍도‍해 주‍세‍요.';
 
   @override
-  String get settingsUninstallTitle => 'Veylor 삭‍제';
+  String get settingsUninstallTitle => 'Vizor 삭‍제';
 
   @override
   String get settingsUninstallWipeFailed =>

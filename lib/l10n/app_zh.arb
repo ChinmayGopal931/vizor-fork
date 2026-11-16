@@ -2731,7 +2731,7 @@
   "settingsUninstallPasswordSubtitle": "请输入密码以卸载 Vizor。",
   "settingsUninstallRemovingTitle": "正在删除数据...",
   "settingsUninstallSwapCheckFailed": "无法检查进行中的兑换。卸载前请重试。",
-  "settingsUninstallTitle": "卸载 Veylor",
+  "settingsUninstallTitle": "卸载 Vizor",
   "settingsUninstallWipeFailed": "无法完成数据删除。请重试。",
   "settingsUninstallWipeSubtitle": "Vizor 将从{device}删除钱包数据和安全存储。尚未分享的礼品卡链接将永久丢失。",
   "settingsUpdateApplying": "安装中",

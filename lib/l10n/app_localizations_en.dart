@@ -10099,7 +10099,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t check for active swaps. Try again before uninstalling.';
 
   @override
-  String get settingsUninstallTitle => 'Uninstall Veylor';
+  String get settingsUninstallTitle => 'Uninstall Vizor';
 
   @override
   String get settingsUninstallWipeFailed =>

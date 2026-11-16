@@ -1494,7 +1494,7 @@ void main() {
               await _flushRealAsync(tester);
               expect(
                 find.text(
-                  'Approved on Ledger. Vizor is finishing the transaction.',
+                  'Approved on Ledger. Veylor is finishing the transaction.',
                 ),
                 findsOneWidget,
               );
@@ -1612,7 +1612,7 @@ void main() {
       approval.complete(_fakeSignatureBytes);
       await _flushRealAsync(tester);
       expect(
-        find.text('Approved on Ledger. Vizor is finishing the transaction.'),
+        find.text('Approved on Ledger. Veylor is finishing the transaction.'),
         findsOneWidget,
       );
       expect(service.checkpoints, isEmpty);
@@ -1670,7 +1670,7 @@ void main() {
       expect(rustApi.addProofsCalls, 1);
       expect(rustApi.createPcztCalls, 1);
       expect(
-        find.text('Approved on Ledger. Vizor is finishing the transaction.'),
+        find.text('Approved on Ledger. Veylor is finishing the transaction.'),
         findsOneWidget,
       );
       proofs.complete(Uint8List.fromList(_fakeProofsBytes));
@@ -1802,7 +1802,7 @@ void main() {
       await _flushRealAsync(tester);
       expect(
         find.text(
-          'Keep Vizor open and try again. No new Ledger approval needed.',
+          'Keep Veylor open and try again. No new Ledger approval needed.',
         ),
         findsOneWidget,
       );

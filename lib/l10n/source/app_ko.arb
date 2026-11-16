@@ -2731,7 +2731,7 @@
   "settingsUninstallPasswordSubtitle": "Vizor를 삭제하려면 필요해요.",
   "settingsUninstallRemovingTitle": "데이터 삭제 중...",
   "settingsUninstallSwapCheckFailed": "진행 중인 스왑을 확인하지 못했어요. 삭제하기 전에 다시 시도해 주세요.",
-  "settingsUninstallTitle": "Veylor 삭제",
+  "settingsUninstallTitle": "Vizor 삭제",
   "settingsUninstallWipeFailed": "데이터를 모두 삭제하지 못했어요. 다시 시도해 주세요.",
   "settingsUninstallWipeSubtitle": "Vizor가 {device}에서 지갑 데이터와 보안 저장소를 삭제해요. 공유하지 않은 기프트 카드 링크는 영구적으로 사라져요.",
   "settingsUpdateApplying": "적용 중",

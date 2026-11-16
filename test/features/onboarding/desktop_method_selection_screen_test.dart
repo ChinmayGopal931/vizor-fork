@@ -69,7 +69,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Import Account\nto Vizor'), findsOneWidget);
+    expect(find.text('Import Account\nto Veylor'), findsOneWidget);
     expect(find.text('Select the method you want.'), findsOneWidget);
     expect(find.text('Import secret passphrase'), findsOneWidget);
     expect(find.text('Vizor or any other Zcash wallet'), findsOneWidget);
@@ -146,7 +146,7 @@ void main() {
 
     await tester.tap(find.text('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('Import Account\nto Vizor'), findsOneWidget);
+    expect(find.text('Import Account\nto Veylor'), findsOneWidget);
 
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
@@ -206,7 +206,7 @@ void main() {
 
     await tester.tap(find.text('Back'));
     await tester.pumpAndSettle();
-    expect(find.text('Import Account\nto Vizor'), findsOneWidget);
+    expect(find.text('Import Account\nto Veylor'), findsOneWidget);
   });
 }
 

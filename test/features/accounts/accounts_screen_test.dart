@@ -1316,7 +1316,7 @@ void main() {
 
     await tester.enterText(find.byType(EditableText), _validDeletePassword);
     await tester.pump();
-    await tester.tap(find.text('Reset Vizor'));
+    await tester.tap(find.text('Reset Veylor'));
     await tester.pumpAndSettle();
 
     expect(accountNotifier.resetWalletCalled, isFalse);
@@ -1551,7 +1551,7 @@ void main() {
     );
     expect(
       find.textContaining(
-        'Removing this account will completely reset the Vizor app.',
+        'Removing this account will completely reset the Veylor app.',
       ),
       findsOneWidget,
     );
@@ -1569,7 +1569,7 @@ void main() {
       findsOneWidget,
     );
 
-    await _submitRemovePassword(tester, buttonLabel: 'Reset Vizor');
+    await _submitRemovePassword(tester, buttonLabel: 'Reset Veylor');
     await tester.pumpAndSettle();
 
     expect(events, ['pause', 'resetWallet', 'clearCachedWalletDbPath']);
@@ -1620,11 +1620,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remove account'));
     await tester.pumpAndSettle();
-    await _submitRemovePassword(tester, buttonLabel: 'Reset Vizor');
+    await _submitRemovePassword(tester, buttonLabel: 'Reset Veylor');
     await tester.pumpAndSettle();
 
     expect(events, ['pause', 'resetWallet', 'clearCachedWalletDbPath']);
-    expect(find.text("Couldn't reset Vizor."), findsOneWidget);
+    expect(find.text("Couldn't reset Veylor."), findsOneWidget);
     expect(find.text("Couldn't remove account."), findsNothing);
     expect(find.text('welcome route'), findsNothing);
   });

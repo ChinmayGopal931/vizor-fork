@@ -16559,7 +16559,7 @@ abstract class AppLocalizations {
   /// [security] Title and destructive button label of the screen that wipes all wallet data from this device.
   ///
   /// In en, this message translates to:
-  /// **'Uninstall Veylor'**
+  /// **'Uninstall Vizor'**
   String get settingsUninstallTitle;
 
   /// Error shown when wiping wallet data failed part way.

@@ -59,7 +59,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('About Vizor'), findsNothing);
-    expect(find.text('About Vizor Wallet'), findsOneWidget);
+    expect(find.text('About Veylor Wallet'), findsOneWidget);
     expect(find.text('Version: 0.0.0 Public Beta'), findsOneWidget);
     expect(find.text('Built by the Keplr team'), findsOneWidget);
     expect(find.text('Designed for shielded Zcash'), findsOneWidget);
@@ -106,7 +106,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('About Vizor'), findsNothing);
-    expect(find.text('About Vizor Wallet'), findsOneWidget);
+    expect(find.text('About Veylor Wallet'), findsOneWidget);
     final backLink = find.byType(AppRouteBackLink);
     expect(
       find.descendant(of: backLink, matching: find.text('Home')),
@@ -166,7 +166,7 @@ void main() {
     _expectScrollbarFillsPaneEdge(tester, const Size(1280, 900));
     _expectUtilityContentCentered(
       tester,
-      titleText: 'About Vizor Wallet',
+      titleText: 'About Veylor Wallet',
       headingText: 'Built by the Keplr team',
     );
   });

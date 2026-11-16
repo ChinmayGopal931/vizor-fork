@@ -9304,7 +9304,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsUninstallSwapCheckFailed => '无法检查进行中的兑换。卸载前请重试。';
 
   @override
-  String get settingsUninstallTitle => '卸载 Veylor';
+  String get settingsUninstallTitle => '卸载 Vizor';
 
   @override
   String get settingsUninstallWipeFailed => '无法完成数据删除。请重试。';
