@@ -1542,13 +1542,13 @@ abstract class AppLocalizations {
   /// Snackbar on Linux announcing a new version is available.
   ///
   /// In en, this message translates to:
-  /// **'Veylor {version} is available.'**
+  /// **'Vizor {version} is available.'**
   String appLinuxUpdateAvailable(String version);
 
   /// Snackbar on Linux announcing a new version when Tor is on; warns that the release page opens in the browser outside Tor.
   ///
   /// In en, this message translates to:
-  /// **'Veylor {version} is available. The release page opens in your browser, outside Veylor’s Tor connection.'**
+  /// **'Vizor {version} is available. The release page opens in your browser, outside Vizor’s Tor connection.'**
   String appLinuxUpdateAvailableTor(String version);
 
   /// Snackbar action on Linux that opens the release page in the browser (shown when Tor is on).
@@ -3767,7 +3767,7 @@ abstract class AppLocalizations {
   /// [security] Notice on desktop Home when the outcome of an earlier wallet password change could not be confirmed.
   ///
   /// In en, this message translates to:
-  /// **'We couldn\'t verify the previous password change. Try again or restart Veylor.'**
+  /// **'We couldn\'t verify the previous password change. Try again or restart Vizor.'**
   String get homePasswordChangeUnverified;
 
   /// Screen-reader and tooltip label of the icon-only Pay button on desktop Home.
@@ -4169,7 +4169,7 @@ abstract class AppLocalizations {
   /// [security] Body of the Linux keyring screen when the system keyring is locked; mentions the keyring password prompt.
   ///
   /// In en, this message translates to:
-  /// **'Veylor cannot access your system keyring. Unlock the keyring, then choose Retry. A system prompt may ask for your keyring password.'**
+  /// **'Vizor cannot access your system keyring. Unlock the keyring, then choose Retry. A system prompt may ask for your keyring password.'**
   String get keyringLockedBody;
 
   /// Message on the Linux keyring screen when a retry or cancel request failed.
@@ -4181,25 +4181,25 @@ abstract class AppLocalizations {
   /// Title of the startup screen on Linux while the app loads.
   ///
   /// In en, this message translates to:
-  /// **'Opening Veylor'**
+  /// **'Opening Vizor'**
   String get keyringOpeningTitle;
 
   /// Body of the Linux keyring screen while waiting for the user to answer a system keyring prompt.
   ///
   /// In en, this message translates to:
-  /// **'Complete any system keyring prompt to continue in Veylor.'**
+  /// **'Complete any system keyring prompt to continue in Vizor.'**
   String get keyringPromptBody;
 
   /// Body of the startup failure screen on Linux.
   ///
   /// In en, this message translates to:
-  /// **'Quit and restart Veylor to try again.'**
+  /// **'Quit and restart Vizor to try again.'**
   String get keyringRestartHint;
 
   /// Body of the Linux keyring screen when it is unknown whether a save succeeded.
   ///
   /// In en, this message translates to:
-  /// **'Veylor could not confirm whether your changes were saved. Quit and restart Veylor before continuing.'**
+  /// **'Vizor could not confirm whether your changes were saved. Quit and restart Vizor before continuing.'**
   String get keyringSaveUnconfirmedBody;
 
   /// Title of the Linux keyring screen when it is unknown whether a save to secure storage succeeded.
@@ -4235,7 +4235,7 @@ abstract class AppLocalizations {
   /// Body of the Linux keyring screen when the stored keyring data is unreadable.
   ///
   /// In en, this message translates to:
-  /// **'Veylor could not read the data in your system keyring. Retry after restoring access, or quit Veylor.'**
+  /// **'Vizor could not read the data in your system keyring. Retry after restoring access, or quit Vizor.'**
   String get keyringUnreadableBody;
 
   /// Title of the Linux keyring screen when the stored keyring data is unreadable.
@@ -5717,7 +5717,7 @@ abstract class AppLocalizations {
   /// Hint shown while checking Bluetooth access on macOS.
   ///
   /// In en, this message translates to:
-  /// **'macOS may ask for Bluetooth access. If prompted, allow access for Veylor.'**
+  /// **'macOS may ask for Bluetooth access. If prompted, allow access for Vizor.'**
   String get ledgerMacosBluetoothPrompt;
 
   /// [security] Message when the connected Ledger is not the one that holds this account.
@@ -6494,10 +6494,10 @@ abstract class AppLocalizations {
   /// **'Unlock Ledger and confirm opening Zcash if prompted.'**
   String get ledgerVerifyingSavedDevice;
 
-  /// Status message while Veylor checks whether the Zcash app is open on the Ledger.
+  /// Status message while Vizor checks whether the Zcash app is open on the Ledger.
   ///
   /// In en, this message translates to:
-  /// **'Veylor is checking the Zcash app.'**
+  /// **'Vizor is checking the Zcash app.'**
   String get ledgerVizorCheckingZcash;
 
   /// [security] Status while waiting for the user to approve on the Ledger.
@@ -6926,10 +6926,10 @@ abstract class AppLocalizations {
   /// **'Estimated arrival time'**
   String get migrationEstimatedArrivalTime;
 
-  /// [security] Explains that the computer must stay unlocked with Veylor running so the next migration transaction can be sent.
+  /// [security] Explains that the computer must stay unlocked with Vizor running so the next migration transaction can be sent.
   ///
   /// In en, this message translates to:
-  /// **'Your computer needs to be unlocked with Veylor running so we can send the next migration transaction'**
+  /// **'Your computer needs to be unlocked with Vizor running so we can send the next migration transaction'**
   String get migrationExpectKeepRunningBody;
 
   /// Explains that the duration depends on the migrated amount.
@@ -9058,7 +9058,7 @@ abstract class AppLocalizations {
   /// [security] Text on the lock screen shown during a running migration, explaining that the wallet auto-locked after inactivity.
   ///
   /// In en, this message translates to:
-  /// **'We auto-locked Veylor after 10 minutes of inactivity.'**
+  /// **'We auto-locked Vizor after 10 minutes of inactivity.'**
   String get migrationPrivacyLockDescription;
 
   /// Carousel tip about block time; {seconds} is the average number of seconds per block.
@@ -10799,7 +10799,7 @@ abstract class AppLocalizations {
   /// Description of the secret passphrase option on the desktop import method picker.
   ///
   /// In en, this message translates to:
-  /// **'Veylor or any other Zcash wallet'**
+  /// **'Vizor or any other Zcash wallet'**
   String get onboardingImportSecretPassphraseDescriptionDesktop;
 
   /// Description of the secret passphrase option on the mobile import method picker.
@@ -10889,7 +10889,7 @@ abstract class AppLocalizations {
   /// [security] Bold phrase inside onboardingLostPasswordBody; the action of wiping the whole app. Written so that it fits after 'the only way ... is to'.
   ///
   /// In en, this message translates to:
-  /// **'completely reset Veylor app'**
+  /// **'completely reset Vizor app'**
   String get onboardingLostPasswordResetAction;
 
   /// Disabled label of the destructive reset button while its safety countdown runs; {seconds} is the number of seconds left.
@@ -11315,7 +11315,7 @@ abstract class AppLocalizations {
   /// Subtitle on the desktop unlock screen asking for the wallet password.
   ///
   /// In en, this message translates to:
-  /// **'Enter your password to open Veylor.'**
+  /// **'Enter your password to open Vizor.'**
   String get onboardingUnlockDescription;
 
   /// Subtitle of the mobile unlock screen asking for the 6-digit passcode.
@@ -12062,7 +12062,7 @@ abstract class AppLocalizations {
   /// [security] Warning on a batch whose payment could not be confirmed; the links must not be shared until the payment is confirmed.
   ///
   /// In en, this message translates to:
-  /// **'Veylor hasn’t confirmed that the payment was sent. Keep these cards and check again before sharing any links.'**
+  /// **'Vizor hasn’t confirmed that the payment was sent. Keep these cards and check again before sharing any links.'**
   String get paymentLinkBatchPaymentUnconfirmed;
 
   /// Error shown when preparing the cards of a group failed.
@@ -12714,7 +12714,7 @@ abstract class AppLocalizations {
   /// Explanation on the desktop redeem screen when redeeming creates a new wallet.
   ///
   /// In en, this message translates to:
-  /// **'Once the card is redeemed, we will create a new Veylor wallet with the card’s balance.'**
+  /// **'Once the card is redeemed, we will create a new Vizor wallet with the card’s balance.'**
   String get paymentLinkEntryExplainWalletDesktop;
 
   /// Explanation on the redeem screen when redeeming creates a new account in an existing wallet.
@@ -12954,7 +12954,7 @@ abstract class AppLocalizations {
   /// Third step of the Gift Cards explainer on desktop.
   ///
   /// In en, this message translates to:
-  /// **'Recipient can redeem the Card in their Veylor wallet using the Link. The sender covers the deposit and redeem fees, so the recipient receives the full Card amount.'**
+  /// **'Recipient can redeem the Card in their Vizor wallet using the Link. The sender covers the deposit and redeem fees, so the recipient receives the full Card amount.'**
   String get paymentLinkHowDesktopStepRedeem;
 
   /// [security] Second step of the Gift Cards explainer on desktop; the link contains a secret that gives access to the funds and must only be sent to the recipient.
@@ -14015,7 +14015,7 @@ abstract class AppLocalizations {
   /// [security] Bullet in the transparent address explainer: funds must be shielded before sending. {ticker} is the currency ticker.
   ///
   /// In en, this message translates to:
-  /// **'After receiving {ticker} to your transparent address, Veylor will guide you to shield the balance. Otherwise, you won\'t be able to send it.'**
+  /// **'After receiving {ticker} to your transparent address, Vizor will guide you to shield the balance. Otherwise, you won\'t be able to send it.'**
   String receiveInfoTransparentShieldFirst(String ticker);
 
   /// [security] Subtitle of the transparent address explainer; its activity is public.
@@ -16049,7 +16049,7 @@ abstract class AppLocalizations {
   /// Settings row that opens the About screen.
   ///
   /// In en, this message translates to:
-  /// **'About Veylor'**
+  /// **'About Vizor'**
   String get settingsRowAboutVizor;
 
   /// Mobile Settings row that opens the account rename sheet (title case).
@@ -16076,10 +16076,10 @@ abstract class AppLocalizations {
   /// **'Change password'**
   String get settingsRowChangePassword;
 
-  /// Settings row that links the desktop wallet with the Veylor mobile app.
+  /// Settings row that links the desktop wallet with the Vizor mobile app.
   ///
   /// In en, this message translates to:
-  /// **'Link Veylor mobile'**
+  /// **'Link Vizor mobile'**
   String get settingsRowLinkMobile;
 
   /// Settings row that opens the user's gift cards.
@@ -16493,7 +16493,7 @@ abstract class AppLocalizations {
   /// Button that quits the app after wallet data was removed.
   ///
   /// In en, this message translates to:
-  /// **'Close Veylor'**
+  /// **'Close Vizor'**
   String get settingsUninstallCloseApp;
 
   /// Phrase naming the current computer on other platforms, inserted into the uninstall warning.
@@ -16523,25 +16523,25 @@ abstract class AppLocalizations {
   /// Final instruction on other platforms after wallet data was removed.
   ///
   /// In en, this message translates to:
-  /// **'To finish uninstallation, remove the Veylor app from this device.'**
+  /// **'To finish uninstallation, remove the Vizor app from this device.'**
   String get settingsUninstallFinishGeneric;
 
   /// Final instruction on macOS after wallet data was removed.
   ///
   /// In en, this message translates to:
-  /// **'To finish uninstallation, remove the Veylor app from Applications.'**
+  /// **'To finish uninstallation, remove the Vizor app from Applications.'**
   String get settingsUninstallFinishMac;
 
   /// Final instruction on Windows after wallet data was removed.
   ///
   /// In en, this message translates to:
-  /// **'To finish uninstallation, uninstall Veylor from Windows settings.'**
+  /// **'To finish uninstallation, uninstall Vizor from Windows settings.'**
   String get settingsUninstallFinishWindows;
 
   /// Subtitle of the access confirmation card on the uninstall screen.
   ///
   /// In en, this message translates to:
-  /// **'To uninstall Veylor.'**
+  /// **'To uninstall Vizor.'**
   String get settingsUninstallPasswordSubtitle;
 
   /// Title shown while wallet data is being deleted.
@@ -16571,7 +16571,7 @@ abstract class AppLocalizations {
   /// [security] Irreversible-deletion warning on the uninstall screen. {device} is one of the phrases 'this Mac', 'this PC' or 'this device'.
   ///
   /// In en, this message translates to:
-  /// **'Veylor will delete wallet data and secure storage from {device}. Unshared gift card links will be permanently lost.'**
+  /// **'Vizor will delete wallet data and secure storage from {device}. Unshared gift card links will be permanently lost.'**
   String settingsUninstallWipeSubtitle(String device);
 
   /// Short value on the Updates row while an update is being applied.
@@ -16673,7 +16673,7 @@ abstract class AppLocalizations {
   /// Status line in the Updates dialog while the app restarts.
   ///
   /// In en, this message translates to:
-  /// **'Restarting Veylor.'**
+  /// **'Restarting Vizor.'**
   String get settingsUpdateStatusRestarting;
 
   /// Status line in the Updates dialog for builds that cannot update themselves.
@@ -16685,7 +16685,7 @@ abstract class AppLocalizations {
   /// Status line in the Updates dialog when no newer version exists.
   ///
   /// In en, this message translates to:
-  /// **'Veylor is up to date.'**
+  /// **'Vizor is up to date.'**
   String get settingsUpdateStatusUpToDate;
 
   /// Short value on the Updates row when updates are not supported in this build.
@@ -16865,7 +16865,7 @@ abstract class AppLocalizations {
   /// Body of the error dialog when updates are unavailable over Tor; direct requests were deliberately not used.
   ///
   /// In en, this message translates to:
-  /// **'Veylor kept direct requests blocked. Retry updates in Settings, or turn off Tor and try the download again.'**
+  /// **'Vizor kept direct requests blocked. Retry updates in Settings, or turn off Tor and try the download again.'**
   String get settingsWinUpdateTorBlockedBody;
 
   /// Title of the error dialog shown when the user picked Tor for a Windows update but updates cannot go through Tor.
@@ -16874,10 +16874,10 @@ abstract class AppLocalizations {
   /// **'Software updates unavailable over Tor'**
   String get settingsWinUpdateTorBlockedTitle;
 
-  /// [security] Explains that updating over Tor is slower and that turning Tor off makes every Veylor request direct.
+  /// [security] Explains that updating over Tor is slower and that turning Tor off makes every Vizor request direct.
   ///
   /// In en, this message translates to:
-  /// **'Updating over Tor may take longer. Turning Tor off switches all Veylor network requests to a direct connection.'**
+  /// **'Updating over Tor may take longer. Turning Tor off switches all Vizor network requests to a direct connection.'**
   String get settingsWinUpdateTorChoiceBody;
 
   /// Title of the dialog that asks whether to download the Windows update over Tor.
@@ -16889,7 +16889,7 @@ abstract class AppLocalizations {
   /// Body of the error dialog when turning off Tor failed and the update stayed blocked.
   ///
   /// In en, this message translates to:
-  /// **'Tor remains on, so Veylor kept the update blocked. Try again, or turn off Tor in Settings before downloading.'**
+  /// **'Tor remains on, so Vizor kept the update blocked. Try again, or turn off Tor in Settings before downloading.'**
   String get settingsWinUpdateTorOffFailedBody;
 
   /// Title of the error dialog when turning off Tor for the update failed.
@@ -20218,10 +20218,10 @@ abstract class AppLocalizations {
   /// **'Deselect all'**
   String get walletLinkDeselectAll;
 
-  /// [security] Subtitle of the desktop password prompt that explains why the password is needed before linking Veylor Mobile.
+  /// [security] Subtitle of the desktop password prompt that explains why the password is needed before linking Vizor Mobile.
   ///
   /// In en, this message translates to:
-  /// **'To link Veylor Mobile.'**
+  /// **'To link Vizor Mobile.'**
   String get walletLinkDesktopConfirmSubtitle;
 
   /// First sentence of the privacy note on the placeholder shown before the QR code appears; followed by a bold sentence.
@@ -20305,13 +20305,13 @@ abstract class AppLocalizations {
   /// Body text on the desktop link screen before a code is generated.
   ///
   /// In en, this message translates to:
-  /// **'Connect this wallet to your Veylor mobile app by scanning a one-time QR code.'**
+  /// **'Connect this wallet to your Vizor mobile app by scanning a one-time QR code.'**
   String get walletLinkDesktopInitialBody;
 
   /// Body of the success screen when the number of imported items is unknown.
   ///
   /// In en, this message translates to:
-  /// **'Veylor Mobile was linked to this wallet.'**
+  /// **'Vizor Mobile was linked to this wallet.'**
   String get walletLinkDesktopLinkedBody;
 
   /// Body of the success screen reporting how many accounts and contacts the phone imported.
@@ -20323,7 +20323,7 @@ abstract class AppLocalizations {
   /// Title of the success screen after the phone finished linking.
   ///
   /// In en, this message translates to:
-  /// **'Veylor Mobile linked successfully'**
+  /// **'Vizor Mobile linked successfully'**
   String get walletLinkDesktopLinkedTitle;
 
   /// Status line under the QR code saying the single code is ready to be scanned.
@@ -20338,16 +20338,16 @@ abstract class AppLocalizations {
   /// **'Regenerate'**
   String get walletLinkDesktopRegenerate;
 
-  /// Instruction under the QR title; the arrows separate menu steps in the mobile app and 'Link Veylor Desktop' is a menu name.
+  /// Instruction under the QR title; the arrows separate menu steps in the mobile app and 'Link Vizor Desktop' is a menu name.
   ///
   /// In en, this message translates to:
-  /// **'Open Veylor on your phone → Add a wallet → Link Veylor Desktop'**
+  /// **'Open Vizor on your phone → Add a wallet → Link Vizor Desktop'**
   String get walletLinkDesktopScanBody;
 
   /// Title above the one-time QR code on the desktop link screen.
   ///
   /// In en, this message translates to:
-  /// **'Scan with Veylor mobile'**
+  /// **'Scan with Vizor mobile'**
   String get walletLinkDesktopScanTitle;
 
   /// Button on the desktop link screen that generates the one-time QR code.

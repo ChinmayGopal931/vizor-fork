@@ -500,7 +500,7 @@ const _legacySwapMessages = <String, SwapMessage>{
   SwapNotice(
     SwapNoticeKind.broadcastUnknown,
   ),
-  'The transaction reached the network, but Vizor could not store it locally. Do not try again until sync or an explorer confirms the latest status.': // l10n-ignore: legacy persisted text
+  'The transaction reached the network, but Veylor could not store it locally. Do not try again until sync or an explorer confirms the latest status.': // l10n-ignore: legacy persisted text
   SwapNotice(
     SwapNoticeKind.broadcastStorageFailed,
   ),

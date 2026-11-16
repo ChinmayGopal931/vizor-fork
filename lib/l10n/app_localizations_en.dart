@@ -838,12 +838,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String appLinuxUpdateAvailable(String version) {
-    return 'Veylor $version is available.';
+    return 'Vizor $version is available.';
   }
 
   @override
   String appLinuxUpdateAvailableTor(String version) {
-    return 'Veylor $version is available. The release page opens in your browser, outside Veylor’s Tor connection.';
+    return 'Vizor $version is available. The release page opens in your browser, outside Vizor’s Tor connection.';
   }
 
   @override
@@ -2181,7 +2181,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homePasswordChangeUnverified =>
-      'We couldn\'t verify the previous password change. Try again or restart Veylor.';
+      'We couldn\'t verify the previous password change. Try again or restart Vizor.';
 
   @override
   String get homePayInUsdc => 'Pay in USDC';
@@ -2420,24 +2420,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get keyringLockedBody =>
-      'Veylor cannot access your system keyring. Unlock the keyring, then choose Retry. A system prompt may ask for your keyring password.';
+      'Vizor cannot access your system keyring. Unlock the keyring, then choose Retry. A system prompt may ask for your keyring password.';
 
   @override
   String get keyringNoResponse => 'The keyring did not respond. Try again.';
 
   @override
-  String get keyringOpeningTitle => 'Opening Veylor';
+  String get keyringOpeningTitle => 'Opening Vizor';
 
   @override
   String get keyringPromptBody =>
-      'Complete any system keyring prompt to continue in Veylor.';
+      'Complete any system keyring prompt to continue in Vizor.';
 
   @override
-  String get keyringRestartHint => 'Quit and restart Veylor to try again.';
+  String get keyringRestartHint => 'Quit and restart Vizor to try again.';
 
   @override
   String get keyringSaveUnconfirmedBody =>
-      'Veylor could not confirm whether your changes were saved. Quit and restart Veylor before continuing.';
+      'Vizor could not confirm whether your changes were saved. Quit and restart Vizor before continuing.';
 
   @override
   String get keyringSaveUnconfirmedTitle => 'Unable to confirm the save';
@@ -2457,7 +2457,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get keyringUnreadableBody =>
-      'Veylor could not read the data in your system keyring. Retry after restoring access, or quit Veylor.';
+      'Vizor could not read the data in your system keyring. Retry after restoring access, or quit Vizor.';
 
   @override
   String get keyringUnreadableTitle => 'Unable to read secure storage';
@@ -3366,7 +3366,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ledgerMacosBluetoothPrompt =>
-      'macOS may ask for Bluetooth access. If prompted, allow access for Veylor.';
+      'macOS may ask for Bluetooth access. If prompted, allow access for Vizor.';
 
   @override
   String get ledgerMismatchChooseHolder =>
@@ -3833,7 +3833,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Unlock Ledger and confirm opening Zcash if prompted.';
 
   @override
-  String get ledgerVizorCheckingZcash => 'Veylor is checking the Zcash app.';
+  String get ledgerVizorCheckingZcash => 'Vizor is checking the Zcash app.';
 
   @override
   String get ledgerWaitingForApproval => 'Waiting for approval…';
@@ -4150,7 +4150,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationExpectKeepRunningBody =>
-      'Your computer needs to be unlocked with Veylor running so we can send the next migration transaction';
+      'Your computer needs to be unlocked with Vizor running so we can send the next migration transaction';
 
   @override
   String get migrationExpectLongBody =>
@@ -5535,7 +5535,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationPrivacyLockDescription =>
-      'We auto-locked Veylor after 10 minutes of inactivity.';
+      'We auto-locked Vizor after 10 minutes of inactivity.';
 
   @override
   String migrationProgressTipBlockTime(String seconds) {
@@ -6589,7 +6589,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onboardingImportSecretPassphraseDescriptionDesktop =>
-      'Veylor or any other Zcash wallet';
+      'Vizor or any other Zcash wallet';
 
   @override
   String get onboardingImportSecretPassphraseDescriptionMobile =>
@@ -6645,7 +6645,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingLostPasswordImportAction => 'import accounts again';
 
   @override
-  String get onboardingLostPasswordResetAction => 'completely reset Veylor app';
+  String get onboardingLostPasswordResetAction => 'completely reset Vizor app';
 
   @override
   String onboardingLostPasswordResetCountdown(int seconds) {
@@ -6891,7 +6891,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onboardingUnlockDescription =>
-      'Enter your password to open Veylor.';
+      'Enter your password to open Vizor.';
 
   @override
   String get onboardingUnlockEnterPasscode =>
@@ -7324,7 +7324,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get paymentLinkBatchPaymentUnconfirmed =>
-      'Veylor hasn’t confirmed that the payment was sent. Keep these cards and check again before sharing any links.';
+      'Vizor hasn’t confirmed that the payment was sent. Keep these cards and check again before sharing any links.';
 
   @override
   String get paymentLinkBatchPrepareFailed =>
@@ -7736,7 +7736,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get paymentLinkEntryExplainWalletDesktop =>
-      'Once the card is redeemed, we will create a new Veylor wallet with the card’s balance.';
+      'Once the card is redeemed, we will create a new Vizor wallet with the card’s balance.';
 
   @override
   String get paymentLinkEntryExplanationAccount =>
@@ -7882,7 +7882,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get paymentLinkHowDesktopStepRedeem =>
-      'Recipient can redeem the Card in their Veylor wallet using the Link. The sender covers the deposit and redeem fees, so the recipient receives the full Card amount.';
+      'Recipient can redeem the Card in their Vizor wallet using the Link. The sender covers the deposit and redeem fees, so the recipient receives the full Card amount.';
 
   @override
   String get paymentLinkHowDesktopStepShare =>
@@ -8570,7 +8570,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String receiveInfoTransparentShieldFirst(String ticker) {
-    return 'After receiving $ticker to your transparent address, Veylor will guide you to shield the balance. Otherwise, you won\'t be able to send it.';
+    return 'After receiving $ticker to your transparent address, Vizor will guide you to shield the balance. Otherwise, you won\'t be able to send it.';
   }
 
   @override
@@ -9803,7 +9803,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsProfilePictureCustom => 'Custom';
 
   @override
-  String get settingsRowAboutVizor => 'About Veylor';
+  String get settingsRowAboutVizor => 'About Vizor';
 
   @override
   String get settingsRowAccountNameMobile => 'Account Name';
@@ -9818,7 +9818,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsRowChangePassword => 'Change password';
 
   @override
-  String get settingsRowLinkMobile => 'Link Veylor mobile';
+  String get settingsRowLinkMobile => 'Link Vizor mobile';
 
   @override
   String get settingsRowMyGiftCards => 'My gift cards';
@@ -10062,7 +10062,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t check for incoming gift cards. Try again before uninstalling.';
 
   @override
-  String get settingsUninstallCloseApp => 'Close Veylor';
+  String get settingsUninstallCloseApp => 'Close Vizor';
 
   @override
   String get settingsUninstallDeviceGeneric => 'this device';
@@ -10078,18 +10078,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsUninstallFinishGeneric =>
-      'To finish uninstallation, remove the Veylor app from this device.';
+      'To finish uninstallation, remove the Vizor app from this device.';
 
   @override
   String get settingsUninstallFinishMac =>
-      'To finish uninstallation, remove the Veylor app from Applications.';
+      'To finish uninstallation, remove the Vizor app from Applications.';
 
   @override
   String get settingsUninstallFinishWindows =>
-      'To finish uninstallation, uninstall Veylor from Windows settings.';
+      'To finish uninstallation, uninstall Vizor from Windows settings.';
 
   @override
-  String get settingsUninstallPasswordSubtitle => 'To uninstall Veylor.';
+  String get settingsUninstallPasswordSubtitle => 'To uninstall Vizor.';
 
   @override
   String get settingsUninstallRemovingTitle => 'Removing data...';
@@ -10107,7 +10107,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String settingsUninstallWipeSubtitle(String device) {
-    return 'Veylor will delete wallet data and secure storage from $device. Unshared gift card links will be permanently lost.';
+    return 'Vizor will delete wallet data and secure storage from $device. Unshared gift card links will be permanently lost.';
   }
 
   @override
@@ -10165,14 +10165,14 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsUpdateStatusRestarting => 'Restarting Veylor.';
+  String get settingsUpdateStatusRestarting => 'Restarting Vizor.';
 
   @override
   String get settingsUpdateStatusUnsupported =>
       'Updates are available in the installed Windows app.';
 
   @override
-  String get settingsUpdateStatusUpToDate => 'Veylor is up to date.';
+  String get settingsUpdateStatusUpToDate => 'Vizor is up to date.';
 
   @override
   String get settingsUpdateUnavailable => 'Unavailable';
@@ -10276,7 +10276,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsWinUpdateTorBlockedBody =>
-      'Veylor kept direct requests blocked. Retry updates in Settings, or turn off Tor and try the download again.';
+      'Vizor kept direct requests blocked. Retry updates in Settings, or turn off Tor and try the download again.';
 
   @override
   String get settingsWinUpdateTorBlockedTitle =>
@@ -10284,14 +10284,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsWinUpdateTorChoiceBody =>
-      'Updating over Tor may take longer. Turning Tor off switches all Veylor network requests to a direct connection.';
+      'Updating over Tor may take longer. Turning Tor off switches all Vizor network requests to a direct connection.';
 
   @override
   String get settingsWinUpdateTorChoiceTitle => 'Use Tor for this update?';
 
   @override
   String get settingsWinUpdateTorOffFailedBody =>
-      'Tor remains on, so Veylor kept the update blocked. Try again, or turn off Tor in Settings before downloading.';
+      'Tor remains on, so Vizor kept the update blocked. Try again, or turn off Tor in Settings before downloading.';
 
   @override
   String get settingsWinUpdateTorOffFailedTitle => 'Couldn\'t turn off Tor';
@@ -12411,7 +12411,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get walletLinkDeselectAll => 'Deselect all';
 
   @override
-  String get walletLinkDesktopConfirmSubtitle => 'To link Veylor Mobile.';
+  String get walletLinkDesktopConfirmSubtitle => 'To link Vizor Mobile.';
 
   @override
   String get walletLinkDesktopEncryptedNotice =>
@@ -12467,11 +12467,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get walletLinkDesktopInitialBody =>
-      'Connect this wallet to your Veylor mobile app by scanning a one-time QR code.';
+      'Connect this wallet to your Vizor mobile app by scanning a one-time QR code.';
 
   @override
   String get walletLinkDesktopLinkedBody =>
-      'Veylor Mobile was linked to this wallet.';
+      'Vizor Mobile was linked to this wallet.';
 
   @override
   String walletLinkDesktopLinkedCounts(int accountCount, int contactCount) {
@@ -12491,8 +12491,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get walletLinkDesktopLinkedTitle =>
-      'Veylor Mobile linked successfully';
+  String get walletLinkDesktopLinkedTitle => 'Vizor Mobile linked successfully';
 
   @override
   String get walletLinkDesktopReadyToScan => '1/1 Ready to scan...';
@@ -12502,10 +12501,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get walletLinkDesktopScanBody =>
-      'Open Veylor on your phone → Add a wallet → Link Veylor Desktop';
+      'Open Vizor on your phone → Add a wallet → Link Vizor Desktop';
 
   @override
-  String get walletLinkDesktopScanTitle => 'Scan with Veylor mobile';
+  String get walletLinkDesktopScanTitle => 'Scan with Vizor mobile';
 
   @override
   String get walletLinkDesktopStartLinking => 'Start linking';

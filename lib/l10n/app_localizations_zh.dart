@@ -792,12 +792,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String appLinuxUpdateAvailable(String version) {
-    return 'Veylor $version 已发布。';
+    return 'Vizor $version 已发布。';
   }
 
   @override
   String appLinuxUpdateAvailableTor(String version) {
-    return 'Veylor $version 已发布。发布页面将在浏览器中打开，不经过 Veylor 的 Tor 连接。';
+    return 'Vizor $version 已发布。发布页面将在浏览器中打开，不经过 Vizor 的 Tor 连接。';
   }
 
   @override
@@ -2084,7 +2084,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeNu7Title => 'NU7 升级已上线。\n这意味着什么？';
 
   @override
-  String get homePasswordChangeUnverified => '无法确认之前的密码更改。请重试或重新启动 Veylor。';
+  String get homePasswordChangeUnverified => '无法确认之前的密码更改。请重试或重新启动 Vizor。';
 
   @override
   String get homePayInUsdc => '使用 USDC 支付';
@@ -2299,23 +2299,23 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get keyringLockedBody =>
-      'Veylor 无法访问系统密钥环。请解锁密钥环，然后选择“重试”。系统可能会要求输入密钥环密码。';
+      'Vizor 无法访问系统密钥环。请解锁密钥环，然后选择“重试”。系统可能会要求输入密钥环密码。';
 
   @override
   String get keyringNoResponse => '密钥环没有响应。请重试。';
 
   @override
-  String get keyringOpeningTitle => '正在打开 Veylor';
+  String get keyringOpeningTitle => '正在打开 Vizor';
 
   @override
-  String get keyringPromptBody => '请完成系统密钥环提示以继续使用 Veylor。';
+  String get keyringPromptBody => '请完成系统密钥环提示以继续使用 Vizor。';
 
   @override
-  String get keyringRestartHint => '请退出并重新启动 Veylor 后重试。';
+  String get keyringRestartHint => '请退出并重新启动 Vizor 后重试。';
 
   @override
   String get keyringSaveUnconfirmedBody =>
-      'Veylor 无法确认你的更改是否已保存。请先退出并重新启动 Veylor 再继续。';
+      'Vizor 无法确认你的更改是否已保存。请先退出并重新启动 Vizor 再继续。';
 
   @override
   String get keyringSaveUnconfirmedTitle => '无法确认是否已保存';
@@ -2334,7 +2334,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get keyringUnreadableBody =>
-      'Veylor 无法读取系统密钥环中的数据。请在恢复访问后重试，或退出 Veylor。';
+      'Vizor 无法读取系统密钥环中的数据。请在恢复访问后重试，或退出 Vizor。';
 
   @override
   String get keyringUnreadableTitle => '无法读取安全存储';
@@ -3152,7 +3152,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get ledgerMacosBluetoothPrompt =>
-      'macOS 可能会请求蓝牙权限。如果出现提示，请允许 Veylor 访问。';
+      'macOS 可能会请求蓝牙权限。如果出现提示，请允许 Vizor 访问。';
 
   @override
   String get ledgerMismatchChooseHolder => '请选择保存此账户的 Ledger。已保存的连接未更改。';
@@ -3582,7 +3582,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ledgerVerifyingSavedDevice => '请解锁 Ledger，如有提示请确认打开 Zcash。';
 
   @override
-  String get ledgerVizorCheckingZcash => 'Veylor 正在检查 Zcash 应用。';
+  String get ledgerVizorCheckingZcash => 'Vizor 正在检查 Zcash 应用。';
 
   @override
   String get ledgerWaitingForApproval => '正在等待批准…';
@@ -3874,7 +3874,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get migrationExpectKeepRunningBody =>
-      '你的电脑需要保持解锁且 Veylor 正在运行，这样我们才能发送下一笔迁移交易';
+      '你的电脑需要保持解锁且 Vizor 正在运行，这样我们才能发送下一笔迁移交易';
 
   @override
   String get migrationExpectLongBody => '根据迁移金额的不同，Ironwood 迁移可能需要数小时到几天不等。';
@@ -5135,7 +5135,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get migrationPreparingBatch => '正在准备批次...';
 
   @override
-  String get migrationPrivacyLockDescription => '由于 10 分钟无操作，我们已自动锁定 Veylor。';
+  String get migrationPrivacyLockDescription => '由于 10 分钟无操作，我们已自动锁定 Vizor。';
 
   @override
   String migrationProgressTipBlockTime(String seconds) {
@@ -6111,7 +6111,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get onboardingImportSecretPassphraseDescriptionDesktop =>
-      'Veylor 或任何其他 Zcash 钱包';
+      'Vizor 或任何其他 Zcash 钱包';
 
   @override
   String get onboardingImportSecretPassphraseDescriptionMobile =>
@@ -6162,7 +6162,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onboardingLostPasswordImportAction => '重新导入账户';
 
   @override
-  String get onboardingLostPasswordResetAction => '完全重置 Veylor 应用';
+  String get onboardingLostPasswordResetAction => '完全重置 Vizor 应用';
 
   @override
   String onboardingLostPasswordResetCountdown(int seconds) {
@@ -6390,7 +6390,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onboardingUnlockBiometricReason => '解锁你的钱包';
 
   @override
-  String get onboardingUnlockDescription => '输入密码以打开 Veylor。';
+  String get onboardingUnlockDescription => '输入密码以打开 Vizor。';
 
   @override
   String get onboardingUnlockEnterPasscode => '输入数字密码以打开 Veylor';
@@ -6794,7 +6794,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get paymentLinkBatchPaymentUnconfirmed =>
-      'Veylor 尚未确认付款已发送。请保留这些卡片，并在分享任何链接前再次检查。';
+      'Vizor 尚未确认付款已发送。请保留这些卡片，并在分享任何链接前再次检查。';
 
   @override
   String get paymentLinkBatchPrepareFailed => '无法准备这些卡片。';
@@ -7176,7 +7176,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get paymentLinkEntryExplainWalletDesktop =>
-      '领取卡片后，我们会创建一个包含卡片余额的新 Veylor 钱包。';
+      '领取卡片后，我们会创建一个包含卡片余额的新 Vizor 钱包。';
 
   @override
   String get paymentLinkEntryExplanationAccount => '创建新账户以接收卡片余额。';
@@ -7305,7 +7305,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get paymentLinkHowDesktopStepRedeem =>
-      '接收人可使用链接在其 Veylor 钱包中领取卡片。发送者承担充值和领取手续费，因此接收人将收到完整的卡片金额。';
+      '接收人可使用链接在其 Vizor 钱包中领取卡片。发送者承担充值和领取手续费，因此接收人将收到完整的卡片金额。';
 
   @override
   String get paymentLinkHowDesktopStepShare =>
@@ -7921,7 +7921,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String receiveInfoTransparentShieldFirst(String ticker) {
-    return '公开地址收到 $ticker 后，Veylor 会引导你将其转为隐私余额，完成转换后才能发送。';
+    return '公开地址收到 $ticker 后，Vizor 会引导你将其转为隐私余额，完成转换后才能发送。';
   }
 
   @override
@@ -9034,7 +9034,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsProfilePictureCustom => '自定义';
 
   @override
-  String get settingsRowAboutVizor => '关于 Veylor';
+  String get settingsRowAboutVizor => '关于 Vizor';
 
   @override
   String get settingsRowAccountNameMobile => '账户名称';
@@ -9049,7 +9049,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsRowChangePassword => '修改密码';
 
   @override
-  String get settingsRowLinkMobile => '关联 Veylor 手机端';
+  String get settingsRowLinkMobile => '关联 Vizor 手机端';
 
   @override
   String get settingsRowMyGiftCards => '我的礼品卡';
@@ -9271,7 +9271,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsUninstallClaimCheckFailed => '无法检查领取中的礼品卡。卸载前请重试。';
 
   @override
-  String get settingsUninstallCloseApp => '关闭 Veylor';
+  String get settingsUninstallCloseApp => '关闭 Vizor';
 
   @override
   String get settingsUninstallDeviceGeneric => '此设备';
@@ -9286,16 +9286,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsUninstallDoneTitle => '你的数据已被删除';
 
   @override
-  String get settingsUninstallFinishGeneric => '要完成卸载，请从此设备移除 Veylor 应用。';
+  String get settingsUninstallFinishGeneric => '要完成卸载，请从此设备移除 Vizor 应用。';
 
   @override
-  String get settingsUninstallFinishMac => '要完成卸载，请从“应用程序”中移除 Veylor 应用。';
+  String get settingsUninstallFinishMac => '要完成卸载，请从“应用程序”中移除 Vizor 应用。';
 
   @override
-  String get settingsUninstallFinishWindows => '要完成卸载，请在 Windows 设置中卸载 Veylor。';
+  String get settingsUninstallFinishWindows => '要完成卸载，请在 Windows 设置中卸载 Vizor。';
 
   @override
-  String get settingsUninstallPasswordSubtitle => '请输入密码以卸载 Veylor。';
+  String get settingsUninstallPasswordSubtitle => '请输入密码以卸载 Vizor。';
 
   @override
   String get settingsUninstallRemovingTitle => '正在删除数据...';
@@ -9311,7 +9311,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String settingsUninstallWipeSubtitle(String device) {
-    return 'Veylor 将从$device删除钱包数据和安全存储。尚未分享的礼品卡链接将永久丢失。';
+    return 'Vizor 将从$device删除钱包数据和安全存储。尚未分享的礼品卡链接将永久丢失。';
   }
 
   @override
@@ -9369,13 +9369,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get settingsUpdateStatusRestarting => '正在重启 Veylor。';
+  String get settingsUpdateStatusRestarting => '正在重启 Vizor。';
 
   @override
   String get settingsUpdateStatusUnsupported => '请在已安装的 Windows 应用中更新。';
 
   @override
-  String get settingsUpdateStatusUpToDate => 'Veylor 已是最新版本。';
+  String get settingsUpdateStatusUpToDate => 'Vizor 已是最新版本。';
 
   @override
   String get settingsUpdateUnavailable => '不可用';
@@ -9471,21 +9471,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsWinUpdateTorBlockedBody =>
-      'Veylor 仍在阻止直接请求。请在设置中重试更新，或关闭 Tor 后重新下载。';
+      'Vizor 仍在阻止直接请求。请在设置中重试更新，或关闭 Tor 后重新下载。';
 
   @override
   String get settingsWinUpdateTorBlockedTitle => '无法通过 Tor 进行软件更新';
 
   @override
   String get settingsWinUpdateTorChoiceBody =>
-      '通过 Tor 更新可能耗时更长。关闭 Tor 会将 Veylor 的所有网络请求切换为直接连接。';
+      '通过 Tor 更新可能耗时更长。关闭 Tor 会将 Vizor 的所有网络请求切换为直接连接。';
 
   @override
   String get settingsWinUpdateTorChoiceTitle => '此次更新是否使用 Tor？';
 
   @override
   String get settingsWinUpdateTorOffFailedBody =>
-      'Tor 仍处于开启状态，因此 Veylor 继续阻止更新。请重试，或在设置中关闭 Tor 后再下载。';
+      'Tor 仍处于开启状态，因此 Vizor 继续阻止更新。请重试，或在设置中关闭 Tor 后再下载。';
 
   @override
   String get settingsWinUpdateTorOffFailedTitle => '无法关闭 Tor';
@@ -11444,7 +11444,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get walletLinkDeselectAll => '取消全选';
 
   @override
-  String get walletLinkDesktopConfirmSubtitle => '请输入密码以关联 Veylor 手机端。';
+  String get walletLinkDesktopConfirmSubtitle => '请输入密码以关联 Vizor 手机端。';
 
   @override
   String get walletLinkDesktopEncryptedNotice => '该二维码使用一次性密钥加密，一分钟后失效。';
@@ -11488,10 +11488,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get walletLinkDesktopGenerateNewCode => '生成新二维码';
 
   @override
-  String get walletLinkDesktopInitialBody => '扫描一次性二维码，将此钱包连接到 Veylor 手机应用。';
+  String get walletLinkDesktopInitialBody => '扫描一次性二维码，将此钱包连接到 Vizor 手机应用。';
 
   @override
-  String get walletLinkDesktopLinkedBody => 'Veylor 手机端已与此钱包关联。';
+  String get walletLinkDesktopLinkedBody => 'Vizor 手机端已与此钱包关联。';
 
   @override
   String walletLinkDesktopLinkedCounts(int accountCount, int contactCount) {
@@ -11499,7 +11499,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get walletLinkDesktopLinkedTitle => 'Veylor 手机端关联成功';
+  String get walletLinkDesktopLinkedTitle => 'Vizor 手机端关联成功';
 
   @override
   String get walletLinkDesktopReadyToScan => '1/1 已可扫描...';
@@ -11508,11 +11508,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get walletLinkDesktopRegenerate => '重新生成';
 
   @override
-  String get walletLinkDesktopScanBody =>
-      '在手机上打开 Veylor → 添加钱包 → 关联 Veylor 桌面版';
+  String get walletLinkDesktopScanBody => '在手机上打开 Vizor → 添加钱包 → 关联 Vizor 桌面版';
 
   @override
-  String get walletLinkDesktopScanTitle => '用 Veylor 手机端扫描';
+  String get walletLinkDesktopScanTitle => '用 Vizor 手机端扫描';
 
   @override
   String get walletLinkDesktopStartLinking => '开始关联';

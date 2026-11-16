@@ -38,7 +38,7 @@
     "notices": [
       {"kind": "expired", "txid": "4f1c", "expiry_height": 3000000, "chain_height": 2999990}
     ],
-    "message": "Hardware signing request expired before broadcast: txid=4f1c, expiry height 3000000, current chain height 2999990. Start the signing flow again so Vizor can build a fresh transaction."
+    "message": "Hardware signing request expired before broadcast: txid=4f1c, expiry height 3000000, current chain height 2999990. Start the signing flow again so Veylor can build a fresh transaction."
   },
   {
     "notices": [

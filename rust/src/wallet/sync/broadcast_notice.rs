@@ -169,7 +169,7 @@ impl BroadcastNotice {
             kind::EXPIRED => format!(
                 "Hardware signing request expired before broadcast: txid={txid}, \
                  expiry height {}, current chain height {}. \
-                 Start the signing flow again so Vizor can build a fresh transaction.",
+                 Start the signing flow again so Veylor can build a fresh transaction.",
                 self.expiry_height.unwrap_or_default(),
                 self.chain_height.unwrap_or_default(),
             ),

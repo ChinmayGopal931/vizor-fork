@@ -1101,7 +1101,7 @@
   "@appExitBackHint": {
     "description": "Hint shown on Android after the first Back press at the root, telling the user to press Back again to exit the app."
   },
-  "appLinuxUpdateAvailable": "Veylor {version} is available.",
+  "appLinuxUpdateAvailable": "Vizor {version} is available.",
   "@appLinuxUpdateAvailable": {
     "description": "Snackbar on Linux announcing a new version is available.",
     "placeholders": {
@@ -1110,7 +1110,7 @@
       }
     }
   },
-  "appLinuxUpdateAvailableTor": "Veylor {version} is available. The release page opens in your browser, outside Veylor’s Tor connection.",
+  "appLinuxUpdateAvailableTor": "Vizor {version} is available. The release page opens in your browser, outside Vizor’s Tor connection.",
   "@appLinuxUpdateAvailableTor": {
     "description": "Snackbar on Linux announcing a new version when Tor is on; warns that the release page opens in the browser outside Tor.",
     "placeholders": {
@@ -2879,7 +2879,7 @@
   "@homeNu7Title": {
     "description": "Two-line title of the announcement shown after the NU7 network upgrade activates."
   },
-  "homePasswordChangeUnverified": "We couldn't verify the previous password change. Try again or restart Veylor.",
+  "homePasswordChangeUnverified": "We couldn't verify the previous password change. Try again or restart Vizor.",
   "@homePasswordChangeUnverified": {
     "description": "[security] Notice on desktop Home when the outcome of an earlier wallet password change could not be confirmed."
   },
@@ -3171,7 +3171,7 @@
   "@incomingLinkPaymentBusy": {
     "description": "Toast shown when a payment request link is opened while the user is in the middle of a task."
   },
-  "keyringLockedBody": "Veylor cannot access your system keyring. Unlock the keyring, then choose Retry. A system prompt may ask for your keyring password.",
+  "keyringLockedBody": "Vizor cannot access your system keyring. Unlock the keyring, then choose Retry. A system prompt may ask for your keyring password.",
   "@keyringLockedBody": {
     "description": "[security] Body of the Linux keyring screen when the system keyring is locked; mentions the keyring password prompt."
   },
@@ -3179,19 +3179,19 @@
   "@keyringNoResponse": {
     "description": "Message on the Linux keyring screen when a retry or cancel request failed."
   },
-  "keyringOpeningTitle": "Opening Veylor",
+  "keyringOpeningTitle": "Opening Vizor",
   "@keyringOpeningTitle": {
     "description": "Title of the startup screen on Linux while the app loads."
   },
-  "keyringPromptBody": "Complete any system keyring prompt to continue in Veylor.",
+  "keyringPromptBody": "Complete any system keyring prompt to continue in Vizor.",
   "@keyringPromptBody": {
     "description": "Body of the Linux keyring screen while waiting for the user to answer a system keyring prompt."
   },
-  "keyringRestartHint": "Quit and restart Veylor to try again.",
+  "keyringRestartHint": "Quit and restart Vizor to try again.",
   "@keyringRestartHint": {
     "description": "Body of the startup failure screen on Linux."
   },
-  "keyringSaveUnconfirmedBody": "Veylor could not confirm whether your changes were saved. Quit and restart Veylor before continuing.",
+  "keyringSaveUnconfirmedBody": "Vizor could not confirm whether your changes were saved. Quit and restart Vizor before continuing.",
   "@keyringSaveUnconfirmedBody": {
     "description": "Body of the Linux keyring screen when it is unknown whether a save succeeded."
   },
@@ -3215,7 +3215,7 @@
   "@keyringUnlockTitle": {
     "description": "Title asking the user to unlock the system keyring (Linux)."
   },
-  "keyringUnreadableBody": "Veylor could not read the data in your system keyring. Retry after restoring access, or quit Veylor.",
+  "keyringUnreadableBody": "Vizor could not read the data in your system keyring. Retry after restoring access, or quit Vizor.",
   "@keyringUnreadableBody": {
     "description": "Body of the Linux keyring screen when the stored keyring data is unreadable."
   },
@@ -4316,7 +4316,7 @@
   "@ledgerKeepZcashOpen": {
     "description": "Note under the Open Zcash step: do not close the Zcash app on the Ledger."
   },
-  "ledgerMacosBluetoothPrompt": "macOS may ask for Bluetooth access. If prompted, allow access for Veylor.",
+  "ledgerMacosBluetoothPrompt": "macOS may ask for Bluetooth access. If prompted, allow access for Vizor.",
   "@ledgerMacosBluetoothPrompt": {
     "description": "Hint shown while checking Bluetooth access on macOS."
   },
@@ -4902,9 +4902,9 @@
   "@ledgerVerifyingSavedDevice": {
     "description": "[security] Message while verifying the saved Ledger."
   },
-  "ledgerVizorCheckingZcash": "Veylor is checking the Zcash app.",
+  "ledgerVizorCheckingZcash": "Vizor is checking the Zcash app.",
   "@ledgerVizorCheckingZcash": {
-    "description": "Status message while Veylor checks whether the Zcash app is open on the Ledger."
+    "description": "Status message while Vizor checks whether the Zcash app is open on the Ledger."
   },
   "ledgerWaitingForApproval": "Waiting for approval…",
   "@ledgerWaitingForApproval": {
@@ -5279,9 +5279,9 @@
   "@migrationEstimatedArrivalTime": {
     "description": "Label on the legacy migration card for when the batch is expected to arrive."
   },
-  "migrationExpectKeepRunningBody": "Your computer needs to be unlocked with Veylor running so we can send the next migration transaction",
+  "migrationExpectKeepRunningBody": "Your computer needs to be unlocked with Vizor running so we can send the next migration transaction",
   "@migrationExpectKeepRunningBody": {
-    "description": "[security] Explains that the computer must stay unlocked with Veylor running so the next migration transaction can be sent."
+    "description": "[security] Explains that the computer must stay unlocked with Vizor running so the next migration transaction can be sent."
   },
   "migrationExpectLongBody": "Ironwood migrations can take anywhere from several hours up to a couple days depending on your migration amount.",
   "@migrationExpectLongBody": {
@@ -7035,7 +7035,7 @@
   "@migrationPreparingBatch": {
     "description": "[security] Button label while a migration batch is being prepared for signing."
   },
-  "migrationPrivacyLockDescription": "We auto-locked Veylor after 10 minutes of inactivity.",
+  "migrationPrivacyLockDescription": "We auto-locked Vizor after 10 minutes of inactivity.",
   "@migrationPrivacyLockDescription": {
     "description": "[security] Text on the lock screen shown during a running migration, explaining that the wallet auto-locked after inactivity."
   },
@@ -8435,7 +8435,7 @@
   "@onboardingImportSecretPassphrase": {
     "description": "[security] Option on the import method picker for importing a wallet from its secret passphrase."
   },
-  "onboardingImportSecretPassphraseDescriptionDesktop": "Veylor or any other Zcash wallet",
+  "onboardingImportSecretPassphraseDescriptionDesktop": "Vizor or any other Zcash wallet",
   "@onboardingImportSecretPassphraseDescriptionDesktop": {
     "description": "Description of the secret passphrase option on the desktop import method picker."
   },
@@ -8508,7 +8508,7 @@
   "@onboardingLostPasswordImportAction": {
     "description": "Bold phrase inside onboardingLostPasswordBody; the user has to import their accounts again after the reset."
   },
-  "onboardingLostPasswordResetAction": "completely reset Veylor app",
+  "onboardingLostPasswordResetAction": "completely reset Vizor app",
   "@onboardingLostPasswordResetAction": {
     "description": "[security] Bold phrase inside onboardingLostPasswordBody; the action of wiping the whole app. Written so that it fits after 'the only way ... is to'."
   },
@@ -8807,7 +8807,7 @@
   "@onboardingUnlockBiometricReason": {
     "description": "Reason line shown in the system biometric prompt when the wallet is unlocked with Face ID, Touch ID or fingerprint."
   },
-  "onboardingUnlockDescription": "Enter your password to open Veylor.",
+  "onboardingUnlockDescription": "Enter your password to open Vizor.",
   "@onboardingUnlockDescription": {
     "description": "Subtitle on the desktop unlock screen asking for the wallet password."
   },
@@ -9371,7 +9371,7 @@
   "@paymentLinkBatchOverBalance": {
     "description": "Error shown when the group costs more than the available balance."
   },
-  "paymentLinkBatchPaymentUnconfirmed": "Veylor hasn’t confirmed that the payment was sent. Keep these cards and check again before sharing any links.",
+  "paymentLinkBatchPaymentUnconfirmed": "Vizor hasn’t confirmed that the payment was sent. Keep these cards and check again before sharing any links.",
   "@paymentLinkBatchPaymentUnconfirmed": {
     "description": "[security] Warning on a batch whose payment could not be confirmed; the links must not be shared until the payment is confirmed."
   },
@@ -9909,7 +9909,7 @@
   "@paymentLinkEntryExplainAccountDesktop": {
     "description": "Explanation on the desktop redeem screen when redeeming creates a new account in the wallet."
   },
-  "paymentLinkEntryExplainWalletDesktop": "Once the card is redeemed, we will create a new Veylor wallet with the card’s balance.",
+  "paymentLinkEntryExplainWalletDesktop": "Once the card is redeemed, we will create a new Vizor wallet with the card’s balance.",
   "@paymentLinkEntryExplainWalletDesktop": {
     "description": "Explanation on the desktop redeem screen when redeeming creates a new wallet."
   },
@@ -10084,7 +10084,7 @@
   "@paymentLinkHowDesktopStepCreate": {
     "description": "First step of the Gift Cards explainer on desktop."
   },
-  "paymentLinkHowDesktopStepRedeem": "Recipient can redeem the Card in their Veylor wallet using the Link. The sender covers the deposit and redeem fees, so the recipient receives the full Card amount.",
+  "paymentLinkHowDesktopStepRedeem": "Recipient can redeem the Card in their Vizor wallet using the Link. The sender covers the deposit and redeem fees, so the recipient receives the full Card amount.",
   "@paymentLinkHowDesktopStepRedeem": {
     "description": "Third step of the Gift Cards explainer on desktop."
   },
@@ -10898,7 +10898,7 @@
   "@receiveInfoTransparentRotates": {
     "description": "[security] Bullet in the transparent address explainer: the transparent address rotates after receiving funds."
   },
-  "receiveInfoTransparentShieldFirst": "After receiving {ticker} to your transparent address, Veylor will guide you to shield the balance. Otherwise, you won't be able to send it.",
+  "receiveInfoTransparentShieldFirst": "After receiving {ticker} to your transparent address, Vizor will guide you to shield the balance. Otherwise, you won't be able to send it.",
   "@receiveInfoTransparentShieldFirst": {
     "description": "[security] Bullet in the transparent address explainer: funds must be shielded before sending. {ticker} is the currency ticker.",
     "placeholders": {
@@ -12428,7 +12428,7 @@
   "@settingsProfilePictureCustom": {
     "description": "Value shown on the profile picture row when the picture is not one of the built-in options."
   },
-  "settingsRowAboutVizor": "About Veylor",
+  "settingsRowAboutVizor": "About Vizor",
   "@settingsRowAboutVizor": {
     "description": "Settings row that opens the About screen."
   },
@@ -12448,9 +12448,9 @@
   "@settingsRowChangePassword": {
     "description": "[security] Settings row that opens the change wallet password screen."
   },
-  "settingsRowLinkMobile": "Link Veylor mobile",
+  "settingsRowLinkMobile": "Link Vizor mobile",
   "@settingsRowLinkMobile": {
-    "description": "Settings row that links the desktop wallet with the Veylor mobile app."
+    "description": "Settings row that links the desktop wallet with the Vizor mobile app."
   },
   "settingsRowMyGiftCards": "My gift cards",
   "@settingsRowMyGiftCards": {
@@ -12734,7 +12734,7 @@
   "@settingsUninstallClaimCheckFailed": {
     "description": "Error shown when checking for gift cards that are still being claimed failed."
   },
-  "settingsUninstallCloseApp": "Close Veylor",
+  "settingsUninstallCloseApp": "Close Vizor",
   "@settingsUninstallCloseApp": {
     "description": "Button that quits the app after wallet data was removed."
   },
@@ -12754,19 +12754,19 @@
   "@settingsUninstallDoneTitle": {
     "description": "Title shown after wallet data was deleted."
   },
-  "settingsUninstallFinishGeneric": "To finish uninstallation, remove the Veylor app from this device.",
+  "settingsUninstallFinishGeneric": "To finish uninstallation, remove the Vizor app from this device.",
   "@settingsUninstallFinishGeneric": {
     "description": "Final instruction on other platforms after wallet data was removed."
   },
-  "settingsUninstallFinishMac": "To finish uninstallation, remove the Veylor app from Applications.",
+  "settingsUninstallFinishMac": "To finish uninstallation, remove the Vizor app from Applications.",
   "@settingsUninstallFinishMac": {
     "description": "Final instruction on macOS after wallet data was removed."
   },
-  "settingsUninstallFinishWindows": "To finish uninstallation, uninstall Veylor from Windows settings.",
+  "settingsUninstallFinishWindows": "To finish uninstallation, uninstall Vizor from Windows settings.",
   "@settingsUninstallFinishWindows": {
     "description": "Final instruction on Windows after wallet data was removed."
   },
-  "settingsUninstallPasswordSubtitle": "To uninstall Veylor.",
+  "settingsUninstallPasswordSubtitle": "To uninstall Vizor.",
   "@settingsUninstallPasswordSubtitle": {
     "description": "Subtitle of the access confirmation card on the uninstall screen."
   },
@@ -12786,7 +12786,7 @@
   "@settingsUninstallWipeFailed": {
     "description": "Error shown when wiping wallet data failed part way."
   },
-  "settingsUninstallWipeSubtitle": "Veylor will delete wallet data and secure storage from {device}. Unshared gift card links will be permanently lost.",
+  "settingsUninstallWipeSubtitle": "Vizor will delete wallet data and secure storage from {device}. Unshared gift card links will be permanently lost.",
   "@settingsUninstallWipeSubtitle": {
     "description": "[security] Irreversible-deletion warning on the uninstall screen. {device} is one of the phrases 'this Mac', 'this PC' or 'this device'.",
     "placeholders": {
@@ -12874,7 +12874,7 @@
       }
     }
   },
-  "settingsUpdateStatusRestarting": "Restarting Veylor.",
+  "settingsUpdateStatusRestarting": "Restarting Vizor.",
   "@settingsUpdateStatusRestarting": {
     "description": "Status line in the Updates dialog while the app restarts."
   },
@@ -12882,7 +12882,7 @@
   "@settingsUpdateStatusUnsupported": {
     "description": "Status line in the Updates dialog for builds that cannot update themselves."
   },
-  "settingsUpdateStatusUpToDate": "Veylor is up to date.",
+  "settingsUpdateStatusUpToDate": "Vizor is up to date.",
   "@settingsUpdateStatusUpToDate": {
     "description": "Status line in the Updates dialog when no newer version exists."
   },
@@ -13007,7 +13007,7 @@
   "@settingsWinUpdateStartFailedTitle": {
     "description": "Title of the error dialog when the update download could not start; the message below comes from the updater."
   },
-  "settingsWinUpdateTorBlockedBody": "Veylor kept direct requests blocked. Retry updates in Settings, or turn off Tor and try the download again.",
+  "settingsWinUpdateTorBlockedBody": "Vizor kept direct requests blocked. Retry updates in Settings, or turn off Tor and try the download again.",
   "@settingsWinUpdateTorBlockedBody": {
     "description": "Body of the error dialog when updates are unavailable over Tor; direct requests were deliberately not used."
   },
@@ -13015,15 +13015,15 @@
   "@settingsWinUpdateTorBlockedTitle": {
     "description": "Title of the error dialog shown when the user picked Tor for a Windows update but updates cannot go through Tor."
   },
-  "settingsWinUpdateTorChoiceBody": "Updating over Tor may take longer. Turning Tor off switches all Veylor network requests to a direct connection.",
+  "settingsWinUpdateTorChoiceBody": "Updating over Tor may take longer. Turning Tor off switches all Vizor network requests to a direct connection.",
   "@settingsWinUpdateTorChoiceBody": {
-    "description": "[security] Explains that updating over Tor is slower and that turning Tor off makes every Veylor request direct."
+    "description": "[security] Explains that updating over Tor is slower and that turning Tor off makes every Vizor request direct."
   },
   "settingsWinUpdateTorChoiceTitle": "Use Tor for this update?",
   "@settingsWinUpdateTorChoiceTitle": {
     "description": "Title of the dialog that asks whether to download the Windows update over Tor."
   },
-  "settingsWinUpdateTorOffFailedBody": "Tor remains on, so Veylor kept the update blocked. Try again, or turn off Tor in Settings before downloading.",
+  "settingsWinUpdateTorOffFailedBody": "Tor remains on, so Vizor kept the update blocked. Try again, or turn off Tor in Settings before downloading.",
   "@settingsWinUpdateTorOffFailedBody": {
     "description": "Body of the error dialog when turning off Tor failed and the update stayed blocked."
   },
@@ -15955,9 +15955,9 @@
   "@walletLinkDeselectAll": {
     "description": "Action in a list section header that clears the selection."
   },
-  "walletLinkDesktopConfirmSubtitle": "To link Veylor Mobile.",
+  "walletLinkDesktopConfirmSubtitle": "To link Vizor Mobile.",
   "@walletLinkDesktopConfirmSubtitle": {
-    "description": "[security] Subtitle of the desktop password prompt that explains why the password is needed before linking Veylor Mobile."
+    "description": "[security] Subtitle of the desktop password prompt that explains why the password is needed before linking Vizor Mobile."
   },
   "walletLinkDesktopEncryptedNotice": "The code is encrypted with a one-time key and expires after a minute.",
   "@walletLinkDesktopEncryptedNotice": {
@@ -16016,11 +16016,11 @@
   "@walletLinkDesktopGenerateNewCode": {
     "description": "Button on the expired-link screen that creates a new one-time code."
   },
-  "walletLinkDesktopInitialBody": "Connect this wallet to your Veylor mobile app by scanning a one-time QR code.",
+  "walletLinkDesktopInitialBody": "Connect this wallet to your Vizor mobile app by scanning a one-time QR code.",
   "@walletLinkDesktopInitialBody": {
     "description": "Body text on the desktop link screen before a code is generated."
   },
-  "walletLinkDesktopLinkedBody": "Veylor Mobile was linked to this wallet.",
+  "walletLinkDesktopLinkedBody": "Vizor Mobile was linked to this wallet.",
   "@walletLinkDesktopLinkedBody": {
     "description": "Body of the success screen when the number of imported items is unknown."
   },
@@ -16036,7 +16036,7 @@
       }
     }
   },
-  "walletLinkDesktopLinkedTitle": "Veylor Mobile linked successfully",
+  "walletLinkDesktopLinkedTitle": "Vizor Mobile linked successfully",
   "@walletLinkDesktopLinkedTitle": {
     "description": "Title of the success screen after the phone finished linking."
   },
@@ -16048,11 +16048,11 @@
   "@walletLinkDesktopRegenerate": {
     "description": "Button under the QR code that creates a fresh one-time code."
   },
-  "walletLinkDesktopScanBody": "Open Veylor on your phone → Add a wallet → Link Veylor Desktop",
+  "walletLinkDesktopScanBody": "Open Vizor on your phone → Add a wallet → Link Vizor Desktop",
   "@walletLinkDesktopScanBody": {
-    "description": "Instruction under the QR title; the arrows separate menu steps in the mobile app and 'Link Veylor Desktop' is a menu name."
+    "description": "Instruction under the QR title; the arrows separate menu steps in the mobile app and 'Link Vizor Desktop' is a menu name."
   },
-  "walletLinkDesktopScanTitle": "Scan with Veylor mobile",
+  "walletLinkDesktopScanTitle": "Scan with Vizor mobile",
   "@walletLinkDesktopScanTitle": {
     "description": "Title above the one-time QR code on the desktop link screen."
   },
