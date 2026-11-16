@@ -555,8 +555,10 @@ Ledger accounts keep the decorative dot style.
 - Figma-authored display headings may keep title case.
 - **Which brand.** Mobile copy names the app Veylor. The desktop builds still
   ship as Vizor (macOS, Linux and Windows product names), so desktop-only
-  copy keeps Vizor, and so do strings that mean upstream itself: the
-  donation's recipient and the links to upstream's GitHub and website. Strings
+  copy keeps Vizor, and so do the links to upstream's GitHub and website.
+  Donations go to the owner's address (`kVizorDonationAddress`, kept equal to
+  README.md's by a test); only desktop Settings offers them, so their copy
+  says Vizor. Strings
   live in the ARB files (`lib/l10n`) and both forms are do-not-translate
   glossary terms. When an upstream merge brings a string that names the app,
   give it the brand of where it shows, in English, Korean and Chinese.
