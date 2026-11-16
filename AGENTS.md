@@ -935,13 +935,16 @@ around an upgrade, where those rules live
 Tor covers the app's foreground traffic only. The desired route lives in Rust
 process memory, applied by the Dart layer at startup and by the settings
 toggle; every foreground lightwalletd and HTTP path goes through the
-policy-aware openers and fails closed while Tor is starting or broken, except
-a sync's large block download (below).
+policy-aware openers and fails closed while Tor is starting or broken. Upstream
+exempts a sync's large block download; Veylor does not (below).
 
-- **Large block downloads may leave Tor; nothing identifying does.** With Tor
-  and Private queries on, a sync session whose estimated direct download
-  reaches `DIRECT_BLOCK_DOWNLOAD_MIN_BYTES` downloads its main-scan batches
-  over `open_block_download_lwd_transport`. Keep these rules:
+- **Veylor keeps large block downloads on Tor.** Upstream lets a sync with
+  Tor and Private queries on download its main-scan batches over a direct
+  connection once the estimate reaches `DIRECT_BLOCK_DOWNLOAD_MIN_BYTES`.
+  Veylor turns that route off (`DIRECT_BLOCK_DOWNLOADS` in
+  `rust/src/wallet/sync_engine/mod.rs`): the direct session shows the server
+  the device's IP address and resume height, and timing ties it to the Tor
+  session. Keep it off. Upstream's rules, should the route come back:
   - Only the batches `batch_uses_direct_connection` allows use it. Every
     request that carries an address, txid or transaction stays on Tor.
   - Never dial an onion server directly (`block_download_can_go_direct`).

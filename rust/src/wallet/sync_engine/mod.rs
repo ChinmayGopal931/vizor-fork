@@ -243,6 +243,12 @@ const PREFETCH_RETRY_PAUSES: [std::time::Duration; 2] = [
     std::time::Duration::from_secs(1),
     std::time::Duration::from_secs(4),
 ];
+/// Whether a sync session may fetch its scan batches over a direct connection
+/// while Tor is on ([fetches_blocks_directly]). Veylor keeps them on Tor: a
+/// direct session shows the server the device's IP address with the height
+/// its scan resumes from, and its timing ties it to the session's Tor
+/// connection.
+const DIRECT_BLOCK_DOWNLOADS: bool = false;
 /// Estimated compact-block download at or above which a sync session fetches
 /// its scan batches directly while Tor is on. A direct session shows the
 /// server the device's IP address with the height its scan resumes from, so a
@@ -4157,7 +4163,8 @@ async fn run_sync_impl(
         checking_cycle,
         scanned_before_session,
     );
-    let opens_direct = checking_cycle == 0
+    let opens_direct = DIRECT_BLOCK_DOWNLOADS
+        && checking_cycle == 0
         && !main_scan_complete
         && lwd::block_download_can_go_direct(lightwalletd_url)
         && fetches_blocks_directly(
