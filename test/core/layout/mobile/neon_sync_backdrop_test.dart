@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/providers/network_privacy_provider.dart';
@@ -40,6 +41,7 @@ void main() {
   }) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: Builder(
@@ -183,6 +185,7 @@ void main() {
     bool? scrolled;
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: NeonSyncScrolled(
           builder: (context, value) {
             scrolled = value;

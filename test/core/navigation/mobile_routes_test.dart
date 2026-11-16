@@ -267,7 +267,7 @@ void main() {
       expect(screen, findsOneWidget);
       expect(tester.getSize(screen), const Size(393, 852));
       expect(find.byType(AppMobileShell), findsNothing);
-      expect(find.text('Enter your passcode to reset Vizor.'), findsOneWidget);
+      expect(find.text('Enter your passcode to reset Veylor.'), findsOneWidget);
       expect(
         ModalRoute.of(tester.element(screen)),
         isA<CupertinoRouteTransitionMixin<dynamic>>(),

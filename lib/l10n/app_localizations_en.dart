@@ -8570,7 +8570,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String receiveInfoTransparentShieldFirst(String ticker) {
-    return 'After receiving $ticker to your transparent address, Vizor will guide you to shield the balance. Otherwise, you won\'t be able to send it.';
+    return 'After receiving $ticker to your transparent address, Veylor will guide you to shield the balance. Otherwise, you won\'t be able to send it.';
   }
 
   @override

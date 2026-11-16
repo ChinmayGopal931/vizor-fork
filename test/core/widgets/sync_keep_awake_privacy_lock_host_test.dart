@@ -571,7 +571,7 @@ void main() {
       final numberRect = tester.getRect(
         find.byKey(const ValueKey('sync_keep_awake_privacy_number')),
       );
-      final bodyRect = tester.getRect(find.text('Vizor is syncing'));
+      final bodyRect = tester.getRect(find.text('Veylor is syncing'));
       final noteRect = tester.getRect(
         find.byKey(const ValueKey('sync_keep_awake_privacy_slowdown')),
       );
@@ -588,8 +588,8 @@ void main() {
         bodyRect.height,
         closeTo(
           tester.platformDispatcher.textScaleFactor *
-              AppTypography.bodyMediumStrong.fontSize! *
-              AppTypography.bodyMediumStrong.height!,
+              AppTypography.bodyMedium.fontSize! *
+              AppTypography.bodyMedium.height!,
           0.5,
         ),
       );
@@ -600,7 +600,7 @@ void main() {
     }),
   );
 
-  testWidgets('at iOS xxxLarge the text rises instead of reaching lower', (
+  testWidgets('at iOS xxxLarge the text stays inside the ring', (
     tester,
   ) async {
     _setMobileViewport(tester);
@@ -617,18 +617,12 @@ void main() {
     await tester.pump(kSyncScanSlowdownAfter);
     await tester.pump(const Duration(milliseconds: 500));
 
-    final ring = _ringRect(tester);
-    final number = tester.getRect(
-      find.byKey(const ValueKey('sync_keep_awake_privacy_number')),
-    );
-    final note = tester.getRect(
-      find.byKey(const ValueKey('sync_keep_awake_privacy_slowdown')),
-    );
-    expect(number.top - ring.top, lessThan(118));
-    expect(note.bottom - ring.top, lessThanOrEqualTo(240));
+    // Veylor's lockup is centered in the ring, so the largest default size
+    // must still keep every line inside its ticks.
+    _expectLockupTextInsideRingTicks(tester);
   }, variant: TargetPlatformVariant.only(TargetPlatform.iOS));
 
-  testWidgets('the number keeps its Figma position at the default text size', (
+  testWidgets('the text stays inside the ring at the default text size', (
     tester,
   ) async {
     _setMobileViewport(tester);
@@ -643,10 +637,7 @@ void main() {
     await tester.pump(kSyncScanSlowdownAfter);
     await tester.pump(const Duration(milliseconds: 500));
 
-    final numberTop = tester
-        .getRect(find.byKey(const ValueKey('sync_keep_awake_privacy_number')))
-        .top;
-    expect(numberTop - _ringRect(tester).top, 118);
+    _expectLockupTextInsideRingTicks(tester);
   });
 
   group('Sync Complete over a catch-up', () {
@@ -702,12 +693,12 @@ void main() {
       tester,
     ) async {
       await lockedComplete(tester);
-      expect(find.text('Sync Complete'), findsOneWidget);
+      expect(find.text('SYNC COMPLETE'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('sync_keep_awake_privacy_done_check')),
         findsOneWidget,
       );
-      expect(tester.widget<Text>(body).data, 'Unlock Vizor to continue');
+      expect(tester.widget<Text>(body).data, 'Unlock Veylor to continue');
     });
 
     testWidgets('the subtitle says new blocks are syncing during a short '
@@ -719,7 +710,7 @@ void main() {
       sync.emit(catchUp(DateTime.now()));
       await tester.pump();
       expect(container.read(syncShortCatchUpProvider), isTrue);
-      expect(find.text('Sync Complete'), findsOneWidget);
+      expect(find.text('SYNC COMPLETE'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('sync_keep_awake_privacy_done_check')),
         findsOneWidget,
@@ -727,12 +718,15 @@ void main() {
       expect(tester.widget<Text>(body).data, 'Syncing new blocks…');
       expect(find.bySemanticsLabel('Syncing new blocks'), findsOneWidget);
       // The same slot: nothing moves.
-      expect(tester.getRect(body).topLeft, idleRect.topLeft);
+      // Veylor's body is centered and as wide as its line, so its slot is
+      // its center and top.
+      expect(tester.getRect(body).center.dx, idleRect.center.dx);
+      expect(tester.getRect(body).top, idleRect.top);
       expect(tester.getRect(body).height, idleRect.height);
 
       sync.emit(completed());
       await tester.pump();
-      expect(tester.widget<Text>(body).data, 'Unlock Vizor to continue');
+      expect(tester.widget<Text>(body).data, 'Unlock Veylor to continue');
       semantics.dispose();
     });
 
@@ -756,12 +750,15 @@ void main() {
       sync.emit(catchUp(startedAt, scanned: synced + 1));
       await tester.pump(const Duration(seconds: 1));
       expect(container.read(syncShortCatchUpProvider), isFalse);
-      expect(find.text('Sync Complete'), findsOneWidget);
+      // Veylor's done sign is still switching on: it lights a second after
+      // the lock shows, then decrypts its title.
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.text('SYNC COMPLETE'), findsOneWidget);
       expect(tester.widget<Text>(body).data, 'Syncing new blocks…');
 
       sync.emit(completed());
       await tester.pump();
-      expect(tester.widget<Text>(body).data, 'Unlock Vizor to continue');
+      expect(tester.widget<Text>(body).data, 'Unlock Veylor to continue');
     });
   });
 
@@ -1687,7 +1684,7 @@ void main() {
       notifier.updateDevicePower(SyncScanSlowdown.heat);
       await tester.pump();
       expect(find.text('Slowed down so your phone can cool'), findsOneWidget);
-      expect(find.text('Vizor is syncing'), findsOneWidget);
+      expect(find.text('Veylor is syncing'), findsOneWidget);
 
       notifier.updateDevicePower(null);
       await tester.pump();
@@ -2031,19 +2028,18 @@ Rect _ringRect(WidgetTester tester) => tester.getRect(
   find.byWidgetPredicate(
     (widget) =>
         widget is CustomPaint &&
-        widget.painter.runtimeType.toString() ==
-            '_SyncKeepAwakeSegmentedRingPainter',
+        widget.painter.runtimeType.toString() == '_SyncKeepAwakeRingPainter',
   ),
 );
 
 /// Every line of the lockup's body and slowdown note lies within the inner
-/// ends of the ring's filled ticks (radius 122.5, less half their stroke),
-/// [inset] pixels inside them.
+/// ends of the neon ring's ticks (radius 133.5 less half their 7 px length,
+/// less half their stroke), [inset] pixels inside them.
 void _expectLockupTextInsideRingTicks(WidgetTester tester, {double inset = 2}) {
   final center = _ringRect(tester).center;
-  final limit = 122.5 - 1.25 - inset;
+  final limit = 130 - 0.5 - inset;
   for (final finder in [
-    find.text('Vizor is syncing'),
+    find.text('Veylor is syncing'),
     find.descendant(
       of: find.byKey(const ValueKey('sync_keep_awake_privacy_slowdown')),
       matching: find.byType(RichText),

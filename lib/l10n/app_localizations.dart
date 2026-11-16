@@ -14015,7 +14015,7 @@ abstract class AppLocalizations {
   /// [security] Bullet in the transparent address explainer: funds must be shielded before sending. {ticker} is the currency ticker.
   ///
   /// In en, this message translates to:
-  /// **'After receiving {ticker} to your transparent address, Vizor will guide you to shield the balance. Otherwise, you won\'t be able to send it.'**
+  /// **'After receiving {ticker} to your transparent address, Veylor will guide you to shield the balance. Otherwise, you won\'t be able to send it.'**
   String receiveInfoTransparentShieldFirst(String ticker);
 
   /// [security] Subtitle of the transparent address explainer; its activity is public.

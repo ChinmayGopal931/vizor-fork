@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_pending_payment.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/railgun_models.dart';
@@ -45,6 +46,7 @@ void main() {
     refreshes = 0;
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: MobilePrivateUsdView(
@@ -190,6 +192,7 @@ void main() {
     final posted = now.subtract(const Duration(seconds: 65));
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: Center(
@@ -372,6 +375,7 @@ void main() {
     Future<void> pump({required bool bridgeAvailable}) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
           home: AppTheme(
             data: AppThemeData.dark,
             child: MobilePrivateUsdView(

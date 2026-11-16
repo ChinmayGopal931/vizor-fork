@@ -1903,6 +1903,7 @@ void main() {
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
           builder: (context, child) =>
               AppTheme(data: AppThemeData.dark, child: child!),
           home: Scaffold(
@@ -1943,6 +1944,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         builder: (context, child) =>
             AppTheme(data: AppThemeData.dark, child: child!),
         home: Scaffold(

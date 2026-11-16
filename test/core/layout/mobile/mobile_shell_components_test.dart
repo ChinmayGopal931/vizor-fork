@@ -103,7 +103,7 @@ void main() {
       );
     }
 
-    final synced = await slotFor('Vizor is synced');
+    final synced = await slotFor('Veylor is synced');
     expect(await slotFor('Syncing\u2026'), synced);
     expect(await slotFor('45% Syncing\u2026'), synced);
     // The label sits at the slot's trailing edge, next to the bar.

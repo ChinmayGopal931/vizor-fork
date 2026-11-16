@@ -11,6 +11,8 @@ import 'figma_compare_capture_support.dart';
 
 void runSwapActivityCaptures(AppFormFactor formFactor) {
   final mobile = formFactor == AppFormFactor.mobile;
+  // Veylor's mobile status tabs draw their labels as uppercase captions.
+  String tab(String label) => mobile ? label.toUpperCase() : label;
   final lane = mobile ? 'mobile' : 'desktop';
   const outputOverride = String.fromEnvironment('ACTIVITY_CAPTURE_OUTPUT');
   const details = bool.fromEnvironment('ACTIVITY_CAPTURE_DETAILS');
@@ -39,7 +41,7 @@ void runSwapActivityCaptures(AppFormFactor formFactor) {
         ),
         beforeCapture: (tester) async {
           expect(
-            find.text(pay ? 'Payment progress' : 'Swap progress'),
+            find.text(tab(pay ? 'Payment progress' : 'Swap progress')),
             findsOneWidget,
           );
           expect(find.text('View on NEAR Intents'), findsOneWidget);
@@ -61,7 +63,7 @@ void runSwapActivityCaptures(AppFormFactor formFactor) {
           expect(card.right - link.right, closeTo(AppSpacing.sm, 0.01));
           expect(card.bottom - link.bottom, closeTo(AppSpacing.sm, 0.01));
           if (!details) return;
-          await tester.tap(find.text('Transaction details'));
+          await tester.tap(find.text(tab('Transaction details')));
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 100));
           // Repaint the whole surface: retained header layers can otherwise

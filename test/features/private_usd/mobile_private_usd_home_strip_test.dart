@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/privacy/privacy_mask.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
@@ -39,6 +40,7 @@ void main() {
     var taps = 0;
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: Center(
@@ -148,6 +150,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: Builder(builder: buildMobileHomePrivateUsdArrivingUseCase),
@@ -174,6 +177,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: Builder(builder: buildMobileHomeDefaultUseCase),

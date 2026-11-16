@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_receive_sheet.dart';
@@ -53,6 +54,7 @@ void main() {
     final switched = <PrivateUsdReceiveKind>[];
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: Scaffold(

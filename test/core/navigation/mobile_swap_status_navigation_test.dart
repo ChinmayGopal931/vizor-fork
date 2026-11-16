@@ -11,7 +11,6 @@ import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
 import 'package:zcash_wallet/src/core/config/swap_feature_config.dart';
 import 'package:zcash_wallet/src/core/l10n/app_language.dart';
-import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_shell.dart';
 import 'package:zcash_wallet/src/core/navigation/mobile_destinations.dart';
 import 'package:zcash_wallet/src/core/navigation/mobile_exit_back_guard.dart';
 import 'package:zcash_wallet/src/core/navigation/mobile_routes.dart';
@@ -49,8 +48,10 @@ void main() {
           final route = ModalRoute.of(tester.element(screen))!;
           expect(route.popGestureEnabled, isTrue);
           expect(router.canPop(), isTrue);
+          // Veylor's Swap is a page pushed over the tabs, not a tab: the
+          // composer itself stays under the receipt.
           expect(
-            find.byType(AppMobileShell, skipOffstage: false),
+            find.byType(MobileSwapScreen, skipOffstage: false),
             findsOneWidget,
           );
           expect(

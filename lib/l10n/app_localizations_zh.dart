@@ -7921,7 +7921,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String receiveInfoTransparentShieldFirst(String ticker) {
-    return '公开地址收到 $ticker 后，Vizor 会引导你将其转为隐私余额，完成转换后才能发送。';
+    return '公开地址收到 $ticker 后，Veylor 会引导你将其转为隐私余额，完成转换后才能发送。';
   }
 
   @override

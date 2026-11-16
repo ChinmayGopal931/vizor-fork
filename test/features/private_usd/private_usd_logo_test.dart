@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/activity/widgets/activity_feed.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_presentation.dart';
@@ -52,6 +53,7 @@ void main() {
   Future<void> pump(WidgetTester tester, Widget child) async {
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(data: AppThemeData.dark, child: child),
       ),
     );

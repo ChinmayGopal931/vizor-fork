@@ -8442,7 +8442,7 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String receiveInfoTransparentShieldFirst(String ticker) {
-    return '공‍개 주‍소‍로 $ticker‍를 받‍으‍면 Vizor‍가 비‍공‍개 전‍환‍을 안‍내‍해‍요. 잔‍액‍을 비‍공‍개‍로 전‍환‍한 뒤‍에 보‍낼 수 있‍어‍요.';
+    return '공‍개 주‍소‍로 $ticker‍를 받‍으‍면 Veylor‍가 비‍공‍개 전‍환‍을 안‍내‍해‍요. 잔‍액‍을 비‍공‍개‍로 전‍환‍한 뒤‍에 보‍낼 수 있‍어‍요.';
   }
 
   @override

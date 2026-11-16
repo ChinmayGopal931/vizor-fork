@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/models/portfolio_chart_models.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/widgets/mobile/mobile_portfolio_chart_card.dart';
@@ -24,6 +25,7 @@ PortfolioChartData _data({
 
 Widget _card(PortfolioChartViewState state) {
   return MaterialApp(
+    localizationsDelegates: appLocalizationsDelegates,
     builder: (context, child) =>
         AppTheme(data: AppThemeData.dark, child: child!),
     home: Scaffold(
@@ -90,6 +92,7 @@ void main() {
     final picked = <PortfolioChartRange>[];
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         builder: (context, child) =>
             AppTheme(data: AppThemeData.dark, child: child!),
         home: Scaffold(

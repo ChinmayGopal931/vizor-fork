@@ -10898,7 +10898,7 @@
   "@receiveInfoTransparentRotates": {
     "description": "[security] Bullet in the transparent address explainer: the transparent address rotates after receiving funds."
   },
-  "receiveInfoTransparentShieldFirst": "After receiving {ticker} to your transparent address, Vizor will guide you to shield the balance. Otherwise, you won't be able to send it.",
+  "receiveInfoTransparentShieldFirst": "After receiving {ticker} to your transparent address, Veylor will guide you to shield the balance. Otherwise, you won't be able to send it.",
   "@receiveInfoTransparentShieldFirst": {
     "description": "[security] Bullet in the transparent address explainer: funds must be shielded before sending. {ticker} is the currency ticker.",
     "placeholders": {

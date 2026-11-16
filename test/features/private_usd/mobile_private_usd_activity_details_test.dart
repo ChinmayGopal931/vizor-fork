@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
 import 'package:zcash_wallet/src/core/formatting/address_display.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
@@ -51,6 +52,7 @@ void main() {
   Future<void> pumpFeed(WidgetTester tester, {bool reducedMotion = false}) =>
       tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
           home: Builder(
             builder: (context) => MediaQuery(
               data: MediaQuery.of(
@@ -164,6 +166,7 @@ void main() {
     );
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: Builder(
@@ -211,6 +214,7 @@ void main() {
       UncontrolledProviderScope(
         container: container,
         child: MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
           home: AppTheme(
             data: AppThemeData.dark,
             child: const Column(

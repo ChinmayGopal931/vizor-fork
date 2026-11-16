@@ -2307,7 +2307,7 @@
   "receiveInfoTransparentPublicDesktop": "所有交易详情——发送方、接收方和金额——在链上公开可见。",
   "receiveInfoTransparentPublicMobile": "所有交易详情——发送方、接收方和金额——在链上公开可见。",
   "receiveInfoTransparentRotates": "此地址收到 ZEC 且 Veylor 同步后，你的下一个公开地址会自动更换。之前的地址仍属于此钱包。",
-  "receiveInfoTransparentShieldFirst": "公开地址收到 {ticker} 后，Vizor 会引导你将其转为隐私余额，完成转换后才能发送。",
+  "receiveInfoTransparentShieldFirst": "公开地址收到 {ticker} 后，Veylor 会引导你将其转为隐私余额，完成转换后才能发送。",
   "receiveInfoTransparentSubtitle": "公开可见",
   "receiveQrSaveFailed": "无法保存二维码图片。请尝试其他文件夹，或改为复制收款链接。",
   "receiveQrSaved": "二维码图片已保存到 {folder}",

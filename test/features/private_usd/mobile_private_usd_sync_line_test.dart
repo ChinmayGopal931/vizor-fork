@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/formatting/date_format.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
@@ -44,6 +45,7 @@ void main() {
     refreshes = 0;
     await tester.pumpWidget(
       MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
         home: AppTheme(
           data: AppThemeData.dark,
           child: MobilePrivateUsdView(

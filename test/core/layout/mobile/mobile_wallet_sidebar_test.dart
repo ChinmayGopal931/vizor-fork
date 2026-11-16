@@ -686,6 +686,7 @@ void main() {
     Future<void> pump(NeonSyncLine line, {bool reduced = false}) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: appLocalizationsDelegates,
           home: AppTheme(
             data: AppThemeData.dark,
             child: Builder(
