@@ -5777,6 +5777,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get navVote => '投票';
 
   @override
+  String neonSyncChecking(int percent) {
+    return '检查 $percent%';
+  }
+
+  @override
+  String get neonSyncFailed => '同步失败';
+
+  @override
+  String neonSyncProgress(int percent) {
+    return '同步 $percent%';
+  }
+
+  @override
+  String get neonSyncTorOffline => 'Tor 离线';
+
+  @override
+  String get neonSyncTorWaiting => 'Tor …';
+
+  @override
   String get networkPrivacyFinishUpdateBeforeTorOff => '关闭 Tor 之前，请先完成当前的软件更新。';
 
   @override
@@ -7841,7 +7860,1626 @@ class AppLocalizationsZh extends AppLocalizations {
   String get poolTransparent => '公开';
 
   @override
+  String get portfolioChartEmpty => '此时间范围内的历史记录还不够。';
+
+  @override
+  String get portfolioChartHoldings => '持仓';
+
+  @override
+  String portfolioChartIncludesPending(String amount) {
+    return '其中 $amount 处理中';
+  }
+
+  @override
+  String get portfolioChartOnDevice => '本机数据';
+
+  @override
+  String get portfolioChartOpen => '打开余额图表';
+
+  @override
+  String portfolioChartPlotSemantics(
+    String title,
+    String range,
+    String change,
+  ) {
+    return '$title，$range，$change。拖动可查看数值。';
+  }
+
+  @override
+  String get portfolioChartPricesStale => '价格较旧';
+
+  @override
+  String get portfolioChartPricesUnavailable => '价格不可用';
+
+  @override
+  String get portfolioChartPrivate => '隐私模式下已隐藏。';
+
+  @override
+  String get portfolioChartRangeAll => '全部时间';
+
+  @override
+  String get portfolioChartRangeAllChip => '全部';
+
+  @override
+  String get portfolioChartRangeMonth => '过去一个月';
+
+  @override
+  String get portfolioChartRangeMonthChip => '1 个月';
+
+  @override
+  String get portfolioChartRangeQuarter => '过去 3 个月';
+
+  @override
+  String get portfolioChartRangeQuarterChip => '3 个月';
+
+  @override
+  String get portfolioChartRangeWeek => '过去一周';
+
+  @override
+  String get portfolioChartRangeWeekChip => '1 周';
+
+  @override
+  String get portfolioChartRangeYear => '过去一年';
+
+  @override
+  String get portfolioChartRangeYearChip => '1 年';
+
+  @override
+  String get portfolioChartScreenHidden => '此账户有余额记录后即可显示图表。';
+
+  @override
+  String get portfolioChartScreenTitle => '余额';
+
+  @override
+  String get portfolioChartSettingsMarketPrices => '使用市场价格';
+
+  @override
+  String get portfolioChartSettingsSaveFailed => '无法更新资产图表设置。';
+
+  @override
+  String get portfolioChartSettingsShowOnHome => '在首页显示';
+
+  @override
+  String get portfolioChartSettingsTitle => '资产图表';
+
+  @override
+  String get portfolioChartTitleUsd => '资产价值';
+
+  @override
+  String get portfolioChartTitleZec => 'ZEC 余额';
+
+  @override
+  String get portfolioChartTotalShielded => '隐私余额合计';
+
+  @override
   String get privateQueriesOptOutUnfinished => '关闭隐私查询未完成。请在设置中再次关闭，以使用公开资金。';
+
+  @override
+  String privateUsdAboutHours(int hours) {
+    return '约 $hours 小时';
+  }
+
+  @override
+  String privateUsdAboutMinutes(int minutes) {
+    return '约 $minutes 分钟';
+  }
+
+  @override
+  String get privateUsdActionConvert => '跨链';
+
+  @override
+  String get privateUsdActionReceive => '接收';
+
+  @override
+  String get privateUsdActionSend => '发送';
+
+  @override
+  String get privateUsdActionWithdraw => '提取';
+
+  @override
+  String get privateUsdActivityConverted => '已跨链到 0zkUSDC';
+
+  @override
+  String get privateUsdActivityConvertedToZec => '已跨链到 ZEC';
+
+  @override
+  String get privateUsdActivityDeposit => '存入';
+
+  @override
+  String get privateUsdActivityDepositRescue => '已找回的存入资金';
+
+  @override
+  String get privateUsdActivityDepositShielded => '已转为隐私余额';
+
+  @override
+  String get privateUsdActivityEmpty => '你的跨链、发送和提取记录会显示在这里。';
+
+  @override
+  String privateUsdActivityFrom(String address) {
+    return '来自 $address';
+  }
+
+  @override
+  String get privateUsdActivityReceived => '已接收';
+
+  @override
+  String get privateUsdActivityReceivedScreening => '筛查后可用';
+
+  @override
+  String get privateUsdActivityRefunded => '跨链已取消';
+
+  @override
+  String get privateUsdActivityRefundedDetail => 'ZEC 已退回';
+
+  @override
+  String get privateUsdActivityRefundedZecDetail => '美元已退回';
+
+  @override
+  String get privateUsdActivitySenderHidden => '发送方未公开';
+
+  @override
+  String get privateUsdActivitySent => '已发送';
+
+  @override
+  String get privateUsdActivityTitle => '活动记录';
+
+  @override
+  String privateUsdActivityTo(String address) {
+    return '至 $address';
+  }
+
+  @override
+  String get privateUsdActivityUnconfirmed => '尚未打包进区块';
+
+  @override
+  String get privateUsdActivityWithdrew => '已提取';
+
+  @override
+  String get privateUsdArchiveSyncSetting => '从 Anon 存档同步历史记录';
+
+  @override
+  String get privateUsdAssetsTitle => '资产';
+
+  @override
+  String privateUsdAvailableAmount(String amount) {
+    return '可用：$amount';
+  }
+
+  @override
+  String get privateUsdBannerAttention => '跨链需要处理';
+
+  @override
+  String privateUsdBannerDetail(String detail) {
+    return '$detail\n请保持 Veylor 打开直至完成';
+  }
+
+  @override
+  String get privateUsdBannerKeepOpen => '请保持 Veylor 打开直至完成';
+
+  @override
+  String get privateUsdBannerRelayerClaims => '可以离开了：中继者会代你领取美元';
+
+  @override
+  String privateUsdBannerRelayerDetail(String detail) {
+    return '$detail\n可以离开了：中继者会代你领取美元';
+  }
+
+  @override
+  String get privateUsdBridgedTitle => '跨链完成';
+
+  @override
+  String get privateUsdBridgedYouPaid => '已支付金额';
+
+  @override
+  String get privateUsdBridgedYouReceived => '已收到金额';
+
+  @override
+  String get privateUsdCheckingPayments => '正在检查处理中的付款…';
+
+  @override
+  String get privateUsdConversionPending => '跨链正在进行中，完成后即可发送。';
+
+  @override
+  String get privateUsdConvertBackgroundNote =>
+      '完成前请保持 Veylor 打开。离开后流程会暂停，回来后会继续。';
+
+  @override
+  String get privateUsdConvertCallOff => '取消跨链';
+
+  @override
+  String get privateUsdConvertCallOffFailed => '未能取消，请稍后重试。';
+
+  @override
+  String get privateUsdConvertCallOffTooLate =>
+      '在此期间兑换已在 Ethereum 上开启，因此无法取消，将继续进行。';
+
+  @override
+  String get privateUsdConvertErrorAmountRefused =>
+      '做市商不接受此金额的跨链。可能超过了单次跨链的上限，或金额太小，不足以支付兑换的网络费用。';
+
+  @override
+  String get privateUsdConvertErrorBelowFee => '此金额不足以支付中继者手续费。请尝试更大的金额。';
+
+  @override
+  String get privateUsdConvertErrorEthereum => 'Veylor 目前无法连接 Ethereum，请稍后重试。';
+
+  @override
+  String get privateUsdConvertErrorFeeCap =>
+      '目前中继者手续费超过 2 USDC 的上限，因此未发送任何内容。请稍后重试。';
+
+  @override
+  String get privateUsdConvertErrorGeneric => '无法获取报价，请稍后重试。';
+
+  @override
+  String get privateUsdConvertErrorMaker => '目前无法连接做市商，请稍后重试。';
+
+  @override
+  String get privateUsdConvertErrorMakerBusy => '做市商正忙于处理其他跨链。请几分钟后重试。';
+
+  @override
+  String get privateUsdConvertErrorRelayer => '目前无法连接负责完成跨链的中继者，请稍后重试。';
+
+  @override
+  String get privateUsdConvertErrorRelayerRefused => '负责完成跨链的中继者拒绝了此请求，请稍后重试。';
+
+  @override
+  String get privateUsdConvertErrorStore => 'Veylor 无法读取已保存的跨链记录。请联系支持团队。';
+
+  @override
+  String get privateUsdConvertErrorTokensUnavailable =>
+      '无法获取此次跨链所需的令牌，因此未发送任何内容。请稍后重试。';
+
+  @override
+  String get privateUsdConvertErrorUnpayable => '钱包目前无法用单笔交易支付此金额，请尝试更小的金额。';
+
+  @override
+  String get privateUsdConvertErrorWallet =>
+      'Veylor 无法使用你的 Zcash 钱包完成此步骤，请稍后重试。';
+
+  @override
+  String get privateUsdConvertEstimatedAmount => '预估金额';
+
+  @override
+  String get privateUsdConvertEtaMinute => '约一分钟';
+
+  @override
+  String get privateUsdConvertEtaSeconds => '几秒钟';
+
+  @override
+  String get privateUsdConvertFees => '跨链手续费';
+
+  @override
+  String privateUsdConvertFeesValue(String relayerUsd, String railgunPercent) {
+    return '中继者 $relayerUsd · Railgun $railgunPercent%';
+  }
+
+  @override
+  String get privateUsdConvertInfoNoteEither => '要么美元进入你的隐私余额，要么你的 ZEC 退回给你。';
+
+  @override
+  String privateUsdConvertInfoNoteTime(String about) {
+    return '需要$about。完成前请保持 Veylor 打开并解锁。如果离开，流程会暂停；如果无法按时完成，流程会被取消，你的 ZEC 将在扣除网络手续费后退回。';
+  }
+
+  @override
+  String privateUsdConvertInfoNoteTimeRelayer(String about) {
+    return '需要$about。请保持 Veylor 打开并解锁，直到做市商确认你的存入，约需几分钟；其余由中继者完成。如果无法按时完成，流程会被取消，下次打开 Veylor 时，你的 ZEC 会在扣除网络手续费后退回。';
+  }
+
+  @override
+  String get privateUsdConvertInfoStepClaim => '存入确认后，Veylor 会将美元领取到你的隐私余额。';
+
+  @override
+  String get privateUsdConvertInfoStepClaimRelayer => '存入确认后，中继者会将美元领取到你的隐私余额。';
+
+  @override
+  String get privateUsdConvertInfoStepDeposit => '你的 ZEC 会转入由你和做市商共同控制的存入地址。';
+
+  @override
+  String get privateUsdConvertInfoStepQuote =>
+      '输入要跨链的 ZEC 数量（含网络手续费）。做市商会报出你将收到的隐私 USD 金额。报价会保留几分钟。';
+
+  @override
+  String get privateUsdConvertInfoTitle => '跨链运作方式';
+
+  @override
+  String privateUsdConvertInsufficient(String zec) {
+    return 'ZEC 不足，可用余额为 $zec。';
+  }
+
+  @override
+  String get privateUsdConvertMakerCost => '做市商网络费用';
+
+  @override
+  String privateUsdConvertMakerSilent(String time) {
+    return '做市商尚未确认你的存入。如果到 $time 仍未确认，Veylor 会自行领取你的美元。在此之前请保持 Veylor 打开。';
+  }
+
+  @override
+  String get privateUsdConvertNewQuote => '刷新报价';
+
+  @override
+  String get privateUsdConvertOpeningSlow => '做市商还没有开启兑换，目前未发送任何资金。';
+
+  @override
+  String get privateUsdConvertProblemEthereum =>
+      'Veylor 目前无法连接 Ethereum。Veylor 打开期间会持续重试。';
+
+  @override
+  String get privateUsdConvertProblemMismatch =>
+      '链上记录与此跨链不符，因此 Veylor 只会取回你的资金。';
+
+  @override
+  String get privateUsdConvertProblemRailgun =>
+      'Railgun 目前不接受存入，因此 Veylor 暂缓领取。如果未能及时恢复，兑换将被取消，你的 ZEC 会退回。';
+
+  @override
+  String get privateUsdConvertProblemRejected =>
+      'Zcash 网络拒绝了此跨链的交易。Veylor 会持续重新发送，直到交易完成或过期。';
+
+  @override
+  String get privateUsdConvertProblemRelayer =>
+      'Veylor 无法连接负责发送你领取交易的中继者。Veylor 打开期间会持续重试。';
+
+  @override
+  String get privateUsdConvertProblemRelayerFee =>
+      '中继者手续费高于此跨链的支付金额，或超过 2 USDC 的上限，因此 Veylor 会等待手续费回落。';
+
+  @override
+  String get privateUsdConvertProblemRelayerRefused =>
+      '中继者一直拒绝此跨链的交易。Veylor 打开期间会持续重试。';
+
+  @override
+  String get privateUsdConvertProblemRetry => '立即重试';
+
+  @override
+  String get privateUsdConvertProblemRoute => 'Tor 正在启动或不可用。Veylor 打开期间会持续重试。';
+
+  @override
+  String get privateUsdConvertProblemTitle => '耗时比平时长';
+
+  @override
+  String get privateUsdConvertProblemTokens =>
+      '做市商要求提供令牌。Veylor 正在获取今天的令牌；若无法获取，此次跨链将被取消。';
+
+  @override
+  String get privateUsdConvertProblemUnexpected => '出了点问题。Veylor 打开期间会持续重试。';
+
+  @override
+  String get privateUsdConvertProblemUnpayable =>
+      '你的钱包目前无法支付存入金额，例如因为网络手续费上涨。Veylor 会持续重试。如果仍无法按时支付，兑换将结束，不会发送任何资金。';
+
+  @override
+  String get privateUsdConvertProblemWallet =>
+      'Veylor 无法通过你的 Zcash 钱包完成此步骤。在 Veylor 打开且解锁期间会持续重试。';
+
+  @override
+  String privateUsdConvertProgressAmounts(String zec, String usd) {
+    return '$zec 换取约 $usd';
+  }
+
+  @override
+  String get privateUsdConvertProgressInfoClaim =>
+      'Veylor 将美元领取到你的隐私余额，Ethereum 手续费由中继者支付。';
+
+  @override
+  String get privateUsdConvertProgressInfoClaimRelayer =>
+      '中继者将美元领取到你的隐私余额，并支付 Ethereum 手续费。';
+
+  @override
+  String privateUsdConvertProgressInfoConfirm(int confirmations) {
+    return '做市商会等待 $confirmations 个 Zcash 确认。';
+  }
+
+  @override
+  String get privateUsdConvertProgressInfoDeposit =>
+      'Veylor 将你的 ZEC 发送到你与做市商共用的存入地址。';
+
+  @override
+  String get privateUsdConvertProgressInfoOpen =>
+      '做市商在 Ethereum 上开启兑换，并将美元放入其中。';
+
+  @override
+  String get privateUsdConvertProgressInfoRefund =>
+      '如果兑换无法按时完成，将被取消，你的 ZEC 会在扣除少量网络手续费后退回。';
+
+  @override
+  String privateUsdConvertProgressInfoScreen(String about) {
+    return 'Railgun 会先筛查$about，之后才能使用。';
+  }
+
+  @override
+  String get privateUsdConvertProgressInfoTitle => '流程说明';
+
+  @override
+  String get privateUsdConvertProgressTitle => '跨链中';
+
+  @override
+  String get privateUsdConvertQuoteClockAhead => '报价送达时已过期。请检查手机时间是否准确，然后重试。';
+
+  @override
+  String privateUsdConvertQuoteExpires(String minutesSeconds) {
+    return '报价剩余有效时间 $minutesSeconds';
+  }
+
+  @override
+  String privateUsdConvertQuoteHolds(String minutesSeconds) {
+    return '报价有效期剩余 $minutesSeconds';
+  }
+
+  @override
+  String get privateUsdConvertQuoteLoading => '正在获取报价…';
+
+  @override
+  String get privateUsdConvertQuoteRanOut => '此报价已过期。请刷新报价以继续。';
+
+  @override
+  String get privateUsdConvertRefunding => '兑换已取消。Veylor 正在将你的 ZEC 退回钱包。';
+
+  @override
+  String get privateUsdConvertRelayerClaims =>
+      '现在可以离开 Veylor 了。做市商已确认你的存入，中继者会领取你的美元。';
+
+  @override
+  String get privateUsdConvertRelayerInfoKeepOpen =>
+      'Veylor 在打开且解锁时发送你的 ZEC，并在做市商确认后将领取交给中继者。退款和发送只在 Veylor 打开且解锁时进行。';
+
+  @override
+  String get privateUsdConvertRelayerReviewNote =>
+      '请保持 Veylor 打开，直到做市商确认你的存入，约需几分钟。之后中继者会领取你的美元，你就可以离开了。';
+
+  @override
+  String get privateUsdConvertResultMakerCancelled =>
+      '在你的 ZEC 发送之前，做市商取消了兑换。你的 ZEC 从未离开钱包。';
+
+  @override
+  String get privateUsdConvertResultMakerRefused => '做市商拒绝了此次跨链。你的 ZEC 从未离开钱包。';
+
+  @override
+  String get privateUsdConvertResultMakerUnavailable =>
+      '做市商目前不接受跨链。你的 ZEC 从未离开钱包。';
+
+  @override
+  String get privateUsdConvertResultMismatch =>
+      'Ethereum 上的兑换与报价不符，因此 Veylor 没有发送你的 ZEC。';
+
+  @override
+  String get privateUsdConvertResultNeverOpened =>
+      '兑换始终未在 Ethereum 上开启。你的 ZEC 从未离开钱包。';
+
+  @override
+  String get privateUsdConvertResultNothingTitle => '未发送任何资金';
+
+  @override
+  String privateUsdConvertResultPaidBody(String usd, String about) {
+    return '$usd 已进入你的隐私余额。新资金需经 Railgun 筛查$about后才能使用。';
+  }
+
+  @override
+  String get privateUsdConvertResultPaidTitle => '0zkUSDC 正在到账';
+
+  @override
+  String get privateUsdConvertResultQuoteExpired =>
+      '做市商接受前，报价已过期。你的 ZEC 从未离开钱包。';
+
+  @override
+  String get privateUsdConvertResultRefundedLate =>
+      '兑换未能按时完成，已被取消，你的 ZEC 已在扣除少量网络手续费后退回。';
+
+  @override
+  String get privateUsdConvertResultRefundedMaker =>
+      '做市商取消了兑换，你的 ZEC 已在扣除少量网络手续费后退回钱包。';
+
+  @override
+  String get privateUsdConvertResultRefundedTitle => '你的 ZEC 已退回';
+
+  @override
+  String privateUsdConvertResultScreenedBody(String usd) {
+    return '$usd 已进入你的隐私余额，可以使用了。';
+  }
+
+  @override
+  String get privateUsdConvertResultViewBalance => '查看隐私 USD';
+
+  @override
+  String get privateUsdConvertResultWindowMissed =>
+      '兑换开启得太晚，无法安全完成，因此 Veylor 没有发送你的 ZEC。';
+
+  @override
+  String get privateUsdConvertResuming => '正在从中断处继续。';
+
+  @override
+  String get privateUsdConvertReviewInfoPay =>
+      '你需支付 ZEC 存入金额（已包含做市商的网络成本），外加 Zcash 网络手续费。';
+
+  @override
+  String get privateUsdConvertReviewInfoQuote =>
+      '报价在几分钟内有效。过期后请刷新：在你确认跨链之前，不会发送任何资金。';
+
+  @override
+  String privateUsdConvertReviewInfoReceive(String railgunPercent) {
+    return '你收到的美元会扣除中继者手续费，以及 Railgun 将其转为隐私余额时收取的 $railgunPercent% 手续费。';
+  }
+
+  @override
+  String get privateUsdConvertReviewInfoTitle => '跨链前须知';
+
+  @override
+  String get privateUsdConvertStartFailed => '跨链未能开始。未发送任何内容。请稍后重试。';
+
+  @override
+  String get privateUsdConvertStepArrive => '正在转入隐私余额';
+
+  @override
+  String get privateUsdConvertStepClaim => '正在领取美元';
+
+  @override
+  String get privateUsdConvertStepConfirm => '正在等待确认';
+
+  @override
+  String privateUsdConvertStepConfirmCount(int count, int of) {
+    return '$count/$of';
+  }
+
+  @override
+  String get privateUsdConvertStepDeposit => '正在发送 ZEC';
+
+  @override
+  String get privateUsdConvertStepOpen => '正在 Ethereum 上开启兑换';
+
+  @override
+  String get privateUsdConvertStepRefund => '正在退回 ZEC';
+
+  @override
+  String get privateUsdConvertStepScreen => '筛查中';
+
+  @override
+  String get privateUsdConvertStepUnwind => '等待做市商退款';
+
+  @override
+  String get privateUsdConvertSwapDirection => '切换跨链方向';
+
+  @override
+  String get privateUsdConvertUnsettled =>
+      '你的 ZEC 付款尚未确认时，做市商取消了兑换。如果这笔付款最终上链，Veylor 会取回你的 ZEC。';
+
+  @override
+  String get privateUsdConvertUnwinding =>
+      '兑换未能按时完成，因此将原路退回：做市商退款后，你的 ZEC 就会回来。';
+
+  @override
+  String privateUsdConvertUnwindingUntil(String time) {
+    return '兑换未能按时完成，因此将原路退回：做市商退款后，你的 ZEC 就会回来。如果做市商到 $time 仍未退款，Veylor 将改为领取你的美元。';
+  }
+
+  @override
+  String get privateUsdConvertWaitSyncing => '等待 Zcash 钱包同步';
+
+  @override
+  String get privateUsdConvertYouPay => '你支付';
+
+  @override
+  String get privateUsdConvertYouReceive => '预计收到';
+
+  @override
+  String get privateUsdConvertZecIncludesFee => '含 Zcash 网络手续费';
+
+  @override
+  String get privateUsdConvertZecNoQuote => '没有适合此金额的报价。请尝试其他金额，或使用最大金额。';
+
+  @override
+  String get privateUsdConvertZecSyncing => '钱包仍在同步。同步完成后，其余 ZEC 即可使用。';
+
+  @override
+  String privateUsdConvertZecSyncingProgress(int percent) {
+    return '钱包仍在同步（$percent%）。同步完成后，其余 ZEC 即可使用。';
+  }
+
+  @override
+  String get privateUsdConvertingToUsd => '正在跨链到 0zkUSDC';
+
+  @override
+  String get privateUsdConvertingToZec => '正在跨链到 ZEC';
+
+  @override
+  String get privateUsdDeleteAnyway => '仍然删除';
+
+  @override
+  String get privateUsdDeleteUncheckedBody =>
+      '无法检查是否有未完成的隐私 USD 跨链。只有此账户能找回其资金，现在删除可能会造成资金损失。';
+
+  @override
+  String privateUsdDeleteUnfinishedBody(int count) {
+    return '此账户有 $count 笔隐私 USD 跨链尚未完成。只有此账户能找回这些资金，现在删除可能会造成资金损失。请保持 Veylor 打开，直到跨链完成或退款。';
+  }
+
+  @override
+  String get privateUsdDeleteUnfinishedTitle => '跨链进行中';
+
+  @override
+  String get privateUsdDepositAddressFailed => '无法加载存入地址。请稍后重试。';
+
+  @override
+  String get privateUsdDepositAddressLoading => '正在加载存入地址…';
+
+  @override
+  String get privateUsdDepositCopy => '复制存入地址';
+
+  @override
+  String privateUsdDepositExample(String sent, String arrives) {
+    return '发送 $sent，扣除两项手续费后到账 $arrives。';
+  }
+
+  @override
+  String get privateUsdDepositFeesFailed => '无法加载手续费。发送到这里的资金会安全地留在此地址。';
+
+  @override
+  String get privateUsdDepositFeesLoading => '正在加载手续费…';
+
+  @override
+  String get privateUsdDepositHow => '可从交易所或任何钱包发送。Veylor 在打开且已解锁时会自动将其转为隐私余额。';
+
+  @override
+  String privateUsdDepositMinimum(String usd) {
+    return '最低 $usd';
+  }
+
+  @override
+  String get privateUsdDepositNotShielding =>
+      '已收到，但尚未转为隐私余额。Veylor 稍后会重试，资金仍安全地留在你的存入地址。';
+
+  @override
+  String privateUsdDepositNotShieldingLine(String usd) {
+    return '已收到 $usd，但尚未转为隐私余额。Veylor 稍后会重试，资金仍安全地留在你的存入地址。';
+  }
+
+  @override
+  String privateUsdDepositOnly(String symbol, String chain) {
+    return '仅发送 $chain 上的 $symbol';
+  }
+
+  @override
+  String privateUsdDepositRailgunFee(String percent) {
+    return 'Railgun 手续费：$percent%';
+  }
+
+  @override
+  String privateUsdDepositReceived(String usd) {
+    return '已收到 $usd';
+  }
+
+  @override
+  String privateUsdDepositRelayerFee(String fixed, String percent) {
+    return '中继者手续费：$fixed + $percent%';
+  }
+
+  @override
+  String privateUsdDepositShielded(String about) {
+    return '已转为隐私余额，$about后可用';
+  }
+
+  @override
+  String privateUsdDepositShieldedLine(String usd, String about) {
+    return '$usd：已转为隐私余额，$about后可用';
+  }
+
+  @override
+  String get privateUsdDepositShielding => '隐私转换中…';
+
+  @override
+  String privateUsdDepositShieldingLine(String usd) {
+    return '已收到 $usd。隐私转换中…';
+  }
+
+  @override
+  String privateUsdDepositTitle(String symbol) {
+    return '接收 $symbol';
+  }
+
+  @override
+  String get privateUsdDepositUnavailable => '目前无法存入。发送到之前存入地址的资金不会丢失，会一直留在那里。';
+
+  @override
+  String privateUsdDepositUnderMinimum(String usd, String minimum) {
+    return '已收到 $usd，低于最低金额 $minimum。请向此地址再发送一些。';
+  }
+
+  @override
+  String get privateUsdDepositWaiting => '正在等待网络，资金仍安全地留在你的存入地址';
+
+  @override
+  String privateUsdDepositWaitingLine(String usd) {
+    return '已收到 $usd。正在等待网络，资金仍安全地留在你的存入地址';
+  }
+
+  @override
+  String get privateUsdDepositsTitle => '存入状态';
+
+  @override
+  String get privateUsdDetailDeposit => 'ZEC 存入';
+
+  @override
+  String get privateUsdDetailFunding => '托管付款';
+
+  @override
+  String get privateUsdDetailPayout => '支付';
+
+  @override
+  String get privateUsdDetailRefund => 'ZEC 退款';
+
+  @override
+  String get privateUsdDetailStarted => '开始时间';
+
+  @override
+  String get privateUsdDetailSwapId => '兑换 ID';
+
+  @override
+  String get privateUsdDetailZecReceived => '收到的 ZEC';
+
+  @override
+  String get privateUsdDetailsConfirmed => '已确认';
+
+  @override
+  String get privateUsdDetailsDepositAddress => '存入地址';
+
+  @override
+  String get privateUsdDetailsEnded => '结束时间';
+
+  @override
+  String get privateUsdDetailsFrom => '来自';
+
+  @override
+  String privateUsdDetailsOpenOn(String transaction, String explorer) {
+    return '在 $explorer 上查看“$transaction”';
+  }
+
+  @override
+  String get privateUsdDetailsReceived => '接收时间';
+
+  @override
+  String get privateUsdDetailsRelayerFee => '中继者手续费';
+
+  @override
+  String get privateUsdDetailsSenderHidden => '未公开';
+
+  @override
+  String get privateUsdDetailsSent => '发送时间';
+
+  @override
+  String get privateUsdDetailsStatus => '状态';
+
+  @override
+  String get privateUsdDetailsTransaction => '交易';
+
+  @override
+  String get privateUsdDetailsUnconfirmed => '尚未打包进区块';
+
+  @override
+  String get privateUsdEmptyBody => '将 ZEC 跨链为他人看不到的美元：你的余额和付款对象都不会暴露。';
+
+  @override
+  String get privateUsdEmptyBodyReceive => '接收他人看不到的美元：你的余额和付款对象都不会暴露。';
+
+  @override
+  String get privateUsdEmptyTitle => '还没有隐私美元';
+
+  @override
+  String get privateUsdFirstLoad =>
+      '正在加载隐私余额。首次加载需要读取 Railgun 的历史记录，可能需要一段时间。请保持 Veylor 打开。';
+
+  @override
+  String privateUsdFirstLoadProgress(int percent) {
+    return '正在加载隐私余额：$percent%。首次加载需要读取 Railgun 的历史记录，可能需要一段时间。请保持 Veylor 打开。';
+  }
+
+  @override
+  String get privateUsdHoldingsShieldedOnEthereum => '在 Ethereum 上';
+
+  @override
+  String privateUsdHomeArriving(String usd) {
+    return '+$usd 到账中';
+  }
+
+  @override
+  String privateUsdHomeArrivingDescription(String usd) {
+    return '$usd 到账中';
+  }
+
+  @override
+  String privateUsdHomeBalanceDescription(String amount) {
+    return '隐私 USD $amount';
+  }
+
+  @override
+  String privateUsdHomeBlocked(String usd) {
+    return '$usd 需要处理';
+  }
+
+  @override
+  String privateUsdHomeBlockedDescription(String usd) {
+    return '需要处理：$usd';
+  }
+
+  @override
+  String get privateUsdHomeOpen => '打开隐私 USD';
+
+  @override
+  String get privateUsdInfoButton => '了解运作方式';
+
+  @override
+  String get privateUsdInfoConvert => '跨链：在 ZEC 和隐私 USD 之间转移资金。';
+
+  @override
+  String get privateUsdInfoKeepOpen => '跨链、发送和退款仅在 Veylor 打开且已解锁时进行。';
+
+  @override
+  String get privateUsdInfoPrivate => '他人无法看到你的余额，也无法看到你的付款对象。';
+
+  @override
+  String get privateUsdInfoReceive =>
+      '接收：来自交易所或任何钱包的公开 USDC 会转入你的存入地址（接收），Veylor 会以少量手续费将其转为隐私余额。来自其他 Railgun 钱包的隐私 USD 会免手续费转入此页面上的 Railgun 地址。';
+
+  @override
+  String get privateUsdInfoRefunds => '退款：找回未能进入隐私余额的退款。';
+
+  @override
+  String privateUsdInfoScreening(String about) {
+    return '新资金需经 Railgun 筛查$about后才能使用。';
+  }
+
+  @override
+  String get privateUsdInfoSend => '发送：将隐私 USD 转给另一个 Railgun 地址，资金始终保持隐私。';
+
+  @override
+  String get privateUsdInfoTitle => '关于隐私 USD';
+
+  @override
+  String get privateUsdInfoWithdraw =>
+      '提取：将隐私 USD 转到公开的 Ethereum 地址。目标地址和金额会在 Ethereum 上公开。';
+
+  @override
+  String get privateUsdKeepOpenBody =>
+      '这可能需要一段时间。完成前，Veylor 需要保持打开并联网：如果屏幕关闭，流程会暂停，直到你回来。';
+
+  @override
+  String get privateUsdKeepOpenTitle => '请保持 Veylor 打开';
+
+  @override
+  String get privateUsdKeepScreenOn => '保持屏幕常亮';
+
+  @override
+  String get privateUsdLoadFailed => '无法加载余额，请稍后重试。';
+
+  @override
+  String get privateUsdLoading => '加载中…';
+
+  @override
+  String get privateUsdMax => '最大';
+
+  @override
+  String get privateUsdNetworkUpgradeHold => '因网络升级已暂停。请几分钟后重试。';
+
+  @override
+  String get privateUsdNotNow => '暂不';
+
+  @override
+  String get privateUsdPaste => '粘贴';
+
+  @override
+  String get privateUsdPaymentPending => '上一笔付款仍在处理中。确认后即可再次发送或跨链。';
+
+  @override
+  String privateUsdPaymentProving(int percent) {
+    return '正在生成付款证明 · $percent%';
+  }
+
+  @override
+  String get privateUsdPaymentUpdatingBalance => '正在更新余额';
+
+  @override
+  String privateUsdPaymentWaitingForBlock(String elapsed) {
+    return '正在等待区块 · $elapsed';
+  }
+
+  @override
+  String get privateUsdProgressTab => '跨链进度';
+
+  @override
+  String get privateUsdQuoteExpired => '报价已过期';
+
+  @override
+  String get privateUsdReceiveAddressNote =>
+      '来自其他 Railgun 钱包的隐私 USD 会免手续费转入此地址。';
+
+  @override
+  String get privateUsdReceiveShieldedCopy => '复制 Railgun 地址';
+
+  @override
+  String get privateUsdReceiveShieldedOnly => '仅限从 Railgun 钱包转入';
+
+  @override
+  String get privateUsdRefresh => '刷新';
+
+  @override
+  String get privateUsdRefreshFailed => '无法更新余额。当前显示的是上次记录的金额。';
+
+  @override
+  String get privateUsdRefundsAvailable => '这笔退款可以找回。';
+
+  @override
+  String get privateUsdRefundsCheckFailed => '无法检查这笔退款。请刷新后重试。';
+
+  @override
+  String get privateUsdRefundsChecking => '正在检查退款…';
+
+  @override
+  String privateUsdRefundsDepositBody(String usd) {
+    return 'Railgun 筛查已将 $usd 退回你存入地址的金库。找回后即可再次转为隐私余额。';
+  }
+
+  @override
+  String privateUsdRefundsDepositConfirmBody(String fee) {
+    return '中继者手续费（$fee）将从这笔资金中扣除。';
+  }
+
+  @override
+  String get privateUsdRefundsDepositConfirmTitle => '要找回这笔存入资金吗？';
+
+  @override
+  String get privateUsdRefundsDepositRecover => '找回存入资金';
+
+  @override
+  String get privateUsdRefundsDepositRecoverFailed => '无法找回这笔存入资金。请重试。';
+
+  @override
+  String get privateUsdRefundsDepositRecovering => '正在找回存入资金…';
+
+  @override
+  String get privateUsdRefundsDepositTitle => '被筛查退回的存入资金';
+
+  @override
+  String get privateUsdRefundsEmpty => '暂无已退款的跨链。';
+
+  @override
+  String get privateUsdRefundsInfo =>
+      '如果退款未能进入你的隐私余额，可在此找回。Railgun 筛查可能会推迟资金可用时间。';
+
+  @override
+  String get privateUsdRefundsNoRecovery => '目前无法找回。退款可能仍在接受 Railgun 筛查。';
+
+  @override
+  String get privateUsdRefundsOriginalAmount => '原跨链金额';
+
+  @override
+  String get privateUsdRefundsRecover => '找回退款';
+
+  @override
+  String privateUsdRefundsRecoverConfirmBody(String cap) {
+    return '中继者手续费（最多 $cap）将从退款中扣除。';
+  }
+
+  @override
+  String get privateUsdRefundsRecoverConfirmTitle => '要找回这笔退款吗？';
+
+  @override
+  String get privateUsdRefundsRecoverFailed => '无法找回这笔退款。请重试。';
+
+  @override
+  String get privateUsdRefundsRecovering => '正在找回退款…';
+
+  @override
+  String get privateUsdRefundsSubtitle => '以往跨链的退款';
+
+  @override
+  String get privateUsdRefundsTitle => '退款';
+
+  @override
+  String get privateUsdRefundsView => '查看退款';
+
+  @override
+  String get privateUsdRelayerClaimsSetting => '由中继者代为领取';
+
+  @override
+  String get privateUsdResetAnyway => '仍然重置';
+
+  @override
+  String get privateUsdResetUncheckedBody =>
+      '无法检查是否有未完成的隐私 USD 跨链。只有此钱包能找回其资金，现在重置可能会造成资金损失。';
+
+  @override
+  String privateUsdResetUnfinishedBody(int count) {
+    return '你的钱包有 $count 笔隐私 USD 跨链尚未完成。只有此钱包能找回这些资金，现在重置可能会造成资金损失。';
+  }
+
+  @override
+  String get privateUsdReverseAccepting => '正在准备接收账户';
+
+  @override
+  String get privateUsdReverseAmountCents => '最多只能输入 2 位小数。';
+
+  @override
+  String get privateUsdReverseBroadcasterFee => '广播手续费';
+
+  @override
+  String get privateUsdReverseCancel => '取消跨链';
+
+  @override
+  String get privateUsdReverseCancelConfirmBody =>
+      '你的隐私 USD 将在扣除中继者和 Railgun 的手续费后退回。此操作无法撤销。';
+
+  @override
+  String get privateUsdReverseCancelConfirmTitle => '要取消此跨链吗？';
+
+  @override
+  String get privateUsdReverseCancelConfirmUnpaidBody =>
+      '尚未支付任何款项，因此不会有损失。此操作无法撤销。';
+
+  @override
+  String get privateUsdReverseCancelled => '跨链已取消。托管中没有剩余款项。';
+
+  @override
+  String get privateUsdReverseComplete => 'ZEC 已到账隐私钱包';
+
+  @override
+  String get privateUsdReverseConfirming => '正在确认托管';
+
+  @override
+  String get privateUsdReverseError =>
+      '无法完成此步骤。Veylor 检查两条链后，会继续你已保存的跨链。不会因为请求超时而重复付款。';
+
+  @override
+  String get privateUsdReverseErrorAmountRefused =>
+      '此金额无法跨链。可能太少，不足以支付手续费，或超过单次跨链的上限。';
+
+  @override
+  String get privateUsdReverseErrorCostChanged =>
+      '手续费有变，因此未进行支付。请查看新的总额，然后支付或取消。';
+
+  @override
+  String get privateUsdReverseErrorFundingUnavailable => '目前无法跨链到 ZEC。请稍后重试。';
+
+  @override
+  String get privateUsdReverseErrorTooLate => '此步骤为时已晚，跨链将自动结束。你已支付的款项都会退回。';
+
+  @override
+  String get privateUsdReverseErrorUnconfirmed => '做市商的 ZEC 尚未确认。请几分钟后重试。';
+
+  @override
+  String get privateUsdReverseEscrow => '托管金额';
+
+  @override
+  String get privateUsdReverseInsufficient => '隐私 USD 不足以支付此金额及其手续费。';
+
+  @override
+  String get privateUsdReverseIntro =>
+      '请先批准发送隐私 USD。待你的钱包自行确认全部 ZEC 存入后，再授权结算以接收隐私 ZEC。';
+
+  @override
+  String privateUsdReverseKeepOpen(String time) {
+    return '支付后请保持 Veylor 打开。ZEC 确认后，你需要在 $time 前在此授权结算。否则，你的隐私 USD 将在扣除手续费后退回。';
+  }
+
+  @override
+  String get privateUsdReverseNew => '发起新跨链';
+
+  @override
+  String privateUsdReversePay(String debit) {
+    return '支付 $debit';
+  }
+
+  @override
+  String get privateUsdReversePayout => '正在将隐私 USD 退回 Railgun';
+
+  @override
+  String get privateUsdReverseProblemRelayer =>
+      'Veylor 无法连接负责转移你美元的中继者。Veylor 打开期间会持续重试。';
+
+  @override
+  String privateUsdReverseProgressAmounts(String usd, String zec) {
+    return '$usd 换取 $zec（已扣除手续费）';
+  }
+
+  @override
+  String privateUsdReverseProgressEstimate(String usd, String zec) {
+    return '$usd 换取约 $zec（已扣除手续费）';
+  }
+
+  @override
+  String privateUsdReverseProgressReceived(String zec) {
+    return '扣除手续费后，已收到 $zec。';
+  }
+
+  @override
+  String get privateUsdReverseProvingNote =>
+      '你的手机正在为此付款生成零知识证明，可能需要几分钟。请保持 Veylor 打开。';
+
+  @override
+  String get privateUsdReverseRailgunFee => 'Railgun 转为公开手续费';
+
+  @override
+  String get privateUsdReverseReady => '授权结算';
+
+  @override
+  String get privateUsdReverseReadyExplanation =>
+      '全部 ZEC 存入已确认。授权结算后，将释放你的隐私 USD，并把 ZEC 转入你的隐私钱包。';
+
+  @override
+  String get privateUsdReverseReceiveEstimate => '扣除转入手续费后的预计 ZEC';
+
+  @override
+  String get privateUsdReverseReceiving => '正在等待 ZEC 确认';
+
+  @override
+  String privateUsdReverseRefundAvailable(String time) {
+    return '此跨链已无法结算。请立即申请退款，否则 Veylor 会在 $time 之后、打开期间自动发送退款。';
+  }
+
+  @override
+  String get privateUsdReverseRefundNote =>
+      '授权结算前，你可以取消。授权后，退款需等到合约截止时间。退款需支付中继者手续费和 Railgun 转为隐私余额的手续费。关闭 Veylor 绝不会授权结算。';
+
+  @override
+  String get privateUsdReverseRefundReady => '可以退款';
+
+  @override
+  String get privateUsdReverseRefundRequested =>
+      '已申请退款。退款可用后，Veylor 会在打开期间继续处理。';
+
+  @override
+  String get privateUsdReverseRefundUnavailable =>
+      '此跨链已结算，无法再退款。Veylor 会完成将 ZEC 转入你钱包的操作。';
+
+  @override
+  String get privateUsdReverseRefundWait => '正在等待可以退款的时机。Veylor 打开期间会重试。';
+
+  @override
+  String get privateUsdReverseRefunded => '退款已转入你的隐私余额。Railgun 筛查可能会推迟资金可用时间。';
+
+  @override
+  String get privateUsdReverseRefunding => '正在处理退款';
+
+  @override
+  String get privateUsdReverseRequestRefund => '申请退款';
+
+  @override
+  String get privateUsdReverseResultCancelled => '跨链已取消';
+
+  @override
+  String get privateUsdReverseResultReceived => '已收到 ZEC';
+
+  @override
+  String get privateUsdReverseResultRefunded => '退款已发送';
+
+  @override
+  String get privateUsdReverseReview => '请查看并批准付款';
+
+  @override
+  String get privateUsdReverseSending => '正在发送隐私 USD';
+
+  @override
+  String privateUsdReverseSettlementRefundLimit(String time) {
+    return '已授权结算。若结算未完成，只能在 $time 之后退款。';
+  }
+
+  @override
+  String get privateUsdReverseSettling => '正在等待结算';
+
+  @override
+  String get privateUsdReverseStepApprovalDetail => '需要你授权才能继续。';
+
+  @override
+  String get privateUsdReverseStepFund => '正在向托管发送隐私 USD';
+
+  @override
+  String get privateUsdReverseStepPay => '向托管支付隐私 USD';
+
+  @override
+  String privateUsdReverseStepPayDetail(String debit) {
+    return '点按“支付”，将价值 $debit 的隐私 USD 发送到托管。';
+  }
+
+  @override
+  String get privateUsdReverseStepSettle => '正在结算跨链';
+
+  @override
+  String privateUsdReverseSweepConfirmations(int count) {
+    return 'Zcash 确认数：$count';
+  }
+
+  @override
+  String get privateUsdReverseSweeping => '正在将 ZEC 转入钱包';
+
+  @override
+  String get privateUsdReverseTitle => '隐私 USD 跨链至 ZEC';
+
+  @override
+  String get privateUsdReview => '确认';
+
+  @override
+  String get privateUsdRouteBlocked => 'Tor 正在启动或不可用，因此未发送任何内容。连接后请重试。';
+
+  @override
+  String get privateUsdRowArriving => '到账中';
+
+  @override
+  String privateUsdRowArrivingInfo(String about) {
+    return '新资金需经 Railgun 筛查后才能使用，这需要$about。';
+  }
+
+  @override
+  String get privateUsdRowArrivingLate => '到账中 · 耗时比平时长';
+
+  @override
+  String privateUsdRowArrivingPercent(int percent) {
+    return '到账中 · $percent%';
+  }
+
+  @override
+  String get privateUsdRowAvailable => '可用';
+
+  @override
+  String get privateUsdRowBlocked => '筛查未通过';
+
+  @override
+  String get privateUsdRowBlockedInfo =>
+      'Railgun 的筛查拒绝了这些资金，因此无法使用或发送。这些资金只能退回其来源，即跨链合约。请联系支持团队。';
+
+  @override
+  String get privateUsdRowProcessing => '处理中';
+
+  @override
+  String get privateUsdRowProcessingInfo => '一笔发送交易正在确认中，完成后这些资金即可再次使用。';
+
+  @override
+  String get privateUsdRowProcessingStalled => '处理中 · 筛查延迟';
+
+  @override
+  String get privateUsdRowProcessingStalledInfo =>
+      'Railgun 的筛查尚未通过这些资金。资金仍归你所有，通过后即可使用。Veylor 打开期间会持续重试。';
+
+  @override
+  String privateUsdRpcBody(String network) {
+    return '你可以使用自己的 Ethereum RPC URL（适用于 $network，需来自受支持的服务商）。设置后，隐私 USD 只会使用它。';
+  }
+
+  @override
+  String get privateUsdRpcChange => '更换 RPC';
+
+  @override
+  String get privateUsdRpcCheckAndSave => '检查并保存';
+
+  @override
+  String get privateUsdRpcCleared => '正在使用默认 Ethereum RPC';
+
+  @override
+  String privateUsdRpcCurrent(String value) {
+    return '当前：$value';
+  }
+
+  @override
+  String get privateUsdRpcDefaultNotAnswering =>
+      'Ethereum RPC 没有响应，无法加载你的余额。请换一个 RPC。';
+
+  @override
+  String get privateUsdRpcErrorCalls => '该 RPC 不响应合约读取请求。请换一个服务商。';
+
+  @override
+  String get privateUsdRpcErrorLogs => '该 RPC 对日志查询的限制低于跨链所需。请换一个服务商或套餐。';
+
+  @override
+  String get privateUsdRpcErrorUnreachable => '该 RPC 没有响应。请检查 URL，或稍后重试。';
+
+  @override
+  String privateUsdRpcErrorUrl(String network) {
+    return '请使用受支持服务商提供的、适用于 $network 的 https URL。';
+  }
+
+  @override
+  String privateUsdRpcErrorWrongChain(String network) {
+    return '该 RPC 属于其他网络。请使用适用于 $network 的 RPC。';
+  }
+
+  @override
+  String get privateUsdRpcNetworkMainnet => 'Ethereum 主网';
+
+  @override
+  String get privateUsdRpcNotAnswering => '你的 Ethereum RPC 没有响应。';
+
+  @override
+  String get privateUsdRpcProviders =>
+      '支持的服务商：Alchemy、Infura、QuickNode、Chainstack、Ankr、dRPC、BlockPI、Tenderly、NodeReal、GetBlock、OnFinality、publicnode、Pocket Network 和 MEV Blocker。';
+
+  @override
+  String get privateUsdRpcSaved => '已保存 Ethereum RPC';
+
+  @override
+  String get privateUsdRpcSees =>
+      'RPC 能看到应用的 Ethereum 请求；如果没有开启 Tor，还能看到你的 IP 地址。';
+
+  @override
+  String get privateUsdRpcTitle => 'Ethereum RPC';
+
+  @override
+  String get privateUsdRpcUseDefault => '使用默认值';
+
+  @override
+  String get privateUsdScanCaptionPrivate => '请扫描 Railgun 0zk 地址';
+
+  @override
+  String get privateUsdScanCaptionWithdraw => '请扫描 Ethereum 0x 地址';
+
+  @override
+  String get privateUsdScanNot0x => '此二维码不是 Ethereum 地址。';
+
+  @override
+  String get privateUsdScanNot0zk => '此二维码不是 Railgun 0zk 地址。';
+
+  @override
+  String get privateUsdScanOtherNetwork => '此二维码属于其他网络。';
+
+  @override
+  String get privateUsdScanPermissionTitle => '扫描收款方地址';
+
+  @override
+  String get privateUsdScanUseSend => '这是隐私 0zk 地址。如需向其付款，请使用“发送”。';
+
+  @override
+  String get privateUsdScanUseWithdraw => '这是公开的 0x 地址。如需向其发送，请使用“提取”。';
+
+  @override
+  String privateUsdScreeningChecking(int done, int count) {
+    return 'Railgun 筛查服务核验中 · $done/$count';
+  }
+
+  @override
+  String get privateUsdScreeningDownloading => '正在下载证明文件';
+
+  @override
+  String privateUsdScreeningDownloadingPercent(int percent) {
+    return '正在下载证明文件 · $percent%';
+  }
+
+  @override
+  String privateUsdScreeningProving(int percent) {
+    return '正在生成筛查证明 · $percent%';
+  }
+
+  @override
+  String privateUsdScreeningProvingStep(int index, int count, int percent) {
+    return '正在生成筛查证明 $index/$count · $percent%';
+  }
+
+  @override
+  String privateUsdScreeningSyncingList(int percent) {
+    return '正在同步 Railgun 交易列表 · $percent%';
+  }
+
+  @override
+  String get privateUsdScreeningWaiting => '正在等待 Railgun 筛查服务';
+
+  @override
+  String get privateUsdSendAsset => '资产';
+
+  @override
+  String get privateUsdSendBalanceDropped => '你的可用余额现已低于此金额。';
+
+  @override
+  String privateUsdSendDoneBody(String amount, String address) {
+    return '$amount 已发送至 $address。';
+  }
+
+  @override
+  String get privateUsdSendDoneTitlePrivate => '已发送';
+
+  @override
+  String get privateUsdSendDoneTitleWithdraw => '已提取';
+
+  @override
+  String privateUsdSendDoneUnconfirmedBody(String amount, String address) {
+    return '$amount 已发送至 $address。尚未打包进区块。再次发送前请先查看活动记录。';
+  }
+
+  @override
+  String get privateUsdSendErrorFeeCap =>
+      '当前网络手续费超过 2 USDC 的上限，因此未发送任何内容。请稍后重试。';
+
+  @override
+  String get privateUsdSendErrorStore => 'Veylor 无法读取已保存的付款记录。请联系支持团队。';
+
+  @override
+  String privateUsdSendFeeRose(String fee) {
+    return '网络手续费已涨至 $fee。未发送任何内容。';
+  }
+
+  @override
+  String get privateUsdSendInfoStepAddress => '输入金额和收款方的 Railgun 地址（以 0zk 开头）。';
+
+  @override
+  String get privateUsdSendInfoStepPrivate =>
+      '美元在 Railgun 内部转移：其他人看不到金额，也不知道谁发送、谁接收。';
+
+  @override
+  String get privateUsdSendInfoStepProof => '你的手机会生成零知识证明，需要几秒钟。';
+
+  @override
+  String get privateUsdSendInfoTitle => '发送隐私 USD';
+
+  @override
+  String get privateUsdSendInvalid0x => '这不是 Ethereum 地址。';
+
+  @override
+  String get privateUsdSendInvalid0zk => '这不是 Railgun 0zk 地址。';
+
+  @override
+  String get privateUsdSendLanding => '中继者正在发送。等待区块可能需要一分钟。请保持 Veylor 打开。';
+
+  @override
+  String privateUsdSendLeaveNetworkFee(String fee) {
+    return '请留出 $fee 作为网络手续费。';
+  }
+
+  @override
+  String get privateUsdSendNotSent => '未发送任何内容。请稍后重试。';
+
+  @override
+  String get privateUsdSendProving => '正在生成交易证明';
+
+  @override
+  String get privateUsdSendProvingDetail =>
+      '你的手机正在生成零知识证明，让任何人都看不到你发送的内容。这需要几秒钟。请保持 Veylor 打开。';
+
+  @override
+  String privateUsdSendProvingPercent(int percent) {
+    return '正在生成交易证明 · $percent%';
+  }
+
+  @override
+  String privateUsdSendReviewRailgunFee(String percent) {
+    return 'Railgun 手续费（$percent%）';
+  }
+
+  @override
+  String get privateUsdSendReviewReceives => '到账金额';
+
+  @override
+  String get privateUsdSendReviewTitlePrivate => '确认发送';
+
+  @override
+  String get privateUsdSendReviewTitleWithdraw => '确认提取';
+
+  @override
+  String get privateUsdSendSending => '发送中';
+
+  @override
+  String get privateUsdSendTitle => '发送';
+
+  @override
+  String get privateUsdSendToPrivate => '发送至 Railgun 地址';
+
+  @override
+  String get privateUsdSendToWithdraw => '提取至 Ethereum 地址';
+
+  @override
+  String get privateUsdSendTooMuch => '超出可用余额。';
+
+  @override
+  String privateUsdSendTooPrecise(int decimals) {
+    return '最多只能输入 $decimals 位小数。';
+  }
+
+  @override
+  String get privateUsdSendUnavailable => '目前无法从隐私余额发送。未发送任何内容。请稍后重试。';
+
+  @override
+  String get privateUsdSendUnconfirmed => '尚未打包进区块。再次发送前请先查看活动记录。';
+
+  @override
+  String get privateUsdSendViewTx => '在 Etherscan 上查看';
+
+  @override
+  String get privateUsdSendWithdrawPublic => 'Ethereum 上的任何人都能看到此金额和地址。';
+
+  @override
+  String get privateUsdSendZeroAddress => '这是零地址：发送到这里的任何资金都会永久丢失。';
+
+  @override
+  String get privateUsdSettingSaveFailed => '无法保存设置。请重试。';
+
+  @override
+  String get privateUsdShieldedZec => '隐私 ZEC';
+
+  @override
+  String get privateUsdSubtitle => '存放在 Ethereum 上的 0zkUSDC';
+
+  @override
+  String get privateUsdSyncReadoutFailed => 'Railgun 同步失败';
+
+  @override
+  String privateUsdSyncReadoutProgress(int percent) {
+    return 'Railgun 同步 $percent%';
+  }
+
+  @override
+  String get privateUsdSyncReadoutSynced => 'Railgun 已同步';
+
+  @override
+  String get privateUsdSyncingRest => '仍在同步 Railgun 交易列表。请保持 Veylor 打开。';
+
+  @override
+  String privateUsdSyncingRestPercent(int percent) {
+    return '仍在同步 Railgun 交易列表：$percent%。请保持 Veylor 打开。';
+  }
+
+  @override
+  String privateUsdSyncingRestWaits(String usd) {
+    return '你发送产生的找零 $usd 需等待此同步完成。其余金额现在即可发送。';
+  }
+
+  @override
+  String get privateUsdTitle => '隐私 USD';
+
+  @override
+  String get privateUsdTokenTestUsd => '测试美元';
+
+  @override
+  String get privateUsdTokensDeviceRefused =>
+      '令牌签发方无法识别此设备，因此无法跨链。模拟器、已解锁引导加载程序的设备、经过修改的系统和无法识别的构建版本都会被拒绝。';
+
+  @override
+  String get privateUsdTokensKeystore => '此手机的密钥库无法为令牌签发方签名。请稍后重试。';
+
+  @override
+  String get privateUsdTokensNoneToday => '此设备今天的跨链次数已用完。UTC 午夜后可再次跨链。';
+
+  @override
+  String get privateUsdTokensTorOffDisclosure =>
+      '关闭 Tor 时，令牌签发方和做市商可以看出此次跨链及其令牌来自同一连接。';
+
+  @override
+  String get privateUsdTokensUnavailable =>
+      '做市商要求每次跨链都提供令牌期间，只能在 Android 手机上跨链。';
+
+  @override
+  String get privateUsdTokensUnreachable => '无法连接令牌签发方，请稍后重试。';
+
+  @override
+  String privateUsdUpdated(String time) {
+    return '更新于 $time';
+  }
+
+  @override
+  String get privateUsdUpdating => '正在更新…';
+
+  @override
+  String privateUsdUpdatingProgress(int percent) {
+    return '正在更新隐私余额：$percent%';
+  }
+
+  @override
+  String get privateUsdUseAvailable => '使用全部余额';
+
+  @override
+  String privateUsdWithdrawInfoNoteFee(String percent) {
+    return 'Railgun 会收取提取金额的 $percent% 作为手续费。';
+  }
+
+  @override
+  String get privateUsdWithdrawInfoNotePrivate =>
+      '为避免提取与你的跨链被关联：不要提取刚跨链的确切金额，先等待一段时间，并且每次都使用新地址。';
+
+  @override
+  String get privateUsdWithdrawInfoNotePublic =>
+      '提取后，任何人都能在 Ethereum 上看到金额和地址。';
+
+  @override
+  String get privateUsdWithdrawInfoStepAddress => '输入金额和 Ethereum 地址（以 0x 开头）。';
+
+  @override
+  String get privateUsdWithdrawInfoStepProof =>
+      '你的手机会生成证明，然后美元会离开 Railgun，转到该地址。';
+
+  @override
+  String get privateUsdWithdrawInfoTitle => '提取后将公开';
 
   @override
   String get profilePictureChange => '更换头像';

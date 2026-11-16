@@ -12,6 +12,7 @@ import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/mobile_surface_card.dart';
 import 'package:zcash_wallet/src/services/native_modal_corners.dart';
 import 'package:zcash_wallet/src/core/l10n/app_language.dart';
+import '../../../support/test_l10n.dart';
 
 void main() {
   final calls = <MethodCall>[];
@@ -114,9 +115,9 @@ void main() {
         child: MobileWalletSidebar(
           accountName: 'Test account',
           avatar: const SizedBox(width: 40, height: 40),
-          sync: const NeonSyncLine(
+          sync: NeonSyncLine(
             progress: 1,
-            readout: NeonSyncReadout.synced,
+            readout: NeonSyncReadout.synced(testL10n),
             semanticsLabel: 'Veylor is synced',
           ),
           currentPath: '/home',

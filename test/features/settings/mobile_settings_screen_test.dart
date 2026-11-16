@@ -24,7 +24,6 @@ import 'package:zcash_wallet/src/core/widgets/mobile/mobile_list_row.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/mobile_surface_card.dart';
 import 'package:zcash_wallet/src/features/onboarding/shared/onboarding_welcome_art.dart';
 import 'package:zcash_wallet/src/features/payment_links/providers/payment_link_cards_provider.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_archive_sync_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_available_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_custom_rpc_provider.dart';
@@ -1330,8 +1329,8 @@ void main() {
         .map((row) => row.label)
         .toList();
     expect(
-      rows.indexOf(PrivateUsdCopy.relayerClaimsSetting),
-      rows.indexOf(PrivateUsdCopy.rpcTitle) + 1,
+      rows.indexOf(testL10n.privateUsdRelayerClaimsSetting),
+      rows.indexOf(testL10n.privateUsdRpcTitle) + 1,
     );
     final row = find.byKey(
       const ValueKey('mobile_settings_relayer_claims_row'),
@@ -1368,8 +1367,8 @@ void main() {
         .map((row) => row.label)
         .toList();
     expect(
-      rows.indexOf(PrivateUsdCopy.archiveSyncSetting),
-      rows.indexOf(PrivateUsdCopy.relayerClaimsSetting) + 1,
+      rows.indexOf(testL10n.privateUsdArchiveSyncSetting),
+      rows.indexOf(testL10n.privateUsdRelayerClaimsSetting) + 1,
     );
     final row = find.byKey(const ValueKey('mobile_settings_archive_sync_row'));
     final thumb = find.byKey(
@@ -1394,8 +1393,8 @@ void main() {
       _app(privateUsdSettings: MemoryRelayerClaimsStore()),
     );
     await tester.pumpAndSettle();
-    expect(find.text(PrivateUsdCopy.relayerClaimsSetting), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.archiveSyncSetting), findsNothing);
+    expect(find.text(testL10n.privateUsdRelayerClaimsSetting), findsOneWidget);
+    expect(find.text(testL10n.privateUsdArchiveSyncSetting), findsNothing);
   });
 
   testWidgets('relayer claims hide with the Ethereum RPC row', (tester) async {
@@ -1403,8 +1402,8 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pump();
 
-    expect(find.text(PrivateUsdCopy.rpcTitle), findsNothing);
-    expect(find.text(PrivateUsdCopy.relayerClaimsSetting), findsNothing);
+    expect(find.text(testL10n.privateUsdRpcTitle), findsNothing);
+    expect(find.text(testL10n.privateUsdRelayerClaimsSetting), findsNothing);
   });
 
   testWidgets('every settings row renders active', (tester) async {

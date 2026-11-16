@@ -171,7 +171,7 @@ class PrivateUsdRpcChecker {
     final NetworkHttpResponse response;
     try {
       response = await _client.request(
-        'POST',
+        'POST', // l10n-ignore: HTTP method
         Uri.parse(url),
         headers: const {
           HttpHeaders.contentTypeHeader: 'application/json',

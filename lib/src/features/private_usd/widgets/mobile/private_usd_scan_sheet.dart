@@ -5,7 +5,7 @@ import '../../../../core/layout/mobile/app_mobile_sheet.dart';
 import '../../../address_scan/widgets/mobile_address_scan_card.dart';
 import '../../models/private_usd_scan.dart';
 import '../../models/private_usd_send.dart';
-import '../../private_usd_copy.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// The send form's camera scanner, as ZEC Send's: the card-contained back
 /// camera over the dimmed form. Send takes a `0zk` address and Withdraw a
@@ -22,12 +22,17 @@ Future<String?> showPrivateUsdScanSheet(
     builder: (sheetContext) => MobileAddressScanCard(
       controller: controller,
       caption: switch (mode) {
-        PrivateUsdSendMode.private => PrivateUsdCopy.scanCaptionPrivate,
-        PrivateUsdSendMode.withdraw => PrivateUsdCopy.scanCaptionWithdraw,
+        PrivateUsdSendMode.private => context.l10n.privateUsdScanCaptionPrivate,
+        PrivateUsdSendMode.withdraw =>
+          context.l10n.privateUsdScanCaptionWithdraw,
       },
-      permissionTitle: PrivateUsdCopy.scanPermissionTitle,
-      resolve: (raw) async =>
-          privateUsdScanOutcome(raw, mode: mode, chainId: chainId),
+      permissionTitle: context.l10n.privateUsdScanPermissionTitle,
+      resolve: (raw) async => privateUsdScanOutcome(
+        context.l10n,
+        raw,
+        mode: mode,
+        chainId: chainId,
+      ),
       onScanned: (address) => Navigator.of(sheetContext).pop(address),
       onClose: () => Navigator.of(sheetContext).pop(),
     ),

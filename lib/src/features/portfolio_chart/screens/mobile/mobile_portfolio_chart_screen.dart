@@ -10,6 +10,7 @@ import '../../providers/portfolio_chart_provider.dart';
 import '../../providers/portfolio_chart_settings_provider.dart';
 import '../../widgets/mobile/mobile_holdings_panel.dart';
 import '../../widgets/mobile/mobile_portfolio_chart_card.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// The full chart, opened from the Home balance sign: the chart card given most
 /// of the page, and under it what the account holds, pool by pool.
@@ -27,7 +28,10 @@ class MobilePortfolioChartScreen extends ConsumerWidget {
       body: SafeArea(
         child: Column(
           children: [
-            MobileTopNav.back(title: 'Balance', onBack: () => context.pop()),
+            MobileTopNav.back(
+              title: context.l10n.portfolioChartScreenTitle,
+              onBack: () => context.pop(),
+            ),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(
@@ -41,8 +45,7 @@ class MobilePortfolioChartScreen extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: AppSpacing.lg),
                       child: Text(
-                        'The chart appears once this account has a balance '
-                        'history.',
+                        context.l10n.portfolioChartScreenHidden,
                         textAlign: TextAlign.center,
                         style: AppTypography.bodyMedium.copyWith(
                           color: colors.text.secondary,

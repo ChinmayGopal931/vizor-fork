@@ -36,7 +36,6 @@ import '../../../migration/providers/ironwood_migration_coordinator_provider.dar
 import '../../../payment_links/services/payment_link_received_store.dart';
 import '../../../payment_links/services/payment_link_recovery_reconciler.dart';
 import '../../../payment_links/services/payment_link_recovery_store.dart';
-import '../../../private_usd/private_usd_copy.dart';
 import '../../../private_usd/providers/private_usd_unfinished_provider.dart';
 import '../../widgets/mobile/account_edit_sheets.dart';
 
@@ -163,10 +162,15 @@ class _MobileAccountsScreenState extends ConsumerState<MobileAccountsScreen> {
       overlaySize.height - bottomNavClearance - menuHeight,
     );
     final menuTop = (anchorRect.top + 34).clamp(AppSpacing.sm, menuMaxTop);
-    final menuRight = (overlaySize.width - anchorRect.right).clamp(
-      AppSpacing.sm,
-      math.max(AppSpacing.sm, overlaySize.width - menuWidth - AppSpacing.sm),
-    ) as double;
+    final menuRight =
+        (overlaySize.width - anchorRect.right).clamp(
+              AppSpacing.sm,
+              math.max(
+                AppSpacing.sm,
+                overlaySize.width - menuWidth - AppSpacing.sm,
+              ),
+            )
+            as double;
 
     void select(_AccountAction action) {
       _hideRowMenu();
@@ -883,15 +887,15 @@ class MobileAccountRemovalSheet extends StatelessWidget {
             if (privateUsdUnfinishedCount case final count? when count > 0) ...[
               const SizedBox(height: AppSpacing.s),
               Text(
-                PrivateUsdCopy.deleteUnfinishedTitle,
+                context.l10n.privateUsdDeleteUnfinishedTitle,
                 key: const ValueKey('mobile_account_remove_private_usd_title'),
                 style: _bodyStyle.copyWith(color: colors.text.destructive),
               ),
               const SizedBox(height: AppSpacing.xxs),
               Text(
                 isLastAccount
-                    ? PrivateUsdCopy.resetUnfinishedBody(count)
-                    : PrivateUsdCopy.deleteUnfinishedBody(count),
+                    ? context.l10n.privateUsdResetUnfinishedBody(count)
+                    : context.l10n.privateUsdDeleteUnfinishedBody(count),
                 key: const ValueKey('mobile_account_remove_private_usd'),
                 style: _bodyStyle.copyWith(color: colors.text.destructive),
               ),
@@ -899,8 +903,8 @@ class MobileAccountRemovalSheet extends StatelessWidget {
               const SizedBox(height: AppSpacing.s),
               Text(
                 isLastAccount
-                    ? PrivateUsdCopy.resetUncheckedBody
-                    : PrivateUsdCopy.deleteUncheckedBody,
+                    ? context.l10n.privateUsdResetUncheckedBody
+                    : context.l10n.privateUsdDeleteUncheckedBody,
                 key: const ValueKey('mobile_account_remove_private_usd'),
                 style: _bodyStyle.copyWith(color: colors.text.destructive),
               ),
@@ -914,9 +918,9 @@ class MobileAccountRemovalSheet extends StatelessWidget {
               leading: isLastAccount ? null : const AppIcon(AppIcons.trash),
               child: Text(
                 switch ((isLastAccount, privateUsdUnfinishedCount != 0)) {
-                  (true, true) => PrivateUsdCopy.resetAnyway,
+                  (true, true) => context.l10n.privateUsdResetAnyway,
                   (true, false) => context.l10n.commonResetVizor,
-                  (false, true) => PrivateUsdCopy.deleteAnyway,
+                  (false, true) => context.l10n.privateUsdDeleteAnyway,
                   (false, false) => context.l10n.commonRemove,
                 },
                 style: _buttonLabelStyle.copyWith(

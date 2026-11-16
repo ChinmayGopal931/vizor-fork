@@ -3,7 +3,6 @@ import 'package:flutter/widgets.dart';
 import '../src/core/l10n/l10n.dart';
 import '../src/features/private_usd/models/private_usd_record_key.dart';
 import '../src/features/private_usd/models/private_usd_reverse_presentation.dart';
-import '../src/features/private_usd/private_usd_copy.dart';
 import '../src/features/private_usd/providers/private_usd_convert_provider.dart';
 import '../src/features/private_usd/providers/private_usd_refunds_provider.dart';
 import '../src/features/private_usd/providers/private_usd_reverse_convert_provider.dart';
@@ -198,7 +197,7 @@ Widget buildMobilePrivateUsdReverseFundingUseCase(BuildContext context) =>
     _reverseProgress(
       context,
       previewPrivateUsdReverseRecord(phase: ApiReversePhase.awaitingFunding),
-      message: PrivateUsdCopy.reverseErrorCostChanged,
+      message: context.l10n.privateUsdReverseErrorCostChanged,
     );
 
 /// The payment proving in the page: its progress and keep-open note.

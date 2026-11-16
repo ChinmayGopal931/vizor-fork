@@ -6227,6 +6227,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navVote => 'Vote';
 
   @override
+  String neonSyncChecking(int percent) {
+    return 'Check $percent%';
+  }
+
+  @override
+  String get neonSyncFailed => 'Sync failed';
+
+  @override
+  String neonSyncProgress(int percent) {
+    return 'Sync $percent%';
+  }
+
+  @override
+  String get neonSyncTorOffline => 'Tor offline';
+
+  @override
+  String get neonSyncTorWaiting => 'Tor …';
+
+  @override
   String get networkPrivacyFinishUpdateBeforeTorOff =>
       'Finish the current software update before turning off Tor.';
 
@@ -8484,8 +8503,1745 @@ class AppLocalizationsEn extends AppLocalizations {
   String get poolTransparent => 'Transparent';
 
   @override
+  String get portfolioChartEmpty => 'Not enough history for this range yet.';
+
+  @override
+  String get portfolioChartHoldings => 'Holdings';
+
+  @override
+  String portfolioChartIncludesPending(String amount) {
+    return 'Includes $amount pending';
+  }
+
+  @override
+  String get portfolioChartOnDevice => 'On this device';
+
+  @override
+  String get portfolioChartOpen => 'Open balance chart';
+
+  @override
+  String portfolioChartPlotSemantics(
+    String title,
+    String range,
+    String change,
+  ) {
+    return '$title, $range, $change. Drag to inspect values.';
+  }
+
+  @override
+  String get portfolioChartPricesStale => 'Older prices';
+
+  @override
+  String get portfolioChartPricesUnavailable => 'Prices unavailable';
+
+  @override
+  String get portfolioChartPrivate => 'Hidden in privacy mode.';
+
+  @override
+  String get portfolioChartRangeAll => 'All time';
+
+  @override
+  String get portfolioChartRangeAllChip => 'All';
+
+  @override
+  String get portfolioChartRangeMonth => 'Past month';
+
+  @override
+  String get portfolioChartRangeMonthChip => '1m';
+
+  @override
+  String get portfolioChartRangeQuarter => 'Past 3 months';
+
+  @override
+  String get portfolioChartRangeQuarterChip => '3m';
+
+  @override
+  String get portfolioChartRangeWeek => 'Past week';
+
+  @override
+  String get portfolioChartRangeWeekChip => '1w';
+
+  @override
+  String get portfolioChartRangeYear => 'Past year';
+
+  @override
+  String get portfolioChartRangeYearChip => '1y';
+
+  @override
+  String get portfolioChartScreenHidden =>
+      'The chart appears once this account has a balance history.';
+
+  @override
+  String get portfolioChartScreenTitle => 'Balance';
+
+  @override
+  String get portfolioChartSettingsMarketPrices => 'Use market prices';
+
+  @override
+  String get portfolioChartSettingsSaveFailed =>
+      'Couldn\'t update the portfolio chart setting.';
+
+  @override
+  String get portfolioChartSettingsShowOnHome => 'Show on home';
+
+  @override
+  String get portfolioChartSettingsTitle => 'Portfolio chart';
+
+  @override
+  String get portfolioChartTitleUsd => 'Portfolio value';
+
+  @override
+  String get portfolioChartTitleZec => 'ZEC balance';
+
+  @override
+  String get portfolioChartTotalShielded => 'Total shielded';
+
+  @override
   String get privateQueriesOptOutUnfinished =>
       'Turning off Private queries didn\'t finish. Turn it off again in Settings to use transparent funds.';
+
+  @override
+  String privateUsdAboutHours(int hours) {
+    return 'about $hours h';
+  }
+
+  @override
+  String privateUsdAboutMinutes(int minutes) {
+    return 'about $minutes min';
+  }
+
+  @override
+  String get privateUsdActionConvert => 'Bridge';
+
+  @override
+  String get privateUsdActionReceive => 'Receive';
+
+  @override
+  String get privateUsdActionSend => 'Send';
+
+  @override
+  String get privateUsdActionWithdraw => 'Withdraw';
+
+  @override
+  String get privateUsdActivityConverted => 'Bridged to 0zkUSDC';
+
+  @override
+  String get privateUsdActivityConvertedToZec => 'Bridged to ZEC';
+
+  @override
+  String get privateUsdActivityDeposit => 'Deposit';
+
+  @override
+  String get privateUsdActivityDepositRescue => 'Recovered deposit';
+
+  @override
+  String get privateUsdActivityDepositShielded => 'Shielded';
+
+  @override
+  String get privateUsdActivityEmpty =>
+      'Your bridges, sends and withdrawals will show here.';
+
+  @override
+  String privateUsdActivityFrom(String address) {
+    return 'from $address';
+  }
+
+  @override
+  String get privateUsdActivityReceived => 'Received';
+
+  @override
+  String get privateUsdActivityReceivedScreening => 'available once screened';
+
+  @override
+  String get privateUsdActivityRefunded => 'Bridge called off';
+
+  @override
+  String get privateUsdActivityRefundedDetail => 'your ZEC came back';
+
+  @override
+  String get privateUsdActivityRefundedZecDetail => 'your dollars came back';
+
+  @override
+  String get privateUsdActivitySenderHidden => 'sender hidden';
+
+  @override
+  String get privateUsdActivitySent => 'Sent';
+
+  @override
+  String get privateUsdActivityTitle => 'Activity';
+
+  @override
+  String privateUsdActivityTo(String address) {
+    return 'to $address';
+  }
+
+  @override
+  String get privateUsdActivityUnconfirmed => 'not in a block yet';
+
+  @override
+  String get privateUsdActivityWithdrew => 'Withdrew';
+
+  @override
+  String get privateUsdArchiveSyncSetting =>
+      'Sync history from Anon\'s archive';
+
+  @override
+  String get privateUsdAssetsTitle => 'Assets';
+
+  @override
+  String privateUsdAvailableAmount(String amount) {
+    return 'Available: $amount';
+  }
+
+  @override
+  String get privateUsdBannerAttention => 'Bridge needs attention';
+
+  @override
+  String privateUsdBannerDetail(String detail) {
+    return '$detail\nKeep Veylor open to finish';
+  }
+
+  @override
+  String get privateUsdBannerKeepOpen => 'Keep Veylor open to finish';
+
+  @override
+  String get privateUsdBannerRelayerClaims =>
+      'You can leave: the relayer claims your dollars';
+
+  @override
+  String privateUsdBannerRelayerDetail(String detail) {
+    return '$detail\nYou can leave: the relayer claims your dollars';
+  }
+
+  @override
+  String get privateUsdBridgedTitle => 'Bridged';
+
+  @override
+  String get privateUsdBridgedYouPaid => 'You paid';
+
+  @override
+  String get privateUsdBridgedYouReceived => 'You received';
+
+  @override
+  String get privateUsdCheckingPayments => 'Checking pending payments…';
+
+  @override
+  String get privateUsdConversionPending =>
+      'A bridge is in progress. Sending will be available when it finishes.';
+
+  @override
+  String get privateUsdConvertBackgroundNote =>
+      'Keep Veylor open until this finishes. If you leave, it pauses and picks up when you\'re back.';
+
+  @override
+  String get privateUsdConvertCallOff => 'Call it off';
+
+  @override
+  String get privateUsdConvertCallOffFailed =>
+      'Couldn\'t call it off. Try again in a moment.';
+
+  @override
+  String get privateUsdConvertCallOffTooLate =>
+      'The swap opened on Ethereum meanwhile, so it can\'t be called off. It carries on.';
+
+  @override
+  String get privateUsdConvertErrorAmountRefused =>
+      'The market maker won\'t bridge this amount. It may be over the limit for one bridge, or too small to cover the swap\'s network cost.';
+
+  @override
+  String get privateUsdConvertErrorBelowFee =>
+      'This amount doesn\'t cover the relayer\'s fee. Try a larger amount.';
+
+  @override
+  String get privateUsdConvertErrorEthereum =>
+      'Veylor can\'t reach Ethereum right now. Try again in a moment.';
+
+  @override
+  String get privateUsdConvertErrorFeeCap =>
+      'The relayer\'s fee is above the 2 USDC limit right now, so nothing was sent. Try again later.';
+
+  @override
+  String get privateUsdConvertErrorGeneric =>
+      'Couldn\'t get a quote. Try again in a moment.';
+
+  @override
+  String get privateUsdConvertErrorMaker =>
+      'The market maker can\'t be reached right now. Try again in a moment.';
+
+  @override
+  String get privateUsdConvertErrorMakerBusy =>
+      'The market maker is busy with other bridges. Try again in a few minutes.';
+
+  @override
+  String get privateUsdConvertErrorRelayer =>
+      'The relayer that completes bridges can\'t be reached right now. Try again in a moment.';
+
+  @override
+  String get privateUsdConvertErrorRelayerRefused =>
+      'The relayer that completes bridges turned this down. Try again in a moment.';
+
+  @override
+  String get privateUsdConvertErrorStore =>
+      'Veylor can\'t read its saved bridges. Contact support.';
+
+  @override
+  String get privateUsdConvertErrorTokensUnavailable =>
+      'Couldn\'t get this bridge\'s token, so nothing was sent. Try again in a moment.';
+
+  @override
+  String get privateUsdConvertErrorUnpayable =>
+      'Your wallet can\'t pay this in one transaction right now. Try a smaller amount.';
+
+  @override
+  String get privateUsdConvertErrorWallet =>
+      'Veylor couldn\'t complete this step with your Zcash wallet. Try again in a moment.';
+
+  @override
+  String get privateUsdConvertEstimatedAmount => 'Estimated amount';
+
+  @override
+  String get privateUsdConvertEtaMinute => 'About a minute';
+
+  @override
+  String get privateUsdConvertEtaSeconds => 'A few seconds';
+
+  @override
+  String get privateUsdConvertFees => 'Bridge fees';
+
+  @override
+  String privateUsdConvertFeesValue(String relayerUsd, String railgunPercent) {
+    return '$relayerUsd relayer · $railgunPercent% Railgun';
+  }
+
+  @override
+  String get privateUsdConvertInfoNoteEither =>
+      'Either the dollars reach your shielded balance, or your ZEC comes back to you.';
+
+  @override
+  String privateUsdConvertInfoNoteTime(String about) {
+    return 'Takes $about. Keep Veylor open and unlocked until it\'s done. If you leave, it pauses; if it can\'t finish in time, it\'s called off and your ZEC comes back, less a network fee.';
+  }
+
+  @override
+  String privateUsdConvertInfoNoteTimeRelayer(String about) {
+    return 'Takes $about. Keep Veylor open and unlocked until the market maker confirms your deposit, a few minutes; the relayer does the rest. If it can\'t finish in time, it\'s called off and your ZEC comes back, less a network fee, the next time you open Veylor.';
+  }
+
+  @override
+  String get privateUsdConvertInfoStepClaim =>
+      'Once the deposit is confirmed, Veylor claims the dollars into your shielded balance.';
+
+  @override
+  String get privateUsdConvertInfoStepClaimRelayer =>
+      'Once the deposit is confirmed, the relayer claims the dollars into your shielded balance.';
+
+  @override
+  String get privateUsdConvertInfoStepDeposit =>
+      'Your ZEC goes to a deposit address that you and the market maker control together.';
+
+  @override
+  String get privateUsdConvertInfoStepQuote =>
+      'Enter the ZEC you want to bridge, including the network fee. The market maker quotes how much shielded USD you receive. The quote holds for a few minutes.';
+
+  @override
+  String get privateUsdConvertInfoTitle => 'How bridging works';
+
+  @override
+  String privateUsdConvertInsufficient(String zec) {
+    return 'Not enough ZEC. You have $zec available.';
+  }
+
+  @override
+  String get privateUsdConvertMakerCost => 'Market maker\'s network cost';
+
+  @override
+  String privateUsdConvertMakerSilent(String time) {
+    return 'The market maker hasn\'t confirmed your deposit yet. If it still hasn\'t by $time, Veylor claims your dollars itself. Keep Veylor open until then.';
+  }
+
+  @override
+  String get privateUsdConvertNewQuote => 'Refresh quote';
+
+  @override
+  String get privateUsdConvertOpeningSlow =>
+      'The market maker hasn\'t opened the swap yet. Nothing has been sent.';
+
+  @override
+  String get privateUsdConvertProblemEthereum =>
+      'Veylor can\'t reach Ethereum right now. It keeps trying while it\'s open.';
+
+  @override
+  String get privateUsdConvertProblemMismatch =>
+      'What\'s on the chain doesn\'t match this bridge, so Veylor only brings your funds back.';
+
+  @override
+  String get privateUsdConvertProblemRailgun =>
+      'Railgun isn\'t accepting deposits right now, so Veylor holds off claiming. If it doesn\'t reopen in time, the swap is called off and your ZEC comes back.';
+
+  @override
+  String get privateUsdConvertProblemRejected =>
+      'The Zcash network turned down a transaction of this bridge. Veylor keeps sending it until it goes through or expires.';
+
+  @override
+  String get privateUsdConvertProblemRelayer =>
+      'Veylor can\'t reach the relayer that sends your claim. It keeps trying while it\'s open.';
+
+  @override
+  String get privateUsdConvertProblemRelayerFee =>
+      'The relayer\'s fee is more than this bridge pays out, or above the 2 USDC limit, so Veylor waits for it to come down.';
+
+  @override
+  String get privateUsdConvertProblemRelayerRefused =>
+      'The relayer keeps turning down this bridge\'s transaction. Veylor keeps trying while it\'s open.';
+
+  @override
+  String get privateUsdConvertProblemRetry => 'Try now';
+
+  @override
+  String get privateUsdConvertProblemRoute =>
+      'Tor is starting or unavailable. Veylor keeps trying while it\'s open.';
+
+  @override
+  String get privateUsdConvertProblemTitle => 'Taking longer than usual';
+
+  @override
+  String get privateUsdConvertProblemTokens =>
+      'The market maker asks for a token. Veylor is getting one for today; if it can\'t, this bridge is called off.';
+
+  @override
+  String get privateUsdConvertProblemUnexpected =>
+      'Something went wrong. Veylor keeps trying while it\'s open.';
+
+  @override
+  String get privateUsdConvertProblemUnpayable =>
+      'Your wallet can\'t pay the deposit right now, for example because the network fee went up. Veylor keeps trying. If it still can\'t pay in time, the swap ends and nothing is sent.';
+
+  @override
+  String get privateUsdConvertProblemWallet =>
+      'Veylor couldn\'t complete this step with your Zcash wallet. It will keep trying while open and unlocked.';
+
+  @override
+  String privateUsdConvertProgressAmounts(String zec, String usd) {
+    return '$zec for about $usd';
+  }
+
+  @override
+  String get privateUsdConvertProgressInfoClaim =>
+      'Veylor claims the dollars into your shielded balance. A relayer pays the Ethereum fees.';
+
+  @override
+  String get privateUsdConvertProgressInfoClaimRelayer =>
+      'The relayer claims the dollars into your shielded balance and pays the Ethereum fees.';
+
+  @override
+  String privateUsdConvertProgressInfoConfirm(int confirmations) {
+    String _temp0 = intl.Intl.pluralLogic(
+      confirmations,
+      locale: localeName,
+      other: 'The market maker waits for $confirmations Zcash confirmations.',
+      one: 'The market maker waits for $confirmations Zcash confirmation.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get privateUsdConvertProgressInfoDeposit =>
+      'Veylor sends your ZEC to the deposit address you and the market maker share.';
+
+  @override
+  String get privateUsdConvertProgressInfoOpen =>
+      'The market maker opens the swap on Ethereum and puts the dollars in it.';
+
+  @override
+  String get privateUsdConvertProgressInfoRefund =>
+      'If the swap can\'t finish in time, it\'s called off and your ZEC comes back, less a small network fee.';
+
+  @override
+  String privateUsdConvertProgressInfoScreen(String about) {
+    return 'Railgun screens them for $about before they can be spent.';
+  }
+
+  @override
+  String get privateUsdConvertProgressInfoTitle => 'What\'s happening';
+
+  @override
+  String get privateUsdConvertProgressTitle => 'Bridging';
+
+  @override
+  String get privateUsdConvertQuoteClockAhead =>
+      'The quote had expired by the time it arrived. Check that your phone\'s clock is right, then try again.';
+
+  @override
+  String privateUsdConvertQuoteExpires(String minutesSeconds) {
+    return 'Quote expires in $minutesSeconds';
+  }
+
+  @override
+  String privateUsdConvertQuoteHolds(String minutesSeconds) {
+    return 'Quote holds for $minutesSeconds';
+  }
+
+  @override
+  String get privateUsdConvertQuoteLoading => 'Getting quote…';
+
+  @override
+  String get privateUsdConvertQuoteRanOut =>
+      'This quote expired. Refresh it to continue.';
+
+  @override
+  String get privateUsdConvertRefunding =>
+      'The swap was called off. Veylor is bringing your ZEC back to your wallet.';
+
+  @override
+  String get privateUsdConvertRelayerClaims =>
+      'You can leave Veylor now. The market maker confirmed your deposit, and the relayer claims your dollars.';
+
+  @override
+  String get privateUsdConvertRelayerInfoKeepOpen =>
+      'Veylor sends your ZEC while it\'s open and unlocked and, once the market maker confirms it, hands the claim to the relayer. Refunds and sends run only while Veylor is open and unlocked.';
+
+  @override
+  String get privateUsdConvertRelayerReviewNote =>
+      'Keep Veylor open until the market maker confirms your deposit, a few minutes. Then the relayer claims your dollars, and you can leave.';
+
+  @override
+  String get privateUsdConvertResultMakerCancelled =>
+      'The market maker called the swap off before your ZEC was sent. Your ZEC never left your wallet.';
+
+  @override
+  String get privateUsdConvertResultMakerRefused =>
+      'The market maker turned the bridge down. Your ZEC never left your wallet.';
+
+  @override
+  String get privateUsdConvertResultMakerUnavailable =>
+      'The market maker isn\'t taking bridges right now. Your ZEC never left your wallet.';
+
+  @override
+  String get privateUsdConvertResultMismatch =>
+      'The swap on Ethereum didn\'t match its quote, so Veylor didn\'t send your ZEC.';
+
+  @override
+  String get privateUsdConvertResultNeverOpened =>
+      'The swap never opened on Ethereum. Your ZEC never left your wallet.';
+
+  @override
+  String get privateUsdConvertResultNothingTitle => 'Nothing was sent';
+
+  @override
+  String privateUsdConvertResultPaidBody(String usd, String about) {
+    return '$usd is in your shielded balance. Railgun screens new funds for $about before they can be spent.';
+  }
+
+  @override
+  String get privateUsdConvertResultPaidTitle => '0zkUSDC on its way';
+
+  @override
+  String get privateUsdConvertResultQuoteExpired =>
+      'The quote expired before the market maker took it. Your ZEC never left your wallet.';
+
+  @override
+  String get privateUsdConvertResultRefundedLate =>
+      'The swap couldn\'t be completed in time, so it was called off and your ZEC came back, less a small network fee.';
+
+  @override
+  String get privateUsdConvertResultRefundedMaker =>
+      'The market maker called the swap off, so your ZEC came back to your wallet, less a small network fee.';
+
+  @override
+  String get privateUsdConvertResultRefundedTitle => 'Your ZEC came back';
+
+  @override
+  String privateUsdConvertResultScreenedBody(String usd) {
+    return '$usd is in your shielded balance, ready to use.';
+  }
+
+  @override
+  String get privateUsdConvertResultViewBalance => 'View shielded USD';
+
+  @override
+  String get privateUsdConvertResultWindowMissed =>
+      'The swap opened too late to finish safely, so Veylor didn\'t send your ZEC.';
+
+  @override
+  String get privateUsdConvertResuming => 'Picking up where it left off.';
+
+  @override
+  String get privateUsdConvertReviewInfoPay =>
+      'You pay the ZEC deposit, which includes the market maker\'s network cost, plus the Zcash network fee.';
+
+  @override
+  String get privateUsdConvertReviewInfoQuote =>
+      'The quote holds for a few minutes. If it expires, refresh it: nothing is sent until you bridge.';
+
+  @override
+  String privateUsdConvertReviewInfoReceive(String railgunPercent) {
+    return 'You receive the dollars left after the relayer\'s fee and Railgun\'s $railgunPercent% fee for shielding them.';
+  }
+
+  @override
+  String get privateUsdConvertReviewInfoTitle => 'Before you bridge';
+
+  @override
+  String get privateUsdConvertStartFailed =>
+      'The bridge couldn\'t start. Nothing was sent. Try again in a moment.';
+
+  @override
+  String get privateUsdConvertStepArrive => 'Arriving in your shielded balance';
+
+  @override
+  String get privateUsdConvertStepClaim => 'Claiming your dollars';
+
+  @override
+  String get privateUsdConvertStepConfirm => 'Waiting for confirmations';
+
+  @override
+  String privateUsdConvertStepConfirmCount(int count, int of) {
+    return '$count of $of';
+  }
+
+  @override
+  String get privateUsdConvertStepDeposit => 'Sending your ZEC';
+
+  @override
+  String get privateUsdConvertStepOpen => 'Opening the swap on Ethereum';
+
+  @override
+  String get privateUsdConvertStepRefund => 'Bringing your ZEC back';
+
+  @override
+  String get privateUsdConvertStepScreen => 'Screening';
+
+  @override
+  String get privateUsdConvertStepUnwind =>
+      'Waiting for the market maker\'s refund';
+
+  @override
+  String get privateUsdConvertSwapDirection => 'Swap bridge direction';
+
+  @override
+  String get privateUsdConvertUnsettled =>
+      'The market maker called the swap off while your ZEC payment was still unconfirmed. If it goes through, Veylor brings your ZEC back.';
+
+  @override
+  String get privateUsdConvertUnwinding =>
+      'The swap couldn\'t be completed in time, so it unwinds: your ZEC comes back after the market maker\'s refund.';
+
+  @override
+  String privateUsdConvertUnwindingUntil(String time) {
+    return 'The swap couldn\'t be completed in time, so it unwinds: your ZEC comes back after the market maker\'s refund. If the market maker hasn\'t refunded by $time, Veylor claims your dollars instead.';
+  }
+
+  @override
+  String get privateUsdConvertWaitSyncing =>
+      'Waiting for your Zcash wallet to sync';
+
+  @override
+  String get privateUsdConvertYouPay => 'You pay';
+
+  @override
+  String get privateUsdConvertYouReceive => 'You receive about';
+
+  @override
+  String get privateUsdConvertZecIncludesFee =>
+      'Includes the Zcash network fee';
+
+  @override
+  String get privateUsdConvertZecNoQuote =>
+      'No quote fits this amount. Try a different amount, or use it all for the maximum.';
+
+  @override
+  String get privateUsdConvertZecSyncing =>
+      'Your wallet is still syncing. The rest of your ZEC is available once it catches up.';
+
+  @override
+  String privateUsdConvertZecSyncingProgress(int percent) {
+    return 'Your wallet is still syncing ($percent%). The rest of your ZEC is available once it catches up.';
+  }
+
+  @override
+  String get privateUsdConvertingToUsd => 'Bridging to 0zkUSDC';
+
+  @override
+  String get privateUsdConvertingToZec => 'Bridging to ZEC';
+
+  @override
+  String get privateUsdDeleteAnyway => 'Delete anyway';
+
+  @override
+  String get privateUsdDeleteUncheckedBody =>
+      'Couldn\'t check for unfinished shielded USD bridges. Only this account can recover their funds, so deleting it now can lose them.';
+
+  @override
+  String privateUsdDeleteUnfinishedBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'This account has $count unfinished shielded USD bridges. Only this account can recover their funds, so deleting it now can lose them. Keep Veylor open until they finish or are refunded.',
+      one:
+          'This account has $count unfinished shielded USD bridge. Only this account can recover their funds, so deleting it now can lose them. Keep Veylor open until they finish or are refunded.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get privateUsdDeleteUnfinishedTitle => 'Bridge in progress';
+
+  @override
+  String get privateUsdDepositAddressFailed =>
+      'Couldn\'t load your deposit address. Try again in a moment.';
+
+  @override
+  String get privateUsdDepositAddressLoading => 'Loading your deposit address…';
+
+  @override
+  String get privateUsdDepositCopy => 'Copy deposit address';
+
+  @override
+  String privateUsdDepositExample(String sent, String arrives) {
+    return 'Sending $sent brings $arrives after both fees.';
+  }
+
+  @override
+  String get privateUsdDepositFeesFailed =>
+      'Couldn\'t load the fees. Money sent here waits safely at this address.';
+
+  @override
+  String get privateUsdDepositFeesLoading => 'Loading the fees…';
+
+  @override
+  String get privateUsdDepositHow =>
+      'Send it from an exchange or any wallet. Veylor shields it on its own while it is open and unlocked.';
+
+  @override
+  String privateUsdDepositMinimum(String usd) {
+    return 'Minimum $usd';
+  }
+
+  @override
+  String get privateUsdDepositNotShielding =>
+      'Received, but not shielded yet. Veylor tries again later; your money is safe at your deposit address.';
+
+  @override
+  String privateUsdDepositNotShieldingLine(String usd) {
+    return 'Received $usd. Received, but not shielded yet. Veylor tries again later; your money is safe at your deposit address.';
+  }
+
+  @override
+  String privateUsdDepositOnly(String symbol, String chain) {
+    return 'Only $symbol on $chain';
+  }
+
+  @override
+  String privateUsdDepositRailgunFee(String percent) {
+    return 'Railgun\'s fee: $percent%';
+  }
+
+  @override
+  String privateUsdDepositReceived(String usd) {
+    return 'Received $usd';
+  }
+
+  @override
+  String privateUsdDepositRelayerFee(String fixed, String percent) {
+    return 'Relayer fee: $fixed + $percent%';
+  }
+
+  @override
+  String privateUsdDepositShielded(String about) {
+    return 'Shielded, available in $about';
+  }
+
+  @override
+  String privateUsdDepositShieldedLine(String usd, String about) {
+    return '$usd: Shielded, available in $about';
+  }
+
+  @override
+  String get privateUsdDepositShielding => 'Shielding…';
+
+  @override
+  String privateUsdDepositShieldingLine(String usd) {
+    return 'Received $usd. Shielding…';
+  }
+
+  @override
+  String privateUsdDepositTitle(String symbol) {
+    return 'Receive $symbol';
+  }
+
+  @override
+  String get privateUsdDepositUnavailable =>
+      'Deposits are unavailable right now. Nothing sent to an earlier deposit address is lost: it waits there.';
+
+  @override
+  String privateUsdDepositUnderMinimum(String usd, String minimum) {
+    return 'Received $usd, under the $minimum minimum. Send more to this address.';
+  }
+
+  @override
+  String get privateUsdDepositWaiting =>
+      'Waiting for the network; your money is safe at your deposit address';
+
+  @override
+  String privateUsdDepositWaitingLine(String usd) {
+    return 'Received $usd. Waiting for the network; your money is safe at your deposit address';
+  }
+
+  @override
+  String get privateUsdDepositsTitle => 'Deposits';
+
+  @override
+  String get privateUsdDetailDeposit => 'ZEC deposit';
+
+  @override
+  String get privateUsdDetailFunding => 'Escrow payment';
+
+  @override
+  String get privateUsdDetailPayout => 'Payout';
+
+  @override
+  String get privateUsdDetailRefund => 'ZEC refund';
+
+  @override
+  String get privateUsdDetailStarted => 'Started';
+
+  @override
+  String get privateUsdDetailSwapId => 'Swap ID';
+
+  @override
+  String get privateUsdDetailZecReceived => 'ZEC received';
+
+  @override
+  String get privateUsdDetailsConfirmed => 'Confirmed';
+
+  @override
+  String get privateUsdDetailsDepositAddress => 'Deposit address';
+
+  @override
+  String get privateUsdDetailsEnded => 'Ended';
+
+  @override
+  String get privateUsdDetailsFrom => 'From';
+
+  @override
+  String privateUsdDetailsOpenOn(String transaction, String explorer) {
+    return '$transaction on $explorer';
+  }
+
+  @override
+  String get privateUsdDetailsReceived => 'Received';
+
+  @override
+  String get privateUsdDetailsRelayerFee => 'Relayer fee';
+
+  @override
+  String get privateUsdDetailsSenderHidden => 'Hidden';
+
+  @override
+  String get privateUsdDetailsSent => 'Sent';
+
+  @override
+  String get privateUsdDetailsStatus => 'Status';
+
+  @override
+  String get privateUsdDetailsTransaction => 'Transaction';
+
+  @override
+  String get privateUsdDetailsUnconfirmed => 'Not in a block yet';
+
+  @override
+  String get privateUsdEmptyBody =>
+      'Bridge ZEC into dollars nobody else can see: not your balance, and not who you pay.';
+
+  @override
+  String get privateUsdEmptyBodyReceive =>
+      'Receive dollars nobody else can see: not your balance, and not who you pay.';
+
+  @override
+  String get privateUsdEmptyTitle => 'No shielded dollars yet';
+
+  @override
+  String get privateUsdFirstLoad =>
+      'Loading your shielded balance. The first time reads Railgun\'s history and can take a while. Keep Veylor open.';
+
+  @override
+  String privateUsdFirstLoadProgress(int percent) {
+    return 'Loading your shielded balance: $percent%. The first time reads Railgun\'s history and can take a while. Keep Veylor open.';
+  }
+
+  @override
+  String get privateUsdHoldingsShieldedOnEthereum => 'On Ethereum';
+
+  @override
+  String privateUsdHomeArriving(String usd) {
+    return '+$usd arriving';
+  }
+
+  @override
+  String privateUsdHomeArrivingDescription(String usd) {
+    return '$usd arriving';
+  }
+
+  @override
+  String privateUsdHomeBalanceDescription(String amount) {
+    return 'Shielded USD $amount';
+  }
+
+  @override
+  String privateUsdHomeBlocked(String usd) {
+    return '$usd needs attention';
+  }
+
+  @override
+  String privateUsdHomeBlockedDescription(String usd) {
+    return 'Needs attention: $usd';
+  }
+
+  @override
+  String get privateUsdHomeOpen => 'Open shielded USD';
+
+  @override
+  String get privateUsdInfoButton => 'How this works';
+
+  @override
+  String get privateUsdInfoConvert =>
+      'Bridge: move between ZEC and shielded USD.';
+
+  @override
+  String get privateUsdInfoKeepOpen =>
+      'Bridges, sends and refunds run only while Veylor is open and unlocked.';
+
+  @override
+  String get privateUsdInfoPrivate =>
+      'Nobody else can see your balance, or who you pay.';
+
+  @override
+  String get privateUsdInfoReceive =>
+      'Receive: public USDC from an exchange or any wallet goes to your deposit address (Receive), and Veylor shields it for a small fee. Shielded USD from another Railgun wallet goes to your Railgun address on this screen, with no fee.';
+
+  @override
+  String get privateUsdInfoRefunds =>
+      'Refunds: recover a refund that couldn\'t enter your shielded balance.';
+
+  @override
+  String privateUsdInfoScreening(String about) {
+    return 'Railgun screens new funds for $about before they can be spent.';
+  }
+
+  @override
+  String get privateUsdInfoSend =>
+      'Send: transfer shielded USD to another Railgun address. It stays shielded.';
+
+  @override
+  String get privateUsdInfoTitle => 'About shielded USD';
+
+  @override
+  String get privateUsdInfoWithdraw =>
+      'Withdraw: move shielded USD to a public Ethereum address. The destination and amount are visible on Ethereum.';
+
+  @override
+  String get privateUsdKeepOpenBody =>
+      'This can take a while. Veylor needs to stay open and online until it\'s done: if your screen turns off, it pauses until you\'re back.';
+
+  @override
+  String get privateUsdKeepOpenTitle => 'Keep Veylor open';
+
+  @override
+  String get privateUsdKeepScreenOn => 'Keep screen on';
+
+  @override
+  String get privateUsdLoadFailed =>
+      'Couldn\'t load the balance. Try again in a moment.';
+
+  @override
+  String get privateUsdLoading => 'Loading…';
+
+  @override
+  String get privateUsdMax => 'Max';
+
+  @override
+  String get privateUsdNetworkUpgradeHold =>
+      'Paused for the network upgrade. Try again in a few minutes.';
+
+  @override
+  String get privateUsdNotNow => 'Not now';
+
+  @override
+  String get privateUsdPaste => 'Paste';
+
+  @override
+  String get privateUsdPaymentPending =>
+      'A previous payment is still pending. You can send or bridge again once it\'s confirmed.';
+
+  @override
+  String privateUsdPaymentProving(int percent) {
+    return 'Proving your payment · $percent%';
+  }
+
+  @override
+  String get privateUsdPaymentUpdatingBalance => 'Updating your balance';
+
+  @override
+  String privateUsdPaymentWaitingForBlock(String elapsed) {
+    return 'Waiting for a block · $elapsed';
+  }
+
+  @override
+  String get privateUsdProgressTab => 'Bridge progress';
+
+  @override
+  String get privateUsdQuoteExpired => 'Quote expired';
+
+  @override
+  String get privateUsdReceiveAddressNote =>
+      'Shielded USD from another Railgun wallet arrives here, with no fee.';
+
+  @override
+  String get privateUsdReceiveShieldedCopy => 'Copy Railgun address';
+
+  @override
+  String get privateUsdReceiveShieldedOnly => 'Only from a Railgun wallet';
+
+  @override
+  String get privateUsdRefresh => 'Refresh';
+
+  @override
+  String get privateUsdRefreshFailed =>
+      'Couldn\'t update the balance. Showing the last known amounts.';
+
+  @override
+  String get privateUsdRefundsAvailable => 'This refund can be recovered.';
+
+  @override
+  String get privateUsdRefundsCheckFailed =>
+      'Couldn\'t check this refund. Refresh to try again.';
+
+  @override
+  String get privateUsdRefundsChecking => 'Checking refunds…';
+
+  @override
+  String privateUsdRefundsDepositBody(String usd) {
+    return 'Railgun\'s screening sent $usd back to your deposit address\'s vault. Recover it to shield it again.';
+  }
+
+  @override
+  String privateUsdRefundsDepositConfirmBody(String fee) {
+    return 'The relayer\'s fee, $fee, comes out of it.';
+  }
+
+  @override
+  String get privateUsdRefundsDepositConfirmTitle => 'Recover this deposit?';
+
+  @override
+  String get privateUsdRefundsDepositRecover => 'Recover deposit';
+
+  @override
+  String get privateUsdRefundsDepositRecoverFailed =>
+      'Couldn\'t recover this deposit. Try again.';
+
+  @override
+  String get privateUsdRefundsDepositRecovering => 'Recovering your deposit…';
+
+  @override
+  String get privateUsdRefundsDepositTitle => 'Deposit sent back by screening';
+
+  @override
+  String get privateUsdRefundsEmpty => 'No refunded bridges yet.';
+
+  @override
+  String get privateUsdRefundsInfo =>
+      'If a refund couldn\'t enter your shielded balance, recover it here. Railgun screening may delay availability.';
+
+  @override
+  String get privateUsdRefundsNoRecovery =>
+      'No recovery available right now. Your refund may still be going through Railgun screening.';
+
+  @override
+  String get privateUsdRefundsOriginalAmount => 'Original bridge amount';
+
+  @override
+  String get privateUsdRefundsRecover => 'Recover refund';
+
+  @override
+  String privateUsdRefundsRecoverConfirmBody(String cap) {
+    return 'The relayer\'s fee, at most $cap, comes out of the refund.';
+  }
+
+  @override
+  String get privateUsdRefundsRecoverConfirmTitle => 'Recover this refund?';
+
+  @override
+  String get privateUsdRefundsRecoverFailed =>
+      'Couldn\'t recover this refund. Try again.';
+
+  @override
+  String get privateUsdRefundsRecovering => 'Recovering your refund…';
+
+  @override
+  String get privateUsdRefundsSubtitle => 'Refunds from earlier bridges';
+
+  @override
+  String get privateUsdRefundsTitle => 'Refunds';
+
+  @override
+  String get privateUsdRefundsView => 'View refunds';
+
+  @override
+  String get privateUsdRelayerClaimsSetting => 'Let the relayer claim for me';
+
+  @override
+  String get privateUsdResetAnyway => 'Reset anyway';
+
+  @override
+  String get privateUsdResetUncheckedBody =>
+      'Couldn\'t check for unfinished shielded USD bridges. Only this wallet can recover their funds, so resetting now can lose them.';
+
+  @override
+  String privateUsdResetUnfinishedBody(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          'Your wallet has $count unfinished shielded USD bridges. Only this wallet can recover their funds, so resetting now can lose them.',
+      one:
+          'Your wallet has $count unfinished shielded USD bridge. Only this wallet can recover their funds, so resetting now can lose them.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get privateUsdReverseAccepting => 'Preparing your receiving account';
+
+  @override
+  String get privateUsdReverseAmountCents => 'Use at most 2 decimal places.';
+
+  @override
+  String get privateUsdReverseBroadcasterFee => 'Broadcast fee';
+
+  @override
+  String get privateUsdReverseCancel => 'Cancel bridge';
+
+  @override
+  String get privateUsdReverseCancelConfirmBody =>
+      'Your shielded USD comes back, less the relayer\'s and Railgun\'s fees. This can\'t be undone.';
+
+  @override
+  String get privateUsdReverseCancelConfirmTitle => 'Cancel this bridge?';
+
+  @override
+  String get privateUsdReverseCancelConfirmUnpaidBody =>
+      'Nothing has been paid yet, so nothing is lost. This can\'t be undone.';
+
+  @override
+  String get privateUsdReverseCancelled =>
+      'Bridge cancelled. No escrow payment remains.';
+
+  @override
+  String get privateUsdReverseComplete =>
+      'ZEC received in your shielded wallet';
+
+  @override
+  String get privateUsdReverseConfirming => 'Confirming escrow';
+
+  @override
+  String get privateUsdReverseError =>
+      'Unable to complete this step. Your saved bridge resumes after Veylor checks both chains. A payment is never repeated because a request timed out.';
+
+  @override
+  String get privateUsdReverseErrorAmountRefused =>
+      'This amount can\'t be bridged. It may be too small to cover the fees, or over the limit for one bridge.';
+
+  @override
+  String get privateUsdReverseErrorCostChanged =>
+      'The fees changed, so nothing was paid. Review the new total, then pay it or cancel.';
+
+  @override
+  String get privateUsdReverseErrorFundingUnavailable =>
+      'Bridging to ZEC is unavailable right now. Try again later.';
+
+  @override
+  String get privateUsdReverseErrorTooLate =>
+      'It\'s too late for this step, so the bridge ends by itself. Anything you paid comes back.';
+
+  @override
+  String get privateUsdReverseErrorUnconfirmed =>
+      'The market maker\'s ZEC isn\'t confirmed yet. Try again in a few minutes.';
+
+  @override
+  String get privateUsdReverseEscrow => 'Escrow value';
+
+  @override
+  String get privateUsdReverseInsufficient =>
+      'Not enough shielded USD for this amount and its fees.';
+
+  @override
+  String get privateUsdReverseIntro =>
+      'Approve sending shielded USD first. After your wallet confirms the full ZEC deposit itself, approve settlement to receive shielded ZEC.';
+
+  @override
+  String privateUsdReverseKeepOpen(String time) {
+    return 'Keep Veylor open after you pay. Once the ZEC is confirmed, you approve settlement here by $time. If you don\'t, your shielded USD is refunded, less fees.';
+  }
+
+  @override
+  String get privateUsdReverseNew => 'New bridge';
+
+  @override
+  String privateUsdReversePay(String debit) {
+    return 'Pay $debit';
+  }
+
+  @override
+  String get privateUsdReversePayout =>
+      'Returning your shielded USD to Railgun';
+
+  @override
+  String get privateUsdReverseProblemRelayer =>
+      'Veylor can\'t reach the relayer that moves your dollars. It keeps trying while it\'s open.';
+
+  @override
+  String privateUsdReverseProgressAmounts(String usd, String zec) {
+    return '$usd for $zec after fees';
+  }
+
+  @override
+  String privateUsdReverseProgressEstimate(String usd, String zec) {
+    return '$usd for about $zec after fees';
+  }
+
+  @override
+  String privateUsdReverseProgressReceived(String zec) {
+    return '$zec arrived after fees.';
+  }
+
+  @override
+  String get privateUsdReverseProvingNote =>
+      'Your phone builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open.';
+
+  @override
+  String get privateUsdReverseRailgunFee => 'Railgun unshield fee';
+
+  @override
+  String get privateUsdReverseReady => 'Authorize settlement';
+
+  @override
+  String get privateUsdReverseReadyExplanation =>
+      'The full ZEC deposit is confirmed. Authorize settlement to release your shielded USD and move ZEC to your shielded wallet.';
+
+  @override
+  String get privateUsdReverseReceiveEstimate =>
+      'Estimated ZEC after sweep fee';
+
+  @override
+  String get privateUsdReverseReceiving => 'Waiting for confirmed ZEC';
+
+  @override
+  String privateUsdReverseRefundAvailable(String time) {
+    return 'This bridge can no longer settle. Request your refund now, or Veylor sends it after $time while it\'s open.';
+  }
+
+  @override
+  String get privateUsdReverseRefundNote =>
+      'Before you approve settlement, you can cancel. After that, a refund waits for the contract deadline. A refund pays the relayer\'s fee and Railgun\'s shielding fee. Closing Veylor never approves settlement.';
+
+  @override
+  String get privateUsdReverseRefundReady => 'Refund available';
+
+  @override
+  String get privateUsdReverseRefundRequested =>
+      'Refund requested. Veylor continues when your refund is available, while it\'s open.';
+
+  @override
+  String get privateUsdReverseRefundUnavailable =>
+      'This bridge has already settled and can no longer be refunded. Veylor will finish moving your ZEC to your wallet.';
+
+  @override
+  String get privateUsdReverseRefundWait =>
+      'Waiting until a refund can proceed. Veylor retries while it\'s open.';
+
+  @override
+  String get privateUsdReverseRefunded =>
+      'Refund paid into your shielded balance. Railgun screening may delay availability.';
+
+  @override
+  String get privateUsdReverseRefunding => 'Securing your refund';
+
+  @override
+  String get privateUsdReverseRequestRefund => 'Request refund';
+
+  @override
+  String get privateUsdReverseResultCancelled => 'Bridge cancelled';
+
+  @override
+  String get privateUsdReverseResultReceived => 'ZEC received';
+
+  @override
+  String get privateUsdReverseResultRefunded => 'Refund sent';
+
+  @override
+  String get privateUsdReverseReview => 'Review and approve your payment';
+
+  @override
+  String get privateUsdReverseSending => 'Sending shielded USD';
+
+  @override
+  String privateUsdReverseSettlementRefundLimit(String time) {
+    return 'Settlement is authorized. A refund can only proceed after $time if settlement hasn\'t completed.';
+  }
+
+  @override
+  String get privateUsdReverseSettling => 'Waiting for settlement';
+
+  @override
+  String get privateUsdReverseStepApprovalDetail =>
+      'Your approval is needed to continue.';
+
+  @override
+  String get privateUsdReverseStepFund => 'Sending shielded USD to escrow';
+
+  @override
+  String get privateUsdReverseStepPay => 'Pay shielded USD to escrow';
+
+  @override
+  String privateUsdReverseStepPayDetail(String debit) {
+    return 'Tap Pay to send $debit of shielded USD to escrow.';
+  }
+
+  @override
+  String get privateUsdReverseStepSettle => 'Settling your bridge';
+
+  @override
+  String privateUsdReverseSweepConfirmations(int count) {
+    return 'Zcash confirmations: $count';
+  }
+
+  @override
+  String get privateUsdReverseSweeping => 'Moving ZEC to your wallet';
+
+  @override
+  String get privateUsdReverseTitle => 'Shielded USD to ZEC';
+
+  @override
+  String get privateUsdReview => 'Review';
+
+  @override
+  String get privateUsdRouteBlocked =>
+      'Tor is starting or unavailable, so nothing was sent. Try again once it\'s connected.';
+
+  @override
+  String get privateUsdRowArriving => 'Arriving';
+
+  @override
+  String privateUsdRowArrivingInfo(String about) {
+    return 'Railgun screens new funds before they can be spent. This takes $about.';
+  }
+
+  @override
+  String get privateUsdRowArrivingLate => 'Arriving · taking longer than usual';
+
+  @override
+  String privateUsdRowArrivingPercent(int percent) {
+    return 'Arriving · $percent%';
+  }
+
+  @override
+  String get privateUsdRowAvailable => 'Available';
+
+  @override
+  String get privateUsdRowBlocked => 'Screening refused';
+
+  @override
+  String get privateUsdRowBlockedInfo =>
+      'Railgun\'s screening refused these funds, so they can\'t be spent or sent. They can only go back to where they came from, the bridge contract. Contact support.';
+
+  @override
+  String get privateUsdRowProcessing => 'Processing';
+
+  @override
+  String get privateUsdRowProcessingInfo =>
+      'A send is being confirmed. These funds are available again once it settles.';
+
+  @override
+  String get privateUsdRowProcessingStalled => 'Processing · screening delayed';
+
+  @override
+  String get privateUsdRowProcessingStalledInfo =>
+      'Railgun\'s screening hasn\'t accepted these funds yet. They\'re still yours and become available once it does. Veylor keeps trying while it\'s open.';
+
+  @override
+  String privateUsdRpcBody(String network) {
+    return 'Use your own Ethereum RPC URL for $network from a supported provider. Shielded USD then uses only it.';
+  }
+
+  @override
+  String get privateUsdRpcChange => 'Change RPC';
+
+  @override
+  String get privateUsdRpcCheckAndSave => 'Check and save';
+
+  @override
+  String get privateUsdRpcCleared => 'Using the default Ethereum RPC';
+
+  @override
+  String privateUsdRpcCurrent(String value) {
+    return 'Current: $value';
+  }
+
+  @override
+  String get privateUsdRpcDefaultNotAnswering =>
+      'The Ethereum RPC isn\'t answering, so your balance can\'t load. Try a different RPC.';
+
+  @override
+  String get privateUsdRpcErrorCalls =>
+      'That RPC does not answer contract reads. Try another provider.';
+
+  @override
+  String get privateUsdRpcErrorLogs =>
+      'That RPC caps log queries below what bridging needs. Try another provider or plan.';
+
+  @override
+  String get privateUsdRpcErrorUnreachable =>
+      'That RPC didn\'t answer. Check the URL, or try again in a moment.';
+
+  @override
+  String privateUsdRpcErrorUrl(String network) {
+    return 'Use an https URL from a supported provider for $network.';
+  }
+
+  @override
+  String privateUsdRpcErrorWrongChain(String network) {
+    return 'That RPC is for another network. Use one for $network.';
+  }
+
+  @override
+  String get privateUsdRpcNetworkMainnet => 'Ethereum mainnet';
+
+  @override
+  String get privateUsdRpcNotAnswering => 'Your Ethereum RPC isn\'t answering.';
+
+  @override
+  String get privateUsdRpcProviders =>
+      'Supported: Alchemy, Infura, QuickNode, Chainstack, Ankr, dRPC, BlockPI, Tenderly, NodeReal, GetBlock, OnFinality, publicnode, Pocket Network and MEV Blocker.';
+
+  @override
+  String get privateUsdRpcSaved => 'Ethereum RPC saved';
+
+  @override
+  String get privateUsdRpcSees =>
+      'The RPC sees the app\'s Ethereum requests, and your IP address unless Tor is on.';
+
+  @override
+  String get privateUsdRpcTitle => 'Ethereum RPC';
+
+  @override
+  String get privateUsdRpcUseDefault => 'Use the default';
+
+  @override
+  String get privateUsdScanCaptionPrivate => 'Scan a Railgun 0zk address';
+
+  @override
+  String get privateUsdScanCaptionWithdraw => 'Scan an Ethereum 0x address';
+
+  @override
+  String get privateUsdScanNot0x => 'This QR code isn\'t an Ethereum address.';
+
+  @override
+  String get privateUsdScanNot0zk =>
+      'This QR code isn\'t a Railgun 0zk address.';
+
+  @override
+  String get privateUsdScanOtherNetwork =>
+      'This QR code is for another network.';
+
+  @override
+  String get privateUsdScanPermissionTitle => 'Scan the recipient\'s address';
+
+  @override
+  String get privateUsdScanUseSend =>
+      'This is a shielded 0zk address. To pay it, use Send.';
+
+  @override
+  String get privateUsdScanUseWithdraw =>
+      'This is a public 0x address. To send to it, use Withdraw.';
+
+  @override
+  String privateUsdScreeningChecking(int done, int count) {
+    return 'Checking with Railgun\'s screening service · $done of $count';
+  }
+
+  @override
+  String get privateUsdScreeningDownloading => 'Downloading proving files';
+
+  @override
+  String privateUsdScreeningDownloadingPercent(int percent) {
+    return 'Downloading proving files · $percent%';
+  }
+
+  @override
+  String privateUsdScreeningProving(int percent) {
+    return 'Building screening proof · $percent%';
+  }
+
+  @override
+  String privateUsdScreeningProvingStep(int index, int count, int percent) {
+    return 'Building screening proof $index of $count · $percent%';
+  }
+
+  @override
+  String privateUsdScreeningSyncingList(int percent) {
+    return 'Syncing Railgun\'s transaction list · $percent%';
+  }
+
+  @override
+  String get privateUsdScreeningWaiting =>
+      'Waiting for Railgun\'s screening service';
+
+  @override
+  String get privateUsdSendAsset => 'Asset';
+
+  @override
+  String get privateUsdSendBalanceDropped =>
+      'Your available balance is now less than this amount.';
+
+  @override
+  String privateUsdSendDoneBody(String amount, String address) {
+    return '$amount went to $address.';
+  }
+
+  @override
+  String get privateUsdSendDoneTitlePrivate => 'Sent';
+
+  @override
+  String get privateUsdSendDoneTitleWithdraw => 'Withdrawn';
+
+  @override
+  String privateUsdSendDoneUnconfirmedBody(String amount, String address) {
+    return '$amount went to $address. It isn\'t in a block yet. Check your activity before sending again.';
+  }
+
+  @override
+  String get privateUsdSendErrorFeeCap =>
+      'The network fee is above the 2 USDC limit right now, so nothing was sent. Try again later.';
+
+  @override
+  String get privateUsdSendErrorStore =>
+      'Veylor can\'t read its saved payments. Contact support.';
+
+  @override
+  String privateUsdSendFeeRose(String fee) {
+    return 'The network fee went up to $fee. Nothing was sent.';
+  }
+
+  @override
+  String get privateUsdSendInfoStepAddress =>
+      'Enter the amount and the recipient\'s Railgun address, which starts with 0zk.';
+
+  @override
+  String get privateUsdSendInfoStepPrivate =>
+      'The dollars move inside Railgun: nobody else sees the amount, or who sent and received it.';
+
+  @override
+  String get privateUsdSendInfoStepProof =>
+      'Your phone builds a zero-knowledge proof. This takes a few seconds.';
+
+  @override
+  String get privateUsdSendInfoTitle => 'Sending shielded USD';
+
+  @override
+  String get privateUsdSendInvalid0x => 'That isn\'t an Ethereum address.';
+
+  @override
+  String get privateUsdSendInvalid0zk => 'That isn\'t a Railgun 0zk address.';
+
+  @override
+  String get privateUsdSendLanding =>
+      'The relayer is sending it. Waiting for a block can take a minute. Keep Veylor open.';
+
+  @override
+  String privateUsdSendLeaveNetworkFee(String fee) {
+    return 'Leave $fee for the network fee.';
+  }
+
+  @override
+  String get privateUsdSendNotSent =>
+      'Nothing was sent. Try again in a moment.';
+
+  @override
+  String get privateUsdSendProving => 'Proving your transaction';
+
+  @override
+  String get privateUsdSendProvingDetail =>
+      'Your phone builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open.';
+
+  @override
+  String privateUsdSendProvingPercent(int percent) {
+    return 'Proving your transaction · $percent%';
+  }
+
+  @override
+  String privateUsdSendReviewRailgunFee(String percent) {
+    return 'Railgun fee ($percent%)';
+  }
+
+  @override
+  String get privateUsdSendReviewReceives => 'They receive';
+
+  @override
+  String get privateUsdSendReviewTitlePrivate => 'Review send';
+
+  @override
+  String get privateUsdSendReviewTitleWithdraw => 'Review withdrawal';
+
+  @override
+  String get privateUsdSendSending => 'Sending';
+
+  @override
+  String get privateUsdSendTitle => 'Send';
+
+  @override
+  String get privateUsdSendToPrivate => 'To a Railgun address';
+
+  @override
+  String get privateUsdSendToWithdraw => 'To an Ethereum address';
+
+  @override
+  String get privateUsdSendTooMuch => 'More than you have available.';
+
+  @override
+  String privateUsdSendTooPrecise(int decimals) {
+    String _temp0 = intl.Intl.pluralLogic(
+      decimals,
+      locale: localeName,
+      other: 'Use at most $decimals decimal places.',
+      one: 'Use at most $decimals decimal place.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get privateUsdSendUnavailable =>
+      'Shielded sends are unavailable right now. Nothing was sent. Try again later.';
+
+  @override
+  String get privateUsdSendUnconfirmed =>
+      'It isn\'t in a block yet. Check your activity before sending again.';
+
+  @override
+  String get privateUsdSendViewTx => 'View on Etherscan';
+
+  @override
+  String get privateUsdSendWithdrawPublic =>
+      'Anyone on Ethereum can see this amount and address.';
+
+  @override
+  String get privateUsdSendZeroAddress =>
+      'That\'s the zero address: anything sent there is lost for good.';
+
+  @override
+  String get privateUsdSettingSaveFailed =>
+      'Couldn\'t save the setting. Try again.';
+
+  @override
+  String get privateUsdShieldedZec => 'Shielded ZEC';
+
+  @override
+  String get privateUsdSubtitle => '0zkUSDC held on Ethereum';
+
+  @override
+  String get privateUsdSyncReadoutFailed => 'Railgun sync failed';
+
+  @override
+  String privateUsdSyncReadoutProgress(int percent) {
+    return 'Railgun sync $percent%';
+  }
+
+  @override
+  String get privateUsdSyncReadoutSynced => 'Railgun synced';
+
+  @override
+  String get privateUsdSyncingRest =>
+      'Still syncing Railgun\'s transaction list. Keep Veylor open.';
+
+  @override
+  String privateUsdSyncingRestPercent(int percent) {
+    return 'Still syncing Railgun\'s transaction list: $percent%. Keep Veylor open.';
+  }
+
+  @override
+  String privateUsdSyncingRestWaits(String usd) {
+    return '$usd of change from your sends waits on it. The rest can be sent now.';
+  }
+
+  @override
+  String get privateUsdTitle => 'Shielded USD';
+
+  @override
+  String get privateUsdTokenTestUsd => 'Test dollar';
+
+  @override
+  String get privateUsdTokensDeviceRefused =>
+      'The token issuer doesn\'t recognize this device, so it can\'t convert. Emulators, unlocked bootloaders, modified systems and unrecognized builds are turned away.';
+
+  @override
+  String get privateUsdTokensKeystore =>
+      'This phone\'s keystore couldn\'t sign for the token issuer. Try again in a moment.';
+
+  @override
+  String get privateUsdTokensNoneToday =>
+      'This device has used today\'s conversions. More are available after midnight UTC.';
+
+  @override
+  String get privateUsdTokensTorOffDisclosure =>
+      'With Tor off, the token issuer and the market maker can tell this bridge and its token came from the same connection.';
+
+  @override
+  String get privateUsdTokensUnavailable =>
+      'Conversions need an Android phone while the market maker asks for a token with each one.';
+
+  @override
+  String get privateUsdTokensUnreachable =>
+      'Couldn\'t reach the token issuer. Try again in a moment.';
+
+  @override
+  String privateUsdUpdated(String time) {
+    return 'Updated $time';
+  }
+
+  @override
+  String get privateUsdUpdating => 'Updating…';
+
+  @override
+  String privateUsdUpdatingProgress(int percent) {
+    return 'Updating your shielded balance: $percent%';
+  }
+
+  @override
+  String get privateUsdUseAvailable => 'Use it all';
+
+  @override
+  String privateUsdWithdrawInfoNoteFee(String percent) {
+    return 'Railgun keeps $percent% of what you withdraw.';
+  }
+
+  @override
+  String get privateUsdWithdrawInfoNotePrivate =>
+      'So a withdrawal can\'t be linked to your bridge, don\'t withdraw the exact amount you just bridged, wait a while first, and use a fresh address each time.';
+
+  @override
+  String get privateUsdWithdrawInfoNotePublic =>
+      'Once withdrawn, the amount and the address are visible to anyone on Ethereum.';
+
+  @override
+  String get privateUsdWithdrawInfoStepAddress =>
+      'Enter the amount and an Ethereum address, which starts with 0x.';
+
+  @override
+  String get privateUsdWithdrawInfoStepProof =>
+      'Your phone builds a proof, and the dollars leave Railgun for that address.';
+
+  @override
+  String get privateUsdWithdrawInfoTitle => 'Withdrawing makes it public';
 
   @override
   String get profilePictureChange => 'Change profile picture';

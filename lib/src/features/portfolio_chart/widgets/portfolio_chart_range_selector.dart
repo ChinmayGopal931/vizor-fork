@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../models/portfolio_chart_models.dart';
+import '../../../core/l10n/l10n.dart';
 
 /// The chart's range chips, each keyed [keyPrefix]`_<label>`.
 class PortfolioChartRangeSelector extends StatelessWidget {
@@ -35,7 +36,7 @@ class PortfolioChartRangeSelector extends StatelessWidget {
               child: Semantics(
                 button: true,
                 selected: range == selected,
-                label: range.description,
+                label: range.description(context.l10n),
                 excludeSemantics: true,
                 onTap: () => onSelected(range),
                 child: GestureDetector(
@@ -57,7 +58,7 @@ class PortfolioChartRangeSelector extends StatelessWidget {
                           width: double.infinity,
                           child: Center(
                             child: Text(
-                              range.label,
+                              range.chipLabel(context.l10n),
                               maxLines: 1,
                               style: AppTypography.labelMedium.copyWith(
                                 color: range == selected

@@ -10181,6 +10181,36 @@ abstract class AppLocalizations {
   /// **'Vote'**
   String get navVote;
 
+  /// Readout at the head of the mobile sync line while the wallet checks for new blocks; {percent} is a whole number from 0 to 100; keep it very short.
+  ///
+  /// In en, this message translates to:
+  /// **'Check {percent}%'**
+  String neonSyncChecking(int percent);
+
+  /// Readout at the head of the mobile sync line when the sync failed; drawn in uppercase in English; keep it very short.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync failed'**
+  String get neonSyncFailed;
+
+  /// Readout at the head of the mobile sync line while the wallet scans; {percent} is a whole number from 0 to 100; keep it very short.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync {percent}%'**
+  String neonSyncProgress(int percent);
+
+  /// Readout at the head of the mobile sync line when Tor failed to connect; drawn in uppercase in English; keep it very short.
+  ///
+  /// In en, this message translates to:
+  /// **'Tor offline'**
+  String get neonSyncTorOffline;
+
+  /// Readout at the head of the mobile sync line while Tor connects, the name followed by an ellipsis; drawn in uppercase in English.
+  ///
+  /// In en, this message translates to:
+  /// **'Tor …'**
+  String get neonSyncTorWaiting;
+
   /// Toast when the user turns off Tor while a software update is in progress.
   ///
   /// In en, this message translates to:
@@ -13892,11 +13922,2753 @@ abstract class AppLocalizations {
   /// **'Transparent'**
   String get poolTransparent;
 
+  /// Shown in place of the balance chart when the chosen span has too few points.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough history for this range yet.'**
+  String get portfolioChartEmpty;
+
+  /// Section caption over the list of the account's balances by pool under the balance chart; drawn in uppercase in English.
+  ///
+  /// In en, this message translates to:
+  /// **'Holdings'**
+  String get portfolioChartHoldings;
+
+  /// Second line of a holdings row; {amount} is the part of the row's balance not yet confirmed, such as 0.5 ZEC.
+  ///
+  /// In en, this message translates to:
+  /// **'Includes {amount} pending'**
+  String portfolioChartIncludesPending(String amount);
+
+  /// Short note beside the balance chart title when it shows the ZEC balance, which is read only from this device's wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'On this device'**
+  String get portfolioChartOnDevice;
+
+  /// Screen-reader label of the balance on mobile Home, which opens the full balance chart.
+  ///
+  /// In en, this message translates to:
+  /// **'Open balance chart'**
+  String get portfolioChartOpen;
+
+  /// Screen-reader label of the balance chart; {title} is the card title (Portfolio value or ZEC balance), {range} the span such as Past week, and {change} the change over it such as +4.2%.
+  ///
+  /// In en, this message translates to:
+  /// **'{title}, {range}, {change}. Drag to inspect values.'**
+  String portfolioChartPlotSemantics(String title, String range, String change);
+
+  /// Short note beside the balance chart title when the market prices are more than a day old.
+  ///
+  /// In en, this message translates to:
+  /// **'Older prices'**
+  String get portfolioChartPricesStale;
+
+  /// Short note beside the balance chart title when market prices could not be loaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Prices unavailable'**
+  String get portfolioChartPricesUnavailable;
+
+  /// Shown in place of the balance chart while privacy mode hides amounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden in privacy mode.'**
+  String get portfolioChartPrivate;
+
+  /// Screen-reader name of the balance chart's whole-history span, also read inside the chart's label.
+  ///
+  /// In en, this message translates to:
+  /// **'All time'**
+  String get portfolioChartRangeAll;
+
+  /// Chip on the balance chart that selects the whole history; as short as possible.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get portfolioChartRangeAllChip;
+
+  /// Screen-reader name of the balance chart's one-month span, also read inside the chart's label.
+  ///
+  /// In en, this message translates to:
+  /// **'Past month'**
+  String get portfolioChartRangeMonth;
+
+  /// Chip on the balance chart that selects a one-month span; as short as possible.
+  ///
+  /// In en, this message translates to:
+  /// **'1m'**
+  String get portfolioChartRangeMonthChip;
+
+  /// Screen-reader name of the balance chart's three-month span, also read inside the chart's label.
+  ///
+  /// In en, this message translates to:
+  /// **'Past 3 months'**
+  String get portfolioChartRangeQuarter;
+
+  /// Chip on the balance chart that selects a three-month span; as short as possible.
+  ///
+  /// In en, this message translates to:
+  /// **'3m'**
+  String get portfolioChartRangeQuarterChip;
+
+  /// Screen-reader name of the balance chart's one-week span, also read inside the chart's label.
+  ///
+  /// In en, this message translates to:
+  /// **'Past week'**
+  String get portfolioChartRangeWeek;
+
+  /// Chip on the balance chart that selects a one-week span; as short as possible.
+  ///
+  /// In en, this message translates to:
+  /// **'1w'**
+  String get portfolioChartRangeWeekChip;
+
+  /// Screen-reader name of the balance chart's one-year span, also read inside the chart's label.
+  ///
+  /// In en, this message translates to:
+  /// **'Past year'**
+  String get portfolioChartRangeYear;
+
+  /// Chip on the balance chart that selects a one-year span; as short as possible.
+  ///
+  /// In en, this message translates to:
+  /// **'1y'**
+  String get portfolioChartRangeYearChip;
+
+  /// Shown on the balance chart page while the account has no balance history yet.
+  ///
+  /// In en, this message translates to:
+  /// **'The chart appears once this account has a balance history.'**
+  String get portfolioChartScreenHidden;
+
+  /// Title of the full-screen balance chart page; drawn in spaced uppercase in English.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get portfolioChartScreenTitle;
+
+  /// Switch in Settings that lets the balance chart fetch public ZEC prices to show a dollar value.
+  ///
+  /// In en, this message translates to:
+  /// **'Use market prices'**
+  String get portfolioChartSettingsMarketPrices;
+
+  /// Toast when a balance chart setting could not be saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t update the portfolio chart setting.'**
+  String get portfolioChartSettingsSaveFailed;
+
+  /// Switch in Settings that shows the balance chart on Home.
+  ///
+  /// In en, this message translates to:
+  /// **'Show on home'**
+  String get portfolioChartSettingsShowOnHome;
+
+  /// Title of the Settings card for the balance chart on Home.
+  ///
+  /// In en, this message translates to:
+  /// **'Portfolio chart'**
+  String get portfolioChartSettingsTitle;
+
+  /// Title of the balance chart card when it shows the wallet's value in dollars; drawn in uppercase in English.
+  ///
+  /// In en, this message translates to:
+  /// **'Portfolio value'**
+  String get portfolioChartTitleUsd;
+
+  /// Title of the balance chart card when it shows the ZEC balance; drawn in uppercase in English.
+  ///
+  /// In en, this message translates to:
+  /// **'ZEC balance'**
+  String get portfolioChartTitleZec;
+
+  /// Row label in the holdings list for the sum of every shielded balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Total shielded'**
+  String get portfolioChartTotalShielded;
+
   /// [security] Error shown when the wallet still requires private recovery because turning off Private queries did not finish.
   ///
   /// In en, this message translates to:
   /// **'Turning off Private queries didn\'t finish. Turn it off again in Settings to use transparent funds.'**
   String get privateQueriesOptOutUnfinished;
+
+  /// Duration estimate of an hour or more, inserted as {about} into other Shielded USD messages; {hours} is a whole number of hours such as 2 (h abbreviates hours).
+  ///
+  /// In en, this message translates to:
+  /// **'about {hours} h'**
+  String privateUsdAboutHours(int hours);
+
+  /// Duration estimate under an hour, inserted as {about} into other Shielded USD messages such as "This takes {about}."; {minutes} is a whole number of minutes, at least 1, such as 5.
+  ///
+  /// In en, this message translates to:
+  /// **'about {minutes} min'**
+  String privateUsdAboutMinutes(int minutes);
+
+  /// Button on the Shielded USD screen that opens the bridge between shielded ZEC and shielded dollars; also the bridge screen's title and the confirm button on its review.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge'**
+  String get privateUsdActionConvert;
+
+  /// Button on the Shielded USD screen that opens the sheet with the deposit address and the Railgun address.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive'**
+  String get privateUsdActionReceive;
+
+  /// Button on the Shielded USD screen that sends shielded dollars to another Railgun (0zk) address.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get privateUsdActionSend;
+
+  /// Button on the Shielded USD screen that moves shielded dollars to a public Ethereum (0x) address; also the title of the withdraw screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdraw'**
+  String get privateUsdActionWithdraw;
+
+  /// Title of an activity row for a finished bridge from ZEC into 0zkUSDC (shielded dollars).
+  ///
+  /// In en, this message translates to:
+  /// **'Bridged to 0zkUSDC'**
+  String get privateUsdActivityConverted;
+
+  /// Title of an activity row for a finished bridge from shielded dollars back to ZEC.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridged to ZEC'**
+  String get privateUsdActivityConvertedToZec;
+
+  /// Title of an activity row for public USDC sent to the deposit address and shielded into the balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit'**
+  String get privateUsdActivityDeposit;
+
+  /// Title of an activity row for a deposit that Railgun's screening sent back and the user then recovered, shielding it again.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovered deposit'**
+  String get privateUsdActivityDepositRescue;
+
+  /// Subtitle of a deposit's activity row once it is shielded and Railgun's screening time has passed.
+  ///
+  /// In en, this message translates to:
+  /// **'Shielded'**
+  String get privateUsdActivityDepositShielded;
+
+  /// Placeholder in the activity list on the Shielded USD screen before there is any activity.
+  ///
+  /// In en, this message translates to:
+  /// **'Your bridges, sends and withdrawals will show here.'**
+  String get privateUsdActivityEmpty;
+
+  /// Subtitle of a received Shielded USD activity row naming the sender; {address} is a shortened Railgun address such as 0zk1qy…8f3a.
+  ///
+  /// In en, this message translates to:
+  /// **'from {address}'**
+  String privateUsdActivityFrom(String address);
+
+  /// Title of an activity row for shielded dollars received from another Railgun wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Received'**
+  String get privateUsdActivityReceived;
+
+  /// Subtitle of a received Shielded USD activity row while Railgun still screens the funds.
+  ///
+  /// In en, this message translates to:
+  /// **'available once screened'**
+  String get privateUsdActivityReceivedScreening;
+
+  /// Title of an activity row for a bridge that was called off and whose funds came back.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge called off'**
+  String get privateUsdActivityRefunded;
+
+  /// Subtitle of an activity row for a called-off bridge from ZEC: the user's ZEC came back to the wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'your ZEC came back'**
+  String get privateUsdActivityRefundedDetail;
+
+  /// Subtitle of an activity row for a called-off bridge to ZEC: the user's shielded dollars came back.
+  ///
+  /// In en, this message translates to:
+  /// **'your dollars came back'**
+  String get privateUsdActivityRefundedZecDetail;
+
+  /// Subtitle of a received Shielded USD activity row when the sender did not reveal their address.
+  ///
+  /// In en, this message translates to:
+  /// **'sender hidden'**
+  String get privateUsdActivitySenderHidden;
+
+  /// Title of an activity row for shielded dollars sent to another Railgun address.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get privateUsdActivitySent;
+
+  /// Section heading above the activity list on the Shielded USD screen, drawn in uppercase in English.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity'**
+  String get privateUsdActivityTitle;
+
+  /// Subtitle of a Shielded USD send or withdrawal activity row naming the recipient; {address} is a shortened address such as 0zk1qy…8f3a or 0x12ab…9f3c.
+  ///
+  /// In en, this message translates to:
+  /// **'to {address}'**
+  String privateUsdActivityTo(String address);
+
+  /// Subtitle of a Shielded USD send or withdrawal activity row before its transaction is included in an Ethereum block.
+  ///
+  /// In en, this message translates to:
+  /// **'not in a block yet'**
+  String get privateUsdActivityUnconfirmed;
+
+  /// Title of an activity row for shielded dollars withdrawn to a public Ethereum address.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdrew'**
+  String get privateUsdActivityWithdrew;
+
+  /// Switch in Settings: whether Shielded USD reads Railgun's history from Anon's archive, a public data source, to sync faster; Anon is a name.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync history from Anon\'s archive'**
+  String get privateUsdArchiveSyncSetting;
+
+  /// Title of the card on the Shielded USD screen that lists each dollar token held and its amount.
+  ///
+  /// In en, this message translates to:
+  /// **'Assets'**
+  String get privateUsdAssetsTitle;
+
+  /// Line under the amount on the bridge screens showing what the user can spend; {amount} is a formatted amount such as 1.25 ZEC or $12.40.
+  ///
+  /// In en, this message translates to:
+  /// **'Available: {amount}'**
+  String privateUsdAvailableAmount(String amount);
+
+  /// Title of the bridge banner on Home when a bridge in progress has a problem or waits for the user to act; tapping it opens the bridge.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge needs attention'**
+  String get privateUsdBannerAttention;
+
+  /// Subtitle of the bridge banner on Home: the bridge's current step on the first line, then a reminder to keep Veylor open; {detail} is the current step, such as Sending your ZEC.
+  ///
+  /// In en, this message translates to:
+  /// **'{detail}\nKeep Veylor open to finish'**
+  String privateUsdBannerDetail(String detail);
+
+  /// Second line of the bridge banner on Home: a reminder that the bridge only finishes while Veylor stays open.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Veylor open to finish'**
+  String get privateUsdBannerKeepOpen;
+
+  /// Second line of the bridge banner on Home once the relayer holds the bridge's claim: the user may close Veylor, because the relayer claims the dollars into the shielded balance.
+  ///
+  /// In en, this message translates to:
+  /// **'You can leave: the relayer claims your dollars'**
+  String get privateUsdBannerRelayerClaims;
+
+  /// Subtitle of the bridge banner on Home once the relayer holds the bridge's claim: the current step on the first line, then that the user may leave; {detail} is the current step, such as Claiming your dollars.
+  ///
+  /// In en, this message translates to:
+  /// **'{detail}\nYou can leave: the relayer claims your dollars'**
+  String privateUsdBannerRelayerDetail(String detail);
+
+  /// Large lit sign on the progress screen when a bridge has finished successfully; drawn in uppercase, and also its screen-reader label.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridged'**
+  String get privateUsdBridgedTitle;
+
+  /// Label of the amount the user paid on a finished bridge (no longer an estimate), in the progress screen header and in the activity details.
+  ///
+  /// In en, this message translates to:
+  /// **'You paid'**
+  String get privateUsdBridgedYouPaid;
+
+  /// Label of the amount the user received on a finished bridge or a shielded deposit (no longer an estimate), in the progress screen header and in the activity details.
+  ///
+  /// In en, this message translates to:
+  /// **'You received'**
+  String get privateUsdBridgedYouReceived;
+
+  /// Note on the Shielded USD screen while Veylor checks for an earlier outgoing payment that is still pending, before Send, Withdraw or Bridge can start.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking pending payments…'**
+  String get privateUsdCheckingPayments;
+
+  /// Note on the Shielded USD screen when a bridge is in progress, so Send and Withdraw must wait.
+  ///
+  /// In en, this message translates to:
+  /// **'A bridge is in progress. Sending will be available when it finishes.'**
+  String get privateUsdConversionPending;
+
+  /// Note on the bridge review screen: Veylor must stay open until the bridge finishes; leaving pauses it and it resumes when the user comes back.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Veylor open until this finishes. If you leave, it pauses and picks up when you\'re back.'**
+  String get privateUsdConvertBackgroundNote;
+
+  /// Button on the bridge progress screen, shown when opening the swap takes long, that calls off (cancels) the bridge before any ZEC is sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Call it off'**
+  String get privateUsdConvertCallOff;
+
+  /// Error under the call-off or cancel button on a bridge's progress screen, in either direction, when cancelling failed; the user can try again shortly.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t call it off. Try again in a moment.'**
+  String get privateUsdConvertCallOffFailed;
+
+  /// Error under the call-off button when the swap opened on Ethereum before the cancellation went through, so the bridge cannot be called off and continues.
+  ///
+  /// In en, this message translates to:
+  /// **'The swap opened on Ethereum meanwhile, so it can\'t be called off. It carries on.'**
+  String get privateUsdConvertCallOffTooLate;
+
+  /// Error on the bridge screens when the market maker refuses the amount, either above its per-bridge limit or too small to cover the swap's network cost.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker won\'t bridge this amount. It may be over the limit for one bridge, or too small to cover the swap\'s network cost.'**
+  String get privateUsdConvertErrorAmountRefused;
+
+  /// Error on the bridge screens when the amount is too small to pay the relayer's fee.
+  ///
+  /// In en, this message translates to:
+  /// **'This amount doesn\'t cover the relayer\'s fee. Try a larger amount.'**
+  String get privateUsdConvertErrorBelowFee;
+
+  /// Error on the bridge screens when Veylor cannot reach Ethereum (or its node is behind); nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Veylor can\'t reach Ethereum right now. Try again in a moment.'**
+  String get privateUsdConvertErrorEthereum;
+
+  /// Error on the bridge screens when the relayer's fee is above Veylor's 2 USDC cap, so Veylor refused to send anything.
+  ///
+  /// In en, this message translates to:
+  /// **'The relayer\'s fee is above the 2 USDC limit right now, so nothing was sent. Try again later.'**
+  String get privateUsdConvertErrorFeeCap;
+
+  /// Error on the bridge screens when getting a quote, or starting from it, failed for another reason; nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t get a quote. Try again in a moment.'**
+  String get privateUsdConvertErrorGeneric;
+
+  /// Error on the bridge screens when the market maker cannot be reached; nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker can\'t be reached right now. Try again in a moment.'**
+  String get privateUsdConvertErrorMaker;
+
+  /// Error on the bridge screens when the market maker is busy with other bridges; nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker is busy with other bridges. Try again in a few minutes.'**
+  String get privateUsdConvertErrorMakerBusy;
+
+  /// Error on the bridge screens when the relayer that completes bridges cannot be reached; nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'The relayer that completes bridges can\'t be reached right now. Try again in a moment.'**
+  String get privateUsdConvertErrorRelayer;
+
+  /// Error on the bridge screens when the relayer that completes bridges refused the request; nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'The relayer that completes bridges turned this down. Try again in a moment.'**
+  String get privateUsdConvertErrorRelayerRefused;
+
+  /// Error on the Shielded USD screens when Veylor cannot read its saved bridge records on the device; the user should contact support.
+  ///
+  /// In en, this message translates to:
+  /// **'Veylor can\'t read its saved bridges. Contact support.'**
+  String get privateUsdConvertErrorStore;
+
+  /// Error on the bridge review when Veylor could not get the Privacy Pass token the market maker asks for, so nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t get this bridge\'s token, so nothing was sent. Try again in a moment.'**
+  String get privateUsdConvertErrorTokensUnavailable;
+
+  /// Error on the bridge screens when the wallet cannot pay the deposit in a single transaction right now; nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your wallet can\'t pay this in one transaction right now. Try a smaller amount.'**
+  String get privateUsdConvertErrorUnpayable;
+
+  /// Error on the bridge screens when a step that uses the Zcash wallet failed; nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Veylor couldn\'t complete this step with your Zcash wallet. Try again in a moment.'**
+  String get privateUsdConvertErrorWallet;
+
+  /// Line under the estimated amount the user receives on the bridge screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated amount'**
+  String get privateUsdConvertEstimatedAmount;
+
+  /// Estimated time shown under the active bridge progress step while the swap opens or the dollars are claimed: about one minute.
+  ///
+  /// In en, this message translates to:
+  /// **'About a minute'**
+  String get privateUsdConvertEtaMinute;
+
+  /// Estimated time shown under the active bridge progress step while the ZEC is being sent: a few seconds.
+  ///
+  /// In en, this message translates to:
+  /// **'A few seconds'**
+  String get privateUsdConvertEtaSeconds;
+
+  /// Row label in the bridge quote breakdown for the relayer's and Railgun's fees.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge fees'**
+  String get privateUsdConvertFees;
+
+  /// Value of the Bridge fees row in the bridge quote breakdown, kept on one line; {relayerUsd} is the relayer's fee in dollars such as $1.20, and {railgunPercent} is Railgun's fee as a number without the percent sign, such as 0.25.
+  ///
+  /// In en, this message translates to:
+  /// **'{relayerUsd} relayer · {railgunPercent}% Railgun'**
+  String privateUsdConvertFeesValue(String relayerUsd, String railgunPercent);
+
+  /// Note in the 'How bridging works' info sheet: a bridge has only two outcomes, either the dollars arrive in the shielded balance or the user's ZEC is returned.
+  ///
+  /// In en, this message translates to:
+  /// **'Either the dollars reach your shielded balance, or your ZEC comes back to you.'**
+  String get privateUsdConvertInfoNoteEither;
+
+  /// Note in the 'How bridging works' info sheet: how long a bridge takes, that Veylor must stay open and unlocked, that leaving pauses it, and that a bridge which cannot finish in time is called off and the ZEC returned minus a network fee; {about} is an already localized rough duration, such as 'about 10 min' or 'about 1 h'.
+  ///
+  /// In en, this message translates to:
+  /// **'Takes {about}. Keep Veylor open and unlocked until it\'s done. If you leave, it pauses; if it can\'t finish in time, it\'s called off and your ZEC comes back, less a network fee.'**
+  String privateUsdConvertInfoNoteTime(String about);
+
+  /// Note in the 'How bridging works' info sheet when the relayer claims: Veylor must stay open and unlocked only until the market maker confirms the deposit (a few minutes); a bridge that cannot finish in time is called off and the ZEC comes back, minus a network fee, the next time Veylor is opened; {about} is an already localized rough duration, such as 'about 10 min' or 'about 1 h'.
+  ///
+  /// In en, this message translates to:
+  /// **'Takes {about}. Keep Veylor open and unlocked until the market maker confirms your deposit, a few minutes; the relayer does the rest. If it can\'t finish in time, it\'s called off and your ZEC comes back, less a network fee, the next time you open Veylor.'**
+  String privateUsdConvertInfoNoteTimeRelayer(String about);
+
+  /// Third step in the 'How bridging works' info sheet for bridging ZEC to shielded USD: once the ZEC deposit is confirmed, Veylor itself claims the dollars into the user's shielded balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Once the deposit is confirmed, Veylor claims the dollars into your shielded balance.'**
+  String get privateUsdConvertInfoStepClaim;
+
+  /// Third step in the 'How bridging works' info sheet when the relayer-claims setting is on: once the ZEC deposit is confirmed, the relayer (a service that pays the Ethereum fees) claims the dollars into the user's shielded balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Once the deposit is confirmed, the relayer claims the dollars into your shielded balance.'**
+  String get privateUsdConvertInfoStepClaimRelayer;
+
+  /// Second step in the bridge info sheet: where the ZEC goes.
+  ///
+  /// In en, this message translates to:
+  /// **'Your ZEC goes to a deposit address that you and the market maker control together.'**
+  String get privateUsdConvertInfoStepDeposit;
+
+  /// First step in the bridge info sheet: entering the ZEC amount and getting the market maker's quote.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the ZEC you want to bridge, including the network fee. The market maker quotes how much shielded USD you receive. The quote holds for a few minutes.'**
+  String get privateUsdConvertInfoStepQuote;
+
+  /// Title of the info sheet on the bridge screen that explains how a bridge works.
+  ///
+  /// In en, this message translates to:
+  /// **'How bridging works'**
+  String get privateUsdConvertInfoTitle;
+
+  /// Error under the ZEC amount on the bridge screen when the amount is more than the spendable balance; {zec} is the spendable amount with its unit, such as 1.2345 ZEC.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough ZEC. You have {zec} available.'**
+  String privateUsdConvertInsufficient(String zec);
+
+  /// Row label in the bridge quote breakdown for the market maker's Ethereum network cost, passed on to the user (a cost, distinct from the fees).
+  ///
+  /// In en, this message translates to:
+  /// **'Market maker\'s network cost'**
+  String get privateUsdConvertMakerCost;
+
+  /// Note on the bridge progress screen when the deposit has enough confirmations but the market maker has not confirmed it: if it still has not by a set time, Veylor claims the dollars itself, so the app must stay open; {time} is a localized date and time such as 25 May, 13:30.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker hasn\'t confirmed your deposit yet. If it still hasn\'t by {time}, Veylor claims your dollars itself. Keep Veylor open until then.'**
+  String privateUsdConvertMakerSilent(String time);
+
+  /// Button on the bridge review that asks the market maker for a new quote after the old one expired.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh quote'**
+  String get privateUsdConvertNewQuote;
+
+  /// Note on the bridge progress screen when the market maker is slow to open the swap: no ZEC has been sent yet.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker hasn\'t opened the swap yet. Nothing has been sent.'**
+  String get privateUsdConvertOpeningSlow;
+
+  /// Problem card message: Veylor cannot reach the Ethereum network right now and keeps retrying while the app is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Veylor can\'t reach Ethereum right now. It keeps trying while it\'s open.'**
+  String get privateUsdConvertProblemEthereum;
+
+  /// Problem card message: what is recorded on chain does not match this bridge, so Veylor only returns the user's funds instead of completing it.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s on the chain doesn\'t match this bridge, so Veylor only brings your funds back.'**
+  String get privateUsdConvertProblemMismatch;
+
+  /// Problem card message: Railgun is temporarily not accepting new deposits into its shielded pool, so Veylor delays the claim; if Railgun does not reopen in time, the swap is called off and the ZEC returns.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun isn\'t accepting deposits right now, so Veylor holds off claiming. If it doesn\'t reopen in time, the swap is called off and your ZEC comes back.'**
+  String get privateUsdConvertProblemRailgun;
+
+  /// Problem card message: the Zcash network rejected one of this bridge's transactions; Veylor keeps resending it until it is mined or expires.
+  ///
+  /// In en, this message translates to:
+  /// **'The Zcash network turned down a transaction of this bridge. Veylor keeps sending it until it goes through or expires.'**
+  String get privateUsdConvertProblemRejected;
+
+  /// Problem card message: Veylor cannot reach the relayer that submits the claim transaction, and keeps retrying while the app is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Veylor can\'t reach the relayer that sends your claim. It keeps trying while it\'s open.'**
+  String get privateUsdConvertProblemRelayer;
+
+  /// Problem card message: the relayer's fee is more than this bridge pays out or above the 2 USDC fee cap, so Veylor waits for the fee to drop.
+  ///
+  /// In en, this message translates to:
+  /// **'The relayer\'s fee is more than this bridge pays out, or above the 2 USDC limit, so Veylor waits for it to come down.'**
+  String get privateUsdConvertProblemRelayerFee;
+
+  /// Problem card message, in either bridge direction: the relayer keeps rejecting this bridge's transaction; Veylor keeps retrying while the app is open.
+  ///
+  /// In en, this message translates to:
+  /// **'The relayer keeps turning down this bridge\'s transaction. Veylor keeps trying while it\'s open.'**
+  String get privateUsdConvertProblemRelayerRefused;
+
+  /// Button on the problem card that retries the failing bridge step immediately instead of waiting for the next automatic retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try now'**
+  String get privateUsdConvertProblemRetry;
+
+  /// Problem card message (also an error after a step the user took): Tor is starting or not working, so the bridge's network requests wait; Veylor keeps retrying while the app is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Tor is starting or unavailable. Veylor keeps trying while it\'s open.'**
+  String get privateUsdConvertProblemRoute;
+
+  /// Title of the problem card on a bridge's progress screen, shown after a step has kept failing for a minute.
+  ///
+  /// In en, this message translates to:
+  /// **'Taking longer than usual'**
+  String get privateUsdConvertProblemTitle;
+
+  /// Message on a bridge's progress screen while Veylor gets the token the market maker asks for; without one, the bridge is called off.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker asks for a token. Veylor is getting one for today; if it can\'t, this bridge is called off.'**
+  String get privateUsdConvertProblemTokens;
+
+  /// Problem card message for an unexpected error; Veylor keeps retrying while the app is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Veylor keeps trying while it\'s open.'**
+  String get privateUsdConvertProblemUnexpected;
+
+  /// Problem card message: the wallet cannot currently pay the ZEC deposit, for example because the network fee rose; Veylor keeps trying, and if it still cannot pay in time the swap ends with nothing sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your wallet can\'t pay the deposit right now, for example because the network fee went up. Veylor keeps trying. If it still can\'t pay in time, the swap ends and nothing is sent.'**
+  String get privateUsdConvertProblemUnpayable;
+
+  /// Problem card message: a bridge step failed in the user's Zcash wallet; Veylor keeps retrying while the app is open and unlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Veylor couldn\'t complete this step with your Zcash wallet. It will keep trying while open and unlocked.'**
+  String get privateUsdConvertProblemWallet;
+
+  /// Summary line of a running ZEC-to-shielded-USD bridge: the ZEC paid and the approximate dollars received; {zec} is a ZEC amount such as 1.25 ZEC and {usd} a dollar amount such as $12.40 (either may show as ***** in privacy mode).
+  ///
+  /// In en, this message translates to:
+  /// **'{zec} for about {usd}'**
+  String privateUsdConvertProgressAmounts(String zec, String usd);
+
+  /// Fourth step in the progress info sheet: Veylor claims the dollars into the shielded balance, and a relayer pays the Ethereum network fees.
+  ///
+  /// In en, this message translates to:
+  /// **'Veylor claims the dollars into your shielded balance. A relayer pays the Ethereum fees.'**
+  String get privateUsdConvertProgressInfoClaim;
+
+  /// Fourth step in the progress info sheet when the relayer claims: the relayer claims the dollars into the shielded balance and pays the Ethereum network fees.
+  ///
+  /// In en, this message translates to:
+  /// **'The relayer claims the dollars into your shielded balance and pays the Ethereum fees.'**
+  String get privateUsdConvertProgressInfoClaimRelayer;
+
+  /// Third step in the progress info sheet: the market maker waits for a number of Zcash block confirmations of the deposit; {confirmations} is that number, such as 3.
+  ///
+  /// In en, this message translates to:
+  /// **'{confirmations, plural, =1{The market maker waits for {confirmations} Zcash confirmation.} other{The market maker waits for {confirmations} Zcash confirmations.}}'**
+  String privateUsdConvertProgressInfoConfirm(int confirmations);
+
+  /// Second step in the progress info sheet: Veylor sends the user's ZEC to a deposit address that the user and the market maker control together.
+  ///
+  /// In en, this message translates to:
+  /// **'Veylor sends your ZEC to the deposit address you and the market maker share.'**
+  String get privateUsdConvertProgressInfoDeposit;
+
+  /// First step in the progress info sheet: the market maker opens the swap contract on Ethereum and funds it with the dollars.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker opens the swap on Ethereum and puts the dollars in it.'**
+  String get privateUsdConvertProgressInfoOpen;
+
+  /// Note in the progress info sheet: if the swap cannot finish in time, it is called off and the ZEC is returned minus a small network fee.
+  ///
+  /// In en, this message translates to:
+  /// **'If the swap can\'t finish in time, it\'s called off and your ZEC comes back, less a small network fee.'**
+  String get privateUsdConvertProgressInfoRefund;
+
+  /// Fifth step in the progress info sheet: Railgun screens the new dollars for a while before they can be spent; {about} is an already localized rough duration, such as 'about 1 h'.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun screens them for {about} before they can be spent.'**
+  String privateUsdConvertProgressInfoScreen(String about);
+
+  /// Title of the info sheet on the bridge progress screen that explains each step of the bridge.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s happening'**
+  String get privateUsdConvertProgressInfoTitle;
+
+  /// Top-bar title of a bridge's progress screen while the bridge is running, in either direction; drawn in uppercase on mobile.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridging'**
+  String get privateUsdConvertProgressTitle;
+
+  /// Message on the bridge screens when a quote arrived already expired, which usually means the phone's clock is wrong.
+  ///
+  /// In en, this message translates to:
+  /// **'The quote had expired by the time it arrived. Check that your phone\'s clock is right, then try again.'**
+  String get privateUsdConvertQuoteClockAhead;
+
+  /// Countdown caption under the quote on the bridge amount screen, drawn in uppercase in English; {minutesSeconds} is the time left in minutes and seconds, such as 4:59.
+  ///
+  /// In en, this message translates to:
+  /// **'Quote expires in {minutesSeconds}'**
+  String privateUsdConvertQuoteExpires(String minutesSeconds);
+
+  /// Countdown caption under the quote on the bridge review, drawn in uppercase in English; {minutesSeconds} is the time left in minutes and seconds, such as 4:59.
+  ///
+  /// In en, this message translates to:
+  /// **'Quote holds for {minutesSeconds}'**
+  String privateUsdConvertQuoteHolds(String minutesSeconds);
+
+  /// Primary button label, and screen-reader label of the estimate, on the bridge screens while a quote is loading.
+  ///
+  /// In en, this message translates to:
+  /// **'Getting quote…'**
+  String get privateUsdConvertQuoteLoading;
+
+  /// Message on the bridge screens when the quote expired before the user confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'This quote expired. Refresh it to continue.'**
+  String get privateUsdConvertQuoteRanOut;
+
+  /// Note on the bridge progress screen after the swap was called off, while Veylor moves the user's ZEC back to their wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'The swap was called off. Veylor is bringing your ZEC back to your wallet.'**
+  String get privateUsdConvertRefunding;
+
+  /// Note on the bridge progress screen once the relayer holds the claim: the user may now close Veylor, since the market maker confirmed the deposit and the relayer will claim the dollars.
+  ///
+  /// In en, this message translates to:
+  /// **'You can leave Veylor now. The market maker confirmed your deposit, and the relayer claims your dollars.'**
+  String get privateUsdConvertRelayerClaims;
+
+  /// Note in the bridge review and progress info sheets when the relayer claims: Veylor sends the ZEC only while open and unlocked and then hands the claim to the relayer once the market maker confirms; refunds and sends still need Veylor open and unlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Veylor sends your ZEC while it\'s open and unlocked and, once the market maker confirms it, hands the claim to the relayer. Refunds and sends run only while Veylor is open and unlocked.'**
+  String get privateUsdConvertRelayerInfoKeepOpen;
+
+  /// Note on the bridge review screen, and on the progress screen until the relayer holds the claim, when the relayer claims for the user: Veylor must stay open a few minutes until the market maker confirms the ZEC deposit, after which the user may leave the app.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Veylor open until the market maker confirms your deposit, a few minutes. Then the relayer claims your dollars, and you can leave.'**
+  String get privateUsdConvertRelayerReviewNote;
+
+  /// Result body when a bridge ended with nothing sent: the market maker cancelled the swap before Veylor sent the ZEC, so no ZEC left the wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker called the swap off before your ZEC was sent. Your ZEC never left your wallet.'**
+  String get privateUsdConvertResultMakerCancelled;
+
+  /// Result body when a bridge ended with nothing sent: the market maker declined the bridge, so no ZEC left the wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker turned the bridge down. Your ZEC never left your wallet.'**
+  String get privateUsdConvertResultMakerRefused;
+
+  /// Result body when a bridge ended with nothing sent, also an error before a bridge starts: the market maker is not accepting bridges at the moment, so no ZEC left the wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker isn\'t taking bridges right now. Your ZEC never left your wallet.'**
+  String get privateUsdConvertResultMakerUnavailable;
+
+  /// Result body when a bridge ended with nothing sent: the swap opened on Ethereum did not match the quote's terms, so Veylor did not send the ZEC.
+  ///
+  /// In en, this message translates to:
+  /// **'The swap on Ethereum didn\'t match its quote, so Veylor didn\'t send your ZEC.'**
+  String get privateUsdConvertResultMismatch;
+
+  /// Result body when a bridge ended with nothing sent: the market maker never opened the swap on Ethereum, so no ZEC left the wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'The swap never opened on Ethereum. Your ZEC never left your wallet.'**
+  String get privateUsdConvertResultNeverOpened;
+
+  /// Result title on the bridge progress screen when the bridge ended before any ZEC was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was sent'**
+  String get privateUsdConvertResultNothingTitle;
+
+  /// Result body once a bridge paid out: the dollars are in the shielded balance, but Railgun screens new funds before they can be spent; {usd} is a dollar amount such as $12.40 and {about} an already localized rough duration such as 'about 1 h'.
+  ///
+  /// In en, this message translates to:
+  /// **'{usd} is in your shielded balance. Railgun screens new funds for {about} before they can be spent.'**
+  String privateUsdConvertResultPaidBody(String usd, String about);
+
+  /// Result title on the bridge progress screen once the dollars (0zkUSDC, Railgun's shielded USDC) have been paid out and are arriving in the shielded balance.
+  ///
+  /// In en, this message translates to:
+  /// **'0zkUSDC on its way'**
+  String get privateUsdConvertResultPaidTitle;
+
+  /// Result body when a bridge ended with nothing sent: the quote expired before the market maker accepted it, so no ZEC left the wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'The quote expired before the market maker took it. Your ZEC never left your wallet.'**
+  String get privateUsdConvertResultQuoteExpired;
+
+  /// Result body, and activity detail note, when the swap could not be completed in time: it was called off and the ZEC returned minus a small network fee.
+  ///
+  /// In en, this message translates to:
+  /// **'The swap couldn\'t be completed in time, so it was called off and your ZEC came back, less a small network fee.'**
+  String get privateUsdConvertResultRefundedLate;
+
+  /// Result body, and activity detail note, when the market maker cancelled the swap: the ZEC returned to the wallet minus a small network fee.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker called the swap off, so your ZEC came back to your wallet, less a small network fee.'**
+  String get privateUsdConvertResultRefundedMaker;
+
+  /// Result title on the bridge progress screen when the bridge was called off and the user's ZEC returned.
+  ///
+  /// In en, this message translates to:
+  /// **'Your ZEC came back'**
+  String get privateUsdConvertResultRefundedTitle;
+
+  /// Result body once a bridge paid out and Railgun's screening finished: the dollars can be used; {usd} is a dollar amount such as $12.40.
+  ///
+  /// In en, this message translates to:
+  /// **'{usd} is in your shielded balance, ready to use.'**
+  String privateUsdConvertResultScreenedBody(String usd);
+
+  /// Button on a finished bridge's progress screen that opens the Shielded USD screen with the balance.
+  ///
+  /// In en, this message translates to:
+  /// **'View shielded USD'**
+  String get privateUsdConvertResultViewBalance;
+
+  /// Result body when a bridge ended with nothing sent: the swap opened too late to be completed safely before its deadline, so Veylor did not send the ZEC.
+  ///
+  /// In en, this message translates to:
+  /// **'The swap opened too late to finish safely, so Veylor didn\'t send your ZEC.'**
+  String get privateUsdConvertResultWindowMissed;
+
+  /// Note on a bridge's progress screen, in either direction, while Veylor resumes the bridge from its saved state after the app was closed or paused.
+  ///
+  /// In en, this message translates to:
+  /// **'Picking up where it left off.'**
+  String get privateUsdConvertResuming;
+
+  /// Line in the 'Before you bridge' info sheet: the user pays the ZEC deposit (which already includes the market maker's network cost) plus the Zcash network fee.
+  ///
+  /// In en, this message translates to:
+  /// **'You pay the ZEC deposit, which includes the market maker\'s network cost, plus the Zcash network fee.'**
+  String get privateUsdConvertReviewInfoPay;
+
+  /// Line in the 'Before you bridge' info sheet: the market maker's quote is valid for a few minutes and can be refreshed once it expires; no funds move until the user taps Bridge.
+  ///
+  /// In en, this message translates to:
+  /// **'The quote holds for a few minutes. If it expires, refresh it: nothing is sent until you bridge.'**
+  String get privateUsdConvertReviewInfoQuote;
+
+  /// Line in the 'Before you bridge' info sheet: the dollars received are what is left after the relayer's fee and Railgun's percentage fee for shielding them; {railgunPercent} is a number without the percent sign, such as 0.25.
+  ///
+  /// In en, this message translates to:
+  /// **'You receive the dollars left after the relayer\'s fee and Railgun\'s {railgunPercent}% fee for shielding them.'**
+  String privateUsdConvertReviewInfoReceive(String railgunPercent);
+
+  /// Title of the info sheet on the review screen of a ZEC-to-shielded-USD bridge, explaining what the user pays and receives before confirming.
+  ///
+  /// In en, this message translates to:
+  /// **'Before you bridge'**
+  String get privateUsdConvertReviewInfoTitle;
+
+  /// Error on the bridge review when the bridge could not start; nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'The bridge couldn\'t start. Nothing was sent. Try again in a moment.'**
+  String get privateUsdConvertStartFailed;
+
+  /// Title of the fifth step in the bridge progress timeline: the paid-out dollars are on their way into the shielded balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Arriving in your shielded balance'**
+  String get privateUsdConvertStepArrive;
+
+  /// Title of the fourth step in the bridge progress timeline, and Home banner detail: the dollars are being claimed from the swap on Ethereum.
+  ///
+  /// In en, this message translates to:
+  /// **'Claiming your dollars'**
+  String get privateUsdConvertStepClaim;
+
+  /// Title of the third step in the bridge progress timeline, and Home banner detail: waiting for Zcash block confirmations of the ZEC deposit.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for confirmations'**
+  String get privateUsdConvertStepConfirm;
+
+  /// Detail under the 'Waiting for confirmations' step and in the Home banner: how many Zcash confirmations the deposit has out of those required; {count} is the current number and {of} the required number, as in 1 of 3.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} of {of}'**
+  String privateUsdConvertStepConfirmCount(int count, int of);
+
+  /// Title of the second step in the bridge progress timeline, and Home banner detail: Veylor is sending the user's ZEC to the swap's deposit address.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending your ZEC'**
+  String get privateUsdConvertStepDeposit;
+
+  /// Title of the first step in a ZEC-to-shielded-USD bridge's progress timeline, and Home banner detail: the market maker is opening the swap contract on Ethereum.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening the swap on Ethereum'**
+  String get privateUsdConvertStepOpen;
+
+  /// Title of the progress step, and Home banner detail, while Veylor returns the user's ZEC after a bridge was called off.
+  ///
+  /// In en, this message translates to:
+  /// **'Bringing your ZEC back'**
+  String get privateUsdConvertStepRefund;
+
+  /// Title of the last step in the bridge progress timeline while Railgun screens the new funds before they can be spent; also the status value in the details of a received payment that is still being screened.
+  ///
+  /// In en, this message translates to:
+  /// **'Screening'**
+  String get privateUsdConvertStepScreen;
+
+  /// Title of the progress step, and Home banner detail, while a bridge that ran out of time unwinds and Veylor waits for the market maker to refund the swap on Ethereum.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the market maker\'s refund'**
+  String get privateUsdConvertStepUnwind;
+
+  /// Screen-reader label of the button between the two amount panels on the bridge screen that flips the bridge direction (ZEC to shielded USD, or back); 'swap' is the verb here, not the swap contract.
+  ///
+  /// In en, this message translates to:
+  /// **'Swap bridge direction'**
+  String get privateUsdConvertSwapDirection;
+
+  /// Note on the bridge progress screen: the market maker cancelled the swap while the user's ZEC payment was still unconfirmed; if that payment is confirmed after all, Veylor gets the ZEC back.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker called the swap off while your ZEC payment was still unconfirmed. If it goes through, Veylor brings your ZEC back.'**
+  String get privateUsdConvertUnsettled;
+
+  /// Note on the bridge progress screen when the swap ran out of time to complete: it is reversed, and the ZEC comes back after the market maker refunds the swap.
+  ///
+  /// In en, this message translates to:
+  /// **'The swap couldn\'t be completed in time, so it unwinds: your ZEC comes back after the market maker\'s refund.'**
+  String get privateUsdConvertUnwinding;
+
+  /// The unwinding note on the bridge progress screen with a deadline: if the market maker has not refunded the swap by then, Veylor claims the dollars instead; {time} is a localized date and time such as 25 May, 13:30.
+  ///
+  /// In en, this message translates to:
+  /// **'The swap couldn\'t be completed in time, so it unwinds: your ZEC comes back after the market maker\'s refund. If the market maker hasn\'t refunded by {time}, Veylor claims your dollars instead.'**
+  String privateUsdConvertUnwindingUntil(String time);
+
+  /// Detail under the active bridge progress step while the user's Zcash wallet is still syncing and the bridge waits for it.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your Zcash wallet to sync'**
+  String get privateUsdConvertWaitSyncing;
+
+  /// Label of the amount the user pays, on the bridge review and in the quote breakdown.
+  ///
+  /// In en, this message translates to:
+  /// **'You pay'**
+  String get privateUsdConvertYouPay;
+
+  /// Label of the estimated amount the user receives, on the bridge review, in the quote breakdown and in a pending deposit's details.
+  ///
+  /// In en, this message translates to:
+  /// **'You receive about'**
+  String get privateUsdConvertYouReceive;
+
+  /// Note under the ZEC amount on the bridge screen and its review: the amount already includes the Zcash network fee.
+  ///
+  /// In en, this message translates to:
+  /// **'Includes the Zcash network fee'**
+  String get privateUsdConvertZecIncludesFee;
+
+  /// Error on the bridge screen when no quote fits the entered amount; the user can change the amount or fill in the maximum with the Max button.
+  ///
+  /// In en, this message translates to:
+  /// **'No quote fits this amount. Try a different amount, or use it all for the maximum.'**
+  String get privateUsdConvertZecNoQuote;
+
+  /// Note under the ZEC amount on the bridge screen while the Zcash wallet is still syncing, so part of the balance is not spendable yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Your wallet is still syncing. The rest of your ZEC is available once it catches up.'**
+  String get privateUsdConvertZecSyncing;
+
+  /// Note under the ZEC amount on the bridge screen while the Zcash wallet is still syncing; {percent} is a whole-number percentage such as 42.
+  ///
+  /// In en, this message translates to:
+  /// **'Your wallet is still syncing ({percent}%). The rest of your ZEC is available once it catches up.'**
+  String privateUsdConvertZecSyncingProgress(int percent);
+
+  /// Title of the banner on Home and of the Activity row while a bridge from shielded ZEC into 0zkUSDC (shielded dollars) is under way.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridging to 0zkUSDC'**
+  String get privateUsdConvertingToUsd;
+
+  /// Title of the banner on Home and of the Activity row while a bridge from shielded dollars back to ZEC is under way.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridging to ZEC'**
+  String get privateUsdConvertingToZec;
+
+  /// [security] Destructive button in the remove-account sheet that removes the account despite unfinished Shielded USD bridges, whose funds can be lost.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete anyway'**
+  String get privateUsdDeleteAnyway;
+
+  /// [security] Warning in the remove-account sheet when Veylor could not check for unfinished Shielded USD bridges: if there are any, removing the account now can lose their funds.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t check for unfinished shielded USD bridges. Only this account can recover their funds, so deleting it now can lose them.'**
+  String get privateUsdDeleteUncheckedBody;
+
+  /// [security] Warning in the remove-account sheet: the account has unfinished Shielded USD bridges whose funds only it can recover, so removing it now can lose them; {count} is the number of bridges, at least 1.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{This account has {count} unfinished shielded USD bridge. Only this account can recover their funds, so deleting it now can lose them. Keep Veylor open until they finish or are refunded.} other{This account has {count} unfinished shielded USD bridges. Only this account can recover their funds, so deleting it now can lose them. Keep Veylor open until they finish or are refunded.}}'**
+  String privateUsdDeleteUnfinishedBody(int count);
+
+  /// [security] Heading of the warning in the remove-account sheet when the account has unfinished Shielded USD bridges whose funds would be lost with it.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge in progress'**
+  String get privateUsdDeleteUnfinishedTitle;
+
+  /// Shown on the Receive sheet in place of the QR code when the address could not be loaded (the deposit address, or the Railgun address on the 0zkUSDC side).
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load your deposit address. Try again in a moment.'**
+  String get privateUsdDepositAddressFailed;
+
+  /// Shown on the Receive sheet in place of the QR code while the address loads (the deposit address, or the Railgun address on the 0zkUSDC side).
+  ///
+  /// In en, this message translates to:
+  /// **'Loading your deposit address…'**
+  String get privateUsdDepositAddressLoading;
+
+  /// Button under the deposit address QR code on the Receive sheet that copies the address.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy deposit address'**
+  String get privateUsdDepositCopy;
+
+  /// Example under the fee lines on the Receive sheet: what a deposit of the minimum brings into the shielded balance after the relayer's and Railgun's fees; {sent} and {arrives} are dollar amounts such as $5.00 and $4.47.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending {sent} brings {arrives} after both fees.'**
+  String privateUsdDepositExample(String sent, String arrives);
+
+  /// Shown on the Receive sheet in place of the deposit fee lines when they could not be loaded; reassures that USDC sent to the address is kept there safely.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the fees. Money sent here waits safely at this address.'**
+  String get privateUsdDepositFeesFailed;
+
+  /// Shown on the Receive sheet in place of the deposit fee lines while they load.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the fees…'**
+  String get privateUsdDepositFeesLoading;
+
+  /// Note at the bottom of the public USDC side of the Receive sheet: where the USDC can come from, and that Veylor shields it automatically while open and unlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Send it from an exchange or any wallet. Veylor shields it on its own while it is open and unlocked.'**
+  String get privateUsdDepositHow;
+
+  /// Line under the deposit address on the Receive sheet giving the smallest deposit the relayer shields; {usd} is a dollar amount such as $5.00.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum {usd}'**
+  String privateUsdDepositMinimum(String usd);
+
+  /// Status of a deposit that arrived but could not be shielded yet; Veylor retries later and the USDC stays safe at the deposit address.
+  ///
+  /// In en, this message translates to:
+  /// **'Received, but not shielded yet. Veylor tries again later; your money is safe at your deposit address.'**
+  String get privateUsdDepositNotShielding;
+
+  /// Line about one deposit on the Receive sheet and the Deposits card when it arrived but could not be shielded yet; Veylor retries later; {usd} is a dollar amount such as $12.40.
+  ///
+  /// In en, this message translates to:
+  /// **'Received {usd}. Received, but not shielded yet. Veylor tries again later; your money is safe at your deposit address.'**
+  String privateUsdDepositNotShieldingLine(String usd);
+
+  /// [security] Warning above the deposit address on the Receive sheet telling the user to send only this token on this chain, otherwise funds may be lost; {symbol} is the token symbol such as USDC and {chain} the chain name such as Ethereum.
+  ///
+  /// In en, this message translates to:
+  /// **'Only {symbol} on {chain}'**
+  String privateUsdDepositOnly(String symbol, String chain);
+
+  /// Line on the Receive sheet giving Railgun's own fee for shielding a deposit; {percent} is a number such as 0.25.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun\'s fee: {percent}%'**
+  String privateUsdDepositRailgunFee(String percent);
+
+  /// Line about one deposit on the Receive sheet, the Deposits card and the deposit's activity row once USDC arrived at the deposit address; {usd} is a dollar amount such as $12.40.
+  ///
+  /// In en, this message translates to:
+  /// **'Received {usd}'**
+  String privateUsdDepositReceived(String usd);
+
+  /// Line on the Receive sheet giving the relayer's fee for shielding a deposit, a fixed part plus a share of the amount; {fixed} is a dollar amount such as $0.50 and {percent} a number such as 0.5.
+  ///
+  /// In en, this message translates to:
+  /// **'Relayer fee: {fixed} + {percent}%'**
+  String privateUsdDepositRelayerFee(String fixed, String percent);
+
+  /// Subtitle of a deposit's activity row once it is shielded while Railgun still screens it; {about} is a duration such as about 5 min.
+  ///
+  /// In en, this message translates to:
+  /// **'Shielded, available in {about}'**
+  String privateUsdDepositShielded(String about);
+
+  /// Line about one deposit on the Receive sheet and the Deposits card once it is shielded while Railgun still screens it; {usd} is a dollar amount such as $12.40 and {about} a duration such as about 5 min.
+  ///
+  /// In en, this message translates to:
+  /// **'{usd}: Shielded, available in {about}'**
+  String privateUsdDepositShieldedLine(String usd, String about);
+
+  /// Subtitle of a deposit's activity row while the relayer shields it into the shielded balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Shielding…'**
+  String get privateUsdDepositShielding;
+
+  /// Line about one deposit on the Receive sheet and the Deposits card while the relayer shields it; {usd} is a dollar amount such as $12.40.
+  ///
+  /// In en, this message translates to:
+  /// **'Received {usd}. Shielding…'**
+  String privateUsdDepositShieldingLine(String usd);
+
+  /// Title of the Receive sheet on the Shielded USD screen; {symbol} is the token symbol, such as USDC.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive {symbol}'**
+  String privateUsdDepositTitle(String symbol);
+
+  /// Shown on the public USDC side of the Receive sheet when the relayer takes no deposits, so no address is shown; funds already sent to an earlier deposit address stay there.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposits are unavailable right now. Nothing sent to an earlier deposit address is lost: it waits there.'**
+  String get privateUsdDepositUnavailable;
+
+  /// Line about one deposit on the Receive sheet and the Deposits card when it is below the minimum the relayer shields; {usd} is the amount received and {minimum} the minimum, dollar amounts such as $3.00 and $5.00.
+  ///
+  /// In en, this message translates to:
+  /// **'Received {usd}, under the {minimum} minimum. Send more to this address.'**
+  String privateUsdDepositUnderMinimum(String usd, String minimum);
+
+  /// Subtitle of a deposit's activity row while its shielding waits for the network; reassures that the USDC is safe at the deposit address.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the network; your money is safe at your deposit address'**
+  String get privateUsdDepositWaiting;
+
+  /// Line about one deposit on the Receive sheet and the Deposits card while its shielding waits for the network; {usd} is a dollar amount such as $12.40.
+  ///
+  /// In en, this message translates to:
+  /// **'Received {usd}. Waiting for the network; your money is safe at your deposit address'**
+  String privateUsdDepositWaitingLine(String usd);
+
+  /// Title of the card on the Shielded USD screen listing the public USDC deposits in progress; tapping it opens the Receive sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposits'**
+  String get privateUsdDepositsTitle;
+
+  /// Row label in a ZEC-to-shielded-USD bridge's details for the Zcash transaction that paid the ZEC deposit into the swap.
+  ///
+  /// In en, this message translates to:
+  /// **'ZEC deposit'**
+  String get privateUsdDetailDeposit;
+
+  /// Row label in a shielded-USD-to-ZEC bridge's details for the Ethereum transaction that paid the shielded USD into escrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Escrow payment'**
+  String get privateUsdDetailFunding;
+
+  /// Row label in a ZEC-to-shielded-USD bridge's details for the Ethereum transaction that paid the dollars out to the user's shielded balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout'**
+  String get privateUsdDetailPayout;
+
+  /// Row label in a ZEC-to-shielded-USD bridge's details for the Zcash transaction that returned the user's ZEC after the bridge was called off.
+  ///
+  /// In en, this message translates to:
+  /// **'ZEC refund'**
+  String get privateUsdDetailRefund;
+
+  /// Row label in the details of a bridge or deposit: the date and time it started.
+  ///
+  /// In en, this message translates to:
+  /// **'Started'**
+  String get privateUsdDetailStarted;
+
+  /// Row label in a bridge's details and activity details: the swap's identifier, which can be copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Swap ID'**
+  String get privateUsdDetailSwapId;
+
+  /// Row label in a shielded-USD-to-ZEC bridge's details for the Zcash transaction that delivered the ZEC to the user's wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'ZEC received'**
+  String get privateUsdDetailZecReceived;
+
+  /// Value of the Status row in a send's details once its transaction is in an Ethereum block.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirmed'**
+  String get privateUsdDetailsConfirmed;
+
+  /// Row label in a USDC deposit's details: the deposit address the public USDC was sent to.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit address'**
+  String get privateUsdDetailsDepositAddress;
+
+  /// Row label in a bridge's details whose value is the date and time the bridge ended.
+  ///
+  /// In en, this message translates to:
+  /// **'Ended'**
+  String get privateUsdDetailsEnded;
+
+  /// Row label in a received payment's details: the sender's address.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get privateUsdDetailsFrom;
+
+  /// Screen-reader label of a block explorer link in a Shielded USD activity row's details, read as e.g. Payout on Railscan; {transaction} is the row's label such as Payout or Transaction, and {explorer} is the explorer's name such as Railscan or Etherscan.
+  ///
+  /// In en, this message translates to:
+  /// **'{transaction} on {explorer}'**
+  String privateUsdDetailsOpenOn(String transaction, String explorer);
+
+  /// Row label in a received payment's details whose value is the date and time it arrived.
+  ///
+  /// In en, this message translates to:
+  /// **'Received'**
+  String get privateUsdDetailsReceived;
+
+  /// Row label in a bridge's or deposit's details: the fee the relayer charged.
+  ///
+  /// In en, this message translates to:
+  /// **'Relayer fee'**
+  String get privateUsdDetailsRelayerFee;
+
+  /// Value of the From row in a received payment's details when the sender did not reveal their address.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden'**
+  String get privateUsdDetailsSenderHidden;
+
+  /// Row label in a send's details whose value is the date and time it was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get privateUsdDetailsSent;
+
+  /// Row label in a Shielded USD activity row's details: the transaction's status.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get privateUsdDetailsStatus;
+
+  /// Row label in a Shielded USD activity row's details, next to links that open the transaction in a block explorer.
+  ///
+  /// In en, this message translates to:
+  /// **'Transaction'**
+  String get privateUsdDetailsTransaction;
+
+  /// Value of the Status row in a send's details before its transaction is included in an Ethereum block.
+  ///
+  /// In en, this message translates to:
+  /// **'Not in a block yet'**
+  String get privateUsdDetailsUnconfirmed;
+
+  /// Body of the empty-state card on the Shielded USD screen, inviting the user to bridge ZEC into shielded dollars and saying what stays private.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge ZEC into dollars nobody else can see: not your balance, and not who you pay.'**
+  String get privateUsdEmptyBody;
+
+  /// Body of the empty-state card on the Shielded USD screen where bridging is unavailable, so receiving is the way to get shielded dollars.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive dollars nobody else can see: not your balance, and not who you pay.'**
+  String get privateUsdEmptyBodyReceive;
+
+  /// Title of the empty-state card on the Shielded USD screen when the balance is zero.
+  ///
+  /// In en, this message translates to:
+  /// **'No shielded dollars yet'**
+  String get privateUsdEmptyTitle;
+
+  /// Status under the balance on the Shielded USD screen, also read by screen readers, during the first load of the balance, which can be long.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading your shielded balance. The first time reads Railgun\'s history and can take a while. Keep Veylor open.'**
+  String get privateUsdFirstLoad;
+
+  /// Screen-reader label of the Shielded USD screen's sync line during the first load of the balance; {percent} is a whole-number percentage such as 42.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading your shielded balance: {percent}%. The first time reads Railgun\'s history and can take a while. Keep Veylor open.'**
+  String privateUsdFirstLoadProgress(int percent);
+
+  /// Caption under the Shielded USD line in the holdings list on the portfolio chart page: these funds are shielded too, but held on Ethereum rather than Zcash.
+  ///
+  /// In en, this message translates to:
+  /// **'On Ethereum'**
+  String get privateUsdHoldingsShieldedOnEthereum;
+
+  /// Short line on Home's Shielded USD row: dollars received that are still being screened by Railgun and not yet spendable; {usd} is a dollar amount such as $12.40, masked in privacy mode.
+  ///
+  /// In en, this message translates to:
+  /// **'+{usd} arriving'**
+  String privateUsdHomeArriving(String usd);
+
+  /// Screen-reader form of the arriving line on Home's Shielded USD row, without the plus sign; {usd} is a dollar amount such as $12.40, masked in privacy mode.
+  ///
+  /// In en, this message translates to:
+  /// **'{usd} arriving'**
+  String privateUsdHomeArrivingDescription(String usd);
+
+  /// Screen-reader value of Home's Shielded USD row: the feature's name followed by its balance; {amount} is a dollar amount such as $12.40, a dash or Loading… while unknown, or the needs-attention text when funds were refused.
+  ///
+  /// In en, this message translates to:
+  /// **'Shielded USD {amount}'**
+  String privateUsdHomeBalanceDescription(String amount);
+
+  /// Short line on Home's Shielded USD row, also read by screen readers, when Railgun's screening refused some funds; {usd} is the refused dollar amount such as $12.40, masked in privacy mode.
+  ///
+  /// In en, this message translates to:
+  /// **'{usd} needs attention'**
+  String privateUsdHomeBlocked(String usd);
+
+  /// Screen-reader text for the balance on Home's Shielded USD row when Railgun's screening refused some funds; {usd} is the spendable balance such as $12.40, masked in privacy mode.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs attention: {usd}'**
+  String privateUsdHomeBlockedDescription(String usd);
+
+  /// Screen-reader label of Home's Shielded USD row, a button that opens the Shielded USD screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open shielded USD'**
+  String get privateUsdHomeOpen;
+
+  /// Screen-reader label of the question-mark button in the top bar of the Shielded USD screens; it opens a sheet that explains the screen.
+  ///
+  /// In en, this message translates to:
+  /// **'How this works'**
+  String get privateUsdInfoButton;
+
+  /// Item in the Shielded USD info sheet explaining the Bridge action.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge: move between ZEC and shielded USD.'**
+  String get privateUsdInfoConvert;
+
+  /// Note in the Shielded USD info sheets: bridges, sends and refunds only make progress while Veylor is open and unlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridges, sends and refunds run only while Veylor is open and unlocked.'**
+  String get privateUsdInfoKeepOpen;
+
+  /// Note in the Shielded USD info sheet saying what stays private.
+  ///
+  /// In en, this message translates to:
+  /// **'Nobody else can see your balance, or who you pay.'**
+  String get privateUsdInfoPrivate;
+
+  /// Item in the Shielded USD info sheet explaining Receive: public USDC goes to the deposit address and is shielded for a fee; shielded USD from another Railgun wallet arrives free. (Receive) names the Receive button.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive: public USDC from an exchange or any wallet goes to your deposit address (Receive), and Veylor shields it for a small fee. Shielded USD from another Railgun wallet goes to your Railgun address on this screen, with no fee.'**
+  String get privateUsdInfoReceive;
+
+  /// Item in the Shielded USD info sheet explaining the Refunds screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunds: recover a refund that couldn\'t enter your shielded balance.'**
+  String get privateUsdInfoRefunds;
+
+  /// Note in the Shielded USD info sheet about Railgun's screening wait; {about} is a duration estimate such as about 5 min or about 2 h.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun screens new funds for {about} before they can be spent.'**
+  String privateUsdInfoScreening(String about);
+
+  /// Item in the Shielded USD info sheet explaining the Send action.
+  ///
+  /// In en, this message translates to:
+  /// **'Send: transfer shielded USD to another Railgun address. It stays shielded.'**
+  String get privateUsdInfoSend;
+
+  /// Title of the info sheet on the Shielded USD screen that explains each action.
+  ///
+  /// In en, this message translates to:
+  /// **'About shielded USD'**
+  String get privateUsdInfoTitle;
+
+  /// Item in the Shielded USD info sheet explaining the Withdraw action and that it is public on Ethereum.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdraw: move shielded USD to a public Ethereum address. The destination and amount are visible on Ethereum.'**
+  String get privateUsdInfoWithdraw;
+
+  /// Body of the 'Keep Veylor open' card on a bridge's progress screen: the bridge can take a while, Veylor must stay open and online, and it pauses if the screen turns off.
+  ///
+  /// In en, this message translates to:
+  /// **'This can take a while. Veylor needs to stay open and online until it\'s done: if your screen turns off, it pauses until you\'re back.'**
+  String get privateUsdKeepOpenBody;
+
+  /// Caption of the card on a bridge's progress screen, in either direction, while the bridge needs Veylor to stay open; drawn in uppercase.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Veylor open'**
+  String get privateUsdKeepOpenTitle;
+
+  /// Label of the switch (also its screen-reader label) in the 'Keep Veylor open' card that keeps the phone's screen on until the bridge no longer needs Veylor.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep screen on'**
+  String get privateUsdKeepScreenOn;
+
+  /// Error on the Shielded USD screen, also read by screen readers, when the balance could not be loaded at all.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t load the balance. Try again in a moment.'**
+  String get privateUsdLoadFailed;
+
+  /// Shown in place of the balance on Home's Shielded USD row while the balance loads for the first time.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading…'**
+  String get privateUsdLoading;
+
+  /// Label of the small button under the amount on the bridge screens that fills in the whole available balance; keep it very short.
+  ///
+  /// In en, this message translates to:
+  /// **'Max'**
+  String get privateUsdMax;
+
+  /// Error on the bridge review in the last blocks before a Zcash network upgrade, when deposits are held; nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused for the network upgrade. Try again in a few minutes.'**
+  String get privateUsdNetworkUpgradeHold;
+
+  /// Secondary button that dismisses a Shielded USD confirmation sheet without doing anything.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get privateUsdNotNow;
+
+  /// Button in an empty recipient field on the Shielded USD send screens that pastes the clipboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste'**
+  String get privateUsdPaste;
+
+  /// Note on the Shielded USD screens when an earlier outgoing payment is still pending, so Send, Withdraw and Bridge must wait.
+  ///
+  /// In en, this message translates to:
+  /// **'A previous payment is still pending. You can send or bridge again once it\'s confirmed.'**
+  String get privateUsdPaymentPending;
+
+  /// Status line for an outgoing shielded USD payment (a send, a withdrawal or an escrow payment) while its proof is being built; {percent} is a whole number from 0 to 100.
+  ///
+  /// In en, this message translates to:
+  /// **'Proving your payment · {percent}%'**
+  String privateUsdPaymentProving(int percent);
+
+  /// Status line for an outgoing shielded USD payment once it is in a block, while the shielded balance refreshes.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating your balance'**
+  String get privateUsdPaymentUpdatingBalance;
+
+  /// Status line for an outgoing shielded USD payment that was submitted and waits to be included in an Ethereum block; {elapsed} is the time waited so far as minutes:seconds, such as 1:05.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a block · {elapsed}'**
+  String privateUsdPaymentWaitingForBlock(String elapsed);
+
+  /// Label of the progress tab on a bridge's status screen, next to the transaction details tab.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge progress'**
+  String get privateUsdProgressTab;
+
+  /// Caption that replaces the quote countdown on the bridge screens once the quote has expired, drawn in uppercase in English.
+  ///
+  /// In en, this message translates to:
+  /// **'Quote expired'**
+  String get privateUsdQuoteExpired;
+
+  /// Note under the Railgun (0zk) address on the Shielded USD receive sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Shielded USD from another Railgun wallet arrives here, with no fee.'**
+  String get privateUsdReceiveAddressNote;
+
+  /// Button under the Railgun (0zk) address on the Shielded USD receive sheet that copies the address.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Railgun address'**
+  String get privateUsdReceiveShieldedCopy;
+
+  /// Warning above the Railgun (0zk) address QR code on the Shielded USD receive sheet: only another Railgun wallet can send to this address.
+  ///
+  /// In en, this message translates to:
+  /// **'Only from a Railgun wallet'**
+  String get privateUsdReceiveShieldedOnly;
+
+  /// Screen-reader label of the refresh button on the Shielded USD balance card, and the label of the button that reloads the list on the Refunds screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get privateUsdRefresh;
+
+  /// Error under the balance on the Shielded USD screen, also read by screen readers, when a refresh failed and the previous balance stays on screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t update the balance. Showing the last known amounts.'**
+  String get privateUsdRefreshFailed;
+
+  /// Status line on a refund card on the Refunds screen when the refund, which could not enter the shielded balance, can now be recovered with the button below it.
+  ///
+  /// In en, this message translates to:
+  /// **'This refund can be recovered.'**
+  String get privateUsdRefundsAvailable;
+
+  /// Error status on a refund card on the Refunds screen when checking whether it can be recovered failed; the screen has a Refresh button.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t check this refund. Refresh to try again.'**
+  String get privateUsdRefundsCheckFailed;
+
+  /// Status text on the Shielded USD Refunds screen while Veylor checks whether refunds from earlier bridges can be recovered, shown in place of the list and on each refund card until its check ends.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking refunds…'**
+  String get privateUsdRefundsChecking;
+
+  /// Body of that card on the Refunds screen: the refused deposit waits in a vault tied to the deposit address and can be recovered and shielded again; {usd} is a dollar amount such as $12.40.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun\'s screening sent {usd} back to your deposit address\'s vault. Recover it to shield it again.'**
+  String privateUsdRefundsDepositBody(String usd);
+
+  /// Body of the confirmation sheet before a refused deposit is recovered; {fee} is the relayer's fee deducted from it, a dollar amount such as $0.50.
+  ///
+  /// In en, this message translates to:
+  /// **'The relayer\'s fee, {fee}, comes out of it.'**
+  String privateUsdRefundsDepositConfirmBody(String fee);
+
+  /// Title of the confirmation sheet opened by the Recover deposit button on the Refunds screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Recover this deposit?'**
+  String get privateUsdRefundsDepositConfirmTitle;
+
+  /// Button on the refused-deposit card on the Refunds screen, also the confirm button of its sheet, that has the relayer shield the deposit again.
+  ///
+  /// In en, this message translates to:
+  /// **'Recover deposit'**
+  String get privateUsdRefundsDepositRecover;
+
+  /// Error under the refused-deposit card on the Refunds screen when its recovery failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t recover this deposit. Try again.'**
+  String get privateUsdRefundsDepositRecoverFailed;
+
+  /// Text on the refused-deposit card on the Refunds screen while its recovery runs.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovering your deposit…'**
+  String get privateUsdRefundsDepositRecovering;
+
+  /// Title of a card on the Refunds screen for a deposit (public USDC sent to the deposit address) that Railgun's screening refused and sent back.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit sent back by screening'**
+  String get privateUsdRefundsDepositTitle;
+
+  /// Empty-state text on the Refunds screen when no bridge has been refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'No refunded bridges yet.'**
+  String get privateUsdRefundsEmpty;
+
+  /// Explanation on the Refunds screen: a refund that could not enter the shielded balance can be recovered here, and Railgun's screening may delay when it can be spent.
+  ///
+  /// In en, this message translates to:
+  /// **'If a refund couldn\'t enter your shielded balance, recover it here. Railgun screening may delay availability.'**
+  String get privateUsdRefundsInfo;
+
+  /// Status line on a refund card on the Refunds screen when nothing can be recovered yet, most likely because Railgun is still screening the refunded dollars.
+  ///
+  /// In en, this message translates to:
+  /// **'No recovery available right now. Your refund may still be going through Railgun screening.'**
+  String get privateUsdRefundsNoRecovery;
+
+  /// Row label in an entry on the Refunds screen: the amount of the bridge that was refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Original bridge amount'**
+  String get privateUsdRefundsOriginalAmount;
+
+  /// Button on a refund card on the Refunds screen, also the confirm button of its sheet, that has the relayer shield a refund stuck outside the shielded balance into it.
+  ///
+  /// In en, this message translates to:
+  /// **'Recover refund'**
+  String get privateUsdRefundsRecover;
+
+  /// Body of the confirmation sheet before a refund is recovered: the relayer's fee is deducted from the refund, and only its maximum is known in advance; {cap} is that maximum, a dollar amount such as $2.00.
+  ///
+  /// In en, this message translates to:
+  /// **'The relayer\'s fee, at most {cap}, comes out of the refund.'**
+  String privateUsdRefundsRecoverConfirmBody(String cap);
+
+  /// Title of the confirmation sheet opened by the Recover refund button on the Refunds screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Recover this refund?'**
+  String get privateUsdRefundsRecoverConfirmTitle;
+
+  /// Error under a refund card on the Refunds screen when its recovery failed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t recover this refund. Try again.'**
+  String get privateUsdRefundsRecoverFailed;
+
+  /// Status line on a refund card on the Refunds screen while its recovery runs.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovering your refund…'**
+  String get privateUsdRefundsRecovering;
+
+  /// Heading at the top of the Refunds screen, which lists refunds from earlier bridges.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunds from earlier bridges'**
+  String get privateUsdRefundsSubtitle;
+
+  /// Title of the Refunds screen, drawn in uppercase, and label of the button on the Shielded USD screen that opens it.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunds'**
+  String get privateUsdRefundsTitle;
+
+  /// Button on a bridge's screens that opens the Refunds screen.
+  ///
+  /// In en, this message translates to:
+  /// **'View refunds'**
+  String get privateUsdRefundsView;
+
+  /// Switch in Settings: whether a new bridge to shielded USD lets the relayer claim the dollars on the user's behalf, so the user can leave once the market maker confirms the deposit.
+  ///
+  /// In en, this message translates to:
+  /// **'Let the relayer claim for me'**
+  String get privateUsdRelayerClaimsSetting;
+
+  /// [security] Destructive button in the reset sheet that erases every account and all wallet data despite unfinished Shielded USD bridges, whose funds can be lost.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset anyway'**
+  String get privateUsdResetAnyway;
+
+  /// [security] Warning in the reset sheet when Veylor could not check for unfinished Shielded USD bridges: if there are any, resetting now can lose their funds.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t check for unfinished shielded USD bridges. Only this wallet can recover their funds, so resetting now can lose them.'**
+  String get privateUsdResetUncheckedBody;
+
+  /// [security] Warning in the reset sheet (removing the last account, or Forgot passcode): the wallet has unfinished Shielded USD bridges whose funds only it can recover, so resetting now can lose them; {count} is the number of bridges, at least 1.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Your wallet has {count} unfinished shielded USD bridge. Only this wallet can recover their funds, so resetting now can lose them.} other{Your wallet has {count} unfinished shielded USD bridges. Only this wallet can recover their funds, so resetting now can lose them.}}'**
+  String privateUsdResetUnfinishedBody(int count);
+
+  /// First step of the shielded-USD-to-ZEC progress timeline, and its banner detail: Veylor is setting up the account that will receive the ZEC.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing your receiving account'**
+  String get privateUsdReverseAccepting;
+
+  /// Error under the amount field on the shielded-USD-to-ZEC bridge screen: the dollar amount may have at most 2 decimal places (whole cents).
+  ///
+  /// In en, this message translates to:
+  /// **'Use at most 2 decimal places.'**
+  String get privateUsdReverseAmountCents;
+
+  /// Row label on the shielded-USD-to-ZEC review and in its activity details: the fee paid to the Railgun broadcaster that submits the escrow payment transaction to Ethereum.
+  ///
+  /// In en, this message translates to:
+  /// **'Broadcast fee'**
+  String get privateUsdReverseBroadcasterFee;
+
+  /// Button on a shielded-USD-to-ZEC bridge's progress screen that cancels the bridge before anything was paid.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel bridge'**
+  String get privateUsdReverseCancel;
+
+  /// [security] Body of the confirmation sheet before calling off a shielded-USD-to-ZEC bridge that was already paid: the shielded USD comes back minus the relayer's and Railgun's fees, and the action cannot be undone.
+  ///
+  /// In en, this message translates to:
+  /// **'Your shielded USD comes back, less the relayer\'s and Railgun\'s fees. This can\'t be undone.'**
+  String get privateUsdReverseCancelConfirmBody;
+
+  /// Title of the confirmation sheet shown before cancelling, or requesting a refund of, a shielded-USD-to-ZEC bridge.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this bridge?'**
+  String get privateUsdReverseCancelConfirmTitle;
+
+  /// [security] Body of the confirmation sheet before cancelling a shielded-USD-to-ZEC bridge that was not paid yet: nothing is lost, but the cancellation cannot be undone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has been paid yet, so nothing is lost. This can\'t be undone.'**
+  String get privateUsdReverseCancelConfirmUnpaidBody;
+
+  /// Result body and activity text when a shielded-USD-to-ZEC bridge was cancelled and no payment is left in escrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge cancelled. No escrow payment remains.'**
+  String get privateUsdReverseCancelled;
+
+  /// Banner and activity-row text once a shielded-USD-to-ZEC bridge has delivered the ZEC to the user's shielded wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'ZEC received in your shielded wallet'**
+  String get privateUsdReverseComplete;
+
+  /// Step detail and banner text while the escrow payment waits to be confirmed on Ethereum.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirming escrow'**
+  String get privateUsdReverseConfirming;
+
+  /// Error after a shielded-USD-to-ZEC step the user took (pay, authorize settlement, cancel) did not go through: the saved bridge resumes after Veylor checks both the Zcash and Ethereum chains, and a timed-out request never causes a second payment.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to complete this step. Your saved bridge resumes after Veylor checks both chains. A payment is never repeated because a request timed out.'**
+  String get privateUsdReverseError;
+
+  /// Error on the shielded-USD-to-ZEC bridge screen: the amount cannot be bridged, either because it is too small to cover the fees or because it is above the maximum for a single bridge.
+  ///
+  /// In en, this message translates to:
+  /// **'This amount can\'t be bridged. It may be too small to cover the fees, or over the limit for one bridge.'**
+  String get privateUsdReverseErrorAmountRefused;
+
+  /// Error after tapping Pay on a shielded-USD-to-ZEC bridge: the fees changed, so no payment was made; the user reviews the new total and then pays or cancels.
+  ///
+  /// In en, this message translates to:
+  /// **'The fees changed, so nothing was paid. Review the new total, then pay it or cancel.'**
+  String get privateUsdReverseErrorCostChanged;
+
+  /// Error on the shielded-USD-to-ZEC bridge screens: bridging back to ZEC is temporarily unavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridging to ZEC is unavailable right now. Try again later.'**
+  String get privateUsdReverseErrorFundingUnavailable;
+
+  /// Error after a shielded-USD-to-ZEC step was tapped too late: the bridge ends on its own, and any payment the user made comes back.
+  ///
+  /// In en, this message translates to:
+  /// **'It\'s too late for this step, so the bridge ends by itself. Anything you paid comes back.'**
+  String get privateUsdReverseErrorTooLate;
+
+  /// Error after tapping Authorize settlement too early: the market maker's ZEC deposit is not confirmed yet.
+  ///
+  /// In en, this message translates to:
+  /// **'The market maker\'s ZEC isn\'t confirmed yet. Try again in a few minutes.'**
+  String get privateUsdReverseErrorUnconfirmed;
+
+  /// Row label on the shielded-USD-to-ZEC review: the dollar amount that goes into escrow for the swap.
+  ///
+  /// In en, this message translates to:
+  /// **'Escrow value'**
+  String get privateUsdReverseEscrow;
+
+  /// Error under the amount field on the shielded-USD-to-ZEC bridge screen: the shielded USD balance cannot cover the amount plus its fees.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough shielded USD for this amount and its fees.'**
+  String get privateUsdReverseInsufficient;
+
+  /// Main text of the shielded-USD-to-ZEC info sheet: the user first approves paying shielded USD into escrow, then, once the wallet itself has confirmed the market maker's full ZEC deposit, approves settlement to receive shielded ZEC.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve sending shielded USD first. After your wallet confirms the full ZEC deposit itself, approve settlement to receive shielded ZEC.'**
+  String get privateUsdReverseIntro;
+
+  /// Note on the shielded-USD-to-ZEC review screen: Veylor must stay open after paying, and once the ZEC is confirmed the user must approve settlement in the app by a deadline, otherwise the shielded USD is refunded minus fees; {time} is a localized date and time such as 25 May, 13:30.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep Veylor open after you pay. Once the ZEC is confirmed, you approve settlement here by {time}. If you don\'t, your shielded USD is refunded, less fees.'**
+  String privateUsdReverseKeepOpen(String time);
+
+  /// Button on a finished shielded-USD-to-ZEC bridge's progress screen that starts a new bridge.
+  ///
+  /// In en, this message translates to:
+  /// **'New bridge'**
+  String get privateUsdReverseNew;
+
+  /// Main button on a shielded-USD-to-ZEC bridge's progress screen that pays the shielded USD into escrow; {debit} is the dollar amount, such as $25.10.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {debit}'**
+  String privateUsdReversePay(String debit);
+
+  /// Step title and banner text while the refunded dollars are being returned into the user's Railgun shielded balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Returning your shielded USD to Railgun'**
+  String get privateUsdReversePayout;
+
+  /// Problem card message on a shielded-USD-to-ZEC bridge: Veylor cannot reach the relayer that moves the user's dollars, and keeps retrying while the app is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Veylor can\'t reach the relayer that moves your dollars. It keeps trying while it\'s open.'**
+  String get privateUsdReverseProblemRelayer;
+
+  /// Summary line of a shielded-USD-to-ZEC bridge: the dollars paid and the ZEC received after fees; {usd} is a dollar amount such as $25.10 and {zec} a ZEC amount such as 0.5 ZEC (either may show as ***** in privacy mode).
+  ///
+  /// In en, this message translates to:
+  /// **'{usd} for {zec} after fees'**
+  String privateUsdReverseProgressAmounts(String usd, String zec);
+
+  /// Summary line of a shielded-USD-to-ZEC bridge while the ZEC is still an estimate: the dollars paid and the approximate ZEC after fees; {usd} is a dollar amount such as $25.10 and {zec} a ZEC amount such as 0.5 ZEC (either may show as ***** in privacy mode).
+  ///
+  /// In en, this message translates to:
+  /// **'{usd} for about {zec} after fees'**
+  String privateUsdReverseProgressEstimate(String usd, String zec);
+
+  /// Result body once a shielded-USD-to-ZEC bridge finished: the ZEC that arrived after fees; {zec} is a ZEC amount such as 0.5 ZEC.
+  ///
+  /// In en, this message translates to:
+  /// **'{zec} arrived after fees.'**
+  String privateUsdReverseProgressReceived(String zec);
+
+  /// Note under the progress steps of a shielded-USD-to-ZEC bridge while the phone builds the zero-knowledge proof for the escrow payment, which can take minutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone builds a zero-knowledge proof of the payment. This can take a few minutes. Keep Veylor open.'**
+  String get privateUsdReverseProvingNote;
+
+  /// Row label on the shielded-USD-to-ZEC review and in its activity details: Railgun's fee for moving the dollars out of the shielded balance (unshielding) into escrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun unshield fee'**
+  String get privateUsdReverseRailgunFee;
+
+  /// Fourth step title, banner text and main button of a shielded-USD-to-ZEC bridge: the user authorizes settlement, which releases the escrowed dollars and moves the ZEC to their wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Authorize settlement'**
+  String get privateUsdReverseReady;
+
+  /// Note on the shielded-USD-to-ZEC progress screen when settlement can be authorized: the market maker's full ZEC deposit is confirmed, and authorizing releases the escrowed shielded USD (to the market maker) and moves the ZEC into the user's shielded wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'The full ZEC deposit is confirmed. Authorize settlement to release your shielded USD and move ZEC to your shielded wallet.'**
+  String get privateUsdReverseReadyExplanation;
+
+  /// Row label on the shielded-USD-to-ZEC review: the estimated ZEC the user receives after the fee of the transaction that moves (sweeps) it from the swap's deposit address into their wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated ZEC after sweep fee'**
+  String get privateUsdReverseReceiveEstimate;
+
+  /// Third step of the shielded-USD-to-ZEC progress timeline, and banner text: waiting until the market maker's ZEC deposit is confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for confirmed ZEC'**
+  String get privateUsdReverseReceiving;
+
+  /// Note on the shielded-USD-to-ZEC progress screen when the bridge can no longer settle: the user can request the refund now, or Veylor sends it automatically after a given time while the app is open; {time} is a localized date and time such as 25 May, 13:30.
+  ///
+  /// In en, this message translates to:
+  /// **'This bridge can no longer settle. Request your refund now, or Veylor sends it after {time} while it\'s open.'**
+  String privateUsdReverseRefundAvailable(String time);
+
+  /// Note in the shielded-USD-to-ZEC info sheet: the bridge can be cancelled until settlement is approved; after that a refund must wait for the contract's deadline and costs the relayer's fee and Railgun's shielding fee; closing the app never approves settlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Before you approve settlement, you can cancel. After that, a refund waits for the contract deadline. A refund pays the relayer\'s fee and Railgun\'s shielding fee. Closing Veylor never approves settlement.'**
+  String get privateUsdReverseRefundNote;
+
+  /// Step title and banner text when the user can request the refund of a shielded-USD-to-ZEC bridge that can no longer settle.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund available'**
+  String get privateUsdReverseRefundReady;
+
+  /// Note on the shielded-USD-to-ZEC progress screen after a refund was requested: Veylor continues once the refund becomes available, while the app is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund requested. Veylor continues when your refund is available, while it\'s open.'**
+  String get privateUsdReverseRefundRequested;
+
+  /// Error after tapping cancel or refund on a shielded-USD-to-ZEC bridge that has already settled: no refund is possible, and Veylor finishes moving the ZEC to the wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'This bridge has already settled and can no longer be refunded. Veylor will finish moving your ZEC to your wallet.'**
+  String get privateUsdReverseRefundUnavailable;
+
+  /// Step title and banner text while the refund of a shielded-USD-to-ZEC bridge must wait until the contract allows it; Veylor retries while the app is open.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting until a refund can proceed. Veylor retries while it\'s open.'**
+  String get privateUsdReverseRefundWait;
+
+  /// Result body and activity text once a shielded-USD-to-ZEC bridge was refunded: the dollars are back in the shielded balance, though Railgun's screening may delay when they can be spent.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund paid into your shielded balance. Railgun screening may delay availability.'**
+  String get privateUsdReverseRefunded;
+
+  /// Step title and banner text while the refund of a shielded-USD-to-ZEC bridge is being secured on Ethereum.
+  ///
+  /// In en, this message translates to:
+  /// **'Securing your refund'**
+  String get privateUsdReverseRefunding;
+
+  /// Button on a shielded-USD-to-ZEC bridge's progress screen that calls the bridge off after paying, requesting a refund of the escrowed dollars.
+  ///
+  /// In en, this message translates to:
+  /// **'Request refund'**
+  String get privateUsdReverseRequestRefund;
+
+  /// Result title once a shielded-USD-to-ZEC bridge was cancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge cancelled'**
+  String get privateUsdReverseResultCancelled;
+
+  /// Result title once a shielded-USD-to-ZEC bridge delivered the ZEC.
+  ///
+  /// In en, this message translates to:
+  /// **'ZEC received'**
+  String get privateUsdReverseResultReceived;
+
+  /// Result title once a shielded-USD-to-ZEC bridge was refunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund sent'**
+  String get privateUsdReverseResultRefunded;
+
+  /// Banner and activity-row detail of a shielded-USD-to-ZEC bridge that waits for the user to review and approve the escrow payment.
+  ///
+  /// In en, this message translates to:
+  /// **'Review and approve your payment'**
+  String get privateUsdReverseReview;
+
+  /// Step detail and banner text while the shielded USD payment to escrow is being sent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending shielded USD'**
+  String get privateUsdReverseSending;
+
+  /// Note on the shielded-USD-to-ZEC progress screen after settlement was authorized: a refund is possible only after a deadline, and only if settlement has not completed by then; {time} is a localized date and time such as 25 May, 13:30.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement is authorized. A refund can only proceed after {time} if settlement hasn\'t completed.'**
+  String privateUsdReverseSettlementRefundLimit(String time);
+
+  /// Step detail and banner text while a shielded-USD-to-ZEC bridge waits for its settlement to complete.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for settlement'**
+  String get privateUsdReverseSettling;
+
+  /// Detail under the 'Authorize settlement' step: the bridge cannot continue without the user's approval.
+  ///
+  /// In en, this message translates to:
+  /// **'Your approval is needed to continue.'**
+  String get privateUsdReverseStepApprovalDetail;
+
+  /// Second step of the shielded-USD-to-ZEC progress timeline while the payment of shielded USD into escrow is under way.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending shielded USD to escrow'**
+  String get privateUsdReverseStepFund;
+
+  /// Second step of the shielded-USD-to-ZEC progress timeline while it waits for the user to tap Pay: paying shielded USD into escrow is the user's action and has not started yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay shielded USD to escrow'**
+  String get privateUsdReverseStepPay;
+
+  /// Detail under the 'Pay shielded USD to escrow' step: tapping the Pay button sends the shown amount of shielded USD into escrow; {debit} is a dollar amount such as $25.10.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Pay to send {debit} of shielded USD to escrow.'**
+  String privateUsdReverseStepPayDetail(String debit);
+
+  /// Fifth step of the shielded-USD-to-ZEC progress timeline: the bridge is being settled.
+  ///
+  /// In en, this message translates to:
+  /// **'Settling your bridge'**
+  String get privateUsdReverseStepSettle;
+
+  /// Detail under the 'Moving ZEC to your wallet' step: the number of Zcash confirmations that transaction has so far; {count} is a number such as 2.
+  ///
+  /// In en, this message translates to:
+  /// **'Zcash confirmations: {count}'**
+  String privateUsdReverseSweepConfirmations(int count);
+
+  /// Last step of the shielded-USD-to-ZEC progress timeline, and banner text: Veylor moves the received ZEC from the swap's deposit address into the user's wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Moving ZEC to your wallet'**
+  String get privateUsdReverseSweeping;
+
+  /// Title of the info sheet on the shielded-USD-to-ZEC bridge screens.
+  ///
+  /// In en, this message translates to:
+  /// **'Shielded USD to ZEC'**
+  String get privateUsdReverseTitle;
+
+  /// Primary button on the Send, Withdraw and Bridge amount screens that opens the review step, and the title of the bridge review screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get privateUsdReview;
+
+  /// Error on the Shielded USD bridge and send screens while Tor is starting or broken, so Veylor sent nothing.
+  ///
+  /// In en, this message translates to:
+  /// **'Tor is starting or unavailable, so nothing was sent. Try again once it\'s connected.'**
+  String get privateUsdRouteBlocked;
+
+  /// Row label in the Shielded USD balance breakdown for received dollars that Railgun is still screening, when no time estimate is known.
+  ///
+  /// In en, this message translates to:
+  /// **'Arriving'**
+  String get privateUsdRowArriving;
+
+  /// Note under the Arriving row of the Shielded USD balance breakdown explaining the wait; {about} is a duration estimate such as about 5 min or about 2 h.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun screens new funds before they can be spent. This takes {about}.'**
+  String privateUsdRowArrivingInfo(String about);
+
+  /// Row label in the Shielded USD balance breakdown when Railgun's screening of received dollars takes longer than its usual time.
+  ///
+  /// In en, this message translates to:
+  /// **'Arriving · taking longer than usual'**
+  String get privateUsdRowArrivingLate;
+
+  /// Row label in the Shielded USD balance breakdown for received dollars under Railgun's screening; {percent} is the whole-number share of the usual screening time that has passed since the funds landed, such as 40.
+  ///
+  /// In en, this message translates to:
+  /// **'Arriving · {percent}%'**
+  String privateUsdRowArrivingPercent(int percent);
+
+  /// Row label in the Shielded USD balance breakdown for the dollars that can be spent now; also a status value in a received payment's details.
+  ///
+  /// In en, this message translates to:
+  /// **'Available'**
+  String get privateUsdRowAvailable;
+
+  /// Row label, in red, in the Shielded USD balance breakdown for dollars that Railgun's screening refused.
+  ///
+  /// In en, this message translates to:
+  /// **'Screening refused'**
+  String get privateUsdRowBlocked;
+
+  /// Note, in red, under the refused row of the Shielded USD balance breakdown: these funds cannot be spent and can only return to the bridge contract they came from.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun\'s screening refused these funds, so they can\'t be spent or sent. They can only go back to where they came from, the bridge contract. Contact support.'**
+  String get privateUsdRowBlockedInfo;
+
+  /// Row label in the Shielded USD balance breakdown for dollars held by a send that is being confirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing'**
+  String get privateUsdRowProcessing;
+
+  /// Note under the Processing row of the Shielded USD balance breakdown explaining why those dollars are not spendable right now.
+  ///
+  /// In en, this message translates to:
+  /// **'A send is being confirmed. These funds are available again once it settles.'**
+  String get privateUsdRowProcessingInfo;
+
+  /// Row label in the Shielded USD balance breakdown when processing dollars wait on Railgun's screening, which keeps failing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing · screening delayed'**
+  String get privateUsdRowProcessingStalled;
+
+  /// Note under the delayed Processing row of the Shielded USD balance breakdown: the funds are safe and become spendable once Railgun's screening accepts them.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun\'s screening hasn\'t accepted these funds yet. They\'re still yours and become available once it does. Veylor keeps trying while it\'s open.'**
+  String get privateUsdRowProcessingStalledInfo;
+
+  /// Body of the Ethereum RPC sheet in Settings; {network} is the chain name such as Ethereum mainnet or Sepolia.
+  ///
+  /// In en, this message translates to:
+  /// **'Use your own Ethereum RPC URL for {network} from a supported provider. Shielded USD then uses only it.'**
+  String privateUsdRpcBody(String network);
+
+  /// Button on the Shielded USD screen, under the error that the default Ethereum RPC is not answering, that opens the Ethereum RPC sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Change RPC'**
+  String get privateUsdRpcChange;
+
+  /// Primary button on the Ethereum RPC sheet that tests the entered URL and saves it if it works.
+  ///
+  /// In en, this message translates to:
+  /// **'Check and save'**
+  String get privateUsdRpcCheckAndSave;
+
+  /// Toast after the user went back to the app's default Ethereum RPC.
+  ///
+  /// In en, this message translates to:
+  /// **'Using the default Ethereum RPC'**
+  String get privateUsdRpcCleared;
+
+  /// Line on the Ethereum RPC sheet naming the RPC in use; {value} is the word Default or the host of the user's saved URL, such as eth-mainnet.g.alchemy.com.
+  ///
+  /// In en, this message translates to:
+  /// **'Current: {value}'**
+  String privateUsdRpcCurrent(String value);
+
+  /// Error on the Shielded USD screen when the app's default Ethereum RPC does not answer or turns requests away, so the balance cannot load; a Change RPC button follows.
+  ///
+  /// In en, this message translates to:
+  /// **'The Ethereum RPC isn\'t answering, so your balance can\'t load. Try a different RPC.'**
+  String get privateUsdRpcDefaultNotAnswering;
+
+  /// Error under the URL field of the Ethereum RPC sheet when the RPC refuses the smart contract reads Shielded USD needs.
+  ///
+  /// In en, this message translates to:
+  /// **'That RPC does not answer contract reads. Try another provider.'**
+  String get privateUsdRpcErrorCalls;
+
+  /// Error under the URL field of the Ethereum RPC sheet when the RPC limits event-log queries to a smaller block range than bridging needs, often on a free plan.
+  ///
+  /// In en, this message translates to:
+  /// **'That RPC caps log queries below what bridging needs. Try another provider or plan.'**
+  String get privateUsdRpcErrorLogs;
+
+  /// Error under the URL field of the Ethereum RPC sheet when the RPC did not answer the check.
+  ///
+  /// In en, this message translates to:
+  /// **'That RPC didn\'t answer. Check the URL, or try again in a moment.'**
+  String get privateUsdRpcErrorUnreachable;
+
+  /// Error under the URL field of the Ethereum RPC sheet when the URL is not https or not from a supported provider; {network} is the chain name such as Ethereum mainnet or Sepolia.
+  ///
+  /// In en, this message translates to:
+  /// **'Use an https URL from a supported provider for {network}.'**
+  String privateUsdRpcErrorUrl(String network);
+
+  /// Error under the URL field of the Ethereum RPC sheet when the RPC serves another chain; {network} is the chain name such as Ethereum mainnet or Sepolia.
+  ///
+  /// In en, this message translates to:
+  /// **'That RPC is for another network. Use one for {network}.'**
+  String privateUsdRpcErrorWrongChain(String network);
+
+  /// Name of the Ethereum main network, filled into the Ethereum RPC sheet's text and errors.
+  ///
+  /// In en, this message translates to:
+  /// **'Ethereum mainnet'**
+  String get privateUsdRpcNetworkMainnet;
+
+  /// Error on the Shielded USD screen when the user's own Ethereum RPC does not answer, so the balance cannot load; a Use the default button follows.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Ethereum RPC isn\'t answering.'**
+  String get privateUsdRpcNotAnswering;
+
+  /// List of the RPC providers the Ethereum RPC sheet accepts; keep the provider names as written.
+  ///
+  /// In en, this message translates to:
+  /// **'Supported: Alchemy, Infura, QuickNode, Chainstack, Ankr, dRPC, BlockPI, Tenderly, NodeReal, GetBlock, OnFinality, publicnode, Pocket Network and MEV Blocker.'**
+  String get privateUsdRpcProviders;
+
+  /// Toast after the user's own Ethereum RPC URL passed the check and was saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Ethereum RPC saved'**
+  String get privateUsdRpcSaved;
+
+  /// Privacy note on the Ethereum RPC sheet: what the chosen RPC provider can see.
+  ///
+  /// In en, this message translates to:
+  /// **'The RPC sees the app\'s Ethereum requests, and your IP address unless Tor is on.'**
+  String get privateUsdRpcSees;
+
+  /// Settings row and sheet title for the Ethereum RPC endpoint Shielded USD uses.
+  ///
+  /// In en, this message translates to:
+  /// **'Ethereum RPC'**
+  String get privateUsdRpcTitle;
+
+  /// Button on the Ethereum RPC sheet, and on the Shielded USD screen when the user's own RPC fails, that goes back to the app's default RPC.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the default'**
+  String get privateUsdRpcUseDefault;
+
+  /// Caption under the camera viewfinder of the QR scanner on the Shielded USD send screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan a Railgun 0zk address'**
+  String get privateUsdScanCaptionPrivate;
+
+  /// Caption under the camera viewfinder of the QR scanner on the Shielded USD withdraw screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan an Ethereum 0x address'**
+  String get privateUsdScanCaptionWithdraw;
+
+  /// Error in the withdraw screen's QR scanner when the scanned code does not hold an Ethereum address.
+  ///
+  /// In en, this message translates to:
+  /// **'This QR code isn\'t an Ethereum address.'**
+  String get privateUsdScanNot0x;
+
+  /// Error in the send screen's QR scanner when the scanned code does not hold a Railgun 0zk address.
+  ///
+  /// In en, this message translates to:
+  /// **'This QR code isn\'t a Railgun 0zk address.'**
+  String get privateUsdScanNot0zk;
+
+  /// Error in the send and withdraw QR scanners when the code is a payment request for another chain.
+  ///
+  /// In en, this message translates to:
+  /// **'This QR code is for another network.'**
+  String get privateUsdScanOtherNetwork;
+
+  /// Title of the QR scanner on the Shielded USD send and withdraw screens while it asks for, or waits on, camera access.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the recipient\'s address'**
+  String get privateUsdScanPermissionTitle;
+
+  /// Error in the withdraw screen's QR scanner when the code holds a shielded Railgun (0zk) address, which only the Send action can pay.
+  ///
+  /// In en, this message translates to:
+  /// **'This is a shielded 0zk address. To pay it, use Send.'**
+  String get privateUsdScanUseSend;
+
+  /// Error in the send screen's QR scanner when the code holds a public Ethereum (0x) address, which only the Withdraw action can pay.
+  ///
+  /// In en, this message translates to:
+  /// **'This is a public 0x address. To send to it, use Withdraw.'**
+  String get privateUsdScanUseWithdraw;
+
+  /// Live status line under the Processing row while Railgun's screening service checks the funds; {done} is how many checks finished such as 1, and {count} is how many there are such as 4.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking with Railgun\'s screening service · {done} of {count}'**
+  String privateUsdScreeningChecking(int done, int count);
+
+  /// Live status line under the Processing row while Veylor downloads the files it needs to build zero-knowledge proofs, when their size is not known yet.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading proving files'**
+  String get privateUsdScreeningDownloading;
+
+  /// Live status line under the Processing row while Veylor downloads the files it needs to build zero-knowledge proofs; {percent} is a whole-number percentage such as 42.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading proving files · {percent}%'**
+  String privateUsdScreeningDownloadingPercent(int percent);
+
+  /// Live status line under the Processing row while Veylor builds the zero-knowledge proof Railgun's screening needs; {percent} is a whole-number percentage such as 42.
+  ///
+  /// In en, this message translates to:
+  /// **'Building screening proof · {percent}%'**
+  String privateUsdScreeningProving(int percent);
+
+  /// Live status line under the Processing row while Veylor builds one of several zero-knowledge proofs for Railgun's screening; {index} is the proof being built such as 2, {count} is how many there are such as 3, and {percent} is that proof's whole-number percentage such as 42.
+  ///
+  /// In en, this message translates to:
+  /// **'Building screening proof {index} of {count} · {percent}%'**
+  String privateUsdScreeningProvingStep(int index, int count, int percent);
+
+  /// Live status line under the Processing row, also read by screen readers from the sync line, while Veylor syncs Railgun's transaction list; {percent} is a whole-number percentage such as 42.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing Railgun\'s transaction list · {percent}%'**
+  String privateUsdScreeningSyncingList(int percent);
+
+  /// Live status line under the Processing row while the funds wait for Railgun's screening service to answer.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for Railgun\'s screening service'**
+  String get privateUsdScreeningWaiting;
+
+  /// Caption over the token choice on the Shielded USD send and withdraw screens, and the label of the token row on their review screens.
+  ///
+  /// In en, this message translates to:
+  /// **'Asset'**
+  String get privateUsdSendAsset;
+
+  /// Error on the send and withdraw review screens when the available balance fell below the reviewed amount.
+  ///
+  /// In en, this message translates to:
+  /// **'Your available balance is now less than this amount.'**
+  String get privateUsdSendBalanceDropped;
+
+  /// Body of the status screen after a send or withdrawal; {amount} is a dollar amount such as $25.00 and {address} a shortened address such as 0x12ab…cd34.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} went to {address}.'**
+  String privateUsdSendDoneBody(String amount, String address);
+
+  /// Title of the status screen once a Shielded USD send went through.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get privateUsdSendDoneTitlePrivate;
+
+  /// Title of the status screen once a Shielded USD withdrawal went through.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdrawn'**
+  String get privateUsdSendDoneTitleWithdraw;
+
+  /// Body of the status screen when the relayer sent the transaction but it is not in a block yet, asking the user to check activity so they do not pay twice; {amount} is a dollar amount such as $25.00 and {address} a shortened address such as 0x12ab…cd34.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} went to {address}. It isn\'t in a block yet. Check your activity before sending again.'**
+  String privateUsdSendDoneUnconfirmedBody(String amount, String address);
+
+  /// Error on the send and withdraw screens when the fee the relayer asks is above the app's 2 USDC cap, so nothing was sent.
+  ///
+  /// In en, this message translates to:
+  /// **'The network fee is above the 2 USDC limit right now, so nothing was sent. Try again later.'**
+  String get privateUsdSendErrorFeeCap;
+
+  /// Error on the send and withdraw screens when the app's record of outgoing payments cannot be read, so nothing can be sent; the closing sentence may link to support.
+  ///
+  /// In en, this message translates to:
+  /// **'Veylor can\'t read its saved payments. Contact support.'**
+  String get privateUsdSendErrorStore;
+
+  /// Error on the send and withdraw review screens when the network fee rose above the one the user confirmed, so nothing was sent and the review shows the new fee; {fee} is a dollar amount such as $0.42.
+  ///
+  /// In en, this message translates to:
+  /// **'The network fee went up to {fee}. Nothing was sent.'**
+  String privateUsdSendFeeRose(String fee);
+
+  /// First step in the send info sheet: what to enter, and how a Railgun address begins.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the amount and the recipient\'s Railgun address, which starts with 0zk.'**
+  String get privateUsdSendInfoStepAddress;
+
+  /// Third step in the send info sheet: a send stays inside Railgun, so its amount and parties stay hidden.
+  ///
+  /// In en, this message translates to:
+  /// **'The dollars move inside Railgun: nobody else sees the amount, or who sent and received it.'**
+  String get privateUsdSendInfoStepPrivate;
+
+  /// Second step in the send info sheet: the phone builds a zero-knowledge proof.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone builds a zero-knowledge proof. This takes a few seconds.'**
+  String get privateUsdSendInfoStepProof;
+
+  /// Title of the info sheet on the Shielded USD send screens explaining how a send works.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending shielded USD'**
+  String get privateUsdSendInfoTitle;
+
+  /// Error under the recipient field on the Shielded USD withdraw screen when the text is not a valid Ethereum address.
+  ///
+  /// In en, this message translates to:
+  /// **'That isn\'t an Ethereum address.'**
+  String get privateUsdSendInvalid0x;
+
+  /// Error under the recipient field on the Shielded USD send screen when the text is not a valid Railgun 0zk address.
+  ///
+  /// In en, this message translates to:
+  /// **'That isn\'t a Railgun 0zk address.'**
+  String get privateUsdSendInvalid0zk;
+
+  /// Body of the send and withdraw progress screen after the proof, while the relayer submits the transaction and the app waits for it to land in a block.
+  ///
+  /// In en, this message translates to:
+  /// **'The relayer is sending it. Waiting for a block can take a minute. Keep Veylor open.'**
+  String get privateUsdSendLanding;
+
+  /// Error under the amount field on the send and withdraw screens when the amount leaves too little for the network fee, paid from the same balance; {fee} is a dollar amount such as $0.42.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave {fee} for the network fee.'**
+  String privateUsdSendLeaveNetworkFee(String fee);
+
+  /// Error on the send and withdraw screens when pricing or sending failed before anything left the wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing was sent. Try again in a moment.'**
+  String get privateUsdSendNotSent;
+
+  /// Title of the send and withdraw progress screen while the phone builds the transaction's zero-knowledge proof.
+  ///
+  /// In en, this message translates to:
+  /// **'Proving your transaction'**
+  String get privateUsdSendProving;
+
+  /// Body of the send and withdraw progress screen while the zero-knowledge proof is built.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone builds a zero-knowledge proof so nobody can see what you send. This takes a few seconds. Keep Veylor open.'**
+  String get privateUsdSendProvingDetail;
+
+  /// Title of the send and withdraw progress screen while the phone builds the proof, with its progress; {percent} is a whole number from 0 to 100.
+  ///
+  /// In en, this message translates to:
+  /// **'Proving your transaction · {percent}%'**
+  String privateUsdSendProvingPercent(int percent);
+
+  /// Row label on the send and withdraw review screens for Railgun's fee; {percent} is a number such as 0.25.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun fee ({percent}%)'**
+  String privateUsdSendReviewRailgunFee(String percent);
+
+  /// Row label on the send and withdraw review screens for the amount the recipient gets after fees.
+  ///
+  /// In en, this message translates to:
+  /// **'They receive'**
+  String get privateUsdSendReviewReceives;
+
+  /// Title of the review screen shown before a Shielded USD send is approved.
+  ///
+  /// In en, this message translates to:
+  /// **'Review send'**
+  String get privateUsdSendReviewTitlePrivate;
+
+  /// Title of the review screen shown before a Shielded USD withdrawal to a public Ethereum address is approved.
+  ///
+  /// In en, this message translates to:
+  /// **'Review withdrawal'**
+  String get privateUsdSendReviewTitleWithdraw;
+
+  /// Title of the send and withdraw progress screen, and label of the busy review button, while the relayer submits the transaction.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending'**
+  String get privateUsdSendSending;
+
+  /// Title of the Shielded USD send screen, which sends 0zkUSDC to another Railgun address.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get privateUsdSendTitle;
+
+  /// Caption over the recipient field on the Shielded USD send screen; the recipient is another Railgun (0zk) address.
+  ///
+  /// In en, this message translates to:
+  /// **'To a Railgun address'**
+  String get privateUsdSendToPrivate;
+
+  /// Caption over the recipient field on the Shielded USD withdraw screen; the recipient is a public Ethereum (0x) address.
+  ///
+  /// In en, this message translates to:
+  /// **'To an Ethereum address'**
+  String get privateUsdSendToWithdraw;
+
+  /// Error under the amount field on the send and withdraw screens when the amount is above the available balance.
+  ///
+  /// In en, this message translates to:
+  /// **'More than you have available.'**
+  String get privateUsdSendTooMuch;
+
+  /// Error under the amount field on the send and withdraw screens when the amount has more decimal places than the token allows; {decimals} is a number such as 6.
+  ///
+  /// In en, this message translates to:
+  /// **'{decimals, plural, =1{Use at most {decimals} decimal place.} other{Use at most {decimals} decimal places.}}'**
+  String privateUsdSendTooPrecise(int decimals);
+
+  /// Error on the send and withdraw screens when sends from the shielded balance are not available for now; nothing left the wallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Shielded sends are unavailable right now. Nothing was sent. Try again later.'**
+  String get privateUsdSendUnavailable;
+
+  /// Sentence on the send and withdraw status screen when the transaction is not in a block yet, asking the user to check activity so they do not pay twice.
+  ///
+  /// In en, this message translates to:
+  /// **'It isn\'t in a block yet. Check your activity before sending again.'**
+  String get privateUsdSendUnconfirmed;
+
+  /// Button on the send and withdraw status screen that opens the transaction on Etherscan, a block explorer.
+  ///
+  /// In en, this message translates to:
+  /// **'View on Etherscan'**
+  String get privateUsdSendViewTx;
+
+  /// Warning on the withdraw review screen: a withdrawal to a public Ethereum address shows its amount and address on chain.
+  ///
+  /// In en, this message translates to:
+  /// **'Anyone on Ethereum can see this amount and address.'**
+  String get privateUsdSendWithdrawPublic;
+
+  /// [security] Error under the recipient field on the withdraw screen, and in its scanner, when the address is Ethereum's zero address, where funds are lost forever.
+  ///
+  /// In en, this message translates to:
+  /// **'That\'s the zero address: anything sent there is lost for good.'**
+  String get privateUsdSendZeroAddress;
+
+  /// Toast in Settings when a Shielded USD setting (relayer claims, archive sync, Ethereum RPC) could not be saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save the setting. Try again.'**
+  String get privateUsdSettingSaveFailed;
+
+  /// Caption under the ZEC amount in the header of a bridge's review and progress screens, naming that side of the bridge as shielded ZEC.
+  ///
+  /// In en, this message translates to:
+  /// **'Shielded ZEC'**
+  String get privateUsdShieldedZec;
+
+  /// Subtitle under the title of the Shielded USD screen, saying what the balance is.
+  ///
+  /// In en, this message translates to:
+  /// **'0zkUSDC held on Ethereum'**
+  String get privateUsdSubtitle;
+
+  /// Readout at the head of the sync line on the Shielded USD screen when Railgun's sync failed, drawn in uppercase in English (RAILGUN SYNC FAILED); keep it very short.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun sync failed'**
+  String get privateUsdSyncReadoutFailed;
+
+  /// Readout at the head of the sync line on the Shielded USD screen while Railgun syncs, drawn in uppercase in English (RAILGUN SYNC 42%); keep it very short; {percent} is a whole-number percentage such as 42.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun sync {percent}%'**
+  String privateUsdSyncReadoutProgress(int percent);
+
+  /// Readout at the head of the sync line on the Shielded USD screen when Railgun is synced, drawn in uppercase in English (RAILGUN SYNCED); keep it very short.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun synced'**
+  String get privateUsdSyncReadoutSynced;
+
+  /// Status under the balance on the Shielded USD screen once the balance shows but Railgun's transaction list is still syncing, when its progress is unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Still syncing Railgun\'s transaction list. Keep Veylor open.'**
+  String get privateUsdSyncingRest;
+
+  /// Status under the balance on the Shielded USD screen once the balance shows but Railgun's transaction list is still syncing; {percent} is a whole-number percentage such as 42.
+  ///
+  /// In en, this message translates to:
+  /// **'Still syncing Railgun\'s transaction list: {percent}%. Keep Veylor open.'**
+  String privateUsdSyncingRestPercent(int percent);
+
+  /// Line under the syncing status on the Shielded USD screen: the change from the user's own sends becomes spendable only after that sync; {usd} is a dollar amount such as $12.40, masked in privacy mode.
+  ///
+  /// In en, this message translates to:
+  /// **'{usd} of change from your sends waits on it. The rest can be sent now.'**
+  String privateUsdSyncingRestWaits(String usd);
+
+  /// Name of the Shielded USD feature, a private dollar balance (Railgun 0zkUSDC on Ethereum); shown as the title of its screen, as the name on its Home row, and under the dollar amount on the bridge screens.
+  ///
+  /// In en, this message translates to:
+  /// **'Shielded USD'**
+  String get privateUsdTitle;
+
+  /// Name of the test network's dollar token (tUSD) in the Assets card of the Shielded USD screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Test dollar'**
+  String get privateUsdTokenTestUsd;
+
+  /// Error on the bridge screens when the token issuer does not trust this device (its hardware attestation failed), so it cannot bridge.
+  ///
+  /// In en, this message translates to:
+  /// **'The token issuer doesn\'t recognize this device, so it can\'t convert. Emulators, unlocked bootloaders, modified systems and unrecognized builds are turned away.'**
+  String get privateUsdTokensDeviceRefused;
+
+  /// Error on the bridge screens when the phone's secure keystore could not sign the request to the token issuer.
+  ///
+  /// In en, this message translates to:
+  /// **'This phone\'s keystore couldn\'t sign for the token issuer. Try again in a moment.'**
+  String get privateUsdTokensKeystore;
+
+  /// Error on the bridge screens when this device has used up today's Privacy Pass tokens, so no more bridges can start until midnight UTC.
+  ///
+  /// In en, this message translates to:
+  /// **'This device has used today\'s conversions. More are available after midnight UTC.'**
+  String get privateUsdTokensNoneToday;
+
+  /// Privacy disclosure on the bridge review while the market maker asks for tokens and Tor is off: the token issuer and the market maker can link this bridge to its token.
+  ///
+  /// In en, this message translates to:
+  /// **'With Tor off, the token issuer and the market maker can tell this bridge and its token came from the same connection.'**
+  String get privateUsdTokensTorOffDisclosure;
+
+  /// Error on the bridge screens on a phone that cannot get tokens (not Android) while the market maker asks for a token with each bridge.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversions need an Android phone while the market maker asks for a token with each one.'**
+  String get privateUsdTokensUnavailable;
+
+  /// Error on the bridge screens when the token issuer cannot be reached.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reach the token issuer. Try again in a moment.'**
+  String get privateUsdTokensUnreachable;
+
+  /// Line under the Shielded USD balance, also read by screen readers, saying when the balance was last updated; {time} is a date and time formatted for the language, such as 25 May, 13:30.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {time}'**
+  String privateUsdUpdated(String time);
+
+  /// Screen-reader label of the Shielded USD screen's sync line while the balance refreshes in the background.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating…'**
+  String get privateUsdUpdating;
+
+  /// Screen-reader label of the Shielded USD screen's sync line while a balance refresh the user waits on runs; {percent} is a whole-number percentage such as 42.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating your shielded balance: {percent}%'**
+  String privateUsdUpdatingProgress(int percent);
+
+  /// Screen-reader label of the Max button under the amount on the bridge screens; it fills in the whole available balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Use it all'**
+  String get privateUsdUseAvailable;
+
+  /// Note in the withdraw info sheet giving Railgun's fee on withdrawals; {percent} is a number such as 0.25.
+  ///
+  /// In en, this message translates to:
+  /// **'Railgun keeps {percent}% of what you withdraw.'**
+  String privateUsdWithdrawInfoNoteFee(String percent);
+
+  /// Privacy advice in the withdraw info sheet on keeping a withdrawal from being linked to a recent bridge.
+  ///
+  /// In en, this message translates to:
+  /// **'So a withdrawal can\'t be linked to your bridge, don\'t withdraw the exact amount you just bridged, wait a while first, and use a fresh address each time.'**
+  String get privateUsdWithdrawInfoNotePrivate;
+
+  /// Note in the withdraw info sheet: once withdrawn, the amount and address are public on Ethereum.
+  ///
+  /// In en, this message translates to:
+  /// **'Once withdrawn, the amount and the address are visible to anyone on Ethereum.'**
+  String get privateUsdWithdrawInfoNotePublic;
+
+  /// First step in the withdraw info sheet: what to enter, and how an Ethereum address begins.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the amount and an Ethereum address, which starts with 0x.'**
+  String get privateUsdWithdrawInfoStepAddress;
+
+  /// Second step in the withdraw info sheet: the phone builds a proof and the dollars leave Railgun for the address.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone builds a proof, and the dollars leave Railgun for that address.'**
+  String get privateUsdWithdrawInfoStepProof;
+
+  /// Title of the info sheet on the withdraw screens: a withdrawal moves the dollars to a public Ethereum address.
+  ///
+  /// In en, this message translates to:
+  /// **'Withdrawing makes it public'**
+  String get privateUsdWithdrawInfoTitle;
 
   /// Button or label that opens the profile picture picker.
   ///

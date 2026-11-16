@@ -39,7 +39,7 @@ class PrivateUsdKeyLockedException implements PrivateUsdPause {
   const PrivateUsdKeyLockedException();
 
   @override
-  String toString() => 'The wallet is locked.';
+  String toString() => 'The wallet is locked.'; // l10n-ignore: exception text
 }
 
 /// A step bound to an earlier moment found the app locked, in the
@@ -49,7 +49,7 @@ class PrivateUsdStaleStepException implements PrivateUsdPause {
   const PrivateUsdStaleStepException();
 
   @override
-  String toString() => 'The step was dropped.';
+  String toString() => 'The step was dropped.'; // l10n-ignore: exception text
 }
 
 /// The page's `prepareReverse` result, as `submit_funding` takes it.

@@ -28,7 +28,6 @@ import 'package:zcash_wallet/src/features/accounts/widgets/mobile/account_edit_s
 import 'package:zcash_wallet/src/features/migration/providers/ironwood_migration_coordinator_provider.dart';
 import 'package:zcash_wallet/src/features/payment_links/services/payment_link_received_store.dart';
 import 'package:zcash_wallet/src/features/payment_links/services/payment_link_recovery_reconciler.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/app_security_provider.dart';
 import 'package:zcash_wallet/src/providers/biometric_unlock_provider.dart';
@@ -38,6 +37,7 @@ import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/services/biometric_unlock.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
+import '../../support/test_l10n.dart';
 
 AccountInfo _account(
   String uuid,
@@ -1285,7 +1285,8 @@ void main() {
         destinationAccountUuid: 'a',
         count: 1,
       ),
-      message: 'Wait for incoming gift cards to finish before deleting this account.',
+      message:
+          'Wait for incoming gift cards to finish before deleting this account.',
     ),
   ]) {
     testWidgets('removal explains ${testCase.name} blockers', (tester) async {
@@ -1853,8 +1854,9 @@ void main() {
         builder: (context, child) => AppTheme(
           data: AppThemeData.light,
           child: MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: const TextScaler.linear(1.5)),
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(1.5)),
             child: child!,
           ),
         ),
@@ -1919,20 +1921,23 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.text(PrivateUsdCopy.deleteUnfinishedTitle), findsOneWidget);
+      expect(
+        find.text(testL10n.privateUsdDeleteUnfinishedTitle),
+        findsOneWidget,
+      );
       expect(
         find.text(
           isLastAccount
-              ? PrivateUsdCopy.resetUnfinishedBody(2)
-              : PrivateUsdCopy.deleteUnfinishedBody(2),
+              ? testL10n.privateUsdResetUnfinishedBody(2)
+              : testL10n.privateUsdDeleteUnfinishedBody(2),
         ),
         findsOneWidget,
       );
       expect(
         find.text(
           isLastAccount
-              ? PrivateUsdCopy.resetAnyway
-              : PrivateUsdCopy.deleteAnyway,
+              ? testL10n.privateUsdResetAnyway
+              : testL10n.privateUsdDeleteAnyway,
         ),
         findsOneWidget,
       );
@@ -1959,7 +1964,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text(PrivateUsdCopy.deleteUnfinishedTitle), findsNothing);
+    expect(find.text(testL10n.privateUsdDeleteUnfinishedTitle), findsNothing);
     expect(find.text('Remove'), findsOneWidget);
   });
 

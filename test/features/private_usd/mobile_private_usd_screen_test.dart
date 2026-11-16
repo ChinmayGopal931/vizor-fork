@@ -12,6 +12,7 @@ import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_priv
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_balance_repository.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_pending_payment_line.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 // The Private USD screen's states (plan reference §9.4 S2).
 void main() {
@@ -75,26 +76,29 @@ void main() {
     );
 
     // The page title is drawn uppercase in the top bar.
-    expect(find.text(PrivateUsdCopy.title.toUpperCase()), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.subtitle), findsOneWidget);
+    expect(find.text(testL10n.privateUsdTitle.toUpperCase()), findsOneWidget);
+    expect(find.text(testL10n.privateUsdSubtitle), findsOneWidget);
     expect(find.text(r'$105.00'), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.rowAvailable), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.rowProcessing), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.rowArriving), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.rowArrivingInfo(_hour)), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.rowBlocked), findsNothing);
+    expect(find.text(testL10n.privateUsdRowAvailable), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRowProcessing), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRowArriving), findsOneWidget);
+    expect(
+      find.text(testL10n.privateUsdRowArrivingInfo(_hour)),
+      findsOneWidget,
+    );
+    expect(find.text(testL10n.privateUsdRowBlocked), findsNothing);
     // The 0zk address moved into the Receive sheet (owner, 2026-10-19).
     expect(
       find.byKey(const ValueKey('mobile_private_usd_receive')),
       findsNothing,
     );
     expect(find.text(previewPrivateUsdAddress), findsNothing);
-    expect(find.text(PrivateUsdCopy.activityEmpty), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.emptyTitle), findsNothing);
+    expect(find.text(testL10n.privateUsdActivityEmpty), findsOneWidget);
+    expect(find.text(testL10n.privateUsdEmptyTitle), findsNothing);
     // Convert shows only with its action (the screen always gives one);
     // Send and Withdraw arrive with M7.
-    expect(find.text(PrivateUsdCopy.actionConvert), findsNothing);
-    expect(find.text(PrivateUsdCopy.actionSend), findsNothing);
+    expect(find.text(testL10n.privateUsdActionConvert), findsNothing);
+    expect(find.text(testL10n.privateUsdActionSend), findsNothing);
   });
 
   testWidgets('processing says so when the screening keeps failing', (
@@ -104,9 +108,9 @@ void main() {
       tester,
       previewPrivateUsdBalance(available: 8.8, processing: 29.11),
     );
-    expect(find.text(PrivateUsdCopy.rowProcessing), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.rowProcessingInfo), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.rowProcessingStalled), findsNothing);
+    expect(find.text(testL10n.privateUsdRowProcessing), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRowProcessingInfo), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRowProcessingStalled), findsNothing);
 
     await pumpScreen(
       tester,
@@ -115,10 +119,13 @@ void main() {
         processing: 29.11,
       ).copyWith(screeningFailed: true),
     );
-    expect(find.text(PrivateUsdCopy.rowProcessingStalled), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.rowProcessingStalledInfo), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.rowProcessing), findsNothing);
-    expect(find.text(PrivateUsdCopy.rowProcessingInfo), findsNothing);
+    expect(find.text(testL10n.privateUsdRowProcessingStalled), findsOneWidget);
+    expect(
+      find.text(testL10n.privateUsdRowProcessingStalledInfo),
+      findsOneWidget,
+    );
+    expect(find.text(testL10n.privateUsdRowProcessing), findsNothing);
+    expect(find.text(testL10n.privateUsdRowProcessingInfo), findsNothing);
     expect(find.text(r'$29.11'), findsOneWidget);
 
     // Nothing processing, nothing to say.
@@ -126,7 +133,7 @@ void main() {
       tester,
       previewPrivateUsdBalance(available: 8.8).copyWith(screeningFailed: true),
     );
-    expect(find.text(PrivateUsdCopy.rowProcessingStalled), findsNothing);
+    expect(find.text(testL10n.privateUsdRowProcessingStalled), findsNothing);
   });
 
   testWidgets('processing says what the screening work is doing, smaller '
@@ -142,8 +149,10 @@ void main() {
       ),
     );
     final status = tester.widget<Text>(find.byKey(statusKey));
-    expect(status.data, PrivateUsdCopy.screeningProving(1, 3, 40));
-    final label = tester.widget<Text>(find.text(PrivateUsdCopy.rowProcessing));
+    expect(status.data, PrivateUsdCopy.screeningProving(testL10n, 1, 3, 40));
+    final label = tester.widget<Text>(
+      find.text(testL10n.privateUsdRowProcessing),
+    );
     expect(status.style!.fontSize!, lessThan(label.style!.fontSize!));
     expect(status.style!.color, isNot(label.style!.color));
 
@@ -174,17 +183,17 @@ void main() {
       tester,
       previewPrivateUsdBalance(available: 100),
       pendingPayment: const PrivateUsdPaymentProving(42),
-      spendNote: PrivateUsdCopy.paymentPending,
+      spendNote: testL10n.privateUsdPaymentPending,
     );
-    expect(line(), PrivateUsdCopy.paymentProving(42));
-    expect(find.text(PrivateUsdCopy.paymentPending), findsOneWidget);
+    expect(line(), testL10n.privateUsdPaymentProving(42));
+    expect(find.text(testL10n.privateUsdPaymentPending), findsOneWidget);
 
     await pumpScreen(
       tester,
       previewPrivateUsdBalance(available: 100),
       pendingPayment: const PrivateUsdPaymentUpdatingBalance(),
     );
-    expect(line(), PrivateUsdCopy.paymentUpdatingBalance);
+    expect(line(), testL10n.privateUsdPaymentUpdatingBalance);
   });
 
   testWidgets('the wait for a block counts up from the post', (tester) async {
@@ -204,19 +213,25 @@ void main() {
         ),
       ),
     );
-    expect(find.text(PrivateUsdCopy.paymentWaitingForBlock('1:05')), findsOne);
+    expect(
+      find.text(testL10n.privateUsdPaymentWaitingForBlock('1:05')),
+      findsOne,
+    );
 
     now = now.add(const Duration(seconds: 1));
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text(PrivateUsdCopy.paymentWaitingForBlock('1:06')), findsOne);
+    expect(
+      find.text(testL10n.privateUsdPaymentWaitingForBlock('1:06')),
+      findsOne,
+    );
   });
 
   testWidgets('an empty balance shows the empty state', (tester) async {
     await pumpScreen(tester, previewPrivateUsdBalance());
 
-    expect(find.text(PrivateUsdCopy.emptyTitle), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.emptyBody), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.rowAvailable), findsNothing);
+    expect(find.text(testL10n.privateUsdEmptyTitle), findsOneWidget);
+    expect(find.text(testL10n.privateUsdEmptyBody), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRowAvailable), findsNothing);
   });
 
   // The percentage is on the sync line (iOS progress VI-19, its own test);
@@ -229,8 +244,8 @@ void main() {
       const PrivateUsdBalanceState(isRefreshing: true, firstSyncPercent: 42),
     );
 
-    expect(find.text(PrivateUsdCopy.firstLoad), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.firstLoadProgress(42)), findsNothing);
+    expect(find.text(testL10n.privateUsdFirstLoad), findsOneWidget);
+    expect(find.text(testL10n.privateUsdFirstLoadProgress(42)), findsNothing);
     expect(find.text('RAILGUN SYNC 42%'), findsOneWidget);
     expect(find.text(PrivateUsdCopy.unknown), findsOneWidget);
   });
@@ -244,10 +259,10 @@ void main() {
       screeningActivity: const RailgunScreeningEvent(txids: 0.42),
     );
     expect(find.text(r'$112.50'), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.syncingRest(42)), findsOneWidget);
+    expect(find.text(PrivateUsdCopy.syncingRest(testL10n, 42)), findsOneWidget);
     expect(
       tester.widget<Text>(find.byKey(waitsKey)).data,
-      PrivateUsdCopy.syncingRestWaits(r'$12.50'),
+      testL10n.privateUsdSyncingRestWaits(r'$12.50'),
     );
 
     // Nothing waits on it: the line alone, before the page says how far.
@@ -255,7 +270,10 @@ void main() {
       tester,
       previewPrivateUsdBalance(available: 100, syncing: true),
     );
-    expect(find.text(PrivateUsdCopy.syncingRest(null)), findsOneWidget);
+    expect(
+      find.text(PrivateUsdCopy.syncingRest(testL10n, null)),
+      findsOneWidget,
+    );
     expect(find.byKey(waitsKey), findsNothing);
 
     // Once it ends, the balance says how old it is again.
@@ -274,10 +292,10 @@ void main() {
       tester,
       previewPrivateUsdBalance(available: 100, refreshFailed: true),
     );
-    expect(find.text(PrivateUsdCopy.refreshFailed), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRefreshFailed), findsOneWidget);
 
     await pumpScreen(tester, const PrivateUsdBalanceState(refreshFailed: true));
-    expect(find.text(PrivateUsdCopy.loadFailed), findsOneWidget);
+    expect(find.text(testL10n.privateUsdLoadFailed), findsOneWidget);
   });
 
   testWidgets('a sync the default RPC failed offers another RPC, and the '
@@ -288,8 +306,11 @@ void main() {
       const PrivateUsdBalanceState(refreshFailed: true, rpcFailed: true),
       onChangeRpc: () => changes++,
     );
-    expect(find.text(PrivateUsdCopy.rpcDefaultNotAnswering), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.loadFailed), findsNothing);
+    expect(
+      find.text(testL10n.privateUsdRpcDefaultNotAnswering),
+      findsOneWidget,
+    );
+    expect(find.text(testL10n.privateUsdLoadFailed), findsNothing);
     await tester.tap(
       find.byKey(const ValueKey('mobile_private_usd_rpc_change')),
     );
@@ -301,8 +322,11 @@ void main() {
       const PrivateUsdBalanceState(isRefreshing: true, rpcFailed: true),
       onChangeRpc: () => changes++,
     );
-    expect(find.text(PrivateUsdCopy.rpcDefaultNotAnswering), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.firstLoad), findsOneWidget);
+    expect(
+      find.text(testL10n.privateUsdRpcDefaultNotAnswering),
+      findsOneWidget,
+    );
+    expect(find.text(testL10n.privateUsdFirstLoad), findsOneWidget);
 
     await pumpScreen(
       tester,
@@ -310,8 +334,8 @@ void main() {
       onUseDefaultRpc: () {},
       onChangeRpc: () => changes++,
     );
-    expect(find.text(PrivateUsdCopy.rpcNotAnswering), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.rpcDefaultNotAnswering), findsNothing);
+    expect(find.text(testL10n.privateUsdRpcNotAnswering), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRpcDefaultNotAnswering), findsNothing);
     expect(
       find.byKey(const ValueKey('mobile_private_usd_rpc_change')),
       findsNothing,
@@ -326,9 +350,9 @@ void main() {
       previewPrivateUsdBalance(available: 80, blocked: 25),
     );
 
-    final label = tester.widget<Text>(find.text(PrivateUsdCopy.rowBlocked));
+    final label = tester.widget<Text>(find.text(testL10n.privateUsdRowBlocked));
     expect(label.style!.color, AppThemeData.dark.colors.text.destructive);
-    expect(find.text(PrivateUsdCopy.rowBlockedInfo), findsOneWidget);
+    expect(find.text(testL10n.privateUsdRowBlockedInfo), findsOneWidget);
   });
 
   testWidgets('refresh asks again', (tester) async {
@@ -362,10 +386,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_private_usd_info')));
     await tester.pumpAndSettle();
 
-    expect(find.text(PrivateUsdCopy.infoTitle), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.infoConvert), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.infoReceive), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.infoScreening(_hour)), findsOneWidget);
+    expect(find.text(testL10n.privateUsdInfoTitle), findsOneWidget);
+    expect(find.text(testL10n.privateUsdInfoConvert), findsOneWidget);
+    expect(find.text(testL10n.privateUsdInfoReceive), findsOneWidget);
+    expect(find.text(testL10n.privateUsdInfoScreening(_hour)), findsOneWidget);
   });
 
   // Mainnet pins no windows contract yet (`ApiDeployment.bridgeAvailable`).
@@ -400,13 +424,13 @@ void main() {
     const bridge = ValueKey('mobile_private_usd_convert');
     await pump(bridgeAvailable: true);
     expect(find.byKey(bridge), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.emptyBody), findsOneWidget);
+    expect(find.text(testL10n.privateUsdEmptyBody), findsOneWidget);
 
     await pump(bridgeAvailable: false);
     expect(find.byKey(bridge), findsNothing);
-    expect(find.text(PrivateUsdCopy.actionConvert), findsNothing);
-    expect(find.text(PrivateUsdCopy.emptyBody), findsNothing);
-    expect(find.text(PrivateUsdCopy.emptyBodyReceive), findsOneWidget);
+    expect(find.text(testL10n.privateUsdActionConvert), findsNothing);
+    expect(find.text(testL10n.privateUsdEmptyBody), findsNothing);
+    expect(find.text(testL10n.privateUsdEmptyBodyReceive), findsOneWidget);
     // Receive, Send and Withdraw stay.
     for (final key in [
       'mobile_private_usd_receive_usdc',
@@ -418,10 +442,10 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('mobile_private_usd_info')));
     await tester.pumpAndSettle();
-    expect(find.text(PrivateUsdCopy.infoTitle), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.infoConvert), findsNothing);
-    expect(find.text(PrivateUsdCopy.infoReceive), findsOneWidget);
+    expect(find.text(testL10n.privateUsdInfoTitle), findsOneWidget);
+    expect(find.text(testL10n.privateUsdInfoConvert), findsNothing);
+    expect(find.text(testL10n.privateUsdInfoReceive), findsOneWidget);
   });
 }
 
-final _hour = PrivateUsdCopy.about(const Duration(hours: 1));
+final _hour = PrivateUsdCopy.about(testL10n, const Duration(hours: 1));

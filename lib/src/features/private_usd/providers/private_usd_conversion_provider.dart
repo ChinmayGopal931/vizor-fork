@@ -14,6 +14,7 @@ import 'private_usd_available_provider.dart';
 import 'private_usd_convert_provider.dart';
 import 'private_usd_engine_provider.dart';
 import 'private_usd_unfinished_provider.dart';
+import '../../../core/l10n/l10n.dart';
 
 /// How often the progress screen looks at the clock (the slow opening and
 /// the maker's deadline notes).
@@ -38,14 +39,14 @@ class PrivateUsdConversionState {
   final bool loaded;
   final DateTime now;
   final bool callingOff;
-  final String? callOffError;
+  final PrivateUsdText? callOffError;
 
   PrivateUsdConversionState copyWith({
     PrivateUsdConversionStatus? status,
     bool? loaded,
     DateTime? now,
     bool? callingOff,
-    String? callOffError,
+    PrivateUsdText? callOffError,
     bool clearCallOffError = false,
   }) => PrivateUsdConversionState(
     status: status ?? this.status,
@@ -116,17 +117,17 @@ class PrivateUsdConversionNotifier extends Notifier<PrivateUsdConversionState> {
   Future<void> callOff() async {
     if (state.callingOff) return;
     state = state.copyWith(callingOff: true, clearCallOffError: true);
-    String? error;
+    PrivateUsdText? error;
     try {
       await ref
           .read(privateUsdEngineProvider)
           .abandon(key.accountUuid, index: key.index);
     } on rust.ApiPrivateUsdError catch (failure) {
       error = failure.code == rust.ApiPrivateUsdErrorCode.tooLate
-          ? PrivateUsdCopy.convertCallOffTooLate
-          : PrivateUsdCopy.convertCallOffFailed;
+          ? (l10n) => l10n.privateUsdConvertCallOffTooLate
+          : (l10n) => l10n.privateUsdConvertCallOffFailed;
     } catch (_) {
-      error = PrivateUsdCopy.convertCallOffFailed;
+      error = (l10n) => l10n.privateUsdConvertCallOffFailed;
     }
     if (!ref.mounted) return;
     state = state.copyWith(
@@ -137,38 +138,80 @@ class PrivateUsdConversionNotifier extends Notifier<PrivateUsdConversionState> {
   }
 }
 
-/// The in-flight conversion banner: its progress route, the title, and the
-/// stage it is at.
+/// The in-flight conversion banner: its progress route and the conversion,
+/// whose stage the widget puts into words ([title], [detail]).
 @immutable
 class PrivateUsdBannerState {
-  const PrivateUsdBannerState({
+  const PrivateUsdBannerState.forward({
     required this.path,
-    required this.title,
-    required this.detail,
+    required PrivateUsdConversionStatus this.forward,
+    required this.zcashConfirmations,
     required this.attention,
     this.claimHandedOver = false,
-  });
+  }) : reverse = null;
+
+  const PrivateUsdBannerState.reverse({
+    required this.path,
+    required rust.ApiReverseRecord this.reverse,
+    required this.attention,
+  }) : forward = null,
+       zcashConfirmations = 0,
+       claimHandedOver = false;
 
   final PrivateUsdRoutePath path;
-  final String title;
-  final String detail;
+
+  /// The forward conversion under way; null for a reverse one.
+  final PrivateUsdConversionStatus? forward;
+
+  /// The reverse conversion's record; null for a forward one.
+  final rust.ApiReverseRecord? reverse;
+
+  /// The confirmations a forward deposit waits for.
+  final int zcashConfirmations;
   final bool attention;
 
   /// The relayer holds the claim: the user can leave.
   final bool claimHandedOver;
 
+  String title(AppLocalizations l10n) => attention
+      ? l10n.privateUsdBannerAttention
+      : forward != null
+      ? l10n.privateUsdConvertingToUsd
+      : l10n.privateUsdConvertingToZec;
+
+  /// The stage it is at.
+  String detail(AppLocalizations l10n) {
+    final forward = this.forward;
+    return forward != null
+        ? privateUsdForwardStageLabel(
+            l10n,
+            forward,
+            zcashConfirmations: zcashConfirmations,
+          )
+        : privateUsdReverseStageLabel(l10n, reverse!);
+  }
+
+  // The engine replaces a conversion's status as it changes, so the same
+  // objects mean the same words.
   @override
   bool operator ==(Object other) =>
       other is PrivateUsdBannerState &&
       other.path == path &&
-      other.title == title &&
-      other.detail == detail &&
+      identical(other.forward, forward) &&
+      identical(other.reverse, reverse) &&
+      other.zcashConfirmations == zcashConfirmations &&
       other.attention == attention &&
       other.claimHandedOver == claimHandedOver;
 
   @override
-  int get hashCode =>
-      Object.hash(path, title, detail, attention, claimHandedOver);
+  int get hashCode => Object.hash(
+    path,
+    identityHashCode(forward),
+    identityHashCode(reverse),
+    zcashConfirmations,
+    attention,
+    claimHandedOver,
+  );
 }
 
 /// [accountUuid]'s conversion under way as a banner, or null. It stays while
@@ -192,15 +235,10 @@ final privateUsdConversionBannerProvider = Provider.autoDispose
           ref.watch(privateUsdCurrentDeploymentProvider)?.zcashConfirmations ??
           2;
       final attention = status.value.problem != null;
-      return PrivateUsdBannerState(
+      return PrivateUsdBannerState.forward(
         path: status.key.path,
-        title: attention
-            ? PrivateUsdCopy.bannerAttention
-            : PrivateUsdCopy.convertingToUsd,
-        detail: privateUsdForwardStageLabel(
-          status.value,
-          zcashConfirmations: confirmations,
-        ),
+        forward: status.value,
+        zcashConfirmations: confirmations,
         attention: attention,
         claimHandedOver: status.value.claimHandedOver,
       );
@@ -223,12 +261,9 @@ PrivateUsdBannerState? _reverseBanner(Ref ref, String accountUuid) {
   if (entry == null) return null;
   final status = entry.value;
   final attention = status.needsYou || status.problem != null;
-  return PrivateUsdBannerState(
+  return PrivateUsdBannerState.reverse(
     path: entry.key.path,
-    title: attention
-        ? PrivateUsdCopy.bannerAttention
-        : PrivateUsdCopy.convertingToZec,
-    detail: privateUsdReverseStageLabel(status.record),
+    reverse: status.record,
     attention: attention,
   );
 }

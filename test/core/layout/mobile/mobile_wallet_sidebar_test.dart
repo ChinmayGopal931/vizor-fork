@@ -17,22 +17,23 @@ import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_sidebar_surface.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/tron_glyph.dart';
 import 'package:zcash_wallet/src/core/l10n/app_language.dart';
+import '../../../support/test_l10n.dart';
 
 final status = NeonSyncLine(
   progress: 0.04,
-  readout: NeonSyncReadout.progress(4),
+  readout: NeonSyncReadout.progress(testL10n, 4),
   semanticsLabel: 'Syncing 4 percent',
   climbing: true,
 );
-const failed = NeonSyncLine(
+final failed = NeonSyncLine(
   progress: 0.04,
-  readout: NeonSyncReadout.failed,
+  readout: NeonSyncReadout.failed(testL10n),
   semanticsLabel: 'Syncing failed. Network error',
   failed: true,
 );
-const synced = NeonSyncLine(
+final synced = NeonSyncLine(
   progress: 1,
-  readout: NeonSyncReadout.synced,
+  readout: NeonSyncReadout.synced(testL10n),
   semanticsLabel: 'Veylor is synced',
 );
 Widget harness(Widget child, {double scale = 1, AppThemeData? theme}) =>

@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/mobile/mobile_home_entry_card.dart';
 import '../../models/private_usd_record_key.dart';
-import '../../private_usd_copy.dart';
 import '../../providers/private_usd_conversion_provider.dart';
 import 'private_usd_logo.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// The banner of a conversion under way, on Home and on `/private-usd`: it
 /// stays while a conversion is unfinished, even when Private USD is
@@ -54,12 +54,14 @@ class PrivateUsdConversionBannerView extends StatelessWidget {
       icon: AppIcons.warning,
       // Private USD's logo, unless it asks for attention.
       leading: banner.attention ? null : const PrivateUsdLogo(),
-      title: banner.title,
+      title: banner.title(context.l10n),
       // Every step still to come needs the seed, so the app must stay open,
       // unless the relayer holds the claim.
       subtitle: banner.claimHandedOver
-          ? PrivateUsdCopy.bannerRelayerDetail(banner.detail)
-          : PrivateUsdCopy.bannerDetail(banner.detail),
+          ? context.l10n.privateUsdBannerRelayerDetail(
+              banner.detail(context.l10n),
+            )
+          : context.l10n.privateUsdBannerDetail(banner.detail(context.l10n)),
       emphasized: true,
       onTap: onTap,
     );

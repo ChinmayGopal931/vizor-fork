@@ -273,7 +273,7 @@ Widget buildMobilePrivateUsdPaymentPendingUseCase(BuildContext context) =>
       ],
       canSend: false,
       canConvert: false,
-      spendNote: PrivateUsdCopy.paymentPending,
+      spendNote: context.l10n.privateUsdPaymentPending,
     );
 
 /// A network with no windows contract (mainnet for now): no Bridge, and the
@@ -423,30 +423,31 @@ Widget _receivePreview(PrivateUsdReceiveKind kind) => PrivateUsdPreviewFrame(
         bottom: false,
         child: Align(
           alignment: Alignment.bottomCenter,
-          child: MobileModalCard(child: _receiveBody(kind)),
+          child: MobileModalCard(child: _receiveBody(context, kind)),
         ),
       ),
     ),
   ),
 );
 
-Widget _receiveBody(PrivateUsdReceiveKind kind) => PrivateUsdReceiveSheetBody(
-  kind: kind,
-  onKindChanged: (_) {},
-  symbol: 'USDC',
-  chain: 'Ethereum',
-  address: previewPrivateUsdEthereumAddress,
-  railgunAddress: previewPrivateUsdAddress,
-  terms: const ApiDepositTerms(
-    fee: '250000',
-    feeBps: 50,
-    minValue: '10000000',
-    railgunFeeBps: 25,
-  ),
-  example: PrivateUsdCopy.depositExample(r'$10.00', r'$9.68'),
-  screening: const Duration(hours: 1),
-  onClose: () {},
-);
+Widget _receiveBody(BuildContext context, PrivateUsdReceiveKind kind) =>
+    PrivateUsdReceiveSheetBody(
+      kind: kind,
+      onKindChanged: (_) {},
+      symbol: 'USDC',
+      chain: 'Ethereum',
+      address: previewPrivateUsdEthereumAddress,
+      railgunAddress: previewPrivateUsdAddress,
+      terms: const ApiDepositTerms(
+        fee: '250000',
+        feeBps: 50,
+        minValue: '10000000',
+        railgunFeeBps: 25,
+      ),
+      example: context.l10n.privateUsdDepositExample(r'$10.00', r'$9.68'),
+      screening: const Duration(hours: 1),
+      onClose: () {},
+    );
 
 /// Receive, public USDC (the default): the deposit address and its terms.
 Widget buildMobilePrivateUsdReceiveUseCase(BuildContext context) =>
@@ -525,7 +526,7 @@ PrivateUsdConvertState previewPrivateUsdConvertState({
   int? syncPercent,
   PrivateUsdConvertStep step = PrivateUsdConvertStep.amount,
   DateTime? now,
-  String? startError,
+  PrivateUsdText? startError,
 }) => PrivateUsdConvertState(
   now: now ?? previewPrivateUsdNow,
   amountText: amountText,
@@ -937,19 +938,16 @@ class FixedPrivateUsdReverseConversionsNotifier
 /// The banner a conversion under way shows; [claimHandedOver] once the
 /// relayer holds its claim.
 PrivateUsdBannerState previewPrivateUsdBanner({bool claimHandedOver = false}) =>
-    PrivateUsdBannerState(
+    PrivateUsdBannerState.forward(
       path: const PrivateUsdRoutePath(
         direction: PrivateUsdDirection.forward,
         index: 7,
       ),
-      title: PrivateUsdCopy.convertingToUsd,
-      detail: privateUsdForwardStageLabel(
-        PrivateUsdConversionStatus(
-          record: previewPrivateUsdRecord(depositConfirmations: 1),
-          wait: ApiForwardWait.confirming,
-        ),
-        zcashConfirmations: _confirmations,
+      forward: PrivateUsdConversionStatus(
+        record: previewPrivateUsdRecord(depositConfirmations: 1),
+        wait: ApiForwardWait.confirming,
       ),
+      zcashConfirmations: _confirmations,
       attention: false,
       claimHandedOver: claimHandedOver,
     );

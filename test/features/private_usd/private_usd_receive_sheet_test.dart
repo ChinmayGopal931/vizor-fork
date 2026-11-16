@@ -6,9 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_receive_sheet.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 // The Receive sheet switches, as ZEC's Receive does its pools, between
 // public USDC (the default) and 0zkUSDC from another Railgun wallet.
@@ -83,7 +83,7 @@ void main() {
     expect(find.text('USDC'), findsOneWidget);
     expect(find.text('0zkUSDC'), findsOneWidget);
     expect(
-      find.text(PrivateUsdCopy.depositOnly('USDC', 'Ethereum')),
+      find.text(testL10n.privateUsdDepositOnly('USDC', 'Ethereum')),
       findsOneWidget,
     );
     expect(find.text(previewPrivateUsdEthereumAddress), findsOneWidget);
@@ -105,17 +105,17 @@ void main() {
   ) async {
     await pumpSheet(tester, kind: PrivateUsdReceiveKind.shielded);
 
-    expect(find.text(PrivateUsdCopy.receiveShieldedOnly), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReceiveShieldedOnly), findsOneWidget);
     expect(find.text(previewPrivateUsdAddress), findsOneWidget);
     expect(find.text(previewPrivateUsdEthereumAddress), findsNothing);
-    expect(find.text(PrivateUsdCopy.receiveAddressNote), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReceiveAddressNote), findsOneWidget);
 
     await tester.tap(
       find.byKey(const ValueKey('mobile_private_usd_copy_address')),
     );
     await tester.pump();
     expect(clipboard, [previewPrivateUsdAddress]);
-    expect(find.text(PrivateUsdCopy.addressCopied), findsOneWidget);
+    expect(find.text(testL10n.commonAddressCopied), findsOneWidget);
     await tester.pump(const Duration(seconds: 5));
   });
 

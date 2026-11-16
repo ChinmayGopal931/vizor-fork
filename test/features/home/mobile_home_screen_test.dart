@@ -65,6 +65,7 @@ import '../../support/app_test_fonts.dart';
 import '../../support/wallet_path_read_blocker.dart';
 import '../../fakes/fake_zec_market_data_cache.dart';
 import 'package:zcash_wallet/src/providers/pending_activity_evidence_provider.dart';
+import '../../support/test_l10n.dart';
 
 /// Skips the secure-storage write so toggling works without a platform
 /// channel in widget tests.
@@ -806,8 +807,9 @@ void main() {
     );
     await tester.pumpWidget(
       _app(
-        _syncedState(orchardBalance: BigInt.from(100000000))
-            .copyWith(recentTransactions: [pending]),
+        _syncedState(
+          orchardBalance: BigInt.from(100000000),
+        ).copyWith(recentTransactions: [pending]),
         showVoting: false,
         etaLabels: const {'pending-receive': ActivityEta.standard},
       ),
@@ -938,8 +940,9 @@ void main() {
               'config',
               'account',
               round,
-            ): const VotingHomeFact(decision: VotingHomeDecision.show)
-                .toJson(),
+            ): const VotingHomeFact(
+              decision: VotingHomeDecision.show,
+            ).toJson(),
           },
         }),
       );
@@ -1340,8 +1343,9 @@ void main() {
     ) async {
       await tester.binding.setSurfaceSize(Size(width, 852));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final initial = _syncedState(orchardBalance: BigInt.from(250000000))
-          .copyWith(hasRecentTransactionsData: false);
+      final initial = _syncedState(
+        orchardBalance: BigInt.from(250000000),
+      ).copyWith(hasRecentTransactionsData: false);
       final sync = FakeSyncNotifier(initial);
       await tester.pumpWidget(
         _app(initial, syncNotifier: sync, showVoting: false),
@@ -1555,7 +1559,7 @@ void main() {
     NeonSyncLine line() => tester
         .widget<NeonSyncLineLayer>(find.byType(NeonSyncLineLayer).first)
         .line;
-    expect(line().readout, NeonSyncReadout.synced);
+    expect(line().readout, NeonSyncReadout.synced(testL10n));
 
     SyncState catchUp(int remainingScanBlocks) => SyncState(
       accountUuid: 'account-1',
@@ -1571,14 +1575,14 @@ void main() {
     );
     notifier.emit(catchUp(3));
     await tester.pump(const Duration(milliseconds: 100));
-    expect(line().readout, NeonSyncReadout.synced);
+    expect(line().readout, NeonSyncReadout.synced(testL10n));
     expect(line().progress, 1);
     expect(line().climbing, isFalse);
 
     // The catch-up turns out large: the line drops and climbs as a sync.
     notifier.emit(catchUp(5000));
     await tester.pump(const Duration(milliseconds: 100));
-    expect(line().readout, isNot(NeonSyncReadout.synced));
+    expect(line().readout, isNot(NeonSyncReadout.synced(testL10n)));
     expect(line().climbing, isTrue);
   });
 
@@ -1837,8 +1841,9 @@ void main() {
 
     // Leaving the completion screen unmounts the host. Returning home must not
     // route back into a completion the user was already shown.
-    GoRouter.of(tester.element(find.text('migration complete route')))
-        .go('/home');
+    GoRouter.of(
+      tester.element(find.text('migration complete route')),
+    ).go('/home');
     await tester.pumpAndSettle();
 
     expect(find.text('migration complete route'), findsNothing);
@@ -1861,8 +1866,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    GoRouter.of(tester.element(find.byType(MobileHomeScreen)))
-        .go('/shell-activity');
+    GoRouter.of(
+      tester.element(find.byType(MobileHomeScreen)),
+    ).go('/shell-activity');
     await tester.pumpAndSettle();
     expect(find.text('shell activity route'), findsOneWidget);
 
@@ -3078,8 +3084,9 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _app(
-        _syncedState(orchardBalance: BigInt.from(14312000000))
-            .copyWith(transparentLockedBalance: BigInt.from(242000000)),
+        _syncedState(
+          orchardBalance: BigInt.from(14312000000),
+        ).copyWith(transparentLockedBalance: BigInt.from(242000000)),
       ),
     );
     await tester.pump();
@@ -3482,8 +3489,9 @@ void main() {
     );
     await tester.pumpWidget(
       _app(
-        _syncedState(orchardBalance: BigInt.from(100000000))
-            .copyWith(recentTransactions: []),
+        _syncedState(
+          orchardBalance: BigInt.from(100000000),
+        ).copyWith(recentTransactions: []),
         giftCardActivityIndex: GiftCardActivityIndex.forAccount(
           accountUuid: 'account-1',
           createdRecords: [],
@@ -3525,8 +3533,9 @@ void main() {
         receivedRecords: [record],
       );
       final syncNotifier = FakeSyncNotifier(
-        _syncedState(orchardBalance: BigInt.from(100000000))
-            .copyWith(recentTransactions: [_tx(1)]),
+        _syncedState(
+          orchardBalance: BigInt.from(100000000),
+        ).copyWith(recentTransactions: [_tx(1)]),
       );
       rust_sync.TransactionInfo receive({required BigInt height}) {
         return rust_sync.TransactionInfo(
@@ -3810,8 +3819,9 @@ void main() {
 
     await tester.pumpWidget(
       _app(
-        _syncedState(orchardBalance: BigInt.from(100000000))
-            .copyWith(recentTransactions: [_tx(1)]),
+        _syncedState(
+          orchardBalance: BigInt.from(100000000),
+        ).copyWith(recentTransactions: [_tx(1)]),
       ),
     );
     await tester.pump();
@@ -3860,8 +3870,9 @@ void main() {
   testWidgets('display progress ticks do not rebuild mobile Home content', (
     tester,
   ) async {
-    final initial = _syncedState(orchardBalance: BigInt.from(100000000))
-        .copyWith(recentTransactions: [_tx(1)]);
+    final initial = _syncedState(
+      orchardBalance: BigInt.from(100000000),
+    ).copyWith(recentTransactions: [_tx(1)]);
     final notifier = FakeSyncNotifier(initial);
 
     await tester.pumpWidget(_app(initial, syncNotifier: notifier));

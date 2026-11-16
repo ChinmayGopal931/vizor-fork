@@ -121,7 +121,7 @@ class ReceiveTabs extends StatelessWidget {
   /// glyphs.
   Widget _buildNeon(BuildContext context) => NeonSwitchTabs(
     key: const ValueKey('receive_address_type_tabs'),
-    labels: ('Shielded', 'Transparent'),
+    labels: (context.l10n.poolShielded, context.l10n.poolTransparent),
     selected: selectedType == ReceiveAddressType.shielded ? 0 : 1,
     onChanged: (index) => onChanged(
       index == 0 ? ReceiveAddressType.shielded : ReceiveAddressType.transparent,

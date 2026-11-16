@@ -83,8 +83,8 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
         : PortfolioPlotGeometry(data.points, plotSize).pointAt(_scrubX!).point;
     final change = data == null ? null : describePortfolioChange(data);
     final title = _mode == PortfolioChartMode.usd
-        ? 'Portfolio value'
-        : 'ZEC balance';
+        ? context.l10n.portfolioChartTitleUsd
+        : context.l10n.portfolioChartTitleZec;
 
     final valueStyle = AppTypography.headlineLarge.copyWith(
       color: colors.neon.core,
@@ -220,8 +220,8 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
   }) {
     final colors = context.colors;
     final message = switch (widget.state) {
-      PortfolioChartEmpty() => 'Not enough history for this range yet.',
-      PortfolioChartPrivate() => 'Hidden in privacy mode.',
+      PortfolioChartEmpty() => context.l10n.portfolioChartEmpty,
+      PortfolioChartPrivate() => context.l10n.portfolioChartPrivate,
       _ => null,
     };
     if (message != null) {
@@ -240,9 +240,11 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
       );
     }
     return Semantics(
-      label:
-          '$title, ${data.range.description}, ${change.text}. '
-          'Drag to inspect values.',
+      label: context.l10n.portfolioChartPlotSemantics(
+        title,
+        data.range.description(context.l10n),
+        change.text,
+      ),
       excludeSemantics: true,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -279,8 +281,12 @@ class _MobilePortfolioChartCardState extends State<MobilePortfolioChartCard> {
   /// The note beside the title: that the ZEC balance is the device's own, or
   /// that prices failed or are old. Healthy prices get none.
   String _sourceLabel(PortfolioChartData? data) => switch (data?.notice) {
-    PortfolioChartNotice.pricesUnavailable => 'Prices unavailable',
-    PortfolioChartNotice.pricesStale => 'Older prices',
-    _ => _mode == PortfolioChartMode.zec ? 'On this device' : '',
+    PortfolioChartNotice.pricesUnavailable =>
+      context.l10n.portfolioChartPricesUnavailable,
+    PortfolioChartNotice.pricesStale => context.l10n.portfolioChartPricesStale,
+    _ =>
+      _mode == PortfolioChartMode.zec
+          ? context.l10n.portfolioChartOnDevice
+          : '',
   };
 }

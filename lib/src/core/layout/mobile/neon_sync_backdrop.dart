@@ -41,14 +41,19 @@ enum NeonSyncLayer {
 /// The readouts at the sync line's head, sentence case here and drawn
 /// uppercase (a HUD caption), for every screen that draws a sync line.
 abstract final class NeonSyncReadout {
-  static const synced = 'Synced';
-  static const failed = 'Sync failed';
-  static const torOffline = 'Tor offline';
-  static const torWaiting = 'Tor …';
+  static String synced(AppLocalizations l10n) => l10n.syncSynced;
+  static String failed(AppLocalizations l10n) => l10n.neonSyncFailed;
+  static String torOffline(AppLocalizations l10n) => l10n.neonSyncTorOffline;
+  static String torWaiting(AppLocalizations l10n) => l10n.neonSyncTorWaiting;
 
   /// A scan [percent] of the way, or a check's.
-  static String progress(int percent, {bool checking = false}) =>
-      '${checking ? 'Check' : 'Sync'} $percent%';
+  static String progress(
+    AppLocalizations l10n,
+    int percent, {
+    bool checking = false,
+  }) => checking
+      ? l10n.neonSyncChecking(percent)
+      : l10n.neonSyncProgress(percent);
 }
 
 /// Home's readout style. A screen whose first block sits close under the top
@@ -117,23 +122,23 @@ class NeonSyncLine {
       SyncStatusKind.failed => sync.percentage.clamp(0.03, 0.99),
     };
     final readout = switch (status.kind) {
-      _ when catchingUp => NeonSyncReadout.synced,
+      _ when catchingUp => NeonSyncReadout.synced(l10n),
       SyncStatusKind.synced ||
-      SyncStatusKind.catchingUp => NeonSyncReadout.synced,
+      SyncStatusKind.catchingUp => NeonSyncReadout.synced(l10n),
       SyncStatusKind.failed =>
-        torFailed ? NeonSyncReadout.torOffline : NeonSyncReadout.failed,
+        torFailed
+            ? NeonSyncReadout.torOffline(l10n)
+            : NeonSyncReadout.failed(l10n),
       SyncStatusKind.syncing =>
         waitingOnTor
-            ? NeonSyncReadout.torWaiting
-            : NeonSyncReadout.progress(whole, checking: sync.isChecking),
+            ? NeonSyncReadout.torWaiting(l10n)
+            : NeonSyncReadout.progress(l10n, whole, checking: sync.isChecking),
     };
     return NeonSyncLine(
       progress: progress.toDouble(),
       readout: readout,
       // A wallet catching up reads as synced, so it says the same.
-      semanticsLabel: catchingUp
-          ? l10n.syncVizorSynced
-          : status.semanticsLabel,
+      semanticsLabel: catchingUp ? l10n.syncVizorSynced : status.semanticsLabel,
       climbing: syncing,
       failed: status.kind == SyncStatusKind.failed,
     );

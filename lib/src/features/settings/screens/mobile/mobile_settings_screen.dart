@@ -10,7 +10,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../payment_links/providers/payment_link_cards_provider.dart';
-import '../../../private_usd/private_usd_copy.dart';
 import '../../../private_usd/providers/private_usd_archive_sync_provider.dart';
 import '../../../private_usd/providers/private_usd_custom_rpc_provider.dart';
 import '../../../private_usd/providers/private_usd_relayer_claims_provider.dart';
@@ -869,9 +868,9 @@ class _EthereumRpcRow extends ConsumerWidget {
     return MobileListRow(
       key: const ValueKey('mobile_settings_ethereum_rpc_row'),
       leading: const _RowIcon(AppIcons.link),
-      label: PrivateUsdCopy.rpcTitle,
+      label: context.l10n.privateUsdRpcTitle,
       value: custom == null
-          ? PrivateUsdCopy.rpcDefault
+          ? context.l10n.commonDefault
           : privateUsdCustomRpcHost(custom),
       minRowHeight: _settingsRowHeight,
       textStyle: textStyle,
@@ -903,13 +902,13 @@ class _RelayerClaimsRow extends ConsumerWidget {
     return Semantics(
       button: true,
       toggled: enabled,
-      label: PrivateUsdCopy.relayerClaimsSetting,
+      label: context.l10n.privateUsdRelayerClaimsSetting,
       onTap: toggle,
       excludeSemantics: true,
       child: MobileListRow(
         key: const ValueKey('mobile_settings_relayer_claims_row'),
         leading: const _RowIcon(AppIcons.plane),
-        label: PrivateUsdCopy.relayerClaimsSetting,
+        label: context.l10n.privateUsdRelayerClaimsSetting,
         minRowHeight: _settingsRowHeight,
         textStyle: textStyle,
         trailing: MobilePrivacyToggle(
@@ -930,7 +929,7 @@ class _RelayerClaimsRow extends ConsumerWidget {
       await ref.read(privateUsdRelayerClaimsProvider.notifier).set(enabled);
     } catch (_) {
       if (context.mounted) {
-        showAppToast(context, PrivateUsdCopy.settingSaveFailed);
+        showAppToast(context, context.l10n.privateUsdSettingSaveFailed);
       }
     }
   }
@@ -950,13 +949,13 @@ class _ArchiveSyncRow extends ConsumerWidget {
     return Semantics(
       button: true,
       toggled: enabled,
-      label: PrivateUsdCopy.archiveSyncSetting,
+      label: context.l10n.privateUsdArchiveSyncSetting,
       onTap: toggle,
       excludeSemantics: true,
       child: MobileListRow(
         key: const ValueKey('mobile_settings_archive_sync_row'),
         leading: const _RowIcon(AppIcons.history),
-        label: PrivateUsdCopy.archiveSyncSetting,
+        label: context.l10n.privateUsdArchiveSyncSetting,
         minRowHeight: _settingsRowHeight,
         textStyle: textStyle,
         trailing: MobilePrivacyToggle(
@@ -975,7 +974,7 @@ class _ArchiveSyncRow extends ConsumerWidget {
       await ref.read(privateUsdArchiveSyncProvider.notifier).set(enabled);
     } catch (_) {
       if (context.mounted) {
-        showAppToast(context, PrivateUsdCopy.settingSaveFailed);
+        showAppToast(context, context.l10n.privateUsdSettingSaveFailed);
       }
     }
   }

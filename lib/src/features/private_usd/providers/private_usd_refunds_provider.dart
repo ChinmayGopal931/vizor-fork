@@ -37,13 +37,13 @@ class PrivateUsdRefundRow {
   final bool checkFailed;
 
   /// Why its last recovery did not go through.
-  final String? error;
+  final PrivateUsdText? error;
 
   PrivateUsdRefundRow copyWith({
     rust.ApiReverseRecord? record,
     bool? recoverable,
     bool? checkFailed,
-    String? error,
+    PrivateUsdText? error,
     bool clearError = false,
   }) => PrivateUsdRefundRow(
     record: record ?? this.record,
@@ -73,7 +73,7 @@ class PrivateUsdRefundsState {
   final int? recovering;
 
   /// The records could not be read.
-  final String? error;
+  final PrivateUsdText? error;
 
   bool get canGoBack => recovering == null;
 
@@ -83,7 +83,7 @@ class PrivateUsdRefundsState {
     bool? refreshing,
     int? recovering,
     bool clearRecovering = false,
-    String? error,
+    PrivateUsdText? error,
     bool clearError = false,
   }) => PrivateUsdRefundsState(
     rows: rows ?? this.rows,
@@ -154,7 +154,7 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
       if (!ref.mounted) return;
       state = state.copyWith(
         loaded: true,
-        error: PrivateUsdCopy.convertErrorStore,
+        error: (l10n) => l10n.privateUsdConvertErrorStore,
       );
     }
     await _checkAll();
@@ -192,16 +192,16 @@ class PrivateUsdRefundsNotifier extends Notifier<PrivateUsdRefundsState> {
           row.record.index == index ? row.copyWith(clearError: true) : row,
       ],
     );
-    String? error;
+    PrivateUsdText? error;
     try {
       await _engine.reverseRescue(accountUuid, index: index);
     } on rust.ApiPrivateUsdError catch (failure) {
       if (failure.code != rust.ApiPrivateUsdErrorCode.cancelled) {
-        error = PrivateUsdCopy.refundsRecoverFailed;
+        error = (l10n) => l10n.privateUsdRefundsRecoverFailed;
       }
     } catch (failure) {
       if (failure is! PrivateUsdPause) {
-        error = PrivateUsdCopy.refundsRecoverFailed;
+        error = (l10n) => l10n.privateUsdRefundsRecoverFailed;
       }
     }
     if (!ref.mounted) return;

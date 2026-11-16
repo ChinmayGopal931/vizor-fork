@@ -25,6 +25,7 @@ import '../../private_usd_copy.dart';
 import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_deposits_provider.dart';
 import '../../providers/private_usd_receive_address_provider.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// How often the open sheet asks for a deposit pass: it is open while money
 /// is on its way to the address, so a deposit shows soon after it lands.
@@ -139,7 +140,7 @@ class _PrivateUsdReceiveSheetState
       railgunAddressFailed: railgunAddress.hasError,
       example: example == null || terms == null
           ? null
-          : PrivateUsdCopy.depositExample(
+          : context.l10n.privateUsdDepositExample(
               formatPrivateUsd(BigInt.tryParse(terms.minValue) ?? BigInt.zero),
               formatPrivateUsd(BigInt.tryParse(example.arrives) ?? BigInt.zero),
             ),
@@ -223,7 +224,9 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
     // Neither address is sensitive: the plain clipboard.
     await Clipboard.setData(ClipboardData(text: address));
     unawaited(AppHaptics.copy());
-    if (context.mounted) showAppToast(context, PrivateUsdCopy.addressCopied);
+    if (context.mounted) {
+      showAppToast(context, context.l10n.commonAddressCopied);
+    }
   }
 
   @override
@@ -232,7 +235,7 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
     final onKindChanged = this.onKindChanged;
     final children = <Widget>[
       Text(
-        PrivateUsdCopy.depositTitle(symbol),
+        context.l10n.privateUsdDepositTitle(symbol),
         style: AppTypography.headlineSmall.copyWith(color: colors.text.accent),
       ),
       const SizedBox(height: AppSpacing.sm),
@@ -283,7 +286,7 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
         variant: AppButtonVariant.secondary,
         expand: true,
         onPressed: onClose,
-        child: const Text(PrivateUsdCopy.close),
+        child: Text(context.l10n.commonClose),
       ),
     ];
     return MobileBottomSafeArea(
@@ -371,7 +374,7 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
     final note = AppTypography.bodySmall.copyWith(color: colors.text.secondary);
     final address = railgunAddress;
     return [
-      const MobileWarningNotice(message: PrivateUsdCopy.receiveShieldedOnly),
+      MobileWarningNotice(message: context.l10n.privateUsdReceiveShieldedOnly),
       const SizedBox(height: AppSpacing.sm),
       if (address != null)
         ..._code(
@@ -382,17 +385,17 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
           // The device rounds read the address shown here.
           addressKey: const ValueKey('mobile_private_usd_address'),
           copyKey: const ValueKey('mobile_private_usd_copy_address'),
-          copyLabel: PrivateUsdCopy.receiveShieldedCopy,
+          copyLabel: context.l10n.privateUsdReceiveShieldedCopy,
         )
       else
         Text(
           railgunAddressFailed
-              ? PrivateUsdCopy.depositAddressFailed
-              : PrivateUsdCopy.depositAddressLoading,
+              ? context.l10n.privateUsdDepositAddressFailed
+              : context.l10n.privateUsdDepositAddressLoading,
           style: note,
         ),
       const SizedBox(height: AppSpacing.s),
-      Text(PrivateUsdCopy.receiveAddressNote, style: note),
+      Text(context.l10n.privateUsdReceiveAddressNote, style: note),
     ];
   }
 
@@ -406,14 +409,16 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
     if (_unavailable) {
       return [
         Text(
-          PrivateUsdCopy.depositUnavailable,
+          context.l10n.privateUsdDepositUnavailable,
           key: const ValueKey('private_usd_deposit_unavailable'),
           style: body,
         ),
       ];
     }
     return [
-      MobileWarningNotice(message: PrivateUsdCopy.depositOnly(symbol, chain)),
+      MobileWarningNotice(
+        message: context.l10n.privateUsdDepositOnly(symbol, chain),
+      ),
       const SizedBox(height: AppSpacing.sm),
       if (address != null)
         ..._code(
@@ -425,13 +430,13 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
           qrKey: const ValueKey('private_usd_deposit_qr'),
           addressKey: const ValueKey('private_usd_deposit_address'),
           copyKey: const ValueKey('private_usd_deposit_copy'),
-          copyLabel: PrivateUsdCopy.depositCopy,
+          copyLabel: context.l10n.privateUsdDepositCopy,
         )
       else
         Text(
           addressFailed
-              ? PrivateUsdCopy.depositAddressFailed
-              : PrivateUsdCopy.depositAddressLoading,
+              ? context.l10n.privateUsdDepositAddressFailed
+              : context.l10n.privateUsdDepositAddressLoading,
           style: note,
         ),
       const SizedBox(height: AppSpacing.sm),
@@ -446,7 +451,7 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
       ],
       if (terms != null) ...[
         Text(
-          PrivateUsdCopy.depositMinimum(
+          context.l10n.privateUsdDepositMinimum(
             formatPrivateUsd(BigInt.tryParse(terms.minValue) ?? BigInt.zero),
           ),
           key: const ValueKey('private_usd_deposit_minimum'),
@@ -454,7 +459,7 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xxs),
         Text(
-          PrivateUsdCopy.depositRelayerFee(
+          context.l10n.privateUsdDepositRelayerFee(
             formatPrivateUsd(BigInt.tryParse(terms.fee) ?? BigInt.zero),
             privateUsdPercentText(terms.feeBps),
           ),
@@ -463,7 +468,7 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xxs),
         Text(
-          PrivateUsdCopy.depositRailgunFee(
+          context.l10n.privateUsdDepositRailgunFee(
             privateUsdPercentText(terms.railgunFeeBps),
           ),
           style: body,
@@ -475,13 +480,13 @@ class PrivateUsdReceiveSheetBody extends StatelessWidget {
       ] else
         Text(
           termsError == null
-              ? PrivateUsdCopy.depositFeesLoading
-              : PrivateUsdCopy.depositFeesFailed,
+              ? context.l10n.privateUsdDepositFeesLoading
+              : context.l10n.privateUsdDepositFeesFailed,
           key: const ValueKey('private_usd_deposit_fees_status'),
           style: note,
         ),
       const SizedBox(height: AppSpacing.s),
-      Text(PrivateUsdCopy.depositHow, style: note),
+      Text(context.l10n.privateUsdDepositHow, style: note),
     ];
   }
 }
@@ -512,35 +517,35 @@ class PrivateUsdDepositLineText extends StatelessWidget {
     final minimum = this.minimum;
     final (text, color) = switch (line.phase) {
       PrivateUsdDepositPhase.received => (
-        PrivateUsdCopy.depositReceived(usd),
+        context.l10n.privateUsdDepositReceived(usd),
         colors.text.accent,
       ),
       PrivateUsdDepositPhase.underMinimum => (
         minimum == null
-            ? PrivateUsdCopy.depositReceived(usd)
-            : PrivateUsdCopy.depositUnderMinimum(
+            ? context.l10n.privateUsdDepositReceived(usd)
+            : context.l10n.privateUsdDepositUnderMinimum(
                 usd,
                 formatPrivateUsd(minimum),
               ),
         colors.text.secondary,
       ),
       PrivateUsdDepositPhase.waiting => (
-        PrivateUsdCopy.depositWaitingLine(usd),
+        context.l10n.privateUsdDepositWaitingLine(usd),
         colors.text.secondary,
       ),
       PrivateUsdDepositPhase.shielding => (
-        PrivateUsdCopy.depositShieldingLine(usd),
+        context.l10n.privateUsdDepositShieldingLine(usd),
         colors.text.accent,
       ),
       PrivateUsdDepositPhase.shielded => (
-        PrivateUsdCopy.depositShieldedLine(
+        context.l10n.privateUsdDepositShieldedLine(
           usd,
-          PrivateUsdCopy.about(screening),
+          PrivateUsdCopy.about(context.l10n, screening),
         ),
         colors.text.positiveStrong,
       ),
       PrivateUsdDepositPhase.notShielding => (
-        PrivateUsdCopy.depositNotShieldingLine(usd),
+        context.l10n.privateUsdDepositNotShieldingLine(usd),
         colors.text.secondary,
       ),
     };

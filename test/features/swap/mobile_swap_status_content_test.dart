@@ -9,7 +9,6 @@ import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/mobile_surface_card.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_reverse_presentation.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_status_presentation.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/features/swap/domain/swap_asset.dart';
 import 'package:zcash_wallet/src/features/swap/models/swap_activity_status_mapper.dart';
@@ -653,9 +652,9 @@ void main() {
     expect(forward.showTabs, isTrue);
     await details(forward);
     for (final label in [
-      PrivateUsdCopy.detailSwapId,
-      PrivateUsdCopy.detailDeposit,
-      PrivateUsdCopy.detailStarted,
+      testL10n.privateUsdDetailSwapId,
+      testL10n.privateUsdDetailDeposit,
+      testL10n.privateUsdDetailStarted,
     ]) {
       expect(find.text(label), findsOneWidget, reason: label);
     }
@@ -672,10 +671,10 @@ void main() {
     expect(reverse.showTabs, isTrue);
     await details(reverse);
     for (final label in [
-      PrivateUsdCopy.detailSwapId,
-      PrivateUsdCopy.detailFunding,
-      PrivateUsdCopy.detailZecReceived,
-      PrivateUsdCopy.detailStarted,
+      testL10n.privateUsdDetailSwapId,
+      testL10n.privateUsdDetailFunding,
+      testL10n.privateUsdDetailZecReceived,
+      testL10n.privateUsdDetailStarted,
     ]) {
       expect(find.text(label), findsOneWidget, reason: label);
     }
@@ -688,9 +687,9 @@ void main() {
         ),
       ),
     );
-    expect(find.text(PrivateUsdCopy.detailSwapId), findsNothing);
-    expect(find.text(PrivateUsdCopy.detailDeposit), findsNothing);
-    expect(find.text(PrivateUsdCopy.detailStarted), findsNothing);
+    expect(find.text(testL10n.privateUsdDetailSwapId), findsNothing);
+    expect(find.text(testL10n.privateUsdDetailDeposit), findsNothing);
+    expect(find.text(testL10n.privateUsdDetailStarted), findsNothing);
   });
 
   testWidgets('completed details hide recipient and deposit address rows', (

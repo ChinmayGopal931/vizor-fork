@@ -202,16 +202,16 @@ class PrivateUsdSendNotifier extends Notifier<PrivateUsdSendForm> {
     if (request == null) return false;
     final pricing = ++_pricing;
     state = form.copyWith(isBusy: true, clearError: true);
-    String? error;
+    PrivateUsdText? error;
     PrivateUsdSendCost? cost;
     try {
       cost = await ref.read(privateUsdSenderProvider).cost(account, request);
     } on PrivateUsdSendFeeCapException {
-      error = PrivateUsdCopy.sendErrorFeeCap;
+      error = (l10n) => l10n.privateUsdSendErrorFeeCap;
     } on rust.ApiPrivateUsdError catch (failure) {
-      error = privateUsdSendErrorMessage(failure.code);
+      error = (l10n) => privateUsdSendErrorMessage(l10n, failure.code);
     } catch (_) {
-      error = PrivateUsdCopy.sendNotSent;
+      error = (l10n) => l10n.privateUsdSendNotSent;
     }
     if (!ref.mounted || pricing != _pricing) return false;
     state = cost == null
@@ -287,14 +287,16 @@ class PrivateUsdSendNotifier extends Notifier<PrivateUsdSendForm> {
     state = switch (outcome) {
       PrivateUsdSendBusy(:final status) => form.copyWith(
         phase: PrivateUsdSendPhase.review,
-        error: privateUsdSpendMessage(status) ?? PrivateUsdCopy.paymentPending,
+        error: (l10n) =>
+            privateUsdSpendMessage(l10n, status) ??
+            l10n.privateUsdPaymentPending,
       ),
       PrivateUsdSendNotSent(:final message) => form.notSent(message),
       PrivateUsdSendRepriced(cost: final repriced) => _priced(
         form,
         request,
         repriced,
-        error: PrivateUsdCopy.sendFeeRose(
+        error: (l10n) => l10n.privateUsdSendFeeRose(
           formatPrivateUsdExact(
             repriced.networkFee,
             form.networkFee?.token.decimals ?? request.token.decimals,
@@ -314,7 +316,7 @@ class PrivateUsdSendNotifier extends Notifier<PrivateUsdSendForm> {
     PrivateUsdSendForm form,
     PrivateUsdSendRequest request,
     PrivateUsdSendCost cost, {
-    String? error,
+    PrivateUsdText? error,
   }) {
     final fee = form.networkFee;
     final priced = form.copyWith(

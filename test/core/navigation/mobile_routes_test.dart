@@ -60,6 +60,7 @@ import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import '../../fakes/fake_sync_notifier.dart';
 import '../../support/go_route_descendants.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
+import '../../support/test_l10n.dart';
 
 class _NativeGeometryFixture extends NativeMobileNavigationGeometry {
   _NativeGeometryFixture(this.value);
@@ -238,7 +239,7 @@ void main() {
     );
     // Veylor's sidebar readout reads a short catch-up as synced, as Home's
     // sync line does.
-    expect(sidebar.sync.readout, NeonSyncReadout.synced);
+    expect(sidebar.sync.readout, NeonSyncReadout.synced(testL10n));
     expect(
       find.descendant(
         of: find.byType(MobileWalletSidebar),

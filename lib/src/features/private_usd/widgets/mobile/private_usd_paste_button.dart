@@ -5,7 +5,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_icon.dart';
-import '../../private_usd_copy.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// A text field's paste button: the clipboard's text, trimmed, replaces the
 /// field's, and [onPasted] hears it. An empty clipboard changes nothing.
@@ -35,7 +35,7 @@ class PrivateUsdPasteButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: PrivateUsdCopy.paste,
+      label: context.l10n.privateUsdPaste,
       excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,

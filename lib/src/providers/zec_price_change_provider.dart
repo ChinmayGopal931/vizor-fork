@@ -31,8 +31,8 @@ final kVizorCoinGeckoUserAgent = _dartUserAgent();
 String _dartUserAgent() {
   final version = RegExp(r'^(\d+)\.(\d+)').firstMatch(Platform.version);
   return version == null
-      ? 'Dart (dart:io)'
-      : 'Dart/${version[1]}.${version[2]} (dart:io)';
+      ? 'Dart (dart:io)' // l10n-ignore: HTTP header
+      : 'Dart/${version[1]}.${version[2]} (dart:io)'; // l10n-ignore: HTTP header
 }
 
 const zecMarketDataRefreshInterval = Duration(minutes: 3);

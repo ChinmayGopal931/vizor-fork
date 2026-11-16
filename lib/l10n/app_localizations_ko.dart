@@ -6139,6 +6139,25 @@ class AppLocalizationsKo extends AppLocalizations {
   String get navVote => '투‍표';
 
   @override
+  String neonSyncChecking(int percent) {
+    return '확‍인 $percent%';
+  }
+
+  @override
+  String get neonSyncFailed => '동‍기‍화 실‍패';
+
+  @override
+  String neonSyncProgress(int percent) {
+    return '동‍기‍화 $percent%';
+  }
+
+  @override
+  String get neonSyncTorOffline => 'Tor 오‍프‍라‍인';
+
+  @override
+  String get neonSyncTorWaiting => 'Tor …';
+
+  @override
   String get networkPrivacyFinishUpdateBeforeTorOff =>
       'Tor‍를 끄‍기 전‍에 진‍행 중‍인 소‍프‍트‍웨‍어 업‍데‍이‍트‍를 끝‍내‍세‍요.';
 
@@ -8356,8 +8375,1707 @@ class AppLocalizationsKo extends AppLocalizations {
   String get poolTransparent => '공‍개';
 
   @override
+  String get portfolioChartEmpty => '이 기‍간‍에‍는 아‍직 기‍록‍이 충‍분‍하‍지 않‍아‍요.';
+
+  @override
+  String get portfolioChartHoldings => '보‍유 자‍산';
+
+  @override
+  String portfolioChartIncludesPending(String amount) {
+    return '대‍기 중‍인 $amount 포‍함';
+  }
+
+  @override
+  String get portfolioChartOnDevice => '이 기‍기 기‍준';
+
+  @override
+  String get portfolioChartOpen => '잔‍액 차‍트 열‍기';
+
+  @override
+  String portfolioChartPlotSemantics(
+    String title,
+    String range,
+    String change,
+  ) {
+    return '$title, $range, $change. 드‍래‍그‍해‍서 값‍을 확‍인‍하‍세‍요.';
+  }
+
+  @override
+  String get portfolioChartPricesStale => '오‍래‍된 가‍격';
+
+  @override
+  String get portfolioChartPricesUnavailable => '가‍격 정‍보 없‍음';
+
+  @override
+  String get portfolioChartPrivate => '프‍라‍이‍버‍시 모‍드‍에‍서‍는 숨‍겨‍져‍요.';
+
+  @override
+  String get portfolioChartRangeAll => '전‍체 기‍간';
+
+  @override
+  String get portfolioChartRangeAllChip => '전‍체';
+
+  @override
+  String get portfolioChartRangeMonth => '최‍근 한 달';
+
+  @override
+  String get portfolioChartRangeMonthChip => '1‍개‍월';
+
+  @override
+  String get portfolioChartRangeQuarter => '최‍근 3‍개‍월';
+
+  @override
+  String get portfolioChartRangeQuarterChip => '3‍개‍월';
+
+  @override
+  String get portfolioChartRangeWeek => '최‍근 일‍주‍일';
+
+  @override
+  String get portfolioChartRangeWeekChip => '1‍주';
+
+  @override
+  String get portfolioChartRangeYear => '최‍근 일 년';
+
+  @override
+  String get portfolioChartRangeYearChip => '1‍년';
+
+  @override
+  String get portfolioChartScreenHidden =>
+      '이 계‍정‍에 잔‍액 기‍록‍이 생‍기‍면 차‍트‍가 표‍시‍돼‍요.';
+
+  @override
+  String get portfolioChartScreenTitle => '잔‍액';
+
+  @override
+  String get portfolioChartSettingsMarketPrices => '시‍세 사‍용';
+
+  @override
+  String get portfolioChartSettingsSaveFailed =>
+      '포‍트‍폴‍리‍오 차‍트 설‍정‍을 업‍데‍이‍트‍하‍지 못‍했‍어‍요.';
+
+  @override
+  String get portfolioChartSettingsShowOnHome => '홈‍에 표‍시';
+
+  @override
+  String get portfolioChartSettingsTitle => '포‍트‍폴‍리‍오 차‍트';
+
+  @override
+  String get portfolioChartTitleUsd => '포‍트‍폴‍리‍오 가‍치';
+
+  @override
+  String get portfolioChartTitleZec => 'ZEC 잔‍액';
+
+  @override
+  String get portfolioChartTotalShielded => '비‍공‍개 잔‍액 합‍계';
+
+  @override
   String get privateQueriesOptOutUnfinished =>
       '비‍공‍개 조‍회 끄‍기‍가 완‍료‍되‍지 않‍았‍어‍요. 공‍개 자‍금‍을 사‍용‍하‍려‍면 설‍정‍에‍서 다‍시 끄‍세‍요.';
+
+  @override
+  String privateUsdAboutHours(int hours) {
+    return '약 $hours‍시‍간';
+  }
+
+  @override
+  String privateUsdAboutMinutes(int minutes) {
+    return '약 $minutes‍분';
+  }
+
+  @override
+  String get privateUsdActionConvert => '브‍리‍지';
+
+  @override
+  String get privateUsdActionReceive => '받‍기';
+
+  @override
+  String get privateUsdActionSend => '보‍내‍기';
+
+  @override
+  String get privateUsdActionWithdraw => '출‍금';
+
+  @override
+  String get privateUsdActivityConverted => '0zkUSDC‍로 브‍리‍지 완‍료';
+
+  @override
+  String get privateUsdActivityConvertedToZec => 'ZEC‍로 브‍리‍지 완‍료';
+
+  @override
+  String get privateUsdActivityDeposit => '입‍금';
+
+  @override
+  String get privateUsdActivityDepositRescue => '되‍찾‍은 입‍금‍액';
+
+  @override
+  String get privateUsdActivityDepositShielded => '비‍공‍개 전‍환 완‍료';
+
+  @override
+  String get privateUsdActivityEmpty =>
+      '브‍리‍지, 보‍내‍기, 출‍금 내‍역‍이 여‍기‍에 표‍시‍돼‍요.';
+
+  @override
+  String privateUsdActivityFrom(String address) {
+    return '보‍낸 곳: $address';
+  }
+
+  @override
+  String get privateUsdActivityReceived => '받‍음';
+
+  @override
+  String get privateUsdActivityReceivedScreening => '심‍사 후 사‍용 가‍능';
+
+  @override
+  String get privateUsdActivityRefunded => '브‍리‍지 취‍소‍됨';
+
+  @override
+  String get privateUsdActivityRefundedDetail => 'ZEC‍가 돌‍아‍왔‍어‍요';
+
+  @override
+  String get privateUsdActivityRefundedZecDetail => '달‍러‍가 돌‍아‍왔‍어‍요';
+
+  @override
+  String get privateUsdActivitySenderHidden => '보‍낸 사‍람 비‍공‍개';
+
+  @override
+  String get privateUsdActivitySent => '보‍냄';
+
+  @override
+  String get privateUsdActivityTitle => '활‍동';
+
+  @override
+  String privateUsdActivityTo(String address) {
+    return '받‍는 곳: $address';
+  }
+
+  @override
+  String get privateUsdActivityUnconfirmed => '아‍직 블‍록‍에 포‍함‍되‍지 않‍음';
+
+  @override
+  String get privateUsdActivityWithdrew => '출‍금';
+
+  @override
+  String get privateUsdArchiveSyncSetting => 'Anon 아‍카‍이‍브‍에‍서 기‍록 동‍기‍화';
+
+  @override
+  String get privateUsdAssetsTitle => '자‍산';
+
+  @override
+  String privateUsdAvailableAmount(String amount) {
+    return '사‍용 가‍능: $amount';
+  }
+
+  @override
+  String get privateUsdBannerAttention => '브‍리‍지‍를 확‍인‍해 주‍세‍요';
+
+  @override
+  String privateUsdBannerDetail(String detail) {
+    return '$detail\n끝‍날 때‍까‍지 Veylor‍를 열‍어 두‍세‍요';
+  }
+
+  @override
+  String get privateUsdBannerKeepOpen => '끝‍날 때‍까‍지 Veylor‍를 열‍어 두‍세‍요';
+
+  @override
+  String get privateUsdBannerRelayerClaims =>
+      '릴‍레‍이‍어‍가 달‍러‍를 수‍령‍하‍니 Veylor‍를 나‍가‍도 돼‍요';
+
+  @override
+  String privateUsdBannerRelayerDetail(String detail) {
+    return '$detail\n릴‍레‍이‍어‍가 달‍러‍를 수‍령‍하‍니 Veylor‍를 나‍가‍도 돼‍요';
+  }
+
+  @override
+  String get privateUsdBridgedTitle => '브‍리‍지 완‍료';
+
+  @override
+  String get privateUsdBridgedYouPaid => '지‍불‍한 금‍액';
+
+  @override
+  String get privateUsdBridgedYouReceived => '받‍은 금‍액';
+
+  @override
+  String get privateUsdCheckingPayments => '대‍기 중‍인 송‍금‍을 확‍인‍하‍는 중…';
+
+  @override
+  String get privateUsdConversionPending =>
+      '브‍리‍지‍가 진‍행 중‍이‍에‍요. 끝‍나‍면 보‍내‍기‍를 사‍용‍할 수 있‍어‍요.';
+
+  @override
+  String get privateUsdConvertBackgroundNote =>
+      '완‍료‍될 때‍까‍지 Veylor‍를 열‍어 두‍세‍요. 나‍가‍면 일‍시 중‍지‍되‍고, 돌‍아‍오‍면 이‍어‍서 진‍행‍돼‍요.';
+
+  @override
+  String get privateUsdConvertCallOff => '브‍리‍지 취‍소';
+
+  @override
+  String get privateUsdConvertCallOffFailed =>
+      '취‍소‍하‍지 못‍했‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertCallOffTooLate =>
+      '그‍사‍이 Ethereum‍에‍서 스‍왑‍이 열‍려 취‍소‍할 수 없‍어‍요. 브‍리‍지‍는 계‍속 진‍행‍돼‍요.';
+
+  @override
+  String get privateUsdConvertErrorAmountRefused =>
+      '마‍켓 메‍이‍커‍가 이 금‍액‍의 브‍리‍지‍는 받‍지 않‍아‍요. 브‍리‍지‍당 한‍도‍를 넘‍었‍거‍나, 금‍액‍이 너‍무 적‍어 스‍왑 네‍트‍워‍크 비‍용‍을 충‍당‍하‍지 못‍할 수 있‍어‍요.';
+
+  @override
+  String get privateUsdConvertErrorBelowFee =>
+      '이 금‍액‍으‍로‍는 릴‍레‍이‍어 수‍수‍료‍를 충‍당‍할 수 없‍어‍요. 더 큰 금‍액‍으‍로 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertErrorEthereum =>
+      '지‍금‍은 Veylor‍가 Ethereum‍에 연‍결‍할 수 없‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertErrorFeeCap =>
+      '지‍금‍은 릴‍레‍이‍어 수‍수‍료‍가 한‍도‍인 2 USDC‍를 넘‍어‍서 아‍무‍것‍도 보‍내‍지 않‍았‍어‍요. 나‍중‍에 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertErrorGeneric =>
+      '견‍적‍을 받‍지 못‍했‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertErrorMaker =>
+      '지‍금‍은 마‍켓 메‍이‍커‍에 연‍결‍할 수 없‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertErrorMakerBusy =>
+      '마‍켓 메‍이‍커‍가 다‍른 브‍리‍지‍를 처‍리‍하‍느‍라 바‍빠‍요. 몇 분 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertErrorRelayer =>
+      '지‍금‍은 브‍리‍지‍를 완‍료‍하‍는 릴‍레‍이‍어‍에 연‍결‍할 수 없‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertErrorRelayerRefused =>
+      '브‍리‍지‍를 완‍료‍하‍는 릴‍레‍이‍어‍가 이 요‍청‍을 거‍절‍했‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertErrorStore =>
+      'Veylor‍가 저‍장‍된 브‍리‍지 기‍록‍을 읽‍을 수 없‍어‍요. 고‍객 지‍원‍에 문‍의‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertErrorTokensUnavailable =>
+      '이 브‍리‍지‍에 필‍요‍한 토‍큰‍을 받‍지 못‍해‍서 아‍무‍것‍도 보‍내‍지 않‍았‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertErrorUnpayable =>
+      '지‍금‍은 지‍갑‍에‍서 이 금‍액‍을 한 번‍의 거‍래‍로 지‍불‍할 수 없‍어‍요. 더 적‍은 금‍액‍으‍로 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertErrorWallet =>
+      'Veylor‍가 Zcash 지‍갑‍으‍로 이 단‍계‍를 완‍료‍하‍지 못‍했‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertEstimatedAmount => '예‍상 금‍액';
+
+  @override
+  String get privateUsdConvertEtaMinute => '일 분 정‍도';
+
+  @override
+  String get privateUsdConvertEtaSeconds => '몇 초 정‍도';
+
+  @override
+  String get privateUsdConvertFees => '브‍리‍지 수‍수‍료';
+
+  @override
+  String privateUsdConvertFeesValue(String relayerUsd, String railgunPercent) {
+    return '릴‍레‍이‍어 $relayerUsd · Railgun $railgunPercent%';
+  }
+
+  @override
+  String get privateUsdConvertInfoNoteEither =>
+      '달‍러‍가 비‍공‍개 잔‍액‍에 들‍어‍오‍거‍나, 아‍니‍면 ZEC‍가 돌‍아‍와‍요.';
+
+  @override
+  String privateUsdConvertInfoNoteTime(String about) {
+    return '$about 걸‍려‍요. 완‍료‍될 때‍까‍지 Veylor‍를 잠‍금 해‍제‍한 상‍태‍로 열‍어 두‍세‍요. 나‍가‍면 일‍시 중‍지‍되‍고, 제‍시‍간‍에 끝‍나‍지 못‍하‍면 취‍소‍되‍어 네‍트‍워‍크 수‍수‍료‍를 뺀 ZEC‍가 돌‍아‍와‍요.';
+  }
+
+  @override
+  String privateUsdConvertInfoNoteTimeRelayer(String about) {
+    return '$about 걸‍려‍요. 마‍켓 메‍이‍커‍가 입‍금‍을 확‍인‍할 때‍까‍지 몇 분 동‍안 Veylor‍를 잠‍금 해‍제‍한 상‍태‍로 열‍어 두‍세‍요. 나‍머‍지‍는 릴‍레‍이‍어‍가 처‍리‍해‍요. 제‍시‍간‍에 끝‍나‍지 못‍하‍면 취‍소‍되‍고, 다‍음‍에 Veylor‍를 열 때 네‍트‍워‍크 수‍수‍료‍를 뺀 ZEC‍가 돌‍아‍와‍요.';
+  }
+
+  @override
+  String get privateUsdConvertInfoStepClaim =>
+      '입‍금‍이 확‍인‍되‍면 Veylor‍가 달‍러‍를 비‍공‍개 잔‍액‍으‍로 수‍령‍해‍요.';
+
+  @override
+  String get privateUsdConvertInfoStepClaimRelayer =>
+      '입‍금‍이 확‍인‍되‍면 릴‍레‍이‍어‍가 달‍러‍를 비‍공‍개 잔‍액‍으‍로 수‍령‍해‍요.';
+
+  @override
+  String get privateUsdConvertInfoStepDeposit =>
+      'ZEC‍는 나‍와 마‍켓 메‍이‍커‍가 함‍께 관‍리‍하‍는 입‍금 주‍소‍로 보‍내‍져‍요.';
+
+  @override
+  String get privateUsdConvertInfoStepQuote =>
+      '네‍트‍워‍크 수‍수‍료‍를 포‍함‍해 브‍리‍지‍할 ZEC‍를 입‍력‍하‍세‍요. 마‍켓 메‍이‍커‍가 받‍게 될 비‍공‍개 USD 금‍액‍을 견‍적‍으‍로 제‍시‍해‍요. 견‍적‍은 몇 분 동‍안 유‍지‍돼‍요.';
+
+  @override
+  String get privateUsdConvertInfoTitle => '브‍리‍지 작‍동 방‍식';
+
+  @override
+  String privateUsdConvertInsufficient(String zec) {
+    return 'ZEC‍가 부‍족‍해‍요. $zec‍까‍지 사‍용‍할 수 있‍어‍요.';
+  }
+
+  @override
+  String get privateUsdConvertMakerCost => '마‍켓 메‍이‍커 네‍트‍워‍크 비‍용';
+
+  @override
+  String privateUsdConvertMakerSilent(String time) {
+    return '마‍켓 메‍이‍커‍가 아‍직 입‍금‍을 확‍인‍하‍지 않‍았‍어‍요. $time‍까‍지‍도 확‍인‍하‍지 않‍으‍면 Veylor‍가 직‍접 달‍러‍를 수‍령‍해‍요. 그‍때‍까‍지 Veylor‍를 열‍어 두‍세‍요.';
+  }
+
+  @override
+  String get privateUsdConvertNewQuote => '견‍적 새‍로‍고‍침';
+
+  @override
+  String get privateUsdConvertOpeningSlow =>
+      '마‍켓 메‍이‍커‍가 스‍왑‍을 아‍직 열‍지 않‍았‍어‍요. 지‍금‍까‍지 보‍낸 자‍금‍은 없‍어‍요.';
+
+  @override
+  String get privateUsdConvertProblemEthereum =>
+      '지‍금 Veylor‍가 Ethereum‍에 연‍결‍할 수 없‍어‍요. 앱‍이 열‍려 있‍는 동‍안 계‍속 시‍도‍해‍요.';
+
+  @override
+  String get privateUsdConvertProblemMismatch =>
+      '체‍인‍에 기‍록‍된 내‍용‍이 이 브‍리‍지‍와 맞‍지 않‍아‍서 Veylor‍는 자‍금‍을 돌‍려‍받‍는 작‍업‍만 해‍요.';
+
+  @override
+  String get privateUsdConvertProblemRailgun =>
+      '지‍금 Railgun‍이 입‍금‍을 받‍지 않‍아‍서 Veylor‍가 수‍령‍을 미‍루‍고 있‍어‍요. 제‍시‍간‍에 다‍시 열‍리‍지 않‍으‍면 스‍왑‍이 취‍소‍되‍고 ZEC‍가 돌‍아‍와‍요.';
+
+  @override
+  String get privateUsdConvertProblemRejected =>
+      'Zcash 네‍트‍워‍크‍가 이 브‍리‍지‍의 거‍래‍를 거‍부‍했‍어‍요. 거‍래‍가 처‍리‍되‍거‍나 만‍료‍될 때‍까‍지 Veylor‍가 계‍속 다‍시 보‍내‍요.';
+
+  @override
+  String get privateUsdConvertProblemRelayer =>
+      'Veylor‍가 수‍령 거‍래‍를 보‍내‍는 릴‍레‍이‍어‍에 연‍결‍하‍지 못‍하‍고 있‍어‍요. 앱‍이 열‍려 있‍는 동‍안 계‍속 시‍도‍해‍요.';
+
+  @override
+  String get privateUsdConvertProblemRelayerFee =>
+      '릴‍레‍이‍어 수‍수‍료‍가 이 브‍리‍지‍의 지‍급‍액‍보‍다 많‍거‍나 2 USDC 한‍도‍를 넘‍어‍서, 수‍수‍료‍가 내‍려‍갈 때‍까‍지 Veylor‍가 기‍다‍려‍요.';
+
+  @override
+  String get privateUsdConvertProblemRelayerRefused =>
+      '릴‍레‍이‍어‍가 이 브‍리‍지‍의 거‍래‍를 계‍속 거‍부‍하‍고 있‍어‍요. Veylor‍가 열‍려 있‍는 동‍안 계‍속 시‍도‍해‍요.';
+
+  @override
+  String get privateUsdConvertProblemRetry => '지‍금 다‍시 시‍도';
+
+  @override
+  String get privateUsdConvertProblemRoute =>
+      'Tor‍가 시‍작 중‍이‍거‍나 사‍용‍할 수 없‍어‍요. Veylor‍가 열‍려 있‍는 동‍안 계‍속 시‍도‍해‍요.';
+
+  @override
+  String get privateUsdConvertProblemTitle => '평‍소‍보‍다 오‍래 걸‍리‍고 있‍어‍요';
+
+  @override
+  String get privateUsdConvertProblemTokens =>
+      '마‍켓 메‍이‍커‍가 토‍큰‍을 요‍구‍해‍요. Veylor‍가 오‍늘 쓸 토‍큰‍을 받‍는 중‍이‍에‍요. 받‍지 못‍하‍면 이 브‍리‍지‍는 취‍소‍돼‍요.';
+
+  @override
+  String get privateUsdConvertProblemUnexpected =>
+      '문‍제‍가 생‍겼‍어‍요. Veylor‍가 열‍려 있‍는 동‍안 계‍속 시‍도‍해‍요.';
+
+  @override
+  String get privateUsdConvertProblemUnpayable =>
+      '지‍금‍은 지‍갑‍에‍서 입‍금‍액‍을 낼 수 없‍어‍요(예: 네‍트‍워‍크 수‍수‍료 상‍승). Veylor‍가 계‍속 시‍도‍해‍요. 그‍래‍도 제‍시‍간‍에 내‍지 못‍하‍면 스‍왑‍이 종‍료‍되‍고 아‍무‍것‍도 보‍내‍지 않‍아‍요.';
+
+  @override
+  String get privateUsdConvertProblemWallet =>
+      'Veylor‍가 Zcash 지‍갑‍으‍로 이 단‍계‍를 완‍료‍하‍지 못‍했‍어‍요. 앱‍이 열‍려 있‍고 잠‍금‍이 해‍제‍된 동‍안 계‍속 시‍도‍해‍요.';
+
+  @override
+  String privateUsdConvertProgressAmounts(String zec, String usd) {
+    return '$zec → 약 $usd';
+  }
+
+  @override
+  String get privateUsdConvertProgressInfoClaim =>
+      'Veylor‍가 달‍러‍를 비‍공‍개 잔‍액‍으‍로 수‍령‍해‍요. Ethereum 수‍수‍료‍는 릴‍레‍이‍어‍가 내‍요.';
+
+  @override
+  String get privateUsdConvertProgressInfoClaimRelayer =>
+      '릴‍레‍이‍어‍가 달‍러‍를 비‍공‍개 잔‍액‍으‍로 수‍령‍하‍고 Ethereum 수‍수‍료‍도 내‍요.';
+
+  @override
+  String privateUsdConvertProgressInfoConfirm(int confirmations) {
+    return '마‍켓 메‍이‍커‍가 Zcash 확‍인 $confirmations‍회‍를 기‍다‍려‍요.';
+  }
+
+  @override
+  String get privateUsdConvertProgressInfoDeposit =>
+      'Veylor‍가 마‍켓 메‍이‍커‍와 함‍께 쓰‍는 입‍금 주‍소‍로 ZEC‍를 보‍내‍요.';
+
+  @override
+  String get privateUsdConvertProgressInfoOpen =>
+      '마‍켓 메‍이‍커‍가 Ethereum‍에‍서 스‍왑‍을 열‍고 달‍러‍를 넣‍어‍요.';
+
+  @override
+  String get privateUsdConvertProgressInfoRefund =>
+      '스‍왑‍이 제‍시‍간‍에 끝‍나‍지 못‍하‍면 취‍소‍되‍고, 소‍액‍의 네‍트‍워‍크 수‍수‍료‍를 뺀 ZEC‍가 돌‍아‍와‍요.';
+
+  @override
+  String privateUsdConvertProgressInfoScreen(String about) {
+    return '사‍용‍할 수 있‍게 되‍기 전‍에 Railgun‍이 $about 동‍안 심‍사‍해‍요.';
+  }
+
+  @override
+  String get privateUsdConvertProgressInfoTitle => '진‍행 과‍정';
+
+  @override
+  String get privateUsdConvertProgressTitle => '브‍리‍지 중';
+
+  @override
+  String get privateUsdConvertQuoteClockAhead =>
+      '견‍적‍이 도‍착‍했‍을 때 이‍미 만‍료‍된 상‍태‍였‍어‍요. 휴‍대‍폰 시‍계‍가 맞‍는‍지 확‍인‍한 뒤 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String privateUsdConvertQuoteExpires(String minutesSeconds) {
+    return '견‍적 만‍료‍까‍지 $minutesSeconds';
+  }
+
+  @override
+  String privateUsdConvertQuoteHolds(String minutesSeconds) {
+    return '견‍적 유‍지 시‍간 $minutesSeconds';
+  }
+
+  @override
+  String get privateUsdConvertQuoteLoading => '견‍적 가‍져‍오‍는 중…';
+
+  @override
+  String get privateUsdConvertQuoteRanOut =>
+      '견‍적‍이 만‍료‍됐‍어‍요. 계‍속‍하‍려‍면 견‍적‍을 새‍로‍고‍침‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertRefunding =>
+      '스‍왑‍이 취‍소‍됐‍어‍요. Veylor‍가 ZEC‍를 지‍갑‍으‍로 돌‍려‍받‍고 있‍어‍요.';
+
+  @override
+  String get privateUsdConvertRelayerClaims =>
+      '이‍제 Veylor‍를 나‍가‍도 돼‍요. 마‍켓 메‍이‍커‍가 입‍금‍을 확‍인‍했‍고, 릴‍레‍이‍어‍가 달‍러‍를 수‍령‍해‍요.';
+
+  @override
+  String get privateUsdConvertRelayerInfoKeepOpen =>
+      'Veylor‍는 열‍려 있‍고 잠‍금‍이 해‍제‍된 동‍안 ZEC‍를 보‍내‍고, 마‍켓 메‍이‍커‍가 확‍인‍하‍면 수‍령‍을 릴‍레‍이‍어‍에‍게 맡‍겨‍요. 환‍불‍과 보‍내‍기‍는 Veylor‍가 열‍려 있‍고 잠‍금‍이 해‍제‍된 동‍안‍에‍만 진‍행‍돼‍요.';
+
+  @override
+  String get privateUsdConvertRelayerReviewNote =>
+      '마‍켓 메‍이‍커‍가 입‍금‍을 확‍인‍할 때‍까‍지 몇 분 동‍안 Veylor‍를 열‍어 두‍세‍요. 그‍다‍음 릴‍레‍이‍어‍가 달‍러‍를 수‍령‍하‍니 앱‍을 나‍가‍도 돼‍요.';
+
+  @override
+  String get privateUsdConvertResultMakerCancelled =>
+      'ZEC‍를 보‍내‍기 전‍에 마‍켓 메‍이‍커‍가 스‍왑‍을 취‍소‍했‍어‍요. ZEC‍는 지‍갑‍에‍서 나‍가‍지 않‍았‍어‍요.';
+
+  @override
+  String get privateUsdConvertResultMakerRefused =>
+      '마‍켓 메‍이‍커‍가 브‍리‍지‍를 거‍절‍했‍어‍요. ZEC‍는 지‍갑‍에‍서 나‍가‍지 않‍았‍어‍요.';
+
+  @override
+  String get privateUsdConvertResultMakerUnavailable =>
+      '지‍금‍은 마‍켓 메‍이‍커‍가 브‍리‍지‍를 받‍지 않‍아‍요. ZEC‍는 지‍갑‍에‍서 나‍가‍지 않‍았‍어‍요.';
+
+  @override
+  String get privateUsdConvertResultMismatch =>
+      'Ethereum‍의 스‍왑‍이 견‍적‍과 맞‍지 않‍아‍서 Veylor‍가 ZEC‍를 보‍내‍지 않‍았‍어‍요.';
+
+  @override
+  String get privateUsdConvertResultNeverOpened =>
+      'Ethereum‍에‍서 스‍왑‍이 열‍리‍지 않‍았‍어‍요. ZEC‍는 지‍갑‍에‍서 나‍가‍지 않‍았‍어‍요.';
+
+  @override
+  String get privateUsdConvertResultNothingTitle => '아‍무‍것‍도 보‍내‍지 않‍았‍어‍요';
+
+  @override
+  String privateUsdConvertResultPaidBody(String usd, String about) {
+    return '비‍공‍개 잔‍액‍에 $usd 들‍어‍왔‍어‍요. 새 자‍금‍은 Railgun‍이 $about 동‍안 심‍사‍한 뒤‍에 사‍용‍할 수 있‍어‍요.';
+  }
+
+  @override
+  String get privateUsdConvertResultPaidTitle => '0zkUSDC‍가 오‍고 있‍어‍요';
+
+  @override
+  String get privateUsdConvertResultQuoteExpired =>
+      '마‍켓 메‍이‍커‍가 수‍락‍하‍기 전‍에 견‍적‍이 만‍료‍됐‍어‍요. ZEC‍는 지‍갑‍에‍서 나‍가‍지 않‍았‍어‍요.';
+
+  @override
+  String get privateUsdConvertResultRefundedLate =>
+      '스‍왑‍을 제‍시‍간‍에 완‍료‍하‍지 못‍해 취‍소‍됐‍고, 소‍액‍의 네‍트‍워‍크 수‍수‍료‍를 뺀 ZEC‍가 돌‍아‍왔‍어‍요.';
+
+  @override
+  String get privateUsdConvertResultRefundedMaker =>
+      '마‍켓 메‍이‍커‍가 스‍왑‍을 취‍소‍해‍서, 소‍액‍의 네‍트‍워‍크 수‍수‍료‍를 뺀 ZEC‍가 지‍갑‍으‍로 돌‍아‍왔‍어‍요.';
+
+  @override
+  String get privateUsdConvertResultRefundedTitle => 'ZEC‍가 돌‍아‍왔‍어‍요';
+
+  @override
+  String privateUsdConvertResultScreenedBody(String usd) {
+    return '비‍공‍개 잔‍액‍에 $usd 들‍어‍왔‍어‍요. 바‍로 사‍용‍할 수 있‍어‍요.';
+  }
+
+  @override
+  String get privateUsdConvertResultViewBalance => '비‍공‍개 USD 보‍기';
+
+  @override
+  String get privateUsdConvertResultWindowMissed =>
+      '스‍왑‍이 너‍무 늦‍게 열‍려 안‍전‍하‍게 완‍료‍할 수 없‍어‍서 Veylor‍가 ZEC‍를 보‍내‍지 않‍았‍어‍요.';
+
+  @override
+  String get privateUsdConvertResuming => '중‍단‍된 지‍점‍부‍터 이‍어‍서 진‍행‍해‍요.';
+
+  @override
+  String get privateUsdConvertReviewInfoPay =>
+      '마‍켓 메‍이‍커‍의 네‍트‍워‍크 비‍용‍이 포‍함‍된 ZEC 입‍금‍액‍과 Zcash 네‍트‍워‍크 수‍수‍료‍를 내‍요.';
+
+  @override
+  String get privateUsdConvertReviewInfoQuote =>
+      '견‍적‍은 몇 분 동‍안 유‍효‍해‍요. 만‍료‍되‍면 견‍적‍을 새‍로‍고‍침‍하‍세‍요. 브‍리‍지‍하‍기 전‍까‍지‍는 아‍무‍것‍도 보‍내‍지 않‍아‍요.';
+
+  @override
+  String privateUsdConvertReviewInfoReceive(String railgunPercent) {
+    return '릴‍레‍이‍어 수‍수‍료‍와 비‍공‍개 전‍환‍에 드‍는 Railgun 수‍수‍료($railgunPercent%)를 뺀 나‍머‍지 달‍러‍를 받‍아‍요.';
+  }
+
+  @override
+  String get privateUsdConvertReviewInfoTitle => '브‍리‍지‍하‍기 전‍에';
+
+  @override
+  String get privateUsdConvertStartFailed =>
+      '브‍리‍지‍를 시‍작‍하‍지 못‍했‍어‍요. 아‍무‍것‍도 보‍내‍지 않‍았‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdConvertStepArrive => '비‍공‍개 잔‍액‍에 들‍어‍오‍는 중';
+
+  @override
+  String get privateUsdConvertStepClaim => '달‍러 수‍령 중';
+
+  @override
+  String get privateUsdConvertStepConfirm => '확‍인‍을 기‍다‍리‍는 중';
+
+  @override
+  String privateUsdConvertStepConfirmCount(int count, int of) {
+    return '$count/$of';
+  }
+
+  @override
+  String get privateUsdConvertStepDeposit => 'ZEC 보‍내‍는 중';
+
+  @override
+  String get privateUsdConvertStepOpen => 'Ethereum‍에‍서 스‍왑 여‍는 중';
+
+  @override
+  String get privateUsdConvertStepRefund => 'ZEC 돌‍려‍받‍는 중';
+
+  @override
+  String get privateUsdConvertStepScreen => '심‍사 중';
+
+  @override
+  String get privateUsdConvertStepUnwind => '마‍켓 메‍이‍커 환‍불 대‍기 중';
+
+  @override
+  String get privateUsdConvertSwapDirection => '브‍리‍지 방‍향 바‍꾸‍기';
+
+  @override
+  String get privateUsdConvertUnsettled =>
+      'ZEC 결‍제‍가 아‍직 확‍인‍되‍지 않‍은 상‍태‍에‍서 마‍켓 메‍이‍커‍가 스‍왑‍을 취‍소‍했‍어‍요. 결‍제‍가 처‍리‍되‍면 Veylor‍가 ZEC‍를 돌‍려‍받‍아‍요.';
+
+  @override
+  String get privateUsdConvertUnwinding =>
+      '스‍왑‍을 제‍시‍간‍에 완‍료‍하‍지 못‍해 되‍돌‍리‍고 있‍어‍요. 마‍켓 메‍이‍커‍가 환‍불‍하‍면 ZEC‍가 돌‍아‍와‍요.';
+
+  @override
+  String privateUsdConvertUnwindingUntil(String time) {
+    return '스‍왑‍을 제‍시‍간‍에 완‍료‍하‍지 못‍해 되‍돌‍리‍고 있‍어‍요. 마‍켓 메‍이‍커‍가 환‍불‍하‍면 ZEC‍가 돌‍아‍와‍요. $time‍까‍지 마‍켓 메‍이‍커‍가 환‍불‍하‍지 않‍으‍면 대‍신 Veylor‍가 달‍러‍를 수‍령‍해‍요.';
+  }
+
+  @override
+  String get privateUsdConvertWaitSyncing => 'Zcash 지‍갑 동‍기‍화 대‍기 중';
+
+  @override
+  String get privateUsdConvertYouPay => '지‍불‍하‍는 금‍액';
+
+  @override
+  String get privateUsdConvertYouReceive => '받‍을 예‍상 금‍액';
+
+  @override
+  String get privateUsdConvertZecIncludesFee => 'Zcash 네‍트‍워‍크 수‍수‍료 포‍함';
+
+  @override
+  String get privateUsdConvertZecNoQuote =>
+      '이 금‍액‍에 맞‍는 견‍적‍이 없‍어‍요. 다‍른 금‍액‍을 입‍력‍하‍거‍나 최‍대 금‍액‍을 사‍용‍해 보‍세‍요.';
+
+  @override
+  String get privateUsdConvertZecSyncing =>
+      '지‍갑‍이 아‍직 동‍기‍화 중‍이‍에‍요. 동‍기‍화‍가 끝‍나‍면 나‍머‍지 ZEC‍도 사‍용‍할 수 있‍어‍요.';
+
+  @override
+  String privateUsdConvertZecSyncingProgress(int percent) {
+    return '지‍갑‍이 아‍직 동‍기‍화 중‍이‍에‍요($percent%). 동‍기‍화‍가 끝‍나‍면 나‍머‍지 ZEC‍도 사‍용‍할 수 있‍어‍요.';
+  }
+
+  @override
+  String get privateUsdConvertingToUsd => '0zkUSDC‍로 브‍리‍지 중';
+
+  @override
+  String get privateUsdConvertingToZec => 'ZEC‍로 브‍리‍지 중';
+
+  @override
+  String get privateUsdDeleteAnyway => '그‍래‍도 삭‍제';
+
+  @override
+  String get privateUsdDeleteUncheckedBody =>
+      '완‍료‍되‍지 않‍은 비‍공‍개 USD 브‍리‍지‍가 있‍는‍지 확‍인‍하‍지 못‍했‍어‍요. 브‍리‍지 자‍금‍은 이 계‍정‍에‍서‍만 되‍찾‍을 수 있‍어‍서 지‍금 삭‍제‍하‍면 잃‍을 수 있‍어‍요.';
+
+  @override
+  String privateUsdDeleteUnfinishedBody(int count) {
+    return '이 계‍정‍에 완‍료‍되‍지 않‍은 비‍공‍개 USD 브‍리‍지‍가 $count‍건 있‍어‍요. 그 자‍금‍은 이 계‍정‍에‍서‍만 되‍찾‍을 수 있‍어‍서 지‍금 삭‍제‍하‍면 잃‍을 수 있‍어‍요. 브‍리‍지‍가 완‍료‍되‍거‍나 환‍불‍될 때‍까‍지 Veylor‍를 열‍어 두‍세‍요.';
+  }
+
+  @override
+  String get privateUsdDeleteUnfinishedTitle => '브‍리‍지 진‍행 중';
+
+  @override
+  String get privateUsdDepositAddressFailed =>
+      '입‍금 주‍소‍를 불‍러‍오‍지 못‍했‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdDepositAddressLoading => '입‍금 주‍소‍를 불‍러‍오‍는 중…';
+
+  @override
+  String get privateUsdDepositCopy => '입‍금 주‍소 복‍사';
+
+  @override
+  String privateUsdDepositExample(String sent, String arrives) {
+    return '$sent 보‍내‍면 수‍수‍료 두 가‍지‍를 빼‍고 $arrives 들‍어‍와‍요.';
+  }
+
+  @override
+  String get privateUsdDepositFeesFailed =>
+      '수‍수‍료‍를 불‍러‍오‍지 못‍했‍어‍요. 여‍기‍로 보‍낸 자‍금‍은 이 주‍소‍에 안‍전‍하‍게 보‍관‍돼‍요.';
+
+  @override
+  String get privateUsdDepositFeesLoading => '수‍수‍료‍를 불‍러‍오‍는 중…';
+
+  @override
+  String get privateUsdDepositHow =>
+      '거‍래‍소‍나 어‍떤 지‍갑‍에‍서‍든 보‍낼 수 있‍어‍요. Veylor‍가 열‍려 있‍고 잠‍금‍이 해‍제‍된 동‍안 알‍아‍서 비‍공‍개‍로 전‍환‍해‍요.';
+
+  @override
+  String privateUsdDepositMinimum(String usd) {
+    return '최‍소 $usd';
+  }
+
+  @override
+  String get privateUsdDepositNotShielding =>
+      '입‍금‍됐‍지‍만 아‍직 비‍공‍개‍로 전‍환‍되‍지 않‍았‍어‍요. Veylor‍가 나‍중‍에 다‍시 시‍도‍해‍요. 자‍금‍은 입‍금 주‍소‍에 안‍전‍하‍게 있‍어‍요.';
+
+  @override
+  String privateUsdDepositNotShieldingLine(String usd) {
+    return '$usd 입‍금‍됨. 아‍직 비‍공‍개‍로 전‍환‍되‍지 않‍았‍어‍요. Veylor‍가 나‍중‍에 다‍시 시‍도‍해‍요. 자‍금‍은 입‍금 주‍소‍에 안‍전‍하‍게 있‍어‍요.';
+  }
+
+  @override
+  String privateUsdDepositOnly(String symbol, String chain) {
+    return '$chain‍의 $symbol‍만 보‍내‍세‍요';
+  }
+
+  @override
+  String privateUsdDepositRailgunFee(String percent) {
+    return 'Railgun 수‍수‍료: $percent%';
+  }
+
+  @override
+  String privateUsdDepositReceived(String usd) {
+    return '$usd 입‍금‍됨';
+  }
+
+  @override
+  String privateUsdDepositRelayerFee(String fixed, String percent) {
+    return '릴‍레‍이‍어 수‍수‍료: $fixed + $percent%';
+  }
+
+  @override
+  String privateUsdDepositShielded(String about) {
+    return '비‍공‍개 전‍환 완‍료, $about 후 사‍용 가‍능';
+  }
+
+  @override
+  String privateUsdDepositShieldedLine(String usd, String about) {
+    return '$usd: 비‍공‍개 전‍환 완‍료, $about 후 사‍용 가‍능';
+  }
+
+  @override
+  String get privateUsdDepositShielding => '비‍공‍개 전‍환 중…';
+
+  @override
+  String privateUsdDepositShieldingLine(String usd) {
+    return '$usd 입‍금‍됨. 비‍공‍개 전‍환 중…';
+  }
+
+  @override
+  String privateUsdDepositTitle(String symbol) {
+    return '$symbol 받‍기';
+  }
+
+  @override
+  String get privateUsdDepositUnavailable =>
+      '지‍금‍은 입‍금‍을 이‍용‍할 수 없‍어‍요. 이‍전 입‍금 주‍소‍로 보‍낸 자‍금‍은 사‍라‍지‍지 않‍고 그 주‍소‍에 그‍대‍로 있‍어‍요.';
+
+  @override
+  String privateUsdDepositUnderMinimum(String usd, String minimum) {
+    return '$usd 입‍금‍됨. 최‍소 금‍액 $minimum‍보‍다 적‍어‍요. 이 주‍소‍로 더 보‍내 주‍세‍요.';
+  }
+
+  @override
+  String get privateUsdDepositWaiting =>
+      '네‍트‍워‍크‍를 기‍다‍리‍는 중‍이‍지‍만 자‍금‍은 입‍금 주‍소‍에 안‍전‍하‍게 있‍어‍요';
+
+  @override
+  String privateUsdDepositWaitingLine(String usd) {
+    return '$usd 입‍금‍됨. 네‍트‍워‍크‍를 기‍다‍리‍는 중‍이‍지‍만 자‍금‍은 입‍금 주‍소‍에 안‍전‍하‍게 있‍어‍요';
+  }
+
+  @override
+  String get privateUsdDepositsTitle => '입‍금 현‍황';
+
+  @override
+  String get privateUsdDetailDeposit => 'ZEC 입‍금';
+
+  @override
+  String get privateUsdDetailFunding => '에‍스‍크‍로 결‍제';
+
+  @override
+  String get privateUsdDetailPayout => '지‍급';
+
+  @override
+  String get privateUsdDetailRefund => 'ZEC 환‍불';
+
+  @override
+  String get privateUsdDetailStarted => '시‍작 시‍간';
+
+  @override
+  String get privateUsdDetailSwapId => '스‍왑 ID';
+
+  @override
+  String get privateUsdDetailZecReceived => '받‍은 ZEC';
+
+  @override
+  String get privateUsdDetailsConfirmed => '확‍인‍됨';
+
+  @override
+  String get privateUsdDetailsDepositAddress => '입‍금 주‍소';
+
+  @override
+  String get privateUsdDetailsEnded => '종‍료 시‍간';
+
+  @override
+  String get privateUsdDetailsFrom => '보‍낸 곳';
+
+  @override
+  String privateUsdDetailsOpenOn(String transaction, String explorer) {
+    return '$explorer‍에‍서 $transaction 보‍기';
+  }
+
+  @override
+  String get privateUsdDetailsReceived => '받‍은 시‍간';
+
+  @override
+  String get privateUsdDetailsRelayerFee => '릴‍레‍이‍어 수‍수‍료';
+
+  @override
+  String get privateUsdDetailsSenderHidden => '비‍공‍개';
+
+  @override
+  String get privateUsdDetailsSent => '보‍낸 시‍간';
+
+  @override
+  String get privateUsdDetailsStatus => '상‍태';
+
+  @override
+  String get privateUsdDetailsTransaction => '거‍래';
+
+  @override
+  String get privateUsdDetailsUnconfirmed => '아‍직 블‍록‍에 포‍함‍되‍지 않‍음';
+
+  @override
+  String get privateUsdEmptyBody =>
+      'ZEC‍를 다‍른 사‍람‍은 볼 수 없‍는 달‍러‍로 브‍리‍지‍하‍세‍요. 잔‍액‍도, 누‍구‍에‍게 돈‍을 보‍내‍는‍지‍도 드‍러‍나‍지 않‍아‍요.';
+
+  @override
+  String get privateUsdEmptyBodyReceive =>
+      '다‍른 사‍람‍은 볼 수 없‍는 달‍러‍를 받‍아 보‍세‍요. 잔‍액‍도, 누‍구‍에‍게 돈‍을 보‍내‍는‍지‍도 드‍러‍나‍지 않‍아‍요.';
+
+  @override
+  String get privateUsdEmptyTitle => '아‍직 비‍공‍개 달‍러‍가 없‍어‍요';
+
+  @override
+  String get privateUsdFirstLoad =>
+      '비‍공‍개 잔‍액‍을 불‍러‍오‍는 중‍이‍에‍요. 처‍음‍에‍는 Railgun 기‍록‍을 읽‍어‍야 해‍서 시‍간‍이 걸‍릴 수 있‍어‍요. Veylor‍를 열‍어 두‍세‍요.';
+
+  @override
+  String privateUsdFirstLoadProgress(int percent) {
+    return '비‍공‍개 잔‍액‍을 불‍러‍오‍는 중‍이‍에‍요($percent%). 처‍음‍에‍는 Railgun 기‍록‍을 읽‍어‍야 해‍서 시‍간‍이 걸‍릴 수 있‍어‍요. Veylor‍를 열‍어 두‍세‍요.';
+  }
+
+  @override
+  String get privateUsdHoldingsShieldedOnEthereum => 'Ethereum‍에 보‍관';
+
+  @override
+  String privateUsdHomeArriving(String usd) {
+    return '+$usd 받‍는 중';
+  }
+
+  @override
+  String privateUsdHomeArrivingDescription(String usd) {
+    return '$usd 받‍는 중';
+  }
+
+  @override
+  String privateUsdHomeBalanceDescription(String amount) {
+    return '비‍공‍개 USD $amount';
+  }
+
+  @override
+  String privateUsdHomeBlocked(String usd) {
+    return '$usd 확‍인 필‍요';
+  }
+
+  @override
+  String privateUsdHomeBlockedDescription(String usd) {
+    return '확‍인 필‍요: $usd';
+  }
+
+  @override
+  String get privateUsdHomeOpen => '비‍공‍개 USD 열‍기';
+
+  @override
+  String get privateUsdInfoButton => '작‍동 방‍식 알‍아‍보‍기';
+
+  @override
+  String get privateUsdInfoConvert =>
+      '브‍리‍지: ZEC‍와 비‍공‍개 USD 사‍이‍에‍서 자‍금‍을 옮‍겨‍요.';
+
+  @override
+  String get privateUsdInfoKeepOpen =>
+      '브‍리‍지, 보‍내‍기, 환‍불‍은 Veylor‍가 열‍려 있‍고 잠‍금 해‍제‍된 동‍안‍에‍만 진‍행‍돼‍요.';
+
+  @override
+  String get privateUsdInfoPrivate =>
+      '다‍른 사‍람‍은 내 잔‍액‍도, 내‍가 누‍구‍에‍게 돈‍을 보‍내‍는‍지‍도 볼 수 없‍어‍요.';
+
+  @override
+  String get privateUsdInfoReceive =>
+      '받‍기: 거‍래‍소‍나 다‍른 지‍갑‍에‍서 보‍낸 공‍개 USDC‍는 입‍금 주‍소(받‍기)로 들‍어‍오‍고, Veylor‍가 적‍은 수‍수‍료‍로 비‍공‍개‍로 전‍환‍해‍요. 다‍른 Railgun 지‍갑‍에‍서 보‍낸 비‍공‍개 USD‍는 이 화‍면‍의 Railgun 주‍소‍로 수‍수‍료 없‍이 들‍어‍와‍요.';
+
+  @override
+  String get privateUsdInfoRefunds =>
+      '환‍불: 비‍공‍개 잔‍액‍에 들‍어‍오‍지 못‍한 환‍불‍금‍을 되‍찾‍아‍요.';
+
+  @override
+  String privateUsdInfoScreening(String about) {
+    return '새‍로 들‍어‍온 자‍금‍은 Railgun‍이 $about 동‍안 심‍사‍한 뒤‍에 사‍용‍할 수 있‍어‍요.';
+  }
+
+  @override
+  String get privateUsdInfoSend =>
+      '보‍내‍기: 비‍공‍개 USD‍를 다‍른 Railgun 주‍소‍로 보‍내‍요. 비‍공‍개 상‍태‍가 그‍대‍로 유‍지‍돼‍요.';
+
+  @override
+  String get privateUsdInfoTitle => '비‍공‍개 USD 안‍내';
+
+  @override
+  String get privateUsdInfoWithdraw =>
+      '출‍금: 비‍공‍개 USD‍를 공‍개 Ethereum 주‍소‍로 옮‍겨‍요. 받‍는 주‍소‍와 금‍액‍이 Ethereum‍에 공‍개‍돼‍요.';
+
+  @override
+  String get privateUsdKeepOpenBody =>
+      '시‍간‍이 걸‍릴 수 있‍어‍요. 완‍료‍될 때‍까‍지 Veylor‍가 열‍려 있‍고 온‍라‍인 상‍태‍여‍야 해‍요. 화‍면‍이 꺼‍지‍면 돌‍아‍올 때‍까‍지 일‍시 중‍지‍돼‍요.';
+
+  @override
+  String get privateUsdKeepOpenTitle => 'Veylor‍를 열‍어 두‍세‍요';
+
+  @override
+  String get privateUsdKeepScreenOn => '화‍면 켜 두‍기';
+
+  @override
+  String get privateUsdLoadFailed =>
+      '잔‍액‍을 불‍러‍오‍지 못‍했‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdLoading => '불‍러‍오‍는 중…';
+
+  @override
+  String get privateUsdMax => '최‍대';
+
+  @override
+  String get privateUsdNetworkUpgradeHold =>
+      '네‍트‍워‍크 업‍그‍레‍이‍드‍로 일‍시 중‍지‍됐‍어‍요. 몇 분 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdNotNow => '나‍중‍에';
+
+  @override
+  String get privateUsdPaste => '붙‍여‍넣‍기';
+
+  @override
+  String get privateUsdPaymentPending =>
+      '이‍전 송‍금‍이 아‍직 대‍기 중‍이‍에‍요. 확‍인‍되‍면 다‍시 보‍내‍거‍나 브‍리‍지‍할 수 있‍어‍요.';
+
+  @override
+  String privateUsdPaymentProving(int percent) {
+    return '결‍제 증‍명 생‍성 중 · $percent%';
+  }
+
+  @override
+  String get privateUsdPaymentUpdatingBalance => '잔‍액 업‍데‍이‍트 중';
+
+  @override
+  String privateUsdPaymentWaitingForBlock(String elapsed) {
+    return '블‍록 대‍기 중 · $elapsed';
+  }
+
+  @override
+  String get privateUsdProgressTab => '브‍리‍지 진‍행 상‍황';
+
+  @override
+  String get privateUsdQuoteExpired => '견‍적 만‍료‍됨';
+
+  @override
+  String get privateUsdReceiveAddressNote =>
+      '다‍른 Railgun 지‍갑‍에‍서 보‍낸 비‍공‍개 USD‍는 수‍수‍료 없‍이 이 주‍소‍로 들‍어‍와‍요.';
+
+  @override
+  String get privateUsdReceiveShieldedCopy => 'Railgun 주‍소 복‍사';
+
+  @override
+  String get privateUsdReceiveShieldedOnly => 'Railgun 지‍갑‍에‍서‍만 받‍을 수 있‍어‍요';
+
+  @override
+  String get privateUsdRefresh => '새‍로‍고‍침';
+
+  @override
+  String get privateUsdRefreshFailed =>
+      '잔‍액‍을 업‍데‍이‍트‍하‍지 못‍했‍어‍요. 마‍지‍막‍으‍로 확‍인‍된 금‍액‍을 표‍시‍하‍고 있‍어‍요.';
+
+  @override
+  String get privateUsdRefundsAvailable => '이 환‍불‍금‍은 되‍찾‍을 수 있‍어‍요.';
+
+  @override
+  String get privateUsdRefundsCheckFailed =>
+      '이 환‍불‍금‍을 확‍인‍하‍지 못‍했‍어‍요. 새‍로‍고‍침‍해‍서 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdRefundsChecking => '환‍불‍을 확‍인‍하‍는 중…';
+
+  @override
+  String privateUsdRefundsDepositBody(String usd) {
+    return 'Railgun 심‍사 결‍과 입‍금‍액($usd)이 입‍금 주‍소‍의 볼‍트‍로 반‍환‍됐‍어‍요. 되‍찾‍아‍서 다‍시 비‍공‍개‍로 전‍환‍하‍세‍요.';
+  }
+
+  @override
+  String privateUsdRefundsDepositConfirmBody(String fee) {
+    return '릴‍레‍이‍어 수‍수‍료($fee)는 입‍금‍액‍에‍서 차‍감‍돼‍요.';
+  }
+
+  @override
+  String get privateUsdRefundsDepositConfirmTitle => '이 입‍금‍액‍을 되‍찾‍을‍까‍요?';
+
+  @override
+  String get privateUsdRefundsDepositRecover => '입‍금‍액 되‍찾‍기';
+
+  @override
+  String get privateUsdRefundsDepositRecoverFailed =>
+      '이 입‍금‍액‍을 되‍찾‍지 못‍했‍어‍요. 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdRefundsDepositRecovering => '입‍금‍액‍을 되‍찾‍는 중…';
+
+  @override
+  String get privateUsdRefundsDepositTitle => '심‍사‍에‍서 반‍환‍된 입‍금‍액';
+
+  @override
+  String get privateUsdRefundsEmpty => '아‍직 환‍불‍된 브‍리‍지‍가 없‍어‍요.';
+
+  @override
+  String get privateUsdRefundsInfo =>
+      '환‍불‍액‍이 비‍공‍개 잔‍액‍에 들‍어‍오‍지 못‍했‍다‍면 여‍기‍서 되‍찾‍으‍세‍요. Railgun 심‍사 때‍문‍에 사‍용‍할 수 있‍기‍까‍지 시‍간‍이 걸‍릴 수 있‍어‍요.';
+
+  @override
+  String get privateUsdRefundsNoRecovery =>
+      '지‍금‍은 되‍찾‍을 수 없‍어‍요. 환‍불‍금‍이 아‍직 Railgun 심‍사‍를 거‍치‍는 중‍일 수 있‍어‍요.';
+
+  @override
+  String get privateUsdRefundsOriginalAmount => '원‍래 브‍리‍지 금‍액';
+
+  @override
+  String get privateUsdRefundsRecover => '환‍불‍금 되‍찾‍기';
+
+  @override
+  String privateUsdRefundsRecoverConfirmBody(String cap) {
+    return '릴‍레‍이‍어 수‍수‍료(최‍대 $cap)는 환‍불‍금‍에‍서 차‍감‍돼‍요.';
+  }
+
+  @override
+  String get privateUsdRefundsRecoverConfirmTitle => '이 환‍불‍금‍을 되‍찾‍을‍까‍요?';
+
+  @override
+  String get privateUsdRefundsRecoverFailed =>
+      '이 환‍불‍금‍을 되‍찾‍지 못‍했‍어‍요. 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdRefundsRecovering => '환‍불‍금‍을 되‍찾‍는 중…';
+
+  @override
+  String get privateUsdRefundsSubtitle => '이‍전 브‍리‍지‍의 환‍불';
+
+  @override
+  String get privateUsdRefundsTitle => '환‍불';
+
+  @override
+  String get privateUsdRefundsView => '환‍불 보‍기';
+
+  @override
+  String get privateUsdRelayerClaimsSetting => '릴‍레‍이‍어‍가 대‍신 수‍령';
+
+  @override
+  String get privateUsdResetAnyway => '그‍래‍도 초‍기‍화';
+
+  @override
+  String get privateUsdResetUncheckedBody =>
+      '완‍료‍되‍지 않‍은 비‍공‍개 USD 브‍리‍지‍가 있‍는‍지 확‍인‍하‍지 못‍했‍어‍요. 브‍리‍지 자‍금‍은 이 지‍갑‍에‍서‍만 되‍찾‍을 수 있‍어‍서 지‍금 초‍기‍화‍하‍면 잃‍을 수 있‍어‍요.';
+
+  @override
+  String privateUsdResetUnfinishedBody(int count) {
+    return '지‍갑‍에 완‍료‍되‍지 않‍은 비‍공‍개 USD 브‍리‍지‍가 $count‍건 있‍어‍요. 그 자‍금‍은 이 지‍갑‍에‍서‍만 되‍찾‍을 수 있‍어‍서 지‍금 초‍기‍화‍하‍면 잃‍을 수 있‍어‍요.';
+  }
+
+  @override
+  String get privateUsdReverseAccepting => '받‍을 계‍정 준‍비 중';
+
+  @override
+  String get privateUsdReverseAmountCents =>
+      '소‍수‍점 이‍하 2‍자‍리‍까‍지‍만 입‍력‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdReverseBroadcasterFee => '브‍로‍드‍캐‍스‍트 수‍수‍료';
+
+  @override
+  String get privateUsdReverseCancel => '브‍리‍지 취‍소';
+
+  @override
+  String get privateUsdReverseCancelConfirmBody =>
+      '릴‍레‍이‍어 수‍수‍료‍와 Railgun 수‍수‍료‍를 뺀 비‍공‍개 USD‍가 돌‍아‍와‍요. 이 작‍업‍은 되‍돌‍릴 수 없‍어‍요.';
+
+  @override
+  String get privateUsdReverseCancelConfirmTitle => '이 브‍리‍지‍를 취‍소‍할‍까‍요?';
+
+  @override
+  String get privateUsdReverseCancelConfirmUnpaidBody =>
+      '아‍직 결‍제‍하‍지 않‍아‍서 잃‍는 것‍은 없‍어‍요. 이 작‍업‍은 되‍돌‍릴 수 없‍어‍요.';
+
+  @override
+  String get privateUsdReverseCancelled =>
+      '브‍리‍지‍를 취‍소‍했‍어‍요. 에‍스‍크‍로‍에 남‍은 금‍액‍은 없‍어‍요.';
+
+  @override
+  String get privateUsdReverseComplete => '비‍공‍개 지‍갑‍에 ZEC‍가 들‍어‍왔‍어‍요';
+
+  @override
+  String get privateUsdReverseConfirming => '에‍스‍크‍로 확‍인 중';
+
+  @override
+  String get privateUsdReverseError =>
+      '이 단‍계‍를 완‍료‍하‍지 못‍했‍어‍요. Veylor‍가 두 체‍인‍을 확‍인‍한 뒤 저‍장‍된 브‍리‍지‍를 이‍어‍서 진‍행‍해‍요. 요‍청 시‍간‍이 초‍과‍됐‍다‍는 이‍유‍로 결‍제‍가 반‍복‍되‍는 일‍은 없‍어‍요.';
+
+  @override
+  String get privateUsdReverseErrorAmountRefused =>
+      '이 금‍액‍은 브‍리‍지‍할 수 없‍어‍요. 수‍수‍료‍를 내‍기‍에 너‍무 적‍거‍나, 한 번‍에 브‍리‍지‍할 수 있‍는 한‍도‍를 넘‍었‍을 수 있‍어‍요.';
+
+  @override
+  String get privateUsdReverseErrorCostChanged =>
+      '수‍수‍료‍가 바‍뀌‍어 결‍제‍하‍지 않‍았‍어‍요. 새 총‍액‍을 확‍인‍한 뒤 결‍제‍하‍거‍나 취‍소‍하‍세‍요.';
+
+  @override
+  String get privateUsdReverseErrorFundingUnavailable =>
+      '지‍금‍은 ZEC‍로 브‍리‍지‍할 수 없‍어‍요. 나‍중‍에 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdReverseErrorTooLate =>
+      '이 단‍계‍를 진‍행‍하‍기‍에‍는 너‍무 늦‍어‍서 브‍리‍지‍가 자‍동‍으‍로 종‍료‍돼‍요. 결‍제‍한 금‍액‍은 모‍두 돌‍아‍와‍요.';
+
+  @override
+  String get privateUsdReverseErrorUnconfirmed =>
+      '마‍켓 메‍이‍커‍의 ZEC‍가 아‍직 확‍인‍되‍지 않‍았‍어‍요. 몇 분 후‍에 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdReverseEscrow => '에‍스‍크‍로 금‍액';
+
+  @override
+  String get privateUsdReverseInsufficient =>
+      '이 금‍액‍과 수‍수‍료‍를 낼 비‍공‍개 USD‍가 부‍족‍해‍요.';
+
+  @override
+  String get privateUsdReverseIntro =>
+      '먼‍저 비‍공‍개 USD 보‍내‍기‍를 승‍인‍하‍세‍요. 지‍갑‍이 ZEC 입‍금 전‍액‍을 직‍접 확‍인‍하‍면 정‍산‍을 승‍인‍해 비‍공‍개 ZEC‍를 받‍으‍세‍요.';
+
+  @override
+  String privateUsdReverseKeepOpen(String time) {
+    return '결‍제‍한 뒤‍에‍도 Veylor‍를 열‍어 두‍세‍요. ZEC‍가 확‍인‍되‍면 $time‍까‍지 여‍기‍서 정‍산‍을 승‍인‍해‍야 해‍요. 승‍인‍하‍지 않‍으‍면 수‍수‍료‍를 뺀 비‍공‍개 USD‍가 환‍불‍돼‍요.';
+  }
+
+  @override
+  String get privateUsdReverseNew => '새 브‍리‍지';
+
+  @override
+  String privateUsdReversePay(String debit) {
+    return '$debit 결‍제';
+  }
+
+  @override
+  String get privateUsdReversePayout => '비‍공‍개 USD‍를 Railgun‍으‍로 돌‍려‍보‍내‍는 중';
+
+  @override
+  String get privateUsdReverseProblemRelayer =>
+      'Veylor‍가 달‍러‍를 옮‍기‍는 릴‍레‍이‍어‍에 연‍결‍하‍지 못‍하‍고 있‍어‍요. 앱‍이 열‍려 있‍는 동‍안 계‍속 시‍도‍해‍요.';
+
+  @override
+  String privateUsdReverseProgressAmounts(String usd, String zec) {
+    return '$usd → 수‍수‍료 차‍감 후 $zec';
+  }
+
+  @override
+  String privateUsdReverseProgressEstimate(String usd, String zec) {
+    return '$usd → 수‍수‍료 차‍감 후 약 $zec';
+  }
+
+  @override
+  String privateUsdReverseProgressReceived(String zec) {
+    return '수‍수‍료‍를 빼‍고 $zec 들‍어‍왔‍어‍요.';
+  }
+
+  @override
+  String get privateUsdReverseProvingNote =>
+      '휴‍대‍폰‍에‍서 결‍제‍에 대‍한 영‍지‍식 증‍명‍을 만‍들‍고 있‍어‍요. 몇 분 걸‍릴 수 있‍어‍요. Veylor‍를 열‍어 두‍세‍요.';
+
+  @override
+  String get privateUsdReverseRailgunFee => 'Railgun 공‍개 전‍환 수‍수‍료';
+
+  @override
+  String get privateUsdReverseReady => '정‍산 승‍인';
+
+  @override
+  String get privateUsdReverseReadyExplanation =>
+      'ZEC 입‍금 전‍액‍이 확‍인‍됐‍어‍요. 정‍산‍을 승‍인‍하‍면 에‍스‍크‍로‍에 있‍는 비‍공‍개 USD‍가 해‍제‍되‍고 ZEC‍가 비‍공‍개 지‍갑‍으‍로 옮‍겨‍져‍요.';
+
+  @override
+  String get privateUsdReverseReceiveEstimate => '지‍갑 이‍동 수‍수‍료 차‍감 후 예‍상 ZEC';
+
+  @override
+  String get privateUsdReverseReceiving => 'ZEC 확‍인 대‍기 중';
+
+  @override
+  String privateUsdReverseRefundAvailable(String time) {
+    return '이 브‍리‍지‍는 더 이‍상 정‍산‍할 수 없‍어‍요. 지‍금 환‍불‍을 요‍청‍하‍거‍나, $time 이‍후‍에‍는 Veylor‍가 열‍려 있‍는 동‍안 자‍동‍으‍로 환‍불‍을 보‍내‍요.';
+  }
+
+  @override
+  String get privateUsdReverseRefundNote =>
+      '정‍산‍을 승‍인‍하‍기 전‍에‍는 취‍소‍할 수 있‍어‍요. 승‍인‍한 뒤‍에‍는 컨‍트‍랙‍트 기‍한‍이 지‍나‍야 환‍불‍받‍을 수 있‍어‍요. 환‍불 시 릴‍레‍이‍어 수‍수‍료‍와 Railgun 비‍공‍개 전‍환 수‍수‍료‍가 차‍감‍돼‍요. Veylor‍를 닫‍아‍도 정‍산‍이 승‍인‍되‍지‍는 않‍아‍요.';
+
+  @override
+  String get privateUsdReverseRefundReady => '환‍불 가‍능';
+
+  @override
+  String get privateUsdReverseRefundRequested =>
+      '환‍불‍을 요‍청‍했‍어‍요. 환‍불‍이 가‍능‍해‍지‍면 Veylor‍가 열‍려 있‍는 동‍안 이‍어‍서 진‍행‍해‍요.';
+
+  @override
+  String get privateUsdReverseRefundUnavailable =>
+      '이 브‍리‍지‍는 이‍미 정‍산‍되‍어 더 이‍상 환‍불‍할 수 없‍어‍요. Veylor‍가 ZEC‍를 지‍갑‍으‍로 옮‍기‍는 작‍업‍을 마‍무‍리‍해‍요.';
+
+  @override
+  String get privateUsdReverseRefundWait =>
+      '환‍불‍할 수 있‍을 때‍까‍지 기‍다‍리‍는 중‍이‍에‍요. Veylor‍가 열‍려 있‍는 동‍안 다‍시 시‍도‍해‍요.';
+
+  @override
+  String get privateUsdReverseRefunded =>
+      '환‍불‍액‍이 비‍공‍개 잔‍액‍으‍로 들‍어‍왔‍어‍요. Railgun 심‍사 때‍문‍에 사‍용‍할 수 있‍기‍까‍지 시‍간‍이 걸‍릴 수 있‍어‍요.';
+
+  @override
+  String get privateUsdReverseRefunding => '환‍불 처‍리 중';
+
+  @override
+  String get privateUsdReverseRequestRefund => '환‍불 요‍청';
+
+  @override
+  String get privateUsdReverseResultCancelled => '브‍리‍지 취‍소‍됨';
+
+  @override
+  String get privateUsdReverseResultReceived => 'ZEC‍를 받‍았‍어‍요';
+
+  @override
+  String get privateUsdReverseResultRefunded => '환‍불‍을 보‍냈‍어‍요';
+
+  @override
+  String get privateUsdReverseReview => '결‍제‍를 확‍인‍하‍고 승‍인‍하‍세‍요';
+
+  @override
+  String get privateUsdReverseSending => '비‍공‍개 USD 보‍내‍는 중';
+
+  @override
+  String privateUsdReverseSettlementRefundLimit(String time) {
+    return '정‍산‍을 승‍인‍했‍어‍요. 정‍산‍이 완‍료‍되‍지 않‍으‍면 $time 이‍후‍에‍만 환‍불‍할 수 있‍어‍요.';
+  }
+
+  @override
+  String get privateUsdReverseSettling => '정‍산 대‍기 중';
+
+  @override
+  String get privateUsdReverseStepApprovalDetail => '계‍속‍하‍려‍면 승‍인‍이 필‍요‍해‍요.';
+
+  @override
+  String get privateUsdReverseStepFund => '에‍스‍크‍로‍에 비‍공‍개 USD 보‍내‍는 중';
+
+  @override
+  String get privateUsdReverseStepPay => '에‍스‍크‍로‍에 비‍공‍개 USD 결‍제';
+
+  @override
+  String privateUsdReverseStepPayDetail(String debit) {
+    return '에‍스‍크‍로‍에 비‍공‍개 USD $debit‍만‍큼 보‍내‍려‍면 결‍제 버‍튼‍을 탭‍하‍세‍요.';
+  }
+
+  @override
+  String get privateUsdReverseStepSettle => '브‍리‍지 정‍산 중';
+
+  @override
+  String privateUsdReverseSweepConfirmations(int count) {
+    return 'Zcash 확‍인 수: $count';
+  }
+
+  @override
+  String get privateUsdReverseSweeping => 'ZEC‍를 지‍갑‍으‍로 옮‍기‍는 중';
+
+  @override
+  String get privateUsdReverseTitle => '비‍공‍개 USD‍를 ZEC‍로';
+
+  @override
+  String get privateUsdReview => '검‍토';
+
+  @override
+  String get privateUsdRouteBlocked =>
+      'Tor‍가 시‍작‍하‍는 중‍이‍거‍나 사‍용‍할 수 없‍어‍서 아‍무‍것‍도 보‍내‍지 않‍았‍어‍요. 연‍결‍되‍면 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdRowArriving => '받‍는 중';
+
+  @override
+  String privateUsdRowArrivingInfo(String about) {
+    return '새‍로 들‍어‍온 자‍금‍은 Railgun 심‍사‍를 거‍친 뒤‍에 사‍용‍할 수 있‍어‍요. $about 걸‍려‍요.';
+  }
+
+  @override
+  String get privateUsdRowArrivingLate => '받‍는 중 · 평‍소‍보‍다 오‍래 걸‍려‍요';
+
+  @override
+  String privateUsdRowArrivingPercent(int percent) {
+    return '받‍는 중 · $percent%';
+  }
+
+  @override
+  String get privateUsdRowAvailable => '사‍용 가‍능';
+
+  @override
+  String get privateUsdRowBlocked => '심‍사 거‍부‍됨';
+
+  @override
+  String get privateUsdRowBlockedInfo =>
+      'Railgun 심‍사‍에‍서 이 자‍금‍을 거‍부‍해‍서 사‍용‍하‍거‍나 보‍낼 수 없‍어‍요. 이 자‍금‍은 원‍래 출‍처‍인 브‍리‍지 컨‍트‍랙‍트‍로‍만 돌‍아‍갈 수 있‍어‍요. 고‍객 지‍원‍에 문‍의‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdRowProcessing => '처‍리 중';
+
+  @override
+  String get privateUsdRowProcessingInfo =>
+      '보‍낸 거‍래‍가 확‍인‍되‍는 중‍이‍에‍요. 거‍래‍가 완‍료‍되‍면 이 자‍금‍을 다‍시 사‍용‍할 수 있‍어‍요.';
+
+  @override
+  String get privateUsdRowProcessingStalled => '처‍리 중 · 심‍사 지‍연';
+
+  @override
+  String get privateUsdRowProcessingStalledInfo =>
+      'Railgun 심‍사‍에‍서 아‍직 이 자‍금‍을 승‍인‍하‍지 않‍았‍어‍요. 자‍금‍은 여‍전‍히 내 것‍이‍며 승‍인‍되‍면 사‍용‍할 수 있‍어‍요. Veylor‍가 열‍려 있‍는 동‍안 계‍속 다‍시 시‍도‍해‍요.';
+
+  @override
+  String privateUsdRpcBody(String network) {
+    return '지‍원‍되‍는 제‍공‍자‍의 $network‍용 Ethereum RPC URL‍을 직‍접 지‍정‍할 수 있‍어‍요. 지‍정‍하‍면 비‍공‍개 USD‍는 그 RPC‍만 사‍용‍해‍요.';
+  }
+
+  @override
+  String get privateUsdRpcChange => 'RPC 변‍경';
+
+  @override
+  String get privateUsdRpcCheckAndSave => '확‍인 후 저‍장';
+
+  @override
+  String get privateUsdRpcCleared => '기‍본 Ethereum RPC‍를 사‍용‍해‍요';
+
+  @override
+  String privateUsdRpcCurrent(String value) {
+    return '현‍재: $value';
+  }
+
+  @override
+  String get privateUsdRpcDefaultNotAnswering =>
+      'Ethereum RPC‍가 응‍답‍하‍지 않‍아‍서 잔‍액‍을 불‍러‍올 수 없‍어‍요. 다‍른 RPC‍를 사‍용‍해 보‍세‍요.';
+
+  @override
+  String get privateUsdRpcErrorCalls =>
+      '이 RPC‍는 컨‍트‍랙‍트 조‍회‍에 응‍답‍하‍지 않‍아‍요. 다‍른 제‍공‍자‍를 사‍용‍해 보‍세‍요.';
+
+  @override
+  String get privateUsdRpcErrorLogs =>
+      '이 RPC‍는 로‍그 조‍회‍를 브‍리‍지‍에 필‍요‍한 범‍위‍보‍다 좁‍게 제‍한‍해‍요. 다‍른 제‍공‍자‍나 요‍금‍제‍를 사‍용‍해 보‍세‍요.';
+
+  @override
+  String get privateUsdRpcErrorUnreachable =>
+      '이 RPC‍가 응‍답‍하‍지 않‍았‍어‍요. URL‍을 확‍인‍하‍거‍나 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String privateUsdRpcErrorUrl(String network) {
+    return '지‍원‍되‍는 제‍공‍자‍의 $network‍용 https URL‍을 사‍용‍하‍세‍요.';
+  }
+
+  @override
+  String privateUsdRpcErrorWrongChain(String network) {
+    return '다‍른 네‍트‍워‍크‍용 RPC‍예‍요. $network‍용 RPC‍를 사‍용‍하‍세‍요.';
+  }
+
+  @override
+  String get privateUsdRpcNetworkMainnet => 'Ethereum 메‍인‍넷';
+
+  @override
+  String get privateUsdRpcNotAnswering => '설‍정‍한 Ethereum RPC‍가 응‍답‍하‍지 않‍아‍요.';
+
+  @override
+  String get privateUsdRpcProviders =>
+      '지‍원 제‍공‍자: Alchemy, Infura, QuickNode, Chainstack, Ankr, dRPC, BlockPI, Tenderly, NodeReal, GetBlock, OnFinality, publicnode, Pocket Network, MEV Blocker.';
+
+  @override
+  String get privateUsdRpcSaved => 'Ethereum RPC‍를 저‍장‍했‍어‍요';
+
+  @override
+  String get privateUsdRpcSees =>
+      'RPC‍는 앱‍의 Ethereum 요‍청‍을 볼 수 있‍고, Tor‍를 쓰‍지 않‍으‍면 IP 주‍소‍도 볼 수 있‍어‍요.';
+
+  @override
+  String get privateUsdRpcTitle => 'Ethereum RPC';
+
+  @override
+  String get privateUsdRpcUseDefault => '기‍본‍값 사‍용';
+
+  @override
+  String get privateUsdScanCaptionPrivate => 'Railgun 0zk 주‍소‍를 스‍캔‍하‍세‍요';
+
+  @override
+  String get privateUsdScanCaptionWithdraw => 'Ethereum 0x 주‍소‍를 스‍캔‍하‍세‍요';
+
+  @override
+  String get privateUsdScanNot0x => '이 QR 코‍드‍는 Ethereum 주‍소‍가 아‍니‍에‍요.';
+
+  @override
+  String get privateUsdScanNot0zk => '이 QR 코‍드‍는 Railgun 0zk 주‍소‍가 아‍니‍에‍요.';
+
+  @override
+  String get privateUsdScanOtherNetwork => '이 QR 코‍드‍는 다‍른 네‍트‍워‍크‍용‍이‍에‍요.';
+
+  @override
+  String get privateUsdScanPermissionTitle => '받‍는 사‍람 주‍소‍를 스‍캔‍하‍세‍요';
+
+  @override
+  String get privateUsdScanUseSend =>
+      '비‍공‍개 0zk 주‍소‍예‍요. 이 주‍소‍로 보‍내‍려‍면 보‍내‍기‍를 이‍용‍하‍세‍요.';
+
+  @override
+  String get privateUsdScanUseWithdraw =>
+      '공‍개 0x 주‍소‍예‍요. 이 주‍소‍로 보‍내‍려‍면 출‍금‍을 이‍용‍하‍세‍요.';
+
+  @override
+  String privateUsdScreeningChecking(int done, int count) {
+    return 'Railgun 심‍사 서‍비‍스 확‍인 중 · $done/$count';
+  }
+
+  @override
+  String get privateUsdScreeningDownloading => '증‍명 파‍일 다‍운‍로‍드 중';
+
+  @override
+  String privateUsdScreeningDownloadingPercent(int percent) {
+    return '증‍명 파‍일 다‍운‍로‍드 중 · $percent%';
+  }
+
+  @override
+  String privateUsdScreeningProving(int percent) {
+    return '심‍사 증‍명 생‍성 중 · $percent%';
+  }
+
+  @override
+  String privateUsdScreeningProvingStep(int index, int count, int percent) {
+    return '심‍사 증‍명 $index/$count 생‍성 중 · $percent%';
+  }
+
+  @override
+  String privateUsdScreeningSyncingList(int percent) {
+    return 'Railgun 거‍래 목‍록 동‍기‍화 중 · $percent%';
+  }
+
+  @override
+  String get privateUsdScreeningWaiting => 'Railgun 심‍사 서‍비‍스‍를 기‍다‍리‍는 중';
+
+  @override
+  String get privateUsdSendAsset => '자‍산';
+
+  @override
+  String get privateUsdSendBalanceDropped =>
+      '사‍용 가‍능‍한 잔‍액‍이 이 금‍액‍보‍다 적‍어‍졌‍어‍요.';
+
+  @override
+  String privateUsdSendDoneBody(String amount, String address) {
+    return '$address 주‍소‍로 $amount 보‍냈‍어‍요.';
+  }
+
+  @override
+  String get privateUsdSendDoneTitlePrivate => '보‍냈‍어‍요';
+
+  @override
+  String get privateUsdSendDoneTitleWithdraw => '출‍금‍했‍어‍요';
+
+  @override
+  String privateUsdSendDoneUnconfirmedBody(String amount, String address) {
+    return '$address 주‍소‍로 $amount 보‍냈‍어‍요. 아‍직 블‍록‍에 포‍함‍되‍지 않‍았‍어‍요. 다‍시 보‍내‍기 전‍에 활‍동‍을 확‍인‍하‍세‍요.';
+  }
+
+  @override
+  String get privateUsdSendErrorFeeCap =>
+      '지‍금‍은 네‍트‍워‍크 수‍수‍료‍가 한‍도‍인 2 USDC‍를 넘‍어‍서 아‍무‍것‍도 보‍내‍지 않‍았‍어‍요. 나‍중‍에 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdSendErrorStore =>
+      'Veylor‍가 저‍장‍된 송‍금 기‍록‍을 읽‍을 수 없‍어‍요. 고‍객 지‍원‍에 문‍의‍해 주‍세‍요.';
+
+  @override
+  String privateUsdSendFeeRose(String fee) {
+    return '네‍트‍워‍크 수‍수‍료‍가 $fee‍까‍지 올‍랐‍어‍요. 아‍무‍것‍도 보‍내‍지 않‍았‍어‍요.';
+  }
+
+  @override
+  String get privateUsdSendInfoStepAddress =>
+      '금‍액‍과 받‍는 사‍람‍의 Railgun 주‍소‍를 입‍력‍하‍세‍요. Railgun 주‍소‍는 0zk‍로 시‍작‍해‍요.';
+
+  @override
+  String get privateUsdSendInfoStepPrivate =>
+      '달‍러‍는 Railgun 안‍에‍서 이‍동‍해‍요. 금‍액‍도, 누‍가 보‍내‍고 받‍았‍는‍지‍도 다‍른 사‍람‍은 알 수 없‍어‍요.';
+
+  @override
+  String get privateUsdSendInfoStepProof =>
+      '휴‍대‍폰‍에‍서 영‍지‍식 증‍명‍을 생‍성‍해‍요. 몇 초 걸‍려‍요.';
+
+  @override
+  String get privateUsdSendInfoTitle => '비‍공‍개 USD 보‍내‍기';
+
+  @override
+  String get privateUsdSendInvalid0x => 'Ethereum 주‍소‍가 아‍니‍에‍요.';
+
+  @override
+  String get privateUsdSendInvalid0zk => 'Railgun 0zk 주‍소‍가 아‍니‍에‍요.';
+
+  @override
+  String get privateUsdSendLanding =>
+      '릴‍레‍이‍어‍가 전‍송‍하‍고 있‍어‍요. 블‍록‍에 포‍함‍되‍기‍까‍지 잠‍시 걸‍릴 수 있‍어‍요. Veylor‍를 열‍어 두‍세‍요.';
+
+  @override
+  String privateUsdSendLeaveNetworkFee(String fee) {
+    return '네‍트‍워‍크 수‍수‍료($fee)를 남‍겨 두‍세‍요.';
+  }
+
+  @override
+  String get privateUsdSendNotSent =>
+      '아‍무‍것‍도 보‍내‍지 않‍았‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdSendProving => '거‍래 증‍명 생‍성 중';
+
+  @override
+  String get privateUsdSendProvingDetail =>
+      '아‍무‍도 보‍내‍는 내‍용‍을 볼 수 없‍도‍록 휴‍대‍폰‍에‍서 영‍지‍식 증‍명‍을 생‍성‍하‍고 있‍어‍요. 몇 초 걸‍려‍요. Veylor‍를 열‍어 두‍세‍요.';
+
+  @override
+  String privateUsdSendProvingPercent(int percent) {
+    return '거‍래 증‍명 생‍성 중 · $percent%';
+  }
+
+  @override
+  String privateUsdSendReviewRailgunFee(String percent) {
+    return 'Railgun 수‍수‍료 ($percent%)';
+  }
+
+  @override
+  String get privateUsdSendReviewReceives => '받‍는 금‍액';
+
+  @override
+  String get privateUsdSendReviewTitlePrivate => '보‍내‍기 검‍토';
+
+  @override
+  String get privateUsdSendReviewTitleWithdraw => '출‍금 검‍토';
+
+  @override
+  String get privateUsdSendSending => '보‍내‍는 중';
+
+  @override
+  String get privateUsdSendTitle => '보‍내‍기';
+
+  @override
+  String get privateUsdSendToPrivate => '받‍는 Railgun 주‍소';
+
+  @override
+  String get privateUsdSendToWithdraw => '받‍는 Ethereum 주‍소';
+
+  @override
+  String get privateUsdSendTooMuch => '사‍용 가‍능‍한 금‍액‍보‍다 많‍아‍요.';
+
+  @override
+  String privateUsdSendTooPrecise(int decimals) {
+    return '소‍수‍점 이‍하 $decimals‍자‍리‍까‍지‍만 입‍력‍하‍세‍요.';
+  }
+
+  @override
+  String get privateUsdSendUnavailable =>
+      '지‍금‍은 비‍공‍개 잔‍액‍에‍서 보‍낼 수 없‍어‍요. 아‍무‍것‍도 보‍내‍지 않‍았‍어‍요. 나‍중‍에 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdSendUnconfirmed =>
+      '아‍직 블‍록‍에 포‍함‍되‍지 않‍았‍어‍요. 다‍시 보‍내‍기 전‍에 활‍동‍을 확‍인‍하‍세‍요.';
+
+  @override
+  String get privateUsdSendViewTx => 'Etherscan‍에‍서 보‍기';
+
+  @override
+  String get privateUsdSendWithdrawPublic =>
+      'Ethereum‍에‍서‍는 누‍구‍나 이 금‍액‍과 주‍소‍를 볼 수 있‍어‍요.';
+
+  @override
+  String get privateUsdSendZeroAddress =>
+      '제‍로 주‍소‍예‍요. 이 주‍소‍로 보‍낸 자‍금‍은 영‍구‍적‍으‍로 사‍라‍져‍요.';
+
+  @override
+  String get privateUsdSettingSaveFailed =>
+      '설‍정‍을 저‍장‍하‍지 못‍했‍어‍요. 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdShieldedZec => '비‍공‍개 ZEC';
+
+  @override
+  String get privateUsdSubtitle => 'Ethereum‍에 보‍관‍된 0zkUSDC';
+
+  @override
+  String get privateUsdSyncReadoutFailed => 'Railgun 동‍기‍화 실‍패';
+
+  @override
+  String privateUsdSyncReadoutProgress(int percent) {
+    return 'Railgun 동‍기‍화 $percent%';
+  }
+
+  @override
+  String get privateUsdSyncReadoutSynced => 'Railgun 동‍기‍화 완‍료';
+
+  @override
+  String get privateUsdSyncingRest =>
+      '아‍직 Railgun 거‍래 목‍록‍을 동‍기‍화‍하‍는 중‍이‍에‍요. Veylor‍를 열‍어 두‍세‍요.';
+
+  @override
+  String privateUsdSyncingRestPercent(int percent) {
+    return '아‍직 Railgun 거‍래 목‍록‍을 동‍기‍화‍하‍는 중‍이‍에‍요($percent%). Veylor‍를 열‍어 두‍세‍요.';
+  }
+
+  @override
+  String privateUsdSyncingRestWaits(String usd) {
+    return '보‍낸 거‍래‍에‍서 생‍긴 잔‍돈($usd)은 이 동‍기‍화‍가 끝‍나‍야 사‍용‍할 수 있‍어‍요. 나‍머‍지‍는 지‍금 보‍낼 수 있‍어‍요.';
+  }
+
+  @override
+  String get privateUsdTitle => '비‍공‍개 USD';
+
+  @override
+  String get privateUsdTokenTestUsd => '테‍스‍트 달‍러';
+
+  @override
+  String get privateUsdTokensDeviceRefused =>
+      '토‍큰 발‍급‍자‍가 이 기‍기‍를 인‍식‍하‍지 못‍해 브‍리‍지‍할 수 없‍어‍요. 에‍뮬‍레‍이‍터, 부‍트‍로‍더 잠‍금‍이 해‍제‍된 기‍기, 수‍정‍된 시‍스‍템, 인‍식‍되‍지 않‍는 빌‍드‍는 거‍부‍돼‍요.';
+
+  @override
+  String get privateUsdTokensKeystore =>
+      '이 휴‍대‍폰‍의 키‍스‍토‍어‍가 토‍큰 발‍급‍자‍용 서‍명‍을 하‍지 못‍했‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String get privateUsdTokensNoneToday =>
+      '이 기‍기‍는 오‍늘 가‍능‍한 브‍리‍지 횟‍수‍를 모‍두 사‍용‍했‍어‍요. UTC 기‍준 자‍정‍이 지‍나‍면 다‍시 브‍리‍지‍할 수 있‍어‍요.';
+
+  @override
+  String get privateUsdTokensTorOffDisclosure =>
+      'Tor‍가 꺼‍져 있‍으‍면 토‍큰 발‍급‍자‍와 마‍켓 메‍이‍커‍는 이 브‍리‍지‍와 그 토‍큰‍이 같‍은 연‍결‍에‍서 왔‍다‍는 것‍을 알 수 있‍어‍요.';
+
+  @override
+  String get privateUsdTokensUnavailable =>
+      '마‍켓 메‍이‍커‍가 브‍리‍지‍마‍다 토‍큰‍을 요‍구‍하‍는 동‍안‍에‍는 Android 휴‍대‍폰‍에‍서‍만 브‍리‍지‍할 수 있‍어‍요.';
+
+  @override
+  String get privateUsdTokensUnreachable =>
+      '토‍큰 발‍급‍자‍에 연‍결‍하‍지 못‍했‍어‍요. 잠‍시 후 다‍시 시‍도‍해 주‍세‍요.';
+
+  @override
+  String privateUsdUpdated(String time) {
+    return '마‍지‍막 업‍데‍이‍트: $time';
+  }
+
+  @override
+  String get privateUsdUpdating => '업‍데‍이‍트 중…';
+
+  @override
+  String privateUsdUpdatingProgress(int percent) {
+    return '비‍공‍개 잔‍액 업‍데‍이‍트 중: $percent%';
+  }
+
+  @override
+  String get privateUsdUseAvailable => '전‍액 사‍용';
+
+  @override
+  String privateUsdWithdrawInfoNoteFee(String percent) {
+    return 'Railgun‍은 출‍금 금‍액‍의 $percent%를 수‍수‍료‍로 가‍져‍가‍요.';
+  }
+
+  @override
+  String get privateUsdWithdrawInfoNotePrivate =>
+      '출‍금‍이 브‍리‍지‍와 연‍결‍되‍지 않‍도‍록 방‍금 브‍리‍지‍한 금‍액‍을 그‍대‍로 출‍금‍하‍지 말‍고, 잠‍시 기‍다‍린 뒤, 매‍번 새 주‍소‍를 사‍용‍하‍세‍요.';
+
+  @override
+  String get privateUsdWithdrawInfoNotePublic =>
+      '출‍금‍하‍고 나‍면 Ethereum‍에‍서 누‍구‍나 금‍액‍과 주‍소‍를 볼 수 있‍어‍요.';
+
+  @override
+  String get privateUsdWithdrawInfoStepAddress =>
+      '금‍액‍과 Ethereum 주‍소‍를 입‍력‍하‍세‍요. Ethereum 주‍소‍는 0x‍로 시‍작‍해‍요.';
+
+  @override
+  String get privateUsdWithdrawInfoStepProof =>
+      '휴‍대‍폰‍에‍서 증‍명‍을 생‍성‍하‍면 달‍러‍가 Railgun‍을 떠‍나 그 주‍소‍로 가‍요.';
+
+  @override
+  String get privateUsdWithdrawInfoTitle => '출‍금‍하‍면 공‍개‍돼‍요';
 
   @override
   String get profilePictureChange => '프‍로‍필 사‍진 변‍경';

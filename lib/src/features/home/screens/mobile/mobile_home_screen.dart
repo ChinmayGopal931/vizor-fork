@@ -452,9 +452,9 @@ class _IronwoodMigrationAttentionHostState
           return MobileIronwoodMigrationAttentionSheetBody(
             kind: attention.kind,
             count: attention.count,
-            onOpenMigration: () =>
-                Navigator.of(sheetContext)
-                    .pop(_IronwoodAttentionAction.openMigration),
+            onOpenMigration: () => Navigator.of(
+              sheetContext,
+            ).pop(_IronwoodAttentionAction.openMigration),
             onLater: () =>
                 Navigator.of(sheetContext).pop(_IronwoodAttentionAction.later),
           );
@@ -528,9 +528,9 @@ class _IronwoodMigrationAnnouncementHostState
       final action = await showAppMobileSheet<_IronwoodAnnouncementAction>(
         context: context,
         builder: (sheetContext) => MobileIronwoodMigrationAnnouncementSheet(
-          onStartMigration: () =>
-              Navigator.of(sheetContext)
-                  .pop(_IronwoodAnnouncementAction.startMigration),
+          onStartMigration: () => Navigator.of(
+            sheetContext,
+          ).pop(_IronwoodAnnouncementAction.startMigration),
           onOpenReleaseNotes: () => unawaited(_openReleaseNotes()),
         ),
       );
@@ -1220,9 +1220,9 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                     ? '—'
                     : privacyModeEnabled
                     ? fixedPrivacyMask()
-                    : ZecAmount.fromZatoshi(shieldedBalance)
-                          .compactBalance
-                          .amountText,
+                    : ZecAmount.fromZatoshi(
+                        shieldedBalance,
+                      ).compactBalance.amountText,
                 fiatBalanceText: shieldedFiatBalanceText,
                 priceChange24hPct: priceChange24hPct,
                 transparentBalanceText: transparentBalance.text(
@@ -1922,7 +1922,9 @@ class _BalanceCard extends StatelessWidget {
           children: [
             Semantics(
               button: onOpenChart != null,
-              label: onOpenChart == null ? null : 'Open balance chart',
+              label: onOpenChart == null
+                  ? null
+                  : context.l10n.portfolioChartOpen,
               child: GestureDetector(
                 key: const ValueKey('mobile_home_balance_sign'),
                 behavior: HitTestBehavior.opaque,

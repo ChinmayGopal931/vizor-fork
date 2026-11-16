@@ -186,7 +186,7 @@ class HttpPrivateUsdAvailabilitySource implements PrivateUsdAvailabilitySource {
     final NetworkHttpResponse response;
     try {
       response = await _client.request(
-        'GET',
+        'GET', // l10n-ignore: HTTP method
         _endpoint,
         headers: const {HttpHeaders.acceptHeader: 'application/json'},
         timeout: timeout,

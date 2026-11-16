@@ -1,5 +1,5 @@
 import '../../../rust/api/private_usd.dart' as rust;
-import '../private_usd_copy.dart';
+import '../../../core/l10n/l10n.dart';
 
 /// When the private USD arriving now landed; null when nothing tells. Every
 /// shield waits out the same screening, so the newest clears last and the
@@ -55,22 +55,25 @@ DateTime? privateUsdArrivingSince({
 
 /// The Arriving row's label at [now]: the share of the [screening] period
 /// gone by since the funds landed at [since], in whole percent and never 100
-/// ([PrivateUsdCopy.rowArrivingPercent]); once the period has passed with
-/// them still arriving, [PrivateUsdCopy.rowArrivingLate]; plain
-/// [PrivateUsdCopy.rowArriving] without a landing time or a period.
-String privateUsdArrivingLabel({
+/// ([AppLocalizations.privateUsdRowArrivingPercent]); once the period has
+/// passed with them still arriving,
+/// [AppLocalizations.privateUsdRowArrivingLate]; plain
+/// [AppLocalizations.privateUsdRowArriving] without a landing time or a
+/// period.
+String privateUsdArrivingLabel(
+  AppLocalizations l10n, {
   required DateTime? since,
   required Duration screening,
   required DateTime now,
 }) {
   if (since == null || screening <= Duration.zero) {
-    return PrivateUsdCopy.rowArriving;
+    return l10n.privateUsdRowArriving;
   }
   final elapsed = now.difference(since);
-  if (elapsed >= screening) return PrivateUsdCopy.rowArrivingLate;
+  if (elapsed >= screening) return l10n.privateUsdRowArrivingLate;
   // A landing time ahead of this clock counts as just landed.
   final percent = elapsed.isNegative
       ? 0
       : elapsed.inMicroseconds * 100 ~/ screening.inMicroseconds;
-  return PrivateUsdCopy.rowArrivingPercent(percent);
+  return l10n.privateUsdRowArrivingPercent(percent);
 }

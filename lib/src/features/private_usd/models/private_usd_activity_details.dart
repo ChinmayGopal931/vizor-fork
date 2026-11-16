@@ -4,7 +4,6 @@ import '../../../core/formatting/date_format.dart';
 import '../../../core/formatting/zec_amount.dart';
 import '../../../core/privacy/privacy_mask.dart';
 import '../../../rust/api/private_usd.dart';
-import '../private_usd_copy.dart';
 import 'private_usd_balances.dart';
 import 'private_usd_explorer.dart';
 import 'private_usd_messages.dart';
@@ -64,32 +63,32 @@ List<PrivateUsdActivityDetail> privateUsdSendDetails(
   final txHash = record.txHash;
   return [
     PrivateUsdDetailValue(
-      PrivateUsdCopy.sendReviewTo,
+      l10n.commonTo,
       truncatedAddress(record.to),
       copyText: record.to,
     ),
     PrivateUsdDetailValue(
-      PrivateUsdCopy.sendAmount,
+      l10n.commonAmount,
       _exact(BigInt.parse(record.amount), privacyModeEnabled),
     ),
     if (fee > BigInt.zero)
       PrivateUsdDetailValue(
-        PrivateUsdCopy.convertNetworkFee,
+        l10n.commonNetworkFee,
         _exact(fee, privacyModeEnabled),
       ),
     PrivateUsdDetailValue(
-      PrivateUsdCopy.detailsStatus,
+      l10n.privateUsdDetailsStatus,
       record.state == ApiSendState.confirmed
-          ? PrivateUsdCopy.detailsConfirmed
-          : PrivateUsdCopy.detailsUnconfirmed,
+          ? l10n.privateUsdDetailsConfirmed
+          : l10n.privateUsdDetailsUnconfirmed,
     ),
     PrivateUsdDetailValue(
-      PrivateUsdCopy.detailsSent,
+      l10n.privateUsdDetailsSent,
       _time(l10n, record.sentAt),
     ),
     if (txHash != null)
       PrivateUsdDetailTransaction.ethereum(
-        PrivateUsdCopy.detailsTransaction,
+        l10n.privateUsdDetailsTransaction,
         txHash,
       ),
   ];
@@ -105,32 +104,32 @@ List<PrivateUsdActivityDetail> privateUsdReceivedDetails(
   final at = receipt.at;
   return [
     sender == null
-        ? const PrivateUsdDetailValue(
-            PrivateUsdCopy.detailsFrom,
-            PrivateUsdCopy.detailsSenderHidden,
+        ? PrivateUsdDetailValue(
+            l10n.privateUsdDetailsFrom,
+            l10n.privateUsdDetailsSenderHidden,
           )
         : PrivateUsdDetailValue(
-            PrivateUsdCopy.detailsFrom,
+            l10n.privateUsdDetailsFrom,
             truncatedAddress(sender),
             copyText: sender,
           ),
     PrivateUsdDetailValue(
-      PrivateUsdCopy.sendAmount,
+      l10n.commonAmount,
       _exact(receipt.amount, privacyModeEnabled),
     ),
     PrivateUsdDetailValue(
-      PrivateUsdCopy.detailsStatus,
+      l10n.privateUsdDetailsStatus,
       receipt.settled
-          ? PrivateUsdCopy.rowAvailable
-          : PrivateUsdCopy.convertStepScreen,
+          ? l10n.privateUsdRowAvailable
+          : l10n.privateUsdConvertStepScreen,
     ),
     if (at != null)
       PrivateUsdDetailValue(
-        PrivateUsdCopy.detailsReceived,
+        l10n.privateUsdDetailsReceived,
         formatDayMonthTime(at, l10n.localeName),
       ),
     PrivateUsdDetailTransaction.ethereum(
-      PrivateUsdCopy.detailsTransaction,
+      l10n.privateUsdDetailsTransaction,
       receipt.txid,
     ),
   ];
@@ -146,31 +145,31 @@ List<PrivateUsdActivityDetail> privateUsdDepositDetails(
   final txHash = record.txHash;
   return [
     PrivateUsdDetailValue(
-      PrivateUsdCopy.detailsDepositAddress,
+      l10n.privateUsdDetailsDepositAddress,
       truncatedAddress(record.address),
       copyText: record.address,
     ),
     PrivateUsdDetailValue(
-      PrivateUsdCopy.sendAmount,
+      l10n.commonAmount,
       _usd(_units(record.value), privacyModeEnabled),
     ),
     PrivateUsdDetailValue(
-      PrivateUsdCopy.detailsRelayerFee,
+      l10n.privateUsdDetailsRelayerFee,
       _usd(_units(record.fee), privacyModeEnabled),
     ),
     PrivateUsdDetailValue(
       record.state == ApiDepositState.landed
-          ? PrivateUsdCopy.bridgedYouReceived
-          : PrivateUsdCopy.convertYouReceive,
+          ? l10n.privateUsdBridgedYouReceived
+          : l10n.privateUsdConvertYouReceive,
       _usd(_units(record.arrives), privacyModeEnabled),
     ),
     PrivateUsdDetailValue(
-      PrivateUsdCopy.detailStarted,
+      l10n.privateUsdDetailStarted,
       _time(l10n, record.createdAt),
     ),
     if (txHash != null)
       PrivateUsdDetailTransaction.ethereum(
-        PrivateUsdCopy.detailsTransaction,
+        l10n.privateUsdDetailsTransaction,
         txHash,
       ),
   ];
@@ -189,38 +188,38 @@ List<PrivateUsdActivityDetail> privateUsdForwardDetails(
   final endedAt = record.endedAt;
   return [
     if (record.outcome == ApiForwardOutcome.refunded)
-      PrivateUsdDetailNote(privateUsdRefundedMessage(record.refundCause)),
+      PrivateUsdDetailNote(privateUsdRefundedMessage(l10n, record.refundCause)),
     if (record.outcome == ApiForwardOutcome.paid) ...[
       PrivateUsdDetailValue(
-        PrivateUsdCopy.bridgedYouPaid,
+        l10n.privateUsdBridgedYouPaid,
         _zec(record.maxTotalZat ?? record.depositZat, privacyModeEnabled),
       ),
       PrivateUsdDetailValue(
-        PrivateUsdCopy.bridgedYouReceived,
+        l10n.privateUsdBridgedYouReceived,
         _usd(_units(record.receives), privacyModeEnabled),
       ),
       PrivateUsdDetailValue(
-        PrivateUsdCopy.detailsRelayerFee,
+        l10n.privateUsdDetailsRelayerFee,
         _usd(_units(record.relayerFee), privacyModeEnabled),
       ),
     ],
     PrivateUsdDetailValue(
-      PrivateUsdCopy.detailSwapId,
+      l10n.privateUsdDetailSwapId,
       truncatedTxid(record.swapId),
       copyText: record.swapId,
     ),
     if (deposit != null)
-      PrivateUsdDetailTransaction.zcash(PrivateUsdCopy.detailDeposit, deposit),
+      PrivateUsdDetailTransaction.zcash(l10n.privateUsdDetailDeposit, deposit),
     if (payout != null)
-      PrivateUsdDetailTransaction.ethereum(PrivateUsdCopy.detailPayout, payout),
+      PrivateUsdDetailTransaction.ethereum(l10n.privateUsdDetailPayout, payout),
     if (sweep != null)
-      PrivateUsdDetailTransaction.zcash(PrivateUsdCopy.detailRefund, sweep),
+      PrivateUsdDetailTransaction.zcash(l10n.privateUsdDetailRefund, sweep),
     PrivateUsdDetailValue(
-      PrivateUsdCopy.detailStarted,
+      l10n.privateUsdDetailStarted,
       _time(l10n, record.acceptedAt),
     ),
     if (endedAt != null)
-      PrivateUsdDetailValue(PrivateUsdCopy.detailsEnded, _time(l10n, endedAt)),
+      PrivateUsdDetailValue(l10n.privateUsdDetailsEnded, _time(l10n, endedAt)),
   ];
 }
 
@@ -237,41 +236,41 @@ List<PrivateUsdActivityDetail> privateUsdReverseDetails(
   final acceptedAt = record.acceptedAt;
   return [
     PrivateUsdDetailValue(
-      PrivateUsdCopy.bridgedYouPaid,
+      l10n.privateUsdBridgedYouPaid,
       _paid(privateUsdReverseDebit(record), privacyModeEnabled),
     ),
     PrivateUsdDetailValue(
-      PrivateUsdCopy.bridgedYouReceived,
+      l10n.privateUsdBridgedYouReceived,
       _zec(privateUsdReverseReceivedZat(record), privacyModeEnabled),
     ),
     if (cost != null) ...[
       PrivateUsdDetailValue(
-        PrivateUsdCopy.reverseRailgunFee,
+        l10n.privateUsdReverseRailgunFee,
         _paid(_units(cost.railgunFee), privacyModeEnabled),
       ),
       PrivateUsdDetailValue(
-        PrivateUsdCopy.reverseBroadcasterFee,
+        l10n.privateUsdReverseBroadcasterFee,
         _paid(_units(cost.broadcasterFee), privacyModeEnabled),
       ),
     ],
     PrivateUsdDetailValue(
-      PrivateUsdCopy.detailSwapId,
+      l10n.privateUsdDetailSwapId,
       truncatedTxid(record.swapId),
       copyText: record.swapId,
     ),
     if (funding != null)
       PrivateUsdDetailTransaction.ethereum(
-        PrivateUsdCopy.detailFunding,
+        l10n.privateUsdDetailFunding,
         funding,
       ),
     if (receive != null)
       PrivateUsdDetailTransaction.zcash(
-        PrivateUsdCopy.detailZecReceived,
+        l10n.privateUsdDetailZecReceived,
         receive,
       ),
     if (acceptedAt != null)
       PrivateUsdDetailValue(
-        PrivateUsdCopy.detailStarted,
+        l10n.privateUsdDetailStarted,
         _time(l10n, acceptedAt),
       ),
   ];

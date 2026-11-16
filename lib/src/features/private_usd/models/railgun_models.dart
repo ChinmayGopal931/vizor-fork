@@ -17,19 +17,19 @@ class RailgunProtocolException implements Exception {
   final String message;
 
   @override
-  String toString() => 'RailgunProtocolException: $message';
+  String toString() => 'RailgunProtocolException: $message'; // l10n-ignore: exception text
 }
 
 /// Where a note stands with Railgun's screening: only [spendable] can be sent
 /// or unshielded.
 enum RailgunBalanceBucket {
-  spendable('Spendable'),
+  spendable('Spendable'), // l10n-ignore: wire name
   shieldPending('ShieldPending'),
   shieldBlocked('ShieldBlocked'),
   proofSubmitted('ProofSubmitted'),
   missingInternalPoi('MissingInternalPOI'),
   missingExternalPoi('MissingExternalPOI'),
-  spent('Spent');
+  spent('Spent'); // l10n-ignore: wire name
 
   const RailgunBalanceBucket(this.wireName);
 
@@ -287,7 +287,9 @@ class RailgunBalances {
         throw RailgunProtocolException('bucket ${entry.key} is not a list');
       }
       byBucket[bucket] = List.unmodifiable([
-        for (final item in amounts.map((item) => _object(item, 'an amount')))
+        for (final item in amounts.map(
+          (item) => _object(item, 'an amount'), // l10n-ignore: exception text
+        ))
           RailgunTokenAmount(
             token: _evmAddress(item['token'], 'token'),
             amount: _decimal(item['amount'], 'amount'),
@@ -745,10 +747,10 @@ class RailgunReverseTransaction {
 enum RailgunMerkletree { utxo, txid }
 
 enum RailgunScanStatus {
-  started('Started'),
-  updated('Updated'),
-  complete('Complete'),
-  incomplete('Incomplete');
+  started('Started'), // l10n-ignore: wire name
+  updated('Updated'), // l10n-ignore: wire name
+  complete('Complete'), // l10n-ignore: wire name
+  incomplete('Incomplete'); // l10n-ignore: wire name
 
   const RailgunScanStatus(this.wireName);
 

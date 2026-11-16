@@ -23,11 +23,16 @@ void main() {
         proving: RailgunPoiProving(index: 2, count: 3, progress: 0.704),
       );
       expect(
-        privateUsdScreeningStatus(activity: all, balances: _processing()),
-        PrivateUsdCopy.screeningProving(2, 3, 70),
+        privateUsdScreeningStatus(
+          testL10n,
+          activity: all,
+          balances: _processing(),
+        ),
+        PrivateUsdCopy.screeningProving(testL10n, 2, 3, 70),
       );
       expect(
         privateUsdScreeningStatus(
+          testL10n,
           activity: const RailgunScreeningEvent(
             txids: 0.5,
             downloading: true,
@@ -35,10 +40,11 @@ void main() {
           ),
           balances: _processing(),
         ),
-        PrivateUsdCopy.screeningDownloading(25),
+        PrivateUsdCopy.screeningDownloading(testL10n, 25),
       );
       expect(
         privateUsdScreeningStatus(
+          testL10n,
           activity: const RailgunScreeningEvent(downloading: true),
           balances: _processing(),
         ),
@@ -46,6 +52,7 @@ void main() {
       );
       expect(
         privateUsdScreeningStatus(
+          testL10n,
           activity: const RailgunScreeningEvent(txids: 0.42, checks: _checks),
           balances: _processing(),
         ),
@@ -53,6 +60,7 @@ void main() {
       );
       expect(
         privateUsdScreeningStatus(
+          testL10n,
           activity: const RailgunScreeningEvent(checks: _checks),
           balances: _processing(submitted: true),
         ),
@@ -65,20 +73,25 @@ void main() {
       'and otherwise there is nothing to say', () {
     expect(
       privateUsdScreeningStatus(
+        testL10n,
         activity: const RailgunScreeningEvent(),
         balances: _processing(submitted: true),
       ),
-      PrivateUsdCopy.screeningWaiting,
+      testL10n.privateUsdScreeningWaiting,
     );
     expect(
-      privateUsdScreeningStatus(activity: null, balances: _processing()),
+      privateUsdScreeningStatus(
+        testL10n,
+        activity: null,
+        balances: _processing(),
+      ),
       isNull,
     );
   });
 
   test('a single proof is not counted, and a share never reads done early', () {
     expect(
-      PrivateUsdCopy.screeningProving(1, 1, 30),
+      PrivateUsdCopy.screeningProving(testL10n, 1, 1, 30),
       'Building screening proof · 30%',
     );
     expect(privateUsdScreeningPercent(0.999), 99);
@@ -94,13 +107,17 @@ void main() {
       isRefreshing: true,
     );
     final catchingUp = privateUsdSyncLine(testL10n, state, txidCatchUp: 0.42);
-    expect(catchingUp.readout, PrivateUsdCopy.syncReadoutProgress(42));
+    expect(catchingUp.readout, testL10n.privateUsdSyncReadoutProgress(42));
     expect(catchingUp.climbing, isTrue);
     expect(catchingUp.progress, closeTo(0.42, 1e-9));
 
     for (final done in [null, 1.0]) {
       final synced = privateUsdSyncLine(testL10n, state, txidCatchUp: done);
-      expect(synced.readout, PrivateUsdCopy.syncReadoutSynced, reason: '$done');
+      expect(
+        synced.readout,
+        testL10n.privateUsdSyncReadoutSynced,
+        reason: '$done',
+      );
       expect(synced.climbing, isFalse);
     }
   });
@@ -114,8 +131,8 @@ void main() {
       refreshPercent: 64,
     );
     final climbing = privateUsdSyncLine(testL10n, state, txidCatchUp: 0.2);
-    expect(climbing.readout, PrivateUsdCopy.syncReadoutProgress(64));
-    expect(climbing.semanticsLabel, PrivateUsdCopy.updatingProgress(64));
+    expect(climbing.readout, testL10n.privateUsdSyncReadoutProgress(64));
+    expect(climbing.semanticsLabel, testL10n.privateUsdUpdatingProgress(64));
     expect(climbing.climbing, isTrue);
     expect(climbing.progress, closeTo(0.64, 1e-9));
 
@@ -129,11 +146,11 @@ void main() {
         state.copyWith(refreshPercent: 0),
         networkPrivacy: connecting,
       ).readout,
-      NeonSyncReadout.torWaiting,
+      NeonSyncReadout.torWaiting(testL10n),
     );
     expect(
       privateUsdSyncLine(testL10n, state, networkPrivacy: connecting).readout,
-      PrivateUsdCopy.syncReadoutProgress(64),
+      testL10n.privateUsdSyncReadoutProgress(64),
       reason: 'under way, it is past Tor',
     );
 
@@ -141,7 +158,7 @@ void main() {
       testL10n,
       state.copyWith(clearRefreshPercent: true),
     );
-    expect(automatic.readout, PrivateUsdCopy.syncReadoutSynced);
+    expect(automatic.readout, testL10n.privateUsdSyncReadoutSynced);
     expect(automatic.climbing, isFalse);
   });
 }

@@ -99,7 +99,7 @@ class _MobilePrivateUsdReverseConversionScreenState
       canPop: !holds,
       child: MobilePrivateUsdReverseConversionView(
         presentation: presentation,
-        message: state.message,
+        message: state.message(context.l10n),
         acting: state.acting,
         celebrate: celebrate,
         onBridgedImpact: () => unawaited(AppHaptics.sendSuccess()),

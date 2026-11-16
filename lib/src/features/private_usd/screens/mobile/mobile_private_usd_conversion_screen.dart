@@ -111,7 +111,7 @@ class _MobilePrivateUsdConversionScreenState
       child: MobilePrivateUsdConversionView(
         presentation: presentation,
         callingOff: state.callingOff,
-        callOffError: state.callOffError,
+        callOffError: state.callOffError?.call(context.l10n),
         celebrate: celebrate,
         onBridgedImpact: () => unawaited(AppHaptics.sendSuccess()),
         activeTab: tab,

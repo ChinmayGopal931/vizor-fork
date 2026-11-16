@@ -16,6 +16,7 @@ import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_custom_rpc_provider.dart';
 import '../../services/private_usd_rpc_check.dart';
 import 'private_usd_paste_button.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// Settings' Ethereum RPC sheet: a URL of the user's own on one of the
 /// network's RPC providers (all of which the Railgun page reaches), checked
@@ -60,13 +61,16 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
   Future<void> _checkAndSave() async {
     final deployment = ref.read(privateUsdCurrentDeploymentProvider);
     if (deployment == null || _busy) return;
-    final chain = privateUsdRpcNetworkName(deployment.railgunNetwork);
+    final chain = privateUsdRpcNetworkName(
+      context.l10n,
+      deployment.railgunNetwork,
+    );
     final url = privateUsdCustomRpcUrl(
       _controller.text,
       rpcHosts: deployment.rpcHosts,
     );
     if (url == null) {
-      setState(() => _error = PrivateUsdCopy.rpcErrorUrl(chain));
+      setState(() => _error = context.l10n.privateUsdRpcErrorUrl(chain));
       return;
     }
     _focus.unfocus();
@@ -92,17 +96,18 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
         _busy = false;
         _error = switch (failure) {
           PrivateUsdRpcCheckFailure.unreachable =>
-            PrivateUsdCopy.rpcErrorUnreachable,
+            context.l10n.privateUsdRpcErrorUnreachable,
           PrivateUsdRpcCheckFailure.wrongChain =>
-            PrivateUsdCopy.rpcErrorWrongChain(chain),
+            context.l10n.privateUsdRpcErrorWrongChain(chain),
           PrivateUsdRpcCheckFailure.callsRefused =>
-            PrivateUsdCopy.rpcErrorCalls,
-          PrivateUsdRpcCheckFailure.logsLimited => PrivateUsdCopy.rpcErrorLogs,
+            context.l10n.privateUsdRpcErrorCalls,
+          PrivateUsdRpcCheckFailure.logsLimited =>
+            context.l10n.privateUsdRpcErrorLogs,
         };
       });
       return;
     }
-    await _change(() => _setting.save(url), PrivateUsdCopy.rpcSaved);
+    await _change(() => _setting.save(url), context.l10n.privateUsdRpcSaved);
   }
 
   Future<void> _useDefault() async {
@@ -111,7 +116,7 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
       _busy = true;
       _error = null;
     });
-    await _change(_setting.clear, PrivateUsdCopy.rpcCleared);
+    await _change(_setting.clear, context.l10n.privateUsdRpcCleared);
   }
 
   Future<void> _change(Future<void> Function() change, String done) async {
@@ -121,7 +126,7 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = PrivateUsdCopy.rpcErrorSave;
+        _error = context.l10n.privateUsdSettingSaveFailed;
       });
       return;
     }
@@ -135,11 +140,12 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
     final network = ref.watch(appBootstrapProvider).network;
     final custom = ref.watch(privateUsdCustomRpcProvider(network)).value;
     final chain = privateUsdRpcNetworkName(
+      context.l10n,
       deployment?.railgunNetwork ?? 'mainnet',
     );
     final error = _error;
     return MobileModalScaffold(
-      title: PrivateUsdCopy.rpcTitle,
+      title: context.l10n.privateUsdRpcTitle,
       onClose: () => Navigator.of(context).pop(),
       // The text scrolls above the keyboard; the actions stay below it.
       constrainBody: true,
@@ -154,14 +160,14 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    PrivateUsdCopy.rpcBody(chain),
+                    context.l10n.privateUsdRpcBody(chain),
                     style: AppTypography.bodyMedium.copyWith(
                       color: colors.text.secondary,
                     ),
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    PrivateUsdCopy.rpcSees,
+                    context.l10n.privateUsdRpcSees,
                     key: const ValueKey('private_usd_rpc_sees'),
                     style: AppTypography.bodySmall.copyWith(
                       color: colors.text.secondary,
@@ -169,7 +175,7 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    PrivateUsdCopy.rpcProviders,
+                    context.l10n.privateUsdRpcProviders,
                     key: const ValueKey('private_usd_rpc_providers'),
                     style: AppTypography.bodySmall.copyWith(
                       color: colors.text.secondary,
@@ -177,9 +183,9 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
-                    PrivateUsdCopy.rpcCurrent(
+                    context.l10n.privateUsdRpcCurrent(
                       custom == null
-                          ? PrivateUsdCopy.rpcDefault
+                          ? context.l10n.commonDefault
                           : privateUsdCustomRpcHost(custom),
                     ),
                     key: const ValueKey('private_usd_rpc_current'),
@@ -233,8 +239,8 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
                 : () => unawaited(_checkAndSave()),
             child: Text(
               _checking
-                  ? PrivateUsdCopy.rpcChecking
-                  : PrivateUsdCopy.rpcCheckAndSave,
+                  ? context.l10n.commonCheckingEllipsis
+                  : context.l10n.privateUsdRpcCheckAndSave,
             ),
           ),
           const SizedBox(height: AppSpacing.s),
@@ -245,7 +251,7 @@ class _PrivateUsdRpcSheetState extends ConsumerState<_PrivateUsdRpcSheet> {
             onPressed: _busy || custom == null
                 ? null
                 : () => unawaited(_useDefault()),
-            child: const Text(PrivateUsdCopy.rpcUseDefault),
+            child: Text(context.l10n.privateUsdRpcUseDefault),
           ),
         ],
       ),

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_arrival.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
+import '../../support/test_l10n.dart';
 
 // The Arriving row's estimate: how much of the screening time has gone by
 // since what arrives landed.
@@ -65,23 +65,30 @@ void main() {
     const hour = Duration(hours: 1);
     expect(
       privateUsdArrivingLabel(
+        testL10n,
         since: landed,
         screening: hour,
         now: landed.add(const Duration(minutes: 24)),
       ),
-      PrivateUsdCopy.rowArrivingPercent(40),
+      testL10n.privateUsdRowArrivingPercent(40),
     );
     expect(
       privateUsdArrivingLabel(
+        testL10n,
         since: landed,
         screening: hour,
         now: landed.add(hour),
       ),
-      PrivateUsdCopy.rowArrivingLate,
+      testL10n.privateUsdRowArrivingLate,
     );
     expect(
-      privateUsdArrivingLabel(since: null, screening: hour, now: landed),
-      PrivateUsdCopy.rowArriving,
+      privateUsdArrivingLabel(
+        testL10n,
+        since: null,
+        screening: hour,
+        now: landed,
+      ),
+      testL10n.privateUsdRowArriving,
     );
   });
 }

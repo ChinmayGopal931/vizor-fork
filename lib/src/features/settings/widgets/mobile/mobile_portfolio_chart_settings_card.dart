@@ -10,6 +10,7 @@ import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../portfolio_chart/providers/portfolio_chart_settings_provider.dart';
 import 'mobile_tor_control.dart' show MobilePrivacyToggle;
+import '../../../../core/l10n/l10n.dart';
 
 const _rowHeight = 44.0;
 
@@ -38,7 +39,7 @@ class MobilePortfolioChartSettingsCard extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.all(AppSpacing.xxs),
             child: Text(
-              'Portfolio chart',
+              context.l10n.portfolioChartSettingsTitle,
               style: AppTypography.labelLarge.copyWith(
                 color: colors.text.secondary,
               ),
@@ -52,7 +53,7 @@ class MobilePortfolioChartSettingsCard extends ConsumerWidget {
               'mobile_settings_portfolio_chart_toggle_thumb',
             ),
             iconName: AppIcons.home,
-            label: 'Show on home',
+            label: context.l10n.portfolioChartSettingsShowOnHome,
             enabled: settings.enabled,
             onToggle: () => unawaited(
               _apply(
@@ -76,7 +77,7 @@ class MobilePortfolioChartSettingsCard extends ConsumerWidget {
                 'mobile_settings_portfolio_chart_prices_toggle_thumb',
               ),
               iconName: AppIcons.coins,
-              label: 'Use market prices',
+              label: context.l10n.portfolioChartSettingsMarketPrices,
               enabled: settings.marketPrices,
               interactive: settings.enabled,
               onToggle: () => unawaited(
@@ -99,7 +100,7 @@ class MobilePortfolioChartSettingsCard extends ConsumerWidget {
       await change;
     } catch (_) {
       if (!context.mounted) return;
-      showAppToast(context, "Couldn't update the portfolio chart setting.");
+      showAppToast(context, context.l10n.portfolioChartSettingsSaveFailed);
     }
   }
 }

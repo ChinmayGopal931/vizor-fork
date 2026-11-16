@@ -64,6 +64,7 @@ import 'package:zcash_wallet/src/rust/api/private_usd.dart'
         ApiTransactResult;
 
 import 'support/mobile_regtest_flow.dart';
+import '../test/support/test_l10n.dart';
 
 // The Private USD device round (plan §10): the M3 device checks on a physical
 // Android phone, against Zcash testnet and Ethereum Sepolia, with no funds.
@@ -210,9 +211,7 @@ const _depositsUsd = String.fromEnvironment(
   'VIZOR_PUSD_DEVICE_DEPOSITS_USD',
   defaultValue: '3',
 );
-const _depositsTwice = bool.fromEnvironment(
-  'VIZOR_PUSD_DEVICE_DEPOSITS_TWICE',
-);
+const _depositsTwice = bool.fromEnvironment('VIZOR_PUSD_DEVICE_DEPOSITS_TWICE');
 const _m8Route = String.fromEnvironment('VIZOR_PUSD_DEVICE_M8_ROUTE');
 const _m8AllPhases = ['forward', 'reverse', 'send'];
 final _m8Phases = [
@@ -812,7 +811,9 @@ class _Round {
                 .read(privateUsdBalanceProvider(_uuid))
                 .firstSyncPercent !=
             null;
-        if (next == PrivateUsdCopy.firstLoad && !reported) sawFirstLoad = true;
+        if (next == testL10n.privateUsdFirstLoad && !reported) {
+          sawFirstLoad = true;
+        }
         final percent = reported
             ? _percent.firstMatch(_syncReadout(tester) ?? '')
             : null;
@@ -899,7 +900,7 @@ class _Round {
       () => textForKey(tester, _addressKey) != null,
     );
     final shown = textForKey(tester, _addressKey)!;
-    await tester.tap(find.text(PrivateUsdCopy.close));
+    await tester.tap(find.text(testL10n.commonClose));
     await _pumpFor(const Duration(seconds: 1));
     final engine = _container.read(railgunEngineStateProvider);
     final derived = await _rustAddress();
@@ -1601,7 +1602,7 @@ class _M5Round extends _Round {
     );
     expect(count, greaterThanOrEqualTo(1));
     expect(
-      find.text(PrivateUsdCopy.deleteUnfinishedBody(count)),
+      find.text(testL10n.privateUsdDeleteUnfinishedBody(count)),
       findsOneWidget,
     );
     await _screenshot('m5-03-delete-warning');
@@ -1919,7 +1920,7 @@ class _M6Round extends _Round {
       'the reverse progress screen',
       () => tester.any(find.byKey(_progressKey)),
     );
-    expect(find.text(PrivateUsdCopy.reverseCancel), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseCancel), findsOneWidget);
     await tapAppButton(tester, _callOffKey);
     await tapAppButton(tester, _confirmKey);
     await _waitUntil(
@@ -2004,7 +2005,7 @@ class _M6Round extends _Round {
       timeout: const Duration(minutes: 15),
     );
     expect(_funded, isTrue, reason: 'ended ${_phase?.name} before paying');
-    expect(find.text(PrivateUsdCopy.reverseRequestRefund), findsOneWidget);
+    expect(find.text(testL10n.privateUsdReverseRequestRefund), findsOneWidget);
     await tapAppButton(tester, _callOffKey);
     await tapAppButton(tester, _confirmKey);
     final started = DateTime.now();
@@ -2022,7 +2023,7 @@ class _M6Round extends _Round {
     await tapAppButton(tester, _refundsKey);
     await _waitUntil(
       'the refund on Refunds',
-      () => tester.any(find.text(PrivateUsdCopy.refundsOriginalAmount)),
+      () => tester.any(find.text(testL10n.privateUsdRefundsOriginalAmount)),
     );
     await _screenshot('m6-07-refunds');
   }

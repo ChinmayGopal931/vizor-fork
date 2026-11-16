@@ -8,11 +8,11 @@ import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/features/activity/activity_feed_sections.dart';
 import 'package:zcash_wallet/src/features/activity/models/activity_row_data.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_activity_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_activity_details.dart';
 import 'package:zcash_wallet/src/features/private_usd/widgets/mobile/private_usd_activity_rows.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 // A private send another wallet made to this one shows in Private USD's
 // activity, as the sender's "Sent privately" does on theirs.
@@ -55,8 +55,8 @@ void main() {
       ),
     );
 
-    expect(received.title, PrivateUsdCopy.activityReceived);
-    expect(received.subtitle, PrivateUsdCopy.activitySenderHidden);
+    expect(received.title, testL10n.privateUsdActivityReceived);
+    expect(received.subtitle, testL10n.privateUsdActivitySenderHidden);
     expect(received.amountText, endsWith(r'+$25.00'));
     expect(received.statusIconName, isNull);
     expect(received.details, isNotNull);
@@ -74,7 +74,7 @@ void main() {
       ),
     );
 
-    expect(arriving.subtitle, PrivateUsdCopy.activityReceivedScreening);
+    expect(arriving.subtitle, testL10n.privateUsdActivityReceivedScreening);
     expect(arriving.statusIconName, AppIcons.loader);
   });
 

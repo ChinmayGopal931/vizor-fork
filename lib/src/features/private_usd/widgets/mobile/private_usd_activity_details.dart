@@ -11,6 +11,7 @@ import '../../models/private_usd_activity_details.dart';
 import '../../models/private_usd_explorer.dart';
 import '../../private_usd_copy.dart';
 import 'private_usd_flow_widgets.dart';
+import '../../../../core/l10n/l10n.dart';
 
 const _unfoldDuration = Duration(milliseconds: 220);
 const _iconSize = 12.0;
@@ -177,13 +178,13 @@ class _ValueLine extends StatelessWidget {
     return MergeSemantics(
       child: Semantics(
         button: true,
-        onTapHint: PrivateUsdCopy.detailsCopyHint,
+        onTapHint: context.l10n.commonCopy,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => copyTextWithToast(
             context,
             text: copyText,
-            toastMessage: PrivateUsdCopy.detailsCopied,
+            toastMessage: context.l10n.commonCopied,
           ),
           child: PrivateUsdLedgerRow(
             label: line.label,
@@ -260,7 +261,7 @@ class _ExplorerLink extends StatelessWidget {
     final glow = context.colors.neon.glow;
     return Semantics(
       link: true,
-      label: PrivateUsdCopy.detailsOpenOn(transaction, name),
+      label: context.l10n.privateUsdDetailsOpenOn(transaction, name),
       excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,

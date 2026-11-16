@@ -140,10 +140,10 @@ void main() {
       tester,
       Center(
         child: PrivateUsdConversionBannerView(
-          banner: PrivateUsdBannerState(
+          banner: PrivateUsdBannerState.forward(
             path: banner.path,
-            title: banner.title,
-            detail: banner.detail,
+            forward: banner.forward!,
+            zcashConfirmations: banner.zcashConfirmations,
             attention: true,
           ),
           onTap: () {},

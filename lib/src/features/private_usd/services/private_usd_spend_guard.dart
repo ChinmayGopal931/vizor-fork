@@ -36,7 +36,7 @@ class PrivateUsdSpendBusyException implements Exception {
   final PrivateUsdSpendStatus status;
 
   @override
-  String toString() => 'A private USD payment is already under way.';
+  String toString() => 'A private USD payment is already under way.'; // l10n-ignore: exception text
 }
 
 /// Reads an account's send log (Rust `private_usd_send_log_list`).

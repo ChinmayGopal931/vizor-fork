@@ -7,11 +7,11 @@ import '../../../../core/formatting/address_display.dart';
 import '../../../../core/widgets/mobile/mobile_transaction_progress_screen.dart';
 import '../../models/private_usd_explorer.dart';
 import '../../models/private_usd_send.dart';
-import '../../private_usd_copy.dart';
 import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_send_provider.dart';
 import '../../providers/railgun_engine_provider.dart';
 import '../../services/railgun_engine.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// `/private-usd/send/status` (`extra`: the mode): the proof's progress
 /// while it proves, then the outcome, pending while it is not in a block
@@ -107,13 +107,13 @@ class MobilePrivateUsdSendStatusView extends StatelessWidget {
       return MobileTransactionProgressScreen(
         phase: MobileTransactionProgressPhase.inProgress,
         title: posting
-            ? PrivateUsdCopy.sendSending
+            ? context.l10n.privateUsdSendSending
             : percent == null
-            ? PrivateUsdCopy.sendProving
-            : PrivateUsdCopy.sendProvingPercent(percent),
+            ? context.l10n.privateUsdSendProving
+            : context.l10n.privateUsdSendProvingPercent(percent),
         body: posting
-            ? PrivateUsdCopy.sendLanding
-            : PrivateUsdCopy.sendProvingDetail,
+            ? context.l10n.privateUsdSendLanding
+            : context.l10n.privateUsdSendProvingDetail,
         canPop: false,
         titleKey: const ValueKey('mobile_private_usd_send_status_title'),
         bodyKey: const ValueKey('mobile_private_usd_send_status_body'),
@@ -130,17 +130,17 @@ class MobilePrivateUsdSendStatusView extends StatelessWidget {
           ? MobileTransactionProgressPhase.pending
           : MobileTransactionProgressPhase.succeeded,
       title: form.mode == PrivateUsdSendMode.private
-          ? PrivateUsdCopy.sendDoneTitlePrivate
-          : PrivateUsdCopy.sendDoneTitleWithdraw,
+          ? context.l10n.privateUsdSendDoneTitlePrivate
+          : context.l10n.privateUsdSendDoneTitleWithdraw,
       body: unconfirmed
-          ? PrivateUsdCopy.sendDoneUnconfirmedBody(amount, address)
-          : PrivateUsdCopy.sendDoneBody(amount, address),
+          ? context.l10n.privateUsdSendDoneUnconfirmedBody(amount, address)
+          : context.l10n.privateUsdSendDoneBody(amount, address),
       canPop: true,
-      primaryActionLabel: PrivateUsdCopy.done,
+      primaryActionLabel: context.l10n.commonDone,
       onPrimaryAction: onDone,
       secondaryActionLabel: onViewTransaction == null
           ? null
-          : PrivateUsdCopy.sendViewTx,
+          : context.l10n.privateUsdSendViewTx,
       onSecondaryAction: onViewTransaction,
       titleKey: const ValueKey('mobile_private_usd_send_status_title'),
       bodyKey: const ValueKey('mobile_private_usd_send_status_body'),

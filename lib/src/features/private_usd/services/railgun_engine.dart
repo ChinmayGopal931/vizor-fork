@@ -89,7 +89,7 @@ class RailgunEngineInterruptedException implements PrivateUsdPause {
   const RailgunEngineInterruptedException();
 
   @override
-  String toString() => 'The Railgun page closed.';
+  String toString() => 'The Railgun page closed.'; // l10n-ignore: exception text
 }
 
 /// Uses are refused while an account deletion or a reset drains the engine.
@@ -97,7 +97,7 @@ class RailgunEngineUnavailableException implements PrivateUsdPause {
   const RailgunEngineUnavailableException();
 
   @override
-  String toString() => 'The Railgun engine is not available right now.';
+  String toString() => 'The Railgun engine is not available right now.'; // l10n-ignore: exception text
 }
 
 /// The page opened a wallet whose address is not the one Rust derives for the
@@ -107,7 +107,7 @@ class RailgunAddressMismatchException implements Exception {
 
   @override
   String toString() =>
-      "The Railgun page opened another wallet than this account's.";
+      "The Railgun page opened another wallet than this account's."; // l10n-ignore: exception text
 }
 
 enum RailgunEnginePhase { idle, starting, syncing, proving, ready, failed }

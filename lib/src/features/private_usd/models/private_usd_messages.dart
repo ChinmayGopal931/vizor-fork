@@ -3,63 +3,71 @@ import '../../../rust/api/private_usd.dart'
 import '../private_usd_copy.dart';
 import '../services/private_usd_attestation.dart';
 import '../services/private_usd_spend_guard.dart' show PrivateUsdSpendStatus;
+import '../../../core/l10n/l10n.dart';
 
 /// Why Send, Withdraw or a new conversion cannot start now; null when they
 /// can.
-String? privateUsdSpendMessage(PrivateUsdSpendStatus status) =>
-    switch (status) {
-      PrivateUsdSpendStatus.available => null,
-      PrivateUsdSpendStatus.checking => PrivateUsdCopy.checkingPayments,
-      PrivateUsdSpendStatus.sending => PrivateUsdCopy.paymentPending,
-      PrivateUsdSpendStatus.converting => PrivateUsdCopy.conversionPending,
-      PrivateUsdSpendStatus.unreadable => PrivateUsdCopy.sendErrorStore,
-    };
+String? privateUsdSpendMessage(
+  AppLocalizations l10n,
+  PrivateUsdSpendStatus status,
+) => switch (status) {
+  PrivateUsdSpendStatus.available => null,
+  PrivateUsdSpendStatus.checking => l10n.privateUsdCheckingPayments,
+  PrivateUsdSpendStatus.sending => l10n.privateUsdPaymentPending,
+  PrivateUsdSpendStatus.converting => l10n.privateUsdConversionPending,
+  PrivateUsdSpendStatus.unreadable => l10n.privateUsdSendErrorStore,
+};
 
 /// What to say when pricing or sending fails before anything was sent.
-String privateUsdSendErrorMessage(ApiPrivateUsdErrorCode code) =>
-    switch (code) {
-      ApiPrivateUsdErrorCode.unavailable => PrivateUsdCopy.sendUnavailable,
-      ApiPrivateUsdErrorCode.relayerFee => PrivateUsdCopy.sendErrorFeeCap,
-      ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.routeBlocked,
-      ApiPrivateUsdErrorCode.storeUnreadable => PrivateUsdCopy.sendErrorStore,
-      ApiPrivateUsdErrorCode.busy => PrivateUsdCopy.paymentPending,
-      _ => PrivateUsdCopy.sendNotSent,
-    };
+String privateUsdSendErrorMessage(
+  AppLocalizations l10n,
+  ApiPrivateUsdErrorCode code,
+) => switch (code) {
+  ApiPrivateUsdErrorCode.unavailable => l10n.privateUsdSendUnavailable,
+  ApiPrivateUsdErrorCode.relayerFee => l10n.privateUsdSendErrorFeeCap,
+  ApiPrivateUsdErrorCode.routeBlocked => l10n.privateUsdRouteBlocked,
+  ApiPrivateUsdErrorCode.storeUnreadable => l10n.privateUsdSendErrorStore,
+  ApiPrivateUsdErrorCode.busy => l10n.privateUsdPaymentPending,
+  _ => l10n.privateUsdSendNotSent,
+};
 
 /// What to say when a quote or an accept fails before anything was sent;
 /// null for a cancelled call, which is never a failure. Dart never branches
 /// on an error's message text.
-String? privateUsdErrorMessage(ApiPrivateUsdErrorCode code) => switch (code) {
+String? privateUsdErrorMessage(
+  AppLocalizations l10n,
+  ApiPrivateUsdErrorCode code,
+) => switch (code) {
   ApiPrivateUsdErrorCode.cancelled => null,
   // A service serving another deployment reads as the relayer being
   // unreachable.
   ApiPrivateUsdErrorCode.relayerUnreachable ||
-  ApiPrivateUsdErrorCode.wrongDeployment => PrivateUsdCopy.convertErrorRelayer,
+  ApiPrivateUsdErrorCode.wrongDeployment => l10n.privateUsdConvertErrorRelayer,
   ApiPrivateUsdErrorCode.relayerRefused =>
-    PrivateUsdCopy.convertErrorRelayerRefused,
+    l10n.privateUsdConvertErrorRelayerRefused,
   // At quote, Rust refuses a fee above the cap.
-  ApiPrivateUsdErrorCode.relayerFee => PrivateUsdCopy.convertErrorFeeCap,
+  ApiPrivateUsdErrorCode.relayerFee => l10n.privateUsdConvertErrorFeeCap,
   ApiPrivateUsdErrorCode.ethereumUnreachable ||
-  ApiPrivateUsdErrorCode.chainLagging => PrivateUsdCopy.convertErrorEthereum,
-  ApiPrivateUsdErrorCode.zcashWallet => PrivateUsdCopy.convertErrorWallet,
+  ApiPrivateUsdErrorCode.chainLagging => l10n.privateUsdConvertErrorEthereum,
+  ApiPrivateUsdErrorCode.zcashWallet => l10n.privateUsdConvertErrorWallet,
   ApiPrivateUsdErrorCode.depositUnpayable =>
-    PrivateUsdCopy.convertErrorUnpayable,
+    l10n.privateUsdConvertErrorUnpayable,
   ApiPrivateUsdErrorCode.tokensRefused =>
-    PrivateUsdCopy.convertErrorTokensUnavailable,
+    l10n.privateUsdConvertErrorTokensUnavailable,
   ApiPrivateUsdErrorCode.tokensNeeded =>
-    PrivateUsdCopy.convertResultMakerUnavailable,
-  ApiPrivateUsdErrorCode.tokensUnreachable => PrivateUsdCopy.tokensUnreachable,
+    l10n.privateUsdConvertResultMakerUnavailable,
+  ApiPrivateUsdErrorCode.tokensUnreachable => l10n.privateUsdTokensUnreachable,
   ApiPrivateUsdErrorCode.tokensDeviceRefused =>
-    PrivateUsdCopy.tokensDeviceRefused,
-  ApiPrivateUsdErrorCode.noTokensToday => PrivateUsdCopy.tokensNoneToday,
-  ApiPrivateUsdErrorCode.keystore => PrivateUsdCopy.tokensKeystore,
-  ApiPrivateUsdErrorCode.quoteExpired => PrivateUsdCopy.convertQuoteRanOut,
-  ApiPrivateUsdErrorCode.makerUnavailable => PrivateUsdCopy.convertErrorMaker,
-  ApiPrivateUsdErrorCode.makerBusy => PrivateUsdCopy.convertErrorMakerBusy,
+    l10n.privateUsdTokensDeviceRefused,
+  ApiPrivateUsdErrorCode.noTokensToday => l10n.privateUsdTokensNoneToday,
+  ApiPrivateUsdErrorCode.keystore => l10n.privateUsdTokensKeystore,
+  ApiPrivateUsdErrorCode.quoteExpired => l10n.privateUsdConvertQuoteRanOut,
+  ApiPrivateUsdErrorCode.makerUnavailable => l10n.privateUsdConvertErrorMaker,
+  ApiPrivateUsdErrorCode.makerBusy => l10n.privateUsdConvertErrorMakerBusy,
   ApiPrivateUsdErrorCode.amountRefused =>
-    PrivateUsdCopy.convertErrorAmountRefused,
-  ApiPrivateUsdErrorCode.storeUnreadable => PrivateUsdCopy.convertErrorStore,
-  ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.routeBlocked,
+    l10n.privateUsdConvertErrorAmountRefused,
+  ApiPrivateUsdErrorCode.storeUnreadable => l10n.privateUsdConvertErrorStore,
+  ApiPrivateUsdErrorCode.routeBlocked => l10n.privateUsdRouteBlocked,
   ApiPrivateUsdErrorCode.railgunClosed ||
   ApiPrivateUsdErrorCode.zcashRejected ||
   ApiPrivateUsdErrorCode.mismatch ||
@@ -68,138 +76,172 @@ String? privateUsdErrorMessage(ApiPrivateUsdErrorCode code) => switch (code) {
   ApiPrivateUsdErrorCode.tooLate ||
   ApiPrivateUsdErrorCode.busy ||
   ApiPrivateUsdErrorCode.unavailable ||
-  ApiPrivateUsdErrorCode.other => PrivateUsdCopy.convertErrorGeneric,
+  ApiPrivateUsdErrorCode.other => l10n.privateUsdConvertErrorGeneric,
 };
+
+/// [privateUsdErrorMessage] kept for a widget to show; null for a cancelled
+/// call.
+PrivateUsdText? privateUsdErrorText(ApiPrivateUsdErrorCode code) =>
+    code == ApiPrivateUsdErrorCode.cancelled
+    ? null
+    : (l10n) =>
+          privateUsdErrorMessage(l10n, code) ??
+          l10n.privateUsdConvertErrorGeneric;
 
 /// The problem card's message for a conversion whose steps have failed for
 /// a minute.
-String privateUsdProblemMessage(ApiPrivateUsdErrorCode code) => switch (code) {
+String privateUsdProblemMessage(
+  AppLocalizations l10n,
+  ApiPrivateUsdErrorCode code,
+) => switch (code) {
   ApiPrivateUsdErrorCode.relayerUnreachable =>
-    PrivateUsdCopy.convertProblemRelayer,
+    l10n.privateUsdConvertProblemRelayer,
   ApiPrivateUsdErrorCode.relayerRefused =>
-    PrivateUsdCopy.convertProblemRelayerRefused,
-  ApiPrivateUsdErrorCode.relayerFee => PrivateUsdCopy.convertProblemRelayerFee,
+    l10n.privateUsdConvertProblemRelayerRefused,
+  ApiPrivateUsdErrorCode.relayerFee => l10n.privateUsdConvertProblemRelayerFee,
   ApiPrivateUsdErrorCode.ethereumUnreachable ||
-  ApiPrivateUsdErrorCode.chainLagging => PrivateUsdCopy.convertProblemEthereum,
-  ApiPrivateUsdErrorCode.railgunClosed => PrivateUsdCopy.convertProblemRailgun,
-  ApiPrivateUsdErrorCode.zcashWallet => PrivateUsdCopy.convertProblemWallet,
+  ApiPrivateUsdErrorCode.chainLagging => l10n.privateUsdConvertProblemEthereum,
+  ApiPrivateUsdErrorCode.railgunClosed => l10n.privateUsdConvertProblemRailgun,
+  ApiPrivateUsdErrorCode.zcashWallet => l10n.privateUsdConvertProblemWallet,
   ApiPrivateUsdErrorCode.depositUnpayable =>
-    PrivateUsdCopy.convertProblemUnpayable,
-  ApiPrivateUsdErrorCode.zcashRejected => PrivateUsdCopy.convertProblemRejected,
-  ApiPrivateUsdErrorCode.mismatch => PrivateUsdCopy.convertProblemMismatch,
-  ApiPrivateUsdErrorCode.storeUnreadable => PrivateUsdCopy.convertErrorStore,
-  ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.convertProblemRoute,
+    l10n.privateUsdConvertProblemUnpayable,
+  ApiPrivateUsdErrorCode.zcashRejected => l10n.privateUsdConvertProblemRejected,
+  ApiPrivateUsdErrorCode.mismatch => l10n.privateUsdConvertProblemMismatch,
+  ApiPrivateUsdErrorCode.storeUnreadable => l10n.privateUsdConvertErrorStore,
+  ApiPrivateUsdErrorCode.routeBlocked => l10n.privateUsdConvertProblemRoute,
   // The token gate's, while a resumed accept waits for the issuance.
-  ApiPrivateUsdErrorCode.tokensNeeded => PrivateUsdCopy.convertProblemTokens,
+  ApiPrivateUsdErrorCode.tokensNeeded => l10n.privateUsdConvertProblemTokens,
   ApiPrivateUsdErrorCode.tokensRefused ||
-  ApiPrivateUsdErrorCode.tokensUnreachable => PrivateUsdCopy.tokensUnreachable,
+  ApiPrivateUsdErrorCode.tokensUnreachable => l10n.privateUsdTokensUnreachable,
   ApiPrivateUsdErrorCode.tokensDeviceRefused =>
-    PrivateUsdCopy.tokensDeviceRefused,
-  ApiPrivateUsdErrorCode.noTokensToday => PrivateUsdCopy.tokensNoneToday,
-  ApiPrivateUsdErrorCode.keystore => PrivateUsdCopy.tokensKeystore,
-  _ => PrivateUsdCopy.convertProblemUnexpected,
+    l10n.privateUsdTokensDeviceRefused,
+  ApiPrivateUsdErrorCode.noTokensToday => l10n.privateUsdTokensNoneToday,
+  ApiPrivateUsdErrorCode.keystore => l10n.privateUsdTokensKeystore,
+  _ => l10n.privateUsdConvertProblemUnexpected,
 };
 
 /// What to say when the phone could not attest an issuance.
-String privateUsdAttestationMessage(PrivateUsdAttestationErrorCode code) =>
-    switch (code) {
-      PrivateUsdAttestationErrorCode.unavailable =>
-        PrivateUsdCopy.tokensUnavailable,
-      PrivateUsdAttestationErrorCode.keystore => PrivateUsdCopy.tokensKeystore,
-    };
+String privateUsdAttestationMessage(
+  AppLocalizations l10n,
+  PrivateUsdAttestationErrorCode code,
+) => switch (code) {
+  PrivateUsdAttestationErrorCode.unavailable =>
+    l10n.privateUsdTokensUnavailable,
+  PrivateUsdAttestationErrorCode.keystore => l10n.privateUsdTokensKeystore,
+};
 
 /// Why a forward conversion ended with nothing sent.
 String privateUsdNothingSentMessage(
+  AppLocalizations l10n,
   ApiNothingSentCause? cause,
 ) => switch (cause) {
-  ApiNothingSentCause.quoteExpired => PrivateUsdCopy.convertResultQuoteExpired,
-  ApiNothingSentCause.makerRefused => PrivateUsdCopy.convertResultMakerRefused,
+  ApiNothingSentCause.quoteExpired => l10n.privateUsdConvertResultQuoteExpired,
+  ApiNothingSentCause.makerRefused => l10n.privateUsdConvertResultMakerRefused,
   ApiNothingSentCause.makerUnavailable =>
-    PrivateUsdCopy.convertResultMakerUnavailable,
+    l10n.privateUsdConvertResultMakerUnavailable,
   ApiNothingSentCause.neverOpened ||
-  null => PrivateUsdCopy.convertResultNeverOpened,
-  ApiNothingSentCause.mismatch => PrivateUsdCopy.convertResultMismatch,
+  null => l10n.privateUsdConvertResultNeverOpened,
+  ApiNothingSentCause.mismatch => l10n.privateUsdConvertResultMismatch,
   ApiNothingSentCause.depositWindowMissed =>
-    PrivateUsdCopy.convertResultWindowMissed,
+    l10n.privateUsdConvertResultWindowMissed,
   ApiNothingSentCause.makerCancelled =>
-    PrivateUsdCopy.convertResultMakerCancelled,
+    l10n.privateUsdConvertResultMakerCancelled,
 };
 
 /// Why a forward conversion's ZEC came back.
-String privateUsdRefundedMessage(ApiRefundCause? cause) => switch (cause) {
+String privateUsdRefundedMessage(
+  AppLocalizations l10n,
+  ApiRefundCause? cause,
+) => switch (cause) {
   ApiRefundCause.makerCancelled ||
-  null => PrivateUsdCopy.convertResultRefundedMaker,
-  ApiRefundCause.notClaimedInTime => PrivateUsdCopy.convertResultRefundedLate,
+  null => l10n.privateUsdConvertResultRefundedMaker,
+  ApiRefundCause.notClaimedInTime => l10n.privateUsdConvertResultRefundedLate,
 };
 
 /// What to say when a reverse quote fails before anything but a swap index
 /// was spent.
-String? privateUsdReverseQuoteMessage(ApiPrivateUsdErrorCode code) =>
-    switch (code) {
-      ApiPrivateUsdErrorCode.unavailable =>
-        PrivateUsdCopy.reverseErrorFundingUnavailable,
-      // The fees took all of the total, or the maker refused what is left.
-      ApiPrivateUsdErrorCode.amountRefused =>
-        PrivateUsdCopy.reverseErrorAmountRefused,
-      _ => privateUsdErrorMessage(code),
-    };
+String? privateUsdReverseQuoteMessage(
+  AppLocalizations l10n,
+  ApiPrivateUsdErrorCode code,
+) => switch (code) {
+  ApiPrivateUsdErrorCode.unavailable =>
+    l10n.privateUsdReverseErrorFundingUnavailable,
+  // The fees took all of the total, or the maker refused what is left.
+  ApiPrivateUsdErrorCode.amountRefused =>
+    l10n.privateUsdReverseErrorAmountRefused,
+  _ => privateUsdErrorMessage(l10n, code),
+};
+
+/// [privateUsdReverseQuoteMessage] kept for a widget to show; null for a
+/// cancelled call.
+PrivateUsdText? privateUsdReverseQuoteText(ApiPrivateUsdErrorCode code) =>
+    code == ApiPrivateUsdErrorCode.cancelled
+    ? null
+    : (l10n) =>
+          privateUsdReverseQuoteMessage(l10n, code) ??
+          l10n.privateUsdConvertErrorGeneric;
 
 /// What to say when a reverse step the user took (pay, authorize settlement,
 /// cancel) did not go through.
 String privateUsdReverseStepMessage(
+  AppLocalizations l10n,
   ApiPrivateUsdErrorCode code,
 ) => switch (code) {
   ApiPrivateUsdErrorCode.depositUnconfirmed =>
-    PrivateUsdCopy.reverseErrorUnconfirmed,
+    l10n.privateUsdReverseErrorUnconfirmed,
   ApiPrivateUsdErrorCode.tooLate ||
-  ApiPrivateUsdErrorCode.quoteExpired => PrivateUsdCopy.reverseErrorTooLate,
+  ApiPrivateUsdErrorCode.quoteExpired => l10n.privateUsdReverseErrorTooLate,
   ApiPrivateUsdErrorCode.fundingCostChanged =>
-    PrivateUsdCopy.reverseErrorCostChanged,
+    l10n.privateUsdReverseErrorCostChanged,
   ApiPrivateUsdErrorCode.unavailable =>
-    PrivateUsdCopy.reverseErrorFundingUnavailable,
+    l10n.privateUsdReverseErrorFundingUnavailable,
   // Settlement is signed only on a fresh head: a node minutes behind is
   // as good as unreachable.
   ApiPrivateUsdErrorCode.ethereumUnreachable ||
-  ApiPrivateUsdErrorCode.chainLagging => PrivateUsdCopy.convertErrorEthereum,
-  ApiPrivateUsdErrorCode.relayerFee => PrivateUsdCopy.convertErrorFeeCap,
-  ApiPrivateUsdErrorCode.routeBlocked => PrivateUsdCopy.convertProblemRoute,
-  ApiPrivateUsdErrorCode.storeUnreadable => PrivateUsdCopy.convertErrorStore,
-  _ => PrivateUsdCopy.reverseError,
+  ApiPrivateUsdErrorCode.chainLagging => l10n.privateUsdConvertErrorEthereum,
+  ApiPrivateUsdErrorCode.relayerFee => l10n.privateUsdConvertErrorFeeCap,
+  ApiPrivateUsdErrorCode.routeBlocked => l10n.privateUsdConvertProblemRoute,
+  ApiPrivateUsdErrorCode.storeUnreadable => l10n.privateUsdConvertErrorStore,
+  _ => l10n.privateUsdReverseError,
 };
 
 /// The problem card's message for a reverse conversion whose steps have
 /// failed for a minute.
-String privateUsdReverseProblemMessage(ApiPrivateUsdErrorCode code) =>
-    switch (code) {
-      ApiPrivateUsdErrorCode.relayerUnreachable =>
-        PrivateUsdCopy.reverseProblemRelayer,
-      ApiPrivateUsdErrorCode.relayerRefused ||
-      ApiPrivateUsdErrorCode.relayerFee ||
-      ApiPrivateUsdErrorCode.ethereumUnreachable ||
-      ApiPrivateUsdErrorCode.chainLagging ||
-      ApiPrivateUsdErrorCode.zcashWallet ||
-      ApiPrivateUsdErrorCode.zcashRejected ||
-      ApiPrivateUsdErrorCode.mismatch ||
-      ApiPrivateUsdErrorCode.storeUnreadable ||
-      ApiPrivateUsdErrorCode.routeBlocked => privateUsdProblemMessage(code),
-      _ => PrivateUsdCopy.convertProblemUnexpected,
-    };
+String privateUsdReverseProblemMessage(
+  AppLocalizations l10n,
+  ApiPrivateUsdErrorCode code,
+) => switch (code) {
+  ApiPrivateUsdErrorCode.relayerUnreachable =>
+    l10n.privateUsdReverseProblemRelayer,
+  ApiPrivateUsdErrorCode.relayerRefused ||
+  ApiPrivateUsdErrorCode.relayerFee ||
+  ApiPrivateUsdErrorCode.ethereumUnreachable ||
+  ApiPrivateUsdErrorCode.chainLagging ||
+  ApiPrivateUsdErrorCode.zcashWallet ||
+  ApiPrivateUsdErrorCode.zcashRejected ||
+  ApiPrivateUsdErrorCode.mismatch ||
+  ApiPrivateUsdErrorCode.storeUnreadable ||
+  ApiPrivateUsdErrorCode.routeBlocked => privateUsdProblemMessage(l10n, code),
+  _ => l10n.privateUsdConvertProblemUnexpected,
+};
 
 /// Why confirming did not start a reverse conversion: the maker's answer
 /// ended it (`nothingSent`) with nothing paid.
-String privateUsdReverseNothingSentMessage(ApiNothingSentCause? cause) =>
-    switch (cause) {
-      ApiNothingSentCause.makerUnavailable => PrivateUsdCopy.convertErrorMaker,
-      ApiNothingSentCause.quoteExpired => PrivateUsdCopy.convertQuoteRanOut,
-      _ => PrivateUsdCopy.convertStartFailed,
-    };
+String privateUsdReverseNothingSentMessage(
+  AppLocalizations l10n,
+  ApiNothingSentCause? cause,
+) => switch (cause) {
+  ApiNothingSentCause.makerUnavailable => l10n.privateUsdConvertErrorMaker,
+  ApiNothingSentCause.quoteExpired => l10n.privateUsdConvertQuoteRanOut,
+  _ => l10n.privateUsdConvertStartFailed,
+};
 
 /// A dollar token's name by its symbol: the testnet maker's token is `tUSD`.
-String privateUsdTokenName(String symbol) =>
-    symbol == 'tUSD' ? PrivateUsdCopy.tokenTestUsd : PrivateUsdCopy.tokenUsdc;
+String privateUsdTokenName(AppLocalizations l10n, String symbol) =>
+    symbol == 'tUSD' ? l10n.privateUsdTokenTestUsd : PrivateUsdCopy.tokenUsdc;
 
 /// What the chain is called for a Railgun network.
-String privateUsdRpcNetworkName(String railgunNetwork) =>
+String privateUsdRpcNetworkName(AppLocalizations l10n, String railgunNetwork) =>
     railgunNetwork == 'sepolia'
     ? PrivateUsdCopy.rpcNetworkSepolia
-    : PrivateUsdCopy.rpcNetworkMainnet;
+    : l10n.privateUsdRpcNetworkMainnet;

@@ -81,7 +81,7 @@ class PricingEnginePortfolioPriceHistorySource
         return null;
       }
       final response = await _client.request(
-        'GET',
+        'GET', // l10n-ignore: HTTP method
         pricingEnginePricesUri(_baseUri, from: from, to: window.to),
         headers: const {HttpHeaders.acceptHeader: 'application/json'},
         timeout: remaining < timeout ? remaining : timeout,

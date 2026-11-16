@@ -83,12 +83,13 @@ ActivityRowData? buildPrivateUsdActivityRow({
     case null:
       return ActivityRowData(
         stableId: base.stableId,
-        title: PrivateUsdCopy.convertingToUsd,
+        title: context.l10n.privateUsdConvertingToUsd,
         leadingIconName: _glyph,
         leading: _logo,
         leadingBackgroundColor: base.leadingBackgroundColor,
         leadingIconColor: base.leadingIconColor,
         subtitle: privateUsdForwardStageLabel(
+          context.l10n,
           PrivateUsdConversionStatus(record: record),
           zcashConfirmations: zcashConfirmations,
         ),
@@ -110,7 +111,7 @@ ActivityRowData? buildPrivateUsdActivityRow({
             ).activity.toString();
       return ActivityRowData(
         stableId: base.stableId,
-        title: PrivateUsdCopy.activityConverted,
+        title: context.l10n.privateUsdActivityConverted,
         leadingIconName: _glyph,
         leading: _logo,
         leadingBackgroundColor: base.leadingBackgroundColor,
@@ -128,11 +129,11 @@ ActivityRowData? buildPrivateUsdActivityRow({
     case ApiForwardOutcome.refunded:
       return ActivityRowData(
         stableId: base.stableId,
-        title: PrivateUsdCopy.activityRefunded,
+        title: context.l10n.privateUsdActivityRefunded,
         leadingIconName: AppIcons.uturnUp,
         leadingBackgroundColor: base.leadingBackgroundColor,
         leadingIconColor: base.leadingIconColor,
-        subtitle: PrivateUsdCopy.activityRefundedDetail,
+        subtitle: context.l10n.privateUsdActivityRefundedDetail,
         amountText: '',
         statusText: '',
         timestampText: timestamp,
@@ -192,7 +193,7 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
       );
       return ActivityRowData(
         stableId: stableId,
-        title: PrivateUsdCopy.activityConvertedToZec,
+        title: context.l10n.privateUsdActivityConvertedToZec,
         leadingIconName: _glyph,
         leading: _logo,
         leadingBackgroundColor: background,
@@ -210,11 +211,11 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
     case ApiReversePhase.refunded:
       return ActivityRowData(
         stableId: stableId,
-        title: PrivateUsdCopy.activityRefunded,
+        title: context.l10n.privateUsdActivityRefunded,
         leadingIconName: AppIcons.uturnUp,
         leadingBackgroundColor: background,
         leadingIconColor: icon,
-        subtitle: PrivateUsdCopy.activityRefundedZecDetail,
+        subtitle: context.l10n.privateUsdActivityRefundedZecDetail,
         amountText: '',
         statusText: '',
         timestampText: timestamp,
@@ -223,12 +224,12 @@ ActivityRowData? buildPrivateUsdReverseActivityRow({
     default:
       return ActivityRowData(
         stableId: stableId,
-        title: PrivateUsdCopy.convertingToZec,
+        title: context.l10n.privateUsdConvertingToZec,
         leadingIconName: _glyph,
         leading: _logo,
         leadingBackgroundColor: background,
         leadingIconColor: icon,
-        subtitle: privateUsdReverseStageLabel(record),
+        subtitle: privateUsdReverseStageLabel(context.l10n, record),
         amountText: activityAmountTextForFormFactor(
           PrivateUsdCopy.activityOut(usd),
         ),
@@ -267,20 +268,24 @@ ActivityRowData buildPrivateUsdSendActivityRow({
   final unfold = _unfold(
     details,
     stableId,
-    () => privateUsdSendDetails(l10n, record, privacyModeEnabled: privacyModeEnabled),
+    () => privateUsdSendDetails(
+      l10n,
+      record,
+      privacyModeEnabled: privacyModeEnabled,
+    ),
   );
   return ActivityRowData(
     stableId: stableId,
     title: record.withdraw
-        ? PrivateUsdCopy.activityWithdrew
-        : PrivateUsdCopy.activitySent,
+        ? context.l10n.privateUsdActivityWithdrew
+        : context.l10n.privateUsdActivitySent,
     leadingIconName: _glyph,
     leading: _logo,
     leadingBackgroundColor: colors.background.neutralSubtleOpacity,
     leadingIconColor: colors.icon.regular,
     subtitle: unconfirmed
-        ? PrivateUsdCopy.activityUnconfirmed
-        : PrivateUsdCopy.activityTo(truncatedAddress(record.to)),
+        ? context.l10n.privateUsdActivityUnconfirmed
+        : context.l10n.privateUsdActivityTo(truncatedAddress(record.to)),
     amountText: activityAmountTextForFormFactor(
       PrivateUsdCopy.activityOut(usd),
     ),
@@ -299,7 +304,7 @@ ActivityRowData buildPrivateUsdSendActivityRow({
 }
 
 String _receivedStableId(RailgunReceipt receipt, int copy) =>
-    'private-usd:received:${receipt.txid}:${receipt.token}:${receipt.amount}'
+    'private-usd:received:${receipt.txid}:${receipt.token}:${receipt.amount}' // l10n-ignore: row identifier
     '${copy == 0 ? '' : ':$copy'}';
 
 /// [receipts] each with how many equal receipts come before it.
@@ -353,16 +358,16 @@ ActivityRowData buildPrivateUsdReceivedActivityRow({
   );
   return ActivityRowData(
     stableId: stableId,
-    title: PrivateUsdCopy.activityReceived,
+    title: context.l10n.privateUsdActivityReceived,
     leadingIconName: _glyph,
     leading: _logo,
     leadingBackgroundColor: colors.background.neutralSubtleOpacity,
     leadingIconColor: colors.icon.regular,
     subtitle: !settled
-        ? PrivateUsdCopy.activityReceivedScreening
+        ? context.l10n.privateUsdActivityReceivedScreening
         : sender == null
-        ? PrivateUsdCopy.activitySenderHidden
-        : PrivateUsdCopy.activityFrom(truncatedAddress(sender)),
+        ? context.l10n.privateUsdActivitySenderHidden
+        : context.l10n.privateUsdActivityFrom(truncatedAddress(sender)),
     amountText: activityAmountTextForFormFactor(PrivateUsdCopy.activityIn(usd)),
     amountColor: settled
         ? colors.text.positiveStrong
@@ -414,14 +419,16 @@ ActivityRowData? buildPrivateUsdDepositActivityRow({
   switch (record.state) {
     case ApiDepositState.signed:
       subtitle = record.waiting
-          ? PrivateUsdCopy.depositWaiting
-          : PrivateUsdCopy.depositReceived(value);
+          ? context.l10n.privateUsdDepositWaiting
+          : context.l10n.privateUsdDepositReceived(value);
     case ApiDepositState.sent:
-      subtitle = PrivateUsdCopy.depositShielding;
+      subtitle = context.l10n.privateUsdDepositShielding;
     case ApiDepositState.landed:
       subtitle = landedAt != null && now().difference(landedAt) < screening
-          ? PrivateUsdCopy.depositShielded(PrivateUsdCopy.about(screening))
-          : PrivateUsdCopy.activityDepositShielded;
+          ? context.l10n.privateUsdDepositShielded(
+              PrivateUsdCopy.about(context.l10n, screening),
+            )
+          : context.l10n.privateUsdActivityDepositShielded;
     case ApiDepositState.refused ||
         ApiDepositState.reverted ||
         ApiDepositState.replaced ||
@@ -442,8 +449,8 @@ ActivityRowData? buildPrivateUsdDepositActivityRow({
   return ActivityRowData(
     stableId: stableId,
     title: record.kind == ApiDepositKind.rescue
-        ? PrivateUsdCopy.activityDepositRescue
-        : PrivateUsdCopy.activityDeposit,
+        ? context.l10n.privateUsdActivityDepositRescue
+        : context.l10n.privateUsdActivityDeposit,
     leadingIconName: _glyph,
     leading: _logo,
     leadingBackgroundColor: colors.background.neutralSubtleOpacity,

@@ -41,7 +41,7 @@ class PrivateUsdProgressPresentation {
     this.showsCallOff = false,
     this.showsKeepOpen = false,
     this.action,
-    this.title = PrivateUsdCopy.convertProgressTitle,
+    required this.title,
     this.bridged = false,
   });
 
@@ -103,7 +103,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation(
   final usdText = privacyModeEnabled
       ? fixedPrivacyMask()
       : formatPrivateUsd(receives);
-  final amountsText = PrivateUsdCopy.convertProgressAmounts(zecText, usdText);
+  final amountsText = l10n.privateUsdConvertProgressAmounts(zecText, usdText);
   final details = _details(l10n, record, explorerTxPrefix: explorerTxPrefix);
 
   SwapActivityStatusPresentation presentation({
@@ -111,6 +111,7 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation(
     required int progressIndex,
     required SwapStatusBadgeKind badgeKind,
   }) => privateUsdSwapStatus(
+    l10n,
     payAsset: SwapAsset.zec,
     receiveAsset: SwapAsset.usdc,
     payAmountText: zecText,
@@ -142,15 +143,15 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation(
     resultBody: body,
     action: action,
     title: badgeKind == SwapStatusBadgeKind.liveQuote
-        ? PrivateUsdCopy.convertProgressTitle
-        : PrivateUsdCopy.actionConvert,
+        ? l10n.privateUsdConvertProgressTitle
+        : l10n.privateUsdActionConvert,
     bridged: badgeKind == SwapStatusBadgeKind.completed,
   );
 
   final tryAgain = bridgeAvailable ? PrivateUsdProgressAction.tryAgain : null;
   switch (record.outcome) {
     case ApiForwardOutcome.paid:
-      final about = PrivateUsdCopy.about(screening);
+      final about = PrivateUsdCopy.about(l10n, screening);
       final endedAt = record.endedAt == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(record.endedAt! * 1000);
@@ -162,35 +163,36 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation(
       if (synced && arriving == BigInt.zero) {
         return ended(
           badgeKind: SwapStatusBadgeKind.completed,
-          title: PrivateUsdCopy.convertResultPaidTitle,
-          body: PrivateUsdCopy.convertResultScreenedBody(usdText),
+          title: l10n.privateUsdConvertResultPaidTitle,
+          body: l10n.privateUsdConvertResultScreenedBody(usdText),
           action: PrivateUsdProgressAction.viewBalance,
         );
       }
       final active = synced ? 5 : 4;
       return ended(
         badgeKind: SwapStatusBadgeKind.liveQuote,
-        title: PrivateUsdCopy.convertResultPaidTitle,
-        body: PrivateUsdCopy.convertResultPaidBody(usdText, about),
+        title: l10n.privateUsdConvertResultPaidTitle,
+        body: l10n.privateUsdConvertResultPaidBody(usdText, about),
         action: PrivateUsdProgressAction.viewBalance,
         steps: _forwardSteps(
+          l10n,
           active: active,
-          description: active == 5 ? about : PrivateUsdCopy.convertEtaMinute,
+          description: active == 5 ? about : l10n.privateUsdConvertEtaMinute,
         ),
         progressIndex: active,
       );
     case ApiForwardOutcome.refunded:
       return ended(
         badgeKind: SwapStatusBadgeKind.refunded,
-        title: PrivateUsdCopy.convertResultRefundedTitle,
-        body: privateUsdRefundedMessage(record.refundCause),
+        title: l10n.privateUsdConvertResultRefundedTitle,
+        body: privateUsdRefundedMessage(l10n, record.refundCause),
         action: tryAgain,
       );
     case ApiForwardOutcome.nothingSent:
       return ended(
         badgeKind: SwapStatusBadgeKind.failed,
-        title: PrivateUsdCopy.convertResultNothingTitle,
-        body: privateUsdNothingSentMessage(record.nothingSentCause),
+        title: l10n.privateUsdConvertResultNothingTitle,
+        body: privateUsdNothingSentMessage(l10n, record.nothingSentCause),
         action: tryAgain,
       );
     case null:
@@ -211,28 +213,30 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation(
     active = 0;
     steps = [
       SwapStatusStepData(
-        title: PrivateUsdCopy.convertStepRefund,
+        title: l10n.privateUsdConvertStepRefund,
         state: SwapStatusStepState.active,
-        description: syncing ? PrivateUsdCopy.convertWaitSyncing : null,
+        description: syncing ? l10n.privateUsdConvertWaitSyncing : null,
       ),
     ];
   } else if (unwinding) {
     // The maker's refund, then the ZEC home.
     active = 0;
-    steps = privateUsdProgressSteps(const [
-      PrivateUsdCopy.convertStepUnwind,
-      PrivateUsdCopy.convertStepRefund,
+    steps = privateUsdProgressSteps([
+      l10n.privateUsdConvertStepUnwind,
+      l10n.privateUsdConvertStepRefund,
     ], active: active);
   } else {
     active = privateUsdForwardStepIndex(status);
     steps = _forwardSteps(
+      l10n,
       active: active,
       description: syncing
-          ? PrivateUsdCopy.convertWaitSyncing
+          ? l10n.privateUsdConvertWaitSyncing
           : switch (active) {
-              0 || 3 => PrivateUsdCopy.convertEtaMinute,
-              1 => PrivateUsdCopy.convertEtaSeconds,
+              0 || 3 => l10n.privateUsdConvertEtaMinute,
+              1 => l10n.privateUsdConvertEtaSeconds,
               2 => _confirmationsDetail(
+                l10n,
                 record.depositConfirmations,
                 zcashConfirmations,
                 blockTimes,
@@ -274,31 +278,31 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation(
   final lateClaimAt = record.lateClaimAt;
   final String? note;
   if (status.resuming) {
-    note = PrivateUsdCopy.convertResuming;
+    note = l10n.privateUsdConvertResuming;
   } else if (refunding) {
-    note = PrivateUsdCopy.convertRefunding;
+    note = l10n.privateUsdConvertRefunding;
   } else if (unwinding) {
     note = lateClaimAt == null
-        ? PrivateUsdCopy.convertUnwinding
-        : PrivateUsdCopy.convertUnwindingUntil(
+        ? l10n.privateUsdConvertUnwinding
+        : l10n.privateUsdConvertUnwindingUntil(
             formatDayMonthTime(
               DateTime.fromMillisecondsSinceEpoch(lateClaimAt * 1000),
               l10n.localeName,
             ),
           );
   } else if (status.wait == ApiForwardWait.depositUnsettled) {
-    note = PrivateUsdCopy.convertUnsettled;
+    note = l10n.privateUsdConvertUnsettled;
   } else if (slowOpening) {
-    note = PrivateUsdCopy.convertOpeningSlow;
+    note = l10n.privateUsdConvertOpeningSlow;
   } else if (handedOver) {
     // Handed over only once the maker made the swap ready: never silent.
-    note = PrivateUsdCopy.convertRelayerClaims;
+    note = l10n.privateUsdConvertRelayerClaims;
   } else if (makerSilent) {
-    note = PrivateUsdCopy.convertMakerSilent(
+    note = l10n.privateUsdConvertMakerSilent(
       formatDayMonthTime(t0, l10n.localeName),
     );
   } else if (relayerToClaim) {
-    note = PrivateUsdCopy.convertRelayerReviewNote;
+    note = l10n.privateUsdConvertRelayerReviewNote;
   } else {
     note = null;
   }
@@ -315,9 +319,10 @@ PrivateUsdProgressPresentation privateUsdProgressPresentation(
     receiveAmountText: usdText,
     amountsText: amountsText,
     note: note,
-    problem: problem == null ? null : privateUsdProblemMessage(problem),
+    problem: problem == null ? null : privateUsdProblemMessage(l10n, problem),
     showsCallOff: slowOpening && problem == null,
     showsKeepOpen: !handedOver && !relayerToClaim,
+    title: l10n.privateUsdConvertProgressTitle,
   );
 }
 
@@ -360,6 +365,7 @@ bool privateUsdForwardUnwinding(PrivateUsdConversionStatus status) =>
 /// the confirmation count while confirming ("Waiting for confirmations · 1
 /// of 2").
 String privateUsdForwardStageLabel(
+  AppLocalizations l10n,
   PrivateUsdConversionStatus status, {
   required int zcashConfirmations,
 }) {
@@ -367,36 +373,37 @@ String privateUsdForwardStageLabel(
   if (record.phase == ApiForwardPhase.refunding ||
       status.wait == ApiForwardWait.refunding ||
       status.activity == ApiActivity.sweeping) {
-    return PrivateUsdCopy.convertStepRefund;
+    return l10n.privateUsdConvertStepRefund;
   }
   if (privateUsdForwardUnwinding(status)) {
-    return PrivateUsdCopy.convertStepUnwind;
+    return l10n.privateUsdConvertStepUnwind;
   }
   return switch (privateUsdForwardStepIndex(status)) {
-    0 => PrivateUsdCopy.convertStepOpen,
-    1 => PrivateUsdCopy.convertStepDeposit,
+    0 => l10n.privateUsdConvertStepOpen,
+    1 => l10n.privateUsdConvertStepDeposit,
     2 => PrivateUsdCopy.activityDetail(
-      PrivateUsdCopy.convertStepConfirm,
-      PrivateUsdCopy.convertStepConfirmCount(
+      l10n.privateUsdConvertStepConfirm,
+      l10n.privateUsdConvertStepConfirmCount(
         record.depositConfirmations ?? 0,
         zcashConfirmations,
       ),
     ),
-    _ => PrivateUsdCopy.convertStepClaim,
+    _ => l10n.privateUsdConvertStepClaim,
   };
 }
 
-List<SwapStatusStepData> _forwardSteps({
+List<SwapStatusStepData> _forwardSteps(
+  AppLocalizations l10n, {
   required int active,
   String? description,
 }) => privateUsdProgressSteps(
-  const [
-    PrivateUsdCopy.convertStepOpen,
-    PrivateUsdCopy.convertStepDeposit,
-    PrivateUsdCopy.convertStepConfirm,
-    PrivateUsdCopy.convertStepClaim,
-    PrivateUsdCopy.convertStepArrive,
-    PrivateUsdCopy.convertStepScreen,
+  [
+    l10n.privateUsdConvertStepOpen,
+    l10n.privateUsdConvertStepDeposit,
+    l10n.privateUsdConvertStepConfirm,
+    l10n.privateUsdConvertStepClaim,
+    l10n.privateUsdConvertStepArrive,
+    l10n.privateUsdConvertStepScreen,
   ],
   active: active,
   description: description,
@@ -423,7 +430,8 @@ List<SwapStatusStepData> privateUsdProgressSteps(
 
 /// A conversion's timeline and details as the swap status screen draws
 /// them. Once it [bridged], its amounts are no longer an estimate.
-SwapActivityStatusPresentation privateUsdSwapStatus({
+SwapActivityStatusPresentation privateUsdSwapStatus(
+  AppLocalizations l10n, {
   required SwapAsset payAsset,
   required SwapAsset receiveAsset,
   required String payAmountText,
@@ -434,7 +442,7 @@ SwapActivityStatusPresentation privateUsdSwapStatus({
   required List<SwapStatusDetailRowData> details,
   required bool bridged,
 }) => SwapActivityStatusPresentation(
-  title: PrivateUsdCopy.convertProgressTitle,
+  title: l10n.privateUsdConvertProgressTitle,
   payAsset: payAsset,
   receiveAsset: receiveAsset,
   payFiatText: '',
@@ -442,16 +450,16 @@ SwapActivityStatusPresentation privateUsdSwapStatus({
   payAmountText: payAmountText,
   receiveAmountText: receiveAmountText,
   payLabel: bridged
-      ? PrivateUsdCopy.bridgedYouPaid
-      : PrivateUsdCopy.convertYouPay,
+      ? l10n.privateUsdBridgedYouPaid
+      : l10n.privateUsdConvertYouPay,
   receiveLabel: bridged
-      ? PrivateUsdCopy.bridgedYouReceived
-      : PrivateUsdCopy.convertYouReceive,
+      ? l10n.privateUsdBridgedYouReceived
+      : l10n.privateUsdConvertYouReceive,
   badgeKind: badgeKind,
   progressIndex: progressIndex,
   steps: steps,
   details: details,
-  progressTabLabel: PrivateUsdCopy.progressTab,
+  progressTabLabel: l10n.privateUsdProgressTab,
   // Every row is one of the conversion's own (swap ID, its transactions,
   // when it started): all of them show while it runs.
   allDetailsInProgress: true,
@@ -459,17 +467,21 @@ SwapActivityStatusPresentation privateUsdSwapStatus({
 );
 
 String _confirmationsDetail(
+  AppLocalizations l10n,
   int? confirmations,
   int needed,
   BlockTimeEstimate blockTimes,
 ) {
   final count = (confirmations ?? 0).clamp(0, needed);
   final left = needed - count;
-  final countText = PrivateUsdCopy.convertStepConfirmCount(count, needed);
+  final countText = l10n.privateUsdConvertStepConfirmCount(count, needed);
   if (left <= 0) return countText;
   return PrivateUsdCopy.activityDetail(
     countText,
-    PrivateUsdCopy.about(Duration(seconds: blockTimes.secondsForBlocks(left))),
+    PrivateUsdCopy.about(
+      l10n,
+      Duration(seconds: blockTimes.secondsForBlocks(left)),
+    ),
   );
 }
 
@@ -483,21 +495,21 @@ List<SwapStatusDetailRowData> _details(
   final payout = record.payoutTx;
   return [
     SwapStatusDetailRowData(
-      label: PrivateUsdCopy.detailSwapId,
+      label: l10n.privateUsdDetailSwapId,
       value: truncatedTxid(record.swapId),
       copyable: true,
       copyText: record.swapId,
     ),
     if (deposit != null)
       SwapStatusDetailRowData(
-        label: PrivateUsdCopy.detailDeposit,
+        label: l10n.privateUsdDetailDeposit,
         value: truncatedTxid(privateUsdDisplayTxid(deposit)),
         copyable: true,
         copyText: privateUsdDisplayTxid(deposit),
       ),
     if (payout != null)
       SwapStatusDetailRowData(
-        label: PrivateUsdCopy.detailPayout,
+        label: l10n.privateUsdDetailPayout,
         value: truncatedTxid(payout),
         copyable: true,
         copyText: payout,
@@ -505,13 +517,13 @@ List<SwapStatusDetailRowData> _details(
       ),
     if (sweep != null)
       SwapStatusDetailRowData(
-        label: PrivateUsdCopy.detailRefund,
+        label: l10n.privateUsdDetailRefund,
         value: truncatedTxid(privateUsdDisplayTxid(sweep)),
         copyable: true,
         copyText: privateUsdDisplayTxid(sweep),
       ),
     SwapStatusDetailRowData(
-      label: PrivateUsdCopy.detailStarted,
+      label: l10n.privateUsdDetailStarted,
       value: formatDayMonthTime(
         DateTime.fromMillisecondsSinceEpoch(record.acceptedAt * 1000),
         l10n.localeName,

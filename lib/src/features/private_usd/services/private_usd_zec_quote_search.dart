@@ -40,7 +40,7 @@ class PrivateUsdNoQuoteFitsException implements Exception {
   const PrivateUsdNoQuoteFitsException();
 
   @override
-  String toString() => 'No quote fits the entered ZEC amount.';
+  String toString() => 'No quote fits the entered ZEC amount.'; // l10n-ignore: exception text
 }
 
 /// Finds the dearest quote whose deposit and network fee fit a ZEC total.

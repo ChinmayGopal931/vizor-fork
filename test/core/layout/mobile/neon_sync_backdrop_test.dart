@@ -14,21 +14,21 @@ import '../../../support/test_l10n.dart';
 // The floor flows, and a climbing line's pulse runs, only while something
 // scans; idle, nothing moves and no frame is drawn.
 void main() {
-  const synced = NeonSyncLine(
+  final synced = NeonSyncLine(
     progress: 1,
-    readout: NeonSyncReadout.synced,
+    readout: NeonSyncReadout.synced(testL10n),
     semanticsLabel: 'Synced',
   );
   final climbing = NeonSyncLine(
     progress: 0.4,
-    readout: NeonSyncReadout.progress(40),
+    readout: NeonSyncReadout.progress(testL10n, 40),
     semanticsLabel: 'Syncing 40%',
     climbing: true,
   );
   // A synced Private USD wallet refreshing: the floor flows under the line.
-  const refreshing = NeonSyncLine(
+  final refreshing = NeonSyncLine(
     progress: 1,
-    readout: NeonSyncReadout.synced,
+    readout: NeonSyncReadout.synced(testL10n),
     semanticsLabel: 'Updating…',
     scanning: true,
   );
@@ -227,7 +227,7 @@ void main() {
           networkPrivacy: off,
           climbProgress: () => 0.42,
         );
-        expect(line.readout, NeonSyncReadout.progress(42));
+        expect(line.readout, NeonSyncReadout.progress(testL10n, 42));
         expect(line.progress, 0.42);
         expect(line.climbing, isTrue);
         expect(line.failed, isFalse);
@@ -242,7 +242,7 @@ void main() {
         networkPrivacy: off,
         climbProgress: () => fail('read while synced'),
       );
-      expect(line.readout, NeonSyncReadout.synced);
+      expect(line.readout, NeonSyncReadout.synced(testL10n));
       expect(line.progress, 1);
       expect(line.climbing, isFalse);
     });
@@ -261,7 +261,7 @@ void main() {
         networkPrivacy: off,
         climbProgress: () => fail('read while catching up'),
       );
-      expect(line.readout, NeonSyncReadout.synced);
+      expect(line.readout, NeonSyncReadout.synced(testL10n));
       expect(line.semanticsLabel, 'Veylor is synced');
       expect(line.progress, 1);
       expect(line.climbing, isFalse);
@@ -281,7 +281,7 @@ void main() {
         networkPrivacy: off,
         climbProgress: () => fail('read after a failure'),
       );
-      expect(line.readout, NeonSyncReadout.failed);
+      expect(line.readout, NeonSyncReadout.failed(testL10n));
       expect(line.progress, 0.3);
       expect(line.failed, isTrue);
       expect(line.climbing, isFalse);
@@ -298,7 +298,7 @@ void main() {
         ),
         climbProgress: () => 0.01,
       );
-      expect(waiting.readout, NeonSyncReadout.torWaiting);
+      expect(waiting.readout, NeonSyncReadout.torWaiting(testL10n));
       expect(waiting.climbing, isTrue);
       final offline = NeonSyncLine.wallet(
         testL10n,
@@ -310,7 +310,7 @@ void main() {
         ),
         climbProgress: () => fail('read while Tor is offline'),
       );
-      expect(offline.readout, NeonSyncReadout.torOffline);
+      expect(offline.readout, NeonSyncReadout.torOffline(testL10n));
       expect(offline.failed, isTrue);
     });
   });

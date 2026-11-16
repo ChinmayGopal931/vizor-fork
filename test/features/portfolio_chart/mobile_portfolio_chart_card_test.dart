@@ -7,6 +7,7 @@ import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/models/portfolio_chart_models.dart';
 import 'package:zcash_wallet/src/features/portfolio_chart/widgets/mobile/mobile_portfolio_chart_card.dart';
+import '../../support/test_l10n.dart';
 
 PortfolioChartData _data({
   PortfolioChartMode mode = PortfolioChartMode.usd,
@@ -111,7 +112,7 @@ void main() {
       find.byKey(const ValueKey('mobile_home_portfolio_chart_range_All')),
     );
     expect(picked, [PortfolioChartRange.all]);
-    expect(PortfolioChartRange.all.description, 'All time');
+    expect(PortfolioChartRange.all.description(testL10n), 'All time');
   });
 
   testWidgets('dragging along a daily price shows the UTC day it belongs to', (

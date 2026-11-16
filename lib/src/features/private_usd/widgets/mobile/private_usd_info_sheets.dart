@@ -5,6 +5,7 @@ import '../../../../core/layout/mobile/mobile_bottom_safe_area.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../private_usd_copy.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// The Private USD screen's info sheet: what each action does, then the
 /// notes on screening, privacy and keeping the app open. [screening] is the
@@ -33,19 +34,23 @@ Future<void> showPrivateUsdConvertInfoSheet(
   required bool relayerClaims,
 }) => _show(
   context,
-  title: PrivateUsdCopy.convertInfoTitle,
+  title: context.l10n.privateUsdConvertInfoTitle,
   steps: [
-    PrivateUsdCopy.convertInfoStepQuote,
-    PrivateUsdCopy.convertInfoStepDeposit,
+    context.l10n.privateUsdConvertInfoStepQuote,
+    context.l10n.privateUsdConvertInfoStepDeposit,
     relayerClaims
-        ? PrivateUsdCopy.convertInfoStepClaimRelayer
-        : PrivateUsdCopy.convertInfoStepClaim,
+        ? context.l10n.privateUsdConvertInfoStepClaimRelayer
+        : context.l10n.privateUsdConvertInfoStepClaim,
   ],
   notes: [
-    PrivateUsdCopy.convertInfoNoteEither,
+    context.l10n.privateUsdConvertInfoNoteEither,
     relayerClaims
-        ? PrivateUsdCopy.convertInfoNoteTimeRelayer(PrivateUsdCopy.about(takes))
-        : PrivateUsdCopy.convertInfoNoteTime(PrivateUsdCopy.about(takes)),
+        ? context.l10n.privateUsdConvertInfoNoteTimeRelayer(
+            PrivateUsdCopy.about(context.l10n, takes),
+          )
+        : context.l10n.privateUsdConvertInfoNoteTime(
+            PrivateUsdCopy.about(context.l10n, takes),
+          ),
   ],
 );
 
@@ -57,16 +62,16 @@ Future<void> showPrivateUsdReviewInfoSheet(
   required bool relayerClaims,
 }) => _show(
   context,
-  title: PrivateUsdCopy.convertReviewInfoTitle,
+  title: context.l10n.privateUsdConvertReviewInfoTitle,
   steps: [
-    PrivateUsdCopy.convertReviewInfoPay,
-    PrivateUsdCopy.convertReviewInfoReceive(railgunPercent),
-    PrivateUsdCopy.convertReviewInfoQuote,
+    context.l10n.privateUsdConvertReviewInfoPay,
+    context.l10n.privateUsdConvertReviewInfoReceive(railgunPercent),
+    context.l10n.privateUsdConvertReviewInfoQuote,
   ],
   notes: [
     relayerClaims
-        ? PrivateUsdCopy.convertRelayerInfoKeepOpen
-        : PrivateUsdCopy.infoKeepOpen,
+        ? context.l10n.privateUsdConvertRelayerInfoKeepOpen
+        : context.l10n.privateUsdInfoKeepOpen,
   ],
 );
 
@@ -79,21 +84,23 @@ Future<void> showPrivateUsdProgressInfoSheet(
   required bool relayerClaims,
 }) => _show(
   context,
-  title: PrivateUsdCopy.convertProgressInfoTitle,
+  title: context.l10n.privateUsdConvertProgressInfoTitle,
   steps: [
-    PrivateUsdCopy.convertProgressInfoOpen,
-    PrivateUsdCopy.convertProgressInfoDeposit,
-    PrivateUsdCopy.convertProgressInfoConfirm(zcashConfirmations),
+    context.l10n.privateUsdConvertProgressInfoOpen,
+    context.l10n.privateUsdConvertProgressInfoDeposit,
+    context.l10n.privateUsdConvertProgressInfoConfirm(zcashConfirmations),
     relayerClaims
-        ? PrivateUsdCopy.convertProgressInfoClaimRelayer
-        : PrivateUsdCopy.convertProgressInfoClaim,
-    PrivateUsdCopy.convertProgressInfoScreen(PrivateUsdCopy.about(screening)),
+        ? context.l10n.privateUsdConvertProgressInfoClaimRelayer
+        : context.l10n.privateUsdConvertProgressInfoClaim,
+    context.l10n.privateUsdConvertProgressInfoScreen(
+      PrivateUsdCopy.about(context.l10n, screening),
+    ),
   ],
   notes: [
-    PrivateUsdCopy.convertProgressInfoRefund,
+    context.l10n.privateUsdConvertProgressInfoRefund,
     relayerClaims
-        ? PrivateUsdCopy.convertRelayerInfoKeepOpen
-        : PrivateUsdCopy.infoKeepOpen,
+        ? context.l10n.privateUsdConvertRelayerInfoKeepOpen
+        : context.l10n.privateUsdInfoKeepOpen,
   ],
 );
 
@@ -101,19 +108,22 @@ Future<void> showPrivateUsdProgressInfoSheet(
 /// can follow.
 Future<void> showPrivateUsdReverseInfoSheet(BuildContext context) => _show(
   context,
-  title: PrivateUsdCopy.reverseTitle,
-  steps: const [PrivateUsdCopy.reverseIntro],
-  notes: const [PrivateUsdCopy.reverseRefundNote, PrivateUsdCopy.infoKeepOpen],
+  title: context.l10n.privateUsdReverseTitle,
+  steps: [context.l10n.privateUsdReverseIntro],
+  notes: [
+    context.l10n.privateUsdReverseRefundNote,
+    context.l10n.privateUsdInfoKeepOpen,
+  ],
 );
 
 /// The send screens' info sheet.
 Future<void> showPrivateUsdSendInfoSheet(BuildContext context) => _show(
   context,
-  title: PrivateUsdCopy.sendInfoTitle,
-  steps: const [
-    PrivateUsdCopy.sendInfoStepAddress,
-    PrivateUsdCopy.sendInfoStepProof,
-    PrivateUsdCopy.sendInfoStepPrivate,
+  title: context.l10n.privateUsdSendInfoTitle,
+  steps: [
+    context.l10n.privateUsdSendInfoStepAddress,
+    context.l10n.privateUsdSendInfoStepProof,
+    context.l10n.privateUsdSendInfoStepPrivate,
   ],
   notes: const [],
 );
@@ -125,15 +135,15 @@ Future<void> showPrivateUsdWithdrawInfoSheet(
   required String railgunPercent,
 }) => _show(
   context,
-  title: PrivateUsdCopy.withdrawInfoTitle,
-  steps: const [
-    PrivateUsdCopy.withdrawInfoStepAddress,
-    PrivateUsdCopy.withdrawInfoStepProof,
+  title: context.l10n.privateUsdWithdrawInfoTitle,
+  steps: [
+    context.l10n.privateUsdWithdrawInfoStepAddress,
+    context.l10n.privateUsdWithdrawInfoStepProof,
   ],
   notes: [
-    PrivateUsdCopy.withdrawInfoNotePublic,
-    PrivateUsdCopy.withdrawInfoNotePrivate,
-    PrivateUsdCopy.withdrawInfoNoteFee(railgunPercent),
+    context.l10n.privateUsdWithdrawInfoNotePublic,
+    context.l10n.privateUsdWithdrawInfoNotePrivate,
+    context.l10n.privateUsdWithdrawInfoNoteFee(railgunPercent),
   ],
 );
 
@@ -168,18 +178,20 @@ class PrivateUsdInfoSheetBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PrivateUsdTextSheetBody(
-    title: PrivateUsdCopy.infoTitle,
+    title: context.l10n.privateUsdInfoTitle,
     steps: [
-      if (bridgeAvailable) PrivateUsdCopy.infoConvert,
-      PrivateUsdCopy.infoReceive,
-      PrivateUsdCopy.infoSend,
-      PrivateUsdCopy.infoWithdraw,
-      PrivateUsdCopy.infoRefunds,
+      if (bridgeAvailable) context.l10n.privateUsdInfoConvert,
+      context.l10n.privateUsdInfoReceive,
+      context.l10n.privateUsdInfoSend,
+      context.l10n.privateUsdInfoWithdraw,
+      context.l10n.privateUsdInfoRefunds,
     ],
     notes: [
-      PrivateUsdCopy.infoScreening(PrivateUsdCopy.about(screening)),
-      PrivateUsdCopy.infoPrivate,
-      PrivateUsdCopy.infoKeepOpen,
+      context.l10n.privateUsdInfoScreening(
+        PrivateUsdCopy.about(context.l10n, screening),
+      ),
+      context.l10n.privateUsdInfoPrivate,
+      context.l10n.privateUsdInfoKeepOpen,
     ],
     onClose: onClose,
   );
@@ -240,7 +252,7 @@ class PrivateUsdTextSheetBody extends StatelessWidget {
               variant: AppButtonVariant.secondary,
               expand: true,
               onPressed: onClose,
-              child: const Text(PrivateUsdCopy.close),
+              child: Text(context.l10n.commonClose),
             ),
           ],
         ),

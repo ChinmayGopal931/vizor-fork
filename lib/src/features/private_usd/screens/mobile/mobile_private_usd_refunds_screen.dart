@@ -17,7 +17,6 @@ import '../../../../providers/account_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../../../rust/api/private_usd.dart' as rust;
 import '../../models/private_usd_balances.dart';
-import '../../private_usd_copy.dart';
 import '../../providers/private_usd_available_provider.dart';
 import '../../providers/private_usd_deposits_provider.dart';
 import '../../providers/private_usd_engine_provider.dart';
@@ -59,6 +58,7 @@ class _MobilePrivateUsdRefundsScreenState
     rust.ApiDepositRescuable rescue,
   ) async {
     if (_depositRecovering != null) return;
+    final l10n = context.l10n;
     final confirmed = await confirmPrivateUsdDepositRescue(
       context,
       fee: formatPrivateUsd(BigInt.tryParse(rescue.fee) ?? BigInt.zero),
@@ -75,11 +75,11 @@ class _MobilePrivateUsdRefundsScreenState
           .rescueDeposit(account, index: rescue.index);
     } on rust.ApiPrivateUsdError catch (failure) {
       if (failure.code != rust.ApiPrivateUsdErrorCode.cancelled) {
-        error = PrivateUsdCopy.refundsDepositRecoverFailed;
+        error = l10n.privateUsdRefundsDepositRecoverFailed;
       }
     } catch (failure) {
       if (failure is! PrivateUsdPause) {
-        error = PrivateUsdCopy.refundsDepositRecoverFailed;
+        error = l10n.privateUsdRefundsDepositRecoverFailed;
       }
     }
     if (!mounted) return;
@@ -163,9 +163,9 @@ class MobilePrivateUsdRefundsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final error = state.error;
+    final error = state.error?.call(context.l10n);
     return PrivateUsdFlowScaffold(
-      title: PrivateUsdCopy.refundsTitle,
+      title: context.l10n.privateUsdRefundsTitle,
       onBack: onBack,
       body: ListView(
         key: const ValueKey('mobile_private_usd_refunds_list'),
@@ -177,12 +177,12 @@ class MobilePrivateUsdRefundsView extends StatelessWidget {
         ),
         children: [
           Text(
-            PrivateUsdCopy.refundsSubtitle,
+            context.l10n.privateUsdRefundsSubtitle,
             style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            PrivateUsdCopy.refundsInfo,
+            context.l10n.privateUsdRefundsInfo,
             style: AppTypography.bodyMedium.copyWith(
               color: colors.text.secondary,
             ),
@@ -200,7 +200,7 @@ class MobilePrivateUsdRefundsView extends StatelessWidget {
               leading: state.refreshing
                   ? const AppLoadingIcon(size: AppIconSize.medium)
                   : const AppIcon(AppIcons.renew),
-              child: const Text(PrivateUsdCopy.refresh),
+              child: Text(context.l10n.privateUsdRefresh),
             ),
           ),
           if (error != null) ...[
@@ -227,8 +227,8 @@ class MobilePrivateUsdRefundsView extends StatelessWidget {
           if (state.rows.isEmpty && depositRescues.isEmpty)
             Text(
               state.loaded
-                  ? PrivateUsdCopy.refundsEmpty
-                  : PrivateUsdCopy.refundsChecking,
+                  ? context.l10n.privateUsdRefundsEmpty
+                  : context.l10n.privateUsdRefundsChecking,
               key: const ValueKey('mobile_private_usd_refunds_empty'),
               style: AppTypography.bodySmall.copyWith(
                 color: colors.text.secondary,
@@ -281,15 +281,15 @@ class _RefundCard extends StatelessWidget {
       denomination: '',
     );
     final status = recovering
-        ? PrivateUsdCopy.refundsRecovering
+        ? context.l10n.privateUsdRefundsRecovering
         : row.checkFailed
-        ? PrivateUsdCopy.refundsCheckFailed
+        ? context.l10n.privateUsdRefundsCheckFailed
         : row.recoverable == null
-        ? PrivateUsdCopy.refundsChecking
+        ? context.l10n.privateUsdRefundsChecking
         : row.recoverable!
-        ? PrivateUsdCopy.refundsAvailable
-        : PrivateUsdCopy.refundsNoRecovery;
-    final error = row.error;
+        ? context.l10n.privateUsdRefundsAvailable
+        : context.l10n.privateUsdRefundsNoRecovery;
+    final error = row.error?.call(context.l10n);
     return MobileSurfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -303,7 +303,7 @@ class _RefundCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  PrivateUsdCopy.refundsOriginalAmount,
+                  context.l10n.privateUsdRefundsOriginalAmount,
                   style: AppTypography.bodyMedium.copyWith(
                     color: colors.text.secondary,
                   ),
@@ -336,7 +336,7 @@ class _RefundCard extends StatelessWidget {
               leading: recovering
                   ? const AppLoadingIcon(size: AppIconSize.medium)
                   : null,
-              child: const Text(PrivateUsdCopy.refundsRecover),
+              child: Text(context.l10n.privateUsdRefundsRecover),
             ),
           ],
           if (error != null) ...[
@@ -383,14 +383,14 @@ class _DepositRescueCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            PrivateUsdCopy.refundsDepositTitle,
+            context.l10n.privateUsdRefundsDepositTitle,
             style: AppTypography.labelLarge.copyWith(color: colors.text.accent),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             recovering
-                ? PrivateUsdCopy.refundsDepositRecovering
-                : PrivateUsdCopy.refundsDepositBody(held),
+                ? context.l10n.privateUsdRefundsDepositRecovering
+                : context.l10n.privateUsdRefundsDepositBody(held),
             style: AppTypography.bodySmall.copyWith(
               color: colors.text.secondary,
             ),
@@ -404,7 +404,7 @@ class _DepositRescueCard extends StatelessWidget {
             leading: recovering
                 ? const AppLoadingIcon(size: AppIconSize.medium)
                 : null,
-            child: const Text(PrivateUsdCopy.refundsDepositRecover),
+            child: Text(context.l10n.privateUsdRefundsDepositRecover),
           ),
           if (error != null) ...[
             const SizedBox(height: AppSpacing.xs),

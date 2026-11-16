@@ -5,7 +5,7 @@ import 'package:flutter/widgets.dart';
 import '../../../../core/formatting/countdown_format.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../models/private_usd_pending_payment.dart';
-import '../../private_usd_copy.dart';
+import '../../../../core/l10n/l10n.dart';
 
 /// Where an outgoing payment in flight stands, on the Private USD screen:
 /// its proof's progress, the wait for a block, whose clock ticks each
@@ -62,15 +62,14 @@ class _PrivateUsdPendingPaymentLineState
   @override
   Widget build(BuildContext context) {
     final text = switch (widget.payment) {
-      PrivateUsdPaymentProving(:final percent) => PrivateUsdCopy.paymentProving(
-        percent,
-      ),
+      PrivateUsdPaymentProving(:final percent) =>
+        context.l10n.privateUsdPaymentProving(percent),
       PrivateUsdPaymentWaitingForBlock(:final postedAt) =>
-        PrivateUsdCopy.paymentWaitingForBlock(
+        context.l10n.privateUsdPaymentWaitingForBlock(
           formatMinutesSeconds(widget.now().difference(postedAt)),
         ),
       PrivateUsdPaymentUpdatingBalance() =>
-        PrivateUsdCopy.paymentUpdatingBalance,
+        context.l10n.privateUsdPaymentUpdatingBalance,
     };
     return Text(
       text,

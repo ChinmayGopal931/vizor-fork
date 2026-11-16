@@ -7,11 +7,11 @@ import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_send.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/features/private_usd/screens/mobile/mobile_private_usd_send_screen.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_spend_guard.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_send_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
+import '../../support/test_l10n.dart';
 
 // The send and withdraw screens, built from the Widgetbook fixtures.
 void main() {
@@ -53,24 +53,27 @@ void main() {
       'amount that leaves no fee or a pending payment cannot', (tester) async {
     await pump(tester, buildMobilePrivateUsdSendUseCase);
     // Page titles are drawn uppercase in the top bar.
-    expect(find.text(PrivateUsdCopy.sendTitle.toUpperCase()), findsOneWidget);
+    expect(
+      find.text(testL10n.privateUsdSendTitle.toUpperCase()),
+      findsOneWidget,
+    );
     expect(enabled(tester, 'mobile_private_usd_send_review'), isTrue);
 
     await pump(tester, buildMobilePrivateUsdSendInvalidUseCase);
-    expect(find.text(PrivateUsdCopy.sendInvalid0zk), findsOneWidget);
+    expect(find.text(testL10n.privateUsdSendInvalid0zk), findsOneWidget);
     expect(enabled(tester, 'mobile_private_usd_send_review'), isFalse);
 
     await pump(tester, buildMobilePrivateUsdWithdrawZeroUseCase);
     expect(
-      find.text(PrivateUsdCopy.actionWithdraw.toUpperCase()),
+      find.text(testL10n.privateUsdActionWithdraw.toUpperCase()),
       findsOneWidget,
     );
-    expect(find.text(PrivateUsdCopy.sendZeroAddress), findsOneWidget);
+    expect(find.text(testL10n.privateUsdSendZeroAddress), findsOneWidget);
     expect(enabled(tester, 'mobile_private_usd_send_review'), isFalse);
 
     await pump(tester, buildMobilePrivateUsdSendLeaveFeeUseCase);
     expect(
-      find.text(PrivateUsdCopy.sendLeaveNetworkFee(r'$0.50')),
+      find.text(testL10n.privateUsdSendLeaveNetworkFee(r'$0.50')),
       findsOneWidget,
     );
     expect(enabled(tester, 'mobile_private_usd_send_review'), isFalse);
@@ -103,7 +106,7 @@ void main() {
         autofocus: false,
       ),
     );
-    expect(find.text(PrivateUsdCopy.paymentPending), findsOneWidget);
+    expect(find.text(testL10n.privateUsdPaymentPending), findsOneWidget);
     expect(enabled(tester, 'mobile_private_usd_send_review'), isFalse);
   });
 
@@ -161,44 +164,50 @@ void main() {
       'pending payment', (tester) async {
     await pump(tester, buildMobilePrivateUsdWithdrawReviewUseCase);
     expect(
-      find.text(PrivateUsdCopy.sendReviewTitleWithdraw.toUpperCase()),
+      find.text(testL10n.privateUsdSendReviewTitleWithdraw.toUpperCase()),
       findsOneWidget,
     );
     expect(
-      find.text(PrivateUsdCopy.sendReviewRailgunFee('0.25')),
+      find.text(testL10n.privateUsdSendReviewRailgunFee('0.25')),
       findsOneWidget,
     );
     expect(find.text(r'$99.75'), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.sendWithdrawPublic), findsOneWidget);
+    expect(find.text(testL10n.privateUsdSendWithdrawPublic), findsOneWidget);
     expect(enabled(tester, 'mobile_private_usd_send_confirm'), isTrue);
 
     await pump(tester, buildMobilePrivateUsdSendReviewUseCase);
-    expect(find.text(PrivateUsdCopy.sendWithdrawPublic), findsNothing);
+    expect(find.text(testL10n.privateUsdSendWithdrawPublic), findsNothing);
     expect(find.textContaining('Railgun fee'), findsNothing);
 
     await pump(tester, buildMobilePrivateUsdSendProvingUseCase);
-    expect(find.text(PrivateUsdCopy.sendProvingPercent(42)), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.sendProvingDetail), findsOneWidget);
+    expect(
+      find.text(testL10n.privateUsdSendProvingPercent(42)),
+      findsOneWidget,
+    );
+    expect(find.text(testL10n.privateUsdSendProvingDetail), findsOneWidget);
 
     await pump(tester, buildMobilePrivateUsdSendDoneUseCase);
-    expect(find.text(PrivateUsdCopy.sendDoneTitlePrivate), findsOneWidget);
-    expect(find.text(PrivateUsdCopy.sendViewTx), findsOneWidget);
+    expect(find.text(testL10n.privateUsdSendDoneTitlePrivate), findsOneWidget);
+    expect(find.text(testL10n.privateUsdSendViewTx), findsOneWidget);
 
     await pump(tester, buildMobilePrivateUsdSendUnconfirmedUseCase);
-    expect(find.text(PrivateUsdCopy.sendDoneTitleWithdraw), findsOneWidget);
-    expect(find.textContaining(PrivateUsdCopy.sendUnconfirmed), findsOneWidget);
+    expect(find.text(testL10n.privateUsdSendDoneTitleWithdraw), findsOneWidget);
+    expect(
+      find.textContaining(testL10n.privateUsdSendUnconfirmed),
+      findsOneWidget,
+    );
 
     await pump(tester, buildMobilePrivateUsdPaymentPendingUseCase);
-    expect(find.text(PrivateUsdCopy.paymentPending), findsOneWidget);
+    expect(find.text(testL10n.privateUsdPaymentPending), findsOneWidget);
     expect(enabled(tester, 'mobile_private_usd_send'), isFalse);
     expect(enabled(tester, 'mobile_private_usd_withdraw'), isFalse);
     expect(enabled(tester, 'mobile_private_usd_convert'), isFalse);
     await tester.dragUntilVisible(
-      find.text(PrivateUsdCopy.activityUnconfirmed),
+      find.text(testL10n.privateUsdActivityUnconfirmed),
       find.byKey(const ValueKey('mobile_private_usd_list')),
       const Offset(0, -200),
     );
-    expect(find.text(PrivateUsdCopy.activityWithdrew), findsNothing);
-    expect(find.text(PrivateUsdCopy.activitySent), findsOneWidget);
+    expect(find.text(testL10n.privateUsdActivityWithdrew), findsNothing);
+    expect(find.text(testL10n.privateUsdActivitySent), findsOneWidget);
   });
 }

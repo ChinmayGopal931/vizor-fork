@@ -6,7 +6,6 @@ import 'package:zcash_wallet/src/core/formatting/zec_amount.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_activity_details.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_explorer.dart';
 import 'package:zcash_wallet/src/features/private_usd/models/private_usd_messages.dart';
-import 'package:zcash_wallet/src/features/private_usd/private_usd_copy.dart';
 import 'package:zcash_wallet/src/rust/api/private_usd.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_reverse_use_cases.dart';
 import 'package:zcash_wallet/widgetbook/private_usd_use_cases.dart';
@@ -31,8 +30,10 @@ void main() {
       },
   ];
 
-  String time(int seconds) =>
-      formatDayMonthTime(DateTime.fromMillisecondsSinceEpoch(seconds * 1000), testL10n.localeName);
+  String time(int seconds) => formatDayMonthTime(
+    DateTime.fromMillisecondsSinceEpoch(seconds * 1000),
+    testL10n.localeName,
+  );
 
   String zec(int zatoshi) =>
       ZecAmount.fromZatoshi(BigInt.from(zatoshi)).activity.toString();
@@ -43,13 +44,13 @@ void main() {
     final lines = privateUsdSendDetails(testL10n, record);
 
     expect(read(lines), [
-      '${PrivateUsdCopy.sendReviewTo}: '
+      '${testL10n.commonTo}: '
           '${truncatedAddress(previewPrivateUsdRecipient)}',
-      '${PrivateUsdCopy.sendAmount}: \$40.00',
-      '${PrivateUsdCopy.convertNetworkFee}: \$0.50',
-      '${PrivateUsdCopy.detailsStatus}: ${PrivateUsdCopy.detailsConfirmed}',
-      '${PrivateUsdCopy.detailsSent}: ${time(record.sentAt)}',
-      '${PrivateUsdCopy.detailsTransaction}: $previewPrivateUsdTxHash on '
+      '${testL10n.commonAmount}: \$40.00',
+      '${testL10n.commonNetworkFee}: \$0.50',
+      '${testL10n.privateUsdDetailsStatus}: ${testL10n.privateUsdDetailsConfirmed}',
+      '${testL10n.privateUsdDetailsSent}: ${time(record.sentAt)}',
+      '${testL10n.privateUsdDetailsTransaction}: $previewPrivateUsdTxHash on '
           'railscan, etherscan',
     ]);
     expect(
@@ -64,7 +65,7 @@ void main() {
     expect(
       read(pending),
       contains(
-        '${PrivateUsdCopy.detailsStatus}: ${PrivateUsdCopy.detailsUnconfirmed}',
+        '${testL10n.privateUsdDetailsStatus}: ${testL10n.privateUsdDetailsUnconfirmed}',
       ),
     );
     expect(pending.whereType<PrivateUsdDetailTransaction>(), isEmpty);
@@ -79,13 +80,13 @@ void main() {
 
     expect(
       read(lines).first,
-      '${PrivateUsdCopy.detailsFrom}: ${PrivateUsdCopy.detailsSenderHidden}',
+      '${testL10n.privateUsdDetailsFrom}: ${testL10n.privateUsdDetailsSenderHidden}',
     );
     expect((lines.first as PrivateUsdDetailValue).copyText, isNull);
     expect(
       read(lines),
       contains(
-        '${PrivateUsdCopy.detailsStatus}: ${PrivateUsdCopy.convertStepScreen}',
+        '${testL10n.privateUsdDetailsStatus}: ${testL10n.privateUsdConvertStepScreen}',
       ),
     );
   });
@@ -98,15 +99,15 @@ void main() {
     );
 
     expect(read(privateUsdForwardDetails(testL10n, record)), [
-      '${PrivateUsdCopy.bridgedYouPaid}: ${zec(50000000)}',
-      '${PrivateUsdCopy.bridgedYouReceived}: \$15.50',
-      '${PrivateUsdCopy.detailsRelayerFee}: \$0.46',
-      '${PrivateUsdCopy.detailSwapId}: ${truncatedTxid(record.swapId)}',
-      '${PrivateUsdCopy.detailDeposit}: ${record.depositTxid} on zcash',
-      '${PrivateUsdCopy.detailPayout}: ${record.payoutTx} on railscan, '
+      '${testL10n.privateUsdBridgedYouPaid}: ${zec(50000000)}',
+      '${testL10n.privateUsdBridgedYouReceived}: \$15.50',
+      '${testL10n.privateUsdDetailsRelayerFee}: \$0.46',
+      '${testL10n.privateUsdDetailSwapId}: ${truncatedTxid(record.swapId)}',
+      '${testL10n.privateUsdDetailDeposit}: ${record.depositTxid} on zcash',
+      '${testL10n.privateUsdDetailPayout}: ${record.payoutTx} on railscan, '
           'etherscan',
-      '${PrivateUsdCopy.detailStarted}: ${time(record.acceptedAt)}',
-      '${PrivateUsdCopy.detailsEnded}: ${time(record.endedAt!)}',
+      '${testL10n.privateUsdDetailStarted}: ${time(record.acceptedAt)}',
+      '${testL10n.privateUsdDetailsEnded}: ${time(record.endedAt!)}',
     ]);
   });
 
@@ -120,14 +121,16 @@ void main() {
 
     expect(
       lines.first,
-      privateUsdRefundedMessage(ApiRefundCause.notClaimedInTime),
+      privateUsdRefundedMessage(testL10n, ApiRefundCause.notClaimedInTime),
     );
     expect(
       lines,
-      contains('${PrivateUsdCopy.detailRefund}: ${record.sweepTxid} on zcash'),
+      contains(
+        '${testL10n.privateUsdDetailRefund}: ${record.sweepTxid} on zcash',
+      ),
     );
     expect(
-      lines.where((line) => line.startsWith(PrivateUsdCopy.bridgedYouPaid)),
+      lines.where((line) => line.startsWith(testL10n.privateUsdBridgedYouPaid)),
       isEmpty,
     );
   });
@@ -139,15 +142,15 @@ void main() {
     );
 
     expect(read(privateUsdReverseDetails(testL10n, record)), [
-      '${PrivateUsdCopy.bridgedYouPaid}: \$25.31',
-      '${PrivateUsdCopy.bridgedYouReceived}: ${zec(79985000)}',
-      '${PrivateUsdCopy.reverseRailgunFee}: \$0.06',
-      '${PrivateUsdCopy.reverseBroadcasterFee}: \$0.25',
-      '${PrivateUsdCopy.detailSwapId}: ${truncatedTxid(record.swapId)}',
-      '${PrivateUsdCopy.detailFunding}: ${record.fundingTx} on railscan, '
+      '${testL10n.privateUsdBridgedYouPaid}: \$25.31',
+      '${testL10n.privateUsdBridgedYouReceived}: ${zec(79985000)}',
+      '${testL10n.privateUsdReverseRailgunFee}: \$0.06',
+      '${testL10n.privateUsdReverseBroadcasterFee}: \$0.25',
+      '${testL10n.privateUsdDetailSwapId}: ${truncatedTxid(record.swapId)}',
+      '${testL10n.privateUsdDetailFunding}: ${record.fundingTx} on railscan, '
           'etherscan',
-      '${PrivateUsdCopy.detailZecReceived}: ${record.receiveTxid} on zcash',
-      '${PrivateUsdCopy.detailStarted}: ${time(record.acceptedAt!)}',
+      '${testL10n.privateUsdDetailZecReceived}: ${record.receiveTxid} on zcash',
+      '${testL10n.privateUsdDetailStarted}: ${time(record.acceptedAt!)}',
     ]);
   });
 
@@ -169,13 +172,13 @@ void main() {
     final lines = privateUsdDepositDetails(testL10n, record);
 
     expect(read(lines), [
-      '${PrivateUsdCopy.detailsDepositAddress}: '
+      '${testL10n.privateUsdDetailsDepositAddress}: '
           '${truncatedAddress(previewPrivateUsdEthereumAddress)}',
-      '${PrivateUsdCopy.sendAmount}: \$50.00',
-      '${PrivateUsdCopy.detailsRelayerFee}: \$2.25',
-      '${PrivateUsdCopy.bridgedYouReceived}: \$47.62',
-      '${PrivateUsdCopy.detailStarted}: ${time(record.createdAt)}',
-      '${PrivateUsdCopy.detailsTransaction}: $previewPrivateUsdTxHash on '
+      '${testL10n.commonAmount}: \$50.00',
+      '${testL10n.privateUsdDetailsRelayerFee}: \$2.25',
+      '${testL10n.privateUsdBridgedYouReceived}: \$47.62',
+      '${testL10n.privateUsdDetailStarted}: ${time(record.createdAt)}',
+      '${testL10n.privateUsdDetailsTransaction}: $previewPrivateUsdTxHash on '
           'railscan, etherscan',
     ]);
     expect(

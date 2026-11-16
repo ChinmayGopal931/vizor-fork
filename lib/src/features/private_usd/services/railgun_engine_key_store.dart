@@ -7,7 +7,7 @@ class RailgunEngineKeyLockedException implements PrivateUsdPause {
   const RailgunEngineKeyLockedException();
 
   @override
-  String toString() => 'The wallet is locked.';
+  String toString() => 'The wallet is locked.'; // l10n-ignore: exception text
 }
 
 /// The random 32-byte key that encrypts one account's Railgun wallet in the

@@ -3,8 +3,8 @@ import '../../address_book/models/address_format_validator.dart'
 import '../../address_scan/domain/address_scan_payload.dart';
 import '../../address_scan/widgets/mobile_address_scan_view.dart'
     show MobileScanOutcome;
-import '../private_usd_copy.dart';
 import 'private_usd_send.dart';
+import '../../../core/l10n/l10n.dart';
 
 /// What a scanned code has to be for [mode]'s recipient: a `0zk` address to
 /// send privately, a `0x` one to withdraw, as
@@ -17,6 +17,7 @@ import 'private_usd_send.dart';
 /// Polygon request names is not one to withdraw Ethereum USDC to. The other
 /// kind of address is refused by name, pointing to the action that takes it.
 MobileScanOutcome privateUsdScanOutcome(
+  AppLocalizations l10n,
   String raw, {
   required PrivateUsdSendMode mode,
   required int? chainId,
@@ -24,7 +25,7 @@ MobileScanOutcome privateUsdScanOutcome(
 }) {
   final requestChain = _ethereumRequestChainId(raw);
   if (requestChain != null && chainId != null && requestChain != chainId) {
-    return const MobileScanOutcome.rejected(PrivateUsdCopy.scanOtherNetwork);
+    return MobileScanOutcome.rejected(l10n.privateUsdScanOtherNetwork);
   }
   final address = _scannedAddress(raw);
   bool takes(PrivateUsdSendMode action) =>
@@ -37,13 +38,13 @@ MobileScanOutcome privateUsdScanOutcome(
   if (takes(mode)) return MobileScanOutcome.accepted(address);
   return MobileScanOutcome.rejected(switch (mode) {
     PrivateUsdSendMode.private when takes(PrivateUsdSendMode.withdraw) =>
-      PrivateUsdCopy.scanUseWithdraw,
-    PrivateUsdSendMode.private => PrivateUsdCopy.scanNot0zk,
+      l10n.privateUsdScanUseWithdraw,
+    PrivateUsdSendMode.private => l10n.privateUsdScanNot0zk,
     PrivateUsdSendMode.withdraw when takes(PrivateUsdSendMode.private) =>
-      PrivateUsdCopy.scanUseSend,
+      l10n.privateUsdScanUseSend,
     PrivateUsdSendMode.withdraw when isZeroEvmAddress(address) =>
-      PrivateUsdCopy.sendZeroAddress,
-    PrivateUsdSendMode.withdraw => PrivateUsdCopy.scanNot0x,
+      l10n.privateUsdSendZeroAddress,
+    PrivateUsdSendMode.withdraw => l10n.privateUsdScanNot0x,
   });
 }
 

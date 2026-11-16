@@ -120,7 +120,7 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
         readOnly: state.step != PrivateUsdConvertStep.amount,
         maxFractionDigits: 8,
         invalid: state.isAmountInvalid,
-        note: PrivateUsdCopy.convertZecIncludesFee,
+        note: context.l10n.privateUsdConvertZecIncludesFee,
         marketValue: _marketValue(
           state.totalZat,
           zecUsdPrice,
@@ -134,8 +134,10 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
         footer: state.holdings.catchingUp
             ? Text(
                 syncPercent == null
-                    ? PrivateUsdCopy.convertZecSyncing
-                    : PrivateUsdCopy.convertZecSyncingProgress(syncPercent),
+                    ? context.l10n.privateUsdConvertZecSyncing
+                    : context.l10n.privateUsdConvertZecSyncingProgress(
+                        syncPercent,
+                      ),
                 key: const ValueKey('mobile_private_usd_convert_syncing'),
                 style: AppTypography.bodySmall.copyWith(
                   color: colors.text.secondary,
@@ -165,7 +167,7 @@ class MobilePrivateUsdConvertView extends StatelessWidget {
           : null,
       expired: state.isExpired,
       expiresIn: state.expiresIn,
-      message: state.message,
+      message: state.message(context.l10n),
       canReview: state.canReview,
       onReview: onReview,
     );
@@ -273,7 +275,7 @@ class MobilePrivateUsdReverseConvertView extends StatelessWidget {
           : null,
       expired: state.isExpired,
       expiresIn: state.expiresIn,
-      message: state.message,
+      message: state.message(context.l10n),
       canReview: state.canReview,
       onReview: onReview,
       extra: [
@@ -283,7 +285,7 @@ class MobilePrivateUsdReverseConvertView extends StatelessWidget {
             variant: AppButtonVariant.secondary,
             expand: true,
             onPressed: onViewRefunds,
-            child: const Text(PrivateUsdCopy.refundsView),
+            child: Text(context.l10n.privateUsdRefundsView),
           ),
       ],
     );
@@ -335,7 +337,7 @@ class _ConvertLayout extends StatelessWidget {
     final ledger = this.ledger;
     final message = this.message;
     return PrivateUsdFlowScaffold(
-      title: PrivateUsdCopy.actionConvert,
+      title: context.l10n.privateUsdActionConvert,
       onBack: onBack,
       onInfo: onInfo,
       body: PrivateUsdFlowColumn(
@@ -350,7 +352,7 @@ class _ConvertLayout extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
             PrivateUsdQuoteExpiry(
               expired: expired,
-              label: PrivateUsdCopy.convertQuoteExpires(
+              label: context.l10n.privateUsdConvertQuoteExpires(
                 formatMinutesSeconds(expiresIn),
               ),
             ),
@@ -374,7 +376,9 @@ class _ConvertLayout extends StatelessWidget {
         onPressed: canReview ? onReview : null,
         leading: busy ? const AppLoadingIcon(size: AppIconSize.medium) : null,
         child: Text(
-          quoting ? PrivateUsdCopy.convertQuoteLoading : PrivateUsdCopy.review,
+          quoting
+              ? context.l10n.privateUsdConvertQuoteLoading
+              : context.l10n.privateUsdReview,
         ),
       ),
     );
@@ -383,9 +387,12 @@ class _ConvertLayout extends StatelessWidget {
 
 /// A review's note, with the Tor-off disclosure under it while a maker asks
 /// for Privacy Pass tokens and Tor is off (plan M4, D10).
-String privateUsdReviewNote(String note, {required bool torOffDisclosure}) =>
-    torOffDisclosure
-    ? '$note\n\n${PrivateUsdCopy.tokensTorOffDisclosure}'
+String privateUsdReviewNote(
+  AppLocalizations l10n,
+  String note, {
+  required bool torOffDisclosure,
+}) => torOffDisclosure
+    ? '$note\n\n${l10n.privateUsdTokensTorOffDisclosure}'
     : note;
 
 /// The forward review: what is paid and what arrives, the quote's ledger
@@ -429,22 +436,22 @@ class MobilePrivateUsdConvertReviewView extends StatelessWidget {
       pay: quote == null
           ? null
           : MobileSwapReviewHeaderRow(
-              label: PrivateUsdCopy.convertYouPay,
+              label: context.l10n.privateUsdConvertYouPay,
               amountText: _masked(_zec(quote.totalZat), privacyModeEnabled),
               asset: SwapAsset.zec,
-              bottomText: PrivateUsdCopy.convertZecIncludesFee,
+              bottomText: context.l10n.privateUsdConvertZecIncludesFee,
             ),
       receive: quote == null
           ? null
           : MobileSwapReviewHeaderRow(
-              label: PrivateUsdCopy.convertYouReceive,
+              label: context.l10n.privateUsdConvertYouReceive,
               amountText: _masked(
                 formatPrivateUsd(quote.receives),
                 privacyModeEnabled,
               ),
               asset: SwapAsset.usdc,
               icon: const PrivateUsdLogo(),
-              bottomText: PrivateUsdCopy.title,
+              bottomText: context.l10n.privateUsdTitle,
             ),
       ledger: quote == null
           ? null
@@ -453,13 +460,14 @@ class MobilePrivateUsdConvertReviewView extends StatelessWidget {
               privacyModeEnabled: privacyModeEnabled,
             ),
       note: privateUsdReviewNote(
+        context.l10n,
         relayerClaims
-            ? PrivateUsdCopy.convertRelayerReviewNote
-            : PrivateUsdCopy.convertBackgroundNote,
+            ? context.l10n.privateUsdConvertRelayerReviewNote
+            : context.l10n.privateUsdConvertBackgroundNote,
         torOffDisclosure: torOffDisclosure,
       ),
       state: state,
-      message: state.message,
+      message: state.message(context.l10n),
       onConfirm: onConfirm,
       onRefreshQuote: onRefreshQuote,
     );
@@ -501,19 +509,19 @@ class MobilePrivateUsdReverseReviewView extends StatelessWidget {
       pay: draft == null
           ? null
           : MobileSwapReviewHeaderRow(
-              label: PrivateUsdCopy.convertYouPay,
+              label: context.l10n.privateUsdConvertYouPay,
               amountText: _masked(
                 formatPrivateUsdNearest(privateUsdReverseDebit(draft)),
                 privacyModeEnabled,
               ),
               asset: SwapAsset.usdc,
               icon: const PrivateUsdLogo(),
-              bottomText: PrivateUsdCopy.title,
+              bottomText: context.l10n.privateUsdTitle,
             ),
       receive: draft == null
           ? null
           : MobileSwapReviewHeaderRow(
-              label: PrivateUsdCopy.convertYouReceive,
+              label: context.l10n.privateUsdConvertYouReceive,
               amountText: _masked(
                 _zec(
                   privateUsdReverseReceivedZat(
@@ -524,7 +532,7 @@ class MobilePrivateUsdReverseReviewView extends StatelessWidget {
                 privacyModeEnabled,
               ),
               asset: SwapAsset.zec,
-              bottomText: PrivateUsdCopy.shieldedZec,
+              bottomText: context.l10n.privateUsdShieldedZec,
             ),
       ledger: draft == null
           ? null
@@ -536,7 +544,8 @@ class MobilePrivateUsdReverseReviewView extends StatelessWidget {
       note: draft == null
           ? null
           : privateUsdReviewNote(
-              PrivateUsdCopy.reverseKeepOpen(
+              context.l10n,
+              context.l10n.privateUsdReverseKeepOpen(
                 formatDayMonthTime(
                   privateUsdReadyBy(draft),
                   context.l10n.localeName,
@@ -545,7 +554,7 @@ class MobilePrivateUsdReverseReviewView extends StatelessWidget {
               torOffDisclosure: torOffDisclosure,
             ),
       state: state,
-      message: state.message,
+      message: state.message(context.l10n),
       onConfirm: onConfirm,
       onRefreshQuote: onRefreshQuote,
     );
@@ -591,7 +600,7 @@ class _ReviewLayout extends StatelessWidget {
     final confirming = state.isConfirming;
     final expired = state.isExpired && !state.quoting;
     return PrivateUsdFlowScaffold(
-      title: PrivateUsdCopy.review,
+      title: context.l10n.privateUsdReview,
       onBack: confirming ? null : onBack,
       onInfo: onInfo,
       body: PrivateUsdFlowColumn(
@@ -604,7 +613,7 @@ class _ReviewLayout extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
             PrivateUsdQuoteExpiry(
               expired: expired,
-              label: PrivateUsdCopy.convertQuoteHolds(
+              label: context.l10n.privateUsdConvertQuoteHolds(
                 formatMinutesSeconds(state.expiresIn),
               ),
             ),
@@ -634,7 +643,7 @@ class _ReviewLayout extends StatelessWidget {
               expand: true,
               onPressed: onRefreshQuote,
               leading: const AppIcon(AppIcons.renew),
-              child: const Text(PrivateUsdCopy.convertNewQuote),
+              child: Text(context.l10n.privateUsdConvertNewQuote),
             )
           : AppButton(
               key: const ValueKey('mobile_private_usd_review_convert'),
@@ -645,8 +654,8 @@ class _ReviewLayout extends StatelessWidget {
                   : null,
               child: Text(
                 state.quoting
-                    ? PrivateUsdCopy.convertQuoteLoading
-                    : PrivateUsdCopy.actionConvert,
+                    ? context.l10n.privateUsdConvertQuoteLoading
+                    : context.l10n.privateUsdActionConvert,
               ),
             ),
     );

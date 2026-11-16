@@ -25,8 +25,8 @@ const kPricingEngineMaxDays = kPricingEnginePageLimit * kPricingEngineMaxPages;
 /// do to the chart's arithmetic and to the amounts it formats.
 const kMaxUsdPerZec = 10000000.0;
 
-const _asset = 'ZEC';
-const _fiat = 'USD';
+const _asset = 'ZEC'; // l10n-ignore: request parameter
+const _fiat = 'USD'; // l10n-ignore: request parameter
 const _resolution = '1d';
 
 /// The pricing engine publishes a day a short while after it ends, so for the
