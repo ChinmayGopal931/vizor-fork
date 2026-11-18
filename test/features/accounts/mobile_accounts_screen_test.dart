@@ -412,10 +412,10 @@ void main() {
     expect(find.text('Other'), findsOneWidget);
     expect(find.text('Knight'), findsOneWidget);
     expect(find.text('Viking'), findsOneWidget);
-    // An inner page: the small title, not the tab roots' serif.
-    final title = tester.widget<Text>(find.text('Accounts'));
-    expect(title.style?.fontSize, AppTypography.headlineSmall.fontSize);
-    expect(title.style?.fontFamily, AppTypography.headlineSmall.fontFamily);
+    // The page title, drawn as the neon page title.
+    final title = tester.widget<Text>(find.text('ACCOUNTS'));
+    expect(title.style?.fontFamily, kNeonPageTitleStyle.fontFamily);
+    expect(title.style?.fontWeight, kNeonPageTitleStyle.fontWeight);
     expect(
       tester.getSize(find.byKey(const ValueKey('mobile_accounts_row_a'))),
       const Size(448, 60),

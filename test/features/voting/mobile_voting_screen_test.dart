@@ -122,13 +122,9 @@ void main() {
       tester.renderObject<RenderParagraph>(descriptionFinder).didExceedMaxLines,
       isTrue,
     );
+    // Veylor's surface is the neon glass panel, which casts no shadow.
     final cardSurface = tester.widget<MobileSurfaceCard>(card);
     expect(cardSurface.cornerRadius, AppRadii.large);
-    final surfaceBox = tester.widget<DecoratedBox>(
-      find.descendant(of: card, matching: find.byType(DecoratedBox)).first,
-    );
-    final cardDecoration = surfaceBox.decoration as BoxDecoration;
-    expect(cardDecoration.boxShadow, isNotEmpty);
     final cardTap = tester.widget<InkWell>(
       find.byKey(
         const ValueKey('voting_poll_card_tap_snack-governance-active'),

@@ -335,7 +335,10 @@ surfaces. Behaviour is unchanged unless a bullet below says otherwise.
   helmet as the badge in place of the pool's; the pool switch names the
   pools without glyphs. A Keystone account's
   `ReceiveQrSurface(scanOptimized: true)` renders as before, but for the
-  badge.
+  badge. Receive keeps its copy-and-share row and the ghost Request button
+  (share stays out of the top nav, and the code stays 260 pt); Request ZEC is
+  upstream's page (`MobileReceiveRequestScreen`), with its code in the same
+  frame. Home's Receive button opens upstream's receive options sheet.
 - **Sync privacy screen.** The screen over a kept-awake sync
   (`SyncKeepAwakePrivacyLockScreen`) draws the progress as a lit red ring
   (a `Neon.strokeTube` arc to a bright head, unlit ticks ahead of it) that

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../../../../core/l10n/l10n.dart';
 import 'package:flutter/widgets.dart';
 
@@ -220,60 +222,83 @@ class _ReviewRow extends StatelessWidget {
     final colors = context.colors;
     return SizedBox(
       height: 32,
-      child: Row(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.xxs),
-            child: Text(
-              label,
-              style: AppTypography.labelLarge.copyWith(
-                color: colors.text.secondary,
+      child: LayoutBuilder(
+        builder: (context, constraints) => Row(
+          children: [
+            // Gotham sets wider than the Figma face, so on a narrow screen at a
+            // large text size the label gives way before the value column
+            // (its padding, and the help icon when there is one) overflows.
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: math.max(
+                  0,
+                  constraints.maxWidth -
+                      (helpTooltip == null
+                          ? _valueMinWidth
+                          : _valueMinWidthHelp),
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xs,
-                AppSpacing.xxs,
-                AppSpacing.xxs,
-                AppSpacing.xxs,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Flexible(
-                    child: Text(
-                      value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                      style: AppTypography.labelLarge.copyWith(
-                        color: colors.text.accent,
-                      ),
-                    ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xxs),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.labelLarge.copyWith(
+                    color: colors.text.secondary,
                   ),
-                  if (helpTooltip != null) ...[
-                    const SizedBox(width: AppSpacing.xxs),
-                    AppTooltip(
-                      message: helpTooltip!,
-                      tapToShow: true,
-                      child: AppIcon(
-                        AppIcons.help,
-                        size: 20,
-                        color: colors.icon.muted,
-                      ),
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xs,
+                  AppSpacing.xxs,
+                  AppSpacing.xxs,
+                  AppSpacing.xxs,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: AppTypography.labelLarge.copyWith(
+                          color: colors.text.accent,
+                        ),
+                      ),
+                    ),
+                    if (helpTooltip != null) ...[
+                      const SizedBox(width: AppSpacing.xxs),
+                      AppTooltip(
+                        message: helpTooltip!,
+                        tapToShow: true,
+                        child: AppIcon(
+                          AppIcons.help,
+                          size: 20,
+                          color: colors.icon.muted,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  /// The value column's padding (xs + xxs), and with the help icon its gap
+  /// and 20px glyph too.
+  static const _valueMinWidth = AppSpacing.xs + AppSpacing.xxs;
+  static const _valueMinWidthHelp = _valueMinWidth + AppSpacing.xxs + 20;
 }
 
 /// Bottom-pinned actions — Figma `Buttons Stack` (4731:85699):

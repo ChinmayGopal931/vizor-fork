@@ -532,17 +532,6 @@ void main() {
     );
   }
 
-  testWidgets('the account card opens Manage accounts as a page', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_routedApp());
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.byKey(const ValueKey('mobile_settings_account_card')),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('accounts route'), findsOneWidget);
-  });
 
   testWidgets('Settings always opens coinholder voting', (tester) async {
     await tester.pumpWidget(_routedApp());

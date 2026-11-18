@@ -42,11 +42,6 @@ class MobileOnboardingIntroScreen extends StatelessWidget {
       showProgress: showProgress,
       onBack: onBack ?? () => Navigator.of(context).maybePop(),
       title: context.l10n.onboardingIntroTitleMobile,
-      topNavHeight: 74,
-      topNavProgressOffset: const Offset(-4.5, 0),
-      topNavProgressTrackColor: colors.background.inverse.withValues(
-        alpha: 0.35,
-      ),
       contentGap: AppSpacing.base,
       // Line break matches the Figma subtitle wrap.
       subtitle: context.l10n.onboardingIntroSubtitleMobile,

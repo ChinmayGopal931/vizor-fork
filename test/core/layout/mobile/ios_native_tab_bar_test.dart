@@ -191,9 +191,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(native.created, isEmpty);
       expect(find.byType(AppMobileTabBar), findsOneWidget);
+      // Veylor's fallback bar draws its tab glyphs as TronGlyph paths; only an
+      // icon without one still loads its SVG.
       expect(
         bundle.svgLoads,
-        containsAll(['assets/icons/home.svg', 'assets/icons/$secondName.svg']),
+        secondName == 'book' ? contains('assets/icons/book.svg') : isEmpty,
       );
       expect(tester.element(find.text('Body')), same(body));
       expect(tester.takeException(), isNull);

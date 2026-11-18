@@ -210,21 +210,21 @@ void main() {
           matching: find.byType(ReceiveQrSurface),
         ),
       ),
-      const Size(260, 276),
+      const Size(292, 308),
     );
     expect(tester.getSize(find.byType(ReceiveRenewButton)), const Size(48, 48));
-    // Copy and request each span the QR card's width; share is in the nav.
+    // Copy shares its row with the square share button: 300 - 8 - 50.
     expect(
       tester.getSize(find.byKey(const ValueKey('mobile_receive_copy'))),
-      const Size(260, 50),
+      const Size(242, 50),
     );
     expect(
       tester.getSize(find.byKey(const ValueKey('mobile_receive_share'))),
-      const Size(44, 44),
+      const Size(50, 50),
     );
     expect(
       tester.getSize(find.byKey(const ValueKey('mobile_receive_request'))),
-      const Size(260, 50),
+      const Size(300, 50),
     );
     final helpIcon = tester.widget<AppIcon>(
       find.descendant(
@@ -302,8 +302,7 @@ void main() {
         (widget) => widget is AppIcon && widget.name == AppIcons.share,
       ),
     );
-    // The nav's share icon matches the back chevron opposite it.
-    expect(shareIcon.size, 24);
+    expect(shareIcon.size, 20);
     final copyIcon = tester.widget<AppIcon>(
       find.byWidgetPredicate(
         (widget) => widget is AppIcon && widget.name == AppIcons.copy,
@@ -729,9 +728,9 @@ void main() {
   ) async {
     await _pumpReceive(tester, _FakeReceiveAddressService());
 
-      final share = find.byKey(const ValueKey('mobile_receive_share'));
-      final request = find.byKey(const ValueKey('mobile_receive_request'));
-      final copy = find.byKey(const ValueKey('mobile_receive_copy'));
+    final share = find.byKey(const ValueKey('mobile_receive_share'));
+    final request = find.byKey(const ValueKey('mobile_receive_request'));
+    final copy = find.byKey(const ValueKey('mobile_receive_copy'));
 
     expect(request, findsOneWidget);
     expect(find.text('Request ZEC'), findsOneWidget);

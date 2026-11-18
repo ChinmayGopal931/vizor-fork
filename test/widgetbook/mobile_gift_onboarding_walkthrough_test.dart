@@ -283,7 +283,7 @@ void main() {
       expect(await container.read(giftClaimImportStoreProvider).load(), isNull);
       await tester.tap(find.byKey(const ValueKey('mobile_biometrics_not_now')));
       await _advance(tester);
-      expect(find.text(name), findsWidgets);
+      expect(_homeAccountNamed(name), findsOneWidget);
       expect(find.byKey(const ValueKey('mobile_home_backup')), findsOneWidget);
     },
   );

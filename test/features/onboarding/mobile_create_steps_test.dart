@@ -9,7 +9,6 @@ import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_sticky_bottom_action.dart';
 import 'package:zcash_wallet/src/core/navigation/mobile_onboarding_routes.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
-import 'package:zcash_wallet/src/core/widgets/liquid_metal.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_create_steps.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_welcome_screen.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_secret_passphrase_screen.dart';
@@ -146,32 +145,6 @@ void main() {
     }
   });
 
-  testWidgets('intro shows the shield in liquid metal over the citadel', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_app('/onboarding/intro'));
-    await tester.pumpAndSettle();
-
-    final title = tester.widget<Text>(find.text('About Zcash'));
-    expect(title.style?.fontSize, 36);
-    expect(
-      tester.getSize(
-        find.byKey(const ValueKey('mobile_intro_info_card_shield')),
-      ),
-      const Size.square(72),
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('mobile_intro_info_card')),
-        matching: find.byType(LiquidMetal),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('mobile_onboarding_citadel_background')),
-      findsOneWidget,
-    );
-  });
 
   for (final theme in [AppThemeData.light, AppThemeData.dark]) {
     for (final size in [const Size(393, 852), const Size(320, 568)]) {

@@ -18,6 +18,7 @@ import 'package:zcash_wallet/src/core/widgets/pool_badge.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/request/request_amount_card.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/request/request_amount_model.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/request/request_amount_steps.dart';
+import 'package:zcash_wallet/src/features/receive/widgets/mobile/receive_qr_frame.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/request/request_qr_surface.dart';
 import 'package:zcash_wallet/src/core/l10n/app_language.dart';
 import '../../support/leading_decimal_input.dart';
@@ -583,9 +584,11 @@ void main() {
       final qr = tester.getRect(
         find.byKey(const ValueKey('request_qr_surface')),
       );
+      // The code sits in Veylor's lit frame, which the group centres.
+      final frame = tester.getRect(find.byType(ReceiveQrFrame));
       final badge = tester.getRect(find.byType(PoolBadge));
       expect(
-        (qr.top - body.top) - (body.bottom - badge.bottom),
+        (frame.top - body.top) - (body.bottom - badge.bottom),
         moreOrLessEquals(0, epsilon: 1),
       );
       // The amount sits under the QR in the Home card's serif, the pool
@@ -629,7 +632,11 @@ void main() {
       );
 
       expect(tester.takeException(), isNull);
-      expect(find.text(requestFlowTitle(testL10n)), findsOneWidget);
+      // The page title is drawn as an uppercase caption.
+      expect(
+        find.text(requestFlowTitle(testL10n).toUpperCase()),
+        findsOneWidget,
+      );
       expect(find.text('Create request'), findsOneWidget);
       expect(_button(tester, 'request_create_button').onPressed, isNull);
       // No Max: a request is not a spend.

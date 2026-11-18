@@ -547,12 +547,10 @@ class MobileSettingsScreen extends ConsumerWidget {
     WidgetRef ref, {
     required bool enabled,
   }) async {
+    // Every switch ticks as it flips, not once the setting has saved.
+    unawaited(AppHaptics.selection());
     try {
       await ref.read(syncKeepAwakeProvider.notifier).setEnabled(!enabled);
-      if (context.mounted &&
-          ref.read(syncKeepAwakeProvider).enabled != enabled) {
-        unawaited(AppHaptics.selection());
-      }
     } catch (_) {
       if (!context.mounted) return;
       showAppToast(context, context.l10n.settingsKeepAwakeUpdateFailed);
@@ -695,7 +693,7 @@ class _SettingsVersionFooter extends StatelessWidget {
             Flexible(
               child: Text(
                 'v$kVizorReleaseVersion',
-                style: AppTypography.codeSmall.copyWith(
+                style: AppTypography.codeMedium.copyWith(
                   color: context.colors.text.secondary,
                 ),
               ),
@@ -999,10 +997,9 @@ class _SettingsToggle extends StatelessWidget {
     final colors = context.colors;
     final trackColor = enabled
         ? colors.background.brandCrimsonStrong
-        : colors.background.raised;
-    final borderColor = enabled
-        ? colors.border.brandCrimsonStrong
-        : colors.border.regular;
+        // A step further from the card than `raised`, so the off track reads
+        // without an outline, like the voting toggle.
+        : colors.background.overlay;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 140),
       curve: Curves.easeOutCubic,
@@ -1012,7 +1009,6 @@ class _SettingsToggle extends StatelessWidget {
       decoration: BoxDecoration(
         color: trackColor,
         borderRadius: BorderRadius.circular(AppRadii.full),
-        border: Border.all(color: borderColor),
       ),
       child: AnimatedAlign(
         duration: const Duration(milliseconds: 140),
@@ -1020,9 +1016,12 @@ class _SettingsToggle extends StatelessWidget {
         alignment: enabled ? Alignment.centerRight : Alignment.centerLeft,
         child: DecoratedBox(
           key: thumbKey,
+          // The thumb's own light outline shadow defines it on a light card,
+          // in place of a track outline.
           decoration: BoxDecoration(
             color: const Color(0xFFFFFFFF),
             borderRadius: BorderRadius.circular(AppRadii.full),
+            boxShadow: appSurfaceShadow(colors),
           ),
           child: const SizedBox(width: 40, height: 24),
         ),
@@ -1218,8 +1217,6 @@ class _ThemeSheetState extends State<_ThemeSheet> {
     return MobileModalScaffold(
       title: context.l10n.settingsThemeTitle,
       onClose: () => Navigator.of(context).pop(),
-      bodyGap: AppSpacing.md,
-      bottomPadding: AppSpacing.base,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1241,7 +1238,7 @@ class _ThemeSheetState extends State<_ThemeSheet> {
             onPressed: () => Navigator.of(context).pop(_selected),
             child: Text(context.l10n.commonUpdate),
           ),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpacing.s),
           MobileSheetCancel(onTap: () => Navigator.of(context).pop()),
         ],
       ),

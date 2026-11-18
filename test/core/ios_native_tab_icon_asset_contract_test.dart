@@ -18,7 +18,11 @@ void main() {
         )
         .where((name) => name.startsWith('VizorTab_'))
         .toSet();
-    expect(sets, {for (final icon in icons) 'VizorTab_$icon.imageset'});
+    // Veylor's tabs leave out Swap; the catalog keeps upstream's set for the
+    // native bar it does not use.
+    expect(sets, {
+      for (final icon in {...icons, 'swap_arrows'}) 'VizorTab_$icon.imageset',
+    });
   });
 
   for (final icon in icons) {

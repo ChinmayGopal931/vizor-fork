@@ -241,7 +241,7 @@ void main() {
     );
     await tester.pump();
     expect(
-      find.text('The check will keep going while Vizor is open.'),
+      find.text('The check will keep going while Veylor is open.'),
       findsOneWidget,
     );
     expect(find.textContaining('background'), findsNothing);

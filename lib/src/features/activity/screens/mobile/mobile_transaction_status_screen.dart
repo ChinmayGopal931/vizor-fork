@@ -322,7 +322,6 @@ class _MobileTransactionStatusScreenState
             children: [
               MobileTopNav.back(
                 title: l10n.activityTitleTransaction,
-                titleStyle: AppTypography.headlineSmall,
                 onBack: () => Navigator.of(context).maybePop(),
               ),
               Expanded(
@@ -666,7 +665,6 @@ class _MobileTransactionStatusScreenState
               children: [
                 MobileTopNav.back(
                   title: _titleFor(giftCard),
-                  titleStyle: AppTypography.headlineSmall,
                   titleMaxLines: giftCard == null ? 1 : 2,
                   onBack: () => Navigator.of(context).maybePop(),
                 ),

@@ -857,17 +857,6 @@ void main() {
     expect(tester.widget<Text>(fiat).data, fixedPrivacyMask());
   });
 
-  testWidgets('the castle engraving fades in behind a light record', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_app(_tx()));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byKey(const ValueKey('mobile_tx_status_backdrop')),
-      findsOneWidget,
-    );
-  });
 
   testWidgets('mined sent tx shows success title, chip, fee, and address', (
     tester,

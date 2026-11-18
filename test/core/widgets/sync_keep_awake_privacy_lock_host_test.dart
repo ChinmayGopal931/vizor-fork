@@ -1218,7 +1218,7 @@ void main() {
     expect(container.read(syncKeepAwakePrivacyLockProvider).isLocked, isTrue);
     expect(_findAppIcon(AppIcons.faceId), findsOneWidget);
 
-    await tester.tap(find.text('Unlock Vizor'));
+    await tester.tap(find.text('Unlock Veylor'));
     await tester.pump();
     await tester.pump();
 
@@ -1233,7 +1233,7 @@ void main() {
     expect(find.text('Welcome Back'), findsNothing);
     expect(find.byType(PasscodeNumpad), findsNothing);
     expect(container.read(syncKeepAwakePrivacyLockProvider).isLocked, isTrue);
-    await tester.tap(find.text('Unlock Vizor'));
+    await tester.tap(find.text('Unlock Veylor'));
     await tester.pump();
     await tester.pump();
     expect(biometric.reads, 2);

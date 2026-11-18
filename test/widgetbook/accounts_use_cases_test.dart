@@ -99,7 +99,8 @@ void main() {
     await _pumpMobileAccountsUseCase(tester, buildMobileAccountsUseCase);
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Accounts'), findsOneWidget);
+    // The page title is drawn as an uppercase caption.
+    expect(find.text('ACCOUNTS'), findsOneWidget);
     expect(find.text('Current'), findsOneWidget);
     expect(find.text('Other'), findsOneWidget);
     expect(find.text('Add account'), findsOneWidget);

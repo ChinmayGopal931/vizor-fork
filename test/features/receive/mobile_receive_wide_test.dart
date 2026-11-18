@@ -81,10 +81,7 @@ void main() {
             await tester.tap(find.text('Transparent'));
             await _settle(tester);
           }
-          // Share is an icon in the top nav; it keeps its pool in the
-          // accessible label.
-          expect(find.bySemanticsLabel('Share $pool address'), findsOneWidget);
-          for (final action in ['Copy']) {
+          for (final action in ['Copy', 'Share']) {
             final label = find.text('$action address');
             final paragraph = tester.renderObject<RenderParagraph>(
               find.descendant(of: label, matching: find.byType(RichText)),
@@ -191,7 +188,7 @@ void main() {
             final surface = tester.widget<ReceiveQrSurface>(
               find.byType(ReceiveQrSurface),
             );
-            expect(surface.size, 228);
+            expect(surface.size, 260);
             expect(surface.paddingX, 16);
             expect(surface.paddingY, 24);
             expect(surface.scanOptimized, keystone);
@@ -205,12 +202,7 @@ void main() {
               final bounds = tester.getRect(action);
               expect(bounds.top, greaterThanOrEqualTo(scroll.top - 1));
               expect(bounds.bottom, lessThanOrEqualTo(scroll.bottom + 1));
-              // Share is the top nav's icon button; the others are buttons
-              // in the actions column.
-              final onPressed = name == 'share'
-                  ? tester.widget<GestureDetector>(action).onTap
-                  : tester.widget<AppButton>(action).onPressed;
-              expect(onPressed, isNotNull);
+              expect(tester.widget<AppButton>(action).onPressed, isNotNull);
               expect(tester.takeException(), isNull);
             }
           },

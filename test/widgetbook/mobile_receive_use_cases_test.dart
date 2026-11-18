@@ -5,7 +5,6 @@ import 'package:flutter/material.dart' show MaterialApp;
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_sheet.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/receive/screens/mobile/mobile_receive_screen.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/mobile/receive_address_info_sheet.dart';
@@ -56,18 +55,18 @@ void main() {
       find.byType(Scrollable).first,
     );
     expect(scrollable.position.maxScrollExtent, 0);
-    // Copy and request each span the QR card's width; share is in the nav.
+    // Copy shares its row with the square share button: 300 - 8 - 50.
     expect(
       tester.getSize(find.byKey(const ValueKey('mobile_receive_copy'))),
-      const Size(260, 50),
+      const Size(242, 50),
     );
     expect(
       tester.getSize(find.byKey(const ValueKey('mobile_receive_share'))),
-      const Size(44, 44),
+      const Size(50, 50),
     );
     expect(
       tester.getSize(find.byKey(const ValueKey('mobile_receive_request'))),
-      const Size(260, 50),
+      const Size(300, 50),
     );
     expect(
       tester.getSize(find.byKey(const ValueKey('receive_address_type_tabs'))),
@@ -86,7 +85,7 @@ void main() {
           matching: find.byType(ReceiveQrSurface),
         ),
       ),
-      const Size(260, 276),
+      const Size(292, 308),
     );
     expect(
       tester.getTopLeft(
@@ -95,7 +94,7 @@ void main() {
           matching: find.byType(ReceiveQrSurface),
         ),
       ),
-      const Offset(66.5, 178.5),
+      const Offset(50.5, 178.5),
     );
   });
 
@@ -154,9 +153,15 @@ void main() {
     final closeButton = find.byKey(
       const ValueKey('receive_address_info_close'),
     );
+    final modalClose = find.byKey(
+      const ValueKey('receive_address_info_modal_close'),
+    );
+    final modalCloseIcon = find.byKey(
+      const ValueKey('receive_address_info_modal_close_icon'),
+    );
     expect(tester.getSize(closeButton), const Size(329, 50));
-    // The shared sheet template draws the title and its close button.
-    expect(find.byType(MobileModalScaffold), findsOneWidget);
+    expect(tester.getSize(modalClose), const Size(32, 32));
+    expect(tester.getSize(modalCloseIcon), const Size(20, 20));
     expect(
       tester.getTopLeft(secondItem).dy - tester.getBottomLeft(firstItem).dy,
       moreOrLessEquals(8, epsilon: 0.1),
@@ -168,7 +173,7 @@ void main() {
     expect(
       tester.getBottomLeft(find.byType(ReceiveAddressInfoSheet)).dy -
           tester.getBottomLeft(closeButton).dy,
-      moreOrLessEquals(AppSpacing.md, epsilon: 0.1),
+      moreOrLessEquals(32, epsilon: 0.1),
     );
   });
 

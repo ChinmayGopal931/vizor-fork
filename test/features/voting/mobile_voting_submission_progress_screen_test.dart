@@ -208,7 +208,8 @@ void main() {
     final proofNoticeRect = tester.getRect(
       find.byKey(const ValueKey('mobile_voting_submission_proof_notice')),
     );
-    expect(proofNoticeRect.size, const Size(269, 75));
+    // Gotham wraps the notice onto a fourth line inside the 20px margins.
+    expect(proofNoticeRect.size, const Size(269, 100));
     expect(proofNoticeRect.bottom, lessThanOrEqualTo(contentRect.bottom));
     final topGap =
         tester

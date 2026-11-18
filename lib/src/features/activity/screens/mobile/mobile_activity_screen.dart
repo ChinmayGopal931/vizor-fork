@@ -454,8 +454,6 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen>
           children: [
             MobileTopNav.back(
               title: context.l10n.navActivity,
-              // Tab roots keep the large serif title.
-              titleStyle: AppTypography.headlineLarge,
             ),
             Expanded(
               // Soft edges under the top nav and the tab bar, as on Home.

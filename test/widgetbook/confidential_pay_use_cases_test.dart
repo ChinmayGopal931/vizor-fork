@@ -59,7 +59,11 @@ void main() {
     expect(recovery.hitTestable(), findsOneWidget);
     await tester.tap(recovery);
     await tester.pumpAndSettle();
-    expect(find.text('Review Payment'), findsOneWidget);
+    // Mobile draws the page title as an uppercase caption.
+    expect(
+      find.text(_mobile ? 'REVIEW PAYMENT' : 'Review Payment'),
+      findsOneWidget,
+    );
     expect(_route, findsOneWidget);
     expect(find.textContaining('2.256'), findsWidgets);
     expect(tester.takeException(), isNull);
@@ -71,7 +75,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(_mobile ? 'Continue' : 'Select recipient'));
     await tester.pumpAndSettle();
-    expect(find.text('Review Payment'), findsOneWidget);
+    // Mobile draws the page title as an uppercase caption.
+    expect(
+      find.text(_mobile ? 'REVIEW PAYMENT' : 'Review Payment'),
+      findsOneWidget,
+    );
     expect(_route, findsNothing);
   });
 

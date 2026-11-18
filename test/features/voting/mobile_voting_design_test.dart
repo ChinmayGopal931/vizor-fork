@@ -324,7 +324,8 @@ void main() {
     expect(find.text('·'), findsNothing);
     expect(tester.getTopLeft(find.text('Show description')).dx, 40);
     final option = find.byKey(const ValueKey('voting_proposal_1_option_1'));
-    expect(tester.getTopLeft(option), const Offset(36, 713));
+    // Gotham wraps the description once more inside the 20px margins.
+    expect(tester.getTopLeft(option), const Offset(36, 738));
     expect(tester.getSize(option), const Size(321, 115));
     expect(
       tester
@@ -947,7 +948,7 @@ void main() {
       final card = find.byType(VotingResultCard);
       expect(tester.getTopLeft(card), const Offset(20, 371));
       // Re-measured for Gotham; the Figma card is 361 x 832.
-      expect(tester.getSize(card), const Size(353, 857));
+      expect(tester.getSize(card), const Size(353, 882));
       expect(find.text('Voted'), findsOneWidget);
       expect(find.text('Results'), findsNothing);
       expect(find.text('985 ZEC (98.5%)'), findsOneWidget);

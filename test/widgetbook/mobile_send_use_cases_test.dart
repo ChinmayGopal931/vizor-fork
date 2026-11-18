@@ -249,7 +249,8 @@ void main() {
       tester.getSize(
         find.byKey(const ValueKey('mobile_send_amount_top_content')),
       ),
-      const Size(328, 285),
+      // 360 less the 20px page margins.
+      const Size(320, 285),
     );
   });
 

@@ -152,22 +152,17 @@ void main() {
             .top,
         16,
       );
-      final card = tester.widget<DecoratedBox>(
-        find
-            .descendant(
-              of: find.byKey(const ValueKey('mobile_pay_amount_card')),
-              matching: find.byType(DecoratedBox),
+      // The card is Veylor's glass surface, at the amount card's radius.
+      expect(
+        tester
+            .widget<MobileSurfaceCard>(
+              find.descendant(
+                of: find.byKey(const ValueKey('mobile_pay_amount_card')),
+                matching: find.byType(MobileSurfaceCard),
+              ),
             )
-            .first,
-      );
-      // The card shares the soft lift of the mobile surfaces.
-      expect(
-        (card.decoration as BoxDecoration).boxShadow,
-        mobileSurfaceShadows(AppThemeData.light.colors),
-      );
-      expect(
-        (card.decoration as BoxDecoration).borderRadius,
-        BorderRadius.circular(MobileAmountCard.cornerRadius),
+            .cornerRadius,
+        MobileAmountCard.cornerRadius,
       );
       expect(find.text('Paying in'), findsOneWidget);
       expect(find.text('USDC'), findsNWidgets(2));

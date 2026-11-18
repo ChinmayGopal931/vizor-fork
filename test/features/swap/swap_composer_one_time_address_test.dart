@@ -70,7 +70,7 @@ void main() {
     await tester.pump();
     expect(
       find.text(
-        "Vizor is checking this address's history before using it. This can "
+        "Veylor is checking this address's history before using it. This can "
         'take a few minutes.',
       ),
       findsOneWidget,
