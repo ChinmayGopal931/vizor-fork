@@ -114,10 +114,9 @@ tendermint = "0.40.4"
 tendermint-light-client-verifier = "0.40.4"
 
 # Private USD. zecswap-core comes from the branch that builds it on Zakura
-# Common 5.4 (`veylor/zakura-v5`, patched below to a local clone until it is
-# pushed); the other two crates from `main`. Neither depends on zecswap-core,
-# so the two revs never meet in the graph.
-zecswap-core    = { git = "https://github.com/ChinmayGopal931/zecSwap", rev = "d73ed7fd4ffae6db6cc25dbfaadb8a2e05d33c47" }
+# Common 5.4 (`veylor/zakura-v5`); the other two crates from `main`. Neither
+# depends on zecswap-core, so the two revs never meet in the graph.
+zecswap-core    = { git = "https://github.com/ChinmayGopal931/zecSwap", rev = "f3f896f6bf93e00881ef16bffe371d8453545d07" }
 zecswap-railgun = { git = "https://github.com/ChinmayGopal931/zecSwap", rev = "92f2acb76a9dccc9ebb944ee07734f9f18c6ecd0" }
 # Privacy Pass tokens for the makers' accepts (M4); its client half only.
 zecswap-tokens  = { git = "https://github.com/ChinmayGopal931/zecSwap", rev = "92f2acb76a9dccc9ebb944ee07734f9f18c6ecd0", default-features = false }
@@ -317,9 +316,3 @@ opt-level = 3
 # `connect_stream`.
 [patch.crates-io]
 zakura-client-backend = { path = "vendor/zakura-client-backend" }
-
-# TODO: swap to the pushed rev. zecswap-core on Zakura Common 5.4 (branch
-# `veylor/zakura-v5`) is a local clone until it is pushed; point the
-# dependency above at its rev and drop this patch then.
-[patch."https://github.com/ChinmayGopal931/zecSwap"]
-zecswap-core = { path = "../../zecswap-common5/crates/zecswap-core" }

@@ -2383,11 +2383,8 @@ Common 5.4 (E1; `veylor/zakura-v4` was the Common v4 build), and
 Zcash crate. Veylor hands zecswap-core PCZT bytes (`sign_pczt_bytes`), so it
 must sit on the wallet's exact libraries: a wallet move to new Zcash crates
 needs a matching build on that branch first, and two Common versions side by
-side are not acceptable even when they compile. Until `veylor/zakura-v5` is
-pushed, a `[patch."https://github.com/ChinmayGopal931/zecSwap"]` entry points
-zecswap-core at a local clone (`../../zecswap-common5`); swap it for the
-pushed rev. `rust/Cargo.toml` also carries one stand-in for a release that
-does not exist yet:
+side are not acceptable even when they compile. `rust/Cargo.toml` also carries
+one stand-in for a release that does not exist yet:
 
 - `rust/vendor/zakura-client-backend`, the published 0.1.0-rc9.8 as `cargo
   vendor` writes it (the extracted `.crate`), with the `connect_stream` patch

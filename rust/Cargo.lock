@@ -6999,6 +6999,7 @@ dependencies = [
 [[package]]
 name = "zecswap-core"
 version = "0.1.0"
+source = "git+https://github.com/ChinmayGopal931/zecSwap?rev=f3f896f6bf93e00881ef16bffe371d8453545d07#f3f896f6bf93e00881ef16bffe371d8453545d07"
 dependencies = [
  "bip32",
  "blake2b_simd",
