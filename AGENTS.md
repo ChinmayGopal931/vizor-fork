@@ -2374,26 +2374,28 @@ rounds use `scripts/private-usd/ios/run_device_round.sh` (the M3 round so
 far), per `docs/private-usd-ios-device-checklist.md`.
 
 **Pinned zecSwap and a local stand-in.** `zecswap-core` comes from
-`ChinmayGopal931/zecSwap`'s `veylor/zakura-v4` branch, its build on Zakura
-Common v4 (E1), and `zecswap-railgun` and `zecswap-tokens` from its `main`
-(PR #18). A zecswap-core rev that changes its Zcash crates needs a matching
-build on that branch first. `rust/Cargo.toml` still carries one stand-in for
-a release that does not exist yet:
+`ChinmayGopal931/zecSwap`'s `veylor/zakura-v5` branch, its build on Zakura
+Common 5.4 (E1; `veylor/zakura-v4` was the Common v4 build), and
+`zecswap-railgun` and `zecswap-tokens` from its `main` (PR #18), which use no
+Zcash crate. Veylor hands zecswap-core PCZT bytes (`sign_pczt_bytes`), so it
+must sit on the wallet's exact libraries: a wallet move to new Zcash crates
+needs a matching build on that branch first, and two Common versions side by
+side are not acceptable even when they compile. Until `veylor/zakura-v5` is
+pushed, a `[patch."https://github.com/ChinmayGopal931/zecSwap"]` entry points
+zecswap-core at a local clone (`../../zecswap-common5`); swap it for the
+pushed rev. `rust/Cargo.toml` also carries one stand-in for a release that
+does not exist yet:
 
-- `rust/vendor/zakura-client-backend`, the 0.1.0-rc9.6 of the
-  wallet-libraries rev the `[patch]` pins, as `cargo vendor` writes it (the
-  published rc9.6 predates the rev's `tor-client` feature), with the
-  `connect_stream` patch the Railgun bridge needs
-  (`rust/vendor/zakura-client-backend.patch`, E4). The crates.io package and
-  the wallet-libraries source are both patched to it, so one backend stays
-  in the graph. Before every push, `diff -r` its `src` against that rev's
-  `librustzcash/zcash_client_backend/src`: only `src/tor.rs` may differ.
-  Never run `cargo fmt --all`, which reformats it, and vendor it again
-  whenever the rev moves: `cargo vendor` a scratch crate that depends on the
-  backend at the new rev with the app's features, take its
-  `zakura-client-backend-*` directory without `.cargo-checksum.json`, drop
-  the `path` keys of the dependencies the `[patch]` entries supply (`pczt`,
-  `zakura-one-time-ivk`, `zakura-pir-protocol`), and apply the patch.
+- `rust/vendor/zakura-client-backend`, the published 0.1.0-rc9.8 as `cargo
+  vendor` writes it (the extracted `.crate`), with the `connect_stream` patch
+  the Railgun bridge needs (`rust/vendor/zakura-client-backend.patch`, E4).
+  The `[patch.crates-io]` entry keeps one backend in the graph: the SQLite,
+  PIR, voting and private swap crates reach it from crates.io too. Before
+  every push, `diff -r` it against the published crate: only `src/tor.rs`
+  may differ. Never run `cargo fmt --all`, which reformats it. When the
+  wallet moves to another backend release, vendor that one the same way
+  (its `.crate` without `.cargo-checksum.json`, then the patch), and drop
+  both once a release carries `connect_stream`.
 
 Push to the owner's fork (`origin`) only when the owner asks; never merge
 into `main` or open a PR unprompted, and never against upstream.
@@ -2467,7 +2469,7 @@ into `main` or open a PR unprompted, and never against upstream.
 
 Constrained in `rust/Cargo.toml` and resolved in `rust/Cargo.lock`. Key crates: `zcash_client_backend` 0.22.0, `zcash_client_sqlite` 0.20.2, `orchard` 0.13.1, `sapling-crypto` 0.7.0. These must stay compatible — check librustzcash releases before bumping.
 
-The zakura wallet crates come from their crates.io releases, with no `[patch]`. A release that adds a wallet migration makes the database unreadable to builds with an older release.
+The zakura wallet crates come from their crates.io releases. Veylor patches only the vendored backend and, until its branch is pushed, zecswap-core (see "Pinned zecSwap and a local stand-in" under Private USD). A release that adds a wallet migration makes the database unreadable to builds with an older release.
 
 `tonic` 0.14 with `tls-ring` + `tls-webpki-roots` features for gRPC TLS. `rustls` 0.23+ requires explicit crypto provider — `tls-ring` provides this.
 
