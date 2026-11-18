@@ -1444,9 +1444,9 @@ void main() {
       );
     });
 
-    test('moves a transaction when a preview round would exceed 64 KiB', () {
-      // The preview partitioner reserves 16 KiB of the 80-KiB QR ceiling for
-      // request framing. Production uses Rust's exact encoded size.
+    test('moves a transaction when a preview round would exceed 28 KiB', () {
+      // The preview partitioner reserves 4 KiB of the 32-KiB firmware ceiling
+      // for request framing. Production uses Rust's exact encoded size.
       final rounds = keystoneSigningRoundsForTest([
         for (var i = 0; i < 40; i++) message('m$i', 4 * 1024),
       ], 40);
@@ -1456,7 +1456,7 @@ void main() {
           0,
           (total, item) => total + item.redactedPczt.length + item.id.length,
         );
-        expect(bytes, lessThanOrEqualTo(64 * 1024));
+        expect(bytes, lessThanOrEqualTo(28 * 1024));
       }
       expect(rounds.expand((round) => round).map((item) => item.id).toList(), [
         for (var i = 0; i < 40; i++) 'm$i',
@@ -1464,10 +1464,10 @@ void main() {
     });
 
     test('splits large synthetic PCZTs at the byte budget', () {
-      // Use 14-KiB payloads to make the preview byte ceiling override the
+      // Use 6-KiB payloads to make the preview byte ceiling override the
       // 40-message count limit.
       final rounds = keystoneSigningRoundsForTest([
-        for (var i = 0; i < 11; i++) message('m$i', 14 * 1024),
+        for (var i = 0; i < 11; i++) message('m$i', 6 * 1024),
       ], 40);
 
       expect(rounds.map((round) => round.length), [4, 4, 3]);
@@ -1487,7 +1487,7 @@ void main() {
     });
 
     test('still packs a message that only just fits', () {
-      const budget = 64 * 1024;
+      const budget = 28 * 1024;
       final rounds = keystoneSigningRoundsForTest([
         message('big', budget - 'big'.length),
         message('small', 10),
@@ -5777,11 +5777,11 @@ void main() {
 
       expect(find.textContaining('12.345'), findsNothing);
       expect(
-        _countOutsideSidebar(find.text('****** $kZcashDefaultCurrencyTicker')),
+        _countOutsideSidebar(find.text('•••••• $kZcashDefaultCurrencyTicker')),
         2,
       );
       expect(
-        find.textContaining('Your ****** ZEC is currently in Orchard.'),
+        find.textContaining('Your •••••• ZEC is currently in Orchard.'),
         findsOneWidget,
       );
       _expectNoDoubledDenomination();
@@ -5808,7 +5808,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.text('Amount to migrate'), findsOneWidget);
-      expect(find.text('******\nZEC'), findsOneWidget);
+      expect(find.text('••••••\nZEC'), findsOneWidget);
       expect(find.textContaining('0.1'), findsNothing);
       _expectNoDoubledDenomination();
 
@@ -5830,7 +5830,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(_countOutsideSidebar(find.text('****** ZEC')), 1);
+      expect(_countOutsideSidebar(find.text('•••••• ZEC')), 1);
       expect(find.text('0.0999 ZEC'), findsNothing);
       expect(find.text('~0.0001 ZEC'), findsOneWidget);
       _expectNoDoubledDenomination();
@@ -5909,15 +5909,15 @@ void main() {
 
       expect(find.text('Next migration window'), findsOneWidget);
       expect(find.text('Left to migrate'), findsOneWidget);
-      expect(_countOutsideSidebar(find.text('****** ZEC')), 2);
+      expect(_countOutsideSidebar(find.text('•••••• ZEC')), 2);
       expect(find.text('5 ZEC'), findsNothing);
       expect(find.text('1,144'), findsOneWidget);
       expect(
         find.bySemanticsLabel(
           'Migration notes in expected processing order. '
-          'Note 1: ****** ZEC, preparing. '
-          'Note 2: ****** ZEC, preparing. '
-          'Note 3: ****** ZEC, completed.',
+          'Note 1: •••••• ZEC, preparing. '
+          'Note 2: •••••• ZEC, preparing. '
+          'Note 3: •••••• ZEC, completed.',
         ),
         findsOneWidget,
       );
@@ -5975,7 +5975,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.text('Batch #1 (1 notes)'), findsOneWidget);
-      expect(find.text('****** ZEC (25%)'), findsOneWidget);
+      expect(find.text('•••••• ZEC (25%)'), findsOneWidget);
       expect(find.text('1 ZEC (25%)'), findsNothing);
       expect(find.text('Sign Batch #1'), findsOneWidget);
       _expectNoDoubledDenomination();
@@ -6030,7 +6030,7 @@ void main() {
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
-      expect(find.text('~****** ZEC'), findsOneWidget);
+      expect(find.text('~•••••• ZEC'), findsOneWidget);
       expect(find.text('~2 ZEC'), findsNothing);
       expect(find.text('Transaction 1 of 6'), findsOneWidget);
       expect(find.text('0 of 6 complete'), findsOneWidget);
@@ -6066,7 +6066,7 @@ void main() {
         _privateStatusHarness(status: status, privacyModeEnabled: true),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Your\n****** ZEC\nare on Ironwood!'), findsOneWidget);
+      expect(find.text('Your\n•••••• ZEC\nare on Ironwood!'), findsOneWidget);
       expect(find.textContaining('0.6'), findsNothing);
       _expectNoDoubledDenomination();
     });
@@ -6134,9 +6134,9 @@ void main() {
 
       await remount(tester, harness(privacyModeEnabled: true));
       await tester.pumpAndSettle();
-      expect(find.text('1. ****** ZEC'), findsOneWidget);
-      expect(find.text('2. ****** ZEC'), findsOneWidget);
-      expect(_countOutsideSidebar(find.text('****** ZEC')), 2);
+      expect(find.text('1. •••••• ZEC'), findsOneWidget);
+      expect(find.text('2. •••••• ZEC'), findsOneWidget);
+      expect(_countOutsideSidebar(find.text('•••••• ZEC')), 2);
       expect(find.text('0.5 ZEC'), findsNothing);
       expect(find.text('Current round'), findsOneWidget);
       expect(find.text('2 of 2'), findsOneWidget);
@@ -6145,15 +6145,15 @@ void main() {
         // The first card merges with its "Split round 1" heading.
         find.bySemanticsLabel(
           RegExp(
-            '${RegExp.escape('Split 1, ****** ZEC, completed at block 984. '
-            'Outputs: ****** ZEC, used in round 2; '
-            '****** ZEC, for migration.')}\$',
+            '${RegExp.escape('Split 1, •••••• ZEC, completed at block 984. '
+            'Outputs: •••••• ZEC, used in round 2; '
+            '•••••• ZEC, for migration.')}\$',
           ),
         ),
         findsOneWidget,
       );
       expect(
-        find.bySemanticsLabel(RegExp(r'Split 2, \*{6} ZEC, ')),
+        find.bySemanticsLabel(RegExp(r'Split 2, •{6} ZEC, ')),
         findsOneWidget,
       );
       expect(find.bySemanticsLabel(RegExp(r'\d ZEC')), findsNothing);
@@ -6206,16 +6206,16 @@ void main() {
       await remount(tester, harness(privacyModeEnabled: true));
       await tester.pumpAndSettle();
       expect(find.text('Left to migrate'), findsOneWidget);
-      expect(_countOutsideSidebar(find.text('****** ZEC')), 1);
+      expect(_countOutsideSidebar(find.text('•••••• ZEC')), 1);
       expect(find.text('3 ZEC'), findsNothing);
-      expect(find.text('1. ****** ZEC 75%'), findsOneWidget);
-      expect(find.text('2. ****** ZEC 25%'), findsOneWidget);
+      expect(find.text('1. •••••• ZEC 75%'), findsOneWidget);
+      expect(find.text('2. •••••• ZEC 25%'), findsOneWidget);
       expect(
-        find.bySemanticsLabel('Note 1, ****** ZEC, scheduled at block 1,200.'),
+        find.bySemanticsLabel('Note 1, •••••• ZEC, scheduled at block 1,200.'),
         findsOneWidget,
       );
       expect(
-        find.bySemanticsLabel('Note 2, ****** ZEC, completed at block 990.'),
+        find.bySemanticsLabel('Note 2, •••••• ZEC, completed at block 990.'),
         findsOneWidget,
       );
       expect(find.bySemanticsLabel(RegExp(r'\d ZEC')), findsNothing);
@@ -6253,7 +6253,7 @@ void main() {
       await remount(tester, harness(privacyModeEnabled: true));
       await tester.pumpAndSettle();
       expect(find.text('Still in Orchard'), findsOneWidget);
-      expect(onStop(find.text('****** ZEC')), findsNWidgets(2));
+      expect(onStop(find.text('•••••• ZEC')), findsNWidgets(2));
       expect(onStop(find.textContaining(RegExp(r'\d ZEC'))), findsNothing);
       expect(find.bySemanticsLabel(RegExp(r'\d ZEC')), findsNothing);
 
@@ -6263,7 +6263,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.text(
-          '****** ZEC is still in Orchard. Choose between more privacy over '
+          '•••••• ZEC is still in Orchard. Choose between more privacy over '
           'time or a faster migration.',
         ),
         findsOneWidget,

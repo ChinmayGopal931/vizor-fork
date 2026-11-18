@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
+import 'package:zcash_wallet/src/core/layout/mobile/mobile_sticky_bottom_action.dart';
 import 'package:zcash_wallet/src/core/navigation/mobile_onboarding_routes.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/onboarding/mobile/mobile_create_steps.dart';
@@ -73,7 +74,7 @@ void main() {
     await tester.pumpWidget(_app('/onboarding/intro'));
     await tester.pumpAndSettle();
 
-    expect(find.text('The Shielded World'), findsOneWidget);
+    expect(find.text('About Zcash'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('mobile_intro_continue')));
     await tester.pumpAndSettle();
@@ -89,10 +90,12 @@ void main() {
     expect(find.byType(MobileOnboardingIntroScreen), findsOneWidget);
   });
 
-  testWidgets('intro Back returns to Welcome', (tester) async {
+  testWidgets('legacy intro Back returns to its caller', (tester) async {
     await tester.pumpWidget(_app('/welcome'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('mobile_welcome_get_started')));
+    GoRouter.of(
+      tester.element(find.byType(MobileWelcomeScreen)),
+    ).push('/onboarding/intro');
     await tester.pumpAndSettle();
     expect(find.byType(MobileOnboardingIntroScreen), findsOneWidget);
     await tester.tap(find.bySemanticsLabel('Back'));
@@ -109,12 +112,39 @@ void main() {
 
     await tester.pumpWidget(_app('/onboarding/address-types'));
     await tester.pumpAndSettle();
-    expect(_stepsProgress(tester), closeTo(0.42176870748, 0.0001));
+    expect(_stepsProgress(tester), closeTo(0.44489795918, 0.0001));
 
     await tester.pumpWidget(_app('/onboarding/things-to-know'));
     await tester.pumpAndSettle();
-    expect(_stepsProgress(tester), closeTo(0.53741496599, 0.0001));
+    expect(_stepsProgress(tester), closeTo(0.58367346939, 0.0001));
   });
+
+  testWidgets('the progress bar sits in one place on every step', (
+    tester,
+  ) async {
+    Rect? track;
+    for (final location in const [
+      '/onboarding/method',
+      '/onboarding/hardware',
+      '/onboarding/intro',
+      '/onboarding/address-types',
+      '/onboarding/things-to-know',
+    ]) {
+      await tester.pumpWidget(_app(location));
+      await tester.pumpAndSettle();
+      final rect = tester.getRect(
+        find
+            .ancestor(
+              of: find.byType(FractionallySizedBox).first,
+              matching: find.byType(DecoratedBox),
+            )
+            .first,
+      );
+      expect(rect, track ?? rect, reason: location);
+      track = rect;
+    }
+  });
+
 
   for (final theme in [AppThemeData.light, AppThemeData.dark]) {
     for (final size in [const Size(393, 852), const Size(320, 568)]) {
@@ -223,8 +253,8 @@ void main() {
             final first = tester.getRect(cardsFor(headings.first));
             final second = tester.getRect(cardsFor(headings.last));
             expect(second.top - first.bottom, 16);
-            expect(first.left, 16);
-            expect(first.width, size.width - 32);
+            expect(first.left, 20);
+            expect(first.width, size.width - 40);
           } else {
             expect(cardsFor(headings.first), findsNothing);
             expect(cardsFor(headings.last), findsNothing);
@@ -236,7 +266,12 @@ void main() {
                   : 'mobile_things_to_know_continue',
             ),
           );
-          expect(tester.getRect(action).bottom, size.height - 48);
+          // The shared footer gap above the home indicator, as on every page.
+          final inset = size.width == 393 ? 34.0 : 0.0;
+          expect(
+            tester.getRect(action).bottom,
+            size.height - inset - kMobileFooterGap,
+          );
           await tester.tap(action);
           await tester.pumpAndSettle();
           expect(

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/formatting/date_format.dart';
 import '../../../core/layout/app_desktop_shell.dart';
 import '../../../core/layout/app_main_sidebar.dart';
+import '../../../core/layout/mobile/mobile_top_nav.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_icon_hover_button.dart';
 import '../../../core/widgets/app_button.dart';
@@ -28,6 +29,7 @@ import '../voting_routes.dart';
 import '../widgets/voting_config_settings_panel.dart';
 import '../widgets/voting_metadata_widgets.dart';
 import '../widgets/voting_pane_scroll_area.dart';
+import '../../../core/widgets/mobile/mobile_surface_card.dart';
 
 const _votingBetaLabelAsset =
     'assets/illustrations/desktop/voting_beta_label.webp';
@@ -153,7 +155,7 @@ class _VotingPollsViewState extends ConsumerState<VotingPollsView> {
     final sortedItems = sortVotingRoundsForPollList(items);
     final horizontalPadding = widget.showDesktopChrome
         ? AppSpacing.md
-        : AppSpacing.sm;
+        : kMobilePageMargin;
     _preSyncVisibleRoundTrees(sortedItems);
     return VotingPaneListView.separated(
       maxWidth: 560,
@@ -411,25 +413,31 @@ class _MobilePollCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0x00000000),
-      child: InkWell(
-        key: ValueKey('voting_poll_card_tap_${round.roundId}'),
-        onTap: onAction,
-        borderRadius: BorderRadius.circular(AppRadii.large),
-        splashFactory: NoSplash.splashFactory,
-        overlayColor: WidgetStateProperty.resolveWith(
-          (states) =>
-              states.contains(WidgetState.pressed) ? Colors.transparent : null,
-        ),
-        child: Ink(
-          key: ValueKey('voting_poll_card_${round.roundId}'),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.md,
+    // Ink decorations are clipped to their Material's rectangular bounds.
+    // Paint the surface outside it so the shadow can extend past the card.
+    return MobileSurfaceCard(
+      key: ValueKey('voting_poll_card_${round.roundId}'),
+      cornerRadius: AppRadii.large,
+      padding: EdgeInsets.zero,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: ValueKey('voting_poll_card_tap_${round.roundId}'),
+          onTap: onAction,
+          borderRadius: BorderRadius.circular(AppRadii.large),
+          splashFactory: NoSplash.splashFactory,
+          overlayColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.pressed)
+                ? Colors.transparent
+                : null,
           ),
-          decoration: _mobilePollCardDecoration(context),
-          child: _MobilePollCardContent(round: round, onAction: onAction),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.md,
+            ),
+            child: _MobilePollCardContent(round: round, onAction: onAction),
+          ),
         ),
       ),
     );
@@ -464,18 +472,6 @@ class _DesktopPollCard extends StatelessWidget {
     );
   }
 }
-
-BoxDecoration _mobilePollCardDecoration(BuildContext context) => BoxDecoration(
-  color: context.colors.background.ground,
-  borderRadius: BorderRadius.circular(AppRadii.large),
-  boxShadow: [
-    BoxShadow(
-      color: context.colors.shadows.subtle,
-      offset: const Offset(0, 1),
-      blurRadius: 2,
-    ),
-  ],
-);
 
 class _MobilePollCardContent extends ConsumerWidget {
   const _MobilePollCardContent({required this.round, required this.onAction});

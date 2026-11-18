@@ -26,6 +26,7 @@ import 'package:zcash_wallet/src/features/private_usd/models/private_usd_record_
 import 'package:zcash_wallet/src/features/private_usd/providers/private_usd_unfinished_provider.dart';
 import 'package:zcash_wallet/src/features/private_usd/services/private_usd_engine.dart';
 import 'package:zcash_wallet/src/providers/account_models.dart';
+import 'package:zcash_wallet/src/providers/hide_balance_on_unlock_provider.dart';
 import 'package:zcash_wallet/src/providers/app_security_provider.dart';
 import 'package:zcash_wallet/src/providers/biometric_unlock_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_keep_awake_provider.dart';
@@ -46,6 +47,8 @@ class _FakeSecurityNotifier extends AppSecurityNotifier {
 
   final bool confirmResult;
   final confirmedWith = <String>[];
+
+  void replaceSession() => state = state.copyWith(isUnlocked: true);
 
   @override
   Future<bool> confirmPassword(String password) async {
@@ -1118,8 +1121,20 @@ void main() {
         _faceBiometricState,
         passcode: '123456',
       );
+      final gate = Completer<void>();
+      var hideCalls = 0;
       final container = ProviderContainer(
         overrides: [
+          hideBalanceOnUnlockActionProvider.overrideWith(
+            (ref) => () async {
+              expect(
+                ref.read(syncKeepAwakePrivacyLockProvider).isLocked,
+                isTrue,
+              );
+              hideCalls++;
+              await gate.future;
+            },
+          ),
           appBootstrapProvider.overrideWithValue(_bootstrap()),
           appSecurityProvider.overrideWith(() => security),
           biometricUnlockProvider.overrideWith(() => biometric),
@@ -1146,6 +1161,10 @@ void main() {
       await tester.pump();
       await tester.pump();
 
+      expect(hideCalls, 1);
+      expect(container.read(syncKeepAwakePrivacyLockProvider).isLocked, isTrue);
+      gate.complete();
+      await tester.pump();
       expect(biometric.reads, 1);
       expect(security.confirmedWith, ['123456']);
       expect(find.text('WELCOME BACK'), findsNothing);
@@ -1156,6 +1175,70 @@ void main() {
       );
     },
   );
+
+  testWidgets('a replaced session cannot complete an older sync unlock', (
+    tester,
+  ) async {
+    _setMobileViewport(tester);
+    final security = _FakeSecurityNotifier();
+    final biometric = _FakeBiometricUnlockNotifier(
+      _faceBiometricState,
+      passcode: '123456',
+    );
+    final gate = Completer<void>();
+    var hideCalls = 0;
+    final container = ProviderContainer(
+      overrides: [
+        hideBalanceOnUnlockActionProvider.overrideWith(
+          (ref) => () async {
+            expect(ref.read(syncKeepAwakePrivacyLockProvider).isLocked, isTrue);
+            hideCalls++;
+            await gate.future;
+          },
+        ),
+        appBootstrapProvider.overrideWithValue(_bootstrap()),
+        appSecurityProvider.overrideWith(() => security),
+        biometricUnlockProvider.overrideWith(() => biometric),
+        syncProvider.overrideWith(
+          () => FakeSyncNotifier(
+            _sync(lastSyncStartedAt: DateTime(2026, 7, 9, 12)),
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: container, child: _themedApp()),
+    );
+    await _settleInitialSync(tester);
+    await tester.pump(const Duration(milliseconds: 60));
+    await tester.pump();
+
+    expect(container.read(syncKeepAwakePrivacyLockProvider).isLocked, isTrue);
+    expect(_findAppIcon(AppIcons.faceId), findsOneWidget);
+
+    await tester.tap(find.text('Unlock Veylor'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(hideCalls, 1);
+    expect(container.read(syncKeepAwakePrivacyLockProvider).isLocked, isTrue);
+    security.replaceSession();
+    gate.complete();
+    await tester.pump();
+    await tester.pump();
+    expect(biometric.reads, 1);
+    expect(security.confirmedWith, ['123456']);
+    expect(find.text('Welcome Back'), findsNothing);
+    expect(find.byType(PasscodeNumpad), findsNothing);
+    expect(container.read(syncKeepAwakePrivacyLockProvider).isLocked, isTrue);
+    await tester.tap(find.text('Unlock Veylor'));
+    await tester.pump();
+    await tester.pump();
+    expect(biometric.reads, 2);
+    expect(container.read(syncKeepAwakePrivacyLockProvider).isLocked, isFalse);
+  });
 
   testWidgets(
     'unlock attempt suppresses duplicate taps before probe resolves',

@@ -7,6 +7,18 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+## [0.1.0-rc9.8] - 2026-11-11
+
+### Fixed
+
+- Use PIR protocol `0.0.1-rc7`. `0.1.0-rc9.7` could not be built from crates.io
+  because its PIR protocol dependency called a filter function missing from the
+  published filter codec.
+- The `tor` feature builds without the TLS root features again. In `0.1.0-rc9.7`
+  the embedded Arti exchange-rate futures exceeded rustc's default query depth.
+
+## [0.1.0-rc9.7] - 2026-11-10
+
 ### Added
 
 - Add the `tor-client` feature for generic Tor client and HTTP APIs without
@@ -19,20 +31,22 @@ and this library adheres to Rust's notion of
 
 ### Changed
 
+- Use the Common 5.4.0 dependency family. Consumers sharing Common types must
+  update their dependencies to the compatible 5.x family.
+- Use PIR protocol `0.0.1-rc6`, one-time IVK `0.0.1-rc5` and PCZT `0.1.0-rc9.1`.
 - Generating the crate's feature table now requires the optional
   `document-features` feature. Ordinary builds omit the documentation macro;
   docs.rs continues to include the table.
-
-- The `tor` feature pins the streamlined embedded Arti snapshot `2a392f77`.
-  Embedded bootstrap, Tokio/Rustls/Ring, ordinary Tor and onion connections,
-  directory/storage builders, and permission policy are retained. Applications
-  using restricted onion services with persistent authentication keys must
-  explicitly enable `keymgr` on the same Arti package and source revision.
+- The `tor` feature uses the streamlined embedded Arti fork, published on
+  crates.io as `zakura-arti-client` `0.47.0-zakura.1` and its `zakura-*`
+  family. Embedded bootstrap, Tokio/Rustls/Ring, ordinary Tor and onion
+  connections, directory/storage builders, and permission policy are retained.
+  Applications using restricted onion services with persistent authentication
+  keys must explicitly enable `keymgr` on the same `zakura-arti-client` release.
   The fork removes unused hosting, RPC, bridge/transport management,
   configuration-file loading, alternative TLS/runtime backends, and obsolete
   helper packages; its per-crate `semver.md` files inventory dependency API
   changes. Wallet-owned Rust declarations and signatures are unchanged.
-
 - The `tor` feature uses Zakura's embedded Arti 0.47 fork. The `DormantMode`
   re-export, `Error::Tor` payload and its `From` conversion now use
   `zakura-arti-client` types. The permission-builder closures accepted by

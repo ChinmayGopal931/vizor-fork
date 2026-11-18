@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../../../../core/l10n/l10n.dart';
 import 'package:flutter/widgets.dart';
 
@@ -6,6 +8,7 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/app_tooltip.dart';
 import '../../../../core/widgets/mobile/mobile_warning_notice.dart';
+import '../../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../address_book/models/address_book_contact.dart';
 import '../../../address_book/widgets/contact_name_inline.dart';
 import '../../domain/swap_address_plan.dart';
@@ -17,6 +20,7 @@ import '../../models/swap_quote_text.dart';
 import '../swap_review_page_content.dart'
     show swapReviewMinimumReceiveText, swapReviewSlippageToleranceText;
 import '../swap_amount_text.dart' show compactSwapAmountText;
+import '../one_time_address_label.dart';
 import 'mobile_swap_review_header.dart';
 
 /// Mobile swap review — Figma `Review Qoute` (4731:85401): the serif
@@ -39,6 +43,7 @@ class MobileSwapReviewContent extends StatelessWidget {
     this.inactiveMessage,
     this.payFiatTextOverride,
     this.receiveFiatTextOverride,
+    this.flowConnector,
     super.key,
   });
 
@@ -55,6 +60,9 @@ class MobileSwapReviewContent extends StatelessWidget {
   final String? inactiveMessage;
   final String? payFiatTextOverride;
   final String? receiveFiatTextOverride;
+
+  /// Optional replacement for the paying/receiving flow arrow row.
+  final Widget? flowConnector;
 
   @override
   Widget build(BuildContext context) {
@@ -90,6 +98,9 @@ class MobileSwapReviewContent extends StatelessWidget {
       ),
       asset: quote.sellAsset,
       bottomText: sendsZec ? payFiatTextOverride : null,
+      oneTimeAddress: sendsZec && addressPlan.oneTimeZecAddress
+          ? OneTimeAddressRole.refund
+          : null,
     );
     final receiveRow = MobileSwapReviewHeaderRow(
       label: context.l10n.commonYoureReceiving,
@@ -99,13 +110,20 @@ class MobileSwapReviewContent extends StatelessWidget {
       asset: quote.receiveAsset,
       bottomText: sendsZec ? externalBottom : receiveFiatTextOverride,
       fullAddress: sendsZec ? externalAddress : null,
+      oneTimeAddress: !sendsZec && addressPlan.oneTimeZecAddress
+          ? OneTimeAddressRole.payout
+          : null,
     );
 
     return Column(
       key: const ValueKey('mobile_swap_review_content'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        MobileSwapReviewHeader(pay: payRow, receive: receiveRow),
+        MobileSwapReviewHeader(
+          pay: payRow,
+          receive: receiveRow,
+          flowConnector: flowConnector,
+        ),
         const SizedBox(height: AppSpacing.sm),
         _ReviewCard(quote: quote),
         if (amountWarning != null) ...[
@@ -156,6 +174,7 @@ class _ReviewCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.background.ground,
         borderRadius: BorderRadius.circular(AppRadii.large),
+        boxShadow: mobileSurfaceShadows(colors),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -203,60 +222,83 @@ class _ReviewRow extends StatelessWidget {
     final colors = context.colors;
     return SizedBox(
       height: 32,
-      child: Row(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.xxs),
-            child: Text(
-              label,
-              style: AppTypography.labelLarge.copyWith(
-                color: colors.text.secondary,
+      child: LayoutBuilder(
+        builder: (context, constraints) => Row(
+          children: [
+            // Gotham sets wider than the Figma face, so on a narrow screen at a
+            // large text size the label gives way before the value column
+            // (its padding, and the help icon when there is one) overflows.
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: math.max(
+                  0,
+                  constraints.maxWidth -
+                      (helpTooltip == null
+                          ? _valueMinWidth
+                          : _valueMinWidthHelp),
+                ),
               ),
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xs,
-                AppSpacing.xxs,
-                AppSpacing.xxs,
-                AppSpacing.xxs,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Flexible(
-                    child: Text(
-                      value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
-                      style: AppTypography.labelLarge.copyWith(
-                        color: colors.text.accent,
-                      ),
-                    ),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xxs),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.labelLarge.copyWith(
+                    color: colors.text.secondary,
                   ),
-                  if (helpTooltip != null) ...[
-                    const SizedBox(width: AppSpacing.xxs),
-                    AppTooltip(
-                      message: helpTooltip!,
-                      tapToShow: true,
-                      child: AppIcon(
-                        AppIcons.help,
-                        size: 20,
-                        color: colors.icon.regular.withValues(alpha: 0.72),
-                      ),
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xs,
+                  AppSpacing.xxs,
+                  AppSpacing.xxs,
+                  AppSpacing.xxs,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        value,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: AppTypography.labelLarge.copyWith(
+                          color: colors.text.accent,
+                        ),
+                      ),
+                    ),
+                    if (helpTooltip != null) ...[
+                      const SizedBox(width: AppSpacing.xxs),
+                      AppTooltip(
+                        message: helpTooltip!,
+                        tapToShow: true,
+                        child: AppIcon(
+                          AppIcons.help,
+                          size: 20,
+                          color: colors.icon.muted,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  /// The value column's padding (xs + xxs), and with the help icon its gap
+  /// and 20px glyph too.
+  static const _valueMinWidth = AppSpacing.xs + AppSpacing.xxs;
+  static const _valueMinWidthHelp = _valueMinWidth + AppSpacing.xxs + 20;
 }
 
 /// Bottom-pinned actions — Figma `Buttons Stack` (4731:85699):

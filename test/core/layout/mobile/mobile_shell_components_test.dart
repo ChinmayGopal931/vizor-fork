@@ -192,12 +192,12 @@ void main() {
       'onBack', (tester) async {
     var backs = 0;
     await tester.pumpWidget(
-      _harness(MobileTopNav.back(title: 'Activity', onBack: () => backs++)),
+      _harness(MobileTopNav.back(title: 'Contacts', onBack: () => backs++)),
     );
 
     // The title is passed in sentence case and drawn as an uppercase caption.
-    expect(find.text('Activity'), findsNothing);
-    final title = tester.widget<Text>(find.text('ACTIVITY'));
+    expect(find.text('Contacts'), findsNothing);
+    final title = tester.widget<Text>(find.text('CONTACTS'));
     expect(title.style?.fontFamily, AppTypography.headlineLarge.fontFamily);
     expect(title.style?.fontWeight, AppTypography.headlineLarge.fontWeight);
     expect(title.style?.letterSpacing, greaterThan(0));
@@ -212,9 +212,9 @@ void main() {
     await tester.pumpWidget(
       _harness(
         const MobileTopNav.back(
-          // Neutral sample text: a distinct style from the headlineLarge
-          // default, purely to prove the override is applied. (Real screens
-          // like the swap status header use the headlineLarge default.)
+          // Neutral sample text: a distinct style from the headlineSmall
+          // default, purely to prove the override is applied. (Tab roots
+          // pass headlineLarge for their serif title.)
           title: 'Custom title',
           titleStyle: AppTypography.headlineMedium,
         ),

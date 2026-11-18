@@ -220,10 +220,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountsUpdatePicture => '更新头像';
 
   @override
-  String get accountsViewSecretPhrase => '查看助记词';
+  String get accountsViewSecretPhrase => '显示助记词';
 
   @override
   String get accountsViewViewingKey => '显示查看密钥';
+
+  @override
+  String get activityAddAddressToContacts => '将地址添加到联系人';
 
   @override
   String get activityAddressUnified => '统一地址';
@@ -239,6 +242,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get activityBalanceOrchard => 'Orchard 余额';
+
+  @override
+  String get activityBalanceTransparent => '公开余额';
 
   @override
   String get activityDetailsLoadFailed => '失败，请重试';
@@ -418,6 +424,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get activityReceiptCardFee => '卡片手续费';
 
   @override
+  String get activityReceiptConfirmations => '确认数';
+
+  @override
+  String activityReceiptConfirmationsProgress(String count, String required) {
+    return '$count / $required';
+  }
+
+  @override
   String get activityReceiptDetails => '详情';
 
   @override
@@ -447,6 +461,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get activityReceiptOutput => '输出';
+
+  @override
+  String get activityReceiptRecipient => '收款方';
 
   @override
   String get activityReceiptRefreshFailed => '无法刷新最新的交易状态。';
@@ -544,7 +561,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get activityTitleReceiveInProgress => '接收中...';
 
   @override
+  String get activityTitleReceiveZecFailed => 'ZEC 接收失败';
+
+  @override
   String get activityTitleReceivedSuccessfully => '接收成功';
+
+  @override
+  String get activityTitleReceivedZec => '已接收 ZEC';
 
   @override
   String get activityTitleReceiving => '接收中...';
@@ -553,10 +576,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get activityTitleReceivingVerb => '接收中';
 
   @override
+  String get activityTitleReceivingZec => 'ZEC 接收中...';
+
+  @override
+  String get activityTitleSendZecFailed => 'ZEC 发送失败';
+
+  @override
   String get activityTitleSendingVerb => '发送中';
 
   @override
+  String get activityTitleSendingZec => 'ZEC 发送中...';
+
+  @override
   String get activityTitleSent => '已发送';
+
+  @override
+  String get activityTitleSentZec => '已发送 ZEC';
 
   @override
   String get activityTitleShielded => '隐私转换';
@@ -622,6 +657,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get addressBookInvalidNear => '无效的 NEAR 地址';
+
+  @override
+  String addressBookInvalidNetworkAddress(String network) {
+    return '无效的 $network 地址';
+  }
 
   @override
   String get addressBookInvalidSolana => '无效的 Solana 地址';
@@ -756,6 +796,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get addressScanTitle => '扫描地址二维码';
+
+  @override
+  String get addressScanWrongNetwork => '此二维码属于其他网络。';
+
+  @override
+  String addressScanWrongNetworkNamed(String network) {
+    return '此二维码属于 $network 网络。';
+  }
 
   @override
   String get addressScanZcashPrompt => '请扫描 Zcash 二维码以继续';
@@ -1094,6 +1142,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonAmount => '金额';
 
   @override
+  String commonAvailableInMinutes(String min, String max) {
+    return '$min–$max 分钟后可用';
+  }
+
+  @override
+  String get commonAvailableInUnderMinute => '1 分钟内可用';
+
+  @override
   String get commonBack => '返回';
 
   @override
@@ -1103,6 +1159,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get commonBackToWallet => '返回钱包';
+
+  @override
+  String get commonBalanceHidden => '余额已隐藏';
+
+  @override
+  String get commonBalanceShown => '余额已显示';
 
   @override
   String get commonCalculatingEllipsis => '正在计算…';
@@ -1791,6 +1853,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonWelcomeBack => '欢迎回来';
 
   @override
+  String get commonWhatsThis => '这是什么？';
+
+  @override
   String get commonWizard => '巫师';
 
   @override
@@ -2094,6 +2159,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get homeReceiveFirstZec => '接收你的第一笔 ZEC';
+
+  @override
+  String get homeReceiveReceiveSubtitle => '分享地址或二维码';
+
+  @override
+  String get homeReceiveRedeemGiftCard => '领取礼品卡';
+
+  @override
+  String get homeReceiveRedeemGiftCardSubtitle => '添加收到的礼品卡';
 
   @override
   String get homeRecentActivity => '最近活动记录';
@@ -5777,6 +5851,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get navVote => '投票';
 
   @override
+  String get nearSwapPrivacyUnsaved => '无法保存此选择。它会一直生效，直到你关闭 Veylor。';
+
+  @override
   String neonSyncChecking(int percent) {
     return '检查 $percent%';
   }
@@ -6167,6 +6244,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get onboardingIntroTitle => '走进隐私世界';
 
   @override
+  String get onboardingIntroTitleMobile => '关于 Zcash';
+
+  @override
   String get onboardingLinkVizorDesktop => '关联 Veylor 桌面版';
 
   @override
@@ -6514,6 +6594,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get payFetchingQuote => '正在获取报价';
 
   @override
+  String payIronwoodOnlyShortfall(String amount) {
+    return '隐私支付仅使用 Ironwood ZEC。你在 Ironwood 中有 $amount。';
+  }
+
+  @override
   String get payNewAddressDetected => '检测到新地址。';
 
   @override
@@ -6578,9 +6663,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get paySaveContactError => '无法保存此联系人。请重试。';
-
-  @override
-  String get payScanBarrierDismiss => '关闭';
 
   @override
   String get payScanCaption => '扫描收款地址二维码';
@@ -7505,6 +7587,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get paymentLinkQrCouldNotBeGenerated => '无法生成二维码';
 
   @override
+  String get paymentLinkQrExpandSemantic => '全屏显示礼品卡二维码';
+
+  @override
   String get paymentLinkQrSaveFailed => '无法保存礼品卡二维码。';
 
   @override
@@ -7950,6 +8035,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get portfolioChartTotalShielded => '隐私余额合计';
+
+  @override
+  String get privacyBalanceHiddenSaveFailed => '余额已隐藏，但无法保存设置。';
+
+  @override
+  String get privacyBalanceShowFailed => '无法显示余额。请重试。';
 
   @override
   String get privateQueriesOptOutUnfinished => '关闭隐私查询未完成。请在设置中再次关闭，以使用公开资金。';
@@ -9669,6 +9760,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sendAmountCtaEnterAmount => '输入金额以继续';
 
   @override
+  String get sendAvailableChangeRow => '上一笔付款的找零';
+
+  @override
+  String get sendAvailableFootnote => '资金经过几次网络确认后即可使用。';
+
+  @override
+  String get sendAvailableReceivedRow => '刚刚收到';
+
+  @override
+  String get sendAvailableTitle => '现在可用';
+
+  @override
   String get sendBroadcastCancelledBeforeParams => '在下载证明参数之前，发送已取消。';
 
   @override
@@ -10120,6 +10223,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sendRecipientLabel => '发送至';
 
   @override
+  String sendRecipientOwnAccountName(String name) {
+    return '$name（我）';
+  }
+
+  @override
   String get sendRecipientUnreadableRequestLink => '无法读取此收款链接';
 
   @override
@@ -10284,6 +10392,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sendStatusMobileReturnToSettings => '返回设置';
 
   @override
+  String sendStatusMobileSendAgainIn(String min, String max) {
+    return '交易即将在链上确认。$min–$max 分钟后可再次发送。';
+  }
+
+  @override
   String get sendStatusMobileSendingDonation => '正在发送捐赠...';
 
   @override
@@ -10337,6 +10450,16 @@ class AppLocalizationsZh extends AppLocalizations {
       other: '$count 笔历史交易',
     );
     return '$_temp0';
+  }
+
+  @override
+  String sendWaitingMoreInMinutes(String amount, String min, String max) {
+    return '+$amount，$min–$max 分钟后';
+  }
+
+  @override
+  String sendWaitingMoreInUnderMinute(String amount) {
+    return '+$amount，1 分钟内';
   }
 
   @override
@@ -10496,11 +10619,18 @@ class AppLocalizationsZh extends AppLocalizations {
       '交易链接会在此区块浏览器中打开。你可以使用 ZecBlock 或其他你喜欢的网站。发送后打开公共区块浏览器，可能会将你的 IP 地址与该交易关联。';
 
   @override
+  String get settingsExplorerPrivateCopy =>
+      'ZecBlock 不会被告知你打开了哪笔交易，但仍能看到你的 IP 地址。页面加载较慢，新交易被打包进区块后才会显示。';
+
+  @override
+  String get settingsExplorerPrivateSubtitle => '私密浏览';
+
+  @override
   String get settingsExplorerSaveFailed => '无法保存该区块浏览器网址。';
 
   @override
   String settingsExplorerTemplateHint(String txid, String txHash) {
-    return '在路径中使用 $txid 或 $txHash，或只输入域名。';
+    return '在交易 ID 所在的位置使用 $txid 或 $txHash，或只输入域名。';
   }
 
   @override
@@ -10511,6 +10641,28 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsExplorerUrlLabel => '区块浏览器网址';
+
+  @override
+  String get settingsFlipToHide => '翻转手机隐藏金额';
+
+  @override
+  String get settingsFlipToHideDescription =>
+      '将手机屏幕朝下翻转即可隐藏金额。如需再次显示，请将手机屏幕朝下翻转，并在 2 秒内翻回朝上。';
+
+  @override
+  String get settingsFlipToHideUpdateFailed => '无法更新翻转隐藏设置。';
+
+  @override
+  String get settingsHideBalanceOnUnlock => '解锁时隐藏余额';
+
+  @override
+  String get settingsHideBalanceOnUnlockDescription => '每次解锁时隐藏余额。点击眼睛图标可再次显示。';
+
+  @override
+  String get settingsHideBalanceOnUnlockUpdateFailed => '无法更新解锁时隐藏余额设置。';
+
+  @override
+  String get settingsHideBalanceTitle => '隐藏余额';
 
   @override
   String get settingsIncorrectPasscode => '数字密码错误';
@@ -10527,6 +10679,66 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsLanguageUpdateFailed => '无法更改语言。';
+
+  @override
+  String get settingsNearSwapPrivacyCheckingPastSwaps => '正在检查过往兑换';
+
+  @override
+  String get settingsNearSwapPrivacyHardware =>
+      '硬件钱包账户不支持此功能。其兑换使用普通 Zcash 地址。';
+
+  @override
+  String get settingsNearSwapPrivacyInfoChangesBody =>
+      '发送 ZEC 的兑换只使用你的 Ironwood 余额支付。Veylor 检查地址历史期间，兑换可能需要几分钟才能准备好。';
+
+  @override
+  String get settingsNearSwapPrivacyInfoChangesTitle => '有何变化';
+
+  @override
+  String get settingsNearSwapPrivacyInfoLead =>
+      '每次兑换都会向 NEAR Intents 提供一个一次性 Zcash 地址，用于兑换的 ZEC 一方：收到 ZEC 时是收款地址，发送 ZEC 时是退款地址。即使是未来的量子计算机，也无法将它与此钱包关联起来。';
+
+  @override
+  String get settingsNearSwapPrivacyInfoLimitsBody =>
+      '它能防止这些地址与你的钱包关联，但不会改变资金的安全保护方式。你自行输入的地址（例如重复使用的 Ethereum 地址）仍可能将你的兑换关联起来。硬件钱包账户使用普通地址。';
+
+  @override
+  String get settingsNearSwapPrivacyInfoLimitsTitle => '不涵盖的内容';
+
+  @override
+  String get settingsNearSwapPrivacyInfoRestore =>
+      '恢复后，钱包会自行以隐私方式找到这些付款。如果恢复时此设置处于关闭状态，兑换为 ZEC 的收款会在你开启此设置或运行“检查兑换历史”后显示。关闭此设置后，只有新的兑换会使用普通地址。发送到你已使用过的一次性地址的收款和退款仍会显示。';
+
+  @override
+  String get settingsNearSwapPrivacyInfoRestoreTitle => '恢复后或关闭时';
+
+  @override
+  String get settingsNearSwapPrivacyInfoReuse =>
+      '报价未付款就过期时，其收款地址可能会用于之后的报价。在极少数情况下，同一钱包的两台设备若在同一时刻获取报价，会得到相同的地址。NEAR 能看出这些报价使用了同一个地址，但仍无法得知该地址属于哪个钱包。';
+
+  @override
+  String get settingsNearSwapPrivacyInfoReuseTitle => '收款地址被共用时';
+
+  @override
+  String get settingsNearSwapPrivacyLabel => '增强兑换隐私';
+
+  @override
+  String get settingsNearSwapPrivacyLearnMore => '了解更多';
+
+  @override
+  String get settingsNearSwapPrivacyLearnMoreSemantics => '了解有关增强兑换隐私的更多信息';
+
+  @override
+  String get settingsNearSwapPrivacyOff => '兑换使用普通 Zcash 地址。';
+
+  @override
+  String get settingsNearSwapPrivacyOn => '兑换使用一次性 Zcash 地址。';
+
+  @override
+  String get settingsNearSwapPrivacyUnavailable => '不可用';
+
+  @override
+  String get settingsNearSwapPrivacyUnknown => 'Veylor 无法读取你保存的选择。请重新设置后再兑换。';
 
   @override
   String get settingsNewBadge => '新';
@@ -10772,6 +10984,48 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsStatusOn => '已开启';
+
+  @override
+  String get settingsSwapHistoryCheckAgainButton => '再次检查';
+
+  @override
+  String get settingsSwapHistoryCheckButton => '检查兑换历史';
+
+  @override
+  String get settingsSwapHistoryChecking => '正在检查… 可能需要几分钟。';
+
+  @override
+  String get settingsSwapHistoryContinuing => 'Veylor 保持打开期间，检查会继续进行。';
+
+  @override
+  String get settingsSwapHistoryDone => '检查已完成。';
+
+  @override
+  String get settingsSwapHistoryFailed => '目前无法检查兑换历史。请稍后重试。';
+
+  @override
+  String get settingsSwapHistoryIdle => '缺少收款或退款？';
+
+  @override
+  String get settingsSwapHistoryNotStarted => '检查未能开始。请稍后重试。';
+
+  @override
+  String get settingsSwapHistoryPauseButton => '暂停';
+
+  @override
+  String get settingsSwapHistoryPauseFailed => '无法暂停检查。请重试。';
+
+  @override
+  String get settingsSwapHistoryPaused => '已暂停。再次检查即可继续。';
+
+  @override
+  String get settingsSwapHistoryWaitingForService => '兑换恢复服务尚未同步到此钱包。请几分钟后重试。';
+
+  @override
+  String get settingsSwapHistoryWaitingForSync => '正在等待钱包同步。请几分钟后重试。';
+
+  @override
+  String get settingsSwapHistoryWalletChanged => '钱包发生了变化，检查已停止。请重试。';
 
   @override
   String get settingsThemeDark => '深色';
@@ -11041,7 +11295,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsViewingKeyConfirmAgain => '请再次验证身份，然后重试加载此密钥。';
 
   @override
+  String get settingsViewingKeyCopied => '查看密钥已复制';
+
+  @override
   String get settingsViewingKeyCopy => '复制查看密钥';
+
+  @override
+  String get settingsViewingKeyCopyFailed => '无法复制查看密钥，请重试。';
 
   @override
   String get settingsViewingKeyExplanation =>
@@ -11162,6 +11422,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get swapActionAddRefundAddress => '添加退款地址';
+
+  @override
+  String get swapActionGetConfidentialQuote => '获取保密报价';
 
   @override
   String get swapActionGettingQuote => '正在获取报价';
@@ -11436,6 +11699,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get swapActivityStepFindingPayoutDescription =>
+      'NEAR 已将其发送到你的一次性地址。Veylor 正在查找。';
+
+  @override
   String get swapActivityStepRecipientReceives => '收款方接收';
 
   @override
@@ -11552,6 +11819,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get swapAddressRememberRefund => '记住此地址作为退款地址';
 
   @override
+  String get swapAddressWaitServer => '选择服务器';
+
+  @override
+  String get swapAddressWaitSync => '正在等待同步…';
+
+  @override
   String get swapAssetSelectorEmpty => '未找到代币或链';
 
   @override
@@ -11573,6 +11846,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get swapComposerYouReceive => '你将收到';
+
+  @override
+  String get swapConfidentialLabel => '保密';
+
+  @override
+  String get swapConfidentialRouteTooltip =>
+      '在 NEAR Intents 上无法将你的存入与收款对应起来，也无法在其区块浏览器中查到。两笔交易仍会显示在各自的链上。';
+
+  @override
+  String get swapConfidentialSettingDescription => '无法将你的存入与收款相互关联追踪。';
 
   @override
   String get swapContactAlreadyInAddressBook => '已在你的地址簿中';
@@ -11615,6 +11898,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get swapDepositOneTimeAddress => '一次性地址';
 
   @override
+  String get swapDepositRecoveryHelp => '如果入金有误？';
+
+  @override
+  String get swapDepositRecoveryIntro => '发送错误的代币或使用其他网络，可能导致入金无法到账。';
+
+  @override
+  String get swapDepositRecoveryPolicy =>
+      '如果错误入金的资产在转账时价值低于 300 美元，NEAR Intents 不会考虑找回申请。金额达到或超过 300 美元时，NEAR Intents 会根据具体情况决定是否协助找回。';
+
+  @override
+  String get swapDepositRecoveryTitle => '入金有误';
+
+  @override
   String swapDepositSendOnly(String symbol, String chain) {
     return '仅发送 $chain 上的 $symbol';
   }
@@ -11630,9 +11926,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get swapDepositZecButton => '存入 ZEC';
-
-  @override
-  String get swapDismissBarrierLabel => '关闭';
 
   @override
   String get swapFailureAmountPrecision => '金额的小数位数过多。\n请减少小数位数后重试。';
@@ -11711,10 +12004,26 @@ class AppLocalizationsZh extends AppLocalizations {
       '可用 ZEC 不足以支付此笔兑换及其网络手续费。\n请尝试更小的金额，或使用最大值。';
 
   @override
+  String get swapFailureZecDepositIronwoodFunding =>
+      '隐私兑换仅使用 Ironwood ZEC，但其不足以支付此笔兑换及其网络手续费。\n请将资金转入 Ironwood，或尝试更小的金额。';
+
+  @override
+  String get swapFailureZecDepositIronwoodFundingPay =>
+      '隐私支付仅使用 Ironwood ZEC，但其不足以支付此笔付款及其网络手续费。\n请将资金转入 Ironwood，或尝试更小的金额。';
+
+  @override
   String get swapFailureZecDepositPreflight => '无法准备 ZEC 存入。\n请检查余额后重试。';
 
   @override
   String get swapFailureZecDepositSendFailed => '无法发送 ZEC 存入交易。\n请稍后重试。';
+
+  @override
+  String get swapFindingPayout => '正在查找你的 ZEC…';
+
+  @override
+  String swapIronwoodOnlyShortfall(String amount) {
+    return '隐私兑换仅使用 Ironwood ZEC。你在 Ironwood 中有 $amount。';
+  }
 
   @override
   String get swapKeystoneBroadcastFailed => '无法广播交易。';
@@ -11837,10 +12146,36 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get swapNoticeNearSwapPrivacyUnknown =>
+      'Veylor 无法读取增强兑换隐私设置。请在设置中重新设置。';
+
+  @override
+  String get swapNoticeNoConfidentialQuoteForAmount => '此金额暂无可用保密报价';
+
+  @override
+  String get swapNoticeNoQuoteForAmount => '此金额暂无可用报价';
+
+  @override
   String get swapNoticeOk => '好的';
 
   @override
   String get swapNoticePaymentsMayFail => '支付目前可能无法使用。';
+
+  @override
+  String get swapNoticePrivateReceiveAddressLimit => '等待中的兑换过多。请在其中一笔完成或过期后重试。';
+
+  @override
+  String get swapNoticePrivateReceiveAddressPreparationFailed =>
+      '无法准备新的钱包接收地址。请在钱包同步后重试。';
+
+  @override
+  String get swapNoticePrivateReceiveAddressPreparing => '正在准备隐私兑换地址。请稍后重试。';
+
+  @override
+  String get swapNoticePrivateReceiveAddressStale => '此兑换地址已不可用。请获取新报价。';
+
+  @override
+  String get swapNoticePrivateReceiveAddressUnavailable => '隐私兑换暂时不可用。请几分钟后重试。';
 
   @override
   String get swapNoticeReceiveAddressUnavailable =>
@@ -11855,10 +12190,38 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get swapNoticeStartNotFinished =>
+      'Veylor 无法确认此兑换已开始。开始新的兑换前，请检查你是否已发送其存款。';
+
+  @override
   String get swapNoticeStatusPage => 'NEAR Intents 状态页面';
 
   @override
   String get swapNoticeSwapsMayFail => '兑换目前可能无法使用。';
+
+  @override
+  String get swapOneTimeAddressLabel => '一次性地址';
+
+  @override
+  String get swapOneTimeAddressPayoutExplanation =>
+      '这是此兑换专用的一次性 Zcash 地址。即使是未来的量子计算机，也无法将它与你的钱包关联起来。';
+
+  @override
+  String get swapOneTimeAddressPreparing => '正在准备地址…';
+
+  @override
+  String get swapOneTimeAddressPreparingExplanation =>
+      'Veylor 正在使用此地址前检查其历史记录。可能需要几分钟。';
+
+  @override
+  String get swapOneTimeAddressPreparingSemantics => '正在准备一次性地址';
+
+  @override
+  String get swapOneTimeAddressRefundExplanation =>
+      '如果此兑换被退款，ZEC 会退回到一个一次性 Zcash 地址。即使是未来的量子计算机，也无法将它与你的钱包关联起来。';
+
+  @override
+  String get swapOneTimeRefundAddressLabel => '一次性退款地址';
 
   @override
   String get swapPageTitle => '兑换';
@@ -11890,7 +12253,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get swapPayStatusSourceAmount => '原始金额';
 
   @override
+  String get swapPayoutUpdateRequired => '请更新 Veylor 以继续检查此兑换的收款。你的资金是安全的。';
+
+  @override
   String get swapPoweredByLabel => '由以下提供支持';
+
+  @override
+  String get swapQuoteErrorViewSwaps => '查看兑换';
 
   @override
   String swapQuoteExpiresAt(String time) {
@@ -11902,6 +12271,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get swapQuoteRatePending => '汇率待定';
+
+  @override
+  String get swapRecoveryUpdateRequired => '请更新 Veylor 以继续使用隐私兑换。';
+
+  @override
+  String get swapRefundUpdateRequired => '请更新 Veylor 以继续检查此兑换的退款。你的资金是安全的。';
 
   @override
   String get swapReviewBackPay => '支付';
@@ -11955,6 +12330,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get swapSettingsTitlePay => '支付设置';
+
+  @override
+  String get swapSettingsTitleSwap => '兑换设置';
+
+  @override
   String get swapSignPayment => '签署支付';
 
   @override
@@ -11964,6 +12345,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get swapSlippageCustom => '自定义';
 
   @override
+  String get swapSlippageCustomValueSemantics => '自定义滑点容差（百分比）';
+
+  @override
+  String get swapSlippageDecrease => '降低滑点';
+
+  @override
   String get swapSlippageDescriptionPay =>
       '报价波动时最多可多付的 ZEC 数量，超出则执行失败。网络手续费另计。';
 
@@ -11971,10 +12358,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get swapSlippageDescriptionSwap => '设置你可接受的最大汇率变动。网络手续费另计。';
 
   @override
+  String get swapSlippageIncrease => '提高滑点';
+
+  @override
+  String swapSlippagePresetSemantics(String value) {
+    return '滑点 $value';
+  }
+
+  @override
   String get swapSlippageRangeError => '滑点必须在 0.1 - 5% 之间';
 
   @override
   String get swapSlippageTitle => '滑点';
+
+  @override
+  String get swapSlippageValueSemantics => '滑点容差（百分比）';
+
+  @override
+  String get swapStartPending => '正在开始兑换…';
 
   @override
   String get swapStatusBadgeNeedsAttention => '需要处理';
@@ -11984,6 +12385,55 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get swapStatusRowLabel => '状态';
+
+  @override
+  String get swapSupportConfidentialRoute => '路由：保密';
+
+  @override
+  String get swapSupportCopyAction => '复制入金详情';
+
+  @override
+  String get swapSupportCopyFailed => '无法复制详情。请重试。';
+
+  @override
+  String swapSupportDetails(
+    String status,
+    String address,
+    String txHash,
+    String routeDetails,
+  ) {
+    return '请协助查询这笔交易及其退款状态。\n\n服务状态：$status\n入金地址：$address\n入金交易：$txHash\n$routeDetails';
+  }
+
+  @override
+  String get swapSupportDirectHelp => '如仍需帮助，请复制入金详情，粘贴到发往下方地址的邮件中。';
+
+  @override
+  String get swapSupportExpiredBody =>
+      '请在转出资金的钱包中查看交易。如果入金延迟到账，NEAR 可能会尝试将资金退回退款地址。';
+
+  @override
+  String get swapSupportExpiredPrompt => '已经入金？';
+
+  @override
+  String get swapSupportExpiredTitle => '查看入金';
+
+  @override
+  String swapSupportExplorer(String explorer) {
+    return '浏览器：$explorer';
+  }
+
+  @override
+  String get swapSupportFailedBody => '请查看交易详情中显示的退款地址。';
+
+  @override
+  String get swapSupportFailedPrompt => '还没收到退款？';
+
+  @override
+  String get swapSupportFailedTitle => '查看退款';
+
+  @override
+  String get swapSwitchDirection => '切换兑换方向';
 
   @override
   String get swapTimeoutBody => '请重新发起一笔兑换。';
@@ -12218,11 +12668,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get votingConfigCustomSource => '自定义来源';
 
   @override
-  String votingConfigDeleteNamed(String name) {
-    return '删除 $name';
-  }
-
-  @override
   String get votingConfigDeleteSaved => '删除已保存的来源';
 
   @override
@@ -12285,7 +12730,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get votingConfigShowTestRoundsHint => '显示标题以 [TEST] 开头的已认证轮次。';
 
   @override
-  String get votingConfigSources => '来源';
+  String get votingConfigSource => '来源';
 
   @override
   String get votingConfigTestVisibilityFailed => '无法更新测试轮次显示设置。';

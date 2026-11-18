@@ -6,13 +6,18 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_icon.dart';
 import '../../../../core/widgets/mobile/neon_glyph_badge.dart';
 import '../../../../core/widgets/mobile/tron_glyph.dart';
+import '../swap_support_notice.dart';
 
 /// Mobile deposit-timeout state — Figma `Swap failed` (4755:89127):
 /// a neon warning badge, the "Time's up" tag, the headline, and the restart
 /// action. The host's top nav carries the "Swap failed" title, so it doesn't
 /// repeat here.
 class MobileSwapTimeoutContent extends StatelessWidget {
-  const MobileSwapTimeoutContent({required this.onRestart, super.key});
+  const MobileSwapTimeoutContent({
+    required this.onRestart,
+    this.onLateDeposit,
+    super.key,
+  });
 
   static const _contentWidth = 340.0;
   static const _messageWidth = 300.0;
@@ -31,6 +36,7 @@ class MobileSwapTimeoutContent extends StatelessWidget {
   );
 
   final VoidCallback onRestart;
+  final VoidCallback? onLateDeposit;
 
   @override
   Widget build(BuildContext context) {
@@ -103,6 +109,10 @@ class MobileSwapTimeoutContent extends StatelessWidget {
               leading: const AppIcon(AppIcons.renew, size: 20),
               child: Text(context.l10n.swapTimeoutRestart),
             ),
+            if (onLateDeposit != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              SwapSupportPrompt(onTap: onLateDeposit!, failedSwap: false),
+            ],
           ],
         ),
       ),

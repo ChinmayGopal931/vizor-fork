@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../main.dart' show log;
 import '../../../core/l10n/l10n.dart';
 import '../../../core/layout/mobile/app_mobile_sheet.dart';
+import '../../../core/layout/mobile/mobile_top_nav.dart';
 import '../../../core/navigation/payment_uri_unlock_claim.dart';
 import '../../../core/feedback/app_haptics.dart';
 import '../../../core/theme/app_theme.dart';
@@ -466,7 +467,7 @@ class _MobileUnlockScreenState extends ConsumerState<MobileUnlockScreen> {
                   onHelp: _submitting ? null : _showForgotPasscodeSheet,
                 ),
                 legacyPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
+                  horizontal: kMobilePageMargin,
                   vertical: AppSpacing.md,
                 ),
                 scaleLegacyKeypadToWidth: true,
@@ -478,7 +479,7 @@ class _MobileUnlockScreenState extends ConsumerState<MobileUnlockScreen> {
                 ),
                 legacy: Padding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm,
+                    horizontal: kMobilePageMargin,
                     vertical: AppSpacing.md,
                   ),
                   child: LayoutBuilder(

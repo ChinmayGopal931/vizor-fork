@@ -34,6 +34,8 @@ import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/neon_sync_backdrop.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_horizon.dart';
 import 'package:zcash_wallet/src/core/widgets/mobile/neon_scramble_text.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/mobile_action_card.dart';
+import 'package:zcash_wallet/src/features/receive/widgets/mobile/receive_options_sheet.dart';
 import 'package:zcash_wallet/src/features/home/screens/mobile/mobile_home_screen.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_sheet.dart';
 import 'package:zcash_wallet/src/core/navigation/mobile_sidebar_route_observer.dart';
@@ -47,6 +49,7 @@ import 'package:zcash_wallet/src/features/migration/providers/ironwood_migration
 import 'package:zcash_wallet/src/features/migration/widgets/mobile/mobile_ironwood_migration_announcement_sheet.dart';
 import 'package:zcash_wallet/src/features/swap/models/swap_models.dart';
 import 'package:zcash_wallet/src/features/swap/providers/swap_activity_store.dart';
+import 'package:zcash_wallet/src/features/swap/providers/swap_payout_discovery_provider.dart';
 import 'package:zcash_wallet/src/features/swap/providers/pay_selected_asset_store.dart';
 import 'package:zcash_wallet/src/features/swap/providers/swap_state_provider.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
@@ -264,6 +267,7 @@ Widget _app(
   IronwoodMigrationCoordinator Function()? migrationCoordinator,
   Set<String> seenMigrationAttentionFingerprints = const {},
   SwapActivityStore? swapActivityStore,
+  SwapPayoutRowsLoader? payoutRowsLoader,
   GiftCardActivityIndex? giftCardActivityIndex,
   Future<GiftCardActivityIndex>? giftCardActivityFuture,
   AppThemeData theme = AppThemeData.dark,
@@ -314,6 +318,10 @@ Widget _app(
       GoRoute(path: '/send', builder: (_, _) => const Text('send route')),
       GoRoute(path: '/receive', builder: (_, _) => const Text('receive route')),
       GoRoute(path: '/swap', builder: (_, _) => const Text('swap route')),
+      GoRoute(
+        path: '/payment-links',
+        builder: (_, state) => Text('payment links route ${state.uri.query}'),
+      ),
       GoRoute(
         path: '/settings',
         builder: (_, _) => const Text(
@@ -458,6 +466,8 @@ Widget _app(
       ),
       if (swapActivityStore != null)
         swapActivityStoreProvider.overrideWithValue(swapActivityStore),
+      if (payoutRowsLoader != null)
+        swapPayoutRowsLoaderProvider.overrideWithValue(payoutRowsLoader),
       giftCardActivityIndexProvider.overrideWith(
         (ref, accountUuid) async =>
             giftCardActivityFuture ??
@@ -1406,7 +1416,7 @@ void main() {
       expect(tester.getRect(list).topLeft, before.topLeft);
       expect(
         tester.getRect(list).height,
-        before.height + 5 * (44 + AppSpacing.s),
+        before.height + 5 * (56 + AppSpacing.s),
       );
       expect(find.byType(HomeActivitySkeletonRow), findsNothing);
       expect(tester.takeException(), isNull);
@@ -2087,9 +2097,9 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Hide balance'));
     await tester.pump();
 
-    expect(find.text('****** ZEC still migrating'), findsOneWidget);
+    expect(find.text('•••••• ZEC still migrating'), findsOneWidget);
     expect(
-      find.bySemanticsLabel(RegExp(r'\*{6} ZEC still migrating')),
+      find.bySemanticsLabel(RegExp(r'•{6} ZEC still migrating')),
       findsOneWidget,
     );
     expect(find.text('2 ZEC still migrating'), findsNothing);
@@ -3329,8 +3339,58 @@ void main() {
 
     await tester.tap(find.text('Receive your first ZEC'));
     await tester.pumpAndSettle();
-    expect(find.text('receive route'), findsOneWidget);
     expect(feedback, ['HapticFeedbackType.lightImpact']);
+    await tester.tap(find.byKey(const ValueKey('receive_options_receive')));
+    await tester.pumpAndSettle();
+    expect(find.text('receive route'), findsOneWidget);
+  });
+
+  testWidgets('receive offers an address and gift card redemption', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(_syncedState(orchardBalance: BigInt.from(14312000000))),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('mobile_home_receive')));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReceiveOptionsSheet), findsOneWidget);
+    expect(find.text('Request ZEC'), findsNothing);
+    final cards = {
+      'receive_options_receive': (
+        'Receive ZEC',
+        'Share your address or QR code',
+        AppIcons.qr,
+      ),
+      'receive_options_redeem_gift_card': (
+        'Redeem gift card',
+        'Add a card someone sent you',
+        AppIcons.giftCard,
+      ),
+    };
+    for (final MapEntry(key: key, value: (title, subtitle, icon))
+        in cards.entries) {
+      final card = tester.widget<MobileActionCard>(find.byKey(ValueKey(key)));
+      expect((card.title, card.subtitle, card.icon), (title, subtitle, icon));
+    }
+
+    await tester.tap(find.byKey(const ValueKey('receive_options_receive')));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReceiveOptionsSheet), findsNothing);
+    final receiveRoute = find.text('receive route');
+    expect(receiveRoute, findsOneWidget);
+    Navigator.of(tester.element(receiveRoute)).pop();
+    await tester.pumpAndSettle();
+
+    // Redeem opens Gift Cards on the redeem page.
+    await tester.tap(find.byKey(const ValueKey('mobile_home_receive')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('receive_options_redeem_gift_card')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('payment links route redeem=1'), findsOneWidget);
   });
 
   testWidgets('swap action opens the swap route with a tap haptic', (
@@ -3369,7 +3429,9 @@ void main() {
   testWidgets('paints the neon horizon on the empty-activity canvas', (
     tester,
   ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 1000));
+    // 402 wide leaves the 340px canvas room inside the 20px page margins and
+    // the empty state's 8px insets; narrower screens scale it down.
+    await tester.binding.setSurfaceSize(const Size(402, 1000));
     addTearDown(() async {
       await tester.binding.setSurfaceSize(null);
     });
@@ -3670,9 +3732,9 @@ void main() {
     expect(find.text('Sent'), findsNothing);
     expect(find.text('Received'), findsNothing);
     // The card amount, not the funding total the transaction carries.
-    expect(find.text('-0.5 ZEC'), findsOneWidget);
+    expect(find.text('0.5 ZEC'), findsOneWidget);
     expect(find.text('+0.3 ZEC'), findsOneWidget);
-    expect(find.text('-0.1954 ZEC'), findsNothing);
+    expect(find.text('0.1954 ZEC'), findsNothing);
     expect(find.text('+2 ZEC'), findsNothing);
   });
 
@@ -3752,7 +3814,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byType(MobileTransactionStatusScreen),
-        matching: find.text('RECEIVED'),
+        matching: find.text('RECEIVED ZEC'),
       ),
       findsOneWidget,
     );
@@ -3809,7 +3871,40 @@ void main() {
     expect(find.text('activity tx route $receiveWalletOrder'), findsOneWidget);
   });
 
-  testWidgets('recent activity section uses the Figma inner inset', (
+  testWidgets('home checks payouts only for the swaps it shows', (
+    tester,
+  ) async {
+    // One more private payout than Home shows, the oldest first.
+    String txid(int i) => i.toRadixString(16).padLeft(64, '0');
+    final checked = <String>{};
+    await tester.pumpWidget(
+      _app(
+        _syncedState(orchardBalance: BigInt.from(100000000)),
+        swapEnabled: true,
+        swapActivityStore: _FakeSwapActivityStore([
+          for (var i = 0; i < 11; i++)
+            _externalToZecActivityRecord(
+              id: 'swap-$i',
+              destinationChainTxHash: txid(i),
+            ).copyWith(
+              privateAddress: true,
+              createdAt: DateTime.utc(2026, 7, 20, i),
+            ),
+        ]),
+        payoutRowsLoader: (_, txids) async {
+          checked.addAll(txids);
+          return const [];
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(testL10n.swapFindingPayout), findsNWidgets(10));
+    expect(checked, hasLength(10));
+    expect(checked, isNot(contains(swapChainTxidToWalletTxidHex(txid(0)))));
+  });
+
+  testWidgets('recent activity section shares the screen margin', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(800, 1400));
@@ -3843,7 +3938,8 @@ void main() {
       find.ancestor(
         of: seeAllFinder,
         matching: find.byWidgetPredicate(
-          (widget) => widget is SizedBox && widget.height == 24,
+          (widget) =>
+              widget is ConstrainedBox && widget.constraints.minHeight == 24,
         ),
       ),
     );

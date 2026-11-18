@@ -198,7 +198,7 @@ void main() {
           pendingLabel: 'Est. 1–3 min',
         );
         expect(row.title, 'Shielded');
-        expect(row.leadingIconName, AppIcons.shieldKeyholeOutline);
+        expect(row.leadingIconName, AppIcons.shieldKeyhole);
         expect(row.subtitle, isNull);
         expect(row.statusText, expired ? 'Failed' : 'Completed');
       }
@@ -210,9 +210,9 @@ void main() {
   ) async {
     for (final kind in ['sent', 'received']) {
       for (final (pool, label, icon) in [
-        ('ironwood', 'Shielded', AppIcons.shieldKeyholeOutline),
-        ('orchard', 'Orchard', AppIcons.shieldKeyholeOutline),
-        ('sapling', 'Sapling', AppIcons.shieldKeyholeOutline),
+        ('ironwood', 'Shielded', AppIcons.shieldKeyhole),
+        ('orchard', 'Orchard', AppIcons.shieldKeyhole),
+        ('sapling', 'Sapling', AppIcons.shieldKeyhole),
         ('transparent', 'Transparent', AppIcons.transparentBalance),
         ('mixed', 'Mixed', null),
         ('unknown', null, null),
@@ -256,7 +256,7 @@ void main() {
               ? isNull
               : label == 'Transparent'
               ? AppIcons.transparentBalance
-              : AppIcons.shieldKeyholeOutline,
+              : AppIcons.shieldKeyhole,
         );
         for (final (pool, expected) in [
           ('ironwood', 'Shielded'),
@@ -270,7 +270,7 @@ void main() {
             giftCardDisplayPool: pool,
           );
           expect(overridden.subtitle, expected);
-          expect(overridden.subtitleIconName, AppIcons.shieldKeyholeOutline);
+          expect(overridden.subtitleIconName, AppIcons.shieldKeyhole);
         }
         final pending = await mapRow(
           tester,
@@ -414,16 +414,23 @@ void main() {
     expect(row.leadingIconName, AppIcons.loader);
   });
 
-  testWidgets('confirmed transactions keep their settled titles and icons', (
+  testWidgets('mined transactions keep their settled titles, icons and pools', (
     tester,
   ) async {
     final sent = await mapRow(tester, _transaction(txKind: 'sent'));
     expect(sent.title, 'Sent');
     expect(sent.leadingIconName, AppIcons.plane);
 
-    final received = await mapRow(tester, _transaction(txKind: 'received'));
-    expect(received.title, 'Received');
-    expect(received.leadingIconName, AppIcons.arrowDownCircle);
+    for (final height in [1000, 990]) {
+      final received = await mapRow(
+        tester,
+        _transaction(txKind: 'received', minedHeight: BigInt.from(height)),
+      );
+      expect(received.title, 'Received');
+      expect(received.leadingIconName, AppIcons.arrowDownCircle);
+      expect(received.subtitle, 'Shielded');
+      expect(received.subtitleIconName, AppIcons.shieldKeyhole);
+    }
   });
 
   testWidgets('Gift Card transactions use their Figma titles and icon', (
@@ -799,7 +806,7 @@ void main() {
           privateQueriesEnabled: true,
         );
         expect(row.title, 'Shielded');
-        expect(row.leadingIconName, AppIcons.shieldKeyholeOutline);
+        expect(row.leadingIconName, AppIcons.shieldKeyhole);
         expect(
           row.amountText,
           activityAmountTextForFormFactor(expected[index]),

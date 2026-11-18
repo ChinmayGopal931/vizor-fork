@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:zcash_wallet/figma_compare/mobile_receive_capture.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/features/receive/screens/mobile/mobile_receive_screen.dart';
-import 'package:zcash_wallet/src/features/receive/widgets/mobile/receive_request_sheet.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/receive_address_widgets.dart';
 import 'package:zcash_wallet/src/services/native_mobile_navigation_geometry.dart';
 import 'package:zcash_wallet/src/core/l10n/app_language.dart';
@@ -34,7 +34,7 @@ Widget _app({
   bool keystone = false,
   double textScale = 1,
   bool dark = false,
-}) => MaterialApp(
+}) => MaterialApp.router(
   localizationsDelegates: appLocalizationsDelegates,
   builder: (context, child) => AppTheme(
     data: dark ? AppThemeData.dark : AppThemeData.light,
@@ -45,7 +45,19 @@ Widget _app({
       child: child!,
     ),
   ),
-  home: MobileReceiveCapture(native: native, keystone: keystone),
+  routerConfig: GoRouter(
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (_, _) =>
+            MobileReceiveCapture(native: native, keystone: keystone),
+      ),
+      GoRoute(
+        path: '/receive/request',
+        builder: (_, state) => Text('request route ${state.extra}'),
+      ),
+    ],
+  ),
 );
 
 Future<void> _view(WidgetTester tester, Size size) async {
@@ -279,7 +291,7 @@ void main() {
     await _settle(tester);
     await tester.tap(request);
     await _settle(tester);
-    expect(find.byType(ReceiveRequestSheet), findsOneWidget);
+    expect(find.textContaining('request route u1'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

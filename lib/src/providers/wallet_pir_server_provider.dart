@@ -254,6 +254,10 @@ Future<void> _applyWalletPirServer(Ref ref, String? baseUrl) async {
   } finally {
     sync.resumeAfterWalletMutation(pause, forceRestart: true);
   }
+  // Swap recovery waits without a server, so a new one owes it a round.
+  if (baseUrl == null) return;
+  ref.read(swapRecoveryNeedsServerProvider.notifier).set(false);
+  sync.requestSwapRecovery();
 }
 
 class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
@@ -296,15 +300,25 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
         }
       },
     );
-    // The config is fetched only for the private queries that use it.
-    ref.listen(privateQueriesControlEnabledProvider, (_, enabled) {
-      if (enabled) {
+    // The config is fetched only while something uses it: Private queries,
+    // or swap recovery (NEAR swap privacy, or an account it still watches).
+    // Only a change of use acts: swap recovery's answer is read again after
+    // every round, which must not become a fetch of its own.
+    var inUse = _configInUse;
+    void useChanged() {
+      final now = _configInUse;
+      if (now == inUse) return;
+      inUse = now;
+      if (now) {
         _startAutomaticRefresh();
         unawaited(refreshAutomatically());
       } else {
         _stopAutomaticRefresh();
       }
-    });
+    }
+
+    ref.listen(privateQueriesControlEnabledProvider, (_, _) => useChanged());
+    ref.listen(swapRecoveryUsesServerProvider, (_, _) => useChanged());
     ref.onDispose(() {
       _lifecycleGeneration++;
       _refreshGeneration++;
@@ -328,8 +342,7 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
 
   void _startAutomaticRefresh() {
     _resetRetries();
-    if (ref.read(walletPirConfigSourceProvider) == null ||
-        !ref.read(privateQueriesControlEnabledProvider)) {
+    if (ref.read(walletPirConfigSourceProvider) == null || !_configInUse) {
       return;
     }
     final lifecycle = WidgetsBinding.instance.lifecycleState;
@@ -340,6 +353,12 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
       (_) => unawaited(refreshAutomatically()),
     );
   }
+
+  /// Whether anything uses the server list: Private queries, or swap
+  /// recovery ([swapRecoveryUsesServerProvider]).
+  bool get _configInUse =>
+      ref.read(privateQueriesControlEnabledProvider) ||
+      (ref.read(swapRecoveryUsesServerProvider).value ?? false);
 
   void _stopAutomaticRefresh() {
     _refreshTimer?.cancel();
@@ -367,7 +386,7 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
         current.config != null ||
         current.customServer != null ||
         _retryAttempt >= kWalletPirConfigRetryDelays.length ||
-        !ref.read(privateQueriesControlEnabledProvider)) {
+        !_configInUse) {
       return;
     }
     final lifecycle = WidgetsBinding.instance.lifecycleState;
@@ -380,10 +399,10 @@ class WalletPirServerNotifier extends AsyncNotifier<WalletPirServerState> {
 
   /// Automatic triggers keep the active fetch running instead of repeatedly
   /// superseding it while a slow mirror is still responding, and fetch
-  /// nothing while private queries are off.
+  /// nothing while neither private queries nor swap recovery use the list.
   Future<void> refreshAutomatically() async {
     if (state.value?.refreshing ?? true) return;
-    if (!ref.read(privateQueriesControlEnabledProvider)) return;
+    if (!_configInUse) return;
     await refresh();
   }
 

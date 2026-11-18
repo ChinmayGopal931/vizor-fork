@@ -12,10 +12,14 @@ import 'package:zcash_wallet/src/core/formatting/address_display.dart';
 import 'package:zcash_wallet/src/core/profile_pictures.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
-import 'package:zcash_wallet/src/core/widgets/app_profile_picture.dart';
+import 'package:zcash_wallet/src/core/zcash/spendable_wait.dart';
+import 'package:zcash_wallet/src/features/payment_links/widgets/mobile/payment_link_mobile_views.dart'
+    show kPaymentLinkMobileCardHeight, kPaymentLinkMobileCardWidth;
+import 'package:zcash_wallet/src/features/activity/widgets/mobile/transaction_type_hero.dart';
 import 'package:zcash_wallet/src/features/activity/activity_row_mapper.dart';
 import 'package:zcash_wallet/src/features/activity/gift_card_activity_index.dart';
 import 'package:zcash_wallet/src/features/activity/screens/mobile/mobile_transaction_status_screen.dart';
+import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/features/address_book/models/address_book_contact.dart';
 import 'package:zcash_wallet/src/features/address_book/providers/address_book_provider.dart';
 import 'package:zcash_wallet/src/features/payment_links/models/vizor_payment_link.dart';
@@ -25,10 +29,13 @@ import 'package:zcash_wallet/src/features/send/widgets/send_recipient_resolver.d
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/enhance_pir_provider.dart';
 import 'package:zcash_wallet/src/providers/privacy_mode_provider.dart';
+import 'package:zcash_wallet/src/providers/spendable_wait_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/rust/api/sync.dart' as rust_sync;
 import 'package:zcash_wallet/src/core/theme/gotham_fonts.dart';
 import 'package:zcash_wallet/src/core/l10n/app_language.dart';
+import 'package:zcash_wallet/src/providers/zec_price_change_provider.dart';
+import 'package:zcash_wallet/src/core/privacy/privacy_mask.dart';
 
 import '../../fakes/fake_sync_notifier.dart';
 import '../../fakes/fake_enhance_pir_notifier.dart';
@@ -165,6 +172,11 @@ GiftCardActivityMetadata _giftCard({
   );
 }
 
+/// A pool named by a row's glyph (its screen-reader label); the record's top
+/// shows only the coin, status, amount and dollar value.
+Finder _poolIcon(String label) =>
+    find.byWidgetPredicate((w) => w is AppIcon && w.semanticLabel == label);
+
 Widget _app(
   rust_sync.TransactionInfo tx, {
   rust_sync.TransactionDetail? detail,
@@ -179,10 +191,16 @@ Widget _app(
   bool privateQueriesEnabled = false,
   String? routeTxid,
   List<rust_sync.TransactionInfo>? history,
+  Map<String, ReceivedSpendableWait>? spendableWaits,
+  double? zecUsdPrice,
 }) {
   final resolvedDetail = detail ?? _detail(kind: tx.txKind);
   return ProviderScope(
     overrides: [
+      if (spendableWaits != null)
+        activeReceivedSpendableWaitsProvider.overrideWithValue(spendableWaits),
+      if (zecUsdPrice != null)
+        zecHomeUsdUnitPriceProvider.overrideWithValue(zecUsdPrice),
       swapFeatureEnabledProvider.overrideWithValue(pricingEnabled),
       privacyModeProvider.overrideWith(() => _FixedPrivacy(privacyEnabled)),
       enhancePirProvider.overrideWith(
@@ -310,7 +328,7 @@ void main() {
         findsNothing,
       );
       expect(find.text(testL10n.commonUnknown), findsNothing);
-      expect(find.text('From transparent balance'), findsOneWidget);
+      expect(find.text('Transparent balance'), findsOneWidget);
     },
   );
 
@@ -410,6 +428,35 @@ void main() {
       expect(find.text('0.00015 ZEC'), findsNothing);
     });
   }
+
+  testWidgets('a receipt that cannot be spent yet says when and counts its '
+      'confirmations', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(393, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final received = _tx(
+      kind: 'received',
+      fee: BigInt.zero,
+      minedHeight: BigInt.from(2500000),
+    );
+    await tester.pumpWidget(
+      _app(
+        received,
+        spendableWaits: {
+          received.txidHex: (
+            wait: const AvailableIn.minutes(1, 2),
+            confirmations: 2,
+            requiredConfirmations: 6,
+          ),
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Available in 1–2 min'), findsOneWidget);
+    expect(find.text('Completed'), findsNothing);
+    expect(find.text('Confirmations'), findsOneWidget);
+    expect(find.text('2 of 6'), findsOneWidget);
+  });
 
   testWidgets('ordinary receive shows no fee even when history is enriched', (
     tester,
@@ -537,12 +584,9 @@ void main() {
         );
         if (settings.$2) {
           final card = find.byType(PaymentLinkGiftCard);
-          expect(tester.widget<PaymentLinkGiftCard>(card).amountText, '******');
-          expect(
-            find.descendant(of: card, matching: find.text('ZEC')),
-            findsOneWidget,
-          );
-          expect(find.text('0.001'), findsNothing);
+          // The card shows its art alone; the masked amount sits under it.
+          expect(tester.widget<PaymentLinkGiftCard>(card).showAmount, isFalse);
+          expect(_heroAmount(tester), isNot(contains('0.001')));
           const captureDir = String.fromEnvironment('GIFT_CARD_CAPTURE_DIR');
           if (captureDir.isNotEmpty) {
             await expectLater(
@@ -574,8 +618,17 @@ void main() {
     await tester.pumpWidget(_app(_tx()));
     await tester.pump();
 
-    expect(find.text('Amount'), findsOneWidget);
-    expect(find.text('To'), findsOneWidget);
+    // The record opens on its type's icon in liquid metal: a send's plane.
+    expect(find.byKey(const ValueKey('mobile_tx_type_hero')), findsOneWidget);
+    expect(
+      tester
+          .widget<TransactionTypeHero>(find.byType(TransactionTypeHero))
+          .iconName,
+      AppIcons.plane,
+    );
+    expect(find.text('Completed'), findsOneWidget);
+    expect(find.text('123.12 ZEC'), findsOneWidget);
+    expect(find.text('Recipient'), findsOneWidget);
   });
 
   testWidgets(
@@ -616,7 +669,7 @@ void main() {
         find.text(formatActivityTimestamp(testL10n, claimTime)),
         findsOneWidget,
       );
-      expect(find.text('0.001'), findsOneWidget);
+      expect(_heroAmount(tester), contains('0.001'));
       expect(find.text('Amount'), findsNothing);
     },
   );
@@ -665,7 +718,7 @@ void main() {
     await tester.pumpWidget(_app(_tx(), giftCard: _giftCard()));
     await tester.pumpAndSettle();
 
-    expect(find.text('0.001'), findsOneWidget);
+    expect(_heroAmount(tester), contains('0.001'));
     expect(find.text('Amount'), findsNothing);
     expect(find.text('123.12 ZEC'), findsNothing);
   });
@@ -682,9 +735,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('CREATED A GIFT CARD'), findsOneWidget);
-    expect(find.text('SENT SUCCESSFULLY'), findsNothing);
+    expect(find.text('SENT ZEC'), findsNothing);
     // The single-use link address is not a counterparty worth verifying.
-    expect(find.text('To'), findsNothing);
+    expect(find.text('Recipient'), findsNothing);
     expect(
       find.byKey(const ValueKey('mobile_tx_status_show_full_address')),
       findsNothing,
@@ -697,6 +750,12 @@ void main() {
       findsNothing,
     );
     expect(find.byType(PaymentLinkGiftCard), findsOneWidget);
+    // The card replaces the type icon, at 70% of the full-width card.
+    expect(find.byType(TransactionTypeHero), findsNothing);
+    // Drawn size: the card lays out full size and is scaled down.
+    final cardSize = tester.getRect(find.byType(PaymentLinkGiftCard)).size;
+    expect(cardSize.width, closeTo(kPaymentLinkMobileCardWidth * 0.7, 0.5));
+    expect(cardSize.height, closeTo(kPaymentLinkMobileCardHeight * 0.7, 0.5));
 
     expect(find.text('Message'), findsOneWidget);
     await tester.tap(
@@ -733,8 +792,8 @@ void main() {
       expect(find.text('CREATED A GIFT CARD'), findsNothing);
       expect(find.byType(PaymentLinkGiftCard), findsNothing);
       expect(find.text('Message'), findsNothing);
-      expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
-      expect(find.text('To'), findsOneWidget);
+      expect(find.text('SENT ZEC'), findsOneWidget);
+      expect(find.text('Recipient'), findsOneWidget);
     },
   );
 
@@ -756,11 +815,48 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('CREATED A GIFT CARD'), findsOneWidget);
-    expect(find.text('0.001'), findsOneWidget);
+    expect(_heroAmount(tester), contains('0.001'));
     expect(find.text('Amount'), findsNothing);
     // Not the raw funding total the transaction carries.
     expect(find.text('123.12 ZEC'), findsNothing);
   });
+
+  testWidgets('the dollar value sits under the amount in place of the pool', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app(_tx(), zecUsdPrice: 2));
+    await tester.pumpAndSettle();
+
+    final fiat = find.byKey(const ValueKey('mobile_tx_status_fiat'));
+    expect(fiat, findsOneWidget);
+    expect(tester.widget<Text>(fiat).data, startsWith(r'$'));
+    // Below the amount, above the card.
+    expect(
+      tester.getTopLeft(fiat).dy,
+      greaterThan(
+        tester
+                .getBottomLeft(
+                  find.byKey(const ValueKey('mobile_tx_status_amount')),
+                )
+                .dy -
+            1,
+      ),
+    );
+    // A send's pool stays on the recipient row's icon.
+    expect(find.text('Shielded'), findsNothing);
+  });
+
+  testWidgets('privacy mode masks the dollar value with the amount', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app(_tx(), zecUsdPrice: 2, privacyEnabled: true));
+    await tester.pumpAndSettle();
+
+    final fiat = find.byKey(const ValueKey('mobile_tx_status_fiat'));
+    expect(fiat, findsOneWidget);
+    expect(tester.widget<Text>(fiat).data, fixedPrivacyMask());
+  });
+
 
   testWidgets('mined sent tx shows success title, chip, fee, and address', (
     tester,
@@ -768,11 +864,18 @@ void main() {
     await tester.pumpWidget(_app(_tx()));
     await tester.pumpAndSettle();
 
-    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
+    expect(find.text('SENT ZEC'), findsOneWidget);
     expect(find.text('Completed'), findsOneWidget);
-    expect(find.text('Amount'), findsOneWidget);
-    expect(find.text('123.12 ZEC'), findsOneWidget);
-    expect(find.text('To'), findsOneWidget);
+    // The amount heads the hero without a row label.
+    expect(find.text('Amount'), findsNothing);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('mobile_tx_status_amount')))
+          .textSpan!
+          .toPlainText(),
+      '123.12 ZEC',
+    );
+    expect(find.text('Recipient'), findsOneWidget);
     // Figma-style 6 ... 5 truncation of the recipient.
     expect(find.text('u1l8xu ... d5gh'.replaceAll('  ', ' ')), findsNothing);
     expect(
@@ -781,7 +884,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Shielded'), findsOneWidget);
+    expect(_poolIcon('Shielded'), findsOneWidget);
     expect(find.text('Tx fee'), findsOneWidget);
     expect(find.text('0.00015 ZEC'), findsOneWidget);
     expect(find.text('Timestamp'), findsOneWidget);
@@ -837,12 +940,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('TRANSACTION'), findsOneWidget);
-    expect(find.text('SENT SUCCESSFULLY'), findsNothing);
+    expect(find.text('SENT ZEC'), findsNothing);
     expect(find.text(testL10n.activityReceiptNetChange), findsOneWidget);
-    expect(find.text('0.00065 ZEC'), findsOneWidget);
+    expect(find.text('0.00065 ZEC'), findsNWidgets(2)); // hero + Net change row
     expect(find.text('Amount'), findsNothing);
     expect(find.text('Tx fee'), findsNothing);
-    expect(find.text('To'), findsNothing);
+    expect(find.text('Recipient'), findsNothing);
     expect(
       find.byKey(const ValueKey('mobile_tx_status_details_incomplete')),
       findsOneWidget,
@@ -872,13 +975,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('TRANSACTION'), findsOneWidget);
-      expect(find.text('SENT SUCCESSFULLY'), findsNothing);
+      expect(find.text('SENT ZEC'), findsNothing);
       expect(find.text('Network fee'), findsNothing);
       expect(find.text(testL10n.activityReceiptNetChange), findsOneWidget);
-      expect(find.text('0.0002 ZEC'), findsNWidgets(2));
+      expect(find.text('0.0002 ZEC'), findsNWidgets(3));
       expect(find.text('Amount'), findsNothing);
       expect(find.text('Tx fee'), findsOneWidget);
-      expect(find.text('To'), findsNothing);
+      expect(find.text('Recipient'), findsNothing);
       expect(
         find.byKey(const ValueKey('mobile_tx_status_details_incomplete')),
         findsOneWidget,
@@ -901,11 +1004,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('TRANSACTION'), findsOneWidget);
-    expect(find.text('SENT SUCCESSFULLY'), findsNothing);
+    expect(find.text('SENT ZEC'), findsNothing);
     expect(find.text(testL10n.activityReceiptNetChange), findsOneWidget);
     expect(find.text('Amount'), findsNothing);
     // Nothing is subtracted, and the fee keeps its own line.
-    expect(find.text('0.70 ZEC'), findsOneWidget);
+    expect(find.text('0.70 ZEC'), findsNWidgets(2)); // hero + Net change row
     expect(find.text('Tx fee'), findsOneWidget);
     expect(find.text('0.0001 ZEC'), findsOneWidget);
     expect(find.text('Network fee'), findsNothing);
@@ -994,7 +1097,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('From transparent balance'), findsOneWidget);
+    expect(find.text('Transparent balance'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('mobile_tx_status_details_incomplete')),
       findsNothing,
@@ -1065,8 +1168,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
-    expect(find.text('TEX'), findsOneWidget);
+    expect(find.text('SENT ZEC'), findsOneWidget);
+    expect(_poolIcon('TEX'), findsOneWidget);
     expect(find.text('Transparent'), findsNothing);
     expect(
       find.text(
@@ -1088,10 +1191,10 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpWidget(_app(_tx(activityPool: pool)));
       await tester.pumpAndSettle();
-      expect(find.text(label), findsOneWidget);
-      expect(find.text('To'), findsOneWidget);
+      expect(_poolIcon(label), findsOneWidget);
+      expect(find.text('Recipient'), findsOneWidget);
       expect(find.text('From'), findsNothing);
-      expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
+      expect(find.text('SENT ZEC'), findsOneWidget);
     }
   });
 
@@ -1105,7 +1208,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('TEX'), findsOneWidget);
+    expect(_poolIcon('TEX'), findsOneWidget);
     expect(find.text('Transparent'), findsNothing);
   });
 
@@ -1124,7 +1227,7 @@ void main() {
       expect(find.text('Shielded'), findsNothing);
       expect(find.text('Orchard'), findsNothing);
       expect(find.text('Sapling'), findsNothing);
-      expect(find.text('To'), findsNothing);
+      expect(find.text('Recipient'), findsNothing);
     }
   });
 
@@ -1147,7 +1250,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Shielded'), findsOneWidget);
+    expect(_poolIcon('Shielded'), findsOneWidget);
 
     final enriched = _tx(activityPool: 'orchard');
     history[0] = enriched;
@@ -1159,9 +1262,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Orchard'), findsOneWidget);
-    expect(find.text('Shielded'), findsNothing);
-    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
+    expect(_poolIcon('Orchard'), findsOneWidget);
+    expect(_poolIcon('Shielded'), findsNothing);
+    expect(find.text('SENT ZEC'), findsOneWidget);
   });
 
   testWidgets('unmined sent tx shows the in-progress state', (tester) async {
@@ -1170,7 +1273,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('SENDING...'), findsOneWidget);
+    expect(find.text('SENDING ZEC...'), findsOneWidget);
     expect(find.text('In progress'), findsOneWidget);
   });
 
@@ -1180,8 +1283,12 @@ void main() {
     await tester.pumpWidget(_app(_tx(minedHeight: BigInt.zero, expired: true)));
     await tester.pumpAndSettle();
 
-    expect(find.text('SEND FAILED'), findsOneWidget);
+    expect(find.text('SEND ZEC FAILED'), findsOneWidget);
     expect(find.text('Failed, funds returned'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate((w) => w is AppIcon && w.name == AppIcons.cancel),
+      findsOneWidget,
+    );
 
     final addressText = tester.widget<Text>(
       find.text(
@@ -1191,7 +1298,9 @@ void main() {
     expect(addressText.style?.decoration, TextDecoration.lineThrough);
   });
 
-  testWidgets('received tx puts the sender above the amount', (tester) async {
+  testWidgets('received tx names the sender in the detail card', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       _app(
         _tx(kind: 'received', fee: BigInt.zero),
@@ -1204,13 +1313,44 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('RECEIVED'), findsOneWidget);
+    expect(find.text('RECEIVED ZEC'), findsOneWidget);
     expect(find.text('From'), findsOneWidget);
+    // Hero amount first, then the card that opens with the sender.
+    final amountY = tester
+        .getTopLeft(find.byKey(const ValueKey('mobile_tx_status_amount')))
+        .dy;
     final fromY = tester.getTopLeft(find.text('From')).dy;
-    final amountY = tester.getTopLeft(find.text('Amount')).dy;
-    expect(fromY, lessThan(amountY));
+    expect(amountY, lessThan(fromY));
+    expect(fromY, lessThan(tester.getTopLeft(find.text('Tx ID')).dy));
+    // The row's glyph names the pool; the top shows only coin, status,
+    // amount and dollar value.
+    expect(find.text('Transparent'), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is AppIcon && w.semanticLabel == 'Transparent',
+      ),
+      findsOneWidget,
+    );
     // Received txs report no fee — the fee section is dropped.
     expect(find.text('Tx fee'), findsNothing);
+  });
+
+  testWidgets('a received amount reads as money in', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        _tx(kind: 'received', fee: BigInt.zero),
+        detail: _detail(kind: 'received'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('mobile_tx_status_amount')))
+          .textSpan!
+          .toPlainText(),
+      '+123.12 ZEC',
+    );
   });
 
   testWidgets('show full address opens the verify sheet', (tester) async {
@@ -1231,11 +1371,12 @@ void main() {
     expect(find.text('Copy address'), findsOneWidget);
   });
 
-  testWidgets('show full address action label fits on mobile width', (
+  testWidgets('recipient row fits on mobile width and names its action', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(360, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    final semantics = tester.ensureSemantics();
 
     await tester.pumpWidget(_app(_tx()));
     await tester.pumpAndSettle();
@@ -1243,28 +1384,24 @@ void main() {
     final action = find.byKey(
       const ValueKey('mobile_tx_status_show_full_address'),
     );
-    final actionLabel = find.descendant(
-      of: action,
-      matching: find.byWidgetPredicate(
-        (widget) =>
-            widget is RichText &&
-            widget.text.toPlainText() == 'Show full address',
-      ),
-    );
-
     expect(action, findsOneWidget);
-    expect(actionLabel, findsOneWidget);
-    final richText = tester.widget<RichText>(actionLabel);
-    final textPainter = TextPainter(
-      text: richText.text,
-      textDirection: TextDirection.ltr,
-      maxLines: 1,
-    )..layout();
-    expect(
-      tester.getSize(actionLabel).width,
-      greaterThanOrEqualTo(textPainter.width - 0.5),
-    );
+    // Figma `Recipient` row: pool glyph, truncated address, chevron.
+    for (final icon in [AppIcons.shieldKeyhole, AppIcons.chevronForward]) {
+      expect(
+        find.descendant(
+          of: action,
+          matching: find.byWidgetPredicate(
+            (w) => w is AppIcon && w.name == icon,
+          ),
+        ),
+        findsOneWidget,
+      );
+    }
+    expect(find.text('Show full address'), findsNothing);
+    expect(find.bySemanticsLabel(RegExp('Show full address')), findsOneWidget);
+    expect(tester.getRect(action).right, lessThanOrEqualTo(360));
     expect(tester.takeException(), isNull);
+    semantics.dispose();
   });
 
   testWidgets('received tx separates transparent sender and shielded receiver', (
@@ -1297,18 +1434,24 @@ void main() {
       ),
       findsOneWidget,
     );
+    // The wallet's own receiving address is not shown: under the amount it
+    // read as the sender, whom Zcash never reveals.
     expect(
       find.text(
         '${_receivingShieldedAddress.substring(0, 6)} ... '
         '${_receivingShieldedAddress.substring(_receivingShieldedAddress.length - 5)}',
       ),
-      findsOneWidget,
+      findsNothing,
     );
-    expect(find.text('Transparent'), findsOneWidget);
-
-    final fromY = tester.getTopLeft(find.text('From')).dy;
-    final amountY = tester.getTopLeft(find.text('Amount')).dy;
-    expect(fromY, lessThan(amountY));
+    // The sender's pool is named by its row glyph alone.
+    expect(find.text('Transparent'), findsNothing);
+    expect(_poolIcon('Transparent'), findsOneWidget);
+    expect(
+      tester
+          .getTopLeft(find.byKey(const ValueKey('mobile_tx_status_amount')))
+          .dy,
+      lessThan(tester.getTopLeft(find.text('From')).dy),
+    );
   });
 
   testWidgets('memo renders a message row that expands', (tester) async {
@@ -1354,7 +1497,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('RECEIVED'), findsOneWidget);
+    expect(find.text('RECEIVED ZEC'), findsOneWidget);
     expect(find.text('0.00 ZEC'), findsOneWidget);
     await tester.tap(
       find.byKey(const ValueKey('mobile_tx_status_message_toggle')),
@@ -1374,7 +1517,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
+    expect(find.text('SENT ZEC'), findsOneWidget);
     expect(find.text('0.00 ZEC'), findsOneWidget);
     expect(find.text('0.00015 ZEC'), findsOneWidget);
     expect(find.text('Message'), findsOneWidget);
@@ -1408,9 +1551,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('TRANSACTION'), findsOneWidget);
-      expect(find.text('SENT SUCCESSFULLY'), findsNothing);
-      expect(find.text('SENDING...'), findsNothing);
-      expect(find.text('To'), findsNothing);
+      expect(find.text('SENT ZEC'), findsNothing);
+      expect(find.text('SENDING ZEC...'), findsNothing);
+      expect(find.text('Recipient'), findsNothing);
       expect(find.text('--'), findsOneWidget);
     }
   });
@@ -1447,19 +1590,22 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // The From row headline becomes the contact name; the raw address is
-    // demoted to the pool strip below (parity with the desktop receipt).
+    // The From row names the contact in place of the address (parity with
+    // the desktop receipt); its chevron still opens the full address.
     expect(find.text('Mom'), findsOneWidget);
     expect(
       find.text(
         '${_transparentSenderAddress.substring(0, 6)} ... '
         '${_transparentSenderAddress.substring(_transparentSenderAddress.length - 5)}',
       ),
-      findsOneWidget,
+      findsNothing,
     );
-    // The leading badge swaps from the wallet icon to the contact's avatar —
-    // the visible half of the named-counterparty path (M1).
-    expect(find.byType(AppProfilePicture), findsOneWidget);
+    expect(_poolIcon('Transparent'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('mobile_tx_status_show_full_address')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(_transparentSenderAddress), findsOneWidget);
   });
 
   testWidgets('shielding tx shows the transparent -> shielded balance flow', (
@@ -1470,16 +1616,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Two-row flow mirroring the desktop ShieldedReceiptView (no external
-    // counterparty): Amount/from-transparent above the shielded destination.
-    expect(find.text('Amount'), findsOneWidget);
-    expect(find.text('From transparent balance'), findsOneWidget);
+    // Mirrors the desktop ShieldedReceiptView (no external counterparty):
+    // the amount from the transparent balance above the shielded destination.
+    expect(find.text('Transparent balance'), findsOneWidget);
     expect(find.text('To'), findsOneWidget);
     expect(find.text('Shielded balance'), findsOneWidget);
 
-    final amountY = tester.getTopLeft(find.text('Amount')).dy;
+    final amountY = tester
+        .getTopLeft(find.byKey(const ValueKey('mobile_tx_status_amount')))
+        .dy;
+    final sourceY = tester.getTopLeft(find.text('Transparent balance')).dy;
     final toY = tester.getTopLeft(find.text('To')).dy;
-    expect(amountY, lessThan(toY));
+    expect(amountY, lessThan(sourceY));
+    expect(sourceY, lessThan(toY));
   });
 
   testWidgets('migration tx shows the Orchard -> Ironwood balance flow', (
@@ -1494,14 +1643,40 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('MIGRATED TO IRONWOOD'), findsOneWidget);
-    expect(find.text('Amount'), findsOneWidget);
-    expect(find.text('From Orchard balance'), findsOneWidget);
+    expect(find.text('Orchard balance'), findsOneWidget);
     expect(find.text('To'), findsOneWidget);
     expect(find.text('Ironwood balance'), findsOneWidget);
-    expect(find.text('Ironwood'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is AppIcon && w.semanticLabel == 'Ironwood',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Completed'), findsOneWidget);
     expect(find.text(_address), findsNothing);
   });
+
+  for (final privacyEnabled in [false, true]) {
+    testWidgets('hero amount and fee follow privacy mode: $privacyEnabled', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_app(_tx(), privacyEnabled: privacyEnabled));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('123.12 ZEC'),
+        privacyEnabled ? findsNothing : findsOneWidget,
+      );
+      expect(
+        find.text('0.00015 ZEC'),
+        privacyEnabled ? findsNothing : findsOneWidget,
+      );
+      expect(
+        find.text('•••••• ZEC'),
+        privacyEnabled ? findsNWidgets(2) : findsNothing,
+      );
+    });
+  }
 
   testWidgets('tapping the tx fee help opens the fee info sheet', (
     tester,
@@ -1521,14 +1696,91 @@ void main() {
     final iconColors = AppThemeData.light.colors.icon;
     expect(helpIcon.color, isNotNull);
     expect(helpIcon.color, isNot(iconColors.accent));
-    expect(helpIcon.color, iconColors.regular.withValues(alpha: 0.72));
-    expect(helpIcon.color!.a, closeTo(0.72, 0.005));
+    expect(helpIcon.color, iconColors.muted);
 
     // The fee value wraps the help icon in a tap target wired to the shared
-    // fee-info bottom sheet.
+    // fee-info bottom sheet. It sits below the hero, so scroll it into view.
+    await tester.ensureVisible(find.text('0.00015 ZEC'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('0.00015 ZEC'));
     await tester.pumpAndSettle();
     expect(find.textContaining('ZIP 317'), findsOneWidget);
+  });
+  group('saving the recipient', () {
+    const addContact = ValueKey('mobile_tx_status_add_contact');
+
+    testWidgets('a sent receipt offers to save an unsaved recipient', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_app(_tx()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Add address to contacts'), findsOneWidget);
+      expect(
+        tester.widget<AppButton>(find.byKey(addContact)).variant,
+        AppButtonVariant.primary,
+      );
+
+      await tester.tap(find.byKey(addContact));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('mobile_pay_add_contact_card')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a recipient that is already a contact is not offered', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app(
+          _tx(),
+          contacts: [
+            AddressBookContact(
+              id: 'contact-1',
+              label: 'Mom',
+              network: AddressBookNetwork.zcash,
+              address: _address,
+              profilePictureId: kDefaultProfilePictureId,
+              createdAtMs: 1,
+              updatedAtMs: 1,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mom'), findsOneWidget);
+      expect(find.byKey(addContact), findsNothing);
+    });
+
+    testWidgets('received and failed receipts are not offered', (tester) async {
+      await tester.pumpWidget(_app(_tx(kind: 'received')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(addContact), findsNothing);
+
+      await tester.pumpWidget(_app(_tx(expired: true)));
+      await tester.pumpAndSettle();
+      expect(find.byKey(addContact), findsNothing);
+    });
+  });
+  testWidgets('each record type opens on its own icon', (tester) async {
+    for (final (kind, icon) in [
+      ('received', AppIcons.arrowDownCircle),
+      ('shielded', AppIcons.shieldKeyhole),
+    ]) {
+      // A fresh record each time, not the previous one updated.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(_app(_tx(kind: kind)));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TransactionTypeHero>(find.byType(TransactionTypeHero))
+            .iconName,
+        icon,
+        reason: kind,
+      );
+    }
   });
 }
 
@@ -1581,3 +1833,9 @@ class _FixedPrivacy extends PrivacyModeNotifier {
   @override
   bool build() => enabled;
 }
+
+/// The record's hero amount, which a Gift Card shows under its card.
+String _heroAmount(WidgetTester tester) => tester
+    .widget<Text>(find.byKey(const ValueKey('mobile_tx_status_amount')))
+    .textSpan!
+    .toPlainText();

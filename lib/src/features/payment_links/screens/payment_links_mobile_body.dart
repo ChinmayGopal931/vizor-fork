@@ -7,8 +7,8 @@
 /// file is left with the state machine plus one render tree instead of two.
 library;
 
+import '../../../core/navigation/mobile_page.dart';
 import '../../../core/navigation/mobile_sidebar_exit.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -550,7 +550,8 @@ class PaymentLinksMobileBody extends StatelessWidget {
 }
 
 /// Keep the wallet state above the navigator, but give each mobile step a real
-/// Cupertino route. The outer /payment-links route remains the intake owner.
+/// route ([MobilePage], with edge-swipe back). The outer /payment-links route
+/// remains the intake owner.
 class _PaymentLinksMobileNavigator extends StatefulWidget {
   const _PaymentLinksMobileNavigator({required this.body});
   final PaymentLinksMobileBody body;
@@ -665,14 +666,19 @@ class _PaymentLinksMobileNavigatorState
             onDidRemovePage: _didRemovePage,
             pages: [
               for (final step in steps)
-                CupertinoPage<Object?>(
+                MobilePage<Object?>(
                   key: _stepKeys[step],
                   child: PopScope<Object?>(
                     canPop: !body.navigationLocked,
                     child: Scaffold(
                       backgroundColor: context.colors.background.window,
                       body: AppToastHost(
-                        child: SafeArea(child: body._buildPage(context, step)),
+                        // Pages run to the bottom edge; their floating
+                        // actions sit at the shared footer offset above it.
+                        child: SafeArea(
+                          bottom: false,
+                          child: body._buildPage(context, step),
+                        ),
                       ),
                     ),
                   ),
@@ -687,7 +693,7 @@ class _PaymentLinksMobileNavigatorState
                   child: AppToastHost(child: signing),
                 )
               else if (signing != null)
-                CupertinoPage<Object?>(
+                MobilePage<Object?>(
                   key: _signingKey,
                   // The shared signing flow owns its decode/finalization guard.
                   child: Scaffold(

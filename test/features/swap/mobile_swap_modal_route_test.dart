@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:zcash_wallet/src/features/swap/domain/near_intents_service_status.dart';
 import 'package:zcash_wallet/src/features/swap/providers/near_intents_service_status_provider.dart';
 import 'support/service_status_fixture.dart';
@@ -15,26 +16,37 @@ import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_top_nav.dart';
 import 'package:zcash_wallet/src/core/navigation/mobile_routes.dart';
 import 'package:zcash_wallet/src/core/profile_pictures.dart';
+import 'package:zcash_wallet/src/core/privacy/privacy_mask.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/features/address_book/models/address_book_contact.dart';
 import 'package:zcash_wallet/src/features/address_book/providers/address_book_provider.dart';
 import 'package:zcash_wallet/src/features/swap/models/swap_models.dart';
+import 'package:zcash_wallet/src/features/swap/providers/swap_address_wait_provider.dart';
 import 'package:zcash_wallet/src/features/swap/providers/swap_composer_preferences_store.dart';
 import 'package:zcash_wallet/src/features/swap/providers/swap_state_provider.dart';
+import 'package:zcash_wallet/src/features/swap/providers/swap_zec_staging_address_service.dart';
 import 'package:zcash_wallet/src/features/swap/screens/mobile/mobile_swap_screen.dart';
 import 'package:zcash_wallet/src/features/swap/widgets/mobile/mobile_swap_review_content.dart';
 import 'package:zcash_wallet/src/features/swap/widgets/mobile/mobile_swap_slippage_stepper_modal.dart';
 import 'package:zcash_wallet/src/features/swap/widgets/mobile/mobile_swap_address_edit_modal.dart';
+import 'package:zcash_wallet/src/features/swap/widgets/swap_confidential_ui.dart';
 import 'package:zcash_wallet/src/features/address_scan/widgets/mobile_address_scan_card.dart';
+import 'package:zcash_wallet/src/services/qr_scanner.dart';
 import 'package:zcash_wallet/src/providers/account_provider.dart';
 import 'package:zcash_wallet/src/providers/sync_provider.dart';
 import 'package:zcash_wallet/src/core/l10n/app_language.dart';
+import 'package:zcash_wallet/src/providers/wallet_pir_server_provider.dart';
+import 'package:zcash_wallet/src/rust/api/one_time_ivk.dart'
+    show SwapAccountReadiness;
 
 import '../../fakes/fake_sync_notifier.dart';
 
+import '../../support/full_text_expectations.dart';
 import '../../support/leading_decimal_input.dart';
+import '../../support/test_l10n.dart';
+import '../../support/widget_test_viewport.dart';
 
 const _accountState = AccountState(
   accounts: [
@@ -49,14 +61,14 @@ const _accountState = AccountState(
   activeAddress: 'u1swapmodaladdress',
 );
 
-AppBootstrapState _bootstrap() => AppBootstrapState(
+AppBootstrapState _bootstrap({bool privacyMode = false}) => AppBootstrapState(
   initialLocation: '/home',
   initialAccountState: _accountState,
   initialSyncSnapshot: AppSyncSnapshot.empty,
   network: 'main',
   rpcEndpointConfig: defaultRpcEndpointConfig('main'),
   themeMode: ThemeMode.dark,
-  privacyModeEnabled: false,
+  privacyModeEnabled: privacyMode,
   isPasswordConfigured: true,
   isUnlocked: true,
   passwordRotationRecoveryFailed: false,
@@ -65,11 +77,20 @@ AppBootstrapState _bootstrap() => AppBootstrapState(
 Widget _app({
   NearIntentsServiceStatus? serviceStatus,
   _MobileDelayedQuoteSwapProvider? swapProvider,
+  SwapState? seededState,
   SwapComposerPreferencesStore? composerPreferencesStore,
   List<AddressBookContact> addressBookContacts = const [],
+  bool oneTimeZecAddress = false,
+  int chainTipHeight = 0,
+  int scannedHeight = 0,
+  BigInt? ironwoodBalance,
+  bool privacyMode = false,
+  bool restoring = false,
 }) => ProviderScope(
   overrides: [
-    appBootstrapProvider.overrideWithValue(_bootstrap()),
+    appBootstrapProvider.overrideWithValue(
+      _bootstrap(privacyMode: privacyMode),
+    ),
     nearIntentsServiceStatusProvider.overrideWith(
       () => FixtureServiceStatusNotifier(serviceStatus),
     ),
@@ -78,6 +99,8 @@ Widget _app({
     ),
     if (swapProvider != null)
       swapIntentProvider.overrideWithValue(swapProvider),
+    if (seededState != null)
+      swapStateProvider.overrideWith(() => _SeededSwapNotifier(seededState)),
     if (composerPreferencesStore != null)
       swapComposerPreferencesStoreProvider.overrideWithValue(
         composerPreferencesStore,
@@ -89,9 +112,25 @@ Widget _app({
           hasAccountScopedData: true,
           orchardBalance: BigInt.from(100000000),
           spendableBalance: BigInt.from(100000000),
+          chainTipHeight: chainTipHeight,
+          scannedHeight: scannedHeight,
+          ironwoodBalance:
+              ironwoodBalance ??
+              (oneTimeZecAddress ? BigInt.from(100000000) : null),
         ),
       ),
     ),
+    if (oneTimeZecAddress)
+      swapUsesOneTimeAddressProvider.overrideWithValue(true),
+    if (restoring)
+      swapAccountReadinessReaderProvider.overrideWithValue(
+        (_) async => const SwapAccountReadiness(
+          seedWalk: true,
+          lookups: false,
+          awaitingAdmission: false,
+        ),
+      ),
+    walletPirServerProvider.overrideWith(_NoWalletPirServers.new),
   ],
   child: MaterialApp.router(
     localizationsDelegates: appLocalizationsDelegates,
@@ -113,6 +152,43 @@ Future<void> _openSwap(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('the direction arrows turn half a turn on each flip', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    await _openSwap(tester);
+    await tester.pumpAndSettle();
+    Finder button() => find.byWidgetPredicate(
+      (widget) =>
+          widget is GestureDetector &&
+          widget.key is ValueKey<String> &&
+          (widget.key! as ValueKey<String>).value.startsWith('swap_direction_'),
+    );
+    double turns() => tester
+        .widget<RotationTransition>(
+          find.descendant(
+            of: button(),
+            matching: find.byType(RotationTransition),
+          ),
+        )
+        .turns
+        .value;
+
+    expect(turns(), 0);
+    await tester.tap(button());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+    // Mid-turn, not snapped to the end by the flip's remount.
+    expect(turns(), inExclusiveRange(0, 0.5));
+    await tester.pumpAndSettle();
+    expect(turns(), 0.5);
+    await tester.tap(button());
+    await tester.pumpAndSettle();
+    // The same way round again.
+    expect(turns(), 1);
+  });
+
   testWidgets('service notice can be dismissed before using mobile Swap', (
     tester,
   ) async {
@@ -122,7 +198,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(_app(serviceStatus: serviceStatusFixture()));
     await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsLabel('Swap').last);
+    await _openSwap(tester);
     await tester.pumpAndSettle();
     expect(find.text('Swaps may not work right now.'), findsOneWidget);
     await tester.tap(
@@ -243,7 +319,8 @@ void main() {
             data: AppThemeData.dark,
             child: MobileSwapSlippageStepperModal(
               slippageBps: 100,
-              onSubmitted: (_) {},
+              confidential: false,
+              onSubmitted: (_, _) {},
               onCancel: () {},
             ),
           ),
@@ -253,12 +330,6 @@ void main() {
     await tester.pump();
 
     expect(
-      find.text(
-        "Sets the maximum rate change you'll accept. Network fees are separate.",
-      ),
-      findsOneWidget,
-    );
-    expect(
       tester.getSize(find.byKey(const ValueKey('mobile_swap_slippage_minus'))),
       const Size(60, 50),
     );
@@ -266,6 +337,46 @@ void main() {
       tester.getSize(find.byKey(const ValueKey('mobile_swap_slippage_plus'))),
       const Size(60, 50),
     );
+    expect(find.bySemanticsLabel('Decrease slippage'), findsOneWidget);
+    expect(find.bySemanticsLabel('Increase slippage'), findsOneWidget);
+  });
+
+  testWidgets('stepper stays put below 2 percent', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: appLocalizationsDelegates,
+        home: Scaffold(
+          body: AppTheme(
+            data: AppThemeData.dark,
+            child: MobileSwapSlippageStepperModal(
+              slippageBps: 200,
+              confidential: false,
+              onSubmitted: (_, _) {},
+              onCancel: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final field = find.byKey(const ValueKey('mobile_swap_slippage_value'));
+    final minus = find.byKey(const ValueKey('mobile_swap_slippage_minus'));
+    final plus = find.byKey(const ValueKey('mobile_swap_slippage_plus'));
+    final fieldRect = tester.getRect(field);
+    final minusRect = tester.getRect(minus);
+    final plusRect = tester.getRect(plus);
+
+    await tester.tap(minus);
+    await tester.pump();
+
+    // The value field widens for 1.9; its vertical bounds stay fixed.
+    expect(tester.getRect(field).top, fieldRect.top);
+    expect(tester.getRect(field).bottom, fieldRect.bottom);
+    expect(tester.getRect(minus), minusRect);
+    expect(tester.getRect(plus), plusRect);
+    semantics.dispose();
   });
 
   testWidgets(
@@ -280,7 +391,8 @@ void main() {
               data: AppThemeData.dark,
               child: MobileSwapSlippageStepperModal(
                 slippageBps: 100,
-                onSubmitted: (value) => submittedBps = value,
+                confidential: false,
+                onSubmitted: (value, _) => submittedBps = value,
                 onCancel: () {},
               ),
             ),
@@ -346,7 +458,8 @@ void main() {
             data: AppThemeData.dark,
             child: MobileSwapSlippageStepperModal(
               slippageBps: 100,
-              onSubmitted: (value) => submittedBps = value,
+              confidential: false,
+              onSubmitted: (value, _) => submittedBps = value,
               onCancel: () {},
             ),
           ),
@@ -379,6 +492,128 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('swap_slippage_update_button')));
     await tester.pump();
     expect(submittedBps, 90);
+  });
+
+  testWidgets(
+    'settings sheet sets confidential and marks the settings button',
+    (tester) async {
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
+      await _openSwap(tester);
+      await tester.pumpAndSettle();
+      final settings = find.byKey(const ValueKey('swap_settings_button'));
+      // The muted mark shows the setting exists; it turns crimson when on.
+      expect(
+        find.descendant(
+          of: settings,
+          matching: find.byType(SwapConfidentialIcon),
+        ),
+        findsOneWidget,
+      );
+      final mark = find.descendant(
+        of: settings,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is SwapConfidentialIcon && widget.on,
+        ),
+      );
+      expect(mark, findsNothing);
+
+      await tester.tap(settings);
+      await tester.pumpAndSettle();
+      expect(find.text('Swap settings'), findsOneWidget);
+      // Opening the sheet to flip confidential must not raise the keypad.
+      expect(
+        tester
+            .widget<TextField>(
+              find.byKey(const ValueKey('mobile_swap_slippage_value')),
+            )
+            .focusNode!
+            .hasFocus,
+        isFalse,
+      );
+      AppButton update() => tester.widget<AppButton>(
+        find.byKey(const ValueKey('swap_slippage_update_button')),
+      );
+      expect(update().onPressed, isNull);
+      final feedback = <Object?>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'HapticFeedback.vibrate') {
+            feedback.add(call.arguments);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          null,
+        ),
+      );
+      // The whole row flips it, its text included, with a selection tick.
+      await tester.tap(find.textContaining("can't be tracked to each other"));
+      await tester.pumpAndSettle();
+      expect(update().onPressed, isNotNull);
+      expect(feedback, ['HapticFeedbackType.selectionClick']);
+      await tester.tap(find.byKey(const ValueKey('swap_confidential_switch')));
+      await tester.pumpAndSettle();
+      expect(update().onPressed, isNull);
+      await tester.tap(find.byKey(const ValueKey('swap_confidential_switch')));
+      await tester.pumpAndSettle();
+      // The flip enables Update and waits for it.
+      expect(mark, findsNothing);
+      expect(update().onPressed, isNotNull);
+      await tester.tap(
+        find.byKey(const ValueKey('swap_slippage_update_button')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(MobileSwapSlippageStepperModal), findsNothing);
+      expect(mark, findsOneWidget);
+    },
+  );
+
+  testWidgets('a missing standard quote offers the confidential route', (
+    tester,
+  ) async {
+    // Seeded rather than quoted: this harness has no address services, and
+    // the failure classification has its own provider tests.
+    await tester.pumpWidget(
+      _app(
+        seededState: SwapState(
+          direction: SwapDirection.zecToExternal,
+          amountText: '0.5',
+          receiveAmountText: '',
+          destinationText: '0x52908400098527886e0f7030069857d2e4169ee7',
+          externalAsset: SwapAsset.usdc,
+          reviewVisible: false,
+          intents: const [],
+          quoteError: const SwapNotice(SwapNoticeKind.noQuoteForAmount),
+          quoteNoLiquidity: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _openSwap(tester);
+    await tester.pumpAndSettle();
+
+    final review = find.byKey(const ValueKey('mobile_swap_review_button'));
+    expect(find.text('No quote for this amount'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: review,
+        matching: find.text('Get confidential quote'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(review);
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MobileSwapScreen)),
+    );
+    expect(container.read(swapStateProvider).confidential, isTrue);
   });
 
   testWidgets('swap composer CTA fits on narrow Android-sized screens', (
@@ -432,15 +667,15 @@ void main() {
     expect(find.byType(MobileSwapAddressEditModal), findsNothing);
     expect(find.byType(MobileSwapScreen), findsOneWidget);
 
-    // The bottom strip is under the barrier too. The modal card is
-    // bottom-anchored with a gap beneath it, so a tap in that gap hits the
-    // barrier and dismisses the modal.
+    // The bottom strip, where the floating tab bar sits, is covered too.
+    // The modal is the shared mobile sheet, so the gap under its card
+    // belongs to the sheet, as on every other mobile sheet: a tap there
+    // neither reaches the tab bar nor switches branches.
     await tester.tap(find.text('Add recipient address'));
     await tester.pumpAndSettle();
     expect(find.byType(MobileSwapAddressEditModal), findsOneWidget);
     await tester.tapAt(Offset(screen.center.dx, screen.bottom - 4));
     await tester.pumpAndSettle();
-    expect(find.byType(MobileSwapAddressEditModal), findsNothing);
     expect(find.byType(MobileSwapScreen), findsOneWidget);
   });
 
@@ -606,6 +841,153 @@ void main() {
     expect(tester.widget<TextField>(textField).controller?.text, '5.12');
   });
 
+  testWidgets('a one-time refund address waits for sync on the button', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(oneTimeZecAddress: true, chainTipHeight: 1000, scannedHeight: 900),
+    );
+    await tester.pumpAndSettle();
+    await _openSwap(tester);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('swap_amount_field')),
+      '0.5',
+    );
+    await tester.tap(find.text('Add recipient address'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('swap_destination_field')),
+      '0x52908400098527886e0f7030069857d2e4169ee7',
+    );
+    await tester.tap(find.byKey(const ValueKey('swap_address_update_button')));
+    await tester.pumpAndSettle();
+
+    final button = find.byKey(const ValueKey('mobile_swap_review_button'));
+    expect(
+      find.descendant(of: button, matching: find.text('Waiting for sync…')),
+      findsOneWidget,
+    );
+    expect(tester.widget<AppButton>(button).onPressed, isNull);
+    expect(
+      find.byKey(const ValueKey('swap_one_time_address_refund')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('an unfinished history check whose round waits for a server '
+      'asks for one, and the button opens the server picker', (tester) async {
+    await tester.pumpWidget(_app(oneTimeZecAddress: true, restoring: true));
+    await tester.pumpAndSettle();
+    await _openSwap(tester);
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(MobileSwapScreen)),
+    );
+    final notifier = container.read(swapStateProvider.notifier);
+    notifier.selectDirection(SwapDirection.externalToZec);
+    notifier.updateDestination('0x52908400098527886e0f7030069857d2e4169ee7');
+    container.read(swapRecoveryNeedsServerProvider.notifier).set(true);
+    await tester.pumpAndSettle();
+
+    final button = find.byKey(const ValueKey('mobile_swap_review_button'));
+    expect(
+      find.descendant(of: button, matching: find.text('Choose a server')),
+      findsOneWidget,
+    );
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    final title = find.text('Private query server');
+    expect(title, findsOneWidget);
+    Navigator.of(tester.element(title)).pop();
+    await tester.pumpAndSettle();
+
+    // Choosing a server clears it, and the address is prepared as usual.
+    container.read(swapRecoveryNeedsServerProvider.notifier).set(false);
+    // The preparing slot's loader keeps animating, so this never settles.
+    await tester.pump();
+    expect(
+      find.descendant(of: button, matching: find.text('Preparing address…')),
+      findsOneWidget,
+    );
+    expect(tester.widget<AppButton>(button).onPressed, isNull);
+  });
+
+  for (final privacy in [false, true]) {
+    testWidgets('a one-time refund address is funded from Ironwood only'
+        '${privacy ? ', with the balance masked in privacy mode' : ''}', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app(
+          oneTimeZecAddress: true,
+          ironwoodBalance: BigInt.from(10000000),
+          privacyMode: privacy,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _openSwap(tester);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('swap_amount_field')),
+        '0.5',
+      );
+      await tester.tap(find.text('Add recipient address'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('swap_destination_field')),
+        '0x52908400098527886e0f7030069857d2e4169ee7',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('swap_address_update_button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('mobile_swap_review_button')),
+          matching: find.text('Not enough ZEC'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Private swaps use Ironwood ZEC only. '
+          'You have ${privacy ? fixedPrivacyMask() : '0.1'}\u00A0ZEC there.',
+        ),
+        findsOneWidget,
+      );
+    });
+  }
+
+  testWidgets('the Ironwood shortfall wraps in full with large text on a '
+      'narrow screen', (tester) async {
+    await ignoringFlexOverflows(() async {
+      await setWidgetTestViewport(tester, const Size(320, 568));
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpWidget(
+        _app(oneTimeZecAddress: true, ironwoodBalance: BigInt.from(10000000)),
+      );
+      await tester.pumpAndSettle();
+      await _openSwap(tester);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('swap_amount_field')),
+        '0.5',
+      );
+      await tester.pumpAndSettle();
+
+      await expectTextFullyShown(
+        tester,
+        'Private swaps use Ironwood ZEC only. You have 0.1\u00A0ZEC there.',
+      );
+    });
+  });
+
   testWidgets(
     'review quote loading shows loader and disables slippage settings',
     (tester) async {
@@ -738,9 +1120,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(MobileAddressScanCard), findsOneWidget);
 
-    tester
-        .widget<MobileAddressScanCard>(find.byType(MobileAddressScanCard))
-        .onScanned(scannedAddress);
+    final scanner = tester.widget<MobileAddressScanCard>(
+      find.byType(MobileAddressScanCard),
+    );
+    // The caption names the destination chain, not the Zcash default.
+    expect(scanner.caption, isNotNull);
+    expect(scanner.caption, isNot(testL10n.addressScanZcashPrompt));
+    expect(
+      (await scanner.resolve('https://example.com/pay')).error,
+      testL10n.commonQrNoAddress,
+    );
+    expect(
+      (await scanner.resolve(
+        'zcash:t1HsdDMzmJfq4vc7T17XYjEkLMLvbgM1fCi',
+      )).error,
+      testL10n.addressScanWrongNetworkNamed('Zcash'),
+    );
+    scanner.onScanned(scannedAddress);
     await tester.pumpAndSettle();
 
     expect(find.byType(MobileSwapAddressEditModal), findsOneWidget);
@@ -768,10 +1164,24 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('swap_address_scan_button')));
     await tester.pumpAndSettle();
+    // Through the camera this time, so the card's own checks run inside the
+    // swap modal route.
     tester
-        .widget<MobileAddressScanCard>(find.byType(MobileAddressScanCard))
-        .onScanned(scannedAddress);
+        .widget<PlainQrScannerView>(
+          find.byType(PlainQrScannerView, skipOffstage: false),
+        )
+        .onComplete('ethereum:$scannedAddress?value=1');
     await tester.pumpAndSettle();
+    expect(find.byType(MobileAddressScanCard), findsNothing);
+    expect(
+      tester
+          .widget<TextField>(
+            find.byKey(const ValueKey('swap_destination_field')),
+          )
+          .controller
+          ?.text,
+      scannedAddress,
+    );
 
     await tester.tap(find.byKey(const ValueKey('swap_address_update_button')));
     await tester.pumpAndSettle();
@@ -910,4 +1320,21 @@ class _FakeAddressBookRepository implements AddressBookRepository {
       ..clear()
       ..addAll(contacts);
   }
+}
+
+/// A private query server picker with no servers, which opens without
+/// storage or native calls.
+class _NoWalletPirServers extends WalletPirServerNotifier {
+  @override
+  Future<WalletPirServerState> build() async =>
+      const WalletPirServerState(source: null);
+}
+
+class _SeededSwapNotifier extends SwapNotifier {
+  _SeededSwapNotifier(this.initialState);
+
+  final SwapState initialState;
+
+  @override
+  SwapState build() => initialState;
 }

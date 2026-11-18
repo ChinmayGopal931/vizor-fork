@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/receive/screens/mobile/mobile_receive_screen.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/mobile/receive_address_info_sheet.dart';
+import 'package:zcash_wallet/src/features/receive/widgets/mobile/receive_options_sheet.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/receive_address_widgets.dart';
 import 'package:zcash_wallet/widgetbook/receive_use_cases.dart';
 import 'package:zcash_wallet/src/core/l10n/app_language.dart';
@@ -175,6 +176,28 @@ void main() {
       moreOrLessEquals(32, epsilon: 0.1),
     );
   });
+
+  testWidgets(
+    'receive mobile options sheet shows address and gift card options',
+    (tester) async {
+      await _pumpReceiveMobileUseCase(
+        tester,
+        buildReceiveMobileOptionsSheetUseCase,
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(ReceiveOptionsSheet), findsOneWidget);
+      expect(find.text('Request ZEC'), findsNothing);
+      for (final label in [
+        'Receive ZEC',
+        'Share your address or QR code',
+        'Redeem gift card',
+        'Add a card someone sent you',
+      ]) {
+        expect(find.text(label), findsOneWidget);
+      }
+    },
+  );
 
   testWidgets('receive mobile transparent sheet use case opens info sheet', (
     tester,

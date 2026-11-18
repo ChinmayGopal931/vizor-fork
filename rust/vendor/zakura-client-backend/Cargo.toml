@@ -13,7 +13,7 @@
 edition = "2024"
 rust-version = "1.97"
 name = "zakura-client-backend"
-version = "0.1.0-rc9.6"
+version = "0.1.0-rc9.8"
 authors = [
     "Jack Grigg <jack@z.cash>",
     "Kris Nuttycombe <kris@electriccoin.co>",
@@ -31,6 +31,7 @@ readme = "README.md"
 categories = ["cryptography::cryptocurrencies"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/zakura-core/wallet-libraries"
+resolver = "2"
 
 [package.metadata.cargo-udeps.ignore]
 development = ["zcash_proofs"]
@@ -91,7 +92,8 @@ sync = [
     "dep:futures-util",
 ]
 sync-decryptor = [
-    "flume/async",
+    "dep:flume",
+    "flume?/async",
     "dep:tokio",
     "tokio?/macros",
     "tokio?/rt",
@@ -167,8 +169,6 @@ path = "tests/enhance_pir_storage.rs"
 
 [dependencies.arti-client]
 version = "=0.47.0-zakura.1"
-git = "https://github.com/zakura-core/arti.git"
-rev = "df38730dc93c5823c7eb9fe68fd5ec925a907c18"
 features = [
     "rustls",
     "tokio",
@@ -192,7 +192,7 @@ optional = true
 default-features = false
 
 [dependencies.bls12_381]
-version = "4.0.0"
+version = "5.4.0"
 package = "zakura-bls12-381"
 
 [dependencies.byteorder]
@@ -205,12 +205,11 @@ optional = true
 
 [dependencies.flume]
 version = "0.11"
+optional = true
 default-features = false
 
 [dependencies.fs-mistrust]
 version = "=0.16.0-zakura.1"
-git = "https://github.com/zakura-core/arti.git"
-rev = "df38730dc93c5823c7eb9fe68fd5ec925a907c18"
 optional = true
 package = "zakura-fs-mistrust"
 
@@ -256,7 +255,7 @@ version = "0.8.2"
 default-features = false
 
 [dependencies.jubjub]
-version = "4.0.0"
+version = "5.4.0"
 optional = true
 package = "zakura-jubjub"
 
@@ -270,18 +269,18 @@ version = "0.11"
 default-features = false
 
 [dependencies.orchard]
-version = "4.0.0"
+version = "5.4.0"
 features = ["backend-halo2"]
 default-features = false
 package = "zakura-orchard"
 
 [dependencies.pasta_curves]
-version = "4.0.0"
+version = "5.4.0"
 optional = true
 package = "zakura-pasta-curves"
 
 [dependencies.pczt]
-version = "0.1.0-rc9"
+version = "0.1.0-rc9.1"
 optional = true
 package = "zakura-pczt"
 
@@ -329,7 +328,7 @@ optional = true
 default-features = false
 
 [dependencies.sapling]
-version = "4.0.0"
+version = "5.4.0"
 default-features = false
 package = "zakura-sapling-crypto"
 
@@ -388,8 +387,6 @@ default-features = false
 
 [dependencies.tor-rtcompat]
 version = "=0.47.0-zakura.1"
-git = "https://github.com/zakura-core/arti.git"
-rev = "df38730dc93c5823c7eb9fe68fd5ec925a907c18"
 optional = true
 package = "zakura-tor-rtcompat"
 
@@ -402,7 +399,7 @@ version = "0.1"
 default-features = false
 
 [dependencies.transparent]
-version = "4.0.0"
+version = "5.4.0"
 default-features = false
 package = "zakura-transparent"
 
@@ -411,18 +408,18 @@ version = "1"
 optional = true
 
 [dependencies.zakura-one-time-ivk]
-version = "=0.0.1-rc4"
+version = "=0.0.1-rc5"
 optional = true
 
 [dependencies.zakura-pir-protocol]
-version = "=0.0.1-rc5"
+version = "=0.0.1-rc7"
 features = [
     "enhance",
     "recovery",
 ]
 
 [dependencies.zcash_address]
-version = "4.0.0"
+version = "5.4.0"
 default-features = false
 package = "zakura-address"
 
@@ -431,7 +428,7 @@ version = "0.5"
 default-features = false
 
 [dependencies.zcash_keys]
-version = "4.0.0"
+version = "5.4.0"
 features = [
     "std",
     "sapling",
@@ -441,11 +438,11 @@ default-features = false
 package = "zakura-keys"
 
 [dependencies.zcash_note_encryption]
-version = "4.0.0"
+version = "5.4.0"
 package = "zakura-note-encryption"
 
 [dependencies.zcash_primitives]
-version = "4.0.0"
+version = "5.4.0"
 features = [
     "std",
     "circuits",
@@ -455,30 +452,28 @@ default-features = false
 package = "zakura-primitives"
 
 [dependencies.zcash_proofs]
-version = "4.0.0"
+version = "5.4.0"
 optional = true
 default-features = false
 package = "zakura-proofs"
 
 [dependencies.zcash_protocol]
-version = "4.0.0"
+version = "5.4.0"
 default-features = false
 package = "zakura-protocol"
 
 [dependencies.zcash_script]
-version = "0.6"
+version = "0.0.1"
 default-features = false
+package = "zakura-zcash-script"
 
 [dependencies.zip32]
 version = "0.2"
 default-features = false
 
 [dependencies.zip321]
-version = "4.0.0"
+version = "5.4.0"
 package = "zakura-zip321"
-
-[dev-dependencies]
-tempfile = "3.5.0"
 
 [dev-dependencies.assert_matches]
 version = "1.5"
@@ -489,7 +484,7 @@ features = ["test-dependencies"]
 default-features = false
 
 [dev-dependencies.jubjub]
-version = "4.0.0"
+version = "5.4.0"
 package = "zakura-jubjub"
 
 [dev-dependencies.proptest]
@@ -499,12 +494,19 @@ version = ">=1,<1.7"
 version = "0.10"
 default-features = false
 
+[dev-dependencies.rand_08]
+version = "0.8"
+package = "rand"
+
 [dev-dependencies.rand_chacha]
 version = "0.3"
 
 [dev-dependencies.shardtree]
 version = "0.7"
 features = ["test-dependencies"]
+
+[dev-dependencies.tempfile]
+version = "3.5.0"
 
 [dev-dependencies.tokio]
 version = "1.21.0"
@@ -514,36 +516,36 @@ features = [
 ]
 
 [dev-dependencies.transparent]
-version = "4.0.0"
+version = "5.4.0"
 features = ["test-dependencies"]
 default-features = false
 package = "zakura-transparent"
 
 [dev-dependencies.zcash_address]
-version = "4.0.0"
+version = "5.4.0"
 features = ["test-dependencies"]
 default-features = false
 package = "zakura-address"
 
 [dev-dependencies.zcash_keys]
-version = "4.0.0"
+version = "5.4.0"
 features = ["test-dependencies"]
 default-features = false
 package = "zakura-keys"
 
 [dev-dependencies.zcash_primitives]
-version = "4.0.0"
+version = "5.4.0"
 features = ["test-dependencies"]
 default-features = false
 package = "zakura-primitives"
 
 [dev-dependencies.zcash_proofs]
-version = "4.0.0"
+version = "5.4.0"
 default-features = false
 package = "zakura-proofs"
 
 [dev-dependencies.zcash_protocol]
-version = "4.0.0"
+version = "5.4.0"
 features = [
     "local-consensus",
     "test-dependencies",

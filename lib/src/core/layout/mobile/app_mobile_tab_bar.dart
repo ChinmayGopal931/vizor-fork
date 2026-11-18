@@ -7,6 +7,12 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_icon.dart';
 import '../../widgets/mobile/tron_glyph.dart';
 
+/// Whether the iOS shell hands its tabs to upstream's native Liquid Glass
+/// tab bar (`IosNativeTabBarHost`, `ios/Runner/NativeTabBar.swift`). Veylor
+/// keeps this neon bar and its side rail on iOS too, so the native bar stays
+/// in the tree, switched off, and later merges carry it unchanged.
+const bool kIosNativeTabBarEnabled = false;
+
 /// Height of [AppMobileTabBar] — Figma `Mobile Nav` (node 4394:88550).
 const double kMobileTabBarHeight = 64;
 

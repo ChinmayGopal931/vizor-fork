@@ -181,7 +181,9 @@ void main() {
     );
   });
 
-  testWidgets('the + button opens the add-contact sheet', (tester) async {
+  testWidgets('Add contact floats at the bottom and opens the add sheet', (
+    tester,
+  ) async {
     await _setMobileViewport(tester);
     await tester.pumpWidget(
       _harness(_FakeRepo([_contact(id: 'mike', label: 'Mike')])),
@@ -200,6 +202,41 @@ void main() {
     );
     // The address field carries a QR scan affordance.
     expect(find.bySemanticsLabel('Scan address QR'), findsOneWidget);
+  });
+
+  testWidgets('the network picker filters networks by name or ticker', (
+    tester,
+  ) async {
+    await _setMobileViewport(tester);
+    await tester.pumpWidget(_harness(_FakeRepo()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mobile_contacts_add_empty')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mobile_address_book_network')));
+    await tester.pumpAndSettle();
+
+    final search = find.byKey(const ValueKey('mobile_network_search_field'));
+    expect(search, findsOneWidget);
+    expect(find.text('Ethereum'), findsOneWidget);
+
+    await tester.enterText(search, 'sol');
+    await tester.pumpAndSettle();
+    expect(find.text('Solana'), findsOneWidget);
+    expect(find.text('Ethereum'), findsNothing);
+
+    await tester.enterText(search, 'zzzz');
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('mobile_network_search_empty')),
+      findsOneWidget,
+    );
+
+    await tester.enterText(search, 'eth');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ethereum'));
+    await tester.pumpAndSettle();
+    expect(search, findsNothing);
+    expect(find.text('Ethereum'), findsOneWidget);
   });
 
   testWidgets('save enables only with a label and a valid address', (
@@ -251,6 +288,58 @@ void main() {
     );
     await tester.pump();
     expect(save().onPressed, isNotNull);
+  });
+
+  testWidgets('a saved address the format check now refuses can be renamed', (
+    tester,
+  ) async {
+    await _setMobileViewport(tester);
+    final repo = _FakeRepo([
+      _contact(
+        id: 'doge',
+        label: 'Doge',
+        address: 'DPlaceholderDogecoinAddress',
+        network: AddressBookNetwork.dogecoin,
+      ),
+    ]);
+    await tester.pumpWidget(_harness(repo));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mobile_contact_menu_doge')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit contact'));
+    await tester.pumpAndSettle();
+
+    AppButton save() => tester.widget<AppButton>(
+      find.byKey(const ValueKey('mobile_address_book_save')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('mobile_address_book_label')),
+      'Doge wallet',
+    );
+    await tester.pump();
+    expect(save().onPressed, isNotNull);
+
+    // A changed address has to pass the check.
+    await tester.enterText(
+      find.byKey(const ValueKey('mobile_address_book_address')),
+      'DAnotherPlaceholder',
+    );
+    await tester.pump();
+    expect(save().onPressed, isNull);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('mobile_address_book_address')),
+      'DPlaceholderDogecoinAddress',
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('mobile_address_book_save')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('mobile_address_book_save')));
+    await tester.pumpAndSettle();
+    expect(repo.contacts.single.label, 'Doge wallet');
+    expect(repo.contacts.single.address, 'DPlaceholderDogecoinAddress');
   });
 }
 

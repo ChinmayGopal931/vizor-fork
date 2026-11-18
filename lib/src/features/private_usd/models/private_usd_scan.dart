@@ -12,7 +12,7 @@ import '../../../core/l10n/l10n.dart';
 /// both kinds as plain strings.
 ///
 /// An `ethereum:` request gives up its recipient
-/// ([normalizeAddressScanPayload]: a token transfer's `address`, not the
+/// ([_ethereumRequestRecipient]: a token transfer's `address`, not the
 /// token), but one for a chain other than [chainId] is refused: an address a
 /// Polygon request names is not one to withdraw Ethereum USDC to. The other
 /// kind of address is refused by name, pointing to the action that takes it.
@@ -55,7 +55,10 @@ MobileScanOutcome privateUsdScanOutcome(
 String _scannedAddress(String raw) {
   final String address;
   try {
-    address = normalizeAddressScanPayload(raw)?.trim() ?? '';
+    address =
+        _ethereumRequestRecipient(raw.trim()) ??
+        normalizeAddressScanPayload(raw)?.trim() ??
+        '';
   } on FormatException {
     return '';
   } on ArgumentError {
@@ -65,6 +68,39 @@ String _scannedAddress(String raw) {
       ? address.toLowerCase()
       : address;
 }
+
+/// The recipient an EIP-681 `ethereum:` request names, read as upstream's
+/// address scan reads one (`resolveAddressScan`): a plain payment's target, a
+/// token transfer's single `address` argument, and none (empty) for any
+/// other call, a fragment, or an `address` argument without a call, where the
+/// payee is unclear. Null when [raw] is no such request. The chain is checked
+/// apart ([_ethereumRequestChainId]), against the deployment's.
+String? _ethereumRequestRecipient(String raw) {
+  if (!_ethereumScheme.hasMatch(raw)) return null;
+  final uri = Uri.tryParse(raw);
+  if (uri == null || uri.hasFragment) return '';
+  var body = Uri.decodeComponent(uri.path).trim();
+  if (body.toLowerCase().startsWith('pay-')) body = body.substring(4);
+  String? function;
+  final functionStart = body.indexOf('/');
+  if (functionStart != -1) {
+    function = body.substring(functionStart + 1);
+    body = body.substring(0, functionStart);
+  }
+  final chainStart = body.indexOf('@');
+  if (chainStart != -1) body = body.substring(0, chainStart);
+  // A repeated recipient has no single reading.
+  final recipients = uri.queryParametersAll['address'] ?? const <String>[];
+  if (function == null || function.isEmpty) {
+    return recipients.isEmpty ? body.trim() : '';
+  }
+  if (function.toLowerCase() != 'transfer' || recipients.length != 1) {
+    return '';
+  }
+  return recipients.single.trim();
+}
+
+final _ethereumScheme = RegExp(r'^(?:ethereum|eth):', caseSensitive: false);
 
 /// The EIP-681 `ethereum:[pay-]<target>@<chain>…` request's chain id, or
 /// null when [raw] is no such request or names none.

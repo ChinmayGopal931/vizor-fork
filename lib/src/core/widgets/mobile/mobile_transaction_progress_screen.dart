@@ -4,7 +4,8 @@ import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart' show Scaffold;
 import 'package:flutter/widgets.dart';
 
-import '../../layout/mobile/mobile_top_nav.dart' show kMobileTopNavHeight;
+import '../../layout/mobile/mobile_top_nav.dart'
+    show kMobilePageMargin, kMobileTopNavHeight;
 import '../../theme/app_theme.dart';
 import '../app_button.dart';
 import '../app_icon.dart';
@@ -96,7 +97,7 @@ class MobileTransactionProgressScreen extends StatelessWidget {
                 child: _ProgressContentViewport(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
+                      horizontal: kMobilePageMargin,
                       vertical: AppSpacing.s,
                     ),
                     child: Center(
@@ -261,7 +262,7 @@ class _MobileTransactionProgressBadgeState
     with TickerProviderStateMixin {
   late final AnimationController _ripple = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 650),
+    duration: const Duration(milliseconds: 1950),
   );
   late final AnimationController _shake = AnimationController(
     vsync: this,

@@ -48,6 +48,7 @@ class MobileSwapStatusContent extends StatelessWidget {
     required this.onToggleDetails,
     this.paymentHeader,
     this.headerToBodyGap = _mobileStatusHeaderToBodyGap,
+    this.flowConnector,
     super.key,
   });
 
@@ -63,6 +64,8 @@ class MobileSwapStatusContent extends StatelessWidget {
   /// Between the header and the tabs (or the status panel). Private USD's
   /// bridge screens close it up: their rows carry no fiat line.
   final double headerToBodyGap;
+  /// Optional replacement for the paying/receiving flow arrow row.
+  final Widget? flowConnector;
 
   @override
   Widget build(BuildContext context) {
@@ -75,6 +78,7 @@ class MobileSwapStatusContent extends StatelessWidget {
             MobileSwapReviewHeader(
               pay: payHeaderRow,
               receive: receiveHeaderRow,
+              flowConnector: flowConnector,
             ),
         SizedBox(height: headerToBodyGap),
         if (presentation.showTabs) ...[
@@ -149,6 +153,7 @@ class MobilePayStatusHeader extends StatelessWidget {
     this.label,
     this.recipientName,
     this.recipientProfilePictureId,
+    this.flowConnector,
     super.key,
   });
 
@@ -159,6 +164,9 @@ class MobilePayStatusHeader extends StatelessWidget {
   final String? label;
   final String? recipientName;
   final String? recipientProfilePictureId;
+
+  /// Optional replacement for the amount-to-recipient arrow.
+  final Widget? flowConnector;
 
   @override
   Widget build(BuildContext context) {
@@ -177,7 +185,7 @@ class MobilePayStatusHeader extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
         child: ReviewInfoFlow(
-          connector: const MobileSwapFlowArrow(),
+          connector: flowConnector ?? const MobileSwapFlowArrow.row(),
           rows: [
             ReviewInfoRow(
               key: const ValueKey('mobile_pay_status_asset_row'),
@@ -1087,9 +1095,11 @@ class _MobileStatusChipRow extends StatelessWidget {
     final labelStyle = paymentMode
         ? AppTypography.labelLarge
         : AppTypography.labelMedium;
-    return SizedBox(
-      key: paymentMode ? const ValueKey('mobile_pay_status_row') : null,
-      height: 32,
+    return ConstrainedBox(
+      key: ValueKey(
+        paymentMode ? 'mobile_pay_status_row' : 'mobile_swap_status_row',
+      ),
+      constraints: const BoxConstraints(minHeight: 32),
       child: Row(
         children: [
           Padding(
@@ -1216,6 +1226,8 @@ class _MobilePaymentDetails extends StatelessWidget {
             kind: SwapStatusDetailKind.txId,
             value: payStatus.txIdText,
             linkUri: payStatus.txIdUri,
+            copyable: payStatus.txIdCopyText != null,
+            copyText: payStatus.txIdCopyText,
           );
     final convertedFrom = SwapStatusDetailRowData(
       label: context.l10n.swapPayStatusConvertedFrom,
@@ -1629,11 +1641,7 @@ class _MobileStatusDetailActionIcon extends StatelessWidget {
       cursor: tooltipMessage == null
           ? SystemMouseCursors.click
           : SystemMouseCursors.help,
-      child: AppIcon(
-        icon,
-        size: size,
-        color: color ?? colors.icon.regular.withValues(alpha: 0.72),
-      ),
+      child: AppIcon(icon, size: size, color: color ?? colors.icon.muted),
     );
     final message = tooltipMessage;
     if (message == null ||

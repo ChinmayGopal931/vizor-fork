@@ -3,8 +3,6 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart'
-    show CupertinoPage, CupertinoRouteTransitionMixin;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -14,6 +12,7 @@ import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
 import 'package:zcash_wallet/src/core/config/swap_feature_config.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_shell.dart';
+import 'package:zcash_wallet/src/core/layout/mobile/ios_native_tab_bar_root.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_adaptive_frame.dart';
 import 'package:zcash_wallet/src/core/navigation/mobile_sidebar_exit.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/app_mobile_sheet.dart';
@@ -29,12 +28,14 @@ import 'package:zcash_wallet/src/core/widgets/app_toast.dart';
 import 'package:zcash_wallet/src/core/navigation/mobile_sidebar_route_observer.dart';
 import 'package:zcash_wallet/src/core/navigation/external_action_guard_provider.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
+import 'package:zcash_wallet/src/core/navigation/mobile_page.dart';
 import 'package:zcash_wallet/src/core/navigation/mobile_routes.dart';
 import 'package:zcash_wallet/src/core/navigation/mobile_destinations.dart';
 import 'package:zcash_wallet/src/core/profile_pictures.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
 import 'package:zcash_wallet/src/features/activity/screens/mobile/mobile_activity_screen.dart';
 import 'package:zcash_wallet/src/features/accounts/screens/mobile/mobile_account_removal_passcode_screen.dart';
+import 'package:zcash_wallet/src/features/accounts/screens/mobile/mobile_accounts_screen.dart';
 import 'package:zcash_wallet/src/features/home/screens/mobile/mobile_home_screen.dart';
 import 'package:zcash_wallet/src/features/home/widgets/mobile/shield/mobile_shield_scene.dart';
 import 'package:zcash_wallet/src/features/pay/screens/mobile/mobile_pay_screen.dart';
@@ -42,9 +43,11 @@ import 'package:zcash_wallet/src/features/portfolio_chart/screens/mobile/mobile_
 import 'package:zcash_wallet/src/features/donation/screens/donation_screen.dart';
 import 'package:zcash_wallet/src/features/send/services/send_proving_key_warmup.dart';
 import 'package:zcash_wallet/src/features/pay/screens/mobile/mobile_pay_submitted_screen.dart';
+import 'package:zcash_wallet/src/features/receive/screens/mobile/mobile_receive_request_screen.dart';
 import 'package:zcash_wallet/src/features/receive/screens/mobile/mobile_receive_screen.dart';
 import 'package:zcash_wallet/src/features/send/models/send_prefill_args.dart';
 import 'package:zcash_wallet/src/features/send/screens/mobile/mobile_send_screen.dart';
+import 'package:zcash_wallet/src/features/settings/screens/mobile/mobile_settings_screen.dart';
 import 'package:zcash_wallet/src/features/swap/models/swap_activity_navigation.dart';
 import 'package:zcash_wallet/src/features/swap/models/swap_models.dart';
 import 'package:zcash_wallet/src/features/swap/providers/swap_hardware_signing_service.dart';
@@ -116,6 +119,7 @@ Widget _app(
   SyncState? initialSyncState,
   String network = 'main',
   List<Override> overrides = const [],
+  bool nativeRoot = false,
 }) => ProviderScope(
   overrides: [
     appBootstrapProvider.overrideWithValue(_bootstrap(network: network)),
@@ -139,7 +143,10 @@ Widget _app(
   child: MaterialApp.router(
     localizationsDelegates: appLocalizationsDelegates,
     routerConfig: router,
-    builder: (_, child) => AppTheme(data: theme, child: child!),
+    builder: (_, child) => AppTheme(
+      data: theme,
+      child: nativeRoot ? IosNativeTabBarRootHost(child: child!) : child!,
+    ),
   ),
 );
 
@@ -193,6 +200,40 @@ List<({Color? fill, Color? label})> _sidebarPaints(WidgetTester tester) => [
 ];
 
 void main() {
+  testWidgets('Android system Back uses the same opaque page slide', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(393, 852);
+    addTearDown(tester.view.reset);
+    final router = _router(initialLocation: '/settings');
+    addTearDown(router.dispose);
+    await tester.pumpWidget(_app(router));
+    await tester.pumpAndSettle();
+    final covered = router.push<void>('/accounts');
+    await tester.pumpAndSettle();
+    final accounts = find.byType(MobileAccountsScreen);
+    final screen = tester.getRect(accounts);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(mobileVisiblePath(router), '/settings');
+    expect(tester.getRect(accounts).left, greaterThan(screen.left));
+    expect(tester.getRect(accounts).width, closeTo(screen.width, .000001));
+    expect(
+      tester
+          .widgetList<Opacity>(
+            find.ancestor(of: accounts, matching: find.byType(Opacity)),
+          )
+          .every((opacity) => opacity.opacity == 1),
+      true,
+    );
+    await tester.pumpAndSettle();
+    await covered;
+    expect(accounts, findsNothing);
+    expect(find.byType(MobileSettingsScreen), findsOneWidget);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
   testWidgets('the wide layout sidebar shows a short catch-up without a '
       'percentage', (tester) async {
     tester.view.devicePixelRatio = 1;
@@ -271,7 +312,7 @@ void main() {
       expect(find.text('Enter your passcode to reset Veylor.'), findsOneWidget);
       expect(
         ModalRoute.of(tester.element(screen)),
-        isA<CupertinoRouteTransitionMixin<dynamic>>(),
+        isA<MobilePageRoute<dynamic>>(),
       );
       await tester.tap(find.bySemanticsLabel('Back'));
       await tester.pumpAndSettle();
@@ -280,6 +321,68 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('accounts covers the tab bar and returns to it on back', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(393, 852);
+    addTearDown(tester.view.reset);
+    final router = _router();
+    addTearDown(router.dispose);
+    await tester.pumpWidget(_app(router));
+    await tester.pumpAndSettle();
+    unawaited(router.push('/accounts'));
+    await tester.pumpAndSettle();
+    final screen = find.byType(MobileAccountsScreen);
+    expect(tester.getSize(screen), const Size(393, 852));
+    expect(find.byType(AppMobileTabBar), findsNothing);
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await tester.pumpAndSettle();
+    expect(screen, findsNothing);
+    expect(find.byType(AppMobileTabBar), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('request ZEC opens as a page for the address it is given', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(393, 852);
+    addTearDown(tester.view.reset);
+    final router = _router();
+    addTearDown(router.dispose);
+    await tester.pumpWidget(_app(router));
+    await tester.pumpAndSettle();
+    unawaited(router.push(kReceiveRequestPath, extra: 'u1requestaddress'));
+    await tester.pumpAndSettle();
+    final screen = find.byType(MobileReceiveRequestScreen);
+    expect(
+      tester.widget<MobileReceiveRequestScreen>(screen).address,
+      'u1requestaddress',
+    );
+    expect(tester.getSize(screen), const Size(393, 852));
+    expect(find.byType(AppMobileTabBar), findsNothing);
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await tester.pumpAndSettle();
+    expect(screen, findsNothing);
+    expect(find.byType(AppMobileTabBar), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('accounts opened with go() goes back to home', (tester) async {
+    final router = _router(initialLocation: '/accounts');
+    addTearDown(router.dispose);
+    await tester.pumpWidget(_app(router));
+    await tester.pumpAndSettle();
+    expect(find.byType(MobileAccountsScreen), findsOneWidget);
+    expect(find.byType(AppMobileTabBar), findsNothing);
+    await tester.tap(find.bySemanticsLabel('Back'));
+    await tester.pumpAndSettle();
+    expect(mobileVisiblePath(router), '/home');
+    expect(find.byType(AppMobileTabBar), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final network in ['main', 'test', 'regtest']) {
     testWidgets('mobile donation route checks its network: $network', (
@@ -621,13 +724,14 @@ void main() {
       final viewport = tester.getRect(find.byWidget(navigator.widget));
       expect(viewport.width, greaterThan(homeRect.width));
       expect(viewport.right, 951);
-      expect(tester.getRect(page).size, viewport.size);
+      // Layout size: mid-push the page is also zoomed slightly smaller.
+      expect(tester.getSize(page), viewport.size);
       expect(tester.getRect(page).left, greaterThan(viewport.left));
       expect(tester.getRect(page).left, lessThan(viewport.right));
       // Receive alone expands into the contiguous native-safe pane. The
       // branch beneath it retains its ordinary 440px content geometry.
       const receiveRect = Rect.fromLTWH(288, 0, 563, 669);
-      expect(tester.getRect(receive).width, receiveRect.width);
+      expect(tester.getSize(receive).width, receiveRect.width);
       expect(tester.getRect(find.byType(MobileWalletSidebar)), sidebar);
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pump();
@@ -1191,7 +1295,7 @@ void main() {
     final shellRoute = ModalRoute.of(
       tester.element(find.byType(AppMobileShell)),
     );
-    expect(shellRoute, isA<CupertinoRouteTransitionMixin<dynamic>>());
+    expect(shellRoute, isA<MobilePageRoute<dynamic>>());
     expect(
       tester
           .widget<AppMobileTabBar>(find.byType(AppMobileTabBar))
@@ -1339,8 +1443,8 @@ void main() {
           pageKey: ValueKey(route.path),
         ),
       );
-      expect(page, isA<CupertinoPage<dynamic>>(), reason: route.path);
-      final child = (page as CupertinoPage<dynamic>).child;
+      expect(page, isA<MobilePage<dynamic>>(), reason: route.path);
+      final child = (page as MobilePage<dynamic>).child;
       expect(child, isA<MobilePageViewport>(), reason: route.path);
       expect(
         (child as MobilePageViewport).constrainContent,
@@ -1448,7 +1552,7 @@ void main() {
 
     expect(find.byType(MobileSendScreen), findsOneWidget);
     final route = ModalRoute.of(tester.element(find.byType(MobileSendScreen)));
-    expect(route, isA<CupertinoRouteTransitionMixin<dynamic>>());
+    expect(route, isA<MobilePageRoute<dynamic>>());
 
     await tester.tap(find.bySemanticsLabel('Back'));
     await tester.pumpAndSettle();
@@ -1541,7 +1645,7 @@ void main() {
       expect(find.text('u1firstrequestaddress'), findsNothing);
     },
   );
-  testWidgets('send amount and review routes push Cupertino pages', (
+  testWidgets('send amount and review routes push mobile pages', (
     tester,
   ) async {
     final router = _router();
@@ -1566,7 +1670,7 @@ void main() {
     var route = ModalRoute.of(
       tester.element(find.byType(MobileSendAmountScreen)),
     );
-    expect(route, isA<CupertinoRouteTransitionMixin<dynamic>>());
+    expect(route, isA<MobilePageRoute<dynamic>>());
     // An amount already composed on the recipient step (a ZIP-321 deep link
     // that stepped back in place) has to reach the pushed amount page.
     final amountScreen = tester.widget<MobileSendScreen>(
@@ -1594,10 +1698,10 @@ void main() {
 
     expect(find.byType(MobileSendReviewScreen), findsOneWidget);
     route = ModalRoute.of(tester.element(find.byType(MobileSendReviewScreen)));
-    expect(route, isA<CupertinoRouteTransitionMixin<dynamic>>());
+    expect(route, isA<MobilePageRoute<dynamic>>());
   });
 
-  testWidgets('swap Keystone signing route pushes a Cupertino page', (
+  testWidgets('swap Keystone signing route pushes a mobile page', (
     tester,
   ) async {
     final router = _router();
@@ -1625,15 +1729,18 @@ void main() {
     final route = ModalRoute.of(
       tester.element(find.byType(MobileSwapKeystoneSignScreen)),
     );
-    expect(route, isA<CupertinoRouteTransitionMixin<dynamic>>());
+    expect(route, isA<MobilePageRoute<dynamic>>());
     expect(route?.opaque, isTrue);
   });
 
-  testWidgets('receive pushes over a Cupertino shell page', (tester) async {
+  testWidgets('receive pushes over a mobile shell page', (tester) async {
     await tester.pumpWidget(_app(_router()));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Receive'));
+    await tester.pumpAndSettle();
+    // Home's Receive opens a sheet; its first card opens the screen.
+    await tester.tap(find.byKey(const ValueKey('receive_options_receive')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
 
@@ -1641,7 +1748,7 @@ void main() {
     final route = ModalRoute.of(
       tester.element(find.byType(MobileReceiveScreen)),
     );
-    expect(route, isA<CupertinoRouteTransitionMixin<dynamic>>());
+    expect(route, isA<MobilePageRoute<dynamic>>());
 
     await tester.tap(find.bySemanticsLabel('Back'));
     await tester.pump();
@@ -1650,9 +1757,7 @@ void main() {
     expect(find.byType(MobileHomeScreen), findsOneWidget);
   });
 
-  testWidgets('payment submitted route pushes a Cupertino page', (
-    tester,
-  ) async {
+  testWidgets('payment submitted route pushes a mobile page', (tester) async {
     final router = _router();
     await tester.pumpWidget(_app(router));
     await tester.pumpAndSettle();
@@ -1669,7 +1774,7 @@ void main() {
     final route = ModalRoute.of(
       tester.element(find.byType(MobilePaySubmittedScreen)),
     );
-    expect(route, isA<CupertinoRouteTransitionMixin<dynamic>>());
+    expect(route, isA<MobilePageRoute<dynamic>>());
   });
 
   testWidgets('pay route forwards prepared-composer navigation state', (

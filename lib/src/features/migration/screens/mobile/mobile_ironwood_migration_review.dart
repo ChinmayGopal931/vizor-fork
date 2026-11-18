@@ -261,7 +261,7 @@ class _MobileMigrationFastReviewState
                         'mobile_ironwood_immediate_submitted_notice',
                       ),
                       textAlign: TextAlign.center,
-                      style: AppTypography.bodySmall.copyWith(
+                      style: AppTypography.bodyMedium.copyWith(
                         color: colors.text.warning,
                       ),
                     ),
@@ -331,7 +331,7 @@ class _MobileMigrationFastReviewState
               Text(
                 _broadcastError!,
                 textAlign: TextAlign.center,
-                style: AppTypography.bodySmall.copyWith(
+                style: AppTypography.bodyMedium.copyWith(
                   color: colors.text.destructive,
                 ),
               ),
@@ -444,7 +444,7 @@ class _MobileMigrationFastReviewState
                           children: [
                             Text(
                               l10n.migrationImmediateTradeoffTitle,
-                              style: AppTypography.bodySmall.copyWith(
+                              style: AppTypography.bodyMedium.copyWith(
                                 color: colors.text.homeCard,
                                 height: 16 / 14,
                                 letterSpacing: -0.06,
@@ -490,7 +490,7 @@ class _MobileMigrationFastReviewState
               Text(
                 l10n.migrationMobileFastPlanError,
                 textAlign: TextAlign.center,
-                style: AppTypography.bodySmall.copyWith(
+                style: AppTypography.bodyMedium.copyWith(
                   color: colors.text.destructive,
                 ),
               ),
@@ -499,7 +499,7 @@ class _MobileMigrationFastReviewState
               Text(
                 l10n.migrationImmediateNoBalance,
                 textAlign: TextAlign.center,
-                style: AppTypography.bodySmall.copyWith(
+                style: AppTypography.bodyMedium.copyWith(
                   color: colors.text.destructive,
                 ),
               ),

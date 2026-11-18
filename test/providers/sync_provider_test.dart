@@ -1631,7 +1631,8 @@ void main() {
         appBootstrapProvider.overrideWithValue(AppBootstrapState.empty),
         syncProvider.overrideWith(
           () => notifier = _LifecycleTestSyncNotifier(() async {
-            resolverStarted.complete();
+            // Ordinary sync and independent recovery can ask for the same path.
+            if (!resolverStarted.isCompleted) resolverStarted.complete();
             return dbPath.future;
           }),
         ),
@@ -2066,7 +2067,8 @@ void main() {
         accountProvider.overrideWith(_ExistingAccountNotifier.new),
         syncProvider.overrideWith(
           () => notifier = _LifecycleTestSyncNotifier(() async {
-            resolverStarted.complete();
+            // Ordinary sync and independent recovery can ask for the same path.
+            if (!resolverStarted.isCompleted) resolverStarted.complete();
             return dbPath.future;
           }),
         ),
@@ -2527,6 +2529,8 @@ rust_sync.WalletBalance _availableBalance(
   orchardPending: orchardPending ?? BigInt.zero,
   ironwoodPending: BigInt.zero,
   changePendingConfirmation: BigInt.zero,
+  pendingSpendable: const [],
+  pendingSpendableTipHeight: 0,
   valuePendingSpendability: BigInt.zero,
   uneconomicValue: BigInt.zero,
   spendable: amount,
@@ -2551,6 +2555,8 @@ final _unavailableBalance = rust_sync.WalletBalance(
   orchardPending: BigInt.zero,
   ironwoodPending: BigInt.zero,
   changePendingConfirmation: BigInt.zero,
+  pendingSpendable: const [],
+  pendingSpendableTipHeight: 0,
   valuePendingSpendability: BigInt.zero,
   uneconomicValue: BigInt.zero,
   spendable: BigInt.zero,

@@ -153,6 +153,7 @@ void main() {
       sent: 'Sent successfully',
       sendFailed: 'Send failed',
       transaction: 'Transaction',
+      recipient: 'To',
     ),
   );
   testWidgets('desktop receipt never names an output its recipient', (

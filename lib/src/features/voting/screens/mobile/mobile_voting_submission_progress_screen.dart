@@ -97,7 +97,7 @@ class MobileVotingSubmissionProgressScreen extends StatelessWidget {
                     final textDirection = Directionality.of(context);
                     final textScaler = MediaQuery.textScalerOf(context);
                     final contentWidth =
-                        constraints.maxWidth - AppSpacing.sm * 2;
+                        constraints.maxWidth - kMobilePageMargin * 2;
                     final noticeHeight = _measureTextHeight(
                       text: noticeText,
                       style: withLocaleFontFallback(context, noticeStyle),
@@ -150,7 +150,7 @@ class MobileVotingSubmissionProgressScreen extends StatelessWidget {
                           primary: false,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.sm,
+                              horizontal: kMobilePageMargin,
                               vertical: AppSpacing.s,
                             ),
                             child: SizedBox(

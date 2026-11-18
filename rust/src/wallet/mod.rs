@@ -16,6 +16,7 @@ pub mod keystone;
 pub mod ledger;
 pub mod network;
 pub(crate) mod network_upgrade;
+pub(crate) mod one_time_ivk;
 pub(crate) mod pir_config;
 pub(crate) mod private_usd;
 pub(crate) mod routed_http;

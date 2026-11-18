@@ -16,6 +16,7 @@ const _mobile = kAppFormFactor == AppFormFactor.mobile;
 /// * [onPrimary] — Icons placed inside a primary button.
 /// * [warning] — Caution icons. Backed by the current gold utility token for
 ///   compatibility with existing warning call sites.
+/// * [warningStrong] — Caution icons with stronger contrast on base surfaces.
 /// * [destructive] — Destructive-state icons.
 /// * [destructiveLight] — Softer destructive icon for secondary error affordances.
 /// * [success] — Positive / success utility icons.
@@ -29,6 +30,7 @@ class AppIconColors {
     required this.inverse,
     required this.onPrimary,
     required this.warning,
+    required this.warningStrong,
     required this.destructive,
     required this.destructiveLight,
     required this.success,
@@ -42,6 +44,7 @@ class AppIconColors {
   final Color inverse;
   final Color onPrimary;
   final Color warning;
+  final Color warningStrong;
   final Color destructive;
   final Color destructiveLight;
   final Color success;
@@ -58,6 +61,7 @@ class AppIconColors {
     inverse: Primitives.p0Dark,
     onPrimary: Primitives.p0Dark,
     warning: GoldPrimitives.p500Dark,
+    warningStrong: GoldPrimitives.p500Dark,
     destructive: PlumPrimitives.p400Dark,
     destructiveLight: PlumPrimitives.p300Dark,
     success: GreenPrimitives.p300Dark,
@@ -72,6 +76,7 @@ class AppIconColors {
     inverse: Primitives.p0Light,
     onPrimary: Primitives.p0Light,
     warning: GoldPrimitives.p300Light,
+    warningStrong: GoldPrimitives.p400Light,
     destructive: PlumPrimitives.p300Light,
     destructiveLight: PlumPrimitives.p200Light,
     success: GreenPrimitives.p500Light,
@@ -86,6 +91,7 @@ class AppIconColors {
     inverse: NeonPrimitives.n0Dark,
     onPrimary: NeonPrimitives.n0Dark,
     warning: GoldPrimitives.p500Dark,
+    warningStrong: GoldPrimitives.p500Dark,
     destructive: NeonPrimitives.red,
     destructiveLight: NeonPrimitives.redPressed,
     success: GreenPrimitives.p300Dark,
@@ -100,6 +106,7 @@ class AppIconColors {
     inverse: NeonPrimitives.n0Light,
     onPrimary: NeonPrimitives.white,
     warning: GoldPrimitives.p300Light,
+    warningStrong: GoldPrimitives.p400Light,
     destructive: NeonPrimitives.redOnLight,
     destructiveLight: NeonPrimitives.redHot,
     success: GreenPrimitives.p500Light,

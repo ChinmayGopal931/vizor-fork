@@ -7,14 +7,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:zcash_wallet/src/app_bootstrap.dart';
 import 'package:zcash_wallet/src/core/config/rpc_endpoint_config.dart';
 import 'package:zcash_wallet/src/core/layout/mobile/mobile_top_nav.dart';
 import 'package:zcash_wallet/src/core/profile_pictures.dart';
 import 'package:zcash_wallet/src/core/theme/app_theme.dart';
+import 'package:zcash_wallet/src/core/widgets/mobile/mobile_memo_sheet.dart';
 import 'package:zcash_wallet/src/core/widgets/app_button.dart';
 import 'package:zcash_wallet/src/core/widgets/app_icon.dart';
 import 'package:zcash_wallet/src/core/widgets/app_toast.dart';
+import 'package:zcash_wallet/src/features/receive/screens/mobile/mobile_receive_request_screen.dart';
 import 'package:zcash_wallet/src/features/receive/screens/mobile/mobile_receive_screen.dart';
 import 'package:zcash_wallet/src/features/receive/services/request_qr_export.dart';
 import 'package:zcash_wallet/src/features/receive/widgets/mobile/receive_qr_frame.dart';
@@ -142,10 +145,23 @@ Widget _app(
       receiveAddressServiceProvider.overrideWithValue(service),
       ...extraOverrides,
     ],
-    child: MaterialApp(
+    child: MaterialApp.router(
       localizationsDelegates: appLocalizationsDelegates,
       builder: (_, child) => AppTheme(data: AppThemeData.dark, child: child!),
-      home: const MobileReceiveScreen(),
+      routerConfig: GoRouter(
+        initialLocation: '/receive',
+        routes: [
+          GoRoute(
+            path: '/receive',
+            builder: (_, _) => const MobileReceiveScreen(),
+          ),
+          GoRoute(
+            path: kReceiveRequestPath,
+            builder: (_, state) =>
+                MobileReceiveRequestScreen(address: state.extra! as String),
+          ),
+        ],
+      ),
     ),
   );
 }
@@ -222,6 +238,39 @@ void main() {
       ),
     );
     expect(helpIcon.color, AppThemeData.dark.colors.icon.muted);
+  });
+
+  testWidgets('the address hands over with the cards, never doubled', (
+    tester,
+  ) async {
+    await _pumpReceive(tester, _FakeReceiveAddressService());
+
+    final line = find.byType(ReceiveAddressLine);
+    double opacity() => tester
+        .widget<Opacity>(
+          find.ancestor(of: line, matching: find.byType(Opacity)).first,
+        )
+        .opacity;
+    Finder lineFor(String pool) =>
+        find.byKey(ValueKey('mobile_receive_address_line_$pool'));
+
+    await tester.tap(find.text('Transparent'));
+    await tester.pump();
+    // Early in the switch the shielded address is fading out with the cards.
+    await tester.pump(const Duration(milliseconds: 33));
+    expect(line, findsOneWidget);
+    expect(lineFor('shielded'), findsOneWidget);
+    expect(opacity(), inExclusiveRange(0, 0.5));
+    // Then the transparent address fades in as the cards settle.
+    await tester.pump(const Duration(milliseconds: 33));
+    expect(line, findsOneWidget);
+    expect(lineFor('transparent'), findsOneWidget);
+    expect(opacity(), inExclusiveRange(0.2, 0.9));
+
+    await _settle(tester);
+    expect(line, findsOneWidget);
+    expect(lineFor('transparent'), findsOneWidget);
+    expect(opacity(), 1);
   });
 
   testWidgets('switching to transparent swaps labels and address', (
@@ -624,12 +673,12 @@ void main() {
       ),
       findsOneWidget,
     );
+    // The explainer uses the filled shield, as does the shielded pool tab.
     expect(
       find.byWidgetPredicate(
-        (widget) =>
-            widget is AppIcon && widget.name == AppIcons.shieldKeyholeOutline,
+        (widget) => widget is AppIcon && widget.name == AppIcons.shieldKeyhole,
       ),
-      findsOneWidget,
+      findsAtLeastNWidgets(1),
     );
     expect(
       find.byWidgetPredicate(
@@ -829,7 +878,7 @@ void main() {
     );
   });
 
-  testWidgets('closing the request message collapses it and drops the text', (
+  testWidgets('the request message is added and cleared in the message sheet', (
     tester,
   ) async {
     await _pumpReceive(tester, _FakeReceiveAddressService());
@@ -842,25 +891,51 @@ void main() {
     );
     await _settle(tester);
 
+    // The line under the card opens Send's message sheet with the request's
+    // own copy: anyone given the link can read the message.
     await tester.tap(find.byKey(const ValueKey('request_message_row')));
     await _settle(tester);
+    final sheet = find.byType(MobileMemoSheet);
+    expect(sheet, findsOneWidget);
+    expect(
+      find.descendant(of: sheet, matching: find.text('Add a message')),
+      findsWidgets,
+    );
+    expect(
+      find.descendant(
+        of: sheet,
+        matching: find.text('Anyone you send the link to can read this'),
+      ),
+      findsOneWidget,
+    );
     await tester.enterText(
-      find.byKey(const ValueKey('request_message_field')),
+      find.byKey(const ValueKey('mobile_send_memo_editable')),
       'Table 4',
     );
     await _settle(tester);
-
-    // The control is labelled "Close message", so it has to close it.
-    final close = find.bySemanticsLabel('Close message');
-    expect(close, findsOneWidget);
-    await tester.tap(close);
+    await tester.tap(find.byKey(const ValueKey('mobile_send_memo_save')));
     await _settle(tester);
+    expect(sheet, findsNothing);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('request_message_preview')))
+          .data,
+      'Table 4',
+    );
 
-    expect(find.byKey(const ValueKey('request_message_field')), findsNothing);
-    expect(find.byKey(const ValueKey('request_message_row')), findsOneWidget);
+    // Reopened on the saved message, the sheet offers to clear it.
+    await tester.tap(find.byKey(const ValueKey('request_message_row')));
+    await _settle(tester);
+    final clear = find.byKey(const ValueKey('mobile_send_memo_clear'));
+    expect(
+      find.descendant(of: clear, matching: find.text('Clear')),
+      findsOneWidget,
+    );
+    await tester.tap(clear);
+    await _settle(tester);
     expect(find.byKey(const ValueKey('request_message_preview')), findsNothing);
 
-    // And the message is gone from the request, not just from the editor.
+    // And the message is gone from the request, not just from the line.
     await tester.tap(find.byKey(const ValueKey('request_create_button')));
     await _settle(tester);
     expect(
@@ -884,23 +959,18 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('request_message_row')));
     await _settle(tester);
-    // U+202E cannot travel in a ZIP-321 memo, so the draft drops it. The
-    // field has to say so: a link that differs from what is on screen is a
-    // silent, unrecoverable edit.
-    await tester.enterText(
-      find.byKey(const ValueKey('request_message_field')),
-      'Table\u202E 4',
-    );
+    // U+202E cannot travel in a ZIP-321 memo, so the sheet drops it as it is
+    // typed. The field has to say so: a link that differs from what is on
+    // screen is a silent, unrecoverable edit.
+    final field = find.byKey(const ValueKey('mobile_send_memo_editable'));
+    await tester.enterText(field, 'Table\u202E 4');
     await _settle(tester);
 
-    expect(_requestMessageFieldText(tester), 'Table 4');
-    expect(
-      tester
-          .widget<Text>(find.byKey(const ValueKey('request_message_counter')))
-          .data,
-      '7/512',
-    );
+    expect(tester.widget<TextField>(field).controller!.text, 'Table 4');
+    expect(find.text('7/512'), findsOneWidget);
 
+    await tester.tap(find.byKey(const ValueKey('mobile_send_memo_save')));
+    await _settle(tester);
     await tester.tap(find.byKey(const ValueKey('request_create_button')));
     await _settle(tester);
     expect(
@@ -1119,17 +1189,4 @@ void main() {
       'zcash:$_transparent?amount=1',
     );
   });
-}
-
-/// What the message editor actually holds, not what the draft was given.
-String _requestMessageFieldText(WidgetTester tester) {
-  return tester
-      .widget<EditableText>(
-        find.descendant(
-          of: find.byKey(const ValueKey('request_message_field')),
-          matching: find.byType(EditableText),
-        ),
-      )
-      .controller
-      .text;
 }

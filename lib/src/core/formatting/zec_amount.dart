@@ -128,6 +128,7 @@ class ZecAmount {
     int minFractionDigits = 2,
     int maxFractionDigits = 5,
     bool hideZeroFraction = true,
+    ZecDenomStyle denomStyle = ZecDenomStyle.none,
   }) {
     assert(minFractionDigits >= 0 && minFractionDigits <= 8);
     assert(maxFractionDigits >= 0 && maxFractionDigits <= 8);
@@ -148,7 +149,7 @@ class ZecAmount {
         zatoshi,
         minFractionDigits: minFractionDigits,
         maxFractionDigits: maxFractionDigits,
-        denomStyle: ZecDenomStyle.none,
+        denomStyle: denomStyle,
         denomination: null,
         signed: false,
         trimTrailingZeros: true,
@@ -165,6 +166,7 @@ class ZecAmount {
     return pretty(
       minFractionDigits: minFractionDigits,
       maxFractionDigits: fractionDigits,
+      denomStyle: denomStyle,
       hideZeroFraction: hideZeroFraction,
     );
   }
@@ -189,10 +191,14 @@ class ZecAmount {
 
   ZecAmountPretty get activity => activityPretty();
 
-  ZecAmountPretty activityDetailPretty({String? denomination}) => pretty(
+  ZecAmountPretty activityDetailPretty({
+    String? denomination,
+    bool signed = false,
+  }) => pretty(
     minFractionDigits: 2,
     denomStyle: ZecDenomStyle.upper,
     denomination: denomination,
+    signed: signed,
   );
 
   ZecAmountPretty get activityDetail => activityDetailPretty();

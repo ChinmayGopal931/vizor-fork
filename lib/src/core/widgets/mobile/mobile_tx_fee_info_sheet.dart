@@ -18,25 +18,15 @@ Future<void> showMobileTxFeeInfoSheet(
     context: context,
     builder: (sheetContext) {
       final colors = sheetContext.colors;
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.sm,
-          AppSpacing.base,
-          AppSpacing.sm,
-          AppSpacing.base,
-        ),
+      void close() => Navigator.of(sheetContext).pop();
+      return MobileModalScaffold(
+        title: title ?? sheetContext.l10n.txFeeInfoTitle,
+        titleMaxLines: 3,
+        onClose: close,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              title ?? sheetContext.l10n.txFeeInfoTitle,
-              style: AppTypography.headlineSmall.copyWith(
-                color: colors.text.accent,
-                fontWeight: AppFontWeight.heading,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
             Text(
               description ?? sheetContext.l10n.txFeeInfoDescription,
               style: AppTypography.bodyMedium.copyWith(
@@ -47,7 +37,7 @@ Future<void> showMobileTxFeeInfoSheet(
             AppButton(
               variant: AppButtonVariant.secondary,
               expand: true,
-              onPressed: () => Navigator.of(sheetContext).pop(),
+              onPressed: close,
               child: Text(sheetContext.l10n.commonClose),
             ),
           ],

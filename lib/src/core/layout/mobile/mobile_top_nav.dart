@@ -12,6 +12,11 @@ import 'mobile_sync_status.dart';
 /// Height of [MobileTopNav] — Figma `Mobile Top Nav` (node 4237:92733).
 const double kMobileTopNavHeight = 72;
 
+/// Left and right margin of mobile pages: the top nav's account row and the
+/// tab roots' scroll content start and end on it. Wider than the 16px
+/// spacing token so content gets more air from the screen edge.
+const double kMobilePageMargin = 20;
+
 /// Mobile top navigation bar with the three Figma variants:
 ///
 /// - [MobileTopNav.account] — avatar + account name (+ optional balance)
@@ -200,7 +205,7 @@ class MobileTopNav extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) => Row(
         children: [
-          const SizedBox(width: AppSpacing.sm),
+          const SizedBox(width: kMobilePageMargin),
           Expanded(
             child: Align(alignment: Alignment.centerLeft, child: account),
           ),
@@ -214,6 +219,7 @@ class MobileTopNav extends StatelessWidget {
               ),
               child: MobileSyncStatus(
                 label: syncLabel!,
+                semanticsLabel: syncSemanticsLabel,
                 baseColor: syncLabelColor ?? colors.sync.text,
                 highlightColor:
                     syncHighlightColor ?? syncLabelColor ?? colors.sync.text,
@@ -222,7 +228,7 @@ class MobileTopNav extends StatelessWidget {
               ),
             )
           else
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: kMobilePageMargin),
         ],
       ),
     );
@@ -306,7 +312,9 @@ class MobileTopNav extends StatelessWidget {
               color: foregroundColor,
             ),
           ),
-        if (trailing != null) Positioned(right: AppSpacing.s, child: trailing!),
+        // Inside the page margin the cards below use.
+        if (trailing != null)
+          PositionedDirectional(end: kMobilePageMargin, child: trailing!),
       ],
     );
   }

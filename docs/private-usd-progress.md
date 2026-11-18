@@ -179,6 +179,15 @@ for UI milestones) passing, and its Pitfalls re-read against the diff.
   `railgun-sepolia-list`, which repairs the chain and logs nothing. Checked
   live against the screening node; not yet seen on a phone.
 
+- **Zakura Common 5.4 (2026-11-18, branch `sync/upstream-2026-11-18`).**
+  Upstream `main` at `a69183bc0` merged, with #1211's move to the Common 5.4
+  crates, backend and SQLite 0.1.0-rc9.8, PCZT 0.1.0-rc9.1 and PIR rc7, all
+  from crates.io. Both stand-ins moved: E1 to zecswap-core on Common 5.4
+  (branch `veylor/zakura-v5` in a local clone, `~/dev/zecswap-common5`,
+  patched in until it is pushed; only its pins changed, and its tests pass),
+  E4 to the published rc9.8 with the `connect_stream` patch. Not yet run on a
+  phone.
+
 - **Zakura Common v4 and NU7 (2026-11-01, branch `sync/upstream-2026-11`).**
   Upstream `main` at `a546cd3ec` merged: the Common 4.0.0 crates, which carry
   mainnet NU7 at 3,543,405 (v3 had none, so every mainnet transaction after
