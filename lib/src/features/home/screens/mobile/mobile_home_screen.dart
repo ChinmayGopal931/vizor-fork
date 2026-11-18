@@ -50,6 +50,7 @@ import '../../../../providers/rpc_endpoint_provider.dart';
 import '../../../../providers/sync_failure.dart';
 import '../../../../providers/sync_keep_awake_provider.dart';
 import '../../../../providers/sync_display_progress_provider.dart';
+import '../../../../providers/spendable_wait_provider.dart';
 import '../../../../providers/sync_provider.dart';
 import '../../../../providers/pending_activity_evidence_provider.dart';
 import '../../../../providers/zec_price_change_provider.dart';
@@ -57,6 +58,7 @@ import '../../../../rust/api/sync.dart' as rust_sync;
 import '../../../accounts/widgets/mobile/mobile_accounts_sheet.dart';
 import '../../../activity/activity_feed_sections.dart';
 import '../../../activity/gift_card_activity_index.dart';
+import '../../../activity/models/activity_row_data.dart';
 import '../../../activity/activity_eta_provider.dart';
 import '../../../activity/activity_row_mapper.dart';
 import '../../../activity/screens/mobile/mobile_transaction_status_screen.dart';
@@ -77,7 +79,10 @@ import '../../../private_usd/providers/private_usd_activity_provider.dart';
 import '../../../private_usd/widgets/mobile/private_usd_activity_rows.dart';
 import '../../../private_usd/widgets/mobile/private_usd_banner.dart';
 import '../../../private_usd/widgets/mobile/private_usd_home_strip.dart';
+import '../../../receive/widgets/mobile/receive_options_sheet.dart';
+import '../../../receive/screens/mobile/mobile_receive_request_screen.dart';
 import '../../../swap/models/swap_activity_navigation.dart';
+import '../../../swap/providers/swap_payout_discovery_provider.dart';
 import '../../../swap/widgets/swap_activity_status_auto_refresh.dart';
 import '../../services/transparent_balance_display.dart';
 import '../../widgets/mobile/shield/mobile_shield_backdrop.dart';
@@ -165,6 +170,10 @@ class MobileHomeScreen extends ConsumerWidget {
             const _SyncKeepAwakePromptHost(),
             const _IronwoodMigrationAnnouncementHost(),
             const _Nu7AnnouncementHost(),
+            // TODO(backup-reminder): mount the backup reminder here. Tony Yoon
+            // is building the version that asks a new user to back up their
+            // secret passphrase; integrate it beside the NU7 announcement, which
+            // already waits for Home to be the visible route.
             _IronwoodMigrationAttentionMountGate(
               isHomeCurrent: isCurrentHomeRoute,
             ),
@@ -668,6 +677,9 @@ const _mobileHomeLabelMStyle = TextStyle(
   fontSize: 14,
   height: 16 / 14,
   letterSpacing: -0.06,
+  // Tabular figures keep the live fiat value and 24h change from shifting
+  // width as their digits update.
+  fontFeatures: [FontFeature.tabularFigures()],
 );
 
 const _mobileHomeActionButtonHeight = AppButtonSizing.largeHeight;
@@ -792,7 +804,6 @@ class _SyncKeepAwakePromptSheet extends StatelessWidget {
       title: context.l10n.homeKeepAwakeTitle,
       onClose: onMaybeLater,
       bodyGap: AppSpacing.xxs,
-      bottomPadding: AppSpacing.base,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -976,6 +987,7 @@ class _HomeContentState extends ConsumerState<_HomeContent>
       row: buildTransactionActivityRow(
         context: context,
         transaction: transaction,
+        spendableWaits: ref.watch(activeReceivedSpendableWaitsProvider),
         privateQueriesEnabled: ref.watch(enhancePirProvider),
         showPendingEstimate: !ref
             .watch(activityEtaExcludedTxidsProvider)
@@ -1008,6 +1020,20 @@ class _HomeContentState extends ConsumerState<_HomeContent>
         ),
       ),
     );
+  }
+
+  Future<void> _openReceiveOptions() async {
+    unawaited(AppHaptics.action());
+    final option = await showReceiveOptionsSheet(context);
+    if (!mounted || option == null) return;
+    switch (option) {
+      case ReceiveOption.receive:
+        _pushUsedScreen('/receive');
+      case ReceiveOption.request:
+        await openActiveAccountReceiveRequest(context, ref);
+      case ReceiveOption.redeemGiftCard:
+        _pushUsedScreen('/payment-links?redeem=1');
+    }
   }
 
   void _openLoadedTransactionStatus(rust_sync.TransactionInfo transaction) {
@@ -1122,6 +1148,36 @@ class _HomeContentState extends ConsumerState<_HomeContent>
     final privateUsd = uuid == null
         ? PrivateUsdActivity.empty
         : ref.watch(privateUsdActivityProvider(uuid));
+    // Home checks the payout only of a swap it shows, so it builds that row
+    // again with the check once sorting shows which rows those are.
+    ActivityRowData swapRow(SwapActivityRowItem item, {bool shown = false}) =>
+        buildSwapActivityRow(
+          context: context,
+          item: item,
+          privacyModeEnabled: privacyModeEnabled,
+          dateOnlyTimestamp: true,
+          onTap: () => _pushUsedScreen(
+            swapActivityDetailUri(
+              intentId: item.intentId,
+              returnTarget: SwapActivityReturnTarget.home,
+            ).toString(),
+          ),
+          receivedAmountText: _absorbedReceiveAmountText(
+            swapReceiveTxByIntent[item.intentId],
+          ),
+          onReceivedLegTap: switch (swapReceiveTxByIntent[item.intentId]) {
+            null => null,
+            final tx => () => _openLoadedTransactionStatus(tx),
+          },
+          findingPayout:
+              shown &&
+              swapReceiveTxByIntent[item.intentId] == null &&
+              watchSwapFindingPayout(
+                ref,
+                accountUuid: uuid,
+                awaitingTxid: item.payoutAwaitingDiscovery,
+              ),
+        );
     final entries = <ActivityEntry>[
       for (final tx in giftCardActivityIndex.withPendingClaims(
         sync.recentTransactions,
@@ -1139,28 +1195,7 @@ class _HomeContentState extends ConsumerState<_HomeContent>
             privacyModeEnabled: privacyModeEnabled,
           ),
       for (final item in swapItems)
-        ActivityEntry(
-          timestamp: item.activityTimestamp,
-          row: buildSwapActivityRow(
-            context: context,
-            item: item,
-            privacyModeEnabled: privacyModeEnabled,
-            dateOnlyTimestamp: true,
-            onTap: () => _pushUsedScreen(
-              swapActivityDetailUri(
-                intentId: item.intentId,
-                returnTarget: SwapActivityReturnTarget.home,
-              ).toString(),
-            ),
-            receivedAmountText: _absorbedReceiveAmountText(
-              swapReceiveTxByIntent[item.intentId],
-            ),
-            onReceivedLegTap: switch (swapReceiveTxByIntent[item.intentId]) {
-              null => null,
-              final tx => () => _openLoadedTransactionStatus(tx),
-            },
-          ),
-        ),
+        ActivityEntry(timestamp: item.activityTimestamp, row: swapRow(item)),
       ...privateUsdFeedEntries(
         context: context,
         activity: privateUsd,
@@ -1171,9 +1206,15 @@ class _HomeContentState extends ConsumerState<_HomeContent>
         onOpenRefunds: () => _pushUsedScreen('/private-usd/refunds'),
       ),
     ]..sort(compareActivityEntries);
+    final swapItemsByRowId = {
+      for (final item in swapItems) item.stableId: item,
+    };
     final recentRows = [
       for (final entry in entries.take(MobileHomeScreen._recentActivityLimit))
-        entry.row,
+        switch (swapItemsByRowId[entry.row.stableId]) {
+          final item? => swapRow(item, shown: true),
+          null => entry.row,
+        },
     ];
 
     final initialPresentation = ref.watch(
@@ -1192,9 +1233,9 @@ class _HomeContentState extends ConsumerState<_HomeContent>
 
     final content = ListView(
       padding: EdgeInsets.fromLTRB(
-        AppSpacing.sm,
+        kMobilePageMargin,
         AppSpacing.xxs,
-        AppSpacing.sm,
+        kMobilePageMargin,
         MobileNavigationScope.bottomClearanceOf(
           context,
           kMobileTabBarHeight + AppSpacing.lg,
@@ -1298,10 +1339,7 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                         expand: true,
                         constrainContent: true,
                         variant: AppButtonVariant.secondary,
-                        onPressed: () {
-                          unawaited(AppHaptics.action());
-                          _pushUsedScreen('/receive');
-                        },
+                        onPressed: () => unawaited(_openReceiveOptions()),
                         leading: const _ButtonIcon(AppIcons.arrowDownCircle),
                         height: _mobileHomeActionButtonHeight,
                         child: Text(
@@ -1322,10 +1360,7 @@ class _HomeContentState extends ConsumerState<_HomeContent>
                   key: const ValueKey('mobile_home_receive'),
                   expand: true,
                   constrainContent: true,
-                  onPressed: () {
-                    unawaited(AppHaptics.action());
-                    _pushUsedScreen('/receive');
-                  },
+                  onPressed: () => unawaited(_openReceiveOptions()),
                   leading: const _ButtonIcon(AppIcons.addNew),
                   height: _mobileHomeActionButtonHeight,
                   child: Text(
@@ -2340,7 +2375,11 @@ class _MobileTransparentBalanceStrip extends StatelessWidget {
     );
 
     return SizedBox(
-      height: _mobileTransparentBalanceStripHeight,
+      // Grows with its text line under a larger text size.
+      height:
+          _mobileTransparentBalanceStripHeight +
+          MediaQuery.textScalerOf(context).scale(17) -
+          17,
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.sm,
@@ -2511,8 +2550,8 @@ class _RecentActivityHeader extends StatelessWidget {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: onSeeAll,
-            child: SizedBox(
-              height: 24,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 24),
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.xxs),
                 child: Row(
@@ -2606,7 +2645,7 @@ class _MobileRestImage extends StatelessWidget {
 class _ImportingView extends StatelessWidget {
   const _ImportingView({required this.progress, super.key});
 
-  static const _horizontalPadding = AppSpacing.sm;
+  static const _horizontalPadding = kMobilePageMargin;
   static const _topGap = AppSpacing.sm;
   static const _contentToRestGap = AppSpacing.lg;
 

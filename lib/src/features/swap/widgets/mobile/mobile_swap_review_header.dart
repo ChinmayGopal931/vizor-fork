@@ -5,6 +5,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/mobile/mobile_address_verify_sheet.dart';
 import '../../../../core/widgets/review_info_row.dart';
 import '../../domain/swap_contract.dart';
+import '../one_time_address_label.dart';
 import '../swap_asset_icon.dart';
 
 /// One serif row of the mobile swap review header.
@@ -17,6 +18,7 @@ class MobileSwapReviewHeaderRow {
     this.bottomText,
     this.fullAddress,
     this.addressNetworkLabel,
+    this.oneTimeAddress,
   });
 
   /// "You're paying" / "You're receiving".
@@ -43,6 +45,10 @@ class MobileSwapReviewHeaderRow {
   /// Sheet title network label ("Ethereum address"); defaults to the
   /// asset's chain label.
   final String? addressNetworkLabel;
+
+  /// Set when this row's ZEC goes to or comes back to a one-time address,
+  /// shown where another row has "Full address".
+  final OneTimeAddressRole? oneTimeAddress;
 }
 
 /// Paying/receiving block shared by the mobile swap review, progress, and
@@ -53,18 +59,22 @@ class MobileSwapReviewHeader extends StatelessWidget {
   const MobileSwapReviewHeader({
     required this.pay,
     required this.receive,
+    this.flowConnector,
     super.key,
   });
 
   final MobileSwapReviewHeaderRow pay;
   final MobileSwapReviewHeaderRow receive;
 
+  /// Optional replacement for the whole flow arrow row.
+  final Widget? flowConnector;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: ReviewInfoFlow(
-        connector: const MobileSwapFlowArrow(),
+        connector: flowConnector ?? const MobileSwapFlowArrow.row(),
         rows: [_row(context, pay), _row(context, receive)],
       ),
     );
@@ -83,6 +93,9 @@ class MobileSwapReviewHeader extends StatelessWidget {
             showChainBadge: !row.asset.isNativeZec,
           ),
       bottomLeftText: row.bottomText,
+      trailing: fullAddress == null && row.oneTimeAddress != null
+          ? OneTimeAddressLabel(role: row.oneTimeAddress!)
+          : null,
       trailingActionLabel: fullAddress == null
           ? null
           : context.l10n.commonFullAddress,
@@ -112,16 +125,30 @@ class MobileSwapReviewHeader extends StatelessWidget {
 /// The downward flow arrow between a paying and a receiving row: a straight
 /// stem and a 45° head drawn as a faint neon tube.
 class MobileSwapFlowArrow extends StatelessWidget {
-  const MobileSwapFlowArrow({super.key});
+  const MobileSwapFlowArrow({super.key}) : _row = false;
+
+  /// The arrow as [ReviewInfoFlow]'s connector row: under the rows' leading
+  /// icon column.
+  const MobileSwapFlowArrow.row({super.key}) : _row = true;
 
   static const size = AppIconSize.large;
+
+  final bool _row;
 
   @override
   Widget build(BuildContext context) {
     final neon = context.colors.neon;
-    return CustomPaint(
+    final arrow = CustomPaint(
       size: const Size.square(size),
       painter: _FlowArrowPainter(glow: neon.glow, core: neon.core),
+    );
+    if (!_row) return arrow;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SizedBox(
+        width: AppAssetSize.size,
+        child: Center(child: arrow),
+      ),
     );
   }
 }

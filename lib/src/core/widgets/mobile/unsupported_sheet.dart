@@ -27,7 +27,8 @@ Future<void> showUnsupportedSheet(BuildContext context, {String? message}) {
             Text(
               sheetContext.l10n.commonNotAvailableYet,
               textAlign: TextAlign.center,
-              style: AppTypography.headlineSmall.copyWith(
+              style: AppTypography.bodyLarge.copyWith(
+                fontWeight: AppFontWeight.semiBold,
                 color: colors.text.accent,
               ),
             ),

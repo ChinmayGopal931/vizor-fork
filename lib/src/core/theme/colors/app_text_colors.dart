@@ -22,6 +22,8 @@ const _mobile = kAppFormFactor == AppFormFactor.mobile;
 /// * [success] — Positive / success utility copy.
 /// * [brandCrimson] — Brand-colored inline text accent.
 /// * [homeCard] — Exception text used on the home balance card. Theme-invariant.
+/// * [homeCardPositive] / [homeCardNegative] — 24h price change on the
+///   home balance card. Theme-invariant, like [homeCard].
 class AppTextColors {
   const AppTextColors({
     required this.accent,
@@ -37,6 +39,8 @@ class AppTextColors {
     required this.success,
     required this.brandCrimson,
     required this.homeCard,
+    required this.homeCardPositive,
+    required this.homeCardNegative,
   });
 
   final Color accent;
@@ -52,6 +56,8 @@ class AppTextColors {
   final Color success;
   final Color brandCrimson;
   final Color homeCard;
+  final Color homeCardPositive;
+  final Color homeCardNegative;
 
   static const dark = _mobile ? neonDark : figmaDark;
   static const light = _mobile ? neonLight : figmaLight;
@@ -65,11 +71,13 @@ class AppTextColors {
     inverse: Primitives.p0Dark,
     warning: GoldPrimitives.p500Dark,
     positiveStrong: GreenPrimitives.p400Dark,
-    destructive: PlumPrimitives.p500Dark,
+    destructive: PlumPrimitives.p600Dark,
     destructiveLight: PlumPrimitives.p400Dark,
     success: GoldPrimitives.p500Dark,
-    brandCrimson: CrimsonPrimitives.p400Dark,
+    brandCrimson: CrimsonPrimitives.p700Dark,
     homeCard: Primitives.p800Dark,
+    homeCardPositive: GreenPrimitives.p400Dark,
+    homeCardNegative: PlumPrimitives.p600Dark,
   );
 
   static const figmaLight = AppTextColors(
@@ -81,13 +89,15 @@ class AppTextColors {
     muted: Primitives.p500Light,
     disabled: Primitives.p400Light,
     inverse: Primitives.p0Light,
-    warning: GoldPrimitives.p400Light,
-    positiveStrong: GreenPrimitives.p500Light,
+    warning: GoldPrimitives.p600Light,
+    positiveStrong: GreenPrimitives.p600Light,
     destructive: PlumPrimitives.p300Light,
     destructiveLight: PlumPrimitives.p150Light,
     success: GoldPrimitives.p400Light,
     brandCrimson: CrimsonPrimitives.p300Light,
     homeCard: Primitives.p0Light,
+    homeCardPositive: GreenPrimitives.p300Light,
+    homeCardNegative: PlumPrimitives.p100Light,
   );
 
   static const neonDark = AppTextColors(
@@ -104,6 +114,8 @@ class AppTextColors {
     success: GoldPrimitives.p500Dark,
     brandCrimson: NeonPrimitives.red,
     homeCard: NeonPrimitives.n800Dark,
+    homeCardPositive: GreenPrimitives.p400Dark,
+    homeCardNegative: NeonPrimitives.redHot,
   );
 
   static const neonLight = AppTextColors(
@@ -120,5 +132,7 @@ class AppTextColors {
     success: GoldPrimitives.p400Light,
     brandCrimson: NeonPrimitives.redOnLight,
     homeCard: NeonPrimitives.n800Dark,
+    homeCardPositive: GreenPrimitives.p400Dark,
+    homeCardNegative: NeonPrimitives.redHot,
   );
 }

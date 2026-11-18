@@ -162,10 +162,10 @@ class _MobileTextFieldState extends State<MobileTextField> {
     final focused = widget.focusNode.hasFocus;
     final textStyle =
         widget.textStyle ??
-        AppTypography.labelMedium.copyWith(color: colors.text.accent);
+        AppTypography.labelLarge.copyWith(color: colors.text.accent);
     final hintStyle =
         widget.hintStyle ??
-        AppTypography.labelMedium.copyWith(color: colors.text.muted);
+        AppTypography.labelLarge.copyWith(color: colors.text.muted);
     final surfaceShadow = [
       BoxShadow(color: colors.shadows.subtle, blurRadius: 1),
       BoxShadow(

@@ -5,6 +5,8 @@ import 'package:flutter/widgets.dart';
 
 import '../../theme/app_theme.dart';
 import '../../widgets/app_toast.dart';
+import 'ios_native_tab_bar.dart';
+import 'ios_native_tab_bar_root.dart';
 import 'mobile_bottom_safe_area.dart';
 import 'mobile_navigation_scope.dart';
 
@@ -12,20 +14,48 @@ import 'mobile_navigation_scope.dart';
 /// floating tab bar overlaid at the bottom.
 ///
 /// Layout from the Figma mobile frames (e.g. `Home Default`, node
-/// 4394:88353): the tab bar floats 16px from the horizontal edges and
+/// 4394:88353): the tab bar floats centred at its own width (never closer
+/// than 16px to the horizontal edges) and
 /// page content scrolls underneath it (`extendBody`). Below the bar,
 /// Android keeps the Figma 12px gap above the navigation-bar inset; on
 /// iOS the home indicator floats inside the gap instead, which is
 /// widened to 16px so all three margins around the bar match (see
 /// [MobileBottomSafeArea]).
+/// The iOS native lane instead uses UIKit's full-width fitting height and
+/// safe area, without these Flutter bar margins.
 class AppMobileShell extends StatelessWidget {
-  const AppMobileShell({required this.body, required this.tabBar, super.key});
+  const AppMobileShell({
+    required this.body,
+    required this.tabBar,
+    this.nativeTabBar,
+    super.key,
+  });
 
   final Widget body;
   final Widget tabBar;
+  final IosNativeTabBarConfiguration? nativeTabBar;
 
   @override
   Widget build(BuildContext context) {
+    final native = nativeTabBar;
+    if (native == null) return _buildShell(context, null);
+    if (IosNativeTabBarScope.maybeOf(context) != null) {
+      return IosNativeTabBarRegistration(
+        configuration: native,
+        builder: _buildShell,
+      );
+    }
+    return IosNativeTabBarHost(
+      configuration: native,
+      enabled:
+          (MobileNavigationScope.maybeOf(context)?.mode ??
+              MobileNavigationMode.bottomTabs) ==
+          MobileNavigationMode.bottomTabs,
+      builder: _buildShell,
+    );
+  }
+
+  Widget _buildShell(BuildContext context, Widget? nativeBar) {
     final bottomGap = defaultTargetPlatform == TargetPlatform.iOS
         ? AppSpacing.sm
         : AppSpacing.s;
@@ -48,7 +78,8 @@ class AppMobileShell extends StatelessWidget {
           children: [
             body,
             if (mode == MobileNavigationMode.systemSideTabs &&
-                rail != null) ...[
+                rail != null &&
+                nativeBar == null) ...[
               // As under the bottom bar, content fades into black around the
               // side rail, toward the screen edge and the bottom it stands
               // at. Above the rail that edge stays clear.
@@ -88,23 +119,29 @@ class AppMobileShell extends StatelessWidget {
       ),
       bottomNavigationBar: mode != MobileNavigationMode.bottomTabs
           ? null
-          : DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: _fadeToward(context, Alignment.bottomCenter),
-              ),
-              child: MobileBottomSafeArea(
-                bottomPadding: bottomGap,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    AppSpacing.sm,
-                    AppSpacing.md,
-                    AppSpacing.sm,
-                    bottomGap,
+          : nativeBar ??
+                // Only the Flutter fallback owns this strip. UIKit controls
+                // the native bar's hit surface and safe-area geometry.
+                Listener(
+                  behavior: HitTestBehavior.opaque,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: _fadeToward(context, Alignment.bottomCenter),
+                    ),
+                    child: MobileBottomSafeArea(
+                      bottomPadding: bottomGap,
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          AppSpacing.sm,
+                          AppSpacing.md,
+                          AppSpacing.sm,
+                          bottomGap,
+                        ),
+                        child: tabBar,
+                      ),
+                    ),
                   ),
-                  child: tabBar,
                 ),
-              ),
-            ),
     );
   }
 

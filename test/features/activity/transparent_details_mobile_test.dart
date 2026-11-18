@@ -137,14 +137,16 @@ void main() {
         ),
     // Mobile draws receipt titles uppercase in the top bar.
     titles: const ReceiptTitles(
-      received: 'RECEIVED',
-      receiving: 'RECEIVING...',
-      receiveFailed: 'RECEIVE FAILED',
+      received: 'RECEIVED ZEC',
+      receiving: 'RECEIVING ZEC...',
+      receiveFailed: 'RECEIVE ZEC FAILED',
       shielded: 'SHIELDED',
-      sending: 'SENDING...',
-      sent: 'SENT SUCCESSFULLY',
-      sendFailed: 'SEND FAILED',
+      sending: 'SENDING ZEC...',
+      sent: 'SENT ZEC',
+      sendFailed: 'SEND ZEC FAILED',
       transaction: 'TRANSACTION',
+      recipient: 'Recipient',
+      showsOwnReceivingAddress: false,
     ),
   );
   testWidgets('mobile receipt never names an output its recipient', (
@@ -157,7 +159,7 @@ void main() {
       ),
     ]);
     final prioritized = await _pump(tester, details);
-    expect(find.text('SENT SUCCESSFULLY'), findsOneWidget);
+    expect(find.text('SENT ZEC'), findsOneWidget);
     expect(find.text(testL10n.activityDetailsUnknownRecipient), findsOneWidget);
     expect(find.text('Show full address'), findsNothing);
     // The other party's output is listed as the transaction's; the change is

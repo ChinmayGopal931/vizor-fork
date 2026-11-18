@@ -16,6 +16,7 @@ import 'swap_privacy_mask.dart';
 import 'swap_status_presentation.dart';
 import 'swap_token_amount_formatting.dart';
 import '../../../core/l10n/l10n.dart';
+import 'one_time_address_role.dart';
 
 class SwapActivityAccountDetail {
   const SwapActivityAccountDetail({required this.name, this.profilePictureId});
@@ -53,12 +54,16 @@ class PayActivityStatusPresentation {
     this.refundedAmountText,
     this.refundFeeText,
     this.txIdUri,
+    this.txIdCopyText,
   });
 
   final PayActivityStatusPhase phase;
   final String timestampText;
   final String txIdText;
   final Uri? txIdUri;
+
+  /// Full Tx ID, copied where the row offers no explorer link.
+  final String? txIdCopyText;
   final String convertedFromText;
   final String transactionFeeText;
   final String? refundAddress;
@@ -109,6 +114,7 @@ class SwapActivityStatusPresentation {
     this.explorerUri,
     required this.showTabs,
     this.allDetailsInProgress = false,
+    this.oneTimeAddress,
   });
 
   final String title;
@@ -154,6 +160,10 @@ class SwapActivityStatusPresentation {
   /// transaction rows there; a Private USD conversion's rows are all its
   /// own transactions, so it shows them all.
   final bool allDetailsInProgress;
+
+  /// Set when the swap's ZEC side uses a one-time address: the payout when
+  /// receiving ZEC, the refund when sending it.
+  final OneTimeAddressRole? oneTimeAddress;
 }
 
 SwapActivityStatusPresentation swapActivityStatusPresentationForIntent(
@@ -163,6 +173,7 @@ SwapActivityStatusPresentation swapActivityStatusPresentationForIntent(
   SwapActivityAccountDetail? accountDetail,
   Iterable<AddressBookContact> addressBookContacts = const [],
   BigInt? confirmedDepositFeeZatoshi,
+  bool findingPayout = false,
   bool privacyModeEnabled = false,
 }) {
   final sellAsset = swapActivitySellAsset(intent) ?? SwapAsset.zec;
@@ -233,10 +244,19 @@ SwapActivityStatusPresentation swapActivityStatusPresentationForIntent(
     }
   }
 
+  // Until the wallet finds the payout, the swap reads as in progress.
+  final labelStatus = findingPayout
+      ? SwapIntentStatus.processing
+      : intent.status;
   return SwapActivityStatusPresentation(
+    oneTimeAddress: intent.privateAddress
+        ? (sendsZec ? OneTimeAddressRole.refund : OneTimeAddressRole.payout)
+        : null,
     // Keep the generic swap presentation stable. Pay surfaces consume the
     // dedicated [payStatus] contract instead of relabelling generic details.
-    title: _swapActivityStatusTitle(l10n, intent),
+    title: findingPayout
+        ? l10n.swapActivitySwapInProgress
+        : _swapActivityStatusTitle(l10n, intent),
     payAsset: sellAsset,
     receiveAsset: receiveAsset,
     payFiatText: payFiatText,
@@ -253,9 +273,9 @@ SwapActivityStatusPresentation swapActivityStatusPresentationForIntent(
         ? _payIntentShowsPaidCopy(intent)
               ? l10n.swapActivityYouPaid
               : l10n.commonYouPay
-        : _swapShowsTerminalFailureLabels(intent.status)
+        : _swapShowsTerminalFailureLabels(labelStatus)
         ? l10n.swapActivityDepositAmount
-        : intent.status == SwapIntentStatus.complete
+        : labelStatus == SwapIntentStatus.complete
         ? l10n.swapActivityYouPaid
         : l10n.commonYourePaying,
     receiveLabel: payMode
@@ -267,19 +287,27 @@ SwapActivityStatusPresentation swapActivityStatusPresentationForIntent(
             SwapIntentStatus.incompleteDeposit => l10n.commonAmount,
             _ => l10n.commonRecipientGets,
           }
-        : _swapShowsTerminalFailureLabels(intent.status)
+        : _swapShowsTerminalFailureLabels(labelStatus)
         ? l10n.swapActivityExpectedToReceive
-        : intent.status == SwapIntentStatus.complete
+        : labelStatus == SwapIntentStatus.complete
         ? l10n.swapActivityYouReceived
         : l10n.commonYoureReceiving,
     payDetailText: payDetailText,
     payDetailCopyText: payDetailCopyText,
     receiveDetailText: receiveDetailText,
     receiveDetailCopyText: receiveDetailCopyText,
-    statusLabel: _swapActivityStatusLabel(l10n, intent.status),
-    badgeKind: _swapActivityStatusBadgeKind(intent.status),
+    statusLabel: findingPayout
+        ? l10n.swapFindingPayout
+        : _swapActivityStatusLabel(l10n, intent.status),
+    badgeKind: findingPayout
+        ? SwapStatusBadgeKind.liveQuote
+        : _swapActivityStatusBadgeKind(intent.status),
     progressIndex: _swapActivityStatusProgressIndex(intent),
-    steps: _swapActivityProgressSteps(l10n, intent),
+    steps: _swapActivityProgressSteps(
+      l10n,
+      intent,
+      findingPayout: findingPayout,
+    ),
     details: _swapActivityStatusDetails(
       l10n,
       intent,
@@ -294,7 +322,8 @@ SwapActivityStatusPresentation swapActivityStatusPresentationForIntent(
     explorerUri: swapActivityExplorerUri(intent),
     // Mobile keeps the shared progress tabs while reading its detail values
     // from [payStatus]; desktop renders its dedicated Pay status content.
-    showTabs: !intent.status.isTerminal,
+    // A payout still being found keeps its steps, like any swap in progress.
+    showTabs: findingPayout || !intent.status.isTerminal,
   );
 }
 
@@ -352,6 +381,7 @@ PayActivityStatusPresentation? _payActivityStatusPresentation(
             separator: '...',
           ),
     txIdUri: swapActivityExplorerUri(intent),
+    txIdCopyText: explorerId,
     convertedFromText: amount(intent.sellAmount),
     transactionFeeText:
         confirmedDepositFeeZatoshi != null &&
@@ -459,8 +489,9 @@ int _swapActivityStatusProgressIndex(SwapIntent intent) {
 
 List<SwapStatusStepData> _swapActivityProgressSteps(
   AppLocalizations l10n,
-  SwapIntent intent,
-) {
+  SwapIntent intent, {
+  bool findingPayout = false,
+}) {
   final sourceSymbol = swapActivityPairSymbol(l10n, intent.pair, 0);
   final receiveSymbol = swapActivityPairSymbol(l10n, intent.pair, 1);
   if (intent.payMode && intent.direction == SwapDirection.zecToExternal) {
@@ -547,16 +578,25 @@ List<SwapStatusStepData> _swapActivityProgressSteps(
       lastCheckedLabel: lastCheckedLabel,
       description: l10n.swapActivityStepSwapDescription,
     ),
-    SwapStatusStepData(
-      title: deliveryTitle,
-      state: SwapStatusStepState.pending,
-      kind: sendsZecToExternal
-          ? SwapStatusStepKind.other
-          : SwapStatusStepKind.walletDelivery,
-      activeTitle: deliveryActive,
-      lastCheckedLabel: lastCheckedLabel,
-      description: l10n.swapActivityStepDeliverSwapDescription,
-    ),
+    if (findingPayout)
+      SwapStatusStepData(
+        title: deliveryTitle,
+        state: SwapStatusStepState.pending,
+        kind: SwapStatusStepKind.walletDelivery,
+        activeTitle: l10n.swapFindingPayout,
+        description: l10n.swapActivityStepFindingPayoutDescription,
+      )
+    else
+      SwapStatusStepData(
+        title: deliveryTitle,
+        state: SwapStatusStepState.pending,
+        kind: sendsZecToExternal
+            ? SwapStatusStepKind.other
+            : SwapStatusStepKind.walletDelivery,
+        activeTitle: deliveryActive,
+        lastCheckedLabel: lastCheckedLabel,
+        description: l10n.swapActivityStepDeliverSwapDescription,
+      ),
   ];
 }
 
@@ -623,7 +663,6 @@ List<SwapStatusDetailRowData> _swapActivityStatusDetails(
       l10n,
       intent.completedAt ?? intent.createdAt,
     );
-    final explorerUri = swapActivityExplorerUri(intent);
     return [
       if (!failed && !payMode)
         SwapStatusDetailRowData(
@@ -645,9 +684,10 @@ List<SwapStatusDetailRowData> _swapActivityStatusDetails(
           value: compactSwapAddress(depositTxHash),
           copyable: true,
           copyText: depositTxHash,
-          linkUri: explorerUri,
         ),
-      if (payMode &&
+      // The explorer link on the Tx ID row shows the delivery; a confidential
+      // swap has no link, so it keeps the hash.
+      if (intent.confidential &&
           destinationChainTxHash != null &&
           destinationChainTxHash.isNotEmpty)
         SwapStatusDetailRowData(
@@ -748,7 +788,13 @@ List<SwapStatusDetailRowData> _swapActivityStatusDetails(
         addressBookContacts: addressBookContacts,
         contactId: intent.userExternalContactId,
       ),
-    if (depositAddress != null && depositAddress.isNotEmpty)
+    // The Tx ID row carries this address too, so it shows here only while
+    // the user still has a deposit to send from another wallet.
+    if (depositAddress != null &&
+        depositAddress.isNotEmpty &&
+        !sendsZec &&
+        intent.status != SwapIntentStatus.depositObserved &&
+        intent.status != SwapIntentStatus.processing)
       ..._addressDetailRows(
         label: l10n.swapActivityDetailDepositTo(sourceSymbol),
         kind: SwapStatusDetailKind.depositAddress,
@@ -930,14 +976,17 @@ String? _recordedRefundFeeText(SwapProviderRefundInfo? info) {
   return _firstNonEmpty([info?.recordedRefundFeeText]);
 }
 
-Uri? swapActivityExplorerUri(SwapIntent intent) => nearIntentsExplorerUri(
-  depositAddress: intent.depositAddress,
-  nearIntentHash: intent.nearIntentHash,
-  depositTxHash: _firstNonEmpty([
-    intent.depositTxHash,
-    intent.originChainTxHash,
-  ]),
-);
+/// The explorer cannot show a confidential swap, so it gets no link.
+Uri? swapActivityExplorerUri(SwapIntent intent) => intent.confidential
+    ? null
+    : nearIntentsExplorerUri(
+        depositAddress: intent.depositAddress,
+        nearIntentHash: intent.nearIntentHash,
+        depositTxHash: _firstNonEmpty([
+          intent.depositTxHash,
+          intent.originChainTxHash,
+        ]),
+      );
 
 SwapStatusDetailRowData? _swapActivityTxIdRow(
   AppLocalizations l10n,
@@ -951,14 +1000,17 @@ SwapStatusDetailRowData? _swapActivityTxIdRow(
   ]);
   if (txId == null || txId.isEmpty) return null;
 
+  // A confidential swap keeps the row, copyable, without the explorer link.
   final linkUri = swapActivityExplorerUri(intent);
-  if (linkUri == null) return null;
+  if (linkUri == null && !intent.confidential) return null;
 
   return SwapStatusDetailRowData(
     label: l10n.commonTxId,
     kind: SwapStatusDetailKind.txId,
     value: compactSwapAddress(txId),
     linkUri: linkUri,
+    copyable: linkUri == null,
+    copyText: txId,
   );
 }
 
@@ -1241,10 +1293,14 @@ class SwapActivityDepositInstruction {
     this.qr,
   });
 
+  /// The instructions for funding `intent`, or null while it has none to show,
+  /// including while its wallet start is pending (see
+  /// [SwapIntent.startPending]).
   static SwapActivityDepositInstruction? fromIntent(
     AppLocalizations l10n,
     SwapIntent intent,
   ) {
+    if (intent.startPending) return null;
     final direction = intent.direction;
     final externalAsset = intent.externalAsset;
     final depositAddress = intent.depositAddress;

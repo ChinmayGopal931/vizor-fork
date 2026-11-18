@@ -13,6 +13,7 @@ import '../../../core/layout/mobile/mobile_top_nav.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_icon.dart';
+import '../../../core/widgets/mobile/mobile_surface_card.dart';
 import '../../../providers/account_provider.dart';
 import '../../../providers/app_security_provider.dart';
 import '../../../providers/wallet_mutation_guard.dart';
@@ -78,6 +79,7 @@ class _DesktopLinkNoticeCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.background.ground,
         borderRadius: BorderRadius.circular(AppRadii.large),
+        boxShadow: mobileSurfaceShadows(colors),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -879,9 +881,9 @@ class _WalletLinkSelectionScaffold extends StatelessWidget {
                   children: [
                     SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.sm,
+                        kMobilePageMargin,
                         AppSpacing.md,
-                        AppSpacing.sm,
+                        kMobilePageMargin,
                         132,
                       ),
                       child: Column(
@@ -1007,6 +1009,7 @@ class _WalletLinkNothingToImportCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.background.ground,
         borderRadius: BorderRadius.circular(AppRadii.medium),
+        boxShadow: mobileSurfaceShadows(colors),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1075,9 +1078,9 @@ class _SelectionBottomAction extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
+          kMobilePageMargin,
           AppSpacing.sm,
-          AppSpacing.sm,
-          AppSpacing.sm,
+          kMobilePageMargin,
           AppSpacing.s,
         ),
         child: AppButton(
@@ -1122,6 +1125,7 @@ class _WalletLinkAccountRow extends StatelessWidget {
         decoration: BoxDecoration(
           color: colors.background.ground,
           borderRadius: BorderRadius.circular(AppRadii.medium),
+          boxShadow: mobileSurfaceShadows(colors),
         ),
         child: Row(
           children: [
@@ -1203,6 +1207,7 @@ class _WalletLinkContactRow extends StatelessWidget {
         decoration: BoxDecoration(
           color: colors.background.ground,
           borderRadius: BorderRadius.circular(AppRadii.medium),
+          boxShadow: mobileSurfaceShadows(colors),
         ),
         child: Row(
           children: [

@@ -31,6 +31,8 @@ import '../../../../core/widgets/app_profile_picture.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/mobile/mobile_list_row.dart';
 import '../../../../core/widgets/mobile/mobile_surface_card.dart';
+import '../../../../providers/flip_to_hide_balance_provider.dart';
+import '../../../../providers/hide_balance_on_unlock_provider.dart';
 import '../../../../providers/account_provider.dart';
 import '../../../../providers/app_security_provider.dart';
 import '../../../../providers/biometric_unlock_provider.dart';
@@ -82,6 +84,8 @@ class MobileSettingsScreen extends ConsumerWidget {
         ref.watch(biometricUnlockProvider).value ??
         BiometricUnlockState.initial;
     final syncKeepAwake = ref.watch(syncKeepAwakeProvider);
+    final flipToHide = ref.watch(flipToHideBalanceProvider);
+    final hideOnUnlock = ref.watch(hideBalanceOnUnlockProvider);
     const settingsRowStyle = AppTypography.labelLarge;
     final settingsValueColor = context.colors.text.accent;
     final settingsChevronColor = context.colors.icon.accent;
@@ -359,6 +363,17 @@ class MobileSettingsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 const MobileNetworkPrivacyCard(),
+                const SizedBox(height: AppSpacing.md),
+                _HideBalanceSettingsCard(
+                  hideOnUnlock: hideOnUnlock,
+                  onToggleHideOnUnlock: () => unawaited(
+                    _toggleHideOnUnlock(context, ref, enabled: hideOnUnlock),
+                  ),
+                  enabled: flipToHide,
+                  onToggle: () => unawaited(
+                    _toggleFlipToHide(context, ref, enabled: flipToHide),
+                  ),
+                ),
                 // The About row stays hidden until the legal documents
                 // are ready — the /about screen exists but must not be
                 // user-reachable (product decision, 2026-06).
@@ -541,6 +556,37 @@ class MobileSettingsScreen extends ConsumerWidget {
     } catch (_) {
       if (!context.mounted) return;
       showAppToast(context, context.l10n.settingsKeepAwakeUpdateFailed);
+    }
+  }
+
+  Future<void> _toggleHideOnUnlock(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool enabled,
+  }) async {
+    unawaited(AppHaptics.selection());
+    try {
+      await ref.read(hideBalanceOnUnlockProvider.notifier).set(!enabled);
+    } catch (_) {
+      if (!context.mounted) return;
+      showAppToast(
+        context,
+        context.l10n.settingsHideBalanceOnUnlockUpdateFailed,
+      );
+    }
+  }
+
+  Future<void> _toggleFlipToHide(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool enabled,
+  }) async {
+    unawaited(AppHaptics.selection());
+    try {
+      await ref.read(flipToHideBalanceProvider.notifier).set(!enabled);
+    } catch (_) {
+      if (!context.mounted) return;
+      showAppToast(context, context.l10n.settingsFlipToHideUpdateFailed);
     }
   }
 }
@@ -779,9 +825,12 @@ class _SyncKeepAwakeSettingsCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      _SyncKeepAwakeToggle(
+                      _SettingsToggle(
                         key: const ValueKey(
                           'mobile_settings_sync_keep_awake_toggle',
+                        ),
+                        thumbKey: const ValueKey(
+                          'mobile_settings_sync_keep_awake_toggle_thumb',
                         ),
                         enabled: enabled,
                       ),
@@ -804,10 +853,146 @@ class _SyncKeepAwakeSettingsCard extends StatelessWidget {
   }
 }
 
-class _SyncKeepAwakeToggle extends StatelessWidget {
-  const _SyncKeepAwakeToggle({required this.enabled, super.key});
+/// Wallet-wide balance hiding preferences, in the keep-awake card's form.
+class _HideBalanceSettingsCard extends StatelessWidget {
+  const _HideBalanceSettingsCard({
+    required this.enabled,
+    required this.onToggle,
+    required this.hideOnUnlock,
+    required this.onToggleHideOnUnlock,
+  });
 
   final bool enabled;
+  final VoidCallback onToggle;
+  final bool hideOnUnlock;
+  final VoidCallback onToggleHideOnUnlock;
+
+  @override
+  Widget build(BuildContext context) {
+    return MobileSurfaceCard(
+      cornerRadius: AppRadii.large,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.sm,
+        AppSpacing.base,
+        AppSpacing.sm,
+        AppSpacing.base,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.xxs),
+            child: Text(
+              context.l10n.settingsHideBalanceTitle,
+              style: AppTypography.labelLarge.copyWith(
+                color: context.colors.text.secondary,
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s),
+          _HideBalanceOption(
+            id: 'hide_on_unlock',
+            label: context.l10n.settingsHideBalanceOnUnlock,
+            description: context.l10n.settingsHideBalanceOnUnlockDescription,
+            enabled: hideOnUnlock,
+            onToggle: onToggleHideOnUnlock,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _HideBalanceOption(
+            id: 'flip_to_hide',
+            label: context.l10n.settingsFlipToHide,
+            description: context.l10n.settingsFlipToHideDescription,
+            enabled: enabled,
+            onToggle: onToggle,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HideBalanceOption extends StatelessWidget {
+  const _HideBalanceOption({
+    required this.id,
+    required this.label,
+    required this.description,
+    required this.enabled,
+    required this.onToggle,
+  });
+
+  final String id;
+  final String label;
+  final String description;
+  final bool enabled;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          button: true,
+          toggled: enabled,
+          label: label,
+          excludeSemantics: true,
+          child: GestureDetector(
+            key: ValueKey('mobile_settings_${id}_row'),
+            behavior: HitTestBehavior.opaque,
+            onTap: onToggle,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: _settingsRowHeight),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+                child: Row(
+                  children: [
+                    const SizedBox.square(
+                      dimension: 32,
+                      child: Center(child: _RowIcon(AppIcons.eyeClosed)),
+                    ),
+                    const SizedBox(width: AppSpacing.s),
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: AppTypography.labelLarge.copyWith(
+                          color: colors.text.accent,
+                        ),
+                      ),
+                    ),
+                    _SettingsToggle(
+                      key: ValueKey('mobile_settings_${id}_toggle'),
+                      thumbKey: ValueKey('mobile_settings_${id}_toggle_thumb'),
+                      enabled: enabled,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          description,
+          style: AppTypography.bodyMedium.copyWith(
+            color: colors.text.secondary,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The Settings cards' on/off switch.
+class _SettingsToggle extends StatelessWidget {
+  const _SettingsToggle({
+    required this.enabled,
+    required this.thumbKey,
+    super.key,
+  });
+
+  final bool enabled;
+  final Key thumbKey;
 
   @override
   Widget build(BuildContext context) {
@@ -834,7 +1019,7 @@ class _SyncKeepAwakeToggle extends StatelessWidget {
         curve: Curves.easeOutCubic,
         alignment: enabled ? Alignment.centerRight : Alignment.centerLeft,
         child: DecoratedBox(
-          key: const ValueKey('mobile_settings_sync_keep_awake_toggle_thumb'),
+          key: thumbKey,
           decoration: BoxDecoration(
             color: const Color(0xFFFFFFFF),
             borderRadius: BorderRadius.circular(AppRadii.full),

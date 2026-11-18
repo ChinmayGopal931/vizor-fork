@@ -79,6 +79,7 @@ class ReviewInfoRow extends StatelessWidget {
     this.trailingActionIconName = AppIcons.eye,
     this.trailingActionKey,
     this.onTrailingAction,
+    this.trailing,
     this.valueFit,
     this.valueStyle,
     this.valuePlaceholder,
@@ -129,6 +130,11 @@ class ReviewInfoRow extends StatelessWidget {
 
   /// Tap handler for the trailing ghost button.
   final VoidCallback? onTrailingAction;
+
+  /// A bottom-right widget in place of the trailing ghost button, for a
+  /// label that is not an action. It gets the width [bottomLeftText] leaves,
+  /// at least half the strip, so it can shorten itself to fit.
+  final Widget? trailing;
 
   /// When set, the headline value shrinks to fit instead of truncating
   /// (long swap amounts scale down rather than ellipsize).
@@ -277,18 +283,41 @@ class ReviewInfoRow extends StatelessWidget {
           if (bottomLeftPlaceholder != null)
             Expanded(child: bottomLeftPlaceholder!)
           else if (bottomLeftText != null)
+            // Beside [trailing] the text keeps its width, up to half the
+            // strip, and [trailing] takes the rest.
+            trailing != null
+                ? ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: ((constraints.maxWidth - leadingIconWidth) / 2)
+                          .clamp(0.0, constraints.maxWidth),
+                    ),
+                    child: Text(
+                      bottomLeftText!,
+                      key: bottomLeftTextKey,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textStyle,
+                    ),
+                  )
+                : Expanded(
+                    child: Text(
+                      bottomLeftText!,
+                      key: bottomLeftTextKey,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textStyle,
+                    ),
+                  )
+          else if (trailing == null)
+            const Spacer(),
+          if (trailing case final trailing?)
             Expanded(
-              child: Text(
-                bottomLeftText!,
-                key: bottomLeftTextKey,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textStyle,
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: trailing,
               ),
             )
-          else
-            const Spacer(),
-          if (trailingActionLabel != null)
+          else if (trailingActionLabel != null)
             // Keeps its natural width but never pushes past the strip, so a
             // long or scaled label ellipsizes instead of overflowing.
             ConstrainedBox(
@@ -390,8 +419,7 @@ class ReviewInfoFlow extends StatelessWidget {
   final String connectorIconName;
   final Color? connectorColor;
 
-  /// Drawn in place of the connector glyph, under the leading column: the
-  /// swap flows' lit arrow.
+  /// Replaces the connector icon between rows when set.
   final Widget? connector;
 
   static const _gap = kAppFormFactor == AppFormFactor.mobile
@@ -407,19 +435,11 @@ class ReviewInfoFlow extends StatelessWidget {
       children: [
         for (var i = 0; i < rows.length; i++) ...[
           if (i > 0)
-            if (connector case final connector?)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: AppAssetSize.size,
-                  child: Center(child: connector),
+            connector ??
+                ReviewConnectorIcon(
+                  iconName: connectorIconName,
+                  color: connectorColor,
                 ),
-              )
-            else
-              ReviewConnectorIcon(
-                iconName: connectorIconName,
-                color: connectorColor,
-              ),
           rows[i],
         ],
       ],

@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import '../../../core/formatting/sync_status_label.dart'
+    show withTabularFigures;
 import '../../../core/l10n/l10n.dart';
 import '../../../core/layout/app_form_factor.dart';
 import '../../../core/theme/app_theme.dart';
@@ -47,6 +49,62 @@ final _activitySupportingStyle = kAppFormFactor == AppFormFactor.mobile
 const _activityRowSubtitleIconSize = kAppFormFactor == AppFormFactor.mobile
     ? AppIconSize.medium
     : 16.0;
+
+/// Month group titles. Mobile uses the label's own weight, like the Settings
+/// group titles; desktop keeps its semibold.
+const _activityGroupTitleWeight = kAppFormFactor == AppFormFactor.mobile
+    ? FontWeight.w500
+    : FontWeight.w600;
+
+/// Leading circle and its glyph. Mobile uses a 44px circle with a 20px glyph
+/// (the asset tokens' 18/40 proportion); desktop keeps the asset tokens. 48px
+/// would cut off long titles such as "Redeemed a gift card" beside a full
+/// Activity timestamp on a 393px phone.
+const _activityRowAvatarSize = kAppFormFactor == AppFormFactor.mobile
+    ? 44.0
+    : AppAssetSize.size;
+const _activityRowAvatarIconSize = kAppFormFactor == AppFormFactor.mobile
+    ? 20.0
+    : AppAssetSize.icon;
+
+/// Inset inside a row, which keeps the content off the edges of its hover
+/// and selection fill. Mobile draws neither, so its rows start on the list's
+/// edge; desktop keeps 4px.
+const _activityRowHorizontalPadding = kAppFormFactor == AppFormFactor.mobile
+    ? 0.0
+    : AppSpacing.xxs;
+
+/// Main row height. Mobile gives the circle room to breathe; desktop keeps 44px.
+const _activityRowHeight = kAppFormFactor == AppFormFactor.mobile ? 56.0 : 44.0;
+
+/// Mobile lists months and rows straight on the page, as Home's recent
+/// activity does; desktop keeps each month on a card.
+const _activityFeedOnCards = kAppFormFactor != AppFormFactor.mobile;
+
+/// Space between a month's top or bottom edge and its content: the card's
+/// padding on desktop, nothing on mobile, where no card edge needs clearing.
+const _activityFeedCardEdgePadding = _activityFeedOnCards ? 24.0 : 0.0;
+
+/// Row inset from the feed edge. Mobile rows sit on the screen's page margin,
+/// the edge Home's balance card and buttons share; desktop keeps the card's
+/// 16px padding.
+const _activityFeedRowInset = _activityFeedOnCards ? 16.0 : 0.0;
+
+/// Month title inset from the feed edge: the screen margin on mobile, the
+/// card's 16px padding on desktop.
+const _activityFeedTitleInset = _activityFeedOnCards ? 16.0 : 0.0;
+
+/// Padding around a month title's text. Mobile pads only above and below, so
+/// the text starts on the same edge as the rows; desktop keeps 4px all round.
+const _activityFeedTitleTextPadding = _activityFeedOnCards
+    ? EdgeInsets.all(AppSpacing.xxs)
+    : EdgeInsets.symmetric(vertical: AppSpacing.xxs);
+
+/// Amount column cap. Desktop keeps 128 px; mobile's 16px label needs room
+/// for a full 8-decimal amount plus the ticker without an ellipsis.
+const _activityAmountMaxWidth = kAppFormFactor == AppFormFactor.mobile
+    ? 200.0
+    : 128.0;
 
 class ActivityFeedSectionData {
   const ActivityFeedSectionData({required this.title, required this.rows});
@@ -172,19 +230,22 @@ class ActivityFeedSliver extends StatelessWidget {
         _ActivityFeedSliverItemType.gap => item.height!,
         _ActivityFeedSliverItemType.message => 160,
         _ActivityFeedSliverItemType.sectionHeader ||
-        _ActivityFeedSliverItemType.skeletonHeader => 24 + 24 + AppSpacing.s,
+        _ActivityFeedSliverItemType.skeletonHeader =>
+          _activityFeedCardEdgePadding + 24 + AppSpacing.s,
         _ActivityFeedSliverItemType.row =>
           (item.hasTopGap ? 12 : 0) +
-              44 +
+              _activityRowHeight +
               40 * item.row!.childRows.length +
               (item.segmentPosition == _ActivityFeedCardSegmentPosition.last
-                  ? 24
+                  ? _activityFeedCardEdgePadding
                   : 0),
         _ActivityFeedSliverItemType.skeletonRow =>
-          (item.hasRows ? 24 : (item.hasTopGap ? 12 : 0)) +
-              44 +
+          (item.hasRows
+                  ? _activityFeedCardEdgePadding
+                  : (item.hasTopGap ? 12 : 0)) +
+              _activityRowHeight +
               (item.segmentPosition == _ActivityFeedCardSegmentPosition.last
-                  ? 24
+                  ? _activityFeedCardEdgePadding
                   : 0),
         _ActivityFeedSliverItemType.retry => 0,
       };
@@ -460,11 +521,13 @@ class _ActivityFeedSliverItemView extends StatelessWidget {
           label: context.l10n.commonLoadingActivity,
           child: Padding(
             padding: EdgeInsets.fromLTRB(
-              16,
-              item.hasRows ? 24 : (item.hasTopGap ? 12 : 0),
-              16,
+              _activityFeedRowInset,
+              item.hasRows
+                  ? _activityFeedCardEdgePadding
+                  : (item.hasTopGap ? 12 : 0),
+              _activityFeedRowInset,
               item.segmentPosition == _ActivityFeedCardSegmentPosition.last
-                  ? 24
+                  ? _activityFeedCardEdgePadding
                   : 0,
             ),
             child: const ActivitySkeletonRow(),
@@ -478,7 +541,11 @@ class _ActivityFeedSliverItemView extends StatelessWidget {
           child: AppButton(
             onPressed: onRetry,
             variant: AppButtonVariant.ghost,
-            size: AppButtonSize.small,
+            // Mobile buttons share the 16px label; desktop keeps its compact
+            // 14px retry.
+            size: kAppFormFactor == AppFormFactor.mobile
+                ? AppButtonSize.medium
+                : AppButtonSize.small,
             child: Text(context.l10n.activityFeedRetry),
           ),
         ),
@@ -523,11 +590,16 @@ class _ActivityFeedSectionHeaderSegment extends StatelessWidget {
       width: width,
       position: position,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 24, 16, hasRows ? AppSpacing.s : 24),
-        child: SizedBox(
-          height: 24,
+        padding: EdgeInsets.fromLTRB(
+          _activityFeedTitleInset,
+          _activityFeedCardEdgePadding,
+          _activityFeedTitleInset,
+          hasRows ? AppSpacing.s : _activityFeedCardEdgePadding,
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 24),
           child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.xxs),
+            padding: _activityFeedTitleTextPadding,
             child: skeleton
                 ? const Align(
                     alignment: Alignment.centerLeft,
@@ -555,7 +627,7 @@ class _ActivityFeedSectionTitle extends StatelessWidget {
           ? kNeonHudCaptionStyle.copyWith(color: colors.neon.glow)
           : AppTypography.labelLarge.copyWith(
               color: colors.text.secondary,
-              fontWeight: FontWeight.w600,
+              fontWeight: _activityGroupTitleWeight,
             ),
     );
   }
@@ -581,10 +653,12 @@ class _ActivityFeedRowSegment extends StatelessWidget {
       position: position,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-          16,
+          _activityFeedRowInset,
           hasTopGap ? 12 : 0,
-          16,
-          position == _ActivityFeedCardSegmentPosition.last ? 24 : 0,
+          _activityFeedRowInset,
+          position == _ActivityFeedCardSegmentPosition.last
+              ? _activityFeedCardEdgePadding
+              : 0,
         ),
         child: ActivityFeedRowGroup(row: row),
       ),
@@ -606,13 +680,16 @@ class _ActivityFeedCardSegment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!_activityFeedOnCards) {
+      return _ActivityFeedCentered(width: width, child: child);
+    }
     final colors = context.colors;
     return _ActivityFeedCentered(
       width: width,
       child: CustomPaint(
         painter: _ActivityFeedCardSegmentShadowPainter(
           position: position,
-          shadows: _activityFeedCardShadow(colors),
+          shadows: appSurfaceShadow(colors),
         ),
         child: DecoratedBox(
           decoration: BoxDecoration(
@@ -853,8 +930,8 @@ class _ActivityFeedCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(
-                height: 24,
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 24),
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.xxs),
                   child: _ActivityFeedSectionTitle(section.title),
@@ -885,26 +962,18 @@ class _ActivityFeedCardShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!_activityFeedOnCards) return child;
     final colors = context.colors;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colors.background.ground,
         borderRadius: BorderRadius.circular(AppRadii.large),
-        boxShadow: _activityFeedCardShadow(colors),
+        boxShadow: appSurfaceShadow(colors),
       ),
       child: child,
     );
   }
 }
-
-/// Activity cards drop their drop shadow on mobile (flat full-width cards on a
-/// tinted background) and keep the surface shadow on desktop. Form-factor
-/// branching is the compile-time [kAppFormFactor] const so the unused branch is
-/// tree-shaken.
-List<BoxShadow> _activityFeedCardShadow(AppColors colors) =>
-    kAppFormFactor == AppFormFactor.mobile
-    ? const <BoxShadow>[]
-    : appSurfaceShadow(colors);
 
 class ActivityFeedRowGroup extends StatelessWidget {
   const ActivityFeedRowGroup({required this.row, super.key});
@@ -1010,14 +1079,17 @@ class _ActivityFeedRowState extends State<ActivityFeedRow> {
     final colors = context.colors;
     final row = widget.row;
     final isInteractive = row.onTap != null;
-    final rowHeight = widget.compact ? 40.0 : 44.0;
+    final rowHeight = widget.compact ? 40.0 : _activityRowHeight;
     final showSelectedBorder = row.selected && !widget.childRow;
     final content = Stack(
       clipBehavior: Clip.none,
       children: [
         Container(
-          height: rowHeight,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+          // A floor, not a fixed height: rows grow with large text.
+          constraints: BoxConstraints(minHeight: rowHeight),
+          padding: const EdgeInsets.symmetric(
+            horizontal: _activityRowHorizontalPadding,
+          ),
           decoration: BoxDecoration(
             color: isInteractive && _hovered
                 ? colors.state.hoverOpacity
@@ -1033,7 +1105,12 @@ class _ActivityFeedRowState extends State<ActivityFeedRow> {
                         ? const _ActivityChildConnector()
                         : _ActivityRowIcon(row: row),
                     const SizedBox(width: AppSpacing.xs),
-                    Flexible(child: _ActivityRowTitle(row: row)),
+                    Flexible(
+                      child: _ActivityRowTitle(
+                        row: row,
+                        compact: widget.compact,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1092,9 +1169,10 @@ class _ActivityFeedRowState extends State<ActivityFeedRow> {
 }
 
 class _ActivityRowTitle extends StatelessWidget {
-  const _ActivityRowTitle({required this.row});
+  const _ActivityRowTitle({required this.row, this.compact = false});
 
   final ActivityRowData row;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -1116,6 +1194,7 @@ class _ActivityRowTitle extends StatelessWidget {
           _ActivityRowSubtitle(
             text: row.subtitle!,
             iconName: row.subtitleIconName,
+            iconSemanticLabel: row.subtitleIconSemanticLabel,
           ),
         ],
       ],
@@ -1124,22 +1203,29 @@ class _ActivityRowTitle extends StatelessWidget {
 }
 
 class _ActivityRowSubtitle extends StatelessWidget {
-  const _ActivityRowSubtitle({required this.text, this.iconName});
+  const _ActivityRowSubtitle({
+    required this.text,
+    this.iconName,
+    this.iconSemanticLabel,
+  });
 
   final String text;
   final String? iconName;
+  final String? iconSemanticLabel;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final shielded = iconName == AppIcons.shieldKeyhole;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (iconName != null) ...[
           AppIcon(
             iconName!,
+            semanticLabel: iconSemanticLabel,
             size: _activityRowSubtitleIconSize,
-            color: iconName == AppIcons.shieldKeyholeOutline
+            color: (shielded || iconName == AppIcons.incognito)
                 ? colors.icon.brandCrimson
                 : colors.icon.muted,
           ),
@@ -1174,12 +1260,16 @@ class _ActivityRowAmount extends StatelessWidget {
     final supporting = _supportingAmountText(row);
     final supportingColor = _supportingAmountColor(row, colors);
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 128),
+      constraints: const BoxConstraints(maxWidth: _activityAmountMaxWidth),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          _ActivityAmountValue(row: row, color: amountColor),
+          _ActivityAmountValue(
+            row: row,
+            color: amountColor,
+            primary: !childRow,
+          ),
           if (supporting != null) ...[
             const SizedBox(height: _activityRowInnerLineGap),
             _ActivitySupportingAmountText(
@@ -1201,21 +1291,31 @@ class _ActivityRowAmount extends StatelessWidget {
     return row.timestampText == '--' ? null : row.timestampText;
   }
 
+  // Timestamps and notices are read, so they use the secondary text tone
+  // (4.5:1 or better on cards and the page); muted fails that on light.
   Color _supportingAmountColor(ActivityRowData row, AppColors colors) {
-    if (row.amountSubtitle != null) return colors.text.muted;
+    if (row.amountSubtitle != null) return colors.text.secondary;
     final supporting = _supportingAmountText(row);
     if (supporting != null && supporting == row.statusText.trim()) {
       return row.statusColor ?? colors.text.secondary;
     }
-    return colors.text.muted;
+    return colors.text.secondary;
   }
 }
 
 class _ActivityAmountValue extends StatelessWidget {
-  const _ActivityAmountValue({required this.row, required this.color});
+  const _ActivityAmountValue({
+    required this.row,
+    required this.color,
+    this.primary = true,
+  });
 
   final ActivityRowData row;
   final Color color;
+
+  /// Whether this is a top-level row's amount, set on the primary line style;
+  /// a child row's amount stays on the label.
+  final bool primary;
 
   @override
   Widget build(BuildContext context) {
@@ -1224,9 +1324,12 @@ class _ActivityAmountValue extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.end,
-      style: _activityRowLabelStyle.copyWith(
-        color: color,
-        fontWeight: AppFontWeight.semiBold,
+      // Tabular figures keep the digits of stacked amounts aligned.
+      style: withTabularFigures(
+        _activityRowLabelStyle.copyWith(
+          color: color,
+          fontWeight: AppFontWeight.semiBold,
+        ),
       ),
     );
     final iconName = row.amountIconName;
@@ -1270,7 +1373,16 @@ class _ActivitySupportingAmountText extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       textAlign: TextAlign.end,
-      style: _activitySupportingStyle.copyWith(color: color, letterSpacing: 0),
+      style: withTabularFigures(
+        kAppFormFactor == AppFormFactor.mobile
+            // The subtitle's style beside it: the 16px label at regular
+            // weight, so the row's second line reads as one.
+            ? _activitySupportingStyle.copyWith(
+                color: color,
+                fontWeight: AppFontWeight.regular,
+              )
+            : _activitySupportingStyle.copyWith(color: color, letterSpacing: 0),
+      ),
     );
     if (iconName == null) return label;
     return Row(
@@ -1287,8 +1399,8 @@ class _ActivitySupportingAmountText extends StatelessWidget {
 class _ActivityRowIcon extends StatelessWidget {
   const _ActivityRowIcon({required this.row});
 
-  static const _avatarSize = AppAssetSize.size;
-  static const _progressRingSize = AppAssetSize.size * (37.0 / 32.0);
+  static const _avatarSize = _activityRowAvatarSize;
+  static const _progressRingSize = _activityRowAvatarSize * (37.0 / 32.0);
 
   final ActivityRowData row;
 
@@ -1314,7 +1426,7 @@ class _ActivityRowIcon extends StatelessWidget {
               child: Center(
                 child: AppIcon(
                   row.leadingIconName,
-                  size: AppAssetSize.icon,
+                  size: _activityRowAvatarIconSize,
                   color: row.leadingIconColor,
                   animated: row.leadingIconName == AppIcons.loader,
                 ),
@@ -1358,7 +1470,7 @@ class _ActivityIconFallback extends StatelessWidget {
       child: Center(
         child: AppIcon(
           row.leadingIconName,
-          size: AppAssetSize.icon,
+          size: _activityRowAvatarIconSize,
           color: row.leadingIconColor,
           animated: row.leadingIconName == AppIcons.loader,
         ),
@@ -1374,13 +1486,13 @@ class _ActivityChildConnector extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       key: const ValueKey('activity_feed_child_connector'),
-      width: AppAssetSize.size,
-      height: AppAssetSize.size,
+      width: _activityRowAvatarSize,
+      height: _activityRowAvatarSize,
       child: Center(
         child: CustomPaint(
           size: const Size(
-            AppAssetSize.size * (14 / 32),
-            AppAssetSize.size * (14 / 32),
+            _activityRowAvatarSize * (14 / 32),
+            _activityRowAvatarSize * (14 / 32),
           ),
           painter: _ActivityChildConnectorPainter(
             color: context.colors.icon.disabled,

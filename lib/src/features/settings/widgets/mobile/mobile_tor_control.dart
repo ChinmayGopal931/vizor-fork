@@ -51,17 +51,15 @@ class MobileTorControl extends ConsumerWidget {
         : presentation.description;
     final toggleAction = networkPrivacyToggleAction(state);
     final interactive = enabled && toggleAction.isInteractive;
-    Future<void> request(bool value) async {
-      await (onRequest?.call(value) ?? notifier.setTorEnabled(value));
-      if (context.mounted &&
-          value != state.torEnabled &&
-          ref.read(networkPrivacyProvider).torEnabled == value) {
-        unawaited(AppHaptics.selection());
-      }
-    }
+    Future<void> request(bool value) =>
+        onRequest?.call(value) ?? notifier.setTorEnabled(value);
 
+    // The switch ticks as it flips; connecting the route can take a while.
     final onToggle = interactive
-        ? () => unawaited(request(toggleAction.requestedTorEnabled))
+        ? () {
+            unawaited(AppHaptics.selection());
+            unawaited(request(toggleAction.requestedTorEnabled));
+          }
         : null;
     final retryLabel = (state.targetTorEnabled ?? state.torEnabled)
         ? context.l10n.commonTryAgain
@@ -88,24 +86,26 @@ class MobileTorControl extends ConsumerWidget {
             key: const ValueKey('mobile_settings_tor_row'),
             behavior: HitTestBehavior.opaque,
             onTap: onToggle,
-            child: SizedBox(
-              height: math.max(
-                _rowHeight,
-                MediaQuery.textScalerOf(context).scale(22) * 2,
+            // A floor, not a fixed height: the label wraps at large text
+            // sizes instead of truncating to "Use T…".
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: math.max(
+                  _rowHeight,
+                  MediaQuery.textScalerOf(context).scale(22) * 2,
+                ),
               ),
+              // Same icon and label edges as the Settings chevron rows.
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+                padding: const EdgeInsetsDirectional.only(end: AppSpacing.xxs),
                 child: Row(
                   children: [
-                    SizedBox.square(
-                      dimension: 32,
-                      child: Center(
-                        child: AppIcon(
-                          AppIcons.tor,
-                          size: 20,
-                          color: presentation.iconColor(colors),
-                        ),
-                      ),
+                    AppIcon(
+                      AppIcons.tor,
+                      size: 20,
+                      // Like the other Settings row icons; the status and
+                      // the toggle carry the state.
+                      color: colors.icon.accent,
                     ),
                     const SizedBox(width: AppSpacing.s),
                     // The label keeps its natural width so the status gets
@@ -185,13 +185,11 @@ class _MobileTorPresentation {
     required this.statusLabel,
     required this.description,
     required this.statusColor,
-    required this.iconColor,
   });
 
   final String statusLabel;
   final String description;
   final Color Function(AppColors colors) statusColor;
-  final Color Function(AppColors colors) iconColor;
 }
 
 _MobileTorPresentation _presentationFor(
@@ -209,14 +207,12 @@ _MobileTorPresentation _presentationFor(
       // where the user is looking.
       description: l10n.settingsTorDescConnecting,
       statusColor: (colors) => colors.text.secondary,
-      iconColor: (colors) => colors.icon.muted,
     ),
     (NetworkPrivacyConnectionStatus.connecting, false) =>
       _MobileTorPresentation(
         statusLabel: l10n.settingsTorStatusSwitching,
         description: l10n.settingsTorDescSwitchingMobile,
         statusColor: (colors) => colors.text.secondary,
-        iconColor: (colors) => colors.icon.muted,
       ),
     (NetworkPrivacyConnectionStatus.connected, _) => _MobileTorPresentation(
       statusLabel: l10n.settingsTorStatusConnected,
@@ -228,7 +224,6 @@ _MobileTorPresentation _presentationFor(
           ? l10n.settingsTorDescConnectedIos
           : l10n.settingsTorDescConnected,
       statusColor: (colors) => colors.text.brandCrimson,
-      iconColor: (colors) => colors.icon.brandCrimson,
     ),
     // A failed enable has two shapes with opposite request behaviour, so the
     // route decides which is described. A bootstrap failure left the process
@@ -239,7 +234,6 @@ _MobileTorPresentation _presentationFor(
               statusLabel: l10n.commonFailed,
               description: l10n.settingsTorDescBootstrapFailed,
               statusColor: (colors) => colors.text.brandCrimson,
-              iconColor: (colors) => colors.icon.brandCrimson,
             )
           // Saying "requests stay blocked" here would describe the opposite
           // of what is happening: nothing was enabled, and requests keep
@@ -248,7 +242,6 @@ _MobileTorPresentation _presentationFor(
               statusLabel: l10n.settingsTorStatusNotSaved,
               description: l10n.settingsTorDescEnableNotSaved,
               statusColor: (colors) => colors.text.brandCrimson,
-              iconColor: (colors) => colors.icon.brandCrimson,
             ),
     // A failed disable has two shapes, and they carry opposite privacy
     // guarantees, so the route decides which is described rather than the
@@ -261,7 +254,6 @@ _MobileTorPresentation _presentationFor(
               statusLabel: l10n.settingsTorStatusSwitchFailed,
               description: l10n.settingsTorDescSwitchFailedStillOn,
               statusColor: (colors) => colors.text.brandCrimson,
-              iconColor: (colors) => colors.icon.brandCrimson,
             )
           // The transport did switch and only the setting could not be saved.
           // Requests are direct from here, and the saved route is still Tor —
@@ -273,13 +265,11 @@ _MobileTorPresentation _presentationFor(
               statusLabel: l10n.settingsTorStatusNotSaved,
               description: l10n.settingsTorDescDisableNotSaved,
               statusColor: (colors) => colors.text.brandCrimson,
-              iconColor: (colors) => colors.icon.brandCrimson,
             ),
     (NetworkPrivacyConnectionStatus.off, _) => _MobileTorPresentation(
       statusLabel: l10n.settingsStatusOff,
       description: l10n.settingsTorDescOffMobile,
       statusColor: (colors) => colors.text.secondary,
-      iconColor: (colors) => colors.icon.muted,
     ),
   };
 }
@@ -305,10 +295,9 @@ class MobilePrivacyToggle extends StatelessWidget {
     final colors = context.colors;
     final trackColor = enabled
         ? colors.background.brandCrimsonStrong
-        : colors.background.raised;
-    final borderColor = enabled
-        ? colors.border.brandCrimsonStrong
-        : colors.border.regular;
+        // A step further from the card than `raised`, so the off track reads
+        // without an outline, like the voting toggle.
+        : colors.background.overlay;
     return Opacity(
       opacity: interactive ? 1 : 0.65,
       child: AnimatedContainer(
@@ -320,7 +309,6 @@ class MobilePrivacyToggle extends StatelessWidget {
         decoration: BoxDecoration(
           color: trackColor,
           borderRadius: BorderRadius.circular(AppRadii.full),
-          border: Border.all(color: borderColor),
         ),
         child: AnimatedAlign(
           duration: const Duration(milliseconds: 140),
@@ -328,9 +316,12 @@ class MobilePrivacyToggle extends StatelessWidget {
           alignment: enabled ? Alignment.centerRight : Alignment.centerLeft,
           child: DecoratedBox(
             key: thumbKey,
+            // The thumb's own light outline shadow defines it on a light
+            // card, in place of a track outline.
             decoration: BoxDecoration(
               color: const Color(0xFFFFFFFF),
               borderRadius: BorderRadius.circular(AppRadii.full),
+              boxShadow: appSurfaceShadow(colors),
             ),
             // Same pill as the keep-awake toggle directly above this card.
             child: const SizedBox(width: 40, height: 24),

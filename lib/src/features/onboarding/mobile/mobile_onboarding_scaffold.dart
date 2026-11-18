@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart' show Scaffold;
 import 'package:flutter/widgets.dart';
 
+import '../../../core/layout/mobile/mobile_scroll_edge_fades.dart';
+import '../../../core/layout/mobile/mobile_sticky_bottom_action.dart';
 import '../../../core/layout/mobile/mobile_top_nav.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_toast.dart';
@@ -28,6 +30,7 @@ class MobileOnboardingStepScaffold extends StatelessWidget {
     this.showBackButton = true,
     this.showProgress = true,
     this.scrollable = true,
+    this.background,
     super.key,
   });
 
@@ -74,6 +77,10 @@ class MobileOnboardingStepScaffold extends StatelessWidget {
   /// being partially scrolled off-screen on shorter phones.
   final bool scrollable;
 
+  /// Full-page art behind the step, from the top of the screen, such as
+  /// [MobileOnboardingCitadelBackground].
+  final Widget? background;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -115,78 +122,104 @@ class MobileOnboardingStepScaffold extends StatelessWidget {
       ],
       SizedBox(height: contentGap),
     ];
-    final childPadding = const EdgeInsets.symmetric(horizontal: AppSpacing.xs);
+    final childPadding = const EdgeInsets.symmetric(
+      horizontal: kMobilePageMargin - AppSpacing.xs,
+    );
+    final page = SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!showProgress)
+            MobileTopNav.back(
+              title: '',
+              height: kMobileTopNavHeight,
+              onBack: showBackButton ? onBack : null,
+            )
+          else
+            MobileTopNav.steps(
+              progress: progress,
+              height: topNavHeight,
+              progressOffset: topNavProgressOffset,
+              progressTrackColor: topNavProgressTrackColor,
+              onBack: onBack,
+              showBackButton: showBackButton,
+            ),
+          Expanded(
+            child: scrollable
+                ? SingleChildScrollView(
+                    // The title gets the near-full screen width (long
+                    // serif titles like "Zcash Address Types" stay on one
+                    // line per the Figma frames); the content keeps the
+                    // page margin via the inner padding below.
+                    padding: contentPadding,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ...contentChildren,
+                        Padding(padding: childPadding, child: child),
+                      ],
+                    ),
+                  )
+                : Padding(
+                    padding: contentPadding,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ...contentChildren,
+                        Expanded(
+                          child: Padding(padding: childPadding, child: child),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+          if (bottomArea != null)
+            Padding(
+              padding:
+                  bottomAreaPadding ??
+                  const EdgeInsets.fromLTRB(
+                    kMobilePageMargin,
+                    AppSpacing.s,
+                    kMobilePageMargin,
+                    kMobileFooterGap,
+                  ),
+              child: bottomArea!,
+            ),
+        ],
+      ),
+    );
     return Scaffold(
       backgroundColor: colors.background.window,
       resizeToAvoidBottomInset: true,
       body: AppToastHost(
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (!showProgress)
-                MobileTopNav.back(
-                  title: '',
-                  height: kMobileTopNavHeight,
-                  onBack: showBackButton ? onBack : null,
-                )
-              else
-                MobileTopNav.steps(
-                  progress: progress,
-                  height: topNavHeight,
-                  progressOffset: topNavProgressOffset,
-                  progressTrackColor: topNavProgressTrackColor,
-                  onBack: onBack,
-                  showBackButton: showBackButton,
-                ),
-              Expanded(
-                child: scrollable
-                    ? SingleChildScrollView(
-                        // The title gets the near-full screen width (long
-                        // serif titles like "Zcash Address Types" stay on one
-                        // line per the Figma frames); the content keeps the
-                        // standard sm inset via the inner padding below.
-                        padding: contentPadding,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            ...contentChildren,
-                            Padding(padding: childPadding, child: child),
-                          ],
-                        ),
-                      )
-                    : Padding(
-                        padding: contentPadding,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            ...contentChildren,
-                            Expanded(
-                              child: Padding(
-                                padding: childPadding,
-                                child: child,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+        child: background == null
+            // Onboarding steps sit outside the page viewport, so they
+            // install the standard scroll edges themselves.
+            ? MobileScrollEdgeFades(
+                color: colors.background.window,
+                bottomHeight: AppSpacing.xl,
+                child: page,
+              )
+            // The fades paint the window color, which would band across the
+            // art; the step scrolls without them, as transaction records do.
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  background!,
+                  MobileScrollEdgeFades.off(child: page),
+                ],
               ),
-              if (bottomArea != null)
-                Padding(
-                  padding:
-                      bottomAreaPadding ??
-                      const EdgeInsets.fromLTRB(
-                        AppSpacing.sm,
-                        AppSpacing.s,
-                        AppSpacing.sm,
-                        AppSpacing.s,
-                      ),
-                  child: bottomArea!,
-                ),
-            ],
-          ),
-        ),
       ),
     );
   }
+}
+
+/// The citadel engraving from the top of an onboarding step in upstream's
+/// Figma design (`Full Page Background`). Veylor's mobile drops the painted
+/// backgrounds and does not ship the asset, so nothing is drawn.
+class MobileOnboardingCitadelBackground extends StatelessWidget {
+  const MobileOnboardingCitadelBackground({super.key});
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }

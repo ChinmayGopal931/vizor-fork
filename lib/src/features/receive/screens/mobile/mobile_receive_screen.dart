@@ -24,8 +24,8 @@ import '../../../../providers/receive_address_provider.dart';
 import '../../../../providers/sync_provider.dart';
 import '../../widgets/mobile/receive_address_info_sheet.dart';
 import '../../widgets/mobile/receive_qr_frame.dart';
-import '../../widgets/mobile/receive_request_sheet.dart';
 import '../../widgets/receive_address_widgets.dart';
+import 'mobile_receive_request_screen.dart';
 
 bool _shouldRefreshTransparentAddressAfterSyncUpdate(
   SyncState previous,
@@ -162,8 +162,8 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
       unawaited(
         _pageController.animateToPage(
           type.index,
-          duration: const Duration(milliseconds: 420),
-          curve: Curves.easeInOutCubic,
+          duration: _MobileReceiveMotion.switchDuration,
+          curve: _MobileReceiveMotion.switchCurve,
         ),
       );
     }
@@ -193,9 +193,30 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
     ),
   );
 
+  // The address follows the pager like the chip, so it moves with the cards
+  // instead of swapping at the tap.
+  Widget _buildAddressSummary({
+    required String accountName,
+    bool adaptive = false,
+  }) => AnimatedBuilder(
+    animation: _pageController,
+    builder: (context, _) => _ReceiveAddressSummary(
+      adaptive: adaptive,
+      accountName: accountName,
+      position: _page,
+      selectedType: _selectedType,
+      addressFor: _addressFor,
+      onShowHelp: () =>
+          unawaited(showReceiveAddressInfoSheet(context, _selectedType)),
+    ),
+  );
+
   void _handlePageChanged(int page) {
     final type = ReceiveAddressType.values[page];
     if (_selectedType == type) return;
+    // A swipe switches the pool without the tabs, so it ticks here; a tap
+    // already ticked in the tabs and set the type before the pager moved.
+    unawaited(AppHaptics.selection());
     setState(() => _selectedType = type);
   }
 
@@ -236,10 +257,10 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
 
   void _openRequest() {
     // Snapshotted here: renewing the shielded address or swiping to the other
-    // pool behind the sheet must not repoint a link being handed out.
+    // pool behind the page must not repoint a link being handed out.
     final address = _selectedAddress;
     if (address.isEmpty) return;
-    unawaited(showReceiveRequestSheet(context, address: address));
+    unawaited(openReceiveRequest(context, address: address));
   }
 
   @override
@@ -291,9 +312,9 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.sm,
+                    kMobilePageMargin,
                     AppSpacing.s,
-                    AppSpacing.sm,
+                    kMobilePageMargin,
                     AppSpacing.md,
                   ),
                   children: [
@@ -309,14 +330,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
                       height: _MobileReceiveMetrics.qrToAddressGap,
                     ),
                     Center(
-                      child: _ReceiveAddressSummary(
-                        accountName: accountName,
-                        type: _selectedType,
-                        address: _selectedAddress,
-                        onShowHelp: () => unawaited(
-                          showReceiveAddressInfoSheet(context, _selectedType),
-                        ),
-                      ),
+                      child: _buildAddressSummary(accountName: accountName),
                     ),
                     const SizedBox(height: AppSpacing.base),
                     Center(
@@ -475,15 +489,7 @@ class _MobileReceiveScreenState extends ConsumerState<MobileReceiveScreen> {
             final details = Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _ReceiveAddressSummary(
-                  adaptive: true,
-                  accountName: accountName,
-                  type: _selectedType,
-                  address: _selectedAddress,
-                  onShowHelp: () => unawaited(
-                    showReceiveAddressInfoSheet(context, _selectedType),
-                  ),
-                ),
+                _buildAddressSummary(accountName: accountName, adaptive: true),
                 const SizedBox(height: AppSpacing.md),
                 _buildWideActions(),
               ],
@@ -659,6 +665,22 @@ abstract final class _MobileReceiveMetrics {
   static const buttonIconSize = 20.0;
 }
 
+abstract final class _MobileReceiveMotion {
+  /// Tab-driven pool switch. iOS-style ease-out: the cards move as soon as
+  /// the tab is tapped and settle without a long tail.
+  static const switchDuration = Duration(milliseconds: 300);
+  static const switchCurve = Cubic(0.32, 0.72, 0, 1);
+
+  /// How far the address line drifts with the cards at a pool switch.
+  static const addressSlide = 12.0;
+
+  /// The share of a switch over which the outgoing address fades. The
+  /// pager's curve covers most of the distance early, so the outgoing line
+  /// leaves as the cards start to move and the incoming one fades in over
+  /// the rest, as they settle.
+  static const addressFadeOut = 0.35;
+}
+
 class _ReceiveQrPage extends StatelessWidget {
   const _ReceiveQrPage({
     required this.type,
@@ -716,53 +738,90 @@ class _ReceiveQrPage extends StatelessWidget {
 class _ReceiveAddressSummary extends StatelessWidget {
   const _ReceiveAddressSummary({
     required this.accountName,
-    required this.type,
-    required this.address,
+    required this.position,
+    required this.selectedType,
+    required this.addressFor,
     required this.onShowHelp,
     this.adaptive = false,
   });
 
   final String accountName;
-  final ReceiveAddressType type;
-  final String address;
+
+  /// The QR pager's position: a pool's index at rest, fractional mid-switch.
+  final double position;
+
+  /// The pool being switched to: set at a tab tap, or halfway through a swipe.
+  final ReceiveAddressType selectedType;
+  final String Function(ReceiveAddressType type) addressFor;
   final VoidCallback onShowHelp;
   final bool adaptive;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    // One address line at a time, following the pager. The outgoing address
+    // fades and drifts out over the first part of a switch; the selected
+    // one fades in over the rest. Mid-swipe both sides of the handover sit at
+    // the same low opacity, so the swap at the midpoint does not jump.
+    final arrival = (position - selectedType.index).abs().clamp(0.0, 1.0);
+    const handover = 1 - _MobileReceiveMotion.addressFadeOut;
+    final showsSelected = arrival <= handover;
+    final type = showsSelected
+        ? selectedType
+        : ReceiveAddressType.values[position.round().clamp(
+            0,
+            ReceiveAddressType.values.length - 1,
+          )];
+    final opacity = showsSelected
+        ? 1 - arrival / handover
+        : (arrival - handover) / (1 - handover);
+    final offset = position - type.index;
+    // The pager runs right to left in RTL, so the drift mirrors with it.
+    final drift = Directionality.of(context) == TextDirection.rtl ? 1 : -1;
     return SizedBox(
       key: const ValueKey('mobile_receive_address_summary'),
       width: _MobileReceiveMetrics.addressWidth,
-      height: adaptive ? null : _MobileReceiveMetrics.addressHeight,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            height: adaptive ? null : _MobileReceiveMetrics.accountNameHeight,
-            child: _ReceiveAccountCaption(name: accountName),
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 140),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeOut,
-            transitionBuilder: (child, animation) =>
-                FadeTransition(opacity: animation, child: child),
-            child: ReceiveAddressLine(
-              key: ValueKey('mobile_receive_address_line_${type.name}'),
-              type: type,
-              address: address,
-              height: _MobileReceiveMetrics.addressLineHeight,
-              helpButtonSize: _MobileReceiveMetrics.addressLineHeight,
-              helpIconSize: 20,
-              helpIconColor: colors.icon.muted,
-              helpGap: 10,
-              scaleToFit: true,
-              onShowHelp: onShowHelp,
+      // Minimum heights, so larger text grows the summary instead of
+      // clipping the account name.
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: adaptive ? 0 : _MobileReceiveMetrics.addressHeight,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: adaptive
+                    ? 0
+                    : _MobileReceiveMetrics.accountNameHeight,
+              ),
+              child: _ReceiveAccountCaption(name: accountName),
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.xxs),
+            Opacity(
+              opacity: opacity.clamp(0.0, 1.0),
+              child: Transform.translate(
+                offset: Offset(
+                  drift * offset * _MobileReceiveMotion.addressSlide,
+                  0,
+                ),
+                child: ReceiveAddressLine(
+                  key: ValueKey('mobile_receive_address_line_${type.name}'),
+                  type: type,
+                  address: addressFor(type),
+                  height: _MobileReceiveMetrics.addressLineHeight,
+                  helpButtonSize: _MobileReceiveMetrics.addressLineHeight,
+                  helpIconSize: 20,
+                  helpIconColor: colors.icon.muted,
+                  helpGap: 10,
+                  scaleToFit: true,
+                  onShowHelp: onShowHelp,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

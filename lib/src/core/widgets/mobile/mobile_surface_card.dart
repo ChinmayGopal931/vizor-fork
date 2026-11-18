@@ -2,6 +2,22 @@ import 'package:flutter/widgets.dart';
 
 import '../../theme/app_theme.dart';
 
+/// The soft lift under mobile surfaces: two wide, low layers rather than the
+/// tight outline of [appSurfaceShadow]. Painted with the subtle shadow token,
+/// so it shows in light mode and is transparent in dark mode.
+List<BoxShadow> mobileSurfaceShadows(AppColors colors) => [
+  BoxShadow(
+    color: colors.shadows.subtle,
+    offset: const Offset(0, 2),
+    blurRadius: 8,
+  ),
+  BoxShadow(
+    color: colors.shadows.subtle,
+    offset: const Offset(0, 6),
+    blurRadius: 20,
+  ),
+];
+
 /// Content surface used by the mobile screens: it sections settings rows,
 /// activity groups, and similar list content.
 ///
@@ -13,6 +29,7 @@ class MobileSurfaceCard extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(AppSpacing.sm),
     this.cornerRadius = defaultRadius,
+    this.shadows,
     super.key,
   });
 
@@ -25,6 +42,10 @@ class MobileSurfaceCard extends StatelessWidget {
 
   /// Ignored: the glass panel's corners are cut ([AppChamfer.large]).
   final double cornerRadius;
+
+  /// Ignored: the glass panel casts no shadow. Upstream's Figma card takes
+  /// its elevation here ([mobileSurfaceShadows] when null).
+  final List<BoxShadow>? shadows;
 
   @override
   Widget build(BuildContext context) {

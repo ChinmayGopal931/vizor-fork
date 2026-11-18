@@ -118,7 +118,7 @@ class _MobileVotingSubmittedScreenState
                           primary: false,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.sm,
+                              horizontal: kMobilePageMargin,
                               vertical: AppSpacing.s,
                             ),
                             child: SizedBox(

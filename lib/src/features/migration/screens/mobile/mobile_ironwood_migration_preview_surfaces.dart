@@ -206,9 +206,9 @@ class _MigrationPreviewPage extends StatelessWidget {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.sm,
+                      kMobilePageMargin,
                       0,
-                      AppSpacing.sm,
+                      kMobilePageMargin,
                       AppSpacing.s,
                     ),
                     child: Column(
@@ -340,7 +340,6 @@ class _MobileMigrationNotificationPermissionScreenState
         title: '',
         showTitle: false,
         showClose: false,
-        bottomPadding: AppSpacing.base,
         onClose: () => Navigator.of(sheetContext).pop(),
         child: _MigrationNotificationConfirmationContent(
           busy: _busy,
@@ -419,7 +418,7 @@ class _MigrationNotificationPromptPreview extends StatelessWidget {
             Text(
               errorMessage!,
               textAlign: TextAlign.center,
-              style: AppTypography.bodySmall.copyWith(
+              style: AppTypography.bodyMedium.copyWith(
                 color: context.colors.text.destructive,
               ),
             ),
@@ -565,7 +564,7 @@ class _MigrationNotificationConfirmationContent extends StatelessWidget {
             color: context.colors.text.primary,
           ),
         ),
-        const SizedBox(height: AppSpacing.base),
+        const SizedBox(height: AppSpacing.md),
         AppButton(
           expand: true,
           constrainContent: true,
@@ -1531,7 +1530,7 @@ class _MigrationViewScheduleButton extends StatelessWidget {
                 children: [
                   Text(
                     context.l10n.migrationMobileViewSchedule,
-                    style: AppTypography.labelMedium.copyWith(
+                    style: AppTypography.labelLarge.copyWith(
                       color: context.colors.text.accent,
                     ),
                   ),
@@ -1978,7 +1977,7 @@ class _MigrationProgressStatus extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: AppTypography.labelMedium.copyWith(
+              style: AppTypography.labelLarge.copyWith(
                 color: context.colors.text.accent,
               ),
             ),
@@ -1994,7 +1993,7 @@ class _MigrationProgressStatus extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: AppTypography.labelMedium.copyWith(
+              style: AppTypography.labelLarge.copyWith(
                 color: context.colors.text.accent,
               ),
             ),
@@ -2481,7 +2480,7 @@ class _MigrationUpgradeStoppedView extends StatelessWidget {
                 ring(
                   math.min(
                     256.0,
-                    MediaQuery.sizeOf(context).width - 2 * AppSpacing.sm,
+                    MediaQuery.sizeOf(context).width - 2 * kMobilePageMargin,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -2729,7 +2728,6 @@ class _MigrationModalPreview extends StatelessWidget {
       title: '',
       showTitle: false,
       showClose: false,
-      bottomPadding: AppSpacing.base,
       onClose: _noopMigrationPreviewAction,
       child: child,
     );
@@ -2768,7 +2766,7 @@ class _MigrationPreviewCard extends StatelessWidget {
         color: context.colors.background.ground,
         borderRadius: BorderRadius.circular(AppRadii.large),
         border: Border.all(color: context.colors.border.subtle),
-        boxShadow: appSurfaceShadow(context.colors),
+        boxShadow: mobileSurfaceShadows(context.colors),
       ),
       child: child,
     );

@@ -381,7 +381,7 @@ class MobileNetworkSettingsContent extends StatelessWidget {
                               ? context.l10n.endpointAutomatic
                               : current.hostPort),
                     ),
-                    style: AppTypography.bodySmall.copyWith(
+                    style: AppTypography.bodyMedium.copyWith(
                       color: colors.text.secondary,
                     ),
                   ),
@@ -415,7 +415,7 @@ class MobileNetworkSettingsContent extends StatelessWidget {
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         context.l10n.onboardingNetworkEndpointHelper,
-                        style: AppTypography.bodySmall.copyWith(
+                        style: AppTypography.bodyMedium.copyWith(
                           color: colors.text.secondary,
                         ),
                       ),
@@ -423,7 +423,7 @@ class MobileNetworkSettingsContent extends StatelessWidget {
                         const SizedBox(height: AppSpacing.xs),
                         Text(
                           message,
-                          style: AppTypography.bodySmall.copyWith(
+                          style: AppTypography.bodyMedium.copyWith(
                             color: colors.text.destructive,
                           ),
                         ),
@@ -434,7 +434,7 @@ class MobileNetworkSettingsContent extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.md),
           AppButton(
             key: const ValueKey('welcome_endpoint_update'),
             variant: AppButtonVariant.primary,
