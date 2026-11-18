@@ -319,10 +319,6 @@ Widget _app(
       GoRoute(path: '/receive', builder: (_, _) => const Text('receive route')),
       GoRoute(path: '/swap', builder: (_, _) => const Text('swap route')),
       GoRoute(
-        path: '/receive/request',
-        builder: (_, state) => Text('request route ${state.extra}'),
-      ),
-      GoRoute(
         path: '/payment-links',
         builder: (_, state) => Text('payment links route ${state.uri.query}'),
       ),
@@ -3349,7 +3345,7 @@ void main() {
     expect(find.text('receive route'), findsOneWidget);
   });
 
-  testWidgets('receive offers receiving, a request and a gift card', (
+  testWidgets('receive offers an address and gift card redemption', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -3360,16 +3356,12 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('mobile_home_receive')));
     await tester.pumpAndSettle();
     expect(find.byType(ReceiveOptionsSheet), findsOneWidget);
+    expect(find.text('Request ZEC'), findsNothing);
     final cards = {
       'receive_options_receive': (
         'Receive ZEC',
         'Share your address or QR code',
         AppIcons.qr,
-      ),
-      'receive_options_request': (
-        'Request ZEC',
-        'Ask for an exact amount',
-        AppIcons.request,
       ),
       'receive_options_redeem_gift_card': (
         'Redeem gift card',
@@ -3383,13 +3375,12 @@ void main() {
       expect((card.title, card.subtitle, card.icon), (title, subtitle, icon));
     }
 
-    // Request opens the request page for the shielded address at once.
-    await tester.tap(find.byKey(const ValueKey('receive_options_request')));
+    await tester.tap(find.byKey(const ValueKey('receive_options_receive')));
     await tester.pumpAndSettle();
     expect(find.byType(ReceiveOptionsSheet), findsNothing);
-    final requestRoute = find.text('request route u1homeaddress');
-    expect(requestRoute, findsOneWidget);
-    Navigator.of(tester.element(requestRoute)).pop();
+    final receiveRoute = find.text('receive route');
+    expect(receiveRoute, findsOneWidget);
+    Navigator.of(tester.element(receiveRoute)).pop();
     await tester.pumpAndSettle();
 
     // Redeem opens Gift Cards on the redeem page.

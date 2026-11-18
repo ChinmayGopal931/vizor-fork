@@ -14,6 +14,7 @@ import '../../../core/widgets/app_icon.dart';
 import '../../../core/widgets/app_pane_modal_overlay.dart';
 import '../../address_book/models/address_book_contact.dart';
 import '../../address_scan/widgets/address_qr_scan_modal.dart';
+import '../../address_scan/widgets/address_scan_resolver.dart';
 import '../../send/widgets/verify_address_modal.dart';
 import '../../../providers/account_provider.dart';
 import '../../address_book/providers/address_book_provider.dart';
@@ -574,6 +575,10 @@ class _PayScreenState extends ConsumerState<PayScreen> {
                         },
                       ),
                       _PayModalSurface.addressScanner => AddressQrScanModal(
+                        resolve: addressScanResolver(
+                          context.l10n,
+                          network: network,
+                        ),
                         onAddressScanned: _handleAddressScanned,
                         onCancel: _closePayModal,
                       ),
@@ -673,13 +678,12 @@ class _PaySlippageControl extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (confidential) ...[
-                SwapConfidentialIcon(
-                  reveal: confidentialReveal,
-                  labeled: true,
-                ),
-                const SizedBox(width: AppSpacing.xxs),
-              ],
+              SwapConfidentialIcon(
+                on: confidential,
+                reveal: confidentialReveal,
+                labeled: confidential,
+              ),
+              const SizedBox(width: AppSpacing.xxs),
               Text(
                 label,
                 style: AppTypography.labelLarge.copyWith(

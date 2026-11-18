@@ -469,11 +469,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get activityReceiptRefreshFailed => '无法刷新最新的交易状态。';
 
   @override
-  String activityReceiptSpendableAfter(String count) {
-    return '新收到的资金需经过 $count 次确认后才能使用。';
-  }
-
-  @override
   String get activityReceiptStatus => '状态';
 
   @override
@@ -664,6 +659,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get addressBookInvalidNear => '无效的 NEAR 地址';
 
   @override
+  String addressBookInvalidNetworkAddress(String network) {
+    return '无效的 $network 地址';
+  }
+
+  @override
   String get addressBookInvalidSolana => '无效的 Solana 地址';
 
   @override
@@ -796,6 +796,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get addressScanTitle => '扫描地址二维码';
+
+  @override
+  String get addressScanWrongNetwork => '此二维码属于其他网络。';
+
+  @override
+  String addressScanWrongNetworkNamed(String network) {
+    return '此二维码属于 $network 网络。';
+  }
 
   @override
   String get addressScanZcashPrompt => '请扫描 Zcash 二维码以继续';
@@ -2160,9 +2168,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get homeReceiveRedeemGiftCardSubtitle => '添加收到的礼品卡';
-
-  @override
-  String get homeReceiveRequestSubtitle => '按指定金额收款';
 
   @override
   String get homeRecentActivity => '最近活动记录';
@@ -10638,11 +10643,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsExplorerUrlLabel => '区块浏览器网址';
 
   @override
-  String get settingsFlipToHide => '翻转隐藏';
+  String get settingsFlipToHide => '翻转手机隐藏金额';
 
   @override
   String get settingsFlipToHideDescription =>
-      '将手机屏幕朝下翻转，即可在任意页面隐藏金额。如需再次显示，请在 2 秒内翻转后再翻回。';
+      '将手机屏幕朝下翻转即可隐藏金额。如需再次显示，请将手机屏幕朝下翻转，并在 2 秒内翻回朝上。';
 
   @override
   String get settingsFlipToHideUpdateFailed => '无法更新翻转隐藏设置。';
@@ -11850,8 +11855,7 @@ class AppLocalizationsZh extends AppLocalizations {
       '在 NEAR Intents 上无法将你的存入与收款对应起来，也无法在其区块浏览器中查到。两笔交易仍会显示在各自的链上。';
 
   @override
-  String get swapConfidentialSettingDescription =>
-      '无法将你的存入与收款相互关联追踪。报价可能与普通路径不同。';
+  String get swapConfidentialSettingDescription => '无法将你的存入与收款相互关联追踪。';
 
   @override
   String get swapContactAlreadyInAddressBook => '已在你的地址簿中';
@@ -11892,6 +11896,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get swapDepositOneTimeAddress => '一次性地址';
+
+  @override
+  String get swapDepositRecoveryHelp => '如果入金有误？';
+
+  @override
+  String get swapDepositRecoveryIntro => '发送错误的代币或使用其他网络，可能导致入金无法到账。';
+
+  @override
+  String get swapDepositRecoveryPolicy =>
+      '如果错误入金的资产在转账时价值低于 300 美元，NEAR Intents 不会考虑找回申请。金额达到或超过 300 美元时，NEAR Intents 会根据具体情况决定是否协助找回。';
+
+  @override
+  String get swapDepositRecoveryTitle => '入金有误';
 
   @override
   String swapDepositSendOnly(String symbol, String chain) {
@@ -12334,6 +12351,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get swapSlippageDecrease => '降低滑点';
 
   @override
+  String get swapSlippageDescriptionPay =>
+      '报价波动时最多可多付的 ZEC 数量，超出则执行失败。网络手续费另计。';
+
+  @override
+  String get swapSlippageDescriptionSwap => '设置你可接受的最大汇率变动。网络手续费另计。';
+
+  @override
   String get swapSlippageIncrease => '提高滑点';
 
   @override
@@ -12361,6 +12385,52 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get swapStatusRowLabel => '状态';
+
+  @override
+  String get swapSupportConfidentialRoute => '路由：保密';
+
+  @override
+  String get swapSupportCopyAction => '复制入金详情';
+
+  @override
+  String get swapSupportCopyFailed => '无法复制详情。请重试。';
+
+  @override
+  String swapSupportDetails(
+    String status,
+    String address,
+    String txHash,
+    String routeDetails,
+  ) {
+    return '请协助查询这笔交易及其退款状态。\n\n服务状态：$status\n入金地址：$address\n入金交易：$txHash\n$routeDetails';
+  }
+
+  @override
+  String get swapSupportDirectHelp => '如仍需帮助，请复制入金详情，粘贴到发往下方地址的邮件中。';
+
+  @override
+  String get swapSupportExpiredBody =>
+      '请在转出资金的钱包中查看交易。如果入金延迟到账，NEAR 可能会尝试将资金退回退款地址。';
+
+  @override
+  String get swapSupportExpiredPrompt => '已经入金？';
+
+  @override
+  String get swapSupportExpiredTitle => '查看入金';
+
+  @override
+  String swapSupportExplorer(String explorer) {
+    return '浏览器：$explorer';
+  }
+
+  @override
+  String get swapSupportFailedBody => '请查看交易详情中显示的退款地址。';
+
+  @override
+  String get swapSupportFailedPrompt => '还没收到退款？';
+
+  @override
+  String get swapSupportFailedTitle => '查看退款';
 
   @override
   String get swapSwitchDirection => '切换兑换方向';

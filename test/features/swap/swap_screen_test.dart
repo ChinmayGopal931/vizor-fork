@@ -920,6 +920,8 @@ void main() {
       );
 
       expect(timeoutRect.width, 340);
+      expect(find.byKey(const ValueKey('swap_support_prompt')), findsOneWidget);
+      expect(find.text('Restart swap').hitTestable(), findsOneWidget);
       expect(timeoutRect.center.dy, closeTo(detailRect.center.dy, 1));
 
       await tester.tap(find.text('Restart swap'));
@@ -1168,7 +1170,9 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('pay_slippage_button')),
-        matching: find.byType(SwapConfidentialIcon),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is SwapConfidentialIcon && widget.on,
+        ),
       ),
       findsNothing,
     );
@@ -2751,6 +2755,39 @@ void main() {
     expect(modalRect.left, greaterThan(sidebarItemRect.right));
     expect(modalRect.size, const Size(312, 440));
     expect(cameraRect.size, const Size(272, 220));
+  });
+
+  testWidgets('address scanner checks the selected chain', (tester) async {
+    await _setDesktopViewport(tester);
+
+    await tester.pumpWidget(
+      _routerHarness(
+        GoRouter(
+          initialLocation: '/swap',
+          routes: [_swapRoute(), _swapActivityRoute()],
+        ),
+        seedSwapActivityFixtures: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('swap_address_summary')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('swap_address_scan_button')));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final scanner = tester.widget<AddressQrScanModal>(
+      find.byType(AddressQrScanModal),
+    );
+    expect(
+      (await scanner.resolve('https://example.com/pay')).error,
+      testL10n.commonQrNoAddress,
+    );
+    expect(
+      (await scanner.resolve(
+        'zcash:t1HsdDMzmJfq4vc7T17XYjEkLMLvbgM1fCi',
+      )).error,
+      testL10n.addressScanWrongNetworkNamed('Zcash'),
+    );
   });
 
   testWidgets('address scan modal content matches camera state layouts', (
@@ -5042,9 +5079,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // The muted mark shows the setting exists; it turns crimson when on.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('swap_settings_button')),
+        matching: find.byType(SwapConfidentialIcon),
+      ),
+      findsOneWidget,
+    );
     final mark = find.descendant(
       of: find.byKey(const ValueKey('swap_settings_button')),
-      matching: find.byType(SwapConfidentialIcon),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is SwapConfidentialIcon && widget.on,
+      ),
     );
     expect(mark, findsNothing);
     await tester.tap(find.byKey(const ValueKey('swap_settings_button')));
@@ -5161,12 +5208,20 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('swap_settings_button')));
     await tester.pumpAndSettle();
 
-    final explainerTop = tester.getBottomLeft(find.text('Slippage')).dy;
+    final description = find.byKey(
+      const ValueKey('swap_slippage_description'),
+    );
+    final explainerTop = tester.getBottomLeft(description).dy;
     final customCardTop = tester
         .getTopLeft(find.byKey(const ValueKey('swap_slippage_custom_card')))
         .dy;
-    // Below the confidential setting, a 16dp gap sits between the Slippage
-    // heading and the presets.
+    // Below the confidential setting, the Slippage heading carries its
+    // explanation 4dp under it, then a 16dp gap before the presets.
+    expect(
+      tester.getTopLeft(description).dy -
+          tester.getBottomLeft(find.text('Slippage')).dy,
+      4,
+    );
     expect(customCardTop - explainerTop, 160);
     expect(
       tester.getSize(find.byKey(const ValueKey('swap_slippage_50bps'))).height,
@@ -7141,7 +7196,9 @@ void main() {
     expect(find.text('Refund to'), findsOneWidget);
     expect(find.text('Total fees'), findsNothing);
     expect(find.text('0.19 USDC'), findsNothing);
-    expect(find.text('No refund yet?'), findsNothing);
+    expect(find.byKey(const ValueKey('swap_support_prompt')), findsOneWidget);
+    expect(find.text('Copy deposit details'), findsNothing);
+    expect(find.text('No refund yet?'), findsOneWidget);
     final refundAddressRow = tester.widget<ReviewListRow>(
       find.byWidgetPredicate(
         (widget) => widget is ReviewListRow && widget.label == 'Refund to',

@@ -50,7 +50,6 @@ import '../../../../providers/rpc_endpoint_provider.dart';
 import '../../../../providers/sync_failure.dart';
 import '../../../../providers/sync_keep_awake_provider.dart';
 import '../../../../providers/sync_display_progress_provider.dart';
-import '../../../../providers/spendable_wait_provider.dart';
 import '../../../../providers/sync_provider.dart';
 import '../../../../providers/pending_activity_evidence_provider.dart';
 import '../../../../providers/zec_price_change_provider.dart';
@@ -80,7 +79,6 @@ import '../../../private_usd/widgets/mobile/private_usd_activity_rows.dart';
 import '../../../private_usd/widgets/mobile/private_usd_banner.dart';
 import '../../../private_usd/widgets/mobile/private_usd_home_strip.dart';
 import '../../../receive/widgets/mobile/receive_options_sheet.dart';
-import '../../../receive/screens/mobile/mobile_receive_request_screen.dart';
 import '../../../swap/models/swap_activity_navigation.dart';
 import '../../../swap/providers/swap_payout_discovery_provider.dart';
 import '../../../swap/widgets/swap_activity_status_auto_refresh.dart';
@@ -987,7 +985,6 @@ class _HomeContentState extends ConsumerState<_HomeContent>
       row: buildTransactionActivityRow(
         context: context,
         transaction: transaction,
-        spendableWaits: ref.watch(activeReceivedSpendableWaitsProvider),
         privateQueriesEnabled: ref.watch(enhancePirProvider),
         showPendingEstimate: !ref
             .watch(activityEtaExcludedTxidsProvider)
@@ -1029,8 +1026,6 @@ class _HomeContentState extends ConsumerState<_HomeContent>
     switch (option) {
       case ReceiveOption.receive:
         _pushUsedScreen('/receive');
-      case ReceiveOption.request:
-        await openActiveAccountReceiveRequest(context, ref);
       case ReceiveOption.redeemGiftCard:
         _pushUsedScreen('/payment-links?redeem=1');
     }

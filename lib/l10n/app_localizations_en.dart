@@ -503,11 +503,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Latest transaction status could not be refreshed.';
 
   @override
-  String activityReceiptSpendableAfter(String count) {
-    return 'New funds can be spent after $count confirmations.';
-  }
-
-  @override
   String get activityReceiptStatus => 'Status';
 
   @override
@@ -699,6 +694,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addressBookInvalidNear => 'Invalid NEAR address';
 
   @override
+  String addressBookInvalidNetworkAddress(String network) {
+    return 'Invalid $network address';
+  }
+
+  @override
   String get addressBookInvalidSolana => 'Invalid Solana address';
 
   @override
@@ -842,6 +842,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addressScanTitle => 'Scan the address QR code';
+
+  @override
+  String get addressScanWrongNetwork =>
+      'This QR code is for a different network.';
+
+  @override
+  String addressScanWrongNetworkNamed(String network) {
+    return 'This QR code is for $network.';
+  }
 
   @override
   String get addressScanZcashPrompt => 'Scan a Zcash QR code to continue';
@@ -2257,9 +2266,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeReceiveRedeemGiftCardSubtitle => 'Add a card someone sent you';
-
-  @override
-  String get homeReceiveRequestSubtitle => 'Ask for an exact amount';
 
   @override
   String get homeRecentActivity => 'Recent activity';
@@ -11511,11 +11517,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsExplorerUrlLabel => 'Explorer URL';
 
   @override
-  String get settingsFlipToHide => 'Flip to hide';
+  String get settingsFlipToHide => 'Flip phone to hide';
 
   @override
   String get settingsFlipToHideDescription =>
-      'Turn your phone screen-down to hide amounts on any screen. To show them again, flip it down and back up within 2 seconds.';
+      'Turn your phone face-down to hide amounts. To show them again, flip it face-down and back up within 2 seconds.';
 
   @override
   String get settingsFlipToHideUpdateFailed =>
@@ -12811,7 +12817,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get swapConfidentialSettingDescription =>
-      'Your deposit and payout can\'t be tracked to each other. Quotes can differ from the standard route.';
+      'Your deposit and payout can\'t be tracked to each other.';
 
   @override
   String get swapContactAlreadyInAddressBook => 'Already in your address book';
@@ -12852,6 +12858,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get swapDepositOneTimeAddress => 'One-time address';
+
+  @override
+  String get swapDepositRecoveryHelp => 'What if I deposit incorrectly?';
+
+  @override
+  String get swapDepositRecoveryIntro =>
+      'Sending the wrong token or using a different network may prevent your deposit from being credited.';
+
+  @override
+  String get swapDepositRecoveryPolicy =>
+      'NEAR Intents does not consider recovery requests for incorrect deposits worth less than \$300 at the time of transfer. For amounts of \$300 or more, NEAR Intents decides whether to help recover the funds on a case-by-case basis.';
+
+  @override
+  String get swapDepositRecoveryTitle => 'Incorrect deposits';
 
   @override
   String swapDepositSendOnly(String symbol, String chain) {
@@ -13347,6 +13367,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get swapSlippageDecrease => 'Decrease slippage';
 
   @override
+  String get swapSlippageDescriptionPay =>
+      'Allows this much extra ZEC for quote movement before execution fails. Network fees are separate.';
+
+  @override
+  String get swapSlippageDescriptionSwap =>
+      'Sets the maximum rate change you\'ll accept. Network fees are separate.';
+
+  @override
   String get swapSlippageIncrease => 'Increase slippage';
 
   @override
@@ -13374,6 +13402,54 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get swapStatusRowLabel => 'Status';
+
+  @override
+  String get swapSupportConfidentialRoute => 'Route: Confidential';
+
+  @override
+  String get swapSupportCopyAction => 'Copy deposit details';
+
+  @override
+  String get swapSupportCopyFailed => 'Couldn’t copy the details. Try again.';
+
+  @override
+  String swapSupportDetails(
+    String status,
+    String address,
+    String txHash,
+    String routeDetails,
+  ) {
+    return 'Could you check this transaction and its refund status?\n\nProvider status: $status\nDeposit address: $address\nDeposit transaction: $txHash\n$routeDetails';
+  }
+
+  @override
+  String get swapSupportDirectHelp =>
+      'If you still need help, copy the deposit details and paste them into an email to the address below.';
+
+  @override
+  String get swapSupportExpiredBody =>
+      'Check the transaction in the wallet you sent from. If your deposit arrived late, NEAR may try to refund it to your refund address.';
+
+  @override
+  String get swapSupportExpiredPrompt => 'Sent a deposit?';
+
+  @override
+  String get swapSupportExpiredTitle => 'Check your deposit';
+
+  @override
+  String swapSupportExplorer(String explorer) {
+    return 'Explorer: $explorer';
+  }
+
+  @override
+  String get swapSupportFailedBody =>
+      'Check the refund address in your transaction details.';
+
+  @override
+  String get swapSupportFailedPrompt => 'No refund yet?';
+
+  @override
+  String get swapSupportFailedTitle => 'Check your refund';
 
   @override
   String get swapSwitchDirection => 'Switch swap direction';

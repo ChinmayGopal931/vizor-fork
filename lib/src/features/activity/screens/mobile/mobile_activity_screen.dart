@@ -19,7 +19,6 @@ import '../../../../providers/account_provider.dart';
 import '../../../../providers/enhance_pir_provider.dart';
 import '../../../../providers/privacy_mode_provider.dart';
 import '../../../../providers/rpc_endpoint_provider.dart';
-import '../../../../providers/spendable_wait_provider.dart';
 import '../../../../providers/sync_provider.dart';
 import '../../../../providers/pending_activity_evidence_provider.dart';
 import '../../../../rust/api/sync.dart' as rust_sync;
@@ -253,7 +252,6 @@ class _MobileActivityScreenState extends ConsumerState<MobileActivityScreen>
       row: buildTransactionActivityRow(
         context: context,
         transaction: transaction,
-        spendableWaits: ref.watch(activeReceivedSpendableWaitsProvider),
         privateQueriesEnabled: ref.watch(enhancePirProvider),
         showPendingEstimate: !ref
             .watch(activityEtaExcludedTxidsProvider)

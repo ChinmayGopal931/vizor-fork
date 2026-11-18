@@ -74,7 +74,7 @@ class AppBootstrapState {
     this.portfolioChartRange,
     this.enhancePirEnabled = false,
     this.railgunHostSupported = false,
-    this.flipToHideBalanceEnabled = true,
+    this.flipToHideBalanceEnabled = false,
     this.hideBalanceOnUnlockEnabled = false,
     this.nearSwapPrivacyEnabled = false,
     this.failureKind,
@@ -102,8 +102,8 @@ class AppBootstrapState {
   final bool portfolioChartMarketPrices;
   final String? portfolioChartRange;
 
-  /// Whether turning the phone screen-down hides amounts (mobile). On unless
-  /// turned off in Settings.
+  /// Whether turning the phone screen-down hides amounts (mobile). Off unless
+  /// turned on in Settings.
   final bool flipToHideBalanceEnabled;
 
   /// The saved private queries setting, or `null` when it could not be read.
@@ -349,10 +349,10 @@ Future<AppBootstrapState> loadAppBootstrap({
     final railgunHostSupported = kPrivateUsdBuildEnabled
         ? await queryRailgunHostSupported()
         : false;
-    final flipToHideBalanceDisabled = await _readPlainBool(
+    final flipToHideBalanceEnabled = await _readPlainBool(
       storage,
-      key: kFlipToHideBalanceDisabledKey,
-      label: 'flip to hide disabled flag', // l10n-ignore: log label
+      key: kFlipToHideBalanceEnabledKey,
+      label: 'flip to hide enabled flag', // l10n-ignore: log label
     );
     final nearSwapPrivacyEnabled = await readNearSwapPrivacyPreference();
     var isPasswordConfigured = await storage.isPasswordConfigured();
@@ -561,7 +561,7 @@ Future<AppBootstrapState> loadAppBootstrap({
       portfolioChartRange: portfolioChart.range,
       enhancePirEnabled: enhancePirEnabled,
       railgunHostSupported: railgunHostSupported,
-      flipToHideBalanceEnabled: !flipToHideBalanceDisabled,
+      flipToHideBalanceEnabled: flipToHideBalanceEnabled,
       nearSwapPrivacyEnabled: nearSwapPrivacyEnabled,
       isPasswordConfigured: isPasswordConfigured,
       isUnlocked: isUnlocked,

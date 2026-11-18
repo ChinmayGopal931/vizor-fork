@@ -939,12 +939,6 @@ abstract class AppLocalizations {
   /// **'Latest transaction status could not be refreshed.'**
   String get activityReceiptRefreshFailed;
 
-  /// Caption under the detail card of a received transaction that cannot be spent yet.
-  ///
-  /// In en, this message translates to:
-  /// **'New funds can be spent after {count} confirmations.'**
-  String activityReceiptSpendableAfter(String count);
-
   /// Label of a row on a transaction receipt: the transaction status.
   ///
   /// In en, this message translates to:
@@ -1293,6 +1287,12 @@ abstract class AppLocalizations {
   /// **'Invalid NEAR address'**
   String get addressBookInvalidNear;
 
+  /// Error under an address field when the text is not a valid mainnet address for the named chain. Used for chains without a wording of their own (Litecoin, Dogecoin, Dash, Bitcoin Cash, TON, Cardano).
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid {network} address'**
+  String addressBookInvalidNetworkAddress(String network);
+
   /// Error under an address field when the text is not a valid Solana address.
   ///
   /// In en, this message translates to:
@@ -1449,7 +1449,7 @@ abstract class AppLocalizations {
   /// **'Scan address QR'**
   String get addressBookScanAddressQr;
 
-  /// Title of the camera scanner that reads a contact address. {network} is the chain name such as Ethereum.
+  /// Title of the camera scanner that reads a contact address, and caption under the mobile Swap scanner. {network} is the chain name such as Ethereum.
   ///
   /// In en, this message translates to:
   /// **'Scan {network} QR code'**
@@ -1544,6 +1544,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Scan the address QR code'**
   String get addressScanTitle;
+
+  /// Error under the QR scanner when the scanned code is for another chain than the address field it was opened from, and that chain cannot be named, for example an Ethereum payment request without a chain scanned for a Bitcoin address.
+  ///
+  /// In en, this message translates to:
+  /// **'This QR code is for a different network.'**
+  String get addressScanWrongNetwork;
+
+  /// Error under the QR scanner when the scanned code names a different chain than the address field it was opened from, for example a Base payment request scanned for an Ethereum address. {network} is the chain the code is for, such as Base, so the user can pick that chain instead.
+  ///
+  /// In en, this message translates to:
+  /// **'This QR code is for {network}.'**
+  String addressScanWrongNetworkNamed(String network);
 
   /// Caption under the viewfinder of the mobile QR scanner.
   ///
@@ -3907,12 +3919,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add a card someone sent you'**
   String get homeReceiveRedeemGiftCardSubtitle;
-
-  /// Description under Request ZEC in the mobile Home Receive sheet, whose card opens the payment request sheet.
-  ///
-  /// In en, this message translates to:
-  /// **'Ask for an exact amount'**
-  String get homeReceiveRequestSubtitle;
 
   /// Heading above the recent transactions list on Home.
   ///
@@ -17090,7 +17096,7 @@ abstract class AppLocalizations {
   /// **'Share transparent address'**
   String get receiveShareTransparentAddress;
 
-  /// Summary line of the inline Receive error when the shielded address could not be read; a technical details line follows. Also a toast when Request ZEC is picked in the mobile Home Receive sheet and the address could not be read.
+  /// Summary line of the inline Receive error when the shielded address could not be read; a technical details line follows.
   ///
   /// In en, this message translates to:
   /// **'Couldn’t load your shielded address. Try again in a moment.'**
@@ -18731,13 +18737,13 @@ abstract class AppLocalizations {
   /// Label of the mobile Settings switch that lets turning the phone screen-down hide amounts.
   ///
   /// In en, this message translates to:
-  /// **'Flip to hide'**
+  /// **'Flip phone to hide'**
   String get settingsFlipToHide;
 
   /// Explanation under the mobile Settings flip to hide switch.
   ///
   /// In en, this message translates to:
-  /// **'Turn your phone screen-down to hide amounts on any screen. To show them again, flip it down and back up within 2 seconds.'**
+  /// **'Turn your phone face-down to hide amounts. To show them again, flip it face-down and back up within 2 seconds.'**
   String get settingsFlipToHideDescription;
 
   /// Toast when the mobile Settings flip to hide switch could not be saved.
@@ -20877,7 +20883,7 @@ abstract class AppLocalizations {
   /// Description under the Confidential toggle in the swap and Pay settings modal.
   ///
   /// In en, this message translates to:
-  /// **'Your deposit and payout can\'t be tracked to each other. Quotes can differ from the standard route.'**
+  /// **'Your deposit and payout can\'t be tracked to each other.'**
   String get swapConfidentialSettingDescription;
 
   /// Toast on mobile after the user tries to save a swap address that is already in the address book.
@@ -20951,6 +20957,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'One-time address'**
   String get swapDepositOneTimeAddress;
+
+  /// [security] Deposit screen button that opens the incorrect deposit help.
+  ///
+  /// In en, this message translates to:
+  /// **'What if I deposit incorrectly?'**
+  String get swapDepositRecoveryHelp;
+
+  /// [security] Explanation of what can happen when a deposit uses the wrong token or network.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending the wrong token or using a different network may prevent your deposit from being credited.'**
+  String get swapDepositRecoveryIntro;
+
+  /// [security] NEAR Intents policy for manual recovery of incorrectly sent deposits, not automatic swap refunds.
+  ///
+  /// In en, this message translates to:
+  /// **'NEAR Intents does not consider recovery requests for incorrect deposits worth less than \$300 at the time of transfer. For amounts of \$300 or more, NEAR Intents decides whether to help recover the funds on a case-by-case basis.'**
+  String get swapDepositRecoveryPolicy;
+
+  /// [security] Title of the incorrect deposit help dialog or sheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect deposits'**
+  String get swapDepositRecoveryTitle;
 
   /// [security] Warning under the deposit address telling the user to send only this asset on this chain, otherwise funds may be lost; {symbol} is the ticker and {chain} the chain name.
   ///
@@ -21762,6 +21792,18 @@ abstract class AppLocalizations {
   /// **'Decrease slippage'**
   String get swapSlippageDecrease;
 
+  /// Explanation under the Slippage heading in the Pay settings modal: extra ZEC allowed when the quote moves.
+  ///
+  /// In en, this message translates to:
+  /// **'Allows this much extra ZEC for quote movement before execution fails. Network fees are separate.'**
+  String get swapSlippageDescriptionPay;
+
+  /// Explanation under the Slippage heading in the swap settings modal: maximum rate change accepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Sets the maximum rate change you\'ll accept. Network fees are separate.'**
+  String get swapSlippageDescriptionSwap;
+
   /// Screen-reader label of the plus button in the mobile slippage stepper.
   ///
   /// In en, this message translates to:
@@ -21815,6 +21857,83 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Status'**
   String get swapStatusRowLabel;
+
+  /// Line that identifies the confidential route in copied support details.
+  ///
+  /// In en, this message translates to:
+  /// **'Route: Confidential'**
+  String get swapSupportConfidentialRoute;
+
+  /// Button that copies swap support details to paste into an email.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy deposit details'**
+  String get swapSupportCopyAction;
+
+  /// Persistent inline message when copying support details fails.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t copy the details. Try again.'**
+  String get swapSupportCopyFailed;
+
+  /// Text copied for a support email. The final line is the explorer link or the confidential route label. Wallet secrets and amounts are excluded.
+  ///
+  /// In en, this message translates to:
+  /// **'Could you check this transaction and its refund status?\n\nProvider status: {status}\nDeposit address: {address}\nDeposit transaction: {txHash}\n{routeDetails}'**
+  String swapSupportDetails(
+    String status,
+    String address,
+    String txHash,
+    String routeDetails,
+  );
+
+  /// Instructions for copying deposit details into a support email the user writes.
+  ///
+  /// In en, this message translates to:
+  /// **'If you still need help, copy the deposit details and paste them into an email to the address below.'**
+  String get swapSupportDirectHelp;
+
+  /// Existing swap refund-policy design: ExpiredBody text in the failed or expired deposit support flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the transaction in the wallet you sent from. If your deposit arrived late, NEAR may try to refund it to your refund address.'**
+  String get swapSupportExpiredBody;
+
+  /// Existing swap refund-policy design: ExpiredPrompt text in the failed or expired deposit support flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent a deposit?'**
+  String get swapSupportExpiredPrompt;
+
+  /// Existing swap refund-policy design: ExpiredTitle text in the failed or expired deposit support flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Check your deposit'**
+  String get swapSupportExpiredTitle;
+
+  /// Line with the explorer URL or its unknown value in copied support details for a standard swap.
+  ///
+  /// In en, this message translates to:
+  /// **'Explorer: {explorer}'**
+  String swapSupportExplorer(String explorer);
+
+  /// Existing swap refund-policy design: FailedBody text in the failed or expired deposit support flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the refund address in your transaction details.'**
+  String get swapSupportFailedBody;
+
+  /// Existing swap refund-policy design: FailedPrompt text in the failed or expired deposit support flow.
+  ///
+  /// In en, this message translates to:
+  /// **'No refund yet?'**
+  String get swapSupportFailedPrompt;
+
+  /// Existing swap refund-policy design: FailedTitle text in the failed or expired deposit support flow.
+  ///
+  /// In en, this message translates to:
+  /// **'Check your refund'**
+  String get swapSupportFailedTitle;
 
   /// Accessibility label of the round button between the pay and receive cards on the mobile Swap screen. Tapping it swaps which asset you pay and which you receive.
   ///

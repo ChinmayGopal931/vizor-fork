@@ -37,8 +37,9 @@ const kSyncKeepAwakePromptSeenKey = 'zcash_sync_keep_awake_prompt_seen';
 const kPortfolioChartEnabledKey = 'zcash_portfolio_chart_enabled';
 const kPortfolioChartMarketPricesKey = 'zcash_portfolio_chart_market_prices';
 const kPortfolioChartRangeKey = 'zcash_portfolio_chart_range';
-/// Flip to hide, saved as its off flag: a missing value reads as on.
-const kFlipToHideBalanceDisabledKey = 'zcash_flip_to_hide_balance_disabled';
+
+/// Flip to hide is off unless explicitly enabled in Settings.
+const kFlipToHideBalanceEnabledKey = 'zcash_flip_to_hide_balance_enabled';
 const kRpcEndpointUrlKey = 'zcash_rpc_endpoint_url';
 const kRpcEndpointPresetKey = 'zcash_rpc_endpoint_preset';
 const kPaymentLinkRecoveryStorageKey = 'zcash_gift_card_recovery_v1';
